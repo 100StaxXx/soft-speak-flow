@@ -166,7 +166,7 @@ describe("getMentorInstructionLines", () => {
     );
     expect(getMentorInstructionLines("create_quest", "select_time")[0]).toContain("Pick a time");
     expect(getMentorInstructionLines("create_quest", "submit_create_quest")[0]).toContain("Tap Add Quest");
-    expect(getMentorInstructionLines("morning_checkin", null)[0]).toContain("Open Mentor");
+    expect(getMentorInstructionLines("morning_checkin", null)[0]).toContain("Open Guide");
     expect(getMentorInstructionLines("companion_tab_intro", null)[0]).toContain("Companion Tab");
     expect(getMentorInstructionLines("evolve_companion", null)[0]).toContain("Tap Evolve to ascend");
     expect(getMentorInstructionLines("post_evolution_companion_intro", null)[0]).toContain(
@@ -610,7 +610,7 @@ describe("guided tutorial intro dialogue sequence", () => {
 
     await waitFor(() => {
       expect(result.current.currentStep).toBe("morning_checkin");
-      expect(result.current.dialogueText).toBe("Open Mentor.");
+      expect(result.current.dialogueText).toBe("Open Guide.");
       expect(result.current.dialogueSupportText).toBeUndefined();
     });
   });

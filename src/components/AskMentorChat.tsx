@@ -278,7 +278,7 @@ export const AskMentorChat = ({
       {!isOnline && (
         <div className="bg-destructive text-destructive-foreground px-4 py-2 text-sm flex items-center justify-center gap-2">
           <WifiOff className="h-4 w-4" />
-          <span>You're offline. Live mentor replies are unavailable; fallback guidance is shown.</span>
+          <span>You're offline. Live guide replies are unavailable; fallback guidance is shown.</span>
         </div>
       )}
       

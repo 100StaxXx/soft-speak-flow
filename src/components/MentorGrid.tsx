@@ -82,7 +82,7 @@ export const MentorGrid = ({ mentors, onSelectMentor, currentMentorId, recommend
             onClick={handleBack}
             className="absolute left-8 z-50 flex items-center justify-center w-12 h-12 text-pure-white hover:text-royal-gold transition-colors group cursor-pointer"
             style={{ top: topControlOffset }}
-            aria-label="Back to mentor grid"
+            aria-label="Back to guide grid"
           >
             <ArrowLeft className="h-6 w-6 group-hover:-translate-x-1 transition-transform" />
           </button>
@@ -94,7 +94,7 @@ export const MentorGrid = ({ mentors, onSelectMentor, currentMentorId, recommend
               style={{ top: topControlOffset }}
             >
               <Check className="h-4 w-4 text-royal-gold" />
-              <span className="text-royal-gold font-bold text-sm">Current Mentor</span>
+              <span className="text-royal-gold font-bold text-sm">Current Guide</span>
             </div>
           )}
 

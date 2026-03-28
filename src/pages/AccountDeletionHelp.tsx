@@ -24,7 +24,7 @@ const deletionSteps = [
 
 const dataTypes = [
   "Profile + onboarding answers",
-  "Mentor chat history and nudges",
+  "Guide chat history and nudges",
   "Companion evolutions, postcards, and XP events",
   "Quests, epics, and streak progress",
   "Referral codes, payouts, and applied tags",

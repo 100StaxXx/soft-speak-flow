@@ -52,7 +52,7 @@ const HelpCenter = () => {
       items: [
         {
           title: "What is Cosmiq?",
-          content: "Cosmiq is your personal growth companion app that combines mentorship, habit tracking, and a gamified companion system. Your journey is guided by mentors who provide personalized wisdom, while your companion evolves as you complete daily quests and build positive habits. Think of it as having a wise mentor and a loyal sidekick helping you become your best self."
+          content: "Cosmiq is your personal growth companion app that combines guidance, habit tracking, and a gamified companion system. Your journey is shaped by guides who provide personalized wisdom, while your companion evolves as you complete daily quests and build positive habits. Think of it as having a wise guide and a loyal sidekick helping you become your best self."
         },
         {
           title: "How does my Companion work?",
@@ -60,7 +60,7 @@ const HelpCenter = () => {
         },
         {
           title: "Understanding XP & Evolution",
-          content: "XP (Experience Points) is earned by completing quests, habits, and interacting with your mentor. Your companion needs specific XP thresholds to evolve to each new stage. Streak multipliers boost repeatable effort events (quests, habits, focus sessions): 7+ days = 1.25x, 30+ = 1.5x, 60+ = 1.75x. Completing your Main Quest each day gives a 1.5x quest bonus."
+          content: "XP (Experience Points) is earned by completing quests, habits, and interacting with your guide. Your companion needs specific XP thresholds to evolve to each new stage. Streak multipliers boost repeatable effort events (quests, habits, focus sessions): 7+ days = 1.25x, 30+ = 1.5x, 60+ = 1.75x. Completing your Main Quest each day gives a 1.5x quest bonus."
         },
         {
           title: "What are Factions?",
@@ -80,7 +80,7 @@ const HelpCenter = () => {
         },
         {
           title: "Earning XP",
-          content: "Gain XP through: completing daily quests (Easy 12, Medium 16, Hard 22 before modifiers), maintaining habits (Easy 10, Medium 14, Hard 20), focus sessions, milestones, and mentor activities. Completing your Main Quest applies a 1.5x quest multiplier. Consistency is key—daily engagement compounds your growth."
+          content: "Gain XP through: completing daily quests (Easy 12, Medium 16, Hard 22 before modifiers), maintaining habits (Easy 10, Medium 14, Hard 20), focus sessions, milestones, and guide activities. Completing your Main Quest applies a 1.5x quest multiplier. Consistency is key—daily engagement compounds your growth."
         },
         {
           title: "Companion Skins",
@@ -92,7 +92,7 @@ const HelpCenter = () => {
         },
         {
           title: "Resetting Your Companion",
-          content: "Want to start fresh? You can reset your companion in Command Center. This creates a new companion from scratch, but your account progress (mentors, settings) remains. Use this if you want to experience a different companion species or start the evolution journey again."
+          content: "Want to start fresh? You can reset your companion in Command Center. This creates a new companion from scratch, but your account progress (guides, settings) remains. Use this if you want to experience a different companion species or start the evolution journey again."
         }
       ]
     },
@@ -174,29 +174,29 @@ const HelpCenter = () => {
     },
     {
       id: "mentors",
-      title: "Mentors",
+      title: "Guides",
       icon: MessageCircle,
       color: "text-blue-400",
       items: [
         {
-          title: "Choosing a Mentor",
-          content: "Cosmiq offers multiple mentors, each with unique personalities and wisdom styles. From stoic philosophers to motivational coaches, find a mentor whose voice resonates with you. Browse all mentors in Command Center or retake the mentor quiz for a new recommendation."
+          title: "Choosing a Guide",
+          content: "Cosmiq offers multiple guides, each with unique personalities and wisdom styles. From stoic philosophers to motivational coaches, find a guide whose voice resonates with you. Browse all guides in Command Center or retake the guide quiz for a new recommendation."
         },
         {
-          title: "Mentor Chat",
-          content: "Have conversations with your mentor anytime. Ask for advice, share your struggles, or seek wisdom. Your mentor responds in their unique voice and remembers your context. Access chat from the Mentor tab or Quick Chat prompts."
+          title: "Guide Chat",
+          content: "Have conversations with your guide anytime. Ask for advice, share your struggles, or seek wisdom. Your guide responds in their unique voice and remembers your context. Access chat from the Guide tab or Quick Chat prompts."
         },
         {
           title: "Quick Chat Prompts",
-          content: "Don't know what to ask? Use Quick Chat prompts—pre-written conversation starters covering common situations. Tap a prompt to instantly start a focused conversation with your mentor. Find prompts on the Mentor page."
+          content: "Don't know what to ask? Use Quick Chat prompts—pre-written conversation starters covering common situations. Tap a prompt to instantly start a focused conversation with your guide. Find prompts on the Guide page."
         },
         {
           title: "Daily Nudges",
-          content: "Receive personalized push notifications from your mentor throughout the day. These contextual messages offer encouragement, reminders, and wisdom based on your activity. Configure nudge frequency and timing in Command Center notifications."
+          content: "Receive personalized push notifications from your guide throughout the day. These contextual messages offer encouragement, reminders, and wisdom based on your activity. Configure nudge frequency and timing in Command Center notifications."
         },
         {
-          title: "Switching Mentors",
-          content: "Change your mentor anytime in Command Center. Your conversation history and progress are preserved—only the mentor's voice and personality change. Experiment to find the mentor that best supports your current needs."
+          title: "Switching Guides",
+          content: "Change your guide anytime in Command Center. Your conversation history and progress are preserved - only the guide's voice and personality change. Experiment to find the guide that best supports your current needs."
         }
       ]
     },
@@ -284,11 +284,11 @@ const HelpCenter = () => {
         },
         {
           title: "Downloads",
-          content: "Some content can be downloaded for offline access. Downloaded items appear in your Library and remain available without internet connection. Perfect for accessing mentor wisdom on the go."
+          content: "Some content can be downloaded for offline access. Downloaded items appear in your Library and remain available without internet connection. Perfect for accessing guide wisdom on the go."
         },
         {
           title: "Weekly Recaps",
-          content: "Every week, Cosmiq prepares a recap of your activity—quests completed, habits maintained, XP earned, and companion progress. Recaps include mentor reflections on your week and encouragement for the week ahead."
+          content: "Every week, Cosmiq prepares a recap of your activity—quests completed, habits maintained, XP earned, and companion progress. Recaps include guide reflections on your week and encouragement for the week ahead."
         },
         {
           title: "Past Recaps",
@@ -304,7 +304,7 @@ const HelpCenter = () => {
       items: [
         {
           title: "Notification Settings",
-          content: "Configure push notifications in Command Center → Notifications. Set preferences for mentor nudges, daily quotes, habit reminders, and more. Choose your preferred time windows and frequency."
+          content: "Configure push notifications in Command Center → Notifications. Set preferences for guide nudges, daily quotes, habit reminders, and more. Choose your preferred time windows and frequency."
         },
         {
           title: "Sound Settings",
@@ -335,7 +335,7 @@ const HelpCenter = () => {
     },
     {
       icon: Heart,
-      title: "Chat with your mentor",
+      title: "Chat with your guide",
       description: "They remember your context and provide personalized guidance."
     },
     {
@@ -477,7 +477,7 @@ const HelpCenter = () => {
               >
                 <div className="flex items-center gap-2">
                   <MessageCircle className="h-4 w-4" />
-                  <span>Browse Mentors</span>
+                  <span>Browse Guides</span>
                 </div>
                 <ChevronRight className="h-4 w-4" />
               </Button>
@@ -522,7 +522,7 @@ const HelpCenter = () => {
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">
-                Can't find what you're looking for? Chat with your mentor for personalized guidance, 
+                Can't find what you're looking for? Chat with your guide for personalized guidance, 
                 or visit our support resources for additional assistance.
               </p>
               <Button
@@ -533,7 +533,7 @@ const HelpCenter = () => {
                 }}
               >
                 <MessageCircle className="h-4 w-4 mr-2" />
-                Chat with Your Mentor
+                Chat with Your Guide
               </Button>
               <Button
                 className="mt-2 w-full"

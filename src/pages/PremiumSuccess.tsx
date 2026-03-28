@@ -69,8 +69,8 @@ export default function PremiumSuccess() {
           <h3 className="font-semibold text-sm text-foreground mb-3">What you get:</h3>
           <div className="space-y-2 text-sm text-muted-foreground">
             <p>✓ Unlimited access to all content</p>
-            <p>✓ All mentors unlocked</p>
-            <p>✓ Unlimited mentor chat</p>
+            <p>✓ All guides unlocked</p>
+            <p>✓ Unlimited guide chat</p>
             <p>✓ Offline downloads</p>
             <p>✓ Priority support</p>
           </div>

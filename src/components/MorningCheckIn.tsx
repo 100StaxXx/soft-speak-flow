@@ -16,6 +16,7 @@ import { CheckInErrorFallback } from "@/components/ErrorFallback";
 import { logger } from "@/utils/logger";
 import { useLivingCompanionSafe } from "@/hooks/useLivingCompanion";
 import { loadMentorImage } from "@/utils/mentorImageLoader";
+import { setPendingMentorMood } from "@/utils/mentorMoodSignal";
 
 const MorningCheckInContent = () => {
   const { user } = useAuth();
@@ -103,6 +104,15 @@ const MorningCheckInContent = () => {
     },
   });
 
+  useEffect(() => {
+    if (existingCheckIn?.completed_at) {
+      setPendingMentorMood(null);
+      return;
+    }
+
+    setPendingMentorMood(mood || null);
+  }, [existingCheckIn?.completed_at, mood]);
+
   const submitCheckIn = async () => {
     if (!user || !mood || !intention.trim()) {
       toast({ title: "Please complete all fields", variant: "destructive" });
@@ -181,6 +191,7 @@ const MorningCheckInContent = () => {
       // Trigger astral encounter check
       window.dispatchEvent(new CustomEvent('quest-completed'));
       window.dispatchEvent(new CustomEvent('morning-checkin-completed'));
+      setPendingMentorMood(null);
 
       // Start polling timer (using ref to avoid stale closure)
       pollStartTimeRef.current = Date.now();

@@ -80,15 +80,15 @@ const TAG_TO_TEXT: Record<string, string> = {
   grounded: "grounded energy",
   spiritual: "spiritual guidance",
   intuition: "intuitive guidance",
-  feminine_preference: "feminine mentor energy",
-  masculine_preference: "masculine mentor energy",
+  feminine_preference: "feminine guide energy",
+  masculine_preference: "masculine guide energy",
 };
 
 export function generateMentorExplanation(
   mentor: Mentor,
   selectedAnswers: Record<string, string>
 ): MentorExplanation {
-  const title = `Your Mentor is: ${mentor.name}`;
+  const title = `Your Guide is: ${mentor.name}`;
   const subtitle = mentor.short_title;
 
   // Support current onboarding question IDs with backward compatibility for legacy keys.
@@ -134,7 +134,7 @@ export function generateMentorExplanation(
   }
 
   // Get bullets
-  const shortTitle = mentor.short_title || mentor.name || "mentor";
+  const shortTitle = mentor.short_title || mentor.name || "guide";
   const bullets = MENTOR_BULLETS[mentor.slug] || [
     `Guides you with ${shortTitle.toLowerCase()}`,
     `Matches your communication style`,

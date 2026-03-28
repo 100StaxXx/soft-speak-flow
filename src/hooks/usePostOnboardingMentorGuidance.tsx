@@ -216,7 +216,7 @@ const getMentorIntroDialogue = (mentorSlug: string | undefined, speakerName: str
     return INTRO_DIALOGUE_BY_MENTOR_SLUG[slug];
   }
 
-  if (speakerName && speakerName !== "Your mentor") {
+  if (speakerName && speakerName !== "Your guide") {
     return {
       text: `Hey, I'm ${speakerName}. I'm glad you're here.`,
       support: "I'll guide your first few taps so you can settle in quickly.",
@@ -224,7 +224,7 @@ const getMentorIntroDialogue = (mentorSlug: string | undefined, speakerName: str
   }
 
   return {
-    text: "Hey, I'm your mentor. I'm glad you're here.",
+    text: "Hey, I'm your guide. I'm glad you're here.",
     support: "I'll guide your first few taps so you can settle in quickly.",
   };
 };
@@ -553,7 +553,7 @@ const DEFAULT_GUIDANCE_STATE: PostOnboardingMentorGuidanceState = {
   canTemporarilyHide: false,
   dialogueText: "",
   dialogueSupportText: undefined,
-  speakerName: "Your mentor",
+  speakerName: "Your guide",
   speakerPrimaryColor: "#f59e0b",
   speakerSlug: undefined,
   speakerAvatarUrl: undefined,
@@ -592,7 +592,7 @@ export const getMentorInstructionLines = (
   }
 
   if (currentStep === "morning_checkin") {
-    return ["Open Mentor."];
+    return ["Open Guide."];
   }
 
   if (currentStep === "companion_tab_intro") {
@@ -658,11 +658,11 @@ const getMilestoneDialogue = (
       };
     case "open_mentor_tab":
       return {
-        text: "Open Mentor.",
+        text: "Open Guide.",
       };
     case "submit_morning_checkin":
       return {
-        text: "Welcome to your Mentor Tab. Receive a Pep Talk or talk to your Mentor to stay on track. Complete your check-in.",
+        text: "Welcome to your Guide tab. Receive a Pep Talk or talk to your Guide to stay on track. Complete your check-in.",
         support: "Keep it honest. Keep it simple.",
       };
     case "companion_tab_intro":
@@ -1575,7 +1575,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
 
   const dialogue = currentMilestone
     ? currentMilestone === "mentor_intro_hello"
-      ? getMentorIntroDialogue(personality?.slug, personality?.name ?? "Your mentor")
+      ? getMentorIntroDialogue(personality?.slug, personality?.name ?? "Your guide")
       : getMilestoneDialogue(currentMilestone, personality?.slug)
     : { text: "", support: undefined };
   const mentorInstructionLines = dialogue.support ? [dialogue.text, dialogue.support] : [dialogue.text];
@@ -1632,7 +1632,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     canTemporarilyHide: currentMilestone === "complete_companion_evolution",
     dialogueText: dialogue.text,
     dialogueSupportText,
-    speakerName: personality?.name ?? "Your mentor",
+    speakerName: personality?.name ?? "Your guide",
     speakerPrimaryColor: personality?.primary_color ?? "#f59e0b",
     speakerSlug: personality?.slug,
     speakerAvatarUrl: personality?.avatar_url,

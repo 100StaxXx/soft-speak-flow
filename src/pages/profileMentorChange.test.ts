@@ -29,6 +29,7 @@ describe("applyMentorChange", () => {
       timezone: "America/Los_Angeles",
       userId: "user-123",
       navigate,
+      destinationPath: "/mentor",
     });
 
     expect(from).toHaveBeenCalledWith("profiles");
@@ -48,6 +49,7 @@ describe("applyMentorChange", () => {
     expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ["mentor-personality"] });
     expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ["mentor"] });
     expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ["selected-mentor"] });
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ["morning-check-in"] });
     expect(navigate).toHaveBeenCalledWith("/mentor", { replace: true });
   });
 });

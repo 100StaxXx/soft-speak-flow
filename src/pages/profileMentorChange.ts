@@ -8,7 +8,8 @@ type ProfileMentorChangeOptions = {
   supabaseClient: SupabaseClient;
   timezone: string;
   userId: string;
-  navigate: (to: string, options?: { replace?: boolean }) => void;
+  navigate?: (to: string, options?: { replace?: boolean }) => void;
+  destinationPath?: string | null;
 };
 
 export async function applyMentorChange({
@@ -19,6 +20,7 @@ export async function applyMentorChange({
   timezone,
   userId,
   navigate,
+  destinationPath,
 }: ProfileMentorChangeOptions): Promise<void> {
   const { error } = await supabaseClient
     .from("profiles")
@@ -41,7 +43,10 @@ export async function applyMentorChange({
     queryClient.invalidateQueries({ queryKey: ["mentor-personality"] }),
     queryClient.invalidateQueries({ queryKey: ["mentor"] }),
     queryClient.invalidateQueries({ queryKey: ["selected-mentor"] }),
+    queryClient.invalidateQueries({ queryKey: ["morning-check-in"] }),
   ]);
 
-  navigate("/mentor", { replace: true });
+  if (navigate && destinationPath) {
+    navigate(destinationPath, { replace: true });
+  }
 }

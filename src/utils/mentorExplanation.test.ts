@@ -21,7 +21,7 @@ describe("generateMentorExplanation", () => {
 
     expect(result.paragraph).toContain("You're focused on building discipline");
     expect(result.paragraph).toContain("prefer supportive growth");
-    expect(result.paragraph).toContain("asked for masculine mentor energy");
+    expect(result.paragraph).toContain("asked for masculine guide energy");
   });
 
   it("keeps backward compatibility with legacy keys", () => {

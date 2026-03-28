@@ -24,7 +24,7 @@ export const ATTRIBUTE_DESCRIPTIONS = {
       "Reading books and articles",
       "Studying and taking courses",
       "Learning new skills",
-      "Mentor interactions and guidance",
+      "Guide interactions and guidance",
       "Reflection and journaling"
     ],
     whenGrows: "You gain insight and understanding. Your mind sharpens and hidden patterns become clear."

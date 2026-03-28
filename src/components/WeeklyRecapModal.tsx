@@ -144,7 +144,7 @@ export const WeeklyRecapModal = () => {
                 </div>
                 <div>
                   <h2 className="font-semibold text-lg text-foreground">
-                    {mentor?.name || "Your Mentor"} Reflects
+                    {mentor?.name || "Your Guide"} Reflects
                   </h2>
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Calendar className="h-3.5 w-3.5" />

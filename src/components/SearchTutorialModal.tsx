@@ -9,7 +9,7 @@ interface SearchTutorialModalProps {
 const features = [
   { icon: FileSearch, text: "Search for quests, quotes, and pep talks" },
   { icon: Quote, text: "Browse featured quotes for daily inspiration" },
-  { icon: Mic, text: "Discover pep talks from your mentor" },
+  { icon: Mic, text: "Discover pep talks from your guide" },
 ];
 
 export function SearchTutorialModal({ open, onClose }: SearchTutorialModalProps) {

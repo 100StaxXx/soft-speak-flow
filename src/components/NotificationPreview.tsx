@@ -14,7 +14,7 @@ const exampleNotifications: NotificationExample[] = [
   {
     icon: Sparkles,
     title: "Daily Pep Talk",
-    message: "Your mentor has a new message: 'Remember, you're capable of more than you think.'",
+    message: "Your guide has a new message: 'Remember, you're capable of more than you think.'",
     time: "8:00 AM",
     color: "text-purple-400"
   },
@@ -86,7 +86,7 @@ export const NotificationPreview = memo(() => {
 
       <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
         <p className="text-xs text-muted-foreground leading-relaxed">
-          <span className="text-primary font-semibold">💡 Tip:</span> Notifications are personalized to your mentor's style and your goals. You can adjust timing and frequency in settings anytime.
+          <span className="text-primary font-semibold">💡 Tip:</span> Notifications are personalized to your guide's style and your goals. You can adjust timing and frequency in settings anytime.
         </p>
       </div>
     </div>

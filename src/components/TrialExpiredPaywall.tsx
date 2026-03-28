@@ -232,7 +232,7 @@ export const TrialExpiredPaywall = ({ variant = "pre_trial_signup" }: TrialExpir
         <div className="space-y-3 py-2">
           {[
             { icon: Sparkles, text: "All 21 evolution stages" },
-            { icon: MessageCircle, text: "Unlimited mentor chat" },
+            { icon: MessageCircle, text: "Unlimited guide chat" },
             { icon: Lock, text: "Unlimited Quests & Epics" },
             { icon: Crown, text: "All premium features" },
           ].map((feature, idx) => (

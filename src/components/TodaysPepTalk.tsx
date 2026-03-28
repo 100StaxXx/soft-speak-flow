@@ -281,7 +281,7 @@ export const TodaysPepTalk = memo(() => {
   // Handle user-triggered pep talk generation
   const handleGeneratePepTalk = async () => {
     if (!mentorSlug) {
-      toast.error("No mentor selected");
+      toast.error("No guide selected");
       return;
     }
 

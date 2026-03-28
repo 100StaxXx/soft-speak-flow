@@ -33,7 +33,7 @@ export const MentorResult = ({
   onConfirm,
   onSeeAll,
   isConfirming = false,
-  seeAllLabel = "See All Mentors",
+  seeAllLabel = "See All Guides",
 }: MentorResultProps) => {
   return (
     <div className="min-h-screen flex items-center justify-center px-6 pt-safe pb-safe-lg relative z-10">
@@ -42,7 +42,7 @@ export const MentorResult = ({
         <div className="text-center space-y-4">
           <div className="h-1 w-24 bg-royal-purple mx-auto animate-scale-in" />
           <h1 className="text-4xl md:text-5xl font-black text-pure-white uppercase tracking-tight">
-            We've Found Your Mentor
+            We've Found Your Guide
           </h1>
         </div>
 
@@ -112,7 +112,7 @@ export const MentorResult = ({
               ) : (
                 <>
                   <Check className="mr-2 h-5 w-5" />
-                  Choose {mentor.name} as My Mentor
+                  Choose {mentor.name} as My Guide
                 </>
               )}
             </Button>

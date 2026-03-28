@@ -24,7 +24,7 @@ const Welcome = () => {
   }, [user, loading, navigate]);
 
   const features = [
-    { icon: Star, text: "Personal Mentors", delay: 0.1 },
+    { icon: Star, text: "Personal Guides", delay: 0.1 },
     { icon: Zap, text: "Daily Quests & XP", delay: 0.2 },
     { icon: Heart, text: "Evolving Companion", delay: 0.3 },
   ];
@@ -74,7 +74,7 @@ const Welcome = () => {
           transition={{ delay: prefersReducedMotion ? 0 : 0.08, duration: prefersReducedMotion ? 0 : 0.24 }}
           className="text-lg text-muted-foreground mb-8 px-2 md:max-w-md"
         >
-          Transform your daily habits into an epic adventure with mentors and a companion that grows with you
+          Transform your daily habits into an epic adventure with guides and a companion that grows with you
         </motion.p>
 
         {/* Feature Pills */}

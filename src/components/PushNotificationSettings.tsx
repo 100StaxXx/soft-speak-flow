@@ -276,7 +276,7 @@ export const PushNotificationSettings = memo(() => {
             <div>
               <Label className="text-foreground font-medium">Daily Pep Talk</Label>
               <p className="text-xs text-muted-foreground mt-1">
-                Personalized motivation from your mentor
+                Personalized motivation from your guide
               </p>
             </div>
             <Switch

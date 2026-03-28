@@ -133,10 +133,6 @@ const loadCompanionStoryJournal = () =>
   import("@/components/CompanionStoryJournal").then((module) => ({
     default: module.CompanionStoryJournal,
   }));
-const loadCompanionPostcards = () =>
-  import("@/components/companion/CompanionPostcards").then((module) => ({
-    default: module.CompanionPostcards,
-  }));
 
 const LazyCompanionStoryJournal = lazy(loadCompanionStoryJournal);
 
@@ -259,7 +255,7 @@ const Companion = () => {
     if (!isTabActive) {
       return Promise.resolve([]);
     }
-    const tasks: Promise<unknown>[] = [loadCompanionPostcards()];
+    const tasks: Promise<unknown>[] = [];
 
     if (user?.id) {
       tasks.push(

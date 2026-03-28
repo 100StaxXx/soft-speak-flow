@@ -51,7 +51,7 @@ export default function TermsOfService() {
                 2. Description of Service
               </h2>
               <p className="text-muted-foreground leading-relaxed">
-                Soft Speak Flow is a personal development platform that provides habit tracking, personalized mentorship, motivational content, companion evolution features, and guidance to help users achieve their goals.
+                Soft Speak Flow is a personal development platform that provides habit tracking, personalized guidance, motivational content, companion evolution features, and tools to help users achieve their goals.
               </p>
             </section>
 
@@ -96,7 +96,7 @@ export default function TermsOfService() {
                 7. Personalized Content
               </h2>
               <p className="text-muted-foreground leading-relaxed">
-                Our service creates personalized content, mentor responses, and companion interactions tailored to your journey. This content is provided for informational and motivational purposes only. While we strive for accuracy and helpfulness, personalized content may not always be perfect or applicable to your specific situation.
+                Our service creates personalized content, guide responses, and companion interactions tailored to your journey. This content is provided for informational and motivational purposes only. While we strive for accuracy and helpfulness, personalized content may not always be perfect or applicable to your specific situation.
               </p>
             </section>
 
@@ -109,7 +109,7 @@ export default function TermsOfService() {
                   ⚠️ Important: Soft Speak Flow is NOT a substitute for professional medical, psychological, or therapeutic services.
                 </p>
                 <p className="text-muted-foreground leading-relaxed">
-                  Our content and mentor guidance are for motivational and educational purposes only. If you are experiencing mental health issues, please consult with qualified healthcare professionals.
+                  Our content and guide guidance are for motivational and educational purposes only. If you are experiencing mental health issues, please consult with qualified healthcare professionals.
                 </p>
                 <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 sm:p-4 space-y-2">
                   <p className="text-xs sm:text-sm font-semibold text-amber-900 dark:text-amber-200">

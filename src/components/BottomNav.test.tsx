@@ -102,7 +102,7 @@ describe("BottomNav", () => {
     renderBottomNav("/mentor");
     scrollToSpy.mockClear();
 
-    fireEvent.click(screen.getByText("Mentor"));
+    fireEvent.click(screen.getByText("Guide"));
 
     expect(mocks.hapticsLight).toHaveBeenCalledTimes(1);
     expect(scrollToSpy).not.toHaveBeenCalled();
@@ -137,7 +137,7 @@ describe("BottomNav", () => {
     renderBottomNav("/mentor");
 
     expect(screen.getAllByRole("link").map((link) => link.textContent)).toEqual([
-      "Mentor",
+      "Guide",
       "Quests",
       "Campaigns",
       "Companion",

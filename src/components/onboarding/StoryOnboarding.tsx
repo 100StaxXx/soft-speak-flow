@@ -368,7 +368,7 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
 
       if (mentorPool.length === 0) {
         onboardingLog.error("Mentor recommendation aborted: no active mentors available");
-        toast.error("Mentor catalog is temporarily unavailable. Please try again in a moment.");
+        toast.error("Guide catalog is temporarily unavailable. Please try again in a moment.");
         setStage("questionnaire");
         return;
       }
@@ -437,13 +437,13 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
         requestedSlug: assignment.requestedSlug,
         mentorPoolCount: mentorPool.length,
       });
-      toast.error("We couldn't automatically match a mentor. Please pick one from the grid.");
+      toast.error("We couldn't automatically match a guide. Please pick one from the grid.");
       setStage("mentor-grid");
     } catch (error) {
       onboardingLog.error("Questionnaire completion failed", {
         error: error instanceof Error ? error.message : String(error),
       });
-      toast.error("We hit a temporary snag matching your mentor. Please try again.");
+      toast.error("We hit a temporary snag matching your guide. Please try again.");
       setStage("questionnaire");
     } finally {
       setIsSubmittingQuestionnaire(false);
@@ -460,7 +460,7 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
 
       if (profileError) {
         console.error("Failed to load profile before mentor confirmation:", profileError);
-        toast.error("We couldn't save your mentor selection right now. Please try again.");
+        toast.error("We couldn't save your guide selection right now. Please try again.");
         return;
       }
       
@@ -486,7 +486,7 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
 
       if (updateError) {
         console.error("Failed to save mentor selection:", updateError);
-        toast.error("We couldn't save your mentor selection right now. Please try again.");
+        toast.error("We couldn't save your guide selection right now. Please try again.");
         return;
       }
       
@@ -856,7 +856,7 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
               compatibilityScore={compatibilityScore}
               onConfirm={() => handleMentorConfirm(recommendedMentor)}
               onSeeAll={handleSeeAllMentors}
-              seeAllLabel="See All Mentors"
+              seeAllLabel="See All Guides"
             />
           </motion.div>
         )}
@@ -870,7 +870,7 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
             className="relative z-10 min-h-screen flex flex-col p-6 pt-safe-lg"
           >
             <div className="text-center mb-8">
-              <h1 className="text-2xl font-bold text-foreground mb-2">Choose Your Mentor</h1>
+              <h1 className="text-2xl font-bold text-foreground mb-2">Choose Your Guide</h1>
               <p className="text-muted-foreground text-sm">Select the guide who resonates with you</p>
             </div>
             <MentorGrid

@@ -34,7 +34,7 @@ const prettyAction = (actionKind: string) => {
     case "TASK_DELETE":
       return "Delete quest";
     case "MENTOR_FEEDBACK":
-      return "Mentor feedback";
+      return "Guide feedback";
     case "SUPPORT_REPORT":
       return "Support report";
     default:

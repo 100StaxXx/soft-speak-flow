@@ -3,7 +3,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { AskMentorChat } from "@/components/AskMentorChat";
+import { MentorSwitcher } from "@/components/MentorSwitcher";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { ArrowLeft } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { PageInfoButton } from "@/components/PageInfoButton";
@@ -13,6 +15,10 @@ import { useState } from "react";
 import { useHapticFeedback } from "@/hooks/useHapticFeedback";
 import { PageTransition } from "@/components/PageTransition";
 import { useMentorConnection } from "@/contexts/MentorConnectionContext";
+import {
+  getConsultMentorIdFromState,
+  withConsultMentorState,
+} from "@/utils/mentorChatLocationState";
 
 
 export default function MentorChat() {
@@ -33,21 +39,44 @@ export default function MentorChat() {
   // Get briefing context from navigation state
   const briefingContext = location.state?.briefingContext;
   const comprehensiveMode = location.state?.comprehensiveMode || false;
+  const consultMentorId = getConsultMentorIdFromState(location.state);
+  const isConsultMode = Boolean(
+    consultMentorId &&
+    resolvedMentorId &&
+    consultMentorId !== resolvedMentorId,
+  );
+  const currentChatMentorId = isConsultMode ? consultMentorId : resolvedMentorId;
 
   const { data: mentor, isLoading: mentorLoading, isFetching: mentorFetching, error: mentorError, refetch: refetchMentor } = useQuery({
-    queryKey: ['mentor', resolvedMentorId],
+    queryKey: ['mentor', currentChatMentorId],
     queryFn: async () => {
-      if (!resolvedMentorId) return null;
+      if (!currentChatMentorId) return null;
       const { data, error } = await supabase
         .from('mentors')
         .select('*')
-        .eq('id', resolvedMentorId)
+        .eq('id', currentChatMentorId)
         .maybeSingle();
       
       if (error) throw error;
       return data;
     },
-    enabled: !!resolvedMentorId,
+    enabled: !!currentChatMentorId,
+  });
+
+  const { data: primaryMentor } = useQuery({
+    queryKey: ['mentor-primary', resolvedMentorId],
+    queryFn: async () => {
+      if (!resolvedMentorId) return null;
+      const { data, error } = await supabase
+        .from('mentors')
+        .select('id, name')
+        .eq('id', resolvedMentorId)
+        .maybeSingle();
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: Boolean(resolvedMentorId && isConsultMode),
   });
 
   const handleRetry = async () => {
@@ -65,6 +94,13 @@ export default function MentorChat() {
     } finally {
       setIsRetrying(false);
     }
+  };
+
+  const handleReturnToPrimary = () => {
+    navigate("/mentor-chat", {
+      replace: true,
+      state: withConsultMentorState(location.state, null, location.pathname),
+    });
   };
 
   // Show loading state while profile or mentor is loading
@@ -99,12 +135,12 @@ export default function MentorChat() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center space-y-4 max-w-md">
-          <p className="text-lg font-semibold">No mentor selected</p>
+          <p className="text-lg font-semibold">No guide selected</p>
           <p className="text-muted-foreground">
-            Please select a mentor to continue.
+            Please select a guide to continue.
           </p>
           <Button onClick={() => navigate('/mentor-selection')}>
-            Choose Your Mentor
+            Choose Your Guide
           </Button>
         </div>
       </div>
@@ -115,7 +151,7 @@ export default function MentorChat() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center space-y-4 max-w-md">
-          <p className="text-lg font-semibold">We couldn't load your mentor</p>
+          <p className="text-lg font-semibold">We couldn't load your guide</p>
           <p className="text-muted-foreground">
             Connection may have dropped while the app was in the background. Try again.
           </p>
@@ -124,7 +160,7 @@ export default function MentorChat() {
               {isRetrying || mentorFetching ? 'Retrying...' : 'Retry'}
             </Button>
             <Button variant="outline" onClick={() => navigate('/mentor-selection')}>
-              Choose Mentor
+              Choose Guide
             </Button>
           </div>
         </div>
@@ -136,16 +172,16 @@ export default function MentorChat() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center space-y-4 max-w-md">
-          <p className="text-lg font-semibold">Mentor unavailable</p>
+          <p className="text-lg font-semibold">Guide unavailable</p>
           <p className="text-muted-foreground">
-            We couldn't find your selected mentor right now.
+            We couldn't find your selected guide right now.
           </p>
           <div className="flex items-center justify-center gap-2">
             <Button onClick={() => void handleRetry()} disabled={isRetrying || mentorFetching}>
               {isRetrying || mentorFetching ? 'Retrying...' : 'Retry'}
             </Button>
             <Button variant="outline" onClick={() => navigate('/mentor-selection')}>
-              Choose Mentor
+              Choose Guide
             </Button>
           </div>
         </div>
@@ -196,23 +232,61 @@ export default function MentorChat() {
             >
               <ArrowLeft className="w-5 h-5" />
             </Button>
-            <PageInfoButton onClick={() => {
-              haptics.tap();
-              setShowPageInfo(true);
-            }} />
+            <div className="flex items-center gap-2">
+              <MentorSwitcher variant="button" />
+              <PageInfoButton onClick={() => {
+                haptics.tap();
+                setShowPageInfo(true);
+              }} />
+            </div>
           </div>
           
           {/* Title overlay */}
           <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background via-background/95 to-transparent p-6 pb-4">
             <h1 className="text-2xl md:text-3xl font-heading font-black text-foreground text-center">
-              Ask {mentor.name}
+              {isConsultMode ? `Consult ${mentor.name}` : `Ask ${mentor.name}`}
             </h1>
-            <p className="text-sm text-muted-foreground text-center">Get guidance from your motivator</p>
+            <p className="text-sm text-muted-foreground text-center">
+              {isConsultMode && primaryMentor?.name
+                ? `${primaryMentor.name} remains your primary guide`
+                : "Get guidance from your motivator"}
+            </p>
           </div>
         </div>
 
         <div className="container max-w-4xl mx-auto p-4 md:p-6 space-y-6">
+          <div className="flex flex-wrap items-center gap-2">
+            {resolvedMentorId && (
+              <Badge variant="gold">
+                Primary: {isConsultMode ? primaryMentor?.name || "Your guide" : mentor.name}
+              </Badge>
+            )}
+            {isConsultMode && (
+              <>
+                <Badge variant="info">Consulting: {mentor.name}</Badge>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleReturnToPrimary}
+                >
+                  Return to {primaryMentor?.name || "primary guide"}
+                </Button>
+              </>
+            )}
+          </div>
+
+          {isConsultMode && (
+            <div className="rounded-2xl border border-primary/25 bg-card/45 p-4 backdrop-blur-xl">
+              <p className="text-sm font-semibold">Temporary consult</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                You&apos;re consulting {mentor.name} for this conversation. {primaryMentor?.name || "Your primary guide"} still powers your briefings, check-ins, and daily pep talks unless you explicitly make a change.
+              </p>
+            </div>
+          )}
+
           <AskMentorChat
+            key={mentor.id}
             mentorName={mentor.name}
             mentorTone={mentor.tone_description}
             mentorId={mentor.id}
@@ -226,16 +300,24 @@ export default function MentorChat() {
       <PageInfoModal
         open={showPageInfo}
         onClose={() => setShowPageInfo(false)}
-        title="About Your Mentor"
+        title={isConsultMode ? `About Consulting ${mentor.name}` : "About Your Guide"}
         icon={MessageCircle}
-        description="Your personal motivator is here to guide and support you on your journey."
+        description={
+          isConsultMode
+            ? `${mentor.name} is joining this conversation as a consult. ${primaryMentor?.name || "Your primary guide"} is still your main guide across the app.`
+            : "Your personal motivator is here to guide and support you on your journey."
+        }
         features={[
           "Ask questions and get personalized advice",
           "Receive guidance tailored to your goals",
           "Get encouragement when you need it most",
           "Chat anytime for instant motivation"
         ]}
-        tip="Your mentor's tone and style match your preferences from onboarding."
+        tip={
+          isConsultMode
+            ? `Return to ${primaryMentor?.name || "your primary guide"} anytime, or make ${mentor.name} primary if this voice fits better.`
+            : "Your guide's tone and style match your preferences from onboarding."
+        }
       />
     </PageTransition>
   );

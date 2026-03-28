@@ -97,7 +97,7 @@ vi.mock("@/hooks/useCompanion", () => ({
 
 vi.mock("@/utils/mentorExplanation", () => ({
   generateMentorExplanation: () => ({
-    title: "Your Mentor is: Atlas",
+    title: "Your Guide is: Atlas",
     subtitle: "The Strategist",
     paragraph: "A fit for focused builders.",
     bullets: ["Clear guidance"],
@@ -301,7 +301,7 @@ describe("StoryOnboarding questionnaire submission flow", () => {
 
       expect(screen.getByRole("button", { name: "questionnaire-submit" })).toBeInTheDocument();
       expect(mocks.toastError).toHaveBeenCalledWith(
-        "We hit a temporary snag matching your mentor. Please try again.",
+        "We hit a temporary snag matching your guide. Please try again.",
       );
     } finally {
       vi.useRealTimers();

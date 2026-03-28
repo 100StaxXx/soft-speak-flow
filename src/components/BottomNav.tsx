@@ -91,7 +91,7 @@ export const BottomNav = memo(() => {
     staleTime: 10 * 60 * 1000, // Cache mentor data for 10 minutes
     queryFn: async () => {
       if (!resolvedMentorId) {
-        throw new Error('No mentor selected');
+        throw new Error('No guide selected');
       }
 
       const { data, error } = await supabase
@@ -140,7 +140,7 @@ export const BottomNav = memo(() => {
                   <User className={`h-6 w-6 transition-colors duration-200 ${isActive ? 'text-orange-300' : 'text-muted-foreground'}`} />
                 )}
                 <span className={`text-[11px] font-medium transition-colors duration-200 ${isActive ? 'text-orange-200' : 'text-muted-foreground/85'}`}>
-                  Mentor
+                  Guide
                 </span>
               </>
             )}

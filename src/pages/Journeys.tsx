@@ -1148,7 +1148,7 @@ const Journeys = () => {
           description="Quests and Campaigns work together in one powerful view."
           features={[
             "Quests are your daily actions to earn XP and build momentum",
-            "Campaigns are goals you break down with your mentor into routines",
+            "Campaigns are goals you break down with your guide into routines",
             "Track progress across quests and campaigns to stay consistent"
           ]}
           tip="Add a quest with +, or start a Campaign to plan your bigger goal."

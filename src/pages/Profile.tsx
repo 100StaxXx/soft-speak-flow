@@ -177,7 +177,7 @@ const Profile = () => {
     enabled: !!resolvedMentorId,
     queryFn: async () => {
       if (!resolvedMentorId) {
-        throw new Error('No mentor selected');
+        throw new Error('No guide selected');
       }
       
       const { data, error } = await supabase
@@ -208,11 +208,12 @@ const Profile = () => {
         timezone: profile?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
         userId: user.id,
         navigate,
+        destinationPath: "/mentor",
       });
 
-      toast({ title: "Mentor Updated", description: "Your mentor has been changed successfully" });
+      toast({ title: "Guide Updated", description: "Your guide has been changed successfully" });
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to change mentor";
+      const errorMessage = error instanceof Error ? error.message : "Failed to change guide";
       toast({ title: "Error", description: errorMessage, variant: "destructive" });
     } finally {
       setIsChangingMentor(false);
@@ -415,11 +416,11 @@ const Profile = () => {
                 </CardContent>
               </Card>
 
-              {/* Mentor Selection - cleaner */}
+              {/* Guide Selection - cleaner */}
               <Card className="border-border/50">
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Your Mentor</CardTitle>
-                  <CardDescription className="text-xs">Change your mentor anytime</CardDescription>
+                  <CardTitle className="text-base">Your Guide</CardTitle>
+                  <CardDescription className="text-xs">Change your guide anytime</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {selectedMentor && (
@@ -441,7 +442,7 @@ const Profile = () => {
                   )}
                   <Select value={profile?.selected_mentor_id || ""} onValueChange={handleChangeMentor} disabled={isChangingMentor}>
                     <SelectTrigger disabled={isChangingMentor} className="h-9">
-                      <SelectValue placeholder={isChangingMentor ? "Changing..." : "Select mentor"} />
+                      <SelectValue placeholder={isChangingMentor ? "Changing..." : "Select guide"} />
                     </SelectTrigger>
                     <SelectContent>
                       {mentors?.map((m) => (<SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>))}
@@ -449,7 +450,7 @@ const Profile = () => {
                   </Select>
                   <div className="grid grid-cols-2 gap-2">
                     <Button onClick={() => navigate("/mentor-selection")} variant="outline" size="sm" className="text-xs h-8">
-                      <User className="h-3 w-3 mr-1.5" />Browse All
+                      <User className="h-3 w-3 mr-1.5" />Browse Guides
                     </Button>
                     <Button onClick={() => navigate("/onboarding")} variant="outline" size="sm" className="text-xs h-8">
                       <Repeat className="h-3 w-3 mr-1.5" />Retake Quiz
@@ -651,7 +652,7 @@ const Profile = () => {
         description="Manage your account settings, notifications, and preferences all in one place."
         features={[
           "Update your account information and subscription",
-          "Change your mentor anytime to match your needs",
+          "Change your guide anytime to match your needs",
           "Manage push notifications and daily reminders",
           "Share your referral code to unlock companion skins",
           "Customize app preferences and sound settings"

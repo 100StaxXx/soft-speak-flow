@@ -195,8 +195,8 @@ export default function Premium() {
                 },
                 {
                   icon: Zap,
-                  title: "Mentor Chat",
-                  description: "Unlimited personalized guidance from your chosen mentor"
+                  title: "Guide Chat",
+                  description: "Unlimited personalized guidance from your chosen guide"
                 },
                 {
                   icon: Bell,

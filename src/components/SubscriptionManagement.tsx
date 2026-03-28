@@ -130,7 +130,7 @@ export const SubscriptionManagement = memo(function SubscriptionManagement() {
         </CardHeader>
         <CardContent className="space-y-5">
           <CardDescription className="text-base">
-            Unlock all quests, mentor chat, Cosmiq Insights, and every future feature across iPhone and iPad.
+            Unlock all quests, guide chat, Cosmiq Insights, and every future feature across iPhone and iPad.
           </CardDescription>
 
           <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-sm text-foreground">
@@ -329,7 +329,7 @@ export const SubscriptionManagement = memo(function SubscriptionManagement() {
           <div className="space-y-2">
             {[
               "All 21 companion evolutions",
-              "Unlimited quests, epics, and mentor chat",
+              "Unlimited quests, epics, and guide chat",
               "Daily Cosmiq Insight across iPhone + iPad",
               "Early access to new companions & stories",
             ].map((benefit) => (

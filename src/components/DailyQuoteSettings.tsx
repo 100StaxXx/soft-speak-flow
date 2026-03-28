@@ -92,7 +92,7 @@ export const DailyQuoteSettings = memo(() => {
                 Enable Daily Quotes
               </Label>
               <p className="text-sm text-muted-foreground">
-                Receive an inspiring quote from your mentor each day
+                Receive an inspiring quote from your guide each day
               </p>
             </div>
             <Switch

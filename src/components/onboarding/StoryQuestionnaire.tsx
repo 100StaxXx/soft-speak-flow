@@ -47,7 +47,7 @@ const questions: StoryQuestion[] = [
   {
     id: "mentor_energy",
     narrative: "",
-    question: "What kind of mentor energy resonates with you?",
+    question: "What kind of guide energy resonates with you?",
     options: [
       { optionId: "feminine_presence", text: "Feminine presence", tags: ["feminine_preference"] },
       { optionId: "masculine_presence", text: "Masculine presence", tags: ["masculine_preference"] },
@@ -221,7 +221,7 @@ export const StoryQuestionnaire = ({
         <Progress value={progress} className="h-2" />
         {isSubmitting ? (
           <p className="mt-3 text-center text-xs uppercase tracking-[0.14em] text-white/70">
-            Matching your mentor...
+            Matching your guide...
           </p>
         ) : null}
       </motion.div>

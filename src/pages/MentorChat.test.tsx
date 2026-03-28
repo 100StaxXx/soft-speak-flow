@@ -18,6 +18,10 @@ const mocks = vi.hoisted(() => ({
     error: null as unknown,
     refetch: vi.fn().mockResolvedValue(undefined),
   },
+  primaryMentorQuery: {
+    data: null as Record<string, unknown> | null,
+    isLoading: false,
+  },
   queryClient: {
     invalidateQueries: vi.fn().mockResolvedValue(undefined),
   },
@@ -25,13 +29,22 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@tanstack/react-query", () => ({
-  useQuery: () => ({
-    data: mocks.mentorQuery.data,
-    isLoading: mocks.mentorQuery.isLoading,
-    isFetching: mocks.mentorQuery.isFetching,
-    error: mocks.mentorQuery.error,
-    refetch: mocks.mentorQuery.refetch,
-  }),
+  useQuery: ({ queryKey }: { queryKey: readonly unknown[] }) => {
+    if (queryKey[0] === "mentor-primary") {
+      return {
+        data: mocks.primaryMentorQuery.data,
+        isLoading: mocks.primaryMentorQuery.isLoading,
+      };
+    }
+
+    return {
+      data: mocks.mentorQuery.data,
+      isLoading: mocks.mentorQuery.isLoading,
+      isFetching: mocks.mentorQuery.isFetching,
+      error: mocks.mentorQuery.error,
+      refetch: mocks.mentorQuery.refetch,
+    };
+  },
   useQueryClient: () => mocks.queryClient,
 }));
 
@@ -62,6 +75,10 @@ vi.mock("@/hooks/useHapticFeedback", () => ({
   }),
 }));
 
+vi.mock("@/components/MentorSwitcher", () => ({
+  MentorSwitcher: () => <div>MentorSwitcher</div>,
+}));
+
 vi.mock("@/components/AskMentorChat", () => ({
   AskMentorChat: () => (
     <button onClick={mocks.askMentorAction} type="button">
@@ -88,9 +105,9 @@ vi.mock("@/components/PageInfoModal", () => ({
 
 import MentorChat from "./MentorChat";
 
-const renderMentorChat = () =>
+const renderMentorChat = (state?: Record<string, unknown>) =>
   render(
-    <MemoryRouter initialEntries={["/mentor-chat"]}>
+    <MemoryRouter initialEntries={[{ pathname: "/mentor-chat", state }]}>
       <MentorChat />
     </MemoryRouter>,
   );
@@ -112,6 +129,10 @@ describe("MentorChat mentor connection state", () => {
       error: null,
       refetch: vi.fn().mockResolvedValue(undefined),
     };
+    mocks.primaryMentorQuery = {
+      data: null,
+      isLoading: false,
+    };
     mocks.queryClient.invalidateQueries.mockClear();
     mocks.askMentorAction.mockClear();
   });
@@ -122,7 +143,7 @@ describe("MentorChat mentor connection state", () => {
     renderMentorChat();
 
     expect(screen.getByText("Loading your motivator...")).toBeInTheDocument();
-    expect(screen.queryByText("No mentor selected")).not.toBeInTheDocument();
+    expect(screen.queryByText("No guide selected")).not.toBeInTheDocument();
   });
 
   it("shows no mentor selected only after recovery confirms missing", () => {
@@ -130,7 +151,7 @@ describe("MentorChat mentor connection state", () => {
 
     renderMentorChat();
 
-    expect(screen.getByText("No mentor selected")).toBeInTheDocument();
+    expect(screen.getByText("No guide selected")).toBeInTheDocument();
     expect(screen.queryByText("Loading your motivator...")).not.toBeInTheDocument();
   });
 
@@ -148,5 +169,28 @@ describe("MentorChat mentor connection state", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "AskMentorChat Action" }));
     expect(mocks.askMentorAction).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("MentorSwitcher")).toBeInTheDocument();
+  });
+
+  it("shows consult mode while keeping the primary guide visible", () => {
+    mocks.mentorStatus = "ready";
+    mocks.effectiveMentorId = "mentor-1";
+    mocks.mentorQuery.data = {
+      id: "mentor-2",
+      name: "Sienna",
+      tone_description: "Gentle guidance",
+      avatar_url: "https://example.com/avatar.png",
+    };
+    mocks.primaryMentorQuery.data = {
+      id: "mentor-1",
+      name: "Atlas",
+    };
+
+    renderMentorChat({ consultMentorId: "mentor-2" });
+
+    expect(screen.getByText("Consult Sienna")).toBeInTheDocument();
+    expect(screen.getByText("Primary: Atlas")).toBeInTheDocument();
+    expect(screen.getByText("Consulting: Sienna")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Return to Atlas" })).toBeInTheDocument();
   });
 });

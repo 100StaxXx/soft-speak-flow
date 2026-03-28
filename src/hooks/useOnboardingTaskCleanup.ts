@@ -15,8 +15,8 @@ const LEGACY_TUTORIAL_TASK_TITLES = [
   "Morning Check-in",
   "Create Your First Campaign 🚀",
   "Create Your First Campaign",
-  "Listen to Your Mentor 🎧",
-  "Listen to Your Mentor",
+  "Listen to Your Guide 🎧",
+  "Listen to Your Guide",
 ] as const;
 const LEGACY_TUTORIAL_XP_REWARDS = [2, 3, 4] as const;
 

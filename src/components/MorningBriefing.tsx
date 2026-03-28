@@ -186,7 +186,7 @@ export const MorningBriefing = memo(({ onAskMore, className }: MorningBriefingPr
             )}
             <div className="w-full space-y-4 text-center">
               <p className="text-sm text-muted-foreground">
-                Get personalized insights from {personality?.name || 'your mentor'} based on your activity
+                Get personalized insights from {personality?.name || 'your guide'} based on your activity
               </p>
               <Button
                 onClick={handleGenerate}
@@ -242,7 +242,7 @@ export const MorningBriefing = memo(({ onAskMore, className }: MorningBriefingPr
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
               <h3 className="font-bold text-base sm:text-lg truncate">
-                {personality?.name || 'Your Mentor'}'s Briefing
+                {personality?.name || 'Your Guide'}'s Briefing
               </h3>
               <Sparkles className="h-4 w-4 text-primary flex-shrink-0" />
             </div>
@@ -329,7 +329,7 @@ export const MorningBriefing = memo(({ onAskMore, className }: MorningBriefingPr
           className="flex-1 bg-primary hover:bg-primary/90"
         >
           <MessageCircle className="h-4 w-4 mr-2" />
-          Ask {personality?.name || 'Mentor'} More
+          Ask {personality?.name || 'Guide'} More
         </Button>
       </div>
     </Card>

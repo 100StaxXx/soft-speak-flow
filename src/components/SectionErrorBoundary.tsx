@@ -247,8 +247,8 @@ export const HoroscopeErrorBoundary = ({ children }: { children: ReactNode }) =>
 export const MentorErrorBoundary = ({ children }: { children: ReactNode }) => (
   <SectionErrorBoundary
     section="mentor"
-    title="Mentor unavailable"
-    description="Unable to connect with your mentor"
+    title="Guide unavailable"
+    description="Unable to connect with your guide"
   >
     {children}
   </SectionErrorBoundary>

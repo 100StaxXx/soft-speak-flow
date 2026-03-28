@@ -141,7 +141,7 @@ const Admin = () => {
       .order("name");
 
     if (error) {
-      toast.error("Failed to load mentors");
+      toast.error("Failed to load guides");
       return;
     }
     setMentors(data || []);
@@ -328,7 +328,7 @@ const Admin = () => {
   const handleVoicePreview = async (mentorSlug: string) => {
     const previewText = mentorPreviewTexts[mentorSlug];
     if (!previewText) {
-      toast.error("No preview text for this mentor");
+      toast.error("No preview text for this guide");
       return;
     }
 
@@ -515,7 +515,7 @@ const Admin = () => {
         {/* Voice Preview Section */}
         <Card className="p-6 mb-8 rounded-3xl shadow-soft">
           <h2 className="font-heading text-2xl font-semibold mb-4">Voice Preview</h2>
-          <p className="text-muted-foreground mb-6">Test each mentor's voice before generating content</p>
+          <p className="text-muted-foreground mb-6">Test each guide's voice before generating content</p>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {mentors.map((mentor) => (
               <div key={mentor.id} className="flex items-center justify-between p-4 border rounded-2xl bg-card">
@@ -1000,7 +1000,7 @@ const Admin = () => {
                 </div>
 
                 <div>
-                  <Label htmlFor="mentor">Mentor</Label>
+                  <Label htmlFor="mentor">Guide</Label>
                   <select
                     id="mentor"
                     value={formData.mentor_id}
@@ -1009,7 +1009,7 @@ const Admin = () => {
                     }
                     className="w-full h-10 px-3 rounded-2xl border border-input bg-background"
                   >
-                    <option value="">No specific mentor</option>
+                    <option value="">No specific guide</option>
                     {mentors.map((m) => (
                       <option key={m.id} value={m.id}>
                         {m.name}
@@ -1223,11 +1223,11 @@ const Admin = () => {
                   <p className="text-sm mt-1 uppercase font-medium">{previewData.category}</p>
                 </div>
                 <div>
-                  <Label className="text-muted-foreground">Mentor</Label>
+                  <Label className="text-muted-foreground">Guide</Label>
                   <p className="text-sm mt-1">
                     {previewData.mentor_id
                       ? mentors.find(m => m.id === previewData.mentor_id)?.name || "Unknown"
-                      : "No specific mentor"}
+                      : "No specific guide"}
                   </p>
                 </div>
               </div>

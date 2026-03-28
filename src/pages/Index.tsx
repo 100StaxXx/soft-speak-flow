@@ -16,6 +16,7 @@ import { EveningReflectionBanner } from "@/components/EveningReflectionBanner";
 import { WeeklyRecapCard } from "@/components/WeeklyRecapCard";
 import { DailyCoachPanel } from "@/components/DailyCoachPanel";
 import { IndexPageSkeleton } from "@/components/skeletons";
+import { MentorSwitcher } from "@/components/MentorSwitcher";
 import { ParallaxCard } from "@/components/ui/parallax-card";
 import { Button } from "@/components/ui/button";
 import { loadMentorImage } from "@/utils/mentorImageLoader";
@@ -202,7 +203,7 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
   const mentorImage = effectiveMentorId ? mentorPageData?.mentorImage || "" : "";
   const mentorName = effectiveMentorId ? mentorPageData?.mentorName || null : null;
   const todaysQuote = effectiveMentorId ? mentorPageData?.todaysQuote || null : null;
-  const askMentorLabel = mentorName ? `Ask ${mentorName}` : "Ask your mentor";
+  const askMentorLabel = mentorName ? `Ask ${mentorName}` : "Ask your guide";
 
   const isReady = useMemo(() => {
     if (!user) return false;
@@ -315,9 +316,9 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
         <div className="mx-4 sm:mx-6 rounded-2xl border border-destructive/45 bg-card/40 backdrop-blur-2xl p-4 sm:p-5 shadow-[0_8px_30px_rgba(0,0,0,0.18)]">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-              <h2 className="text-base sm:text-lg font-bold">Mentor temporarily unavailable</h2>
+              <h2 className="text-base sm:text-lg font-bold">Guide temporarily unavailable</h2>
               <p className="text-sm text-muted-foreground">
-                We could not refresh your mentor data right now. Try again in a moment.
+                We could not refresh your guide data right now. Try again in a moment.
               </p>
             </div>
             <Button
@@ -335,13 +336,13 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
         <div className="mx-4 sm:mx-6 rounded-2xl border border-primary/35 bg-card/40 backdrop-blur-2xl p-4 sm:p-5 shadow-[0_8px_30px_rgba(0,0,0,0.18)]">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-              <h2 className="text-base sm:text-lg font-bold">Mentor connection lost</h2>
+              <h2 className="text-base sm:text-lg font-bold">Guide connection lost</h2>
               <p className="text-sm text-muted-foreground">
-                Reconnect a mentor to restore personalized briefings, pep talks, and chat.
+                Reconnect a guide to restore personalized briefings, pep talks, and chat.
               </p>
             </div>
             <Button onClick={handleMentorReconnect} className="sm:self-start">
-              Reconnect Mentor
+              Reconnect Guide
             </Button>
           </div>
         </div>
@@ -365,6 +366,12 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
       <ParallaxCard offset={14}>
         <ErrorBoundary>
           <MorningCheckIn />
+        </ErrorBoundary>
+      </ParallaxCard>
+
+      <ParallaxCard offset={13}>
+        <ErrorBoundary>
+          <MentorSwitcher />
         </ErrorBoundary>
       </ParallaxCard>
 
@@ -427,7 +434,7 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
                 <>
                   <img
                     src={mentorImage}
-                    alt={mentorName ? `${mentorName} portrait` : "Mentor portrait"}
+                    alt={mentorName ? `${mentorName} portrait` : "Guide portrait"}
                     className="h-full w-full object-cover object-center"
                     loading="eager"
                     decoding="async"
@@ -443,10 +450,10 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
               )}
               <div className="absolute inset-x-0 bottom-0 p-6">
                 <p className="text-xs font-semibold uppercase tracking-[0.28em] text-white/70">
-                  Mentor tab
+                  Guide tab
                 </p>
                 <h1 className="mt-2 text-3xl font-semibold tracking-tight text-white">
-                  {mentorName || "Mentor"}
+                  {mentorName || "Guide"}
                 </h1>
                 <p className="mt-2 max-w-xs text-sm text-white/80">
                   Check in, get guidance, and keep your momentum steady.
@@ -460,26 +467,26 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
                   <Sparkles className="h-4 w-4" />
                 </div>
                 <div className="space-y-1">
-                  <p className="text-sm font-semibold">Everything from your mentor</p>
+                  <p className="text-sm font-semibold">Everything from your guide</p>
                   <p className="text-sm text-muted-foreground">
-                    Check-ins, briefings, coach guidance, and chat stay in one place.
+                    Check-ins, briefings, coach guidance, and daily pep talks follow your primary guide. You can still consult other voices whenever you need another perspective.
                   </p>
                 </div>
               </div>
 
               {mentorConnectionIssue ? (
                 <DesktopMentorStateCard
-                  title="Mentor temporarily unavailable"
-                  description="We could not refresh your mentor data right now. Try again in a moment."
+                  title="Guide temporarily unavailable"
+                  description="We could not refresh your guide data right now. Try again in a moment."
                   actionLabel="Retry"
                   onAction={handleMentorRetry}
                   variant="destructive"
                 />
               ) : mentorConnectionMissing ? (
                 <DesktopMentorStateCard
-                  title="Mentor connection lost"
-                  description="Reconnect a mentor to restore personalized briefings, pep talks, and chat."
-                  actionLabel="Reconnect Mentor"
+                  title="Guide connection lost"
+                  description="Reconnect a guide to restore personalized briefings, pep talks, and chat."
+                  actionLabel="Reconnect Guide"
                   onAction={handleMentorReconnect}
                   variant="default"
                 />
@@ -502,7 +509,7 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
 
       <div className="min-w-0 space-y-6" data-testid="mentor-desktop-workspace">
         <div className="space-y-1 px-1">
-          <p className="text-sm font-medium text-muted-foreground">Mentor workspace</p>
+          <p className="text-sm font-medium text-muted-foreground">Guide workspace</p>
           <p className="text-2xl font-semibold tracking-tight">
             Your daily guidance
           </p>
@@ -511,6 +518,12 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
         <ParallaxCard offset={14}>
           <ErrorBoundary>
             <MorningCheckIn />
+          </ErrorBoundary>
+        </ParallaxCard>
+
+        <ParallaxCard offset={13}>
+          <ErrorBoundary>
+            <MentorSwitcher />
           </ErrorBoundary>
         </ParallaxCard>
 
@@ -568,7 +581,7 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
         <div className="fixed inset-0 z-0 pointer-events-none">
           <img
             src={mentorImage}
-            alt="Mentor background"
+            alt="Guide background"
             className="w-full h-full object-cover object-center"
             loading="eager"
             decoding="async"

@@ -44,8 +44,8 @@ const MentorSelection = () => {
     } catch (error) {
       console.error("Error loading mentors:", error);
       toast({
-        title: "Error loading mentors",
-        description: error instanceof Error ? error.message : "Failed to load mentors",
+        title: "Error loading guides",
+        description: error instanceof Error ? error.message : "Failed to load guides",
         variant: "destructive",
       });
     } finally {
@@ -62,7 +62,7 @@ const MentorSelection = () => {
     if (!user) {
       toast({
         title: "Please log in",
-        description: "You need to be logged in to select a mentor",
+        description: "You need to be logged in to select a guide",
         variant: "destructive",
       });
       navigate("/auth");
@@ -106,8 +106,8 @@ const MentorSelection = () => {
       await queryClient.refetchQueries({ queryKey: ["profile", user.id] });
 
       toast({
-        title: "Mentor Selected!",
-        description: "Your mentor has been updated successfully",
+        title: "Guide Selected!",
+        description: "Your guide has been updated successfully",
       });
       
       // Navigate without full reload
@@ -115,8 +115,8 @@ const MentorSelection = () => {
     } catch (error) {
       console.error("Error selecting mentor:", error);
       toast({
-        title: "Error selecting mentor",
-        description: error instanceof Error ? error.message : "Failed to select mentor",
+        title: "Error selecting guide",
+        description: error instanceof Error ? error.message : "Failed to select guide",
         variant: "destructive",
       });
     } finally {
@@ -135,14 +135,14 @@ const MentorSelection = () => {
         <div className="text-center space-y-6 animate-fade-in">
           <div className="h-1 w-24 bg-royal-gold mx-auto animate-scale-in" />
           <h1 className="text-5xl md:text-7xl font-black text-pure-white uppercase tracking-tight">
-            Choose Your Mentor
+            Choose Your Guide
           </h1>
           <p className="text-xl md:text-2xl text-steel max-w-2xl mx-auto">
             Pick the voice you want guiding you.
           </p>
         </div>
 
-        {/* Mentor Grid */}
+        {/* Guide Grid */}
         <MentorGrid 
           mentors={mentors}
           onSelectMentor={handleSelectMentor}

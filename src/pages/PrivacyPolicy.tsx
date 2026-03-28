@@ -119,7 +119,7 @@ export default function PrivacyPolicy() {
                 4. Personalization and Data Processing
               </h2>
               <p className="text-muted-foreground leading-relaxed">
-                We use advanced personalization to provide tailored mentorship, guide companion evolutions, and create motivational content. Your interaction data may be processed to improve personalization. We implement measures to protect your privacy during this processing, including data anonymization where appropriate.
+                We use advanced personalization to provide tailored guidance, support companion evolutions, and create motivational content. Your interaction data may be processed to improve personalization. We implement measures to protect your privacy during this processing, including data anonymization where appropriate.
               </p>
             </section>
 

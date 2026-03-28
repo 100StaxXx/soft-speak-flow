@@ -6,7 +6,7 @@ const LOADING_MESSAGES = [
   "Reading the stars...",
   "Aligning your cosmic path...",
   "Finding your perfect guide...",
-  "The universe is revealing your mentor...",
+  "The universe is revealing your guide...",
   "Calculating your destiny...",
 ];
 

@@ -123,6 +123,10 @@ vi.mock("@/components/DailyCoachPanel", () => ({
   DailyCoachPanel: () => <div>DailyCoachPanel</div>,
 }));
 
+vi.mock("@/components/MentorSwitcher", () => ({
+  MentorSwitcher: () => <div>MentorSwitcher</div>,
+}));
+
 vi.mock("@/components/TodaysPepTalk", () => ({
   TodaysPepTalk: () => <div>TodaysPepTalk</div>,
 }));
@@ -165,7 +169,7 @@ describe("Index mentor connection state", () => {
 
     renderIndex();
 
-    expect(screen.queryByText("Mentor connection lost")).not.toBeInTheDocument();
+    expect(screen.queryByText("Guide connection lost")).not.toBeInTheDocument();
   });
 
   it("keeps the stacked mentor dashboard on mobile", () => {
@@ -186,6 +190,7 @@ describe("Index mentor connection state", () => {
     expect(screen.getByTestId("mentor-mobile-layout")).toBeInTheDocument();
     expect(screen.queryByTestId("mentor-desktop-layout")).not.toBeInTheDocument();
     expect(screen.getByText("MorningCheckIn")).toBeInTheDocument();
+    expect(screen.getByText("MentorSwitcher")).toBeInTheDocument();
     expect(screen.getByText("MentorQuickChat")).toBeInTheDocument();
   });
 
@@ -208,6 +213,7 @@ describe("Index mentor connection state", () => {
     expect(screen.getByTestId("mentor-desktop-rail")).toBeInTheDocument();
     expect(screen.getByTestId("mentor-desktop-workspace")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Ask Atlas" })).toBeInTheDocument();
+    expect(screen.getByText("MentorSwitcher")).toBeInTheDocument();
   });
 
   it("shows mentor connection lost only after recovery fails", () => {
@@ -216,8 +222,8 @@ describe("Index mentor connection state", () => {
 
     renderIndex();
 
-    expect(screen.getByText("Mentor connection lost")).toBeInTheDocument();
-    expect(screen.getByText("Reconnect Mentor")).toBeInTheDocument();
+    expect(screen.getByText("Guide connection lost")).toBeInTheDocument();
+    expect(screen.getByText("Reconnect Guide")).toBeInTheDocument();
   });
 
   it("keeps temporary issue banner behavior unchanged", () => {
@@ -232,7 +238,7 @@ describe("Index mentor connection state", () => {
 
     renderIndex();
 
-    expect(screen.getByText("Mentor temporarily unavailable")).toBeInTheDocument();
-    expect(screen.queryByText("Mentor connection lost")).not.toBeInTheDocument();
+    expect(screen.getByText("Guide temporarily unavailable")).toBeInTheDocument();
+    expect(screen.queryByText("Guide connection lost")).not.toBeInTheDocument();
   });
 });

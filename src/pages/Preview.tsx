@@ -155,7 +155,7 @@ const Preview = () => {
           </div>
         </motion.div>
 
-        {/* Demo Mentors */}
+        {/* Demo Guides */}
         <motion.div
           initial={prefersReducedMotion ? false : { y: 12, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
@@ -164,7 +164,7 @@ const Preview = () => {
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-semibold flex items-center gap-2">
               <Star className="h-5 w-5 text-yellow-500" />
-              Mentors
+              Guides
             </h2>
           </div>
           <div className="grid grid-cols-3 gap-3">
@@ -207,7 +207,7 @@ const Preview = () => {
                   { icon: BookOpen, text: "Daily personalized morning briefings" },
                   { icon: Trophy, text: "Epic quests and achievement system" },
                   { icon: Heart, text: "Companion that evolves with your progress" },
-                  { icon: Star, text: "Mentors with unique personalities" },
+                  { icon: Star, text: "Guides with unique personalities" },
                 ].map((feature) => (
                   <div key={feature.text} className="flex items-center gap-3">
                     <div className="h-8 w-8 rounded-lg bg-primary/20 flex items-center justify-center">
