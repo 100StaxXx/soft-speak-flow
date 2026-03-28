@@ -28,6 +28,15 @@ interface TaskScopedRecord extends UserScopedRecord {
   task_date: string | null;
 }
 
+interface CanonicalTaskScopedRecord extends TaskScopedRecord {
+  habit_source_id?: string | null;
+  parent_template_id?: string | null;
+  completed?: boolean | null;
+  completed_at?: string | null;
+  created_at?: string | null;
+  sort_order?: number | null;
+}
+
 interface SubtaskRecord extends UserScopedRecord {
   task_id: string;
 }
@@ -252,6 +261,70 @@ async function getAllFromStore<T>(storeName: PlannerStoreName): Promise<T[]> {
   });
 }
 
+function getCanonicalTaskKey(task: CanonicalTaskScopedRecord): string | null {
+  const taskDate = task.task_date ?? "__null__";
+
+  if (typeof task.habit_source_id === "string" && task.habit_source_id.length > 0) {
+    return `habit:${task.user_id}:${taskDate}:${task.habit_source_id}`;
+  }
+
+  if (typeof task.parent_template_id === "string" && task.parent_template_id.length > 0) {
+    return `template:${task.user_id}:${taskDate}:${task.parent_template_id}`;
+  }
+
+  return null;
+}
+
+function preferCanonicalTask<T extends CanonicalTaskScopedRecord>(current: T, candidate: T): T {
+  const currentCompleted = current.completed === true || Boolean(current.completed_at);
+  const candidateCompleted = candidate.completed === true || Boolean(candidate.completed_at);
+
+  if (candidateCompleted !== currentCompleted) {
+    return candidateCompleted ? candidate : current;
+  }
+
+  const currentSort = current.sort_order ?? Number.MAX_SAFE_INTEGER;
+  const candidateSort = candidate.sort_order ?? Number.MAX_SAFE_INTEGER;
+  if (candidateSort !== currentSort) {
+    return candidateSort < currentSort ? candidate : current;
+  }
+
+  const currentCreatedAt = current.created_at ?? "";
+  const candidateCreatedAt = candidate.created_at ?? "";
+  if (candidateCreatedAt !== currentCreatedAt) {
+    return candidateCreatedAt > currentCreatedAt ? candidate : current;
+  }
+
+  return current;
+}
+
+export function dedupePlannerTasksByInstance<T extends TaskScopedRecord>(tasks: T[]): T[] {
+  const deduped: T[] = [];
+  const keyedTaskIndex = new Map<string, number>();
+
+  for (const task of tasks) {
+    const key = getCanonicalTaskKey(task as CanonicalTaskScopedRecord);
+    if (!key) {
+      deduped.push(task);
+      continue;
+    }
+
+    const existingIndex = keyedTaskIndex.get(key);
+    if (existingIndex === undefined) {
+      keyedTaskIndex.set(key, deduped.length);
+      deduped.push(task);
+      continue;
+    }
+
+    deduped[existingIndex] = preferCanonicalTask(
+      deduped[existingIndex] as T & CanonicalTaskScopedRecord,
+      task as T & CanonicalTaskScopedRecord,
+    );
+  }
+
+  return deduped;
+}
+
 export async function upsertPlannerRecords<T extends { id: string }>(
   storeName: PlannerStoreName,
   records: T[],
@@ -356,12 +429,13 @@ export async function replaceLocalTasksForDate<T extends TaskScopedRecord & { su
   taskDate: string,
   tasks: T[],
 ): Promise<void> {
-  const existingTasks = await getLocalTasksByDate<TaskScopedRecord>(userId, taskDate);
+  const existingTasks = await getAllByIndex<TaskScopedRecord>("daily_tasks", "user_task_date", [userId, taskDate]);
   const existingTaskIds = existingTasks.map((task) => task.id);
-  const incomingTaskIds = new Set(tasks.map((task) => task.id));
+  const canonicalTasks = dedupePlannerTasksByInstance(tasks);
+  const incomingTaskIds = new Set(canonicalTasks.map((task) => task.id));
   const taskIdsToDelete = existingTaskIds.filter((taskId) => !incomingTaskIds.has(taskId));
 
-  const subtasksToPersist = tasks.flatMap((task) =>
+  const subtasksToPersist = canonicalTasks.flatMap((task) =>
     ((task.subtasks ?? []) as SubtaskRecord[]).map((subtask) => ({
       ...subtask,
       user_id: subtask.user_id || userId,
@@ -370,10 +444,10 @@ export async function replaceLocalTasksForDate<T extends TaskScopedRecord & { su
 
   await upsertPlannerRecords(
     "daily_tasks",
-    tasks.map(({ subtasks, ...task }) => task as T),
+    canonicalTasks.map(({ subtasks, ...task }) => task as T),
   );
 
-  for (const task of tasks) {
+  for (const task of canonicalTasks) {
     const existingSubtasks = await getLocalSubtasksForTask<SubtaskRecord>(task.id);
     const incomingSubtaskIds = new Set(((task.subtasks ?? []) as SubtaskRecord[]).map((subtask) => subtask.id));
     const subtaskIdsToDelete = existingSubtasks

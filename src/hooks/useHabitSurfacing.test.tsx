@@ -304,6 +304,85 @@ describe("useHabitSurfacing", () => {
     );
   });
 
+  it("serializes concurrent surfacing passes for the same campaign ritual date", async () => {
+    let localTasks: Array<ReturnType<typeof buildTask>> = [];
+    let releaseFirstWrite: (() => void) | null = null;
+    let firstWriteBlocked = false;
+
+    mocks.getLocalHabitsMock.mockResolvedValue([
+      {
+        id: "habit-campaign",
+        user_id: "user-1",
+        title: "Daily Marketing Review",
+        description: null,
+        difficulty: "medium",
+        category: "mind",
+        frequency: "daily",
+        estimated_minutes: 20,
+        preferred_time: null,
+        custom_days: [0, 1, 2, 3, 4, 5, 6],
+        custom_month_days: null,
+        is_active: true,
+      },
+    ]);
+    mocks.loadLocalEpicsMock.mockResolvedValue([
+      {
+        id: "epic-campaign",
+        user_id: "user-1",
+        title: "COSMIQ 10k MEE",
+        description: null,
+        status: "active",
+        progress_percentage: 0,
+        target_days: 90,
+        start_date: "2026-03-01",
+        end_date: null,
+        epic_habits: [{ habit_id: "habit-campaign", habits: null }],
+      },
+    ]);
+    mocks.loadLocalDailyTasksMock.mockImplementation(async (_userId: string, taskDate: string) => (
+      taskDate === "2026-03-29" ? localTasks : []
+    ));
+    mocks.upsertPlannerRecordMock.mockImplementation(async (store: string, record: Record<string, unknown>) => {
+      if (store !== "daily_tasks") return;
+
+      if (!firstWriteBlocked) {
+        firstWriteBlocked = true;
+        await new Promise<void>((resolve) => {
+          releaseFirstWrite = resolve;
+        });
+      }
+
+      localTasks = [...localTasks, record as ReturnType<typeof buildTask>];
+    });
+    mocks.createOfflinePlannerIdMock
+      .mockReturnValueOnce("ritual-task-1")
+      .mockReturnValueOnce("ritual-task-2");
+
+    const { result } = renderHook(
+      () => useHabitSurfacing(new Date("2026-03-29T12:00:00.000Z")),
+      { wrapper: createWrapper() },
+    );
+
+    await waitFor(() => {
+      expect(result.current.unsurfacedHabitsCount).toBe(1);
+    });
+
+    await act(async () => {
+      result.current.surfaceAllEpicHabits();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+
+    expect(mocks.upsertPlannerRecordMock).toHaveBeenCalledTimes(1);
+
+    releaseFirstWrite?.();
+
+    await waitFor(() => {
+      expect(mocks.upsertPlannerRecordMock).toHaveBeenCalledTimes(1);
+    });
+    expect(localTasks).toHaveLength(1);
+    expect(localTasks[0]?.habit_source_id).toBe("habit-campaign");
+  });
+
   it("materializes missing due campaign rituals during refresh for the March 27 account shape", async () => {
     let localTasks = [
       {

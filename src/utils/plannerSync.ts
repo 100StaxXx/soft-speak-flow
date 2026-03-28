@@ -10,6 +10,7 @@ import {
   getLocalHabits,
   getLocalSubtasksForTask,
   getLocalTasksByDate,
+  dedupePlannerTasksByInstance,
   replaceLocalEpicHabits,
   replaceLocalEpicsForUser,
   replaceLocalHabitCompletionsForDate,
@@ -112,7 +113,7 @@ export async function loadLocalDailyTasks(userId: string, taskDate: string): Pro
     })),
   );
 
-  return sortTasks(hydratedTasks);
+  return sortTasks(dedupePlannerTasksByInstance(hydratedTasks));
 }
 
 export async function loadAllLocalTaskDates(userId: string): Promise<string[]> {

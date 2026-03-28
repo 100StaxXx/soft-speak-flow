@@ -50,6 +50,44 @@ interface SurfacedTaskWriteResult {
   queued: boolean;
 }
 
+type SupabaseLikeError = {
+  code?: string | null;
+  message?: string | null;
+  details?: string | null;
+  hint?: string | null;
+};
+
+const habitSurfacingWriteChains = new Map<string, Promise<void>>();
+
+async function withHabitSurfacingWriteLock<T>(
+  userId: string,
+  taskDate: string,
+  operation: () => Promise<T>,
+): Promise<T> {
+  const key = `${userId}:${taskDate}`;
+  const previous = habitSurfacingWriteChains.get(key) ?? Promise.resolve();
+  const waitForPrevious = previous.catch(() => undefined);
+
+  let releaseCurrent!: () => void;
+  const current = new Promise<void>((resolve) => {
+    releaseCurrent = resolve;
+  });
+  const currentChain = waitForPrevious.then(() => current);
+
+  habitSurfacingWriteChains.set(key, currentChain);
+
+  await waitForPrevious;
+
+  try {
+    return await operation();
+  } finally {
+    releaseCurrent();
+    if (habitSurfacingWriteChains.get(key) === currentChain) {
+      habitSurfacingWriteChains.delete(key);
+    }
+  }
+}
+
 export interface SurfacedHabit {
   id: string;
   habit_id: string;
@@ -66,6 +104,31 @@ export interface SurfacedHabit {
   category: string | null;
   custom_days: number[] | null;
   custom_month_days: number[] | null;
+}
+
+function isOnConflictArbiterError(error: SupabaseLikeError | null | undefined): boolean {
+  if (!error) return false;
+
+  const code = (error.code ?? "").toUpperCase();
+  const haystack = `${error.message ?? ""} ${error.details ?? ""} ${error.hint ?? ""}`.toLowerCase();
+
+  if (code === "42P10") return true;
+
+  return haystack.includes("no unique or exclusion constraint matching the on conflict specification")
+    || (haystack.includes("on conflict") && haystack.includes("arbiter"));
+}
+
+function isUniqueViolationError(error: SupabaseLikeError | null | undefined): boolean {
+  if (!error) return false;
+
+  const code = (error.code ?? "").toUpperCase();
+  const haystack = `${error.message ?? ""} ${error.details ?? ""} ${error.hint ?? ""}`.toLowerCase();
+
+  if (code === "23505") return true;
+
+  return haystack.includes("duplicate key")
+    || haystack.includes("already exists")
+    || haystack.includes("unique constraint");
 }
 
 function shouldSurfaceToday(habit: SurfacedHabit, dayOfWeek: number, targetDate: Date): boolean {
@@ -86,7 +149,7 @@ async function buildSurfacedHabits(userId: string, taskDate: string): Promise<Su
 
   const tasksByHabit = new Map<string, DailyTask>();
   existingTasks.forEach((task) => {
-    if (task.habit_source_id) {
+    if (task.habit_source_id && !tasksByHabit.has(task.habit_source_id)) {
       tasksByHabit.set(task.habit_source_id, task);
     }
   });
@@ -224,6 +287,37 @@ function toSurfacedTaskInsertPayload(userId: string, task: DailyTask) {
   };
 }
 
+function toSurfacedTaskQueuePayload(task: DailyTask) {
+  return {
+    id: task.id,
+    task_text: task.task_text,
+    difficulty: task.difficulty,
+    xp_reward: task.xp_reward,
+    task_date: task.task_date,
+    scheduled_time: task.scheduled_time,
+    estimated_duration: task.estimated_duration,
+    category: task.category,
+    source: task.source,
+    habit_source_id: task.habit_source_id,
+    epic_id: task.epic_id,
+    sort_order: task.sort_order,
+  };
+}
+
+async function queueSurfacedTaskCreates(
+  tasks: DailyTask[],
+  queueTaskAction: (
+    actionKind: "CREATE_TASK",
+    payload: Record<string, unknown>,
+  ) => Promise<unknown>,
+): Promise<void> {
+  await Promise.all(
+    tasks.map((task) =>
+      queueTaskAction("CREATE_TASK", toSurfacedTaskQueuePayload(task)),
+    ),
+  );
+}
+
 async function persistSurfacedTasks(
   userId: string,
   localTasks: DailyTask[],
@@ -243,24 +337,7 @@ async function persistSurfacedTasks(
   await Promise.all(localTasks.map((task) => upsertPlannerRecord("daily_tasks", task)));
 
   if (options.shouldQueueWrites) {
-    await Promise.all(
-      localTasks.map((task) =>
-        options.queueTaskAction("CREATE_TASK", {
-          id: task.id,
-          task_text: task.task_text,
-          difficulty: task.difficulty,
-          xp_reward: task.xp_reward,
-          task_date: task.task_date,
-          scheduled_time: task.scheduled_time,
-          estimated_duration: task.estimated_duration,
-          category: task.category,
-          source: task.source,
-          habit_source_id: task.habit_source_id,
-          epic_id: task.epic_id,
-          sort_order: task.sort_order,
-        }),
-      ),
-    );
+    await queueSurfacedTaskCreates(localTasks, options.queueTaskAction);
 
     return localTasks.map((task) => ({ id: task.id, queued: true }));
   }
@@ -275,30 +352,34 @@ async function persistSurfacedTasks(
       },
     );
 
-  if (error) {
-    await Promise.all(
-      localTasks.map((task) =>
-        options.queueTaskAction("CREATE_TASK", {
-          id: task.id,
-          task_text: task.task_text,
-          difficulty: task.difficulty,
-          xp_reward: task.xp_reward,
-          task_date: task.task_date,
-          scheduled_time: task.scheduled_time,
-          estimated_duration: task.estimated_duration,
-          category: task.category,
-          source: task.source,
-          habit_source_id: task.habit_source_id,
-          epic_id: task.epic_id,
-          sort_order: task.sort_order,
-        }),
-      ),
-    );
-    void options.retryNow();
-    return localTasks.map((task) => ({ id: task.id, queued: true }));
+  if (!error) {
+    return localTasks.map((task) => ({ id: task.id, queued: false }));
   }
 
-  return localTasks.map((task) => ({ id: task.id, queued: false }));
+  if (isOnConflictArbiterError(error)) {
+    const results = await Promise.all(localTasks.map(async (task) => {
+      const insertResult = await supabase
+        .from("daily_tasks")
+        .insert(toSurfacedTaskInsertPayload(userId, task));
+
+      if (!insertResult.error || isUniqueViolationError(insertResult.error)) {
+        return { id: task.id, queued: false } satisfies SurfacedTaskWriteResult;
+      }
+
+      await options.queueTaskAction("CREATE_TASK", toSurfacedTaskQueuePayload(task));
+      return { id: task.id, queued: true } satisfies SurfacedTaskWriteResult;
+    }));
+
+    if (results.some((result) => result.queued)) {
+      void options.retryNow();
+    }
+
+    return results;
+  }
+
+  await queueSurfacedTaskCreates(localTasks, options.queueTaskAction);
+  void options.retryNow();
+  return localTasks.map((task) => ({ id: task.id, queued: true }));
 }
 
 async function ensureSurfacedHabitTasksForDate(
@@ -388,25 +469,27 @@ export function useHabitSurfacing(selectedDate?: Date) {
 
     const refreshFromRemote = async () => {
       try {
-        const refreshed = await withPlannerRemoteSyncLock(user.id, async () => {
-          await Promise.all([
-            syncLocalHabitsFromRemote(user.id, taskDate),
-            syncLocalEpicsFromRemote(user.id),
-            syncLocalDailyTasksFromRemote(user.id, taskDate),
-          ]);
+        const refreshed = await withHabitSurfacingWriteLock(user.id, taskDate, async () =>
+          withPlannerRemoteSyncLock(user.id, async () => {
+            await Promise.all([
+              syncLocalHabitsFromRemote(user.id, taskDate),
+              syncLocalEpicsFromRemote(user.id),
+              syncLocalDailyTasksFromRemote(user.id, taskDate),
+            ]);
 
-          return ensureSurfacedHabitTasksForDate(
-            user.id,
-            taskDate,
-            new Date(effectiveDateKey),
-            dayOfWeek,
-            {
-              shouldQueueWrites,
-              queueTaskAction,
-              retryNow,
-            },
-          );
-        });
+            return ensureSurfacedHabitTasksForDate(
+              user.id,
+              taskDate,
+              new Date(effectiveDateKey),
+              dayOfWeek,
+              {
+                shouldQueueWrites,
+                queueTaskAction,
+                retryNow,
+              },
+            );
+          }),
+        );
 
         if (disposed) return;
 
@@ -450,81 +533,55 @@ export function useHabitSurfacing(selectedDate?: Date) {
   const surfaceHabitMutation = useMutation({
     mutationFn: async (habitId: string) => {
       if (!user?.id) throw new Error("Not authenticated");
-      return withPlannerRemoteSyncLock(user.id, async () => {
-        const habit = surfacedHabits.find((candidate) => candidate.habit_id === habitId);
-        if (!habit) throw new Error("Habit not found");
-        if (habit.task_id) {
-          return { id: habit.task_id, queued: false };
-        }
+      return withHabitSurfacingWriteLock(user.id, taskDate, async () =>
+        withPlannerRemoteSyncLock(user.id, async () => {
+          const habit = surfacedHabits.find((candidate) => candidate.habit_id === habitId);
+          if (!habit) throw new Error("Habit not found");
+          if (habit.task_id) {
+            return { id: habit.task_id, queued: false };
+          }
 
-        const existingTasks = await loadLocalDailyTasks(user.id, taskDate);
-        const localTask = buildSurfacedTaskRow(user.id, taskDate, habit, existingTasks.length);
-        await upsertPlannerRecord("daily_tasks", localTask);
+          const existingTasks = await loadLocalDailyTasks(user.id, taskDate);
+          const existingTask = existingTasks.find((task) => task.habit_source_id === habitId);
+          if (existingTask) {
+            return { id: existingTask.id, queued: false };
+          }
 
-        if (shouldQueueWrites) {
-          await queueTaskAction("CREATE_TASK", {
-            id: localTask.id,
-            task_text: localTask.task_text,
-            difficulty: localTask.difficulty,
-            xp_reward: localTask.xp_reward,
-            task_date: localTask.task_date,
-            scheduled_time: localTask.scheduled_time,
-            estimated_duration: localTask.estimated_duration,
-            category: localTask.category,
-            source: localTask.source,
-            habit_source_id: localTask.habit_source_id,
-            epic_id: localTask.epic_id,
-            sort_order: localTask.sort_order,
-          });
+          const localTask = buildSurfacedTaskRow(user.id, taskDate, habit, existingTasks.length);
+          await upsertPlannerRecord("daily_tasks", localTask);
 
-          return { id: localTask.id, queued: true };
-        }
+          if (shouldQueueWrites) {
+            await queueTaskAction("CREATE_TASK", toSurfacedTaskQueuePayload(localTask));
+            return { id: localTask.id, queued: true };
+          }
 
-        const { error } = await supabase
-          .from("daily_tasks")
-          .upsert({
-            id: localTask.id,
-            user_id: user.id,
-            task_text: localTask.task_text,
-            difficulty: localTask.difficulty,
-            xp_reward: localTask.xp_reward,
-            task_date: localTask.task_date,
-            completed: false,
-            completed_at: null,
-            is_main_quest: false,
-            scheduled_time: localTask.scheduled_time,
-            estimated_duration: localTask.estimated_duration,
-            category: localTask.category,
-            source: localTask.source,
-            habit_source_id: localTask.habit_source_id,
-            epic_id: localTask.epic_id,
-            sort_order: localTask.sort_order,
-          }, {
-            onConflict: "user_id,task_date,habit_source_id",
-            ignoreDuplicates: true,
-          });
+          const insertPayload = toSurfacedTaskInsertPayload(user.id, localTask);
+          const { error } = await supabase
+            .from("daily_tasks")
+            .upsert(insertPayload, {
+              onConflict: "user_id,task_date,habit_source_id",
+              ignoreDuplicates: true,
+            });
 
-        if (error) {
-          await queueTaskAction("CREATE_TASK", {
-            id: localTask.id,
-            task_text: localTask.task_text,
-            difficulty: localTask.difficulty,
-            xp_reward: localTask.xp_reward,
-            task_date: localTask.task_date,
-            scheduled_time: localTask.scheduled_time,
-            estimated_duration: localTask.estimated_duration,
-            category: localTask.category,
-            source: localTask.source,
-            habit_source_id: localTask.habit_source_id,
-            epic_id: localTask.epic_id,
-            sort_order: localTask.sort_order,
-          });
+          if (!error) {
+            return { id: localTask.id, queued: false };
+          }
+
+          if (isOnConflictArbiterError(error)) {
+            const insertResult = await supabase
+              .from("daily_tasks")
+              .insert(insertPayload);
+
+            if (!insertResult.error || isUniqueViolationError(insertResult.error)) {
+              return { id: localTask.id, queued: false };
+            }
+          }
+
+          await queueTaskAction("CREATE_TASK", toSurfacedTaskQueuePayload(localTask));
           void retryNow();
           return { id: localTask.id, queued: true };
-        }
-
-        return { id: localTask.id, queued: false };
-      });
+        }),
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["habit-surfacing"] });
@@ -537,22 +594,24 @@ export function useHabitSurfacing(selectedDate?: Date) {
   const surfaceAllHabitsMutation = useMutation({
     mutationFn: async () => {
       if (!user?.id) throw new Error("Not authenticated");
-      return withPlannerRemoteSyncLock(user.id, async () => {
-        const { results } = await ensureSurfacedHabitTasksForDate(
-          user.id,
-          taskDate,
-          new Date(effectiveDateKey),
-          dayOfWeek,
-          {
-            shouldQueueWrites,
-            queueTaskAction,
-            retryNow,
-            surfacedHabits,
-          },
-        );
+      return withHabitSurfacingWriteLock(user.id, taskDate, async () =>
+        withPlannerRemoteSyncLock(user.id, async () => {
+          const { results } = await ensureSurfacedHabitTasksForDate(
+            user.id,
+            taskDate,
+            new Date(effectiveDateKey),
+            dayOfWeek,
+            {
+              shouldQueueWrites,
+              queueTaskAction,
+              retryNow,
+              surfacedHabits,
+            },
+          );
 
-        return results;
-      });
+          return results;
+        }),
+      );
     },
     onSuccess: (rows) => {
       queryClient.invalidateQueries({ queryKey: ["habit-surfacing"] });
