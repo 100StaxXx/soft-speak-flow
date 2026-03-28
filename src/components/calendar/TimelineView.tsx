@@ -5,7 +5,10 @@ import { cn } from "@/lib/utils";
 import { Clock, Plus, ChevronRight } from "lucide-react";
 import { CalendarTask, CalendarMilestone } from "@/types/quest";
 import { useTimelineDrag } from "@/hooks/useTimelineDrag";
-import { SHARED_TIMELINE_DRAG_PROFILE } from "./dragSnap";
+import {
+  SHARED_TIMELINE_DRAG_INTERACTION_PROFILE,
+  SHARED_TIMELINE_DRAG_PROFILE,
+} from "./dragSnap";
 import { WeekStrip } from "./WeekStrip";
 import { TimelineTaskCard } from "./TimelineTaskCard";
 import { AllDayTaskBanner } from "./AllDayTaskBanner";
@@ -65,9 +68,7 @@ export function TimelineView({
   const timelineDrag = useTimelineDrag({
     containerRef: timelineDragContainerRef,
     snapConfig: SHARED_TIMELINE_DRAG_PROFILE,
-    touchActivationThresholdPx: 24,
-    touchActivationPolicy: "longPressThenMove",
-    postActivationDeadzonePx: 8,
+    ...SHARED_TIMELINE_DRAG_INTERACTION_PROFILE,
     onDrop: (taskId, newTime) => {
       onTaskReschedule?.(taskId, newTime);
     },

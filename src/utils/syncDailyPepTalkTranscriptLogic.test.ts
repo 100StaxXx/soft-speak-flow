@@ -5,7 +5,7 @@ import {
 } from "../../supabase/functions/sync-daily-pep-talk-transcript/syncLogic";
 
 describe("buildTranscriptSyncPlan", () => {
-  it("plans daily + library updates when transcript changes", () => {
+  it("preserves existing script text when transcript changes", () => {
     const plan = buildTranscriptSyncPlan({
       currentScript: "Old script",
       currentTranscript: [{ word: "old", start: 0, end: 0.3 }],
@@ -18,7 +18,8 @@ describe("buildTranscriptSyncPlan", () => {
     });
 
     expect(plan.updated).toBe(true);
-    expect(plan.scriptChanged).toBe(true);
+    expect(plan.nextScript).toBe("Old script");
+    expect(plan.scriptChanged).toBe(false);
     expect(plan.transcriptChanged).toBe(true);
     expect(plan.hasWordTimestamps).toBe(true);
     expect(plan.wordCount).toBe(1);
@@ -26,6 +27,21 @@ describe("buildTranscriptSyncPlan", () => {
     expect(plan.nextTranscript).toEqual([{ word: "new", start: 0, end: 0.4 }]);
     expect(plan.libraryIdsToUpdate).toEqual(["library-1"]);
     expect(plan.warning).toBeUndefined();
+  });
+
+  it("backfills missing script text from transcription", () => {
+    const plan = buildTranscriptSyncPlan({
+      currentScript: "   ",
+      currentTranscript: [],
+      transcribedText: "Recovered script",
+      transcribedTranscript: [{ word: "Recovered", start: 0, end: 0.4 }],
+      libraryRows: [],
+    });
+
+    expect(plan.nextScript).toBe("Recovered script");
+    expect(plan.scriptChanged).toBe(true);
+    expect(plan.transcriptChanged).toBe(true);
+    expect(plan.updated).toBe(true);
   });
 
   it("preserves existing transcript when upstream timestamps are empty", () => {

@@ -59,7 +59,10 @@ import { useMotionProfile } from "@/hooks/useMotionProfile";
 import type { JourneysLayoutMode } from "@/hooks/useJourneysLayoutMode";
 import { buildTaskConflictMap, getTaskConflictSetForTask } from "@/utils/taskTimeConflicts";
 import { buildTaskTimelineFlow } from "@/utils/taskTimelineFlow";
-import { SHARED_TIMELINE_DRAG_PROFILE } from "@/components/calendar/dragSnap";
+import {
+  SHARED_TIMELINE_DRAG_INTERACTION_PROFILE,
+  SHARED_TIMELINE_DRAG_PROFILE,
+} from "@/components/calendar/dragSnap";
 import type { TaskAttachment } from "@/types/questAttachments";
 
 // Helper to calculate days remaining
@@ -920,9 +923,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     containerRef: timelineDragContainerRef,
     enabled: isTimelineDragEnabled,
     snapConfig: SHARED_TIMELINE_DRAG_PROFILE,
-    touchActivationThresholdPx: 24,
-    touchActivationPolicy: "longPressThenMove",
-    postActivationDeadzonePx: 8,
+    ...SHARED_TIMELINE_DRAG_INTERACTION_PROFILE,
     onDrop: (taskId, newTime) => {
       const overlapCount = getTaskConflictSetForTask(taskId, draggableTimelineItems, { [taskId]: newTime }).size;
       onUpdateScheduledTime?.(taskId, newTime);

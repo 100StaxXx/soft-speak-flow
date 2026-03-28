@@ -5,6 +5,7 @@ import { requireRequestAuth } from "../_shared/auth.ts";
 import {
   buildTranscriptionFailurePayload,
   buildTranscriptSyncPlan,
+  scriptsDifferMaterially,
   type LibraryTranscriptRow,
 } from "./syncLogic.ts";
 
@@ -114,6 +115,14 @@ serve(async (req) => {
       );
     }
 
+    if (scriptsDifferMaterially(pepTalk.script, transcribedText)) {
+      console.warn("Transcription text diverged from stored daily pep talk script; preserving original script", {
+        id: pepTalk.id,
+        mentor_slug: pepTalk.mentor_slug ?? null,
+        for_date: pepTalk.for_date ?? null,
+      });
+    }
+
     let libraryRows: LibraryTranscriptRow[] = [];
     if (pepTalk.mentor_slug && pepTalk.for_date) {
       const { data: candidateRows, error: libraryLookupError } = await supabase
@@ -152,16 +161,24 @@ serve(async (req) => {
     });
 
     if (syncPlan.updated) {
+      const updatePayload: {
+        script?: string;
+        transcript: typeof syncPlan.nextTranscript;
+      } = {
+        transcript: syncPlan.nextTranscript,
+      };
+
+      if (syncPlan.scriptChanged) {
+        updatePayload.script = syncPlan.nextScript;
+      }
+
       const { error: updateErr } = await supabase
         .from("daily_pep_talks")
-        .update({
-          script: syncPlan.nextScript,
-          transcript: syncPlan.nextTranscript,
-        })
+        .update(updatePayload)
         .eq("id", pepTalk.id);
 
       if (updateErr) {
-        console.error("Failed updating daily_pep_talks.script:", updateErr);
+        console.error("Failed updating daily_pep_talks transcript state:", updateErr);
         return new Response(
           JSON.stringify({
             error: "Failed to update script/transcript",
@@ -180,7 +197,10 @@ serve(async (req) => {
           { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      console.log(`Updated daily_pep_talks.script and transcript (id=${pepTalk.id})`);
+      console.log(`Updated daily_pep_talks transcript state (id=${pepTalk.id})`, {
+        scriptChanged: syncPlan.scriptChanged,
+        transcriptChanged: syncPlan.transcriptChanged,
+      });
     }
 
     let libraryRowsUpdated = 0;

@@ -3,6 +3,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
 import { requireRequestAuth } from "../_shared/auth.ts";
+import { buildTranscriptionFormData } from "./request.ts";
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -51,11 +52,7 @@ serve(async (req) => {
     console.log('Audio fetched, size:', audioBlob.size, 'bytes');
 
     // Prepare form data for OpenAI Whisper API
-    const formData = new FormData();
-    formData.append('file', audioBlob, 'audio.mp3');
-    formData.append('model', 'whisper-1');
-    formData.append('response_format', 'verbose_json');
-    formData.append('timestamp_granularities[]', 'word');
+    const formData = buildTranscriptionFormData(audioBlob);
 
     console.log('Sending to OpenAI Whisper API...');
 

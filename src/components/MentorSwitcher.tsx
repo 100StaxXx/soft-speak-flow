@@ -1,4 +1,4 @@
-import { forwardRef, useMemo, useState, type ButtonHTMLAttributes } from "react";
+import { forwardRef, useCallback, useMemo, useState, type ButtonHTMLAttributes } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Loader2, Repeat2, Sparkles } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -34,8 +34,10 @@ import {
 } from "@/utils/mentorChatLocationState";
 
 type MentorSwitcherProps = {
-  variant?: "card" | "button";
+  variant?: "card" | "button" | "none";
   className?: string;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 };
 
 type ActiveMentorRecord = MentorRecommendationCandidate & {
@@ -188,6 +190,8 @@ TriggerCard.displayName = "TriggerCard";
 export const MentorSwitcher = ({
   variant = "card",
   className,
+  open: controlledOpen,
+  onOpenChange,
 }: MentorSwitcherProps) => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -197,8 +201,18 @@ export const MentorSwitcher = ({
   const pendingMood = usePendingMentorMood();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
   const [switchingMentorId, setSwitchingMentorId] = useState<string | null>(null);
+  const open = controlledOpen ?? internalOpen;
+  const handleOpenChange = useCallback(
+    (nextOpen: boolean) => {
+      if (controlledOpen === undefined) {
+        setInternalOpen(nextOpen);
+      }
+      onOpenChange?.(nextOpen);
+    },
+    [controlledOpen, onOpenChange],
+  );
 
   const timezone =
     profile?.timezone ||
@@ -298,7 +312,7 @@ export const MentorSwitcher = ({
       replace: shouldReplaceMentorChatEntry,
       state: withConsultMentorState(location.state, consultedMentorId, location.pathname),
     });
-    setOpen(false);
+    handleOpenChange(false);
   };
 
   const handleConsultMentor = (mentor: ActiveMentorRecord) => {
@@ -345,7 +359,7 @@ export const MentorSwitcher = ({
         title: "Primary guide updated",
         description: `${mentor.name} is now your primary guide. You can still consult other guides anytime.`,
       });
-      setOpen(false);
+      handleOpenChange(false);
     } catch (error) {
       toast({
         title: "Couldn't update primary guide",
@@ -357,26 +371,28 @@ export const MentorSwitcher = ({
     }
   };
 
-  const trigger = variant === "button" ? (
-    <Button
-      type="button"
-      variant="outline"
-      size="sm"
-      className={cn("rounded-full border-border/70 bg-background/75 backdrop-blur-sm", className)}
-      data-testid="mentor-switcher-trigger"
-    >
-      <Repeat2 className="h-4 w-4" />
-      {isConsultingAlternateMentor ? "Change consult" : "Consult guides"}
-    </Button>
-  ) : (
-    <TriggerCard
-      activeMentor={activeMentor}
-      consultMentor={consultMentor}
-      currentMood={currentMood}
-      recommendations={recommendations}
-      className={className}
-    />
-  );
+  const trigger = variant === "none"
+    ? null
+    : variant === "button" ? (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className={cn("rounded-full border-border/70 bg-background/75 backdrop-blur-sm", className)}
+          data-testid="mentor-switcher-trigger"
+        >
+          <Repeat2 className="h-4 w-4" />
+          {isConsultingAlternateMentor ? "Change consult" : "Consult guides"}
+        </Button>
+      ) : (
+        <TriggerCard
+          activeMentor={activeMentor}
+          consultMentor={consultMentor}
+          currentMood={currentMood}
+          recommendations={recommendations}
+          className={className}
+        />
+      );
 
   const moodSummary = getMoodSummary({
     pendingMood,
@@ -385,8 +401,8 @@ export const MentorSwitcher = ({
   });
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>{trigger}</DialogTrigger>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      {trigger ? <DialogTrigger asChild>{trigger}</DialogTrigger> : null}
       <DialogContent data-testid="mentor-switcher-dialog" className="max-w-3xl gap-0 overflow-hidden p-0">
         <DialogHeader className="border-b border-border/60 px-6 py-5">
           <DialogTitle>Consult another guide</DialogTitle>

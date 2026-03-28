@@ -88,6 +88,13 @@ export const SHARED_TIMELINE_DRAG_PROFILE: Readonly<Partial<AdaptiveSnapConfig>>
   precisionActivationMode: "manual-hold",
 });
 
+export const SHARED_TIMELINE_DRAG_INTERACTION_PROFILE = Object.freeze({
+  activationThresholdPx: 12,
+  touchActivationThresholdPx: 24,
+  touchActivationPolicy: "longPressThenMove" as const,
+  postActivationDeadzonePx: 8,
+});
+
 export const clampMinuteToRange = (
   minute: number,
   config?: Partial<AdaptiveSnapConfig>,

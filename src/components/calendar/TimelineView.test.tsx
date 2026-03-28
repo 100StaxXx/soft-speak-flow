@@ -54,13 +54,13 @@ const dispatchPointerMove = (clientY: number) => {
 };
 
 const dispatchTouchMove = (clientY: number) => {
-  const event = new Event("touchmove", { cancelable: true }) as TouchEvent;
+  const event = new Event("touchmove", { bubbles: true, cancelable: true }) as TouchEvent;
   Object.defineProperty(event, "touches", { value: [{ clientY }] });
-  window.dispatchEvent(event);
+  document.dispatchEvent(event);
 };
 
 const dispatchTouchEnd = () => {
-  window.dispatchEvent(new Event("touchend"));
+  document.dispatchEvent(new Event("touchend", { bubbles: true, cancelable: true }));
 };
 
 const createPointerDownEvent = (clientY: number) => {
@@ -93,13 +93,35 @@ describe("TimelineView drag integration", () => {
     act(() => {
       fireEvent(dragRow, createPointerDownEvent(100));
 
-      dispatchPointerMove(120); // +20px with post-activation deadzone => +5m
+      dispatchPointerMove(124); // +24px with 20px combined activation/deadzone => +5m
       window.dispatchEvent(new Event("pointerup"));
     });
 
     await waitFor(() => {
       expect(onTaskReschedule).toHaveBeenCalledWith("task-1", "09:05");
     });
+  });
+
+  it("does not reschedule for a pointer wiggle below the shared desktop threshold", async () => {
+    const onTaskReschedule = vi.fn();
+
+    render(
+      <TimelineView
+        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+        onDateSelect={vi.fn()}
+        tasks={[baseTask()]}
+        onTaskReschedule={onTaskReschedule}
+      />,
+    );
+
+    const dragRow = screen.getByText("Focus block");
+    act(() => {
+      fireEvent(dragRow, createPointerDownEvent(100));
+      dispatchPointerMove(111);
+      window.dispatchEvent(new Event("pointerup"));
+    });
+
+    expect(onTaskReschedule).not.toHaveBeenCalled();
   });
 
   it("does not show zoom rail during active drag", async () => {

@@ -16,7 +16,6 @@ import { EveningReflectionBanner } from "@/components/EveningReflectionBanner";
 import { WeeklyRecapCard } from "@/components/WeeklyRecapCard";
 import { DailyCoachPanel } from "@/components/DailyCoachPanel";
 import { IndexPageSkeleton } from "@/components/skeletons";
-import { MentorSwitcher } from "@/components/MentorSwitcher";
 import { ParallaxCard } from "@/components/ui/parallax-card";
 import { Button } from "@/components/ui/button";
 import { loadMentorImage } from "@/utils/mentorImageLoader";
@@ -369,12 +368,6 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
         </ErrorBoundary>
       </ParallaxCard>
 
-      <ParallaxCard offset={13}>
-        <ErrorBoundary>
-          <MentorSwitcher />
-        </ErrorBoundary>
-      </ParallaxCard>
-
       <ParallaxCard offset={12}>
         <ErrorBoundary>
           <MorningBriefing />
@@ -518,12 +511,6 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
         <ParallaxCard offset={14}>
           <ErrorBoundary>
             <MorningCheckIn />
-          </ErrorBoundary>
-        </ParallaxCard>
-
-        <ParallaxCard offset={13}>
-          <ErrorBoundary>
-            <MentorSwitcher />
           </ErrorBoundary>
         </ParallaxCard>
 

@@ -146,6 +146,19 @@ describe("MentorSwitcher", () => {
     expect(screen.getAllByText("Atlas").length).toBeGreaterThan(0);
   });
 
+  it("supports a controlled triggerless dialog", () => {
+    const onOpenChange = vi.fn();
+
+    render(<MentorSwitcher variant="none" open onOpenChange={onOpenChange} />);
+
+    expect(screen.queryByTestId("mentor-switcher-trigger")).not.toBeInTheDocument();
+    expect(screen.getByTestId("mentor-switcher-dialog")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
   it("opens a scoped consult without changing the primary guide", async () => {
     render(<MentorSwitcher variant="button" />);
 

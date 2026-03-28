@@ -425,7 +425,8 @@ export const TodaysPepTalk = memo(() => {
 
           setPepTalk((prev: DailyPepTalk | null) => {
             if (!prev) return prev;
-            const nextScript = syncedScript ?? prev.script;
+            const hasStoredScript = typeof prev.script === "string" && prev.script.trim().length > 0;
+            const nextScript = hasStoredScript ? prev.script : (syncedScript ?? prev.script);
             const nextTranscript = validatedTranscript.length > 0 ? validatedTranscript : prev.transcript;
             const shouldUpdate = nextScript !== prev.script || JSON.stringify(nextTranscript) !== JSON.stringify(prev.transcript);
             return shouldUpdate

@@ -1,11 +1,13 @@
-import { memo, useCallback, useEffect, useRef } from "react";
+import { memo, useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { PawPrint, User, Compass, Target } from "lucide-react";
 
 import { NavLink } from "@/components/NavLink";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { MentorAvatar } from "@/components/MentorAvatar";
+import { MentorSwitcher } from "@/components/MentorSwitcher";
 import { useCompanion } from "@/hooks/useCompanion";
+import { useLongPress } from "@/hooks/useLongPress";
 import { Badge } from "@/components/ui/badge";
 import { haptics } from "@/utils/haptics";
 import { CompanionNavPresence } from "@/components/companion/CompanionNavPresence";
@@ -21,10 +23,21 @@ type PrefetchTarget = "mentor" | "journeys" | "campaigns" | "companion";
 
 export const BottomNav = memo(() => {
   const navRef = useRef<HTMLElement | null>(null);
+  const suppressGuideNavigationRef = useRef(false);
+  const suppressGuideNavigationTimerRef = useRef<number | null>(null);
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { mentorId: resolvedMentorId } = useMentorConnection();
   const { companion, canEvolve } = useCompanion();
+  const [isMentorSwitcherOpen, setIsMentorSwitcherOpen] = useState(false);
+
+  const clearGuideNavigationSuppression = useCallback(() => {
+    suppressGuideNavigationRef.current = false;
+    if (suppressGuideNavigationTimerRef.current !== null) {
+      window.clearTimeout(suppressGuideNavigationTimerRef.current);
+      suppressGuideNavigationTimerRef.current = null;
+    }
+  }, []);
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -60,6 +73,8 @@ export const BottomNav = memo(() => {
     };
   }, []);
 
+  useEffect(() => clearGuideNavigationSuppression, [clearGuideNavigationSuppression]);
+
   const prefetchJourneysTasks = useCallback(() => {
     if (!user?.id) return;
 
@@ -85,6 +100,37 @@ export const BottomNav = memo(() => {
     }
   }, [prefetchCampaigns, prefetchJourneysTasks]);
 
+  const openMentorSwitcher = useCallback(() => {
+    suppressGuideNavigationRef.current = true;
+    if (suppressGuideNavigationTimerRef.current !== null) {
+      window.clearTimeout(suppressGuideNavigationTimerRef.current);
+    }
+    suppressGuideNavigationTimerRef.current = window.setTimeout(() => {
+      clearGuideNavigationSuppression();
+    }, 250);
+    setIsMentorSwitcherOpen(true);
+  }, [clearGuideNavigationSuppression]);
+
+  const handleGuideTabClick = useCallback((event: ReactMouseEvent<HTMLAnchorElement>) => {
+    if (suppressGuideNavigationRef.current) {
+      event.preventDefault();
+      event.stopPropagation();
+      clearGuideNavigationSuppression();
+      return;
+    }
+
+    haptics.light();
+  }, [clearGuideNavigationSuppression]);
+
+  const {
+    handlers: guideAvatarLongPressHandlers,
+    isActivated: isGuideAvatarLongPressed,
+  } = useLongPress({
+    onLongPress: () => {
+      openMentorSwitcher();
+    },
+  });
+
   const { data: selectedMentor, isLoading: mentorLoading } = useQuery({
     queryKey: ["selected-mentor", resolvedMentorId],
     enabled: !!resolvedMentorId,
@@ -106,6 +152,13 @@ export const BottomNav = memo(() => {
 
   return (
     <>
+      {isMentorSwitcherOpen ? (
+        <MentorSwitcher
+          variant="none"
+          open={isMentorSwitcherOpen}
+          onOpenChange={setIsMentorSwitcherOpen}
+        />
+      ) : null}
       <nav
         ref={navRef}
         className="fixed bottom-0 left-0 right-0 cosmiq-glass-nav z-50 border-t border-border/40 transition-transform duration-200"
@@ -119,7 +172,7 @@ export const BottomNav = memo(() => {
             className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation min-w-[58px] min-h-[56px]"
             activeClassName="bg-orange-500/12"
             data-tour="mentor-tab"
-            onClick={() => haptics.light()}
+            onClick={handleGuideTabClick}
             onMouseEnter={() => handlePrefetch('mentor')}
             onFocus={() => handlePrefetch('mentor')}
           >
@@ -128,14 +181,21 @@ export const BottomNav = memo(() => {
                 {mentorLoading ? (
                   <div className="h-7 w-7 rounded-full bg-muted animate-pulse" aria-hidden />
                 ) : selectedMentor ? (
-                  <MentorAvatar
-                    mentorSlug={selectedMentor.slug || ''}
-                    mentorName={selectedMentor.name}
-                    primaryColor={selectedMentor.primary_color || '#000'}
-                    size="sm"
-                    className="w-7 h-7"
-                    showBorder={false}
-                  />
+                  <div
+                    {...guideAvatarLongPressHandlers}
+                    data-testid="bottom-nav-guide-avatar"
+                    className={`rounded-full ${isGuideAvatarLongPressed ? 'opacity-70' : ''}`}
+                    style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}
+                  >
+                    <MentorAvatar
+                      mentorSlug={selectedMentor.slug || ''}
+                      mentorName={selectedMentor.name}
+                      primaryColor={selectedMentor.primary_color || '#000'}
+                      size="sm"
+                      className="w-7 h-7"
+                      showBorder={false}
+                    />
+                  </div>
                 ) : (
                   <User className={`h-6 w-6 transition-colors duration-200 ${isActive ? 'text-orange-300' : 'text-muted-foreground'}`} />
                 )}

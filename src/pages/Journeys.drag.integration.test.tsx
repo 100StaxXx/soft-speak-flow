@@ -688,7 +688,7 @@ describe("Journeys row drag integration", () => {
 
     act(() => {
       fireEvent(row, createPointerDownEvent(100));
-      dispatchPointerMove(820);
+      dispatchPointerMove(825);
     });
 
     await waitFor(() => {
@@ -709,6 +709,34 @@ describe("Journeys row drag integration", () => {
 
     expect(mocks.syncTaskUpdateMutateAsync).toHaveBeenCalledWith({ taskId: "task-1" });
     expect(screen.getByText("Plan your quests for the week ahead.")).toBeInTheDocument();
+  });
+
+  it("does not reschedule a quest from a sub-threshold timeline row wiggle on /journeys", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/journeys"]}>
+          <Journeys />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    const row = await screen.findByTestId("timeline-row-task-1");
+
+    act(() => {
+      fireEvent(row, createPointerDownEvent(100));
+      dispatchPointerMove(111);
+      window.dispatchEvent(new Event("pointerup"));
+    });
+
+    expect(mocks.updateTask).not.toHaveBeenCalled();
+    expect(mocks.syncTaskUpdateMutateAsync).not.toHaveBeenCalled();
   });
 
   it("reschedules a quest from the timeline row touch drag path on /journeys", async () => {
@@ -770,7 +798,7 @@ describe("Journeys row drag integration", () => {
 
     act(() => {
       fireEvent(row, createPointerDownEvent(100));
-      dispatchPointerMove(820);
+      dispatchPointerMove(825);
       window.dispatchEvent(new Event("pointerup"));
     });
 
@@ -815,7 +843,7 @@ describe("Journeys row drag integration", () => {
 
     act(() => {
       fireEvent(row, createPointerDownEvent(100));
-      dispatchPointerMove(820);
+      dispatchPointerMove(825);
       window.dispatchEvent(new Event("pointerup"));
     });
 
@@ -904,7 +932,7 @@ describe("Journeys row drag integration", () => {
 
     act(() => {
       fireEvent(rowTaskOne, createPointerDownEvent(100));
-      dispatchPointerMove(820);
+      dispatchPointerMove(825);
     });
 
     act(() => {

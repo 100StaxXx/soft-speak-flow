@@ -47,6 +47,31 @@ export interface TranscriptSyncFailurePayload {
 const EMPTY_TIMESTAMPS_WARNING =
   "Transcription returned no word timestamps; preserved existing transcript.";
 
+function normalizeComparableText(input: string | null | undefined): string {
+  return (input ?? "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+export function hasStoredScript(input: string | null | undefined): boolean {
+  return normalizeComparableText(input).length > 0;
+}
+
+export function scriptsDifferMaterially(
+  currentScript: string | null | undefined,
+  transcribedText: string | null | undefined,
+): boolean {
+  const normalizedCurrent = normalizeComparableText(currentScript);
+  const normalizedTranscribed = normalizeComparableText(transcribedText);
+
+  if (normalizedCurrent.length === 0 || normalizedTranscribed.length === 0) {
+    return false;
+  }
+
+  return normalizedCurrent !== normalizedTranscribed;
+}
+
 export function normalizeTranscript(input: unknown): TranscriptWord[] {
   if (!Array.isArray(input)) {
     return [];
@@ -88,8 +113,11 @@ export function transcriptsEqual(a: TranscriptWord[], b: TranscriptWord[]): bool
 
 export function buildTranscriptSyncPlan(input: TranscriptSyncPlanInput): TranscriptSyncPlan {
   const currentText = input.currentScript ?? "";
-  const nextScript = input.transcribedText;
-  const scriptChanged = currentText.trim() !== nextScript.trim();
+  const currentScriptExists = hasStoredScript(currentText);
+  const nextScript = currentScriptExists ? currentText : input.transcribedText;
+  const scriptChanged =
+    !currentScriptExists &&
+    normalizeComparableText(nextScript) !== normalizeComparableText(currentText);
 
   const currentTranscript = normalizeTranscript(input.currentTranscript);
   const transcribedTranscript = normalizeTranscript(input.transcribedTranscript);

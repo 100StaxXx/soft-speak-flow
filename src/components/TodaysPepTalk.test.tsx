@@ -276,18 +276,18 @@ describe("TodaysPepTalk transcript expand behavior", () => {
     expect(screen.queryByText(/word21/)).not.toBeInTheDocument();
   });
 
-  it("applies timed transcript returned by background sync without regressions", async () => {
+  it("preserves displayed script while applying timed transcript returned by background sync", async () => {
     mocks.state.dailyPepTalk = makePepTalk({
       id: "pep-talk-sync-success",
-      script: "INITIAL_SCRIPT_TEXT",
+      script: "Original preview text stays intact before transcript expansion.",
       transcript: [],
     });
     mocks.state.syncResponse = {
       data: {
-        script: "SYNCED_SCRIPT_TEXT",
+        script: "Bad garbled replacement text",
         transcript: [
-          { word: "SYNCED", start: 0, end: 0.5 },
-          { word: "CAPTION", start: 0.5, end: 1 },
+          { word: "Stay", start: 0, end: 0.5 },
+          { word: "Sharp", start: 0.5, end: 1 },
         ],
       },
       error: null,
@@ -301,11 +301,14 @@ describe("TodaysPepTalk transcript expand behavior", () => {
       });
     });
 
+    expect(screen.getByText(/Original preview text stays intact/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Bad garbled replacement text/i)).not.toBeInTheDocument();
+
     fireEvent.click(await screen.findByRole("button", { name: /show full transcript/i }));
 
-    expect(await screen.findByText("SYNCED")).toBeInTheDocument();
-    expect(screen.getByText("CAPTION")).toBeInTheDocument();
-    expect(screen.queryByText("INITIAL_SCRIPT_TEXT")).not.toBeInTheDocument();
+    expect(await screen.findByText("Stay")).toBeInTheDocument();
+    expect(screen.getByText("Sharp")).toBeInTheDocument();
+    expect(screen.queryByText(/Original preview text stays intact/i)).not.toBeInTheDocument();
   });
 
   it("auto-scrolls transcript container without calling word scrollIntoView", async () => {
