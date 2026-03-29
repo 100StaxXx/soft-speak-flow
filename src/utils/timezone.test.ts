@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { getEffectiveMissionDate } from "./timezone";
+import { getEffectiveDailyDate, getEffectiveMissionDate } from "./timezone";
 
 describe("getEffectiveMissionDate", () => {
   afterEach(() => {
@@ -28,5 +28,13 @@ describe("getEffectiveMissionDate", () => {
     vi.setSystemTime(new Date("2026-03-10T02:00:00Z"));
 
     expect(getEffectiveMissionDate("UTC")).toBe("2026-03-10");
+  });
+
+  it("allows explicit timezone overrides", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-03-10T08:30:00Z"));
+
+    expect(getEffectiveDailyDate("America/Los_Angeles")).toBe("2026-03-09");
+    expect(getEffectiveDailyDate("UTC")).toBe("2026-03-10");
   });
 });

@@ -21,13 +21,13 @@ const MENTOR_VOICES: Record<string, string> = {
   'darius': 'rWyjfFeMZ6PxkHqD3wGC', // Brian
   'eli': 'mcuuWJIofmzgKEGk3EMA', // Chris
   'nova': 'onwK4e9ZLuTAKqWW03F9', // Daniel
-  'sienna': 'XB0fDUnXU5powFXDhCwa', // Charlotte
+  'sienna': 'wGcFBfKz5yUQqhqr0mVy', // Charlotte
   'lumi': 'EXAVITQu4vr4xnSDxMaL', // Sarah
   'kai': 'N2lVS1w4EtoT3dr4eOWO', // Callum
   'stryker': 'pNInz6obpgDQGcFmaJgB', // Rich
-  'carmen': 'bD9maNcCuQQS75DGuteM', // Carmen
+  'carmen': 'hZLR2VL7jAuie9sowsXqg', // Carmen
   'reign': 'GTQ4ImqrRljZAa9VJX6B', // Reign custom voice
-  'solace': 'pFZP5JQG7iQjIQuC4Bku', // Lily
+  'solace': 'XB0fDUnXU5powFXDhCwa', // Solace
 };
 
 serve(async (req) => {

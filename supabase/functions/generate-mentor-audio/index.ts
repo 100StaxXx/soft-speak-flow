@@ -36,7 +36,7 @@ const mentorVoices: Record<string, MentorVoiceConfig> = {
   atlas: { voiceId: "JBFqnCBsd6RMkjVDRZzb", stability: 0.75, similarity_boost: 0.85, style_exaggeration: 0.5 },
   eli: { voiceId: "mcuuWJIofmzgKEGk3EMA", stability: 0.7, similarity_boost: 0.8, style_exaggeration: 0.4 },
   nova: { voiceId: "onwK4e9ZLuTAKqWW03F9", stability: 0.65, similarity_boost: 0.75, style_exaggeration: 0.6 },
-  sienna: { voiceId: "XB0fDUnXU5powFXDhCwa", stability: 0.8, similarity_boost: 0.85, style_exaggeration: 0.3 },
+  sienna: { voiceId: "wGcFBfKz5yUQqhqr0mVy", stability: 0.8, similarity_boost: 0.85, style_exaggeration: 0.3 },
   lumi: { voiceId: "EXAVITQu4vr4xnSDxMaL", stability: 0.75, similarity_boost: 0.8, style_exaggeration: 0.2 },
   kai: { voiceId: "N2lVS1w4EtoT3dr4eOWO", stability: 0.7, similarity_boost: 0.85, style_exaggeration: 0.8 },
   stryker: {
@@ -46,7 +46,7 @@ const mentorVoices: Record<string, MentorVoiceConfig> = {
     style_exaggeration: 1.0,
     use_speaker_boost: true,
   },
-  carmen: { voiceId: "bD9maNcCuQQS75DGuteM", stability: 0.75, similarity_boost: 0.85, style_exaggeration: 0.7 },
+  carmen: { voiceId: "hZLR2VL7jAuie9sowsXqg", stability: 0.75, similarity_boost: 0.85, style_exaggeration: 0.7 },
   reign: {
     voiceId: "GTQ4ImqrRljZAa9VJX6B",
     stability: 0.52,
@@ -54,7 +54,7 @@ const mentorVoices: Record<string, MentorVoiceConfig> = {
     style_exaggeration: 1.0,
     use_speaker_boost: true,
   },
-  solace: { voiceId: "XrExE9yKIg1WjnnlVkGX", stability: 0.8, similarity_boost: 0.8, style_exaggeration: 0.35 },
+  solace: { voiceId: "XB0fDUnXU5powFXDhCwa", stability: 0.8, similarity_boost: 0.8, style_exaggeration: 0.35 },
 };
 
 const legacyVoiceAliases: Record<string, string> = {

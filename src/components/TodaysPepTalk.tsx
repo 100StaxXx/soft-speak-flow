@@ -14,6 +14,7 @@ import { parseFunctionInvokeError, toUserFacingFunctionError } from "@/utils/sup
 import { Capacitor } from "@capacitor/core";
 import { applyScriptPunctuationToTranscript } from "@/utils/transcriptPunctuation";
 import { useMentorConnection } from "@/contexts/MentorConnectionContext";
+import { getEffectiveDailyDate } from "@/utils/timezone";
 
 import { logger } from "@/utils/logger";
 import { toast } from "sonner";
@@ -97,6 +98,10 @@ export const TodaysPepTalk = memo(() => {
     () => typeof window !== "undefined" && Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios",
     [],
   );
+  const effectiveDate = useMemo(
+    () => getEffectiveDailyDate(profile?.timezone ?? undefined),
+    [profile?.timezone],
+  );
   
 
   // Reset audio ready state when audio URL changes
@@ -139,7 +144,6 @@ export const TodaysPepTalk = memo(() => {
     try {
       setError(false);
       setIsFallback(false);
-      const today = new Date().toLocaleDateString("en-CA");
 
       const { data: mentor, error: mentorError } = await supabase
         .from("mentors")
@@ -166,7 +170,7 @@ export const TodaysPepTalk = memo(() => {
       const { data: todayPepTalk, error: pepTalkError } = await supabase
         .from("daily_pep_talks")
         .select("*")
-        .eq("for_date", today)
+        .eq("for_date", effectiveDate)
         .eq("mentor_slug", mentor.slug)
         .maybeSingle();
 
@@ -215,7 +219,7 @@ export const TodaysPepTalk = memo(() => {
     } finally {
       setLoading(false);
     }
-  }, [resolvedMentorId]);
+  }, [effectiveDate, resolvedMentorId]);
 
   useEffect(() => {
     void fetchDailyPepTalk();

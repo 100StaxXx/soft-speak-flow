@@ -10,14 +10,30 @@ type DateParts = {
   day: string;
 };
 
+function resolveTimezone(userTimezone?: string): string {
+  const fallback = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  if (!userTimezone) {
+    return fallback;
+  }
+
+  try {
+    Intl.DateTimeFormat("en-US", { timeZone: userTimezone });
+    return userTimezone;
+  } catch {
+    return fallback;
+  }
+}
+
 /**
- * Get the effective mission date based on user timezone.
- * If current time is before 2 AM, returns yesterday's date.
- * This allows users who stay up past midnight to still see the same missions.
+ * Get the effective daily date based on user timezone.
+ * If current time is before the reset hour, returns yesterday's date.
  */
-export function getEffectiveMissionDate(userTimezone?: string): string {
+export function getEffectiveDailyDate(
+  userTimezone?: string,
+  resetHour = RESET_HOUR,
+): string {
   const now = new Date();
-  const tz = userTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const tz = resolveTimezone(userTimezone);
   
   // Get local hour in user's timezone
   const localHour = parseInt(
@@ -29,7 +45,7 @@ export function getEffectiveMissionDate(userTimezone?: string): string {
   );
   
   // If before reset hour, use previous day's date
-  if (localHour < RESET_HOUR) {
+  if (localHour < resetHour) {
     const yesterday = new Date(now);
     yesterday.setDate(yesterday.getDate() - 1);
     return formatDateForTimezone(yesterday, tz);
@@ -39,12 +55,21 @@ export function getEffectiveMissionDate(userTimezone?: string): string {
 }
 
 /**
+ * Get the effective mission date based on user timezone.
+ * If current time is before 2 AM, returns yesterday's date.
+ * This allows users who stay up past midnight to still see the same missions.
+ */
+export function getEffectiveMissionDate(userTimezone?: string): string {
+  return getEffectiveDailyDate(userTimezone, RESET_HOUR);
+}
+
+/**
  * Get the effective day of week (0=Sunday, 1=Monday, etc.) based on user timezone.
  * Respects the 2 AM reset rule.
  */
 export function getEffectiveDayOfWeek(userTimezone?: string): number {
   const now = new Date();
-  const tz = userTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const tz = resolveTimezone(userTimezone);
   
   // Get local hour in user's timezone
   const localHour = parseInt(
@@ -104,5 +129,5 @@ function formatDateForTimezone(date: Date, timezone: string): string {
  * Get the user's current timezone string
  */
 export function getUserTimezone(): string {
-  return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  return resolveTimezone();
 }

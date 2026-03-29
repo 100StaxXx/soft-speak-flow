@@ -46,7 +46,7 @@ export const mentorVoices: Record<string, MentorVoiceConfig> = {
     mentorSlug: "sienna",
     mentorName: "Sienna",
     voiceName: "Charlotte",
-    voiceId: "XB0fDUnXU5powFXDhCwa",
+    voiceId: "wGcFBfKz5yUQqhqr0mVy",
     defaultIntensity: "gentle",
     categories: ["compassion", "healing", "support"],
     voiceSettings: {
@@ -74,7 +74,7 @@ export const mentorVoices: Record<string, MentorVoiceConfig> = {
     mentorSlug: "carmen",
     mentorName: "Carmen",
     voiceName: "Domi",
-    voiceId: "bD9maNcCuQQS75DGuteM",
+    voiceId: "hZLR2VL7jAuie9sowsXqg",
     defaultIntensity: "high",
     categories: ["discipline", "business", "confidence"],
     voiceSettings: {
@@ -102,7 +102,7 @@ export const mentorVoices: Record<string, MentorVoiceConfig> = {
     mentorSlug: "solace",
     mentorName: "Solace",
     voiceName: "Matilda",
-    voiceId: "XrExE9yKIg1WjnnlVkGX",
+    voiceId: "XB0fDUnXU5powFXDhCwa",
     defaultIntensity: "medium",
     categories: ["confidence", "support", "encouragement"],
     voiceSettings: {

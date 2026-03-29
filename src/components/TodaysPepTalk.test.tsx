@@ -28,10 +28,16 @@ const mocks = vi.hoisted(() => {
     dailyPepTalk: MockPepTalk | null;
     syncResponse: { data: unknown; error: unknown };
     generationResponse: { data: unknown; error: unknown };
+    profileTimezone: string | null;
+    effectiveDate: string;
+    dailyPepTalkEqCalls: Array<[string, unknown]>;
   } = {
     dailyPepTalk: null,
     syncResponse: { data: {}, error: null },
     generationResponse: { data: null, error: null },
+    profileTimezone: "America/Los_Angeles",
+    effectiveDate: "2026-02-20",
+    dailyPepTalkEqCalls: [],
   };
 
   const awardPepTalkListened = vi.fn();
@@ -50,7 +56,12 @@ const mocks = vi.hoisted(() => {
   const from = vi.fn((table: string) => {
     const builder = {
       select: vi.fn(() => builder),
-      eq: vi.fn(() => builder),
+      eq: vi.fn((column: string, value: unknown) => {
+        if (table === "daily_pep_talks") {
+          state.dailyPepTalkEqCalls.push([column, value]);
+        }
+        return builder;
+      }),
       order: vi.fn(() => builder),
       limit: vi.fn(() => builder),
       maybeSingle: vi.fn(async () => {
@@ -107,8 +118,12 @@ vi.mock("@/utils/storage", () => ({
 
 vi.mock("@/hooks/useProfile", () => ({
   useProfile: () => ({
-    profile: { id: "user-1", selected_mentor_id: "mentor-1" },
+    profile: { id: "user-1", selected_mentor_id: "mentor-1", timezone: mocks.state.profileTimezone },
   }),
+}));
+
+vi.mock("@/utils/timezone", () => ({
+  getEffectiveDailyDate: () => mocks.state.effectiveDate,
 }));
 
 vi.mock("@/contexts/MentorConnectionContext", () => ({
@@ -178,6 +193,7 @@ function renderComponent() {
 
 describe("TodaysPepTalk transcript expand behavior", () => {
   beforeEach(() => {
+    vi.useRealTimers();
     mocks.safeLocalStorage.clear();
     mocks.awardPepTalkListened.mockClear();
     mocks.toastError.mockClear();
@@ -187,6 +203,22 @@ describe("TodaysPepTalk transcript expand behavior", () => {
     mocks.state.syncResponse = { data: {}, error: null };
     mocks.state.generationResponse = { data: null, error: null };
     mocks.state.dailyPepTalk = makePepTalk();
+    mocks.state.profileTimezone = "America/Los_Angeles";
+    mocks.state.effectiveDate = "2026-02-20";
+    mocks.state.dailyPepTalkEqCalls = [];
+  });
+
+  it("queries the effective local date before the 2 AM reset", async () => {
+    mocks.state.effectiveDate = "2026-03-09";
+    mocks.state.dailyPepTalk = makePepTalk({ for_date: "2026-03-09" });
+
+    renderComponent();
+
+    await waitFor(() => {
+      expect(mocks.state.dailyPepTalkEqCalls).toContainEqual(["for_date", "2026-03-09"]);
+    });
+
+    expect(screen.getByText("Execute Your Vision")).toBeInTheDocument();
   });
 
   it("shows full raw script when transcript array is empty", async () => {

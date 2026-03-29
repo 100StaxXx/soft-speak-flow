@@ -15,6 +15,10 @@ import {
   createCostGuardrailSession,
   isCostGuardrailBlockedError,
 } from "../_shared/costGuardrails.ts";
+import {
+  resolveSingleDailyPepTalkDateContext,
+  type ProfileTimezoneSupabaseClient,
+} from "./workflow.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -145,10 +149,12 @@ serve(async (req) => {
       providers: ["openai", "elevenlabs"],
     });
 
-    // Get today's date
-    const today = new Date();
-    const todayDate = today.toLocaleDateString('en-CA');
-    console.log(`Generating pep talk for date: ${todayDate}`);
+    const { effectiveDate: todayDate, themeAnchorDate, timezone } = await resolveSingleDailyPepTalkDateContext({
+      supabase: supabase as unknown as ProfileTimezoneSupabaseClient,
+      userId: auth.userId,
+      now: new Date(),
+    });
+    console.log(`Generating pep talk for effective date: ${todayDate} (${timezone})`);
 
     // Check if already generated for today
     const { data: existing, error: checkError } = await supabase
@@ -172,7 +178,7 @@ serve(async (req) => {
       );
     }
 
-    const { theme, usedFallbackTheme } = selectThemeForDate(resolvedMentorSlug, today);
+    const { theme, usedFallbackTheme } = selectThemeForDate(resolvedMentorSlug, themeAnchorDate);
     if (usedFallbackTheme) {
       console.warn(`Using fallback pep talk theme for mentor: ${resolvedMentorSlug}`);
     }

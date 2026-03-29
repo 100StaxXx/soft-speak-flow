@@ -16,6 +16,7 @@ import {
   createCostGuardrailSession,
   isCostGuardrailBlockedError,
 } from "../_shared/costGuardrails.ts";
+import { getDateAnchorForIsoDate, getUtcIsoDate } from "../_shared/effectiveDailyDate.ts";
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -45,9 +46,8 @@ serve(async (req) => {
       providers: ["openai", "elevenlabs"],
     });
 
-    // Get today's date in UTC
-    const today = new Date();
-    const todayDate = today.toLocaleDateString('en-CA');
+    const todayDate = getUtcIsoDate();
+    const todayAnchor = getDateAnchorForIsoDate(todayDate);
     console.log(`Generating pep talks for date: ${todayDate}`);
 
     const results = [];
@@ -77,7 +77,7 @@ serve(async (req) => {
           continue;
         }
 
-        const { theme, usedFallbackTheme } = selectThemeForDate(mentorSlug, today);
+        const { theme, usedFallbackTheme } = selectThemeForDate(mentorSlug, todayAnchor);
         if (usedFallbackTheme) {
           console.warn(`Using fallback theme for mentor ${mentorSlug}`);
         }

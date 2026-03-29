@@ -27,6 +27,7 @@ import { useMentorLayoutMode } from "@/hooks/useMentorLayoutMode";
 import { MessageCircle, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useMentorConnection } from "@/contexts/MentorConnectionContext";
+import { getEffectiveDailyDate } from "@/utils/timezone";
 
 type IndexProps = {
   enableOnboardingGuard?: boolean;
@@ -117,6 +118,10 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
   const queryClient = useQueryClient();
   const layoutMode = useMentorLayoutMode();
   const isDesktop = layoutMode === "desktop";
+  const pepTalkDate = useMemo(
+    () => getEffectiveDailyDate(profile?.timezone ?? undefined),
+    [profile?.timezone],
+  );
 
   // Scroll to top on mount
   useEffect(() => {
@@ -135,7 +140,7 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
     isLoading: mentorPageDataLoading,
     isError: mentorPageDataError,
   } = useQuery({
-    queryKey: ['mentor-page-data', effectiveMentorId],
+    queryKey: ['mentor-page-data', effectiveMentorId, pepTalkDate],
     queryFn: async () => {
       if (!effectiveMentorId) return null;
 
@@ -152,11 +157,10 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
       const imageUrl = mentorData.avatar_url || await loadMentorImage(mentorData.slug || 'atlas');
 
       // Get today's pep talk and quote in parallel
-      const today = new Date().toLocaleDateString("en-CA");
       const { data: dailyPepTalk, error: pepTalkError } = await supabase
         .from("daily_pep_talks")
         .select("topic_category")
-        .eq("for_date", today)
+        .eq("for_date", pepTalkDate)
         .eq("mentor_slug", mentorData.slug)
         .maybeSingle();
 

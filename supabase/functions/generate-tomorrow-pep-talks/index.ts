@@ -9,6 +9,7 @@ import {
   isCostGuardrailBlockedError,
 } from "../_shared/costGuardrails.ts";
 import { invokeInternalFunction } from "../_shared/internalFunctionAuth.ts";
+import { getDateAnchorForIsoDate, getUtcIsoDate } from "../_shared/effectiveDailyDate.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -69,10 +70,8 @@ serve(async (req) => {
       providers: ["openai", "elevenlabs"],
     });
 
-    // Get tomorrow's date
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowDate = tomorrow.toLocaleDateString('en-CA');
+    const tomorrowDate = getUtcIsoDate(new Date(), 1);
+    const tomorrowAnchor = getDateAnchorForIsoDate(tomorrowDate);
     console.log(`Pre-generating pep talks for date: ${tomorrowDate}`);
 
     // Get active canonical mentors for pre-generation.
@@ -119,7 +118,7 @@ serve(async (req) => {
           continue;
         }
 
-        const { theme, usedFallbackTheme } = selectThemeForDate(mentorSlug, tomorrow);
+        const { theme, usedFallbackTheme } = selectThemeForDate(mentorSlug, tomorrowAnchor);
         if (usedFallbackTheme) {
           console.warn(`Using fallback theme for mentor ${mentorSlug}`);
         }

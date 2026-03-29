@@ -167,9 +167,9 @@ export function selectThemeForDate(
   const resolvedMentorSlug = resolveMentorSlug(mentorSlug);
   const themes = getMentorThemes(mentorSlug);
 
-  const dayOfYear = Math.floor(
-    (date.getTime() - new Date(date.getFullYear(), 0, 0).getTime()) / 86400000,
-  );
+  const startOfYearUtc = Date.UTC(date.getUTCFullYear(), 0, 0);
+  const currentDayUtc = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+  const dayOfYear = Math.floor((currentDayUtc - startOfYearUtc) / 86400000);
   const themeIndex = dayOfYear % themes.length;
   const theme = themes[themeIndex] ?? SAFE_DEFAULT_THEME;
 
