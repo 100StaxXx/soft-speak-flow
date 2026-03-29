@@ -20,6 +20,17 @@ vi.mock("@/services/dailyTasksRemote", () => ({
   fetchDailyTasksRemote: (...args: unknown[]) => mocks.fetchDailyTasksRemoteMock(...args),
 }));
 
+vi.mock("@/integrations/supabase/client", () => ({
+  supabase: {
+    from: vi.fn(() => ({
+      select: vi.fn(),
+      eq: vi.fn(),
+      in: vi.fn(),
+      order: vi.fn(),
+    })),
+  },
+}));
+
 vi.mock("@/utils/plannerLocalStore", async () => {
   const actual = await vi.importActual<typeof import("@/utils/plannerLocalStore")>("@/utils/plannerLocalStore");
 
@@ -30,10 +41,16 @@ vi.mock("@/utils/plannerLocalStore", async () => {
 });
 
 import {
+  loadLocalEpics,
   acquirePlannerRemoteSyncLock,
   canSyncPlannerFromRemote,
   syncLocalDailyTasksFromRemote,
 } from "./plannerSync";
+import {
+  __resetPlannerLocalDBForTests,
+  clearPlannerLocalStateForUser,
+  upsertPlannerRecord,
+} from "@/utils/plannerLocalStore";
 
 const originalOnlineDescriptor = Object.getOwnPropertyDescriptor(Navigator.prototype, "onLine");
 
@@ -53,9 +70,15 @@ describe("plannerSync", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    __resetPlannerLocalDBForTests();
     setOnline(true);
     mocks.getPendingActionCountMock.mockResolvedValue(0);
     mocks.replaceLocalTasksForDateMock.mockResolvedValue(undefined);
+  });
+
+  afterEach(async () => {
+    await clearPlannerLocalStateForUser("user-1");
+    __resetPlannerLocalDBForTests();
   });
 
   it("blocks remote sync while a local planner write is in flight", async () => {
@@ -107,5 +130,36 @@ describe("plannerSync", () => {
 
     expect(result).toEqual(remoteTasks);
     expect(mocks.replaceLocalTasksForDateMock).toHaveBeenCalledWith("user-1", "2026-03-25", remoteTasks);
+  });
+
+  it("hydrates locally persisted latest journey-path snapshots onto epics", async () => {
+    await upsertPlannerRecord("epics", {
+      id: "epic-1",
+      user_id: "user-1",
+      title: "Hydrated Trail",
+      description: null,
+      status: "active",
+      progress_percentage: 18,
+      target_days: 30,
+      start_date: "2026-03-01",
+      end_date: "2026-03-31",
+      created_at: "2026-03-01T00:00:00.000Z",
+      epic_habits: [],
+    });
+
+    await upsertPlannerRecord("epic_journey_paths", {
+      id: "user-1:epic-1",
+      user_id: "user-1",
+      epic_id: "epic-1",
+      milestone_index: 2,
+      image_url: "https://example.com/persisted-path.png",
+      generated_at: "2026-03-27T23:59:59.000Z",
+    });
+
+    const epics = await loadLocalEpics("user-1");
+
+    expect(epics).toHaveLength(1);
+    expect(epics[0]?.latest_journey_path_url).toBe("https://example.com/persisted-path.png");
+    expect(epics[0]?.latest_journey_path_milestone_index).toBe(2);
   });
 });

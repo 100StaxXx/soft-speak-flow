@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { requestJourneyPathGeneration } from "@/utils/journeyPathCache";
 import { toast } from "sonner";
 import { useCallback, useState } from "react";
 
@@ -121,20 +122,15 @@ export const useCompanionPostcards = () => {
 
         // Trigger journey path regeneration for the new milestone
         // The chapter_number becomes the milestoneIndex for the path
-        if (data?.postcard?.chapter_number && data?.postcard?.epic_id && user?.id) {
-          try {
-            await supabase.functions.invoke("generate-journey-path", {
-              body: {
-                epicId: data.postcard.epic_id,
-                milestoneIndex: data.postcard.chapter_number,
-              },
-            });
-            // Invalidate journey path cache to show new image
-            queryClient.invalidateQueries({ queryKey: ["journey-path", data.postcard.epic_id, user?.id] });
-          } catch (err) {
+        if (typeof data?.postcard?.chapter_number === "number" && data?.postcard?.epic_id && user?.id) {
+          void requestJourneyPathGeneration({
+            epicId: data.postcard.epic_id,
+            milestoneIndex: data.postcard.chapter_number,
+            queryClient,
+            userId: user.id,
+          }).catch((err) => {
             console.error("Failed to regenerate journey path:", err);
-            // Silent fail - path regeneration is a nice-to-have
-          }
+          });
         }
       }
     },

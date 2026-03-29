@@ -8,6 +8,7 @@ import {
   getLocalEpics,
   getLocalHabitCompletionsForDate,
   getLocalHabits,
+  getLocalJourneyPaths,
   getLocalSubtasksForTask,
   getLocalTasksByDate,
   dedupePlannerTasksByInstance,
@@ -15,6 +16,7 @@ import {
   replaceLocalEpicsForUser,
   replaceLocalHabitCompletionsForDate,
   replaceLocalHabitsForUser,
+  replaceLocalJourneyPathsForEpics,
   replaceLocalJourneyPhases,
   replaceLocalEpicMilestones,
   replaceLocalTasksForDate,
@@ -22,6 +24,12 @@ import {
 } from "@/utils/plannerLocalStore";
 import { getPendingActionCount } from "@/utils/offlineStorage";
 import { fetchDailyTasksRemote, type DailyTask } from "@/services/dailyTasksRemote";
+import {
+  attachJourneyPathSnapshotToEpic,
+  normalizeJourneyPathSnapshot,
+  preferNewerJourneyPathSnapshot,
+  type JourneyPathSnapshot,
+} from "@/utils/journeyPathCache";
 
 export const PLANNER_SYNC_EVENT = "planner-sync-finished";
 
@@ -198,16 +206,26 @@ export async function syncLocalHabitsFromRemote(userId: string, today: string): 
 }
 
 export async function loadLocalEpics(userId: string): Promise<EpicRecord[]> {
-  const [epics, habits] = await Promise.all([
+  const [epics, habits, journeyPathSnapshots] = await Promise.all([
     getLocalEpics<EpicRecord>(userId),
     getLocalHabits<HabitRemoteRow>(userId),
+    getLocalJourneyPaths<JourneyPathSnapshot>(userId),
   ]);
   const epicHabits = await getLocalEpicHabits<Array<{ id: string; epic_id: string; habit_id: string }>[number]>(
     epics.map((epic) => epic.id),
   );
 
   const habitById = new Map(habits.map((habit) => [habit.id, habit]));
+  const journeyPathByEpicId = new Map<string, JourneyPathSnapshot>();
   const linksByEpicId = new Map<string, Array<{ habit_id: string; habits: EpicRecord["epic_habits"][number]["habits"] }>>();
+
+  journeyPathSnapshots.forEach((snapshot) => {
+    const currentSnapshot = journeyPathByEpicId.get(snapshot.epic_id);
+    journeyPathByEpicId.set(
+      snapshot.epic_id,
+      preferNewerJourneyPathSnapshot(currentSnapshot, snapshot) ?? snapshot,
+    );
+  });
 
   epicHabits.forEach((link) => {
     const habit = habitById.get(link.habit_id);
@@ -237,10 +255,15 @@ export async function loadLocalEpics(userId: string): Promise<EpicRecord[]> {
   return epics
     .slice()
     .sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""))
-    .map((epic) => ({
-      ...epic,
-      epic_habits: linksByEpicId.get(epic.id) ?? [],
-    }));
+    .map((epic) =>
+      attachJourneyPathSnapshotToEpic(
+        {
+          ...epic,
+          epic_habits: linksByEpicId.get(epic.id) ?? [],
+        },
+        journeyPathByEpicId.get(epic.id),
+      ),
+    );
 }
 
 export async function syncLocalEpicsFromRemote(userId: string): Promise<void> {
@@ -252,7 +275,11 @@ export async function syncLocalEpicsFromRemote(userId: string): Promise<void> {
   await replaceLocalEpicsForUser(userId, epics);
 
   const epicIds = epics.map((epic) => epic.id);
-  const [{ data: phases, error: phasesError }, { data: milestones, error: milestonesError }] = epicIds.length > 0
+  const [
+    { data: phases, error: phasesError },
+    { data: milestones, error: milestonesError },
+    { data: journeyPathRows, error: journeyPathsError },
+  ] = epicIds.length > 0
     ? await Promise.all([
       supabase
         .from("journey_phases")
@@ -264,11 +291,31 @@ export async function syncLocalEpicsFromRemote(userId: string): Promise<void> {
         .select("*")
         .eq("user_id", userId)
         .in("epic_id", epicIds),
+      supabase
+        .from("epic_journey_paths")
+        .select("id, user_id, epic_id, milestone_index, image_url, generated_at")
+        .eq("user_id", userId)
+        .in("epic_id", epicIds)
+        .order("milestone_index", { ascending: false })
+        .order("generated_at", { ascending: false }),
     ])
-    : [{ data: [], error: null }, { data: [], error: null }];
+    : [{ data: [], error: null }, { data: [], error: null }, { data: [], error: null }];
 
   if (phasesError) throw phasesError;
   if (milestonesError) throw milestonesError;
+  if (journeyPathsError) throw journeyPathsError;
+
+  const latestJourneyPathByEpicId = new Map<string, JourneyPathSnapshot>();
+  (journeyPathRows ?? []).forEach((row) => {
+    const normalizedRow = normalizeJourneyPathSnapshot(row as JourneyPathSnapshot);
+    const currentSnapshot = latestJourneyPathByEpicId.get(normalizedRow.epic_id);
+    latestJourneyPathByEpicId.set(
+      normalizedRow.epic_id,
+      preferNewerJourneyPathSnapshot(currentSnapshot, normalizedRow) ?? normalizedRow,
+    );
+  });
+
+  await replaceLocalJourneyPathsForEpics(userId, epicIds, [...latestJourneyPathByEpicId.values()]);
 
   const habitsToUpsert: HabitRemoteRow[] = [];
   for (const epic of epics) {

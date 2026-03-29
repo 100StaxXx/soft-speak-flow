@@ -9,6 +9,11 @@ const mocks = vi.hoisted(() => {
   const eqUserIdMock = vi.fn();
   const orderCreatedAtMock = vi.fn();
   const loadLocalEpicsMock = vi.fn();
+  const queueActionMock = vi.fn();
+  const requestJourneyPathGenerationMock = vi.fn();
+  const retryNowMock = vi.fn();
+  const rpcMock = vi.fn();
+  let shouldQueueWrites = false;
   const warmEpicsQueryFromRemoteMock = vi.fn();
 
   return {
@@ -17,6 +22,16 @@ const mocks = vi.hoisted(() => {
     eqUserIdMock,
     orderCreatedAtMock,
     loadLocalEpicsMock,
+    queueActionMock,
+    requestJourneyPathGenerationMock,
+    retryNowMock,
+    rpcMock,
+    get shouldQueueWrites() {
+      return shouldQueueWrites;
+    },
+    set shouldQueueWrites(value: boolean) {
+      shouldQueueWrites = value;
+    },
     warmEpicsQueryFromRemoteMock,
   };
 });
@@ -41,19 +56,24 @@ vi.mock("@/hooks/useAIInteractionTracker", () => ({
 
 vi.mock("@/contexts/ResilienceContext", () => ({
   useResilience: () => ({
-    queueAction: vi.fn(),
-    shouldQueueWrites: false,
-    retryNow: vi.fn(),
+    queueAction: (...args: unknown[]) => mocks.queueActionMock(...args),
+    shouldQueueWrites: mocks.shouldQueueWrites,
+    retryNow: (...args: unknown[]) => mocks.retryNowMock(...args),
   }),
 }));
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: (...args: unknown[]) => mocks.fromMock(...args),
+    rpc: (...args: unknown[]) => mocks.rpcMock(...args),
     auth: {
       getSession: vi.fn(),
     },
   },
+}));
+
+vi.mock("@/utils/journeyPathCache", () => ({
+  requestJourneyPathGeneration: (...args: unknown[]) => mocks.requestJourneyPathGenerationMock(...args),
 }));
 
 vi.mock("@/utils/plannerSync", () => ({
@@ -80,7 +100,12 @@ const createWrapper = () => {
 describe("useEpics", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.shouldQueueWrites = false;
     mocks.loadLocalEpicsMock.mockResolvedValue([]);
+    mocks.queueActionMock.mockResolvedValue(undefined);
+    mocks.requestJourneyPathGenerationMock.mockResolvedValue(null);
+    mocks.retryNowMock.mockResolvedValue(undefined);
+    mocks.rpcMock.mockResolvedValue({ data: 0, error: null });
     mocks.warmEpicsQueryFromRemoteMock.mockResolvedValue([]);
 
     mocks.fromMock.mockReturnValue({
@@ -245,6 +270,122 @@ describe("useEpics", () => {
       "Summer Gains",
       "Get Money",
     ]);
+  });
+
+  it("starts background initial journey-path generation after a successful remote create", async () => {
+    const tableWithInsert = () => ({
+      insert: vi.fn().mockResolvedValue({ error: null }),
+      select: mocks.selectMock,
+    });
+
+    mocks.fromMock.mockImplementation((table: string) => {
+      if (["habits", "epics", "epic_habits", "journey_phases", "epic_milestones"].includes(table)) {
+        return tableWithInsert();
+      }
+
+      return {
+        select: mocks.selectMock,
+      };
+    });
+
+    const { result } = renderHook(() => useEpics(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    await act(async () => {
+      await result.current.createEpic({
+        title: "Launch Sequence",
+        target_days: 14,
+        habits: [
+          {
+            title: "Morning focus",
+            difficulty: "easy",
+            frequency: "daily",
+            custom_days: [1, 2, 3, 4, 5],
+          },
+        ],
+      });
+    });
+
+    await waitFor(() => {
+      expect(mocks.requestJourneyPathGenerationMock).toHaveBeenCalledWith({
+        epicId: expect.any(String),
+        milestoneIndex: 0,
+        queryClient: expect.any(QueryClient),
+        userId: "user-1",
+      });
+    });
+  });
+
+  it("skips background initial journey-path generation when the create is queued offline", async () => {
+    mocks.shouldQueueWrites = true;
+
+    const { result } = renderHook(() => useEpics(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    await act(async () => {
+      await result.current.createEpic({
+        title: "Offline Campaign",
+        target_days: 21,
+        habits: [
+          {
+            title: "Evening reflection",
+            difficulty: "medium",
+            frequency: "daily",
+            custom_days: [0, 1, 2, 3, 4, 5, 6],
+          },
+        ],
+      });
+    });
+
+    expect(mocks.queueActionMock).toHaveBeenCalled();
+    expect(mocks.requestJourneyPathGenerationMock).not.toHaveBeenCalled();
+  });
+
+  it("surfaces hydrated latest journey-path data after a reopen-style load", async () => {
+    const hydratedEpics = [
+      {
+        id: "epic-1",
+        user_id: "user-1",
+        title: "Reopen Ready",
+        description: null,
+        status: "active",
+        progress_percentage: 12,
+        target_days: 30,
+        start_date: "2026-03-01",
+        end_date: "2026-03-31",
+        created_at: "2026-03-01T00:00:00.000Z",
+        epic_habits: [],
+        latest_journey_path_url: "https://example.com/persisted-path.png",
+        latest_journey_path_milestone_index: 1,
+        latest_journey_path_generated_at: "2026-03-27T23:59:59.000Z",
+      },
+    ];
+
+    mocks.loadLocalEpicsMock.mockResolvedValue(hydratedEpics);
+    mocks.warmEpicsQueryFromRemoteMock.mockImplementationOnce(async (queryClient: QueryClient, userId: string) => {
+      queryClient.setQueryData(["epics", userId], hydratedEpics);
+      return hydratedEpics;
+    });
+
+    const { result } = renderHook(() => useEpics(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.activeEpics).toHaveLength(1);
+    });
+
+    expect(result.current.activeEpics[0]?.latest_journey_path_url).toBe("https://example.com/persisted-path.png");
   });
 });
 

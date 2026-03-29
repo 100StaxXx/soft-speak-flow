@@ -1,94 +1,205 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
-import { useCallback } from "react";
-
-interface JourneyPath {
-  id: string;
-  epic_id: string;
-  milestone_index: number;
-  image_url: string;
-  prompt_context: Record<string, unknown> | null;
-  generated_at: string;
-}
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { getEpicsQueryKey, type EpicRecord } from "@/hooks/epicsQuery";
+import {
+  fetchRemoteLatestJourneyPath,
+  getJourneyPathGenerationKey,
+  getJourneyPathQueryKey,
+  getJourneyPathSnapshotFromEpic,
+  getPersistedJourneyPathSnapshot,
+  patchJourneyPathQueryCache,
+  persistAndPatchJourneyPathSnapshot,
+  preferNewerJourneyPathSnapshot,
+  requestJourneyPathGeneration,
+  type JourneyPathSnapshot,
+} from "@/utils/journeyPathCache";
 
 export const useJourneyPathImage = (epicId: string | undefined) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const initialGenerationRequestedRef = useRef(false);
+  const [persistedJourneyPath, setPersistedJourneyPath] = useState<JourneyPathSnapshot | null>(null);
+  const [hasResolvedLocalSnapshot, setHasResolvedLocalSnapshot] = useState(false);
 
-  // Fetch the latest journey path for this epic
-  const { data: journeyPath, isLoading, error } = useQuery({
-    queryKey: ["journey-path", epicId, user?.id],
+  const epics = queryClient.getQueryData<EpicRecord[]>(getEpicsQueryKey(user?.id)) ?? [];
+
+  const journeyPathFromEpics = useMemo(() => {
+    if (!epicId || !user?.id) return null;
+    const matchingEpic = epics.find((epic) => epic.id === epicId) ?? null;
+    return getJourneyPathSnapshotFromEpic(matchingEpic, user.id);
+  }, [epicId, epics, user?.id]);
+
+  const remoteJourneyPathQuery = useQuery<JourneyPathSnapshot | null>({
+    queryKey: getJourneyPathQueryKey(epicId, user?.id),
     queryFn: async () => {
       if (!epicId || !user?.id) return null;
 
-      const { data, error } = await supabase
-        .from("epic_journey_paths")
-        .select("*")
-        .eq("epic_id", epicId)
-        .eq("user_id", user.id)
-        .order("milestone_index", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (error) {
-        console.error("Error fetching journey path:", error);
-        throw error;
+      const remoteJourneyPath = await fetchRemoteLatestJourneyPath(user.id, epicId);
+      if (remoteJourneyPath) {
+        await persistAndPatchJourneyPathSnapshot(queryClient, remoteJourneyPath);
       }
 
-      return data as JourneyPath | null;
+      return remoteJourneyPath;
     },
     enabled: !!epicId && !!user?.id,
-    staleTime: 10 * 60 * 1000, // 10 minutes - journey path images rarely change
+    staleTime: 10 * 60 * 1000,
+    placeholderData: (previousJourneyPath) =>
+      previousJourneyPath
+      ?? queryClient.getQueryData<JourneyPathSnapshot | null>(getJourneyPathQueryKey(epicId, user?.id))
+      ?? journeyPathFromEpics
+      ?? null,
   });
 
-  // Generate a new journey path
-  const generatePath = useMutation({
-    mutationFn: async ({ milestoneIndex }: { milestoneIndex: number }) => {
-      if (!epicId || !user?.id) throw new Error("Missing epic or user");
+  const { data: generationState = { pending: false, milestoneIndex: null } } = useQuery<{
+    pending: boolean;
+    milestoneIndex: number | null;
+  }>({
+    queryKey: getJourneyPathGenerationKey(epicId, user?.id),
+    queryFn: async () => ({ pending: false, milestoneIndex: null }),
+    enabled: false,
+    initialData: { pending: false, milestoneIndex: null },
+    staleTime: Infinity,
+    gcTime: Infinity,
+  });
 
-      const { data, error } = await supabase.functions.invoke("generate-journey-path", {
-        body: {
-          epicId,
-          milestoneIndex,
-        },
+  useEffect(() => {
+    if (!journeyPathFromEpics || !user?.id) return;
+
+    setPersistedJourneyPath((currentJourneyPath) =>
+      preferNewerJourneyPathSnapshot(currentJourneyPath, journeyPathFromEpics),
+    );
+    patchJourneyPathQueryCache(queryClient, user.id, journeyPathFromEpics);
+  }, [journeyPathFromEpics, queryClient, user?.id]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!epicId || !user?.id) {
+      setPersistedJourneyPath(null);
+      setHasResolvedLocalSnapshot(true);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setHasResolvedLocalSnapshot(false);
+
+    void getPersistedJourneyPathSnapshot(user.id, epicId)
+      .then((journeyPathSnapshot) => {
+        if (cancelled || !journeyPathSnapshot) return;
+
+        setPersistedJourneyPath((currentJourneyPath) =>
+          preferNewerJourneyPathSnapshot(currentJourneyPath, journeyPathSnapshot),
+        );
+        patchJourneyPathQueryCache(queryClient, user.id, journeyPathSnapshot);
+      })
+      .catch((error) => {
+        console.error("Failed to load persisted journey path:", error);
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setHasResolvedLocalSnapshot(true);
+        }
       });
 
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+    return () => {
+      cancelled = true;
+    };
+  }, [epicId, queryClient, user?.id]);
 
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["journey-path", epicId, user?.id] });
-    },
-    onError: (error) => {
-      console.error("Failed to generate journey path:", error);
-    },
-  });
+  useEffect(() => {
+    if (!remoteJourneyPathQuery.data) return;
 
-  // Helper to trigger initial path generation
+    setPersistedJourneyPath((currentJourneyPath) =>
+      preferNewerJourneyPathSnapshot(currentJourneyPath, remoteJourneyPathQuery.data),
+    );
+  }, [remoteJourneyPathQuery.data]);
+
+  useEffect(() => {
+    initialGenerationRequestedRef.current = false;
+  }, [epicId, user?.id]);
+
+  const journeyPath = useMemo(
+    () =>
+      preferNewerJourneyPathSnapshot(
+        remoteJourneyPathQuery.data,
+        preferNewerJourneyPathSnapshot(persistedJourneyPath, journeyPathFromEpics),
+      ),
+    [journeyPathFromEpics, persistedJourneyPath, remoteJourneyPathQuery.data],
+  );
+
+  const triggerJourneyPathGeneration = useCallback(
+    async (milestoneIndex: number) => {
+      if (!epicId || !user?.id) {
+        throw new Error("Missing epic or user");
+      }
+
+      const generatedJourneyPath = await requestJourneyPathGeneration({
+        epicId,
+        milestoneIndex,
+        queryClient,
+        userId: user.id,
+      });
+
+      if (generatedJourneyPath) {
+        setPersistedJourneyPath((currentJourneyPath) =>
+          preferNewerJourneyPathSnapshot(currentJourneyPath, generatedJourneyPath),
+        );
+      }
+
+      return generatedJourneyPath;
+    },
+    [epicId, queryClient, user?.id],
+  );
+
   const generateInitialPath = useCallback(() => {
-    if (!epicId || !user?.id) return;
-    
-    // Only generate if no path exists yet
-    if (!journeyPath && !isLoading) {
-      generatePath.mutate({ milestoneIndex: 0 });
-    }
-  }, [epicId, user?.id, journeyPath, isLoading, generatePath]);
+    if (!epicId || !user?.id || journeyPath) return;
 
-  // Helper to trigger path regeneration after milestone
+    void triggerJourneyPathGeneration(0).catch((error) => {
+      console.error("Failed to generate initial journey path:", error);
+    });
+  }, [epicId, journeyPath, triggerJourneyPathGeneration, user?.id]);
+
   const regeneratePathForMilestone = useCallback((milestoneIndex: number) => {
     if (!epicId || !user?.id) return;
-    generatePath.mutate({ milestoneIndex });
-  }, [epicId, user?.id, generatePath]);
+
+    void triggerJourneyPathGeneration(milestoneIndex).catch((error) => {
+      console.error("Failed to regenerate journey path:", error);
+    });
+  }, [epicId, triggerJourneyPathGeneration, user?.id]);
+
+  useEffect(() => {
+    if (
+      !epicId
+      || !user?.id
+      || !hasResolvedLocalSnapshot
+      || remoteJourneyPathQuery.isFetching
+      || journeyPath
+      || initialGenerationRequestedRef.current
+    ) {
+      return;
+    }
+
+    initialGenerationRequestedRef.current = true;
+    void triggerJourneyPathGeneration(0).catch((error) => {
+      console.error("Failed to auto-generate initial journey path:", error);
+    });
+  }, [
+    epicId,
+    hasResolvedLocalSnapshot,
+    journeyPath,
+    remoteJourneyPathQuery.isFetching,
+    triggerJourneyPathGeneration,
+    user?.id,
+  ]);
 
   return {
     pathImageUrl: journeyPath?.image_url || null,
     currentMilestoneIndex: journeyPath?.milestone_index ?? -1,
-    isLoading,
-    isGenerating: generatePath.isPending,
-    error,
+    isLoading: !journeyPath && (!hasResolvedLocalSnapshot || remoteJourneyPathQuery.isLoading),
+    isGenerating: generationState.pending,
+    error: remoteJourneyPathQuery.error,
     generateInitialPath,
     regeneratePathForMilestone,
   };

@@ -8,6 +8,7 @@ import { useAIInteractionTracker } from "@/hooks/useAIInteractionTracker";
 import { format } from "date-fns";
 import type { StoryTypeSlug } from "@/types/narrativeTypes";
 import type { EpicRecord } from "@/hooks/epicsQuery";
+import { requestJourneyPathGeneration } from "@/utils/journeyPathCache";
 import { useResilience } from "@/contexts/ResilienceContext";
 import {
   PLANNER_SYNC_EVENT,
@@ -557,12 +558,24 @@ export const useEpics = (options: EpicsOptions = {}) => {
         return { queued: true, epic };
       }
     },
-    onSuccess: ({ queued }) => {
+    onSuccess: ({ queued, epic }) => {
       queryClient.invalidateQueries({ queryKey: ["epics"] });
       queryClient.invalidateQueries({ queryKey: ["habits"] });
       queryClient.invalidateQueries({ queryKey: ["habit-surfacing"] });
       queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
       queryClient.invalidateQueries({ queryKey: ["user-ai-context"] });
+
+      if (!queued && user?.id) {
+        void requestJourneyPathGeneration({
+          epicId: epic.id,
+          milestoneIndex: 0,
+          queryClient,
+          userId: user.id,
+        }).catch((error) => {
+          console.error("Failed to generate initial journey path:", error);
+        });
+      }
+
       window.dispatchEvent(new CustomEvent("campaign-created"));
       toast.success(queued ? "Campaign saved offline" : "Campaign created! 🎯", {
         description: queued

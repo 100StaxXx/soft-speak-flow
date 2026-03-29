@@ -1,7 +1,7 @@
 import { memo, useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import { differenceInDays } from "date-fns";
-import { Target, Flame, Star, Map, Sparkles, Calendar } from "lucide-react";
+import { Target, Flame, Star, Map, Calendar } from "lucide-react";
 import {
   Drawer,
   DrawerContent,
@@ -51,7 +51,7 @@ export const JourneyPathDrawer = memo(function JourneyPathDrawer({
 }: JourneyPathDrawerProps) {
   const [open, setOpen] = useState(false);
   
-  const { pathImageUrl, isLoading: isLoadingPath } = useJourneyPathImage(epic.id);
+  const { pathImageUrl } = useJourneyPathImage(epic.id);
   const { milestones, totalCount } = useMilestones(epic.id);
   const { companion } = useCompanion();
 
@@ -140,15 +140,6 @@ export const JourneyPathDrawer = memo(function JourneyPathDrawer({
                 />
               </div>
 
-              {/* Loading state for path */}
-              {isLoadingPath && !pathImageUrl && (
-                <div className="h-56 flex items-center justify-center">
-                  <div className="text-center space-y-2">
-                    <Sparkles className="w-8 h-8 text-primary/50 mx-auto animate-pulse" />
-                    <p className="text-xs text-muted-foreground">Loading journey path...</p>
-                  </div>
-                </div>
-              )}
             </div>
           </motion.div>
 

@@ -27,6 +27,9 @@ export interface EpicRecord {
   start_date: string;
   end_date: string;
   epic_habits?: EpicHabitRecord[] | null;
+  latest_journey_path_generated_at?: string | null;
+  latest_journey_path_milestone_index?: number | null;
+  latest_journey_path_url?: string | null;
   [key: string]: unknown;
 }
 

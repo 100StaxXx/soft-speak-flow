@@ -5,7 +5,7 @@ import {
 } from "@/utils/indexedDbReconnect";
 
 const DB_NAME = "cosmiq-planner-db";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 type PlannerStoreName =
   | "daily_tasks"
@@ -15,7 +15,8 @@ type PlannerStoreName =
   | "epics"
   | "epic_habits"
   | "journey_phases"
-  | "epic_milestones";
+  | "epic_milestones"
+  | "epic_journey_paths";
 
 type StoreMode = IDBTransactionMode;
 
@@ -57,6 +58,12 @@ interface EpicScopedRecord extends UserScopedRecord {
   epic_id: string;
 }
 
+interface JourneyPathSnapshotRecord extends EpicScopedRecord {
+  milestone_index: number;
+  image_url: string;
+  generated_at: string;
+}
+
 let db: IDBDatabase | null = null;
 let openPromise: Promise<IDBDatabase> | null = null;
 let plannerLegacyIdMigrationPromise: Promise<void> | null = null;
@@ -70,6 +77,7 @@ const PLANNER_STORE_NAMES: PlannerStoreName[] = [
   "epic_habits",
   "journey_phases",
   "epic_milestones",
+  "epic_journey_paths",
 ];
 
 const requestToPromise = <T>(request: IDBRequest<T>) =>
@@ -202,6 +210,11 @@ export async function initPlannerLocalDB(): Promise<IDBDatabase> {
         createStore(database, "epic_milestones", [
           { name: "user_id", keyPath: "user_id" },
           { name: "epic_id", keyPath: "epic_id" },
+        ]);
+        createStore(database, "epic_journey_paths", [
+          { name: "user_id", keyPath: "user_id" },
+          { name: "epic_id", keyPath: "epic_id" },
+          { name: "user_epic", keyPath: ["user_id", "epic_id"] },
         ]);
       };
     }).finally(() => {
@@ -424,6 +437,18 @@ export async function getLocalEpicMilestones<T extends EpicScopedRecord>(epicId:
   return getAllByIndex<T>("epic_milestones", "epic_id", epicId);
 }
 
+export async function getLocalJourneyPaths<T extends JourneyPathSnapshotRecord>(userId: string): Promise<T[]> {
+  return getAllByIndex<T>("epic_journey_paths", "user_id", userId);
+}
+
+export async function getLocalJourneyPathForEpic<T extends JourneyPathSnapshotRecord>(
+  userId: string,
+  epicId: string,
+): Promise<T | null> {
+  const rows = await getAllByIndex<T>("epic_journey_paths", "user_epic", [userId, epicId]);
+  return rows[0] ?? null;
+}
+
 export async function replaceLocalTasksForDate<T extends TaskScopedRecord & { subtasks?: SubtaskRecord[] | null }>(
   userId: string,
   taskDate: string,
@@ -512,14 +537,21 @@ export async function replaceLocalEpicsForUser<T extends UserScopedRecord>(
   epics: T[],
 ): Promise<void> {
   const existingEpics = await getLocalEpics<UserScopedRecord>(userId);
+  const existingJourneyPaths = await getLocalJourneyPaths<JourneyPathSnapshotRecord>(userId);
   const incomingIds = new Set(epics.map((epic) => epic.id));
   const idsToDelete = existingEpics
     .map((epic) => epic.id)
     .filter((epicId) => !incomingIds.has(epicId));
+  const journeyPathIdsToDelete = existingJourneyPaths
+    .filter((snapshot) => idsToDelete.includes(snapshot.epic_id))
+    .map((snapshot) => snapshot.id);
 
   await upsertPlannerRecords("epics", epics);
   if (idsToDelete.length > 0) {
     await removePlannerRecords("epics", idsToDelete);
+  }
+  if (journeyPathIdsToDelete.length > 0) {
+    await removePlannerRecords("epic_journey_paths", journeyPathIdsToDelete);
   }
 }
 
@@ -571,12 +603,32 @@ export async function replaceLocalEpicMilestones<T extends EpicScopedRecord>(
   }
 }
 
+export async function replaceLocalJourneyPathsForEpics<T extends JourneyPathSnapshotRecord>(
+  userId: string,
+  epicIds: string[],
+  snapshots: T[],
+): Promise<void> {
+  const existingRows = await getLocalJourneyPaths<JourneyPathSnapshotRecord>(userId);
+  const targetEpicIds = new Set(epicIds);
+  const incomingIds = new Set(snapshots.map((snapshot) => snapshot.id));
+  const idsToDelete = existingRows
+    .filter((snapshot) => targetEpicIds.has(snapshot.epic_id))
+    .map((snapshot) => snapshot.id)
+    .filter((snapshotId) => !incomingIds.has(snapshotId));
+
+  await upsertPlannerRecords("epic_journey_paths", snapshots);
+  if (idsToDelete.length > 0) {
+    await removePlannerRecords("epic_journey_paths", idsToDelete);
+  }
+}
+
 export async function clearPlannerLocalStateForUser(userId: string): Promise<void> {
   const tasks = await getAllLocalTasksForUser<TaskScopedRecord>(userId);
   const taskIds = tasks.map((task) => task.id);
   const habits = await getLocalHabits<UserScopedRecord>(userId);
   const completions = await getLocalHabitCompletions<HabitCompletionRecord>(userId);
   const epics = await getLocalEpics<UserScopedRecord>(userId);
+  const journeyPaths = await getLocalJourneyPaths<JourneyPathSnapshotRecord>(userId);
   const epicIds = epics.map((epic) => epic.id);
 
   if (taskIds.length > 0) {
@@ -597,6 +649,9 @@ export async function clearPlannerLocalStateForUser(userId: string): Promise<voi
   }
   if (completions.length > 0) {
     await removePlannerRecords("habit_completions", completions.map((completion) => completion.id));
+  }
+  if (journeyPaths.length > 0) {
+    await removePlannerRecords("epic_journey_paths", journeyPaths.map((row) => row.id));
   }
   if (epics.length > 0) {
     await removePlannerRecords("epics", epicIds);
