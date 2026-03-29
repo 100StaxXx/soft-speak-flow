@@ -731,24 +731,24 @@ begin
   perform set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
 
   begin
-    perform public.apply_referral_code_secure(
-      '22222222-2222-2222-2222-222222222222',
-      'USERA-CODE'
-    );
-    raise exception 'apply_referral_code_secure should reject impersonation attempts';
+    update public.profiles
+    set referred_by = '22222222-2222-2222-2222-222222222222',
+        referred_by_code = 'USERA-CODE'
+    where id = '11111111-1111-1111-1111-111111111111';
+    raise exception 'profiles update policy should reject client-side referral field edits';
   exception
     when others then
       perform public.test_assert(
-        position('another user' in lower(sqlerrm)) > 0,
-        'apply_referral_code_secure should reject cross-user application attempts'
+        position('new row violates row-level security policy' in lower(sqlerrm)) > 0,
+        'profiles policy should block client-side referral field edits'
       );
   end;
 
   execute 'reset role';
 
   perform public.test_assert(
-    (select referred_by_code is null from public.profiles where id = '22222222-2222-2222-2222-222222222222'),
-    'cross-user referral attempts must not mutate victim profiles'
+    (select referred_by_code is null from public.profiles where id = '11111111-1111-1111-1111-111111111111'),
+    'client-side referral edits must not mutate the authenticated profile'
   );
 end
 $$;

@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { requireAdminOrServiceRoleAuth } from "../_shared/auth.ts";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
 
 /**
@@ -8,7 +9,7 @@ import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
  * Called after user signup when a referral code was used.
  * Records the signup and increments tracking metrics.
  * 
- * SECURITY: Requires authentication - validates the caller owns the user_id
+ * SECURITY: Restricted to admin and service-role callers.
  * 
  * Request body:
  * {
@@ -25,51 +26,10 @@ serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
 
   try {
-    // SECURITY: Require authentication
-    const authHeader = req.headers.get("authorization");
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ 
-          success: false,
-          error: "Unauthorized: Missing authorization header" 
-        }),
-        {
-          status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+    const requestAuth = await requireAdminOrServiceRoleAuth(req, corsHeaders);
+    if (requestAuth instanceof Response) {
+      return requestAuth;
     }
-
-    // Create authenticated client to get user
-    const supabaseAuth = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      {
-        global: {
-          headers: { Authorization: authHeader },
-        },
-      }
-    );
-
-    // Get authenticated user
-    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
-    
-    if (authError || !user) {
-      console.error("Auth error:", authError);
-      return new Response(
-        JSON.stringify({ 
-          success: false,
-          error: "Unauthorized: Invalid or expired token" 
-        }),
-        {
-          status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
-
-    // Use authenticated user's ID - don't trust client-provided user_id
-    const user_id = user.id;
 
     // Service role client for database operations
     const supabaseClient = createClient(
@@ -111,7 +71,7 @@ serve(async (req) => {
     // Validate and retrieve referral code
     const { data: codeData, error: codeError } = await supabaseClient
       .from("referral_codes")
-      .select("id, code, owner_type, is_active, owner_user_id")
+      .select("id, code, owner_type, is_active")
       .eq("code", referral_code.toUpperCase())
       .single();
 
@@ -135,20 +95,6 @@ serve(async (req) => {
         JSON.stringify({ 
           success: false,
           error: "Referral code is not active" 
-        }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
-
-    // Prevent self-referral
-    if (codeData.owner_user_id === user_id) {
-      return new Response(
-        JSON.stringify({ 
-          success: false,
-          error: "Cannot use your own referral code" 
         }),
         {
           status: 400,
@@ -189,7 +135,9 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Recorded signup for user ${user_id} with referral code ${referral_code} from ${source_app || 'unknown'}`);
+    console.log(
+      `Recorded admin/service signup for referral code ${referral_code} from ${source_app || "unknown"} by ${requestAuth.userId}`,
+    );
 
     return new Response(
       JSON.stringify({

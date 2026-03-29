@@ -7910,7 +7910,7 @@ export type Database = {
         }[]
       }
       apply_referral_code_secure: {
-        Args: { p_referral_code: string; p_user_id: string }
+        Args: { p_referral_code: string }
         Returns: {
           message: string
           success: boolean

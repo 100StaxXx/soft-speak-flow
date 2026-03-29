@@ -94,7 +94,7 @@ export const useReferrals = () => {
        
       const { data: result, error } = await (supabase.rpc as any)(
         "apply_referral_code_secure",
-        { p_user_id: user.id, p_referral_code: normalizedCode }
+        { p_referral_code: normalizedCode }
       ) as { data: ApplyReferralResult[] | null; error: Error | null };
 
       if (error) {
