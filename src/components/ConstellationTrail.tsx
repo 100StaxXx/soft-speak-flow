@@ -7,6 +7,7 @@ import { format } from "date-fns";
 import { Haptics, ImpactStyle, NotificationType } from "@capacitor/haptics";
 import { cosmicPathBackgrounds, getStaticBackgroundSrcSet } from "@/assets/backgrounds";
 import { useJourneyPathImage } from "@/hooks/useJourneyPathImage";
+import { getJourneyPathCardImageUrl } from "@/utils/journeyPathUrls";
 
 // Milestone from epic_milestones table
 interface TrailMilestone {
@@ -917,9 +918,13 @@ export const ConstellationTrail = memo(function ConstellationTrail({
     const backgroundIndex = hashString(epicId || "fallback-cosmic-path") % cosmicPathBackgrounds.length;
     return cosmicPathBackgrounds[backgroundIndex];
   }, [epicId]);
-  const backgroundImageUrl = pathImageUrl || (!transparentBackground ? fallbackBackground.src : null);
+  const optimizedPathImageUrl = useMemo(
+    () => getJourneyPathCardImageUrl(pathImageUrl),
+    [pathImageUrl],
+  );
+  const backgroundImageUrl = optimizedPathImageUrl || (!transparentBackground ? fallbackBackground.src : null);
   const backgroundImageSrcSet =
-    !pathImageUrl && !transparentBackground
+    !optimizedPathImageUrl && !transparentBackground
       ? getStaticBackgroundSrcSet(fallbackBackground)
       : undefined;
 
@@ -946,9 +951,12 @@ export const ConstellationTrail = memo(function ConstellationTrail({
             src={backgroundImageUrl}
             srcSet={backgroundImageSrcSet}
             sizes={backgroundImageSrcSet ? "100vw" : undefined}
-            alt={pathImageUrl ? "Journey path" : ""}
-            aria-hidden={pathImageUrl ? undefined : true}
-            data-testid={pathImageUrl ? "journey-path-image" : "journey-path-fallback"}
+            alt={optimizedPathImageUrl ? "Journey path" : ""}
+            aria-hidden={optimizedPathImageUrl ? undefined : true}
+            data-testid={optimizedPathImageUrl ? "journey-path-image" : "journey-path-fallback"}
+            loading="eager"
+            decoding="async"
+            fetchPriority={optimizedPathImageUrl ? "high" : undefined}
             className="w-full h-full object-cover"
           />
           {/* Overlay gradient for star/companion visibility */}

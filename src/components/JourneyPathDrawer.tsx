@@ -17,6 +17,7 @@ import { JourneyDetailDrawer } from "@/components/JourneyDetailDrawer";
 import { useJourneyPathImage } from "@/hooks/useJourneyPathImage";
 import { useMilestones } from "@/hooks/useMilestones";
 import { useCompanion } from "@/hooks/useCompanion";
+import { getJourneyPathDrawerImageUrl } from "@/utils/journeyPathUrls";
 
 interface EpicHabit {
   habit_id: string;
@@ -52,6 +53,7 @@ export const JourneyPathDrawer = memo(function JourneyPathDrawer({
   const [open, setOpen] = useState(false);
   
   const { pathImageUrl } = useJourneyPathImage(epic.id);
+  const drawerImageUrl = useMemo(() => getJourneyPathDrawerImageUrl(pathImageUrl), [pathImageUrl]);
   const { milestones, totalCount } = useMilestones(epic.id);
   const { companion } = useCompanion();
 
@@ -116,11 +118,14 @@ export const JourneyPathDrawer = memo(function JourneyPathDrawer({
               {/* Combined Journey Visualization */}
               <div className="relative h-56 w-full overflow-hidden">
                 {/* AI-Generated Path Image Background */}
-                {pathImageUrl && (
+                {drawerImageUrl && (
                   <>
                     <img
-                      src={pathImageUrl}
+                      src={drawerImageUrl}
                       alt="Your journey path"
+                      loading="eager"
+                      decoding="async"
+                      fetchPriority="high"
                       className="absolute inset-0 w-full h-full object-cover"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-background/30 to-transparent" />
@@ -135,7 +140,7 @@ export const JourneyPathDrawer = memo(function JourneyPathDrawer({
                   companionMood={companion?.current_mood}
                   showCompanion={true}
                   milestones={trailMilestones}
-                  transparentBackground={!!pathImageUrl}
+                  transparentBackground={!!drawerImageUrl}
                   className="absolute inset-0"
                 />
               </div>

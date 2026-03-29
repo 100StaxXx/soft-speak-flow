@@ -174,7 +174,6 @@ export const useJourneyPathImage = (epicId: string | undefined) => {
       !epicId
       || !user?.id
       || !hasResolvedLocalSnapshot
-      || remoteJourneyPathQuery.isFetching
       || journeyPath
       || initialGenerationRequestedRef.current
     ) {
@@ -189,7 +188,6 @@ export const useJourneyPathImage = (epicId: string | undefined) => {
     epicId,
     hasResolvedLocalSnapshot,
     journeyPath,
-    remoteJourneyPathQuery.isFetching,
     triggerJourneyPathGeneration,
     user?.id,
   ]);

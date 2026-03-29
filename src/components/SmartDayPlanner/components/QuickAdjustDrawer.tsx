@@ -248,7 +248,7 @@ export function QuickAdjustDrawer({
           </DrawerDescription>
         </DrawerHeader>
 
-        <div className="px-4 pb-6 space-y-4">
+        <div className="flex-1 overflow-y-auto overscroll-contain px-4 pb-6 space-y-4" data-vaul-no-drag>
           {/* Quick Actions */}
           <div className="grid grid-cols-2 gap-2">
             {quickActions.map((action, i) => (

@@ -27,7 +27,7 @@ describe("ConstellationTrail", () => {
 
   it("renders the persisted/generated path immediately without a blocking loading state", () => {
     mocks.useJourneyPathImageMock.mockReturnValue({
-      pathImageUrl: "https://example.com/persisted-path.png",
+      pathImageUrl: "https://example.supabase.co/storage/v1/object/public/journey-paths/user-1/epic-1/path.png",
       currentMilestoneIndex: 1,
       isGenerating: false,
       isLoading: false,
@@ -38,7 +38,10 @@ describe("ConstellationTrail", () => {
 
     render(<ConstellationTrail progress={18} targetDays={30} epicId="epic-1" />);
 
-    expect(screen.getByTestId("journey-path-image")).toHaveAttribute("src", "https://example.com/persisted-path.png");
+    expect(screen.getByTestId("journey-path-image")).toHaveAttribute(
+      "src",
+      "https://example.supabase.co/storage/v1/render/image/public/journey-paths/user-1/epic-1/path.png?width=1200&height=675&resize=cover&quality=70",
+    );
     expect(screen.queryByText(/mapping your path/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/loading journey path/i)).not.toBeInTheDocument();
   });

@@ -33,14 +33,6 @@ vi.mock("@/hooks/useEveningReflection", () => ({
   }),
 }));
 
-vi.mock("@/hooks/useIOSKeyboardAvoidance", () => ({
-  useIOSKeyboardAvoidance: () => ({
-    containerStyle: {},
-    inputStyle: {},
-    scrollInputIntoView: vi.fn(),
-  }),
-}));
-
 vi.mock("@/hooks/use-toast", () => ({
   useToast: () => ({
     toast: mocks.toast,
@@ -68,6 +60,45 @@ describe("EveningReflectionDrawer", () => {
 
     expect(screen.getByText(/anything else you'd like to reflect on from today\?/i)).toBeInTheDocument();
     expect(screen.getByText(/what's one small adjustment you'd like to make tomorrow\?/i)).toBeInTheDocument();
+  });
+
+  it("does not call scrollIntoView when moving between textareas", () => {
+    const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
+    const scrollIntoViewMock = vi.fn();
+
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      writable: true,
+      value: scrollIntoViewMock,
+    });
+
+    try {
+      render(<EveningReflectionDrawer open={true} onOpenChange={vi.fn()} />);
+
+      fireEvent.focus(screen.getByPlaceholderText(
+        "A small win, a moment of joy, something you appreciated about today...",
+      ));
+
+      fireEvent.click(screen.getByRole("button", { name: /go a little deeper/i }));
+
+      fireEvent.focus(screen.getByPlaceholderText("Anything else that feels worth naming tonight..."));
+      fireEvent.focus(screen.getByPlaceholderText(
+        "One small shift, boundary, or choice you'd like to try tomorrow...",
+      ));
+      fireEvent.focus(screen.getByPlaceholderText("Something or someone you appreciate today..."));
+
+      expect(scrollIntoViewMock).not.toHaveBeenCalled();
+    } finally {
+      if (originalScrollIntoView) {
+        Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+          configurable: true,
+          writable: true,
+          value: originalScrollIntoView,
+        });
+      } else {
+        delete (HTMLElement.prototype as HTMLElement & { scrollIntoView?: unknown }).scrollIntoView;
+      }
+    }
   });
 
   it("limits entries to 800 characters and submits all four sections", async () => {

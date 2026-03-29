@@ -248,6 +248,31 @@ describe("useJourneyPathImage", () => {
     });
   });
 
+  it("starts initial generation without waiting for remote revalidation to finish", async () => {
+    const remoteDeferred = createDeferred<ReturnType<typeof buildJourneyPathSnapshot> | null>();
+
+    mocks.fetchRemoteLatestJourneyPathMock.mockReturnValue(remoteDeferred.promise);
+    mocks.requestJourneyPathGenerationMock.mockResolvedValue(null);
+
+    renderHook(() => useJourneyPathImage("epic-1"), {
+      wrapper: createWrapper().wrapper,
+    });
+
+    await waitFor(() => {
+      expect(mocks.requestJourneyPathGenerationMock).toHaveBeenCalledWith({
+        epicId: "epic-1",
+        milestoneIndex: 0,
+        queryClient: expect.any(QueryClient),
+        userId: "user-1",
+      });
+    });
+
+    await act(async () => {
+      remoteDeferred.resolve(null);
+      await remoteDeferred.promise;
+    });
+  });
+
   it("keeps the previous image visible while a new milestone path is generating", async () => {
     const localSnapshot = buildJourneyPathSnapshot();
     const generationDeferred = createDeferred<ReturnType<typeof buildJourneyPathSnapshot> | null>();

@@ -204,6 +204,7 @@ Ultra high resolution.`;
         model: "google/gemini-2.5-flash-image-preview",
         messages: [{ role: "user", content: prompt }],
         modalities: ["image", "text"],
+        image_size: "1024x1024",
       }),
     });
 

@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { ChevronDown, Moon, Sparkles } from "lucide-react";
 import {
   Drawer,
@@ -11,7 +11,6 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useEveningReflection } from "@/hooks/useEveningReflection";
-import { useIOSKeyboardAvoidance } from "@/hooks/useIOSKeyboardAvoidance";
 import { useToast } from "@/hooks/use-toast";
 
 const MOOD_OPTIONS = [
@@ -38,12 +37,6 @@ export const EveningReflectionDrawer = ({ open, onOpenChange }: EveningReflectio
   const [tomorrowAdjustment, setTomorrowAdjustment] = useState("");
   const [gratitude, setGratitude] = useState("");
   const [isDeeperOpen, setIsDeeperOpen] = useState(false);
-  
-  const winsRef = useRef<HTMLTextAreaElement>(null);
-  const additionalReflectionRef = useRef<HTMLTextAreaElement>(null);
-  const tomorrowAdjustmentRef = useRef<HTMLTextAreaElement>(null);
-  const gratitudeRef = useRef<HTMLTextAreaElement>(null);
-  const { containerStyle, inputStyle, scrollInputIntoView } = useIOSKeyboardAvoidance({ offsetBuffer: 10 });
 
   const resetForm = () => {
     setMood("");
@@ -87,8 +80,8 @@ export const EveningReflectionDrawer = ({ open, onOpenChange }: EveningReflectio
   const isValid = mood.length > 0;
 
   return (
-    <Drawer open={open} onOpenChange={handleOpenChange} shouldScaleBackground={false} handleOnly={true} repositionInputs={false}>
-      <DrawerContent className="max-h-[85dvh]" style={containerStyle}>
+    <Drawer open={open} onOpenChange={handleOpenChange} shouldScaleBackground={false} handleOnly={true}>
+      <DrawerContent className="max-h-[85dvh]">
         <div 
           className="mx-auto w-full max-w-lg px-4 pb-8 overflow-y-auto overscroll-contain"
           style={{ 
@@ -137,14 +130,11 @@ export const EveningReflectionDrawer = ({ open, onOpenChange }: EveningReflectio
                 What went well today? <span className="text-muted-foreground">(optional)</span>
               </label>
               <Textarea
-                ref={winsRef}
                 placeholder="A small win, a moment of joy, something you appreciated about today..."
                 value={wins}
                 maxLength={MAX_REFLECTION_LENGTH}
                 onChange={(e) => setWins(e.target.value.slice(0, MAX_REFLECTION_LENGTH))}
-                onFocus={() => scrollInputIntoView(winsRef)}
                 className="resize-none min-h-24 bg-muted/30 border-border/50"
-                style={inputStyle}
               />
               <p className="text-xs text-muted-foreground text-right">{wins.length}/{MAX_REFLECTION_LENGTH}</p>
             </div>
@@ -176,14 +166,11 @@ export const EveningReflectionDrawer = ({ open, onOpenChange }: EveningReflectio
                       Anything else you'd like to reflect on from today? <span className="text-muted-foreground">(optional)</span>
                     </label>
                     <Textarea
-                      ref={additionalReflectionRef}
                       placeholder="Anything else that feels worth naming tonight..."
                       value={additionalReflection}
                       maxLength={MAX_REFLECTION_LENGTH}
                       onChange={(e) => setAdditionalReflection(e.target.value.slice(0, MAX_REFLECTION_LENGTH))}
-                      onFocus={() => scrollInputIntoView(additionalReflectionRef)}
                       className="resize-none min-h-24 bg-muted/30 border-border/50"
-                      style={inputStyle}
                     />
                     <p className="text-xs text-muted-foreground text-right">
                       {additionalReflection.length}/{MAX_REFLECTION_LENGTH}
@@ -195,14 +182,11 @@ export const EveningReflectionDrawer = ({ open, onOpenChange }: EveningReflectio
                       What's one small adjustment you'd like to make tomorrow? <span className="text-muted-foreground">(optional)</span>
                     </label>
                     <Textarea
-                      ref={tomorrowAdjustmentRef}
                       placeholder="One small shift, boundary, or choice you'd like to try tomorrow..."
                       value={tomorrowAdjustment}
                       maxLength={MAX_REFLECTION_LENGTH}
                       onChange={(e) => setTomorrowAdjustment(e.target.value.slice(0, MAX_REFLECTION_LENGTH))}
-                      onFocus={() => scrollInputIntoView(tomorrowAdjustmentRef)}
                       className="resize-none min-h-24 bg-muted/30 border-border/50"
-                      style={inputStyle}
                     />
                     <p className="text-xs text-muted-foreground text-right">
                       {tomorrowAdjustment.length}/{MAX_REFLECTION_LENGTH}
@@ -218,14 +202,11 @@ export const EveningReflectionDrawer = ({ open, onOpenChange }: EveningReflectio
                 What are you grateful for? <span className="text-muted-foreground">(optional)</span>
               </label>
               <Textarea
-                ref={gratitudeRef}
                 placeholder="Something or someone you appreciate today..."
                 value={gratitude}
                 maxLength={MAX_REFLECTION_LENGTH}
                 onChange={(e) => setGratitude(e.target.value.slice(0, MAX_REFLECTION_LENGTH))}
-                onFocus={() => scrollInputIntoView(gratitudeRef)}
                 className="resize-none min-h-24 bg-muted/30 border-border/50"
-                style={inputStyle}
               />
               <p className="text-xs text-muted-foreground text-right">{gratitude.length}/{MAX_REFLECTION_LENGTH}</p>
             </div>
