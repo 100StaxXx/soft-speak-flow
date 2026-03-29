@@ -259,7 +259,7 @@ serve(async (req) => {
       }
     }
 
-    const inviteProtection = await applyAbuseProtection(req, supabaseClient, {
+    const inviteProtection = await applyAbuseProtection(req, supabaseClient as any, {
       profileKey: "invite",
       endpointName: "create-influencer-code",
       requestId,
@@ -287,14 +287,11 @@ serve(async (req) => {
       .maybeSingle();
 
     if (existingCode) {
-      const creatorAccessToken = await createCreatorAccessToken(existingCode.code);
-
       // Return existing code instead of creating duplicate
       const appLink = `${appUrl}/?ref=${existingCode.code}`;
-      const dashboardUrl = `${appUrl}/creator/dashboard?code=${existingCode.code}&token=${encodeURIComponent(creatorAccessToken)}`;
       let reminderEmailSent = false;
 
-      const emailProtection = await applyAbuseProtection(req, supabaseClient, {
+      const emailProtection = await applyAbuseProtection(req, supabaseClient as any, {
         profileKey: "email.send",
         endpointName: "create-influencer-code",
         requestId: crypto.randomUUID(),
@@ -307,6 +304,8 @@ serve(async (req) => {
       });
 
       if (!(emailProtection instanceof Response)) {
+        const creatorAccessToken = await createCreatorAccessToken(existingCode.code);
+        const dashboardUrl = `${appUrl}/creator/dashboard?code=${existingCode.code}&token=${encodeURIComponent(creatorAccessToken)}`;
         await sendConfirmationEmail(name, email, existingCode.code, dashboardUrl, appLink);
         reminderEmailSent = true;
       }
@@ -315,12 +314,10 @@ serve(async (req) => {
         JSON.stringify({
           code: existingCode.code,
           link: appLink,
-          creator_access_token: creatorAccessToken,
-          dashboard_url: dashboardUrl,
           email_sent: reminderEmailSent,
           message: reminderEmailSent
-            ? "You already have a referral code. We've sent you a reminder email!"
-            : "You already have a referral code.",
+            ? "You already have a referral code. We emailed you a fresh secure dashboard link."
+            : "You already have a referral code. Dashboard access is only sent by email.",
         }),
         {
           status: 200,
@@ -376,11 +373,9 @@ serve(async (req) => {
     }
 
     const appLink = `${appUrl}/?ref=${code}`;
-    const creatorAccessToken = await createCreatorAccessToken(code);
-    const dashboardUrl = `${appUrl}/creator/dashboard?code=${code}&token=${encodeURIComponent(creatorAccessToken)}`;
 
     let confirmationEmailSent = false;
-    const emailProtection = await applyAbuseProtection(req, supabaseClient, {
+    const emailProtection = await applyAbuseProtection(req, supabaseClient as any, {
       profileKey: "email.send",
       endpointName: "create-influencer-code",
       requestId: crypto.randomUUID(),
@@ -393,6 +388,8 @@ serve(async (req) => {
     });
 
     if (!(emailProtection instanceof Response)) {
+      const creatorAccessToken = await createCreatorAccessToken(code);
+      const dashboardUrl = `${appUrl}/creator/dashboard?code=${code}&token=${encodeURIComponent(creatorAccessToken)}`;
       await sendConfirmationEmail(name, email, code, dashboardUrl, appLink);
       confirmationEmailSent = true;
     }
@@ -403,9 +400,10 @@ serve(async (req) => {
       JSON.stringify({
         code,
         link: appLink,
-        creator_access_token: creatorAccessToken,
-        dashboard_url: dashboardUrl,
         email_sent: confirmationEmailSent,
+        message: confirmationEmailSent
+          ? "Your referral code is ready. Check your email for a secure creator dashboard link."
+          : "Your referral code is ready. Dashboard access is only sent by email.",
         promo_caption: `✨ Transform your habits into an epic journey! Use my code ${code} or click: ${appLink}`,
       }),
       {

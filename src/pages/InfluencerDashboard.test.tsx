@@ -33,6 +33,15 @@ vi.mock("@/utils/storage", () => ({
       mocks.storage.delete(key);
     },
   },
+  safeSessionStorage: {
+    getItem: (key: string) => mocks.storage.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      mocks.storage.set(key, value);
+    },
+    removeItem: (key: string) => {
+      mocks.storage.delete(key);
+    },
+  },
 }));
 
 vi.mock("@capacitor/core", () => ({

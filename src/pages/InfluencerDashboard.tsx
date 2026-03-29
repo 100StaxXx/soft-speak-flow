@@ -20,7 +20,7 @@ import {
 import { toast } from "sonner";
 import { Share } from "@capacitor/share";
 import { Capacitor } from "@capacitor/core";
-import { safeLocalStorage } from "@/utils/storage";
+import { safeLocalStorage, safeSessionStorage } from "@/utils/storage";
 
 interface CreatorDashboardData {
   creator: {
@@ -69,7 +69,7 @@ const InfluencerDashboard = () => {
     const urlCode = searchParams.get("code");
     const urlToken = searchParams.get("token");
     const storedCode = safeLocalStorage.getItem("influencer_code");
-    const storedToken = safeLocalStorage.getItem("influencer_dashboard_token");
+    const storedToken = safeSessionStorage.getItem("influencer_dashboard_token");
 
     if (urlCode) {
       const normalizedCode = urlCode.toUpperCase();
@@ -78,10 +78,10 @@ const InfluencerDashboard = () => {
 
       if (urlToken) {
         setCreatorAccessToken(urlToken);
-        safeLocalStorage.setItem("influencer_dashboard_token", urlToken);
+        safeSessionStorage.setItem("influencer_dashboard_token", urlToken);
       } else {
         setCreatorAccessToken(null);
-        safeLocalStorage.removeItem("influencer_dashboard_token");
+        safeSessionStorage.removeItem("influencer_dashboard_token");
       }
 
       navigate("/creator/dashboard", { replace: true });
@@ -131,7 +131,7 @@ const InfluencerDashboard = () => {
 
     const error = creatorDashboardQuery.error as DashboardError;
     if (error.code === "INVALID_CREATOR_TOKEN") {
-      safeLocalStorage.removeItem("influencer_dashboard_token");
+      safeSessionStorage.removeItem("influencer_dashboard_token");
       setCreatorAccessToken(null);
       toast.error("Your secure creator session expired. Re-open the dashboard link from your email.");
     }
@@ -202,7 +202,7 @@ const InfluencerDashboard = () => {
 
   const logout = () => {
     safeLocalStorage.removeItem("influencer_code");
-    safeLocalStorage.removeItem("influencer_dashboard_token");
+    safeSessionStorage.removeItem("influencer_dashboard_token");
     setVerifiedCode(null);
     setCreatorAccessToken(null);
     navigate("/creator");

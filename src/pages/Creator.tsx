@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,8 +12,17 @@ import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { Capacitor } from "@capacitor/core";
 import { Share } from "@capacitor/share";
 
+interface CreatorSignupResult {
+  code: string;
+  link: string;
+  promo_caption: string;
+  email_sent?: boolean;
+  message?: string;
+}
+
 export default function Creator() {
-  const navigate = useNavigate();
+  const location = useLocation();
+  const navigationState = location.state as { creatorSignupResult?: CreatorSignupResult } | null;
   const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined;
   const turnstileRequired = import.meta.env.PROD || Boolean(turnstileSiteKey);
   const turnstileUnavailable = turnstileRequired && !turnstileSiteKey;
@@ -26,13 +35,7 @@ export default function Creator() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [turnstileResetSignal, setTurnstileResetSignal] = useState(0);
-  const [result, setResult] = useState<{
-    code: string;
-    link: string;
-    promo_caption: string;
-    creator_access_token?: string;
-    dashboard_url?: string;
-  } | null>(null);
+  const [result, setResult] = useState<CreatorSignupResult | null>(navigationState?.creatorSignupResult ?? null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,7 +67,7 @@ export default function Creator() {
       if (data.error) throw new Error(data.error);
 
       setResult(data);
-      toast.success("Your referral code is ready!");
+      toast.success(data.message || "Your referral code is ready. Check your email for dashboard access.");
     } catch (error) {
       console.error("Failed to create code:", error);
       toast.error(
@@ -133,24 +136,18 @@ export default function Creator() {
               </p>
             </div>
 
-            {/* Dashboard Button */}
             <div className="mb-6 p-4 bg-primary/10 border border-primary/30 rounded-lg">
-              <Button
-                onClick={() => {
-                  const params = new URLSearchParams({ code: result.code });
-                  if (result.creator_access_token) {
-                    params.set("token", result.creator_access_token);
-                  }
-                  navigate(`/creator/dashboard?${params.toString()}`);
-                }}
-                className="w-full"
-                size="lg"
-              >
-                View Your Dashboard →
-              </Button>
-              <p className="text-xs text-center text-muted-foreground mt-2">
-                Track your referrals and earnings
+              <p className="text-sm font-medium text-center">
+                Dashboard access is sent only through your secure email link.
               </p>
+              <p className="text-xs text-center text-muted-foreground mt-2">
+                {result.message || "Check your inbox for a secure creator dashboard link."}
+              </p>
+              {!result.email_sent && (
+                <p className="text-xs text-center text-muted-foreground mt-2">
+                  If the link did not arrive yet, wait a minute and request it again from this portal.
+                </p>
+              )}
             </div>
 
             <div className="space-y-6">

@@ -2,10 +2,10 @@ interface CreatorAccessTokenPayload {
   code: string;
   iat: number;
   exp: number;
-  v: 1;
+  v: 2;
 }
 
-const TOKEN_TTL_SECONDS = 60 * 60 * 24 * 90; // 90 days
+const TOKEN_TTL_SECONDS = 60 * 60 * 24; // 24 hours
 
 function getTokenSecret(): string {
   const configured = Deno.env.get("INFLUENCER_DASHBOARD_SECRET");
@@ -69,7 +69,7 @@ export async function createCreatorAccessToken(code: string): Promise<string> {
     code: code.toUpperCase(),
     iat: now,
     exp: now + TOKEN_TTL_SECONDS,
-    v: 1,
+    v: 2,
   };
 
   const payloadB64 = base64UrlEncode(JSON.stringify(payload));
@@ -96,7 +96,7 @@ export async function verifyCreatorAccessToken(
     return { valid: false, reason: "Invalid token payload" };
   }
 
-  if (payload.v !== 1) {
+  if (payload.v !== 2) {
     return { valid: false, reason: "Unsupported token version" };
   }
 
