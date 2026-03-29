@@ -1,4 +1,0 @@
-
-module CapacitorHaptics.__Swift {
-  exclude header "CapacitorHaptics-Swift.h"
-}

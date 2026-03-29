@@ -21,6 +21,7 @@ dist-ssr
 *.env.bak
 *.env.backup
 *.env.save
+ios/App/build*/
 
 # Editor directories and files
 .vscode/*
