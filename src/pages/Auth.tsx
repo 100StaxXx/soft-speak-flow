@@ -633,6 +633,9 @@ const Auth = () => {
   };
 
   const handleOAuthSignIn = async (provider: 'google' | 'apple') => {
+    const socialAuthIntent: SocialAuthIntent = getSocialAuthIntent(isLogin);
+    let storedPendingSocialAuth = false;
+
     setInlineError(null);
     setOauthLoading(provider);
     console.log(`[OAuth Debug] Starting ${provider} sign-in flow`);
@@ -675,7 +678,7 @@ const Auth = () => {
           
           // Call our edge function to handle native Google auth
           const { data: sessionData, error: functionError } = await supabase.functions.invoke('google-native-auth', {
-            body: { idToken }
+            body: { idToken, intent: socialAuthIntent }
           });
 
           const functionErrorBody = functionError ? await readFunctionErrorContext(functionError) : null;
@@ -683,10 +686,18 @@ const Auth = () => {
           console.log('[Google OAuth] Edge function response:', { 
             hasAccessToken: !!sessionData?.access_token,
             hasRefreshToken: !!sessionData?.refresh_token,
-            error: functionErrorBody?.error || functionError?.message 
+            error: functionErrorBody?.error || functionError?.message,
+            errorCode: functionErrorBody?.code,
           });
 
           if (functionError) {
+            if (functionErrorBody?.code === 'ACCOUNT_NOT_FOUND') {
+              setIsLogin(true);
+              setIsForgotPassword(false);
+              setInlineError(getSocialAccountNotFoundMessage('google'));
+              return;
+            }
+
             throw new Error(
               typeof functionErrorBody?.error === 'string'
                 ? functionErrorBody.error
@@ -792,6 +803,7 @@ const Auth = () => {
           body: {
             identityToken: result.response.identityToken,
             rawNonce,
+            intent: socialAuthIntent,
           }
         });
         const functionErrorBody = functionError ? await readFunctionErrorContext(functionError) : null;
@@ -805,6 +817,13 @@ const Auth = () => {
         });
 
         if (functionError) {
+          if (functionErrorBody?.code === 'ACCOUNT_NOT_FOUND') {
+            setInlineError(getSocialAccountNotFoundMessage('apple'));
+            setIsLogin(true);
+            setIsForgotPassword(false);
+            return;
+          }
+
           if (functionErrorBody?.code === 'APPLE_EMAIL_MISSING') {
             console.warn('[Apple OAuth] Missing email for Apple ID, prompting user to re-register');
             setInlineError("We couldn’t create an account with your Apple ID. Open Settings, remove Revolution from Sign in with Apple, then try again and share your email.");
@@ -884,10 +903,14 @@ const Auth = () => {
       console.log(`[${provider} OAuth] Redirect URL:`, getRedirectUrl());
 
       // Use standard Supabase OAuth for all web providers
+      storedPendingSocialAuth = storePendingSocialAuthAttempt({
+        provider,
+        intent: socialAuthIntent,
+      });
       const { data: oauthData, error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: getRedirectUrlWithPath('/'),
+          redirectTo: getRedirectUrlWithPath('/auth'),
         },
       });
 
@@ -899,6 +922,10 @@ const Auth = () => {
 
       if (error) throw error;
     } catch (error) {
+      if (storedPendingSocialAuth) {
+        clearPendingSocialAuthAttempt();
+      }
+
       const message = getErrorMessage(error);
       console.error(`[${provider} OAuth] Error caught:`, {
         message,
