@@ -1,6 +1,5 @@
 import { memo, useState, useMemo } from "react";
 import { motion } from "framer-motion";
-import { differenceInDays } from "date-fns";
 import { Target, Flame, Star, Map, Calendar } from "lucide-react";
 import {
   Drawer,
@@ -18,6 +17,7 @@ import { useJourneyPathImage } from "@/hooks/useJourneyPathImage";
 import { useMilestones } from "@/hooks/useMilestones";
 import { useCompanion } from "@/hooks/useCompanion";
 import { getJourneyPathDrawerImageUrl } from "@/utils/journeyPathUrls";
+import { getEpicDaysRemaining, resolveEpicEndDate } from "@/utils/epicDates";
 
 interface EpicHabit {
   habit_id: string;
@@ -40,7 +40,7 @@ interface JourneyPathDrawerProps {
     progress_percentage: number;
     target_days: number;
     start_date: string;
-    end_date: string;
+    end_date: string | null;
     epic_habits?: EpicHabit[];
   };
   children?: React.ReactNode;
@@ -56,10 +56,15 @@ export const JourneyPathDrawer = memo(function JourneyPathDrawer({
   const drawerImageUrl = useMemo(() => getJourneyPathDrawerImageUrl(pathImageUrl), [pathImageUrl]);
   const { milestones, totalCount } = useMilestones(epic.id);
   const { companion } = useCompanion();
+  const resolvedEndDate = useMemo(() => resolveEpicEndDate(epic), [epic]);
 
   const daysRemaining = useMemo(() => {
-    return Math.max(0, differenceInDays(new Date(epic.end_date), new Date()));
-  }, [epic.end_date]);
+    return getEpicDaysRemaining({
+      start_date: epic.start_date,
+      target_days: epic.target_days,
+      end_date: resolvedEndDate,
+    });
+  }, [epic.start_date, epic.target_days, resolvedEndDate]);
 
   // Convert milestones to trail format
   const trailMilestones = useMemo(() => {
@@ -96,7 +101,7 @@ export const JourneyPathDrawer = memo(function JourneyPathDrawer({
               </span>
               <span className="text-muted-foreground flex items-center gap-1">
                 <Flame className="w-3.5 h-3.5 text-orange-500" />
-                {daysRemaining}d left
+                {daysRemaining === null ? "Timeline pending" : `${daysRemaining}d left`}
               </span>
             </div>
             <Progress value={epic.progress_percentage} className="h-2" />
@@ -166,7 +171,7 @@ export const JourneyPathDrawer = memo(function JourneyPathDrawer({
               epicId={epic.id}
               epicTitle={epic.title}
               epicGoal={epic.description}
-              currentDeadline={epic.end_date}
+              currentDeadline={resolvedEndDate ?? undefined}
             >
               <Button variant="outline" className="gap-2">
                 <Map className="w-4 h-4" />

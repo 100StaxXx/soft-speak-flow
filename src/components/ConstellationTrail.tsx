@@ -922,9 +922,10 @@ export const ConstellationTrail = memo(function ConstellationTrail({
     () => getJourneyPathCardImageUrl(pathImageUrl),
     [pathImageUrl],
   );
+  const hasGeneratedBackground = Boolean(optimizedPathImageUrl);
   const backgroundImageUrl = optimizedPathImageUrl || (!transparentBackground ? fallbackBackground.src : null);
   const backgroundImageSrcSet =
-    !optimizedPathImageUrl && !transparentBackground
+    !hasGeneratedBackground && !transparentBackground
       ? getStaticBackgroundSrcSet(fallbackBackground)
       : undefined;
 
@@ -960,7 +961,16 @@ export const ConstellationTrail = memo(function ConstellationTrail({
             className="w-full h-full object-cover"
           />
           {/* Overlay gradient for star/companion visibility */}
-          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/50 to-slate-950/70" />
+          <div
+            className={cn(
+              "absolute inset-0",
+              hasGeneratedBackground
+                ? "bg-gradient-to-t from-slate-950/58 via-slate-950/22 to-slate-950/30"
+                : "bg-gradient-to-t from-slate-950/90 via-slate-950/50 to-slate-950/70",
+            )}
+            data-testid="journey-path-overlay"
+            data-overlay-mode={hasGeneratedBackground ? "generated" : "fallback"}
+          />
         </div>
       )}
       

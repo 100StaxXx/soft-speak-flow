@@ -1,3 +1,4 @@
+import type { JourneyPathPromptContext } from "@/shared/journeyPathConfig";
 import { supabase } from "@/integrations/supabase/client";
 
 export interface EpicHabitRecord {
@@ -25,11 +26,12 @@ export interface EpicRecord {
   progress_percentage: number | null;
   target_days: number;
   start_date: string;
-  end_date: string;
+  end_date: string | null;
   epic_habits?: EpicHabitRecord[] | null;
   latest_journey_path_generated_at?: string | null;
   latest_journey_path_milestone_index?: number | null;
   latest_journey_path_url?: string | null;
+  latest_journey_path_prompt_context?: JourneyPathPromptContext | null;
   [key: string]: unknown;
 }
 

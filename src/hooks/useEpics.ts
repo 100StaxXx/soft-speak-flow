@@ -15,6 +15,7 @@ import {
   loadLocalEpics,
   warmEpicsQueryFromRemote,
 } from "@/utils/plannerSync";
+import { resolveEpicEndDate } from "@/utils/epicDates";
 import {
   createOfflinePlannerId,
   getAllLocalTasksForUser,
@@ -424,6 +425,7 @@ export const useEpics = (options: EpicsOptions = {}) => {
       }
 
       const nowIso = new Date().toISOString();
+      const startDate = nowIso.split("T")[0];
       const epicId = createOfflinePlannerId("epic");
       const inviteCode = `EPIC-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
       const habits = epicData.habits.map((habit) => ({
@@ -454,8 +456,11 @@ export const useEpics = (options: EpicsOptions = {}) => {
         status: "active",
         progress_percentage: 0,
         target_days: epicData.target_days,
-        start_date: nowIso.split("T")[0],
-        end_date: null,
+        start_date: startDate,
+        end_date: resolveEpicEndDate({
+          start_date: startDate,
+          target_days: epicData.target_days,
+        }),
         epic_habits: [],
         xp_reward: Math.floor(epicData.target_days * 10),
         invite_code: inviteCode,

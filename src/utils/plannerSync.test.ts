@@ -154,6 +154,10 @@ describe("plannerSync", () => {
       milestone_index: 2,
       image_url: "https://example.com/persisted-path.png",
       generated_at: "2026-03-27T23:59:59.000Z",
+      prompt_context: {
+        image_size: "1536x1024",
+        render_version: 2,
+      },
     });
 
     const epics = await loadLocalEpics("user-1");
@@ -161,5 +165,29 @@ describe("plannerSync", () => {
     expect(epics).toHaveLength(1);
     expect(epics[0]?.latest_journey_path_url).toBe("https://example.com/persisted-path.png");
     expect(epics[0]?.latest_journey_path_milestone_index).toBe(2);
+    expect(epics[0]?.latest_journey_path_prompt_context).toEqual({
+      image_size: "1536x1024",
+      render_version: 2,
+    });
+  });
+
+  it("normalizes legacy local epics with missing end dates before they reach the UI", async () => {
+    await upsertPlannerRecord("epics", {
+      id: "epic-legacy",
+      user_id: "user-1",
+      title: "Legacy Countdown",
+      description: null,
+      status: "active",
+      progress_percentage: 4,
+      target_days: 21,
+      start_date: "2026-03-01",
+      end_date: null,
+      created_at: "2026-03-01T00:00:00.000Z",
+      epic_habits: [],
+    });
+
+    const epics = await loadLocalEpics("user-1");
+
+    expect(epics[0]?.end_date).toBe("2026-03-22");
   });
 });

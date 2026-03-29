@@ -124,6 +124,7 @@ const Auth = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [inlineError, setInlineError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<'google' | 'apple' | null>(null);
   const navigate = useNavigate();
@@ -431,6 +432,7 @@ const Auth = () => {
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
+    setInlineError(null);
 
     // Sanitize inputs before validation
     const sanitizedEmail = email.trim().toLowerCase();
@@ -440,11 +442,7 @@ const Auth = () => {
       confirmPassword: isLogin ? undefined : confirmPassword 
     });
     if (!result.success) {
-      toast({
-        title: "Validation Error",
-        description: result.error.errors[0].message,
-        variant: "destructive",
-      });
+      setInlineError(result.error.errors[0].message);
       return;
     }
 
@@ -502,11 +500,7 @@ const Auth = () => {
         }
       }
     } catch (error) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
+      setInlineError(getErrorMessage(error));
     } finally {
       setLoading(false);
     }
@@ -514,26 +508,19 @@ const Auth = () => {
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
+    setInlineError(null);
     
     const sanitizedEmail = email.trim().toLowerCase();
     
     if (!sanitizedEmail) {
-      toast({
-        variant: "destructive",
-        title: "Email Required",
-        description: "Please enter your email address",
-      });
+      setInlineError("Please enter your email address.");
       return;
     }
 
     // Validate email format
     const emailValidation = z.string().email().safeParse(sanitizedEmail);
     if (!emailValidation.success) {
-      toast({
-        variant: "destructive",
-        title: "Invalid Email",
-        description: "Please enter a valid email address",
-      });
+      setInlineError("Please enter a valid email address.");
       return;
     }
 
@@ -550,20 +537,18 @@ const Auth = () => {
         title: "Check your email",
         description: "We've sent you a password reset link",
       });
+      setInlineError(null);
       setIsForgotPassword(false);
       setEmail("");
     } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error instanceof Error ? error.message : "An unexpected error occurred",
-      });
+      setInlineError(error instanceof Error ? error.message : "An unexpected error occurred");
     } finally {
       setLoading(false);
     }
   };
 
   const handleOAuthSignIn = async (provider: 'google' | 'apple') => {
+    setInlineError(null);
     setOauthLoading(provider);
     console.log(`[OAuth Debug] Starting ${provider} sign-in flow`);
     console.log(`[OAuth Debug] Platform: ${Capacitor.isNativePlatform() ? 'Native' : 'Web'}`);
@@ -737,10 +722,7 @@ const Auth = () => {
         if (functionError) {
           if (functionErrorBody?.code === 'APPLE_EMAIL_MISSING') {
             console.warn('[Apple OAuth] Missing email for Apple ID, prompting user to re-register');
-            toast({
-              title: "Finish setting up Apple Sign-In",
-              description: "We couldn’t create an account with your Apple ID. Open Settings → Apple ID → Password & Security → Sign in with Apple, remove Revolution, then try again to share your email.",
-            });
+            setInlineError("We couldn’t create an account with your Apple ID. Open Settings, remove Revolution from Sign in with Apple, then try again and share your email.");
             setIsLogin(true);
             setIsForgotPassword(false);
             return;
@@ -847,53 +829,78 @@ const Auth = () => {
       }
 
       if (provider === 'apple') {
-        toast({
-          title: "Apple Sign-In Error",
-          description: getAppleErrorDescription(error),
-          variant: "destructive",
-        });
+        setInlineError(getAppleErrorDescription(error));
         return;
       }
       
-      toast({
-        title: "Error",
-        description: message || 'Failed to sign in. Please try again.',
-        variant: "destructive",
-      });
+      setInlineError(message || 'Failed to sign in. Please try again.');
     } finally {
       setOauthLoading(null);
     }
   };
 
+  const fieldLabelClassName = "text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-white/[0.62]";
+  const fieldInputClassName =
+    "h-14 rounded-full border border-white/[0.08] bg-[rgba(16,10,39,0.62)] px-5 text-[0.95rem] text-white shadow-[0_18px_36px_rgba(7,2,24,0.42),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl placeholder:text-white/[0.42] focus-visible:border-white/[0.18] focus-visible:ring-white/[0.12] focus-visible:ring-offset-0";
+  const switchMode = () => {
+    setInlineError(null);
+    if (isForgotPassword) {
+      setIsForgotPassword(false);
+      setEmail("");
+      return;
+    }
+
+    setIsLogin(!isLogin);
+    setConfirmPassword("");
+  };
+
   return (
-    <div className="min-h-screen relative">
-      <StaticBackgroundImage background={backgroundImage} />
-      {/* Auth Form Section with iOS safe areas */}
+    <div className="min-h-screen relative overflow-hidden bg-[#080313] text-pure-white">
+      <StaticBackgroundImage
+        background={backgroundImage}
+        className="fixed inset-0 -z-20 h-full w-full scale-[1.02] object-cover object-center pointer-events-none select-none"
+      />
+      <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_50%_12%,rgba(255,220,240,0.24),transparent_17%),radial-gradient(circle_at_52%_44%,rgba(201,109,255,0.18),transparent_22%),linear-gradient(180deg,rgba(10,8,31,0.14)_0%,rgba(12,10,38,0.32)_44%,rgba(7,5,23,0.9)_100%)]" />
+      <div className="absolute inset-x-0 bottom-0 -z-10 h-[45vh] bg-gradient-to-t from-[#050313] via-[#050313]/70 to-transparent" />
       <section
         id="auth-form"
-        className="min-h-screen relative flex items-center justify-center pt-safe-top pb-safe-bottom"
+        className="min-h-screen relative flex items-end justify-center px-5 pb-[max(2rem,env(safe-area-inset-bottom))] pt-[max(3.5rem,env(safe-area-inset-top))] md:items-center md:px-6"
       >
-        {/* Dark overlay */}
-        <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-background/20 to-background/50" />
-        <div className="relative z-10 w-full px-6 md:max-w-md space-y-8">
+        <div className="relative z-10 w-full max-w-[23rem] pb-5 md:max-w-md md:pb-0">
+          <h1 className="sr-only">
+            {isForgotPassword ? "Reset password" : isLogin ? "Sign in" : "Create account"}
+          </h1>
+
           <div className="space-y-6">
             {isForgotPassword ? (
               <form onSubmit={handleForgotPassword} className="space-y-5">
-                <div className="space-y-2">
-                  <Label htmlFor="email" className="text-steel text-sm uppercase tracking-wide">Email</Label>
+                <div className="space-y-1">
+                  <p className="text-sm leading-6 text-white/70">
+                    Enter your email and we&apos;ll send a reset link.
+                  </p>
+                </div>
+                <div className="space-y-3">
+                  <Label htmlFor="email" className={fieldLabelClassName}>Email</Label>
                   <Input
                     id="email"
                     type="email"
-                    placeholder="your@email.com"
+                    placeholder="you@example.com"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => {
+                      setInlineError(null);
+                      setEmail(e.target.value);
+                    }}
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    autoComplete="email"
                     required
-                    className="bg-obsidian/50 border-royal-purple/30 text-pure-white h-12 focus:border-royal-purple"
+                    className={fieldInputClassName}
                   />
                 </div>
                 <Button
                   type="submit"
-                  className="w-full bg-royal-purple hover:bg-accent-purple text-pure-white font-bold h-12 text-lg"
+                  className="h-14 w-full rounded-[18px] bg-gradient-to-r from-[#c25eff] via-[#b45fff] to-[#e26cff] text-base font-bold text-pure-white shadow-[0_18px_42px_rgba(165,78,255,0.38)] hover:brightness-105"
                   disabled={loading}
                 >
                   {loading ? "Sending..." : "Send Reset Link"}
@@ -901,56 +908,74 @@ const Auth = () => {
               </form>
             ) : (
               <form onSubmit={handleAuth} className="space-y-5">
-                <div className="space-y-2">
-                  <Label htmlFor="email" className="text-steel text-sm uppercase tracking-wide">Email</Label>
+                <div className="space-y-3">
+                  <Label htmlFor="email" className={fieldLabelClassName}>Email</Label>
                   <Input
                     id="email"
                     type="email"
-                    placeholder="your@email.com"
+                    placeholder="you@example.com"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => {
+                      setInlineError(null);
+                      setEmail(e.target.value);
+                    }}
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    autoComplete="email"
                     required
-                    className="bg-obsidian/50 border-royal-purple/30 text-pure-white h-12 focus:border-royal-purple"
+                    className={fieldInputClassName}
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="password" className="text-steel text-sm uppercase tracking-wide">Password</Label>
+                <div className="space-y-3">
+                  <Label htmlFor="password" className={fieldLabelClassName}>Password</Label>
                   <Input
                     id="password"
                     type="password"
                     placeholder="••••••••"
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={(e) => {
+                      setInlineError(null);
+                      setPassword(e.target.value);
+                    }}
+                    autoComplete={isLogin ? "current-password" : "new-password"}
                     required
-                    className="bg-obsidian/50 border-royal-purple/30 text-pure-white h-12 focus:border-royal-purple"
+                    className={fieldInputClassName}
                   />
                   {isLogin && (
                     <button
                       type="button"
-                      onClick={() => setIsForgotPassword(true)}
-                      className="text-xs text-pure-white/70 hover:text-pure-white transition-colors"
+                      onClick={() => {
+                        setInlineError(null);
+                        setIsForgotPassword(true);
+                      }}
+                      className="pl-1 text-xs font-medium text-white/[0.72] transition-colors hover:text-pure-white"
                     >
                       Forgot password?
                     </button>
                   )}
                 </div>
                 {!isLogin && (
-                  <div className="space-y-2">
-                    <Label htmlFor="confirmPassword" className="text-steel text-sm uppercase tracking-wide">Confirm Password</Label>
+                  <div className="space-y-3">
+                    <Label htmlFor="confirmPassword" className={fieldLabelClassName}>Confirm Password</Label>
                     <Input
                       id="confirmPassword"
                       type="password"
                       placeholder="••••••••"
                       value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      onChange={(e) => {
+                        setInlineError(null);
+                        setConfirmPassword(e.target.value);
+                      }}
+                      autoComplete="new-password"
                       required
-                      className="bg-obsidian/50 border-royal-purple/30 text-pure-white h-12 focus:border-royal-purple"
+                      className={fieldInputClassName}
                     />
                   </div>
                 )}
                 <Button
                   type="submit"
-                  className="w-full bg-royal-purple hover:bg-accent-purple text-pure-white font-bold h-12 text-lg"
+                  className="h-14 w-full rounded-[18px] bg-gradient-to-r from-[#c25eff] via-[#b45fff] to-[#e26cff] text-base font-bold text-pure-white shadow-[0_18px_42px_rgba(165,78,255,0.38)] hover:brightness-105"
                   disabled={loading}
                 >
                   {loading ? "Loading..." : isLogin ? "Sign In" : "Get Started"}
@@ -958,15 +983,16 @@ const Auth = () => {
               </form>
             )}
 
-            {/* Apple Sign In - divider and button */}
             {!isForgotPassword && (
               <>
-                <div className="relative my-6">
+                <div className="relative my-1">
                   <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-white/20" />
+                    <div className="w-full border-t border-white/[0.16]" />
                   </div>
                   <div className="relative flex justify-center text-sm">
-                    <span className="bg-card px-4 text-white/60">or</span>
+                    <span className="rounded-[6px] bg-[#1d1438]/90 px-3 py-0.5 text-[0.75rem] text-white/[0.72] shadow-[0_8px_18px_rgba(8,3,24,0.35)]">
+                      or
+                    </span>
                   </div>
                 </div>
 
@@ -974,7 +1000,7 @@ const Auth = () => {
                   type="button"
                   onClick={() => handleOAuthSignIn('apple')}
                   disabled={loading || oauthLoading !== null}
-                  className="w-full bg-white hover:bg-white/90 text-black font-semibold h-12 text-base flex items-center justify-center gap-3 rounded-xl"
+                  className="h-12 w-full rounded-[14px] bg-white text-base font-semibold text-black shadow-[0_16px_30px_rgba(0,0,0,0.28)] hover:bg-white/95"
                 >
                   {oauthLoading === 'apple' ? (
                     <div className="animate-spin h-5 w-5 border-2 border-black/20 border-t-black rounded-full" />
@@ -990,24 +1016,26 @@ const Auth = () => {
               </>
             )}
 
-            <div className="text-center space-y-3">
-              <Button
-                variant="link"
-                onClick={() => {
-                  if (isForgotPassword) {
-                    setIsForgotPassword(false);
-                    setEmail("");
-                  } else {
-                    setIsLogin(!isLogin);
-                    setConfirmPassword(""); // Clear confirm password when switching modes
-                  }
-                }}
-                className="text-pure-white/90 hover:text-stardust-gold underline underline-offset-4"
+            {inlineError ? (
+              <div
+                role="alert"
+                className="rounded-[22px] bg-[#ea5a54]/95 px-5 py-5 shadow-[0_22px_48px_rgba(61,8,17,0.36)]"
+              >
+                <p className="text-sm font-bold text-pure-white">Error</p>
+                <p className="mt-1 text-sm leading-6 text-pure-white/[0.84]">{inlineError}</p>
+              </div>
+            ) : null}
+
+            <div className="text-center">
+              <button
+                type="button"
+                onClick={switchMode}
+                className="text-sm font-medium text-white/[0.86] underline underline-offset-4 transition-colors hover:text-white"
               >
                 {isForgotPassword 
                   ? "Back to Sign In" 
                   : isLogin ? "Need an account? Sign up" : "Already have an account? Sign in"}
-              </Button>
+              </button>
             </div>
           </div>
         </div>

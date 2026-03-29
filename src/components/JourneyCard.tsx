@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionHealth } from "@/hooks/useCompanionHealth";
 import { useMilestones } from "@/hooks/useMilestones";
+import { getEpicDaysRemaining, resolveEpicEndDate } from "@/utils/epicDates";
 
 interface Journey {
   id: string;
@@ -32,7 +33,7 @@ interface Journey {
   description?: string;
   target_days: number;
   start_date: string;
-  end_date: string;
+  end_date: string | null;
   status: string;
   xp_reward: number;
   progress_percentage: number;
@@ -80,8 +81,14 @@ export const JourneyCard = memo(function JourneyCard({ journey, onComplete, onAb
     isBackfilling,
   } = useMilestones(journey.id);
   
-  const daysRemaining = Math.ceil(
-    (new Date(journey.end_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
+  const resolvedEndDate = useMemo(() => resolveEpicEndDate(journey), [journey]);
+  const daysRemaining = useMemo(
+    () => getEpicDaysRemaining({
+      start_date: journey.start_date,
+      target_days: journey.target_days,
+      end_date: resolvedEndDate,
+    }),
+    [resolvedEndDate, journey.start_date, journey.target_days],
   );
   const isCompleted = journey.status === "completed";
   const isActive = journey.status === "active";
@@ -109,7 +116,7 @@ export const JourneyCard = memo(function JourneyCard({ journey, onComplete, onAb
   }, [journey.id, journey.story_type_slug, journey.target_days, journey.start_date, milestones?.length, isActive, milestonesLoading, isBackfilling, backfillLegacyMilestones]);
   
   const postcardProgress = getProgressToNextPostcard();
-  const journeyHealth = getJourneyHealth(journey.start_date, journey.end_date);
+  const journeyHealth = getJourneyHealth(journey.start_date, resolvedEndDate ?? undefined);
   const companionDisplayName = useMemo(() => {
     const rawName = companion?.cached_creature_name;
     if (typeof rawName !== "string") return undefined;
@@ -226,7 +233,7 @@ export const JourneyCard = memo(function JourneyCard({ journey, onComplete, onAb
           <span className="text-muted-foreground/30">•</span>
           <span className="flex items-center gap-1">
             <Flame className="w-3 h-3 text-orange-500" />
-            {isCompleted ? "Done!" : `${daysRemaining}d left`}
+            {isCompleted ? "Done!" : daysRemaining === null ? "Timeline pending" : `${daysRemaining}d left`}
           </span>
           <span className="text-muted-foreground/30">•</span>
           {journeyHealth ? (
@@ -278,7 +285,7 @@ export const JourneyCard = memo(function JourneyCard({ journey, onComplete, onAb
             epicId={journey.id} 
             epicTitle={journey.title}
             epicGoal={journey.description}
-            currentDeadline={journey.end_date}
+            currentDeadline={resolvedEndDate ?? undefined}
           >
             <motion.button 
               className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl

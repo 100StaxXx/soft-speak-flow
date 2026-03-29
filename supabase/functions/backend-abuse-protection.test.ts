@@ -68,6 +68,59 @@ Deno.test("auth-gateway allows normal password sign-in under limit", async () =>
   assertEquals(body.user.id, "user-1", "Expected auth gateway to return the signed-in user");
 });
 
+Deno.test("auth-gateway allows normal password sign-up under limit", async () => {
+  let abuseChecks = 0;
+
+  const response = await authGatewayModule.handleAuthGateway(
+    new Request("https://example.com/functions/v1/auth-gateway", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "sign_up_password",
+        email: "NewUser@example.com",
+        password: "supersecret123",
+        redirectTo: "https://example.com/welcome",
+        timezone: "America/Los_Angeles",
+      }),
+    }),
+    {
+      createAdminClient: () => ({}),
+      createAnonClient: () => ({
+        auth: {
+          signUp: async ({ email, password, options }: { email: string; password: string; options: { emailRedirectTo?: string; data?: { timezone?: string } } }) => ({
+            data: {
+              session: null,
+              user: {
+                id: "new-user-1",
+                email,
+                user_metadata: {
+                  timezone: options?.data?.timezone,
+                },
+              },
+            },
+            error: password === "supersecret123" && options?.emailRedirectTo === "https://example.com/welcome" ? null : new Error("unexpected payload"),
+          }),
+        },
+      }),
+      applyAbuseProtectionFn: async () => {
+        abuseChecks += 1;
+        return {
+          requestId: "req-auth-signup-1",
+          ipAddress: "203.0.113.11",
+          protection: null,
+        } as any;
+      },
+    },
+  );
+
+  const body = await response.json();
+  assertEquals(response.status, 200, "Expected sign-up to succeed");
+  assertEquals(abuseChecks, 1, "Expected one abuse check for sign-up");
+  assertEquals(body.user.id, "new-user-1", "Expected auth gateway to return the created user");
+  assertEquals(body.user.email, "newuser@example.com", "Expected auth gateway to normalize the email");
+  assertEquals(body.requiresEmailConfirmation, true, "Expected sign-up without a session to require email confirmation");
+});
+
 Deno.test("auth-gateway blocks burst abuse before auth is attempted", async () => {
   let anonCalled = false;
 

@@ -29,6 +29,7 @@ import { useMilestones } from "@/hooks/useMilestones";
 import { useXPRewards } from "@/hooks/useXPRewards";
 
 import { useEpicRewards } from "@/hooks/useEpicRewards";
+import { getEpicDaysRemaining, resolveEpicEndDate } from "@/utils/epicDates";
 // HIDDEN: Boss battle feature disabled
 // import { generateAdversary } from "@/utils/adversaryGenerator";
 // import type { StorySeed, BossBattleContext } from "@/types/narrativeTypes";
@@ -60,7 +61,7 @@ interface Epic {
   description?: string;
   target_days: number;
   start_date: string;
-  end_date: string;
+  end_date: string | null;
   status: string;
   xp_reward: number;
   progress_percentage: number;
@@ -129,8 +130,14 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
   const hasInitializedRef = useRef<boolean>(false);
   const encounterCheckRef = useRef<number>(-1);
   
-  const daysRemaining = Math.ceil(
-    (new Date(epic.end_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
+  const resolvedEndDate = useMemo(() => resolveEpicEndDate(epic), [epic]);
+  const daysRemaining = useMemo(
+    () => getEpicDaysRemaining({
+      start_date: epic.start_date,
+      target_days: epic.target_days,
+      end_date: resolvedEndDate,
+    }),
+    [epic.start_date, epic.target_days, resolvedEndDate],
   );
   const isCompleted = epic.status === "completed";
   const isActive = epic.status === "active";
@@ -318,7 +325,7 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
           <span className="text-muted-foreground/30">•</span>
           <span className="flex items-center gap-1">
             <Flame className="w-3 h-3 text-orange-500" />
-            {isCompleted ? "Done" : `${daysRemaining}d left`}
+            {isCompleted ? "Done" : daysRemaining === null ? "Timeline pending" : `${daysRemaining}d left`}
           </span>
           <span className="text-muted-foreground/30">•</span>
           <span className="flex items-center gap-1">

@@ -4,6 +4,11 @@ installOpenAICompatibilityShim();
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createSafeErrorResponse, requireProtectedRequest } from "../_shared/abuseProtection.ts";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
+import {
+  JOURNEY_PATH_LANDSCAPE_IMAGE_SIZE,
+  JOURNEY_PATH_RENDER_VERSION,
+  needsJourneyPathLandscapeRefresh,
+} from "../../../src/shared/journeyPathConfig.ts";
 
 interface JourneyPathRequestBody {
   epicId: string | null;
@@ -69,17 +74,18 @@ export async function handleGenerateJourneyPath(req: Request): Promise<Response>
 
     const { data: existingPath } = await supabase
       .from("epic_journey_paths")
-      .select("id, image_url")
+      .select("id, image_url, prompt_context")
       .eq("epic_id", epicId)
       .eq("user_id", userId)
       .eq("milestone_index", milestoneIndex)
       .maybeSingle();
 
-    if (existingPath) {
+    if (existingPath && !needsJourneyPathLandscapeRefresh(existingPath.prompt_context)) {
       return new Response(JSON.stringify({
         success: true,
         existing: true,
         imageUrl: existingPath.image_url,
+        milestoneIndex,
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -187,11 +193,13 @@ export async function handleGenerateJourneyPath(req: Request): Promise<Response>
 
     const visualTheme = storyThemes[epic.story_type_slug || ""] || "cosmic fantasy landscapes";
     const prompt = `A beautiful panoramic walk path through ${worldContext.worldName} in ${worldContext.worldEra}.
-The path leads from ${worldContext.currentLocation} towards ${worldContext.nextLocation}.
+The path leads from ${worldContext.currentLocation} toward ${worldContext.nextLocation} in a clear left-to-right travel composition.
 Visual theme: ${visualTheme}.
-The path should be suitable for a ${companionType} companion with ${coreElement} energy walking alongside.
+The path should feel suitable for a ${companionType} companion with ${coreElement} energy walking alongside, but do not show any visible characters.
 Color palette: ${themeColor} tones with cosmic accents.
-Style: ethereal fantasy illustration, dreamy atmosphere, horizontal landscape format, magical lighting, no text or characters visible.
+Style: ethereal fantasy illustration, dreamy atmosphere, magical lighting, wide cinematic landscape composition.
+Keep the main path readable across the lower-middle band with open breathing room near the top corners and side edges for UI overlays.
+No text, no UI, no readable symbols, no characters visible.
 Ultra high resolution.`;
 
     const aiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -204,7 +212,7 @@ Ultra high resolution.`;
         model: "google/gemini-2.5-flash-image-preview",
         messages: [{ role: "user", content: prompt }],
         modalities: ["image", "text"],
-        image_size: "1024x1024",
+        image_size: JOURNEY_PATH_LANDSCAPE_IMAGE_SIZE,
       }),
     });
 
@@ -270,6 +278,8 @@ Ultra high resolution.`;
           coreElement,
           themeColor,
           storyType: epic.story_type_slug,
+          image_size: JOURNEY_PATH_LANDSCAPE_IMAGE_SIZE,
+          render_version: JOURNEY_PATH_RENDER_VERSION,
         },
         generated_at: new Date().toISOString(),
       }, {

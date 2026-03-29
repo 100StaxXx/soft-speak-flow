@@ -2,7 +2,7 @@ import { useMemo, useRef, useState, useEffect, useLayoutEffect, useCallback, mem
 import { createPortal } from "react-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTimelineDrag } from "@/hooks/useTimelineDrag";
-import { format, differenceInDays, isSameDay } from "date-fns";
+import { format, isSameDay } from "date-fns";
 import { AnimatePresence, motion, useMotionValue, useReducedMotion, type MotionValue } from "framer-motion";
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { toast } from "sonner";
@@ -64,18 +64,15 @@ import {
   SHARED_TIMELINE_DRAG_PROFILE,
 } from "@/components/calendar/dragSnap";
 import type { TaskAttachment } from "@/types/questAttachments";
+import { getEpicDaysRemaining, resolveEpicEndDate } from "@/utils/epicDates";
 
 // Helper to calculate days remaining
-const getDaysLeft = (endDate?: string | null) => {
-  if (!endDate) return null;
-  try {
-    const parsed = new Date(endDate);
-    if (Number.isNaN(parsed.getTime())) return null;
-    return Math.max(0, differenceInDays(parsed, new Date()));
-  } catch {
-    return null;
-  }
-};
+const getDaysLeft = (epic: { start_date: string; target_days: number; end_date?: string | null }) =>
+  getEpicDaysRemaining({
+    start_date: epic.start_date,
+    target_days: epic.target_days,
+    end_date: epic.end_date,
+  });
 
 const safeFormat = (date: Date, fmt: string, fallback = "") => {
   try {
@@ -196,7 +193,7 @@ interface TodaysAgendaProps {
     progress_percentage?: number | null;
     target_days: number;
     start_date: string;
-    end_date: string;
+    end_date: string | null;
     epic_habits?: Array<{
       habit_id: string;
       habits: {
@@ -713,6 +710,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   }, []);
   
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
+  const [openActionMenuTaskId, setOpenActionMenuTaskId] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<'custom' | 'time' | 'priority' | 'xp'>('custom');
   const [justCompletedTasks, setJustCompletedTasks] = useState<Set<string>>(new Set());
   const [optimisticCompleted, setOptimisticCompleted] = useState<Set<string>>(new Set());
@@ -764,6 +762,15 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       return next.size !== prev.size ? next : prev;
     });
   }, [tasks]);
+
+  useEffect(() => {
+    if (openActionMenuTaskId === null) return;
+
+    const hasActiveTask = tasks.some((task) => task.id === openActionMenuTaskId);
+    if (!hasActiveTask) {
+      setOpenActionMenuTaskId(null);
+    }
+  }, [openActionMenuTaskId, tasks]);
 
   const clearTouchCheckboxClickSuppression = useCallback(() => {
     suppressNextCheckboxClickRef.current = false;
@@ -1545,7 +1552,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         epicId,
         title: epic?.title || group.title || "Campaign",
         progress: epic ? Math.round(epic.progress_percentage ?? 0) : null,
-        daysLeft: epic ? getDaysLeft(epic.end_date) : null,
+        daysLeft: epic ? getDaysLeft(epic) : null,
         rituals: group.rituals,
         completedCount: group.rituals.filter((ritual) => !!ritual.completed).length,
         epic,
@@ -1582,6 +1589,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
           <div className="space-y-2">
             {campaignRitualGroups.map((group) => {
               const isCampaignExpanded = expandedCampaigns.has(group.epicId);
+              const resolvedEndDate = group.epic ? resolveEpicEndDate(group.epic) : null;
               return (
                 <div key={group.epicId} className="rounded-xl border border-border/30 bg-card/30 overflow-hidden">
                   {/* Campaign Header */}
@@ -1594,7 +1602,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                         progress_percentage: group.epic.progress_percentage ?? 0,
                         target_days: group.epic.target_days,
                         start_date: group.epic.start_date,
-                        end_date: group.epic.end_date,
+                        end_date: resolvedEndDate,
                         epic_habits: group.epic.epic_habits,
                       }}>
                         <button className="flex items-center gap-2 min-w-0 flex-1 text-left focus:outline-none">
@@ -1676,7 +1684,8 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         <div className={cn(inDesktopRail ? "space-y-2" : "mt-4 pt-3 border-t border-border/20 space-y-2")}>
           {activeEpics.map((epic) => {
             const progress = Math.round(epic.progress_percentage ?? 0);
-            const daysLeft = getDaysLeft(epic.end_date);
+            const daysLeft = getDaysLeft(epic);
+            const resolvedEndDate = resolveEpicEndDate(epic);
             return (
               <JourneyPathDrawer key={epic.id} epic={{
                 id: epic.id,
@@ -1685,7 +1694,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                 progress_percentage: epic.progress_percentage ?? 0,
                 target_days: epic.target_days,
                 start_date: epic.start_date,
-                end_date: epic.end_date,
+                end_date: resolvedEndDate,
                 epic_habits: epic.epic_habits,
               }}>
                 <button className="w-full text-left focus:outline-none">
@@ -1806,6 +1815,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     const isDragging = dragProps?.isDragging ?? false;
     const isPressed = dragProps?.isPressed ?? false;
     const isActivated = dragProps?.isActivated ?? false;
+    const isActionMenuOpen = openActionMenuTaskId === task.id;
     const isExpanded = expandedTasks.has(task.id);
     const hasDetails = hasExpandableDetails(task);
     const CategoryIcon = getCategoryIcon(task.category);
@@ -1989,7 +1999,15 @@ export const TodaysAgenda = memo(function TodaysAgenda({
           <div className="flex items-center gap-2">
             {/* Quest action menu */}
             {!isComplete && !isDragging && !isActivated && (onEditQuest || onSendToCalendar || onDeleteQuest || onMoveQuestToNextDay) && (
-              <DropdownMenu>
+              <DropdownMenu
+                open={isActionMenuOpen}
+                onOpenChange={(open) => {
+                  setOpenActionMenuTaskId((current) => {
+                    if (open) return task.id;
+                    return current === task.id ? null : current;
+                  });
+                }}
+              >
                 <DropdownMenuTrigger asChild>
                   <Button
                     data-interactive="true"
@@ -2008,6 +2026,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                     <DropdownMenuItem
                       onClick={(e) => {
                         e.stopPropagation();
+                        setOpenActionMenuTaskId(null);
                         onEditQuest(task);
                       }}
                     >
@@ -2019,6 +2038,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                     <DropdownMenuItem
                       onClick={(e) => {
                         e.stopPropagation();
+                        setOpenActionMenuTaskId(null);
                         onSendToCalendar(task.id);
                       }}
                     >
@@ -2030,6 +2050,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                     <DropdownMenuItem
                       onClick={(e) => {
                         e.stopPropagation();
+                        setOpenActionMenuTaskId(null);
                         onMoveQuestToNextDay(task.id);
                       }}
                     >
@@ -2042,6 +2063,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                       className="text-destructive focus:text-destructive"
                       onClick={(e) => {
                         e.stopPropagation();
+                        setOpenActionMenuTaskId(null);
                         onDeleteQuest(task.id);
                       }}
                     >
@@ -2234,7 +2256,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     );
 
     return taskContent;
-  }, [onToggle, onUndoToggle, onEditQuest, onSendToCalendar, hasCalendarLink, onDeleteQuest, onMoveQuestToNextDay, expandedTasks, hasExpandableDetails, toggleTaskExpanded, justCompletedTasks, optimisticCompleted, toggleSubtask, useLiteAnimations, registerCompletionCombo, resetCombo, armTouchCheckboxClickSuppression, clearTouchCheckboxClickSuppression, suppressNativeContextMenu]);
+  }, [onToggle, onUndoToggle, onEditQuest, onSendToCalendar, hasCalendarLink, onDeleteQuest, onMoveQuestToNextDay, expandedTasks, hasExpandableDetails, toggleTaskExpanded, justCompletedTasks, optimisticCompleted, toggleSubtask, useLiteAnimations, registerCompletionCombo, resetCombo, armTouchCheckboxClickSuppression, clearTouchCheckboxClickSuppression, suppressNativeContextMenu, openActionMenuTaskId]);
 
   const desktopRailCardClass = "journeys-desktop-rail-card rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(23,20,38,0.94),rgba(16,13,27,0.9))] p-5 shadow-[0_20px_40px_rgba(0,0,0,0.2)]";
   const desktopRail = isDesktopLayout ? (
@@ -2553,7 +2575,10 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                 {tasks.length > 0 && (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <button className="p-1 rounded opacity-40 hover:opacity-70 transition-opacity flex-shrink-0">
+                      <button
+                        aria-label="Sort tasks"
+                        className="p-1 rounded opacity-40 hover:opacity-70 transition-opacity flex-shrink-0"
+                      >
                         <ArrowUpDown className="w-3 h-3" />
                       </button>
                     </DropdownMenuTrigger>

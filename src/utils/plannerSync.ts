@@ -30,6 +30,7 @@ import {
   preferNewerJourneyPathSnapshot,
   type JourneyPathSnapshot,
 } from "@/utils/journeyPathCache";
+import { resolveEpicEndDate } from "@/utils/epicDates";
 
 export const PLANNER_SYNC_EVENT = "planner-sync-finished";
 
@@ -259,6 +260,7 @@ export async function loadLocalEpics(userId: string): Promise<EpicRecord[]> {
       attachJourneyPathSnapshotToEpic(
         {
           ...epic,
+          end_date: resolveEpicEndDate(epic),
           epic_habits: linksByEpicId.get(epic.id) ?? [],
         },
         journeyPathByEpicId.get(epic.id),
@@ -293,7 +295,7 @@ export async function syncLocalEpicsFromRemote(userId: string): Promise<void> {
         .in("epic_id", epicIds),
       supabase
         .from("epic_journey_paths")
-        .select("id, user_id, epic_id, milestone_index, image_url, generated_at")
+        .select("id, user_id, epic_id, milestone_index, image_url, prompt_context, generated_at")
         .eq("user_id", userId)
         .in("epic_id", epicIds)
         .order("milestone_index", { ascending: false })

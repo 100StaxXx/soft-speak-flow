@@ -83,6 +83,7 @@ vi.mock("@/utils/plannerSync", () => ({
 }));
 
 import { normalizeCreateCampaignError, useEpics } from "./useEpics";
+import { resolveEpicEndDate } from "@/utils/epicDates";
 
 const createWrapper = () => {
   const queryClient = new QueryClient({
@@ -319,6 +320,71 @@ describe("useEpics", () => {
         userId: "user-1",
       });
     });
+  });
+
+  it("computes a local end date before inserting a newly created campaign", async () => {
+    const habitsInsertMock = vi.fn().mockResolvedValue({ error: null });
+    const epicsInsertMock = vi.fn().mockResolvedValue({ error: null });
+    const linksInsertMock = vi.fn().mockResolvedValue({ error: null });
+
+    mocks.fromMock.mockImplementation((table: string) => {
+      if (table === "habits") {
+        return {
+          insert: habitsInsertMock,
+          select: mocks.selectMock,
+        };
+      }
+
+      if (table === "epics") {
+        return {
+          insert: epicsInsertMock,
+          select: mocks.selectMock,
+        };
+      }
+
+      if (["epic_habits", "journey_phases", "epic_milestones"].includes(table)) {
+        return {
+          insert: linksInsertMock,
+          select: mocks.selectMock,
+        };
+      }
+
+      return {
+        select: mocks.selectMock,
+      };
+    });
+
+    const { result } = renderHook(() => useEpics(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    await act(async () => {
+      await result.current.createEpic({
+        title: "Date Locked",
+        target_days: 14,
+        habits: [
+          {
+            title: "Morning focus",
+            difficulty: "easy",
+            frequency: "daily",
+            custom_days: [1, 2, 3, 4, 5],
+          },
+        ],
+      });
+    });
+
+    const insertedEpic = epicsInsertMock.mock.calls[0]?.[0];
+
+    expect(insertedEpic).toEqual(expect.objectContaining({
+      start_date: expect.any(String),
+      end_date: expect.any(String),
+      target_days: 14,
+    }));
+    expect(insertedEpic.end_date).toBe(resolveEpicEndDate(insertedEpic));
   });
 
   it("skips background initial journey-path generation when the create is queued offline", async () => {

@@ -1,6 +1,7 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { getEpicsQueryKey, type EpicRecord } from "@/hooks/epicsQuery";
+import { normalizeJourneyPathPromptContext, type JourneyPathPromptContext } from "@/shared/journeyPathConfig";
 import {
   getLocalJourneyPathForEpic,
   upsertPlannerRecord,
@@ -13,7 +14,7 @@ export interface JourneyPathSnapshot {
   milestone_index: number;
   image_url: string;
   generated_at: string;
-  prompt_context?: Record<string, unknown> | null;
+  prompt_context?: JourneyPathPromptContext | null;
 }
 
 interface JourneyPathGenerationState {
@@ -32,6 +33,7 @@ type EpicWithJourneyPath = EpicRecord & {
   latest_journey_path_generated_at?: string | null;
   latest_journey_path_milestone_index?: number | null;
   latest_journey_path_url?: string | null;
+  latest_journey_path_prompt_context?: JourneyPathPromptContext | null;
 };
 
 const pendingJourneyPathGenerations = new Map<string, Promise<JourneyPathSnapshot | null>>();
@@ -98,7 +100,7 @@ export const normalizeJourneyPathSnapshot = (
   milestone_index: snapshot.milestone_index,
   image_url: snapshot.image_url,
   generated_at: snapshot.generated_at,
-  prompt_context: snapshot.prompt_context ?? null,
+  prompt_context: normalizeJourneyPathPromptContext(snapshot.prompt_context),
 });
 
 export const attachJourneyPathSnapshotToEpic = <TEpic extends EpicRecord>(
@@ -109,6 +111,7 @@ export const attachJourneyPathSnapshotToEpic = <TEpic extends EpicRecord>(
   latest_journey_path_url: snapshot?.image_url ?? null,
   latest_journey_path_milestone_index: snapshot?.milestone_index ?? null,
   latest_journey_path_generated_at: snapshot?.generated_at ?? null,
+  latest_journey_path_prompt_context: snapshot?.prompt_context ?? null,
 });
 
 export const getJourneyPathSnapshotFromEpic = (
@@ -131,7 +134,7 @@ export const getJourneyPathSnapshotFromEpic = (
     milestone_index: epic.latest_journey_path_milestone_index,
     image_url: epic.latest_journey_path_url,
     generated_at: epic.latest_journey_path_generated_at ?? "",
-    prompt_context: null,
+    prompt_context: normalizeJourneyPathPromptContext(epic.latest_journey_path_prompt_context),
   };
 };
 

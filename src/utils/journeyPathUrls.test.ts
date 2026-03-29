@@ -11,15 +11,15 @@ describe("journeyPathUrls", () => {
     const url = getJourneyPathRenderUrl(
       "https://example.supabase.co/storage/v1/object/public/journey-paths/user-1/epic-1/0_123.png",
       {
-        width: 1200,
-        height: 675,
+        width: 1536,
+        height: 1024,
         resize: "cover",
         quality: 70,
       },
     );
 
     expect(url).toBe(
-      "https://example.supabase.co/storage/v1/render/image/public/journey-paths/user-1/epic-1/0_123.png?width=1200&height=675&resize=cover&quality=70",
+      "https://example.supabase.co/storage/v1/render/image/public/journey-paths/user-1/epic-1/0_123.png?width=1536&height=1024&resize=cover&quality=70",
     );
   });
 
@@ -38,7 +38,7 @@ describe("journeyPathUrls", () => {
     );
 
     expect(url).toBe(
-      "https://example.supabase.co/storage/v1/render/image/public/journey-paths/user-1/epic-1/0_123.png?width=1200&quality=70&height=675&resize=cover",
+      "https://example.supabase.co/storage/v1/render/image/public/journey-paths/user-1/epic-1/0_123.png?width=1536&quality=70&height=1024&resize=cover",
     );
   });
 });

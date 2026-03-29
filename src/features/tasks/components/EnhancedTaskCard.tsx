@@ -61,6 +61,8 @@ interface EnhancedTaskCardProps {
   onStartFocus?: (taskId: string, taskName: string) => void;
   onDelete?: (taskId: string) => void;
   onEdit?: (taskId: string) => void;
+  actionMenuOpen?: boolean;
+  onActionMenuOpenChange?: (open: boolean) => void;
   showSubtasks?: boolean;
   compact?: boolean;
 }
@@ -73,10 +75,13 @@ export function EnhancedTaskCard({
   onStartFocus,
   onDelete,
   onEdit,
+  actionMenuOpen,
+  onActionMenuOpenChange,
   showSubtasks = true,
   compact = false,
 }: EnhancedTaskCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isActionMenuOpenInternal, setIsActionMenuOpenInternal] = useState(false);
   const [showDecomposeDialog, setShowDecomposeDialog] = useState(false);
   const [justCompleted, setJustCompleted] = useState(false);
   const { subtasks, progressPercent } = useSubtasks(task.id);
@@ -85,6 +90,8 @@ export function EnhancedTaskCard({
 
   const hasSubtasks = subtasks.length > 0;
   const blockerNames = incompleteBlockers.map(b => b.daily_tasks?.task_text || 'Unknown task');
+  const isActionMenuControlled = actionMenuOpen !== undefined;
+  const isActionMenuOpen = isActionMenuControlled ? actionMenuOpen : isActionMenuOpenInternal;
 
   const handleToggleComplete = useCallback((checked: boolean) => {
     if (checked) {
@@ -96,6 +103,17 @@ export function EnhancedTaskCard({
     }
     onToggleComplete(task.id, checked);
   }, [task.id, onToggleComplete, success, light]);
+
+  const setActionMenuOpen = useCallback((open: boolean) => {
+    if (!isActionMenuControlled) {
+      setIsActionMenuOpenInternal(open);
+    }
+    onActionMenuOpenChange?.(open);
+  }, [isActionMenuControlled, onActionMenuOpenChange]);
+
+  const closeActionMenu = useCallback(() => {
+    setActionMenuOpen(false);
+  }, [setActionMenuOpen]);
 
   return (
     <motion.div
@@ -241,32 +259,44 @@ export function EnhancedTaskCard({
               </Button>
             )}
             
-            <DropdownMenu>
+            <DropdownMenu open={isActionMenuOpen} onOpenChange={setActionMenuOpen}>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-7 w-7">
+                <Button aria-label="Task actions" variant="ghost" size="icon" className="h-7 w-7">
                   <MoreHorizontal className="w-4 h-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
                 {onToggleTopThree && (
-                  <DropdownMenuItem onClick={() => onToggleTopThree(task.id, !task.is_top_three)}>
+                  <DropdownMenuItem onClick={() => {
+                    closeActionMenu();
+                    onToggleTopThree(task.id, !task.is_top_three);
+                  }}>
                     <Star className={cn("w-4 h-4 mr-2", task.is_top_three && "fill-yellow-500 text-yellow-500")} />
                     {task.is_top_three ? 'Remove from Top 3' : 'Add to Top 3'}
                   </DropdownMenuItem>
                 )}
-                <DropdownMenuItem onClick={() => setShowDecomposeDialog(true)}>
+                <DropdownMenuItem onClick={() => {
+                  closeActionMenu();
+                  setShowDecomposeDialog(true);
+                }}>
                   <Sparkles className="w-4 h-4 mr-2" />
                   Break down with AI
                 </DropdownMenuItem>
                 {onEdit && (
-                  <DropdownMenuItem onClick={() => onEdit(task.id)}>
+                  <DropdownMenuItem onClick={() => {
+                    closeActionMenu();
+                    onEdit(task.id);
+                  }}>
                     Edit quest
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuSeparator />
                 {onDelete && (
                   <DropdownMenuItem 
-                    onClick={() => onDelete(task.id)}
+                    onClick={() => {
+                      closeActionMenu();
+                      onDelete(task.id);
+                    }}
                     className="text-destructive focus:text-destructive"
                   >
                     Delete quest

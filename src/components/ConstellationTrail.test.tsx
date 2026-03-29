@@ -40,8 +40,9 @@ describe("ConstellationTrail", () => {
 
     expect(screen.getByTestId("journey-path-image")).toHaveAttribute(
       "src",
-      "https://example.supabase.co/storage/v1/render/image/public/journey-paths/user-1/epic-1/path.png?width=1200&height=675&resize=cover&quality=70",
+      "https://example.supabase.co/storage/v1/render/image/public/journey-paths/user-1/epic-1/path.png?width=1536&height=1024&resize=cover&quality=70",
     );
+    expect(screen.getByTestId("journey-path-overlay")).toHaveAttribute("data-overlay-mode", "generated");
     expect(screen.queryByText(/mapping your path/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/loading journey path/i)).not.toBeInTheDocument();
   });
@@ -60,6 +61,7 @@ describe("ConstellationTrail", () => {
     render(<ConstellationTrail progress={42} targetDays={45} epicId="epic-9" />);
 
     expect(screen.getByTestId("journey-path-fallback")).toBeInTheDocument();
+    expect(screen.getByTestId("journey-path-overlay")).toHaveAttribute("data-overlay-mode", "fallback");
     expect(screen.getByText("Updating")).toBeInTheDocument();
     expect(screen.queryByText(/mapping your path/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/loading journey path/i)).not.toBeInTheDocument();

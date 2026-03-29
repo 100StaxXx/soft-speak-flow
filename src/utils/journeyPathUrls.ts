@@ -68,8 +68,8 @@ export const getJourneyPathRenderUrl = (
 
 export const getJourneyPathCardImageUrl = (imageUrl: string | null | undefined) =>
   getJourneyPathRenderUrl(imageUrl, {
-    width: 1200,
-    height: 675,
+    width: 1536,
+    height: 1024,
     resize: "cover",
     quality: 70,
   });
@@ -77,7 +77,7 @@ export const getJourneyPathCardImageUrl = (imageUrl: string | null | undefined) 
 export const getJourneyPathDrawerImageUrl = (imageUrl: string | null | undefined) =>
   getJourneyPathRenderUrl(imageUrl, {
     width: 1536,
-    height: 864,
+    height: 1024,
     resize: "cover",
     quality: 76,
   });

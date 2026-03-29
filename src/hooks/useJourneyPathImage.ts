@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getEpicsQueryKey, type EpicRecord } from "@/hooks/epicsQuery";
+import { needsJourneyPathLandscapeRefresh } from "@/shared/journeyPathConfig";
 import {
   fetchRemoteLatestJourneyPath,
   getJourneyPathGenerationKey,
@@ -19,6 +20,7 @@ export const useJourneyPathImage = (epicId: string | undefined) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const initialGenerationRequestedRef = useRef(false);
+  const legacyLandscapeRefreshRequestedRef = useRef(false);
   const [persistedJourneyPath, setPersistedJourneyPath] = useState<JourneyPathSnapshot | null>(null);
   const [hasResolvedLocalSnapshot, setHasResolvedLocalSnapshot] = useState(false);
 
@@ -118,6 +120,7 @@ export const useJourneyPathImage = (epicId: string | undefined) => {
 
   useEffect(() => {
     initialGenerationRequestedRef.current = false;
+    legacyLandscapeRefreshRequestedRef.current = false;
   }, [epicId, user?.id]);
 
   const journeyPath = useMemo(
@@ -127,6 +130,10 @@ export const useJourneyPathImage = (epicId: string | undefined) => {
         preferNewerJourneyPathSnapshot(persistedJourneyPath, journeyPathFromEpics),
       ),
     [journeyPathFromEpics, persistedJourneyPath, remoteJourneyPathQuery.data],
+  );
+  const needsLandscapeRefresh = useMemo(
+    () => Boolean(journeyPath && needsJourneyPathLandscapeRefresh(journeyPath.prompt_context)),
+    [journeyPath],
   );
 
   const triggerJourneyPathGeneration = useCallback(
@@ -192,11 +199,42 @@ export const useJourneyPathImage = (epicId: string | undefined) => {
     user?.id,
   ]);
 
+  useEffect(() => {
+    if (
+      !epicId
+      || !user?.id
+      || !journeyPath
+      || !hasResolvedLocalSnapshot
+      || remoteJourneyPathQuery.isFetching
+      || generationState.pending
+      || !needsLandscapeRefresh
+      || legacyLandscapeRefreshRequestedRef.current
+    ) {
+      return;
+    }
+
+    legacyLandscapeRefreshRequestedRef.current = true;
+    void triggerJourneyPathGeneration(Math.max(0, journeyPath.milestone_index ?? 0)).catch((error) => {
+      console.error("Failed to refresh legacy journey path image:", error);
+    });
+  }, [
+    epicId,
+    generationState.pending,
+    hasResolvedLocalSnapshot,
+    journeyPath,
+    needsLandscapeRefresh,
+    remoteJourneyPathQuery.isFetching,
+    triggerJourneyPathGeneration,
+    user?.id,
+  ]);
+
   return {
     pathImageUrl: journeyPath?.image_url || null,
     currentMilestoneIndex: journeyPath?.milestone_index ?? -1,
+    journeyPathPromptContext: journeyPath?.prompt_context ?? null,
     isLoading: !journeyPath && (!hasResolvedLocalSnapshot || remoteJourneyPathQuery.isLoading),
     isGenerating: generationState.pending,
+    needsLandscapeRefresh,
     error: remoteJourneyPathQuery.error,
     generateInitialPath,
     regeneratePathForMilestone,

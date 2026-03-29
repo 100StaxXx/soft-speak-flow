@@ -243,6 +243,13 @@ const minuteFromTime = (time: string) => {
   return (hour * 60) + minute;
 };
 
+const openDropdownMenu = (trigger: HTMLElement) => {
+  act(() => {
+    trigger.focus();
+    fireEvent.keyDown(trigger, { key: "Enter", code: "Enter" });
+  });
+};
+
 const createDomRect = (overrides: Partial<DOMRect> = {}): DOMRect => ({
   x: 0,
   y: 0,
@@ -2716,6 +2723,110 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(actionTrigger).toHaveClass("md:group-hover:opacity-100");
     expect(actionTrigger).toHaveClass("md:group-focus-within:opacity-100");
     expect(actionTrigger).toHaveClass("md:focus-visible:opacity-100");
+  });
+
+  it("keeps only one quest action menu open at a time", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-scheduled-1",
+            task_text: "Morning focus",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "08:00",
+          },
+          {
+            id: "task-scheduled-2",
+            task_text: "Deep work",
+            completed: false,
+            xp_reward: 30,
+            scheduled_time: "10:00",
+          },
+        ]}
+        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={2}
+        onDeleteQuest={vi.fn()}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    const [firstActionTrigger, secondActionTrigger] = screen.getAllByLabelText("Quest actions");
+
+    openDropdownMenu(firstActionTrigger);
+
+    await waitFor(() => {
+      expect(screen.getAllByText("Delete quest")).toHaveLength(1);
+    });
+
+    openDropdownMenu(secondActionTrigger);
+
+    await waitFor(() => {
+      expect(screen.getAllByText("Delete quest")).toHaveLength(1);
+    });
+  });
+
+  it("keeps the sort dropdown working independently of quest action menus", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-scheduled-1",
+            task_text: "Morning focus",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "08:00",
+          },
+          {
+            id: "task-scheduled-2",
+            task_text: "Deep work",
+            completed: false,
+            xp_reward: 30,
+            scheduled_time: "10:00",
+          },
+        ]}
+        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={2}
+        onDeleteQuest={vi.fn()}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    openDropdownMenu(screen.getAllByLabelText("Quest actions")[0]);
+
+    await waitFor(() => {
+      expect(screen.getAllByText("Delete quest")).toHaveLength(1);
+    });
+
+    openDropdownMenu(screen.getByLabelText("Sort tasks"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Custom")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("Time")).toBeInTheDocument();
+    expect(screen.getByText("Priority")).toBeInTheDocument();
+    expect(screen.getByText("XP")).toBeInTheDocument();
   });
 
   it("shows the row action trigger when move-to-tomorrow is available", () => {

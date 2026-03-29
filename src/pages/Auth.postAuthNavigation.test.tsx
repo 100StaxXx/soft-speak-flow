@@ -1,4 +1,4 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => {
   const toastMock = vi.fn();
   const getSessionMock = vi.fn();
   const onAuthStateChangeMock = vi.fn();
+  const invokeMock = vi.fn();
   const maybeSingleMock = vi.fn();
 
   const selectEqMock = vi.fn(() => ({ maybeSingle: maybeSingleMock }));
@@ -24,6 +25,7 @@ const mocks = vi.hoisted(() => {
     toastMock,
     getSessionMock,
     onAuthStateChangeMock,
+    invokeMock,
     maybeSingleMock,
     selectEqMock,
     selectMock,
@@ -100,7 +102,7 @@ vi.mock("@/integrations/supabase/client", () => ({
     },
     from: mocks.fromMock,
     functions: {
-      invoke: vi.fn(),
+      invoke: mocks.invokeMock,
     },
   },
 }));
@@ -193,6 +195,90 @@ describe("Auth post-auth navigation", () => {
 
     expect(screen.queryByRole("button", { name: /continue as guest/i })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^sign in$/i })).toBeInTheDocument();
+  });
+
+  it("renders an inline error card when password sign-in fails", async () => {
+    mocks.getSessionMock.mockResolvedValue({
+      data: {
+        session: null,
+      },
+    });
+
+    mocks.invokeMock.mockResolvedValue({
+      data: null,
+      error: {
+        message: "Function failed",
+        context: {
+          json: vi.fn().mockResolvedValue({
+            error: "Request could not be completed.",
+          }),
+        },
+      },
+    });
+
+    renderAuth();
+    await flushMicrotasks();
+
+    fireEvent.change(screen.getByLabelText(/email/i), {
+      target: { value: "user@example.com" },
+    });
+    fireEvent.change(screen.getByLabelText(/password/i), {
+      target: { value: "password1" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /^sign in$/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Request could not be completed.");
+  });
+
+  it("submits password sign-up requests and shows the confirmation email toast", async () => {
+    mocks.getSessionMock.mockResolvedValue({
+      data: {
+        session: null,
+      },
+    });
+
+    mocks.invokeMock.mockResolvedValue({
+      data: {
+        access_token: null,
+        refresh_token: null,
+        user: {
+          id: "new-user-1",
+          email: "new@example.com",
+        },
+        requiresEmailConfirmation: true,
+      },
+      error: null,
+    });
+
+    renderAuth();
+    await flushMicrotasks();
+
+    fireEvent.click(screen.getByRole("button", { name: /need an account\? sign up/i }));
+    fireEvent.change(screen.getByLabelText(/email/i), {
+      target: { value: "new@example.com" },
+    });
+    fireEvent.change(screen.getByLabelText(/^password$/i), {
+      target: { value: "Password123" },
+    });
+    fireEvent.change(screen.getByLabelText(/confirm password/i), {
+      target: { value: "Password123" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /^get started$/i }));
+
+    await screen.findByRole("button", { name: /already have an account\? sign in/i });
+
+    expect(mocks.invokeMock).toHaveBeenCalledWith("auth-gateway", {
+      body: expect.objectContaining({
+        action: "sign_up_password",
+        email: "new@example.com",
+        password: "Password123",
+      }),
+    });
+    expect(mocks.toastMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Check your email",
+      }),
+    );
   });
 
   it("routes incomplete users to /onboarding when core redirect hangs and timeout fallback runs", async () => {
