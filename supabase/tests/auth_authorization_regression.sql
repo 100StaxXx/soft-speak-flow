@@ -344,6 +344,103 @@ end
 $$;
 
 do $$
+declare
+  v_community_id uuid := '33333333-3333-3333-3333-333333333333';
+  v_owner_membership_id uuid := '44444444-4444-4444-4444-444444444444';
+  v_member_membership_id uuid := '55555555-5555-5555-5555-555555555555';
+begin
+  insert into public.communities (
+    id,
+    name,
+    invite_code,
+    is_public,
+    owner_id
+  )
+  values (
+    v_community_id,
+    'Regression Guild',
+    'REGTEST1',
+    false,
+    '11111111-1111-1111-1111-111111111111'
+  )
+  on conflict (id) do update
+  set owner_id = excluded.owner_id;
+
+  insert into public.community_members (
+    id,
+    community_id,
+    user_id,
+    role
+  )
+  values
+    (
+      v_owner_membership_id,
+      v_community_id,
+      '11111111-1111-1111-1111-111111111111',
+      'owner'
+    ),
+    (
+      v_member_membership_id,
+      v_community_id,
+      '22222222-2222-2222-2222-222222222222',
+      'member'
+    )
+  on conflict (community_id, user_id) do update
+  set role = excluded.role;
+
+  execute 'set local role authenticated';
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
+
+  begin
+    update public.community_members
+    set role = 'admin'
+    where id = v_member_membership_id;
+    raise exception 'community member role should not be directly editable by clients';
+  exception
+    when others then
+      perform public.test_assert(
+        position('new row violates row-level security policy' in lower(sqlerrm)) > 0,
+        'community member role changes should require server-owned rpc enforcement'
+      );
+  end;
+
+  begin
+    update public.communities
+    set owner_id = '22222222-2222-2222-2222-222222222222'
+    where id = v_community_id;
+    raise exception 'community owner_id should not be directly editable by clients';
+  exception
+    when others then
+      perform public.test_assert(
+        position('new row violates row-level security policy' in lower(sqlerrm)) > 0,
+        'community owner_id changes should require transfer_community_ownership'
+      );
+  end;
+
+  execute 'reset role';
+
+  perform public.test_assert(
+    (
+      select role = 'member'
+      from public.community_members
+      where id = v_member_membership_id
+    ),
+    'direct client writes must not change community member roles'
+  );
+
+  perform public.test_assert(
+    (
+      select owner_id = '11111111-1111-1111-1111-111111111111'
+      from public.communities
+      where id = v_community_id
+    ),
+    'direct client writes must not change communities.owner_id'
+  );
+end
+$$;
+
+do $$
 begin
   execute 'set local role authenticated';
   perform set_config('request.jwt.claim.role', 'authenticated', true);

@@ -145,14 +145,15 @@ export const useCommunityMembers = (communityId?: string) => {
     mutationFn: async ({ memberId, newRole }: { memberId: string; newRole: 'admin' | 'member' }) => {
       if (!user) throw new Error("Not authenticated");
 
-      const { data, error } = await supabase
-        .from("community_members")
-        .update({ role: newRole })
-        .eq("id", memberId)
-        .select()
-        .single();
+      const { data, error } = await (supabase.rpc as any)(
+        "update_community_member_role",
+        { p_member_id: memberId, p_new_role: newRole },
+      ) as { data: { success?: boolean; error?: string } | null; error: Error | null };
 
       if (error) throw error;
+      if (!data?.success) {
+        throw new Error(data?.error || "Failed to update member role");
+      }
       return data;
     },
     onSuccess: () => {

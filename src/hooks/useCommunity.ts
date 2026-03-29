@@ -183,6 +183,43 @@ export const useCommunity = (communityId?: string) => {
     },
   });
 
+  const transferOwnership = useMutation({
+    mutationFn: async ({
+      communityId: targetCommunityId,
+      newOwnerUserId,
+    }: {
+      communityId: string;
+      newOwnerUserId: string;
+    }) => {
+      if (!user) throw new Error("Not authenticated");
+
+      const { data, error } = await (supabase.rpc as any)(
+        "transfer_community_ownership",
+        {
+          p_community_id: targetCommunityId,
+          p_new_owner_user_id: newOwnerUserId,
+        },
+      ) as { data: { success?: boolean; error?: string } | null; error: Error | null };
+
+      if (error) throw error;
+      if (!data?.success) {
+        throw new Error(data?.error || "Failed to transfer ownership");
+      }
+
+      return data;
+    },
+    onSuccess: () => {
+      toast.success("Guild ownership transferred");
+      queryClient.invalidateQueries({ queryKey: ["communities"] });
+      queryClient.invalidateQueries({ queryKey: ["community", communityId] });
+      queryClient.invalidateQueries({ queryKey: ["community-members", communityId] });
+    },
+    onError: (error) => {
+      console.error("Transfer ownership error:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to transfer guild ownership");
+    },
+  });
+
   // Delete a community
   const deleteCommunity = useMutation({
     mutationFn: async (id: string) => {
@@ -232,11 +269,13 @@ export const useCommunity = (communityId?: string) => {
     // Mutations
     createCommunity,
     updateCommunity,
+    transferOwnership,
     deleteCommunity,
     
     // Mutation states
     isCreating: createCommunity.isPending,
     isUpdating: updateCommunity.isPending,
+    isTransferringOwnership: transferOwnership.isPending,
     isDeleting: deleteCommunity.isPending,
     
     // Utils
