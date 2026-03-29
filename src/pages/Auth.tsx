@@ -15,11 +15,27 @@ import { getAuthRedirectPath, getProfileAwareAuthFallbackPath, ensureProfile } f
 import { logger } from "@/utils/logger";
 import { hasWalkthroughCompleted } from "@/utils/profileOnboarding";
 import { getRedirectUrlWithPath, getRedirectUrl } from '@/utils/redirectUrl';
+import {
+  clearPendingSocialAuthAttempt,
+  getSocialAccountNotFoundMessage,
+  getSocialAuthIntent,
+  readPendingSocialAuthAttempt,
+  storePendingSocialAuthAttempt,
+  type PendingSocialAuthAttempt,
+  type SocialAuthIntent,
+} from "@/utils/socialAuth";
 import { signinBackground } from "@/assets/backgrounds";
 import { StaticBackgroundImage } from "@/components/StaticBackgroundImage";
 
 const POST_AUTH_NAVIGATION_TIMEOUT_MS = 5000;
 const POST_AUTH_DEFAULT_PATH = '/onboarding';
+
+const hasOAuthCallbackParams = (): boolean => {
+  if (typeof window === "undefined") return false;
+
+  const url = new URL(window.location.href);
+  return Boolean(url.searchParams.get("code") || url.hash.includes("access_token"));
+};
 
 const authSchema = z.object({
   email: z.string()
@@ -263,10 +279,65 @@ const Auth = () => {
   
   // Ref to prevent re-renders during initialization
   const initializationComplete = useRef(false);
+  const oauthCallbackInProgress = useRef(hasOAuthCallbackParams());
 
   // Track whether the native SocialLogin plugin is ready for use
   const [googleNativeReady, setGoogleNativeReady] = useState(false);
   const [appleNativeReady, setAppleNativeReady] = useState(false);
+
+  const blockSocialSignIn = useCallback(
+    async (attempt: PendingSocialAuthAttempt, source: string) => {
+      logger.warn(`[Auth ${source}] Blocking social sign-in with no returning account match`, attempt);
+      clearPendingSocialAuthAttempt();
+
+      try {
+        await supabase.auth.signOut();
+      } catch (error) {
+        logger.warn(`[Auth ${source}] Failed to clear blocked social auth session`, { error });
+      }
+
+      hasRedirected.current = false;
+      setIsLogin(true);
+      setIsForgotPassword(false);
+      setInlineError(getSocialAccountNotFoundMessage(attempt.provider));
+    },
+    [],
+  );
+
+  const handleResolvedSocialAuth = useCallback(
+    async (session: Session | null, source: string, attempt: PendingSocialAuthAttempt | null) => {
+      if (!session) {
+        clearPendingSocialAuthAttempt();
+        await handlePostAuthNavigation(session, source);
+        return;
+      }
+
+      if (!attempt) {
+        await handlePostAuthNavigation(session, source);
+        return;
+      }
+
+      if (attempt.intent !== "sign_in") {
+        clearPendingSocialAuthAttempt();
+        await handlePostAuthNavigation(session, source);
+        return;
+      }
+
+      try {
+        const path = await getAuthRedirectPath(session.user.id);
+        if (path === POST_AUTH_DEFAULT_PATH) {
+          await blockSocialSignIn(attempt, source);
+          return;
+        }
+      } catch (error) {
+        logger.warn(`[Auth ${source}] Failed to preflight social sign-in redirect, continuing`, { error });
+      }
+
+      clearPendingSocialAuthAttempt();
+      await handlePostAuthNavigation(session, source);
+    },
+    [blockSocialSignIn, handlePostAuthNavigation],
+  );
 
   // If we ever land back on /auth, allow redirects to run again
   useEffect(() => {
@@ -342,11 +413,12 @@ const Auth = () => {
   // Handle OAuth callback parameters that return the user to /auth with a valid code/token
   useEffect(() => {
     const handleOAuthCallback = async () => {
-      if (typeof window === "undefined" || hasRedirected.current) return;
+      if (typeof window === "undefined" || hasRedirected.current || !oauthCallbackInProgress.current) return;
 
       const url = new URL(window.location.href);
       const hasAccessToken = url.hash.includes("access_token");
       const code = url.searchParams.get("code");
+      const pendingAttempt = readPendingSocialAuthAttempt();
 
       // Only run when coming back from an OAuth provider
       if (!code && !hasAccessToken) return;
@@ -356,15 +428,16 @@ const Auth = () => {
         if (code) {
           const { data, error } = await supabase.auth.exchangeCodeForSession(code);
           if (error) throw error;
-          await handlePostAuthNavigation(data.session, "oauthCodeExchange");
+          await handleResolvedSocialAuth(data.session, "oauthCodeExchange", pendingAttempt);
         } else {
           // Hash-based tokens (implicit flow)
           const { data: { session } } = await supabase.auth.getSession();
           if (session) {
-            await handlePostAuthNavigation(session, "oauthHashSession");
+            await handleResolvedSocialAuth(session, "oauthHashSession", pendingAttempt);
           }
         }
       } catch (error) {
+        clearPendingSocialAuthAttempt();
         logger.error("[OAuth Callback] Failed to complete OAuth login", { error });
         toast({
           title: "Error",
@@ -380,15 +453,22 @@ const Auth = () => {
         } else if (hasAccessToken) {
           window.location.hash = "";
         }
+
+        oauthCallbackInProgress.current = false;
       }
     };
 
     handleOAuthCallback();
-  }, [handlePostAuthNavigation, toast]);
+  }, [handleResolvedSocialAuth, toast]);
 
   // Separate effect for session check and auth state listener
   useEffect(() => {
     const checkSession = async () => {
+      if (oauthCallbackInProgress.current) {
+        logger.debug("[Auth checkSession] Deferring session redirect while OAuth callback is processing");
+        return;
+      }
+
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
         await handlePostAuthNavigation(session, 'checkSession');
@@ -400,6 +480,11 @@ const Auth = () => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       // Handle all sign-in events including setSession() which triggers TOKEN_REFRESHED
       if (['SIGNED_IN', 'TOKEN_REFRESHED', 'INITIAL_SESSION'].includes(event) && session) {
+        if (oauthCallbackInProgress.current) {
+          logger.debug(`[Auth onAuthStateChange] Deferring ${event} while OAuth callback is processing`);
+          return;
+        }
+
         // Skip if already redirected by direct OAuth call, checkSession, or previous event
         if (hasRedirected.current) {
           logger.debug(`[Auth onAuthStateChange] Skipping ${event} - already redirected`);
