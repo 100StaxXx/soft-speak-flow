@@ -175,4 +175,17 @@ describe("useAccessStatus", () => {
     expect(result.current.hasAccess).toBe(false);
     expect(result.current.gateReason).toBe("pre_trial_signup");
   });
+
+  it("does not trigger the pre-trial gate when the tutorial was dismissed instead of completed", () => {
+    mocks.profile = createProfile({
+      onboarding_data: {
+        guided_tutorial: { completed: false, dismissed: true },
+      },
+    });
+
+    const { result } = renderHook(() => useAccessStatus());
+
+    expect(result.current.hasAccess).toBe(true);
+    expect(result.current.gateReason).toBe("none");
+  });
 });

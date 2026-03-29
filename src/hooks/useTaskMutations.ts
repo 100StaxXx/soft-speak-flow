@@ -29,7 +29,7 @@ import { isQueueableWriteError } from "@/utils/networkErrors";
 import type { DailyTask } from "@/services/dailyTasksRemote";
 import { trackResilienceEvent } from "@/utils/resilienceTelemetry";
 import type { ResilienceState } from "@/types/resilience";
-import { normalizeUuidLikeId } from "@/utils/offlineId";
+import { normalizeUuidFields, normalizeUuidLikeId } from "@/utils/offlineId";
 import {
   createOfflinePlannerId,
   getLocalHabitCompletionsForDate,
@@ -375,16 +375,18 @@ async function runDailyTaskWriteWithRecurrenceFallback<T>(
   payload: Record<string, unknown>,
   write: (nextPayload: Record<string, unknown>) => Promise<{ data: T | null; error: SupabaseLikeError | null }>,
 ): Promise<{ data: T | null; error: SupabaseLikeError | null; fallbackUsed: boolean }> {
-  let result = await write(payload);
+  const normalizedPayload = normalizeUuidFields(payload) as Record<string, unknown>;
+
+  let result = await write(normalizedPayload);
   if (!isDailyTasksRecurrenceColumnsMissingError(result.error)) {
     return { ...result, fallbackUsed: false };
   }
 
-  if (isMonthBasedRecurrencePayload(payload)) {
+  if (isMonthBasedRecurrencePayload(normalizedPayload)) {
     throw new Error(MONTHLY_RECURRENCE_SCHEMA_MESSAGE);
   }
 
-  const fallbackPayload = stripUnsupportedRecurrenceColumns(payload);
+  const fallbackPayload = stripUnsupportedRecurrenceColumns(normalizedPayload);
   result = await write(fallbackPayload);
   return { ...result, fallbackUsed: true };
 }

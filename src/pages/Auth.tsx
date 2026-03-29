@@ -1110,6 +1110,39 @@ const Auth = () => {
 
                 <Button
                   type="button"
+                  onClick={() => handleOAuthSignIn('google')}
+                  disabled={loading || oauthLoading !== null}
+                  className="h-12 w-full rounded-[14px] bg-[#f7f8fc] text-base font-semibold text-[#111827] shadow-[0_16px_30px_rgba(0,0,0,0.18)] hover:bg-white"
+                >
+                  {oauthLoading === 'google' ? (
+                    <div className="animate-spin h-5 w-5 border-2 border-[#111827]/20 border-t-[#111827] rounded-full" />
+                  ) : (
+                    <>
+                      <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
+                        <path
+                          fill="#4285F4"
+                          d="M21.6 12.23c0-.68-.06-1.33-.18-1.95H12v3.69h5.39a4.62 4.62 0 0 1-2 3.03v2.52h3.24c1.9-1.75 2.97-4.33 2.97-7.29Z"
+                        />
+                        <path
+                          fill="#34A853"
+                          d="M12 22c2.7 0 4.97-.9 6.63-2.44l-3.24-2.52c-.9.6-2.05.97-3.39.97-2.6 0-4.8-1.76-5.58-4.12H3.08v2.59A9.99 9.99 0 0 0 12 22Z"
+                        />
+                        <path
+                          fill="#FBBC04"
+                          d="M6.42 13.89A5.99 5.99 0 0 1 6.1 12c0-.66.11-1.29.32-1.89V7.52H3.08A9.99 9.99 0 0 0 2 12c0 1.61.39 3.13 1.08 4.48l3.34-2.59Z"
+                        />
+                        <path
+                          fill="#EA4335"
+                          d="M12 5.98c1.47 0 2.8.5 3.84 1.48l2.88-2.88C16.96 2.95 14.7 2 12 2a9.99 9.99 0 0 0-8.92 5.52l3.34 2.59C7.2 7.74 9.4 5.98 12 5.98Z"
+                        />
+                      </svg>
+                      {isLogin ? 'Sign in with Google' : 'Sign up with Google'}
+                    </>
+                  )}
+                </Button>
+
+                <Button
+                  type="button"
                   onClick={() => handleOAuthSignIn('apple')}
                   disabled={loading || oauthLoading !== null}
                   className="h-12 w-full rounded-[14px] bg-white text-base font-semibold text-black shadow-[0_16px_30px_rgba(0,0,0,0.28)] hover:bg-white/95"

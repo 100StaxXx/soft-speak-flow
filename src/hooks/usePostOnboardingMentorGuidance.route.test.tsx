@@ -77,8 +77,14 @@ vi.mock("@/integrations/supabase/client", () => ({
 const RouteProbe = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { isIntroDialogueActive, dialogueActionLabel, onDialogueAction, currentStep } =
-    usePostOnboardingMentorGuidance();
+  const {
+    isIntroDialogueActive,
+    dialogueActionLabel,
+    onDialogueAction,
+    currentStep,
+    skipTutorialLabel,
+    onSkipTutorial,
+  } = usePostOnboardingMentorGuidance();
 
   return (
     <div>
@@ -86,8 +92,12 @@ const RouteProbe = () => {
       <div data-testid="step">{currentStep ?? ""}</div>
       <div data-testid="intro-active">{String(isIntroDialogueActive)}</div>
       <div data-testid="intro-action">{dialogueActionLabel || ""}</div>
+      <div data-testid="skip-action">{skipTutorialLabel || ""}</div>
       <button type="button" onClick={() => onDialogueAction?.()}>
         intro-action
+      </button>
+      <button type="button" onClick={() => onSkipTutorial?.()}>
+        skip
       </button>
       <button type="button" onClick={() => navigate(-1)}>
         back
@@ -198,6 +208,7 @@ describe("guided tutorial route restoration", () => {
       expect(screen.getByTestId("path")).toHaveTextContent("/mentor");
       expect(screen.getByTestId("intro-active")).toHaveTextContent("true");
       expect(screen.getByTestId("intro-action")).toHaveTextContent("Start Tutorial");
+      expect(screen.getByTestId("skip-action")).toHaveTextContent("");
     });
   });
 
@@ -282,6 +293,36 @@ describe("guided tutorial route restoration", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("path")).toHaveTextContent("/companion");
+    });
+  });
+
+  it("stops restoring tutorial routes after the tutorial is skipped", async () => {
+    renderWithProviders();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("path")).toHaveTextContent("/mentor");
+      expect(screen.getByTestId("step")).toHaveTextContent("morning_checkin");
+      expect(screen.getByTestId("intro-action")).toHaveTextContent("Start Tutorial");
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "intro-action" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("intro-action")).toHaveTextContent("");
+      expect(screen.getByTestId("skip-action")).toHaveTextContent("Skip tutorial");
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "skip" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("step")).toHaveTextContent("");
+      expect(screen.getByTestId("skip-action")).toHaveTextContent("");
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "go-journeys" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("path")).toHaveTextContent("/journeys");
     });
   });
 

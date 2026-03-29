@@ -534,6 +534,8 @@ export interface PostOnboardingMentorGuidanceState {
   speakerPrimaryColor?: string;
   speakerSlug?: string;
   speakerAvatarUrl?: string;
+  skipTutorialLabel?: string;
+  onSkipTutorial?: () => void;
   dialogueActionLabel?: string;
   onDialogueAction?: () => void;
 }
@@ -556,6 +558,8 @@ const DEFAULT_GUIDANCE_STATE: PostOnboardingMentorGuidanceState = {
   speakerPrimaryColor: "#f59e0b",
   speakerSlug: undefined,
   speakerAvatarUrl: undefined,
+  skipTutorialLabel: undefined,
+  onSkipTutorial: undefined,
   dialogueActionLabel: undefined,
   onDialogueAction: undefined,
 };
@@ -732,6 +736,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
   const [sessionCreateQuestCompleted, setSessionCreateQuestCompleted] = useState<CreateQuestSubstepId[]>([]);
   const [sessionMilestonesCompleted, setSessionMilestonesCompleted] = useState<GuidedMilestoneId[]>([]);
   const [sessionEvolutionInFlight, setSessionEvolutionInFlight] = useState<boolean | null>(null);
+  const [sessionDismissed, setSessionDismissed] = useState<boolean | null>(null);
   const [activeTargetSelector, setActiveTargetSelector] = useState<string | null>(null);
 
   const onboardingData = (profile?.onboarding_data as Record<string, unknown> | null) ?? null;
@@ -742,6 +747,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
 
   const tutorialEligible =
     remoteProgress?.version === GUIDED_TUTORIAL_VERSION && remoteProgress?.eligible === true;
+  const persistedDismissed = Boolean(remoteProgress?.dismissed || localProgress?.dismissed);
 
   useEffect(() => {
     setSessionCompleted([]);
@@ -749,6 +755,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     setSessionCreateQuestCompleted([]);
     setSessionMilestonesCompleted([]);
     setSessionEvolutionInFlight(null);
+    setSessionDismissed(null);
     setActiveTargetSelector(null);
     completionPersistRef.current = false;
     stepPersistThrottleRef.current.clear();
@@ -890,15 +897,16 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     Boolean(user?.id) && !profileLoading && walkthroughCompleted && tutorialEligible;
 
   const tutorialMarkedComplete = migratedProgress.completed;
-
+  const tutorialDismissed = sessionDismissed ?? persistedDismissed;
   const tutorialComplete = tutorialReady && (tutorialMarkedComplete || !currentStep);
+  const tutorialSuppressed = tutorialComplete || tutorialDismissed;
   const hasPendingIntroDialogue = Boolean(currentStep) && !milestoneSet.has("mentor_intro_hello");
   const stepRoute = currentStep?.route ?? null;
   const shouldRestoreRoute = shouldRestoreTutorialRoute({
     pathname: location.pathname,
     stepRoute,
     tutorialReady,
-    tutorialComplete,
+    tutorialComplete: tutorialSuppressed,
     currentStepId,
     evolutionInFlight,
   });
@@ -1093,7 +1101,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
   }, [awardedSet, persistProgress, tutorialComplete]);
 
   useEffect(() => {
-    if (!tutorialReady || tutorialComplete || hasPendingIntroDialogue || !currentStep) return;
+    if (!tutorialReady || tutorialSuppressed || hasPendingIntroDialogue || !currentStep) return;
 
     if (currentStep.id === "quests_campaigns_intro") {
       if (location.pathname !== "/journeys") return;
@@ -1199,13 +1207,13 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     queryClient,
     milestoneSet,
     hasPendingIntroDialogue,
-    tutorialComplete,
+    tutorialSuppressed,
     tutorialReady,
     user?.id,
   ]);
 
   useEffect(() => {
-    if (!currentStep || !tutorialReady || tutorialComplete || hasPendingIntroDialogue) return;
+    if (!currentStep || !tutorialReady || tutorialSuppressed || hasPendingIntroDialogue) return;
 
     const listeners: Array<{ eventName: string; handler: (event: Event) => void }> = [];
 
@@ -1314,7 +1322,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     milestoneSet,
     persistProgress,
     hasPendingIntroDialogue,
-    tutorialComplete,
+    tutorialSuppressed,
     tutorialReady,
   ]);
 
@@ -1371,6 +1379,36 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     markMilestoneComplete(currentMilestone);
   }, [currentMilestone, markMilestoneComplete, supportsDialogueAction]);
 
+  const onSkipTutorial = useCallback(() => {
+    if (!tutorialReady || tutorialMarkedComplete || tutorialDismissed) return;
+
+    emitTutorialEvent("tutorial_skipped", {
+      userId: user?.id,
+      stepId: currentStepId,
+      milestoneId: currentMilestone,
+      route: location.pathname,
+    });
+
+    setSessionDismissed(true);
+    setActiveTargetSelector(null);
+    missingTargetSinceRef.current = null;
+
+    void persistProgress({
+      dismissed: true,
+      completed: false,
+      completedAt: undefined,
+    });
+  }, [
+    currentMilestone,
+    currentStepId,
+    location.pathname,
+    persistProgress,
+    tutorialDismissed,
+    tutorialMarkedComplete,
+    tutorialReady,
+    user?.id,
+  ]);
+
   const activeTargetSelectors = useMemo(
     () => (currentMilestone ? getTargetSelectorsForMilestone(currentMilestone) : []),
     [currentMilestone]
@@ -1407,7 +1445,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
   ]);
 
   useEffect(() => {
-    if (!currentMilestone) {
+    if (tutorialSuppressed || !currentMilestone) {
       currentMilestoneStartedAtRef.current = null;
       lastTargetResolutionSignatureRef.current = null;
       return;
@@ -1421,12 +1459,12 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
       milestoneId: currentMilestone,
       route: location.pathname,
     });
-  }, [currentMilestone, currentStep?.id, location.pathname, user?.id]);
+  }, [currentMilestone, currentStep?.id, location.pathname, tutorialSuppressed, user?.id]);
 
   useEffect(() => {
     if (
       !tutorialReady ||
-      tutorialComplete ||
+      tutorialSuppressed ||
       !currentMilestone ||
       isIntroDialogueActive ||
       shouldRestoreRoute ||
@@ -1483,14 +1521,14 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     isIntroDialogueActive,
     location.pathname,
     shouldRestoreRoute,
-    tutorialComplete,
+    tutorialSuppressed,
     tutorialReady,
     user?.id,
   ]);
 
   const isActive =
     tutorialReady &&
-    !tutorialComplete &&
+    !tutorialSuppressed &&
     !shouldRestoreRoute &&
     !pathIsHidden(location.pathname) &&
     Boolean(currentStep);
@@ -1616,27 +1654,32 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     ? "I'm waiting for this area to load. Stay on this screen and it'll highlight as soon as it's ready."
     : dialogue.support;
   const strictLockEnabled = milestoneUsesStrictLock(currentMilestone);
+  const skipTutorialLabel =
+    !tutorialSuppressed && !isIntroDialogueActive ? "Skip tutorial" : undefined;
 
   return {
     isIntroDialogueActive,
     isActive,
-    currentStep: currentStepId,
-    currentSubstep,
-    stepRoute,
-    mentorInstructionLines,
-    progressText,
-    activeTargetSelectors,
-    activeTargetSelector,
+    currentStep: tutorialSuppressed ? null : currentStepId,
+    currentSubstep: tutorialSuppressed ? null : currentSubstep,
+    stepRoute: tutorialSuppressed ? null : stepRoute,
+    mentorInstructionLines: tutorialSuppressed ? [] : mentorInstructionLines,
+    progressText: tutorialSuppressed ? "" : progressText,
+    activeTargetSelectors: tutorialSuppressed ? [] : activeTargetSelectors,
+    activeTargetSelector: tutorialSuppressed ? null : activeTargetSelector,
     isStrictLockActive: Boolean(isActive && activeTargetSelector && strictLockEnabled),
-    canTemporarilyHide: currentMilestone === "complete_companion_evolution",
-    dialogueText: dialogue.text,
-    dialogueSupportText,
+    canTemporarilyHide: !tutorialSuppressed && currentMilestone === "complete_companion_evolution",
+    dialogueText: tutorialSuppressed ? "" : dialogue.text,
+    dialogueSupportText: tutorialSuppressed ? undefined : dialogueSupportText,
     speakerName: personality?.name ?? "Your guide",
     speakerPrimaryColor: personality?.primary_color ?? "#f59e0b",
     speakerSlug: personality?.slug,
     speakerAvatarUrl: personality?.avatar_url,
-    dialogueActionLabel,
-    onDialogueAction: supportsDialogueAction ? onDialogueAction : undefined,
+    skipTutorialLabel,
+    onSkipTutorial: skipTutorialLabel ? onSkipTutorial : undefined,
+    dialogueActionLabel: tutorialSuppressed ? undefined : dialogueActionLabel,
+    onDialogueAction:
+      tutorialSuppressed ? undefined : (supportsDialogueAction ? onDialogueAction : undefined),
   };
 };
 

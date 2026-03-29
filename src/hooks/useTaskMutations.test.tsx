@@ -524,10 +524,12 @@ describe("useTaskMutations attachment handling", () => {
     );
   });
 
-  it("normalizes legacy prefixed task IDs before live quest creation", async () => {
+  it("normalizes legacy prefixed UUID-like fields before live quest creation", async () => {
     setOnline(true);
     const legacyTaskId = "task-e47e5651-7522-4888-a04d-6eff518fa4ba";
     const normalizedTaskId = "e47e5651-7522-4888-a04d-6eff518fa4ba";
+    const legacyContactId = "contact-2F96D0D4-0B3D-4C91-8A11-0C685B392253";
+    const normalizedContactId = "2f96d0d4-0b3d-4c91-8a11-0c685b392253";
 
     mocks.createOfflinePlannerIdMock.mockReturnValueOnce(legacyTaskId);
     mocks.dailyTasksInsertSingleMock.mockResolvedValueOnce({
@@ -552,6 +554,7 @@ describe("useTaskMutations attachment handling", () => {
         taskText: "Ship feature",
         difficulty: "medium",
         taskDate: "2026-02-20",
+        contactId: legacyContactId,
       });
     });
 
@@ -560,7 +563,10 @@ describe("useTaskMutations attachment handling", () => {
       expect.objectContaining({ id: normalizedTaskId }),
     );
     expect(mocks.dailyTasksInsertMock).toHaveBeenCalledWith(
-      expect.objectContaining({ id: normalizedTaskId }),
+      expect.objectContaining({
+        id: normalizedTaskId,
+        contact_id: normalizedContactId,
+      }),
     );
   });
 

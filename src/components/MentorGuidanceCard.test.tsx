@@ -8,6 +8,7 @@ import {
 
 const mocks = vi.hoisted(() => ({
   onDialogueAction: vi.fn(),
+  onSkipTutorial: vi.fn(),
   guidance: {
     isActive: true,
     isIntroDialogueActive: false,
@@ -22,6 +23,8 @@ const mocks = vi.hoisted(() => ({
     canTemporarilyHide: false,
     dialogueText: "Tap the + in the bottom right.",
     dialogueSupportText: "I'll highlight it for you.",
+    skipTutorialLabel: "Skip tutorial",
+    onSkipTutorial: vi.fn(),
     dialogueActionLabel: undefined,
     onDialogueAction: undefined,
     speakerName: "Atlas",
@@ -39,7 +42,7 @@ vi.mock("@/hooks/usePostOnboardingMentorGuidance", () => ({
 }));
 
 describe("MentorGuidanceCard", () => {
-  it("renders VN-style dialogue without tutorial control buttons", () => {
+  it("renders VN-style dialogue with a skip control once the tutorial is in progress", () => {
     render(<MentorGuidanceCard />);
 
     expect(screen.getByText("Atlas portrait")).toBeInTheDocument();
@@ -47,7 +50,7 @@ describe("MentorGuidanceCard", () => {
     expect(screen.getByText("Step 1 of 3 - Create Quest 2/5")).toBeInTheDocument();
     expect(screen.getByText("Tap the + in the bottom right.")).toBeInTheDocument();
     expect(screen.getByText("I'll highlight it for you.")).toBeInTheDocument();
-    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Skip tutorial" })).toBeInTheDocument();
   });
 
   it("does not render when guidance is inactive", () => {
@@ -59,6 +62,8 @@ describe("MentorGuidanceCard", () => {
 
   it("renders intro action button and triggers callback", () => {
     mocks.guidance.isIntroDialogueActive = true;
+    mocks.guidance.skipTutorialLabel = undefined;
+    mocks.guidance.onSkipTutorial = undefined;
     mocks.guidance.dialogueActionLabel = "Start Tutorial";
     mocks.guidance.onDialogueAction = mocks.onDialogueAction;
 
@@ -68,9 +73,22 @@ describe("MentorGuidanceCard", () => {
     expect(mocks.onDialogueAction).toHaveBeenCalledTimes(1);
 
     mocks.guidance.isIntroDialogueActive = false;
+    mocks.guidance.skipTutorialLabel = "Skip tutorial";
+    mocks.guidance.onSkipTutorial = mocks.onSkipTutorial;
     mocks.guidance.dialogueActionLabel = undefined;
     mocks.guidance.onDialogueAction = undefined;
     mocks.onDialogueAction.mockClear();
+  });
+
+  it("renders skip action for in-progress tutorial milestones", () => {
+    mocks.guidance.onSkipTutorial = mocks.onSkipTutorial;
+
+    render(<MentorGuidanceCard />);
+    fireEvent.click(screen.getByRole("button", { name: "Skip tutorial" }));
+
+    expect(mocks.onSkipTutorial).toHaveBeenCalledTimes(1);
+
+    mocks.onSkipTutorial.mockClear();
   });
 
   it("renders continue action for non-intro explainer milestones", () => {

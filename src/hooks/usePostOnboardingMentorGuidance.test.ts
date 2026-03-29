@@ -679,6 +679,47 @@ describe("guided tutorial intro dialogue sequence", () => {
     });
   });
 
+  it("dismisses an in-progress tutorial and persists the dismissed state", async () => {
+    mocks.state.guidedTutorial = {
+      version: 2,
+      flowVersion: 3,
+      eligible: true,
+      dismissed: false,
+      completed: false,
+      completedSteps: [],
+      xpAwardedSteps: [],
+      milestonesCompleted: ["mentor_intro_hello"],
+    };
+
+    const { result } = renderHook(() => usePostOnboardingMentorGuidance(), {
+      wrapper: createWrapper("/journeys"),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isActive).toBe(true);
+      expect(result.current.currentStep).toBe("quests_campaigns_intro");
+      expect(result.current.skipTutorialLabel).toBe("Skip tutorial");
+      expect(result.current.onSkipTutorial).toBeDefined();
+    });
+
+    await act(async () => {
+      result.current.onSkipTutorial?.();
+    });
+
+    await waitFor(() => {
+      expect(result.current.isActive).toBe(false);
+      expect(result.current.currentStep).toBe(null);
+      expect(result.current.skipTutorialLabel).toBeUndefined();
+      expect(result.current.dialogueText).toBe("");
+    });
+
+    const latestPayload = mocks.state.profileUpdatePayloads.at(-1) as
+      | { onboarding_data?: { guided_tutorial?: { dismissed?: boolean; completed?: boolean } } }
+      | undefined;
+    expect(latestPayload?.onboarding_data?.guided_tutorial?.dismissed).toBe(true);
+    expect(latestPayload?.onboarding_data?.guided_tutorial?.completed).toBe(false);
+  });
+
   it("keeps completed old tutorial completed after migration", async () => {
     mocks.state.guidedTutorial = {
       version: 2,

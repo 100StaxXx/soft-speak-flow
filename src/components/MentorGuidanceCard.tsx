@@ -168,6 +168,8 @@ export const MentorGuidanceCard = () => {
     speakerPrimaryColor,
     speakerSlug,
     speakerAvatarUrl,
+    skipTutorialLabel,
+    onSkipTutorial,
     dialogueActionLabel,
     onDialogueAction,
   } = usePostOnboardingMentorGuidance();
@@ -283,28 +285,39 @@ export const MentorGuidanceCard = () => {
             {dialogueSupportText ? (
               <p className="mt-1 text-sm leading-relaxed text-white/80">{dialogueSupportText}</p>
             ) : null}
-            {canTemporarilyHide ? (
-              <div className="mt-3">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  aria-label="Hide tutorial"
-                  onClick={() => setIsTemporarilyHidden(true)}
-                  className="pointer-events-auto h-9 rounded-xl border border-white/25 bg-black/45 text-white hover:bg-black/60"
-                >
-                  Hide tutorial
-                </Button>
-              </div>
-            ) : null}
-            {onDialogueAction ? (
-              <div className="mt-3">
-                <Button
-                  type="button"
-                  onClick={onDialogueAction}
-                  className="pointer-events-auto h-9 rounded-xl bg-amber-500 text-black hover:bg-amber-400"
-                >
-                  {dialogueActionLabel || "Continue"}
-                </Button>
+            {canTemporarilyHide || onSkipTutorial || onDialogueAction ? (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {canTemporarilyHide ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    aria-label="Hide tutorial"
+                    onClick={() => setIsTemporarilyHidden(true)}
+                    className="pointer-events-auto h-9 rounded-xl border border-white/25 bg-black/45 text-white hover:bg-black/60"
+                  >
+                    Hide tutorial
+                  </Button>
+                ) : null}
+                {onSkipTutorial ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    aria-label={skipTutorialLabel || "Skip tutorial"}
+                    onClick={onSkipTutorial}
+                    className="pointer-events-auto h-9 rounded-xl border border-white/25 bg-black/45 text-white hover:bg-black/60"
+                  >
+                    {skipTutorialLabel || "Skip tutorial"}
+                  </Button>
+                ) : null}
+                {onDialogueAction ? (
+                  <Button
+                    type="button"
+                    onClick={onDialogueAction}
+                    className="pointer-events-auto h-9 rounded-xl bg-amber-500 text-black hover:bg-amber-400"
+                  >
+                    {dialogueActionLabel || "Continue"}
+                  </Button>
+                ) : null}
               </div>
             ) : null}
           </div>
