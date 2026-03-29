@@ -75,6 +75,19 @@ describe("getAuthRedirectPath", () => {
     await expect(getAuthRedirectPath("existing-user-no-mentor")).resolves.toBe("/tasks");
   });
 
+  it("routes to /tasks when walkthrough is completed even if onboarding is false", async () => {
+    mocks.maybeSingleMock.mockResolvedValueOnce({
+      data: {
+        selected_mentor_id: null,
+        onboarding_completed: false,
+        onboarding_data: { walkthrough_completed: true },
+      },
+      error: null,
+    });
+
+    await expect(getAuthRedirectPath("walkthrough-complete-user")).resolves.toBe("/tasks");
+  });
+
   it("routes to /onboarding when onboarding is explicitly incomplete, even with mentor", async () => {
     mocks.maybeSingleMock.mockResolvedValueOnce({
       data: {
@@ -202,6 +215,19 @@ describe("getProfileAwareAuthFallbackPath", () => {
     await expect(getProfileAwareAuthFallbackPath("legacy-returning-user")).resolves.toBe("/tasks");
   });
 
+  it("returns /tasks when walkthrough is completed even if onboarding is false", async () => {
+    mocks.maybeSingleMock.mockResolvedValueOnce({
+      data: {
+        onboarding_completed: false,
+        selected_mentor_id: null,
+        onboarding_data: { walkthrough_completed: true },
+      },
+      error: null,
+    });
+
+    await expect(getProfileAwareAuthFallbackPath("walkthrough-fallback-user")).resolves.toBe("/tasks");
+  });
+
   it("returns /onboarding for incomplete users", async () => {
     mocks.maybeSingleMock.mockResolvedValueOnce({
       data: {
@@ -237,7 +263,7 @@ describe("ensureProfile", () => {
     vi.clearAllMocks();
   });
 
-  it("creates a full default profile payload when the profile is missing", async () => {
+  it("creates only a minimal bootstrap payload when the profile is missing", async () => {
     mocks.maybeSingleMock.mockResolvedValueOnce({
       data: null,
       error: null,
@@ -256,22 +282,13 @@ describe("ensureProfile", () => {
       expect.objectContaining({
         id: "profile-missing-user",
         email: "new@example.com",
-        onboarding_completed: false,
-        onboarding_step: "questionnaire",
-        onboarding_data: {},
-        daily_push_enabled: true,
-        daily_quote_push_enabled: true,
-        habit_reminders_enabled: true,
-        task_reminders_enabled: true,
-        checkin_reminders_enabled: true,
-        completed_tasks_stay_in_place: true,
-        streak_freezes_available: 1,
-        stat_mode: "casual",
-        stats_enabled: true,
-        life_status: "active",
+        timezone: expect.any(String),
       }),
     );
-    expect(typeof payload.timezone).toBe("string");
+    expect(payload).not.toHaveProperty("selected_mentor_id");
+    expect(payload).not.toHaveProperty("onboarding_completed");
+    expect(payload).not.toHaveProperty("onboarding_step");
+    expect(payload).not.toHaveProperty("onboarding_data");
     expect(options).toEqual({ onConflict: "id" });
   });
 });

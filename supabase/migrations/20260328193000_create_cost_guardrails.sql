@@ -255,7 +255,7 @@ BEGIN
         SELECT cron.schedule(
           'cost-guardrail-monitor',
           '5 * * * *',
-          $$SELECT public.invoke_edge_function_with_service_role('cost-guardrail-monitor', '{}'::jsonb);$$
+          'SELECT public.invoke_edge_function_with_service_role(''cost-guardrail-monitor'', ''{}''::jsonb);'
         )
         WHERE NOT EXISTS (
           SELECT 1

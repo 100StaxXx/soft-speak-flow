@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, useEffect, useLayoutEffect, useCallback, memo, type CSSProperties } from "react";
+import { useMemo, useRef, useState, useEffect, useLayoutEffect, useCallback, memo, type CSSProperties, type MouseEvent as ReactMouseEvent } from "react";
 import { createPortal } from "react-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTimelineDrag } from "@/hooks/useTimelineDrag";
@@ -242,6 +242,11 @@ const MAX_PLACEHOLDER_EMPHASIS = 1;
 const LANE_OFFSET_STEP_PX = 10;
 const NOW_MARKER_VIEWPORT_TARGET = 0.45;
 const DEFAULT_BOTTOM_NAV_SAFE_OFFSET_PX = 104;
+const MOBILE_FAB_SIZE_PX = 44;
+const MOBILE_FAB_BOTTOM_GAP_PX = 24;
+const MOBILE_FAB_CLEARANCE_BUFFER_PX = 8;
+const MOBILE_FAB_SCROLL_CLEARANCE_PX =
+  MOBILE_FAB_SIZE_PX + MOBILE_FAB_BOTTOM_GAP_PX + MOBILE_FAB_CLEARANCE_BUFFER_PX;
 const DRAG_OVERLAY_TOP_PADDING_PX = 8;
 const DRAG_OVERLAY_BOTTOM_PADDING_PX = 10;
 const DRAG_OVERLAY_NAV_GAP_PX = 4;
@@ -643,6 +648,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   }, []);
   const useLiteAnimations = isNativeIOS || Boolean(prefersReducedMotion) || !capabilities.allowBackgroundAnimation;
   const isTimelineDragEnabled = !disableTimelineDrag;
+  const mobileFabScrollClearance = isDesktopLayout ? undefined : `${MOBILE_FAB_SCROLL_CLEARANCE_PX}px`;
   const { profile } = useProfile();
   const queryClient = useQueryClient();
   const keepInPlace = profile?.completed_tasks_stay_in_place ?? true;
@@ -715,6 +721,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   const [showComboFx, setShowComboFx] = useState(false);
   const lastComboAtRef = useRef<number | null>(null);
   const comboResetTimerRef = useRef<number | null>(null);
+  const comboFxTimerRef = useRef<number | null>(null);
   
   // Track touch start position to distinguish taps from scrolls
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -808,9 +815,13 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     scheduleComboReset();
 
     if (nextCombo > 1) {
+      if (comboFxTimerRef.current !== null) {
+        window.clearTimeout(comboFxTimerRef.current);
+      }
       setShowComboFx(true);
-      window.setTimeout(() => {
+      comboFxTimerRef.current = window.setTimeout(() => {
         setShowComboFx(false);
+        comboFxTimerRef.current = null;
       }, useLiteAnimations ? 600 : 1000);
     }
   }, [comboCount, scheduleComboReset, useLiteAnimations]);
@@ -819,6 +830,10 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     if (comboResetTimerRef.current !== null) {
       window.clearTimeout(comboResetTimerRef.current);
       comboResetTimerRef.current = null;
+    }
+    if (comboFxTimerRef.current !== null) {
+      window.clearTimeout(comboFxTimerRef.current);
+      comboFxTimerRef.current = null;
     }
     setComboCount(0);
     setShowComboFx(false);
@@ -829,6 +844,9 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     return () => {
       if (comboResetTimerRef.current !== null) {
         window.clearTimeout(comboResetTimerRef.current);
+      }
+      if (comboFxTimerRef.current !== null) {
+        window.clearTimeout(comboFxTimerRef.current);
       }
     };
   }, []);
@@ -1771,6 +1789,10 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     }
   };
 
+  const suppressNativeContextMenu = useCallback((event: ReactMouseEvent<HTMLElement>) => {
+    event.preventDefault();
+  }, []);
+
   const renderTaskItem = useCallback((
     task: Task,
     dragProps?: ListDragHandleProps,
@@ -1840,12 +1862,13 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         <div
           className={cn(
             "flex items-center gap-3 transition-all relative group",
-            "select-none min-h-[46px]",
+            "no-text-select select-none min-h-[46px]",
             isRitual ? "py-3" : "py-2",
             isComplete && "opacity-60",
             isDragging && "cursor-grabbing",
             isActivated && !isDragging && "bg-muted/30 rounded-lg"
           )}
+          onContextMenu={suppressNativeContextMenu}
         >
           {/* Checkbox - only this toggles completion */}
           <div className="relative ml-1 flex flex-col items-center self-start pt-0.5 gap-0">
@@ -2211,7 +2234,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     );
 
     return taskContent;
-  }, [onToggle, onUndoToggle, onEditQuest, onSendToCalendar, hasCalendarLink, onDeleteQuest, onMoveQuestToNextDay, expandedTasks, hasExpandableDetails, toggleTaskExpanded, justCompletedTasks, optimisticCompleted, toggleSubtask, useLiteAnimations, registerCompletionCombo, resetCombo, armTouchCheckboxClickSuppression, clearTouchCheckboxClickSuppression]);
+  }, [onToggle, onUndoToggle, onEditQuest, onSendToCalendar, hasCalendarLink, onDeleteQuest, onMoveQuestToNextDay, expandedTasks, hasExpandableDetails, toggleTaskExpanded, justCompletedTasks, optimisticCompleted, toggleSubtask, useLiteAnimations, registerCompletionCombo, resetCombo, armTouchCheckboxClickSuppression, clearTouchCheckboxClickSuppression, suppressNativeContextMenu]);
 
   const desktopRailCardClass = "journeys-desktop-rail-card rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(23,20,38,0.94),rgba(16,13,27,0.9))] p-5 shadow-[0_20px_40px_rgba(0,0,0,0.2)]";
   const desktopRail = isDesktopLayout ? (
@@ -2368,6 +2391,21 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       </section>
     </aside>
   ) : null;
+
+  const scheduledPaneStyle: CSSProperties | undefined = timelineBodyHeightPx
+    ? isDesktopLayout
+      ? { height: `${timelineBodyHeightPx}px` }
+      : {
+          maxHeight: `${timelineBodyHeightPx}px`,
+          scrollPaddingBottom: mobileFabScrollClearance,
+        }
+    : !isDesktopLayout
+      ? { scrollPaddingBottom: mobileFabScrollClearance }
+      : undefined;
+
+  const scheduledTimelineContentStyle: CSSProperties | undefined = isDesktopLayout
+    ? undefined
+    : { paddingBottom: mobileFabScrollClearance };
 
   return (
     <div
@@ -2558,184 +2596,186 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                       "overflow-y-auto overflow-x-hidden overscroll-contain pr-1",
                       isDesktopLayout && "min-h-0",
                     )}
-                    style={timelineBodyHeightPx
-                      ? isDesktopLayout
-                        ? { height: `${timelineBodyHeightPx}px` }
-                        : { maxHeight: `${timelineBodyHeightPx}px` }
-                      : undefined}
+                    style={scheduledPaneStyle}
                     data-testid="scheduled-timeline-pane"
                   >
-                    {timelineRows.map((row, index) => {
-                      if (row.kind === "marker") {
-                        const marker = row.marker;
-                        const previousRow = index > 0 ? timelineRows[index - 1] : null;
-                        const nextRow = index < timelineRows.length - 1 ? timelineRows[index + 1] : null;
-                        const previousTaskMinute = previousRow?.kind === "task"
-                          ? parseTimeToMinute(previousRow.task.scheduled_time)
-                          : null;
-                        const nextTaskMinute = nextRow?.kind === "task"
-                          ? parseTimeToMinute(nextRow.task.scheduled_time)
-                          : null;
-                        const isBetweenQuestMarker = previousTaskMinute !== null
-                          && nextTaskMinute !== null
-                          && previousTaskMinute < marker.minute
-                          && marker.minute < nextTaskMinute;
-                        const markerScale = marker.kind === "placeholder"
-                          ? 0.72 + (marker.emphasis * 0.28)
-                          : 1;
-                        const markerOpacity = marker.kind === "placeholder"
-                          ? 0.25 + (marker.emphasis * 0.65)
-                          : 1;
-                        const markerTransform = isBetweenQuestMarker
-                          ? `translateY(-50%) scale(${markerScale})`
-                          : `scale(${markerScale})`;
-                        return (
-                          <div
-                            key={marker.id}
-                            className={cn(
-                              "pointer-events-none select-none",
-                              isBetweenQuestMarker && "h-0 overflow-visible",
-                            )}
-                            data-testid={marker.id}
-                          >
+                    <div
+                      data-testid="scheduled-timeline-content"
+                      style={scheduledTimelineContentStyle}
+                    >
+                      {timelineRows.map((row, index) => {
+                        if (row.kind === "marker") {
+                          const marker = row.marker;
+                          const previousRow = index > 0 ? timelineRows[index - 1] : null;
+                          const nextRow = index < timelineRows.length - 1 ? timelineRows[index + 1] : null;
+                          const previousTaskMinute = previousRow?.kind === "task"
+                            ? parseTimeToMinute(previousRow.task.scheduled_time)
+                            : null;
+                          const nextTaskMinute = nextRow?.kind === "task"
+                            ? parseTimeToMinute(nextRow.task.scheduled_time)
+                            : null;
+                          const isBetweenQuestMarker = previousTaskMinute !== null
+                            && nextTaskMinute !== null
+                            && previousTaskMinute < marker.minute
+                            && marker.minute < nextTaskMinute;
+                          const markerScale = marker.kind === "placeholder"
+                            ? 0.72 + (marker.emphasis * 0.28)
+                            : 1;
+                          const markerOpacity = marker.kind === "placeholder"
+                            ? 0.25 + (marker.emphasis * 0.65)
+                            : 1;
+                          const markerTransform = isBetweenQuestMarker
+                            ? `translateY(-50%) scale(${markerScale})`
+                            : `scale(${markerScale})`;
+                          return (
                             <div
-                              ref={marker.kind === "now" ? nowMarkerRowRef : undefined}
-                              style={{
-                                opacity: markerOpacity,
-                                transform: markerTransform,
-                                transformOrigin: "left center",
-                              }}
+                              key={marker.id}
+                              className={cn(
+                                "pointer-events-none select-none",
+                                isBetweenQuestMarker && "h-0 overflow-visible",
+                              )}
+                              data-testid={marker.id}
                             >
-                              <TimelineTaskRow
-                                rowKind="marker"
-                                time={marker.time}
-                                tone={marker.kind === "now" ? "now" : "default"}
-                                showLine={index > 0}
-                                isLast={index === timelineRows.length - 1}
+                              <div
+                                ref={marker.kind === "now" ? nowMarkerRowRef : undefined}
+                                style={{
+                                  opacity: markerOpacity,
+                                  transform: markerTransform,
+                                  transformOrigin: "left center",
+                                }}
                               >
-                                <div className="h-px" />
-                              </TimelineTaskRow>
+                                <TimelineTaskRow
+                                  rowKind="marker"
+                                  time={marker.time}
+                                  tone={marker.kind === "now" ? "now" : "default"}
+                                  showLine={index > 0}
+                                  isLast={index === timelineRows.length - 1}
+                                >
+                                  <div className="h-px" />
+                                </TimelineTaskRow>
+                              </div>
                             </div>
-                          </div>
-                        );
-                      }
+                          );
+                        }
 
-                      const task = row.task;
-                      const isThisDragging = timelineDrag.draggingTaskId === task.id;
-                      const isThisLongPressed = timelineDrag.longPressTaskId === task.id;
-                      const isThisEngaged = isThisDragging || isThisLongPressed;
-                      const isAnyDragging = timelineDrag.isDragging;
-                      const isJustDropped = timelineDrag.justDroppedId === task.id;
-                      const usesOverlayPlaceholder = isThisDragging && shouldRenderDragOverlay;
-                      const rowFlow = scheduledFlow.byTaskId.get(task.id);
-                      const laneIndex = rowFlow?.laneIndex;
-                      const laneCount = rowFlow?.laneCount;
-                      const laneOffsetPx = rowFlow
-                        ? getLaneOffsetPx(rowFlow.laneIndex, rowFlow.overlapCount)
-                        : 0;
-                      const baseTimelineRowDragProps = isTimelineDragEnabled && task.scheduled_time && !task.completed
-                        ? timelineDrag.getRowDragProps(task.id, task.scheduled_time)
-                        : undefined;
-                      const timelineRowDragProps = baseTimelineRowDragProps
-                        ? {
-                            ...baseTimelineRowDragProps,
-                            onPointerDownCapture: (
-                              event: Parameters<NonNullable<typeof baseTimelineRowDragProps.onPointerDownCapture>>[0],
-                            ) => {
-                              seedDragOverlaySnapshotForTask(task.id);
-                              baseTimelineRowDragProps.onPointerDownCapture?.(event);
-                            },
-                            onTouchStartCapture: (
-                              event: Parameters<NonNullable<typeof baseTimelineRowDragProps.onTouchStartCapture>>[0],
-                            ) => {
-                              seedDragOverlaySnapshotForTask(task.id);
-                              baseTimelineRowDragProps.onTouchStartCapture?.(event);
-                            },
-                          }
-                        : undefined;
-                      const isRowDraggable = !!timelineRowDragProps;
-                      const overlapCount = timelineConflictMap.get(task.id)?.size ?? 0;
-
-                      const rowStyle: CSSProperties = {
-                        WebkitUserSelect: 'none',
-                        userSelect: 'none',
-                        WebkitTouchCallout: 'none',
-                        touchAction: isThisEngaged ? 'none' : 'pan-y',
-                        pointerEvents: isAnyDragging && !isThisDragging ? 'none' : 'auto',
-                        opacity: usesOverlayPlaceholder ? 0 : isAnyDragging && !isThisDragging ? 0.7 : 1,
-                        boxShadow: isThisEngaged && !usesOverlayPlaceholder
-                          ? "0 15px 30px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -4px rgba(0, 0, 0, 0.15)"
-                          : "none",
-                        backgroundColor: isThisEngaged && !usesOverlayPlaceholder ? "hsl(var(--background))" : "transparent",
-                        borderRadius: isThisEngaged && !usesOverlayPlaceholder ? 12 : 0,
-                        transition: 'none',
-                        willChange: isThisDragging && !usesOverlayPlaceholder ? "transform" : undefined,
-                      };
-
-                      const rowContent = (
-                        <TimelineTaskRow
-                          rowKind="task"
-                          time={task.scheduled_time}
-                          overrideTime={isThisDragging ? timelineDrag.previewTime : undefined}
-                          showLine={index > 0}
-                          isLast={index === timelineRows.length - 1}
-                          isDragTarget={isThisDragging}
-                          durationMinutes={task.estimated_duration}
-                          laneIndex={laneIndex}
-                          laneCount={laneCount}
-                          overlapCount={rowFlow?.overlapCount}
-                          className={cn(
-                            isRowDraggable && "cursor-default",
-                          )}
-                          data-testid={`timeline-row-${task.id}`}
-                        >
-                          {renderTaskItem(task, undefined, overlapCount)}
-                        </TimelineTaskRow>
-                      );
-
-                      const bounceAnimation = !useLiteAnimations && isJustDropped && !isThisDragging
-                        ? {
-                            scale: [1, 1.02, 0.98, 1],
-                            y: [0, -2, 1, 0],
-                          }
-                        : undefined;
-                      return (
-                        <motion.div
-                          ref={(node) => {
-                            if (node) {
-                              timelineRowRefs.current.set(task.id, node);
-                            } else {
-                              timelineRowRefs.current.delete(task.id);
+                        const task = row.task;
+                        const isThisDragging = timelineDrag.draggingTaskId === task.id;
+                        const isThisLongPressed = timelineDrag.longPressTaskId === task.id;
+                        const isThisEngaged = isThisDragging || isThisLongPressed;
+                        const isAnyDragging = timelineDrag.isDragging;
+                        const isJustDropped = timelineDrag.justDroppedId === task.id;
+                        const usesOverlayPlaceholder = isThisDragging && shouldRenderDragOverlay;
+                        const rowFlow = scheduledFlow.byTaskId.get(task.id);
+                        const laneIndex = rowFlow?.laneIndex;
+                        const laneCount = rowFlow?.laneCount;
+                        const laneOffsetPx = rowFlow
+                          ? getLaneOffsetPx(rowFlow.laneIndex, rowFlow.overlapCount)
+                          : 0;
+                        const baseTimelineRowDragProps = isTimelineDragEnabled && task.scheduled_time && !task.completed
+                          ? timelineDrag.getRowDragProps(task.id, task.scheduled_time)
+                          : undefined;
+                        const timelineRowDragProps = baseTimelineRowDragProps
+                          ? {
+                              ...baseTimelineRowDragProps,
+                              onPointerDownCapture: (
+                                event: Parameters<NonNullable<typeof baseTimelineRowDragProps.onPointerDownCapture>>[0],
+                              ) => {
+                                seedDragOverlaySnapshotForTask(task.id);
+                                baseTimelineRowDragProps.onPointerDownCapture?.(event);
+                              },
+                              onTouchStartCapture: (
+                                event: Parameters<NonNullable<typeof baseTimelineRowDragProps.onTouchStartCapture>>[0],
+                              ) => {
+                                seedDragOverlaySnapshotForTask(task.id);
+                                baseTimelineRowDragProps.onTouchStartCapture?.(event);
+                              },
                             }
-                          }}
-                          key={task.id}
-                          className={cn("relative", isThisEngaged && !usesOverlayPlaceholder && "z-50")}
-                          layout={!isThisDragging || usesOverlayPlaceholder}
-                          animate={bounceAnimation}
-                          transition={bounceAnimation ? {
-                            duration: 0.25,
-                            ease: [0.25, 0.1, 0.25, 1],
-                            layout: { type: "spring", stiffness: 420, damping: 34, mass: 0.7 },
-                          } : {
-                            layout: { type: "spring", stiffness: 420, damping: 34, mass: 0.7 },
-                          }}
-                          data-timeline-lane={laneIndex}
-                          data-timeline-lane-count={laneCount}
-                          data-timeline-overlap={rowFlow?.overlapCount}
-                          data-timeline-shift-px={laneOffsetPx}
-                          {...(timelineRowDragProps ?? {})}
-                          style={{
-                            ...rowStyle,
-                            maxWidth: laneOffsetPx > 0 ? `calc(100% - ${laneOffsetPx}px)` : undefined,
-                            x: laneOffsetPx,
-                            y: isThisDragging && !usesOverlayPlaceholder ? dragVisualOffsetY : 0,
-                          }}
-                        >
-                          {rowContent}
-                        </motion.div>
-                      );
-                    })}
-                    {!isDesktopLayout ? renderCampaignSection() : null}
+                          : undefined;
+                        const isRowDraggable = !!timelineRowDragProps;
+                        const overlapCount = timelineConflictMap.get(task.id)?.size ?? 0;
+
+                        const rowStyle: CSSProperties = {
+                          WebkitUserSelect: 'none',
+                          userSelect: 'none',
+                          WebkitTouchCallout: 'none',
+                          touchAction: isThisEngaged ? 'none' : 'pan-y',
+                          pointerEvents: isAnyDragging && !isThisDragging ? 'none' : 'auto',
+                          opacity: usesOverlayPlaceholder ? 0 : isAnyDragging && !isThisDragging ? 0.7 : 1,
+                          boxShadow: isThisEngaged && !usesOverlayPlaceholder
+                            ? "0 15px 30px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -4px rgba(0, 0, 0, 0.15)"
+                            : "none",
+                          backgroundColor: isThisEngaged && !usesOverlayPlaceholder ? "hsl(var(--background))" : "transparent",
+                          borderRadius: isThisEngaged && !usesOverlayPlaceholder ? 12 : 0,
+                          transition: 'none',
+                          willChange: isThisDragging && !usesOverlayPlaceholder ? "transform" : undefined,
+                        };
+
+                        const rowContent = (
+                          <TimelineTaskRow
+                            rowKind="task"
+                            time={task.scheduled_time}
+                            overrideTime={isThisDragging ? timelineDrag.previewTime : undefined}
+                            showLine={index > 0}
+                            isLast={index === timelineRows.length - 1}
+                            isDragTarget={isThisDragging}
+                            durationMinutes={task.estimated_duration}
+                            laneIndex={laneIndex}
+                            laneCount={laneCount}
+                            overlapCount={rowFlow?.overlapCount}
+                            className={cn(
+                              isRowDraggable && "cursor-default",
+                            )}
+                            data-testid={`timeline-row-${task.id}`}
+                          >
+                            {renderTaskItem(task, undefined, overlapCount)}
+                          </TimelineTaskRow>
+                        );
+
+                        const bounceAnimation = !useLiteAnimations && isJustDropped && !isThisDragging
+                          ? {
+                              scale: [1, 1.02, 0.98, 1],
+                              y: [0, -2, 1, 0],
+                            }
+                          : undefined;
+                        return (
+                          <motion.div
+                            ref={(node) => {
+                              if (node) {
+                                timelineRowRefs.current.set(task.id, node);
+                              } else {
+                                timelineRowRefs.current.delete(task.id);
+                              }
+                            }}
+                            key={task.id}
+                            className={cn("relative no-text-select", isThisEngaged && !usesOverlayPlaceholder && "z-50")}
+                            layout={!isThisDragging || usesOverlayPlaceholder}
+                            animate={bounceAnimation}
+                            transition={bounceAnimation ? {
+                              duration: 0.25,
+                              ease: [0.25, 0.1, 0.25, 1],
+                              layout: { type: "spring", stiffness: 420, damping: 34, mass: 0.7 },
+                            } : {
+                              layout: { type: "spring", stiffness: 420, damping: 34, mass: 0.7 },
+                            }}
+                            data-timeline-lane={laneIndex}
+                            data-timeline-lane-count={laneCount}
+                            data-timeline-overlap={rowFlow?.overlapCount}
+                            data-timeline-shift-px={laneOffsetPx}
+                            onContextMenu={suppressNativeContextMenu}
+                            {...(timelineRowDragProps ?? {})}
+                            style={{
+                              ...rowStyle,
+                              maxWidth: laneOffsetPx > 0 ? `calc(100% - ${laneOffsetPx}px)` : undefined,
+                              x: laneOffsetPx,
+                              y: isThisDragging && !usesOverlayPlaceholder ? dragVisualOffsetY : 0,
+                            }}
+                          >
+                            {rowContent}
+                          </motion.div>
+                        );
+                      })}
+                      {!isDesktopLayout ? renderCampaignSection() : null}
+                    </div>
                   </div>
                 </div>
               )}

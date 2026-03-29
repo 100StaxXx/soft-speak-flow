@@ -39,7 +39,7 @@ export const useXPRewards = () => {
   const queryClient = useQueryClient();
   const { multiplier: streakMultiplier } = useStreakMultiplier();
   const {
-    updateDisciplineFromRitual,
+    awardDisciplineForHabitCompletion,
     updateWisdomFromLearning,
     updateAlignmentFromReflection,
     updateFromStreakMilestone,
@@ -111,7 +111,7 @@ export const useXPRewards = () => {
     });
   };
 
-  const awardHabitCompletion = async () => {
+  const awardHabitCompletion = async (options?: { habitId?: string; date?: string }) => {
     if (!companion || awardXP.isPending) return;
     
     try {
@@ -132,9 +132,15 @@ export const useXPRewards = () => {
         updateWisdomFromLearning(companionId).catch(err => {
           logger.error('Wisdom update failed:', err);
         });
-        updateDisciplineFromRitual(companionId).catch(err => {
-          logger.error('Discipline update failed:', err);
-        });
+        if (options?.habitId && options.date) {
+          awardDisciplineForHabitCompletion({
+            companionId,
+            habitId: options.habitId,
+            date: options.date,
+          }).catch(err => {
+            logger.error('Discipline update failed:', err);
+          });
+        }
       }
        
        // Trigger companion reaction for quest/habit completion with first-of-day gating
@@ -212,9 +218,6 @@ export const useXPRewards = () => {
       if (companionId) {
         updateAlignmentFromReflection(companionId).catch(err => {
           logger.error('Alignment update failed:', err);
-        });
-        updateDisciplineFromRitual(companionId).catch(err => {
-          logger.error('Discipline update failed:', err);
         });
       }
     } catch (error) {

@@ -77,7 +77,7 @@ export const CompanionAttributes = ({ companion }: CompanionAttributesProps) => 
           </div>
           
           <p className="text-[10px] text-center text-muted-foreground/70 italic">
-            Tap a stat to learn more
+            Long-run scores on a 100-1000 scale. Tap a stat to learn more.
           </p>
         </div>
       </Card>
@@ -95,8 +95,12 @@ export const CompanionAttributes = ({ companion }: CompanionAttributesProps) => 
           
           {attributeDetails && selectedAttribute && (
             <div className="space-y-4 text-sm">
+              <p className="text-xs text-muted-foreground">
+                Companion stats are long-run scores on a 100-1000 scale.
+              </p>
+
               <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Current Level:</span>
+                <span className="text-muted-foreground">Current Score:</span>
                 <span className="font-mono font-semibold">{getStatValue(selectedAttribute)} / {STAT_MAX}</span>
               </div>
               

@@ -287,6 +287,8 @@ const mockViewport = ({ height, offsetTop = 0 }: { height: number; offsetTop?: n
   };
 };
 
+const EXPECTED_MOBILE_FAB_SCROLL_CLEARANCE = "76px";
+
 const getRenderedPlaceholderMinutes = (): number[] => {
   return Array.from(document.querySelectorAll<HTMLElement>('[data-testid^="timeline-marker-placeholder-"]'))
     .map((element) => element.getAttribute("data-testid"))
@@ -1253,7 +1255,9 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
         expect(scheduledPane.style.height).toBe("584px");
       });
       expect(scheduledPane.style.maxHeight).toBe("");
+      expect(scheduledPane.style.scrollPaddingBottom).toBe("");
       expect(scheduledPane).toHaveClass("overflow-y-auto", "overflow-x-hidden");
+      expect(screen.getByTestId("scheduled-timeline-content").style.paddingBottom).toBe("");
     } finally {
       paneRectSpy?.mockRestore();
       restoreViewport();
@@ -1305,7 +1309,9 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
       await waitFor(() => {
         expect(scheduledPane.style.height).toBe("406px");
       });
+      expect(scheduledPane.style.scrollPaddingBottom).toBe("");
       expect(scheduledPane).toHaveClass("overflow-y-auto", "overflow-x-hidden");
+      expect(screen.getByTestId("scheduled-timeline-content").style.paddingBottom).toBe("");
     } finally {
       paneRectSpy?.mockRestore();
       restoreViewport();
@@ -1355,6 +1361,83 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
       emptyStateRectSpy?.mockRestore();
       restoreViewport();
     }
+  });
+
+  it("adds mobile FAB clearance to the scheduled timeline pane", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-scheduled-mobile-1",
+            task_text: "Mobile focus block",
+            completed: false,
+            xp_reward: 18,
+            scheduled_time: "09:00",
+          },
+        ]}
+        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+        layoutMode="mobile"
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    const scheduledPane = screen.getByTestId("scheduled-timeline-pane");
+    const scheduledContent = screen.getByTestId("scheduled-timeline-content");
+
+    expect(scheduledPane.style.scrollPaddingBottom).toBe(EXPECTED_MOBILE_FAB_SCROLL_CLEARANCE);
+    expect(scheduledContent.style.paddingBottom).toBe(EXPECTED_MOBILE_FAB_SCROLL_CLEARANCE);
+  });
+
+  it("keeps mobile FAB clearance when only campaign content renders beneath placeholder timeline markers", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "ritual-mobile-1",
+            task_text: "Campaign ritual",
+            completed: false,
+            xp_reward: 14,
+            habit_source_id: "habit-mobile-1",
+            epic_id: "epic-mobile-1",
+            epic_title: "Campaign Mobile",
+          },
+        ]}
+        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+        layoutMode="mobile"
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+        activeEpics={[]}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    const scheduledPane = screen.getByTestId("scheduled-timeline-pane");
+    const scheduledContent = screen.getByTestId("scheduled-timeline-content");
+
+    expect(screen.getByText("Campaign Mobile")).toBeInTheDocument();
+    expect(scheduledPane.style.scrollPaddingBottom).toBe(EXPECTED_MOBILE_FAB_SCROLL_CLEARANCE);
+    expect(scheduledContent.style.paddingBottom).toBe(EXPECTED_MOBILE_FAB_SCROLL_CLEARANCE);
+    expect(screen.queryByTestId("timeline-row-ritual-mobile-1")).not.toBeInTheDocument();
   });
 
   it("keeps quests timeline scheduled-only and excludes unscheduled quests", () => {
@@ -1635,6 +1718,49 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     mocks.timelineDragState.longPressTaskId = null;
     rerender(renderAgenda());
     expect(getScheduledRowWrapper().style.touchAction).toBe("pan-y");
+  });
+
+  it("suppresses context menus on scheduled quest rows while keeping touch drag wiring", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-scheduled-1",
+            task_text: "Morning focus",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "08:00",
+          },
+        ]}
+        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    const row = screen.getByTestId("timeline-row-task-scheduled-1");
+    const contextMenuEvent = new MouseEvent("contextmenu", {
+      bubbles: true,
+      cancelable: true,
+    });
+
+    expect(row.dispatchEvent(contextMenuEvent)).toBe(false);
+    expect(contextMenuEvent.defaultPrevented).toBe(true);
+
+    fireEvent.touchStart(row, { touches: [{ clientX: 0, clientY: 100 }] });
+
+    expect(mocks.rowTouchStartCaptureSpy).toHaveBeenCalledTimes(1);
+    expect(mocks.rowTouchStartSpy).toHaveBeenCalledTimes(1);
   });
 
   it("shows compact overlap copy for conflicting tasks", () => {

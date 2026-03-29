@@ -31,10 +31,10 @@ export const useDailyTasksRealtime = () => {
         },
         async (payload) => {
           const taskDates = new Set<string>();
-          const nextTaskDate = payload.new && typeof payload.new === "object"
+          const nextTaskDate = payload?.new && typeof payload.new === "object"
             ? (payload.new as Record<string, unknown>).task_date
             : null;
-          const previousTaskDate = payload.old && typeof payload.old === "object"
+          const previousTaskDate = payload?.old && typeof payload.old === "object"
             ? (payload.old as Record<string, unknown>).task_date
             : null;
 

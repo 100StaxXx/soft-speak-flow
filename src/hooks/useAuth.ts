@@ -156,7 +156,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.error("Failed to refresh session:", lastError);
       if (currentSession?.user) {
         if (isNetworkLikeError(lastError)) {
-          applySessionState(currentSession, "authenticated");
+          applySessionState(currentSession, "recovering");
           return;
         }
 

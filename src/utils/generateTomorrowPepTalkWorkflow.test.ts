@@ -89,7 +89,7 @@ describe("insertTomorrowDailyPepTalkAndSync", () => {
     expect(spies.update).toHaveBeenCalledWith(expect.objectContaining({
       transcript_status: "pending",
       transcript_attempt_count: 1,
-      transcript_last_error: expect.stringContaining("returned error"),
+      transcript_last_error: expect.stringContaining("sync failed"),
     }));
     expect(spies.updateEq).toHaveBeenCalledWith("id", "daily-123");
   });

@@ -4,10 +4,14 @@ import { useAuth } from "./useAuth";
 import { toast } from "sonner";
 import { ECHO_MAP, AttributeType } from "@/config/attributeDescriptions";
 
-// Stat scale constants
 const STAT_MIN = 100;
 const STAT_MAX = 1000;
 const STAT_DEFAULT = 300;
+
+type DisciplineSourceEvent =
+  | "habit_complete"
+  | "planned_task_on_time"
+  | "streak_milestone";
 
 interface UpdateAttributeParams {
   companionId: string;
@@ -15,6 +19,59 @@ interface UpdateAttributeParams {
   amount: number;
   applyEchoGains?: boolean;
 }
+
+interface AwardCompanionAttributeParams {
+  attribute: AttributeType;
+  sourceEvent: DisciplineSourceEvent;
+  sourceKey: string;
+  amount: number;
+  applyEchoGains?: boolean;
+}
+
+interface AwardCompanionAttributeResult {
+  awardedAmount: number;
+  attributeBefore: number;
+  attributeAfter: number;
+  capApplied: boolean;
+  wasDuplicate: boolean;
+  echoAmount: number;
+}
+
+interface AwardCompanionAttributeRpcRow {
+  awarded_amount: number;
+  attribute_before: number;
+  attribute_after: number;
+  cap_applied: boolean;
+  was_duplicate: boolean;
+  echo_amount: number;
+}
+
+interface StreakMilestoneParams {
+  companionId: string;
+  streakDays: number;
+  date?: string;
+}
+
+interface HabitDisciplineAwardParams {
+  companionId: string;
+  habitId: string;
+  date: string;
+}
+
+interface PlannedTaskDisciplineAwardParams {
+  companionId: string;
+  taskId: string;
+}
+
+const getLocalDateStamp = () => new Date().toLocaleDateString("en-CA");
+
+export const getStreakDisciplineGain = (streakDays: number): number => {
+  if (streakDays === 7) return 15;
+  if (streakDays === 14) return 25;
+  if (streakDays === 30) return 40;
+  if (streakDays > 0 && streakDays % 7 === 0) return 5;
+  return 0;
+};
 
 export const useCompanionAttributes = () => {
   const { user } = useAuth();
@@ -24,7 +81,6 @@ export const useCompanionAttributes = () => {
     mutationFn: async ({ companionId, attribute, amount, applyEchoGains = true }: UpdateAttributeParams) => {
       if (!user) throw new Error("Not authenticated");
 
-      // Get current companion data (6 stats)
       const { data: companion, error: fetchError } = await supabase
         .from("user_companion")
         .select("vitality, wisdom, discipline, resolve, creativity, alignment")
@@ -35,22 +91,18 @@ export const useCompanionAttributes = () => {
       if (fetchError) throw fetchError;
       if (!companion) throw new Error("Companion not found");
 
-      // Calculate new primary stat value (100-1000 scale)
       const currentValue = companion[attribute] ?? STAT_DEFAULT;
       const newValue = Math.max(STAT_MIN, Math.min(STAT_MAX, currentValue + amount));
 
-      // Build update object with primary stat
       const updates: Record<string, number | string> = {
         [attribute]: newValue,
-        last_energy_update: new Date().toISOString()
+        last_energy_update: new Date().toISOString(),
       };
 
-      // Apply echo gains if enabled and amount is positive
       if (applyEchoGains && amount > 0) {
         const echoStats = ECHO_MAP[attribute] || [];
-        // 20% of gain, max +20 (scaled for 1000 range)
         const echoAmount = Math.min(20, Math.floor(amount * 0.2));
-        
+
         if (echoAmount > 0) {
           for (const echoStat of echoStats) {
             const echoCurrentValue = companion[echoStat] ?? STAT_DEFAULT;
@@ -59,7 +111,6 @@ export const useCompanionAttributes = () => {
         }
       }
 
-      // Update all stats
       const { error: updateError } = await supabase
         .from("user_companion")
         .update(updates)
@@ -72,8 +123,7 @@ export const useCompanionAttributes = () => {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["companion"] });
-      
-      // Show toast for significant changes (scaled for 1000 range)
+
       if (Math.abs(data.change) >= 50) {
         const emoji = data.change > 0 ? "⬆️" : "⬇️";
         const direction = data.change > 0 ? "increased" : "decreased";
@@ -84,96 +134,155 @@ export const useCompanionAttributes = () => {
       }
     },
     onError: (error) => {
-      console.error('Attribute update failed:', error);
+      console.error("Attribute update failed:", error);
     },
   });
 
-  // Specific update methods for different activities (slow-grind values)
+  const awardCompanionAttribute = useMutation({
+    mutationFn: async ({
+      attribute,
+      sourceEvent,
+      sourceKey,
+      amount,
+      applyEchoGains = true,
+    }: AwardCompanionAttributeParams): Promise<AwardCompanionAttributeResult> => {
+      if (!user) throw new Error("Not authenticated");
+
+      const { data, error } = await supabase.rpc("award_companion_attribute", {
+        p_attribute: attribute,
+        p_source_event: sourceEvent,
+        p_source_key: sourceKey,
+        p_amount: amount,
+        p_apply_echo_gains: applyEchoGains,
+      });
+
+      if (error) throw error;
+
+      const result = (Array.isArray(data) ? data[0] : data) as AwardCompanionAttributeRpcRow | null;
+      if (!result) throw new Error("Attribute award returned no data");
+
+      return {
+        awardedAmount: result.awarded_amount ?? 0,
+        attributeBefore: result.attribute_before ?? STAT_DEFAULT,
+        attributeAfter: result.attribute_after ?? STAT_DEFAULT,
+        capApplied: Boolean(result.cap_applied),
+        wasDuplicate: Boolean(result.was_duplicate),
+        echoAmount: result.echo_amount ?? 0,
+      };
+    },
+    onSuccess: (data) => {
+      if (data.awardedAmount > 0) {
+        queryClient.invalidateQueries({ queryKey: ["companion"] });
+      }
+    },
+    onError: (error) => {
+      console.error("Companion attribute award failed:", error);
+    },
+  });
+
   const updateVitalityFromFitness = useMutation({
     mutationFn: async (companionId: string) => {
       if (!user) throw new Error("Not authenticated");
-      await updateAttribute.mutateAsync({ companionId, attribute: 'vitality', amount: 12 });
+      await updateAttribute.mutateAsync({ companionId, attribute: "vitality", amount: 12 });
     },
   });
 
   const updateWisdomFromLearning = useMutation({
     mutationFn: async (companionId: string) => {
       if (!user) throw new Error("Not authenticated");
-      await updateAttribute.mutateAsync({ companionId, attribute: 'wisdom', amount: 8 });
-    },
-  });
-
-  const updateDisciplineFromRitual = useMutation({
-    mutationFn: async (companionId: string) => {
-      if (!user) throw new Error("Not authenticated");
-      await updateAttribute.mutateAsync({ companionId, attribute: 'discipline', amount: 15 });
+      await updateAttribute.mutateAsync({ companionId, attribute: "wisdom", amount: 8 });
     },
   });
 
   const updateDisciplineFromWork = useMutation({
     mutationFn: async (companionId: string) => {
       if (!user) throw new Error("Not authenticated");
-      await updateAttribute.mutateAsync({ companionId, attribute: 'discipline', amount: 10 });
+      await updateAttribute.mutateAsync({ companionId, attribute: "discipline", amount: 10 });
     },
   });
 
   const updateResolveFromResist = useMutation({
     mutationFn: async (companionId: string) => {
       if (!user) throw new Error("Not authenticated");
-      await updateAttribute.mutateAsync({ companionId, attribute: 'resolve', amount: 20 });
+      await updateAttribute.mutateAsync({ companionId, attribute: "resolve", amount: 20 });
     },
   });
 
   const updateCreativityFromShipping = useMutation({
     mutationFn: async (companionId: string) => {
       if (!user) throw new Error("Not authenticated");
-      await updateAttribute.mutateAsync({ companionId, attribute: 'creativity', amount: 10 });
+      await updateAttribute.mutateAsync({ companionId, attribute: "creativity", amount: 10 });
     },
   });
 
   const updateAlignmentFromReflection = useMutation({
     mutationFn: async (companionId: string) => {
       if (!user) throw new Error("Not authenticated");
-      await updateAttribute.mutateAsync({ companionId, attribute: 'alignment', amount: 6 });
-    },
-  });
-
-  // Streak milestone rewards (slow-grind values)
-  const updateFromStreakMilestone = useMutation({
-    mutationFn: async ({ companionId, streakDays }: { companionId: string; streakDays: number }) => {
-      if (!user) throw new Error("Not authenticated");
-
-      let disciplineGain = 0;
-      if (streakDays === 7) disciplineGain = 15;
-      else if (streakDays === 14) disciplineGain = 25;
-      else if (streakDays === 30) disciplineGain = 40;
-      else if (streakDays % 7 === 0) disciplineGain = 5;
-
-      if (disciplineGain > 0) {
-        await updateAttribute.mutateAsync({ 
-          companionId, 
-          attribute: 'discipline', 
-          amount: disciplineGain 
-        });
-      }
-    },
-  });
-
-  // Perfect day bonus - small boost to alignment (slow-grind)
-  const updateFromPerfectDay = useMutation({
-    mutationFn: async (companionId: string) => {
-      if (!user) throw new Error("Not authenticated");
-      await updateAttribute.mutateAsync({ 
-        companionId, 
-        attribute: 'alignment', 
-        amount: 8,
-        applyEchoGains: true 
+      await updateAttribute.mutateAsync({
+        companionId,
+        attribute: "alignment",
+        amount: 6,
       });
     },
   });
 
-  // Decay for inactivity - now handled by weekly maintenance in edge function
-  // This is kept for manual decay if needed, with 100 floor
+  const awardDisciplineForHabitCompletion = useMutation({
+    mutationFn: async ({ companionId: _companionId, habitId, date }: HabitDisciplineAwardParams) => {
+      if (!user) throw new Error("Not authenticated");
+      return awardCompanionAttribute.mutateAsync({
+        attribute: "discipline",
+        sourceEvent: "habit_complete",
+        sourceKey: `habit_complete:${habitId}:${date}`,
+        amount: 4,
+        applyEchoGains: true,
+      });
+    },
+  });
+
+  const awardDisciplineForPlannedTaskOnTime = useMutation({
+    mutationFn: async ({ companionId: _companionId, taskId }: PlannedTaskDisciplineAwardParams) => {
+      if (!user) throw new Error("Not authenticated");
+      return awardCompanionAttribute.mutateAsync({
+        attribute: "discipline",
+        sourceEvent: "planned_task_on_time",
+        sourceKey: `planned_task_on_time:${taskId}`,
+        amount: 2,
+        applyEchoGains: true,
+      });
+    },
+  });
+
+  const updateFromStreakMilestone = useMutation({
+    mutationFn: async ({ companionId: _companionId, streakDays, date }: StreakMilestoneParams) => {
+      if (!user) throw new Error("Not authenticated");
+
+      const disciplineGain = getStreakDisciplineGain(streakDays);
+      if (disciplineGain <= 0) {
+        return null;
+      }
+
+      return awardCompanionAttribute.mutateAsync({
+        attribute: "discipline",
+        sourceEvent: "streak_milestone",
+        sourceKey: `streak_milestone:${streakDays}:${date ?? getLocalDateStamp()}`,
+        amount: disciplineGain,
+        applyEchoGains: true,
+      });
+    },
+  });
+
+  const updateFromPerfectDay = useMutation({
+    mutationFn: async (companionId: string) => {
+      if (!user) throw new Error("Not authenticated");
+      await updateAttribute.mutateAsync({
+        companionId,
+        attribute: "alignment",
+        amount: 8,
+        applyEchoGains: true,
+      });
+    },
+  });
+
   const decayStats = useMutation({
     mutationFn: async (companionId: string) => {
       if (!user) throw new Error("Not authenticated");
@@ -188,7 +297,6 @@ export const useCompanionAttributes = () => {
       if (fetchError) throw fetchError;
       if (!companion) throw new Error("Companion not found");
 
-      // Weekly maintenance amounts (scaled for 1000 range)
       const decayAmounts: Record<string, number> = {
         discipline: 40,
         vitality: 30,
@@ -199,7 +307,7 @@ export const useCompanionAttributes = () => {
       };
 
       const updates: Record<string, number | string> = {
-        last_energy_update: new Date().toISOString()
+        last_energy_update: new Date().toISOString(),
       };
 
       for (const [stat, decayAmount] of Object.entries(decayAmounts)) {
@@ -218,11 +326,13 @@ export const useCompanionAttributes = () => {
   });
 
   return {
+    awardCompanionAttribute: awardCompanionAttribute.mutateAsync,
     updateAttribute: updateAttribute.mutateAsync,
     updateVitalityFromFitness: updateVitalityFromFitness.mutateAsync,
     updateWisdomFromLearning: updateWisdomFromLearning.mutateAsync,
-    updateDisciplineFromRitual: updateDisciplineFromRitual.mutateAsync,
     updateDisciplineFromWork: updateDisciplineFromWork.mutateAsync,
+    awardDisciplineForHabitCompletion: awardDisciplineForHabitCompletion.mutateAsync,
+    awardDisciplineForPlannedTaskOnTime: awardDisciplineForPlannedTaskOnTime.mutateAsync,
     updateResolveFromResist: updateResolveFromResist.mutateAsync,
     updateCreativityFromShipping: updateCreativityFromShipping.mutateAsync,
     updateAlignmentFromReflection: updateAlignmentFromReflection.mutateAsync,
@@ -232,7 +342,6 @@ export const useCompanionAttributes = () => {
   };
 };
 
-// Simple name lookup for toast messages
 const ATTRIBUTE_DESCRIPTIONS_SIMPLE: Record<AttributeType, { name: string }> = {
   vitality: { name: "Vitality" },
   wisdom: { name: "Wisdom" },
@@ -242,4 +351,4 @@ const ATTRIBUTE_DESCRIPTIONS_SIMPLE: Record<AttributeType, { name: string }> = {
   alignment: { name: "Alignment" },
 };
 
-export type { AttributeType };
+export type { AttributeType, AwardCompanionAttributeResult, DisciplineSourceEvent };

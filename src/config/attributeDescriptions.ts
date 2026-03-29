@@ -36,11 +36,12 @@ export const ATTRIBUTE_DESCRIPTIONS = {
     progressColor: "bg-green-400",
     whatItMeans: "Reliability of action and consistency. The backbone of transformation.",
     boostedBy: [
-      "Completing daily rituals",
+      "Completing daily habits",
+      "Finishing habit-sourced tasks",
       "Maintaining streaks",
-      "Showing up on hard days",
-      "Following through on plans",
-      "Deep work and Pomodoro sessions"
+      "Completing planned work on time",
+      "Following through on hard days",
+      "Keeping promises to yourself"
     ],
     whenGrows: "You become someone who follows through. Your word to yourself becomes unbreakable."
   },

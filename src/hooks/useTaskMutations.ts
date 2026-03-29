@@ -122,6 +122,51 @@ interface ToggleTaskVariables {
   forceUndo?: boolean;
 }
 
+interface TaskCompletionDisciplineAwardInput {
+  taskId: string;
+  taskDate: string;
+  habitSourceId: string | null;
+  scheduledTime: string | null;
+  completedAt: Date;
+}
+
+type TaskCompletionDisciplineAward =
+  | { kind: "habit_complete"; habitId: string; date: string }
+  | { kind: "planned_task_on_time"; taskId: string }
+  | null;
+
+export const isTaskCompletionOnTime = (scheduledTime: string | null, completedAt: Date): boolean | null => {
+  if (!scheduledTime) return null;
+  const scheduledHour = Number.parseInt(scheduledTime.split(":")[0] ?? "", 10);
+  if (Number.isNaN(scheduledHour)) return null;
+  return Math.abs(scheduledHour - completedAt.getHours()) <= 1;
+};
+
+export const getTaskCompletionDisciplineAward = ({
+  taskId,
+  taskDate,
+  habitSourceId,
+  scheduledTime,
+  completedAt,
+}: TaskCompletionDisciplineAwardInput): TaskCompletionDisciplineAward => {
+  if (habitSourceId) {
+    return {
+      kind: "habit_complete",
+      habitId: habitSourceId,
+      date: taskDate,
+    };
+  }
+
+  if (isTaskCompletionOnTime(scheduledTime, completedAt)) {
+    return {
+      kind: "planned_task_on_time",
+      taskId,
+    };
+  }
+
+  return null;
+};
+
 interface TaskUpdateInput {
   task_text?: string;
   task_date?: string | null;
@@ -353,7 +398,10 @@ export const useTaskMutations = (taskDate: string) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { companion } = useCompanion();
-  const { updateDisciplineFromRitual } = useCompanionAttributes();
+  const {
+    awardDisciplineForHabitCompletion,
+    awardDisciplineForPlannedTaskOnTime,
+  } = useCompanionAttributes();
   const { showXPToast } = useXPToast();
   const { awardCustomXP } = useXPRewards();
   const { trackTaskCompletion, trackTaskCreation } = useSchedulingLearner();
@@ -1320,6 +1368,7 @@ export const useTaskMutations = (taskDate: string) => {
         isUndo: false, 
         taskText, 
         habitSourceId,
+        taskDate: taskDateValue,
         taskDifficulty,
         taskScheduledTime,
         taskCategory,
@@ -1329,7 +1378,20 @@ export const useTaskMutations = (taskDate: string) => {
       };
     }),
     onSuccess: async (result: any) => {
-      const { completed, xpAwarded, toastReason, wasAlreadyCompleted, isUndo, taskId, taskText, habitSourceId, taskDifficulty, taskScheduledTime, taskCategory } = result ?? {};
+      const {
+        completed,
+        xpAwarded,
+        toastReason,
+        wasAlreadyCompleted,
+        isUndo,
+        taskId,
+        taskText,
+        habitSourceId,
+        taskDate,
+        taskDifficulty,
+        taskScheduledTime,
+        taskCategory,
+      } = result ?? {};
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
 
@@ -1361,14 +1423,34 @@ export const useTaskMutations = (taskDate: string) => {
         if (xpAwarded > 0) {
           showXPToast(xpAwarded, toastReason || 'Quest Complete!');
         }
-        if (companion?.id) {
-          updateDisciplineFromRitual(companion.id).catch(console.error);
+        const now = new Date();
+        const wasOnTime = isTaskCompletionOnTime(taskScheduledTime, now);
+        const disciplineAward = getTaskCompletionDisciplineAward({
+          taskId,
+          taskDate: taskDate || format(now, "yyyy-MM-dd"),
+          habitSourceId: habitSourceId ?? null,
+          scheduledTime: taskScheduledTime ?? null,
+          completedAt: now,
+        });
+
+        if (companion?.id && disciplineAward) {
+          if (disciplineAward.kind === "habit_complete") {
+            awardDisciplineForHabitCompletion({
+              companionId: companion.id,
+              habitId: disciplineAward.habitId,
+              date: disciplineAward.date,
+            }).catch(console.error);
+          } else {
+            awardDisciplineForPlannedTaskOnTime({
+              companionId: companion.id,
+              taskId: disciplineAward.taskId,
+            }).catch(console.error);
+          }
         }
+
         window.dispatchEvent(new CustomEvent('mission-completed'));
         window.dispatchEvent(new CustomEvent('quest-completed'));
 
-        // Track completion for scheduling learner
-        const now = new Date();
         console.log('[TaskMutations] About to track completion:', {
           taskId,
           taskText: taskText?.substring(0, 50),
@@ -1384,9 +1466,7 @@ export const useTaskMutations = (taskDate: string) => {
             scheduledTime: taskScheduledTime,
             actualCompletionHour: now.getHours(),
             dayOfWeek: now.getDay(),
-            wasOnTime: taskScheduledTime 
-              ? Math.abs(parseInt(taskScheduledTime.split(':')[0]) - now.getHours()) <= 1 
-              : null,
+            wasOnTime,
             category: taskCategory || undefined,
             taskText,
           });

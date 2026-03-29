@@ -1147,6 +1147,72 @@ export type Database = {
         }
         Relationships: []
       }
+      companion_attribute_events: {
+        Row: {
+          amount_awarded: number
+          amount_requested: number
+          apply_echo_gains: boolean
+          attribute: string
+          attribute_after: number
+          attribute_before: number
+          cap_applied: boolean
+          companion_id: string
+          created_at: string
+          echo_amount: number
+          id: string
+          source_event: string
+          source_key: string
+          user_id: string
+        }
+        Insert: {
+          amount_awarded: number
+          amount_requested: number
+          apply_echo_gains?: boolean
+          attribute: string
+          attribute_after: number
+          attribute_before: number
+          cap_applied?: boolean
+          companion_id: string
+          created_at?: string
+          echo_amount?: number
+          id?: string
+          source_event: string
+          source_key: string
+          user_id: string
+        }
+        Update: {
+          amount_awarded?: number
+          amount_requested?: number
+          apply_echo_gains?: boolean
+          attribute?: string
+          attribute_after?: number
+          attribute_before?: number
+          cap_applied?: boolean
+          companion_id?: string
+          created_at?: string
+          echo_amount?: number
+          id?: string
+          source_event?: string
+          source_key?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "companion_attribute_events_companion_id_fkey"
+            columns: ["companion_id"]
+            isOneToOne: false
+            referencedRelation: "user_companion"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "companion_attribute_events_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       companion_evolution_cards: {
         Row: {
           bond_level: number | null
@@ -7893,6 +7959,23 @@ export type Database = {
       }
     }
     Functions: {
+      award_companion_attribute: {
+        Args: {
+          p_amount: number
+          p_apply_echo_gains?: boolean
+          p_attribute: string
+          p_source_event: string
+          p_source_key: string
+        }
+        Returns: {
+          attribute_after: number
+          attribute_before: number
+          awarded_amount: number
+          cap_applied: boolean
+          echo_amount: number
+          was_duplicate: boolean
+        }[]
+      }
       award_xp_v2: {
         Args: {
           p_event_metadata?: Json

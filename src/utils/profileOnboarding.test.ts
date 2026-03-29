@@ -13,6 +13,16 @@ describe("isReturningProfile", () => {
     ).toBe(true);
   });
 
+  it("returns true when walkthrough is completed even if onboarding is false", () => {
+    expect(
+      isReturningProfile({
+        onboarding_completed: false,
+        selected_mentor_id: null,
+        onboarding_data: { walkthrough_completed: true },
+      }),
+    ).toBe(true);
+  });
+
   it("returns true for legacy accounts with a resolved mentor and null onboarding state", () => {
     expect(
       isReturningProfile({
@@ -28,7 +38,7 @@ describe("isReturningProfile", () => {
       isReturningProfile({
         onboarding_completed: false,
         selected_mentor_id: "mentor-1",
-        onboarding_data: {},
+        onboarding_data: { walkthrough_completed: false },
       }),
     ).toBe(false);
   });

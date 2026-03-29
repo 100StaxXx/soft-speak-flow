@@ -8,7 +8,8 @@ const mocks = vi.hoisted(() => {
   const toastMock = vi.fn();
   const showXPToastMock = vi.fn();
   const awardCustomXPMock = vi.fn();
-  const updateDisciplineFromRitualMock = vi.fn();
+  const awardDisciplineForHabitCompletionMock = vi.fn();
+  const awardDisciplineForPlannedTaskOnTimeMock = vi.fn();
   const trackTaskCreationMock = vi.fn();
   const trackTaskCompletionMock = vi.fn();
   const trackResilienceEventMock = vi.fn();
@@ -27,6 +28,7 @@ const mocks = vi.hoisted(() => {
   const removePlannerRecordsMock = vi.fn();
   const upsertPlannerRecordMock = vi.fn();
   const upsertPlannerRecordsMock = vi.fn();
+  const companion = { id: "companion-1" } as { id: string } | null;
 
   const dailyTasksCountExecuteMock = vi.fn();
   const dailyTasksInsertMock = vi.fn();
@@ -46,7 +48,8 @@ const mocks = vi.hoisted(() => {
     toastMock,
     showXPToastMock,
     awardCustomXPMock,
-    updateDisciplineFromRitualMock,
+    awardDisciplineForHabitCompletionMock,
+    awardDisciplineForPlannedTaskOnTimeMock,
     trackTaskCreationMock,
     trackTaskCompletionMock,
     trackResilienceEventMock,
@@ -62,6 +65,7 @@ const mocks = vi.hoisted(() => {
     removePlannerRecordsMock,
     upsertPlannerRecordMock,
     upsertPlannerRecordsMock,
+    companion,
     dailyTasksCountExecuteMock,
     dailyTasksInsertMock,
     dailyTasksInsertSingleMock,
@@ -97,13 +101,14 @@ vi.mock("@/hooks/use-toast", () => ({
 
 vi.mock("@/hooks/useCompanion", () => ({
   useCompanion: () => ({
-    companion: null,
+    companion: mocks.companion,
   }),
 }));
 
 vi.mock("@/hooks/useCompanionAttributes", () => ({
   useCompanionAttributes: () => ({
-    updateDisciplineFromRitual: mocks.updateDisciplineFromRitualMock,
+    awardDisciplineForHabitCompletion: mocks.awardDisciplineForHabitCompletionMock,
+    awardDisciplineForPlannedTaskOnTime: mocks.awardDisciplineForPlannedTaskOnTimeMock,
   }),
 }));
 
@@ -163,7 +168,9 @@ vi.mock("@/utils/plannerLocalStore", () => ({
 }));
 
 import {
+  getTaskCompletionDisciplineAward,
   isTaskAttachmentsTableMissingError,
+  isTaskCompletionOnTime,
   useTaskMutations,
 } from "./useTaskMutations";
 import { TimeoutError } from "@/utils/asyncTimeout";
@@ -234,6 +241,59 @@ describe("isTaskAttachmentsTableMissingError", () => {
   });
 });
 
+describe("task completion discipline helpers", () => {
+  it("returns null for unscheduled task completions", () => {
+    const completedAt = new Date("2026-02-20T14:15:00");
+
+    expect(isTaskCompletionOnTime(null, completedAt)).toBeNull();
+    expect(
+      getTaskCompletionDisciplineAward({
+        taskId: "task-1",
+        taskDate: "2026-02-20",
+        habitSourceId: null,
+        scheduledTime: null,
+        completedAt,
+      }),
+    ).toBeNull();
+  });
+
+  it("awards planned-task discipline when a scheduled quest is finished on time", () => {
+    const completedAt = new Date("2026-02-20T09:25:00");
+
+    expect(isTaskCompletionOnTime("09:00", completedAt)).toBe(true);
+    expect(
+      getTaskCompletionDisciplineAward({
+        taskId: "task-1",
+        taskDate: "2026-02-20",
+        habitSourceId: null,
+        scheduledTime: "09:00",
+        completedAt,
+      }),
+    ).toEqual({
+      kind: "planned_task_on_time",
+      taskId: "task-1",
+    });
+  });
+
+  it("keeps habit-sourced completions on the habit discipline path", () => {
+    const completedAt = new Date("2026-02-20T09:25:00");
+
+    expect(
+      getTaskCompletionDisciplineAward({
+        taskId: "task-1",
+        taskDate: "2026-02-20",
+        habitSourceId: "habit-1",
+        scheduledTime: "09:00",
+        completedAt,
+      }),
+    ).toEqual({
+      kind: "habit_complete",
+      habitId: "habit-1",
+      date: "2026-02-20",
+    });
+  });
+});
+
 describe("useTaskMutations attachment handling", () => {
   afterEach(() => {
     vi.useRealTimers();
@@ -246,6 +306,8 @@ describe("useTaskMutations attachment handling", () => {
     vi.clearAllMocks();
     mocks.resilienceState.shouldQueueWrites = false;
     mocks.resilienceState.state = "healthy";
+    mocks.awardDisciplineForHabitCompletionMock.mockResolvedValue(undefined);
+    mocks.awardDisciplineForPlannedTaskOnTimeMock.mockResolvedValue(undefined);
     mocks.getLocalHabitCompletionsForDateMock.mockResolvedValue([]);
     mocks.getLocalSubtasksForTaskMock.mockResolvedValue([]);
     mocks.getPlannerRecordMock.mockResolvedValue({

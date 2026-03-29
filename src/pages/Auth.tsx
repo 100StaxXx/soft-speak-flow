@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { getAuthRedirectPath, getProfileAwareAuthFallbackPath, ensureProfile } from "@/utils/authRedirect";
 import { logger } from "@/utils/logger";
+import { hasWalkthroughCompleted } from "@/utils/profileOnboarding";
 import { getRedirectUrlWithPath, getRedirectUrl } from '@/utils/redirectUrl';
 import { signinBackground } from "@/assets/backgrounds";
 import { StaticBackgroundImage } from "@/components/StaticBackgroundImage";
@@ -175,7 +176,7 @@ const Auth = () => {
         const telemetryStart = Date.now();
         const { data, error } = await supabase
           .from("profiles")
-          .select("onboarding_completed")
+          .select("onboarding_completed, onboarding_data")
           .eq("id", session.user.id)
           .maybeSingle();
 
@@ -186,6 +187,7 @@ const Auth = () => {
 
         logger.info(`[Auth ${source}] Timeout telemetry profile check completed`, {
           onboardingCompleted: data?.onboarding_completed,
+          walkthroughCompleted: hasWalkthroughCompleted(data?.onboarding_data),
           durationMs: Date.now() - telemetryStart,
         });
       })()).catch((error: unknown) => {

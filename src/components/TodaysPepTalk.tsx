@@ -92,6 +92,7 @@ export const TodaysPepTalk = memo(() => {
   const seekDebounceRef = useRef<number | null>(null);
   const transcriptScrollRafRef = useRef<number | null>(null);
   const lastTranscriptScrollTopRef = useRef<number>(0);
+  const transcriptSyncAttemptedIdsRef = useRef<Set<string>>(new Set());
   const isNativeIOS = useMemo(
     () => typeof window !== "undefined" && Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios",
     [],
@@ -200,6 +201,7 @@ export const TodaysPepTalk = memo(() => {
 
       if (data) {
         const transcript = sanitizeTranscript(data.transcript);
+        transcriptSyncAttemptedIdsRef.current.delete(data.id);
 
         setPepTalk({
           ...data,
@@ -218,6 +220,59 @@ export const TodaysPepTalk = memo(() => {
   useEffect(() => {
     void fetchDailyPepTalk();
   }, [fetchDailyPepTalk]);
+
+  useEffect(() => {
+    if (!pepTalk?.id) return;
+    if (timedTranscript.length > 0) return;
+    if (transcriptSyncAttemptedIdsRef.current.has(pepTalk.id)) return;
+
+    transcriptSyncAttemptedIdsRef.current.add(pepTalk.id);
+
+    const syncTranscript = async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke(
+          "sync-daily-pep-talk-transcript",
+          { body: { id: pepTalk.id } },
+        );
+
+        if (error) {
+          log.warn("Background transcript sync failed", {
+            pepTalkId: pepTalk.id,
+            error: error instanceof Error ? error.message : String(error),
+          });
+          return;
+        }
+
+        const nextTranscript = sanitizeTranscript(
+          data && typeof data === "object"
+            ? (data as Record<string, unknown>).transcript
+            : null,
+        );
+
+        if (nextTranscript.length === 0) {
+          return;
+        }
+
+        setPepTalk((current) => {
+          if (!current || current.id !== pepTalk.id) {
+            return current;
+          }
+
+          return {
+            ...current,
+            transcript: nextTranscript,
+          };
+        });
+      } catch (error) {
+        log.warn("Background transcript sync threw unexpectedly", {
+          pepTalkId: pepTalk.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    };
+
+    void syncTranscript();
+  }, [pepTalk?.id, timedTranscript.length]);
 
   // Handle user-triggered pep talk generation
   const handleGeneratePepTalk = async () => {
@@ -265,6 +320,7 @@ export const TodaysPepTalk = memo(() => {
           .maybeSingle();
 
         const transcript = sanitizeTranscript(data.pepTalk.transcript);
+        transcriptSyncAttemptedIdsRef.current.delete(data.pepTalk.id);
 
         setPepTalk({
           ...data.pepTalk,

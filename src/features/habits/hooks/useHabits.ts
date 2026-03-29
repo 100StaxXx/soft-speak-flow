@@ -31,7 +31,7 @@ export function useHabits() {
   const queryClient = useQueryClient();
   const { profile } = useProfile();
   const { companion } = useCompanion();
-  const { updateWisdomFromLearning, updateDisciplineFromRitual } = useCompanionAttributes();
+  const { updateWisdomFromLearning, awardDisciplineForHabitCompletion } = useCompanionAttributes();
   const { awardCustomXP, awardAllHabitsComplete } = useXPRewards();
   const { checkStreakAchievements } = useAchievements();
   const { queueAction, shouldQueueWrites, retryNow } = useResilience();
@@ -324,7 +324,11 @@ export function useHabits() {
           await maybeAwardAllHabitsComplete();
 
           if (companion?.id) {
-            updateDisciplineFromRitual(companion.id).catch((e) => {
+            awardDisciplineForHabitCompletion({
+              companionId: companion.id,
+              habitId,
+              date: today,
+            }).catch((e) => {
               console.warn("Failed to update discipline from habit:", e);
             });
             updateWisdomFromLearning(companion.id).catch((e) => {

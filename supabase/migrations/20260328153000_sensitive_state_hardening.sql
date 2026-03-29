@@ -237,7 +237,8 @@ SELECT
     ELSE 'none'
   END,
   CASE
-    WHEN p.subscription_status IS NOT NULL THEN p.subscription_status
+    WHEN p.subscription_status = ANY (ARRAY['active', 'trialing', 'cancelled', 'past_due', 'expired', 'inactive', 'incomplete'])
+      THEN p.subscription_status
     WHEN p.trial_ends_at IS NOT NULL AND p.trial_ends_at > now() THEN 'trialing'
     WHEN p.trial_ends_at IS NOT NULL THEN 'expired'
     WHEN COALESCE(p.is_premium, false) THEN 'active'

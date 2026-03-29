@@ -176,6 +176,18 @@ describe("Index onboarding guard", () => {
     expect(mocks.navigate).not.toHaveBeenCalledWith("/onboarding");
   });
 
+  it("does not send walkthrough-complete users back through onboarding", () => {
+    mocks.profile = {
+      onboarding_completed: false,
+      selected_mentor_id: "mentor-legacy",
+      onboarding_data: { walkthrough_completed: true },
+    };
+
+    renderIndex();
+
+    expect(mocks.navigate).not.toHaveBeenCalledWith("/onboarding");
+  });
+
   it("still sends explicitly incomplete users to onboarding", () => {
     mocks.profile = {
       onboarding_completed: false,

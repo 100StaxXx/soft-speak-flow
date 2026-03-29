@@ -7,7 +7,7 @@ import {
   stripOnboardingMentorId,
 } from "./mentor";
 import { logger } from "./logger";
-import { isReturningProfile } from "./profileOnboarding";
+import { hasWalkthroughCompleted, isReturningProfile } from "./profileOnboarding";
 
 const PROFILE_QUERY_TIMEOUT_MS = 5000;
 const RETURNING_USER_QUERY_TIMEOUT_MS = 2000;
@@ -16,7 +16,7 @@ const PROFILE_MUTATION_TIMEOUT_MS = 3000;
 const DEFAULT_AUTH_REDIRECT_PATH = "/onboarding";
 const RETURNING_USER_REDIRECT_PATH = "/tasks";
 
-const buildDefaultProfilePayload = (
+const buildProfileBootstrapPayload = (
   userId: string,
   email: string | null,
   timezone: string,
@@ -24,43 +24,6 @@ const buildDefaultProfilePayload = (
   id: userId,
   email: email ?? null,
   timezone,
-  preferences: {},
-  selected_mentor_id: null,
-  onboarding_completed: false,
-  onboarding_step: "questionnaire",
-  onboarding_data: {},
-  daily_push_enabled: true,
-  daily_push_window: null,
-  daily_push_time: null,
-  daily_quote_push_enabled: true,
-  daily_quote_push_window: null,
-  daily_quote_push_time: null,
-  habit_reminders_enabled: true,
-  task_reminders_enabled: true,
-  checkin_reminders_enabled: true,
-  completed_tasks_stay_in_place: true,
-  current_habit_streak: 0,
-  longest_habit_streak: 0,
-  total_quests_completed: 0,
-  last_encounter_quest_count: 0,
-  next_encounter_quest_count: null,
-  last_weekly_encounter: null,
-  streak_at_risk: false,
-  streak_at_risk_since: null,
-  streak_freezes_available: 1,
-  last_streak_freeze_used: null,
-  astral_encounters_enabled: true,
-  stat_mode: "casual",
-  stats_enabled: true,
-  life_status: "active",
-  life_status_set_at: null,
-  life_status_expires_at: null,
-  paypal_email: null,
-  referral_code: null,
-  referral_count: 0,
-  referred_by: null,
-  referred_by_code: null,
-  faction: null,
 });
 
 /**
@@ -142,9 +105,11 @@ const resolveAuthRedirectPath = async (userId: string): Promise<string> => {
 
     const resolvedMentorId = getResolvedMentorId(profile);
     const onboardingMentorId = getOnboardingMentorId(profile);
+    const walkthroughCompleted = hasWalkthroughCompleted(profile?.onboarding_data);
     logger.debug("[getAuthRedirectPath] Profile fetched", {
       hasProfile: !!profile,
       onboardingCompleted: profile?.onboarding_completed,
+      walkthroughCompleted,
       hasMentor: !!profile?.selected_mentor_id,
       onboardingMentorId: onboardingMentorId?.substring(0, 8),
       resolvedMentorId: resolvedMentorId?.substring(0, 8),
@@ -190,7 +155,8 @@ const resolveAuthRedirectPath = async (userId: string): Promise<string> => {
       return RETURNING_USER_REDIRECT_PATH;
     }
 
-    // Explicitly incomplete onboarding must always return to onboarding.
+    // Explicitly incomplete onboarding returns to onboarding unless later
+    // walkthrough state already proves the user completed the flow.
     if (profile?.onboarding_completed === false) {
       logger.debug("[getAuthRedirectPath] Onboarding marked incomplete, redirecting to /onboarding");
       return DEFAULT_AUTH_REDIRECT_PATH;
@@ -252,13 +218,14 @@ export const ensureProfile = async (userId: string, email: string | null): Promi
     logger.debug("[ensureProfile] Profile check result", { exists: !!existing, userTimezone });
 
     if (!existing) {
-      // Create new profile with user's timezone
+      // Create a missing profile without resetting onboarding or mentor state
+      // if another client already created the row before this upsert lands.
       logger.debug("[ensureProfile] Creating new profile...");
-      const profileDefaults = buildDefaultProfilePayload(userId, email, userTimezone);
+      const profileBootstrap = buildProfileBootstrapPayload(userId, email, userTimezone);
       const { error } = await withTimeout(
         () =>
           supabase.from("profiles").upsert(
-            profileDefaults,
+            profileBootstrap,
             {
               onConflict: "id",
             },
@@ -271,7 +238,7 @@ export const ensureProfile = async (userId: string, email: string | null): Promi
         logger.warn("[ensureProfile] Create error, continuing anyway", { error: error.message });
         // Don't throw - allow navigation to continue
       } else {
-        logger.debug("[ensureProfile] Profile created successfully");
+        logger.debug("[ensureProfile] Profile bootstrap completed");
       }
     } else if (existing.timezone !== userTimezone) {
       // Update timezone if it's different - fire and forget
