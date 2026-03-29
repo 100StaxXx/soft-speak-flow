@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { TaskAttachment } from "@/types/questAttachments";
+import { createQuestAttachmentSignedUrlMap } from "@/utils/questAttachmentUrls";
 
 export interface DailySubtask {
   id: string;
@@ -127,14 +128,15 @@ export async function fetchDailyTasksRemote(userId: string, taskDate: string): P
     throw error;
   }
 
-  return (data || []).map((task) => ({
-    ...task,
-    epic_title: (task.epics as { title: string } | null)?.title || null,
-    contact: task.contact as { id: string; name: string; avatar_url: string | null } | null,
-    subtasks: ((task.subtasks as DailySubtask[] | null) ?? [])
-      .slice()
-      .sort((a, b) => (a.sort_order ?? Number.MAX_SAFE_INTEGER) - (b.sort_order ?? Number.MAX_SAFE_INTEGER)),
-    attachments: (((task.task_attachments as Array<{
+  const rawTasks = data || [];
+  const signedUrlMap = await createQuestAttachmentSignedUrlMap(
+    rawTasks.flatMap((task) =>
+      (((task.task_attachments as Array<{ file_path: string }> | null) ?? []).map((attachment) => attachment.file_path)),
+    ),
+  );
+
+  return rawTasks.map((task) => {
+    const attachments = (((task.task_attachments as Array<{
       id: string;
       task_id: string;
       file_url: string;
@@ -151,7 +153,7 @@ export async function fetchDailyTasksRemote(userId: string, taskDate: string): P
       .map((attachment) => ({
         id: attachment.id,
         taskId: attachment.task_id,
-        fileUrl: attachment.file_url,
+        fileUrl: signedUrlMap.get(attachment.file_path) ?? attachment.file_url,
         filePath: attachment.file_path,
         fileName: attachment.file_name,
         mimeType: attachment.mime_type,
@@ -159,6 +161,17 @@ export async function fetchDailyTasksRemote(userId: string, taskDate: string): P
         isImage: attachment.is_image,
         sortOrder: attachment.sort_order ?? undefined,
         createdAt: attachment.created_at,
-      }))),
-  })) as DailyTask[];
+      })));
+
+    return {
+      ...task,
+      epic_title: (task.epics as { title: string } | null)?.title || null,
+      contact: task.contact as { id: string; name: string; avatar_url: string | null } | null,
+      image_url: attachments.find((attachment) => attachment.isImage)?.fileUrl ?? task.image_url,
+      subtasks: ((task.subtasks as DailySubtask[] | null) ?? [])
+        .slice()
+        .sort((a, b) => (a.sort_order ?? Number.MAX_SAFE_INTEGER) - (b.sort_order ?? Number.MAX_SAFE_INTEGER)),
+      attachments,
+    };
+  }) as DailyTask[];
 }

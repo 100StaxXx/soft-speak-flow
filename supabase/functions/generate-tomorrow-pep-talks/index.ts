@@ -2,6 +2,13 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { insertTomorrowDailyPepTalkAndSync, type SupabaseLikeClient } from "./workflow.ts";
 import { ACTIVE_MENTOR_SLUGS, selectThemeForDate } from "../_shared/mentorPepTalkConfig.ts";
+import { requireInternalRequest } from "../_shared/auth.ts";
+import {
+  buildCostGuardrailBlockedResponse,
+  createCostGuardrailSession,
+  isCostGuardrailBlockedError,
+} from "../_shared/costGuardrails.ts";
+import { invokeInternalFunction } from "../_shared/internalFunctionAuth.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -42,11 +49,25 @@ serve(async (req) => {
   }
 
   try {
+    const auth = await requireInternalRequest(req, corsHeaders);
+    if (auth instanceof Response) {
+      return auth;
+    }
+
     console.log('Starting tomorrow pep talk pre-generation...');
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const costGuardrails = createCostGuardrailSession({
+      supabase,
+      endpointKey: "generate-tomorrow-pep-talks",
+      featureKey: "ai_pep_talks",
+    });
+    await costGuardrails.enforceAccess({
+      capabilities: ["text", "tts"],
+      providers: ["openai", "elevenlabs"],
+    });
 
     // Get tomorrow's date
     const tomorrow = new Date();
@@ -106,22 +127,12 @@ serve(async (req) => {
         console.log(`Generating for ${mentorSlug} with theme:`, theme);
 
         // Call generate-full-mentor-audio
-        const audioResponse = await fetch(
-          `${supabaseUrl}/functions/v1/generate-full-mentor-audio`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${supabaseServiceKey}`,
-            },
-            body: JSON.stringify({
-              mentorSlug: mentorSlug,
-              topic_category: theme.topic_category,
-              intensity: theme.intensity,
-              emotionalTriggers: theme.triggers
-            }),
-          }
-        );
+        const audioResponse = await invokeInternalFunction("generate-full-mentor-audio", {
+          mentorSlug,
+          topic_category: theme.topic_category,
+          intensity: theme.intensity,
+          emotionalTriggers: theme.triggers,
+        });
 
         if (!audioResponse.ok) {
           const errorText = await audioResponse.text();
@@ -146,6 +157,21 @@ serve(async (req) => {
           supabase: supabase as unknown as SupabaseLikeClient,
           mentorSlug,
           logger: console,
+          invokeTranscriptSync: async (dailyPepTalkId) => {
+            const response = await invokeInternalFunction("sync-daily-pep-talk-transcript", { id: dailyPepTalkId });
+            const raw = await response.text();
+            let data: unknown = null;
+            try {
+              data = raw.length > 0 ? JSON.parse(raw) : null;
+            } catch {
+              data = null;
+            }
+
+            return {
+              data,
+              error: response.ok ? null : new Error(raw || `HTTP ${response.status}`),
+            };
+          },
           beforeSync: async () => {
             // Also insert into main pep_talks library before transcript sync runs.
             const { error: libraryInsertError } = await supabase
@@ -219,6 +245,9 @@ serve(async (req) => {
     );
 
   } catch (error) {
+    if (isCostGuardrailBlockedError(error)) {
+      return buildCostGuardrailBlockedResponse(error, corsHeaders);
+    }
     console.error('Error in generate-tomorrow-pep-talks:', error);
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),

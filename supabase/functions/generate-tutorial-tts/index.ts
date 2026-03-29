@@ -1,5 +1,12 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { requireServiceRoleAuth } from "../_shared/auth.ts";
+import {
+  buildCostGuardrailBlockedResponse,
+  createCostGuardrailSession,
+  createCostGuardrailSupabaseClient,
+  isCostGuardrailBlockedError,
+} from "../_shared/costGuardrails.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -25,6 +32,11 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
+  const auth = await requireServiceRoleAuth(req, corsHeaders);
+  if (auth instanceof Response) {
+    return auth;
+  }
+
   try {
     const { text, mentorSlug, stepId } = await req.json();
 
@@ -38,11 +50,21 @@ serve(async (req) => {
     }
 
     const voice = mentorVoiceMap[mentorSlug] || 'alloy';
+    const costGuardrails = createCostGuardrailSession({
+      supabase: createCostGuardrailSupabaseClient(),
+      endpointKey: "generate-tutorial-tts",
+      featureKey: "ai_pep_talks",
+    });
+    const guardedFetch = costGuardrails.wrapFetch(fetch);
+    await costGuardrails.enforceAccess({
+      capabilities: ["tts"],
+      providers: ["openai"],
+    });
 
     console.log(`Generating TTS for mentor ${mentorSlug} (voice: ${voice}), step: ${stepId}`);
 
     // Generate speech from text using OpenAI TTS
-    const response = await fetch('https://api.openai.com/v1/audio/speech', {
+    const response = await guardedFetch('https://api.openai.com/v1/audio/speech', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${openAIApiKey}`,
@@ -85,6 +107,9 @@ serve(async (req) => {
       },
     );
   } catch (error) {
+    if (isCostGuardrailBlockedError(error)) {
+      return buildCostGuardrailBlockedResponse(error, corsHeaders);
+    }
     console.error('Error in generate-tutorial-tts:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return new Response(

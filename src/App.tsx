@@ -55,7 +55,6 @@ const CalendarOAuthCallback = lazy(() => import("./pages/CalendarOAuthCallback")
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const Welcome = lazy(() => import("./pages/Welcome"));
-const Preview = lazy(() => import("./pages/Preview"));
 
 const Profile = lazy(() => import("./pages/Profile"));
 const Premium = lazy(() => import("./pages/Premium"));
@@ -344,7 +343,6 @@ const AppContent = memo(() => {
                       <AnimatePresence mode="sync" initial={false}>
                         <Routes location={location} key={location.pathname}>
                   <Route path="/welcome" element={<Welcome />} />
-                  <Route path="/preview" element={<Preview />} />
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/calendar/oauth/callback" element={<CalendarOAuthCallback />} />
                   <Route path="/auth/reset-password" element={<ResetPassword />} />

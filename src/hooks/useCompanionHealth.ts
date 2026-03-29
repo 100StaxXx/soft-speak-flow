@@ -168,16 +168,8 @@ export const useCompanionHealth = () => {
     if (!user?.id) return;
 
     try {
-      const today = new Date().toISOString().split('T')[0];
-      
-      await supabase
-        .from('user_companion')
-        .update({
-          last_activity_date: today,
-          inactive_days: 0,
-          current_mood: 'happy',
-        })
-        .eq('user_id', user.id);
+      const { error } = await supabase.rpc('mark_companion_active');
+      if (error) throw error;
 
       // Invalidate queries to refresh UI
       queryClient.invalidateQueries({ queryKey: ['companion-health'] });

@@ -2,7 +2,13 @@ import { installOpenAICompatibilityShim } from "../_shared/aiClient.ts";
 installOpenAICompatibilityShim();
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { requireUserAuth } from "../_shared/auth.ts";
+import {
+  buildCostGuardrailBlockedResponse,
+  createCostGuardrailSession,
+  createCostGuardrailSupabaseClient,
+  isCostGuardrailBlockedError,
+} from "../_shared/costGuardrails.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -15,29 +21,23 @@ serve(async (req) => {
   }
 
   try {
-    // Authentication check
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: "Authentication required" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    const auth = await requireUserAuth(req, corsHeaders);
+    if (auth instanceof Response) {
+      return auth;
     }
+    const userId = auth.userId;
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } }
+    const costGuardrails = createCostGuardrailSession({
+      supabase: createCostGuardrailSupabaseClient(),
+      endpointKey: "generate-quote-image",
+      featureKey: "ai_journey_images",
+      userId,
     });
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return new Response(
-        JSON.stringify({ error: "Invalid authentication" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    const guardedFetch = costGuardrails.wrapFetch(fetch);
+    await costGuardrails.enforceAccess({
+      capabilities: ["image"],
+      providers: ["openai"],
+    });
 
     const { quoteText, author, category, intensity, emotionalTrigger } = await req.json();
 
@@ -50,7 +50,6 @@ serve(async (req) => {
       throw new Error("OPENAI_API_KEY not configured");
     }
 
-    // Build visual style based on context
     const intensityStyles = {
       gentle: "soft gradients, warm pastel colors, gentle lighting, calm atmosphere",
       moderate: "balanced colors, clear composition, motivational energy",
@@ -69,11 +68,10 @@ serve(async (req) => {
     const style = intensityStyles[intensity as keyof typeof intensityStyles] || intensityStyles.moderate;
     const themeStyle = categoryStyles[category as keyof typeof categoryStyles] || "";
 
-    // Create a prompt for a complete quote image with text embedded
     const imagePrompt = `Create a beautiful inspirational quote image with the following text prominently displayed:
 
 "${quoteText}"
-${author ? `— ${author}` : ''}
+${author ? `— ${author}` : ""}
 
 Style: ${style}
 Theme: ${themeStyle}
@@ -96,8 +94,7 @@ CRITICAL: The text must be spelled EXACTLY as written above with perfect accurac
 
     console.log("Generating image with prompt:", imagePrompt);
 
-    // Call OpenAI image generation endpoint
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const response = await guardedFetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${OPENAI_API_KEY}`,
@@ -118,21 +115,20 @@ CRITICAL: The text must be spelled EXACTLY as written above with perfect accurac
     if (!response.ok) {
       const errorText = await response.text();
       console.error("AI Gateway error:", response.status, errorText);
-      
+
       if (response.status === 429) {
         throw new Error("Rate limit exceeded. Please try again later.");
       }
       if (response.status === 402) {
         throw new Error("AI credits required. Please add credits to continue.");
       }
-      
+
       throw new Error(`AI Gateway error: ${response.status}`);
     }
 
     const data = await response.json();
     console.log("AI response received");
 
-    // Extract the image from the response
     const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
 
     if (!imageUrl) {
@@ -148,21 +144,24 @@ CRITICAL: The text must be spelled EXACTLY as written above with perfect accurac
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      },
     );
   } catch (error) {
+    if (isCostGuardrailBlockedError(error)) {
+      return buildCostGuardrailBlockedResponse(error, corsHeaders);
+    }
     console.error("Error generating quote image:", error);
     const errorMessage = error instanceof Error ? error.message : "Failed to generate quote image";
     const errorDetails = error instanceof Error ? error.toString() : String(error);
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         error: errorMessage,
         details: errorDetails,
       }),
       {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      },
     );
   }
 });

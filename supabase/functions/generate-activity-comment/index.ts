@@ -2,12 +2,11 @@ import { installOpenAICompatibilityShim } from "../_shared/aiClient.ts";
 installOpenAICompatibilityShim();
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 import { PromptBuilder } from "../_shared/promptBuilder.ts";
 import { OutputValidator } from "../_shared/outputValidator.ts";
+import { createSafeErrorResponse, requireProtectedRequest } from "../_shared/abuseProtection.ts";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
-import { requireRequestAuth } from "../_shared/auth.ts";
 
 const ActivityCommentSchema = z.object({
   activityId: z.string().uuid(),
@@ -21,31 +20,35 @@ serve(async (req) => {
 
   const corsHeaders = getCorsHeaders(req);
   const startTime = Date.now();
+  let requestId: string = crypto.randomUUID();
 
   try {
-    const auth = await requireRequestAuth(req, corsHeaders);
-    if (auth instanceof Response) {
-      return auth;
+    const protectedRequest = await requireProtectedRequest(req, {
+      profileKey: "ai.standard",
+      endpointName: "generate-activity-comment",
+    });
+    if (protectedRequest instanceof Response) {
+      return protectedRequest;
     }
+    const { auth, supabase, requestId: protectedRequestId } = protectedRequest;
+    requestId = protectedRequestId;
 
     const body = await req.json();
     const validation = ActivityCommentSchema.safeParse(body);
     
     if (!validation.success) {
-      return new Response(
-        JSON.stringify({ 
-          error: 'Invalid input', 
-          details: validation.error.errors 
-        }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return createSafeErrorResponse(req, {
+        status: 400,
+        code: "INVALID_INPUT",
+        error: "Invalid input",
+        requestId,
+      });
     }
 
     const { activityId, userReply } = validation.data;
     
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const supabase = createClient(supabaseUrl, supabaseKey)
 
     // Get activity details and user's mentor
     const activityQuery = supabase
@@ -225,10 +228,11 @@ serve(async (req) => {
     })
   } catch (error) {
     console.error('Error:', error)
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-    return new Response(JSON.stringify({ error: errorMessage }), {
+    return createSafeErrorResponse(req, {
       status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      code: "INTERNAL_ERROR",
+      error: "Request could not be processed right now",
+      requestId,
     })
   }
 })

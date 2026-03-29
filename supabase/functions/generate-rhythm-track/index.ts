@@ -1,6 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { requireRequestAuth } from "../_shared/auth.ts";
+import {
+  buildCostGuardrailBlockedResponse,
+  createCostGuardrailSession,
+  isCostGuardrailBlockedError,
+} from "../_shared/costGuardrails.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -57,6 +62,17 @@ serve(async (req) => {
     }
 
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
+    const costGuardrails = createCostGuardrailSession({
+      supabase,
+      endpointKey: "generate-rhythm-track",
+      featureKey: "ai_rhythm_tracks",
+      userId: auth.isServiceRole ? null : auth.userId,
+    });
+    const guardedFetch = costGuardrails.wrapFetch(fetch);
+    await costGuardrails.enforceAccess({
+      capabilities: ["music"],
+      providers: ["elevenlabs"],
+    });
     
     // Get genre preset
     const preset = GENRE_PRESETS[genre as keyof typeof GENRE_PRESETS] || GENRE_PRESETS.stellar_beats;
@@ -70,7 +86,7 @@ serve(async (req) => {
     console.log(`Prompt: ${prompt}`);
 
     // Generate music using ElevenLabs Music API
-    const response = await fetch('https://api.elevenlabs.io/v1/music', {
+    const response = await guardedFetch('https://api.elevenlabs.io/v1/music', {
       method: 'POST',
       headers: {
         'xi-api-key': ELEVENLABS_API_KEY,
@@ -153,6 +169,9 @@ serve(async (req) => {
     });
 
   } catch (error) {
+    if (isCostGuardrailBlockedError(error)) {
+      return buildCostGuardrailBlockedResponse(error, corsHeaders);
+    }
     console.error('Error generating rhythm track:', error);
     return new Response(JSON.stringify({
       success: false,

@@ -2,7 +2,12 @@ import { installOpenAICompatibilityShim } from "../_shared/aiClient.ts";
 installOpenAICompatibilityShim();
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createSafeErrorResponse, requireProtectedRequest } from "../_shared/abuseProtection.ts";
+import {
+  buildCostGuardrailBlockedResponse,
+  createCostGuardrailSession,
+  isCostGuardrailBlockedError,
+} from "../_shared/costGuardrails.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -57,28 +62,32 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  let requestId: string = crypto.randomUUID();
+
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "No authorization header" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    const protectedRequest = await requireProtectedRequest(req, {
+      profileKey: "ai.standard",
+      endpointName: "generate-smart-daily-plan",
+      allowServiceRole: false,
+    });
+    if (protectedRequest instanceof Response) {
+      return protectedRequest;
     }
+    const { auth, supabase: supabaseClient, requestId: protectedRequestId } = protectedRequest;
+    requestId = protectedRequestId;
 
-    const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      { global: { headers: { Authorization: authHeader } } }
-    );
-
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    const user = { id: auth.userId };
+    const costGuardrails = createCostGuardrailSession({
+      supabase: supabaseClient,
+      endpointKey: "generate-smart-daily-plan",
+      featureKey: "ai_planner_text",
+      userId: user.id,
+    });
+    const guardedFetch = costGuardrails.wrapFetch(fetch);
+    await costGuardrails.enforceAccess({
+      capabilities: ["text"],
+      providers: ["openai"],
+    });
 
     const body: RequestBody = await req.json();
     const {
@@ -100,6 +109,7 @@ serve(async (req) => {
       const { data } = await supabaseClient
         .from("habits")
         .select("id, title, preferred_time, category, current_streak")
+        .eq("user_id", user.id)
         .in("id", protectedHabitIds);
       protectedHabits = data || [];
     }
@@ -110,15 +120,19 @@ serve(async (req) => {
       const { data: epics } = await supabaseClient
         .from("epics")
         .select("id, title, description")
+        .eq("user_id", user.id)
         .in("id", prioritizedEpicIds);
 
-      const { data: milestones } = await supabaseClient
-        .from("epic_milestones")
-        .select("id, title, epic_id, milestone_percent")
-        .in("epic_id", prioritizedEpicIds)
-        .is("completed_at", null)
-        .order("milestone_percent", { ascending: true })
-        .limit(5);
+      const accessibleEpicIds = (epics || []).map((epic) => epic.id);
+      const { data: milestones } = accessibleEpicIds.length > 0
+        ? await supabaseClient
+          .from("epic_milestones")
+          .select("id, title, epic_id, milestone_percent")
+          .in("epic_id", accessibleEpicIds)
+          .is("completed_at", null)
+          .order("milestone_percent", { ascending: true })
+          .limit(5)
+        : { data: [] };
 
       epicContext = (epics || []).map((e) => ({
         ...e,
@@ -161,7 +175,7 @@ serve(async (req) => {
       throw new Error("OPENAI_API_KEY not configured");
     }
 
-    const aiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+    const aiResponse = await guardedFetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${OPENAI_API_KEY}`,
@@ -267,11 +281,16 @@ serve(async (req) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
+    if (isCostGuardrailBlockedError(error)) {
+      return buildCostGuardrailBlockedResponse(error, corsHeaders);
+    }
     console.error("Error in generate-smart-daily-plan:", error);
-    return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return createSafeErrorResponse(req, {
+      status: 500,
+      code: "INTERNAL_ERROR",
+      error: "Request could not be processed right now",
+      requestId,
+    });
   }
 });
 

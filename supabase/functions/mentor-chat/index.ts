@@ -5,8 +5,16 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 import { PromptBuilder } from "../_shared/promptBuilder.ts";
 import { OutputValidator } from "../_shared/outputValidator.ts";
-import { checkRateLimit, RATE_LIMITS, createRateLimitResponse } from "../_shared/rateLimiter.ts";
+import {
+  logRateLimitedInvocation,
+} from "../_shared/rateLimiter.ts";
+import { createSafeErrorResponse, requireProtectedRequest } from "../_shared/abuseProtection.ts";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
+import {
+  buildCostGuardrailBlockedResponse,
+  createCostGuardrailSession,
+  isCostGuardrailBlockedError,
+} from "../_shared/costGuardrails.ts";
 
 const ChatSchema = z.object({
   message: z.string().min(1).max(1000),
@@ -215,7 +223,7 @@ function sanitizeError(error: unknown): string {
   return "An error occurred. Please try again.";
 }
 
-Deno.serve(async (req) => {
+export async function handleMentorChat(req: Request) {
   if (req.method === "OPTIONS") {
     return handleCors(req);
   }
@@ -224,13 +232,27 @@ Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
 
   try {
-    // Get authenticated user
     const authHeader = req.headers.get("Authorization");
+    const protectedRequest = await requireProtectedRequest(req, {
+      profileKey: "ai.standard",
+      endpointName: "mentor-chat",
+      blockedMessage: "Too many AI requests. Please try again later.",
+      metadata: {
+        flow: "mentor_chat",
+      },
+    });
+
+    if (protectedRequest instanceof Response) {
+      return protectedRequest;
+    }
+
     if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return createSafeErrorResponse(req, {
+        status: 401,
+        code: "UNAUTHORIZED",
+        error: "Unauthorized",
+        requestId: protectedRequest.requestId,
+      });
     }
 
     const supabase = createClient(
@@ -238,14 +260,19 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_ANON_KEY") ?? "",
       { global: { headers: { Authorization: authHeader } } }
     );
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    const userId = protectedRequest.auth.userId;
+    const supabaseAdmin = protectedRequest.supabase;
+    const costGuardrails = createCostGuardrailSession({
+      supabase: supabaseAdmin,
+      endpointKey: "mentor-chat",
+      featureKey: "ai_mentor_chat",
+      userId,
+    });
+    const guardedFetch = costGuardrails.wrapFetch(fetch);
+    await costGuardrails.enforceAccess({
+      capabilities: ["text"],
+      providers: ["openai"],
+    });
 
     // Validate input
     const body = await req.json();
@@ -273,25 +300,13 @@ Deno.serve(async (req) => {
     if (comprehensiveMode) {
       additionalContext += '\nThe user wants comprehensive, data-aware guidance. Reference their activities and goals.';
     }
-    // Check rate limit using shared rateLimiter
-    const rateLimitCheck = await checkRateLimit(
-      supabase,
-      user.id,
-      'mentor-chat',
-      RATE_LIMITS['mentor-chat']
-    );
-
-    if (!rateLimitCheck.allowed) {
-      return createRateLimitResponse(rateLimitCheck, corsHeaders);
-    }
-
     // Enforce server-side daily cap regardless of client state
     const startOfDay = new Date();
     startOfDay.setUTCHours(0, 0, 0, 0);
     const { count: messagesToday, error: dailyCountError } = await supabase
       .from('mentor_chats')
       .select('id', { count: 'exact', head: true })
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .eq('role', 'user')
       .gte('created_at', startOfDay.toISOString());
 
@@ -328,7 +343,7 @@ Deno.serve(async (req) => {
 
     const { systemPrompt: baseSystemPrompt, userPrompt, validationRules, outputConstraints } = await promptBuilder.build({
       templateKey: 'mentor_chat',
-      userId: user.id,
+      userId,
       variables: {
         mentorName,
         mentorTone,
@@ -347,7 +362,7 @@ Deno.serve(async (req) => {
       { role: "user", content: userPrompt }
     ];
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const response = await guardedFetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${OPENAI_API_KEY}`,
@@ -389,18 +404,16 @@ Deno.serve(async (req) => {
 
     // Log validation results
     const responseTime = Date.now() - startTime;
-    await supabase
-      .from('ai_output_validation_log')
-      .insert({
-        user_id: user.id,
-        template_key: 'mentor_chat',
-        input_data: { message, mentorName, mentorTone },
-        output_data: { response: assistantMessage },
-        validation_passed: validationResult.isValid,
-        validation_errors: validationResult.errors && validationResult.errors.length > 0 ? validationResult.errors : null,
-        model_used: 'google/gemini-2.5-flash',
-        response_time_ms: responseTime
-      });
+    await logRateLimitedInvocation(supabase, {
+      userId,
+      templateKey: 'mentor-chat',
+      inputData: { message, mentorName, mentorTone, promptTemplateKey: 'mentor_chat' },
+      outputData: { response: assistantMessage },
+      validationPassed: validationResult.isValid,
+      validationErrors: validationResult.errors && validationResult.errors.length > 0 ? validationResult.errors : null,
+      modelUsed: 'google/gemini-2.5-flash',
+      responseTimeMs: responseTime
+    });
 
     if (!validationResult.isValid) {
       console.warn('Validation failed:', validator.getValidationSummary(validationResult));
@@ -410,7 +423,7 @@ Deno.serve(async (req) => {
     updateCommunicationLearning(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-      user.id,
+      userId,
       communicationAnalysis
     );
 
@@ -430,10 +443,17 @@ Deno.serve(async (req) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
+    if (isCostGuardrailBlockedError(error)) {
+      return buildCostGuardrailBlockedResponse(error, corsHeaders);
+    }
     console.error("Error in mentor-chat function:", error);
     return new Response(
       JSON.stringify({ error: sanitizeError(error) }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
-});
+}
+
+if (Deno.env.get("SUPABASE_FUNCTIONS_TEST") !== "1") {
+  Deno.serve((req) => handleMentorChat(req));
+}

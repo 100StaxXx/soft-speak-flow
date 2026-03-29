@@ -77,6 +77,45 @@ const getAppleErrorDescription = (error: unknown): string => {
   return message || "Apple Sign-In failed. Please try again.";
 };
 
+const invokeAuthGateway = async (payload: Record<string, unknown>) => {
+  const { data, error } = await supabase.functions.invoke("auth-gateway", {
+    body: payload,
+  });
+
+  if (error) {
+    let message = "Request could not be completed.";
+
+    const maybeErrorWithContext = error as { context?: { json?: () => Promise<Record<string, unknown>> } };
+    if (maybeErrorWithContext.context?.json) {
+      try {
+        const body = await maybeErrorWithContext.context.json();
+        if (typeof body?.error === "string" && body.error.trim()) {
+          message = body.error;
+        }
+      } catch {
+        // Fall through to the generic message.
+      }
+    }
+
+    throw new Error(message);
+  }
+
+  return (data ?? {}) as Record<string, unknown>;
+};
+
+const readFunctionErrorContext = async (error: unknown) => {
+  const maybeErrorWithContext = error as { context?: { json?: () => Promise<Record<string, unknown>> } };
+  if (!maybeErrorWithContext.context?.json) {
+    return null;
+  }
+
+  try {
+    return await maybeErrorWithContext.context.json();
+  } catch {
+    return null;
+  }
+};
+
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -411,41 +450,49 @@ const Auth = () => {
 
     try {
       if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({
+        const authData = await invokeAuthGateway({
+          action: "sign_in_password",
           email: sanitizedEmail,
           password,
         });
 
-        if (error) throw error;
+        const accessToken = typeof authData.access_token === "string" ? authData.access_token : null;
+        const refreshToken = typeof authData.refresh_token === "string" ? authData.refresh_token : null;
 
-        const { data: { session } } = await supabase.auth.getSession();
+        if (!accessToken || !refreshToken) {
+          throw new Error("Invalid email or password.");
+        }
+
+        const { error: sessionError, data: { session } } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        });
+
+        if (sessionError) throw sessionError;
+
         await handlePostAuthNavigation(session, 'passwordSignIn');
       } else {
-        const { data: signUpData, error } = await supabase.auth.signUp({
+        const authData = await invokeAuthGateway({
+          action: "sign_up_password",
           email: sanitizedEmail,
           password,
-          options: {
-            emailRedirectTo: getRedirectUrlWithPath('/'),
-            data: {
-              timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
-            }
-          },
+          redirectTo: getRedirectUrlWithPath('/'),
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
         });
 
-        if (error) {
-          // Special handling for email already registered
-          if (error.message.includes('already registered')) {
-            throw new Error('This email is already registered. Please sign in instead.');
-          }
-          throw error;
-        }
-        
-        // Check if we have a session (email confirmation disabled in Supabase)
-        // If session exists, user is immediately logged in - navigate them
-        if (signUpData?.session) {
-          await handlePostAuthNavigation(signUpData.session, 'signUpImmediate');
+        const accessToken = typeof authData.access_token === "string" ? authData.access_token : null;
+        const refreshToken = typeof authData.refresh_token === "string" ? authData.refresh_token : null;
+
+        if (accessToken && refreshToken) {
+          const { error: sessionError, data: { session } } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+
+          if (sessionError) throw sessionError;
+
+          await handlePostAuthNavigation(session, 'signUpImmediate');
         } else {
-          // Email confirmation required - show message
           toast({
             title: "Check your email",
             description: "We've sent you a confirmation link to complete your registration.",
@@ -491,29 +538,23 @@ const Auth = () => {
     setLoading(true);
 
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(sanitizedEmail, {
+      await invokeAuthGateway({
+        action: "reset_password",
+        email: sanitizedEmail,
         redirectTo: getRedirectUrlWithPath('/auth/reset-password'),
       });
 
-      if (error) {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: error.message,
-        });
-      } else {
-        toast({
-          title: "Check your email",
-          description: "We've sent you a password reset link",
-        });
-        setIsForgotPassword(false);
-        setEmail("");
-      }
+      toast({
+        title: "Check your email",
+        description: "We've sent you a password reset link",
+      });
+      setIsForgotPassword(false);
+      setEmail("");
     } catch (error) {
       toast({
         variant: "destructive",
         title: "Error",
-        description: error.message || "An unexpected error occurred",
+        description: error instanceof Error ? error.message : "An unexpected error occurred",
       });
     } finally {
       setLoading(false);
@@ -565,13 +606,21 @@ const Auth = () => {
             body: { idToken }
           });
 
+          const functionErrorBody = functionError ? await readFunctionErrorContext(functionError) : null;
+
           console.log('[Google OAuth] Edge function response:', { 
             hasAccessToken: !!sessionData?.access_token,
             hasRefreshToken: !!sessionData?.refresh_token,
-            error: functionError?.message 
+            error: functionErrorBody?.error || functionError?.message 
           });
 
-          if (functionError) throw functionError;
+          if (functionError) {
+            throw new Error(
+              typeof functionErrorBody?.error === 'string'
+                ? functionErrorBody.error
+                : functionError.message || 'Google Sign-In failed',
+            );
+          }
           if (!sessionData?.access_token || !sessionData?.refresh_token) {
             throw new Error('Failed to get session tokens from edge function');
           }
@@ -673,17 +722,18 @@ const Auth = () => {
             rawNonce,
           }
         });
+        const functionErrorBody = functionError ? await readFunctionErrorContext(functionError) : null;
         console.log(`[Apple OAuth] apple-native-auth completed in ${Date.now() - edgeInvokeStart}ms`);
 
         console.log('[Apple OAuth] Edge function response:', { 
           hasAccessToken: !!sessionData?.access_token,
           hasRefreshToken: !!sessionData?.refresh_token,
-          error: functionError?.message,
-          errorCode: sessionData?.code
+          error: functionErrorBody?.error || functionError?.message,
+          errorCode: functionErrorBody?.code
         });
 
         if (functionError) {
-          if (sessionData?.code === 'APPLE_EMAIL_MISSING') {
+          if (functionErrorBody?.code === 'APPLE_EMAIL_MISSING') {
             console.warn('[Apple OAuth] Missing email for Apple ID, prompting user to re-register');
             toast({
               title: "Finish setting up Apple Sign-In",
@@ -694,11 +744,15 @@ const Auth = () => {
             return;
           }
 
-          if (sessionData?.code === 'APPLE_NONCE_MISSING' || sessionData?.code === 'APPLE_NONCE_MISMATCH') {
+          if (functionErrorBody?.code === 'APPLE_NONCE_MISSING' || functionErrorBody?.code === 'APPLE_NONCE_MISMATCH') {
             throw new Error('Apple Sign-In security check failed. Please try again.');
           }
 
-          throw new Error(sessionData?.error || functionError.message || 'Apple Sign-In failed');
+          throw new Error(
+            typeof functionErrorBody?.error === 'string'
+              ? functionErrorBody.error
+              : functionError.message || 'Apple Sign-In failed',
+          );
         }
         if (!sessionData?.access_token || !sessionData?.refresh_token) {
           throw new Error('Failed to get session tokens from edge function');
@@ -952,17 +1006,6 @@ const Auth = () => {
                   ? "Back to Sign In" 
                   : isLogin ? "Need an account? Sign up" : "Already have an account? Sign in"}
               </Button>
-              
-              {/* Continue as Guest - for App Store compliance */}
-              <div className="pt-2">
-                <Button
-                  variant="ghost"
-                  onClick={() => navigate("/preview")}
-                  className="text-muted-foreground hover:text-foreground text-sm"
-                >
-                  Continue as Guest
-                </Button>
-              </div>
             </div>
           </div>
         </div>

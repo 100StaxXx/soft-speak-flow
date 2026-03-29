@@ -1,18 +1,16 @@
-import { useAuth } from "./useAuth";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { useMemo } from "react";
 import { logger } from "@/utils/logger";
+import { useAccessState } from "./useAccessState";
 
 export interface Subscription {
-  status: "active" | "cancelled" | "past_due" | "trialing" | "incomplete";
+  status: "active" | "cancelled" | "past_due" | "trialing" | "incomplete" | "expired";
   plan: "monthly" | "yearly";
   trial_ends_at?: string | null;
   current_period_end?: string | null;
 }
 
 // Valid status values for type safety
-const VALID_STATUSES: Subscription["status"][] = ["active", "cancelled", "past_due", "trialing", "incomplete"];
+const VALID_STATUSES: Subscription["status"][] = ["active", "cancelled", "past_due", "trialing", "incomplete", "expired"];
 const VALID_PLANS: Subscription["plan"][] = ["monthly", "yearly"];
 
 function isValidStatus(status: unknown): status is Subscription["status"] {
@@ -24,60 +22,38 @@ function isValidPlan(plan: unknown): plan is Subscription["plan"] {
 }
 
 export function useSubscription() {
-  const { user, loading: authLoading } = useAuth();
-
-  const { data: subscriptionData, isLoading: queryLoading, error, refetch } = useQuery({
-    queryKey: ["subscription", user?.id],
-    queryFn: async () => {
-      if (!user) return null;
-
-      const { data, error } = await supabase.functions.invoke("check-apple-subscription");
-
-      if (error) throw error;
-      return data as {
-        subscribed: boolean;
-        status?: string;
-        subscription_end?: string;
-        plan?: string;
-      } | null;
-    },
-    enabled: !!user,
-    staleTime: 5 * 60 * 1000, // 5 minutes - increased for better performance
-    refetchInterval: false, // Disable automatic refetching for better performance
-  });
-
-  // Only consider loading if auth is done AND user exists AND query is actually loading
-  const isLoading = authLoading || (!!user && queryLoading);
+  const { accessState, isLoading, error, refetch } = useAccessState();
 
   const subscription = useMemo(() => {
     // Return null if no data or user is not subscribed
-    if (!subscriptionData || !subscriptionData.subscribed) return null;
+    if (!accessState.subscribed) return null;
     
     // Validate status and plan - default to safe values if invalid
-    const status = isValidStatus(subscriptionData.status) 
-      ? subscriptionData.status 
+    const status = isValidStatus(accessState.status) 
+      ? accessState.status 
       : "incomplete";
-    const plan = isValidPlan(subscriptionData.plan) 
-      ? subscriptionData.plan 
+    const plan = isValidPlan(accessState.plan) 
+      ? accessState.plan 
       : "monthly";
 
     // Log warning if values were unexpected (for debugging)
-    if (!isValidStatus(subscriptionData.status)) {
-      logger.warn(`Unexpected subscription status: ${subscriptionData.status}`);
+    if (!isValidStatus(accessState.status)) {
+      logger.warn(`Unexpected subscription status: ${accessState.status}`);
     }
-    if (subscriptionData.plan && !isValidPlan(subscriptionData.plan)) {
-      logger.warn(`Unexpected subscription plan: ${subscriptionData.plan}`);
+    if (accessState.plan && !isValidPlan(accessState.plan)) {
+      logger.warn(`Unexpected subscription plan: ${accessState.plan}`);
     }
 
     return {
       status,
       plan,
-      current_period_end: subscriptionData.subscription_end,
+      current_period_end: accessState.subscription_end,
+      trial_ends_at: accessState.trial_ends_at,
     };
-  }, [subscriptionData]);
+  }, [accessState]);
 
   // Helper functions - memoized for performance
-  const isActive = subscriptionData?.subscribed || false;
+  const isActive = accessState.subscribed;
   const isCancelled = subscription?.status === "cancelled";
 
   // Calculate next billing date - memoized

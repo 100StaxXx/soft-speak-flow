@@ -4,13 +4,40 @@ installOpenAICompatibilityShim();
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { resolveCompanionImageSizeForUser } from "../_shared/companionImagePolicy.ts";
+import { errorResponse, type InternalRequestAuth, requireInternalRequest } from "../_shared/auth.ts";
+import {
+  buildCostGuardrailBlockedResponse,
+  createCostGuardrailSession,
+  isCostGuardrailBlockedError,
+} from "../_shared/costGuardrails.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-serve(async (req) => {
+interface GenerateNeglectedCompanionImageDeps {
+  authenticate: (req: Request, corsHeaders: HeadersInit) => Promise<InternalRequestAuth | Response>;
+  createSupabaseClient: () => any;
+  createCostGuardrailSessionFn: any;
+  fetchImpl: typeof fetch;
+}
+
+const defaultDeps: GenerateNeglectedCompanionImageDeps = {
+  authenticate: requireInternalRequest,
+  createSupabaseClient: () => {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    return createClient(supabaseUrl, supabaseServiceKey);
+  },
+  createCostGuardrailSessionFn: createCostGuardrailSession,
+  fetchImpl: fetch,
+};
+
+export async function handleGenerateNeglectedCompanionImage(
+  req: Request,
+  deps: GenerateNeglectedCompanionImageDeps = defaultDeps,
+): Promise<Response> {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -18,41 +45,54 @@ serve(async (req) => {
   const requestStartedAt = Date.now();
 
   try {
-    const { companionId, userId } = await req.json();
-
-    if (!companionId || !userId) {
-      throw new Error("Missing companionId or userId");
+    const requestAuth = await deps.authenticate(req, corsHeaders);
+    if (requestAuth instanceof Response) {
+      return requestAuth;
     }
 
-    const imageSize = resolveCompanionImageSizeForUser(userId);
-    console.log(`[NeglectedImagePolicy] user=${userId} image_size=${imageSize}`);
+    const body = await req.json().catch(() => ({}));
+    const companionId = typeof body?.companionId === "string" ? body.companionId : null;
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const openAIApiKey = Deno.env.get("OPENAI_API_KEY")!;
-    
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    if (!companionId) {
+      return errorResponse(400, "Missing companionId", corsHeaders);
+    }
 
-    console.log(`[Neglected Image] Generating for companion ${companionId}`);
-
-    // Fetch companion data
+    const supabase = deps.createSupabaseClient();
     const { data: companion, error: companionError } = await supabase
       .from("user_companion")
-      .select("current_image_url, spirit_animal, core_element, favorite_color, current_stage, neglected_image_url")
+      .select("id, user_id, current_image_url, spirit_animal, core_element, favorite_color, current_stage, neglected_image_url")
       .eq("id", companionId)
-      .eq("user_id", userId)
       .maybeSingle();
 
-    if (companionError || !companion) {
-      throw new Error("Companion not found");
+    if (companionError) {
+      console.error("[Neglected Image] Failed to fetch companion:", companionError);
+      return errorResponse(500, "Failed to load companion", corsHeaders);
     }
 
-    // Skip if neglected image already exists
+    if (!companion) {
+      return errorResponse(404, "Companion not found", corsHeaders);
+    }
+
+    const imageSize = resolveCompanionImageSizeForUser(companion.user_id);
+    console.log(`[NeglectedImagePolicy] user=${companion.user_id} image_size=${imageSize}`);
+    console.log(`[Neglected Image] Generating for companion ${companionId}`);
+    const costGuardrails = deps.createCostGuardrailSessionFn({
+      supabase,
+      endpointKey: "generate-neglected-companion-image",
+      featureKey: "ai_companion_images",
+      userId: companion.user_id,
+    });
+    const guardedFetch = costGuardrails.wrapFetch(deps.fetchImpl);
+    await costGuardrails.enforceAccess({
+      capabilities: ["image"],
+      providers: ["openai"],
+    });
+
     if (companion.neglected_image_url) {
       console.log(`[Neglected Image] Already exists for companion ${companionId}`);
       return new Response(
         JSON.stringify({ success: true, imageUrl: companion.neglected_image_url, cached: true }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
@@ -60,7 +100,11 @@ serve(async (req) => {
       throw new Error("No current image to edit");
     }
 
-    // Use Gemini's image editing to create sad version
+    const openAIApiKey = Deno.env.get("OPENAI_API_KEY");
+    if (!openAIApiKey) {
+      throw new Error("OPENAI_API_KEY not configured");
+    }
+
     const editPrompt = `Edit this companion creature to look sad and neglected while PRESERVING ITS EXACT APPEARANCE:
 
 PRESERVE COMPLETELY (DO NOT CHANGE):
@@ -81,9 +125,9 @@ MODIFY TO SHOW NEGLECT (SUBTLE CHANGES ONLY):
 MOOD: Sad, lonely, longing for attention - but still recognizable as the same companion
 OUTPUT: Same composition and framing as the original image`;
 
-    console.log(`[Neglected Image] Calling image edit API...`);
+    console.log("[Neglected Image] Calling image edit API...");
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const response = await guardedFetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${openAIApiKey}`,
@@ -95,16 +139,8 @@ OUTPUT: Same composition and framing as the original image`;
           {
             role: "user",
             content: [
-              {
-                type: "text",
-                text: editPrompt,
-              },
-              {
-                type: "image_url",
-                image_url: {
-                  url: companion.current_image_url,
-                },
-              },
+              { type: "text", text: editPrompt },
+              { type: "image_url", image_url: { url: companion.current_image_url } },
             ],
           },
         ],
@@ -116,14 +152,14 @@ OUTPUT: Same composition and framing as the original image`;
     if (!response.ok) {
       const errorText = await response.text();
       console.error("[Neglected Image] API error:", response.status, errorText);
-      
+
       if (response.status === 429) {
         throw new Error("RATE_LIMITED: AI service is currently busy. Please try again later.");
       }
       if (response.status === 402) {
         throw new Error("INSUFFICIENT_CREDITS: Insufficient AI credits.");
       }
-      
+
       throw new Error(`AI service error: ${response.status}`);
     }
 
@@ -135,16 +171,14 @@ OUTPUT: Same composition and framing as the original image`;
       throw new Error("Failed to generate neglected image");
     }
 
-    console.log(`[Neglected Image] Successfully generated, saving to database...`);
+    console.log(`[Neglected Image] Successfully generated, saving to database for ${companionId}...`);
 
-    // Save the neglected image URL to the companion record
     const { error: updateError } = await supabase
       .from("user_companion")
       .update({
         neglected_image_url: editedImageUrl,
       })
-      .eq("id", companionId)
-      .eq("user_id", userId);
+      .eq("id", companionId);
 
     if (updateError) {
       console.error("[Neglected Image] Failed to save:", updateError);
@@ -161,9 +195,12 @@ OUTPUT: Same composition and framing as the original image`;
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      },
     );
   } catch (error) {
+    if (isCostGuardrailBlockedError(error)) {
+      return buildCostGuardrailBlockedResponse(error, corsHeaders);
+    }
     console.error("[Neglected Image] Error:", error);
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
     return new Response(
@@ -171,9 +208,13 @@ OUTPUT: Same composition and framing as the original image`;
       {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      },
     );
   } finally {
     console.log(`[NeglectedImageTiming] total_ms=${Date.now() - requestStartedAt}`);
   }
-});
+}
+
+if (Deno.env.get("SUPABASE_FUNCTIONS_TEST") !== "1") {
+  serve((req) => handleGenerateNeglectedCompanionImage(req));
+}

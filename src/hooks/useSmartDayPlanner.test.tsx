@@ -97,6 +97,16 @@ describe("useSmartDayPlanner", () => {
         };
       }
 
+      if (fnName === "record-daily-planning-use") {
+        return {
+          data: {
+            times_used: 4,
+            last_used_at: "2026-02-13T12:00:00.000Z",
+          },
+          error: null,
+        };
+      }
+
       return { data: null, error: null };
     });
 
@@ -104,6 +114,12 @@ describe("useSmartDayPlanner", () => {
       if (table === "daily_tasks" || table === "daily_plan_sessions") {
         return {
           insert: vi.fn().mockResolvedValue({ error: null }),
+        };
+      }
+
+      if (table === "daily_planning_preferences") {
+        return {
+          upsert: vi.fn().mockResolvedValue({ error: null }),
         };
       }
 
@@ -132,5 +148,20 @@ describe("useSmartDayPlanner", () => {
       "user-1",
       "2026-02-13",
     );
+  });
+
+  it("records planner usage through the server function when saving preferences", async () => {
+    const { result } = renderHook(
+      () => useSmartDayPlanner(new Date(2026, 1, 13, 12, 0, 0)),
+      { wrapper: createWrapper() },
+    );
+
+    await act(async () => {
+      await result.current.savePreferences();
+    });
+
+    expect(mocks.functionsInvokeMock).toHaveBeenCalledWith("record-daily-planning-use", {
+      body: { increment: true },
+    });
   });
 });

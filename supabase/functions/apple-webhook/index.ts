@@ -1,8 +1,14 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { createRemoteJWKSet, jwtVerify } from "https://esm.sh/jose@5.8.0";
+import { upsertAccountEntitlement } from "../_shared/accountEntitlements.ts";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
-import { resolvePlanFromProduct, upsertSubscription } from "../_shared/appleSubscriptions.ts";
+import {
+  fetchAppleTransactionBinding,
+  resolvePlanFromProduct,
+  upsertSubscription,
+} from "../_shared/appleSubscriptions.ts";
+import { normalizeAppAccountToken } from "../_shared/appleServerAPI.ts";
 
 const defaultAppleBundleId = "com.darrylgraham.revolution";
 const appleWebhookAudiences = [
@@ -81,7 +87,7 @@ serve(async (req) => {
       });
     }
 
-    const { notificationType, latestReceiptInfo, autoRenewStatus } = notificationContext;
+    const { notificationType, latestReceiptInfo, autoRenewStatus, transactionInfo, environment } = notificationContext;
     
     if (!latestReceiptInfo) {
       console.error("No receipt info in notification");
@@ -90,37 +96,35 @@ serve(async (req) => {
 
     // Extract subscription details
     const originalTransactionId = latestReceiptInfo.original_transaction_id;
+    const latestTransactionId = latestReceiptInfo.transaction_id ?? originalTransactionId;
     const productId = latestReceiptInfo.product_id;
     const expiresDateMs = latestReceiptInfo.expires_date_ms;
     const purchaseDateMs = latestReceiptInfo.purchase_date_ms;
     const cancellationDateMs = latestReceiptInfo.cancellation_date_ms;
+    const appAccountToken = normalizeAppAccountToken(
+      typeof transactionInfo?.appAccountToken === "string" ? transactionInfo.appAccountToken : null,
+    );
 
-    // Find user by transaction ID
-    const { data: subscription, error: subscriptionError } = await supabaseClient
-      .from("subscriptions")
-      .select("user_id")
-      .eq("stripe_subscription_id", originalTransactionId)
-      .maybeSingle();
+    const binding = await fetchAppleTransactionBinding(supabaseClient, originalTransactionId)
+      .catch((bindingError) => {
+        console.error("Error fetching Apple transaction binding:", bindingError);
+        return null;
+      });
 
-    if (subscriptionError) {
-      console.error("Error fetching subscription:", subscriptionError);
+    const userId = binding?.bound_user_id ?? appAccountToken;
+
+    if (!userId) {
+      console.log(
+        "No user binding found for transaction:",
+        originalTransactionId,
+        "- waiting for verified app-account restore",
+      );
       // Still return 200 to prevent Apple from retrying
       return new Response("OK", { 
         status: 200, 
         headers: getCorsHeaders(req),
       });
     }
-
-    if (!subscription) {
-      console.log("No subscription found for transaction:", originalTransactionId, "- This may be a new subscription being processed via verify-apple-receipt");
-      // This might be a new subscription, return 200 to acknowledge
-      return new Response("OK", { 
-        status: 200, 
-        headers: getCorsHeaders(req),
-      });
-    }
-
-    const userId = subscription.user_id;
 
     // Determine plan from product ID
     const plan = resolvePlanFromProduct(productId);
@@ -132,10 +136,13 @@ serve(async (req) => {
         await handleActivation(
           supabaseClient,
           userId,
+          latestTransactionId,
           originalTransactionId,
+          appAccountToken,
           plan,
           expiresDateMs,
-          purchaseDateMs
+          purchaseDateMs,
+          environment,
         );
         // Create referral payout if user was referred
         await createReferralPayout(
@@ -152,10 +159,13 @@ serve(async (req) => {
         await handleActivation(
           supabaseClient,
           userId,
+          latestTransactionId,
           originalTransactionId,
+          appAccountToken,
           plan,
           expiresDateMs,
-          purchaseDateMs
+          purchaseDateMs,
+          environment,
         );
         break;
 
@@ -206,7 +216,7 @@ serve(async (req) => {
         await handleRefund(
           supabaseClient,
           userId,
-          originalTransactionId
+          latestTransactionId
         );
         break;
 
@@ -235,9 +245,12 @@ async function handleActivation(
   supabase: any,
   userId: string,
   transactionId: string,
+  originalTransactionId: string,
+  appAccountToken: string | null,
   plan: string,
   expiresDateMs: string,
-  purchaseDateMs: string
+  purchaseDateMs: string,
+  environment?: string,
 ) {
   const expiresDate = new Date(parseInt(expiresDateMs));
   const purchaseDate = new Date(parseInt(purchaseDateMs));
@@ -246,12 +259,14 @@ async function handleActivation(
   await upsertSubscription(supabase, {
     userId,
     transactionId,
+    originalTransactionId,
     productId: plan,
+    appAccountToken,
     plan: normalizedPlan,
     expiresAt: expiresDate,
     purchaseDate,
     cancellationDate: null,
-    environment: undefined,
+    environment,
     source: "webhook",
   });
 
@@ -264,6 +279,8 @@ async function buildNotificationContext(body: any) {
   let notificationType = body?.notification_type as NotificationType | undefined;
   let latestReceiptInfo = body?.latest_receipt_info;
   let autoRenewStatus = body?.auto_renew_status;
+  let transactionInfo: AppleJWSPayload | null = null;
+  let environment = typeof body?.environment === "string" ? body.environment : undefined;
 
   if (body?.signedPayload) {
     const rootPayload = await verifyAppleNotification(body.signedPayload, appleWebhookAudiences);
@@ -271,8 +288,8 @@ async function buildNotificationContext(body: any) {
 
     const data = (rootPayload.data ?? {}) as Record<string, unknown>;
     const bundleAudience = typeof data.bundleId === "string" ? data.bundleId : appleWebhookAudiences;
+    environment = typeof data.environment === "string" ? data.environment : environment;
 
-    let transactionInfo: AppleJWSPayload | null = null;
     if (typeof data.signedTransactionInfo === "string") {
       transactionInfo = await verifyAppleNotification(data.signedTransactionInfo, bundleAudience);
     }
@@ -294,7 +311,7 @@ async function buildNotificationContext(body: any) {
     throw new Error("Apple notification missing type");
   }
 
-  return { notificationType, latestReceiptInfo, autoRenewStatus };
+  return { notificationType, latestReceiptInfo, autoRenewStatus, transactionInfo, environment };
 }
 
 async function verifyAppleNotification(token: string, audience: string | string[]) {
@@ -316,6 +333,7 @@ async function verifyAppleNotification(token: string, audience: string | string[
 function convertTransactionToLegacyShape(transactionInfo: AppleJWSPayload) {
   return {
     original_transaction_id: transactionInfo.originalTransactionId ?? transactionInfo.transactionId,
+    transaction_id: transactionInfo.transactionId,
     product_id: transactionInfo.productId,
     expires_date_ms: normalizeMillis(transactionInfo.expiresDate ?? transactionInfo.expiresDateMs),
     purchase_date_ms: normalizeMillis(transactionInfo.purchaseDate ?? transactionInfo.purchaseDateMs),
@@ -361,6 +379,17 @@ async function handleRenewalStatusChange(
     updated_at: new Date().toISOString(),
   }).eq("user_id", userId);
 
+  await upsertAccountEntitlement(supabase, {
+    user_id: userId,
+    source: "subscription",
+    status: willRenew ? "active" : "cancelled",
+    is_active: expiresDate > new Date(),
+    ends_at: expiresDate.toISOString(),
+    metadata: {
+      webhook_event: "renewal_status_change",
+    },
+  });
+
   console.log(`Renewal status changed for user ${userId}: ${willRenew ? "enabled" : "disabled"}`);
 }
 
@@ -378,6 +407,16 @@ async function handlePlanChange(
     updated_at: new Date().toISOString(),
   }).eq("user_id", userId);
 
+  await upsertAccountEntitlement(supabase, {
+    user_id: userId,
+    source: "subscription",
+    plan: newPlan,
+    ends_at: expiresDate.toISOString(),
+    metadata: {
+      webhook_event: "plan_change",
+    },
+  });
+
   console.log(`Plan changed for user ${userId} to ${newPlan}`);
 }
 
@@ -394,11 +433,16 @@ async function handleBillingIssue(
     updated_at: new Date().toISOString(),
   }).eq("user_id", userId);
 
-  // Keep premium active for grace period
-  await supabase.from("profiles").update({
-    subscription_status: "past_due",
-    updated_at: new Date().toISOString(),
-  }).eq("id", userId);
+  await upsertAccountEntitlement(supabase, {
+    user_id: userId,
+    source: "subscription",
+    status: "past_due",
+    is_active: expiresDate > new Date(),
+    ends_at: expiresDate.toISOString(),
+    metadata: {
+      webhook_event: "billing_issue",
+    },
+  });
 
   console.log(`Billing issue for user ${userId}`);
 }
@@ -419,15 +463,19 @@ async function handleCancellation(
     updated_at: new Date().toISOString(),
   }).eq("user_id", userId);
 
-  // Keep premium until expiration date
   const isStillActive = expiresDate > new Date();
-  
-  await supabase.from("profiles").update({
-    is_premium: isStillActive,
-    subscription_status: "cancelled",
-    subscription_expires_at: expiresDate.toISOString(),
-    updated_at: new Date().toISOString(),
-  }).eq("id", userId);
+
+  await upsertAccountEntitlement(supabase, {
+    user_id: userId,
+    source: "subscription",
+    status: "cancelled",
+    is_active: isStillActive,
+    ends_at: expiresDate.toISOString(),
+    metadata: {
+      webhook_event: "cancellation",
+      cancelled_at: cancellationDate.toISOString(),
+    },
+  });
 
   console.log(`Subscription cancelled for user ${userId}, expires ${expiresDate.toISOString()}`);
 }
@@ -444,11 +492,17 @@ async function handleRefund(
     updated_at: new Date().toISOString(),
   }).eq("user_id", userId);
 
-  await supabase.from("profiles").update({
-    is_premium: false,
-    subscription_status: "cancelled",
-    updated_at: new Date().toISOString(),
-  }).eq("id", userId);
+  await upsertAccountEntitlement(supabase, {
+    user_id: userId,
+    source: "subscription",
+    status: "cancelled",
+    is_active: false,
+    ends_at: new Date().toISOString(),
+    metadata: {
+      webhook_event: "refund",
+      refunded_transaction_id: transactionId,
+    },
+  });
 
   // Mark payment as refunded
   await supabase.from("payment_history").update({

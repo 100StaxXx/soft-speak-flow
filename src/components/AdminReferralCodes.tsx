@@ -48,42 +48,16 @@ export const AdminReferralCodes = () => {
   const { data: codes, isLoading } = useQuery({
     queryKey: ["admin-referral-codes"],
     queryFn: async () => {
-      const { data: codesData, error: codesError } = await supabase
-        .from("referral_codes")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (codesError) throw codesError;
-
-      // Fetch conversion counts and earnings for each code
-      const codesWithStats = await Promise.all(
-        codesData.map(async (code) => {
-          // Count conversions (profiles that used this code)
-          const { count: conversionCount } = await supabase
-            .from("profiles")
-            .select("*", { count: "exact", head: true })
-            .eq("referred_by_code", code.code);
-
-          // Sum earnings from payouts
-          const { data: payouts } = await supabase
-            .from("referral_payouts")
-            .select("amount")
-            .eq("referral_code_id", code.id);
-
-          const totalEarnings = payouts?.reduce(
-            (sum, p) => sum + Number(p.amount),
-            0
-          ) || 0;
-
-          return {
-            ...code,
-            conversion_count: conversionCount || 0,
-            total_earnings: totalEarnings,
-          };
-        })
+      const { data, error } = await supabase.functions.invoke(
+        "manage-referral-codes",
+        {
+          body: { action: "list" },
+        }
       );
 
-      return codesWithStats as ReferralCode[];
+      if (error) throw error;
+
+      return (data?.codes ?? []) as ReferralCode[];
     },
   });
 
@@ -91,10 +65,16 @@ export const AdminReferralCodes = () => {
   const toggleActiveMutation = useMutation({
     mutationFn: async ({ codeId, isActive }: { codeId: string; isActive: boolean }) => {
       setTogglingId(codeId);
-      const { error } = await supabase
-        .from("referral_codes")
-        .update({ is_active: !isActive })
-        .eq("id", codeId);
+      const { error } = await supabase.functions.invoke(
+        "manage-referral-codes",
+        {
+          body: {
+            action: "toggle",
+            codeId,
+            isActive,
+          },
+        }
+      );
 
       if (error) throw error;
     },

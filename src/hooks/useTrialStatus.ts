@@ -1,6 +1,5 @@
 import { useMemo } from "react";
-import { useProfile } from "./useProfile";
-import { useSubscription } from "./useSubscription";
+import { useAccessState } from "./useAccessState";
 
 interface TrialStatus {
   isInTrial: boolean;
@@ -13,14 +12,11 @@ interface TrialStatus {
 }
 
 export function useTrialStatus(): TrialStatus {
-  const { profile, loading: profileLoading } = useProfile();
-  const { isActive, isLoading: subscriptionLoading } = useSubscription();
+  const { accessState, isLoading } = useAccessState();
 
   return useMemo(() => {
-    const loading = profileLoading || subscriptionLoading;
-    
     // If still loading, return safe defaults
-    if (loading || !profile) {
+    if (isLoading) {
       return {
         isInTrial: false,
         trialDaysRemaining: 0,
@@ -32,23 +28,11 @@ export function useTrialStatus(): TrialStatus {
       };
     }
 
-    const isSubscribed = isActive;
-    
-    // Parse trial end date with fallback to created_at + 7 days
-    let trialEndsAt: Date | null = null;
-    
-    if (profile.trial_ends_at) {
-      trialEndsAt = new Date(profile.trial_ends_at);
-    } else if (profile.created_at) {
-      // Fallback: use profile creation date + 7 days
-      trialEndsAt = new Date(new Date(profile.created_at).getTime() + 7 * 24 * 60 * 60 * 1000);
-    }
-    
+    const isSubscribed = accessState.subscribed;
+    const trialEndsAt = accessState.trial_ends_at ? new Date(accessState.trial_ends_at) : null;
     const now = new Date();
-    
-    // Calculate trial status - default to NOT expired if no date (benefit of doubt for new users)
-    const trialExpired = trialEndsAt ? now > trialEndsAt : false;
-    const isInTrial = trialEndsAt ? now <= trialEndsAt : true;
+    const isInTrial = accessState.access_source === "trial" && accessState.has_access;
+    const trialExpired = !isSubscribed && !accessState.has_access && Boolean(trialEndsAt && now > trialEndsAt);
     
     // Calculate days remaining (round up to show "1 day" until it's actually expired)
     let trialDaysRemaining = 0;
@@ -67,7 +51,7 @@ export function useTrialStatus(): TrialStatus {
       isSubscribed,
       needsPaywall,
       trialEndsAt,
-      loading: false,
-    };
-  }, [profile, profileLoading, isActive, subscriptionLoading]);
+        loading: false,
+      };
+  }, [accessState, isLoading]);
 }

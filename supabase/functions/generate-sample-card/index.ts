@@ -4,6 +4,7 @@ installOpenAICompatibilityShim();
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { calculateBondLevel, calculateEnergyCost, normalizeStats } from "../_shared/cardMath.ts";
+import { checkRateLimit, createRateLimitResponse, RATE_LIMITS } from "../_shared/rateLimiter.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -36,6 +37,17 @@ serve(async (req) => {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    const rateLimit = await checkRateLimit(
+      supabase,
+      user.id,
+      'generate-sample-card',
+      RATE_LIMITS['generate-sample-card'],
+    );
+
+    if (!rateLimit.allowed) {
+      return createRateLimitResponse(rateLimit, corsHeaders);
     }
 
     const {

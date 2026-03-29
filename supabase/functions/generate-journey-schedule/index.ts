@@ -2,7 +2,7 @@ import { installOpenAICompatibilityShim } from "../_shared/aiClient.ts";
 installOpenAICompatibilityShim();
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { requireRequestAuth } from "../_shared/auth.ts";
+import { createSafeErrorResponse, requireProtectedRequest } from "../_shared/abuseProtection.ts";
 import {
   createFallbackScheduleParts,
   enforceExecutionModelSemantics,
@@ -10,6 +10,11 @@ import {
   inferExecutionModel,
   type ExecutionModel,
 } from "./planner.ts";
+import {
+  buildCostGuardrailBlockedResponse,
+  createCostGuardrailSession,
+  isCostGuardrailBlockedError,
+} from "../_shared/costGuardrails.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -108,11 +113,18 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  let requestId: string = crypto.randomUUID();
+
   try {
-    const auth = await requireRequestAuth(req, corsHeaders);
-    if (auth instanceof Response) {
-      return auth;
+    const protectedRequest = await requireProtectedRequest(req, {
+      profileKey: "ai.standard",
+      endpointName: "generate-journey-schedule",
+    });
+    if (protectedRequest instanceof Response) {
+      return protectedRequest;
     }
+    const { auth, supabase, requestId: protectedRequestId } = protectedRequest;
+    requestId = protectedRequestId;
 
     const { goal, deadline, clarificationAnswers, epicContext, timelineContext, adjustmentRequest, previousSchedule } = await req.json() as ScheduleRequest;
 
@@ -134,6 +146,18 @@ serve(async (req) => {
     if (!OPENAI_API_KEY) {
       throw new Error('OPENAI_API_KEY is not configured');
     }
+
+    const costGuardrails = createCostGuardrailSession({
+      supabase,
+      endpointKey: "generate-journey-schedule",
+      featureKey: "ai_planner_text",
+      userId: auth.isServiceRole ? null : auth.userId,
+    });
+    const guardedFetch = costGuardrails.wrapFetch(fetch);
+    await costGuardrails.enforceAccess({
+      capabilities: ["text"],
+      providers: ["openai"],
+    });
 
     // Calculate days until deadline
     const deadlineDate = new Date(deadline);
@@ -312,7 +336,7 @@ ${timelineContext ? '9. Adjust the schedule based on the user\'s context (existi
 
     console.log('Generating journey schedule for goal:', goal, 'deadline:', deadline, 'days:', daysAvailable, 'context:', timelineContext);
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await guardedFetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${OPENAI_API_KEY}`,
@@ -461,10 +485,15 @@ ${timelineContext ? '9. Adjust the schedule based on the user\'s context (existi
     );
 
   } catch (error) {
+    if (isCostGuardrailBlockedError(error)) {
+      return buildCostGuardrailBlockedResponse(error, corsHeaders);
+    }
     console.error('Error generating journey schedule:', error);
-    return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return createSafeErrorResponse(req, {
+      status: 500,
+      code: "INTERNAL_ERROR",
+      error: "Request could not be processed right now",
+      requestId,
+    });
   }
 });

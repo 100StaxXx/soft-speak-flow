@@ -4,6 +4,12 @@ installOpenAICompatibilityShim();
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
+import { checkRateLimit, createRateLimitResponse, RATE_LIMITS } from "../_shared/rateLimiter.ts";
+import {
+  buildCostGuardrailBlockedResponse,
+  createCostGuardrailSession,
+  isCostGuardrailBlockedError,
+} from "../_shared/costGuardrails.ts";
 import {
   getCompanionFastRetryLimits,
   isCompanionFastPathEligible,
@@ -416,12 +422,13 @@ async function fetchWithTimeout(
   init: RequestInit,
   timeoutMs: number,
   timeoutCode: TimeoutCode,
+  fetchImpl: typeof fetch = fetch,
 ): Promise<Response> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    return await fetch(input, {
+    return await fetchImpl(input, {
       ...init,
       signal: controller.signal,
     });
@@ -542,6 +549,31 @@ serve(async (req) => {
     }
 
     console.log(`User authenticated: ${user.id}`);
+    const costGuardrails = createCostGuardrailSession({
+      supabase,
+      endpointKey: "generate-companion-image",
+      featureKey: "ai_companion_images",
+      userId: user.id,
+    });
+    const guardedFetch = costGuardrails.wrapFetch(fetch);
+    await costGuardrails.enforceAccess({
+      capabilities: ["image", "text"],
+      providers: ["openai"],
+    });
+
+    const rateLimit = await checkRateLimit(
+      supabase,
+      user.id,
+      'generate-companion-image',
+      RATE_LIMITS['companion-image'],
+    );
+
+    if (!rateLimit.allowed) {
+      return timedResponse(
+        createRateLimitResponse(rateLimit, corsHeaders),
+        "rate_limit_blocked",
+      );
+    }
 
     const {
       spiritAnimal,
@@ -693,6 +725,7 @@ serve(async (req) => {
             },
             AUXILIARY_FETCH_TIMEOUT_MS,
             "AI_TIMEOUT",
+            guardedFetch,
           );
 
           if (analysisResponse.ok) {
@@ -951,6 +984,7 @@ Slightly brighter exposure with lifted midtones and clearer highlights for reada
           },
           GENERATION_FETCH_TIMEOUT_MS,
           "GENERATION_TIMEOUT",
+          guardedFetch,
         );
         generationCallDurationMs += Date.now() - generationAttemptStartedAt;
       } catch (fetchError) {
@@ -1087,6 +1121,7 @@ Score each aspect from 0-100 and list any issues.`;
           },
           AUXILIARY_FETCH_TIMEOUT_MS,
           "AI_TIMEOUT",
+          guardedFetch,
         );
         qualityCallDurationMs += Date.now() - qualityStartedAt;
         console.log(`[CompanionImageTiming] quality_attempt_ms=${Date.now() - qualityStartedAt} attempt=${currentAttempt + 1}`);
@@ -1211,6 +1246,12 @@ Score each aspect from 0-100 and list any issues.`;
     );
 
   } catch (error) {
+    if (isCostGuardrailBlockedError(error)) {
+      return timedResponse(
+        buildCostGuardrailBlockedResponse(error, corsHeaders),
+        "cost_guardrail_blocked",
+      );
+    }
     if (isTimedRequestError(error)) {
       return timedResponse(
         new Response(

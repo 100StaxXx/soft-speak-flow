@@ -1,7 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
-import { requireRequestAuth } from "../_shared/auth.ts";
+import { requireInternalRequest, type InternalRequestAuth } from "../_shared/auth.ts";
+import { invokeInternalFunction } from "../_shared/internalFunctionAuth.ts";
 import {
   buildTranscriptionFailurePayload,
   buildTranscriptSyncPlan,
@@ -9,7 +10,30 @@ import {
   type LibraryTranscriptRow,
 } from "./syncLogic.ts";
 
-serve(async (req) => {
+interface SyncDailyPepTalkTranscriptDeps {
+  authenticate: (req: Request, corsHeaders: HeadersInit) => Promise<InternalRequestAuth | Response>;
+  createSupabaseClient: () => any;
+  invokeTranscribeAudio: (payload: Record<string, unknown>) => Promise<Response>;
+}
+
+const defaultDeps: SyncDailyPepTalkTranscriptDeps = {
+  authenticate: requireInternalRequest,
+  createSupabaseClient: () => {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!supabaseUrl || !supabaseServiceRoleKey) {
+      throw new Error("Backend configuration missing");
+    }
+
+    return createClient(supabaseUrl, supabaseServiceRoleKey);
+  },
+  invokeTranscribeAudio: (payload) => invokeInternalFunction("transcribe-audio", payload),
+};
+
+export async function handleSyncDailyPepTalkTranscript(
+  req: Request,
+  deps: SyncDailyPepTalkTranscriptDeps = defaultDeps,
+): Promise<Response> {
   if (req.method === "OPTIONS") {
     return handleCors(req);
   }
@@ -17,23 +41,14 @@ serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
 
   try {
-    const auth = await requireRequestAuth(req, corsHeaders);
-    if (auth instanceof Response) {
-      return auth;
+    const internalAuth = await deps.authenticate(req, corsHeaders);
+    if (internalAuth instanceof Response) {
+      return internalAuth;
     }
 
     const body = await req.json().catch(() => ({}));
     const { id, mentor_slug, for_date } = body as { id?: string; mentor_slug?: string; for_date?: string };
-
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
-    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-      throw new Error("Backend configuration missing");
-    }
-    const functionApiKey = SUPABASE_ANON_KEY || SUPABASE_SERVICE_ROLE_KEY;
-
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    const supabase = deps.createSupabaseClient();
 
     // Fetch the daily pep talk row
     let pepTalk: any = null;
@@ -76,14 +91,8 @@ serve(async (req) => {
     }
 
     // Call existing transcribe-audio function to get authoritative text + timestamps
-    const transcribeResp = await fetch(`${SUPABASE_URL}/functions/v1/transcribe-audio`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-        apikey: functionApiKey,
-      },
-      body: JSON.stringify({ audioUrl: pepTalk.audio_url }),
+    const transcribeResp = await deps.invokeTranscribeAudio({
+      audioUrl: pepTalk.audio_url,
     });
 
     if (!transcribeResp.ok) {
@@ -265,4 +274,8 @@ serve(async (req) => {
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
-});
+}
+
+if (Deno.env.get("SUPABASE_FUNCTIONS_TEST") !== "1") {
+  serve((req) => handleSyncDailyPepTalkTranscript(req));
+}

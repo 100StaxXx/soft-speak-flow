@@ -4,6 +4,12 @@ installOpenAICompatibilityShim();
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { resolveCompanionImageSizeForUser } from "../_shared/companionImagePolicy.ts";
+import { requireServiceRoleAuth } from "../_shared/auth.ts";
+import {
+  buildCostGuardrailBlockedResponse,
+  createCostGuardrailSession,
+  isCostGuardrailBlockedError,
+} from "../_shared/costGuardrails.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -18,6 +24,11 @@ serve(async (req) => {
   const requestStartedAt = Date.now();
 
   try {
+    const auth = await requireServiceRoleAuth(req, corsHeaders);
+    if (auth instanceof Response) {
+      return auth;
+    }
+
     const { memorialId, companionData } = await req.json();
 
     if (!memorialId || !companionData) {
@@ -40,20 +51,30 @@ serve(async (req) => {
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const costGuardrails = createCostGuardrailSession({
+      supabase,
+      endpointKey: "generate-memorial-image",
+      featureKey: "ai_companion_images",
+      userId: typeof companionData?.user_id === "string" ? companionData.user_id : null,
+    });
+    const guardedFetch = costGuardrails.wrapFetch(fetch);
+    await costGuardrails.enforceAccess({
+      capabilities: ["image"],
+      providers: ["openai"],
+    });
 
-    const { 
-      companion_name, 
-      spirit_animal, 
-      core_element, 
+    const {
+      companion_name,
+      spirit_animal,
+      core_element,
       final_image_url,
       days_together,
       final_evolution_stage,
-      death_cause 
+      death_cause,
     } = companionData;
 
     console.log(`[Memorial Image] Generating memorial for ${companion_name} the ${spirit_animal}`);
 
-    // Generate a peaceful, ethereal memorial portrait
     const memorialPrompt = `Create a beautiful, ethereal memorial portrait of this creature:
 - Transform the creature into a peaceful spirit form
 - Add soft, glowing ethereal light surrounding it
@@ -73,9 +94,8 @@ serve(async (req) => {
 
     let generatedImageUrl = final_image_url;
 
-    // Try to generate memorial image, fall back to final image if API fails
     try {
-      const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      const response = await guardedFetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${openAIApiKey}`,
@@ -86,7 +106,7 @@ serve(async (req) => {
           messages: [
             {
               role: "user",
-              content: final_image_url 
+              content: final_image_url
                 ? [
                     { type: "text", text: memorialPrompt },
                     { type: "image_url", image_url: { url: final_image_url } },
@@ -104,12 +124,11 @@ serve(async (req) => {
         const generatedImage = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
 
         if (generatedImage) {
-          // Upload to Supabase Storage
           const base64Data = generatedImage.replace(/^data:image\/\w+;base64,/, "");
-          const imageBuffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
-          
+          const imageBuffer = Uint8Array.from(atob(base64Data), (char) => char.charCodeAt(0));
+
           const fileName = `memorials/${memorialId}-${Date.now()}.png`;
-          
+
           const { error: uploadError } = await supabase.storage
             .from("companion-images")
             .upload(fileName, imageBuffer, {
@@ -123,7 +142,7 @@ serve(async (req) => {
               .getPublicUrl(fileName);
 
             generatedImageUrl = publicUrl.publicUrl;
-            console.log(`[Memorial Image] Successfully generated and uploaded memorial image`);
+            console.log("[Memorial Image] Successfully generated and uploaded memorial image");
           } else {
             console.error("[Memorial Image] Upload error:", uploadError);
           }
@@ -135,7 +154,6 @@ serve(async (req) => {
       console.error("[Memorial Image] API error, using final image:", apiError);
     }
 
-    // Update the memorial with the generated image
     const { error: updateError } = await supabase
       .from("companion_memorials")
       .update({ memorial_image_url: generatedImageUrl })
@@ -149,18 +167,21 @@ serve(async (req) => {
     console.log(`[Memorial Image] Memorial updated for ${companion_name}`);
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
+      JSON.stringify({
+        success: true,
         imageUrl: generatedImageUrl,
-        message: `Memorial created for ${companion_name}`
+        message: `Memorial created for ${companion_name}`,
       }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (error) {
+    if (isCostGuardrailBlockedError(error)) {
+      return buildCostGuardrailBlockedResponse(error, corsHeaders);
+    }
     console.error("[Memorial Image] Error:", error);
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } finally {
     console.log(`[MemorialImageTiming] total_ms=${Date.now() - requestStartedAt}`);

@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { requireInternalRequest } from "../_shared/auth.ts";
+import { invokeInternalFunction } from "../_shared/internalFunctionAuth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -118,6 +120,11 @@ serve(async (req) => {
   }
 
   try {
+    const auth = await requireInternalRequest(req, corsHeaders);
+    if (auth instanceof Response) {
+      return auth;
+    }
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -945,8 +952,8 @@ async function handleInactiveDay(
   // Trigger neglected image at 3 days
   if (newInactiveDays === 3 && !companion.neglected_image_url && companion.current_image_url) {
     try {
-      await supabase.functions.invoke("generate-neglected-companion-image", {
-        body: { companionId: companion.id, userId: companion.user_id },
+      await invokeInternalFunction("generate-neglected-companion-image", {
+        companionId: companion.id,
       });
     } catch (e) {
       console.error(`Failed to trigger neglected image:`, e);
@@ -977,8 +984,8 @@ async function enterDormancy(supabase: any, companion: UserCompanion, today: str
     .eq("id", companion.id);
 
   try {
-    await supabase.functions.invoke("generate-dormant-companion-image", {
-      body: { companionId: companion.id, userId: companion.user_id },
+    await invokeInternalFunction("generate-dormant-companion-image", {
+      companionId: companion.id,
     });
   } catch (e) {
     console.error(`Failed to trigger dormant image:`, e);

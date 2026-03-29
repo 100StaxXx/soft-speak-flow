@@ -112,9 +112,7 @@ export const useWeeklyRecap = () => {
     mutationFn: async () => {
       if (!user?.id) throw new Error("Not authenticated");
 
-      const { data, error } = await supabase.functions.invoke("generate-weekly-recap", {
-        body: { userId: user.id },
-      });
+      const { data, error } = await supabase.functions.invoke("generate-weekly-recap");
 
       if (error) throw error;
       return data;
@@ -128,10 +126,9 @@ export const useWeeklyRecap = () => {
   // Mark as viewed mutation
   const markViewedMutation = useMutation({
     mutationFn: async (recapId: string) => {
-      const { error } = await supabase
-        .from("weekly_recaps")
-        .update({ viewed_at: new Date().toISOString() })
-        .eq("id", recapId);
+      const { error } = await supabase.rpc("mark_weekly_recap_viewed", {
+        p_recap_id: recapId,
+      });
 
       if (error) throw error;
     },

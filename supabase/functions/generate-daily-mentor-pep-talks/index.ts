@@ -1,8 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
-import { requireRequestAuth } from "../_shared/auth.ts";
+import { requireInternalRequest } from "../_shared/auth.ts";
 import { summarizeFunctionInvokeError } from "../_shared/functionInvokeError.ts";
+import { invokeInternalFunction } from "../_shared/internalFunctionAuth.ts";
 import { ACTIVE_MENTOR_SLUGS, selectThemeForDate } from "../_shared/mentorPepTalkConfig.ts";
 import {
   buildReadyTranscriptState,
@@ -10,6 +11,11 @@ import {
   parseTranscriptSyncPayload,
   TRANSCRIPT_STATUS_PENDING,
 } from "../_shared/transcriptRetryState.ts";
+import {
+  buildCostGuardrailBlockedResponse,
+  createCostGuardrailSession,
+  isCostGuardrailBlockedError,
+} from "../_shared/costGuardrails.ts";
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -19,16 +25,9 @@ serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
 
   try {
-    const auth = await requireRequestAuth(req, corsHeaders);
+    const auth = await requireInternalRequest(req, corsHeaders);
     if (auth instanceof Response) {
       return auth;
-    }
-
-    if (!auth.isServiceRole) {
-      return new Response(
-        JSON.stringify({ error: "Forbidden" }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
     }
 
     console.log('Starting daily mentor pep talk generation...');
@@ -36,6 +35,15 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const costGuardrails = createCostGuardrailSession({
+      supabase,
+      endpointKey: "generate-daily-mentor-pep-talks",
+      featureKey: "ai_pep_talks",
+    });
+    await costGuardrails.enforceAccess({
+      capabilities: ["text", "tts"],
+      providers: ["openai", "elevenlabs"],
+    });
 
     // Get today's date in UTC
     const today = new Date();
@@ -91,21 +99,18 @@ serve(async (req) => {
 
         // Generate pep talk using existing function
         console.log(`Calling generate-full-mentor-audio for ${mentorSlug}...`);
-        const { data: generatedData, error: generateError } = await supabase.functions.invoke(
-          'generate-full-mentor-audio',
-          {
-            body: {
-              mentorSlug: mentorSlug,
-              topic_category: theme.topic_category,
-              intensity: theme.intensity,
-              emotionalTriggers: theme.triggers
-            }
-          }
-        );
+        const generateResponse = await invokeInternalFunction("generate-full-mentor-audio", {
+          mentorSlug,
+          topic_category: theme.topic_category,
+          intensity: theme.intensity,
+          emotionalTriggers: theme.triggers,
+        });
+        const generateRaw = await generateResponse.text();
+        const generatedData = generateRaw.length > 0 ? JSON.parse(generateRaw) : null;
 
-        if (generateError || !generatedData) {
-          console.error(`Error generating audio for ${mentorSlug}:`, generateError);
-          errors.push({ mentor: mentorSlug, error: generateError?.message || 'Generation failed' });
+        if (!generateResponse.ok || !generatedData) {
+          console.error(`Error generating audio for ${mentorSlug}:`, generateRaw);
+          errors.push({ mentor: mentorSlug, error: generateRaw || 'Generation failed' });
           continue;
         }
 
@@ -190,16 +195,18 @@ serve(async (req) => {
         // Sync transcript for the daily pep talk to enable word-by-word highlighting
         try {
           console.log(`Syncing transcript for daily pep talk ${dailyPepTalk.id}...`);
-          const { data: syncData, error: syncError } = await supabase.functions.invoke('sync-daily-pep-talk-transcript', {
-            body: { id: dailyPepTalk.id }
+          const syncResponse = await invokeInternalFunction("sync-daily-pep-talk-transcript", {
+            id: dailyPepTalk.id,
           });
+          const syncRaw = await syncResponse.text();
+          const syncData = syncRaw.length > 0 ? JSON.parse(syncRaw) : null;
 
-          if (syncError) {
-            const summary = await summarizeFunctionInvokeError(syncError);
+          if (!syncResponse.ok) {
+            const summary = await summarizeFunctionInvokeError(new Error(syncRaw || `HTTP ${syncResponse.status}`));
             console.error(`Transcript sync returned error for ${mentorSlug}:`, summary);
             const retryState = buildRetryTranscriptState({
               currentAttemptCount,
-              errorMessage: typeof summary === "string" ? summary : "Transcript sync returned error",
+              errorMessage: summary.body ?? summary.message,
             });
             await persistTranscriptState(retryState.update);
           } else {
@@ -240,7 +247,7 @@ serve(async (req) => {
           console.error(`Failed to sync transcript for ${mentorSlug}:`, summary);
           const retryState = buildRetryTranscriptState({
             currentAttemptCount,
-            errorMessage: typeof summary === "string" ? summary : "Transcript sync threw",
+            errorMessage: summary.body ?? summary.message,
           });
           await persistTranscriptState(retryState.update);
           // Non-blocking - continue even if transcript sync fails
@@ -277,6 +284,9 @@ serve(async (req) => {
     );
 
   } catch (error) {
+    if (isCostGuardrailBlockedError(error)) {
+      return buildCostGuardrailBlockedResponse(error, corsHeaders);
+    }
     console.error('Fatal error in daily generation:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return new Response(

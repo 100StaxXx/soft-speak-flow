@@ -110,8 +110,44 @@ function loadDotEnv(filePath) {
   return values;
 }
 
+function loadDotEnvFiles(filePaths) {
+  return filePaths.reduce((acc, filePath) => ({
+    ...acc,
+    ...loadDotEnv(filePath),
+  }), {});
+}
+
 function getEnvValue(key, dotenv) {
   return process.env[key] || dotenv[key] || null;
+}
+
+function isTruthyEnvValue(value) {
+  return ["1", "true", "yes", "on"].includes(String(value || "").trim().toLowerCase());
+}
+
+function hasEndpointKillSwitch(dotenv, endpointName) {
+  const raw = getEnvValue("COST_KILL_SWITCH_ENDPOINTS", dotenv) || "";
+  const endpoints = raw
+    .split(",")
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+  return endpoints.includes(String(endpointName).trim().toLowerCase());
+}
+
+function getCostGuardrailBlock(dotenv) {
+  if (isTruthyEnvValue(getEnvValue("COST_KILL_SWITCH_ALL", dotenv))) {
+    return "COST_KILL_SWITCH_ALL";
+  }
+  if (isTruthyEnvValue(getEnvValue("COST_KILL_SWITCH_TRANSCRIPTION", dotenv))) {
+    return "COST_KILL_SWITCH_TRANSCRIPTION";
+  }
+  if (
+    hasEndpointKillSwitch(dotenv, "sync-daily-pep-talk-transcript") ||
+    hasEndpointKillSwitch(dotenv, "transcribe-audio")
+  ) {
+    return "COST_KILL_SWITCH_ENDPOINTS(sync-daily-pep-talk-transcript|transcribe-audio)";
+  }
+  return null;
 }
 
 function isMissingTranscript(transcript) {
@@ -143,8 +179,8 @@ async function fetchMissingRows({ supabaseUrl, serviceKey, apiKey, batchSize, of
 
   const response = await fetch(endpoint, {
     headers: {
-      apikey: apiKey,
-      Authorization: `Bearer ${apiKey}`,
+      apikey: serviceKey,
+      Authorization: `Bearer ${serviceKey}`,
     },
   });
 
@@ -157,13 +193,13 @@ async function fetchMissingRows({ supabaseUrl, serviceKey, apiKey, batchSize, of
   return Array.isArray(rows) ? rows.filter((row) => isMissingTranscript(row.transcript)) : [];
 }
 
-async function invokeTranscriptSync({ supabaseUrl, serviceKey, apiKey, pepTalkId }) {
+async function invokeTranscriptSync({ supabaseUrl, functionAuthKey, publishableKey, pepTalkId }) {
   const response = await fetch(new URL("/functions/v1/sync-daily-pep-talk-transcript", supabaseUrl), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      apikey: apiKey,
-      Authorization: `Bearer ${serviceKey}`,
+      apikey: publishableKey,
+      "x-internal-key": functionAuthKey,
     },
     body: JSON.stringify({ id: pepTalkId }),
   });
@@ -224,27 +260,38 @@ function formatUsage() {
 
 async function main() {
   const args = parseCliArgs(process.argv.slice(2));
-  const dotenv = loadDotEnv(path.resolve(process.cwd(), ".env"));
+  const dotenv = loadDotEnvFiles([
+    path.resolve(process.cwd(), ".env"),
+    path.resolve(process.cwd(), ".env.local"),
+  ]);
+  const costGuardrailBlock = getCostGuardrailBlock(dotenv);
+  if (costGuardrailBlock) {
+    console.log("Skipping transcript backfill because a cost guardrail is active.", {
+      reason: costGuardrailBlock,
+    });
+    return;
+  }
 
-  const supabaseUrl =
-    getEnvValue("SUPABASE_URL", dotenv) ||
-    getEnvValue("VITE_SUPABASE_URL", dotenv);
-  const serviceKey =
-    getEnvValue("SUPABASE_SERVICE_ROLE_KEY", dotenv) ||
-    getEnvValue("VITE_SUPABASE_SERVICE_ROLE_KEY", dotenv);
-  const apiKey =
-    getEnvValue("SUPABASE_ANON_KEY", dotenv) ||
-    getEnvValue("VITE_SUPABASE_ANON_KEY", dotenv) ||
-    getEnvValue("VITE_SUPABASE_PUBLISHABLE_KEY", dotenv);
+  const supabaseUrl = getEnvValue("SUPABASE_URL", dotenv);
+  const serviceKey = getEnvValue("SUPABASE_SERVICE_ROLE_KEY", dotenv);
+  const publishableKey =
+    getEnvValue("SUPABASE_PUBLISHABLE_KEY", dotenv) ||
+    getEnvValue("SUPABASE_ANON_KEY", dotenv);
+  const functionAuthKey =
+    getEnvValue("INTERNAL_FUNCTION_SECRET", dotenv) ||
+    getEnvValue("SUPABASE_FUNCTION_AUTH_KEY", dotenv);
 
   if (!supabaseUrl) {
-    throw new Error("Missing SUPABASE_URL (or VITE_SUPABASE_URL) in env/.env");
+    throw new Error("Missing SUPABASE_URL in env/.env.local");
   }
   if (!serviceKey) {
-    throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY in env/.env");
+    throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY in env/.env.local");
   }
-  if (!apiKey) {
-    throw new Error("Missing SUPABASE_ANON_KEY or VITE_SUPABASE_PUBLISHABLE_KEY in env/.env");
+  if (!publishableKey) {
+    throw new Error("Missing SUPABASE_PUBLISHABLE_KEY or SUPABASE_ANON_KEY in env/.env.local");
+  }
+  if (!functionAuthKey) {
+    throw new Error("Missing INTERNAL_FUNCTION_SECRET or SUPABASE_FUNCTION_AUTH_KEY in env/.env.local");
   }
 
   const counters = {
@@ -273,7 +320,7 @@ async function main() {
     const rows = await fetchMissingRows({
       supabaseUrl,
       serviceKey,
-      apiKey,
+      apiKey: publishableKey,
       batchSize: args.batchSize,
       offset,
       fromDate: args.fromDate,
@@ -313,8 +360,8 @@ async function main() {
         try {
           lastResult = await invokeTranscriptSync({
             supabaseUrl,
-            serviceKey,
-            apiKey,
+            functionAuthKey,
+            publishableKey,
             pepTalkId: row.id,
           });
         } catch (error) {

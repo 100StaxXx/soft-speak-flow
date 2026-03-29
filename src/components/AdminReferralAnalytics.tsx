@@ -30,28 +30,28 @@ export const AdminReferralAnalytics = () => {
   const { data: analytics, isLoading } = useQuery({
     queryKey: ["admin-referral-analytics"],
     queryFn: async (): Promise<AnalyticsData> => {
-      // Get all referral codes
-      const { data: codes } = await supabase
-        .from("referral_codes")
-        .select("*");
+      const [{ data: codeResponse, error: codeError }, { data: payoutResponse, error: payoutError }] = await Promise.all([
+        supabase.functions.invoke("manage-referral-codes", {
+          body: { action: "list" },
+        }),
+        supabase.functions.invoke("manage-referral-payouts", {
+          body: { action: "list" },
+        }),
+      ]);
 
-      // Get all payouts
-      const { data: payouts } = await supabase
-        .from("referral_payouts")
-        .select("*");
+      if (codeError) throw codeError;
+      if (payoutError) throw payoutError;
 
-      // Get signups by referral code
+      const codes = Array.isArray(codeResponse?.codes) ? codeResponse.codes : [];
+      const payouts = Array.isArray(payoutResponse?.payouts) ? payoutResponse.payouts : [];
+
       const { data: referredProfiles } = await supabase
         .from("profiles")
         .select("referred_by_code, created_at")
         .not("referred_by_code", "is", null);
 
       const totalSignups = referredProfiles?.length || 0;
-
-      // Count conversions (profiles with subscriptions via referral)
-      const { count: totalConversions } = await supabase
-        .from("referral_payouts")
-        .select("*", { count: "exact", head: true });
+      const totalConversions = payouts.length;
 
       const conversionRate =
         totalSignups > 0
@@ -149,7 +149,7 @@ export const AdminReferralAnalytics = () => {
 
       return {
         totalSignups,
-        totalConversions: totalConversions || 0,
+        totalConversions,
         conversionRate,
         totalPaid,
         totalPending,

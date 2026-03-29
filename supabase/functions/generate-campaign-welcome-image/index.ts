@@ -4,6 +4,12 @@ installOpenAICompatibilityShim();
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { requireAuthenticatedUser } from "../_shared/auth.ts";
+import {
+  buildCostGuardrailBlockedResponse,
+  createCostGuardrailSession,
+  isCostGuardrailBlockedError,
+} from "../_shared/costGuardrails.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -17,17 +23,29 @@ serve(async (req) => {
   }
 
   try {
-    const { userId } = await req.json();
-    
-    if (!userId) {
-      throw new Error('userId is required');
+    const userAuth = await requireAuthenticatedUser(req, corsHeaders);
+    if (userAuth instanceof Response) {
+      return userAuth;
     }
+    await req.json().catch(() => ({}));
+    const userId = userAuth.userId;
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const openAIApiKey = Deno.env.get('OPENAI_API_KEY')!;
     
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const costGuardrails = createCostGuardrailSession({
+      supabase,
+      endpointKey: "generate-campaign-welcome-image",
+      featureKey: "ai_journey_images",
+      userId: userId,
+    });
+    const guardedFetch = costGuardrails.wrapFetch(fetch);
+    await costGuardrails.enforceAccess({
+      capabilities: ["image"],
+      providers: ["openai"],
+    });
     
     // Check if user already has a cached welcome image
     const { data: existingImage } = await supabase
@@ -49,7 +67,7 @@ serve(async (req) => {
     // Generate the image using OpenAI with next-gen model for higher quality
     const prompt = `9:16 portrait aspect ratio full-screen mobile wallpaper. Mystical cosmic adventure scene - a glowing ethereal portal gateway at center-bottom third, surrounded by swirling nebula clouds in deep purples, cosmic blues, and subtle pink hues. Starfield with sparkling stars, floating magical particles, mystical path leading to the portal. Fantasy adventure theme, atmospheric depth, cinematic lighting. No text, no characters, no UI elements. Ultra high resolution, 4K quality, sharp details, professional digital art. Dreamy ethereal fantasy art style.`;
     
-    const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+    const aiResponse = await guardedFetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${openAIApiKey}`,
@@ -129,6 +147,9 @@ serve(async (req) => {
     );
     
   } catch (error: unknown) {
+    if (isCostGuardrailBlockedError(error)) {
+      return buildCostGuardrailBlockedResponse(error, corsHeaders);
+    }
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('Error generating welcome image:', errorMessage);
     return new Response(

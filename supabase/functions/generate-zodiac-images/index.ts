@@ -3,6 +3,13 @@ installOpenAICompatibilityShim();
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
+import { requireServiceRoleAuth } from "../_shared/auth.ts";
+import {
+  buildCostGuardrailBlockedResponse,
+  createCostGuardrailSession,
+  createCostGuardrailSupabaseClient,
+  isCostGuardrailBlockedError,
+} from "../_shared/costGuardrails.ts";
 
 const zodiacPrompts = [
   { sign: "aries", prompt: "A white ram with curved horns in a dynamic leaping pose, white line art illustration on dark purple starry background, simple elegant silhouette style" },
@@ -26,6 +33,11 @@ serve(async (req) => {
 
   const corsHeaders = getCorsHeaders(req);
 
+  const auth = await requireServiceRoleAuth(req, corsHeaders);
+  if (auth instanceof Response) {
+    return auth;
+  }
+
   try {
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
     if (!OPENAI_API_KEY) {
@@ -38,8 +50,18 @@ serve(async (req) => {
     if (!zodiacData) {
       throw new Error(`Invalid zodiac sign: ${zodiacSign}`);
     }
+    const costGuardrails = createCostGuardrailSession({
+      supabase: createCostGuardrailSupabaseClient(),
+      endpointKey: "generate-zodiac-images",
+      featureKey: "ai_journey_images",
+    });
+    const guardedFetch = costGuardrails.wrapFetch(fetch);
+    await costGuardrails.enforceAccess({
+      capabilities: ["image"],
+      providers: ["openai"],
+    });
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const response = await guardedFetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${OPENAI_API_KEY}`,
@@ -85,13 +107,16 @@ serve(async (req) => {
       }
     );
   } catch (error) {
+    if (isCostGuardrailBlockedError(error)) {
+      return buildCostGuardrailBlockedResponse(error, corsHeaders);
+    }
     console.error('Error generating zodiac image:', error);
-    const corsHeaders = getCorsHeaders(req);
+    const errorCorsHeaders = getCorsHeaders(req);
     return new Response(
       JSON.stringify({ error: String(error) }),
       {
         status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...errorCorsHeaders, 'Content-Type': 'application/json' },
       }
     );
   }

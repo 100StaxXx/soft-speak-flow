@@ -18,7 +18,7 @@ export const useJourneyPathImage = (epicId: string | undefined) => {
 
   // Fetch the latest journey path for this epic
   const { data: journeyPath, isLoading, error } = useQuery({
-    queryKey: ["journey-path", epicId],
+    queryKey: ["journey-path", epicId, user?.id],
     queryFn: async () => {
       if (!epicId || !user?.id) return null;
 
@@ -26,6 +26,7 @@ export const useJourneyPathImage = (epicId: string | undefined) => {
         .from("epic_journey_paths")
         .select("*")
         .eq("epic_id", epicId)
+        .eq("user_id", user.id)
         .order("milestone_index", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -50,7 +51,6 @@ export const useJourneyPathImage = (epicId: string | undefined) => {
         body: {
           epicId,
           milestoneIndex,
-          userId: user.id,
         },
       });
 
@@ -60,7 +60,7 @@ export const useJourneyPathImage = (epicId: string | undefined) => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["journey-path", epicId] });
+      queryClient.invalidateQueries({ queryKey: ["journey-path", epicId, user?.id] });
     },
     onError: (error) => {
       console.error("Failed to generate journey path:", error);

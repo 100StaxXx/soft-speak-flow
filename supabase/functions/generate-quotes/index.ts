@@ -3,7 +3,7 @@ installOpenAICompatibilityShim();
 
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { checkRateLimit, RATE_LIMITS, createRateLimitResponse } from "../_shared/rateLimiter.ts";
+import { applyAbuseProtection, createSafeErrorResponse, getClientIpAddress } from "../_shared/abuseProtection.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -29,6 +29,20 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
+    const protection = await applyAbuseProtection(req, supabase, {
+      profileKey: "ai.standard",
+      endpointName: "generate-quotes",
+      requestId: crypto.randomUUID(),
+      ipAddress: getClientIpAddress(req),
+      blockedMessage: "Too many AI requests. Please try again later.",
+      metadata: {
+        flow: "generate_quotes",
+      },
+    });
+
+    if (protection instanceof Response) {
+      return protection;
+    }
 
     // Parse and validate input
     let rawBody;
@@ -51,10 +65,6 @@ Deno.serve(async (req) => {
     }
 
     const { type, value, count } = parseResult.data;
-
-    // Rate limit check (anonymous but still limit by IP-based estimation via service call count)
-    // Note: For authenticated endpoints, we'd use userId
-    const rateLimitConfig = RATE_LIMITS['generate-quotes'] || { maxCalls: 20, windowHours: 24 };
 
     console.log('Generating quotes for:', { type, value, count });
 
@@ -129,10 +139,11 @@ Deno.serve(async (req) => {
     });
   } catch (err: any) {
     console.error('generate-quotes error:', err);
-    return new Response(JSON.stringify({ error: err?.message || 'Unknown error' }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    return createSafeErrorResponse(req, {
       status: 500,
+      code: "GENERATE_QUOTES_FAILED",
+      error: "Unable to generate quotes right now.",
+      requestId: crypto.randomUUID(),
     });
   }
 });
-

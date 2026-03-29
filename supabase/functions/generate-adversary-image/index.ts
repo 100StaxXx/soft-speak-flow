@@ -4,6 +4,11 @@ installOpenAICompatibilityShim();
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { requireRequestAuth } from "../_shared/auth.ts";
+import {
+  buildCostGuardrailBlockedResponse,
+  createCostGuardrailSession,
+  isCostGuardrailBlockedError,
+} from "../_shared/costGuardrails.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -125,11 +130,15 @@ Style requirements:
 - Professional game asset quality`;
 };
 
-const generateImage = async (prompt: string, openAiApiKey: string): Promise<string> => {
+const generateImage = async (
+  prompt: string,
+  openAiApiKey: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<string> => {
   const abortController = new AbortController();
   const timeoutHandle = setTimeout(() => abortController.abort(), IMAGE_GENERATION_TIMEOUT_MS);
 
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+  const response = await fetchImpl("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${openAiApiKey}`,
@@ -229,6 +238,7 @@ serve(async (req) => {
   }
 
   try {
+    let resolvedUserId: string | null = null;
     const bearerToken = extractBearerToken(req);
     const auth = await requireRequestAuth(req, corsHeaders);
     if (auth instanceof Response) {
@@ -236,6 +246,8 @@ serve(async (req) => {
       if (!serviceRoleFromJwt) {
         return auth;
       }
+    } else if (!auth.isServiceRole) {
+      resolvedUserId = auth.userId;
     }
 
     const body = await req.json();
@@ -257,6 +269,17 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const costGuardrails = createCostGuardrailSession({
+      supabase,
+      endpointKey: "generate-adversary-image",
+      featureKey: "ai_journey_images",
+      userId: resolvedUserId,
+    });
+    const guardedFetch = costGuardrails.wrapFetch(fetch);
+    await costGuardrails.enforceAccess({
+      capabilities: ["image"],
+      providers: ["openai"],
+    });
 
     const { data: cachedImages, error: cachedImagesError } = await supabase
       .from("adversary_images")
@@ -341,7 +364,7 @@ serve(async (req) => {
     for (const missingVariantIndex of missingVariantIndexes) {
       try {
         const prompt = buildPrompt(theme, tier, name, missingVariantIndex, effectiveTargetVariants);
-        const imageUrl = await generateImage(prompt, openAiApiKey as string);
+        const imageUrl = await generateImage(prompt, openAiApiKey as string, guardedFetch);
         generatedVariants += 1;
 
         variantsByIndex.set(missingVariantIndex, {
@@ -405,6 +428,9 @@ serve(async (req) => {
       generatedVariants,
     });
   } catch (error) {
+    if (isCostGuardrailBlockedError(error)) {
+      return buildCostGuardrailBlockedResponse(error, corsHeaders);
+    }
     console.error("Error generating adversary image:", error);
     return toResponse({ error: error instanceof Error ? error.message : "Unknown error" }, 500);
   }

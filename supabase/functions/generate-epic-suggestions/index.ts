@@ -2,7 +2,12 @@ import { installOpenAICompatibilityShim } from "../_shared/aiClient.ts";
 installOpenAICompatibilityShim();
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { requireRequestAuth } from "../_shared/auth.ts";
+import { createSafeErrorResponse, requireProtectedRequest } from "../_shared/abuseProtection.ts";
+import {
+  buildCostGuardrailBlockedResponse,
+  createCostGuardrailSession,
+  isCostGuardrailBlockedError,
+} from "../_shared/costGuardrails.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -77,25 +82,46 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  let requestId: string = crypto.randomUUID();
+
   try {
-    const auth = await requireRequestAuth(req, corsHeaders);
-    if (auth instanceof Response) {
-      return auth;
+    const protectedRequest = await requireProtectedRequest(req, {
+      profileKey: "ai.standard",
+      endpointName: "generate-epic-suggestions",
+    });
+    if (protectedRequest instanceof Response) {
+      return protectedRequest;
     }
+    const { auth, supabase, requestId: protectedRequestId } = protectedRequest;
+    requestId = protectedRequestId;
 
     const { goal, deadline, targetDays, clarificationAnswers, epicContext, timelineAnalysis } = await req.json() as GenerateRequest;
 
     if (!goal || goal.trim().length < 3) {
-      return new Response(
-        JSON.stringify({ error: 'Goal must be at least 3 characters' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return createSafeErrorResponse(req, {
+        status: 400,
+        code: "INVALID_INPUT",
+        error: "Goal must be at least 3 characters",
+        requestId,
+      });
     }
 
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
     if (!OPENAI_API_KEY) {
       throw new Error('OPENAI_API_KEY is not configured');
     }
+
+    const costGuardrails = createCostGuardrailSession({
+      supabase,
+      endpointKey: "generate-epic-suggestions",
+      featureKey: "ai_planner_text",
+      userId: auth.isServiceRole ? null : auth.userId,
+    });
+    const guardedFetch = costGuardrails.wrapFetch(fetch);
+    await costGuardrails.enforceAccess({
+      capabilities: ["text"],
+      providers: ["openai"],
+    });
 
     // Calculate duration context
     let durationContext = '';
@@ -252,7 +278,7 @@ Generate practical, specific suggestions that will help achieve this goal. Make 
 
     console.log('Generating suggestions for goal:', goal, 'context:', epicContext, 'answers:', clarificationAnswers, 'timeline:', timelineAnalysis);
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await guardedFetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${OPENAI_API_KEY}`,
@@ -380,10 +406,15 @@ Generate practical, specific suggestions that will help achieve this goal. Make 
     );
 
   } catch (error) {
+    if (isCostGuardrailBlockedError(error)) {
+      return buildCostGuardrailBlockedResponse(error, corsHeaders);
+    }
     console.error('Error generating epic suggestions:', error);
-    return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return createSafeErrorResponse(req, {
+      status: 500,
+      code: "INTERNAL_ERROR",
+      error: "Request could not be processed right now",
+      requestId,
+    });
   }
 });

@@ -2,8 +2,13 @@ import { installOpenAICompatibilityShim } from "../_shared/aiClient.ts";
 installOpenAICompatibilityShim();
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { QUEST_XP_REWARDS } from "../../../src/config/xpRewards.ts";
+import { createSafeErrorResponse, requireProtectedRequest } from "../_shared/abuseProtection.ts";
+import {
+  buildCostGuardrailBlockedResponse,
+  createCostGuardrailSession,
+  isCostGuardrailBlockedError,
+} from "../_shared/costGuardrails.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -99,29 +104,32 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  let requestId: string = crypto.randomUUID();
+
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "No authorization header" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    const protectedRequest = await requireProtectedRequest(req, {
+      profileKey: "ai.standard",
+      endpointName: "generate-daily-plan",
+      allowServiceRole: false,
+    });
+    if (protectedRequest instanceof Response) {
+      return protectedRequest;
     }
+    const { auth, supabase, requestId: protectedRequestId } = protectedRequest;
+    requestId = protectedRequestId;
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
-    // Get user from token
-    const token = authHeader.replace("Bearer ", "");
-    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
-    
-    if (userError || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    const user = { id: auth.userId };
+    const costGuardrails = createCostGuardrailSession({
+      supabase,
+      endpointKey: "generate-daily-plan",
+      featureKey: "ai_planner_text",
+      userId: user.id,
+    });
+    const guardedFetch = costGuardrails.wrapFetch(fetch);
+    await costGuardrails.enforceAccess({
+      capabilities: ["text"],
+      providers: ["openai"],
+    });
 
     const body: RequestBody = await req.json();
     const { energyLevel, dayType, focusArea } = body;
@@ -234,7 +242,7 @@ Available habits with streaks: ${habitsToProtect.length > 0 ? habitsToProtect.ma
       throw new Error("OPENAI_API_KEY not configured");
     }
 
-    const aiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+    const aiResponse = await guardedFetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${OPENAI_API_KEY}`,
@@ -373,10 +381,15 @@ Available habits with streaks: ${habitsToProtect.length > 0 ? habitsToProtect.ma
     });
 
   } catch (error) {
+    if (isCostGuardrailBlockedError(error)) {
+      return buildCostGuardrailBlockedResponse(error, corsHeaders);
+    }
     console.error("Error in generate-daily-plan:", error);
-    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }), {
+    return createSafeErrorResponse(req, {
       status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      code: "INTERNAL_ERROR",
+      error: "Request could not be processed right now",
+      requestId,
     });
   }
 });

@@ -8,8 +8,8 @@ export type PromoCodeFailureReason =
   | "expired"
   | "unauthorized"
   | "already_active"
+  | "rate_limited"
   | "unknown";
-
 type PromoCodeRpcResult = {
   success: boolean;
   status: string;
@@ -34,6 +34,7 @@ const toFailureReason = (status: string | null | undefined): PromoCodeFailureRea
     case "expired":
     case "unauthorized":
     case "already_active":
+    case "rate_limited":
       return status;
     default:
       return "unknown";
@@ -55,22 +56,36 @@ export const usePromoCode = () => {
         throw new PromoCodeRedeemError("Enter a promo code.", "invalid");
       }
 
-      const { data, error } = await (supabase.rpc as any)(
-        "redeem_promo_code_secure",
-        {
-          p_user_id: user.id,
-          p_promo_code: normalizedCode,
+      const { data, error } = await supabase.functions.invoke("redeem-promo-code", {
+        body: {
+          promoCode: normalizedCode,
         },
-      ) as { data: PromoCodeRpcResult[] | PromoCodeRpcResult | null; error: Error | null };
+      });
 
       if (error) {
-        const backendMessage =
+        let backendMessage =
           (error as { message?: string }).message ||
           "Unable to redeem promo code right now. Please try again.";
-        throw new PromoCodeRedeemError(backendMessage, "unknown");
+        let failureReason: PromoCodeFailureReason = "unknown";
+
+        const errorWithContext = error as { context?: Response };
+        if (errorWithContext.context instanceof Response) {
+          try {
+            const errorPayload = await errorWithContext.context.json() as Partial<PromoCodeRpcResult> | null;
+            backendMessage = errorPayload?.message || backendMessage;
+            failureReason = toFailureReason(errorPayload?.status);
+          } catch {
+            if (errorWithContext.context.status === 429) {
+              backendMessage = "Too many promo redemption attempts. Please try again later.";
+              failureReason = "rate_limited";
+            }
+          }
+        }
+
+        throw new PromoCodeRedeemError(backendMessage, failureReason);
       }
 
-      const result = (Array.isArray(data) ? data[0] : data) as PromoCodeRpcResult | undefined;
+      const result = data as PromoCodeRpcResult | undefined;
       if (!result?.success) {
         throw new PromoCodeRedeemError(
           result?.message || "Unable to redeem this promo code.",

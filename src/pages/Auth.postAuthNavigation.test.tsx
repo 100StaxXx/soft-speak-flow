@@ -1,4 +1,4 @@
-import { act, render } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -179,6 +179,20 @@ describe("Auth post-auth navigation", () => {
     expect(mocks.safeNavigateMock).toHaveBeenCalledWith(expect.any(Function), "/tasks");
     expect(mocks.safeNavigateMock).toHaveBeenCalledTimes(1);
     expect(mocks.toastMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not render a guest-mode CTA", async () => {
+    mocks.getSessionMock.mockResolvedValue({
+      data: {
+        session: null,
+      },
+    });
+
+    renderAuth();
+    await flushMicrotasks();
+
+    expect(screen.queryByRole("button", { name: /continue as guest/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^sign in$/i })).toBeInTheDocument();
   });
 
   it("routes incomplete users to /onboarding when core redirect hangs and timeout fallback runs", async () => {

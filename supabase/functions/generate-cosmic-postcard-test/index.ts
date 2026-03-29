@@ -2,6 +2,9 @@ import { installOpenAICompatibilityShim } from "../_shared/aiClient.ts";
 installOpenAICompatibilityShim();
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { requireRequestAuth } from "../_shared/auth.ts";
+import { checkRateLimit, createRateLimitResponse, RATE_LIMITS } from "../_shared/rateLimiter.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -86,10 +89,32 @@ serve(async (req) => {
   }
 
   try {
+    const auth = await requireRequestAuth(req, corsHeaders);
+    if (auth instanceof Response) {
+      return auth;
+    }
+
     const { milestonePercent, sourceImageUrl, companionData } = await req.json();
 
     if (!sourceImageUrl || !milestonePercent) {
       throw new Error("Missing required fields: sourceImageUrl, milestonePercent");
+    }
+
+    if (!auth.isServiceRole) {
+      const supabase = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      );
+      const rateLimit = await checkRateLimit(
+        supabase,
+        auth.userId,
+        'generate-cosmic-postcard-test',
+        RATE_LIMITS['generate-cosmic-postcard-test'],
+      );
+
+      if (!rateLimit.allowed) {
+        return createRateLimitResponse(rateLimit, corsHeaders);
+      }
     }
 
     console.log(`[Cosmic Postcard Test] Starting for milestone ${milestonePercent}%`);

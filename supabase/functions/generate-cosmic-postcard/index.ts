@@ -4,6 +4,12 @@ installOpenAICompatibilityShim();
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { mentorNarrativeProfiles, getMentorNarrativeProfile, type MentorNarrativeProfile } from "../_shared/mentorNarrativeProfiles.ts";
+import { requireProtectedRequest } from "../_shared/abuseProtection.ts";
+import {
+  buildCostGuardrailBlockedResponse,
+  createCostGuardrailSession,
+  isCostGuardrailBlockedError,
+} from "../_shared/costGuardrails.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -153,10 +159,24 @@ serve(async (req) => {
   }
 
   try {
-    const { userId, companionId, epicId, milestonePercent, chapterNumber } = await req.json();
+    const protectedRequest = await requireProtectedRequest(req, {
+      profileKey: "ai.expensive_export",
+      endpointName: "generate-cosmic-postcard",
+      blockedMessage: "Too many postcard requests. Please try again later.",
+      metadata: {
+        flow: "generate_cosmic_postcard",
+      },
+    });
 
-    if (!userId || !companionId || !milestonePercent) {
-      throw new Error("Missing required fields: userId, companionId, milestonePercent");
+    if (protectedRequest instanceof Response) {
+      return protectedRequest;
+    }
+
+    const { companionId, epicId, milestonePercent, chapterNumber } = await req.json();
+    const userId = protectedRequest.auth.userId;
+
+    if (!companionId || !milestonePercent) {
+      throw new Error("Missing required fields: companionId, milestonePercent");
     }
 
     console.log(`[Cosmic Postcard] Starting for user ${userId}, companion ${companionId}, milestone ${milestonePercent}%, chapter ${chapterNumber || 'N/A'}`);
@@ -170,6 +190,17 @@ serve(async (req) => {
     }
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    const costGuardrails = createCostGuardrailSession({
+      supabase,
+      endpointKey: "generate-cosmic-postcard",
+      featureKey: "ai_journey_images",
+      userId,
+    });
+    const guardedFetch = costGuardrails.wrapFetch(fetch);
+    await costGuardrails.enforceAccess({
+      capabilities: ["image", "text"],
+      providers: ["openai"],
+    });
 
     // Check if postcard already exists for this milestone
     const { data: existingPostcard } = await supabase
@@ -217,11 +248,40 @@ serve(async (req) => {
     if (epicId) {
       const { data: epic, error: epicError } = await supabase
         .from('epics')
-        .select('story_seed, book_title, story_type_slug, total_chapters')
+        .select('id, user_id, story_seed, book_title, story_type_slug, total_chapters')
         .eq('id', epicId)
         .maybeSingle();
-      
-      if (!epicError && epic?.story_seed) {
+
+      if (epicError || !epic) {
+        console.error('[Cosmic Postcard] Failed to load epic:', epicError);
+        return new Response(
+          JSON.stringify({ error: "Epic not found" }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (epic.user_id !== userId) {
+        const { data: membership, error: membershipError } = await supabase
+          .from('epic_members')
+          .select('user_id')
+          .eq('epic_id', epicId)
+          .eq('user_id', userId)
+          .maybeSingle();
+
+        if (membershipError) {
+          console.error('[Cosmic Postcard] Failed to verify epic access:', membershipError);
+          throw new Error("Failed to verify epic access");
+        }
+
+        if (!membership) {
+          return new Response(
+            JSON.stringify({ error: "Not allowed to generate postcards for this epic" }),
+            { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      }
+
+      if (epic.story_seed) {
         epicData = epic;
         storySeed = epic.story_seed;
         
@@ -297,7 +357,7 @@ OUTPUT: A beautiful cosmic postcard showing THIS EXACT companion visiting ${loca
     console.log('[Cosmic Postcard] Calling Gemini image edit API...');
 
     // Use Gemini's image editing (multimodal) to place companion in scene
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const response = await guardedFetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${OPENAI_API_KEY}`,
@@ -457,7 +517,7 @@ Return ONLY the story content - no JSON, no formatting markers, just the narrati
 
       console.log('[Cosmic Postcard] Generating chapter content with mentor voice...');
       
-      const storyResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+      const storyResponse = await guardedFetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${OPENAI_API_KEY}`,
@@ -554,6 +614,9 @@ Return ONLY the story content - no JSON, no formatting markers, just the narrati
     );
 
   } catch (error) {
+    if (isCostGuardrailBlockedError(error)) {
+      return buildCostGuardrailBlockedResponse(error, corsHeaders);
+    }
     console.error('[Cosmic Postcard] Error:', error);
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),

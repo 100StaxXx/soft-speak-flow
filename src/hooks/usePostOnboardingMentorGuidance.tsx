@@ -490,7 +490,6 @@ const readRemoteProgress = (
 
 const pathIsHidden = (pathname: string) =>
   pathname === "/welcome" ||
-  pathname === "/preview" ||
   pathname.startsWith("/auth") ||
   pathname.startsWith("/onboarding");
 

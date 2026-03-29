@@ -11,22 +11,23 @@ const authState = vi.hoisted(() => ({
 const profileState = vi.hoisted(() => ({
   profile: {
     created_at: "2026-02-01T00:00:00.000Z",
-    trial_started_at: null,
-    trial_ends_at: null,
     onboarding_data: {
       guided_tutorial: { completed: false },
     },
   } as {
     created_at: string;
-    trial_started_at: string | null;
-    trial_ends_at: string | null;
     onboarding_data: Record<string, unknown>;
   },
   loading: false,
 }));
 
-const subscriptionState = vi.hoisted(() => ({
-  isActive: false,
+const accessState = vi.hoisted(() => ({
+  accessState: {
+    has_access: false,
+    access_source: "none",
+    trial_ends_at: null,
+    subscribed: false,
+  },
   isLoading: false,
 }));
 
@@ -38,8 +39,8 @@ vi.mock("@/hooks/useProfile", () => ({
   useProfile: () => profileState,
 }));
 
-vi.mock("@/hooks/useSubscription", () => ({
-  useSubscription: () => subscriptionState,
+vi.mock("@/hooks/useAccessState", () => ({
+  useAccessState: () => accessState,
 }));
 
 vi.mock("@/components/TrialExpiredPaywall", () => ({
@@ -72,14 +73,17 @@ describe("ProtectedRoute post-tutorial gating", () => {
     authState.loading = false;
     authState.status = "authenticated";
 
-    subscriptionState.isActive = false;
-    subscriptionState.isLoading = false;
+    accessState.accessState = {
+      has_access: false,
+      access_source: "none",
+      trial_ends_at: null,
+      subscribed: false,
+    };
+    accessState.isLoading = false;
 
     profileState.loading = false;
     profileState.profile = {
       created_at: "2026-02-01T00:00:00.000Z",
-      trial_started_at: null,
-      trial_ends_at: null,
       onboarding_data: {
         guided_tutorial: { completed: false },
       },
@@ -123,11 +127,15 @@ describe("ProtectedRoute post-tutorial gating", () => {
   it("still renders trial-expired gate when tutorial is not complete and trial is expired", () => {
     profileState.profile = {
       ...profileState.profile,
-      trial_started_at: "2026-01-01T00:00:00.000Z",
-      trial_ends_at: "2026-01-08T00:00:00.000Z",
       onboarding_data: {
         guided_tutorial: { completed: false },
       },
+    };
+    accessState.accessState = {
+      has_access: false,
+      access_source: "none",
+      trial_ends_at: "2026-01-08T00:00:00.000Z",
+      subscribed: false,
     };
 
     renderRoute();

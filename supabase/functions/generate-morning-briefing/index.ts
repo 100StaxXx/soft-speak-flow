@@ -1,8 +1,13 @@
 import { installOpenAICompatibilityShim } from "../_shared/aiClient.ts";
 installOpenAICompatibilityShim();
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createSafeErrorResponse, requireProtectedRequest } from "../_shared/abuseProtection.ts";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
+import {
+  buildCostGuardrailBlockedResponse,
+  createCostGuardrailSession,
+  isCostGuardrailBlockedError,
+} from "../_shared/costGuardrails.ts";
 
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
 
@@ -67,30 +72,31 @@ Deno.serve(async (req) => {
   }
 
   const corsHeaders = getCorsHeaders(req);
+  let requestId: string = crypto.randomUUID();
 
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    const protectedRequest = await requireProtectedRequest(req, {
+      profileKey: "ai.standard",
+      endpointName: "generate-morning-briefing",
+      allowServiceRole: false,
+    });
+    if (protectedRequest instanceof Response) {
+      return protectedRequest;
     }
-
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      { global: { headers: { Authorization: authHeader } } }
-    );
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
+    const { auth, supabase, requestId: protectedRequestId } = protectedRequest;
+    requestId = protectedRequestId;
+    const user = { id: auth.userId };
+    const costGuardrails = createCostGuardrailSession({
+      supabase,
+      endpointKey: "generate-morning-briefing",
+      featureKey: "ai_morning_briefing",
+      userId: user.id,
+    });
+    const guardedFetch = costGuardrails.wrapFetch(fetch);
+    await costGuardrails.enforceAccess({
+      capabilities: ["text"],
+      providers: ["openai"],
+    });
     // Resolve profile and timezone first so "today" matches the user's configured timezone.
     const { data: profile } = await supabase
       .from('profiles')
@@ -368,7 +374,7 @@ Based on this data, generate a personalized morning briefing. Infer their life g
     }
 
     // Call OpenAI GPT-5
-    const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+    const openaiResponse = await guardedFetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${OPENAI_API_KEY}`,
@@ -463,10 +469,15 @@ Based on this data, generate a personalized morning briefing. Infer their life g
     );
 
   } catch (error) {
+    if (isCostGuardrailBlockedError(error)) {
+      return buildCostGuardrailBlockedResponse(error, corsHeaders);
+    }
     console.error("Error in generate-morning-briefing:", error);
-    return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return createSafeErrorResponse(req, {
+      status: 500,
+      code: "INTERNAL_ERROR",
+      error: "Request could not be processed right now",
+      requestId,
+    });
   }
 });

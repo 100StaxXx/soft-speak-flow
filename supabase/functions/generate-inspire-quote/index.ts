@@ -3,6 +3,7 @@ installOpenAICompatibilityShim();
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
+import { requireServiceRoleAuth } from "../_shared/auth.ts";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -10,6 +11,11 @@ serve(async (req) => {
   }
 
   const corsHeaders = getCorsHeaders(req);
+
+  const auth = await requireServiceRoleAuth(req, corsHeaders);
+  if (auth instanceof Response) {
+    return auth;
+  }
 
   try {
     const { emotionalTrigger, category } = await req.json();

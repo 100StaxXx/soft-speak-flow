@@ -21,16 +21,11 @@ type XPEventMetadata = Record<string, string | number | boolean | undefined>;
 const REPEATABLE_STREAK_EVENTS = new Set(["task_complete", "habit_complete", "focus_session"]);
 
 // Helper to mark user as active (resets companion decay)
-const markUserActive = async (userId: string) => {
-  const today = new Date().toISOString().split('T')[0];
-  await supabase
-    .from('user_companion')
-    .update({
-      last_activity_date: today,
-      inactive_days: 0,
-      current_mood: 'happy',
-    })
-    .eq('user_id', userId);
+const markUserActive = async () => {
+  const { error } = await supabase.rpc("mark_companion_active");
+  if (error) {
+    throw error;
+  }
 };
 
 /**
@@ -122,7 +117,7 @@ export const useXPRewards = () => {
     try {
       // Mark user as active (resets companion decay)
       if (user?.id) {
-        markUserActive(user.id).then(() => {
+        markUserActive().then(() => {
           queryClient.invalidateQueries({ queryKey: ['companion-health'] });
         });
       }
@@ -165,7 +160,7 @@ export const useXPRewards = () => {
     
     // Mark user as active (resets companion decay)
     if (user?.id) {
-      markUserActive(user.id).then(() => {
+      markUserActive().then(() => {
         queryClient.invalidateQueries({ queryKey: ['companion-health'] });
       });
     }
@@ -180,7 +175,7 @@ export const useXPRewards = () => {
     
     // Mark user as active (resets companion decay)
     if (user?.id) {
-      markUserActive(user.id).then(() => {
+      markUserActive().then(() => {
         queryClient.invalidateQueries({ queryKey: ['companion-health'] });
       });
     }
@@ -203,7 +198,7 @@ export const useXPRewards = () => {
     try {
       // Mark user as active (resets companion decay)
       if (user?.id) {
-        markUserActive(user.id).then(() => {
+        markUserActive().then(() => {
           queryClient.invalidateQueries({ queryKey: ['companion-health'] });
         });
       }

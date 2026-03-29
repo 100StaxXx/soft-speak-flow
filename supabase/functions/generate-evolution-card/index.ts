@@ -10,6 +10,7 @@ import {
   evaluateSpiritLockTextCompliance,
   resolveCompanionSpiritLockProfile,
 } from "../_shared/companionSpiritLock.ts";
+import { checkRateLimit, createRateLimitResponse, RATE_LIMITS } from "../_shared/rateLimiter.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -103,30 +104,105 @@ serve(async (req) => {
   }
 
   try {
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      serviceRoleKey,
     );
 
-    const authHeader = req.headers.get('Authorization')!;
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user } } = await supabaseClient.auth.getUser(token);
+    const authHeader = req.headers.get('Authorization');
+    const apiKey = req.headers.get('apikey');
+    let authUserId: string | null = null;
+    const bearerToken = authHeader?.startsWith('Bearer ')
+      ? authHeader.replace('Bearer ', '')
+      : null;
 
-    if (!user) {
-      throw new Error('No user found');
+    if (bearerToken) {
+      const { data: { user } } = await supabaseClient.auth.getUser(bearerToken);
+      authUserId = user?.id ?? null;
+    }
+
+    const isServiceRoleCall =
+      authHeader === serviceRoleKey
+      || bearerToken === serviceRoleKey
+      || apiKey === serviceRoleKey;
+    if (!authUserId && !isServiceRoleCall) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     const { 
       companionId, 
       evolutionId, 
       stage, 
-      species, 
-      element, 
-      color,
+      species: requestedSpecies, 
+      element: requestedElement, 
+      color: requestedColor,
       userAttributes // vitality, wisdom, discipline, resolve, creativity, alignment
     } = await req.json();
 
-    console.log('Generating evolution card for:', { companionId, stage, species, element });
+    const { data: companionRecord, error: companionError } = await supabaseClient
+      .from('user_companion')
+      .select('id, user_id, spirit_animal, core_element, favorite_color')
+      .eq('id', companionId)
+      .maybeSingle();
+
+    if (companionError || !companionRecord) {
+      return new Response(JSON.stringify({ error: 'Companion not found' }), {
+        status: 404,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (!isServiceRoleCall && companionRecord.user_id !== authUserId) {
+      return new Response(JSON.stringify({ error: 'Forbidden' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const { data: evolutionRecord, error: evolutionError } = await supabaseClient
+      .from('companion_evolutions')
+      .select('id, companion_id, stage')
+      .eq('id', evolutionId)
+      .maybeSingle();
+
+    if (evolutionError || !evolutionRecord || evolutionRecord.companion_id !== companionId) {
+      return new Response(JSON.stringify({ error: 'Evolution not found for companion' }), {
+        status: 404,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (typeof stage === 'number' && evolutionRecord.stage !== stage) {
+      return new Response(JSON.stringify({ error: 'Evolution stage mismatch' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const user = { id: companionRecord.user_id };
+    const resolvedSpecies = companionRecord.spirit_animal || requestedSpecies;
+    const resolvedElement = companionRecord.core_element || requestedElement;
+    const resolvedColor = companionRecord.favorite_color || requestedColor;
+    const species = resolvedSpecies;
+    const element = resolvedElement;
+    const color = resolvedColor;
+
+    const rateLimit = await checkRateLimit(
+      supabaseClient,
+      user.id,
+      'generate-evolution-card',
+      RATE_LIMITS['evolution-card'],
+    );
+
+    if (!rateLimit.allowed) {
+      return createRateLimitResponse(rateLimit, corsHeaders);
+    }
+
+    console.log('Generating evolution card for:', { companionId, evolutionId, stage, species: resolvedSpecies, element: resolvedElement });
 
     // Check if this companion already has cards with a name (to maintain consistency)
     const { data: existingCards } = await supabaseClient

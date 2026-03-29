@@ -3,8 +3,12 @@ installOpenAICompatibilityShim();
 
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
-import { requireRequestAuth } from "../_shared/auth.ts";
+import { createSafeErrorResponse, requireProtectedRequest } from "../_shared/abuseProtection.ts";
+import {
+  buildCostGuardrailBlockedResponse,
+  createCostGuardrailSession,
+  isCostGuardrailBlockedError,
+} from "../_shared/costGuardrails.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -31,11 +35,18 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  let requestId: string = crypto.randomUUID();
+
   try {
-    const auth = await requireRequestAuth(req, corsHeaders);
-    if (auth instanceof Response) {
-      return auth;
+    const protectedRequest = await requireProtectedRequest(req, {
+      profileKey: "ai.expensive_export",
+      endpointName: "generate-evolution-voice",
+    });
+    if (protectedRequest instanceof Response) {
+      return protectedRequest;
     }
+    const { auth, supabase: supabaseClient, requestId: protectedRequestId } = protectedRequest;
+    requestId = protectedRequestId;
 
     const { mentorSlug, newStage, userId } = await req.json();
     const effectiveUserId = userId ?? auth.userId;
@@ -63,10 +74,17 @@ serve(async (req) => {
       );
     }
 
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    const costGuardrails = createCostGuardrailSession({
+      supabase: supabaseClient,
+      endpointKey: "generate-evolution-voice",
+      featureKey: "ai_pep_talks",
+      userId: auth.isServiceRole ? null : effectiveUserId,
+    });
+    const guardedFetch = costGuardrails.wrapFetch(fetch);
+    await costGuardrails.enforceAccess({
+      capabilities: ["text", "tts"],
+      providers: ["openai", "elevenlabs"],
+    });
 
     // Get mentor personality details
     const { data: mentor, error: mentorError } = await supabaseClient
@@ -87,7 +105,7 @@ serve(async (req) => {
     }
 
     // Generate AI voice line based on mentor personality
-    const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+    const openaiResponse = await guardedFetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
@@ -134,7 +152,7 @@ Make it personal to ${mentor.name}'s voice. Keep it SHORT and IMPACTFUL.`
     // Convert to speech using ElevenLabs
     const voiceId = MENTOR_VOICES[mentorSlug] || MENTOR_VOICES['atlas'];
     
-    const elevenLabsResponse = await fetch(
+    const elevenLabsResponse = await guardedFetch(
       `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
       {
         method: 'POST',
@@ -179,14 +197,15 @@ Make it personal to ${mentor.name}'s voice. Keep it SHORT and IMPACTFUL.`
       }
     );
   } catch (error) {
+    if (isCostGuardrailBlockedError(error)) {
+      return buildCostGuardrailBlockedResponse(error, corsHeaders);
+    }
     console.error('Error in generate-evolution-voice:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    return new Response(
-      JSON.stringify({ error: errorMessage }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
-    );
+    return createSafeErrorResponse(req, {
+      status: 500,
+      code: "INTERNAL_ERROR",
+      error: "Request could not be processed right now",
+      requestId,
+    });
   }
 });

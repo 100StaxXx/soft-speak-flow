@@ -13,8 +13,8 @@ collect_frontend() {
 }
 
 collect_internal() {
-  grep -RhoE "functions/v1/[a-z0-9-]+" --include='*.ts' --include='*.js' supabase/functions \
-    | perl -nE 'while(/functions\/v1\/([a-z0-9-]+)/g){say $1}' \
+  grep -RhoE "functions/v1/[a-z0-9-]+|invokeInternalFunction\([[:space:]]*['\"][a-z0-9-]+['\"]" --include='*.ts' --include='*.js' supabase/functions \
+    | perl -nE 'while(/functions\/v1\/([a-z0-9-]+)/g){say $1} while(/invokeInternalFunction\(\s*["\x27]([a-z0-9-]+)["\x27]/g){say $1}' \
     | sort -u
 }
 

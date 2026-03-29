@@ -14,7 +14,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
-      SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+      INTERNAL_FUNCTION_SECRET: ${{ secrets.INTERNAL_FUNCTION_SECRET }}
 
     steps:
       - name: Basic auth health check
@@ -22,7 +23,7 @@ jobs:
           set -euo pipefail
           status=$(curl -sS -o /tmp/auth-health.txt -w "%{http_code}" \
             "https://${PROJECT_REF}.supabase.co/auth/v1/health" \
-            -H "apikey: ${SERVICE_ROLE_KEY}")
+            -H "apikey: ${PUBLISHABLE_KEY}")
           echo "auth/v1/health => HTTP $status"
           cat /tmp/auth-health.txt || true
           if [ "$status" -ge 300 ]; then
@@ -58,10 +59,10 @@ jobs:
           check_unauthorized "notifications-enqueue-v2" '{}'
           check_unauthorized "notifications-dispatch-v2" '{}'
 
-      - name: Verify service-auth scheduled endpoint executes
+      - name: Verify internal scheduled endpoint executes
         run: |
           set -euo pipefail
-          check_service_function() {
+          check_internal_function() {
             local fn="$1"
             local body="$2"
             local expected_mode="${3:-}"
@@ -69,12 +70,12 @@ jobs:
 
             status=$(curl -sS -o /tmp/scheduled.json -w "%{http_code}" \
               -X POST "https://${PROJECT_REF}.supabase.co/functions/v1/${fn}" \
-              -H "Authorization: Bearer ${SERVICE_ROLE_KEY}" \
-              -H "apikey: ${SERVICE_ROLE_KEY}" \
+              -H "apikey: ${PUBLISHABLE_KEY}" \
+              -H "x-internal-key: ${INTERNAL_FUNCTION_SECRET}" \
               -H "Content-Type: application/json" \
               -d "$body")
 
-            echo "${fn} (service role) => HTTP ${status}"
+            echo "${fn} (internal) => HTTP ${status}"
             cat /tmp/scheduled.json || true
 
             if [ "$status" -ge 300 ]; then
@@ -90,6 +91,6 @@ jobs:
             fi
           }
 
-          check_service_function "notifications-enqueue-v2" '{}'
-          check_service_function "notifications-dispatch-v2" '{}' 'send'
-          check_service_function "retry-missing-pep-talk-transcripts" '{"mode":"scheduled","limit":5}'
+          check_internal_function "notifications-enqueue-v2" '{}'
+          check_internal_function "notifications-dispatch-v2" '{}' 'send'
+          check_internal_function "retry-missing-pep-talk-transcripts" '{"mode":"scheduled","limit":5}'

@@ -2,7 +2,7 @@ import { installOpenAICompatibilityShim } from "../_shared/aiClient.ts";
 installOpenAICompatibilityShim();
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createSafeErrorResponse, requireProtectedRequest } from "../_shared/abuseProtection.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -27,20 +27,21 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  try {
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
-    );
+  let requestId: string = crypto.randomUUID();
 
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+  try {
+    const protectedRequest = await requireProtectedRequest(req, {
+      profileKey: "ai.standard",
+      endpointName: "adjust-saved-daily-plan",
+      allowServiceRole: false,
+    });
+    if (protectedRequest instanceof Response) {
+      return protectedRequest;
     }
+    const { auth, requestId: protectedRequestId } = protectedRequest;
+    requestId = protectedRequestId;
+
+    const user = { id: auth.userId };
 
     const { planDate, adjustmentRequest, currentTasks } = await req.json() as {
       planDate: string;
@@ -169,11 +170,11 @@ Always return valid adjustments that reference actual task IDs from the list.`;
     });
   } catch (error) {
     console.error('Error in adjust-saved-daily-plan:', error);
-    return new Response(JSON.stringify({ 
-      error: error instanceof Error ? error.message : 'Unknown error' 
-    }), {
+    return createSafeErrorResponse(req, {
       status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      code: "INTERNAL_ERROR",
+      error: "Request could not be processed right now",
+      requestId,
     });
   }
 });

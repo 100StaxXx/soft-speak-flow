@@ -9,6 +9,8 @@ const mocks = vi.hoisted(() => {
   const eqTaskDateMock = vi.fn();
   const orderSortOrderMock = vi.fn();
   const orderCreatedAtMock = vi.fn();
+  const storageCreateSignedUrlMock = vi.fn();
+  const storageFromMock = vi.fn();
   const loadLocalDailyTasksMock = vi.fn();
   const warmDailyTasksQueryFromRemoteMock = vi.fn();
 
@@ -18,6 +20,8 @@ const mocks = vi.hoisted(() => {
     eqTaskDateMock,
     orderSortOrderMock,
     orderCreatedAtMock,
+    storageCreateSignedUrlMock,
+    storageFromMock,
     loadLocalDailyTasksMock,
     warmDailyTasksQueryFromRemoteMock,
   };
@@ -28,6 +32,9 @@ vi.mock("@/integrations/supabase/client", () => ({
     from: vi.fn(() => ({
       select: mocks.selectMock,
     })),
+    storage: {
+      from: mocks.storageFromMock,
+    },
   },
 }));
 
@@ -77,6 +84,14 @@ describe("fetchDailyTasks", () => {
     mocks.orderSortOrderMock.mockReturnValue({
       order: mocks.orderCreatedAtMock,
     });
+
+    mocks.storageFromMock.mockReturnValue({
+      createSignedUrl: mocks.storageCreateSignedUrlMock,
+    });
+    mocks.storageCreateSignedUrlMock.mockImplementation(async (filePath: string) => ({
+      data: { signedUrl: `https://signed.example/${filePath}` },
+      error: null,
+    }));
   });
 
   it("maps and sorts subtasks by sort_order", async () => {
@@ -150,7 +165,8 @@ describe("fetchDailyTasks", () => {
     expect(result).toHaveLength(1);
     expect(result[0].epic_title).toBe("Growth Sprint");
     expect(result[0].contact?.name).toBe("Jordan");
-    expect(result[0].attachments?.[0]?.fileUrl).toBe("https://example.com/att-1.png");
+    expect(result[0].attachments?.[0]?.fileUrl).toBe("https://signed.example/user/att-1.png");
+    expect(result[0].image_url).toBe("https://signed.example/user/att-1.png");
     expect(result[0].subtasks?.map((subtask) => subtask.id)).toEqual(["s1", "s2", "s3"]);
   });
 

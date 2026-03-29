@@ -2,9 +2,8 @@ import { installOpenAICompatibilityShim } from "../_shared/aiClient.ts";
 installOpenAICompatibilityShim();
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
-import { requireRequestAuth } from "../_shared/auth.ts";
+import { createSafeErrorResponse, requireProtectedRequest } from "../_shared/abuseProtection.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -39,11 +38,18 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  let requestId: string = crypto.randomUUID();
+
   try {
-    const auth = await requireRequestAuth(req, corsHeaders);
-    if (auth instanceof Response) {
-      return auth;
+    const protectedRequest = await requireProtectedRequest(req, {
+      profileKey: "ai.standard",
+      endpointName: "adjust-epic-plan",
+    });
+    if (protectedRequest instanceof Response) {
+      return protectedRequest;
     }
+    const { auth, supabase, requestId: protectedRequestId } = protectedRequest;
+    requestId = protectedRequestId;
 
     // Parse and validate input
     const rawInput = await req.json();
@@ -51,10 +57,12 @@ serve(async (req) => {
     
     if (!parseResult.success) {
       console.error("[adjust-epic-plan] Validation error:", parseResult.error.errors);
-      return new Response(
-        JSON.stringify({ error: 'Invalid input', details: parseResult.error.errors }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return createSafeErrorResponse(req, {
+        status: 400,
+        code: "INVALID_INPUT",
+        error: "Invalid input",
+        requestId,
+      });
     }
 
     const { epicId, adjustmentType, reason, newDeadline, daysToAdd, habitsToRemove, customRequest } = parseResult.data;
@@ -63,11 +71,6 @@ serve(async (req) => {
     if (!OPENAI_API_KEY) {
       throw new Error('OPENAI_API_KEY is not configured');
     }
-
-    // Initialize Supabase client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Fetch the epic with its habits
     const epicQuery = supabase
@@ -279,9 +282,11 @@ Return a JSON object with this structure:
 
   } catch (error) {
     console.error('Error generating adjustment suggestions:', error);
-    return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return createSafeErrorResponse(req, {
+      status: 500,
+      code: "INTERNAL_ERROR",
+      error: "Request could not be processed right now",
+      requestId,
+    });
   }
 });

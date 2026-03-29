@@ -5,6 +5,31 @@ export interface RequestAuth {
   isServiceRole: boolean;
 }
 
+export interface RoleAwareClient {
+  rpc: (fn: string, args?: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>;
+  from: (table: string) => {
+    select: (columns: string) => {
+      eq: (column: string, value: unknown) => {
+        eq: (column: string, value: unknown) => {
+          maybeSingle: () => Promise<{ data: unknown; error: unknown }>;
+        };
+        maybeSingle: () => Promise<{ data: unknown; error: unknown }>;
+      };
+    };
+  };
+}
+
+export interface InternalRequestAuth {
+  isInternal: true;
+}
+
+export interface UserRequestAuth {
+  userId: string;
+  isInternal: false;
+}
+
+export type UserOrInternalRequestAuth = InternalRequestAuth | UserRequestAuth;
+
 function extractProjectRef(supabaseUrl: string): string | null {
   try {
     const hostname = new URL(supabaseUrl).hostname;
@@ -67,18 +92,179 @@ async function isValidSupabaseApiKey(supabaseUrl: string, token: string): Promis
   }
 }
 
-function jsonResponse(
+export function jsonResponse(
   status: number,
-  error: string,
+  body: Record<string, unknown>,
   corsHeaders: HeadersInit,
 ): Response {
   return new Response(
-    JSON.stringify({ error }),
+    JSON.stringify(body),
     {
       status,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     },
   );
+}
+
+export function errorResponse(
+  status: number,
+  error: string,
+  corsHeaders: HeadersInit,
+): Response {
+  return jsonResponse(status, { error }, corsHeaders);
+}
+
+function createServiceRoleClient() {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+  if (!supabaseUrl || !supabaseServiceRoleKey) {
+    return null;
+  }
+
+  return createClient(supabaseUrl, supabaseServiceRoleKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  });
+}
+
+export async function hasUserRole(
+  userId: string,
+  role: string,
+): Promise<boolean> {
+  const serviceRoleClient = createServiceRoleClient();
+  if (!serviceRoleClient) {
+    throw new Error("Auth configuration missing");
+  }
+
+  const { data, error } = await serviceRoleClient
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", userId)
+    .eq("role", role)
+    .maybeSingle();
+
+  if (error) {
+    console.error(`Failed to verify ${role} role for user ${userId}:`, error);
+    return false;
+  }
+
+  return !!data;
+}
+
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+
+  let diff = 0;
+  for (let i = 0; i < a.length; i += 1) {
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+
+  return diff === 0;
+}
+
+export function extractBearerTokenFromHeader(authHeader: string | null): string | null {
+  if (!authHeader) return null;
+
+  const trimmedAuthHeader = authHeader.trim();
+  if (!trimmedAuthHeader.toLowerCase().startsWith("bearer ")) {
+    return null;
+  }
+
+  const token = trimmedAuthHeader.slice(7).trim();
+  return token.length > 0 ? token : null;
+}
+
+export function extractBearerToken(req: Request): string | null {
+  return extractBearerTokenFromHeader(req.headers.get("Authorization"));
+}
+
+async function authenticateBearerUser(
+  req: Request,
+  corsHeaders: HeadersInit,
+): Promise<UserRequestAuth | Response> {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return errorResponse(500, "Auth configuration missing", corsHeaders);
+  }
+
+  const token = extractBearerToken(req);
+  if (!token) {
+    return errorResponse(401, "Missing or invalid Authorization header", corsHeaders);
+  }
+
+  const authClient = createClient(
+    supabaseUrl,
+    supabaseAnonKey,
+    {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+    },
+  );
+
+  const { data: { user }, error } = await authClient.auth.getUser();
+  if (error || !user) {
+    return errorResponse(401, "Unauthorized", corsHeaders);
+  }
+
+  return { userId: user.id, isInternal: false };
+}
+
+export function hasInternalKey(req: Request): boolean {
+  return Boolean(req.headers.get("x-internal-key"));
+}
+
+export function isValidInternalKey(providedKey: string | null): boolean {
+  const expected = Deno.env.get("INTERNAL_FUNCTION_SECRET");
+  if (!expected || !providedKey) return false;
+  return timingSafeEqual(providedKey, expected);
+}
+
+export async function requireInternalRequest(
+  req: Request,
+  corsHeaders: HeadersInit,
+): Promise<InternalRequestAuth | Response> {
+  const expected = Deno.env.get("INTERNAL_FUNCTION_SECRET");
+  if (!expected) {
+    return errorResponse(500, "Internal auth configuration missing", corsHeaders);
+  }
+
+  const providedKey = req.headers.get("x-internal-key");
+  if (!providedKey) {
+    return errorResponse(401, "Missing x-internal-key header", corsHeaders);
+  }
+
+  if (!timingSafeEqual(providedKey, expected)) {
+    return errorResponse(403, "Forbidden", corsHeaders);
+  }
+
+  return { isInternal: true };
+}
+
+export async function requireAuthenticatedUser(
+  req: Request,
+  corsHeaders: HeadersInit,
+): Promise<UserRequestAuth | Response> {
+  return authenticateBearerUser(req, corsHeaders);
+}
+
+export async function requireUserOrInternalRequest(
+  req: Request,
+  corsHeaders: HeadersInit,
+): Promise<UserOrInternalRequestAuth | Response> {
+  const internalKey = req.headers.get("x-internal-key");
+  if (internalKey) {
+    return requireInternalRequest(req, corsHeaders);
+  }
+
+  return authenticateBearerUser(req, corsHeaders);
 }
 
 export async function requireRequestAuth(
@@ -87,7 +273,7 @@ export async function requireRequestAuth(
 ): Promise<RequestAuth | Response> {
   const authHeader = req.headers.get("Authorization");
   if (!authHeader) {
-    return jsonResponse(401, "Missing Authorization header", corsHeaders);
+    return errorResponse(401, "Missing Authorization header", corsHeaders);
   }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
@@ -95,7 +281,7 @@ export async function requireRequestAuth(
   const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    return jsonResponse(500, "Auth configuration missing", corsHeaders);
+    return errorResponse(500, "Auth configuration missing", corsHeaders);
   }
 
   const projectRef = extractProjectRef(supabaseUrl);
@@ -113,7 +299,7 @@ export async function requireRequestAuth(
   }
 
   if (!token) {
-    return jsonResponse(401, "Missing bearer token", corsHeaders);
+    return errorResponse(401, "Missing bearer token", corsHeaders);
   }
 
   // Allow other valid service-level API keys (legacy JWT service_role or sb_secret_*).
@@ -125,7 +311,7 @@ export async function requireRequestAuth(
   }
 
   if (!hasBearerPrefix) {
-    return jsonResponse(401, "Missing or invalid Authorization header", corsHeaders);
+    return errorResponse(401, "Missing or invalid Authorization header", corsHeaders);
   }
 
   const authClient = createClient(
@@ -142,8 +328,115 @@ export async function requireRequestAuth(
 
   const { data: { user }, error } = await authClient.auth.getUser();
   if (error || !user) {
-    return jsonResponse(401, "Unauthorized", corsHeaders);
+    return errorResponse(401, "Unauthorized", corsHeaders);
   }
 
   return { userId: user.id, isServiceRole: false };
+}
+
+export async function requireUserAuth(
+  req: Request,
+  corsHeaders: HeadersInit,
+): Promise<{ userId: string } | Response> {
+  const auth = await requireRequestAuth(req, corsHeaders);
+  if (auth instanceof Response) {
+    return auth;
+  }
+
+  if (auth.isServiceRole) {
+    return errorResponse(403, "Forbidden", corsHeaders);
+  }
+
+  return { userId: auth.userId };
+}
+
+export async function requireServiceRoleAuth(
+  req: Request,
+  corsHeaders: HeadersInit,
+): Promise<{ userId: "service_role" } | Response> {
+  const auth = await requireRequestAuth(req, corsHeaders);
+  if (auth instanceof Response) {
+    return auth;
+  }
+
+  if (!auth.isServiceRole) {
+    return errorResponse(403, "Forbidden", corsHeaders);
+  }
+
+  return { userId: "service_role" };
+}
+
+export async function requireAdminOrServiceRoleAuth(
+  req: Request,
+  corsHeaders: HeadersInit,
+): Promise<RequestAuth | Response> {
+  const auth = await requireRequestAuth(req, corsHeaders);
+  if (auth instanceof Response) {
+    return auth;
+  }
+
+  if (auth.isServiceRole) {
+    return auth;
+  }
+
+  const isAdmin = await hasUserRole(auth.userId, "admin");
+  if (!isAdmin) {
+    return errorResponse(403, "Admin access required", corsHeaders);
+  }
+
+  return auth;
+}
+
+export async function hasRole(
+  supabase: RoleAwareClient,
+  userId: string,
+  role: string,
+): Promise<boolean> {
+  const { data, error } = await supabase.rpc("has_role", {
+    _user_id: userId,
+    _role: role,
+  });
+
+  if (!error) {
+    return Boolean(data);
+  }
+
+  console.warn(`has_role rpc failed for ${userId}/${role}; falling back to user_roles lookup`, error);
+
+  const { data: roleRow, error: roleLookupError } = await supabase
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", userId)
+    .eq("role", role)
+    .maybeSingle();
+
+  if (roleLookupError) {
+    console.error(`Role lookup failed for ${userId}/${role}:`, roleLookupError);
+    return false;
+  }
+
+  return Boolean(roleRow);
+}
+
+export async function requireAdminOrServiceRole(
+  req: Request,
+  corsHeaders: HeadersInit,
+  supabase: RoleAwareClient,
+  authFn: typeof requireRequestAuth = requireRequestAuth,
+): Promise<RequestAuth | Response> {
+  const requestAuth = await authFn(req, corsHeaders);
+  if (requestAuth instanceof Response) {
+    return requestAuth;
+  }
+
+  if (requestAuth.isServiceRole) {
+    return requestAuth;
+  }
+
+  const isAdmin = await hasRole(supabase, requestAuth.userId, "admin");
+  if (!isAdmin) {
+    return errorResponse(403, "Admin access required", corsHeaders);
+  }
+
+  return requestAuth;
 }

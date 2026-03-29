@@ -6,14 +6,22 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 import { PromptBuilder } from "../_shared/promptBuilder.ts";
 import { OutputValidator } from "../_shared/outputValidator.ts";
-import { checkRateLimit, RATE_LIMITS, createRateLimitResponse } from "../_shared/rateLimiter.ts";
+import {
+  logRateLimitedInvocation,
+} from "../_shared/rateLimiter.ts";
+import { requireProtectedRequest } from "../_shared/abuseProtection.ts";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
+import {
+  buildCostGuardrailBlockedResponse,
+  createCostGuardrailSession,
+  isCostGuardrailBlockedError,
+} from "../_shared/costGuardrails.ts";
 
 const CheckInSchema = z.object({
   checkInId: z.string().uuid()
 });
 
-serve(async (req) => {
+export async function handleGenerateCheckInResponse(req: Request) {
   if (req.method === 'OPTIONS') {
     return handleCors(req);
   }
@@ -22,12 +30,17 @@ serve(async (req) => {
   const startTime = Date.now();
 
   try {
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: 'Missing authorization header' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+    const protectedRequest = await requireProtectedRequest(req, {
+      profileKey: "ai.standard",
+      endpointName: "generate-check-in-response",
+      blockedMessage: "Too many AI requests. Please try again later.",
+      metadata: {
+        flow: "generate_check_in_response",
+      },
+    });
+
+    if (protectedRequest instanceof Response) {
+      return protectedRequest;
     }
 
     const body = await req.json()
@@ -48,25 +61,19 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseKey)
+    const userId = protectedRequest.auth.userId;
 
-    const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
-    
-    if (authError || !user) {
-      throw new Error('Unauthorized')
-    }
-
-    // Check rate limit
-    const rateLimitCheck = await checkRateLimit(
+    const costGuardrails = createCostGuardrailSession({
       supabase,
-      user.id,
-      'generate-check-in-response',
-      RATE_LIMITS['check-in-response']
-    );
-
-    if (!rateLimitCheck.allowed) {
-      return createRateLimitResponse(rateLimitCheck, corsHeaders);
-    }
+      endpointKey: "generate-check-in-response",
+      featureKey: "ai_mentor_chat",
+      userId,
+    });
+    const guardedFetch = costGuardrails.wrapFetch(fetch);
+    await costGuardrails.enforceAccess({
+      capabilities: ["text"],
+      providers: ["openai"],
+    });
 
     // Fetch check-in and profile in parallel
     const [
@@ -81,7 +88,7 @@ serve(async (req) => {
       supabase
         .from('profiles')
         .select('selected_mentor_id')
-        .eq('id', user.id)
+        .eq('id', userId)
         .maybeSingle()
     ]);
 
@@ -103,7 +110,7 @@ serve(async (req) => {
       throw new Error('Check-in not found');
     }
     
-    if (checkIn.user_id !== user.id) {
+    if (checkIn.user_id !== userId) {
       throw new Error('Unauthorized: You can only access your own check-ins')
     }
 
@@ -144,7 +151,7 @@ serve(async (req) => {
 
     const { systemPrompt, userPrompt, validationRules, outputConstraints } = await promptBuilder.build({
       templateKey: 'check_in_response',
-      userId: user.id,
+      userId,
       variables: {
         mentorName: mentor.name,
         mentorTone: mentor.tone_description,
@@ -157,7 +164,7 @@ serve(async (req) => {
       }
     });
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await guardedFetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${openAIApiKey}`,
@@ -191,18 +198,16 @@ serve(async (req) => {
 
     // Log validation results
     const responseTime = Date.now() - startTime;
-    await supabase
-      .from('ai_output_validation_log')
-      .insert({
-        user_id: user.id,
-        template_key: 'check_in_response',
-        input_data: { mood: checkIn.mood, intention: checkIn.intention },
-        output_data: { response: mentorResponse },
-        validation_passed: validationResult.isValid,
-        validation_errors: validationResult.errors && validationResult.errors.length > 0 ? validationResult.errors : null,
-        model_used: 'google/gemini-2.5-flash',
-        response_time_ms: responseTime
-      });
+    await logRateLimitedInvocation(supabase, {
+      userId,
+      templateKey: 'check-in-response',
+      inputData: { mood: checkIn.mood, intention: checkIn.intention, promptTemplateKey: 'check_in_response' },
+      outputData: { response: mentorResponse },
+      validationPassed: validationResult.isValid,
+      validationErrors: validationResult.errors && validationResult.errors.length > 0 ? validationResult.errors : null,
+      modelUsed: 'google/gemini-2.5-flash',
+      responseTimeMs: responseTime
+    });
 
     if (!validationResult.isValid) {
       console.warn('Validation warnings:', validator.getValidationSummary(validationResult));
@@ -219,6 +224,9 @@ serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (error) {
+    if (isCostGuardrailBlockedError(error)) {
+      return buildCostGuardrailBlockedResponse(error, corsHeaders);
+    }
     console.error('Error:', error)
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
     return new Response(JSON.stringify({ error: errorMessage }), {
@@ -226,4 +234,8 @@ serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
-})
+}
+
+if (Deno.env.get("SUPABASE_FUNCTIONS_TEST") !== "1") {
+  serve((req) => handleGenerateCheckInResponse(req))
+}

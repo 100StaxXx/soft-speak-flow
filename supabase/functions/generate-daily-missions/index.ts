@@ -2,10 +2,14 @@ import { installOpenAICompatibilityShim } from "../_shared/aiClient.ts";
 installOpenAICompatibilityShim();
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createSafeErrorResponse, requireProtectedRequest } from "../_shared/abuseProtection.ts";
 import { PromptBuilder } from "../_shared/promptBuilder.ts";
 import { OutputValidator } from "../_shared/outputValidator.ts";
-import { checkRateLimit, RATE_LIMITS, createRateLimitResponse } from "../_shared/rateLimiter.ts";
+import {
+  buildCostGuardrailBlockedResponse,
+  createCostGuardrailSession,
+  isCostGuardrailBlockedError,
+} from "../_shared/costGuardrails.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -610,42 +614,39 @@ export async function handleGenerateDailyMissions(req: Request): Promise<Respons
   }
 
   const startTime = Date.now();
+  let requestId: string = crypto.randomUUID();
 
   try {
-    const authHeader = req.headers.get("Authorization");
-    const accessToken = parseBearerToken(authHeader);
-
-    if (!accessToken) {
-      return errorResponse(401, "Authorization header required", "AUTH_HEADER_REQUIRED");
+    const protectedRequest = await requireProtectedRequest(req, {
+      profileKey: "ai.standard",
+      endpointName: "generate-daily-missions",
+      allowServiceRole: false,
+    });
+    if (protectedRequest instanceof Response) {
+      return protectedRequest;
     }
+    const { auth, supabase, requestId: protectedRequestId } = protectedRequest;
+    requestId = protectedRequestId;
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
     const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
     if (!supabaseUrl || !supabaseServiceRoleKey) {
       return errorResponse(500, "Server configuration missing", "MISSING_ENV");
     }
-
-    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser(accessToken);
-
-    if (authError || !user) {
-      console.error("Auth error:", authError);
-      return errorResponse(401, "Unauthorized", "UNAUTHORIZED");
-    }
-
-    const userId = user.id;
+    const userId = auth.userId;
+    const costGuardrails = createCostGuardrailSession({
+      supabase,
+      endpointKey: "generate-daily-missions",
+      featureKey: "ai_planner_text",
+      userId,
+    });
+    const guardedFetch = costGuardrails.wrapFetch(fetch);
+    await costGuardrails.enforceAccess({
+      capabilities: ["text"],
+      providers: ["openai"],
+    });
     const body = await req.json().catch(() => ({}));
     const forceRegenerate = Boolean((body as { forceRegenerate?: unknown }).forceRegenerate);
-
-    const rateLimitConfig = RATE_LIMITS[CANONICAL_RATE_LIMIT_KEY] ?? RATE_LIMITS["daily-missions"];
-    const rateLimit = await checkRateLimit(supabase, userId, CANONICAL_RATE_LIMIT_KEY, rateLimitConfig);
-    if (!rateLimit.allowed) {
-      return createRateLimitResponse(rateLimit, corsHeaders);
-    }
 
     const { data: profileForTz, error: profileForTzError } = await supabase
       .from("profiles")
@@ -775,7 +776,7 @@ export async function handleGenerateDailyMissions(req: Request): Promise<Respons
         },
       });
 
-      const aiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+      const aiResponse = await guardedFetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${openAIApiKey}`,
@@ -907,12 +908,16 @@ export async function handleGenerateDailyMissions(req: Request): Promise<Respons
       meta: generationMeta,
     });
   } catch (error) {
+    if (isCostGuardrailBlockedError(error)) {
+      return buildCostGuardrailBlockedResponse(error, corsHeaders);
+    }
     console.error("Error generating missions:", error);
-    return errorResponse(
-      500,
-      error instanceof Error ? error.message : "Unknown error",
-      "MISSION_GENERATION_FAILED",
-    );
+    return createSafeErrorResponse(req, {
+      status: 500,
+      code: "MISSION_GENERATION_FAILED",
+      error: "Request could not be processed right now",
+      requestId,
+    });
   }
 }
 

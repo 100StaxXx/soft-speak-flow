@@ -7,7 +7,7 @@ verify_jwt = false
 verify_jwt = true
 
 [functions.generate-adversary-image]
-verify_jwt = false
+verify_jwt = true
 
 [functions.delete-user]
 verify_jwt = true
@@ -36,8 +36,14 @@ verify_jwt = false
 [functions.apple-native-auth]
 verify_jwt = false
 
+[functions.auth-gateway]
+verify_jwt = false
+
 [functions.generate-tutorial-tts]
 verify_jwt = false
+
+[functions.generate-quote-image]
+verify_jwt = true
 
 [functions.generate-daily-mentor-pep-talks]
 verify_jwt = false
@@ -67,7 +73,7 @@ verify_jwt = false
 verify_jwt = true
 
 [functions.generate-complete-pep-talk]
-verify_jwt = false
+verify_jwt = true
 
 [functions.generate-weekly-challenges]
 verify_jwt = false
@@ -76,7 +82,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.generate-reflection-reply]
-verify_jwt = false
+verify_jwt = true
 
 [functions.generate-evolution-voice]
 verify_jwt = true
@@ -133,7 +139,7 @@ verify_jwt = true
 verify_jwt = false
 
 [functions.generate-daily-missions]
-verify_jwt = false
+verify_jwt = true
 
 [functions.generate-daily-quotes]
 verify_jwt = false
@@ -148,10 +154,10 @@ verify_jwt = false
 verify_jwt = true
 
 [functions.generate-check-in-response]
-verify_jwt = false
+verify_jwt = true
 
 [functions.generate-companion-image]
-verify_jwt = false
+verify_jwt = true
 
 [functions.generate-companion-story]
 verify_jwt = false
@@ -160,7 +166,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.generate-weekly-insights]
-verify_jwt = false
+verify_jwt = true
 
 [functions.mentor-chat]
 verify_jwt = true
@@ -172,10 +178,16 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.request-referral-payout]
-verify_jwt = true
+verify_jwt = false
 
 [functions.process-paypal-payout]
 verify_jwt = false
+
+[functions.manage-referral-payouts]
+verify_jwt = true
+
+[functions.manage-referral-codes]
+verify_jwt = true
 
 [functions.reset-companion]
 verify_jwt = true
@@ -184,10 +196,10 @@ verify_jwt = true
 verify_jwt = false
 
 [functions.generate-evening-response]
-verify_jwt = false
+verify_jwt = true
 
 [functions.generate-weekly-recap]
-verify_jwt = false
+verify_jwt = true
 
 [functions.generate-rhythm-track]
 verify_jwt = true
@@ -223,7 +235,7 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.deal-boss-damage]
-verify_jwt = false
+verify_jwt = true
 
 [functions.paypal-webhook]
 verify_jwt = false
@@ -234,7 +246,22 @@ verify_jwt = false
 [functions.get-creator-stats]
 verify_jwt = false
 
+[functions.redeem-promo-code]
+verify_jwt = true
+
+[functions.record-ai-interaction]
+verify_jwt = true
+
+[functions.record-daily-planning-use]
+verify_jwt = true
+
 [functions.generate-morning-briefing]
+verify_jwt = true
+
+[functions.init-quest-attachment-upload]
+verify_jwt = true
+
+[functions.delete-quest-attachment]
 verify_jwt = true
 
 [functions.decompose-task]
@@ -270,6 +297,9 @@ verify_jwt = true
 [functions.generate-journey-path]
 verify_jwt = true
 
+[functions.generate-story-universe]
+verify_jwt = true
+
 [functions.generate-campaign-welcome-image]
 verify_jwt = true
 
@@ -295,9 +325,12 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.verify-admin-access]
-verify_jwt = false
+verify_jwt = true
 
 [functions.generate-dormant-companion-image]
+verify_jwt = false
+
+[functions.generate-memorial-image]
 verify_jwt = false
 
 [functions.generate-companion-scar]
@@ -316,4 +349,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.notifications-dispatch-v2]
+verify_jwt = false
+
+[functions.cost-guardrail-monitor]
 verify_jwt = false

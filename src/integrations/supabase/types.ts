@@ -272,6 +272,57 @@ export type Database = {
         }
         Relationships: []
       }
+      account_entitlements: {
+        Row: {
+          billing_customer_id: string | null
+          billing_subscription_id: string | null
+          created_at: string
+          ends_at: string | null
+          is_active: boolean
+          metadata: Json
+          plan: string | null
+          source: string
+          started_at: string | null
+          status: string
+          trial_ends_at: string | null
+          trial_started_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          billing_customer_id?: string | null
+          billing_subscription_id?: string | null
+          created_at?: string
+          ends_at?: string | null
+          is_active?: boolean
+          metadata?: Json
+          plan?: string | null
+          source?: string
+          started_at?: string | null
+          status?: string
+          trial_ends_at?: string | null
+          trial_started_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          billing_customer_id?: string | null
+          billing_subscription_id?: string | null
+          created_at?: string
+          ends_at?: string | null
+          is_active?: boolean
+          metadata?: Json
+          plan?: string | null
+          source?: string
+          started_at?: string | null
+          status?: string
+          trial_ends_at?: string | null
+          trial_started_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       ai_interactions: {
         Row: {
           ai_response: Json | null
@@ -2152,10 +2203,8 @@ export type Database = {
           default_flex_hours: number | null
           id: string
           include_relationship_tasks: boolean | null
-          last_used_at: string | null
           preferred_work_blocks: Json | null
           relationship_tasks_count: number | null
-          times_used: number | null
           updated_at: string | null
           user_id: string
           wake_time: string | null
@@ -2170,10 +2219,8 @@ export type Database = {
           default_flex_hours?: number | null
           id?: string
           include_relationship_tasks?: boolean | null
-          last_used_at?: string | null
           preferred_work_blocks?: Json | null
           relationship_tasks_count?: number | null
-          times_used?: number | null
           updated_at?: string | null
           user_id: string
           wake_time?: string | null
@@ -2188,14 +2235,36 @@ export type Database = {
           default_flex_hours?: number | null
           id?: string
           include_relationship_tasks?: boolean | null
-          last_used_at?: string | null
           preferred_work_blocks?: Json | null
           relationship_tasks_count?: number | null
-          times_used?: number | null
           updated_at?: string | null
           user_id?: string
           wake_time?: string | null
           wind_down_time?: string | null
+        }
+        Relationships: []
+      }
+      daily_planning_usage: {
+        Row: {
+          created_at: string
+          last_used_at: string | null
+          times_used: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          last_used_at?: string | null
+          times_used?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          last_used_at?: string | null
+          times_used?: number
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -5234,7 +5303,6 @@ export type Database = {
           checkin_reminders_enabled: boolean
           habit_reminders_enabled: boolean | null
           id: string
-          is_premium: boolean | null
           last_encounter_quest_count: number | null
           last_streak_freeze_used: string | null
           last_weekly_encounter: string | null
@@ -5263,15 +5331,9 @@ export type Database = {
           streak_at_risk_since: string | null
           streak_freezes_available: number | null
           streak_freezes_reset_at: string | null
-          stripe_customer_id: string | null
-          subscription_expires_at: string | null
-          subscription_started_at: string | null
-          subscription_status: string | null
           task_reminders_enabled: boolean | null
           timezone: string | null
           total_quests_completed: number | null
-          trial_ends_at: string | null
-          trial_started_at: string | null
           updated_at: string | null
           venus_sign: string | null
           zodiac_sign: string | null
@@ -5296,7 +5358,6 @@ export type Database = {
           checkin_reminders_enabled?: boolean
           habit_reminders_enabled?: boolean | null
           id: string
-          is_premium?: boolean | null
           last_encounter_quest_count?: number | null
           last_streak_freeze_used?: string | null
           last_weekly_encounter?: string | null
@@ -5325,15 +5386,9 @@ export type Database = {
           streak_at_risk_since?: string | null
           streak_freezes_available?: number | null
           streak_freezes_reset_at?: string | null
-          stripe_customer_id?: string | null
-          subscription_expires_at?: string | null
-          subscription_started_at?: string | null
-          subscription_status?: string | null
           task_reminders_enabled?: boolean | null
           timezone?: string | null
           total_quests_completed?: number | null
-          trial_ends_at?: string | null
-          trial_started_at?: string | null
           updated_at?: string | null
           venus_sign?: string | null
           zodiac_sign?: string | null
@@ -5358,7 +5413,6 @@ export type Database = {
           checkin_reminders_enabled?: boolean
           habit_reminders_enabled?: boolean | null
           id?: string
-          is_premium?: boolean | null
           last_encounter_quest_count?: number | null
           last_streak_freeze_used?: string | null
           last_weekly_encounter?: string | null
@@ -5387,15 +5441,9 @@ export type Database = {
           streak_at_risk_since?: string | null
           streak_freezes_available?: number | null
           streak_freezes_reset_at?: string | null
-          stripe_customer_id?: string | null
-          subscription_expires_at?: string | null
-          subscription_started_at?: string | null
-          subscription_status?: string | null
           task_reminders_enabled?: boolean | null
           timezone?: string | null
           total_quests_completed?: number | null
-          trial_ends_at?: string | null
-          trial_started_at?: string | null
           updated_at?: string | null
           venus_sign?: string | null
           zodiac_sign?: string | null
@@ -7867,6 +7915,21 @@ export type Database = {
           message: string
           success: boolean
         }[]
+      }
+      consume_companion_regeneration: {
+        Args: { p_companion_id: string; p_image_url: string }
+        Returns: {
+          current_image_url: string
+          image_regenerations_used: number
+        }[]
+      }
+      mark_companion_active: {
+        Args: never
+        Returns: string
+      }
+      mark_weekly_recap_viewed: {
+        Args: { p_recap_id: string }
+        Returns: string
       }
       cleanup_old_audit_logs: { Args: never; Returns: undefined }
       cleanup_old_influencer_logs: { Args: never; Returns: undefined }

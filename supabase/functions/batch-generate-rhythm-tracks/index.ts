@@ -1,5 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { requireServiceRoleAuth } from "../_shared/auth.ts";
+import {
+  buildCostGuardrailBlockedResponse,
+  createCostGuardrailSession,
+  isCostGuardrailBlockedError,
+} from "../_shared/costGuardrails.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -45,7 +51,8 @@ const DIFFICULTY_TIERS = ['easy', 'medium', 'hard'];
 async function generateSingleTrack(
   supabase: any,
   genre: string,
-  difficulty: string
+  difficulty: string,
+  fetchImpl: typeof fetch,
 ): Promise<{ success: boolean; trackId?: string; error?: string }> {
   try {
     const preset = GENRE_PRESETS[genre as keyof typeof GENRE_PRESETS] || GENRE_PRESETS.stellar_beats;
@@ -58,7 +65,7 @@ async function generateSingleTrack(
     console.log(`Generating track: ${genre}, ${difficulty}, BPM: ${bpm}, Duration: ${duration}s`);
 
     // Generate music using ElevenLabs Music API
-    const response = await fetch('https://api.elevenlabs.io/v1/music', {
+    const response = await fetchImpl('https://api.elevenlabs.io/v1/music', {
       method: 'POST',
       headers: {
         'xi-api-key': ELEVENLABS_API_KEY!,
@@ -138,6 +145,11 @@ serve(async (req) => {
   }
 
   try {
+    const auth = await requireServiceRoleAuth(req, corsHeaders);
+    if (auth instanceof Response) {
+      return auth;
+    }
+
     const { 
       count = 6, 
       genre = 'stellar_beats',
@@ -149,6 +161,16 @@ serve(async (req) => {
     }
 
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
+    const costGuardrails = createCostGuardrailSession({
+      supabase,
+      endpointKey: "batch-generate-rhythm-tracks",
+      featureKey: "ai_rhythm_tracks",
+    });
+    const guardedFetch = costGuardrails.wrapFetch(fetch);
+    await costGuardrails.enforceAccess({
+      capabilities: ["music"],
+      providers: ["elevenlabs"],
+    });
     
     const results: { success: boolean; trackId?: string; difficulty: string; error?: string }[] = [];
     
@@ -162,7 +184,7 @@ serve(async (req) => {
       
       console.log(`Generating track ${i + 1}/${count} (${difficulty})...`);
       
-      const result = await generateSingleTrack(supabase, genre, difficulty);
+      const result = await generateSingleTrack(supabase, genre, difficulty, guardedFetch);
       results.push({ ...result, difficulty });
       
       // Add delay between requests to respect rate limits
@@ -187,6 +209,9 @@ serve(async (req) => {
     });
 
   } catch (error) {
+    if (isCostGuardrailBlockedError(error)) {
+      return buildCostGuardrailBlockedResponse(error, corsHeaders);
+    }
     console.error('Error in batch generation:', error);
     return new Response(JSON.stringify({
       success: false,

@@ -8,7 +8,6 @@ describe("shouldShowBottomNav", () => {
 
   it("shows nav for authenticated users on regular app routes", () => {
     expect(shouldShowBottomNav("/companion", true)).toBe(true);
-    expect(shouldShowBottomNav("/preview", true)).toBe(true);
     expect(shouldShowBottomNav("/", true)).toBe(true);
   });
 
@@ -32,4 +31,3 @@ describe("shouldShowBottomNav", () => {
     expect(shouldShowBottomNav("/onboardingish", true)).toBe(true);
   });
 });
-

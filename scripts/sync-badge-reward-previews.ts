@@ -63,7 +63,7 @@ async function ensureBucketExists(supabase: ReturnType<typeof createClient>) {
 async function main() {
   const dryRun = process.argv.includes("--dry-run");
   const env = loadEnvFromFiles();
-  const supabaseUrl = requireEnv(env, "VITE_SUPABASE_URL");
+  const supabaseUrl = requireEnv(env, "SUPABASE_URL");
   const serviceKey = requireEnv(env, "SUPABASE_SERVICE_ROLE_KEY");
 
   const supabase = createClient(supabaseUrl, serviceKey, {
@@ -158,4 +158,3 @@ main().catch((error) => {
   console.error(error instanceof Error ? error.message : error);
   process.exitCode = 1;
 });
-

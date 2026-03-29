@@ -1,8 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
-import { requireRequestAuth } from "../_shared/auth.ts";
+import { requireInternalRequest } from "../_shared/auth.ts";
 import { summarizeFunctionInvokeError } from "../_shared/functionInvokeError.ts";
+import { invokeInternalFunction } from "../_shared/internalFunctionAuth.ts";
 import {
   TRANSCRIPT_STATUS_PENDING,
   TRANSCRIPT_STATUS_PROCESSING,
@@ -87,16 +88,9 @@ serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
 
   try {
-    const auth = await requireRequestAuth(req, corsHeaders);
+    const auth = await requireInternalRequest(req, corsHeaders);
     if (auth instanceof Response) {
       return auth;
-    }
-
-    if (!auth.isServiceRole) {
-      return new Response(
-        JSON.stringify({ error: "Forbidden" }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
     }
 
     const body = await req.json().catch(() => ({})) as TranscriptRetryRequestBody;
@@ -210,18 +204,21 @@ serve(async (req) => {
       let syncErrorMessage: string | null = null;
 
       try {
-        const { data, error } = await supabase.functions.invoke("sync-daily-pep-talk-transcript", {
-          body: { id: pepTalkId },
-        });
-        syncPayload = data;
+        const response = await invokeInternalFunction("sync-daily-pep-talk-transcript", { id: pepTalkId });
+        const rawResponse = await response.text();
 
-        if (error) {
-          const summary = await summarizeFunctionInvokeError(error);
-          syncErrorMessage = typeof summary === "string" ? summary : "Transcript sync invocation returned an error";
+        try {
+          syncPayload = rawResponse.length > 0 ? JSON.parse(rawResponse) : null;
+        } catch {
+          syncPayload = null;
+        }
+
+        if (!response.ok) {
+          syncErrorMessage = rawResponse || `Transcript sync returned HTTP ${response.status}`;
         }
       } catch (error) {
         const summary = await summarizeFunctionInvokeError(error);
-        syncErrorMessage = typeof summary === "string" ? summary : "Transcript sync invocation failed";
+        syncErrorMessage = summary.body ?? summary.message;
       }
 
       const decision = decideTranscriptRetryOutcome({

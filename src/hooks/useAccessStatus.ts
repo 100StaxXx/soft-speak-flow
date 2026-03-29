@@ -1,7 +1,7 @@
 import { useProfile } from "./useProfile";
-import { useSubscription } from "./useSubscription";
+import { useAccessState } from "./useAccessState";
 
-export type AccessSource = 'subscription' | 'trial' | 'none';
+export type AccessSource = 'subscription' | 'promo_code' | 'trial' | 'none';
 export type AccessGateReason = 'none' | 'pre_trial_signup' | 'trial_expired';
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -54,9 +54,10 @@ interface AccessStatus {
 
 export function useAccessStatus(): AccessStatus {
   const { profile, loading: profileLoading } = useProfile();
-  const { isActive: isSubscribed, isLoading: subscriptionLoading } = useSubscription();
+  const { accessState, isLoading: accessLoading } = useAccessState();
+  const isSubscribed = accessState.subscribed;
 
-  const loading = profileLoading || subscriptionLoading;
+  const loading = profileLoading || accessLoading;
 
   // If still loading, return safe defaults (grant access during load to avoid flash)
   if (loading) {
@@ -91,20 +92,12 @@ export function useAccessStatus(): AccessStatus {
   const tutorialCompleted =
     hasGuidedTutorialCompleted(profile.onboarding_data) ||
     hasLocalGuidedTutorialCompleted(profile.id);
-  const trialStarted = Boolean(profile.trial_started_at || profile.trial_ends_at);
 
-  // Parse trial end date with fallback to created_at + 7 days only when trial has started.
-  let trialEndsAt: Date | null = null;
-  if (profile.trial_ends_at) {
-    trialEndsAt = new Date(profile.trial_ends_at);
-  } else if (trialStarted && profile.created_at) {
-    // Fallback: use profile creation date + 7 days
-    trialEndsAt = new Date(new Date(profile.created_at).getTime() + 7 * 24 * 60 * 60 * 1000);
-  }
+  const trialEndsAt = accessState.trial_ends_at ? new Date(accessState.trial_ends_at) : null;
 
   const now = new Date();
-  const trialExpired = trialStarted && trialEndsAt ? now > trialEndsAt : false;
-  const isInTrial = trialStarted && trialEndsAt ? now <= trialEndsAt : trialStarted;
+  const isInTrial = accessState.access_source === "trial" && accessState.has_access;
+  const trialExpired = !isSubscribed && !accessState.has_access && Boolean(trialEndsAt && now > trialEndsAt);
 
   let trialDaysRemaining = 0;
   if (isInTrial && trialEndsAt) {
@@ -121,13 +114,13 @@ export function useAccessStatus(): AccessStatus {
   let gateReason: AccessGateReason = 'none';
 
   if (isSubscribed) {
-    accessSource = 'subscription';
+    accessSource = accessState.access_source === 'promo_code' ? 'promo_code' : 'subscription';
     hasAccess = true;
   } else if (needsPreTrialSignup) {
     hasAccess = false;
     gateReason = 'pre_trial_signup';
-  } else if (isInTrial) {
-    accessSource = 'trial';
+  } else if (accessState.has_access) {
+    accessSource = accessState.access_source === 'trial' ? 'trial' : 'subscription';
     hasAccess = true;
   } else if (trialExpired) {
     hasAccess = false;

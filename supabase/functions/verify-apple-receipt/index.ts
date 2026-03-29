@@ -2,16 +2,15 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { handleCors, jsonResponse, errorResponse } from "../_shared/cors.ts";
 import {
+  APPLE_BINDING_CONFLICT_ERROR,
+  APPLE_BINDING_MISSING_ERROR,
   verifyReceiptWithApple,
   extractLatestTransaction,
   resolvePlanFromProduct,
   upsertSubscription,
   buildSubscriptionResponse,
 } from "../_shared/appleSubscriptions.ts";
-import {
-  verifyTransaction,
-  AppleTransactionInfo,
-} from "../_shared/appleServerAPI.ts";
+import { verifyTransaction } from "../_shared/appleServerAPI.ts";
 
 /**
  * Verify Apple Receipt / Transaction
@@ -77,8 +76,10 @@ serve(async (req) => {
 
         const subscription = await upsertSubscription(serviceClient, {
           userId: user.id,
-          transactionId: transactionInfo.originalTransactionId || transactionInfo.transactionId,
+          transactionId: transactionInfo.transactionId,
+          originalTransactionId: transactionInfo.originalTransactionId || transactionInfo.transactionId,
           productId: transactionInfo.productId,
+          appAccountToken: transactionInfo.appAccountToken ?? null,
           plan,
           expiresAt,
           purchaseDate,
@@ -96,6 +97,13 @@ serve(async (req) => {
           subscription: buildSubscriptionResponse(subscription),
         });
       } catch (txError) {
+        const txErrorMessage = txError instanceof Error ? txError.message : String(txError ?? "");
+        if (
+          txErrorMessage === APPLE_BINDING_CONFLICT_ERROR ||
+          txErrorMessage === APPLE_BINDING_MISSING_ERROR
+        ) {
+          throw txError;
+        }
         if (!receipt) {
           throw txError;
         }
@@ -123,6 +131,7 @@ serve(async (req) => {
       const subscription = await upsertSubscription(serviceClient, {
         userId: user.id,
         transactionId: latestTransaction.transactionId,
+        originalTransactionId: latestTransaction.originalTransactionId,
         productId: latestTransaction.productId,
         plan,
         expiresAt: latestTransaction.expiresAt,
@@ -155,6 +164,10 @@ serve(async (req) => {
 
     if (errorMessage === "Unauthorized") {
       statusCode = 401;
+    } else if (errorMessage === APPLE_BINDING_CONFLICT_ERROR) {
+      statusCode = 403;
+    } else if (errorMessage === APPLE_BINDING_MISSING_ERROR) {
+      statusCode = 400;
     } else if (errorMessage.includes("not found")) {
       statusCode = 404;
     } else if (errorMessage.includes("invalid") || errorMessage.includes("required") || errorMessage.includes("already register")) {

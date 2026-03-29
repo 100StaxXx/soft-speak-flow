@@ -2,7 +2,10 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
-import { checkRateLimit, RATE_LIMITS, createRateLimitResponse } from "../_shared/rateLimiter.ts";
+import {
+  logRateLimitedInvocation,
+} from "../_shared/rateLimiter.ts";
+import { requireProtectedRequest } from "../_shared/abuseProtection.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -40,7 +43,7 @@ interface EnrichedContext {
   recentAbandonedEpics: number;
 }
 
-serve(async (req) => {
+export async function handleAiOrchestrator(req: Request) {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -51,27 +54,21 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
+    const protectedRequest = await requireProtectedRequest(req, {
+      profileKey: "ai.standard",
+      endpointName: "ai-orchestrator",
+      blockedMessage: "Too many AI requests. Please try again later.",
+      metadata: {
+        flow: "ai_orchestrator",
+      },
+    });
 
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: 'No authorization header' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    if (protectedRequest instanceof Response) {
+      return protectedRequest;
     }
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser(
-      authHeader.replace('Bearer ', '')
-    );
-
-    if (authError || !user) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid token' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const userId = user.id;
+    const authHeader = req.headers.get('Authorization')!;
+    const userId = protectedRequest.auth.userId;
 
     // Parse and validate input
     let rawBody;
@@ -94,19 +91,6 @@ serve(async (req) => {
     }
 
     const { input, interactionType, sessionId, additionalContext } = parseResult.data;
-
-    // Check rate limit for AI orchestrator calls
-    const rateLimitResult = await checkRateLimit(
-      supabase,
-      userId,
-      'ai-orchestrator',
-      RATE_LIMITS['ai-orchestrator'] || { maxCalls: 100, windowHours: 24 }
-    );
-
-    if (!rateLimitResult.allowed) {
-      console.warn(`[ai-orchestrator] Rate limit exceeded for user ${userId}`);
-      return createRateLimitResponse(rateLimitResult, corsHeaders);
-    }
 
     console.log(`Orchestrator request: type=${interactionType}, input="${input.substring(0, 50)}..."`);
 
@@ -286,6 +270,16 @@ serve(async (req) => {
       console.warn('Failed to log interaction:', logError);
     }
 
+    await logRateLimitedInvocation(supabase, {
+      userId,
+      templateKey: 'ai-orchestrator',
+      inputData: { interactionType, sessionId: sessionId || null },
+      outputData: { detectedIntent },
+      validationPassed: true,
+      modelUsed: 'orchestrator',
+      responseTimeMs: responseTime,
+    });
+
     // Step 4: Update user_ai_learning (increment interaction count)
     // First try to update existing record
     const { data: existingLearning } = await supabase
@@ -338,4 +332,8 @@ serve(async (req) => {
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
-});
+}
+
+if (Deno.env.get("SUPABASE_FUNCTIONS_TEST") !== "1") {
+  serve((req) => handleAiOrchestrator(req));
+}

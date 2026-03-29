@@ -1,4 +1,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
+import { requireInternalRequest } from "../_shared/auth.ts";
+import {
+  buildCostGuardrailBlockedResponse,
+  createCostGuardrailSession,
+  isCostGuardrailBlockedError,
+} from "../_shared/costGuardrails.ts";
+import { invokeInternalFunction } from "../_shared/internalFunctionAuth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -58,6 +66,11 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const auth = await requireInternalRequest(req, corsHeaders);
+  if (auth instanceof Response) {
+    return auth;
+  }
+
   try {
     const { mentorSlug, topic_category, intensity, emotionalTriggers } = await req.json();
 
@@ -71,26 +84,27 @@ serve(async (req) => {
       return buildErrorResponse(500, "Missing Supabase environment variables", { code: "MISSING_ENV" });
     }
 
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    const costGuardrails = createCostGuardrailSession({
+      supabase,
+      endpointKey: "generate-full-mentor-audio",
+      featureKey: "ai_pep_talks",
+    });
+    await costGuardrails.enforceAccess({
+      capabilities: ["text", "tts"],
+      providers: ["openai", "elevenlabs"],
+    });
+
     console.log(`Starting full audio generation for mentor ${mentorSlug}`);
 
     // Step 1: Generate script
     console.log("Step 1: Generating script...");
-    const scriptResponse = await fetch(
-      `${SUPABASE_URL}/functions/v1/generate-mentor-script`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-        },
-        body: JSON.stringify({
-          mentorSlug,
-          topic_category,
-          intensity,
-          emotionalTriggers,
-        }),
-      }
-    );
+    const scriptResponse = await invokeInternalFunction("generate-mentor-script", {
+      mentorSlug,
+      topic_category,
+      intensity,
+      emotionalTriggers,
+    });
 
     if (!scriptResponse.ok) {
       const upstreamRaw = await scriptResponse.text();
@@ -123,20 +137,10 @@ serve(async (req) => {
 
     // Step 2: Generate audio from script
     console.log("Step 2: Generating audio...");
-    const audioResponse = await fetch(
-      `${SUPABASE_URL}/functions/v1/generate-mentor-audio`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-        },
-        body: JSON.stringify({
-          mentorSlug,
-          script,
-        }),
-      }
-    );
+    const audioResponse = await invokeInternalFunction("generate-mentor-audio", {
+      mentorSlug,
+      script,
+    });
 
     if (!audioResponse.ok) {
       const upstreamRaw = await audioResponse.text();
@@ -170,6 +174,9 @@ serve(async (req) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
+    if (isCostGuardrailBlockedError(error)) {
+      return buildCostGuardrailBlockedResponse(error, corsHeaders);
+    }
     console.error("Error in generate-full-mentor-audio function:", error);
     return buildErrorResponse(500, error instanceof Error ? error.message : "Unknown error", {
       code: "INTERNAL_ERROR",

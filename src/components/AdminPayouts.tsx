@@ -79,25 +79,15 @@ export const AdminPayouts = () => {
   const { data: payouts, isLoading: payoutsLoading } = useQuery({
     queryKey: ["admin-referral-payouts"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("referral_payouts")
-        .select(`
-          *,
-          referral_code:referral_codes!referral_code_id(
-            code,
-            owner_type,
-            owner_user_id,
-            influencer_name,
-            influencer_email,
-            influencer_handle,
-            payout_identifier
-          ),
-          referee:profiles!referee_id(email)
-        `)
-        .order("created_at", { ascending: false });
+      const { data, error } = await supabase.functions.invoke(
+        "manage-referral-payouts",
+        {
+          body: { action: "list" },
+        }
+      );
 
       if (error) throw error;
-      return data as ReferralPayout[];
+      return (data?.payouts ?? []) as ReferralPayout[];
     },
   });
 
@@ -157,14 +147,16 @@ export const AdminPayouts = () => {
       payoutId: string;
       notes?: string;
     }) => {
-      const { error } = await supabase
-        .from("referral_payouts")
-        .update({
-          status: "approved",
-          approved_at: new Date().toISOString(),
-          admin_notes: notes || null,
-        })
-        .eq("id", payoutId);
+      const { error } = await supabase.functions.invoke(
+        "manage-referral-payouts",
+        {
+          body: {
+            action: "approve",
+            payoutId,
+            notes: notes || null,
+          },
+        }
+      );
 
       if (error) throw error;
     },
@@ -188,14 +180,16 @@ export const AdminPayouts = () => {
       payoutId: string;
       notes?: string;
     }) => {
-      const { error } = await supabase
-        .from("referral_payouts")
-        .update({
-          status: "rejected",
-          rejected_at: new Date().toISOString(),
-          admin_notes: notes || null,
-        })
-        .eq("id", payoutId);
+      const { error } = await supabase.functions.invoke(
+        "manage-referral-payouts",
+        {
+          body: {
+            action: "reject",
+            payoutId,
+            notes: notes || null,
+          },
+        }
+      );
 
       if (error) throw error;
     },
@@ -267,14 +261,16 @@ export const AdminPayouts = () => {
       );
       if (!pendingPayouts || pendingPayouts.length === 0) return;
 
-      const { error } = await supabase
-        .from("referral_payouts")
-        .update({
-          status: "approved",
-          approved_at: new Date().toISOString(),
-        })
-        .eq("referral_code_id", referralCodeId)
-        .eq("status", "pending");
+      const { error } = await supabase.functions.invoke(
+        "manage-referral-payouts",
+        {
+          body: {
+            action: "bulk_approve",
+            referralCodeId,
+            notes: adminNotes || null,
+          },
+        }
+      );
 
       if (error) throw error;
     },

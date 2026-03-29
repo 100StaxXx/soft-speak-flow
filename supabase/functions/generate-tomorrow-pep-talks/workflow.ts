@@ -42,6 +42,7 @@ export interface InsertTomorrowDailyPepTalkArgs {
   mentorSlug: string;
   logger: TranscriptSyncLog;
   beforeSync?: (dailyPepTalkId: string) => Promise<void>;
+  invokeTranscriptSync?: (dailyPepTalkId: string) => Promise<{ data: unknown; error: unknown }>;
 }
 
 export interface InsertTomorrowDailyPepTalkResult {
@@ -57,6 +58,7 @@ export async function insertTomorrowDailyPepTalkAndSync({
   mentorSlug,
   logger,
   beforeSync,
+  invokeTranscriptSync,
 }: InsertTomorrowDailyPepTalkArgs): Promise<InsertTomorrowDailyPepTalkResult> {
   const initialInsertPayload = {
     transcript_status: TRANSCRIPT_STATUS_PENDING,
@@ -91,13 +93,16 @@ export async function insertTomorrowDailyPepTalkAndSync({
     }
   };
 
-  try {
-    const { data: syncData, error: syncError } = await supabase.functions.invoke(
+  const transcriptSyncInvoker = invokeTranscriptSync
+    ?? ((dailyPepTalkId: string) => supabase.functions.invoke(
       "sync-daily-pep-talk-transcript",
       {
-        body: { id: dailyPepTalk.id },
+        body: { id: dailyPepTalkId },
       },
-    );
+    ));
+
+  try {
+    const { data: syncData, error: syncError } = await transcriptSyncInvoker(dailyPepTalk.id);
 
     const syncPayload = (syncData && typeof syncData === "object")
       ? syncData as Record<string, unknown>
@@ -108,7 +113,7 @@ export async function insertTomorrowDailyPepTalkAndSync({
       logger.warn(`Transcript sync returned error for ${mentorSlug}:`, summary);
       const retryState = buildRetryTranscriptState({
         currentAttemptCount,
-        errorMessage: typeof summary === "string" ? summary : "Transcript sync returned error",
+        errorMessage: summary.body ?? summary.message,
       });
       await persistTranscriptState(retryState.update);
       return {
@@ -164,7 +169,7 @@ export async function insertTomorrowDailyPepTalkAndSync({
     logger.error(`Failed to sync transcript for ${mentorSlug}:`, summary);
     const retryState = buildRetryTranscriptState({
       currentAttemptCount,
-      errorMessage: typeof summary === "string" ? summary : "Failed to sync transcript",
+      errorMessage: summary.body ?? summary.message,
     });
     await persistTranscriptState(retryState.update);
     return {

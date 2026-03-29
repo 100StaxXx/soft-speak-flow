@@ -9,6 +9,7 @@ export interface IAPPurchase {
   transactionDate?: number;
   receipt?: string;
   transactionReceipt?: string;
+  appAccountToken?: string;
 }
 
 export interface IAPProduct {
@@ -103,7 +104,10 @@ const ensureBillingSupported = async (): Promise<void> => {
 };
 
 // Purchase a product
-export const purchaseProduct = async (productId: string): Promise<IAPPurchase> => {
+export const purchaseProduct = async (
+  productId: string,
+  appAccountToken?: string,
+): Promise<IAPPurchase> => {
   if (!isIAPAvailable()) {
     throw new Error('In-App Purchases are only available on iOS');
   }
@@ -112,6 +116,7 @@ export const purchaseProduct = async (productId: string): Promise<IAPPurchase> =
     const result = await NativePurchases.purchaseProduct({
       productIdentifier: productId,
       productType: PURCHASE_TYPE.SUBS,
+      appAccountToken,
     });
 
     return result as IAPPurchase;
@@ -122,7 +127,7 @@ export const purchaseProduct = async (productId: string): Promise<IAPPurchase> =
 };
 
 // Restore purchases
-export const restorePurchases = async (): Promise<IAPPurchase[]> => {
+export const restorePurchases = async (appAccountToken?: string): Promise<IAPPurchase[]> => {
   if (!isIAPAvailable()) {
     throw new Error('In-App Purchases are only available on iOS');
   }
@@ -133,6 +138,7 @@ export const restorePurchases = async (): Promise<IAPPurchase[]> => {
     // The restore API resolves void, so query purchases after sync.
     const result = await NativePurchases.getPurchases({
       productType: PURCHASE_TYPE.SUBS,
+      appAccountToken,
     }) as unknown;
     const purchases = ((result as { purchases?: unknown[] })?.purchases) || [];
 
@@ -162,6 +168,7 @@ export const restorePurchases = async (): Promise<IAPPurchase[]> => {
           transactionDate,
           receipt,
           transactionReceipt,
+          appAccountToken: typeof source.appAccountToken === 'string' ? source.appAccountToken : undefined,
         } satisfies IAPPurchase;
       })
       .filter((purchase) => Boolean(purchase.transactionId || purchase.productId));

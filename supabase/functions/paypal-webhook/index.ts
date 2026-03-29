@@ -27,6 +27,26 @@ const PAYOUT_EVENTS = {
 };
 const WEBHOOK_PROVIDER = "paypal";
 
+function isLocalRuntime(): boolean {
+  const environment = Deno.env.get("ENVIRONMENT");
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+
+  if (environment && environment !== "production") {
+    return true;
+  }
+
+  if (!supabaseUrl) {
+    return false;
+  }
+
+  try {
+    const hostname = new URL(supabaseUrl).hostname;
+    return hostname === "127.0.0.1" || hostname === "localhost";
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Verify PayPal webhook signature using PayPal's verification API
  * This is the recommended approach as it handles certificate validation automatically
@@ -159,6 +179,32 @@ async function registerWebhookEvent(
   return { duplicate: false, error: true };
 }
 
+async function logSecurityAuditEvent(
+  // deno-lint-ignore no-explicit-any
+  supabaseClient: any,
+  req: Request,
+  reason: string,
+  details: Record<string, unknown> = {},
+): Promise<void> {
+  const { error } = await supabaseClient
+    .from("security_audit_log")
+    .insert({
+      event_type: "webhook_verification_failure",
+      function_name: "paypal-webhook",
+      ip_address: req.headers.get("x-forwarded-for") || req.headers.get("cf-connecting-ip") || "unknown",
+      user_agent: req.headers.get("user-agent") || "unknown",
+      details: {
+        provider: WEBHOOK_PROVIDER,
+        reason,
+        ...details,
+      },
+    });
+
+  if (error) {
+    console.error("Failed to write security audit log:", error);
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -170,13 +216,40 @@ serve(async (req) => {
     
     // Clone request to read body twice (once for verification, once for parsing)
     const rawBody = await req.text();
+
+    const supabaseClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+    );
     
-    // Verify webhook signature (required in production)
-    if (webhookId) {
+    if (!webhookId) {
+      if (!isLocalRuntime()) {
+        console.error("PAYPAL_WEBHOOK_ID is not configured; refusing to process webhook in non-local environment");
+        await logSecurityAuditEvent(
+          supabaseClient,
+          req,
+          "missing_webhook_id",
+        );
+        return new Response(
+          JSON.stringify({ error: "Webhook verification is not configured" }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+
+      console.warn("PAYPAL_WEBHOOK_ID not configured - webhook signature verification skipped in local environment");
+    } else {
       const isValid = await verifyPayPalWebhook(req, rawBody, webhookId);
       
       if (!isValid) {
         console.error("PayPal webhook signature verification failed - rejecting request");
+        await logSecurityAuditEvent(
+          supabaseClient,
+          req,
+          "invalid_signature",
+        );
         return new Response(
           JSON.stringify({ error: "Invalid webhook signature" }),
           {
@@ -187,15 +260,7 @@ serve(async (req) => {
       }
       
       console.log("PayPal webhook signature verified successfully");
-    } else {
-      // Log warning but allow in development/testing
-      console.warn("PAYPAL_WEBHOOK_ID not configured - webhook signature verification skipped. Configure this secret for production!");
     }
-
-    const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-    );
 
     // Parse webhook payload
     const webhookEvent = JSON.parse(rawBody);

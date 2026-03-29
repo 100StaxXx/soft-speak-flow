@@ -4,6 +4,7 @@ installOpenAICompatibilityShim();
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { requireAuthenticatedUser } from "../_shared/auth.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -18,15 +19,17 @@ serve(async (req) => {
   }
 
   try {
+    const userAuth = await requireAuthenticatedUser(req, corsHeaders);
+    if (userAuth instanceof Response) {
+      return userAuth;
+    }
+
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { userId, companionData, mentorData } = await req.json();
-
-    if (!userId) {
-      throw new Error('userId is required');
-    }
+    const { companionData, mentorData } = await req.json();
+    const userId = userAuth.userId;
 
     // Check if user already has a story universe
     const { data: existingUniverse } = await supabase

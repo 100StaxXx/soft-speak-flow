@@ -1,0 +1,41 @@
+name: Security Regression
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/security-regression.yml"
+      - "package.json"
+      - "scripts/run-security-function-tests.sh"
+      - "supabase/**"
+  workflow_dispatch:
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start local Supabase stack
+        run: supabase start --exclude edge-runtime
+
+      - name: Run database security regression suite
+        run: npm run test:security:db
+
+      - name: Run edge-function security regression suite
+        run: npm run test:security:functions

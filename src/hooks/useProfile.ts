@@ -7,7 +7,6 @@ import { ProfilePreferences } from "@/types/profile";
 export interface Profile {
   id: string;
   email: string | null;
-  is_premium: boolean;
   preferences: ProfilePreferences | null;
   selected_mentor_id: string | null;
   created_at: string;
@@ -23,11 +22,6 @@ export interface Profile {
   longest_habit_streak: number | null;
   onboarding_completed: boolean | null;
   onboarding_data: Record<string, unknown> | null;
-  // Trial & subscription fields
-  trial_started_at: string | null;
-  trial_ends_at: string | null;
-  subscription_status: string | null;
-  subscription_expires_at: string | null;
   // Astrology fields
   zodiac_sign: string | null;
   birthdate: string | null;
@@ -59,7 +53,40 @@ export const useProfile = () => {
 
       const { data, error } = await supabase
         .from("profiles")
-        .select("*")
+        .select(`
+          id,
+          email,
+          preferences,
+          selected_mentor_id,
+          created_at,
+          updated_at,
+          daily_push_enabled,
+          daily_push_window,
+          daily_push_time,
+          daily_quote_push_enabled,
+          daily_quote_push_window,
+          daily_quote_push_time,
+          timezone,
+          current_habit_streak,
+          longest_habit_streak,
+          onboarding_completed,
+          onboarding_data,
+          zodiac_sign,
+          birthdate,
+          birth_time,
+          birth_location,
+          moon_sign,
+          rising_sign,
+          mercury_sign,
+          mars_sign,
+          venus_sign,
+          cosmic_profile_generated_at,
+          faction,
+          habit_reminders_enabled,
+          task_reminders_enabled,
+          checkin_reminders_enabled,
+          completed_tasks_stay_in_place
+        `)
         .eq("id", user.id)
         .maybeSingle();
 
@@ -79,7 +106,40 @@ export const useProfile = () => {
             onConflict: 'id',
             ignoreDuplicates: false
           })
-          .select("*")
+          .select(`
+            id,
+            email,
+            preferences,
+            selected_mentor_id,
+            created_at,
+            updated_at,
+            daily_push_enabled,
+            daily_push_window,
+            daily_push_time,
+            daily_quote_push_enabled,
+            daily_quote_push_window,
+            daily_quote_push_time,
+            timezone,
+            current_habit_streak,
+            longest_habit_streak,
+            onboarding_completed,
+            onboarding_data,
+            zodiac_sign,
+            birthdate,
+            birth_time,
+            birth_location,
+            moon_sign,
+            rising_sign,
+            mercury_sign,
+            mars_sign,
+            venus_sign,
+            cosmic_profile_generated_at,
+            faction,
+            habit_reminders_enabled,
+            task_reminders_enabled,
+            checkin_reminders_enabled,
+            completed_tasks_stay_in_place
+          `)
           .maybeSingle();
 
         if (insertError) {

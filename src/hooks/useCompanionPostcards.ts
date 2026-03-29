@@ -92,7 +92,6 @@ export const useCompanionPostcards = () => {
 
       const { data, error } = await supabase.functions.invoke("generate-cosmic-postcard", {
         body: {
-          userId: user.id,
           companionId,
           epicId,
           milestonePercent,
@@ -128,11 +127,10 @@ export const useCompanionPostcards = () => {
               body: {
                 epicId: data.postcard.epic_id,
                 milestoneIndex: data.postcard.chapter_number,
-                userId: user.id,
               },
             });
             // Invalidate journey path cache to show new image
-            queryClient.invalidateQueries({ queryKey: ["journey-path", data.postcard.epic_id] });
+            queryClient.invalidateQueries({ queryKey: ["journey-path", data.postcard.epic_id, user?.id] });
           } catch (err) {
             console.error("Failed to regenerate journey path:", err);
             // Silent fail - path regeneration is a nice-to-have

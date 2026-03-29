@@ -5,6 +5,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 import { OutputValidator } from "../_shared/outputValidator.ts";
+import { requireServiceRoleAuth } from "../_shared/auth.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -23,6 +24,11 @@ serve(async (req) => {
   }
 
   const startTime = Date.now();
+
+  const auth = await requireServiceRoleAuth(req, corsHeaders);
+  if (auth instanceof Response) {
+    return auth;
+  }
 
   try {
     const body = await req.json();

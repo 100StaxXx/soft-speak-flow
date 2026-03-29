@@ -25,7 +25,7 @@ export function useWelcomeImage() {
       // Generate new image via edge function
       const { data, error: fnError } = await supabase.functions.invoke(
         'generate-campaign-welcome-image',
-        { body: { userId: user.id } }
+        { body: {} }
       );
 
       if (fnError) throw fnError;

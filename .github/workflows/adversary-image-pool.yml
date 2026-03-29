@@ -37,6 +37,10 @@ jobs:
     env:
       SUPABASE_URL: https://${{ secrets.SUPABASE_PROJECT_REF }}.supabase.co
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      COST_KILL_SWITCH_ALL: ${{ secrets.COST_KILL_SWITCH_ALL }}
+      COST_KILL_SWITCH_IMAGE: ${{ secrets.COST_KILL_SWITCH_IMAGE }}
+      COST_KILL_SWITCH_ENDPOINTS: ${{ secrets.COST_KILL_SWITCH_ENDPOINTS }}
+      INTERNAL_FUNCTION_SECRET: ${{ secrets.INTERNAL_FUNCTION_SECRET }}
 
     steps:
       - name: Checkout

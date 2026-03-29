@@ -114,13 +114,13 @@ function getRewardIcon(reward: EpicRewardRow): string {
 }
 
 export async function fetchEpicRewards(env: Record<string, string>, opts?: { useServiceRole?: boolean }): Promise<EpicRewardRow[]> {
-  const supabaseUrl = requireEnv(env, "VITE_SUPABASE_URL");
+  const supabaseUrl = requireEnv(env, "SUPABASE_URL");
   const key = opts?.useServiceRole
     ? requireEnv(env, "SUPABASE_SERVICE_ROLE_KEY")
-    : env.VITE_SUPABASE_ANON_KEY || env.VITE_SUPABASE_PUBLISHABLE_KEY;
+    : env.SUPABASE_ANON_KEY || env.SUPABASE_PUBLISHABLE_KEY;
 
   if (!key) {
-    throw new Error("Missing Supabase anon/publishable key for epic reward queries.");
+    throw new Error("Missing SUPABASE_ANON_KEY or SUPABASE_PUBLISHABLE_KEY for epic reward queries.");
   }
 
   const supabase = createClient(supabaseUrl, key, {
@@ -157,4 +157,3 @@ export function toRewardManifestRows(rewards: EpicRewardRow[]): RewardManifestIt
     css_effect_keys: reward.css_effect ? Object.keys(reward.css_effect).sort() : [],
   }));
 }
-

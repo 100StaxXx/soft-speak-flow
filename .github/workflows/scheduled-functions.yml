@@ -27,7 +27,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
-      SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+      INTERNAL_FUNCTION_SECRET: ${{ secrets.INTERNAL_FUNCTION_SECRET }}
 
     steps:
       - name: Select function + payload
@@ -73,8 +74,8 @@ jobs:
           url="https://${PROJECT_REF}.supabase.co/functions/v1/${fn}"
           status=$(curl -sS -o /tmp/function-response.json -w "%{http_code}" \
             -X POST "$url" \
-            -H "Authorization: Bearer ${SERVICE_ROLE_KEY}" \
-            -H "apikey: ${SERVICE_ROLE_KEY}" \
+            -H "apikey: ${PUBLISHABLE_KEY}" \
+            -H "x-internal-key: ${INTERNAL_FUNCTION_SECRET}" \
             -H "Content-Type: application/json" \
             -d "$payload")
 
@@ -102,8 +103,8 @@ jobs:
 
             status=$(curl -sS -o /tmp/function-response.json -w "%{http_code}" \
               -X POST "$url" \
-              -H "Authorization: Bearer ${SERVICE_ROLE_KEY}" \
-              -H "apikey: ${SERVICE_ROLE_KEY}" \
+              -H "apikey: ${PUBLISHABLE_KEY}" \
+              -H "x-internal-key: ${INTERNAL_FUNCTION_SECRET}" \
               -H "Content-Type: application/json" \
               -d "$payload")
 

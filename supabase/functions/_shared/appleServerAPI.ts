@@ -17,6 +17,7 @@ export interface AppleTransactionInfo {
   environment: string;
   revocationDate?: number;
   revocationReason?: number;
+  appAccountToken?: string;
 }
 
 export interface AppleSubscriptionStatus {
@@ -49,6 +50,18 @@ function base64UrlDecode(str: string): Uint8Array {
   }
   const binString = atob(padded);
   return Uint8Array.from(binString, (c) => c.charCodeAt(0));
+}
+
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export function normalizeAppAccountToken(value: string | null | undefined): string | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim().toLowerCase();
+  if (!UUID_REGEX.test(normalized)) {
+    return null;
+  }
+  return normalized;
 }
 
 /**

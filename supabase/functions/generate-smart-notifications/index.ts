@@ -9,6 +9,7 @@ import {
   evaluateSpiritLockTextCompliance,
   resolveCompanionSpiritLockProfile,
 } from "../_shared/companionSpiritLock.ts";
+import { requireServiceRoleAuth } from "../_shared/auth.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -453,6 +454,11 @@ Make the companion feel cosmically attuned, sharing this celestial wisdom as a g
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  const auth = await requireServiceRoleAuth(req, corsHeaders);
+  if (auth instanceof Response) {
+    return auth;
   }
 
   try {

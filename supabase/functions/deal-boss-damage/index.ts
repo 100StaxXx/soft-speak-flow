@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
+import { requireAuthenticatedUser } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,7 +12,6 @@ const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[
 
 // Input validation schema
 const DealBossDamageSchema = z.object({
-  userId: z.string().regex(uuidRegex, "Invalid userId format"),
   epicId: z.string().regex(uuidRegex, "Invalid epicId format").optional().nullable(),
   communityId: z.string().regex(uuidRegex, "Invalid communityId format").optional().nullable(),
   damageSource: z.enum(["habit_completion", "quest_completion", "streak_milestone", "blessing_attack", "critical_hit"]),
@@ -43,7 +43,12 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    
+
+    const userAuth = await requireAuthenticatedUser(req, corsHeaders);
+    if (userAuth instanceof Response) {
+      return userAuth;
+    }
+
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Parse and validate input
@@ -57,8 +62,15 @@ Deno.serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-    
-    const { userId, epicId, communityId, damageSource, sourceId, bonusDamageMultiplier } = parseResult.data;
+
+    const {
+      epicId,
+      communityId,
+      damageSource,
+      sourceId,
+      bonusDamageMultiplier,
+    } = parseResult.data;
+    const userId = userAuth.userId;
 
     // Verify user is actually a member of the epic or community
     if (epicId) {

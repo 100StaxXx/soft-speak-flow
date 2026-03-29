@@ -2,8 +2,13 @@ import { installOpenAICompatibilityShim } from "../_shared/aiClient.ts";
 installOpenAICompatibilityShim();
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createSafeErrorResponse, requireProtectedRequest } from "../_shared/abuseProtection.ts";
 import { mentorNarrativeProfiles, getMentorNarrativeProfile } from "../_shared/mentorNarrativeProfiles.ts";
+import {
+  buildCostGuardrailBlockedResponse,
+  createCostGuardrailSession,
+  isCostGuardrailBlockedError,
+} from "../_shared/costGuardrails.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -49,9 +54,21 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  let requestId: string = crypto.randomUUID();
+
   try {
+    const protectedRequest = await requireProtectedRequest(req, {
+      profileKey: "ai.standard",
+      endpointName: "generate-epic-narrative-seed",
+    });
+    if (protectedRequest instanceof Response) {
+      return protectedRequest;
+    }
+    const { auth, supabase, requestId: protectedRequestId } = protectedRequest;
+    requestId = protectedRequestId;
+
     const { 
-      userId, 
+      userId: requestedUserId,
       epicId,
       epicTitle,
       epicDescription,
@@ -64,6 +81,15 @@ serve(async (req) => {
       milestoneData, // Array of { chapterNumber, title, targetDate, milestonePercent }
     } = await req.json();
 
+    const userId = auth.isServiceRole ? requestedUserId : auth.userId;
+
+    if (!auth.isServiceRole && requestedUserId && requestedUserId !== auth.userId) {
+      return new Response(
+        JSON.stringify({ error: "Forbidden: user mismatch" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     if (!userId || !epicId || !storyTypeSlug) {
       throw new Error("Missing required fields");
     }
@@ -71,14 +97,20 @@ serve(async (req) => {
     console.log(`[Narrative Seed] Generating for epic ${epicId}, story type: ${storyTypeSlug}, chapters: ${passedTotalChapters}`);
 
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
-    const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
-    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-
-    if (!OPENAI_API_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    if (!OPENAI_API_KEY) {
       throw new Error("Missing environment variables");
     }
-
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    const costGuardrails = createCostGuardrailSession({
+      supabase,
+      endpointKey: "generate-epic-narrative-seed",
+      featureKey: "ai_planner_text",
+      userId: auth.isServiceRole ? null : userId,
+    });
+    const guardedFetch = costGuardrails.wrapFetch(fetch);
+    await costGuardrails.enforceAccess({
+      capabilities: ["text"],
+      providers: ["openai"],
+    });
 
     // Fetch story type details (for theme/flavor, not chapter count)
     const { data: storyType, error: storyTypeError } = await supabase
@@ -277,7 +309,7 @@ Return ONLY valid JSON (no markdown):
 
     console.log('[Narrative Seed] Calling AI...');
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const response = await guardedFetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${OPENAI_API_KEY}`,
@@ -410,10 +442,15 @@ Return ONLY valid JSON (no markdown):
     );
 
   } catch (error) {
+    if (isCostGuardrailBlockedError(error)) {
+      return buildCostGuardrailBlockedResponse(error, corsHeaders);
+    }
     console.error('[Narrative Seed] Error:', error);
-    return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return createSafeErrorResponse(req, {
+      status: 500,
+      code: "INTERNAL_ERROR",
+      error: "Request could not be processed right now",
+      requestId,
+    });
   }
 });

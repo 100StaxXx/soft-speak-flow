@@ -1,17 +1,28 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
-import { checkRateLimit, RATE_LIMITS, createRateLimitResponse } from "../_shared/rateLimiter.ts";
+import {
+  createRateLimitResponse,
+  logRateLimitedInvocation,
+} from "../_shared/rateLimiter.ts";
+import { applyAbuseProtection, getClientIpAddress } from "../_shared/abuseProtection.ts";
+import {
+  errorResponse,
+  requireUserOrInternalRequest,
+  type UserOrInternalRequestAuth,
+} from "../_shared/auth.ts";
+import {
+  buildCostGuardrailBlockedResponse,
+  createCostGuardrailSession,
+  isCostGuardrailBlockedError,
+} from "../_shared/costGuardrails.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-internal-key",
 };
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
-
-const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+const MODEL_NAME = "eleven_multilingual_v2";
+const RATE_LIMIT_KEY = "mentor-audio";
 
 interface MentorVoiceConfig {
   voiceId: string;
@@ -22,141 +33,129 @@ interface MentorVoiceConfig {
 }
 
 const mentorVoices: Record<string, MentorVoiceConfig> = {
-  atlas: {
-    voiceId: "JBFqnCBsd6RMkjVDRZzb", // George
-    stability: 0.75,
-    similarity_boost: 0.85,
-    style_exaggeration: 0.5,
-  },
-  eli: {
-    voiceId: "mcuuWJIofmzgKEGk3EMA", // Chris
-    stability: 0.7,
-    similarity_boost: 0.8,
-    style_exaggeration: 0.4,
-  },
-  nova: {
-    voiceId: "onwK4e9ZLuTAKqWW03F9", // Daniel
-    stability: 0.65,
-    similarity_boost: 0.75,
-    style_exaggeration: 0.6,
-  },
-  sienna: {
-    voiceId: "XB0fDUnXU5powFXDhCwa", // Charlotte
-    stability: 0.8,
-    similarity_boost: 0.85,
-    style_exaggeration: 0.3,
-  },
-  lumi: {
-    voiceId: "EXAVITQu4vr4xnSDxMaL", // Sarah
-    stability: 0.75,
-    similarity_boost: 0.8,
-    style_exaggeration: 0.2,
-  },
-  kai: {
-    voiceId: "N2lVS1w4EtoT3dr4eOWO", // Callum
-    stability: 0.7,
-    similarity_boost: 0.85,
-    style_exaggeration: 0.8,
-  },
+  atlas: { voiceId: "JBFqnCBsd6RMkjVDRZzb", stability: 0.75, similarity_boost: 0.85, style_exaggeration: 0.5 },
+  eli: { voiceId: "mcuuWJIofmzgKEGk3EMA", stability: 0.7, similarity_boost: 0.8, style_exaggeration: 0.4 },
+  nova: { voiceId: "onwK4e9ZLuTAKqWW03F9", stability: 0.65, similarity_boost: 0.75, style_exaggeration: 0.6 },
+  sienna: { voiceId: "XB0fDUnXU5powFXDhCwa", stability: 0.8, similarity_boost: 0.85, style_exaggeration: 0.3 },
+  lumi: { voiceId: "EXAVITQu4vr4xnSDxMaL", stability: 0.75, similarity_boost: 0.8, style_exaggeration: 0.2 },
+  kai: { voiceId: "N2lVS1w4EtoT3dr4eOWO", stability: 0.7, similarity_boost: 0.85, style_exaggeration: 0.8 },
   stryker: {
-    voiceId: "pNInz6obpgDQGcFmaJgB", // Rich
+    voiceId: "pNInz6obpgDQGcFmaJgB",
     stability: 0.58,
     similarity_boost: 0.96,
     style_exaggeration: 1.0,
     use_speaker_boost: true,
   },
-  carmen: {
-    voiceId: "bD9maNcCuQQS75DGuteM", // Carmen
-    stability: 0.75,
-    similarity_boost: 0.85,
-    style_exaggeration: 0.7,
-  },
+  carmen: { voiceId: "bD9maNcCuQQS75DGuteM", stability: 0.75, similarity_boost: 0.85, style_exaggeration: 0.7 },
   reign: {
-    voiceId: "GTQ4ImqrRljZAa9VJX6B", // Reign custom voice
+    voiceId: "GTQ4ImqrRljZAa9VJX6B",
     stability: 0.52,
     similarity_boost: 0.97,
     style_exaggeration: 1.0,
     use_speaker_boost: true,
   },
-  solace: {
-    voiceId: "XrExE9yKIg1WjnnlVkGX", // Matilda - Warm, nurturing
-    stability: 0.80,
-    similarity_boost: 0.80,
-    style_exaggeration: 0.35,
-  },
+  solace: { voiceId: "XrExE9yKIg1WjnnlVkGX", stability: 0.8, similarity_boost: 0.8, style_exaggeration: 0.35 },
 };
 
 const legacyVoiceAliases: Record<string, string> = {
   elizabeth: "solace",
 };
 
-serve(async (req) => {
+interface GenerateMentorAudioDeps {
+  authorize: (req: Request, corsHeaders: HeadersInit) => Promise<UserOrInternalRequestAuth | Response>;
+  createSupabaseClient: () => any;
+  fetchImpl: typeof fetch;
+  checkRateLimitFn?: unknown;
+  now: () => number;
+}
+
+const defaultDeps: GenerateMentorAudioDeps = {
+  authorize: requireUserOrInternalRequest,
+  createSupabaseClient: () => {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    return createClient(supabaseUrl, supabaseServiceRoleKey);
+  },
+  fetchImpl: fetch,
+  now: () => Date.now(),
+};
+
+export async function handleGenerateMentorAudio(
+  req: Request,
+  deps: GenerateMentorAudioDeps = defaultDeps,
+): Promise<Response> {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    if (!SUPABASE_ANON_KEY) {
-      throw new Error("SUPABASE_ANON_KEY is not configured");
-    }
-    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-      throw new Error("Supabase service credentials are not configured");
-    }
+    const supabaseAdmin = deps.createSupabaseClient();
 
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    const requestAuth = await deps.authorize(req, corsHeaders);
+    if (requestAuth instanceof Response) {
+      return requestAuth;
     }
 
-    // Detect service role calls (from cron/internal functions) and bypass user auth
-    const isServiceRole = authHeader.includes(SUPABASE_SERVICE_ROLE_KEY);
-
-    if (!isServiceRole) {
-      // Only check user auth and rate limits for regular user calls
-      const supabaseUser = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-        global: { headers: { Authorization: authHeader } }
-      });
-      const { data: { user }, error: authError } = await supabaseUser.auth.getUser();
-
-      if (authError || !user) {
-        return new Response(
-          JSON.stringify({ error: "Unauthorized" }),
-          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
-      const rateLimitResult = await checkRateLimit(
-        supabaseAdmin,
-        user.id,
-        'mentor-audio',
-        RATE_LIMITS['mentor-audio']
-      );
-
-      if (!rateLimitResult.allowed) {
-        return createRateLimitResponse(rateLimitResult, corsHeaders);
-      }
-    }
+    const costGuardrails = createCostGuardrailSession({
+      supabase: supabaseAdmin,
+      endpointKey: "generate-mentor-audio",
+      featureKey: "ai_pep_talks",
+      userId: requestAuth.isInternal ? null : requestAuth.userId,
+    });
+    const guardedFetch = costGuardrails.wrapFetch(deps.fetchImpl);
+    await costGuardrails.enforceAccess({
+      capabilities: ["tts"],
+      providers: ["elevenlabs"],
+    });
 
     const { mentorSlug, script } = await req.json();
-
     if (!mentorSlug || !script) {
-      throw new Error("mentorSlug and script are required");
+      return errorResponse(400, "mentorSlug and script are required", corsHeaders);
     }
 
-// Get ElevenLabs API key from environment
-    const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
+    if (!requestAuth.isInternal) {
+      if (typeof deps.checkRateLimitFn === "function") {
+        const rateLimit = await (deps.checkRateLimitFn as (
+          supabase: unknown,
+          userId: string,
+          rateLimitKey: string,
+        ) => Promise<{ allowed: boolean; available: boolean; remaining: number; limit: number; resetAt: Date }>)(
+          supabaseAdmin,
+          requestAuth.userId,
+          RATE_LIMIT_KEY,
+        );
 
-    if (!ELEVENLABS_API_KEY) {
+        if (!rateLimit.allowed) {
+          return createRateLimitResponse(rateLimit, corsHeaders);
+        }
+      } else {
+        const abuseProtection = await applyAbuseProtection(req, supabaseAdmin, {
+          profileKey: "ai.expensive_export",
+          endpointName: "generate-mentor-audio",
+          requestId: crypto.randomUUID(),
+          userId: requestAuth.userId,
+          ipAddress: getClientIpAddress(req),
+          blockedMessage: "Too many audio generation requests. Please try again later.",
+          metadata: {
+            flow: "generate_mentor_audio",
+          },
+        });
+
+        if (abuseProtection instanceof Response) {
+          return abuseProtection;
+        }
+      }
+    }
+
+    const elevenLabsApiKey = Deno.env.get("ELEVENLABS_API_KEY");
+    if (!elevenLabsApiKey) {
       throw new Error("ELEVENLABS_API_KEY is not configured");
     }
 
     const requestedMentorSlug = String(mentorSlug).trim().toLowerCase();
     const resolvedMentorSlug = legacyVoiceAliases[requestedMentorSlug] ?? requestedMentorSlug;
-
     const voiceConfig = mentorVoices[resolvedMentorSlug];
+
     if (!voiceConfig) {
       throw new Error(`No voice configuration found for mentor: ${requestedMentorSlug}`);
     }
@@ -169,34 +168,33 @@ serve(async (req) => {
     };
 
     console.log(`Generating audio for mentor ${requestedMentorSlug} (resolved=${resolvedMentorSlug}) with voice ${voiceConfig.voiceId}`);
-    console.log(`Applying voice settings for mentor ${resolvedMentorSlug}: ${JSON.stringify(voiceSettings)}`);
 
-    // Call ElevenLabs TTS API with timeout handling
+    const startedAt = deps.now();
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 55000); // 55 second timeout
-    
-    let elevenLabsResponse;
+    const timeoutId = setTimeout(() => controller.abort(), 55000);
+
+    let elevenLabsResponse: Response;
     try {
-      elevenLabsResponse = await fetch(
+      elevenLabsResponse = await guardedFetch(
         `https://api.elevenlabs.io/v1/text-to-speech/${voiceConfig.voiceId}`,
         {
           method: "POST",
           headers: {
-            "xi-api-key": ELEVENLABS_API_KEY,
+            "xi-api-key": elevenLabsApiKey,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
             text: script,
-            model_id: "eleven_multilingual_v2",
+            model_id: MODEL_NAME,
             voice_settings: voiceSettings,
           }),
           signal: controller.signal,
-        }
+        },
       );
     } catch (error) {
       clearTimeout(timeoutId);
-      const err = error as { name?: string; message?: string };
-      if (err?.name === 'AbortError') {
+      const err = error as { name?: string };
+      if (err?.name === "AbortError") {
         console.error("ElevenLabs API timeout after 55 seconds");
         throw new Error("Audio generation timed out. Please try again.");
       }
@@ -211,14 +209,10 @@ serve(async (req) => {
       throw new Error(`ElevenLabs API error: ${elevenLabsResponse.status}`);
     }
 
-    // Get audio as array buffer
     const audioBuffer = await elevenLabsResponse.arrayBuffer();
     const audioBytes = new Uint8Array(audioBuffer);
-
-    // Upload to Supabase Storage
-    const timestamp = Date.now();
-    const fileName = `${resolvedMentorSlug}_${timestamp}.mp3`;
-    const filePath = `${fileName}`;
+    const timestamp = deps.now();
+    const filePath = `${resolvedMentorSlug}_${timestamp}.mp3`;
 
     const { error: uploadError } = await supabaseAdmin.storage
       .from("mentor-audio")
@@ -232,24 +226,42 @@ serve(async (req) => {
       throw new Error(`Failed to upload audio: ${uploadError.message}`);
     }
 
-    // Get public URL
     const { data: urlData } = supabaseAdmin.storage
       .from("mentor-audio")
       .getPublicUrl(filePath);
 
     const audioUrl = urlData.publicUrl;
 
+    if (!requestAuth.isInternal) {
+      await logRateLimitedInvocation(supabaseAdmin, {
+        userId: requestAuth.userId,
+        templateKey: RATE_LIMIT_KEY,
+        inputData: { mentorSlug: requestedMentorSlug },
+        outputData: { audioUrl },
+        validationPassed: true,
+        modelUsed: MODEL_NAME,
+        responseTimeMs: deps.now() - startedAt,
+      });
+    }
+
     console.log(`Audio generated and uploaded successfully: ${audioUrl}`);
 
     return new Response(
       JSON.stringify({ audioUrl }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (error) {
+    if (isCostGuardrailBlockedError(error)) {
+      return buildCostGuardrailBlockedResponse(error, corsHeaders);
+    }
     console.error("Error in generate-mentor-audio function:", error);
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
-});
+}
+
+if (Deno.env.get("SUPABASE_FUNCTIONS_TEST") !== "1") {
+  serve((req) => handleGenerateMentorAudio(req));
+}

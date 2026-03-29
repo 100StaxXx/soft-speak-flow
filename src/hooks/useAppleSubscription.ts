@@ -15,6 +15,7 @@ import {
 } from '@/utils/appleIAP';
 import { parseFunctionInvokeError } from '@/utils/supabaseFunctionErrors';
 import { useToast } from './use-toast';
+import { useAuth } from './useAuth';
 
 const PRODUCT_FETCH_ERROR_MESSAGE = "Premium subscriptions are temporarily unavailable. Please try again later.";
 const PRODUCT_IDS = getAllIAPProductIds();
@@ -33,6 +34,7 @@ const toProductFetchErrorMessage = (error: unknown): string => {
 export function useAppleSubscription() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [products, setProducts] = useState<IAPProduct[]>([]);
   const [productsLoading, setProductsLoading] = useState(false);
@@ -120,6 +122,14 @@ export function useAppleSubscription() {
       });
       return false;
     }
+    if (!user?.id) {
+      toast({
+        title: "Sign in required",
+        description: "Please sign in before purchasing premium.",
+        variant: "destructive",
+      });
+      return false;
+    }
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
       toast({
         title: "Connection required",
@@ -158,7 +168,7 @@ export function useAppleSubscription() {
         return false;
       }
 
-      const purchase = await purchaseProduct(matchedProduct.identifier);
+      const purchase = await purchaseProduct(matchedProduct.identifier, user.id);
       
       console.log('[IAP] Purchase response:', JSON.stringify(purchase, null, 2));
       
@@ -219,6 +229,14 @@ export function useAppleSubscription() {
       });
       return;
     }
+    if (!user?.id) {
+      toast({
+        title: "Sign in required",
+        description: "Please sign in before restoring purchases.",
+        variant: "destructive",
+      });
+      return;
+    }
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
       toast({
         title: "Connection required",
@@ -230,7 +248,7 @@ export function useAppleSubscription() {
 
     setLoading(true);
     try {
-      const restored = await restorePurchases();
+      const restored = await restorePurchases(user.id);
       
       if (!restored || !Array.isArray(restored) || restored.length === 0) {
         toast({

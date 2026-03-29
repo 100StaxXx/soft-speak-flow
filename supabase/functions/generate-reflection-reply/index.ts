@@ -2,11 +2,16 @@ import { installOpenAICompatibilityShim } from "../_shared/aiClient.ts";
 installOpenAICompatibilityShim();
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 import { PromptBuilder } from "../_shared/promptBuilder.ts";
 import { OutputValidator } from "../_shared/outputValidator.ts";
+import { createSafeErrorResponse, requireProtectedRequest } from "../_shared/abuseProtection.ts";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
+import {
+  buildCostGuardrailBlockedResponse,
+  createCostGuardrailSession,
+  isCostGuardrailBlockedError,
+} from "../_shared/costGuardrails.ts";
 
 const ReflectionReplySchema = z.object({
   reflectionId: z.string().uuid(),
@@ -21,25 +26,30 @@ serve(async (req) => {
 
   const corsHeaders = getCorsHeaders(req);
   const startTime = Date.now();
+  let requestId: string = crypto.randomUUID();
 
   try {
-    // Get authentication token
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
-      throw new Error('Missing authorization header')
+    const protectedRequest = await requireProtectedRequest(req, {
+      profileKey: "ai.standard",
+      endpointName: "generate-reflection-reply",
+      allowServiceRole: false,
+    });
+    if (protectedRequest instanceof Response) {
+      return protectedRequest;
     }
+    const { auth, supabase, requestId: protectedRequestId } = protectedRequest;
+    requestId = protectedRequestId;
 
     const body = await req.json();
     const validation = ReflectionReplySchema.safeParse(body);
     
     if (!validation.success) {
-      return new Response(
-        JSON.stringify({ 
-          error: 'Invalid input', 
-          details: validation.error.errors 
-        }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return createSafeErrorResponse(req, {
+        status: 400,
+        code: "INVALID_INPUT",
+        error: "Invalid input",
+        requestId,
+      });
     }
 
     const { reflectionId, mood, note } = validation.data;
@@ -47,16 +57,18 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const openAIApiKey = Deno.env.get('OPENAI_API_KEY')!;
-    
-    const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Verify user authentication
-    const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
-    
-    if (authError || !user) {
-      throw new Error('Unauthorized')
-    }
+    const costGuardrails = createCostGuardrailSession({
+      supabase,
+      endpointKey: "generate-reflection-reply",
+      featureKey: "ai_mentor_chat",
+      userId: auth.userId,
+    });
+    const guardedFetch = costGuardrails.wrapFetch(fetch);
+    await costGuardrails.enforceAccess({
+      capabilities: ["text"],
+      providers: ["openai"],
+    });
 
     // Verify reflection ownership
     const { data: reflection, error: reflectionError } = await supabase
@@ -67,7 +79,7 @@ serve(async (req) => {
     
     if (reflectionError) throw reflectionError
     
-    if (reflection.user_id !== user.id) {
+    if (reflection.user_id !== auth.userId) {
       throw new Error('Unauthorized: You can only access your own reflections')
     }
 
@@ -76,7 +88,7 @@ serve(async (req) => {
 
     const { systemPrompt, userPrompt, validationRules, outputConstraints } = await promptBuilder.build({
       templateKey: 'reflection_reply',
-      userId: user.id,
+      userId: auth.userId,
       variables: {
         userMood: mood,
         userNote: note || 'No additional note provided',
@@ -87,7 +99,7 @@ serve(async (req) => {
     });
 
     // Call OpenAI
-    const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+    const aiResponse = await guardedFetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${openAIApiKey}`,
@@ -120,7 +132,7 @@ serve(async (req) => {
     await supabase
       .from('ai_output_validation_log')
       .insert({
-        user_id: user.id,
+        user_id: auth.userId,
         template_key: 'reflection_reply',
         input_data: { mood, note },
         output_data: { reply: aiReply },
@@ -151,11 +163,15 @@ serve(async (req) => {
     );
 
   } catch (error) {
+    if (isCostGuardrailBlockedError(error)) {
+      return buildCostGuardrailBlockedResponse(error, corsHeaders);
+    }
     console.error('Error in generate-reflection-reply:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    return new Response(
-      JSON.stringify({ error: errorMessage }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return createSafeErrorResponse(req, {
+      status: 500,
+      code: "INTERNAL_ERROR",
+      error: "Request could not be processed right now",
+      requestId,
+    });
   }
 });

@@ -18,14 +18,13 @@ npm install
 2. Configure environment values:
 
 ```sh
-cp .env.example .env
+cp .env.example .env.local
 ```
 
-3. Set at minimum:
+3. Set the client-visible values you need:
 
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_PUBLISHABLE_KEY`
-- `VITE_SUPABASE_PROJECT_ID`
 - `VITE_NATIVE_REDIRECT_BASE`
 
 4. Run the web app:
@@ -33,6 +32,29 @@ cp .env.example .env
 ```sh
 npm run dev
 ```
+
+## Secrets and envs
+
+- `.env.example` is the only tracked env template.
+- Keep real secrets in untracked files such as `.env.local`.
+- Only these vars should be exposed to frontend bundles:
+  - `VITE_APP_VERSION`
+  - `VITE_GOOGLE_IOS_CLIENT_ID`
+  - `VITE_GOOGLE_WEB_CLIENT_ID`
+  - `VITE_NATIVE_REDIRECT_BASE`
+  - `VITE_SENTRY_DSN`
+  - `VITE_SUPABASE_PUBLISHABLE_KEY`
+  - `VITE_SUPABASE_URL`
+- Server-only credentials must use non-`VITE_*` names.
+
+Secret scan commands:
+
+```sh
+npm run secrets:scan
+npm run hooks:install
+```
+
+More detail lives in [`docs/secrets-hardening.md`](/Users/macbookair/Developer/soft-speak-flow/docs/secrets-hardening.md).
 
 ## Backend ownership model
 
@@ -69,13 +91,48 @@ Required GitHub secrets:
 - `SUPABASE_PROJECT_REF`
 - `SUPABASE_DB_PASSWORD`
 - `SUPABASE_SERVICE_ROLE_KEY`
+- `SUPABASE_PUBLISHABLE_KEY`
+- `INTERNAL_FUNCTION_SECRET`
 
 Required Supabase project secrets (minimum):
 
 - `SUPABASE_URL`
 - `SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
+- `INTERNAL_FUNCTION_SECRET`
+- `INFLUENCER_DASHBOARD_SECRET`
 - `OPENAI_API_KEY`
+- `ELEVENLABS_API_KEY`
+- `COST_ALERT_WEBHOOK_URL`
+- `COST_ALERT_WEBHOOK_BEARER_TOKEN`
+
+Optional Supabase project secrets for emergency guardrails:
+
+- `COST_KILL_SWITCH_ALL`
+- `COST_KILL_SWITCH_TEXT`
+- `COST_KILL_SWITCH_IMAGE`
+- `COST_KILL_SWITCH_TTS`
+- `COST_KILL_SWITCH_MUSIC`
+- `COST_KILL_SWITCH_TRANSCRIPTION`
+- `COST_KILL_SWITCH_VIDEO`
+- `COST_KILL_SWITCH_ENDPOINTS`
+
+## Cost guardrails
+
+This repo now includes backend spend guardrails for high-cost AI and media routes:
+
+- runtime feature flags and monthly budgets in `public.cost_guardrail_config`
+- monthly state rollups in `public.cost_guardrail_state`
+- per-provider-call telemetry in `public.cost_events`
+- threshold/anomaly alert history in `public.cost_alert_events`
+- reporting views:
+  - `public.cost_driver_endpoints_daily_v`
+  - `public.cost_driver_users_daily_v`
+  - `public.cost_budget_status_v`
+
+Threshold alerts emit at `50%`, `80%`, `90%`, and `100%` of the configured monthly budget. When a scope hits `100%`, the backend blocks further spend for that scope until the budget is raised or the next UTC month starts.
+
+Manual shutdown and provider-side budget setup are documented in [`docs/cost-guardrails-runbook.md`](/Users/macbookair/Developer/soft-speak-flow/docs/cost-guardrails-runbook.md).
 
 ## iOS build troubleshooting
 

@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
-import { requireRequestAuth } from "../_shared/auth.ts";
+import { requireInternalRequest } from "../_shared/auth.ts";
 import {
   computeDeterministicJitterMinutes,
   getLocalDateTimeParts,
@@ -163,16 +163,9 @@ serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
 
   try {
-    const auth = await requireRequestAuth(req, corsHeaders);
+    const auth = await requireInternalRequest(req, corsHeaders);
     if (auth instanceof Response) {
       return auth;
-    }
-
-    if (!auth.isServiceRole) {
-      return new Response(
-        JSON.stringify({ error: "Forbidden" }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
     }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL");

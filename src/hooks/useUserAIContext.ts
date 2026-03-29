@@ -87,33 +87,22 @@ export function useUserAIContext() {
     gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
   });
 
-  // Fetch learning profile from database
-  const { 
-    data: learningProfile, 
-    isLoading: isLearningLoading,
-    refetch: refetchLearning,
-  } = useQuery({
-    queryKey: ['user-ai-learning', user?.id],
-    queryFn: async (): Promise<UserAILearning | null> => {
-      if (!user) return null;
-
-      const { data, error } = await supabase
-        .from('user_ai_learning')
-        .select('*')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (error) {
-        console.error('Error fetching AI learning profile:', error);
-        return null;
-      }
-
-      return data as UserAILearning | null;
-    },
-    enabled: !!user,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
-  });
+  const learningProfile: UserAILearning | null = enrichedContext ? {
+    id: '',
+    user_id: user?.id ?? '',
+    preferred_epic_duration: enrichedContext.preferredEpicDuration,
+    preferred_habit_difficulty: enrichedContext.preferredDifficulty,
+    preferred_habit_frequency: enrichedContext.preferredHabitFrequency,
+    common_contexts: enrichedContext.commonContexts,
+    peak_productivity_times: [],
+    successful_patterns: {},
+    failed_patterns: {},
+    preference_weights: enrichedContext.preferenceWeights,
+    interaction_count: 0,
+    acceptance_rate: 0,
+    modification_rate: 0,
+    last_interaction_at: null,
+  } : null;
 
   // Derived capacity signals
   const isAtEpicLimit = enrichedContext?.atEpicLimit ?? false;
@@ -122,11 +111,11 @@ export function useUserAIContext() {
 
   // Derived preferences with fallbacks
   const preferences = {
-    epicDuration: learningProfile?.preferred_epic_duration ?? enrichedContext?.preferredEpicDuration ?? 30,
-    habitDifficulty: learningProfile?.preferred_habit_difficulty ?? enrichedContext?.preferredDifficulty ?? 'medium',
-    habitFrequency: learningProfile?.preferred_habit_frequency ?? enrichedContext?.preferredHabitFrequency ?? 'daily',
-    commonContexts: learningProfile?.common_contexts ?? enrichedContext?.commonContexts ?? [],
-    preferenceWeights: learningProfile?.preference_weights ?? enrichedContext?.preferenceWeights ?? {},
+    epicDuration: enrichedContext?.preferredEpicDuration ?? 30,
+    habitDifficulty: enrichedContext?.preferredDifficulty ?? 'medium',
+    habitFrequency: enrichedContext?.preferredHabitFrequency ?? 'daily',
+    commonContexts: enrichedContext?.commonContexts ?? [],
+    preferenceWeights: enrichedContext?.preferenceWeights ?? {},
   };
 
   // Capacity warning message
@@ -146,9 +135,9 @@ export function useUserAIContext() {
     learningProfile,
     
     // Loading states
-    isLoading: isContextLoading || isLearningLoading,
+    isLoading: isContextLoading,
     isContextLoading,
-    isLearningLoading,
+    isLearningLoading: isContextLoading,
     
     // Capacity signals
     isAtEpicLimit,
@@ -167,9 +156,8 @@ export function useUserAIContext() {
     // Refetch functions
     refetch: () => {
       refetchContext();
-      refetchLearning();
     },
     refetchContext,
-    refetchLearning,
+    refetchLearning: refetchContext,
   };
 }

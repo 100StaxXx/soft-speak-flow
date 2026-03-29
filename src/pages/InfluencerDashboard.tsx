@@ -1,10 +1,9 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
   TrendingUp,
@@ -23,46 +22,55 @@ import { Share } from "@capacitor/share";
 import { Capacitor } from "@capacitor/core";
 import { safeLocalStorage } from "@/utils/storage";
 
-interface ReferralCode {
-  id: string;
-  code: string;
-  influencer_name: string;
-  influencer_email: string;
-  influencer_handle: string | null;
-  payout_identifier: string;
-  created_at: string;
+interface CreatorDashboardData {
+  creator: {
+    code: string;
+    name: string | null;
+    handle: string | null;
+    contact_email_masked: string | null;
+    payout_destination_masked: string | null;
+    created_at: string;
+  };
+  stats: {
+    total_signups: number;
+    active_subscribers: number;
+    pending_earnings: number;
+    requested_earnings: number;
+    paid_earnings: number;
+    total_earnings: number;
+  };
+  recent_signups: Array<{
+    id: string;
+    email_masked: string | null;
+    created_at: string;
+    subscription_status: string | null;
+  }>;
+  payout_history: Array<{
+    amount: number;
+    status: string;
+    payout_type: string;
+    created_at: string;
+    paid_at: string | null;
+  }>;
 }
 
-interface Conversion {
-  id: string;
-  email: string;
-  created_at: string;
-  subscription_status: string | null;
-}
-
-interface Payout {
-  id: string;
-  amount: number;
-  status: string;
-  payout_type: string;
-  created_at: string;
-  paid_at: string | null;
-}
+type DashboardError = Error & {
+  code?: string;
+};
 
 const InfluencerDashboard = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const [codeInput, setCodeInput] = useState("");
+  const queryClient = useQueryClient();
   const [verifiedCode, setVerifiedCode] = useState<string | null>(null);
   const [creatorAccessToken, setCreatorAccessToken] = useState<string | null>(null);
 
-  // Check for code in URL params or localStorage
   useEffect(() => {
     const urlCode = searchParams.get("code");
     const urlToken = searchParams.get("token");
     const storedCode = safeLocalStorage.getItem("influencer_code");
     const storedToken = safeLocalStorage.getItem("influencer_dashboard_token");
-    
+
     if (urlCode) {
       const normalizedCode = urlCode.toUpperCase();
       setVerifiedCode(normalizedCode);
@@ -75,91 +83,60 @@ const InfluencerDashboard = () => {
         setCreatorAccessToken(null);
         safeLocalStorage.removeItem("influencer_dashboard_token");
       }
-    } else if (storedCode) {
-      setVerifiedCode(storedCode);
 
-      if (storedToken) {
-        setCreatorAccessToken(storedToken);
-      }
+      navigate("/creator/dashboard", { replace: true });
+      return;
     }
-  }, [searchParams]);
 
-  // Fetch referral code details
-  const { data: referralCode, isLoading: codeLoading } = useQuery({
-    queryKey: ["influencer-code", verifiedCode],
+    if (storedCode) {
+      setVerifiedCode(storedCode);
+    }
+
+    if (storedToken) {
+      setCreatorAccessToken(storedToken);
+    }
+  }, [navigate, searchParams]);
+
+  const creatorDashboardQuery = useQuery({
+    queryKey: ["creator-dashboard", verifiedCode, creatorAccessToken],
+    enabled: Boolean(verifiedCode && creatorAccessToken),
+    retry: false,
     queryFn: async () => {
-      if (!verifiedCode) return null;
-
-      const { data, error } = await supabase
-        .from("referral_codes")
-        .select("*")
-        .eq("code", verifiedCode)
-        .eq("owner_type", "influencer")
-        .maybeSingle();
+      const { data, error } = await supabase.functions.invoke("get-creator-stats", {
+        body: {
+          referral_code: verifiedCode,
+          creator_access_token: creatorAccessToken,
+        },
+      });
 
       if (error) {
-        console.error("Error fetching influencer code:", error);
-        throw error;
+        const requestError = new Error(error.message) as DashboardError;
+        throw requestError;
       }
-      
-      if (!data) {
-        throw new Error("Invalid or expired influencer code");
+
+      if (data?.error) {
+        const responseError = new Error(data.error) as DashboardError;
+        responseError.code = data.code;
+        throw responseError;
       }
-      
-      return data as ReferralCode;
+
+      return data as CreatorDashboardData;
     },
-    enabled: !!verifiedCode,
   });
 
-  // Fetch conversions (users who used this code)
-  const { data: conversions } = useQuery({
-    queryKey: ["influencer-conversions", verifiedCode],
-    queryFn: async () => {
-      if (!verifiedCode) return [];
+  useEffect(() => {
+    if (!creatorDashboardQuery.error) {
+      return;
+    }
 
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("id, email, created_at, subscription_status")
-        .eq("referred_by_code", verifiedCode)
-        .order("created_at", { ascending: false });
+    const error = creatorDashboardQuery.error as DashboardError;
+    if (error.code === "INVALID_CREATOR_TOKEN") {
+      safeLocalStorage.removeItem("influencer_dashboard_token");
+      setCreatorAccessToken(null);
+      toast.error("Your secure creator session expired. Re-open the dashboard link from your email.");
+    }
+  }, [creatorDashboardQuery.error]);
 
-      if (error) throw error;
-      return data as Conversion[];
-    },
-    enabled: !!verifiedCode,
-  });
-
-  // Fetch payouts
-  const { data: payouts } = useQuery({
-    queryKey: ["influencer-payouts", referralCode?.id],
-    queryFn: async () => {
-      if (!referralCode?.id) return [];
-
-      const { data, error } = await supabase
-        .from("referral_payouts")
-        .select("*")
-        .eq("referral_code_id", referralCode.id)
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-      return data as Payout[];
-    },
-    enabled: !!referralCode?.id,
-  });
-
-  // Calculate stats
-  const stats = {
-    totalSignups: conversions?.length || 0,
-    activeSubscribers: conversions?.filter(c => c.subscription_status === "active").length || 0,
-    totalEarnings: payouts?.reduce((sum, p) => sum + Number(p.amount), 0) || 0,
-    pendingEarnings: payouts?.filter(p => p.status === "pending").reduce((sum, p) => sum + Number(p.amount), 0) || 0,
-    requestedEarnings: payouts?.filter(p => p.status === "requested").reduce((sum, p) => sum + Number(p.amount), 0) || 0,
-    paidEarnings: payouts?.filter(p => p.status === "paid").reduce((sum, p) => sum + Number(p.amount), 0) || 0,
-  };
-
-  const queryClient = useQueryClient();
-
-  // Request payout mutation
   const requestPayoutMutation = useMutation({
     mutationFn: async () => {
       if (!verifiedCode) {
@@ -175,44 +152,31 @@ const InfluencerDashboard = () => {
           creator_access_token: creatorAccessToken,
         },
       });
-      
+
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       return data;
     },
     onSuccess: (data) => {
       toast.success(data.message || "Payout request submitted!");
-      queryClient.invalidateQueries({ queryKey: ["influencer-payouts"] });
+      queryClient.invalidateQueries({ queryKey: ["creator-dashboard"] });
     },
     onError: (error: Error) => {
       toast.error(error.message || "Failed to request payout");
     },
   });
 
-  const handleVerifyCode = () => {
-    if (!codeInput.trim()) {
-      toast.error("Please enter your referral code");
-      return;
-    }
-    setVerifiedCode(codeInput.trim().toUpperCase());
-    safeLocalStorage.setItem("influencer_code", codeInput.trim().toUpperCase());
-    setCreatorAccessToken(null);
-    safeLocalStorage.removeItem("influencer_dashboard_token");
-  };
-
   const copyCode = () => {
-    if (verifiedCode) {
-      navigator.clipboard.writeText(verifiedCode);
-      toast.success("Code copied to clipboard!");
-    }
+    if (!verifiedCode) return;
+    navigator.clipboard.writeText(verifiedCode);
+    toast.success("Code copied to clipboard!");
   };
 
   const copyLink = () => {
-    if (verifiedCode) {
-      const link = `${window.location.origin}/?ref=${verifiedCode}`;
-      navigator.clipboard.writeText(link);
-      toast.success("Link copied to clipboard!");
-    }
+    if (!verifiedCode) return;
+    const link = `${window.location.origin}/?ref=${verifiedCode}`;
+    navigator.clipboard.writeText(link);
+    toast.success("Link copied to clipboard!");
   };
 
   const shareCode = async () => {
@@ -229,10 +193,11 @@ const InfluencerDashboard = () => {
       } catch (error) {
         console.error("Share failed:", error);
       }
-    } else {
-      navigator.clipboard.writeText(shareText);
-      toast.success("Promo text copied to clipboard!");
+      return;
     }
+
+    navigator.clipboard.writeText(shareText);
+    toast.success("Promo text copied to clipboard!");
   };
 
   const logout = () => {
@@ -243,48 +208,32 @@ const InfluencerDashboard = () => {
     navigate("/creator");
   };
 
-  // Code verification screen
-  if (!verifiedCode) {
+  if (!verifiedCode || !creatorAccessToken) {
     return (
       <div className="min-h-screen pb-nav-safe bg-gradient-to-b from-background via-background/95 to-primary/5 py-12 px-4">
         <div className="max-w-md mx-auto">
-          <Card className="p-8 rounded-3xl shadow-soft">
-            <div className="text-center mb-6">
-              <TrendingUp className="h-12 w-12 text-primary mx-auto mb-4" />
-              <h1 className="font-heading text-3xl font-bold mb-2">
-                Influencer Dashboard
-              </h1>
-              <p className="text-muted-foreground">
-                Enter your referral code to view your performance
-              </p>
-            </div>
-
-            <div className="space-y-4">
-              <Input
-                placeholder="Enter your code (e.g., COSMIQ-DARRYL)"
-                value={codeInput}
-                onChange={(e) => setCodeInput(e.target.value.toUpperCase())}
-                onKeyPress={(e) => e.key === "Enter" && handleVerifyCode()}
-                className="text-center text-lg font-mono"
-              />
+          <Card className="p-8 rounded-3xl shadow-soft text-center">
+            <TrendingUp className="h-12 w-12 text-primary mx-auto mb-4" />
+            <h1 className="font-heading text-3xl font-bold mb-3">
+              Secure Creator Access Required
+            </h1>
+            <p className="text-muted-foreground mb-6">
+              Open the secure dashboard link from your creator confirmation email to view your stats and request payouts.
+            </p>
+            <div className="space-y-3">
               <Button
-                onClick={handleVerifyCode}
                 className="w-full"
                 size="lg"
-              >
-                View Dashboard
-              </Button>
-            </div>
-
-            <div className="mt-6 pt-6 border-t text-center">
-              <p className="text-sm text-muted-foreground mb-2">
-                Don't have a code yet?
-              </p>
-              <Button
-                variant="outline"
                 onClick={() => navigate("/creator")}
               >
-                Create Referral Code
+                Go To Creator Portal
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={logout}
+              >
+                Clear Saved Session
               </Button>
             </div>
           </Card>
@@ -293,8 +242,7 @@ const InfluencerDashboard = () => {
     );
   }
 
-  // Loading state
-  if (codeLoading) {
+  if (creatorDashboardQuery.isLoading) {
     return (
       <div className="min-h-screen pb-nav-safe bg-gradient-to-b from-background via-background/95 to-primary/5 flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -302,57 +250,68 @@ const InfluencerDashboard = () => {
     );
   }
 
-  // Invalid code
-  if (!referralCode) {
+  if (creatorDashboardQuery.isError || !creatorDashboardQuery.data) {
+    const message = creatorDashboardQuery.error instanceof Error
+      ? creatorDashboardQuery.error.message
+      : "Unable to load creator dashboard";
+
     return (
       <div className="min-h-screen pb-nav-safe bg-gradient-to-b from-background via-background/95 to-primary/5 py-12 px-4">
         <div className="max-w-md mx-auto">
           <Card className="p-8 rounded-3xl shadow-soft text-center">
             <h1 className="font-heading text-2xl font-bold mb-4 text-destructive">
-              Invalid Code
+              Secure Link Needed
             </h1>
             <p className="text-muted-foreground mb-6">
-              The code "{verifiedCode}" was not found or is not an influencer code.
+              {message}
             </p>
-            <Button onClick={logout}>
-              Try Different Code
-            </Button>
+            <div className="space-y-3">
+              <Button onClick={logout} className="w-full">
+                Reopen Creator Portal
+              </Button>
+              <Button variant="outline" className="w-full" onClick={() => navigate("/creator")}>
+                Request A Fresh Link
+              </Button>
+            </div>
           </Card>
         </div>
       </div>
     );
   }
 
-  // Dashboard view
+  const dashboard = creatorDashboardQuery.data;
+  const creator = dashboard.creator;
+  const stats = dashboard.stats;
+  const conversions = dashboard.recent_signups;
+  const payouts = dashboard.payout_history;
+
   return (
     <div className="min-h-screen pb-nav-safe bg-gradient-to-b from-background via-background/95 to-primary/5 py-8 px-4">
       <div className="max-w-6xl mx-auto">
-        {/* Header */}
         <div className="mb-8 flex items-start justify-between">
           <div>
             <h1 className="font-heading text-4xl font-bold mb-2">
-              Welcome back, {referralCode.influencer_name}! 👋
+              Welcome back, {creator.name || creator.code}! 👋
             </h1>
             <p className="text-muted-foreground">
               Track your referrals and earnings
             </p>
           </div>
           <Button variant="outline" onClick={logout}>
-            Switch Code
+            Switch Link
           </Button>
         </div>
 
-        {/* Referral Code Card */}
         <Card className="p-6 mb-6 rounded-3xl shadow-soft">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div>
               <p className="text-sm text-muted-foreground mb-2">Your Referral Code</p>
               <code className="text-3xl font-bold font-mono text-primary">
-                {referralCode.code}
+                {creator.code}
               </code>
               <p className="text-sm text-muted-foreground mt-2">
-                {referralCode.influencer_handle && `${referralCode.influencer_handle} • `}
-                {referralCode.influencer_email}
+                {creator.handle && `${creator.handle} • `}
+                {creator.contact_email_masked || "Creator email hidden"}
               </p>
             </div>
             <div className="flex gap-2">
@@ -372,61 +331,61 @@ const InfluencerDashboard = () => {
           </div>
         </Card>
 
-        {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <Card className="p-6 rounded-3xl shadow-soft">
             <div className="flex items-center justify-between mb-4">
               <Users className="h-8 w-8 text-blue-500" />
-              <Badge variant="secondary">{stats.totalSignups}</Badge>
+              <Badge variant="secondary">{stats.total_signups}</Badge>
             </div>
-            <p className="text-2xl font-bold">{stats.totalSignups}</p>
+            <p className="text-2xl font-bold">{stats.total_signups}</p>
             <p className="text-sm text-muted-foreground">Total Sign-Ups</p>
           </Card>
 
           <Card className="p-6 rounded-3xl shadow-soft">
             <div className="flex items-center justify-between mb-4">
               <TrendingUp className="h-8 w-8 text-green-500" />
-              <Badge variant="secondary">{stats.activeSubscribers}</Badge>
+              <Badge variant="secondary">{stats.active_subscribers}</Badge>
             </div>
-            <p className="text-2xl font-bold">{stats.activeSubscribers}</p>
+            <p className="text-2xl font-bold">{stats.active_subscribers}</p>
             <p className="text-sm text-muted-foreground">Active Subscribers</p>
           </Card>
 
           <Card className="p-6 rounded-3xl shadow-soft">
             <div className="flex items-center justify-between mb-4">
               <DollarSign className="h-8 w-8 text-green-600" />
-              <Badge className="bg-green-500">${stats.totalEarnings.toFixed(2)}</Badge>
+              <Badge className="bg-green-500">${stats.total_earnings.toFixed(2)}</Badge>
             </div>
-            <p className="text-2xl font-bold">${stats.totalEarnings.toFixed(2)}</p>
+            <p className="text-2xl font-bold">${stats.total_earnings.toFixed(2)}</p>
             <p className="text-sm text-muted-foreground">Total Earnings</p>
           </Card>
 
           <Card className="p-6 rounded-3xl shadow-soft">
             <div className="flex items-center justify-between mb-4">
               <Clock className="h-8 w-8 text-yellow-500" />
-              <Badge variant="outline">${stats.pendingEarnings.toFixed(2)}</Badge>
+              <Badge variant="outline">${stats.pending_earnings.toFixed(2)}</Badge>
             </div>
-            <p className="text-2xl font-bold">${stats.pendingEarnings.toFixed(2)}</p>
+            <p className="text-2xl font-bold">${stats.pending_earnings.toFixed(2)}</p>
             <p className="text-sm text-muted-foreground">Pending Payout</p>
           </Card>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Recent Conversions */}
           <Card className="p-6 rounded-3xl shadow-soft">
             <h2 className="font-heading text-2xl font-semibold mb-4 flex items-center gap-2">
               <Users className="h-6 w-6 text-primary" />
               Recent Sign-Ups
             </h2>
-            {conversions && conversions.length > 0 ? (
+            {conversions.length > 0 ? (
               <div className="space-y-3">
-                {conversions.slice(0, 10).map((conversion) => (
+                {conversions.map((conversion) => (
                   <div
                     key={conversion.id}
                     className="flex items-center justify-between p-3 bg-secondary/20 rounded-lg"
                   >
                     <div>
-                      <p className="font-medium text-sm">{conversion.email}</p>
+                      <p className="font-medium text-sm">
+                        {conversion.email_masked || "Email hidden"}
+                      </p>
                       <p className="text-xs text-muted-foreground">
                         {new Date(conversion.created_at).toLocaleDateString()}
                       </p>
@@ -450,17 +409,16 @@ const InfluencerDashboard = () => {
             )}
           </Card>
 
-          {/* Payout History */}
           <Card className="p-6 rounded-3xl shadow-soft">
             <h2 className="font-heading text-2xl font-semibold mb-4 flex items-center gap-2">
               <DollarSign className="h-6 w-6 text-primary" />
               Payout History
             </h2>
-            {payouts && payouts.length > 0 ? (
+            {payouts.length > 0 ? (
               <div className="space-y-3">
-                {payouts.map((payout) => (
+                {payouts.map((payout, index) => (
                   <div
-                    key={payout.id}
+                    key={`${payout.created_at}-${index}`}
                     className="flex items-center justify-between p-3 bg-secondary/20 rounded-lg"
                   >
                     <div>
@@ -475,8 +433,8 @@ const InfluencerDashboard = () => {
                         payout.status === "paid"
                           ? "default"
                           : payout.status === "pending"
-                          ? "outline"
-                          : "secondary"
+                            ? "outline"
+                            : "secondary"
                       }
                     >
                       {payout.status === "paid" && <CheckCircle2 className="h-3 w-3 mr-1" />}
@@ -492,7 +450,7 @@ const InfluencerDashboard = () => {
               </p>
             )}
 
-            {stats.pendingEarnings >= 50 && (
+            {stats.pending_earnings >= 50 && (
               <div className="mt-4 p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
                 <div className="flex items-center justify-between gap-4">
                   <div>
@@ -500,12 +458,13 @@ const InfluencerDashboard = () => {
                       🎉 You've reached the $50 payout threshold!
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Request your payout to be sent to {referralCode.payout_identifier}
+                      Request your payout to be sent to{" "}
+                      {creator.payout_destination_masked || "your saved payout destination"}
                     </p>
                   </div>
                   <Button
                     onClick={() => requestPayoutMutation.mutate()}
-                    disabled={requestPayoutMutation.isPending || !creatorAccessToken}
+                    disabled={requestPayoutMutation.isPending}
                     className="shrink-0"
                   >
                     {requestPayoutMutation.isPending ? (
@@ -516,18 +475,13 @@ const InfluencerDashboard = () => {
                     Request Payout
                   </Button>
                 </div>
-                {!creatorAccessToken && (
-                  <p className="text-xs text-amber-600 mt-3">
-                    Secure session required. Re-open your dashboard link from your confirmation email.
-                  </p>
-                )}
               </div>
             )}
 
-            {stats.requestedEarnings > 0 && (
+            {stats.requested_earnings > 0 && (
               <div className="mt-4 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
                 <p className="text-sm font-medium text-blue-600">
-                  ⏳ Payout of ${stats.requestedEarnings.toFixed(2)} is pending review
+                  ⏳ Payout of ${stats.requested_earnings.toFixed(2)} is pending review
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
                   Our team will process your payout request shortly.
@@ -535,17 +489,16 @@ const InfluencerDashboard = () => {
               </div>
             )}
 
-            {stats.pendingEarnings < 50 && stats.pendingEarnings > 0 && (
+            {stats.pending_earnings < 50 && stats.pending_earnings > 0 && (
               <div className="mt-4 p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
                 <p className="text-sm font-medium">
-                  ${(50 - stats.pendingEarnings).toFixed(2)} away from $50 minimum payout
+                  ${(50 - stats.pending_earnings).toFixed(2)} away from $50 minimum payout
                 </p>
               </div>
             )}
           </Card>
         </div>
 
-        {/* Promo Kit */}
         <Card className="p-6 mt-6 rounded-3xl shadow-soft">
           <h2 className="font-heading text-2xl font-semibold mb-4">
             📢 Promo Kit
@@ -556,14 +509,14 @@ const InfluencerDashboard = () => {
           <div className="bg-secondary/20 p-4 rounded-lg">
             <p className="text-sm mb-3">
               ✨ Transform your habits into an epic journey with Cosmiq! Use my code{" "}
-              <strong>{referralCode.code}</strong> or click:{" "}
-              {window.location.origin}/?ref={referralCode.code}
+              <strong>{creator.code}</strong> or click:{" "}
+              {window.location.origin}/?ref={creator.code}
             </p>
             <Button
               variant="outline"
               size="sm"
               onClick={() => {
-                const text = `✨ Transform your habits into an epic journey with Cosmiq! Use my code ${referralCode.code} or click: ${window.location.origin}/?ref=${referralCode.code}`;
+                const text = `✨ Transform your habits into an epic journey with Cosmiq! Use my code ${creator.code} or click: ${window.location.origin}/?ref=${creator.code}`;
                 navigator.clipboard.writeText(text);
                 toast.success("Promo caption copied!");
               }}

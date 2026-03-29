@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { requireAdminOrServiceRoleAuth } from "../_shared/auth.ts";
 
 /**
  * Process PayPal Payout
@@ -40,38 +41,9 @@ serve(async (req) => {
     const paypalBaseUrl = getPayPalApiUrl();
     console.log(`Processing payout in ${paypalEnv} mode (${paypalBaseUrl})`);
 
-    // Verify admin authentication
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const token = authHeader.replace("Bearer ", "");
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
-
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Check if user is admin
-    const { data: userRole } = await supabaseClient
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .eq("role", "admin")
-      .single();
-
-    if (!userRole) {
-      return new Response(JSON.stringify({ error: "Admin access required" }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    const requestAuth = await requireAdminOrServiceRoleAuth(req, corsHeaders);
+    if (requestAuth instanceof Response) {
+      return requestAuth;
     }
 
     const { payout_id } = await req.json();

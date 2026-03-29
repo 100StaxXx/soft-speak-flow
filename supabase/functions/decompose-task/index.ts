@@ -2,6 +2,7 @@ import { installOpenAICompatibilityShim } from "../_shared/aiClient.ts";
 installOpenAICompatibilityShim();
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createSafeErrorResponse, requireProtectedRequest } from "../_shared/abuseProtection.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -14,14 +15,29 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  let requestId: string = crypto.randomUUID();
+
   try {
+    const protectedRequest = await requireProtectedRequest(req, {
+      profileKey: "ai.standard",
+      endpointName: "decompose-task",
+      allowServiceRole: false,
+    });
+    if (protectedRequest instanceof Response) {
+      return protectedRequest;
+    }
+    const { auth, requestId: protectedRequestId } = protectedRequest;
+    requestId = protectedRequestId;
+
     const { taskTitle, taskDescription } = await req.json();
 
     if (!taskTitle) {
-      return new Response(
-        JSON.stringify({ error: 'Task title is required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return createSafeErrorResponse(req, {
+        status: 400,
+        code: "INVALID_INPUT",
+        error: "Task title is required",
+        requestId,
+      });
     }
 
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
@@ -135,9 +151,11 @@ You MUST use the decompose_task function to return your response.`;
 
   } catch (error) {
     console.error('Error in decompose-task:', error);
-    return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return createSafeErrorResponse(req, {
+      status: 500,
+      code: "INTERNAL_ERROR",
+      error: "Request could not be processed right now",
+      requestId,
+    });
   }
 });

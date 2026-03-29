@@ -9,7 +9,6 @@ import { Play, Pause, Sparkles, SkipBack, SkipForward, ChevronDown, ChevronUp, W
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useMentorPersonality } from "@/hooks/useMentorPersonality";
-import { safeLocalStorage } from "@/utils/storage";
 import { getActiveWordIndex } from "@/utils/captionTiming";
 import { parseFunctionInvokeError, toUserFacingFunctionError } from "@/utils/supabaseFunctionErrors";
 import { Capacitor } from "@capacitor/core";
@@ -41,11 +40,6 @@ interface DailyPepTalk {
 }
 
 const log = logger.scope("TodaysPepTalk");
-const TRANSCRIPT_SYNC_MAX_ATTEMPTS = 3;
-const TRANSCRIPT_SYNC_BASE_RETRY_MS = 1200;
-const TRANSCRIPT_SYNC_COOLDOWN_MS = 10 * 60 * 1000;
-const TRANSCRIPT_SYNC_IN_FLIGHT_MS = 45 * 1000;
-const transcriptSyncNextAttemptById = new Map<string, number>();
 
 function isCaptionWord(word: unknown): word is CaptionWord {
   if (!word || typeof word !== "object") {
@@ -69,59 +63,6 @@ function sanitizeTranscript(transcript: unknown): CaptionWord[] {
     .filter(isCaptionWord)
     .slice()
     .sort((a, b) => (a.start - b.start) || (a.end - b.end));
-}
-
-function getTranscriptSyncCooldownKey(pepTalkId: string): string {
-  return `pep_talk_transcript_sync_cooldown:${pepTalkId}`;
-}
-
-function getStoredTranscriptSyncCooldown(pepTalkId: string): number {
-  const stored = safeLocalStorage.getItem(getTranscriptSyncCooldownKey(pepTalkId));
-  if (!stored) return 0;
-  const parsed = Number(stored);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function clearTranscriptSyncCooldown(pepTalkId: string): void {
-  safeLocalStorage.removeItem(getTranscriptSyncCooldownKey(pepTalkId));
-  transcriptSyncNextAttemptById.delete(pepTalkId);
-}
-
-function setTranscriptSyncCooldown(pepTalkId: string, cooldownUntil: number): void {
-  safeLocalStorage.setItem(getTranscriptSyncCooldownKey(pepTalkId), String(cooldownUntil));
-  transcriptSyncNextAttemptById.set(pepTalkId, cooldownUntil);
-}
-
-function getFunctionErrorName(error: unknown): string {
-  if (!error || typeof error !== "object") {
-    return "";
-  }
-  const name = (error as { name?: unknown }).name;
-  return typeof name === "string" ? name : "";
-}
-
-function getFunctionInvokeStatus(error: unknown): number | null {
-  if (!error || typeof error !== "object" || !("context" in error)) {
-    return null;
-  }
-
-  const context = (error as { context?: unknown }).context;
-  return context instanceof Response ? context.status : null;
-}
-
-function isTransientTranscriptSyncStatus(status: number | null): boolean {
-  if (status === null) {
-    return false;
-  }
-  return status === 429 || (status >= 500 && status < 600);
-}
-
-function getTranscriptSyncRetryDelay(attempt: number): number {
-  return TRANSCRIPT_SYNC_BASE_RETRY_MS * (2 ** Math.max(0, attempt - 1));
-}
-
-function wait(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 export const TodaysPepTalk = memo(() => {
@@ -357,126 +298,6 @@ export const TodaysPepTalk = memo(() => {
       setGenerationStage('idle');
     }
   };
-
-  useEffect(() => {
-    const pepTalkId = pepTalk?.id;
-    const audioUrl = pepTalk?.audio_url;
-    if (!pepTalkId || !audioUrl) return;
-
-    const transcript = sanitizeTranscript(pepTalk?.transcript);
-    if (transcript.length > 0) return;
-
-    const now = Date.now();
-    const inMemoryCooldownUntil = transcriptSyncNextAttemptById.get(pepTalkId) ?? 0;
-    const storedCooldownUntil = getStoredTranscriptSyncCooldown(pepTalkId);
-    const cooldownUntil = Math.max(inMemoryCooldownUntil, storedCooldownUntil);
-
-    if (cooldownUntil > now) {
-      transcriptSyncNextAttemptById.set(pepTalkId, cooldownUntil);
-      log.debug("Skipping transcript sync during cooldown window", {
-        pepTalkId,
-        remainingMs: cooldownUntil - now,
-      });
-      return;
-    }
-
-    transcriptSyncNextAttemptById.set(pepTalkId, now + TRANSCRIPT_SYNC_IN_FLIGHT_MS);
-    let cancelled = false;
-
-    const runSync = async () => {
-      for (let attempt = 1; attempt <= TRANSCRIPT_SYNC_MAX_ATTEMPTS; attempt += 1) {
-        try {
-          const { data, error } = await supabase.functions.invoke('sync-daily-pep-talk-transcript', {
-            body: { id: pepTalkId },
-          });
-
-          if (cancelled) return;
-
-          if (error) {
-            const status = getFunctionInvokeStatus(error);
-            const retryable = isTransientTranscriptSyncStatus(status);
-            const errorName = getFunctionErrorName(error);
-            const errorMessage = error instanceof Error ? error.message : String(error);
-
-            log.info("Transcript sync returned non-blocking error", {
-              pepTalkId,
-              attempt,
-              status,
-              retryable,
-              errorName,
-              errorMessage,
-            });
-
-            if (retryable && attempt < TRANSCRIPT_SYNC_MAX_ATTEMPTS) {
-              const delay = getTranscriptSyncRetryDelay(attempt);
-              await wait(delay);
-              if (cancelled) return;
-              continue;
-            }
-            break;
-          }
-
-          const syncedScript = typeof data?.script === "string" ? data.script : null;
-          const validatedTranscript = sanitizeTranscript(data?.transcript);
-
-          if (!syncedScript && validatedTranscript.length === 0) {
-            break;
-          }
-
-          setPepTalk((prev: DailyPepTalk | null) => {
-            if (!prev) return prev;
-            const hasStoredScript = typeof prev.script === "string" && prev.script.trim().length > 0;
-            const nextScript = hasStoredScript ? prev.script : (syncedScript ?? prev.script);
-            const nextTranscript = validatedTranscript.length > 0 ? validatedTranscript : prev.transcript;
-            const shouldUpdate = nextScript !== prev.script || JSON.stringify(nextTranscript) !== JSON.stringify(prev.transcript);
-            return shouldUpdate
-              ? {
-                ...prev,
-                script: nextScript,
-                transcript: nextTranscript,
-              }
-              : prev;
-          });
-
-          if (validatedTranscript.length > 0) {
-            clearTranscriptSyncCooldown(pepTalkId);
-            return;
-          }
-
-          break;
-        } catch (error) {
-          if (cancelled) return;
-
-          const message = error instanceof Error ? error.message : String(error);
-          log.info("Transcript sync invocation failed (non-blocking)", {
-            pepTalkId,
-            attempt,
-            message,
-          });
-
-          if (attempt < TRANSCRIPT_SYNC_MAX_ATTEMPTS) {
-            const delay = getTranscriptSyncRetryDelay(attempt);
-            await wait(delay);
-            if (cancelled) return;
-            continue;
-          }
-        }
-      }
-
-      const cooldownExpiresAt = Date.now() + TRANSCRIPT_SYNC_COOLDOWN_MS;
-      setTranscriptSyncCooldown(pepTalkId, cooldownExpiresAt);
-      log.info("Applied transcript sync cooldown after failed attempts", {
-        pepTalkId,
-        cooldownMs: TRANSCRIPT_SYNC_COOLDOWN_MS,
-      });
-    };
-
-    void runSync();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [pepTalk?.id, pepTalk?.audio_url, pepTalk?.transcript]);
 
   // Check if XP was already awarded for this specific pep talk
   useEffect(() => {

@@ -134,6 +134,32 @@ function getEnvValue(key, dotenvValues) {
   return process.env[key] || dotenvValues[key] || null;
 }
 
+function isTruthyEnvValue(value) {
+  return ["1", "true", "yes", "on"].includes(String(value || "").trim().toLowerCase());
+}
+
+function hasEndpointKillSwitch(dotenvValues, endpointName) {
+  const raw = getEnvValue("COST_KILL_SWITCH_ENDPOINTS", dotenvValues) || "";
+  const endpoints = raw
+    .split(",")
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+  return endpoints.includes(String(endpointName).trim().toLowerCase());
+}
+
+function getCostGuardrailBlock(dotenvValues) {
+  if (isTruthyEnvValue(getEnvValue("COST_KILL_SWITCH_ALL", dotenvValues))) {
+    return "COST_KILL_SWITCH_ALL";
+  }
+  if (isTruthyEnvValue(getEnvValue("COST_KILL_SWITCH_IMAGE", dotenvValues))) {
+    return "COST_KILL_SWITCH_IMAGE";
+  }
+  if (hasEndpointKillSwitch(dotenvValues, "generate-adversary-image")) {
+    return "COST_KILL_SWITCH_ENDPOINTS(generate-adversary-image)";
+  }
+  return null;
+}
+
 function toTitleCase(value) {
   return value
     .split("_")
@@ -262,22 +288,32 @@ async function invokeTopUp({
 
 async function main() {
   const args = parseCliArgs(process.argv.slice(2));
-  const dotenvValues = loadDotEnv(path.resolve(process.cwd(), ".env"));
+  const dotenvValues = {
+    ...loadDotEnv(path.resolve(process.cwd(), ".env")),
+    ...loadDotEnv(path.resolve(process.cwd(), ".env.local")),
+  };
+  const costGuardrailBlock = getCostGuardrailBlock(dotenvValues);
+  if (costGuardrailBlock) {
+    console.log("Skipping adversary image prewarm because a cost guardrail is active.", {
+      reason: costGuardrailBlock,
+    });
+    return;
+  }
 
-  const supabaseUrl =
-    getEnvValue("SUPABASE_URL", dotenvValues) ||
-    getEnvValue("VITE_SUPABASE_URL", dotenvValues);
+  const supabaseUrl = getEnvValue("SUPABASE_URL", dotenvValues);
   const serviceRoleKey = getEnvValue("SUPABASE_SERVICE_ROLE_KEY", dotenvValues);
-  const functionAuthKey = getEnvValue("SUPABASE_FUNCTION_AUTH_KEY", dotenvValues) || serviceRoleKey;
+  const functionAuthKey =
+    getEnvValue("SUPABASE_FUNCTION_AUTH_KEY", dotenvValues) ||
+    getEnvValue("INTERNAL_FUNCTION_SECRET", dotenvValues);
 
   if (!supabaseUrl) {
-    throw new Error("Missing SUPABASE_URL (or VITE_SUPABASE_URL) in env/.env");
+    throw new Error("Missing SUPABASE_URL in env/.env.local");
   }
   if (!serviceRoleKey) {
-    throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY in env/.env");
+    throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY in env/.env.local");
   }
   if (!functionAuthKey) {
-    throw new Error("Missing SUPABASE_FUNCTION_AUTH_KEY (or SUPABASE_SERVICE_ROLE_KEY) in env/.env");
+    throw new Error("Missing SUPABASE_FUNCTION_AUTH_KEY or INTERNAL_FUNCTION_SECRET in env/.env.local");
   }
 
   const combos = [];

@@ -3,6 +3,12 @@ installOpenAICompatibilityShim();
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
+import { requireInternalRequest } from "../_shared/auth.ts";
+import {
+  buildCostGuardrailBlockedResponse,
+  createCostGuardrailSession,
+  isCostGuardrailBlockedError,
+} from "../_shared/costGuardrails.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,6 +18,11 @@ const corsHeaders = {
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  const auth = await requireInternalRequest(req, corsHeaders);
+  if (auth instanceof Response) {
+    return auth;
   }
 
   try {
@@ -33,14 +44,28 @@ serve(async (req) => {
 
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-    const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
     if (!OPENAI_API_KEY) {
       throw new Error("OPENAI_API_KEY is not configured");
     }
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      throw new Error("Supabase service credentials are not configured");
+    }
 
     // Fetch mentor details
-    const supabase = createClient(SUPABASE_URL!, SUPABASE_ANON_KEY!);
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    const costGuardrails = createCostGuardrailSession({
+      supabase,
+      endpointKey: "generate-mentor-script",
+      featureKey: "ai_pep_talks",
+    });
+    const guardedFetch = costGuardrails.wrapFetch(fetch);
+    await costGuardrails.enforceAccess({
+      capabilities: ["text"],
+      providers: ["openai"],
+    });
+
     const { data: mentor, error: mentorError } = await supabase
       .from("mentors")
       .select("*")
@@ -220,7 +245,7 @@ GOAL: Two scripts on the same topic should feel like different conversations ent
 
 Write ONLY the script text, nothing else.`;
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const response = await guardedFetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${OPENAI_API_KEY}`,
@@ -266,6 +291,9 @@ Write ONLY the script text, nothing else.`;
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
+    if (isCostGuardrailBlockedError(error)) {
+      return buildCostGuardrailBlockedResponse(error, corsHeaders);
+    }
     console.error("Error in generate-mentor-script function:", error);
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),

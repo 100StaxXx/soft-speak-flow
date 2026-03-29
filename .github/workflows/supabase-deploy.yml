@@ -46,6 +46,8 @@ jobs:
             APNS_ENVIRONMENT
             OPENAI_API_KEY
             ELEVENLABS_API_KEY
+            COST_ALERT_WEBHOOK_URL
+            COST_ALERT_WEBHOOK_BEARER_TOKEN
           )
 
           missing=0

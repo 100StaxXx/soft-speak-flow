@@ -4,8 +4,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   profile: null as Record<string, unknown> | null,
   profileLoading: false,
-  isSubscribed: false,
-  subscriptionLoading: false,
+  accessState: {
+    has_access: false,
+    access_source: "none",
+    trial_ends_at: null,
+    subscribed: false,
+  },
+  accessLoading: false,
 }));
 
 const localStorageState = vi.hoisted(() => ({
@@ -19,10 +24,10 @@ vi.mock("./useProfile", () => ({
   }),
 }));
 
-vi.mock("./useSubscription", () => ({
-  useSubscription: () => ({
-    isActive: mocks.isSubscribed,
-    isLoading: mocks.subscriptionLoading,
+vi.mock("./useAccessState", () => ({
+  useAccessState: () => ({
+    accessState: mocks.accessState,
+    isLoading: mocks.accessLoading,
   }),
 }));
 
@@ -31,8 +36,6 @@ import { useAccessStatus } from "./useAccessStatus";
 const createProfile = (overrides: Partial<Record<string, unknown>> = {}) => ({
   id: "user-1",
   created_at: "2026-02-01T00:00:00.000Z",
-  trial_started_at: null,
-  trial_ends_at: null,
   onboarding_data: null,
   ...overrides,
 });
@@ -64,8 +67,13 @@ describe("useAccessStatus", () => {
     installLocalStorageMock();
     localStorageState.store.clear();
     mocks.profileLoading = false;
-    mocks.subscriptionLoading = false;
-    mocks.isSubscribed = false;
+    mocks.accessLoading = false;
+    mocks.accessState = {
+      has_access: false,
+      access_source: "none",
+      trial_ends_at: null,
+      subscribed: false,
+    };
     mocks.profile = createProfile();
   });
 
@@ -74,8 +82,6 @@ describe("useAccessStatus", () => {
       onboarding_data: {
         guided_tutorial: { completed: true },
       },
-      trial_started_at: null,
-      trial_ends_at: null,
     });
 
     const { result } = renderHook(() => useAccessStatus());
@@ -85,10 +91,12 @@ describe("useAccessStatus", () => {
   });
 
   it("allows access during active trial", () => {
-    mocks.profile = createProfile({
-      trial_started_at: "2026-02-20T00:00:00.000Z",
+    mocks.accessState = {
+      has_access: true,
+      access_source: "trial",
       trial_ends_at: "2026-03-01T00:00:00.000Z",
-    });
+      subscribed: false,
+    };
 
     const { result } = renderHook(() => useAccessStatus());
 
@@ -98,10 +106,12 @@ describe("useAccessStatus", () => {
   });
 
   it("blocks access when trial is expired and user is not subscribed", () => {
-    mocks.profile = createProfile({
-      trial_started_at: "2026-01-01T00:00:00.000Z",
+    mocks.accessState = {
+      has_access: false,
+      access_source: "none",
       trial_ends_at: "2026-01-08T00:00:00.000Z",
-    });
+      subscribed: false,
+    };
 
     const { result } = renderHook(() => useAccessStatus());
 
@@ -111,7 +121,12 @@ describe("useAccessStatus", () => {
   });
 
   it("keeps access when user is subscribed regardless of trial state", () => {
-    mocks.isSubscribed = true;
+    mocks.accessState = {
+      has_access: true,
+      access_source: "subscription",
+      trial_ends_at: null,
+      subscribed: true,
+    };
     mocks.profile = createProfile({
       onboarding_data: {
         guided_tutorial: { completed: true },
@@ -126,12 +141,16 @@ describe("useAccessStatus", () => {
   });
 
   it("shows pre-trial signup gate after tutorial completion even if legacy trial dates exist", () => {
+    mocks.accessState = {
+      has_access: true,
+      access_source: "trial",
+      trial_ends_at: "2026-03-01T00:00:00.000Z",
+      subscribed: false,
+    };
     mocks.profile = createProfile({
       onboarding_data: {
         guided_tutorial: { completed: true },
       },
-      trial_started_at: "2026-02-20T00:00:00.000Z",
-      trial_ends_at: "2026-03-01T00:00:00.000Z",
     });
 
     const { result } = renderHook(() => useAccessStatus());

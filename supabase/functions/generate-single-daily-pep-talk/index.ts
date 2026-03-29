@@ -2,12 +2,19 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { summarizeFunctionInvokeError } from "../_shared/functionInvokeError.ts";
 import { selectThemeForDate, resolveMentorSlug } from "../_shared/mentorPepTalkConfig.ts";
+import { invokeInternalFunction } from "../_shared/internalFunctionAuth.ts";
 import {
   buildReadyTranscriptState,
   buildRetryTranscriptState,
   parseTranscriptSyncPayload,
   TRANSCRIPT_STATUS_PENDING,
 } from "../_shared/transcriptRetryState.ts";
+import { requireUserAuth } from "../_shared/auth.ts";
+import {
+  buildCostGuardrailBlockedResponse,
+  createCostGuardrailSession,
+  isCostGuardrailBlockedError,
+} from "../_shared/costGuardrails.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -100,6 +107,11 @@ serve(async (req) => {
   }
 
   try {
+    const auth = await requireUserAuth(req, corsHeaders);
+    if (auth instanceof Response) {
+      return auth;
+    }
+
     let mentorSlugInput: string | null = null;
     try {
       const body = await req.json();
@@ -122,6 +134,16 @@ serve(async (req) => {
       return buildErrorResponse(500, "Missing Supabase environment variables", { code: "MISSING_ENV" });
     }
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const costGuardrails = createCostGuardrailSession({
+      supabase,
+      endpointKey: "generate-single-daily-pep-talk",
+      featureKey: "ai_pep_talks",
+      userId: auth.userId,
+    });
+    await costGuardrails.enforceAccess({
+      capabilities: ["text", "tts"],
+      providers: ["openai", "elevenlabs"],
+    });
 
     // Get today's date
     const today = new Date();
@@ -175,22 +197,12 @@ serve(async (req) => {
     // Generate pep talk using existing function via direct fetch (edge-to-edge call)
     console.log(`Calling generate-full-mentor-audio for ${resolvedMentorSlug}...`);
     
-    const audioResponse = await fetch(
-      `${supabaseUrl}/functions/v1/generate-full-mentor-audio`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${supabaseServiceKey}`,
-        },
-        body: JSON.stringify({
-          mentorSlug: resolvedMentorSlug,
-          topic_category: theme.topic_category,
-          intensity: theme.intensity,
-          emotionalTriggers: theme.triggers
-        }),
-      }
-    );
+    const audioResponse = await invokeInternalFunction("generate-full-mentor-audio", {
+      mentorSlug: resolvedMentorSlug,
+      topic_category: theme.topic_category,
+      intensity: theme.intensity,
+      emotionalTriggers: theme.triggers,
+    });
 
     if (!audioResponse.ok) {
       const upstreamRaw = await audioResponse.text();
@@ -295,12 +307,14 @@ serve(async (req) => {
     // Non-blocking transcript sync to reduce client-side sync retries.
     try {
       console.log(`Syncing transcript for daily pep talk ${dailyPepTalk.id}...`);
-      const { data: syncData, error: syncError } = await supabase.functions.invoke('sync-daily-pep-talk-transcript', {
-        body: { id: dailyPepTalk.id },
+      const syncResponse = await invokeInternalFunction("sync-daily-pep-talk-transcript", {
+        id: dailyPepTalk.id,
       });
+      const syncRaw = await syncResponse.text();
+      const syncData = syncRaw.length > 0 ? JSON.parse(syncRaw) : null;
 
-      if (syncError) {
-        const summary = await summarizeFunctionInvokeError(syncError);
+      if (!syncResponse.ok) {
+        const summary = await summarizeFunctionInvokeError(new Error(syncRaw || `HTTP ${syncResponse.status}`));
         console.error(`Transcript sync failed for ${dailyPepTalk.id}:`, summary);
         const retryState = buildRetryTranscriptState({
           currentAttemptCount,
@@ -362,6 +376,9 @@ serve(async (req) => {
     );
 
   } catch (error) {
+    if (isCostGuardrailBlockedError(error)) {
+      return buildCostGuardrailBlockedResponse(error, corsHeaders);
+    }
     console.error('Error in generate-single-daily-pep-talk:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return buildErrorResponse(500, errorMessage, { code: "INTERNAL_ERROR" });

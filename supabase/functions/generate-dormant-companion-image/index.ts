@@ -4,13 +4,40 @@ installOpenAICompatibilityShim();
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { resolveCompanionImageSizeForUser } from "../_shared/companionImagePolicy.ts";
+import { errorResponse, type InternalRequestAuth, requireInternalRequest } from "../_shared/auth.ts";
+import {
+  buildCostGuardrailBlockedResponse,
+  createCostGuardrailSession,
+  isCostGuardrailBlockedError,
+} from "../_shared/costGuardrails.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-serve(async (req) => {
+interface GenerateDormantCompanionImageDeps {
+  authenticate: (req: Request, corsHeaders: HeadersInit) => Promise<InternalRequestAuth | Response>;
+  createSupabaseClient: () => any;
+  createCostGuardrailSessionFn: any;
+  fetchImpl: typeof fetch;
+}
+
+const defaultDeps: GenerateDormantCompanionImageDeps = {
+  authenticate: requireInternalRequest,
+  createSupabaseClient: () => {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    return createClient(supabaseUrl, supabaseServiceKey);
+  },
+  createCostGuardrailSessionFn: createCostGuardrailSession,
+  fetchImpl: fetch,
+};
+
+export async function handleGenerateDormantCompanionImage(
+  req: Request,
+  deps: GenerateDormantCompanionImageDeps = defaultDeps,
+): Promise<Response> {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -18,41 +45,52 @@ serve(async (req) => {
   const requestStartedAt = Date.now();
 
   try {
-    const { companionId, userId } = await req.json();
-
-    if (!companionId || !userId) {
-      throw new Error("Missing companionId or userId");
+    const requestAuth = await deps.authenticate(req, corsHeaders);
+    if (requestAuth instanceof Response) {
+      return requestAuth;
     }
 
-    const imageSize = resolveCompanionImageSizeForUser(userId);
-    console.log(`[DormantImagePolicy] user=${userId} image_size=${imageSize}`);
+    const body = await req.json().catch(() => ({}));
+    const companionId = typeof body?.companionId === "string" ? body.companionId : null;
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const openAIApiKey = Deno.env.get("OPENAI_API_KEY");
-
-    if (!openAIApiKey) {
-      throw new Error("OPENAI_API_KEY not configured");
+    if (!companionId) {
+      return errorResponse(400, "Missing companionId", corsHeaders);
     }
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-    // Get companion data
+    const supabase = deps.createSupabaseClient();
     const { data: companion, error: companionError } = await supabase
       .from("user_companion")
-      .select("current_image_url, dormant_image_url, spirit_animal, companion_name")
+      .select("id, user_id, current_image_url, dormant_image_url, spirit_animal, companion_name")
       .eq("id", companionId)
-      .single();
+      .maybeSingle();
 
-    if (companionError || !companion) {
-      throw new Error("Companion not found");
+    if (companionError) {
+      console.error("[Dormant Image] Failed to fetch companion:", companionError);
+      return errorResponse(500, "Failed to load companion", corsHeaders);
     }
 
-    // If already has dormant image, return it
+    if (!companion) {
+      return errorResponse(404, "Companion not found", corsHeaders);
+    }
+
+    const imageSize = resolveCompanionImageSizeForUser(companion.user_id);
+    console.log(`[DormantImagePolicy] user=${companion.user_id} image_size=${imageSize}`);
+    const costGuardrails = deps.createCostGuardrailSessionFn({
+      supabase,
+      endpointKey: "generate-dormant-companion-image",
+      featureKey: "ai_companion_images",
+      userId: companion.user_id,
+    });
+    const guardedFetch = costGuardrails.wrapFetch(deps.fetchImpl);
+    await costGuardrails.enforceAccess({
+      capabilities: ["image"],
+      providers: ["openai"],
+    });
+
     if (companion.dormant_image_url) {
       return new Response(
         JSON.stringify({ success: true, imageUrl: companion.dormant_image_url, cached: true }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
@@ -60,9 +98,13 @@ serve(async (req) => {
       throw new Error("No current image to base dormant image on");
     }
 
+    const openAIApiKey = Deno.env.get("OPENAI_API_KEY");
+    if (!openAIApiKey) {
+      throw new Error("OPENAI_API_KEY not configured");
+    }
+
     console.log(`[Dormant Image] Generating for companion ${companionId}`);
 
-    // Generate dormant/sleeping version of the companion
     const editPrompt = `Transform this creature into a peaceful sleeping state:
 - Eyes gently closed, serene expression
 - Curled up in a comfortable resting position
@@ -75,7 +117,7 @@ serve(async (req) => {
 - Preserve the core identity and features of the creature
 - Add a subtle ethereal glow suggesting the spirit is dormant but alive`;
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const response = await guardedFetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${openAIApiKey}`,
@@ -110,12 +152,11 @@ serve(async (req) => {
       throw new Error("No image generated");
     }
 
-    // Upload to Supabase Storage
     const base64Data = generatedImage.replace(/^data:image\/\w+;base64,/, "");
-    const imageBuffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
-    
+    const imageBuffer = Uint8Array.from(atob(base64Data), (char) => char.charCodeAt(0));
+
     const fileName = `dormant/${companionId}-${Date.now()}.png`;
-    
+
     const { error: uploadError } = await supabase.storage
       .from("companion-images")
       .upload(fileName, imageBuffer, {
@@ -132,25 +173,36 @@ serve(async (req) => {
       .from("companion-images")
       .getPublicUrl(fileName);
 
-    // Update companion with dormant image
-    await supabase
+    const { error: updateError } = await supabase
       .from("user_companion")
       .update({ dormant_image_url: publicUrl.publicUrl })
       .eq("id", companionId);
+
+    if (updateError) {
+      console.error("[Dormant Image] Failed to save image:", updateError);
+      throw updateError;
+    }
 
     console.log(`[Dormant Image] Generated and saved for companion ${companionId}`);
 
     return new Response(
       JSON.stringify({ success: true, imageUrl: publicUrl.publicUrl }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (error) {
+    if (isCostGuardrailBlockedError(error)) {
+      return buildCostGuardrailBlockedResponse(error, corsHeaders);
+    }
     console.error("[Dormant Image] Error:", error);
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } finally {
     console.log(`[DormantImageTiming] total_ms=${Date.now() - requestStartedAt}`);
   }
-});
+}
+
+if (Deno.env.get("SUPABASE_FUNCTIONS_TEST") !== "1") {
+  serve((req) => handleGenerateDormantCompanionImage(req));
+}

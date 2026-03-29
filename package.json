@@ -8,6 +8,9 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
+    "secrets:scan": "node scripts/scan-secrets.mjs",
+    "secrets:scan:staged": "node scripts/scan-secrets.mjs --staged",
+    "hooks:install": "node scripts/install-git-hooks.mjs",
     "preview": "vite preview",
     "postinstall": "patch-package",
     "cards:snapshot": "tsx scripts/cardSnapshot.ts",
@@ -26,7 +29,10 @@
     "previews:validate": "node --import tsx scripts/validate-badge-reward-previews.ts",
     "previews:build": "npm run previews:manifest && npm run previews:render",
     "previews:pipeline": "npm run previews:build && npm run previews:sync && npm run previews:validate",
-    "adversaries:prewarm": "node scripts/prewarm-adversary-images.mjs"
+    "adversaries:prewarm": "node scripts/prewarm-adversary-images.mjs",
+    "test:security:db": "supabase test db supabase/tests/security/01_rls_and_storage.sql supabase/tests/security/02_entitlements_and_rpc.sql",
+    "test:security:functions": "./scripts/run-security-function-tests.sh",
+    "test:security": "npm run test:security:db && npm run test:security:functions"
   },
   "dependencies": {
     "@capacitor-community/apple-sign-in": "^7.1.0",

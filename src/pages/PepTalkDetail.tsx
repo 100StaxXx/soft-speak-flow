@@ -36,7 +36,6 @@ const PepTalkDetail = () => {
   const [pepTalk, setPepTalk] = useState<PepTalk | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState(0);
-  const [isTranscribing, setIsTranscribing] = useState(false);
 
   const fetchPepTalk = async (pepTalkId: string) => {
     try {
@@ -74,33 +73,6 @@ const PepTalkDetail = () => {
     }
      
   }, [id]);
-
-  const handleTranscribe = async () => {
-    if (!pepTalk || !id) return;
-    
-    setIsTranscribing(true);
-    toast.info("Transcribing audio... This may take a minute.");
-    
-    try {
-      const { data, error } = await supabase.functions.invoke('transcribe-audio', {
-        body: { audioUrl: pepTalk.audio_url, pepTalkId: id }
-      });
-
-      if (error) throw error;
-
-      if (data?.transcript && Array.isArray(data.transcript)) {
-        toast.success("Transcript is ready!");
-        await fetchPepTalk(id);
-      } else {
-        throw new Error('No transcript data returned');
-      }
-    } catch (error) {
-      console.error('Transcription error:', error);
-      toast.error("Failed to prepare transcript");
-    } finally {
-      setIsTranscribing(false);
-    }
-  };
 
   if (loading) {
     return (
@@ -241,26 +213,9 @@ const PepTalkDetail = () => {
                     </div>
                     <div>
                       <h3 className="font-semibold mb-2">No Transcript Available</h3>
-                      <p className="text-sm text-muted-foreground mb-4">
-                        Prepare a word-by-word transcript with timestamps
+                      <p className="text-sm text-muted-foreground">
+                        Transcript preparation now runs through internal backend jobs only.
                       </p>
-                      <Button 
-                        onClick={handleTranscribe}
-                        disabled={isTranscribing}
-                        className="w-full bg-gradient-to-r from-primary to-primary/80 hover:shadow-glow transition-all"
-                      >
-                        {isTranscribing ? (
-                          <>
-                            <div className="animate-spin mr-2 h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
-                            Transcribing...
-                          </>
-                        ) : (
-                          <>
-                            <FileText className="mr-2 h-4 w-4" />
-                            Prepare Transcript
-                          </>
-                        )}
-                      </Button>
                     </div>
                   </div>
                 </GlassCard>

@@ -10,9 +10,7 @@ const TOKEN_TTL_SECONDS = 60 * 60 * 24 * 90; // 90 days
 function getTokenSecret(): string {
   const configured = Deno.env.get("INFLUENCER_DASHBOARD_SECRET");
   if (configured && configured.length >= 32) return configured;
-
-  // Backward-compatible fallback so existing environments still work.
-  return Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  throw new Error("INFLUENCER_DASHBOARD_SECRET must be configured and at least 32 characters long");
 }
 
 function base64UrlEncode(input: string): string {
@@ -90,30 +88,38 @@ export async function verifyCreatorAccessToken(
 
   const [payloadB64, providedSignature] = parts;
 
+  let payload: Partial<CreatorAccessTokenPayload>;
   try {
     const decoded = base64UrlDecode(payloadB64);
-    const payload = JSON.parse(decoded) as Partial<CreatorAccessTokenPayload>;
+    payload = JSON.parse(decoded) as Partial<CreatorAccessTokenPayload>;
+  } catch (_error) {
+    return { valid: false, reason: "Invalid token payload" };
+  }
 
-    if (payload.v !== 1) {
-      return { valid: false, reason: "Unsupported token version" };
-    }
+  if (payload.v !== 1) {
+    return { valid: false, reason: "Unsupported token version" };
+  }
 
-    if (typeof payload.code !== "string" || payload.code.toUpperCase() !== expectedCode.toUpperCase()) {
-      return { valid: false, reason: "Token does not match referral code" };
-    }
+  if (typeof payload.code !== "string" || payload.code.toUpperCase() !== expectedCode.toUpperCase()) {
+    return { valid: false, reason: "Token does not match referral code" };
+  }
 
-    const now = Math.floor(Date.now() / 1000);
-    if (typeof payload.exp !== "number" || payload.exp < now) {
-      return { valid: false, reason: "Token expired" };
-    }
+  const now = Math.floor(Date.now() / 1000);
+  if (typeof payload.exp !== "number" || payload.exp < now) {
+    return { valid: false, reason: "Token expired" };
+  }
 
+  try {
     const expectedSignature = await signPayload(payloadB64);
     if (!timingSafeEqual(expectedSignature, providedSignature)) {
       return { valid: false, reason: "Invalid token signature" };
     }
-
-    return { valid: true };
-  } catch (_error) {
-    return { valid: false, reason: "Invalid token payload" };
+  } catch (error) {
+    return {
+      valid: false,
+      reason: error instanceof Error ? error.message : "Creator dashboard token secret is not configured",
+    };
   }
+
+  return { valid: true };
 }

@@ -134,6 +134,19 @@ export function useSmartDayPlanner(planDate: Date = new Date()) {
 
   const dateStr = format(planDate, 'yyyy-MM-dd');
 
+  const fetchUsageSnapshot = useCallback(async (increment: boolean) => {
+    const { data, error: usageError } = await supabase.functions.invoke('record-daily-planning-use', {
+      body: { increment },
+    });
+
+    if (usageError) throw usageError;
+
+    return {
+      timesUsed: Number(data?.times_used || 0),
+      lastUsedAt: typeof data?.last_used_at === 'string' ? data.last_used_at : null,
+    };
+  }, []);
+
   // Fetch habits with streaks (3+ days)
   const fetchHabitsWithStreaks = useCallback(async () => {
     if (!user?.id) return;
@@ -161,7 +174,7 @@ export function useSmartDayPlanner(planDate: Date = new Date()) {
     } catch (err) {
       console.error('Error fetching habits with streaks:', err);
     }
-  }, [user?.id]);
+  }, [user?.id, fetchUsageSnapshot]);
 
   // Fetch upcoming epic milestones (due within 7 days)
   const fetchUpcomingMilestones = useCallback(async () => {
@@ -340,11 +353,14 @@ export function useSmartDayPlanner(planDate: Date = new Date()) {
     
     setIsLoadingPreferences(true);
     try {
-      const { data, error: prefError } = await supabase
-        .from('daily_planning_preferences')
-        .select('*')
-        .eq('user_id', user.id)
-        .maybeSingle();
+      const [{ data, error: prefError }, usageSnapshot] = await Promise.all([
+        supabase
+          .from('daily_planning_preferences')
+          .select('*')
+          .eq('user_id', user.id)
+          .maybeSingle(),
+        fetchUsageSnapshot(false).catch(() => ({ timesUsed: 0, lastUsedAt: null })),
+      ]);
 
       if (prefError) throw prefError;
 
@@ -357,7 +373,7 @@ export function useSmartDayPlanner(planDate: Date = new Date()) {
           includeRelationshipTasks: data.include_relationship_tasks ?? true,
           coldContactThresholdDays: data.cold_contact_threshold_days || 14,
           relationshipTasksCount: data.relationship_tasks_count || 2,
-          timesUsed: data.times_used || 0,
+          timesUsed: usageSnapshot.timesUsed,
         });
         // Start at quick_start if preferences exist
         setStep('quick_start');
@@ -387,16 +403,16 @@ export function useSmartDayPlanner(planDate: Date = new Date()) {
           default_flex_hours: context.flexTimeHours,
           default_day_shape: context.dayShape,
           include_relationship_tasks: context.includeRelationshipTasks,
-          times_used: (savedPreferences?.timesUsed || 0) + 1,
-          last_used_at: new Date().toISOString(),
         }, { onConflict: 'user_id' });
 
       if (upsertError) throw upsertError;
+      const usageSnapshot = await fetchUsageSnapshot(true);
+      setSavedPreferences((prev) => prev ? { ...prev, timesUsed: usageSnapshot.timesUsed } : prev);
       toast.success('Settings saved for faster planning!');
     } catch (err) {
       console.error('Error saving preferences:', err);
     }
-  }, [user?.id, context, savedPreferences]);
+  }, [user?.id, context, fetchUsageSnapshot]);
 
   // Reset preferences
   const resetPreferences = useCallback(async () => {
@@ -432,13 +448,8 @@ export function useSmartDayPlanner(planDate: Date = new Date()) {
     // Update usage count (non-blocking)
     if (user?.id) {
       try {
-        await supabase
-          .from('daily_planning_preferences')
-          .update({ 
-            times_used: (savedPreferences.timesUsed || 0) + 1,
-            last_used_at: new Date().toISOString(),
-          })
-          .eq('user_id', user.id);
+        const usageSnapshot = await fetchUsageSnapshot(true);
+        setSavedPreferences((prev) => prev ? { ...prev, timesUsed: usageSnapshot.timesUsed } : prev);
       } catch (err) {
         console.warn('Failed to update usage count:', err);
       }
@@ -446,7 +457,7 @@ export function useSmartDayPlanner(planDate: Date = new Date()) {
     
     medium();
     setStep('anchors');
-  }, [savedPreferences, user?.id, medium]);
+  }, [savedPreferences, user?.id, medium, fetchUsageSnapshot]);
 
   const updateContext = useCallback((updates: Partial<PlanContext>) => {
     setContext(prev => ({ ...prev, ...updates }));

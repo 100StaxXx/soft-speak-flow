@@ -1,8 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { Resend } from "https://esm.sh/resend@2.0.0";
+import { applyAbuseProtection, createSafeErrorResponse, getClientIpAddress } from "../_shared/abuseProtection.ts";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
+import { hasUserRole, requireRequestAuth } from "../_shared/auth.ts";
 import { createCreatorAccessToken } from "../_shared/influencerAuth.ts";
+import { verifyTurnstileToken } from "../_shared/turnstile.ts";
 
 /**
  * Create Influencer Referral Code
@@ -23,10 +26,6 @@ import { createCreatorAccessToken } from "../_shared/influencerAuth.ts";
  * }
  */
 
-// Rate limit: 3 requests per IP per hour
-const RATE_LIMIT_MAX = 3;
-const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
-
 function generateCodeFromHandle(handle: string): string {
   // Remove @ and special chars, uppercase
   const clean = handle.replace(/[@\s-]/g, "").toUpperCase();
@@ -34,23 +33,6 @@ function generateCodeFromHandle(handle: string): string {
   const base = clean.substring(0, 8);
   const random = Math.random().toString(36).substring(2, 6).toUpperCase();
   return `COSMIQ-${base}${random}`;
-}
-
-/**
- * Get client IP address securely
- * Only trusts cf-connecting-ip as Supabase Edge Functions run behind Cloudflare
- * Falls back to combined hash for rate limiting when IP unavailable
- */
-function getClientIP(req: Request): string {
-  // Supabase Edge Functions run behind Cloudflare, so cf-connecting-ip is reliable
-  const cfConnectingIP = req.headers.get("cf-connecting-ip");
-  if (cfConnectingIP) {
-    return cfConnectingIP;
-  }
-  
-  // For non-Cloudflare environments (dev/test), fall back but log warning
-  console.warn("cf-connecting-ip not available, rate limiting may be less effective");
-  return "unknown";
 }
 
 /**
@@ -74,56 +56,6 @@ function sanitizeError(error: unknown): string {
     }
   }
   return "An error occurred. Please try again.";
-}
-
-async function checkRateLimit(
-  supabaseClient: any,
-  ip: string,
-  email: string
-): Promise<{ allowed: boolean; message?: string }> {
-  const oneHourAgo = new Date(Date.now() - RATE_LIMIT_WINDOW_MS).toISOString();
-  
-  // Check requests from this IP OR this email in the last hour (combined protection)
-  const { count: ipCount, error: ipError } = await supabaseClient
-    .from("influencer_creation_log")
-    .select("*", { count: "exact", head: true })
-    .eq("ip_address", ip)
-    .gte("created_at", oneHourAgo);
-  
-  if (ipError) {
-    console.error("Rate limit check (IP) failed:", ipError);
-  }
-  
-  // Also check by email to prevent bypass via IP spoofing
-  const { count: emailCount, error: emailError } = await supabaseClient
-    .from("influencer_creation_log")
-    .select("*", { count: "exact", head: true })
-    .eq("email", email.toLowerCase())
-    .gte("created_at", oneHourAgo);
-  
-  if (emailError) {
-    console.error("Rate limit check (email) failed:", emailError);
-  }
-  
-  // Block if either IP or email exceeds limit
-  const effectiveIpCount = ipCount ?? 0;
-  const effectiveEmailCount = emailCount ?? 0;
-  
-  if (effectiveIpCount >= RATE_LIMIT_MAX || effectiveEmailCount >= RATE_LIMIT_MAX) {
-    console.warn(`Rate limit exceeded - IP: ${ip} (${effectiveIpCount}), Email: ${email} (${effectiveEmailCount})`);
-    return { 
-      allowed: false, 
-      message: `Rate limit exceeded. Maximum ${RATE_LIMIT_MAX} code requests per hour.` 
-    };
-  }
-  
-  // Log this request for future rate limiting
-  await supabaseClient.from("influencer_creation_log").insert({
-    ip_address: ip,
-    email: email.toLowerCase(),
-  });
-  
-  return { allowed: true };
 }
 
 async function sendConfirmationEmail(
@@ -246,6 +178,27 @@ async function sendConfirmationEmail(
   }
 }
 
+async function isTrustedCreatorSignupRequest(
+  req: Request,
+  corsHeaders: HeadersInit,
+): Promise<boolean> {
+  if (!req.headers.get("Authorization")) {
+    return false;
+  }
+
+  const requestAuth = await requireRequestAuth(req, corsHeaders);
+  if (requestAuth instanceof Response) {
+    console.warn("Ignoring invalid Authorization header on creator signup request");
+    return false;
+  }
+
+  if (requestAuth.isServiceRole) {
+    return true;
+  }
+
+  return hasUserRole(requestAuth.userId, "admin");
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return handleCors(req);
@@ -258,8 +211,10 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
+    const requestId = crypto.randomUUID();
 
-    const { name, email, handle, paypal_email, promotion_channel } = await req.json();
+    const trustedRequest = await isTrustedCreatorSignupRequest(req, corsHeaders);
+    const { name, email, handle, paypal_email, promotion_channel, turnstile_token } = await req.json();
 
     // Validate required fields
     if (!name || !email || !handle || !paypal_email) {
@@ -285,18 +240,40 @@ serve(async (req) => {
     }
 
     // SECURITY: Check rate limit before processing (by IP + email)
-    const clientIP = getClientIP(req);
-    const rateLimitResult = await checkRateLimit(supabaseClient, clientIP, email);
-    
-    if (!rateLimitResult.allowed) {
-      console.warn(`Rate limit blocked request from IP: ${clientIP}, email: ${email}`);
-      return new Response(
-        JSON.stringify({ error: rateLimitResult.message }),
-        {
-          status: 429,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
+    const clientIP = getClientIpAddress(req);
+
+    if (!trustedRequest) {
+      const turnstileCheck = await verifyTurnstileToken(
+        typeof turnstile_token === "string" ? turnstile_token : "",
+        clientIP,
       );
+
+      if (!turnstileCheck.success) {
+        return new Response(
+          JSON.stringify({ error: turnstileCheck.message ?? "Security challenge failed" }),
+          {
+            status: turnstileCheck.status ?? 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+    }
+
+    const inviteProtection = await applyAbuseProtection(req, supabaseClient, {
+      profileKey: "invite",
+      endpointName: "create-influencer-code",
+      requestId,
+      ipAddress: clientIP,
+      emailTarget: email,
+      blockedMessage: "Too many invite attempts. Please try again later.",
+      metadata: {
+        flow: "create_influencer_code",
+        trustedRequest,
+      },
+    });
+
+    if (inviteProtection instanceof Response) {
+      return inviteProtection;
     }
 
     const appUrl = Deno.env.get("APP_URL") || "https://cosmiq.quest";
@@ -315,9 +292,24 @@ serve(async (req) => {
       // Return existing code instead of creating duplicate
       const appLink = `${appUrl}/?ref=${existingCode.code}`;
       const dashboardUrl = `${appUrl}/creator/dashboard?code=${existingCode.code}&token=${encodeURIComponent(creatorAccessToken)}`;
-      
-      // Send reminder email with existing code
-      await sendConfirmationEmail(name, email, existingCode.code, dashboardUrl, appLink);
+      let reminderEmailSent = false;
+
+      const emailProtection = await applyAbuseProtection(req, supabaseClient, {
+        profileKey: "email.send",
+        endpointName: "create-influencer-code",
+        requestId: crypto.randomUUID(),
+        ipAddress: clientIP,
+        emailTarget: email,
+        blockedMessage: "Too many email requests. Please try again later.",
+        metadata: {
+          flow: "create_influencer_code_existing_code_email",
+        },
+      });
+
+      if (!(emailProtection instanceof Response)) {
+        await sendConfirmationEmail(name, email, existingCode.code, dashboardUrl, appLink);
+        reminderEmailSent = true;
+      }
       
       return new Response(
         JSON.stringify({
@@ -325,7 +317,10 @@ serve(async (req) => {
           link: appLink,
           creator_access_token: creatorAccessToken,
           dashboard_url: dashboardUrl,
-          message: "You already have a referral code. We've sent you a reminder email!",
+          email_sent: reminderEmailSent,
+          message: reminderEmailSent
+            ? "You already have a referral code. We've sent you a reminder email!"
+            : "You already have a referral code.",
         }),
         {
           status: 200,
@@ -384,8 +379,23 @@ serve(async (req) => {
     const creatorAccessToken = await createCreatorAccessToken(code);
     const dashboardUrl = `${appUrl}/creator/dashboard?code=${code}&token=${encodeURIComponent(creatorAccessToken)}`;
 
-    // Send confirmation email
-    await sendConfirmationEmail(name, email, code, dashboardUrl, appLink);
+    let confirmationEmailSent = false;
+    const emailProtection = await applyAbuseProtection(req, supabaseClient, {
+      profileKey: "email.send",
+      endpointName: "create-influencer-code",
+      requestId: crypto.randomUUID(),
+      ipAddress: clientIP,
+      emailTarget: email,
+      blockedMessage: "Too many email requests. Please try again later.",
+      metadata: {
+        flow: "create_influencer_code_confirmation_email",
+      },
+    });
+
+    if (!(emailProtection instanceof Response)) {
+      await sendConfirmationEmail(name, email, code, dashboardUrl, appLink);
+      confirmationEmailSent = true;
+    }
 
     console.log(`Created influencer code for ${name} (@${handle}): ${code} from IP: ${clientIP}`);
 
@@ -395,6 +405,7 @@ serve(async (req) => {
         link: appLink,
         creator_access_token: creatorAccessToken,
         dashboard_url: dashboardUrl,
+        email_sent: confirmationEmailSent,
         promo_caption: `✨ Transform your habits into an epic journey! Use my code ${code} or click: ${appLink}`,
       }),
       {
@@ -404,12 +415,11 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error("Error creating influencer code:", error);
-    return new Response(
-      JSON.stringify({ error: sanitizeError(error) }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
+    return createSafeErrorResponse(req, {
+      status: 500,
+      code: "CREATOR_CODE_FAILED",
+      error: sanitizeError(error),
+      requestId: crypto.randomUUID(),
+    });
   }
 });

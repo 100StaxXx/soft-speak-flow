@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
+import { TurnstileWidget } from "@/components/security/TurnstileWidget";
 import { toast } from "sonner";
 import { 
   Sparkles, 
@@ -22,6 +23,9 @@ import { StarfieldBackground } from "@/components/StarfieldBackground";
 
 export default function Partners() {
   const navigate = useNavigate();
+  const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined;
+  const turnstileRequired = import.meta.env.PROD || Boolean(turnstileSiteKey);
+  const turnstileUnavailable = turnstileRequired && !turnstileSiteKey;
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -29,16 +33,32 @@ export default function Partners() {
     paypal_email: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [turnstileResetSignal, setTurnstileResetSignal] = useState(0);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (turnstileUnavailable) {
+      toast.error("Creator signup is temporarily unavailable until the security check is configured.");
+      return;
+    }
+
+    if (turnstileSiteKey && !turnstileToken) {
+      toast.error("Please complete the security check.");
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
       const { data, error } = await supabase.functions.invoke(
         "create-influencer-code",
         {
-          body: formData,
+          body: {
+            ...formData,
+            turnstile_token: turnstileToken,
+          },
         }
       );
 
@@ -58,6 +78,10 @@ export default function Partners() {
       );
     } finally {
       setIsSubmitting(false);
+      if (turnstileSiteKey) {
+        setTurnstileToken(null);
+        setTurnstileResetSignal((value) => value + 1);
+      }
     }
   };
 
@@ -310,11 +334,31 @@ export default function Partners() {
                   </p>
                 </div>
 
+                {turnstileSiteKey ? (
+                  <div>
+                    <Label>Security Check</Label>
+                    <div className="mt-2 rounded-lg border border-border/60 p-3">
+                      <TurnstileWidget
+                        siteKey={turnstileSiteKey}
+                        onTokenChange={setTurnstileToken}
+                        resetSignal={turnstileResetSignal}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      This helps protect the creator portal from automated abuse.
+                    </p>
+                  </div>
+                ) : turnstileUnavailable ? (
+                  <p className="text-sm text-destructive">
+                    Creator signup is temporarily unavailable until the security check is configured.
+                  </p>
+                ) : null}
+
                 <Button
                   type="submit"
                   className="w-full"
                   size="lg"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || turnstileUnavailable || (Boolean(turnstileSiteKey) && !turnstileToken)}
                 >
                   {isSubmitting ? "Creating..." : "Get My Referral Code"}
                 </Button>

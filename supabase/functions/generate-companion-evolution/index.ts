@@ -6,6 +6,11 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { checkRateLimit, RATE_LIMITS, createRateLimitResponse } from "../_shared/rateLimiter.ts";
 import { resolveCompanionImageSizeForUser } from "../_shared/companionImagePolicy.ts";
 import {
+  buildCostGuardrailBlockedResponse,
+  createCostGuardrailSession,
+  isCostGuardrailBlockedError,
+} from "../_shared/costGuardrails.ts";
+import {
   SYSTEM_PROMPT_STAGE1_COLOR_DISTRIBUTION,
   STAGE1_COVERAGE_TARGETS,
   buildStageOneColorPlacementGuidance,
@@ -270,6 +275,17 @@ serve(async (req) => {
     console.log(`[CompanionEvolutionPolicy] user=${resolvedUserId} image_size=${imageSize}`);
 
     const supabase = createClient(supabaseUrl, supabaseKey);
+    const costGuardrails = createCostGuardrailSession({
+      supabase,
+      endpointKey: "generate-companion-evolution",
+      featureKey: "ai_companion_evolution",
+      userId: resolvedUserId,
+    });
+    const guardedFetch = costGuardrails.wrapFetch(fetch);
+    await costGuardrails.enforceAccess({
+      capabilities: ["image", "text"],
+      providers: ["openai"],
+    });
 
     // Rate limiting check - evolution is expensive
     const rateLimit = await checkRateLimit(supabase, resolvedUserId, 'companion-evolution', RATE_LIMITS['companion-evolution']);
@@ -563,7 +579,7 @@ MOOD: Pure wonder, new beginning, innocent potential, sacred first breath, prote
         console.log("Analyzing previous image with vision AI...");
         
         try {
-          const visionResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+          const visionResponse = await guardedFetch("https://api.openai.com/v1/chat/completions", {
             method: "POST",
             headers: {
               "Authorization": `Bearer ${openAIApiKey}`,
@@ -844,7 +860,7 @@ Generate an ULTIMATE COSMIQ EVOLUTION that achieves grandiose divinity while mai
     const shouldUseSystemPrompt = nextStage !== 0;
 
     const generateEvolutionImage = async (prompt: string): Promise<string> => {
-      const imageResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+      const imageResponse = await guardedFetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${openAIApiKey}`,
@@ -899,7 +915,7 @@ Generate an ULTIMATE COSMIQ EVOLUTION that achieves grandiose divinity while mai
         };
       }
 
-      const complianceResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+      const complianceResponse = await guardedFetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${openAIApiKey}`,
@@ -1110,6 +1126,9 @@ Rules:
     );
 
   } catch (error) {
+    if (isCostGuardrailBlockedError(error)) {
+      return buildCostGuardrailBlockedResponse(error, corsHeaders);
+    }
     console.error("Error in generate-companion-evolution:", error);
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
     const errorCode = resolveServerErrorCode(errorMessage);

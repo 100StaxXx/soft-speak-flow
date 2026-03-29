@@ -82,23 +82,20 @@ export const useCompanionRegenerate = () => {
 
       // Update companion with new image and increment regeneration count atomically
       const { data: updatedRow, error: updateError } = await supabase
-        .from("user_companion")
-        .update({
-          current_image_url: imageUrl,
-          dormant_image_url: null,
-          neglected_image_url: null,
-          scarred_image_url: null,
-          image_regenerations_used: regenerationsUsed + 1,
+        .rpc("consume_companion_regeneration", {
+          p_companion_id: companion.id,
+          p_image_url: imageUrl,
         })
-        .eq("id", companion.id)
-        .eq("user_id", user.id)
-        .eq("image_regenerations_used", regenerationsUsed)
-        .select("image_regenerations_used")
         .single();
 
       if (updateError) {
         const errorCode = (updateError as { code?: string })?.code;
-        if (errorCode === "PGRST116") {
+        const errorMessage = updateError.message?.toLowerCase() || "";
+        if (
+          errorCode === "PGRST116"
+          || errorMessage.includes("no look refreshes remaining")
+          || errorMessage.includes("companion not found")
+        ) {
           throw new Error("Look refresh already used. Please refresh to continue.");
         }
         throw updateError;

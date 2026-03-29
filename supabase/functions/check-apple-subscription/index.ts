@@ -2,6 +2,10 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { handleCors, jsonResponse, errorResponse } from "../_shared/cors.ts";
 import {
+  buildAccessStateResponse,
+  fetchAccountEntitlementForUser,
+} from "../_shared/accountEntitlements.ts";
+import {
   fetchSubscriptionForUser,
   buildSubscriptionResponse,
   fetchActivePromoAccessForUser,
@@ -16,26 +20,27 @@ serve(async (req) => {
   try {
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      {
-        global: {
-          headers: { Authorization: req.headers.get("Authorization") ?? "" },
-        },
-      }
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
 
+    const authHeader = req.headers.get("Authorization") ?? "";
     const {
       data: { user },
       error: authError,
-    } = await supabaseClient.auth.getUser();
+    } = await supabaseClient.auth.getUser(authHeader.replace("Bearer ", ""));
 
     if (authError || !user) {
-      return jsonResponse(req, { subscribed: false });
+      return jsonResponse(req, buildAccessStateResponse(null));
+    }
+
+    const entitlement = await fetchAccountEntitlementForUser(supabaseClient, user.id);
+    if (entitlement) {
+      return jsonResponse(req, buildAccessStateResponse(entitlement));
     }
 
     const subscription = await fetchSubscriptionForUser(supabaseClient, user.id);
     const subscriptionResponse = buildSubscriptionResponse(subscription);
-    if (subscriptionResponse.subscribed) {
+    if (subscriptionResponse.has_access) {
       return jsonResponse(req, subscriptionResponse);
     }
 

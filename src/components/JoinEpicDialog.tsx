@@ -27,6 +27,18 @@ export const JoinEpicDialog = memo(function JoinEpicDialog({ open, onOpenChange 
     }
   }, [open]);
 
+  const extractInviteCode = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return "";
+
+    const epicCodeMatch = trimmed.match(/EPIC-[A-Z0-9-]+/i);
+    if (epicCodeMatch?.[0]) {
+      return epicCodeMatch[0].toUpperCase();
+    }
+
+    return `EPIC-${trimmed.toUpperCase().replace(/^EPIC-/, "")}`;
+  };
+
   const handleJoinEpic = async () => {
     if (!inviteCode.trim()) {
       toast.error("Please enter an invite code");
@@ -36,111 +48,38 @@ export const JoinEpicDialog = memo(function JoinEpicDialog({ open, onOpenChange 
     setIsLoading(true);
     
     try {
-      // Clean up the code (remove prefix if present)
-      const code = inviteCode.trim().toUpperCase().replace('EPIC-', '');
-      const fullCode = `EPIC-${code}`;
+      const normalizedInviteCode = extractInviteCode(inviteCode);
+      const { data, error } = await (supabase.rpc as unknown as (
+        fn: string,
+        args: Record<string, unknown>,
+      ) => Promise<{ data: Array<{
+        success: boolean;
+        code: string;
+        message: string;
+        epic_id: string | null;
+        epic_title: string | null;
+        copied_habit_count: number;
+      }> | null; error: { message?: string } | null }>)('join_epic_by_invite_code', {
+        p_invite_code: normalizedInviteCode,
+      });
 
-      // Look up the epic by invite code (include frequency and schedule data for copied rituals)
-      const { data: epic, error: epicError } = await supabase
-        .from('epics')
-        .select('*, epic_story_types(slug), epic_habits(habit_id, habits(id, title, difficulty, frequency, custom_days, custom_month_days))')
-        .eq('invite_code', fullCode)
-        .eq('is_public', true)
-        .maybeSingle();
+      if (error) throw error;
 
-      if (epicError) throw epicError;
-      if (!epic) {
-        toast.error("Epic not found. Check the code and try again.");
-        setIsLoading(false);
+      const result = data?.[0];
+      if (!result) {
+        throw new Error('Failed to join guild');
+      }
+
+      if (!result.success) {
+        if (result.code === 'epic_limit_reached') {
+          setEpicLimitReached(true);
+        }
+
+        toast.error(result.message || 'Failed to join guild');
         return;
       }
 
-      // Check if user is logged in
-      const { data: user } = await supabase.auth.getUser();
-      if (!user.user) {
-        toast.error("Please sign in to join guilds");
-        setIsLoading(false);
-        return;
-      }
-
-      // Check epic limit (owned + joined)
-      const { data: ownedEpics } = await supabase
-        .from('epics')
-        .select('id')
-        .eq('user_id', user.user.id)
-        .eq('status', 'active');
-      
-      const { data: joinedEpics } = await supabase
-        .from('epic_members')
-        .select('epic_id, epics!inner(user_id, status)')
-        .eq('user_id', user.user.id)
-        .neq('epics.user_id', user.user.id)
-        .eq('epics.status', 'active');
-
-      const totalActiveEpics = (ownedEpics?.length || 0) + (joinedEpics?.length || 0);
-      
-      if (totalActiveEpics >= MAX_EPICS) {
-        setEpicLimitReached(true);
-        toast.error(`You can only have ${MAX_EPICS} active epics at a time`);
-        setIsLoading(false);
-        return;
-      }
-
-      const { data: existingMember } = await supabase
-        .from('epic_members')
-        .select('id')
-        .eq('epic_id', epic.id)
-        .eq('user_id', user.user.id)
-        .maybeSingle();
-
-      if (existingMember) {
-        toast.error("You're already in this guild!");
-        setIsLoading(false);
-        return;
-      }
-
-      // Join the epic
-      const { error: memberError } = await supabase
-        .from('epic_members')
-        .insert({
-          epic_id: epic.id,
-          user_id: user.user.id,
-        });
-
-      if (memberError) throw memberError;
-
-      // Copy all habits to user's account.
-      if (epic.epic_habits && epic.epic_habits.length > 0) {
-        const habitsToCreate = epic.epic_habits.map((eh: { habits: { title: string; difficulty: string; frequency?: string; custom_days?: number[] | null; custom_month_days?: number[] | null } }) => ({
-          user_id: user.user.id,
-          title: eh.habits.title,
-          difficulty: eh.habits.difficulty,
-          frequency: eh.habits.frequency || 'daily',
-          custom_days: eh.habits.custom_days || null,
-          custom_month_days: eh.habits.custom_month_days || null,
-        }));
-
-        const { data: newHabits, error: habitsError } = await supabase
-          .from('habits')
-          .insert(habitsToCreate)
-          .select();
-
-        if (habitsError) throw habitsError;
-
-        // Link new habits back to the epic
-        const habitLinks = newHabits?.map((habit: { id: string }) => ({
-          epic_id: epic.id,
-          habit_id: habit.id,
-        })) || [];
-
-        const { error: linkError } = await supabase
-          .from('epic_habits')
-          .insert(habitLinks);
-
-        if (linkError) throw linkError;
-      }
-
-      toast.success(`Joined "${epic.title}" guild! 🎯`);
+      toast.success(`Joined "${result.epic_title}" guild! 🎯`);
       onOpenChange(false);
       setInviteCode("");
       

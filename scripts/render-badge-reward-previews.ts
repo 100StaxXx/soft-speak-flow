@@ -24,6 +24,31 @@ interface RenderResult {
   message?: string;
 }
 
+function isTruthyEnvValue(value: unknown): boolean {
+  return ["1", "true", "yes", "on"].includes(String(value ?? "").trim().toLowerCase());
+}
+
+function hasEndpointKillSwitch(env: Record<string, string>, endpointName: string): boolean {
+  return String(env.COST_KILL_SWITCH_ENDPOINTS || "")
+    .split(",")
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean)
+    .includes(endpointName.trim().toLowerCase());
+}
+
+function shouldDisableAiPreviews(env: Record<string, string>): string | null {
+  if (isTruthyEnvValue(env.COST_KILL_SWITCH_ALL)) {
+    return "COST_KILL_SWITCH_ALL";
+  }
+  if (isTruthyEnvValue(env.COST_KILL_SWITCH_IMAGE)) {
+    return "COST_KILL_SWITCH_IMAGE";
+  }
+  if (hasEndpointKillSwitch(env, "render-badge-reward-previews")) {
+    return "COST_KILL_SWITCH_ENDPOINTS(render-badge-reward-previews)";
+  }
+  return null;
+}
+
 const BADGE_TIER_GRADIENTS: Record<string, [string, string]> = {
   bronze: ["#b45309", "#f97316"],
   silver: ["#64748b", "#cbd5e1"],
@@ -151,6 +176,10 @@ async function tryAiRender(params: {
   env: Record<string, string>;
 }): Promise<boolean> {
   const { itemKind, id, title, icon, promptDetail, outputPath, env } = params;
+
+  if (shouldDisableAiPreviews(env)) {
+    return false;
+  }
 
   if (String(env.BADGE_REWARD_PREVIEW_DISABLE_AI || "").toLowerCase() === "true") {
     return false;
@@ -397,6 +426,13 @@ async function retryFailures(
 
 async function main() {
   const env = loadEnvFromFiles();
+  const costGuardrailBlock = shouldDisableAiPreviews(env);
+  if (costGuardrailBlock) {
+    env.BADGE_REWARD_PREVIEW_DISABLE_AI = "true";
+    console.log("AI preview rendering is disabled by a cost guardrail. Falling back to symbolic local renders.", {
+      reason: costGuardrailBlock,
+    });
+  }
   const forceRegenerate = process.argv.includes("--force")
     || String(env.PREVIEWS_FORCE_REGEN || "").toLowerCase() === "true";
   ensureDir(BADGE_ASSET_DIR);

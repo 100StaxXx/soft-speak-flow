@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { ATTACHMENT_INPUT_ACCEPT, MAX_ATTACHMENTS_PER_TASK } from '@/constants/questAttachments';
 import { validateAttachmentFiles } from '@/utils/questAttachmentValidation';
 import type { QuestAttachmentInput } from '@/types/questAttachments';
+import { createQuestAttachmentSignedUrl, extractQuestAttachmentFilePath } from '@/utils/questAttachmentUrls';
 
 interface UseQuestImagePickerReturn {
   pickImage: () => Promise<string | null>;
@@ -55,11 +56,21 @@ export function useQuestImagePicker(): UseQuestImagePickerReturn {
     );
   }, [getErrorMessage]);
 
-  const buildFilePath = useCallback((providedFileName?: string) => {
-    const timestamp = Date.now();
-    const extension = providedFileName?.split('.').pop() || 'jpg';
-    return `${user?.id}/${timestamp}_${Math.random().toString(36).slice(2)}_quest.${extension}`;
-  }, [user?.id]);
+  const getInvokeErrorMessage = useCallback(async (err: unknown, fallback: string): Promise<string> => {
+    const maybeErrorWithContext = err as { context?: { json?: () => Promise<Record<string, unknown>> } };
+    if (maybeErrorWithContext.context?.json) {
+      try {
+        const body = await maybeErrorWithContext.context.json();
+        if (typeof body?.error === 'string' && body.error.trim()) {
+          return body.error;
+        }
+      } catch {
+        // Fall through to the generic fallback.
+      }
+    }
+
+    return getErrorMessage(err) || fallback;
+  }, [getErrorMessage]);
 
   const uploadAttachment = useCallback(async (file: File | Blob, fileName?: string): Promise<QuestAttachmentInput | null> => {
     if (!user?.id) {
@@ -71,11 +82,29 @@ export function useQuestImagePicker(): UseQuestImagePickerReturn {
     setError(null);
 
     try {
-      const path = buildFilePath(fileName);
+      const resolvedFileName = fileName || `attachment-${Date.now()}`;
+      const { data: uploadInit, error: initError } = await supabase.functions.invoke('init-quest-attachment-upload', {
+        body: {
+          fileName: resolvedFileName,
+          mimeType: file.type || 'application/octet-stream',
+          fileSizeBytes: typeof file.size === 'number' ? file.size : 0,
+        },
+      });
+
+      if (initError) {
+        throw new Error(await getInvokeErrorMessage(initError, 'Failed to prepare attachment upload'));
+      }
+
+      const path = typeof uploadInit?.path === 'string' ? uploadInit.path : null;
+      const token = typeof uploadInit?.token === 'string' ? uploadInit.token : null;
+
+      if (!path || !token) {
+        throw new Error('Failed to prepare attachment upload');
+      }
 
       const { error: uploadError } = await supabase.storage
         .from('quest-attachments')
-        .upload(path, file, {
+        .uploadToSignedUrl(path, token, file, {
           contentType: file.type || 'application/octet-stream',
           upsert: false,
         });
@@ -84,14 +113,15 @@ export function useQuestImagePicker(): UseQuestImagePickerReturn {
         throw uploadError;
       }
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('quest-attachments')
-        .getPublicUrl(path);
+      const signedUrl = await createQuestAttachmentSignedUrl(path);
+      if (!signedUrl) {
+        throw new Error('Failed to create secure attachment URL');
+      }
 
       return {
-        fileUrl: publicUrl,
+        fileUrl: signedUrl,
         filePath: path,
-        fileName: fileName || `attachment-${Date.now()}`,
+        fileName: resolvedFileName,
         mimeType: file.type || 'application/octet-stream',
         fileSizeBytes: typeof file.size === 'number' ? file.size : 0,
         isImage: !!file.type?.startsWith('image/'),
@@ -104,7 +134,7 @@ export function useQuestImagePicker(): UseQuestImagePickerReturn {
     } finally {
       setIsUploading(false);
     }
-  }, [buildFilePath, user?.id]);
+  }, [getInvokeErrorMessage, user?.id]);
 
   const uploadImage = useCallback(async (file: File | Blob, fileName?: string): Promise<string | null> => {
     const attachment = await uploadAttachment(file, fileName);
@@ -263,23 +293,19 @@ export function useQuestImagePicker(): UseQuestImagePickerReturn {
 
     try {
       const filePath = typeof attachment === 'string'
-        ? (() => {
-          const url = new URL(attachment);
-          const pathParts = url.pathname.split('/');
-          const bucketIndex = pathParts.findIndex((p) => p === 'quest-attachments');
-          if (bucketIndex === -1) return null;
-          return pathParts.slice(bucketIndex + 1).join('/');
-        })()
+        ? extractQuestAttachmentFilePath(attachment)
         : attachment.filePath;
 
       if (!filePath) return false;
 
-      const { error: deleteError } = await supabase.storage
-        .from('quest-attachments')
-        .remove([filePath]);
+      const { error: deleteError } = await supabase.functions.invoke('delete-quest-attachment', {
+        body: {
+          filePath,
+        },
+      });
 
       if (deleteError) {
-        throw deleteError;
+        throw new Error(await getInvokeErrorMessage(deleteError, 'Failed to delete attachment'));
       }
 
       return true;
@@ -289,7 +315,7 @@ export function useQuestImagePicker(): UseQuestImagePickerReturn {
       console.error('Delete attachment error:', err);
       return false;
     }
-  }, [user?.id]);
+  }, [getInvokeErrorMessage, user?.id]);
 
   const deleteImage = useCallback(async (imageUrl: string): Promise<boolean> => {
     return deleteAttachment(imageUrl);
