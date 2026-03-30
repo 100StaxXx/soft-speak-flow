@@ -15,6 +15,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { DIFFICULTY_COLORS, QUEST_FORM_STYLES, getQuestOptionPillClasses } from "@/components/quest-shared";
+import { DurationPickerField, TimePickerField } from "@/components/scheduling";
 
 interface AdvancedQuestOptionsProps {
   scheduledTime: string | null;
@@ -72,12 +73,12 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
   const [isEditingCustomReminder, setIsEditingCustomReminder] = useState(false);
 
   const durationOptions = [
-    { value: 15, label: "15 min" },
-    { value: 30, label: "30 min" },
-    { value: 45, label: "45 min" },
-    { value: 60, label: "1 hr" },
-    { value: 90, label: "1.5 hrs" },
-    { value: 120, label: "2 hrs" },
+    { value: 15, label: "15m" },
+    { value: 30, label: "30m" },
+    { value: 45, label: "45m" },
+    { value: 60, label: "1h" },
+    { value: 90, label: "1.5h" },
+    { value: 120, label: "2h" },
   ];
 
   const reminderOptions = [
@@ -103,7 +104,6 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
     { value: 'custom', label: 'Custom Days' },
   ];
 
-  const [showDurationOptions, setShowDurationOptions] = useState(false);
   const [showRecurrenceOptions, setShowRecurrenceOptions] = useState(false);
   const [showReminderOptions, setShowReminderOptions] = useState(false);
   const recurrenceSelectionDisabled = Boolean(
@@ -117,6 +117,7 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
   const isQuestSoft = props.visualStyle === "quest-soft";
   const tone = props.taskDifficulty ?? "medium";
   const toneColors = DIFFICULTY_COLORS[tone];
+  const schedulingVariant = isQuestSoft ? "quest-soft" : "default";
   const rootClassName = isQuestSoft ? "space-y-3" : "space-y-4 border-t pt-4";
   const sectionClassName = isQuestSoft
     ? cn(QUEST_FORM_STYLES.sectionCard, "space-y-3 p-4")
@@ -142,9 +143,6 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
   const popoverClassName = isQuestSoft
     ? cn("w-[min(24rem,var(--radix-popover-trigger-width))] p-2", QUEST_FORM_STYLES.popover)
     : "w-[min(24rem,var(--radix-popover-trigger-width))] p-1";
-  const dropdownClassName = isQuestSoft
-    ? cn("absolute z-10 mt-2 w-full max-h-60 overflow-y-auto", QUEST_FORM_STYLES.popover)
-    : "absolute z-10 w-full mt-1 bg-popover border rounded-lg shadow-lg max-h-48 overflow-y-auto";
   const dropdownItemClassName = (selected: boolean) => cn(
     isQuestSoft
       ? "w-full rounded-[18px] px-3 py-2.5 text-left text-sm font-medium transition-all duration-200 motion-reduce:transition-none"
@@ -363,15 +361,17 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
           <Clock className={cn("w-4 h-4", isQuestSoft ? "text-white/58" : "text-muted-foreground")} />
           <Label className={labelClassName}>Scheduled Time</Label>
         </div>
-        <div className="flex gap-2">
-          <Input
-            type="time"
-            step={300}
-            value={props.scheduledTime || ''}
-            onChange={(e) => props.onScheduledTimeChange(e.target.value || null)}
-            className={cn("flex-1", inputClassName)}
-          />
-          {props.selectedDate && (
+        <TimePickerField
+          value={props.scheduledTime}
+          onChange={props.onScheduledTimeChange}
+          ariaLabel="Advanced scheduled time"
+          variant={schedulingVariant}
+          tone={tone}
+          stepMinutes={30}
+          inputProps={{
+            className: inputClassName,
+          }}
+          suggestionAction={props.selectedDate ? (
             <Popover open={showSuggestions} onOpenChange={setShowSuggestions}>
               <PopoverTrigger asChild>
                 <Button
@@ -428,8 +428,8 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
                 </div>
               </PopoverContent>
             </Popover>
-          )}
-        </div>
+          ) : null}
+        />
       </div>
       )}
 
@@ -440,38 +440,14 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
           <Calendar className={cn("w-4 h-4", isQuestSoft ? "text-white/58" : "text-muted-foreground")} />
           <Label className={labelClassName}>Estimated Duration</Label>
         </div>
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => setShowDurationOptions(!showDurationOptions)}
-            className={triggerClassName}
-          >
-            <span>
-              {props.estimatedDuration 
-                ? durationOptions.find(opt => opt.value === props.estimatedDuration)?.label || `${props.estimatedDuration} min`
-                : "Select duration"}
-            </span>
-            <ChevronDown className={cn("w-4 h-4", isQuestSoft ? "text-white/52" : "text-muted-foreground")} />
-          </button>
-          
-          {showDurationOptions && (
-            <div className={dropdownClassName}>
-              {durationOptions.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => {
-                    props.onEstimatedDurationChange(option.value);
-                    setShowDurationOptions(false);
-                  }}
-                  className={dropdownItemClassName(props.estimatedDuration === option.value)}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        <DurationPickerField
+          value={props.estimatedDuration}
+          onChange={props.onEstimatedDurationChange}
+          variant={schedulingVariant}
+          tone={tone}
+          presets={durationOptions}
+          placeholder="Select duration"
+        />
       </div>
       )}
 
@@ -582,22 +558,27 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
             <Repeat className={cn("w-4 h-4", isQuestSoft ? "text-white/58" : "text-muted-foreground")} />
             <Label className={labelClassName}>Recurrence</Label>
           </div>
-          
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setShowRecurrenceOptions(!showRecurrenceOptions)}
-              disabled={recurrenceSelectionDisabled}
-              className={recurrenceSelectionDisabled ? disabledTriggerClassName : triggerClassName}
+
+          <Popover open={showRecurrenceOptions} onOpenChange={setShowRecurrenceOptions}>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                disabled={recurrenceSelectionDisabled}
+                className={recurrenceSelectionDisabled ? disabledTriggerClassName : triggerClassName}
+              >
+                <span>
+                  {recurrenceOptions.find(opt => opt.value === (recurrencePatternForEditor || 'none'))?.label || "None"}
+                </span>
+                <ChevronDown className={cn("w-4 h-4", isQuestSoft ? "text-white/52" : "text-muted-foreground")} />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent
+              align="start"
+              side="bottom"
+              sideOffset={6}
+              className={popoverClassName}
             >
-              <span>
-                {recurrenceOptions.find(opt => opt.value === (recurrencePatternForEditor || 'none'))?.label || "None"}
-              </span>
-              <ChevronDown className={cn("w-4 h-4", isQuestSoft ? "text-white/52" : "text-muted-foreground")} />
-            </button>
-            
-            {showRecurrenceOptions && (
-              <div className={cn(dropdownClassName, !isQuestSoft && "max-h-none")}>
+              <div className={cn(isQuestSoft && "max-h-60 overflow-y-auto")}>
                 {recurrenceOptions.map((option) => (
                   <button
                     key={option.value}
@@ -609,8 +590,8 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
                   </button>
                 ))}
               </div>
-            )}
-          </div>
+            </PopoverContent>
+          </Popover>
 
           {recurrenceSelectionDisabled && (
             <p className={helperClassName}>

@@ -11,11 +11,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { Calendar as CalendarIcon, Clock, Timer, Zap, Flame, Mountain, AlertTriangle, Repeat, Bell, Check, X, CalendarOff } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, Zap, Flame, Mountain, AlertTriangle, Repeat, Bell, Check, X, CalendarOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ParsedTask } from '../hooks/useNaturalLanguageParser';
 import { format, parseISO } from 'date-fns';
 import { QuestAttachmentPicker } from '@/components/QuestAttachmentPicker';
+import { DurationPickerField, TimePickerField } from '@/components/scheduling';
 import {
   Select,
   SelectContent,
@@ -143,8 +144,6 @@ export function TaskAdvancedEditSheet({
         }]
         : [],
   );
-  
-  const [showDurationPicker, setShowDurationPicker] = useState(false);
   const [showReminderPicker, setShowReminderPicker] = useState(false);
 
   const getReferenceDate = () => {
@@ -308,11 +307,11 @@ export function TaskAdvancedEditSheet({
                 <Clock className="w-3.5 h-3.5 text-purple-500" />
                 Time
               </Label>
-              <Input
-                type="time"
-                value={scheduledTime}
-                onChange={(e) => setScheduledTime(e.target.value)}
-                className="bg-background/50"
+              <TimePickerField
+                value={scheduledTime || null}
+                onChange={(time) => setScheduledTime(time ?? '')}
+                ariaLabel="Task advanced edit time"
+                inputProps={{ className: 'bg-background/50' }}
               />
             </div>
           </div>
@@ -320,44 +319,15 @@ export function TaskAdvancedEditSheet({
           {/* Duration */}
           <div className="space-y-2">
             <Label className="text-sm font-medium flex items-center gap-1.5">
-              <Timer className="w-3.5 h-3.5 text-cyan-500" />
+              <Clock className="w-3.5 h-3.5 text-cyan-500" />
               Duration
             </Label>
-            <div className="relative">
-              <Button
-                variant="outline"
-                className="w-full justify-start bg-background/50"
-                onClick={() => setShowDurationPicker(!showDurationPicker)}
-              >
-                {estimatedDuration 
-                  ? (estimatedDuration >= 60 
-                      ? `${Math.floor(estimatedDuration / 60)}h ${estimatedDuration % 60 ? `${estimatedDuration % 60}m` : ''}`
-                      : `${estimatedDuration} min`)
-                  : 'No duration set'}
-              </Button>
-              {showDurationPicker && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-background border rounded-lg shadow-lg z-10 p-1">
-                  <button
-                    className="w-full text-left px-3 py-2 text-sm hover:bg-muted rounded-md text-muted-foreground"
-                    onClick={() => { setEstimatedDuration(null); setShowDurationPicker(false); }}
-                  >
-                    No duration
-                  </button>
-                  {durationOptions.map(opt => (
-                    <button
-                      key={opt.value}
-                      className={cn(
-                        "w-full text-left px-3 py-2 text-sm hover:bg-muted rounded-md",
-                        estimatedDuration === opt.value && "bg-primary/10 text-primary"
-                      )}
-                      onClick={() => { setEstimatedDuration(opt.value); setShowDurationPicker(false); }}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            <DurationPickerField
+              value={estimatedDuration}
+              onChange={setEstimatedDuration}
+              presets={durationOptions}
+              placeholder="No duration set"
+            />
           </div>
 
           {/* Difficulty */}

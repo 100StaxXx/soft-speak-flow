@@ -1,5 +1,21 @@
 project_id = "opbfpbbqvuksuvmtmssd"
 
+[remotes.production]
+project_id = "opbfpbbqvuksuvmtmssd"
+
+[remotes.production.auth]
+site_url = "https://app.cosmiq.quest"
+additional_redirect_urls = [
+  "https://app.cosmiq.quest",
+  "https://app.cosmiq.quest/",
+  "https://app.cosmiq.quest/auth",
+  "https://app.cosmiq.quest/auth/reset-password",
+  "https://cosmiq.quest",
+  "https://cosmiq.quest/",
+  "https://cosmiq.quest/auth",
+  "https://cosmiq.quest/auth/reset-password",
+]
+
 [functions.validate-companion-image]
 verify_jwt = false
 

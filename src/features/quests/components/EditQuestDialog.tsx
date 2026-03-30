@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { format, isToday, addMinutes } from "date-fns";
-import { X, ArrowLeft, Clock, ChevronRight, Trash2, Sliders, CalendarIcon, Zap, Flame, Mountain, CalendarPlus } from "lucide-react";
+import { X, ArrowLeft, Trash2, Sliders, CalendarIcon, Zap, Flame, Mountain, CalendarPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,17 +24,12 @@ import { AdvancedQuestOptions } from "@/components/AdvancedQuestOptions";
 import { QuestAttachmentPicker } from "@/components/QuestAttachmentPicker";
 import { useSubtasks } from "@/features/tasks/hooks/useSubtasks";
 import {
-  centerSelectedTimeInWheel,
   DIFFICULTY_COLORS,
   QUEST_FORM_STYLES,
-  formatTime12,
-  TIME_SLOTS,
-  DURATION_OPTIONS,
-  getNextHalfHourTime,
   getQuestDifficultyIconClasses,
   getQuestDifficultyOptionClasses,
-  getQuestOptionPillClasses,
 } from "@/components/quest-shared";
+import { DurationPickerField, TimePickerField, formatDurationLabel, getNextTimeForStep } from "@/components/scheduling";
 import type { QuestDifficulty } from "../types";
 import {
   normalizeQuestDifficulty,
@@ -125,12 +120,7 @@ export function EditQuestDialog({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [attachments, setAttachments] = useState<QuestAttachmentInput[]>([]);
   const [location, setLocation] = useState<string | null>(null);
-  const [showDurationChips, setShowDurationChips] = useState(false);
-  const [showTimePicker, setShowTimePicker] = useState(false);
-  const [customDurationInput, setCustomDurationInput] = useState("");
   const [newSubtaskText, setNewSubtaskText] = useState("");
-
-  const timeWheelRef = useRef<HTMLDivElement>(null);
 
   const { subtasks, addSubtask, toggleSubtask, deleteSubtask } = useSubtasks(task?.id ?? null);
 
@@ -195,25 +185,12 @@ export function EditQuestDialog({
         setAttachments([]);
       }
       setLocation(task.location || null);
-      setShowDurationChips(false);
-      setShowTimePicker(false);
       setShowAdvanced(
         !!task.recurrence_pattern ||
         !!task.location
       );
     }
   }, [task, open]);
-
-  // Auto-scroll time wheel
-  useEffect(() => {
-    if (!showTimePicker || !scheduledTime) return;
-
-    const frameId = window.requestAnimationFrame(() => {
-      centerSelectedTimeInWheel(timeWheelRef.current, scheduledTime, "smooth");
-    });
-
-    return () => window.cancelAnimationFrame(frameId);
-  }, [showTimePicker, scheduledTime]);
 
   const endTime = useMemo(() => {
     if (!scheduledTime || !estimatedDuration) return null;
@@ -222,13 +199,8 @@ export function EditQuestDialog({
     return format(addMinutes(base, estimatedDuration), "HH:mm");
   }, [scheduledTime, estimatedDuration]);
 
-  const isCustomDuration = estimatedDuration !== null && !DURATION_OPTIONS.some(o => o.value === estimatedDuration);
-
   const durationLabel = useMemo(() => {
-    if (!estimatedDuration) return "No duration";
-    if (estimatedDuration === 1440) return "All Day";
-    if (estimatedDuration >= 60) return `${estimatedDuration / 60}h`;
-    return `${estimatedDuration} min`;
+    return formatDurationLabel(estimatedDuration);
   }, [estimatedDuration]);
 
   const parsedTaskDate = useMemo(() => parseTaskDate(taskDate), [taskDate]);
@@ -383,143 +355,25 @@ export function EditQuestDialog({
                 </PopoverContent>
               </Popover>
 
-              {/* Time Chip */}
-              <button
-                onClick={() => {
-                  if (!scheduledTime) {
-                    setScheduledTime(getNextHalfHourTime());
-                  }
-                  setShowTimePicker(!showTimePicker);
-                }}
-                className={cn(
-                  "flex-1 flex items-center justify-center gap-2 text-sm font-semibold text-white",
-                  QUEST_FORM_STYLES.selectorChip,
-                  scheduledTime
-                    ? ""
-                    : QUEST_FORM_STYLES.selectorChipMuted
-                )}
-              >
-                <Clock className="h-4 w-4" />
-                {scheduledTime ? formatTime12(scheduledTime) : "Time"}
-              </button>
+              <TimePickerField
+                value={scheduledTime}
+                onChange={setScheduledTime}
+                placeholder="Time"
+                ariaLabel="Custom quest time"
+                variant="quest-soft"
+                tone={difficulty}
+                stepMinutes={30}
+                seedValueOnOpen={() => getNextTimeForStep(30)}
+                endTimeHint={endTime}
+                className="flex-1"
+              />
             </div>
-
-            {/* Time Wheel */}
-            {showTimePicker && (
-              <div className="space-y-2">
-                <Input
-                  aria-label="Custom quest time"
-                  type="time"
-                  step={60}
-                  value={scheduledTime || ""}
-                  onChange={(event) => setScheduledTime(event.target.value || null)}
-                  className="h-11 rounded-[20px] border-white/10 bg-white/[0.08] text-base text-white"
-                />
-                <div
-                  ref={timeWheelRef}
-                  className={QUEST_FORM_STYLES.timeWheel}
-                  style={{ scrollbarWidth: "none" }}
-                >
-                  <div className={QUEST_FORM_STYLES.timeWheelFadeTop} />
-                  <div className="flex flex-col items-center py-1">
-                    {TIME_SLOTS.map((slot) => {
-                      const isSelected = scheduledTime === slot;
-                      const selectedIdx = scheduledTime ? TIME_SLOTS.indexOf(scheduledTime) : -1;
-                      const slotIdx = TIME_SLOTS.indexOf(slot);
-                      const distance = selectedIdx >= 0 ? Math.abs(slotIdx - selectedIdx) : 0;
-                      const opacity = isSelected ? 1 : Math.max(0.25, 1 - distance * 0.15);
-
-                      return (
-                        <button
-                          key={slot}
-                          data-time-slot={slot}
-                          onClick={() => setScheduledTime(slot)}
-                          className={cn(
-                            "my-0.5 w-[85%] rounded-[20px] py-2.5 text-center text-sm font-semibold snap-center transition-all duration-150 motion-reduce:transition-none",
-                            isSelected
-                              ? cn(getQuestOptionPillClasses(true, colors.pill), "scale-[1.02]")
-                              : "text-white/74 hover:bg-white/[0.08]"
-                          )}
-                          style={{ opacity: isSelected ? 1 : opacity }}
-                        >
-                          {isSelected && endTime
-                            ? `${formatTime12(slot)} – ${formatTime12(endTime)}`
-                            : formatTime12(slot)}
-                        </button>
-                        );
-                    })}
-                  </div>
-                  <div className={QUEST_FORM_STYLES.timeWheelFadeBottom} />
-                </div>
-              </div>
-            )}
-
-            {/* Duration Row */}
-            <button
-              onClick={() => setShowDurationChips(!showDurationChips)}
-              className={cn(
-                "w-full flex items-center justify-between text-white",
-                QUEST_FORM_STYLES.selectorChip,
-              )}
-            >
-              <div className="flex items-center gap-2.5 text-sm font-semibold">
-                <Clock className="h-4 w-4 text-white/58" />
-                <span>{durationLabel}</span>
-              </div>
-              <ChevronRight className={cn("h-4 w-4 text-white/52 transition-transform", showDurationChips && "rotate-90")} />
-            </button>
-
-            {showDurationChips && (
-              <div className="space-y-2 px-1">
-                <div className="flex gap-2 flex-wrap">
-                  {DURATION_OPTIONS.map((opt) => {
-                    const isSelected = opt.value === -1
-                      ? isCustomDuration
-                      : estimatedDuration === opt.value;
-                    return (
-                      <button
-                        key={opt.value}
-                        onClick={() => {
-                          if (opt.value === -1) {
-                            setCustomDurationInput("");
-                            setEstimatedDuration(null);
-                          } else {
-                            setCustomDurationInput("");
-                            setEstimatedDuration(opt.value);
-                          }
-                        }}
-                        className={getQuestOptionPillClasses(isSelected, colors.pill)}
-                      >
-                        {opt.label}
-                      </button>
-                    );
-                  })}
-                </div>
-                {(isCustomDuration || (estimatedDuration === null && customDurationInput !== undefined)) && (
-                  <div className={cn("flex items-center gap-2 rounded-[20px] px-3 py-2", QUEST_FORM_STYLES.insetPanel)}>
-                    <Input
-                      type="number"
-                      inputMode="numeric"
-                      placeholder="Minutes"
-                      value={customDurationInput}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setCustomDurationInput(val);
-                        const num = parseInt(val, 10);
-                        if (!isNaN(num) && num > 0) {
-                          setEstimatedDuration(num);
-                        } else {
-                          setEstimatedDuration(null);
-                        }
-                      }}
-                      className="h-10 w-28 border-white/10 bg-white/[0.08] text-sm text-white"
-                      autoFocus
-                    />
-                    <span className="text-xs text-white/58">min</span>
-                  </div>
-                )}
-              </div>
-            )}
+            <DurationPickerField
+              value={estimatedDuration}
+              onChange={setEstimatedDuration}
+              variant="quest-soft"
+              tone={difficulty}
+            />
 
             {/* Subtasks + Notes Card */}
             <div className={cn(QUEST_FORM_STYLES.sectionCard, "overflow-hidden")}>

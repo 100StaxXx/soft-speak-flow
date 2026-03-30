@@ -387,6 +387,72 @@ describe("useEpics", () => {
     expect(insertedEpic.end_date).toBe(resolveEpicEndDate(insertedEpic));
   });
 
+  it("preserves monthly ritual cadence and month days during campaign creation", async () => {
+    const habitsInsertMock = vi.fn().mockResolvedValue({ error: null });
+    const epicsInsertMock = vi.fn().mockResolvedValue({ error: null });
+    const linksInsertMock = vi.fn().mockResolvedValue({ error: null });
+
+    mocks.fromMock.mockImplementation((table: string) => {
+      if (table === "habits") {
+        return {
+          insert: habitsInsertMock,
+          select: mocks.selectMock,
+        };
+      }
+
+      if (table === "epics") {
+        return {
+          insert: epicsInsertMock,
+          select: mocks.selectMock,
+        };
+      }
+
+      if (["epic_habits", "journey_phases", "epic_milestones"].includes(table)) {
+        return {
+          insert: linksInsertMock,
+          select: mocks.selectMock,
+        };
+      }
+
+      return {
+        select: mocks.selectMock,
+      };
+    });
+
+    const { result } = renderHook(() => useEpics(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    await act(async () => {
+      await result.current.createEpic({
+        title: "Revenue Rhythm",
+        target_days: 30,
+        habits: [
+          {
+            title: "Monthly Review and Adjust",
+            difficulty: "medium",
+            frequency: "monthly",
+            custom_days: [],
+            custom_month_days: [1],
+          },
+        ],
+      });
+    });
+
+    expect(habitsInsertMock).toHaveBeenCalledWith([
+      expect.objectContaining({
+        title: "Monthly Review and Adjust",
+        frequency: "monthly",
+        custom_days: null,
+        custom_month_days: [1],
+      }),
+    ]);
+  });
+
   it("skips background initial journey-path generation when the create is queued offline", async () => {
     mocks.shouldQueueWrites = true;
 

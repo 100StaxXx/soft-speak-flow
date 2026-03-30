@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CalendarIcon, Bell, Clock } from 'lucide-react';
+import { CalendarIcon, Bell } from 'lucide-react';
 import { format, addDays, setHours, setMinutes } from 'date-fns';
 import {
   Dialog,
@@ -19,6 +19,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useContactReminders } from '@/hooks/useContactReminders';
 import { Contact } from '@/hooks/useContacts';
+import { TimePickerField } from '@/components/scheduling';
 
 interface ReminderDialogProps {
   contact: Contact;
@@ -137,15 +138,11 @@ export function ReminderDialog({ contact, open, onOpenChange }: ReminderDialogPr
           {/* Time Picker */}
           <div className="space-y-2">
             <Label>Time</Label>
-            <div className="relative">
-              <Clock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                type="time"
-                value={time}
-                onChange={(e) => handleTimeChange(e.target.value)}
-                className="pl-10"
-              />
-            </div>
+            <TimePickerField
+              value={time}
+              onChange={(nextTime) => handleTimeChange(nextTime || '09:00')}
+              ariaLabel="Reminder time"
+            />
             <p className="text-xs text-muted-foreground">Times are in your local timezone</p>
           </div>
 

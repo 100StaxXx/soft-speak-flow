@@ -5,17 +5,39 @@ import { logger } from './logger';
 export type CalendarOAuthProvider = 'google' | 'outlook';
 export type CalendarOAuthStatus = 'success' | 'error';
 
+const AUTH_RESET_PATH = '/auth/reset-password';
+const AUTH_RESET_HOSTS = new Set(['app.cosmiq.quest', 'cosmiq.quest']);
+
 export interface DeepLinkData {
-  type: 'task' | 'calendar_oauth' | 'unknown';
+  type: 'task' | 'calendar_oauth' | 'auth_recovery' | 'unknown';
   taskId?: string;
   provider?: CalendarOAuthProvider;
   status?: CalendarOAuthStatus;
   message?: string;
+  path?: string;
   rawUrl: string;
 }
 
+const isNativeAuthRecoveryLink = (parsed: URL): boolean => {
+  const isWebRecoveryLink = (
+    ['https:', 'http:'].includes(parsed.protocol) &&
+    AUTH_RESET_HOSTS.has(parsed.hostname) &&
+    parsed.pathname === AUTH_RESET_PATH
+  );
+
+  const isSchemeRecoveryLink = (
+    ['cosmiq:', 'com.darrylgraham.revolution:'].includes(parsed.protocol) &&
+    (
+      (parsed.hostname === 'auth' && parsed.pathname === '/reset-password') ||
+      parsed.pathname === AUTH_RESET_PATH
+    )
+  );
+
+  return (isWebRecoveryLink || isSchemeRecoveryLink) && parsed.hash.includes('type=recovery');
+};
+
 /**
- * Parse a cosmiq:// deep link URL
+ * Parse incoming native deep links and universal links
  */
 export const parseDeepLink = (url: string): DeepLinkData => {
   try {
@@ -39,6 +61,16 @@ export const parseDeepLink = (url: string): DeepLinkData => {
         provider,
         status,
         message,
+        rawUrl: url,
+      };
+    }
+
+    const parsed = new URL(url);
+
+    if (isNativeAuthRecoveryLink(parsed)) {
+      return {
+        type: 'auth_recovery',
+        path: `${AUTH_RESET_PATH}${parsed.search}${parsed.hash}`,
         rawUrl: url,
       };
     }

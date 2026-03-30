@@ -7,6 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { Plus, Check, Clock } from "lucide-react";
 import { HabitDifficultySelector } from "@/components/HabitDifficultySelector";
 import { FrequencyPicker } from "@/components/FrequencyPicker";
+import { TimePickerField, getNextTimeForStep } from "@/components/scheduling";
 import {
   Select,
   SelectContent,
@@ -92,12 +93,13 @@ export const EpicHabitForm = memo(({
         </div>
         
         <div className="flex gap-2">
-          <Input
-            type="time"
-            value={preferredTime}
-            onChange={(e) => onPreferredTimeChange(e.target.value)}
-            className="flex-1"
+          <TimePickerField
+            value={preferredTime || null}
+            onChange={(time) => onPreferredTimeChange(time ?? "")}
             placeholder="Set time"
+            ariaLabel="Habit schedule time"
+            seedValueOnOpen={() => getNextTimeForStep(30)}
+            className="flex-1"
           />
           {preferredTime && (
             <Button

@@ -3,7 +3,6 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { Capacitor } from '@capacitor/core';
 import { safeNavigate } from "@/utils/nativeNavigation";
 import { SignInWithApple, SignInWithAppleResponse } from '@capacitor-community/apple-sign-in';
-import { SocialLogin } from '@capgo/capacitor-social-login';
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -15,6 +14,7 @@ import { getAuthRedirectPath, getProfileAwareAuthFallbackPath, ensureProfile } f
 import { logger } from "@/utils/logger";
 import { hasWalkthroughCompleted } from "@/utils/profileOnboarding";
 import { getRedirectUrlWithPath, getRedirectUrl } from '@/utils/redirectUrl';
+import { parseFunctionInvokeError, toUserFacingFunctionError } from "@/utils/supabaseFunctionErrors";
 import {
   clearPendingSocialAuthAttempt,
   getSocialAccountNotFoundMessage,
@@ -29,6 +29,13 @@ import { StaticBackgroundImage } from "@/components/StaticBackgroundImage";
 
 const POST_AUTH_NAVIGATION_TIMEOUT_MS = 5000;
 const POST_AUTH_DEFAULT_PATH = '/onboarding';
+const FUNCTION_TRANSPORT_ERROR_MESSAGES = new Set([
+  "edge function returned a non-2xx status code",
+  "failed to send a request to the edge function",
+  "relay error invoking the edge function",
+]);
+
+type AuthGatewayAction = "sign_in_password" | "sign_up_password" | "reset_password";
 
 const hasOAuthCallbackParams = (): boolean => {
   if (typeof window === "undefined") return false;
@@ -63,6 +70,14 @@ const authSchema = z.object({
 
 const getErrorMessage = (error: unknown): string => {
   if (error instanceof Error) return error.message;
+  if (
+    error &&
+    typeof error === "object" &&
+    "message" in error &&
+    typeof (error as { message?: unknown }).message === "string"
+  ) {
+    return (error as { message: string }).message;
+  }
   if (typeof error === "string") return error;
   return "Unknown error";
 };
@@ -94,27 +109,55 @@ const getAppleErrorDescription = (error: unknown): string => {
   return message || "Apple Sign-In failed. Please try again.";
 };
 
-const invokeAuthGateway = async (payload: Record<string, unknown>) => {
+const getAuthGatewayActionDescription = (action: AuthGatewayAction): string => {
+  switch (action) {
+    case "sign_in_password":
+      return "sign you in";
+    case "sign_up_password":
+      return "create your account";
+    case "reset_password":
+      return "send the reset link";
+  }
+};
+
+const isFunctionTransportErrorMessage = (message: string): boolean =>
+  FUNCTION_TRANSPORT_ERROR_MESSAGES.has(message.trim().toLowerCase());
+
+const getAuthGatewayErrorMessage = async (
+  error: unknown,
+  action: AuthGatewayAction,
+): Promise<string> => {
+  const parsed = await parseFunctionInvokeError(error);
+
+  if (typeof parsed.backendMessage === "string" && parsed.backendMessage.trim()) {
+    return parsed.backendMessage;
+  }
+
+  const directMessage = getErrorMessage(error).trim();
+  if (directMessage && !isFunctionTransportErrorMessage(directMessage)) {
+    return directMessage;
+  }
+
+  return toUserFacingFunctionError(parsed, {
+    action: getAuthGatewayActionDescription(action),
+  });
+};
+
+interface AuthGatewayPayload {
+  action: AuthGatewayAction;
+  email?: string;
+  password?: string;
+  redirectTo?: string;
+  timezone?: string;
+}
+
+const invokeAuthGateway = async (payload: AuthGatewayPayload) => {
   const { data, error } = await supabase.functions.invoke("auth-gateway", {
     body: payload,
   });
 
   if (error) {
-    let message = "Request could not be completed.";
-
-    const maybeErrorWithContext = error as { context?: { json?: () => Promise<Record<string, unknown>> } };
-    if (maybeErrorWithContext.context?.json) {
-      try {
-        const body = await maybeErrorWithContext.context.json();
-        if (typeof body?.error === "string" && body.error.trim()) {
-          message = body.error;
-        }
-      } catch {
-        // Fall through to the generic message.
-      }
-    }
-
-    throw new Error(message);
+    throw new Error(await getAuthGatewayErrorMessage(error, payload.action));
   }
 
   return (data ?? {}) as Record<string, unknown>;
@@ -142,7 +185,7 @@ const Auth = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [inlineError, setInlineError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [oauthLoading, setOauthLoading] = useState<'google' | 'apple' | null>(null);
+  const [oauthLoading, setOauthLoading] = useState<'apple' | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
@@ -270,8 +313,7 @@ const Auth = () => {
     }
   }, [navigate, toast]);
   
-  // Refs to track OAuth fallback timeouts (for cleanup)
-  const googleFallbackTimeout = useRef<NodeJS.Timeout | null>(null);
+  // Ref to track Apple OAuth fallback timeout (for cleanup)
   const appleFallbackTimeout = useRef<NodeJS.Timeout | null>(null);
   
   // Ref to track if initial session check has redirected
@@ -281,8 +323,6 @@ const Auth = () => {
   const initializationComplete = useRef(false);
   const oauthCallbackInProgress = useRef(hasOAuthCallbackParams());
 
-  // Track whether the native SocialLogin plugin is ready for use
-  const [googleNativeReady, setGoogleNativeReady] = useState(false);
   const [appleNativeReady, setAppleNativeReady] = useState(false);
 
   const blockSocialSignIn = useCallback(
@@ -346,52 +386,10 @@ const Auth = () => {
     }
   }, [location.pathname]);
 
-  // Separate effect for OAuth initialization to prevent re-renders
   useEffect(() => {
     if (initializationComplete.current) return;
+    initializationComplete.current = true;
 
-    const initializeAuth = async () => {
-      // Initialize SocialLogin plugin for native platforms
-      if (Capacitor.isNativePlatform() && Capacitor.isPluginAvailable('SocialLogin')) {
-        try {
-          const webClientId = import.meta.env.VITE_GOOGLE_WEB_CLIENT_ID;
-          const iOSClientId = import.meta.env.VITE_GOOGLE_IOS_CLIENT_ID;
-
-          logger.debug('[OAuth Init] Initializing with', {
-            hasWebClientId: !!webClientId,
-            hasIOSClientId: !!iOSClientId
-          });
-
-          if (!webClientId || !iOSClientId) {
-            logger.error('[OAuth Init] Missing Google Client IDs in environment variables');
-            throw new Error('Google Client IDs not configured');
-          }
-
-          await SocialLogin.initialize({
-            google: {
-              webClientId,
-              iOSClientId,
-              mode: 'online'
-            }
-          });
-
-          logger.info('[OAuth Init] SocialLogin initialized successfully');
-          setGoogleNativeReady(true);
-        } catch (error) {
-          logger.error('[OAuth Init] Failed to initialize SocialLogin', { error });
-          setGoogleNativeReady(false);
-        }
-      } else {
-        logger.warn('[OAuth Init] SocialLogin plugin unavailable - using web OAuth fallback');
-        setGoogleNativeReady(false);
-      }
-      initializationComplete.current = true;
-    };
-
-    initializeAuth();
-  }, []); // No dependencies - run only once
-
-  useEffect(() => {
     if (!Capacitor.isNativePlatform()) {
       setAppleNativeReady(false);
       return;
@@ -500,10 +498,6 @@ const Auth = () => {
 
     return () => {
       subscription.unsubscribe();
-      // Clean up any pending OAuth fallback timeouts to prevent memory leaks
-      if (googleFallbackTimeout.current) {
-        clearTimeout(googleFallbackTimeout.current);
-      }
       if (appleFallbackTimeout.current) {
         clearTimeout(appleFallbackTimeout.current);
       }
@@ -632,7 +626,7 @@ const Auth = () => {
     }
   };
 
-  const handleOAuthSignIn = async (provider: 'google' | 'apple') => {
+  const handleOAuthSignIn = async (provider: 'apple') => {
     const socialAuthIntent: SocialAuthIntent = getSocialAuthIntent(isLogin);
     let storedPendingSocialAuth = false;
 
@@ -644,114 +638,7 @@ const Auth = () => {
     try {
       const isNative = Capacitor.isNativePlatform();
       const platform = Capacitor.getPlatform?.() ?? 'web';
-      const providerSupportsNative = provider === 'google' ? isNative : (isNative && platform === 'ios');
-
-      // Native Google Sign-In for iOS/Android
-      if (provider === 'google' && providerSupportsNative && googleNativeReady) {
-        console.log('[Google OAuth] Initiating native Google sign-in');
-        
-        const result = await SocialLogin.login({
-          provider: 'google',
-          options: {}
-        });
-
-        console.log('[Google OAuth] SocialLogin result:', JSON.stringify(result, null, 2));
-
-        // The plugin sometimes returns the payload under `result`, sometimes directly at the root
-        const nativeResponse = (result as unknown as { result?: Record<string, unknown> })?.result ?? result;
-
-        // Prefer explicit responseType when available but don't block when it's missing
-        const responseType = (nativeResponse as { responseType?: string })?.responseType;
-        const idToken = (nativeResponse as { idToken?: string })?.idToken;
-
-        // Check if we got a valid response
-        if (idToken) {
-          console.log('[Google OAuth] ID token received:', `${idToken.substring(0, 20)}...`);
-
-          if (responseType && responseType !== 'online') {
-            console.warn(`[Google OAuth] Unexpected responseType (${responseType}), continuing with idToken flow`);
-          }
-
-          // Continue using the idToken even if the provider/responseType metadata is missing
-
-          console.log('[Google OAuth] Calling google-native-auth edge function');
-          
-          // Call our edge function to handle native Google auth
-          const { data: sessionData, error: functionError } = await supabase.functions.invoke('google-native-auth', {
-            body: { idToken, intent: socialAuthIntent }
-          });
-
-          const functionErrorBody = functionError ? await readFunctionErrorContext(functionError) : null;
-
-          console.log('[Google OAuth] Edge function response:', { 
-            hasAccessToken: !!sessionData?.access_token,
-            hasRefreshToken: !!sessionData?.refresh_token,
-            error: functionErrorBody?.error || functionError?.message,
-            errorCode: functionErrorBody?.code,
-          });
-
-          if (functionError) {
-            if (functionErrorBody?.code === 'ACCOUNT_NOT_FOUND') {
-              setIsLogin(true);
-              setIsForgotPassword(false);
-              setInlineError(getSocialAccountNotFoundMessage('google'));
-              return;
-            }
-
-            throw new Error(
-              typeof functionErrorBody?.error === 'string'
-                ? functionErrorBody.error
-                : functionError.message || 'Google Sign-In failed',
-            );
-          }
-          if (!sessionData?.access_token || !sessionData?.refresh_token) {
-            throw new Error('Failed to get session tokens from edge function');
-          }
-
-          // Set the session with tokens from edge function
-          const { error: sessionError, data: { session: newSession } } = await supabase.auth.setSession({
-            access_token: sessionData.access_token,
-            refresh_token: sessionData.refresh_token,
-          });
-
-          if (sessionError) throw sessionError;
-
-          // Ensure Supabase client state has the session before navigating
-          const { data: { session: currentSession } } = await supabase.auth.getSession();
-          const sessionToUse = newSession ?? currentSession;
-
-          if (!sessionToUse) {
-            throw new Error('Failed to establish Supabase session after Google sign-in');
-          }
-
-          const sessionSetTime = Date.now();
-          console.log(`[Google OAuth] Session set successfully at ${sessionSetTime}, proceeding to navigation`);
-          await handlePostAuthNavigation(sessionToUse, 'googleNative');
-
-          // Fallback: manually redirect if onAuthStateChange doesn't fire (increased to 800ms to avoid race conditions)
-          if (sessionToUse.user) {
-            googleFallbackTimeout.current = setTimeout(async () => {
-              try {
-                // Check if already redirected by onAuthStateChange
-                if (window.location.pathname !== '/auth') {
-                  console.log(`[Google OAuth Fallback] Already redirected, skipping (${Date.now() - sessionSetTime}ms since session set)`);
-                  return;
-                }
-                console.log(`[Google OAuth Fallback] Executing manual redirect at ${Date.now()} (${Date.now() - sessionSetTime}ms since session set)`);
-                await handlePostAuthNavigation(sessionToUse, 'googleNativeFallback');
-              } catch (error) {
-                console.error('[Google OAuth Fallback] Error during redirect:', error);
-                // Fallback to onboarding if something goes wrong
-                navigate('/onboarding');
-              }
-            }, 800);
-          }
-          return;
-        } else {
-          console.error('[Google OAuth] Missing idToken in native response:', result);
-          throw new Error('Google sign-in did not return an ID token');
-        }
-      }
+      const providerSupportsNative = isNative && platform === 'ios';
 
       // Native Apple Sign-In for iOS
       if (provider === 'apple' && providerSupportsNative && appleNativeReady) {
@@ -891,18 +778,15 @@ const Auth = () => {
         return;
       }
 
-      // Web OAuth flow for Google and Apple Sign-In
-      if (providerSupportsNative) {
-        const providerReady = provider === 'google' ? googleNativeReady : appleNativeReady;
-        if (!providerReady) {
-          console.warn(`[${provider} OAuth] Native plugin unavailable - falling back to web flow`);
-        }
+      // Web OAuth fallback for Apple Sign-In
+      if (providerSupportsNative && !appleNativeReady) {
+        console.warn(`[${provider} OAuth] Native plugin unavailable - falling back to web flow`);
       }
 
       console.log(`[${provider} OAuth] Using web OAuth flow`);
       console.log(`[${provider} OAuth] Redirect URL:`, getRedirectUrl());
 
-      // Use standard Supabase OAuth for all web providers
+      // Use standard Supabase OAuth for Apple web fallback
       storedPendingSocialAuth = storePendingSocialAuthAttempt({
         provider,
         intent: socialAuthIntent,
@@ -940,12 +824,7 @@ const Auth = () => {
         return; // User cancelled, just return silently
       }
 
-      if (provider === 'apple') {
-        setInlineError(getAppleErrorDescription(error));
-        return;
-      }
-      
-      setInlineError(message || 'Failed to sign in. Please try again.');
+      setInlineError(getAppleErrorDescription(error));
     } finally {
       setOauthLoading(null);
     }
@@ -1107,39 +986,6 @@ const Auth = () => {
                     </span>
                   </div>
                 </div>
-
-                <Button
-                  type="button"
-                  onClick={() => handleOAuthSignIn('google')}
-                  disabled={loading || oauthLoading !== null}
-                  className="h-12 w-full rounded-[14px] bg-[#f7f8fc] text-base font-semibold text-[#111827] shadow-[0_16px_30px_rgba(0,0,0,0.18)] hover:bg-white"
-                >
-                  {oauthLoading === 'google' ? (
-                    <div className="animate-spin h-5 w-5 border-2 border-[#111827]/20 border-t-[#111827] rounded-full" />
-                  ) : (
-                    <>
-                      <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
-                        <path
-                          fill="#4285F4"
-                          d="M21.6 12.23c0-.68-.06-1.33-.18-1.95H12v3.69h5.39a4.62 4.62 0 0 1-2 3.03v2.52h3.24c1.9-1.75 2.97-4.33 2.97-7.29Z"
-                        />
-                        <path
-                          fill="#34A853"
-                          d="M12 22c2.7 0 4.97-.9 6.63-2.44l-3.24-2.52c-.9.6-2.05.97-3.39.97-2.6 0-4.8-1.76-5.58-4.12H3.08v2.59A9.99 9.99 0 0 0 12 22Z"
-                        />
-                        <path
-                          fill="#FBBC04"
-                          d="M6.42 13.89A5.99 5.99 0 0 1 6.1 12c0-.66.11-1.29.32-1.89V7.52H3.08A9.99 9.99 0 0 0 2 12c0 1.61.39 3.13 1.08 4.48l3.34-2.59Z"
-                        />
-                        <path
-                          fill="#EA4335"
-                          d="M12 5.98c1.47 0 2.8.5 3.84 1.48l2.88-2.88C16.96 2.95 14.7 2 12 2a9.99 9.99 0 0 0-8.92 5.52l3.34 2.59C7.2 7.74 9.4 5.98 12 5.98Z"
-                        />
-                      </svg>
-                      {isLogin ? 'Sign in with Google' : 'Sign up with Google'}
-                    </>
-                  )}
-                </Button>
 
                 <Button
                   type="button"

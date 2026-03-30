@@ -65,6 +65,9 @@ jobs:
       - name: Link Supabase project
         run: supabase link --project-ref "$PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
 
+      - name: Push Supabase config
+        run: supabase config push --project-ref "$PROJECT_REF" --yes
+
       - name: Repair stale migration versions
         run: |
           set -euo pipefail

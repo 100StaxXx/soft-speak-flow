@@ -1,0 +1,1 @@
+export const QUEST_ACTION_TOAST_DURATION_MS = 2_500;

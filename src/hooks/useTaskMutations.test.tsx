@@ -1,7 +1,8 @@
 import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { QUEST_ACTION_TOAST_DURATION_MS } from "@/constants/questToast";
 
 const mocks = vi.hoisted(() => {
   const fromMock = vi.fn();
@@ -10,6 +11,7 @@ const mocks = vi.hoisted(() => {
   const awardCustomXPMock = vi.fn();
   const awardDisciplineForHabitCompletionMock = vi.fn();
   const awardDisciplineForPlannedTaskOnTimeMock = vi.fn();
+  const calculateGuildBonusMock = vi.fn();
   const trackTaskCreationMock = vi.fn();
   const trackTaskCompletionMock = vi.fn();
   const trackResilienceEventMock = vi.fn();
@@ -50,6 +52,7 @@ const mocks = vi.hoisted(() => {
     awardCustomXPMock,
     awardDisciplineForHabitCompletionMock,
     awardDisciplineForPlannedTaskOnTimeMock,
+    calculateGuildBonusMock,
     trackTaskCreationMock,
     trackTaskCompletionMock,
     trackResilienceEventMock,
@@ -122,6 +125,10 @@ vi.mock("@/hooks/useXPRewards", () => ({
   useXPRewards: () => ({
     awardCustomXP: mocks.awardCustomXPMock,
   }),
+}));
+
+vi.mock("@/utils/guildBonus", () => ({
+  calculateGuildBonus: (...args: unknown[]) => mocks.calculateGuildBonusMock(...args),
 }));
 
 vi.mock("@/hooks/useSchedulingLearner", () => ({
@@ -308,6 +315,7 @@ describe("useTaskMutations attachment handling", () => {
     mocks.resilienceState.state = "healthy";
     mocks.awardDisciplineForHabitCompletionMock.mockResolvedValue(undefined);
     mocks.awardDisciplineForPlannedTaskOnTimeMock.mockResolvedValue(undefined);
+    mocks.calculateGuildBonusMock.mockResolvedValue({ bonusXP: 0, toastReason: "Task Complete!" });
     mocks.getLocalHabitCompletionsForDateMock.mockResolvedValue([]);
     mocks.getLocalSubtasksForTaskMock.mockResolvedValue([]);
     mocks.getPlannerRecordMock.mockResolvedValue({
@@ -469,6 +477,19 @@ describe("useTaskMutations attachment handling", () => {
       if (table === "subtasks") {
         return {
           insert: vi.fn().mockResolvedValue({ error: null }),
+        };
+      }
+
+      if (table === "epic_habits") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn().mockResolvedValue({
+                data: [],
+                error: null,
+              }),
+            })),
+          })),
         };
       }
 
@@ -934,6 +955,160 @@ describe("useTaskMutations attachment handling", () => {
     expect(mocks.dailyTasksUpdateExecuteMock).toHaveBeenCalledTimes(1);
     expect(mocks.toastMock).toHaveBeenCalledWith(expect.objectContaining({ title: "Quest updated!" }));
     expect(mocks.toastMock).toHaveBeenCalledWith(expect.objectContaining({ title: "Attachments unavailable" }));
+  });
+
+  it("shows a fast quest completion toast with an Undo action", async () => {
+    setOnline(true);
+    mocks.awardCustomXPMock.mockResolvedValueOnce({ xpAwarded: 16 });
+
+    const completionSelectMaybeSingleMock = vi.fn().mockResolvedValue({
+      data: {
+        completed_at: null,
+        task_text: "Ship feature",
+        habit_source_id: null,
+        task_date: "2026-02-20",
+        difficulty: "medium",
+        scheduled_time: "09:00",
+        category: "mind",
+        is_main_quest: false,
+        xp_reward: 16,
+        contact_id: null,
+        auto_log_interaction: true,
+        contact: null,
+      },
+      error: null,
+    });
+    const completionUpdateSelectMock = vi.fn().mockResolvedValue({
+      data: [{ id: "task-1", completed: true }],
+      error: null,
+    });
+
+    mocks.fromMock.mockImplementation((table: string) => {
+      if (table === "daily_tasks") {
+        return {
+          select: vi.fn((selection?: string) => {
+            if (selection?.includes("completed_at")) {
+              return {
+                eq: vi.fn(() => ({
+                  eq: vi.fn(() => ({
+                    maybeSingle: completionSelectMaybeSingleMock,
+                  })),
+                })),
+              };
+            }
+
+            if (selection?.includes("task_date, scheduled_time, habit_source_id, source")) {
+              return {
+                eq: vi.fn(() => ({
+                  eq: vi.fn(() => ({
+                    maybeSingle: mocks.dailyTasksFetchSchedulingSingleMock,
+                  })),
+                })),
+              };
+            }
+
+            if (selection === "*") {
+              return {
+                eq: vi.fn(() => ({
+                  eq: vi.fn(() => ({
+                    maybeSingle: mocks.dailyTasksFetchByIdMaybeSingleMock,
+                  })),
+                })),
+              };
+            }
+
+            return {
+              eq: vi.fn(() => ({
+                eq: mocks.dailyTasksCountExecuteMock,
+                is: mocks.dailyTasksCountExecuteMock,
+              })),
+            };
+          }),
+          insert: mocks.dailyTasksInsertMock,
+          delete: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: mocks.dailyTasksDeleteExecuteMock,
+            })),
+          })),
+          update: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                eq: vi.fn(() => ({
+                  select: completionUpdateSelectMock,
+                })),
+              })),
+            })),
+          })),
+        };
+      }
+
+      if (table === "task_attachments") {
+        return {
+          delete: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: mocks.taskAttachmentsDeleteExecuteMock,
+            })),
+          })),
+          insert: mocks.taskAttachmentsInsertExecuteMock,
+        };
+      }
+
+      if (table === "subtasks") {
+        return {
+          insert: vi.fn().mockResolvedValue({ error: null }),
+        };
+      }
+
+      return {
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            eq: vi.fn(),
+            is: vi.fn(),
+          })),
+        })),
+        insert: vi.fn(),
+        delete: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            eq: vi.fn(),
+          })),
+        })),
+        update: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            eq: vi.fn(),
+          })),
+        })),
+      };
+    });
+
+    const { result } = renderHook(() => useTaskMutations("2026-02-20"), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      result.current.toggleTask({
+        taskId: "task-1",
+        completed: true,
+        xpReward: 16,
+      });
+    });
+
+    await waitFor(() => {
+      expect(mocks.toastMock).toHaveBeenCalledWith(expect.objectContaining({
+        title: "Quest completed! ✨",
+        duration: QUEST_ACTION_TOAST_DURATION_MS,
+      }));
+    });
+
+    const completionToastCall = mocks.toastMock.mock.calls.find(
+      ([toastArg]) => toastArg?.title === "Quest completed! ✨",
+    );
+
+    expect(completionToastCall).toBeDefined();
+    expect(completionToastCall?.[0]).toEqual(expect.objectContaining({
+      action: expect.any(Object),
+    }));
+    expect(completionToastCall?.[0].action.props.altText).toBe("Undo completion");
+    expect(completionToastCall?.[0].action.props.children).toBe("Undo");
   });
 
   it("normalizes legacy prefixed task IDs before remote quest updates", async () => {

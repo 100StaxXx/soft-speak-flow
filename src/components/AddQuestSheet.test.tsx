@@ -775,7 +775,7 @@ describe("AddQuestSheet", () => {
     fireEvent.click(screen.getByRole("button", { name: "30 min" }));
     fireEvent.click(screen.getByRole("button", { name: "Custom" }));
     fireEvent.change(screen.getByPlaceholderText("Minutes"), { target: { value: "17" } });
-    fireEvent.click(screen.getByRole("button", { name: "1m" }));
+    fireEvent.click(screen.getByRole("button", { name: "15m" }));
 
     expect(screen.queryByPlaceholderText("Minutes")).not.toBeInTheDocument();
   });
@@ -908,7 +908,7 @@ describe("AddQuestSheet", () => {
     }
   });
 
-  it("snaps custom manual time values to the nearest half-hour on submit", async () => {
+  it("preserves custom manual time values on submit", async () => {
     const onAdd = vi.fn<Parameters<(data: AddQuestData) => Promise<void>>, ReturnType<(data: AddQuestData) => Promise<void>>>()
       .mockResolvedValue(undefined);
 
@@ -937,7 +937,7 @@ describe("AddQuestSheet", () => {
     });
 
     expect(onAdd.mock.calls[0]?.[0]).toMatchObject({
-      scheduledTime: "11:30",
+      scheduledTime: "11:17",
     });
   });
 

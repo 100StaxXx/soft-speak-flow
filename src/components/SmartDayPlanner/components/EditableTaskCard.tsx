@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { GeneratedTask } from '@/hooks/useSmartDayPlanner';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { DurationPickerField, TimePickerField, formatDurationLabel } from '@/components/scheduling';
 import { 
   Clock, 
   Flame, 
@@ -46,7 +47,7 @@ export function EditableTaskCard({
   const [isEditing, setIsEditing] = useState(false);
   const [editedTitle, setEditedTitle] = useState(task.title);
   const [editedTime, setEditedTime] = useState(task.scheduledTime);
-  const [editedDuration, setEditedDuration] = useState(task.estimatedDuration.toString());
+  const [editedDuration, setEditedDuration] = useState<number | null>(task.estimatedDuration);
 
   const priorityColors = {
     high: 'border-l-red-500',
@@ -58,7 +59,7 @@ export function EditableTaskCard({
     onUpdate(index, {
       title: editedTitle,
       scheduledTime: editedTime,
-      estimatedDuration: parseInt(editedDuration) || task.estimatedDuration,
+      estimatedDuration: editedDuration ?? task.estimatedDuration,
     });
     setIsEditing(false);
   };
@@ -66,7 +67,7 @@ export function EditableTaskCard({
   const handleCancelEdit = () => {
     setEditedTitle(task.title);
     setEditedTime(task.scheduledTime);
-    setEditedDuration(task.estimatedDuration.toString());
+    setEditedDuration(task.estimatedDuration);
     setIsEditing(false);
   };
 
@@ -87,23 +88,21 @@ export function EditableTaskCard({
         />
         <div className="flex gap-2">
           <div className="flex-1">
-            <label className="text-[10px] text-muted-foreground mb-1 block">Time</label>
-            <Input
-              type="time"
-              value={editedTime}
-              onChange={(e) => setEditedTime(e.target.value)}
-              className="text-xs h-8"
+            <TimePickerField
+              value={editedTime || null}
+              onChange={(time) => setEditedTime(time ?? '')}
+              label="Time"
+              placeholder="Time"
+              ariaLabel="Planner task time"
+              variant="compact"
             />
           </div>
-          <div className="w-20">
-            <label className="text-[10px] text-muted-foreground mb-1 block">Mins</label>
-            <Input
-              type="number"
+          <div className="w-28">
+            <DurationPickerField
               value={editedDuration}
-              onChange={(e) => setEditedDuration(e.target.value)}
-              className="text-xs h-8"
-              min="5"
-              max="240"
+              onChange={setEditedDuration}
+              label="Mins"
+              variant="compact"
             />
           </div>
         </div>
@@ -152,7 +151,7 @@ export function EditableTaskCard({
           <div className="flex items-center gap-2 mt-1">
             <span className="text-[10px] text-muted-foreground flex items-center gap-1">
               <Clock className="h-3 w-3" />
-              {task.scheduledTime} · {task.estimatedDuration}m
+              {task.scheduledTime} · {formatDurationLabel(task.estimatedDuration, "No duration")}
             </span>
             {hasConflict && (
               <TooltipProvider>

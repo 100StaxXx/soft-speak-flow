@@ -42,6 +42,13 @@ export const DeepLinkProvider = ({ children }: { children: ReactNode }) => {
       window.dispatchEvent(new CustomEvent('deep-link-navigation', {
         detail: { path: `/profile?${params.toString()}` },
       }));
+      return;
+    }
+
+    if (data.type === 'auth_recovery' && data.path) {
+      window.dispatchEvent(new CustomEvent('deep-link-navigation', {
+        detail: { path: data.path },
+      }));
     }
   }, []);
 

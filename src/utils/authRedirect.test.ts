@@ -1,25 +1,49 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => {
-  const maybeSingleMock = vi.fn();
-  const updateEqMock = vi.fn(() => Promise.resolve({ error: null }));
-  const updateMock = vi.fn(() => ({ eq: updateEqMock }));
-  const upsertMock = vi.fn(() => Promise.resolve({ error: null }));
-  const selectEqMock = vi.fn(() => ({ maybeSingle: maybeSingleMock }));
-  const selectMock = vi.fn(() => ({ eq: selectEqMock }));
-  const fromMock = vi.fn(() => ({
-    select: selectMock,
-    update: updateMock,
-    upsert: upsertMock,
-  }));
+  const profilesMaybeSingleMock = vi.fn();
+  const companionMaybeSingleMock = vi.fn();
+  const profilesUpdateEqMock = vi.fn(() => Promise.resolve({ error: null }));
+  const profilesUpdateMock = vi.fn(() => ({ eq: profilesUpdateEqMock }));
+  const profilesUpsertMock = vi.fn(() => Promise.resolve({ error: null }));
+  const profilesSelectEqMock = vi.fn(() => ({ maybeSingle: profilesMaybeSingleMock }));
+  const profilesSelectMock = vi.fn(() => ({ eq: profilesSelectEqMock }));
+
+  const companionLimitMock = vi.fn(() => ({ maybeSingle: companionMaybeSingleMock }));
+  const companionOrderMock = vi.fn(() => ({ limit: companionLimitMock }));
+  const companionEqMock = vi.fn(() => ({ order: companionOrderMock }));
+  const companionSelectMock = vi.fn(() => ({ eq: companionEqMock }));
+
+  const fromMock = vi.fn((table: string) => {
+    if (table === "profiles") {
+      return {
+        select: profilesSelectMock,
+        update: profilesUpdateMock,
+        upsert: profilesUpsertMock,
+      };
+    }
+
+    if (table === "user_companion") {
+      return {
+        select: companionSelectMock,
+      };
+    }
+
+    throw new Error(`Unexpected table: ${table}`);
+  });
 
   return {
-    maybeSingleMock,
-    updateEqMock,
-    updateMock,
-    upsertMock,
-    selectEqMock,
-    selectMock,
+    profilesMaybeSingleMock,
+    companionMaybeSingleMock,
+    profilesUpdateEqMock,
+    profilesUpdateMock,
+    profilesUpsertMock,
+    profilesSelectEqMock,
+    profilesSelectMock,
+    companionLimitMock,
+    companionOrderMock,
+    companionEqMock,
+    companionSelectMock,
     fromMock,
   };
 });
@@ -40,9 +64,19 @@ vi.mock("./logger", () => ({
 
 import { ensureProfile, getAuthRedirectPath, getProfileAwareAuthFallbackPath } from "./authRedirect";
 
+const noCompanion = { data: null, error: null };
+const existingCompanion = { data: { id: "companion-1" }, error: null };
+
+const flushMicrotasks = async () => {
+  await Promise.resolve();
+  await Promise.resolve();
+};
+
 describe("getAuthRedirectPath", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.profilesMaybeSingleMock.mockResolvedValue({ data: null, error: null });
+    mocks.companionMaybeSingleMock.mockResolvedValue(noCompanion);
   });
 
   afterEach(() => {
@@ -50,7 +84,7 @@ describe("getAuthRedirectPath", () => {
   });
 
   it("routes to /tasks when onboarding is complete", async () => {
-    mocks.maybeSingleMock.mockResolvedValueOnce({
+    mocks.profilesMaybeSingleMock.mockResolvedValueOnce({
       data: {
         selected_mentor_id: "mentor-1",
         onboarding_completed: true,
@@ -63,7 +97,7 @@ describe("getAuthRedirectPath", () => {
   });
 
   it("routes existing users to /tasks even without mentor when onboarding is complete", async () => {
-    mocks.maybeSingleMock.mockResolvedValueOnce({
+    mocks.profilesMaybeSingleMock.mockResolvedValueOnce({
       data: {
         selected_mentor_id: null,
         onboarding_completed: true,
@@ -76,7 +110,7 @@ describe("getAuthRedirectPath", () => {
   });
 
   it("routes to /tasks when walkthrough is completed even if onboarding is false", async () => {
-    mocks.maybeSingleMock.mockResolvedValueOnce({
+    mocks.profilesMaybeSingleMock.mockResolvedValueOnce({
       data: {
         selected_mentor_id: null,
         onboarding_completed: false,
@@ -88,8 +122,32 @@ describe("getAuthRedirectPath", () => {
     await expect(getAuthRedirectPath("walkthrough-complete-user")).resolves.toBe("/tasks");
   });
 
+  it("routes companion-backed stale profiles to /tasks and self-heals the flags", async () => {
+    mocks.profilesMaybeSingleMock.mockResolvedValueOnce({
+      data: {
+        selected_mentor_id: "mentor-2",
+        onboarding_completed: false,
+        onboarding_data: { guided_tutorial: { completed: false } },
+      },
+      error: null,
+    });
+    mocks.companionMaybeSingleMock.mockResolvedValueOnce(existingCompanion);
+
+    await expect(getAuthRedirectPath("companion-backed-user")).resolves.toBe("/tasks");
+    await flushMicrotasks();
+
+    expect(mocks.profilesUpdateEqMock).toHaveBeenCalledWith("id", "companion-backed-user");
+    expect(mocks.profilesUpdateMock).toHaveBeenCalledWith({
+      onboarding_completed: true,
+      onboarding_data: {
+        guided_tutorial: { completed: false },
+        walkthrough_completed: true,
+      },
+    });
+  });
+
   it("routes to /onboarding when onboarding is explicitly incomplete, even with mentor", async () => {
-    mocks.maybeSingleMock.mockResolvedValueOnce({
+    mocks.profilesMaybeSingleMock.mockResolvedValueOnce({
       data: {
         selected_mentor_id: "mentor-2",
         onboarding_completed: false,
@@ -102,7 +160,7 @@ describe("getAuthRedirectPath", () => {
   });
 
   it("keeps legacy compatibility for null onboarding_completed when mentor is resolved", async () => {
-    mocks.maybeSingleMock.mockResolvedValueOnce({
+    mocks.profilesMaybeSingleMock.mockResolvedValueOnce({
       data: {
         selected_mentor_id: "mentor-legacy",
         onboarding_completed: null,
@@ -115,7 +173,7 @@ describe("getAuthRedirectPath", () => {
   });
 
   it("routes to /onboarding when profile is missing", async () => {
-    mocks.maybeSingleMock.mockResolvedValueOnce({
+    mocks.profilesMaybeSingleMock.mockResolvedValueOnce({
       data: null,
       error: null,
     });
@@ -126,7 +184,7 @@ describe("getAuthRedirectPath", () => {
   it("falls back safely on timeout and checks returning-user status", async () => {
     vi.useFakeTimers();
 
-    mocks.maybeSingleMock
+    mocks.profilesMaybeSingleMock
       .mockImplementationOnce(() => new Promise(() => {}))
       .mockResolvedValueOnce({
         data: { onboarding_completed: false },
@@ -142,7 +200,7 @@ describe("getAuthRedirectPath", () => {
   it("falls back to /tasks on timeout when returning-user check confirms completion", async () => {
     vi.useFakeTimers();
 
-    mocks.maybeSingleMock
+    mocks.profilesMaybeSingleMock
       .mockImplementationOnce(() => new Promise(() => {}))
       .mockResolvedValueOnce({
         data: { onboarding_completed: true },
@@ -155,10 +213,33 @@ describe("getAuthRedirectPath", () => {
     await expect(pathPromise).resolves.toBe("/tasks");
   });
 
+  it("falls back to /tasks on timeout when the returning-user check finds a companion-backed stale profile", async () => {
+    vi.useFakeTimers();
+
+    mocks.profilesMaybeSingleMock
+      .mockImplementationOnce(() => new Promise(() => {}))
+      .mockResolvedValueOnce({
+        data: {
+          selected_mentor_id: "mentor-2",
+          onboarding_completed: false,
+          onboarding_data: {},
+        },
+        error: null,
+      });
+    mocks.companionMaybeSingleMock
+      .mockResolvedValueOnce(existingCompanion)
+      .mockResolvedValueOnce(existingCompanion);
+
+    const pathPromise = getAuthRedirectPath("timeout-companion-user");
+    await vi.advanceTimersByTimeAsync(5001);
+
+    await expect(pathPromise).resolves.toBe("/tasks");
+  });
+
   it("returns /onboarding when profile and returning-user checks both timeout", async () => {
     vi.useFakeTimers();
 
-    mocks.maybeSingleMock.mockImplementation(() => new Promise(() => {}));
+    mocks.profilesMaybeSingleMock.mockImplementation(() => new Promise(() => {}));
 
     const pathPromise = getAuthRedirectPath("12345678-double-timeout");
     await vi.advanceTimersByTimeAsync(7005);
@@ -169,7 +250,7 @@ describe("getAuthRedirectPath", () => {
   it("keeps fallback deterministic when all lookups hang", async () => {
     vi.useFakeTimers();
 
-    mocks.maybeSingleMock.mockImplementation(() => new Promise(() => {}));
+    mocks.profilesMaybeSingleMock.mockImplementation(() => new Promise(() => {}));
 
     const firstPathPromise = getAuthRedirectPath("12345678-stuck-1");
     const secondPathPromise = getAuthRedirectPath("12345678-stuck-2");
@@ -183,6 +264,8 @@ describe("getAuthRedirectPath", () => {
 describe("getProfileAwareAuthFallbackPath", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.profilesMaybeSingleMock.mockResolvedValue({ data: null, error: null });
+    mocks.companionMaybeSingleMock.mockResolvedValue(noCompanion);
   });
 
   afterEach(() => {
@@ -190,7 +273,7 @@ describe("getProfileAwareAuthFallbackPath", () => {
   });
 
   it("returns /tasks for existing users", async () => {
-    mocks.maybeSingleMock.mockResolvedValueOnce({
+    mocks.profilesMaybeSingleMock.mockResolvedValueOnce({
       data: {
         onboarding_completed: true,
         selected_mentor_id: null,
@@ -203,7 +286,7 @@ describe("getProfileAwareAuthFallbackPath", () => {
   });
 
   it("returns /tasks for legacy existing users with a mentor and null onboarding_completed", async () => {
-    mocks.maybeSingleMock.mockResolvedValueOnce({
+    mocks.profilesMaybeSingleMock.mockResolvedValueOnce({
       data: {
         onboarding_completed: null,
         selected_mentor_id: "mentor-legacy",
@@ -216,7 +299,7 @@ describe("getProfileAwareAuthFallbackPath", () => {
   });
 
   it("returns /tasks when walkthrough is completed even if onboarding is false", async () => {
-    mocks.maybeSingleMock.mockResolvedValueOnce({
+    mocks.profilesMaybeSingleMock.mockResolvedValueOnce({
       data: {
         onboarding_completed: false,
         selected_mentor_id: null,
@@ -228,8 +311,22 @@ describe("getProfileAwareAuthFallbackPath", () => {
     await expect(getProfileAwareAuthFallbackPath("walkthrough-fallback-user")).resolves.toBe("/tasks");
   });
 
+  it("returns /tasks for companion-backed stale profiles", async () => {
+    mocks.profilesMaybeSingleMock.mockResolvedValueOnce({
+      data: {
+        onboarding_completed: false,
+        selected_mentor_id: "mentor-2",
+        onboarding_data: {},
+      },
+      error: null,
+    });
+    mocks.companionMaybeSingleMock.mockResolvedValueOnce(existingCompanion);
+
+    await expect(getProfileAwareAuthFallbackPath("companion-fallback-user")).resolves.toBe("/tasks");
+  });
+
   it("returns /onboarding for incomplete users", async () => {
-    mocks.maybeSingleMock.mockResolvedValueOnce({
+    mocks.profilesMaybeSingleMock.mockResolvedValueOnce({
       data: {
         onboarding_completed: false,
         selected_mentor_id: null,
@@ -243,7 +340,7 @@ describe("getProfileAwareAuthFallbackPath", () => {
 
   it("returns /onboarding when fallback lookup times out", async () => {
     vi.useFakeTimers();
-    mocks.maybeSingleMock.mockImplementationOnce(() => new Promise(() => {}));
+    mocks.profilesMaybeSingleMock.mockImplementationOnce(() => new Promise(() => {}));
 
     const fallbackPath = getProfileAwareAuthFallbackPath("timeout-user");
     await vi.advanceTimersByTimeAsync(2001);
@@ -252,7 +349,7 @@ describe("getProfileAwareAuthFallbackPath", () => {
   });
 
   it("returns /onboarding when fallback lookup throws", async () => {
-    mocks.maybeSingleMock.mockRejectedValueOnce(new Error("profile unavailable"));
+    mocks.profilesMaybeSingleMock.mockRejectedValueOnce(new Error("profile unavailable"));
 
     await expect(getProfileAwareAuthFallbackPath("error-user")).resolves.toBe("/onboarding");
   });
@@ -261,18 +358,20 @@ describe("getProfileAwareAuthFallbackPath", () => {
 describe("ensureProfile", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.profilesMaybeSingleMock.mockResolvedValue({ data: null, error: null });
+    mocks.companionMaybeSingleMock.mockResolvedValue(noCompanion);
   });
 
   it("creates only a minimal bootstrap payload when the profile is missing", async () => {
-    mocks.maybeSingleMock.mockResolvedValueOnce({
+    mocks.profilesMaybeSingleMock.mockResolvedValueOnce({
       data: null,
       error: null,
     });
 
     await ensureProfile("profile-missing-user", "new@example.com");
 
-    expect(mocks.upsertMock).toHaveBeenCalledTimes(1);
-    const firstCall = mocks.upsertMock.mock.calls.at(0);
+    expect(mocks.profilesUpsertMock).toHaveBeenCalledTimes(1);
+    const firstCall = mocks.profilesUpsertMock.mock.calls.at(0);
     expect(firstCall).toBeDefined();
 
     const payload = firstCall?.[0] as Record<string, unknown>;

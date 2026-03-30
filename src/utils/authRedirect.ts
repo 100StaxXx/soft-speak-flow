@@ -7,7 +7,11 @@ import {
   stripOnboardingMentorId,
 } from "./mentor";
 import { logger } from "./logger";
-import { hasWalkthroughCompleted, isReturningProfile } from "./profileOnboarding";
+import {
+  buildEstablishedProfileSelfHealPatch,
+  getOnboardingGateState,
+  hasWalkthroughCompleted,
+} from "./profileOnboarding";
 
 const PROFILE_QUERY_TIMEOUT_MS = 5000;
 const RETURNING_USER_QUERY_TIMEOUT_MS = 2000;
@@ -26,6 +30,27 @@ const buildProfileBootstrapPayload = (
   timezone,
 });
 
+type AuthRedirectProfile = Pick<
+  Database["public"]["Tables"]["profiles"]["Row"],
+  "selected_mentor_id" | "onboarding_completed" | "onboarding_data"
+>;
+
+const fetchAuthRedirectProfile = (userId: string) =>
+  supabase
+    .from("profiles")
+    .select("selected_mentor_id, onboarding_completed, onboarding_data")
+    .eq("id", userId)
+    .maybeSingle();
+
+const fetchAuthRedirectCompanion = (userId: string) =>
+  supabase
+    .from("user_companion")
+    .select("id")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
 /**
  * Helper to wrap a promise with a timeout
  */
@@ -38,23 +63,100 @@ const withTimeout = <T>(promiseFn: () => PromiseLike<T>, timeoutMs: number, oper
   ]);
 };
 
+const readAuthRedirectContext = async (
+  userId: string,
+  timeoutMs: number,
+): Promise<{
+  profile: AuthRedirectProfile | null;
+  profileError: string | null;
+  hasCompanion: boolean;
+}> => {
+  const [profileResult, companionResult] = await Promise.allSettled([
+    withTimeout(
+      () => fetchAuthRedirectProfile(userId),
+      timeoutMs,
+      "Profile fetch",
+    ),
+    withTimeout(
+      () => fetchAuthRedirectCompanion(userId),
+      timeoutMs,
+      "Companion fetch",
+    ),
+  ]);
+
+  let profile: AuthRedirectProfile | null = null;
+  let profileError: string | null = null;
+  let hasCompanion = false;
+
+  if (profileResult.status === "fulfilled") {
+    profile = (profileResult.value.data ?? null) as AuthRedirectProfile | null;
+    if (profileResult.value.error) {
+      profileError = profileResult.value.error.message;
+    }
+  } else {
+    profileError = profileResult.reason instanceof Error ? profileResult.reason.message : String(profileResult.reason);
+  }
+
+  if (companionResult.status === "fulfilled") {
+    if (companionResult.value.error) {
+      logger.warn("[authRedirect] Companion lookup failed, continuing without companion signal", {
+        error: companionResult.value.error.message,
+      });
+    } else {
+      hasCompanion = Boolean(companionResult.value.data);
+    }
+  } else {
+    logger.warn("[authRedirect] Companion lookup timed out, continuing without companion signal", {
+      error: companionResult.reason instanceof Error ? companionResult.reason.message : String(companionResult.reason),
+    });
+  }
+
+  return { profile, profileError, hasCompanion };
+};
+
+const scheduleEstablishedProfileSelfHeal = (
+  userId: string,
+  profile: AuthRedirectProfile | null,
+  hasCompanion: boolean,
+) => {
+  const patch = buildEstablishedProfileSelfHealPatch({ profile, hasCompanion });
+  if (!patch) return;
+
+  Promise.resolve(
+    supabase
+      .from("profiles")
+      .update(patch)
+      .eq("id", userId),
+  )
+    .then(({ error }) => {
+      if (error) {
+        logger.warn("[authRedirect] Failed to self-heal established profile flags", { userId, error });
+      }
+    })
+    .catch((error: unknown) => {
+      logger.warn("[authRedirect] Established profile self-heal threw", { userId, error });
+    });
+};
+
 /**
  * Quick check if user has completed onboarding (for fallback scenarios)
  */
 const isReturningUser = async (userId: string): Promise<boolean> => {
   try {
-    const { data } = await withTimeout(
-      () =>
-        supabase
-          .from("profiles")
-          .select("selected_mentor_id, onboarding_completed, onboarding_data")
-          .eq("id", userId)
-          .maybeSingle(),
+    const { profile, profileError, hasCompanion } = await readAuthRedirectContext(
+      userId,
       RETURNING_USER_QUERY_TIMEOUT_MS,
-      "Returning user check",
     );
+    if (profileError) {
+      throw new Error(profileError);
+    }
 
-    return isReturningProfile(data);
+    const gate = getOnboardingGateState({ profile, hasCompanion });
+    if (gate.isEstablished) {
+      scheduleEstablishedProfileSelfHeal(userId, profile, hasCompanion);
+    }
+
+    return gate.isEstablished;
   } catch (error) {
     logger.warn("[isReturningUser] Returning user check failed, defaulting to false", { error });
     return false;
@@ -87,32 +189,29 @@ const resolveAuthRedirectPath = async (userId: string): Promise<string> => {
   try {
     logger.debug("[getAuthRedirectPath] Fetching profile...", { userId: userId.substring(0, 8) });
 
-    const { data: profile, error } = await withTimeout(
-      () =>
-        supabase
-          .from("profiles")
-          .select("selected_mentor_id, onboarding_completed, onboarding_data")
-          .eq("id", userId)
-          .maybeSingle(),
+    const { profile, profileError, hasCompanion } = await readAuthRedirectContext(
+      userId,
       PROFILE_QUERY_TIMEOUT_MS,
-      "Profile fetch",
     );
 
-    if (error) {
-      logger.warn("[getAuthRedirectPath] Profile fetch error, checking if returning user", { error: error.message });
+    if (profileError) {
+      logger.warn("[getAuthRedirectPath] Profile fetch error, checking if returning user", { error: profileError });
       return await getProfileAwareAuthFallbackPath(userId);
     }
 
     const resolvedMentorId = getResolvedMentorId(profile);
     const onboardingMentorId = getOnboardingMentorId(profile);
     const walkthroughCompleted = hasWalkthroughCompleted(profile?.onboarding_data);
+    const gate = getOnboardingGateState({ profile, hasCompanion });
     logger.debug("[getAuthRedirectPath] Profile fetched", {
       hasProfile: !!profile,
       onboardingCompleted: profile?.onboarding_completed,
       walkthroughCompleted,
+      hasCompanion,
       hasMentor: !!profile?.selected_mentor_id,
       onboardingMentorId: onboardingMentorId?.substring(0, 8),
       resolvedMentorId: resolvedMentorId?.substring(0, 8),
+      gateReason: gate.reason,
     });
 
     if (profile?.onboarding_completed && !profile.selected_mentor_id && onboardingMentorId) {
@@ -150,27 +249,16 @@ const resolveAuthRedirectPath = async (userId: string): Promise<string> => {
       );
     }
 
-    if (isReturningProfile(profile)) {
-      logger.debug("[getAuthRedirectPath] Onboarding complete, redirecting to /tasks");
+    if (gate.isEstablished) {
+      scheduleEstablishedProfileSelfHeal(userId, profile, hasCompanion);
+      logger.debug("[getAuthRedirectPath] Established account, redirecting to /tasks", {
+        reason: gate.reason,
+      });
       return RETURNING_USER_REDIRECT_PATH;
     }
 
-    // Explicitly incomplete onboarding returns to onboarding unless later
-    // walkthrough state already proves the user completed the flow.
-    if (profile?.onboarding_completed === false) {
-      logger.debug("[getAuthRedirectPath] Onboarding marked incomplete, redirecting to /onboarding");
-      return DEFAULT_AUTH_REDIRECT_PATH;
-    }
-
-    // No profile or no mentor selected -> onboarding
-    if (!profile || !resolvedMentorId) {
-      logger.debug("[getAuthRedirectPath] No profile or mentor, redirecting to /onboarding");
-      return DEFAULT_AUTH_REDIRECT_PATH;
-    }
-
-    // Has mentor -> quests page
-    logger.debug("[getAuthRedirectPath] Has mentor, redirecting to /tasks");
-    return RETURNING_USER_REDIRECT_PATH;
+    logger.debug("[getAuthRedirectPath] Account still needs onboarding, redirecting to /onboarding");
+    return DEFAULT_AUTH_REDIRECT_PATH;
   } catch (error) {
     logger.error("[getAuthRedirectPath] Error, checking if returning user", { error });
     return await getProfileAwareAuthFallbackPath(userId);

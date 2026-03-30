@@ -75,13 +75,6 @@ vi.mock("@capacitor/core", () => ({
   },
 }));
 
-vi.mock("@capgo/capacitor-social-login", () => ({
-  SocialLogin: {
-    initialize: vi.fn().mockResolvedValue(undefined),
-    login: vi.fn(),
-  },
-}));
-
 vi.mock("@capacitor-community/apple-sign-in", () => ({
   SignInWithApple: {
     authorize: vi.fn(),
@@ -228,6 +221,35 @@ describe("Auth post-auth navigation", () => {
     fireEvent.click(screen.getByRole("button", { name: /^sign in$/i }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Request could not be completed.");
+  });
+
+  it("shows a friendly inline error when reset password cannot reach the auth service", async () => {
+    mocks.getSessionMock.mockResolvedValue({
+      data: {
+        session: null,
+      },
+    });
+
+    mocks.invokeMock.mockResolvedValue({
+      data: null,
+      error: {
+        name: "FunctionsFetchError",
+        message: "Failed to send a request to the Edge Function",
+      },
+    });
+
+    renderAuth();
+    await flushMicrotasks();
+
+    fireEvent.click(screen.getByRole("button", { name: /forgot password\?/i }));
+    fireEvent.change(screen.getByLabelText(/email/i), {
+      target: { value: "user@example.com" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /send reset link/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "We couldn't reach the server to send the reset link. Check your connection and try again.",
+    );
   });
 
   it("submits password sign-up requests and shows the confirmation email toast", async () => {

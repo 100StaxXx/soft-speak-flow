@@ -51,13 +51,36 @@ function getOfflineState(): boolean {
   return typeof navigator !== "undefined" ? navigator.onLine === false : false;
 }
 
-function getContextResponse(error: unknown): Response | undefined {
+function getErrorContext(error: unknown): unknown {
   if (!error || typeof error !== "object" || !("context" in error)) {
     return undefined;
   }
 
-  const context = (error as { context?: unknown }).context;
+  return (error as { context?: unknown }).context;
+}
+
+function getContextResponse(error: unknown): Response | undefined {
+  const context = getErrorContext(error);
   return context instanceof Response ? context : undefined;
+}
+
+function getContextJsonReader(error: unknown): (() => Promise<unknown>) | undefined {
+  const context = getErrorContext(error);
+
+  if (context instanceof Response) {
+    return () => context.clone().json();
+  }
+
+  if (
+    context &&
+    typeof context === "object" &&
+    "json" in context &&
+    typeof (context as { json?: unknown }).json === "function"
+  ) {
+    return () => (context as { json: () => Promise<unknown> }).json();
+  }
+
+  return undefined;
 }
 
 function getStatusFromError(error: unknown): number | undefined {
@@ -127,10 +150,10 @@ export async function parseFunctionInvokeError(
   const isOffline = getOfflineState();
 
   let responsePayload: ParsedFunctionInvokeError["responsePayload"];
-  const contextResponse = getContextResponse(error);
-  if (contextResponse) {
+  const readContextJson = getContextJsonReader(error);
+  if (readContextJson) {
     try {
-      const payload = await contextResponse.clone().json();
+      const payload = await readContextJson();
       if (payload && typeof payload === "object" && !Array.isArray(payload)) {
         const payloadRecord = payload as Record<string, unknown>;
         const payloadMessage = asString(payloadRecord.message);

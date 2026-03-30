@@ -1,34 +1,51 @@
-import { render } from "@testing-library/react";
+import { render, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({
-  navigate: vi.fn(),
-  user: { id: "user-1" } as { id: string } | null,
-  profile: {
-    onboarding_completed: null,
-    selected_mentor_id: "mentor-legacy",
-    onboarding_data: {},
-  } as Record<string, unknown> | null,
-  profileLoading: false,
-  companion: null,
-  companionLoading: false,
-  effectiveMentorId: "mentor-legacy" as string | null,
-  mentorStatus: "ready" as "ready" | "recovering" | "missing",
-  mentorQuery: {
-    data: null as {
-      mentorImage?: string;
-      mentorName?: string | null;
-      todaysQuote?: { text: string; author?: string };
-    } | null,
-    isLoading: false,
-    isError: false,
-  },
-  queryClient: {
-    refetchQueries: vi.fn().mockResolvedValue(undefined),
-  },
-  refreshConnection: vi.fn().mockResolvedValue(undefined),
-}));
+const mocks = vi.hoisted(() => {
+  const profilesUpdateEqMock = vi.fn(() => Promise.resolve({ error: null }));
+  const profilesUpdateMock = vi.fn(() => ({ eq: profilesUpdateEqMock }));
+  const fromMock = vi.fn((table: string) => {
+    if (table !== "profiles") {
+      throw new Error(`Unexpected table: ${table}`);
+    }
+
+    return {
+      update: profilesUpdateMock,
+    };
+  });
+
+  return {
+    navigate: vi.fn(),
+    user: { id: "user-1" } as { id: string } | null,
+    profile: {
+      onboarding_completed: null,
+      selected_mentor_id: "mentor-legacy",
+      onboarding_data: {},
+    } as Record<string, unknown> | null,
+    profileLoading: false,
+    companion: null,
+    companionLoading: false,
+    effectiveMentorId: "mentor-legacy" as string | null,
+    mentorStatus: "ready" as "ready" | "recovering" | "missing",
+    mentorQuery: {
+      data: null as {
+        mentorImage?: string;
+        mentorName?: string | null;
+        todaysQuote?: { text: string; author?: string };
+      } | null,
+      isLoading: false,
+      isError: false,
+    },
+    queryClient: {
+      refetchQueries: vi.fn().mockResolvedValue(undefined),
+    },
+    refreshConnection: vi.fn().mockResolvedValue(undefined),
+    profilesUpdateEqMock,
+    profilesUpdateMock,
+    fromMock,
+  };
+});
 
 vi.mock("react-router-dom", async () => {
   const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
@@ -65,6 +82,12 @@ vi.mock("@/hooks/useCompanion", () => ({
     companion: mocks.companion,
     isLoading: mocks.companionLoading,
   }),
+}));
+
+vi.mock("@/integrations/supabase/client", () => ({
+  supabase: {
+    from: mocks.fromMock,
+  },
 }));
 
 vi.mock("@/hooks/useMentorLayoutMode", () => ({
@@ -151,6 +174,7 @@ const renderIndex = () =>
 describe("Index onboarding guard", () => {
   beforeEach(() => {
     vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
+    window.sessionStorage.clear();
     mocks.navigate.mockClear();
     mocks.user = { id: "user-1" };
     mocks.profile = {
@@ -168,6 +192,9 @@ describe("Index onboarding guard", () => {
       isLoading: false,
       isError: false,
     };
+    mocks.profilesUpdateEqMock.mockClear();
+    mocks.profilesUpdateMock.mockClear();
+    mocks.fromMock.mockClear();
   });
 
   it("does not send legacy returning users back through onboarding", () => {
@@ -186,6 +213,24 @@ describe("Index onboarding guard", () => {
     renderIndex();
 
     expect(mocks.navigate).not.toHaveBeenCalledWith("/onboarding");
+  });
+
+  it("does not send companion-backed stale profiles back through onboarding", async () => {
+    mocks.profile = {
+      onboarding_completed: false,
+      selected_mentor_id: "mentor-legacy",
+      onboarding_data: {},
+    };
+    mocks.companion = {
+      id: "companion-1",
+    } as { id: string };
+
+    renderIndex();
+
+    expect(mocks.navigate).not.toHaveBeenCalledWith("/onboarding");
+    await waitFor(() => {
+      expect(mocks.navigate).toHaveBeenCalledWith("/journeys", { replace: true });
+    });
   });
 
   it("still sends explicitly incomplete users to onboarding", () => {

@@ -7,6 +7,7 @@ import { Progress } from "@/components/ui/progress";
 import { HabitTemplates } from "@/components/HabitTemplates";
 import { FrequencyPicker } from "@/components/FrequencyPicker";
 import { HabitDifficultySelector } from "@/components/HabitDifficultySelector";
+import { TimePickerField, getNextTimeForStep } from "@/components/scheduling";
 import { cn } from "@/lib/utils";
 import type { Habit, HabitCompletion, HabitDifficulty } from "../types";
 
@@ -252,12 +253,12 @@ export function HabitSection({
                 Evening
               </button>
             </div>
-            <Input
-              type="time"
-              value={preferredTime}
-              onChange={(e) => setPreferredTime(e.target.value)}
-              className="w-full"
+            <TimePickerField
+              value={preferredTime || null}
+              onChange={(time) => setPreferredTime(time ?? "")}
               placeholder="Custom time"
+              ariaLabel="Habit custom time"
+              seedValueOnOpen={() => getNextTimeForStep(30)}
             />
           </div>
           

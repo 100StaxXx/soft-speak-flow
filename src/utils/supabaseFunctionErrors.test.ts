@@ -37,6 +37,22 @@ describe("supabaseFunctionErrors", () => {
     expect(parsed.responsePayload?.code).toBe("AUTH_EXPIRED");
   });
 
+  it("parses JSON-readable function error contexts used in mocks", async () => {
+    const parsed = await parseFunctionInvokeError({
+      name: "FunctionsHttpError",
+      message: "Edge Function returned a non-2xx status code",
+      context: {
+        json: async () => ({
+          error: "Invalid email or password.",
+          code: "INVALID_CREDENTIALS",
+        }),
+      },
+    });
+
+    expect(parsed.backendMessage).toBe("Invalid email or password.");
+    expect(parsed.responsePayload?.code).toBe("INVALID_CREDENTIALS");
+  });
+
   it("classifies 429 as rate_limit and preserves backend message", async () => {
     const response = new Response(JSON.stringify({ error: "Too many requests" }), {
       status: 429,

@@ -641,4 +641,57 @@ describe("useHabitSurfacing", () => {
         .every((habit) => typeof habit.task_id === "string" && habit.task_id.length > 0),
     ).toBe(true);
   });
+
+  it("does not materialize a monthly campaign ritual on non-matching days", async () => {
+    mocks.getLocalHabitsMock.mockResolvedValue([
+      {
+        id: "habit-monthly-review",
+        user_id: "user-1",
+        title: "Monthly Review and Adjust",
+        description: null,
+        difficulty: "medium",
+        category: "mind",
+        frequency: "monthly",
+        estimated_minutes: 30,
+        preferred_time: null,
+        custom_days: null,
+        custom_month_days: [1],
+        is_active: true,
+      },
+    ]);
+    mocks.loadLocalEpicsMock.mockResolvedValue([
+      {
+        id: "epic-campaign",
+        user_id: "user-1",
+        title: "COSMIQ 10k MEE",
+        description: null,
+        status: "active",
+        progress_percentage: 0,
+        target_days: 90,
+        start_date: "2026-03-01",
+        end_date: null,
+        epic_habits: [{ habit_id: "habit-monthly-review", habits: null }],
+      },
+    ]);
+    mocks.loadLocalDailyTasksMock.mockResolvedValue([]);
+
+    const { result } = renderHook(
+      () => useHabitSurfacing(new Date("2026-03-29T12:00:00.000Z")),
+      { wrapper: createWrapper() },
+    );
+
+    await waitFor(() => {
+      expect(result.current.surfacedHabits.map((habit) => habit.habit_id)).toEqual([
+        "habit-monthly-review",
+      ]);
+    });
+
+    await waitFor(() => {
+      expect(mocks.syncLocalDailyTasksFromRemoteMock).toHaveBeenCalledWith("user-1", "2026-03-29");
+    });
+
+    expect(result.current.unsurfacedHabitsCount).toBe(0);
+    expect(mocks.upsertPlannerRecordMock).not.toHaveBeenCalled();
+    expect(mocks.supabaseUpsertMock).not.toHaveBeenCalled();
+  });
 });

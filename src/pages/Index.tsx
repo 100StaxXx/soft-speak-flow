@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useCallback, useRef } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
@@ -19,7 +19,10 @@ import { IndexPageSkeleton } from "@/components/skeletons";
 import { ParallaxCard } from "@/components/ui/parallax-card";
 import { Button } from "@/components/ui/button";
 import { loadMentorImage } from "@/utils/mentorImageLoader";
-import { isReturningProfile } from "@/utils/profileOnboarding";
+import {
+  buildEstablishedProfileSelfHealPatch,
+  getOnboardingGateState,
+} from "@/utils/profileOnboarding";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMainTabVisibility } from "@/contexts/MainTabVisibilityContext";
@@ -28,6 +31,7 @@ import { MessageCircle, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useMentorConnection } from "@/contexts/MentorConnectionContext";
 import { getEffectiveDailyDate } from "@/utils/timezone";
+import { safeSessionStorage } from "@/utils/storage";
 
 type IndexProps = {
   enableOnboardingGuard?: boolean;
@@ -114,10 +118,12 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
   const { profile, loading: profileLoading } = useProfile();
   const { companion, isLoading: companionLoading } = useCompanion({ enabled: isTabActive });
   const { isTransitioning } = useTheme();
+  const location = useLocation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const layoutMode = useMentorLayoutMode();
   const isDesktop = layoutMode === "desktop";
+  const onboardingSelfHealAttemptedRef = useRef(false);
   const pepTalkDate = useMemo(
     () => getEffectiveDailyDate(profile?.timezone ?? undefined),
     [profile?.timezone],
@@ -207,6 +213,15 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
   const mentorName = effectiveMentorId ? mentorPageData?.mentorName || null : null;
   const todaysQuote = effectiveMentorId ? mentorPageData?.todaysQuote || null : null;
   const askMentorLabel = mentorName ? `Ask ${mentorName}` : "Ask your guide";
+  const onboardingGate = useMemo(
+    () =>
+      getOnboardingGateState({
+        profile,
+        hasCompanion: Boolean(companion),
+      }),
+    [profile, companion],
+  );
+  const onboardingGateReady = Boolean(user) && !profileLoading && !companionLoading;
 
   const isReady = useMemo(() => {
     if (!user) return false;
@@ -228,6 +243,45 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
     mentorPageData,
     mentorPageDataLoading,
   ]);
+
+  useEffect(() => {
+    onboardingSelfHealAttemptedRef.current = false;
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user || !onboardingGateReady || onboardingSelfHealAttemptedRef.current) return;
+
+    const patch = buildEstablishedProfileSelfHealPatch({
+      profile,
+      hasCompanion: Boolean(companion),
+    });
+    if (!patch) return;
+
+    onboardingSelfHealAttemptedRef.current = true;
+
+    void supabase
+      .from("profiles")
+      .update(patch)
+      .eq("id", user.id)
+      .then(({ error }) => {
+        if (error) {
+          onboardingSelfHealAttemptedRef.current = false;
+          console.warn("Failed to self-heal established profile flags:", error);
+        }
+      });
+  }, [user, onboardingGateReady, profile, companion]);
+
+  useEffect(() => {
+    if (location.pathname !== "/") return;
+    if (!onboardingGateReady) return;
+    if (!onboardingGate.isEstablished) return;
+
+    const hasRedirected = safeSessionStorage.getItem("initialRouteRedirected");
+    if (!hasRedirected) {
+      safeSessionStorage.setItem("initialRouteRedirected", "true");
+      navigate("/journeys", { replace: true });
+    }
+  }, [location.pathname, navigate, onboardingGate.isEstablished, onboardingGateReady]);
 
   const mentorConnectionMissing = !enableOnboardingGuard && mentorConnectionStatus === "missing";
   const mentorConnectionIssue =
@@ -263,22 +317,15 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
     }
   }, [navigate]);
 
-  // Check for incomplete onboarding pieces and redirect (only after data is ready)
+  // Redirect accounts that still need onboarding once profile and companion state are resolved.
   useEffect(() => {
     if (!enableOnboardingGuard) return;
-    if (!user || !isReady || !profile) return;
+    if (!user || !onboardingGateReady) return;
 
-    // Existing accounts should stay in the app even if legacy onboarding flags are incomplete.
-    if (isReturningProfile(profile)) return;
-
-    const missingMentor = !effectiveMentorId;
-    const explicitlyIncomplete = profile.onboarding_completed === false;
-    const missingCompanion = !companion && !companionLoading;
-
-    if (missingMentor || explicitlyIncomplete || missingCompanion) {
+    if (onboardingGate.needsOnboarding) {
       navigate("/onboarding");
     }
-  }, [enableOnboardingGuard, user, isReady, profile, companion, companionLoading, navigate, effectiveMentorId]);
+  }, [enableOnboardingGuard, user, onboardingGateReady, onboardingGate.needsOnboarding, navigate]);
 
   // Show loading state with skeleton while critical data loads
   if (isTransitioning || !isReady) {

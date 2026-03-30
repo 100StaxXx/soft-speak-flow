@@ -1,0 +1,14 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "B6VW78ABTR.com.darrylgraham.revolution",
+        "paths": [
+          "/auth",
+          "/auth/*"
+        ]
+      }
+    ]
+  }
+}

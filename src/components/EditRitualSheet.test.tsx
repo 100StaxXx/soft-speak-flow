@@ -73,6 +73,42 @@ describe("EditRitualSheet", () => {
     vi.clearAllMocks();
   });
 
+  it("uses the shared time and duration controls", () => {
+    render(
+      <EditRitualSheet
+        ritual={{
+          habitId: "habit-1",
+          title: "Morning pages",
+          description: "Write three pages",
+          difficulty: "medium",
+          frequency: "daily",
+          preferred_time: "07:00",
+          estimated_minutes: 45,
+          reminder_enabled: false,
+          reminder_minutes_before: 15,
+          category: "mind",
+        }}
+        open
+        onOpenChange={vi.fn()}
+      />,
+    );
+
+    const timeButtons = screen.getAllByRole("button", { name: "7:00 AM" });
+    expect(timeButtons[0]).toBeInTheDocument();
+    const durationButtons = screen.getAllByRole("button", { name: "45 min" });
+    expect(durationButtons[0]).toBeInTheDocument();
+
+    fireEvent.click(timeButtons[0]);
+    fireEvent.change(screen.getByLabelText("Scheduled ritual time"), {
+      target: { value: "08:15" },
+    });
+    expect(screen.getByDisplayValue("08:15")).toBeInTheDocument();
+
+    fireEvent.click(durationButtons[0]);
+    fireEvent.click(screen.getAllByRole("button", { name: "1h" })[0]);
+    expect(screen.getAllByRole("button", { name: "1h" })[0]).toBeInTheDocument();
+  });
+
   it("shows Early Reminder above Advanced Options without duplicating it", () => {
     render(
       <EditRitualSheet

@@ -1,3 +1,5 @@
+import type { JourneyRitual } from "./ritualNormalization.ts";
+
 export type ExecutionModel = "sequential" | "overlap_early";
 
 export interface JourneyPhase {
@@ -18,16 +20,6 @@ export interface JourneyMilestone {
   phaseName: string;
   isPostcardMilestone: boolean;
   milestonePercent: number;
-}
-
-export interface JourneyRitual {
-  id: string;
-  title: string;
-  description: string;
-  frequency: "daily" | "5x_week" | "3x_week" | "custom";
-  customDays?: number[];
-  difficulty: "easy" | "medium" | "hard";
-  estimatedMinutes?: number;
 }
 
 interface PlanningSignals {

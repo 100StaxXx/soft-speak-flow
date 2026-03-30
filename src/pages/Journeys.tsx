@@ -63,6 +63,7 @@ import { SEND_TO_CALENDAR_ENABLED } from "@/utils/calendarFeatureFlags";
 import { useJourneysLayoutMode } from "@/hooks/useJourneysLayoutMode";
 import { isMacDesignedForIPadIOSApp } from "@/utils/platformTargets";
 import { QuestInboxSection } from "@/components/QuestInboxSection";
+import { QUEST_ACTION_TOAST_DURATION_MS } from "@/constants/questToast";
 
 const TIME_24H_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const DATE_INPUT_REGEX = /^\d{4}-\d{2}-\d{2}$/;
@@ -865,7 +866,7 @@ const Journeys = () => {
     await deleteTask(taskId);
     
     toast("Quest deleted", {
-      duration: 4000,
+      duration: QUEST_ACTION_TOAST_DURATION_MS,
       action: {
         label: "Undo",
         onClick: async () => {
@@ -898,7 +899,7 @@ const Journeys = () => {
     moveTaskToDate({ taskId, targetDate: nextDayStr });
     
     toast(`Moved to ${format(nextDay, "EEEE, MMM d")}`, {
-      duration: 4000,
+      duration: QUEST_ACTION_TOAST_DURATION_MS,
       action: {
         label: "Undo",
         onClick: () => {

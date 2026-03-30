@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { PlanContext, HardCommitment } from '@/hooks/useSmartDayPlanner';
+import { TimeRangePickerField } from '@/components/scheduling';
 import { Clock, Plus, X, MessageSquare, Calendar, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -146,27 +147,15 @@ export function CustomizeStep({ context, updateContext, onNext, isGenerating }: 
               className="bg-background"
             />
             
-            <div className="flex items-center gap-2">
-              <div className="flex-1">
-                <Label className="text-xs text-muted-foreground">Start</Label>
-                <Input
-                  type="time"
-                  value={newBlock.startTime}
-                  onChange={(e) => setNewBlock(prev => ({ ...prev, startTime: e.target.value }))}
-                  className="bg-background"
-                />
-              </div>
-              <span className="text-muted-foreground mt-5">–</span>
-              <div className="flex-1">
-                <Label className="text-xs text-muted-foreground">End</Label>
-                <Input
-                  type="time"
-                  value={newBlock.endTime}
-                  onChange={(e) => setNewBlock(prev => ({ ...prev, endTime: e.target.value }))}
-                  className="bg-background"
-                />
-              </div>
-            </div>
+            <TimeRangePickerField
+              startValue={newBlock.startTime || null}
+              endValue={newBlock.endTime || null}
+              onStartChange={(time) => setNewBlock(prev => ({ ...prev, startTime: time ?? '' }))}
+              onEndChange={(time) => setNewBlock(prev => ({ ...prev, endTime: time ?? '' }))}
+              variant="default"
+              startLabel="Start"
+              endLabel="End"
+            />
 
             {/* Quick Duration Buttons */}
             <div className="flex gap-2">

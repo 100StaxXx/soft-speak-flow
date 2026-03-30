@@ -29,13 +29,11 @@ import { UpdateAvailablePrompt } from "@/components/UpdateAvailablePrompt";
 import { hideSplashScreen } from "@/utils/capacitor";
 import { initializeNativePush, isNativePushSupported, unregisterNativePush } from "@/utils/nativePushNotifications";
 import { logger } from "@/utils/logger";
-import { isReturningProfile } from "@/utils/profileOnboarding";
 import { AstralEncounterProvider } from "@/components/astral-encounters";
 import { WeeklyRecapModal } from "@/components/WeeklyRecapModal";
 import { WeeklyRecapProvider } from "@/contexts/WeeklyRecapContext";
 import { useAppResumeRefresh } from "@/hooks/useAppResumeRefresh";
 import { useGlobalWidgetSync } from "@/hooks/useGlobalWidgetSync";
-import { safeSessionStorage } from "@/utils/storage";
 import { TalkPopupProvider } from "@/contexts/TalkPopupContext";
 import { MainTabsKeepAlive, isMainTabPath } from "@/components/MainTabsKeepAlive";
 import { BottomNav } from "@/components/BottomNav";
@@ -195,7 +193,7 @@ const MentorConnectedThemeProvider = memo(({ children }: { children: ReactNode }
 MentorConnectedThemeProvider.displayName = "MentorConnectedThemeProvider";
 
 const AppContent = memo(() => {
-  const { profile, loading: profileLoading } = useProfile();
+  const { loading: profileLoading } = useProfile();
   const { session, status } = useAuth();
   const [splashHidden, setSplashHidden] = useState(false);
   const [recoveryChecked, setRecoveryChecked] = useState(false);
@@ -216,21 +214,6 @@ const AppContent = memo(() => {
     }
     setRecoveryChecked(true);
   }, [location.pathname, navigate]);
-  
-  // Ensure first app load starts on the Quests (Tasks) tab
-  useEffect(() => {
-    if (location.pathname !== "/") return;
-    if (typeof window === "undefined") return;
-    if (!session?.user) return;
-    if (profileLoading) return;
-    if (!isReturningProfile(profile)) return;
-    
-    const hasRedirected = safeSessionStorage.getItem("initialRouteRedirected");
-    if (!hasRedirected) {
-      safeSessionStorage.setItem("initialRouteRedirected", "true");
-      navigate("/journeys", { replace: true });
-    }
-  }, [location.pathname, navigate, profile, profileLoading, session?.user]);
   
   // Respond to native push navigation events
   useEffect(() => {

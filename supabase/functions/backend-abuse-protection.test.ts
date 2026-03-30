@@ -161,6 +161,88 @@ Deno.test("auth-gateway blocks burst abuse before auth is attempted", async () =
   assert(!anonCalled, "Expected sign-in attempt to stop before provider auth");
 });
 
+Deno.test("auth-gateway forwards reset password redirects", async () => {
+  let abuseChecks = 0;
+  let capturedEmail = "";
+  let capturedRedirectTo = "";
+
+  const response = await authGatewayModule.handleAuthGateway(
+    new Request("https://example.com/functions/v1/auth-gateway", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "reset_password",
+        email: "ResetMe@example.com",
+        redirectTo: "https://app.cosmiq.quest/auth/reset-password",
+      }),
+    }),
+    {
+      createAdminClient: () => ({}),
+      createAnonClient: () => ({
+        auth: {
+          resetPasswordForEmail: async (email: string, options: { redirectTo?: string }) => {
+            capturedEmail = email;
+            capturedRedirectTo = options.redirectTo ?? "";
+            return { error: null };
+          },
+        },
+      }),
+      applyAbuseProtectionFn: async () => {
+        abuseChecks += 1;
+        return {
+          requestId: "req-auth-reset-1",
+          ipAddress: "203.0.113.12",
+          protection: null,
+        } as any;
+      },
+    },
+  );
+
+  const body = await response.json();
+  assertEquals(response.status, 200, "Expected reset password request to succeed");
+  assertEquals(abuseChecks, 1, "Expected one abuse check for reset password");
+  assertEquals(capturedEmail, "resetme@example.com", "Expected reset email to be normalized");
+  assertEquals(
+    capturedRedirectTo,
+    "https://app.cosmiq.quest/auth/reset-password",
+    "Expected reset password redirect to be forwarded",
+  );
+  assertEquals(body.success, true, "Expected auth gateway to return a success flag");
+});
+
+Deno.test("auth-gateway returns safe error when reset password provider call fails", async () => {
+  const response = await authGatewayModule.handleAuthGateway(
+    new Request("https://example.com/functions/v1/auth-gateway", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "reset_password",
+        email: "resetme@example.com",
+        redirectTo: "https://app.cosmiq.quest/auth/reset-password",
+      }),
+    }),
+    {
+      createAdminClient: () => ({}),
+      createAnonClient: () => ({
+        auth: {
+          resetPasswordForEmail: async () => ({
+            error: new Error("provider down"),
+          }),
+        },
+      }),
+      applyAbuseProtectionFn: async () => ({
+        requestId: "req-auth-reset-2",
+        ipAddress: "203.0.113.13",
+        protection: null,
+      }) as any,
+    },
+  );
+
+  const body = await response.json();
+  assertEquals(response.status, 500, "Expected reset password provider failure to be sanitized");
+  assertEquals(body.code, "RESET_PASSWORD_FAILED", "Expected a safe reset password failure code");
+});
+
 Deno.test("init quest attachment upload allows normal backend-issued tickets", async () => {
   const response = await initUploadModule.handleInitQuestAttachmentUpload(
     new Request("https://example.com/functions/v1/init-quest-attachment-upload", {

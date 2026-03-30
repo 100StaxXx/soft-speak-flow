@@ -29,6 +29,7 @@ import { isQueueableWriteError } from "@/utils/networkErrors";
 import type { DailyTask } from "@/services/dailyTasksRemote";
 import { trackResilienceEvent } from "@/utils/resilienceTelemetry";
 import type { ResilienceState } from "@/types/resilience";
+import { QUEST_ACTION_TOAST_DURATION_MS } from "@/constants/questToast";
 import { normalizeUuidFields, normalizeUuidLikeId } from "@/utils/offlineId";
 import {
   createOfflinePlannerId,
@@ -1477,11 +1478,10 @@ export const useTaskMutations = (taskDate: string) => {
           console.error('[TaskMutations] trackTaskCompletion failed:', trackError);
         }
 
-        // Show undo toast with 5-second window
         toast({
           title: "Quest completed! ✨",
           description: taskText.length > 40 ? taskText.substring(0, 40) + '...' : taskText,
-          duration: 5000,
+          duration: QUEST_ACTION_TOAST_DURATION_MS,
           action: createElement(
             ToastAction,
             {

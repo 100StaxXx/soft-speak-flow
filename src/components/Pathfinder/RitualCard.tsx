@@ -18,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { DurationPickerField } from '@/components/scheduling';
 import { cn } from '@/lib/utils';
 import type { JourneyRitual } from '@/hooks/useJourneySchedule';
 import { FrequencyPresets, formatDaysShort, getDefaultDaysForFrequency, getDefaultMonthDays } from './FrequencyPresets';
@@ -124,19 +125,16 @@ export const RitualCard = memo(function RitualCard({ ritual, onUpdate, onDelete,
             </Select>
           </div>
 
-          <div>
-            <label className="text-[10px] text-muted-foreground mb-1 block">Minutes</label>
-            <Input
-              type="number"
-              value={editedRitual.estimatedMinutes || ''}
-              onChange={(e) => setEditedRitual({ 
-                ...editedRitual, 
-                estimatedMinutes: parseInt(e.target.value) || undefined 
-              })}
-              placeholder="15"
-              className="h-8 text-xs"
-            />
-          </div>
+          <DurationPickerField
+            value={editedRitual.estimatedMinutes ?? null}
+            onChange={(duration) => setEditedRitual({
+              ...editedRitual,
+              estimatedMinutes: duration ?? undefined,
+            })}
+            label="Minutes"
+            variant="compact"
+            className="min-w-0"
+          />
         </div>
 
         <div className="flex gap-2">

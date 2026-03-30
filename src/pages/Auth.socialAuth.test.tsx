@@ -16,8 +16,6 @@ const mocks = vi.hoisted(() => {
   const setSessionMock = vi.fn();
   const signOutMock = vi.fn();
   const signInWithOAuthMock = vi.fn();
-  const socialLoginInitializeMock = vi.fn();
-  const socialLoginLoginMock = vi.fn();
   const appleAuthorizeMock = vi.fn();
 
   return {
@@ -33,12 +31,9 @@ const mocks = vi.hoisted(() => {
     setSessionMock,
     signOutMock,
     signInWithOAuthMock,
-    socialLoginInitializeMock,
-    socialLoginLoginMock,
     appleAuthorizeMock,
     isNativePlatform: false,
     platform: "web",
-    socialLoginAvailable: false,
     applePluginAvailable: false,
   };
 });
@@ -81,18 +76,10 @@ vi.mock("@capacitor/core", () => ({
   Capacitor: {
     isNativePlatform: () => mocks.isNativePlatform,
     isPluginAvailable: (name: string) => {
-      if (name === "SocialLogin") return mocks.socialLoginAvailable;
       if (name === "SignInWithApple") return mocks.applePluginAvailable;
       return false;
     },
     getPlatform: () => mocks.platform,
-  },
-}));
-
-vi.mock("@capgo/capacitor-social-login", () => ({
-  SocialLogin: {
-    initialize: mocks.socialLoginInitializeMock,
-    login: mocks.socialLoginLoginMock,
   },
 }));
 
@@ -160,7 +147,6 @@ describe("Auth social auth intent guard", () => {
 
     mocks.isNativePlatform = false;
     mocks.platform = "web";
-    mocks.socialLoginAvailable = false;
     mocks.applePluginAvailable = false;
 
     mocks.getSessionMock.mockResolvedValue({
@@ -201,15 +187,9 @@ describe("Auth social auth intent guard", () => {
     mocks.signInWithOAuthMock.mockResolvedValue({
       data: {
         url: "https://example.com/oauth",
-        provider: "google",
+        provider: "apple",
       },
       error: null,
-    });
-    mocks.socialLoginInitializeMock.mockResolvedValue(undefined);
-    mocks.socialLoginLoginMock.mockResolvedValue({
-      result: {
-        idToken: "google-id-token",
-      },
     });
     mocks.appleAuthorizeMock.mockResolvedValue({
       response: {
@@ -224,52 +204,15 @@ describe("Auth social auth intent guard", () => {
     window.history.replaceState({}, "", "/auth");
   });
 
-  it("sends sign_in intent for Google in login mode", async () => {
-    mocks.isNativePlatform = true;
-    mocks.platform = "ios";
-    mocks.socialLoginAvailable = true;
-
+  it("does not render Google social auth buttons", async () => {
     renderAuth();
     await flushMicrotasks();
-    await flushMicrotasks();
 
-    fireEvent.click(screen.getByRole("button", { name: /sign in with google/i }));
-
-    await waitFor(() => {
-      expect(mocks.invokeMock).toHaveBeenCalledWith("google-native-auth", {
-        body: {
-          idToken: "google-id-token",
-          intent: "sign_in",
-        },
-      });
-    });
-  });
-
-  it("sends sign_up intent for Google in signup mode and still allows onboarding", async () => {
-    mocks.isNativePlatform = true;
-    mocks.platform = "ios";
-    mocks.socialLoginAvailable = true;
-    mocks.getAuthRedirectPathMock.mockResolvedValue("/onboarding");
-
-    renderAuth();
-    await flushMicrotasks();
-    await flushMicrotasks();
+    expect(screen.queryByRole("button", { name: /sign in with google/i })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /need an account\? sign up/i }));
-    fireEvent.click(screen.getByRole("button", { name: /sign up with google/i }));
 
-    await waitFor(() => {
-      expect(mocks.invokeMock).toHaveBeenCalledWith("google-native-auth", {
-        body: {
-          idToken: "google-id-token",
-          intent: "sign_up",
-        },
-      });
-    });
-
-    await waitFor(() => {
-      expect(mocks.safeNavigateMock).toHaveBeenCalledWith(expect.any(Function), "/onboarding");
-    });
+    expect(screen.queryByRole("button", { name: /sign up with google/i })).not.toBeInTheDocument();
   });
 
   it("sends sign_in intent for Apple in login mode and blocks account-not-found logins", async () => {
@@ -338,7 +281,7 @@ describe("Auth social auth intent guard", () => {
   it("blocks redirect-based social sign-in callbacks that resolve to onboarding", async () => {
     window.history.replaceState({}, "", "/auth?code=oauth-code");
     storePendingSocialAuthAttempt({
-      provider: "google",
+      provider: "apple",
       intent: "sign_in",
     });
     mocks.getAuthRedirectPathMock.mockResolvedValue("/onboarding");
@@ -348,7 +291,7 @@ describe("Auth social auth intent guard", () => {
     await flushMicrotasks();
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "We couldn't find an existing account for Google sign-in.",
+      "We couldn't find an existing account for Apple sign-in.",
     );
     expect(mocks.exchangeCodeForSessionMock).toHaveBeenCalledWith("oauth-code");
     expect(mocks.signOutMock).toHaveBeenCalledTimes(1);

@@ -31,6 +31,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { DurationPickerField, TimePickerField, getNextTimeForStep } from "@/components/scheduling";
 import type { ParsedTask } from "@/features/tasks/hooks";
 import { inferCustomPeriod } from "@/utils/habitSchedule";
 
@@ -316,27 +317,20 @@ export const EditRitualSheet = memo(function EditRitualSheet({
             </div>
 
             {/* Time and Duration */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="time">Scheduled Time</Label>
-                <Input
-                  id="time"
-                  type="time"
-                  value={preferredTime}
-                  onChange={(e) => setPreferredTime(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="duration">Duration (min)</Label>
-                <Input
-                  id="duration"
-                  type="number"
-                  value={estimatedMinutes || ""}
-                  onChange={(e) => setEstimatedMinutes(e.target.value ? parseInt(e.target.value) : null)}
-                  placeholder="30"
-                  min="1"
-                />
-              </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <TimePickerField
+                value={preferredTime || null}
+                onChange={(time) => setPreferredTime(time ?? "")}
+                label="Scheduled Time"
+                placeholder="Time"
+                ariaLabel="Scheduled ritual time"
+                seedValueOnOpen={() => getNextTimeForStep(30)}
+              />
+              <DurationPickerField
+                value={estimatedMinutes}
+                onChange={setEstimatedMinutes}
+                label="Duration (min)"
+              />
             </div>
             
             {/* Frequency with day picker */}

@@ -11,6 +11,10 @@ import {
   type ExecutionModel,
 } from "./planner.ts";
 import {
+  normalizeJourneyRitual,
+  type JourneyRitual,
+} from "./ritualNormalization.ts";
+import {
   buildCostGuardrailBlockedResponse,
   createCostGuardrailSession,
   isCostGuardrailBlockedError,
@@ -28,19 +32,6 @@ function normalizeDifficulty(value: unknown): 'easy' | 'medium' | 'hard' {
   if (['easy', 'simple', 'beginner', 'low', '1'].includes(lower)) return 'easy';
   if (['hard', 'difficult', 'advanced', 'high', 'challenging', '3'].includes(lower)) return 'hard';
   return 'medium';
-}
-
-// Normalize frequency values to valid database enum values
-function normalizeFrequency(value: unknown): 'daily' | '5x_week' | '3x_week' | 'custom' {
-  if (typeof value !== 'string') return 'daily';
-  const lower = value.toLowerCase().trim().replace(/\s+/g, '_');
-  
-  if (['daily', 'everyday', 'every_day', '7x_week', '7x'].includes(lower)) return 'daily';
-  if (['5x_week', '5x', 'weekdays', 'five_times', '5_times'].includes(lower)) return '5x_week';
-  if (['3x_week', '3x', 'three_times', '3_times', 'thrice'].includes(lower)) return '3x_week';
-  if (['weekly', 'biweekly', 'twice', '2x', '2x_week', 'once', '1x', 'custom', 'twice_daily'].includes(lower)) return 'custom';
-  
-  return 'daily';
 }
 
 interface JourneyPhase {
@@ -61,16 +52,6 @@ interface JourneyMilestone {
   phaseName: string;
   isPostcardMilestone: boolean;
   milestonePercent: number;
-}
-
-interface JourneyRitual {
-  id: string;
-  title: string;
-  description: string;
-  frequency: 'daily' | '5x_week' | '3x_week' | 'custom';
-  customDays?: number[]; // 0=Mon, 1=Tue, ..., 6=Sun
-  difficulty: 'easy' | 'medium' | 'hard';
-  estimatedMinutes?: number;
 }
 
 interface ScheduleRequest {
@@ -295,9 +276,12 @@ CRITICAL: Return ONLY valid JSON with this exact structure:
   "rituals": [
     {
       "id": "ritual-1",
-      "title": "Daily ritual title",
+      "title": "Ritual title",
       "description": "What to do",
-      "frequency": "daily",
+      "frequency": "daily" | "5x_week" | "3x_week" | "weekly" | "monthly" | "custom",
+      "customDays": [0, 2, 4],
+      "customMonthDays": [1],
+      "customPeriod": "week" | "month",
       "difficulty": "medium",
       "estimatedMinutes": 30
     }
@@ -332,7 +316,9 @@ Generate a phased schedule working backwards from the deadline. Make sure:
 6. Rituals are realistic for the available time
 7. suggestedChapterCount matches the exact count of milestones with isPostcardMilestone: true
 8. executionModel matches the kind of work: use overlap_early for repeatable goals where setup and action can run together, otherwise use sequential
-${timelineContext ? '9. Adjust the schedule based on the user\'s context (existing skills, constraints, etc.)' : ''}`;
+9. Use "customDays" only for week-based rituals (0 = Monday through 6 = Sunday)
+10. Use "customMonthDays" for monthly or month-based rituals (1-31). If a ritual is monthly and no specific day is obvious, use [1]
+${timelineContext ? '11. Adjust the schedule based on the user\'s context (existing skills, constraints, etc.)' : ''}`;
 
     console.log('Generating journey schedule for goal:', goal, 'deadline:', deadline, 'days:', daysAvailable, 'context:', timelineContext);
 
@@ -396,24 +382,13 @@ ${timelineContext ? '9. Adjust the schedule based on the user\'s context (existi
         milestonePercent: m.milestonePercent || Math.round((i + 1) / schedule.milestones.length * 100),
       }));
       
-      schedule.rituals = schedule.rituals.map((r, i) => {
-        const freq = normalizeFrequency(r.frequency);
-        // Default customDays based on frequency if not provided
-        let customDays = r.customDays;
-        if (!customDays || customDays.length === 0) {
-          if (freq === '5x_week') customDays = [0, 1, 2, 3, 4]; // Mon-Fri
-          else if (freq === '3x_week') customDays = [0, 2, 4]; // Mon/Wed/Fri
-          else if (freq === 'custom') customDays = [0]; // Default Monday
-          // daily doesn't need customDays
-        }
-        return {
-          ...r,
-          id: r.id || `ritual-${Date.now()}-${i}`,
-          frequency: freq,
-          customDays,
-          difficulty: normalizeDifficulty(r.difficulty),
-        };
-      });
+      schedule.rituals = schedule.rituals.map((ritual, index) =>
+        normalizeJourneyRitual(
+          ritual,
+          ritual.id || `ritual-${Date.now()}-${index}`,
+          normalizeDifficulty,
+        ),
+      );
 
       schedule.executionModel = schedule.executionModel === 'overlap_early' || schedule.executionModel === 'sequential'
         ? schedule.executionModel

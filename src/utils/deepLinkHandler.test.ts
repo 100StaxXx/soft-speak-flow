@@ -24,4 +24,28 @@ describe("parseDeepLink", () => {
         "cosmiq://calendar/oauth/callback?provider=google&status=error&message=OAuth%20failed",
     });
   });
+
+  it("parses hosted auth recovery links", () => {
+    const parsed = parseDeepLink(
+      "https://app.cosmiq.quest/auth/reset-password#access_token=token&refresh_token=refresh&type=recovery",
+    );
+    expect(parsed).toEqual({
+      type: "auth_recovery",
+      path: "/auth/reset-password#access_token=token&refresh_token=refresh&type=recovery",
+      rawUrl:
+        "https://app.cosmiq.quest/auth/reset-password#access_token=token&refresh_token=refresh&type=recovery",
+    });
+  });
+
+  it("parses custom-scheme auth recovery links", () => {
+    const parsed = parseDeepLink(
+      "cosmiq://auth/reset-password#access_token=token&refresh_token=refresh&type=recovery",
+    );
+    expect(parsed).toEqual({
+      type: "auth_recovery",
+      path: "/auth/reset-password#access_token=token&refresh_token=refresh&type=recovery",
+      rawUrl:
+        "cosmiq://auth/reset-password#access_token=token&refresh_token=refresh&type=recovery",
+    });
+  });
 });

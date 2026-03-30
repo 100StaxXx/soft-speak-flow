@@ -109,6 +109,38 @@ function ReminderHarness() {
   );
 }
 
+function DurationHarness() {
+  const [estimatedDuration, setEstimatedDuration] = useState<number | null>(30);
+
+  return (
+    <div>
+      <AdvancedQuestOptions
+        scheduledTime={null}
+        onScheduledTimeChange={vi.fn()}
+        estimatedDuration={estimatedDuration}
+        onEstimatedDurationChange={setEstimatedDuration}
+        recurrencePattern={null}
+        onRecurrencePatternChange={vi.fn()}
+        recurrenceDays={[]}
+        onRecurrenceDaysChange={vi.fn()}
+        recurrenceMonthDays={[]}
+        onRecurrenceMonthDaysChange={vi.fn()}
+        recurrenceCustomPeriod={null}
+        onRecurrenceCustomPeriodChange={vi.fn()}
+        reminderEnabled={false}
+        onReminderEnabledChange={vi.fn()}
+        reminderMinutesBefore={15}
+        onReminderMinutesBeforeChange={vi.fn()}
+        moreInformation={null}
+        onMoreInformationChange={vi.fn()}
+        location={null}
+        onLocationChange={vi.fn()}
+      />
+      <div data-testid="duration-state">{estimatedDuration ?? "none"}</div>
+    </div>
+  );
+}
+
 describe("AdvancedQuestOptions recurrence", () => {
   it("renders expanded recurrence options", () => {
     render(<RecurrenceHarness selectedDate={new Date(2026, 0, 12)} />);
@@ -132,6 +164,8 @@ describe("AdvancedQuestOptions recurrence", () => {
     await waitFor(() => {
       expect(screen.getByTestId("recurrence-state")).toHaveTextContent("weekdays|0,1,2,3,4");
     });
+
+    expect(screen.queryByRole("button", { name: "Daily" })).not.toBeInTheDocument();
   });
 
   it("enforces single-day selection for weekly", async () => {
@@ -235,6 +269,19 @@ describe("AdvancedQuestOptions recurrence", () => {
 });
 
 describe("AdvancedQuestOptions reminder picker", () => {
+  it("updates duration using the shared duration picker", async () => {
+    render(<DurationHarness />);
+
+    fireEvent.click(screen.getByRole("button", { name: "30 min" }));
+    expect(screen.getByRole("button", { name: "45m" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "45m" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("duration-state")).toHaveTextContent("45");
+    });
+  });
+
   it("shows 2 days and custom reminder options", () => {
     render(<ReminderHarness />);
 
