@@ -7,7 +7,7 @@ import {
 } from "./journeyPathUrls";
 
 describe("journeyPathUrls", () => {
-  it("returns transformed render urls for public journey path images", () => {
+  it("returns raw public journey path urls by default", () => {
     const url = getJourneyPathRenderUrl(
       "https://example.supabase.co/storage/v1/object/public/journey-paths/user-1/epic-1/0_123.png",
       {
@@ -15,6 +15,23 @@ describe("journeyPathUrls", () => {
         height: 1024,
         resize: "cover",
         quality: 70,
+      },
+    );
+
+    expect(url).toBe(
+      "https://example.supabase.co/storage/v1/object/public/journey-paths/user-1/epic-1/0_123.png",
+    );
+  });
+
+  it("allows transforms when explicitly enabled", () => {
+    const url = getJourneyPathRenderUrl(
+      "https://example.supabase.co/storage/v1/object/public/journey-paths/user-1/epic-1/0_123.png",
+      {
+        width: 1536,
+        height: 1024,
+        resize: "cover",
+        quality: 70,
+        enableTransform: true,
       },
     );
 
@@ -32,13 +49,13 @@ describe("journeyPathUrls", () => {
     expect(getJourneyPathCardImageUrl("")).toBeNull();
   });
 
-  it("upgrades existing render urls by overriding transform params", () => {
+  it("downgrades existing render urls back to public object urls when transforms are disabled", () => {
     const url = getJourneyPathCardImageUrl(
       "https://example.supabase.co/storage/v1/render/image/public/journey-paths/user-1/epic-1/0_123.png?width=200&quality=30",
     );
 
     expect(url).toBe(
-      "https://example.supabase.co/storage/v1/render/image/public/journey-paths/user-1/epic-1/0_123.png?width=1536&quality=70&height=1024&resize=cover",
+      "https://example.supabase.co/storage/v1/object/public/journey-paths/user-1/epic-1/0_123.png",
     );
   });
 });

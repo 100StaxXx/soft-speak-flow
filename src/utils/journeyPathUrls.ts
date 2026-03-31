@@ -3,10 +3,12 @@ export interface JourneyPathRenderOptions {
   height?: number;
   resize?: "cover" | "contain" | "fill";
   quality?: number;
+  enableTransform?: boolean;
 }
 
 const JOURNEY_PATH_PUBLIC_SEGMENT = "/storage/v1/object/public/journey-paths/";
 const JOURNEY_PATH_RENDER_SEGMENT = "/storage/v1/render/image/public/journey-paths/";
+const JOURNEY_PATH_TRANSFORMS_ENABLED = import.meta.env.VITE_ENABLE_JOURNEY_PATH_TRANSFORMS === "true";
 
 const toPositiveInteger = (value: number | undefined) => {
   if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
@@ -34,9 +36,18 @@ export const getJourneyPathRenderUrl = (
     const url = new URL(imageUrl);
     const publicPathIndex = url.pathname.indexOf(JOURNEY_PATH_PUBLIC_SEGMENT);
     const renderPathIndex = url.pathname.indexOf(JOURNEY_PATH_RENDER_SEGMENT);
+    const enableTransform = options.enableTransform ?? JOURNEY_PATH_TRANSFORMS_ENABLED;
 
     if (publicPathIndex === -1 && renderPathIndex === -1) {
       return imageUrl;
+    }
+
+    if (!enableTransform) {
+      url.pathname = renderPathIndex >= 0
+        ? url.pathname.replace(JOURNEY_PATH_RENDER_SEGMENT, JOURNEY_PATH_PUBLIC_SEGMENT)
+        : url.pathname;
+      url.search = "";
+      return url.toString();
     }
 
     url.pathname = publicPathIndex >= 0

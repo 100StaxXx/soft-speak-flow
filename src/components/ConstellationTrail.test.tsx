@@ -40,7 +40,7 @@ describe("ConstellationTrail", () => {
 
     expect(screen.getByTestId("journey-path-image")).toHaveAttribute(
       "src",
-      "https://example.supabase.co/storage/v1/render/image/public/journey-paths/user-1/epic-1/path.png?width=1536&height=1024&resize=cover&quality=70",
+      "https://example.supabase.co/storage/v1/object/public/journey-paths/user-1/epic-1/path.png",
     );
     expect(screen.getByTestId("journey-path-overlay")).toHaveAttribute("data-overlay-mode", "generated");
     expect(screen.queryByText(/mapping your path/i)).not.toBeInTheDocument();
@@ -65,5 +65,41 @@ describe("ConstellationTrail", () => {
     expect(screen.getByText("Updating")).toBeInTheDocument();
     expect(screen.queryByText(/mapping your path/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/loading journey path/i)).not.toBeInTheDocument();
+  });
+
+  it("replaces the fallback with the generated image once a real path becomes available", () => {
+    mocks.useJourneyPathImageMock.mockReturnValue({
+      pathImageUrl: null,
+      currentMilestoneIndex: -1,
+      isGenerating: true,
+      isLoading: false,
+      error: null,
+      generateInitialPath: vi.fn(),
+      regeneratePathForMilestone: vi.fn(),
+    });
+
+    const { rerender } = render(<ConstellationTrail progress={42} targetDays={45} epicId="epic-9" />);
+
+    expect(screen.getByTestId("journey-path-fallback")).toBeInTheDocument();
+    expect(screen.queryByTestId("journey-path-image")).not.toBeInTheDocument();
+
+    mocks.useJourneyPathImageMock.mockReturnValue({
+      pathImageUrl: "https://example.supabase.co/storage/v1/object/public/journey-paths/user-1/epic-9/path.png",
+      currentMilestoneIndex: 0,
+      isGenerating: false,
+      isLoading: false,
+      error: null,
+      generateInitialPath: vi.fn(),
+      regeneratePathForMilestone: vi.fn(),
+    });
+
+    rerender(<ConstellationTrail progress={43} targetDays={45} epicId="epic-9" />);
+
+    expect(screen.queryByTestId("journey-path-fallback")).not.toBeInTheDocument();
+    expect(screen.getByTestId("journey-path-image")).toHaveAttribute(
+      "src",
+      "https://example.supabase.co/storage/v1/object/public/journey-paths/user-1/epic-9/path.png",
+    );
+    expect(screen.getByTestId("journey-path-overlay")).toHaveAttribute("data-overlay-mode", "generated");
   });
 });

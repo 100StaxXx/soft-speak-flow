@@ -923,17 +923,16 @@ export const ConstellationTrail = memo(function ConstellationTrail({
     [pathImageUrl],
   );
   const hasGeneratedBackground = Boolean(optimizedPathImageUrl);
-  const backgroundImageUrl = optimizedPathImageUrl || (!transparentBackground ? fallbackBackground.src : null);
-  const backgroundImageSrcSet =
-    !hasGeneratedBackground && !transparentBackground
-      ? getStaticBackgroundSrcSet(fallbackBackground)
-      : undefined;
+  const fallbackBackgroundUrl = !transparentBackground ? fallbackBackground.src : null;
+  const fallbackBackgroundSrcSet = !hasGeneratedBackground && !transparentBackground
+    ? getStaticBackgroundSrcSet(fallbackBackground)
+    : undefined;
 
   return (
     <div 
       className={cn(
         "relative w-full h-56 rounded-xl overflow-hidden",
-        !transparentBackground && !backgroundImageUrl && "bg-gradient-to-br from-slate-950 via-purple-950/50 to-slate-950",
+        !transparentBackground && !optimizedPathImageUrl && !fallbackBackgroundUrl && "bg-gradient-to-br from-slate-950 via-purple-950/50 to-slate-950",
         className
       )}
       style={!transparentBackground ? {
@@ -945,34 +944,47 @@ export const ConstellationTrail = memo(function ConstellationTrail({
         `
       } : undefined}
     >
-      {/* Generated or persisted fallback background */}
-      {backgroundImageUrl && (
-        <div className="absolute inset-0">
+      {/* Generated background */}
+      {optimizedPathImageUrl ? (
+        <div key="journey-path-generated" className="absolute inset-0">
           <img 
-            src={backgroundImageUrl}
-            srcSet={backgroundImageSrcSet}
-            sizes={backgroundImageSrcSet ? "100vw" : undefined}
-            alt={optimizedPathImageUrl ? "Journey path" : ""}
-            aria-hidden={optimizedPathImageUrl ? undefined : true}
-            data-testid={optimizedPathImageUrl ? "journey-path-image" : "journey-path-fallback"}
+            src={optimizedPathImageUrl}
+            alt="Journey path"
+            data-testid="journey-path-image"
             loading="eager"
             decoding="async"
-            fetchPriority={optimizedPathImageUrl ? "high" : undefined}
+            fetchPriority="high"
             className="w-full h-full object-cover"
           />
-          {/* Overlay gradient for star/companion visibility */}
           <div
             className={cn(
               "absolute inset-0",
-              hasGeneratedBackground
-                ? "bg-gradient-to-t from-slate-950/58 via-slate-950/22 to-slate-950/30"
-                : "bg-gradient-to-t from-slate-950/90 via-slate-950/50 to-slate-950/70",
+              "bg-gradient-to-t from-slate-950/58 via-slate-950/22 to-slate-950/30",
             )}
             data-testid="journey-path-overlay"
-            data-overlay-mode={hasGeneratedBackground ? "generated" : "fallback"}
+            data-overlay-mode="generated"
           />
         </div>
-      )}
+      ) : fallbackBackgroundUrl ? (
+        <div key="journey-path-fallback" className="absolute inset-0">
+          <img
+            src={fallbackBackgroundUrl}
+            srcSet={fallbackBackgroundSrcSet}
+            sizes={fallbackBackgroundSrcSet ? "100vw" : undefined}
+            alt=""
+            aria-hidden="true"
+            data-testid="journey-path-fallback"
+            loading="eager"
+            decoding="async"
+            className="w-full h-full object-cover"
+          />
+          <div
+            className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/50 to-slate-950/70"
+            data-testid="journey-path-overlay"
+            data-overlay-mode="fallback"
+          />
+        </div>
+      ) : null}
       
       {isGenerating && (
         <motion.div
