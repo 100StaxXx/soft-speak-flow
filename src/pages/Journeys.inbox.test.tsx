@@ -107,39 +107,27 @@ vi.mock("@/components/DatePillsScroller", () => ({
   DatePillsScroller: () => <div data-testid="date-pills" />,
 }));
 
-vi.mock("@/components/DesktopWeekStrip", () => ({
-  DesktopWeekStrip: ({
-    plannerMode,
-    onPlannerModeChange,
-  }: {
-    plannerMode?: "week" | "day";
-    onPlannerModeChange?: (mode: "week" | "day") => void;
-  }) => (
-    <div data-testid="desktop-week-strip">
-      <div data-testid="desktop-week-strip-mode">{plannerMode ?? "unset"}</div>
-      <button type="button" onClick={() => onPlannerModeChange?.("week")}>
-        set-week-mode
-      </button>
-      <button type="button" onClick={() => onPlannerModeChange?.("day")}>
-        set-day-mode
-      </button>
-    </div>
-  ),
-}));
-
 vi.mock("@/components/TodaysAgenda", () => ({
   TodaysAgenda: ({
     tasks,
     activeEpics,
     selectedDate,
+    desktopPlannerMode,
+    onDesktopPlannerModeChange,
   }: {
     tasks: Array<{ id: string; task_text: string; habit_source_id?: string | null }>;
     activeEpics: Array<{ id: string; title: string }>;
     selectedDate: Date;
+    desktopPlannerMode?: "week" | "day";
+    onDesktopPlannerModeChange?: (mode: "week" | "day") => void;
   }) => (
     <div data-testid="todays-agenda">
       <div>agenda</div>
       <div data-testid="todays-agenda-selected-date">{selectedDate.toISOString()}</div>
+      <div data-testid="todays-agenda-mode">{desktopPlannerMode ?? "unset"}</div>
+      <button type="button" onClick={() => onDesktopPlannerModeChange?.("week")}>
+        set-week-mode
+      </button>
       <div data-testid="agenda-task-list">
         {tasks.map((task) => (
           <div key={task.id}>
@@ -161,17 +149,25 @@ vi.mock("@/components/DesktopWeekPlanner", () => ({
   DesktopWeekPlanner: ({
     selectedDate,
     onDateSelect,
+    plannerMode,
+    onPlannerModeChange,
   }: {
     selectedDate: Date;
     onDateSelect: (date: Date) => void;
+    plannerMode?: "week" | "day";
+    onPlannerModeChange?: (mode: "week" | "day") => void;
   }) => (
     <div data-testid="desktop-week-planner">
       <div data-testid="desktop-week-planner-selected-date">{selectedDate.toISOString()}</div>
+      <div data-testid="desktop-week-planner-mode">{plannerMode ?? "unset"}</div>
       <button
         type="button"
         onClick={() => onDateSelect(new Date("2026-03-28T12:00:00.000Z"))}
       >
         select-desktop-week-date
+      </button>
+      <button type="button" onClick={() => onPlannerModeChange?.("day")}>
+        set-day-mode
       </button>
     </div>
   ),
@@ -676,15 +672,16 @@ describe("Journeys inbox integration", () => {
 
     renderJourneys();
 
-    expect(screen.getByTestId("desktop-week-strip-mode")).toHaveTextContent("week");
+    expect(screen.queryByTestId("desktop-week-strip")).not.toBeInTheDocument();
+    expect(screen.getByTestId("desktop-week-planner-mode")).toHaveTextContent("week");
     expect(screen.getByTestId("desktop-week-planner")).toBeInTheDocument();
     expect(screen.queryByTestId("todays-agenda")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "select-desktop-week-date" }));
     fireEvent.click(screen.getByRole("button", { name: "set-day-mode" }));
 
-    expect(screen.getByTestId("desktop-week-strip-mode")).toHaveTextContent("day");
     expect(screen.getByTestId("todays-agenda")).toBeInTheDocument();
+    expect(screen.getByTestId("todays-agenda-mode")).toHaveTextContent("day");
     expect(screen.queryByTestId("desktop-week-planner")).not.toBeInTheDocument();
     expect(screen.getByTestId("todays-agenda-selected-date")).toHaveTextContent("2026-03-28");
   });

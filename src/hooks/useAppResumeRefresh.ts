@@ -45,6 +45,7 @@ export const useAppResumeRefresh = ({ enabled = true }: UseAppResumeRefreshOptio
       queryClient.invalidateQueries({ queryKey: ['mentor-personality'] }),
       queryClient.invalidateQueries({ queryKey: ['mentor'] }),
       queryClient.invalidateQueries({ queryKey: ['selected-mentor'] }),
+      queryClient.invalidateQueries({ queryKey: ['today-pep-talk'] }),
       queryClient.invalidateQueries({ queryKey: ['streak-freezes'] }),
     ]);
 

@@ -20,6 +20,14 @@ import {
 type XPEventMetadata = Record<string, string | number | boolean | undefined>;
 const REPEATABLE_STREAK_EVENTS = new Set(["task_complete", "habit_complete", "focus_session"]);
 
+type PepTalkAwardResult = {
+  xpAwarded: number;
+  capApplied: boolean;
+  nextThreshold: number | null;
+  shouldEvolve: boolean;
+  duplicate: boolean;
+};
+
 // Helper to mark user as active (resets companion decay)
 const markUserActive = async () => {
   const { error } = await supabase.rpc("mark_companion_active");
@@ -191,11 +199,33 @@ export const useXPRewards = () => {
     awardXPEvent("weekly_challenge", reward);
   };
 
-  const awardPepTalkListened = (metadata?: Record<string, string | number | boolean | undefined>) => {
-    if (!companion) return;
+  const awardPepTalkListenedAsync = async (
+    metadata?: Record<string, string | number | boolean | undefined>,
+  ): Promise<PepTalkAwardResult | null> => {
     const reward = XP_REWARDS.PEP_TALK_LISTEN;
-    showXPToast(reward, "Pep Talk Listened!");
-    awardXPEvent("pep_talk_listen", reward, metadata);
+    const result = await awardXPEventAsync("pep_talk_listen", reward, metadata);
+
+    if (!result) {
+      return null;
+    }
+
+    if (result.xpAwarded > 0) {
+      showXPToast(reward, "Pep Talk Listened!");
+    }
+
+    return {
+      xpAwarded: result.xpAwarded,
+      capApplied: result.capApplied,
+      nextThreshold: result.nextThreshold,
+      shouldEvolve: result.shouldEvolve,
+      duplicate: result.xpAwarded === 0,
+    };
+  };
+
+  const awardPepTalkListened = (metadata?: Record<string, string | number | boolean | undefined>) => {
+    void awardPepTalkListenedAsync(metadata).catch((error) => {
+      logger.error('Error awarding pep talk listen:', error);
+    });
   };
 
   const awardCheckInComplete = async () => {
@@ -526,6 +556,7 @@ export const useXPRewards = () => {
     awardChallengeCompletion,
     awardWeeklyChallengeCompletion,
     awardPepTalkListened,
+    awardPepTalkListenedAsync,
     awardCheckInComplete,
     
     // Additional XP awards

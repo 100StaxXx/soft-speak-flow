@@ -13,7 +13,6 @@ import { DesktopWeekPlanner } from "@/components/DesktopWeekPlanner";
 import { cn } from "@/lib/utils";
 
 import { DatePillsScroller } from "@/components/DatePillsScroller";
-import { DesktopWeekStrip } from "@/components/DesktopWeekStrip";
 import { AddQuestSheet, AddQuestData } from "@/components/AddQuestSheet";
 import type { QuestAttachmentInput } from "@/types/questAttachments";
 import { PageInfoButton } from "@/components/PageInfoButton";
@@ -59,7 +58,6 @@ import { HourlyViewModal } from "@/components/HourlyViewModal";
 import { usePostOnboardingMentorGuidance } from "@/hooks/usePostOnboardingMentorGuidance";
 import { getTodayIfDateStale, JOURNEYS_ROUTE } from "@/pages/journeysDateSync";
 import { isOnboardingCleanupEligible } from "@/pages/journeysCleanupEligibility";
-import { formatTime12 } from "@/components/quest-shared";
 import { useMainTabVisibility } from "@/contexts/MainTabVisibilityContext";
 import { SEND_TO_CALENDAR_ENABLED } from "@/utils/calendarFeatureFlags";
 import { useJourneysLayoutMode } from "@/hooks/useJourneysLayoutMode";
@@ -106,7 +104,6 @@ const Journeys = () => {
   const [showPathfinder, setShowPathfinder] = useState(false);
   const [showCreatedAnimation, setShowCreatedAnimation] = useState(false);
   const [createdCampaignData, setCreatedCampaignData] = useState<CreatedCampaignData | null>(null);
-  const [headerDragTime, setHeaderDragTime] = useState<string | null>(null);
   const [isInboxExpanded, setIsInboxExpanded] = useState(false);
   const previousIsTabActiveRef = useRef(isTabActive);
   const scheduledTimeUpdateQueueRef = useRef<Map<string, Promise<void>>>(new Map());
@@ -278,6 +275,17 @@ const Journeys = () => {
   
   // Edit ritual state (for tasks linked to habits)
   const [editingRitual, setEditingRitual] = useState<RitualData | null>(null);
+  const desktopInteractionResetKey = useMemo(
+    () => [
+      format(selectedDate, "yyyy-MM-dd"),
+      desktopPlannerMode,
+      showAddSheet ? "add-open" : "add-closed",
+      showMonthView ? "month-open" : "month-closed",
+      editingTask?.id ?? "no-edit-task",
+      editingRitual?.taskId ?? "no-edit-ritual",
+    ].join("|"),
+    [desktopPlannerMode, editingRitual?.taskId, editingTask?.id, selectedDate, showAddSheet, showMonthView],
+  );
   const { tasks: allCalendarTasks } = useCalendarTasks(selectedDate, "month", { enabled: isTabActive });
   const { tasks: weekCalendarTasks } = useCalendarTasks(selectedDate, "week", { enabled: isTabActive });
 
@@ -1012,47 +1020,26 @@ const Journeys = () => {
               >
                 Quests
               </h1>
-              <p className="text-sm text-muted-foreground/90">
-                {headerDragTime
-                  ? `Dragging to ${formatTime12(headerDragTime)}`
-                  : "Plan your quests for the week ahead."}
-              </p>
+              <p className="text-sm text-muted-foreground/90">Plan your quests for the week ahead.</p>
             </div>
           </motion.div>
 
         <QuestsErrorBoundary>
-          {/* Date Selector */}
-          <motion.div
-            initial={
-              prefersReducedMotion
-                ? false
-                : isMacHostedIOSApp && isDesktopLayout
-                ? { opacity: 0, y: 8 }
-                : { opacity: 0, scale: 0.98 }
-            }
-            animate={isMacHostedIOSApp && isDesktopLayout ? { opacity: 1, y: 0 } : { opacity: 1, scale: 1 }}
-            transition={{ delay: prefersReducedMotion ? 0 : 0.04, duration: prefersReducedMotion ? 0 : 0.2 }}
-            className="mb-4"
-          >
-            {isDesktopLayout ? (
-              <DesktopWeekStrip
-                selectedDate={selectedDate}
-                tasks={weekCalendarTasks}
-                onDateSelect={setSelectedDate}
-                onOpenMonthView={() => setShowMonthView(true)}
-                onAddQuest={isMacHostedIOSApp ? () => openAddQuestSheet() : undefined}
-                plannerMode={desktopPlannerMode}
-                onPlannerModeChange={setDesktopPlannerMode}
-              />
-            ) : (
+          {!isDesktopLayout ? (
+            <motion.div
+              initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: prefersReducedMotion ? 0 : 0.04, duration: prefersReducedMotion ? 0 : 0.2 }}
+              className="mb-4"
+            >
               <DatePillsScroller
                 selectedDate={selectedDate}
                 onDateSelect={handleDatePillClick}
                 tasksPerDay={tasksPerDay}
                 isActive={isTabActive}
               />
-            )}
-          </motion.div>
+            </motion.div>
+          ) : null}
 
           {isInboxRequested || inboxCount > 0 ? (
             <motion.div
@@ -1088,10 +1075,13 @@ const Journeys = () => {
                 currentStreak={currentStreak}
                 activeEpics={activeEpics}
                 isCampaignsLoading={epicsLoading}
-                showInlineAddButton={!isMacHostedIOSApp}
+                plannerMode={desktopPlannerMode}
+                desktopInteractionResetKey={desktopInteractionResetKey}
                 onDateSelect={setSelectedDate}
+                onPlannerModeChange={setDesktopPlannerMode}
                 onToggle={handleToggleTask}
                 onAddQuest={() => openAddQuestSheet()}
+                onOpenMonthView={() => setShowMonthView(true)}
                 onUndoToggle={handleUndoToggle}
                 onEditQuest={handleEditQuest}
                 onDeleteQuest={handleDeleteQuestFromWeekPlanner}
@@ -1112,6 +1102,8 @@ const Journeys = () => {
                 completedCount={completedCount}
                 totalCount={totalCount}
                 currentStreak={currentStreak}
+                desktopPlannerMode={desktopPlannerMode}
+                desktopInteractionResetKey={desktopInteractionResetKey}
                 onUndoToggle={handleUndoToggle}
                 onEditQuest={handleEditQuest}
                 weekTasks={weekCalendarTasks}
@@ -1122,11 +1114,12 @@ const Journeys = () => {
                 hasCalendarLink={hasLinkedEvent}
                 onMoveQuestToNextDay={handleSwipeMoveToNextDay}
                 onUpdateScheduledTime={handleTimelineScheduledTimeUpdate}
+                onDateSelect={setSelectedDate}
+                onDesktopPlannerModeChange={setDesktopPlannerMode}
                 onOpenMonthView={() => setShowMonthView(true)}
                 onTimeSlotLongPress={(date, time) => {
                   openAddQuestSheet({ date, time });
                 }}
-                onTimelineDragPreviewTimeChange={setHeaderDragTime}
               />
             )}
           </motion.div>

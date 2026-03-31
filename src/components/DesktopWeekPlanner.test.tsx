@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { format } from "date-fns";
 import { describe, expect, it, vi } from "vitest";
 
@@ -58,23 +58,34 @@ const baseTask = (overrides: Partial<DailyTask> = {}): DailyTask => ({
 });
 
 describe("DesktopWeekPlanner", () => {
-  it("renders all seven days for the selected week", () => {
+  it("renders all seven days plus compact desktop header controls", () => {
+    const onPlannerModeChange = vi.fn();
+
     render(
       <DesktopWeekPlanner
         selectedDate={selectedDate}
         tasks={[]}
+        plannerMode="week"
         onDateSelect={vi.fn()}
+        onPlannerModeChange={onPlannerModeChange}
         onToggle={vi.fn()}
         onAddQuest={vi.fn()}
+        onOpenMonthView={vi.fn()}
       />,
     );
 
     expect(screen.getByTestId("desktop-week-day-2026-03-29")).toBeInTheDocument();
     expect(screen.getByTestId("desktop-week-day-2026-04-04")).toBeInTheDocument();
     expect(screen.getByTestId("desktop-week-hour-6")).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: /desktop planner mode/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Today" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /add quest/i })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Day" }));
+    expect(onPlannerModeChange).toHaveBeenCalledWith("day");
   });
 
-  it("places timed tasks into hour rows and anytime tasks into the anytime lane", () => {
+  it("places timed tasks into hour rows and keeps cards title-only until clicked", () => {
     render(
       <DesktopWeekPlanner
         selectedDate={selectedDate}
@@ -104,12 +115,15 @@ describe("DesktopWeekPlanner", () => {
       />,
     );
 
-    expect(screen.getByTestId("desktop-week-task-timed-task")).toBeInTheDocument();
+    const timedCard = screen.getByTestId("desktop-week-task-timed-task");
+    expect(timedCard).toBeInTheDocument();
     expect(within(screen.getByTestId("desktop-week-anytime-2026-03-31")).getByText("Loose planning")).toBeInTheDocument();
     expect(screen.getByText("Wednesday review")).toBeInTheDocument();
+    expect(within(timedCard).queryByText("8:00 AM")).not.toBeInTheDocument();
+    expect(within(timedCard).queryByText("+20 XP")).not.toBeInTheDocument();
   });
 
-  it("keeps week actions wired to the provided callbacks", () => {
+  it("keeps checkbox, popover details, double-click edit, and day selection wired correctly", async () => {
     const onDateSelect = vi.fn();
     const onToggle = vi.fn();
     const onUndoToggle = vi.fn();
@@ -127,15 +141,13 @@ describe("DesktopWeekPlanner", () => {
       id: "editable-task",
       task_text: "Editable quest",
       scheduled_time: "07:30",
+      notes: "Discuss roadmap",
     });
 
     render(
       <DesktopWeekPlanner
         selectedDate={selectedDate}
-        tasks={[
-          completedTask,
-          editableTask,
-        ]}
+        tasks={[completedTask, editableTask]}
         onDateSelect={onDateSelect}
         onToggle={onToggle}
         onAddQuest={vi.fn()}
@@ -154,23 +166,46 @@ describe("DesktopWeekPlanner", () => {
     fireEvent.click(screen.getByLabelText("Mark task as complete"));
     expect(onToggle).toHaveBeenCalledWith("editable-task", true, 20);
 
-    fireEvent.click(screen.getByLabelText("Edit Editable quest"));
+    expect(screen.queryByText("Edit")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("desktop-week-task-button-editable-task"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("desktop-quest-popover-editable-task")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("Discuss roadmap")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Edit"));
     expect(onEditQuest).toHaveBeenCalledWith(expect.objectContaining({ id: "editable-task" }));
 
-    fireEvent.click(screen.getByLabelText("Re-send Editable quest to calendar"));
+    fireEvent.click(screen.getByTestId("desktop-week-task-button-editable-task"));
+    await waitFor(() => {
+      expect(screen.getByTestId("desktop-quest-popover-editable-task")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByText("Re-send to calendar"));
     expect(onSendToCalendar).toHaveBeenCalledWith("editable-task");
 
-    fireEvent.click(screen.getByLabelText("Move Editable quest to tomorrow"));
+    fireEvent.click(screen.getByTestId("desktop-week-task-button-editable-task"));
+    await waitFor(() => {
+      expect(screen.getByTestId("desktop-quest-popover-editable-task")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByText("Move to tomorrow"));
     expect(onMoveQuestToNextDay).toHaveBeenCalledWith(expect.objectContaining({ id: "editable-task" }));
 
-    fireEvent.click(screen.getByLabelText("Delete Editable quest"));
+    fireEvent.click(screen.getByTestId("desktop-week-task-button-editable-task"));
+    await waitFor(() => {
+      expect(screen.getByTestId("desktop-quest-popover-editable-task")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByText("Delete"));
     expect(onDeleteQuest).toHaveBeenCalledWith(expect.objectContaining({ id: "editable-task" }));
+
+    fireEvent.doubleClick(screen.getByTestId("desktop-week-task-button-editable-task"));
+    expect(onEditQuest).toHaveBeenCalledWith(expect.objectContaining({ id: "editable-task" }));
 
     const wednesdayColumn = screen.getByTestId("desktop-week-day-2026-04-01");
     fireEvent.click(within(wednesdayColumn).getByRole("button"));
 
     expect(onDateSelect).toHaveBeenCalledWith(expect.any(Date));
-    const selectedDateArg = onDateSelect.mock.calls[0]?.[0] as Date;
+    const selectedDateArg = onDateSelect.mock.calls.at(-1)?.[0] as Date;
     expect(format(selectedDateArg, "yyyy-MM-dd")).toBe("2026-04-01");
   });
 });

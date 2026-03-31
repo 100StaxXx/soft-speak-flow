@@ -590,7 +590,6 @@ describe("Journeys row drag integration", () => {
     );
 
     expect(await screen.findByRole("button", { name: /add quest/i })).toBeInTheDocument();
-    expect(screen.getByText("⌘N")).toBeInTheDocument();
     expect(screen.queryByTestId("draggable-fab")).not.toBeInTheDocument();
     expect(mocks.draggableFabRenderCount).toBe(0);
     expect(mocks.lastAddQuestSheetProps?.presentation).toBe("desktop-panel");
@@ -690,10 +689,6 @@ describe("Journeys row drag integration", () => {
     act(() => {
       fireEvent(row, createPointerDownEvent(100));
       dispatchPointerMove(825);
-    });
-
-    await waitFor(() => {
-      expect(screen.getByText(/Dragging to/)).toBeInTheDocument();
     });
 
     act(() => {

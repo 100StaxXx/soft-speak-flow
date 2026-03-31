@@ -1,6 +1,9 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import React from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { fireEvent, render, screen, waitFor, act } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
+import { MainTabVisibilityProvider } from "@/contexts/MainTabVisibilityContext";
 
 type CaptionWord = {
   word: string;
@@ -22,41 +25,73 @@ type MockPepTalk = {
   transcript: CaptionWord[];
 };
 
+type InvokeResult = {
+  data: unknown;
+  error: unknown;
+};
+
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((nextResolve, nextReject) => {
+    resolve = nextResolve;
+    reject = nextReject;
+  });
+  return { promise, resolve, reject };
+}
+
 const mocks = vi.hoisted(() => {
   const storage = new Map<string, string>();
+  const audioListeners = new Set<(muted: boolean) => void>();
   const state: {
-    dailyPepTalk: MockPepTalk | null;
-    syncResponse: { data: unknown; error: unknown };
-    generationResponse: { data: unknown; error: unknown };
+    todayPepTalk: MockPepTalk | null;
+    fallbackPepTalk: MockPepTalk | null;
+    syncResponse: InvokeResult | Promise<InvokeResult>;
+    generationResponse: InvokeResult | Promise<InvokeResult>;
     profileTimezone: string | null;
     effectiveDate: string;
     dailyPepTalkEqCalls: Array<[string, unknown]>;
+    existingPepTalkXpEvent: boolean;
+    isTabActive: boolean;
+    isGloballyMuted: boolean;
+    mentor: { slug: string; name: string };
   } = {
-    dailyPepTalk: null,
-    syncResponse: { data: {}, error: null },
-    generationResponse: { data: null, error: null },
+    todayPepTalk: null,
+    fallbackPepTalk: null,
+    syncResponse: Promise.resolve({ data: {}, error: null }),
+    generationResponse: Promise.resolve({ data: null, error: null }),
     profileTimezone: "America/Los_Angeles",
     effectiveDate: "2026-02-20",
     dailyPepTalkEqCalls: [],
+    existingPepTalkXpEvent: false,
+    isTabActive: true,
+    isGloballyMuted: false,
+    mentor: { slug: "carmen", name: "Carmen" },
   };
 
-  const awardPepTalkListened = vi.fn();
+  const awardPepTalkListenedAsync = vi.fn();
   const toastError = vi.fn();
   const toastSuccess = vi.fn();
+  const safePlayMock = vi.fn(async () => true);
+  const registerAudioMock = vi.fn();
+  const unregisterAudioMock = vi.fn();
+
   const invoke = vi.fn(async (fnName: string) => {
     if (fnName === "sync-daily-pep-talk-transcript") {
-      return state.syncResponse;
+      return await state.syncResponse;
     }
     if (fnName === "generate-single-daily-pep-talk") {
-      return state.generationResponse;
+      return await state.generationResponse;
     }
     return { data: null, error: null };
   });
 
   const from = vi.fn((table: string) => {
+    const filters = new Map<string, unknown>();
     const builder = {
       select: vi.fn(() => builder),
       eq: vi.fn((column: string, value: unknown) => {
+        filters.set(column, value);
         if (table === "daily_pep_talks") {
           state.dailyPepTalkEqCalls.push([column, value]);
         }
@@ -66,13 +101,19 @@ const mocks = vi.hoisted(() => {
       limit: vi.fn(() => builder),
       maybeSingle: vi.fn(async () => {
         if (table === "mentors") {
-          return { data: { slug: "carmen", name: "Carmen" }, error: null };
+          return { data: state.mentor, error: null };
         }
         if (table === "daily_pep_talks") {
-          return { data: state.dailyPepTalk, error: null };
+          return {
+            data: filters.has("for_date") ? state.todayPepTalk : state.fallbackPepTalk,
+            error: null,
+          };
         }
         if (table === "xp_events") {
-          return { data: null, error: null };
+          return {
+            data: state.existingPepTalkXpEvent ? { id: "xp-1" } : null,
+            error: null,
+          };
         }
         return { data: null, error: null };
       }),
@@ -83,9 +124,13 @@ const mocks = vi.hoisted(() => {
 
   return {
     state,
-    awardPepTalkListened,
+    awardPepTalkListenedAsync,
     toastError,
     toastSuccess,
+    safePlayMock,
+    registerAudioMock,
+    unregisterAudioMock,
+    audioListeners,
     safeLocalStorage: {
       getItem: (key: string) => storage.get(key) ?? null,
       setItem: (key: string, value: string) => {
@@ -134,15 +179,9 @@ vi.mock("@/contexts/MentorConnectionContext", () => ({
   }),
 }));
 
-vi.mock("@/hooks/useMentorPersonality", () => ({
-  useMentorPersonality: () => ({
-    name: "Carmen",
-  }),
-}));
-
 vi.mock("@/hooks/useXPRewards", () => ({
   useXPRewards: () => ({
-    awardPepTalkListened: mocks.awardPepTalkListened,
+    awardPepTalkListenedAsync: mocks.awardPepTalkListenedAsync,
   }),
 }));
 
@@ -162,6 +201,41 @@ vi.mock("@capacitor/core", () => ({
     isNativePlatform: () => false,
     getPlatform: () => "web",
   },
+}));
+
+vi.mock("@/utils/globalAudio", () => ({
+  globalAudio: {
+    getMuted: () => mocks.state.isGloballyMuted,
+    setMuted: (muted: boolean) => {
+      mocks.state.isGloballyMuted = muted;
+      mocks.audioListeners.forEach((listener) => listener(muted));
+    },
+    subscribe: (listener: (muted: boolean) => void) => {
+      mocks.audioListeners.add(listener);
+      return () => {
+        mocks.audioListeners.delete(listener);
+      };
+    },
+  },
+}));
+
+vi.mock("@/utils/iosAudio", () => ({
+  isIOS: false,
+  createIOSOptimizedAudio: (src?: string) => {
+    const audio = document.createElement("audio");
+    if (src) {
+      audio.src = src;
+    }
+    audio.preload = "auto";
+    (audio as HTMLAudioElement & { playsInline?: boolean }).playsInline = true;
+    (audio as HTMLAudioElement & { "webkit-playsinline"?: boolean })["webkit-playsinline"] = true;
+    return audio;
+  },
+  iosAudioManager: {
+    registerAudio: mocks.registerAudioMock,
+    unregisterAudio: mocks.unregisterAudioMock,
+  },
+  safePlay: mocks.safePlayMock,
 }));
 
 import { TodaysPepTalk } from "./TodaysPepTalk";
@@ -184,33 +258,79 @@ function makePepTalk(overrides: Partial<MockPepTalk> = {}): MockPepTalk {
 }
 
 function renderComponent() {
-  return render(
-    <MemoryRouter>
-      <TodaysPepTalk />
-    </MemoryRouter>,
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
+
+  const view = render(
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter>
+        <MainTabVisibilityProvider isTabActive={mocks.state.isTabActive}>
+          <TodaysPepTalk />
+        </MainTabVisibilityProvider>
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
+
+  return {
+    queryClient,
+    ...view,
+    rerenderComponent: () =>
+      view.rerender(
+        <QueryClientProvider client={queryClient}>
+          <MemoryRouter>
+            <MainTabVisibilityProvider isTabActive={mocks.state.isTabActive}>
+              <TodaysPepTalk />
+            </MainTabVisibilityProvider>
+          </MemoryRouter>
+        </QueryClientProvider>,
+      ),
+  };
 }
 
 describe("TodaysPepTalk transcript expand behavior", () => {
   beforeEach(() => {
     vi.useRealTimers();
     mocks.safeLocalStorage.clear();
-    mocks.awardPepTalkListened.mockClear();
+    mocks.awardPepTalkListenedAsync.mockReset();
+    mocks.awardPepTalkListenedAsync.mockResolvedValue({
+      xpAwarded: 8,
+      duplicate: false,
+      capApplied: false,
+      nextThreshold: 120,
+      shouldEvolve: false,
+    });
     mocks.toastError.mockClear();
     mocks.toastSuccess.mockClear();
+    mocks.safePlayMock.mockClear();
+    mocks.registerAudioMock.mockClear();
+    mocks.unregisterAudioMock.mockClear();
     mocks.supabase.from.mockClear();
     mocks.supabase.functions.invoke.mockClear();
-    mocks.state.syncResponse = { data: {}, error: null };
-    mocks.state.generationResponse = { data: null, error: null };
-    mocks.state.dailyPepTalk = makePepTalk();
+    mocks.state.syncResponse = Promise.resolve({ data: {}, error: null });
+    mocks.state.generationResponse = Promise.resolve({ data: null, error: null });
+    mocks.state.todayPepTalk = makePepTalk();
+    mocks.state.fallbackPepTalk = makePepTalk({
+      id: "pep-talk-fallback",
+      for_date: "2026-02-19",
+      title: "Fallback Message",
+    });
     mocks.state.profileTimezone = "America/Los_Angeles";
     mocks.state.effectiveDate = "2026-02-20";
     mocks.state.dailyPepTalkEqCalls = [];
+    mocks.state.existingPepTalkXpEvent = false;
+    mocks.state.isTabActive = true;
+    mocks.state.isGloballyMuted = false;
+    mocks.state.mentor = { slug: "carmen", name: "Carmen" };
+    mocks.audioListeners.clear();
   });
 
   it("queries the effective local date before the 2 AM reset", async () => {
     mocks.state.effectiveDate = "2026-03-09";
-    mocks.state.dailyPepTalk = makePepTalk({ for_date: "2026-03-09" });
+    mocks.state.todayPepTalk = makePepTalk({ for_date: "2026-03-09" });
 
     renderComponent();
 
@@ -222,7 +342,7 @@ describe("TodaysPepTalk transcript expand behavior", () => {
   });
 
   it("shows full raw script when transcript array is empty", async () => {
-    mocks.state.dailyPepTalk = makePepTalk({
+    mocks.state.todayPepTalk = makePepTalk({
       id: "pep-talk-empty",
       transcript: [],
     });
@@ -239,7 +359,7 @@ describe("TodaysPepTalk transcript expand behavior", () => {
   });
 
   it("shows timed transcript words when word-level transcript exists", async () => {
-    mocks.state.dailyPepTalk = makePepTalk({
+    mocks.state.todayPepTalk = makePepTalk({
       id: "pep-talk-timed",
       script: "SCRIPT_FALLBACK_ONLY",
       transcript: [
@@ -263,7 +383,7 @@ describe("TodaysPepTalk transcript expand behavior", () => {
   });
 
   it("re-applies punctuation from script for timed transcript display", async () => {
-    mocks.state.dailyPepTalk = makePepTalk({
+    mocks.state.todayPepTalk = makePepTalk({
       id: "pep-talk-punctuation",
       script: "Focus your gaze on what truly matters. Identify your priorities.",
       transcript: [
@@ -291,7 +411,7 @@ describe("TodaysPepTalk transcript expand behavior", () => {
   });
 
   it("returns to preview mode and label after collapsing", async () => {
-    mocks.state.dailyPepTalk = makePepTalk({
+    mocks.state.todayPepTalk = makePepTalk({
       id: "pep-talk-toggle",
       transcript: [],
     });
@@ -309,12 +429,12 @@ describe("TodaysPepTalk transcript expand behavior", () => {
   });
 
   it("preserves displayed script while applying timed transcript returned by background sync", async () => {
-    mocks.state.dailyPepTalk = makePepTalk({
+    mocks.state.todayPepTalk = makePepTalk({
       id: "pep-talk-sync-success",
       script: "Original preview text stays intact before transcript expansion.",
       transcript: [],
     });
-    mocks.state.syncResponse = {
+    mocks.state.syncResponse = Promise.resolve({
       data: {
         script: "Bad garbled replacement text",
         transcript: [
@@ -323,7 +443,7 @@ describe("TodaysPepTalk transcript expand behavior", () => {
         ],
       },
       error: null,
-    };
+    });
 
     renderComponent();
 
@@ -344,7 +464,7 @@ describe("TodaysPepTalk transcript expand behavior", () => {
   });
 
   it("auto-scrolls transcript container without calling word scrollIntoView", async () => {
-    mocks.state.dailyPepTalk = makePepTalk({
+    mocks.state.todayPepTalk = makePepTalk({
       id: "pep-talk-autoscroll",
       script: "Stay Focused Today",
       transcript: [
@@ -410,12 +530,17 @@ describe("TodaysPepTalk transcript expand behavior", () => {
         value: 24,
       });
 
-      const audio = document.querySelector("audio");
+      const audio = screen.getByTestId("pep-talk-audio");
       expect(audio).toBeInstanceOf(HTMLAudioElement);
       Object.defineProperty(audio as HTMLAudioElement, "currentTime", {
         configurable: true,
         writable: true,
         value: 1.2,
+      });
+      Object.defineProperty(audio as HTMLAudioElement, "duration", {
+        configurable: true,
+        writable: true,
+        value: 1.5,
       });
 
       fireEvent(audio as HTMLAudioElement, new Event("timeupdate"));
@@ -438,8 +563,9 @@ describe("TodaysPepTalk transcript expand behavior", () => {
   });
 
   it("shows backend error text for non-2xx pep talk refresh failures", async () => {
-    mocks.state.dailyPepTalk = null;
-    mocks.state.generationResponse = {
+    mocks.state.todayPepTalk = null;
+    mocks.state.fallbackPepTalk = null;
+    mocks.state.generationResponse = Promise.resolve({
       data: null,
       error: {
         name: "FunctionsHttpError",
@@ -452,7 +578,7 @@ describe("TodaysPepTalk transcript expand behavior", () => {
           },
         ),
       },
-    };
+    });
 
     renderComponent();
 
@@ -467,6 +593,149 @@ describe("TodaysPepTalk transcript expand behavior", () => {
 
     await waitFor(() => {
       expect(mocks.toastError).toHaveBeenCalledWith("No themes configured for mentor: solace");
+    });
+  });
+
+  it("refetches when the mentor tab becomes active again", async () => {
+    const rendered = renderComponent();
+
+    expect(await screen.findByText("Execute Your Vision")).toBeInTheDocument();
+
+    mocks.state.isTabActive = false;
+    mocks.state.todayPepTalk = makePepTalk({
+      id: "pep-talk-2",
+      title: "Return to the Path",
+    });
+    rendered.rerenderComponent();
+
+    expect(screen.queryByText("Return to the Path")).not.toBeInTheDocument();
+
+    mocks.state.isTabActive = true;
+    rendered.rerenderComponent();
+
+    expect(await screen.findByText("Return to the Path")).toBeInTheDocument();
+  });
+
+  it("reloads server state after an interrupted refresh and tab return", async () => {
+    const generationDeferred = createDeferred<InvokeResult>();
+    const oldFallback = makePepTalk({
+      id: "pep-talk-old-fallback",
+      for_date: "2026-02-19",
+      title: "Yesterday's Message",
+    });
+    const generatedLocal = makePepTalk({
+      id: "pep-talk-generated",
+      title: "Local Refresh Result",
+    });
+    const freshServer = makePepTalk({
+      id: "pep-talk-fresh-server",
+      title: "Fresh Server Result",
+    });
+
+    mocks.state.todayPepTalk = null;
+    mocks.state.fallbackPepTalk = oldFallback;
+    mocks.state.generationResponse = generationDeferred.promise;
+
+    const rendered = renderComponent();
+
+    expect(await screen.findByText("Yesterday's Message")).toBeInTheDocument();
+
+    fireEvent.click(await screen.findByRole("button", { name: /refresh today's/i }));
+
+    mocks.state.isTabActive = false;
+    mocks.state.todayPepTalk = freshServer;
+    rendered.rerenderComponent();
+
+    await act(async () => {
+      generationDeferred.resolve({
+        data: { pepTalk: generatedLocal },
+        error: null,
+      });
+      await generationDeferred.promise;
+    });
+
+    mocks.state.isTabActive = true;
+    rendered.rerenderComponent();
+
+    expect(await screen.findByText("Fresh Server Result")).toBeInTheDocument();
+  });
+
+  it("keeps pep talk XP retriable after a failed award attempt", async () => {
+    mocks.awardPepTalkListenedAsync
+      .mockRejectedValueOnce(new Error("XP temporarily unavailable"))
+      .mockResolvedValueOnce({
+        xpAwarded: 8,
+        duplicate: false,
+        capApplied: false,
+        nextThreshold: 120,
+        shouldEvolve: false,
+      });
+
+    renderComponent();
+
+    await screen.findByText("Execute Your Vision");
+
+    const audio = screen.getByTestId("pep-talk-audio") as HTMLAudioElement;
+    Object.defineProperty(audio, "duration", {
+      configurable: true,
+      writable: true,
+      value: 100,
+    });
+    Object.defineProperty(audio, "currentTime", {
+      configurable: true,
+      writable: true,
+      value: 80,
+    });
+
+    fireEvent(audio, new Event("timeupdate"));
+
+    await waitFor(() => {
+      expect(mocks.awardPepTalkListenedAsync).toHaveBeenCalledTimes(1);
+    });
+
+    Object.defineProperty(audio, "currentTime", {
+      configurable: true,
+      writable: true,
+      value: 90,
+    });
+    fireEvent(audio, new Event("timeupdate"));
+
+    await waitFor(() => {
+      expect(mocks.awardPepTalkListenedAsync).toHaveBeenCalledTimes(2);
+    });
+
+    Object.defineProperty(audio, "currentTime", {
+      configurable: true,
+      writable: true,
+      value: 95,
+    });
+    fireEvent(audio, new Event("timeupdate"));
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(mocks.awardPepTalkListenedAsync).toHaveBeenCalledTimes(2);
+  });
+
+  it("awards XP on ended when the last threshold-crossing timeupdate is missed", async () => {
+    renderComponent();
+
+    await screen.findByText("Execute Your Vision");
+
+    const audio = screen.getByTestId("pep-talk-audio") as HTMLAudioElement;
+    Object.defineProperty(audio, "duration", {
+      configurable: true,
+      writable: true,
+      value: 100,
+    });
+    Object.defineProperty(audio, "currentTime", {
+      configurable: true,
+      writable: true,
+      value: 100,
+    });
+
+    fireEvent(audio, new Event("ended"));
+
+    await waitFor(() => {
+      expect(mocks.awardPepTalkListenedAsync).toHaveBeenCalledWith({ pep_talk_id: "pep-talk-1" });
     });
   });
 });

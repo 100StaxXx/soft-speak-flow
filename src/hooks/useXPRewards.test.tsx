@@ -46,6 +46,7 @@ vi.mock("./useCompanion", () => ({
     HABIT_COMPLETE: 8,
     CHECK_IN: 4,
     STREAK_MILESTONE: 15,
+    PEP_TALK_LISTEN: 8,
   },
 }));
 
@@ -131,5 +132,54 @@ describe("useXPRewards discipline rebalance", () => {
     }));
     expect(mocks.updateAlignmentFromReflectionMock).toHaveBeenCalledWith("companion-1");
     expect(mocks.awardDisciplineForHabitCompletionMock).not.toHaveBeenCalled();
+  });
+
+  it("returns pep talk award results and only toasts on successful XP awards", async () => {
+    mocks.awardXPMutateAsyncMock.mockResolvedValueOnce({
+      xpAwarded: 8,
+      capApplied: false,
+      nextThreshold: 120,
+      shouldEvolve: false,
+    });
+    mocks.awardXPMutateAsyncMock.mockResolvedValueOnce({
+      xpAwarded: 0,
+      capApplied: false,
+      nextThreshold: 120,
+      shouldEvolve: false,
+    });
+
+    const { result } = renderHook(() => useXPRewards(), {
+      wrapper: createWrapper(),
+    });
+
+    let awardResult: Awaited<ReturnType<typeof result.current.awardPepTalkListenedAsync>>;
+    let duplicateResult: Awaited<ReturnType<typeof result.current.awardPepTalkListenedAsync>>;
+
+    await act(async () => {
+      awardResult = await result.current.awardPepTalkListenedAsync({ pep_talk_id: "pep-talk-1" });
+      duplicateResult = await result.current.awardPepTalkListenedAsync({ pep_talk_id: "pep-talk-1" });
+    });
+
+    expect(mocks.awardXPMutateAsyncMock).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      eventType: "pep_talk_listen",
+      xpAmount: 8,
+      metadata: { pep_talk_id: "pep-talk-1" },
+    }));
+    expect(awardResult).toEqual({
+      xpAwarded: 8,
+      capApplied: false,
+      nextThreshold: 120,
+      shouldEvolve: false,
+      duplicate: false,
+    });
+    expect(duplicateResult).toEqual({
+      xpAwarded: 0,
+      capApplied: false,
+      nextThreshold: 120,
+      shouldEvolve: false,
+      duplicate: true,
+    });
+    expect(mocks.showXPToastMock).toHaveBeenCalledTimes(1);
+    expect(mocks.showXPToastMock).toHaveBeenCalledWith(8, "Pep Talk Listened!");
   });
 });

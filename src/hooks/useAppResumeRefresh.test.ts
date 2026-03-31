@@ -75,6 +75,10 @@ describe("useAppResumeRefresh", () => {
     vi.clearAllMocks();
     mocks.state.native = true;
     mocks.state.appStateHandler = null;
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      value: "visible",
+    });
 
     mocks.addListenerMock.mockImplementation(
       async (_event: string, callback: (payload: { isActive: boolean }) => Promise<void>) => {
@@ -96,6 +100,7 @@ describe("useAppResumeRefresh", () => {
     expect(mocks.refetchQueriesMock).toHaveBeenCalledWith({ queryKey: ["profile"] });
     expect(mocks.invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: ["mentor-page-data"] });
     expect(mocks.invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: ["selected-mentor"] });
+    expect(mocks.invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: ["today-pep-talk"] });
     expect(mocks.invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: ["streak-freezes"] });
     expect(mocks.invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: ["companion"] });
     expect(mocks.invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: ["companion-health"] });
@@ -104,6 +109,20 @@ describe("useAppResumeRefresh", () => {
     expect(mocks.invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: ["evolution-cards"] });
     expect(mocks.warmEpicsQueryFromRemoteMock).toHaveBeenCalledWith(expect.any(Object), "user-1");
     expect(mocks.warmDailyTasksQueryFromRemoteMock).toHaveBeenCalledWith(expect.any(Object), "user-1", expect.any(String));
+    expect(mocks.dispatchPlannerSyncFinishedMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("invalidates daily pep talks when the web tab becomes visible again", async () => {
+    mocks.state.native = false;
+
+    renderHook(() => useAppResumeRefresh());
+
+    await act(async () => {
+      document.dispatchEvent(new Event("visibilitychange"));
+      await Promise.resolve();
+    });
+
+    expect(mocks.invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: ["today-pep-talk"] });
     expect(mocks.dispatchPlannerSyncFinishedMock).toHaveBeenCalledTimes(1);
   });
 });

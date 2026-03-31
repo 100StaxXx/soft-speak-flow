@@ -2,7 +2,7 @@ import { useMemo, useRef, useState, useEffect, useLayoutEffect, useCallback, mem
 import { createPortal } from "react-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTimelineDrag } from "@/hooks/useTimelineDrag";
-import { format, isSameDay } from "date-fns";
+import { addDays, format, isSameDay } from "date-fns";
 import { AnimatePresence, motion, useMotionValue, useReducedMotion, type MotionValue } from "framer-motion";
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { toast } from "sonner";
@@ -28,8 +28,11 @@ import {
   ArrowUpDown,
   MoreHorizontal,
   CalendarPlus,
+  CalendarDays,
   CalendarArrowUp,
   Trash2,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -65,6 +68,9 @@ import {
 } from "@/components/calendar/dragSnap";
 import type { TaskAttachment } from "@/types/questAttachments";
 import { getEpicDaysRemaining, resolveEpicEndDate } from "@/utils/epicDates";
+import {
+  DesktopQuestDetailsPopover,
+} from "@/components/DesktopQuestDetailsPopover";
 
 // Helper to calculate days remaining
 const getDaysLeft = (epic: { start_date: string; target_days: number; end_date?: string | null }) =>
@@ -178,6 +184,8 @@ interface TodaysAgendaProps {
   hideDesktopRailAddButton?: boolean;
   isVisible?: boolean;
   disableTimelineDrag?: boolean;
+  desktopPlannerMode?: "week" | "day";
+  desktopInteractionResetKey?: string | number;
   onToggle: (taskId: string, completed: boolean, xpReward: number) => void;
   onAddQuest: () => void;
   completedCount: number;
@@ -212,9 +220,10 @@ interface TodaysAgendaProps {
   onMoveQuestToNextDay?: (taskId: string) => void;
   onUpdateScheduledTime?: (taskId: string, newTime: string) => void;
   onTimeSlotLongPress?: (date: Date, time: string) => void;
+  onDateSelect?: (date: Date) => void;
+  onDesktopPlannerModeChange?: (mode: "week" | "day") => void;
   onSendToCalendar?: (taskId: string) => void;
   hasCalendarLink?: (taskId: string) => boolean;
-  onTimelineDragPreviewTimeChange?: (time: string | null) => void;
   onOpenMonthView?: () => void;
 }
 
@@ -610,6 +619,8 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   hideDesktopRailAddButton = false,
   isVisible = true,
   disableTimelineDrag = false,
+  desktopPlannerMode = "day",
+  desktopInteractionResetKey,
   onToggle,
   onAddQuest,
   completedCount,
@@ -624,9 +635,10 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   onMoveQuestToNextDay,
   onUpdateScheduledTime,
   onTimeSlotLongPress,
+  onDateSelect,
+  onDesktopPlannerModeChange,
   onSendToCalendar,
   hasCalendarLink,
-  onTimelineDragPreviewTimeChange,
   onOpenMonthView,
 }: TodaysAgendaProps) {
   const prefersReducedMotion = useReducedMotion();
@@ -645,6 +657,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   }, []);
   const useLiteAnimations = isNativeIOS || Boolean(prefersReducedMotion) || !capabilities.allowBackgroundAnimation;
   const isTimelineDragEnabled = !disableTimelineDrag;
+  const isDesktopTimelineDragEnabled = isTimelineDragEnabled && !isDesktopLayout;
   const mobileFabScrollClearance = isDesktopLayout ? undefined : `${MOBILE_FAB_SCROLL_CLEARANCE_PX}px`;
   const { profile } = useProfile();
   const queryClient = useQueryClient();
@@ -710,6 +723,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   }, []);
   
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
+  const [openDesktopDetailTaskId, setOpenDesktopDetailTaskId] = useState<string | null>(null);
   const [openActionMenuTaskId, setOpenActionMenuTaskId] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<'custom' | 'time' | 'priority' | 'xp'>('custom');
   const [justCompletedTasks, setJustCompletedTasks] = useState<Set<string>>(new Set());
@@ -725,6 +739,40 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const suppressNextCheckboxClickRef = useRef(false);
   const suppressNextCheckboxClickTimeoutRef = useRef<number | null>(null);
+  const desktopTaskClickTimersRef = useRef<Map<string, number>>(new Map());
+
+  const clearDesktopTaskClickIntent = useCallback((taskId?: string) => {
+    if (taskId) {
+      const timeoutId = desktopTaskClickTimersRef.current.get(taskId);
+      if (timeoutId !== undefined) {
+        window.clearTimeout(timeoutId);
+        desktopTaskClickTimersRef.current.delete(taskId);
+      }
+      return;
+    }
+
+    desktopTaskClickTimersRef.current.forEach((timeoutId) => {
+      window.clearTimeout(timeoutId);
+    });
+    desktopTaskClickTimersRef.current.clear();
+  }, []);
+
+  useEffect(() => clearDesktopTaskClickIntent, [clearDesktopTaskClickIntent]);
+
+  const scheduleDesktopTaskSingleClick = useCallback((task: Task) => {
+    clearDesktopTaskClickIntent(task.id);
+    const timeoutId = window.setTimeout(() => {
+      setOpenDesktopDetailTaskId(task.id);
+      desktopTaskClickTimersRef.current.delete(task.id);
+    }, 200);
+    desktopTaskClickTimersRef.current.set(task.id, timeoutId);
+  }, [clearDesktopTaskClickIntent]);
+
+  const handleDesktopTaskDoubleClick = useCallback((task: Task) => {
+    clearDesktopTaskClickIntent(task.id);
+    setOpenDesktopDetailTaskId(null);
+    onEditQuest?.(task);
+  }, [clearDesktopTaskClickIntent, onEditQuest]);
   
   // Clean up optimistic state when server confirms completion
   useEffect(() => {
@@ -753,6 +801,16 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       mediaQuery.removeListener(handleDesktopLayoutChange);
     };
   }, [layoutMode]);
+
+  useEffect(() => {
+    setOpenDesktopDetailTaskId(null);
+  }, [desktopInteractionResetKey]);
+
+  useEffect(() => {
+    if (openDesktopDetailTaskId && !tasks.some((task) => task.id === openDesktopDetailTaskId)) {
+      setOpenDesktopDetailTaskId(null);
+    }
+  }, [openDesktopDetailTaskId, tasks]);
 
   useEffect(() => {
     setOptimisticCompleted(prev => {
@@ -946,7 +1004,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
   const timelineDrag = useTimelineDrag({
     containerRef: timelineDragContainerRef,
-    enabled: isTimelineDragEnabled,
+    enabled: isDesktopTimelineDragEnabled,
     snapConfig: SHARED_TIMELINE_DRAG_PROFILE,
     ...SHARED_TIMELINE_DRAG_INTERACTION_PROFILE,
     onDrop: (taskId, newTime) => {
@@ -959,6 +1017,12 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   });
   const dragVisualOffsetY = (timelineDrag.dragVisualOffsetY ?? timelineDrag.dragOffsetY) as MotionValue<number>;
   const dragEdgeOffsetY = (timelineDrag.dragEdgeOffsetY ?? dragVisualOffsetY) as MotionValue<number>;
+  const timelineIsDragging = isDesktopTimelineDragEnabled && timelineDrag.isDragging;
+  const timelineDraggingTaskId = isDesktopTimelineDragEnabled ? timelineDrag.draggingTaskId : null;
+  const timelineLongPressTaskId = isDesktopTimelineDragEnabled ? timelineDrag.longPressTaskId : null;
+  const timelineJustDroppedId = isDesktopTimelineDragEnabled ? timelineDrag.justDroppedId : null;
+  const timelinePreviewTime = isDesktopTimelineDragEnabled ? timelineDrag.previewTime : undefined;
+  const timelineZoomRail = isDesktopTimelineDragEnabled ? timelineDrag.zoomRail : null;
   const timelineRowRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const [dragOverlaySnapshot, setDragOverlaySnapshot] = useState<DragOverlaySnapshot | null>(null);
   const seededDragOverlaySnapshotRef = useRef<DragOverlaySnapshot | null>(null);
@@ -973,7 +1037,6 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
   const [nowMarkerMinute, setNowMarkerMinute] = useState(() => parseTimeToMinute(format(new Date(), "HH:mm")) ?? 0);
   const isTodaySelected = isSameDay(selectedDate, new Date());
-  const lastReportedPreviewTimeRef = useRef<string | null>(null);
   const nowMarkerRowRef = useRef<HTMLDivElement | null>(null);
   const wasVisibleRef = useRef(isVisible);
   const wasTodayRef = useRef(isTodaySelected);
@@ -1001,19 +1064,6 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       dragOverlayBottomInsetRef.current = getBottomNavObstructionPx();
     }
   }, [captureDragOverlaySnapshotForTask]);
-
-  useEffect(() => {
-    const emitPreviewTime = timelineDrag.isDragging ? (timelineDrag.previewTime ?? null) : null;
-    if (lastReportedPreviewTimeRef.current === emitPreviewTime) return;
-    lastReportedPreviewTimeRef.current = emitPreviewTime;
-    onTimelineDragPreviewTimeChange?.(emitPreviewTime);
-  }, [onTimelineDragPreviewTimeChange, timelineDrag.isDragging, timelineDrag.previewTime]);
-
-  useEffect(() => {
-    return () => {
-      onTimelineDragPreviewTimeChange?.(null);
-    };
-  }, [onTimelineDragPreviewTimeChange]);
 
   const clearEdgeHoldActivationTimer = useCallback(() => {
     if (edgeHoldActivationTimeoutRef.current !== null) {
@@ -1044,7 +1094,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       edgeHoldStepMultiplierRef.current = Math.max(1, stepMultiplier);
       edgeHoldIsActiveRef.current = true;
       edgeHoldRepeatIntervalRef.current = window.setInterval(() => {
-        if (!timelineDrag.isDragging || edgeHoldDirectionRef.current !== direction) {
+        if (!timelineIsDragging || edgeHoldDirectionRef.current !== direction) {
           edgeHoldIsActiveRef.current = false;
           clearEdgeHoldRepeatTimer();
           return;
@@ -1061,12 +1111,12 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         }
       }, repeatMs);
     },
-    [clearEdgeHoldRepeatTimer, timelineDrag.isDragging, timelineDrag.nudgeByFineStep],
+    [clearEdgeHoldRepeatTimer, timelineDrag.nudgeByFineStep, timelineIsDragging],
   );
 
   const syncEdgeHoldState = useCallback(
     (nextDirection: -1 | 0 | 1, nextProfile: EdgeHoldProfile | null) => {
-      if (!timelineDrag.isDragging || nextDirection === 0 || nextProfile === null) {
+      if (!timelineIsDragging || nextDirection === 0 || nextProfile === null) {
         stopEdgeHold();
         return;
       }
@@ -1091,7 +1141,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
         edgeHoldActivationTimeoutRef.current = window.setTimeout(() => {
           edgeHoldActivationTimeoutRef.current = null;
-          if (!timelineDrag.isDragging || edgeHoldDirectionRef.current !== nextDirection) {
+          if (!timelineIsDragging || edgeHoldDirectionRef.current !== nextDirection) {
             return;
           }
 
@@ -1119,12 +1169,12 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       clearEdgeHoldRepeatTimer,
       startEdgeHoldInterval,
       stopEdgeHold,
-      timelineDrag.isDragging,
+      timelineIsDragging,
     ],
   );
 
   useLayoutEffect(() => {
-    const draggingTaskId = timelineDrag.draggingTaskId;
+    const draggingTaskId = timelineDraggingTaskId;
     if (!draggingTaskId) {
       setDragOverlaySnapshot(null);
       dragOverlayOffsetY.set(0);
@@ -1161,10 +1211,10 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         window.cancelAnimationFrame(frameId);
       }
     };
-  }, [captureDragOverlaySnapshotForTask, dragOverlayOffsetY, timelineDrag.draggingTaskId]);
+  }, [captureDragOverlaySnapshotForTask, dragOverlayOffsetY, timelineDraggingTaskId]);
 
   useEffect(() => {
-    if (!timelineDrag.isDragging || !dragOverlaySnapshot) {
+    if (!timelineIsDragging || !dragOverlaySnapshot) {
       dragOverlayOffsetY.set(0);
       stopEdgeHold();
       return;
@@ -1263,12 +1313,12 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         viewport.removeEventListener("scroll", handleViewportChange);
       }
     };
-  }, [dragEdgeOffsetY, dragOverlayOffsetY, dragOverlaySnapshot, dragVisualOffsetY, stopEdgeHold, syncEdgeHoldState, timelineDrag.isDragging]);
+  }, [dragEdgeOffsetY, dragOverlayOffsetY, dragOverlaySnapshot, dragVisualOffsetY, stopEdgeHold, syncEdgeHoldState, timelineIsDragging]);
 
   useEffect(() => {
-    if (timelineDrag.isDragging) return;
+    if (timelineIsDragging) return;
     stopEdgeHold();
-  }, [stopEdgeHold, timelineDrag.isDragging]);
+  }, [stopEdgeHold, timelineIsDragging]);
 
   useEffect(() => {
     return () => {
@@ -1456,7 +1506,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       isVisible &&
       isToday &&
       hasRenderableNowMarker &&
-      !timelineDrag.isDragging &&
+      !timelineIsDragging &&
       (becameVisible || becameToday || gainedNowMarker);
 
     if (shouldCenter && nowMarkerRowRef.current && typeof window !== "undefined") {
@@ -1485,7 +1535,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     wasVisibleRef.current = isVisible;
     wasTodayRef.current = isToday;
     hadNowMarkerRef.current = hasRenderableNowMarker;
-  }, [hasRenderableNowMarker, isTodaySelected, isVisible, timelineDrag.isDragging]);
+  }, [hasRenderableNowMarker, isTodaySelected, isVisible, timelineIsDragging]);
 
   const baseTimelineConflictMap = useMemo(
     () => buildTaskConflictMap(draggableTimelineItems),
@@ -1494,15 +1544,15 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
   const timelineConflictMap = baseTimelineConflictMap;
   const draggedScheduledTask = useMemo(() => {
-    if (!timelineDrag.draggingTaskId) return null;
-    return scheduledItemsById.get(timelineDrag.draggingTaskId) ?? null;
-  }, [scheduledItemsById, timelineDrag.draggingTaskId]);
+    if (!timelineDraggingTaskId) return null;
+    return scheduledItemsById.get(timelineDraggingTaskId) ?? null;
+  }, [scheduledItemsById, timelineDraggingTaskId]);
   const draggedScheduledFlow = useMemo(() => {
     if (!draggedScheduledTask) return null;
     return scheduledFlow.byTaskId.get(draggedScheduledTask.id) ?? null;
   }, [draggedScheduledTask, scheduledFlow.byTaskId]);
   const shouldRenderDragOverlay = Boolean(
-    timelineDrag.isDragging &&
+    timelineIsDragging &&
       dragOverlaySnapshot &&
       draggedScheduledTask &&
       dragOverlaySnapshot.taskId === draggedScheduledTask.id,
@@ -1646,8 +1696,8 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                   {isCampaignExpanded && (
                     <div className="border-t border-border/20 px-2 pb-1">
                       {group.rituals.map((task) => {
-                        const isThisDragging = timelineDrag.draggingTaskId === task.id;
-                        const isAnyDragging = timelineDrag.isDragging;
+                        const isThisDragging = timelineDraggingTaskId === task.id;
+                        const isAnyDragging = timelineIsDragging;
                         const overlapCount = timelineConflictMap.get(task.id)?.size ?? 0;
 
                         return (
@@ -1866,6 +1916,85 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         onToggle(task.id, !isComplete, effectiveTaskXP);
       }
     };
+
+    if (isDesktopLayout) {
+      const isDesktopDetailOpen = openDesktopDetailTaskId === task.id;
+
+      return (
+        <div
+          className={cn(
+            "group flex items-center gap-2 rounded-[18px] border border-white/10 bg-white/[0.04] p-2 shadow-[0_12px_22px_rgba(0,0,0,0.14)] transition-colors",
+            isDesktopDetailOpen && "border-primary/40 bg-primary/[0.08]",
+            isComplete && "opacity-70",
+          )}
+          onContextMenu={suppressNativeContextMenu}
+        >
+          <button
+            type="button"
+            data-interactive="true"
+            onClick={handleCheckboxClick}
+            className={cn(
+              "flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border-2 transition-colors",
+              isComplete
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-white/25 text-transparent hover:border-primary/70",
+            )}
+            aria-label={
+              isComplete
+                ? "Mark task as incomplete"
+                : "Mark task as complete"
+            }
+            role="checkbox"
+            aria-checked={isComplete}
+          >
+            <Check className="h-3 w-3" />
+          </button>
+
+          <DesktopQuestDetailsPopover
+            task={task}
+            open={isDesktopDetailOpen}
+            onOpenChange={(open) => {
+              setOpenDesktopDetailTaskId(open ? task.id : null);
+            }}
+            hasCalendarLink={hasCalendarLink?.(task.id)}
+            onEdit={onEditQuest}
+            onDelete={onDeleteQuest ? (currentTask) => onDeleteQuest(currentTask.id) : undefined}
+            onMoveQuestToNextDay={
+              onMoveQuestToNextDay && !isRitual
+                ? (currentTask) => onMoveQuestToNextDay(currentTask.id)
+                : undefined
+            }
+            onSendToCalendar={onSendToCalendar}
+            onToggleSubtask={(taskId, subtaskId, completed) => {
+              toggleSubtask.mutate({ taskId, subtaskId, completed });
+            }}
+            anchor={(
+              <button
+                type="button"
+                onClick={() => scheduleDesktopTaskSingleClick(task)}
+                onDoubleClick={() => handleDesktopTaskDoubleClick(task)}
+                className="min-w-0 flex-1 rounded-[14px] px-2 py-1.5 text-left transition-colors hover:bg-white/[0.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                data-testid={`desktop-timeline-task-button-${task.id}`}
+              >
+                <div className="flex items-center gap-2">
+                  {isRitual ? (
+                    <Repeat className="h-3.5 w-3.5 flex-shrink-0 text-accent" />
+                  ) : null}
+                  <p
+                    className={cn(
+                      "truncate text-sm font-medium text-foreground",
+                      isComplete && "text-muted-foreground line-through",
+                    )}
+                  >
+                    {task.task_text}
+                  </p>
+                </div>
+              </button>
+            )}
+          />
+        </div>
+      );
+    }
 
     const taskContent = (
       <Collapsible open={isExpanded} onOpenChange={() => {}}>
@@ -2256,7 +2385,32 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     );
 
     return taskContent;
-  }, [onToggle, onUndoToggle, onEditQuest, onSendToCalendar, hasCalendarLink, onDeleteQuest, onMoveQuestToNextDay, expandedTasks, hasExpandableDetails, toggleTaskExpanded, justCompletedTasks, optimisticCompleted, toggleSubtask, useLiteAnimations, registerCompletionCombo, resetCombo, armTouchCheckboxClickSuppression, clearTouchCheckboxClickSuppression, suppressNativeContextMenu, openActionMenuTaskId]);
+  }, [
+    onToggle,
+    onUndoToggle,
+    onEditQuest,
+    onSendToCalendar,
+    hasCalendarLink,
+    onDeleteQuest,
+    onMoveQuestToNextDay,
+    expandedTasks,
+    hasExpandableDetails,
+    toggleTaskExpanded,
+    justCompletedTasks,
+    optimisticCompleted,
+    toggleSubtask,
+    useLiteAnimations,
+    registerCompletionCombo,
+    resetCombo,
+    armTouchCheckboxClickSuppression,
+    clearTouchCheckboxClickSuppression,
+    suppressNativeContextMenu,
+    openActionMenuTaskId,
+    isDesktopLayout,
+    openDesktopDetailTaskId,
+    scheduleDesktopTaskSingleClick,
+    handleDesktopTaskDoubleClick,
+  ]);
 
   const desktopRailCardClass = "journeys-desktop-rail-card rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(23,20,38,0.94),rgba(16,13,27,0.9))] p-5 shadow-[0_20px_40px_rgba(0,0,0,0.2)]";
   const desktopRail = isDesktopLayout ? (
@@ -2332,7 +2486,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
               Nothing is queued yet for this day.
             </p>
           )}
-          {!hideDesktopRailAddButton ? (
+          {!hideDesktopRailAddButton && !isDesktopLayout ? (
             <Button
               variant="outline"
               size="sm"
@@ -2498,6 +2652,106 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             </div>
           </div>
         </div>
+
+        {isDesktopLayout ? (
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            {onDesktopPlannerModeChange ? (
+              <div
+                className="flex items-center gap-1 rounded-[18px] border border-white/10 bg-white/5 p-1"
+                role="group"
+                aria-label="Desktop planner mode"
+              >
+                <Button
+                  type="button"
+                  variant={desktopPlannerMode === "week" ? "secondary" : "ghost"}
+                  size="sm"
+                  className={cn(
+                    "h-8 rounded-[14px] px-3 text-xs",
+                    desktopPlannerMode === "week"
+                      ? "bg-white/12 text-white hover:bg-white/15"
+                      : "text-muted-foreground hover:bg-white/8 hover:text-foreground",
+                  )}
+                  aria-pressed={desktopPlannerMode === "week"}
+                  onClick={() => onDesktopPlannerModeChange("week")}
+                >
+                  Week
+                </Button>
+                <Button
+                  type="button"
+                  variant={desktopPlannerMode === "day" ? "secondary" : "ghost"}
+                  size="sm"
+                  className={cn(
+                    "h-8 rounded-[14px] px-3 text-xs",
+                    desktopPlannerMode === "day"
+                      ? "bg-white/12 text-white hover:bg-white/15"
+                      : "text-muted-foreground hover:bg-white/8 hover:text-foreground",
+                  )}
+                  aria-pressed={desktopPlannerMode === "day"}
+                  onClick={() => onDesktopPlannerModeChange("day")}
+                >
+                  Day
+                </Button>
+              </div>
+            ) : <div />}
+
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {onDateSelect ? (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="h-9 w-9 rounded-[18px] border-white/10 bg-white/5 hover:bg-white/10"
+                    onClick={() => onDateSelect(addDays(selectedDate, -1))}
+                    aria-label="Previous day"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-9 rounded-[18px] border-white/10 bg-white/5 px-3 text-xs hover:bg-white/10"
+                    onClick={() => onDateSelect(new Date())}
+                  >
+                    Today
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="h-9 w-9 rounded-[18px] border-white/10 bg-white/5 hover:bg-white/10"
+                    onClick={() => onDateSelect(addDays(selectedDate, 1))}
+                    aria-label="Next day"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </>
+              ) : null}
+              {onOpenMonthView ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-9 rounded-[18px] border-white/10 bg-white/5 px-3 text-xs hover:bg-white/10"
+                  onClick={() => onOpenMonthView()}
+                >
+                  <CalendarDays className="h-4 w-4" />
+                  Month
+                </Button>
+              ) : null}
+              <Button
+                type="button"
+                size="sm"
+                className="h-9 rounded-[18px] px-4 shadow-[0_14px_28px_rgba(122,61,255,0.2)]"
+                onClick={onAddQuest}
+              >
+                <Plus className="h-4 w-4" />
+                Add Quest
+              </Button>
+            </div>
+          </div>
+        ) : null}
 
         <AnimatePresence>
           {comboCount > 1 && (
@@ -2684,11 +2938,11 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                         }
 
                         const task = row.task;
-                        const isThisDragging = timelineDrag.draggingTaskId === task.id;
-                        const isThisLongPressed = timelineDrag.longPressTaskId === task.id;
+                        const isThisDragging = timelineDraggingTaskId === task.id;
+                        const isThisLongPressed = timelineLongPressTaskId === task.id;
                         const isThisEngaged = isThisDragging || isThisLongPressed;
-                        const isAnyDragging = timelineDrag.isDragging;
-                        const isJustDropped = timelineDrag.justDroppedId === task.id;
+                        const isAnyDragging = timelineIsDragging;
+                        const isJustDropped = timelineJustDroppedId === task.id;
                         const usesOverlayPlaceholder = isThisDragging && shouldRenderDragOverlay;
                         const rowFlow = scheduledFlow.byTaskId.get(task.id);
                         const laneIndex = rowFlow?.laneIndex;
@@ -2696,7 +2950,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                         const laneOffsetPx = rowFlow
                           ? getLaneOffsetPx(rowFlow.laneIndex, rowFlow.overlapCount)
                           : 0;
-                        const baseTimelineRowDragProps = isTimelineDragEnabled && task.scheduled_time && !task.completed
+                        const baseTimelineRowDragProps = isDesktopTimelineDragEnabled && task.scheduled_time && !task.completed
                           ? timelineDrag.getRowDragProps(task.id, task.scheduled_time)
                           : undefined;
                         const timelineRowDragProps = baseTimelineRowDragProps
@@ -2739,7 +2993,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                           <TimelineTaskRow
                             rowKind="task"
                             time={task.scheduled_time}
-                            overrideTime={isThisDragging ? timelineDrag.previewTime : undefined}
+                            overrideTime={isThisDragging ? timelinePreviewTime : undefined}
                             showLine={index > 0}
                             isLast={index === timelineRows.length - 1}
                             isDragTarget={isThisDragging}
@@ -2830,7 +3084,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
               <TimelineTaskRow
                 rowKind="task"
                 time={draggedScheduledTask.scheduled_time}
-                overrideTime={timelineDrag.previewTime ?? undefined}
+                overrideTime={timelinePreviewTime ?? undefined}
                 isDragTarget
                 durationMinutes={draggedScheduledTask.estimated_duration}
                 laneIndex={draggedScheduledFlow?.laneIndex}
@@ -2846,7 +3100,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
           )
         : null}
 
-      <DragTimeZoomRail rail={timelineDrag.zoomRail} />
+      {timelineZoomRail ? <DragTimeZoomRail rail={timelineZoomRail} /> : null}
     </div>
   );
 });

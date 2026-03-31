@@ -2863,16 +2863,16 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(onMoveQuestToNextDay).not.toHaveBeenCalled();
   });
 
-  it("emits drag preview time updates and resets when drag ends", () => {
+  it("opens desktop quest details on single click and edits on double click", async () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
         mutations: { retry: false },
       },
     });
-    const onTimelineDragPreviewTimeChange = vi.fn();
+    const onEditQuest = vi.fn();
 
-    const { rerender } = render(
+    render(
       <TodaysAgenda
         tasks={[
           {
@@ -2884,20 +2884,36 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
           },
         ]}
         selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+        layoutMode="desktop"
         onToggle={vi.fn()}
         onAddQuest={vi.fn()}
         completedCount={0}
         totalCount={1}
-        onTimelineDragPreviewTimeChange={onTimelineDragPreviewTimeChange}
+        onEditQuest={onEditQuest}
       />,
       { wrapper: createWrapper(queryClient) },
     );
 
-    mocks.timelineDragState.draggingTaskId = "task-scheduled-1";
-    mocks.timelineDragState.isDragging = true;
-    mocks.timelineDragState.previewTime = "10:15";
+    fireEvent.click(screen.getByTestId("desktop-timeline-task-button-task-scheduled-1"));
 
-    rerender(
+    await waitFor(() => {
+      expect(screen.getByTestId("desktop-quest-popover-task-scheduled-1")).toBeInTheDocument();
+    });
+
+    fireEvent.doubleClick(screen.getByTestId("desktop-timeline-task-button-task-scheduled-1"));
+
+    expect(onEditQuest).toHaveBeenCalledWith(expect.objectContaining({ id: "task-scheduled-1" }));
+  });
+
+  it("does not wire desktop scheduled rows for drag", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
       <TodaysAgenda
         tasks={[
           {
@@ -2909,41 +2925,16 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
           },
         ]}
         selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+        layoutMode="desktop"
         onToggle={vi.fn()}
         onAddQuest={vi.fn()}
         completedCount={0}
         totalCount={1}
-        onTimelineDragPreviewTimeChange={onTimelineDragPreviewTimeChange}
       />,
+      { wrapper: createWrapper(queryClient) },
     );
 
-    expect(onTimelineDragPreviewTimeChange).toHaveBeenCalledWith("10:15");
-
-    mocks.timelineDragState.draggingTaskId = null;
-    mocks.timelineDragState.isDragging = false;
-    mocks.timelineDragState.previewTime = undefined;
-
-    rerender(
-      <TodaysAgenda
-        tasks={[
-          {
-            id: "task-scheduled-1",
-            task_text: "Morning focus",
-            completed: false,
-            xp_reward: 25,
-            scheduled_time: "08:00",
-          },
-        ]}
-        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
-        onToggle={vi.fn()}
-        onAddQuest={vi.fn()}
-        completedCount={0}
-        totalCount={1}
-        onTimelineDragPreviewTimeChange={onTimelineDragPreviewTimeChange}
-      />,
-    );
-
-    expect(onTimelineDragPreviewTimeChange).toHaveBeenCalledWith(null);
+    expect(mocks.getRowDragPropsMock).not.toHaveBeenCalled();
   });
 
   it("renders minimal 3-hour placeholders outside scheduled quest times", () => {

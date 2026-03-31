@@ -1,16 +1,13 @@
-import { Fragment, useMemo } from "react";
-import { addDays, format, isSameDay, isToday, startOfWeek } from "date-fns";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { addDays, addWeeks, format, isSameDay, isToday, startOfWeek, subWeeks } from "date-fns";
 import {
-  CalendarArrowUp,
-  CalendarPlus,
+  CalendarDays,
   Check,
-  Clock,
+  ChevronLeft,
+  ChevronRight,
   Flame,
-  Pencil,
   Plus,
-  Repeat,
   Target,
-  Trash2,
   Trophy,
 } from "lucide-react";
 
@@ -20,6 +17,10 @@ import { MAIN_QUEST_XP_MULTIPLIER } from "@/config/xpRewards";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  DesktopQuestDetailsPopover,
+  useDesktopQuestCardClickHandlers,
+} from "@/components/DesktopQuestDetailsPopover";
 import { getEpicDaysRemaining } from "@/utils/epicDates";
 
 interface ActiveEpic {
@@ -50,10 +51,13 @@ interface DesktopWeekPlannerProps {
   currentStreak?: number;
   activeEpics?: ActiveEpic[];
   isCampaignsLoading?: boolean;
-  showInlineAddButton?: boolean;
+  plannerMode?: "week" | "day";
+  desktopInteractionResetKey?: string | number;
   onDateSelect: (date: Date) => void;
+  onPlannerModeChange?: (mode: "week" | "day") => void;
   onToggle: (taskId: string, completed: boolean, xpReward: number) => void;
   onAddQuest: () => void;
+  onOpenMonthView?: () => void;
   onUndoToggle?: (taskId: string, xpReward: number) => void;
   onEditQuest?: (task: DailyTask) => void;
   onDeleteQuest?: (task: DailyTask) => void;
@@ -73,28 +77,24 @@ interface DayBuckets {
   timedByHour: Map<number, DailyTask[]>;
 }
 
+interface WeekPlannerTaskCardProps {
+  task: DailyTask;
+  compact?: boolean;
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  onToggle: (taskId: string, completed: boolean, xpReward: number) => void;
+  onUndoToggle?: (taskId: string, xpReward: number) => void;
+  onEditQuest?: (task: DailyTask) => void;
+  onDeleteQuest?: (task: DailyTask) => void;
+  onMoveQuestToNextDay?: (task: DailyTask) => void;
+  onSendToCalendar?: (taskId: string) => void;
+  hasCalendarLink?: (taskId: string) => boolean;
+}
+
 const DEFAULT_TIMELINE_START_HOUR = 6;
 const DEFAULT_TIMELINE_END_HOUR = 21;
 
-const formatTime = (time: string | null | undefined) => {
-  if (!time) return "Anytime";
-  const [hours, minutes] = time.split(":");
-  const hour = Number.parseInt(hours, 10);
-  if (!Number.isFinite(hour)) return time;
-  const meridiem = hour >= 12 ? "PM" : "AM";
-  const displayHour = hour % 12 || 12;
-  return `${displayHour}:${minutes} ${meridiem}`;
-};
-
 const formatHourLabel = (hour: number) => format(new Date(2000, 0, 1, hour, 0), "h a");
-
-const formatDuration = (minutes: number | null | undefined) => {
-  if (!minutes) return null;
-  if (minutes === 1440) return "All day";
-  if (minutes < 60) return `${minutes}m`;
-  const hours = minutes / 60;
-  return Number.isInteger(hours) ? `${hours}h` : `${hours.toFixed(1)}h`;
-};
 
 const parseHour = (time: string | null | undefined) => {
   if (!time) return null;
@@ -139,16 +139,113 @@ const sortWeekTasks = (left: DailyTask, right: DailyTask) => {
   return (right.created_at ?? "").localeCompare(left.created_at ?? "");
 };
 
+function WeekPlannerTaskCard({
+  task,
+  compact = false,
+  isOpen,
+  onOpenChange,
+  onToggle,
+  onUndoToggle,
+  onEditQuest,
+  onDeleteQuest,
+  onMoveQuestToNextDay,
+  onSendToCalendar,
+  hasCalendarLink,
+}: WeekPlannerTaskCardProps) {
+  const effectiveTaskXP = getEffectiveTaskXP(task);
+  const isComplete = !!task.completed;
+  const { handleClick, handleDoubleClick } = useDesktopQuestCardClickHandlers(task, {
+    onSingleClick: (clickedTask) => onOpenChange(clickedTask.id === task.id),
+    onDoubleClick: onEditQuest
+      ? (clickedTask) => {
+          onOpenChange(false);
+          onEditQuest(clickedTask);
+        }
+      : undefined,
+  });
+
+  return (
+    <div
+      data-testid={`desktop-week-task-${task.id}`}
+      className={cn(
+        "rounded-[18px] border border-white/10 bg-white/[0.04] p-2 shadow-[0_12px_22px_rgba(0,0,0,0.14)] transition-colors",
+        compact && "rounded-[16px]",
+        isOpen && "border-primary/40 bg-primary/[0.08]",
+        isComplete && "opacity-70",
+      )}
+    >
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            if (isComplete && onUndoToggle) {
+              onUndoToggle(task.id, effectiveTaskXP);
+              return;
+            }
+            onToggle(task.id, !isComplete, effectiveTaskXP);
+          }}
+          className={cn(
+            "flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border-2 transition-colors",
+            isComplete
+              ? "border-primary bg-primary text-primary-foreground"
+              : "border-white/25 text-transparent hover:border-primary/70",
+          )}
+          aria-label={isComplete ? "Mark task as incomplete" : "Mark task as complete"}
+        >
+          <Check className="h-3 w-3" />
+        </button>
+
+        <DesktopQuestDetailsPopover
+          task={task}
+          open={isOpen}
+          onOpenChange={onOpenChange}
+          hasCalendarLink={hasCalendarLink?.(task.id)}
+          onEdit={onEditQuest}
+          onDelete={onDeleteQuest}
+          onMoveQuestToNextDay={!task.habit_source_id ? onMoveQuestToNextDay : undefined}
+          onSendToCalendar={onSendToCalendar}
+          anchor={(
+            <button
+              type="button"
+              onClick={handleClick}
+              onDoubleClick={handleDoubleClick}
+              data-testid={`desktop-week-task-button-${task.id}`}
+              className={cn(
+                "min-w-0 flex-1 rounded-[14px] px-2 py-1.5 text-left transition-colors hover:bg-white/[0.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60",
+                compact && "px-1.5 py-1",
+              )}
+            >
+              <p
+                className={cn(
+                  compact ? "text-xs" : "text-sm",
+                  "truncate font-medium text-foreground",
+                  isComplete && "text-muted-foreground line-through",
+                )}
+              >
+                {task.task_text}
+              </p>
+            </button>
+          )}
+        />
+      </div>
+    </div>
+  );
+}
+
 export function DesktopWeekPlanner({
   selectedDate,
   tasks,
   currentStreak = 0,
   activeEpics = [],
   isCampaignsLoading = false,
-  showInlineAddButton = true,
+  plannerMode = "week",
+  desktopInteractionResetKey,
   onDateSelect,
+  onPlannerModeChange,
   onToggle,
   onAddQuest,
+  onOpenMonthView,
   onUndoToggle,
   onEditQuest,
   onDeleteQuest,
@@ -156,11 +253,22 @@ export function DesktopWeekPlanner({
   onSendToCalendar,
   hasCalendarLink,
 }: DesktopWeekPlannerProps) {
+  const [openDetailsTaskId, setOpenDetailsTaskId] = useState<string | null>(null);
   const weekStart = useMemo(() => startOfWeek(selectedDate, { weekStartsOn: 0 }), [selectedDate]);
   const weekDays = useMemo(
     () => Array.from({ length: 7 }, (_, index) => addDays(weekStart, index)),
     [weekStart],
   );
+
+  useEffect(() => {
+    setOpenDetailsTaskId(null);
+  }, [desktopInteractionResetKey]);
+
+  useEffect(() => {
+    if (openDetailsTaskId && !tasks.some((task) => task.id === openDetailsTaskId)) {
+      setOpenDetailsTaskId(null);
+    }
+  }, [openDetailsTaskId, tasks]);
 
   const tasksByDate = useMemo(() => {
     const grouped = new Map<string, DailyTask[]>();
@@ -300,144 +408,33 @@ export function DesktopWeekPlanner({
   const desktopRailCardClass =
     "journeys-desktop-rail-card rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(23,20,38,0.94),rgba(16,13,27,0.9))] p-5 shadow-[0_20px_40px_rgba(0,0,0,0.2)]";
 
-  const renderTaskCard = (task: DailyTask, compact = false) => {
-    const effectiveTaskXP = getEffectiveTaskXP(task);
-    const isComplete = !!task.completed;
-    const isRitual = !!task.habit_source_id;
-    const duration = formatDuration(task.estimated_duration);
-
-    return (
-      <div
-        key={task.id}
-        className={cn(
-          "rounded-[18px] border border-white/10 bg-white/[0.05] p-2.5 shadow-[0_12px_22px_rgba(0,0,0,0.14)]",
-          compact && "rounded-[16px] p-2",
-          isComplete && "opacity-65",
-        )}
-        data-testid={`desktop-week-task-${task.id}`}
-      >
-        <div className="flex items-start gap-2.5">
-          <button
-            type="button"
-            onClick={() => {
-              if (isComplete && onUndoToggle) {
-                onUndoToggle(task.id, effectiveTaskXP);
-                return;
-              }
-              onToggle(task.id, !isComplete, effectiveTaskXP);
-            }}
-            className={cn(
-              "mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border-2 transition-colors",
-              isComplete
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-white/25 text-transparent hover:border-primary/70",
-            )}
-            aria-label={isComplete ? "Mark task as incomplete" : "Mark task as complete"}
-          >
-            <Check className="h-3 w-3" />
-          </button>
-
-          <div className="min-w-0 flex-1">
-            <div className="flex items-start justify-between gap-2">
-              <p
-                className={cn(
-                  compact ? "text-xs" : "text-sm",
-                  "line-clamp-2 font-medium text-foreground",
-                  isComplete && "text-muted-foreground line-through",
-                )}
-              >
-                {task.task_text}
-              </p>
-              {task.is_main_quest ? (
-                <Badge
-                  variant="outline"
-                  className="h-5 shrink-0 border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[10px]"
-                >
-                  Main
-                </Badge>
-              ) : null}
-            </div>
-
-            <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
-              <span className="inline-flex items-center gap-1">
-                <Clock className="h-3 w-3" />
-                {formatTime(task.scheduled_time)}
-              </span>
-              {duration ? (
-                <span className="rounded-full border border-white/8 bg-white/[0.04] px-1.5 py-0.5 text-white/66">
-                  {duration}
-                </span>
-              ) : null}
-              {isRitual ? (
-                <span className="inline-flex items-center gap-1">
-                  <Repeat className="h-3 w-3" />
-                  Ritual
-                </span>
-              ) : null}
-              <span className="font-semibold text-stardust-gold/85">+{effectiveTaskXP} XP</span>
-            </div>
-
-            {!isComplete && (onEditQuest || onSendToCalendar || onMoveQuestToNextDay || onDeleteQuest) ? (
-              <div className="mt-2 flex flex-wrap items-center gap-1">
-                {onEditQuest ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 rounded-xl px-2"
-                    onClick={() => onEditQuest(task)}
-                    aria-label={`Edit ${task.task_text}`}
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                  </Button>
-                ) : null}
-                {onSendToCalendar ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 rounded-xl px-2"
-                    onClick={() => onSendToCalendar(task.id)}
-                    aria-label={
-                      hasCalendarLink?.(task.id)
-                        ? `Re-send ${task.task_text} to calendar`
-                        : `Send ${task.task_text} to calendar`
-                    }
-                  >
-                    <CalendarPlus className="h-3.5 w-3.5" />
-                  </Button>
-                ) : null}
-                {onMoveQuestToNextDay && !isRitual ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 rounded-xl px-2"
-                    onClick={() => onMoveQuestToNextDay(task)}
-                    aria-label={`Move ${task.task_text} to tomorrow`}
-                  >
-                    <CalendarArrowUp className="h-3.5 w-3.5" />
-                  </Button>
-                ) : null}
-                {onDeleteQuest ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 rounded-xl px-2 text-destructive hover:text-destructive"
-                    onClick={() => onDeleteQuest(task)}
-                    aria-label={`Delete ${task.task_text}`}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                ) : null}
-              </div>
-            ) : null}
-          </div>
-        </div>
-      </div>
-    );
-  };
+  const renderTaskCard = useCallback((task: DailyTask, compact = false) => (
+    <WeekPlannerTaskCard
+      key={task.id}
+      task={task}
+      compact={compact}
+      isOpen={openDetailsTaskId === task.id}
+      onOpenChange={(open) => {
+        setOpenDetailsTaskId(open ? task.id : null);
+      }}
+      onToggle={onToggle}
+      onUndoToggle={onUndoToggle}
+      onEditQuest={onEditQuest}
+      onDeleteQuest={onDeleteQuest}
+      onMoveQuestToNextDay={onMoveQuestToNextDay}
+      onSendToCalendar={onSendToCalendar}
+      hasCalendarLink={hasCalendarLink}
+    />
+  ), [
+    hasCalendarLink,
+    onDeleteQuest,
+    onEditQuest,
+    onMoveQuestToNextDay,
+    onSendToCalendar,
+    onToggle,
+    onUndoToggle,
+    openDetailsTaskId,
+  ]);
 
   return (
     <div
@@ -445,7 +442,7 @@ export function DesktopWeekPlanner({
       data-testid="desktop-week-planner"
     >
       <div className="journeys-desktop-shell flex min-h-0 flex-col rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgba(24,21,39,0.95),rgba(13,11,23,0.92))] px-4 py-4 shadow-[0_28px_54px_rgba(0,0,0,0.24)]">
-        <div className="mb-4 flex items-start justify-between gap-4">
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-muted-foreground/75">
               Week Planner
@@ -454,16 +451,96 @@ export function DesktopWeekPlanner({
               {format(weekStart, "MMMM d")} - {format(addDays(weekStart, 6), "MMMM d")}
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Keep the full week visible with timed quests placed into a desktop schedule.
+              Cleaner desktop week planning with click-to-inspect quests.
             </p>
           </div>
 
-          {showInlineAddButton ? (
-            <Button onClick={onAddQuest} className="rounded-2xl px-4">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {onPlannerModeChange ? (
+              <div
+                className="flex items-center gap-1 rounded-[18px] border border-white/10 bg-white/5 p-1"
+                role="group"
+                aria-label="Desktop planner mode"
+              >
+                <Button
+                  type="button"
+                  variant={plannerMode === "week" ? "secondary" : "ghost"}
+                  size="sm"
+                  className={cn(
+                    "h-8 rounded-[14px] px-3 text-xs",
+                    plannerMode === "week"
+                      ? "bg-white/12 text-white hover:bg-white/15"
+                      : "text-muted-foreground hover:bg-white/8 hover:text-foreground",
+                  )}
+                  aria-pressed={plannerMode === "week"}
+                  onClick={() => onPlannerModeChange("week")}
+                >
+                  Week
+                </Button>
+                <Button
+                  type="button"
+                  variant={plannerMode === "day" ? "secondary" : "ghost"}
+                  size="sm"
+                  className={cn(
+                    "h-8 rounded-[14px] px-3 text-xs",
+                    plannerMode === "day"
+                      ? "bg-white/12 text-white hover:bg-white/15"
+                      : "text-muted-foreground hover:bg-white/8 hover:text-foreground",
+                  )}
+                  aria-pressed={plannerMode === "day"}
+                  onClick={() => onPlannerModeChange("day")}
+                >
+                  Day
+                </Button>
+              </div>
+            ) : null}
+
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-9 w-9 rounded-[18px] border-white/10 bg-white/5 hover:bg-white/10"
+              onClick={() => onDateSelect(subWeeks(selectedDate, 1))}
+              aria-label="Previous week"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 rounded-[18px] border-white/10 bg-white/5 px-3 text-xs hover:bg-white/10"
+              onClick={() => onDateSelect(new Date())}
+            >
+              Today
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-9 w-9 rounded-[18px] border-white/10 bg-white/5 hover:bg-white/10"
+              onClick={() => onDateSelect(addWeeks(selectedDate, 1))}
+              aria-label="Next week"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            {onOpenMonthView ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-9 rounded-[18px] border-white/10 bg-white/5 px-3 text-xs hover:bg-white/10"
+                onClick={onOpenMonthView}
+              >
+                <CalendarDays className="h-4 w-4" />
+                Month
+              </Button>
+            ) : null}
+            <Button
+              size="sm"
+              className="h-9 rounded-[18px] px-4 shadow-[0_14px_28px_rgba(122,61,255,0.2)]"
+              onClick={onAddQuest}
+            >
               <Plus className="h-4 w-4" />
               Add Quest
             </Button>
-          ) : null}
+          </div>
         </div>
 
         <div className="overflow-hidden rounded-[28px] border border-white/8 bg-black/10">
@@ -578,7 +655,7 @@ export function DesktopWeekPlanner({
               })}
 
               {timelineHours.map((hour) => (
-                <Fragment key={hour}>
+                <div key={hour} className="contents">
                   <div
                     className="sticky left-0 z-10 border-b border-r border-white/8 bg-[rgba(19,16,29,0.98)] px-3 py-3 text-right text-[11px] font-semibold text-muted-foreground/75 backdrop-blur-xl"
                     data-testid={`desktop-week-hour-${hour}`}
@@ -615,7 +692,7 @@ export function DesktopWeekPlanner({
                       </div>
                     );
                   })}
-                </Fragment>
+                </div>
               ))}
             </div>
           </div>

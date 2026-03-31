@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useCallback, memo, useMemo } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { useXPRewards } from "@/hooks/useXPRewards";
 import { Button } from "@/components/ui/button";
@@ -8,14 +9,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { Play, Pause, Sparkles, SkipBack, SkipForward, ChevronDown, ChevronUp, Wand2, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { useMentorPersonality } from "@/hooks/useMentorPersonality";
 import { getActiveWordIndex } from "@/utils/captionTiming";
 import { parseFunctionInvokeError, toUserFacingFunctionError } from "@/utils/supabaseFunctionErrors";
 import { Capacitor } from "@capacitor/core";
 import { applyScriptPunctuationToTranscript } from "@/utils/transcriptPunctuation";
 import { useMentorConnection } from "@/contexts/MentorConnectionContext";
+import { useMainTabVisibility } from "@/contexts/MainTabVisibilityContext";
 import { getEffectiveDailyDate } from "@/utils/timezone";
-
+import { globalAudio } from "@/utils/globalAudio";
+import { createIOSOptimizedAudio, isIOS, iosAudioManager, safePlay } from "@/utils/iosAudio";
 import { logger } from "@/utils/logger";
 import { toast } from "sonner";
 
@@ -40,7 +42,24 @@ interface DailyPepTalk {
   mentor_name?: string;
 }
 
+interface TodayPepTalkQueryData {
+  pepTalk: DailyPepTalk | null;
+  mentorSlug: string | null;
+  isFallback: boolean;
+}
+
+type InlineAudioElement = HTMLAudioElement & {
+  playsInline?: boolean;
+  "webkit-playsinline"?: boolean;
+};
+
 const log = logger.scope("TodaysPepTalk");
+const AUDIO_READY_TIMEOUT_MS = 5000;
+const TODAY_PEP_TALK_QUERY_ROOT = ["today-pep-talk"] as const;
+
+function buildTodayPepTalkQueryKey(mentorId: string | null | undefined, effectiveDate: string) {
+  return [...TODAY_PEP_TALK_QUERY_ROOT, mentorId ?? null, effectiveDate] as const;
+}
 
 function isCaptionWord(word: unknown): word is CaptionWord {
   if (!word || typeof word !== "object") {
@@ -66,27 +85,107 @@ function sanitizeTranscript(transcript: unknown): CaptionWord[] {
     .sort((a, b) => (a.start - b.start) || (a.end - b.end));
 }
 
+function normalizeDailyPepTalk(rawPepTalk: Record<string, unknown>, mentorName?: string | null): DailyPepTalk {
+  return {
+    ...rawPepTalk,
+    mentor_name: mentorName ?? undefined,
+    transcript: sanitizeTranscript(rawPepTalk.transcript),
+  } as DailyPepTalk;
+}
+
+async function fetchTodayPepTalk(
+  resolvedMentorId: string,
+  effectiveDate: string,
+): Promise<TodayPepTalkQueryData> {
+  const { data: mentor, error: mentorError } = await supabase
+    .from("mentors")
+    .select("slug, name")
+    .eq("id", resolvedMentorId)
+    .maybeSingle();
+
+  if (mentorError) {
+    throw mentorError;
+  }
+
+  if (!mentor) {
+    return {
+      pepTalk: null,
+      mentorSlug: null,
+      isFallback: false,
+    };
+  }
+
+  const { data: todayPepTalk, error: pepTalkError } = await supabase
+    .from("daily_pep_talks")
+    .select("*")
+    .eq("for_date", effectiveDate)
+    .eq("mentor_slug", mentor.slug)
+    .maybeSingle();
+
+  if (pepTalkError) {
+    throw pepTalkError;
+  }
+
+  if (todayPepTalk) {
+    return {
+      pepTalk: normalizeDailyPepTalk(todayPepTalk as Record<string, unknown>, mentor.name),
+      mentorSlug: mentor.slug,
+      isFallback: false,
+    };
+  }
+
+  log.debug("No pep talk for today, fetching most recent...", {
+    mentorSlug: mentor.slug,
+    effectiveDate,
+  });
+
+  const { data: fallbackPepTalk, error: fallbackError } = await supabase
+    .from("daily_pep_talks")
+    .select("*")
+    .eq("mentor_slug", mentor.slug)
+    .order("for_date", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (fallbackError) {
+    throw fallbackError;
+  }
+
+  if (!fallbackPepTalk) {
+    return {
+      pepTalk: null,
+      mentorSlug: mentor.slug,
+      isFallback: false,
+    };
+  }
+
+  log.debug("Using fallback pep talk", {
+    mentorSlug: mentor.slug,
+    forDate: fallbackPepTalk.for_date,
+  });
+
+  return {
+    pepTalk: normalizeDailyPepTalk(fallbackPepTalk as Record<string, unknown>, mentor.name),
+    mentorSlug: mentor.slug,
+    isFallback: true,
+  };
+}
+
 export const TodaysPepTalk = memo(() => {
   const { profile } = useProfile();
   const { mentorId: resolvedMentorId } = useMentorConnection();
-  const personality = useMentorPersonality();
+  const { isTabActive } = useMainTabVisibility();
   const navigate = useNavigate();
-  const { awardPepTalkListened } = useXPRewards();
-  const [pepTalk, setPepTalk] = useState<DailyPepTalk | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const queryClient = useQueryClient();
+  const { awardPepTalkListenedAsync } = useXPRewards();
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [showFullTranscript, setShowFullTranscript] = useState(false);
   const [activeWordIndex, setActiveWordIndex] = useState<number>(-1);
-  const [hasAwardedXP, setHasAwardedXP] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [generationStage, setGenerationStage] = useState<'idle' | 'script' | 'audio' | 'loading'>('idle');
-  const [isFallback, setIsFallback] = useState(false);
-  const [mentorSlug, setMentorSlug] = useState<string | null>(null);
+  const [, setHasAwardedXP] = useState(false);
+  const [generationStage, setGenerationStage] = useState<"idle" | "script" | "audio" | "loading">("idle");
   const [isAudioReady, setIsAudioReady] = useState(false);
-  // Removed walkthrough check - was causing play button to be permanently disabled
   const audioRef = useRef<HTMLAudioElement>(null);
   const activeWordRef = useRef<HTMLSpanElement>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
@@ -94,6 +193,9 @@ export const TodaysPepTalk = memo(() => {
   const transcriptScrollRafRef = useRef<number | null>(null);
   const lastTranscriptScrollTopRef = useRef<number>(0);
   const transcriptSyncAttemptedIdsRef = useRef<Set<string>>(new Set());
+  const isAwardingXPRef = useRef(false);
+  const hasAwardedXPRef = useRef(false);
+  const previousTabActiveRef = useRef(isTabActive);
   const isNativeIOS = useMemo(
     () => typeof window !== "undefined" && Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios",
     [],
@@ -102,29 +204,111 @@ export const TodaysPepTalk = memo(() => {
     () => getEffectiveDailyDate(profile?.timezone ?? undefined),
     [profile?.timezone],
   );
-  
+  const pepTalkQueryKey = useMemo(
+    () => buildTodayPepTalkQueryKey(resolvedMentorId, effectiveDate),
+    [resolvedMentorId, effectiveDate],
+  );
 
-  // Reset audio ready state when audio URL changes
+  const pepTalkQuery = useQuery({
+    queryKey: pepTalkQueryKey,
+    queryFn: async () => fetchTodayPepTalk(resolvedMentorId!, effectiveDate),
+    enabled: Boolean(resolvedMentorId) && isTabActive,
+    staleTime: 5 * 60 * 1000,
+    refetchOnMount: "always",
+  });
+
+  const pepTalk = pepTalkQuery.data?.pepTalk ?? null;
+  const mentorSlug = pepTalkQuery.data?.mentorSlug ?? null;
+  const isFallback = pepTalkQuery.data?.isFallback ?? false;
+  const loading = pepTalkQuery.isPending || (pepTalkQuery.isFetching && !pepTalkQuery.data);
+  const error = pepTalkQuery.isError && !pepTalk;
+  const { refetch: refetchPepTalk } = pepTalkQuery;
+
   useEffect(() => {
-    setIsAudioReady(false);
-  }, [pepTalk?.audio_url]);
+    if (!pepTalk?.id) return;
+    transcriptSyncAttemptedIdsRef.current.delete(pepTalk.id);
+  }, [pepTalk?.id, pepTalkQuery.dataUpdatedAt]);
 
-  // Timeout fallback for slow connections - allow play after 5 seconds
+  useEffect(() => {
+    setCurrentTime(0);
+    setDuration(0);
+    setIsAudioReady(false);
+    setHasAwardedXP(false);
+    setIsPlaying(false);
+    setActiveWordIndex(-1);
+    isAwardingXPRef.current = false;
+    hasAwardedXPRef.current = false;
+  }, [pepTalk?.id]);
+
+  useEffect(() => {
+    const becameActive = isTabActive && !previousTabActiveRef.current;
+    previousTabActiveRef.current = isTabActive;
+
+    if (!resolvedMentorId || !becameActive) return;
+
+    void queryClient.invalidateQueries({ queryKey: TODAY_PEP_TALK_QUERY_ROOT });
+    void refetchPepTalk();
+  }, [isTabActive, queryClient, refetchPepTalk, resolvedMentorId]);
+
   useEffect(() => {
     if (!pepTalk?.audio_url || isAudioReady) return;
-    
-    const timeout = setTimeout(() => {
+
+    const timeout = window.setTimeout(() => {
       if (!isAudioReady && audioRef.current) {
-        log.debug('Audio ready timeout reached, enabling play button');
+        log.debug("Audio ready timeout reached, enabling play button");
         setIsAudioReady(true);
       }
-    }, 5000);
-    
-    return () => clearTimeout(timeout);
+    }, AUDIO_READY_TIMEOUT_MS);
+
+    return () => window.clearTimeout(timeout);
   }, [pepTalk?.audio_url, isAudioReady]);
 
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio || !pepTalk?.audio_url) {
+      return;
+    }
 
-  // Removed walkthrough tracking - was causing play button to be permanently disabled
+    const optimizedAudio = createIOSOptimizedAudio(pepTalk.audio_url) as InlineAudioElement;
+    const targetAudio = audio as InlineAudioElement;
+
+    targetAudio.src = optimizedAudio.src;
+    targetAudio.preload = optimizedAudio.preload;
+    targetAudio.playsInline = optimizedAudio.playsInline ?? true;
+    targetAudio["webkit-playsinline"] = optimizedAudio["webkit-playsinline"] ?? true;
+    targetAudio.muted = globalAudio.getMuted();
+
+    if (isIOS) {
+      iosAudioManager.registerAudio(targetAudio);
+    }
+
+    return () => {
+      targetAudio.pause();
+      if (isIOS) {
+        iosAudioManager.unregisterAudio(targetAudio);
+      }
+    };
+  }, [pepTalk?.audio_url]);
+
+  useEffect(() => {
+    const unsubscribe = globalAudio.subscribe((muted) => {
+      const audio = audioRef.current;
+      if (!audio) return;
+
+      audio.muted = muted;
+      if (muted && isPlaying) {
+        audio.pause();
+        setIsPlaying(false);
+      }
+    });
+
+    const audio = audioRef.current;
+    if (audio) {
+      audio.muted = globalAudio.getMuted();
+    }
+
+    return unsubscribe;
+  }, [isPlaying]);
 
   const timedTranscript = useMemo(
     () => sanitizeTranscript(pepTalk?.transcript),
@@ -135,96 +319,6 @@ export const TodaysPepTalk = memo(() => {
     [timedTranscript, pepTalk?.script],
   );
 
-  const fetchDailyPepTalk = useCallback(async () => {
-    if (!resolvedMentorId) {
-      setLoading(false);
-      return;
-    }
-
-    try {
-      setError(false);
-      setIsFallback(false);
-
-      const { data: mentor, error: mentorError } = await supabase
-        .from("mentors")
-        .select("slug, name")
-        .eq("id", resolvedMentorId)
-        .maybeSingle();
-
-      if (mentorError) {
-        console.error("Error fetching mentor:", mentorError);
-        setError(true);
-        setLoading(false);
-        return;
-      }
-
-      if (!mentor) {
-        setLoading(false);
-        return;
-      }
-
-      // Save mentor slug for potential generation
-      setMentorSlug(mentor.slug);
-
-      // First try today's pep talk
-      const { data: todayPepTalk, error: pepTalkError } = await supabase
-        .from("daily_pep_talks")
-        .select("*")
-        .eq("for_date", effectiveDate)
-        .eq("mentor_slug", mentor.slug)
-        .maybeSingle();
-
-      let data = todayPepTalk;
-
-      if (pepTalkError) {
-        console.error("Error fetching pep talk:", pepTalkError);
-        setError(true);
-        setLoading(false);
-        return;
-      }
-
-      // If no pep talk for today, fall back to most recent
-      if (!data) {
-        console.log("No pep talk for today, fetching most recent...");
-        const { data: fallbackData, error: fallbackError } = await supabase
-          .from("daily_pep_talks")
-          .select("*")
-          .eq("mentor_slug", mentor.slug)
-          .order("for_date", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (fallbackError) {
-          console.error("Error fetching fallback pep talk:", fallbackError);
-        } else if (fallbackData) {
-          data = fallbackData;
-          setIsFallback(true);
-          console.log("Using fallback pep talk from:", fallbackData.for_date);
-        }
-      }
-
-      if (data) {
-        const transcript = sanitizeTranscript(data.transcript);
-        transcriptSyncAttemptedIdsRef.current.delete(data.id);
-
-        setPepTalk({
-          ...data,
-          mentor_name: mentor.name,
-          transcript,
-        } as DailyPepTalk);
-      }
-    } catch (err) {
-      console.error("Unexpected error fetching pep talk:", err);
-      setError(true);
-    } finally {
-      setLoading(false);
-    }
-  }, [effectiveDate, resolvedMentorId]);
-
-  useEffect(() => {
-    void fetchDailyPepTalk();
-  }, [fetchDailyPepTalk]);
-
   useEffect(() => {
     if (!pepTalk?.id) return;
     if (timedTranscript.length > 0) return;
@@ -234,15 +328,15 @@ export const TodaysPepTalk = memo(() => {
 
     const syncTranscript = async () => {
       try {
-        const { data, error } = await supabase.functions.invoke(
+        const { data, error: syncError } = await supabase.functions.invoke(
           "sync-daily-pep-talk-transcript",
           { body: { id: pepTalk.id } },
         );
 
-        if (error) {
+        if (syncError) {
           log.warn("Background transcript sync failed", {
             pepTalkId: pepTalk.id,
-            error: error instanceof Error ? error.message : String(error),
+            error: syncError instanceof Error ? syncError.message : String(syncError),
           });
           return;
         }
@@ -257,126 +351,183 @@ export const TodaysPepTalk = memo(() => {
           return;
         }
 
-        setPepTalk((current) => {
-          if (!current || current.id !== pepTalk.id) {
+        queryClient.setQueryData<TodayPepTalkQueryData>(pepTalkQueryKey, (current) => {
+          if (!current?.pepTalk || current.pepTalk.id !== pepTalk.id) {
             return current;
           }
 
           return {
             ...current,
-            transcript: nextTranscript,
+            pepTalk: {
+              ...current.pepTalk,
+              transcript: nextTranscript,
+            },
           };
         });
-      } catch (error) {
+      } catch (syncError) {
         log.warn("Background transcript sync threw unexpectedly", {
           pepTalkId: pepTalk.id,
-          error: error instanceof Error ? error.message : String(error),
+          error: syncError instanceof Error ? syncError.message : String(syncError),
         });
       }
     };
 
     void syncTranscript();
-  }, [pepTalk?.id, timedTranscript.length]);
+  }, [pepTalk?.id, pepTalkQueryKey, queryClient, timedTranscript.length]);
 
-  // Handle user-triggered pep talk generation
-  const handleGeneratePepTalk = async () => {
-    if (!mentorSlug) {
-      toast.error("No guide selected");
-      return;
-    }
-
-    setIsGenerating(true);
-    setGenerationStage('script');
-    try {
-      // Stage 1: Generating script
-      const { data, error } = await supabase.functions.invoke(
-        'generate-single-daily-pep-talk',
-        { body: { mentorSlug } }
+  const generatePepTalkMutation = useMutation({
+    mutationFn: async (nextMentorSlug: string) => {
+      setGenerationStage("script");
+      const { data, error: generationError } = await supabase.functions.invoke(
+        "generate-single-daily-pep-talk",
+        { body: { mentorSlug: nextMentorSlug } },
       );
-      
-      // Stage 2: Audio generated (part of the edge function)
-      setGenerationStage('audio');
 
-      if (error) {
-        console.error("Generation error:", error);
-        const parsedError = await parseFunctionInvokeError(error);
+      setGenerationStage("audio");
+
+      if (generationError) {
+        const parsedError = await parseFunctionInvokeError(generationError);
         const userMessage = toUserFacingFunctionError(parsedError, {
           action: "refresh today's pep talk",
         });
+
         log.warn("Pep talk generation returned HTTP error", {
           status: parsedError.status,
           backendMessage: parsedError.backendMessage,
           category: parsedError.category,
           code: parsedError.code,
         });
+
         throw new Error(userMessage);
       }
 
-      if (data?.pepTalk) {
-        // Stage 3: Loading audio file
-        setGenerationStage('loading');
-        
-        // Fetch mentor name for display
-        const { data: mentor } = await supabase
-          .from("mentors")
-          .select("name")
-          .eq("slug", mentorSlug)
-          .maybeSingle();
+      const generatedPepTalk =
+        data && typeof data === "object" && "pepTalk" in data
+          ? (data as { pepTalk?: Record<string, unknown> }).pepTalk
+          : null;
 
-        const transcript = sanitizeTranscript(data.pepTalk.transcript);
-        transcriptSyncAttemptedIdsRef.current.delete(data.pepTalk.id);
-
-        setPepTalk({
-          ...data.pepTalk,
-          mentor_name: mentor?.name,
-          transcript
-        });
-        setError(false);
-        setIsFallback(false);
-        toast.success("Your pep talk is ready!");
-      } else {
+      if (!generatedPepTalk) {
         throw new Error("No pep talk data returned");
       }
-    } catch (err) {
-      console.error("Error generating pep talk:", err);
-      let errorMessage = err instanceof Error ? err.message : "Failed to prepare pep talk";
+
+      setGenerationStage("loading");
+
+      const { data: mentor } = await supabase
+        .from("mentors")
+        .select("name")
+        .eq("slug", nextMentorSlug)
+        .maybeSingle();
+
+      return {
+        pepTalk: normalizeDailyPepTalk(generatedPepTalk, mentor?.name),
+        mentorSlug: nextMentorSlug,
+        isFallback: false,
+      } satisfies TodayPepTalkQueryData;
+    },
+    onSuccess: (nextData) => {
+      transcriptSyncAttemptedIdsRef.current.delete(nextData.pepTalk?.id ?? "");
+      queryClient.setQueryData(pepTalkQueryKey, nextData);
+      toast.success("Your pep talk is ready!");
+    },
+    onError: async (mutationError) => {
+      let errorMessage =
+        mutationError instanceof Error ? mutationError.message : "Failed to prepare pep talk";
 
       const shouldParseFunctionError =
-        (typeof err === "object" && err !== null && "context" in err) ||
+        (typeof mutationError === "object" && mutationError !== null && "context" in mutationError) ||
         /edge function|functions(fetch|http|relay)error|non-2xx|failed to send a request/i.test(errorMessage);
 
       if (shouldParseFunctionError) {
-        const parsedError = await parseFunctionInvokeError(err);
+        const parsedError = await parseFunctionInvokeError(mutationError);
         errorMessage = toUserFacingFunctionError(parsedError, {
           action: "refresh today's pep talk",
         });
       }
 
       toast.error(errorMessage);
-    } finally {
-      setIsGenerating(false);
-      setGenerationStage('idle');
+    },
+    onSettled: async () => {
+      try {
+        await queryClient.invalidateQueries({ queryKey: pepTalkQueryKey });
+        await queryClient.refetchQueries({ queryKey: pepTalkQueryKey });
+      } finally {
+        setGenerationStage("idle");
+      }
+    },
+  });
+
+  const isGenerating = generatePepTalkMutation.isPending;
+
+  const handleGeneratePepTalk = () => {
+    if (!mentorSlug) {
+      toast.error("No guide selected");
+      return;
     }
+
+    generatePepTalkMutation.mutate(mentorSlug);
   };
 
-  // Check if XP was already awarded for this specific pep talk
   useEffect(() => {
+    let isDisposed = false;
+
     const checkXPStatus = async () => {
-      if (!pepTalk?.id || !profile?.id) return;
-      
+      if (!pepTalk?.id || !profile?.id) {
+        if (!isDisposed) {
+          hasAwardedXPRef.current = false;
+          setHasAwardedXP(false);
+        }
+        return;
+      }
+
       const { data } = await supabase
-        .from('xp_events')
-        .select('id')
-        .eq('user_id', profile.id)
-        .eq('event_type', 'pep_talk_listen')
-        .eq('event_metadata->>pep_talk_id', pepTalk.id)
+        .from("xp_events")
+        .select("id")
+        .eq("user_id", profile.id)
+        .eq("event_type", "pep_talk_listen")
+        .eq("event_metadata->>pep_talk_id", pepTalk.id)
         .maybeSingle();
-      
-      setHasAwardedXP(!!data);
+
+      if (!isDisposed) {
+        hasAwardedXPRef.current = Boolean(data);
+        setHasAwardedXP(Boolean(data));
+      }
     };
-    
-    checkXPStatus();
+
+    void checkXPStatus();
+
+    return () => {
+      isDisposed = true;
+    };
   }, [pepTalk?.id, profile?.id]);
+
+  const maybeAwardPepTalkXP = useCallback(async () => {
+    const audio = audioRef.current;
+    if (!audio || !pepTalk?.id || !profile?.id || hasAwardedXPRef.current || isAwardingXPRef.current) {
+      return;
+    }
+
+    const currentDuration = audio.duration;
+    if (!(currentDuration > 0) || audio.currentTime < currentDuration * 0.8) {
+      return;
+    }
+
+    isAwardingXPRef.current = true;
+
+    try {
+      const awardResult = await awardPepTalkListenedAsync({ pep_talk_id: pepTalk.id });
+      if (awardResult) {
+        hasAwardedXPRef.current = true;
+        setHasAwardedXP(true);
+      }
+    } catch (awardError) {
+      log.warn("Pep talk XP award failed", {
+        pepTalkId: pepTalk.id,
+        error: awardError instanceof Error ? awardError.message : String(awardError),
+      });
+    } finally {
+      isAwardingXPRef.current = false;
+    }
+  }, [awardPepTalkListenedAsync, pepTalk?.id, profile?.id]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -385,31 +536,41 @@ export const TodaysPepTalk = memo(() => {
     const updateTime = () => {
       const time = audio.currentTime;
       setCurrentTime(time);
-      const currentDuration = audio.duration;
-      
-      // Award XP when user has listened to 80% (only once per pep talk)
-      if (!hasAwardedXP && currentDuration > 0 && time >= currentDuration * 0.8 && pepTalk?.id && profile?.id) {
-        setHasAwardedXP(true);
-        awardPepTalkListened({ pep_talk_id: pepTalk.id });
+      void maybeAwardPepTalkXP();
+    };
+
+    const updateDuration = () => {
+      setDuration(audio.duration);
+      if (audio.duration > 0) {
+        setIsAudioReady(true);
       }
     };
-    
-    const updateDuration = () => setDuration(audio.duration);
+
+    const handleSeeked = () => {
+      const time = audio.currentTime;
+      setCurrentTime(time);
+      void maybeAwardPepTalkXP();
+    };
+
     const handleEnded = () => {
+      setCurrentTime(audio.currentTime);
       setIsPlaying(false);
       setActiveWordIndex(-1);
+      void maybeAwardPepTalkXP();
     };
 
     audio.addEventListener("timeupdate", updateTime);
     audio.addEventListener("loadedmetadata", updateDuration);
+    audio.addEventListener("seeked", handleSeeked);
     audio.addEventListener("ended", handleEnded);
 
     return () => {
       audio.removeEventListener("timeupdate", updateTime);
       audio.removeEventListener("loadedmetadata", updateDuration);
+      audio.removeEventListener("seeked", handleSeeked);
       audio.removeEventListener("ended", handleEnded);
     };
-  }, [hasAwardedXP, awardPepTalkListened, pepTalk?.id, profile?.id]);
+  }, [maybeAwardPepTalkXP]);
 
   useEffect(() => {
     setActiveWordIndex((previousIndex) =>
@@ -417,19 +578,17 @@ export const TodaysPepTalk = memo(() => {
     );
   }, [timedTranscript, currentTime]);
 
-  // Cleanup seek debounce on unmount
   useEffect(() => {
     return () => {
       if (transcriptScrollRafRef.current !== null) {
         window.cancelAnimationFrame(transcriptScrollRafRef.current);
       }
       if (seekDebounceRef.current) {
-        clearTimeout(seekDebounceRef.current);
+        window.clearTimeout(seekDebounceRef.current);
       }
     };
   }, []);
 
-  // Auto-scroll active word only inside transcript container.
   useEffect(() => {
     if (activeWordRef.current && transcriptRef.current && showFullTranscript) {
       const container = transcriptRef.current;
@@ -468,48 +627,47 @@ export const TodaysPepTalk = memo(() => {
   const togglePlayPause = async () => {
     const audio = audioRef.current;
     if (!audio) {
-      console.error('Audio element not found');
+      log.error("Audio element not found");
       return;
     }
 
     if (isPlaying) {
       audio.pause();
       setIsPlaying(false);
-    } else {
-      try {
-        console.log('Attempting to play audio from:', pepTalk?.audio_url);
-        await audio.play();
-        setIsPlaying(true);
-      } catch (err) {
-        console.error('Audio play failed:', err);
-        // Reload the audio element and try again
-        audio.load();
-        try {
-          await audio.play();
-          setIsPlaying(true);
-        } catch (retryErr) {
-          console.error('Audio play retry failed:', retryErr);
-        }
-      }
+      return;
+    }
+
+    if (globalAudio.getMuted()) {
+      globalAudio.setMuted(false);
+    }
+
+    audio.muted = false;
+
+    const played = await safePlay(audio);
+    if (played) {
+      setIsPlaying(true);
+      return;
+    }
+
+    audio.load();
+    const playedAfterReload = await safePlay(audio);
+    if (playedAfterReload) {
+      setIsPlaying(true);
     }
   };
 
   const handleSeek = useCallback((value: number[]) => {
     const audio = audioRef.current;
     if (!audio) return;
-    
-    // Update UI immediately for responsiveness
+
     setCurrentTime(value[0]);
-    
-    // Debounce actual audio seek to prevent excessive operations
+
     if (seekDebounceRef.current) {
-      clearTimeout(seekDebounceRef.current);
+      window.clearTimeout(seekDebounceRef.current);
     }
-    
+
     seekDebounceRef.current = window.setTimeout(() => {
-      if (audio) {
-        audio.currentTime = value[0];
-      }
+      audio.currentTime = value[0];
     }, 100);
   }, []);
 
@@ -537,22 +695,21 @@ export const TodaysPepTalk = memo(() => {
       );
     }
 
-    const words = pepTalk.script.split(' ');
+    const words = pepTalk.script.split(" ");
     const previewWords = words.slice(0, 20);
 
     return (
       <div className="text-sm leading-relaxed text-foreground/70">
-        {previewWords.join(' ')}...
+        {previewWords.join(" ")}...
       </div>
     );
   };
 
   const renderFullTranscript = () => {
     if (displayTranscript.length === 0) {
-      // Fallback to plain text if no word timestamps
       if (!pepTalk?.script) return null;
       return (
-        <div 
+        <div
           ref={transcriptRef}
           data-testid="pep-talk-transcript"
           className="text-sm leading-relaxed max-h-64 overflow-y-auto scroll-smooth pr-2 text-foreground/80"
@@ -563,7 +720,7 @@ export const TodaysPepTalk = memo(() => {
     }
 
     return (
-      <div 
+      <div
         ref={transcriptRef}
         data-testid="pep-talk-transcript"
         className="text-sm leading-relaxed max-h-64 overflow-y-auto scroll-smooth pr-2 text-foreground/80"
@@ -576,7 +733,7 @@ export const TodaysPepTalk = memo(() => {
               "transition-colors duration-200",
               index === activeWordIndex
                 ? "text-primary font-semibold bg-primary/10 px-1 rounded"
-                : "text-foreground/80"
+                : "text-foreground/80",
             )}
           >
             {wordData.word}{" "}
@@ -597,7 +754,6 @@ export const TodaysPepTalk = memo(() => {
     );
   }
 
-  // Show fallback card when error or no pep talk available
   if (error || !pepTalk) {
     return (
       <Card className="relative overflow-hidden rounded-3xl border-2 p-6">
@@ -613,7 +769,7 @@ export const TodaysPepTalk = memo(() => {
             {error ? "Unable to load today's pep talk" : "No pep talk available today"}
           </p>
           <div className="flex flex-col sm:flex-row gap-2 justify-center">
-            <Button 
+            <Button
               onClick={handleGeneratePepTalk}
               disabled={isGenerating || !mentorSlug}
               className="rounded-full min-w-[200px]"
@@ -621,9 +777,9 @@ export const TodaysPepTalk = memo(() => {
               {isGenerating ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  {generationStage === 'script' && 'Preparing script...'}
-                  {generationStage === 'audio' && 'Creating audio...'}
-                  {generationStage === 'loading' && 'Loading...'}
+                  {generationStage === "script" && "Preparing script..."}
+                  {generationStage === "audio" && "Creating audio..."}
+                  {generationStage === "loading" && "Loading..."}
                 </>
               ) : (
                 <>
@@ -632,8 +788,8 @@ export const TodaysPepTalk = memo(() => {
                 </>
               )}
             </Button>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               size="default"
               className="rounded-full"
               onClick={() => navigate("/pep-talks")}
@@ -654,25 +810,21 @@ export const TodaysPepTalk = memo(() => {
         isNativeIOS && "gpu-layer",
       )}
     >
-      {/* Pokemon-style gradient background */}
       <div className="absolute inset-0 bg-gradient-to-br from-primary/25 via-accent/15 to-primary/10 animate-gradient-shift" />
-      
-      {/* Sparkle particles when playing */}
+
       {isPlaying && (
         <>
           <div className="absolute top-1/4 left-1/4 w-1 h-1 bg-primary rounded-full animate-sparkle" />
-          <div className="absolute top-1/3 right-1/4 w-1.5 h-1.5 bg-accent rounded-full animate-sparkle" style={{ animationDelay: '0.3s' }} />
-          <div className="absolute bottom-1/3 left-1/3 w-1 h-1 bg-primary rounded-full animate-sparkle" style={{ animationDelay: '0.6s' }} />
-          <div className="absolute top-1/2 right-1/3 w-1.5 h-1.5 bg-accent rounded-full animate-sparkle" style={{ animationDelay: '0.9s' }} />
+          <div className="absolute top-1/3 right-1/4 w-1.5 h-1.5 bg-accent rounded-full animate-sparkle" style={{ animationDelay: "0.3s" }} />
+          <div className="absolute bottom-1/3 left-1/3 w-1 h-1 bg-primary rounded-full animate-sparkle" style={{ animationDelay: "0.6s" }} />
+          <div className="absolute top-1/2 right-1/3 w-1.5 h-1.5 bg-accent rounded-full animate-sparkle" style={{ animationDelay: "0.9s" }} />
         </>
       )}
-      
-      {/* Glowing orbs */}
+
       <div className="absolute -top-20 -right-20 w-40 h-40 bg-primary/20 blur-3xl rounded-full animate-pulse-slow" />
       <div className="absolute -bottom-20 -left-20 w-40 h-40 bg-accent/20 blur-3xl rounded-full animate-pulse-slow" style={{ animationDelay: "1.5s" }} />
-      
+
       <div className="relative p-6 md:p-8 space-y-6">
-        {/* Header with sparkle icon */}
         <div className="flex items-center justify-center gap-2">
           <div className="relative">
             <Sparkles className="h-6 w-6 text-primary animate-pulse-slow" />
@@ -683,12 +835,10 @@ export const TodaysPepTalk = memo(() => {
           </h2>
         </div>
 
-        {/* Bubble card content */}
         <div className="space-y-6 p-6 rounded-2xl bg-gradient-to-br from-card/90 to-card/70 backdrop-blur-sm border-2 border-primary/30 shadow-glow">
-          {/* Fallback indicator */}
           {isFallback && (
             <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground bg-muted/50 rounded-full px-3 py-1 mx-auto w-fit">
-              <span>From {new Date(pepTalk.for_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+              <span>From {new Date(pepTalk.for_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
               <Button
                 variant="ghost"
                 size="sm"
@@ -699,9 +849,9 @@ export const TodaysPepTalk = memo(() => {
                 {isGenerating ? (
                   <>
                     <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                    {generationStage === 'script' && 'Writing...'}
-                    {generationStage === 'audio' && 'Recording...'}
-                    {generationStage === 'loading' && 'Loading...'}
+                    {generationStage === "script" && "Writing..."}
+                    {generationStage === "audio" && "Recording..."}
+                    {generationStage === "loading" && "Loading..."}
                   </>
                 ) : "Refresh today's"}
               </Button>
@@ -716,31 +866,25 @@ export const TodaysPepTalk = memo(() => {
             </p>
           </div>
 
-          {/* Audio Player */}
-          <audio 
-            ref={audioRef} 
-            src={pepTalk.audio_url} 
-            preload="auto"
+          <audio
+            ref={audioRef}
+            data-testid="pep-talk-audio"
             onCanPlay={() => setIsAudioReady(true)}
             onError={() => {
-              logger.error('Audio loading error', { 
+              log.error("Audio loading error", {
                 audioUrl: pepTalk.audio_url,
                 errorCode: audioRef.current?.error?.code,
-                errorMessage: audioRef.current?.error?.message 
+                errorMessage: audioRef.current?.error?.message,
               });
             }}
             onLoadedMetadata={() => {
-              logger.log('Audio loaded successfully');
-              logger.log('Duration:', audioRef.current?.duration);
-              // If we have duration, audio is likely ready enough
-              if (audioRef.current?.duration && audioRef.current.duration > 0) {
+              if ((audioRef.current?.duration ?? 0) > 0) {
                 setIsAudioReady(true);
               }
             }}
           />
-          
+
           <div className="space-y-4">
-            {/* Large central play button */}
             <div className="flex items-center justify-center">
               <Button
                 size="icon"
@@ -750,7 +894,7 @@ export const TodaysPepTalk = memo(() => {
                   "h-20 w-20 rounded-full transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed",
                   isPlaying
                     ? "bg-gradient-to-br from-accent to-primary shadow-glow-lg scale-110"
-                    : "bg-gradient-to-br from-primary to-accent shadow-glow hover:scale-110"
+                    : "bg-gradient-to-br from-primary to-accent shadow-glow hover:scale-110",
                 )}
                 aria-label={!isAudioReady ? "Loading audio" : isPlaying ? "Pause pep talk" : "Play pep talk"}
               >
@@ -764,7 +908,6 @@ export const TodaysPepTalk = memo(() => {
               </Button>
             </div>
 
-            {/* Playback Controls */}
             <div className="flex items-center justify-center gap-3">
               <Button
                 variant="ghost"
@@ -793,7 +936,6 @@ export const TodaysPepTalk = memo(() => {
               </Button>
             </div>
 
-            {/* Progress Bar */}
             <div className="space-y-2 px-2">
               <Slider
                 value={[currentTime]}
@@ -805,11 +947,10 @@ export const TodaysPepTalk = memo(() => {
               />
             </div>
 
-            {/* Transcript bubble */}
             <div className="space-y-2 p-4 rounded-2xl bg-background/60 backdrop-blur-sm border border-primary/20 shadow-soft">
               {!showFullTranscript ? renderTranscriptPreview() : renderFullTranscript()}
-              
-              {pepTalk?.script && (
+
+              {pepTalk.script && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -828,9 +969,9 @@ export const TodaysPepTalk = memo(() => {
               )}
             </div>
           </div>
-          
-          <Button 
-            variant="outline" 
+
+          <Button
+            variant="outline"
             size="lg"
             className="w-full rounded-full border-2 hover:bg-primary/10 hover:scale-105 transition-all shadow-soft"
             onClick={() => navigate("/pep-talks")}
@@ -843,4 +984,4 @@ export const TodaysPepTalk = memo(() => {
   );
 });
 
-TodaysPepTalk.displayName = 'TodaysPepTalk';
+TodaysPepTalk.displayName = "TodaysPepTalk";
