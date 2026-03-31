@@ -70,6 +70,7 @@ interface AddQuestSheetProps {
   selectedDate: Date;
   prefilledTime?: string | null;
   autoFillTimeOnFirstTap?: boolean;
+  presentation?: QuestComposerPresentation;
   onAdd: (data: AddQuestData) => Promise<void>;
   isAdding?: boolean;
   onCreateCampaign?: () => void;
@@ -80,6 +81,7 @@ interface AddQuestSheetProps {
 import {
   QUEST_FORM_STYLES,
   DIFFICULTY_COLORS,
+  type QuestComposerPresentation,
   formatTime12,
   getQuestDifficultyIconClasses,
   getQuestDifficultyOptionClasses,
@@ -93,6 +95,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   onOpenChange,
   selectedDate,
   prefilledTime,
+  presentation = "mobile-sheet",
   onAdd,
   isAdding = false,
   onCreateCampaign,
@@ -211,6 +214,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
 
   const colors = DIFFICULTY_COLORS[difficulty];
   const dateObj = taskDate ? new Date(taskDate + "T00:00:00") : selectedDate;
+  const isDesktopPanel = presentation === "desktop-panel";
 
   const hasDateAndTime = !!taskDate && !!scheduledTime;
   const hasRecurrence = hasRecurrencePattern(recurrencePattern);
@@ -250,6 +254,11 @@ export const AddQuestSheet = memo(function AddQuestSheet({
     };
   }, [selectedTemplate]);
   const isTemplatePromptBusy = isHandlingTemplatePrompt || isSavingTemplate || isAdding;
+  const difficultyOptions = [
+    { value: "easy" as const, icon: Zap, label: "Easy" },
+    { value: "medium" as const, icon: Flame, label: "Medium" },
+    { value: "hard" as const, icon: Mountain, label: "Hard" },
+  ];
 
   // --- Subtask helpers ---
   const handleSubtaskChange = useCallback((index: number, value: string) => {
@@ -460,11 +469,14 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   return (
     <Sheet open={open} onOpenChange={requestOpenChange}>
       <SheetContent
-        side="bottom"
+        side={isDesktopPanel ? "right" : "bottom"}
+        data-testid={isDesktopPanel ? "add-quest-desktop-panel" : "add-quest-mobile-sheet"}
         data-tour="add-quest-sheet"
         className={cn(
-          "h-[92vh] rounded-t-[34px] flex flex-col p-0 gap-0 overflow-hidden",
-          QUEST_FORM_STYLES.sheet,
+          isDesktopPanel
+            ? "!top-4 !bottom-4 !left-auto !right-4 !h-[calc(100dvh-2rem)] !w-[calc(100vw-2rem)] !max-w-[640px] !rounded-[32px] flex flex-col !p-0 !gap-0 overflow-hidden sm:!w-[620px]"
+            : "h-[92vh] rounded-t-[34px] flex flex-col p-0 gap-0 overflow-hidden",
+          isDesktopPanel ? QUEST_FORM_STYLES.desktopPanelShell : QUEST_FORM_STYLES.sheet,
         )}
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
@@ -472,20 +484,75 @@ export const AddQuestSheet = memo(function AddQuestSheet({
         <SheetDescription className="sr-only">
           Create a new quest with schedule, subtasks, and optional details.
         </SheetDescription>
-        <div className={cn("relative isolate overflow-hidden px-4 pt-3 pb-4 flex-shrink-0", colors.bg)}>
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.26),transparent_72%)] opacity-80" />
-          <div className="pointer-events-none absolute -left-10 top-10 h-24 w-24 rounded-full bg-white/[0.10] blur-2xl" />
-          <div className="pointer-events-none absolute -right-8 bottom-5 h-28 w-28 rounded-full bg-black/10 blur-2xl" />
-          <button
-            onClick={() => requestOpenChange(false)}
-            className="absolute top-4 right-4 z-10 rounded-full border border-white/22 bg-black/10 p-2 text-white shadow-[0_10px_18px_rgba(0,0,0,0.14)] backdrop-blur-md transition-all duration-200 ease-out hover:bg-black/18 active:scale-[0.97] motion-reduce:transition-none"
-            aria-label="Close"
-          >
-            <X className="h-4 w-4" />
-          </button>
+        {sheetView === "editor" ? (
+          isDesktopPanel ? (
+            <div className={cn("flex-shrink-0 px-5 py-5", QUEST_FORM_STYLES.desktopPanelHeader)}>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-white/42">
+                    New Quest
+                  </p>
+                  <p className="mt-1 text-sm text-white/62">{summaryLine}</p>
+                </div>
+                <button
+                  onClick={() => requestOpenChange(false)}
+                  className={QUEST_FORM_STYLES.desktopPanelCloseButton}
+                  aria-label="Close"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
 
-          {sheetView === "editor" ? (
-            <>
+              <div data-testid="add-quest-editor-header" className={cn("mt-4 space-y-4", QUEST_FORM_STYLES.desktopPanelHeaderCard)}>
+                <Input
+                  data-tour="add-quest-title-input"
+                  placeholder="Quest Title"
+                  value={taskText}
+                  onChange={(e) => setTaskText(e.target.value)}
+                  disabled={isAdding}
+                  className={QUEST_FORM_STYLES.desktopPanelInput}
+                />
+
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {difficultyOptions.map(({ value, icon: Icon, label }) => (
+                      <button
+                        key={value}
+                        onClick={() => setDifficulty(value)}
+                        className={getQuestDifficultyOptionClasses(value, difficulty === value)}
+                      >
+                        <span className={getQuestDifficultyIconClasses(value, difficulty === value)}>
+                          <Icon className="h-3.5 w-3.5" />
+                        </span>
+                        <span className="font-fredoka text-[12px] leading-none">{label}</span>
+                      </button>
+                    ))}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => openTemplateBrowser("common")}
+                    className={QUEST_FORM_STYLES.desktopPanelToolbarButton}
+                  >
+                    <Sparkles className="h-3.5 w-3.5" />
+                    Browse common quests
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className={cn("relative isolate overflow-hidden px-4 pt-3 pb-4 flex-shrink-0", colors.bg)}>
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.26),transparent_72%)] opacity-80" />
+              <div className="pointer-events-none absolute -left-10 top-10 h-24 w-24 rounded-full bg-white/[0.10] blur-2xl" />
+              <div className="pointer-events-none absolute -right-8 bottom-5 h-28 w-28 rounded-full bg-black/10 blur-2xl" />
+              <button
+                onClick={() => requestOpenChange(false)}
+                className="absolute top-4 right-4 z-10 rounded-full border border-white/22 bg-black/10 p-2 text-white shadow-[0_10px_18px_rgba(0,0,0,0.14)] backdrop-blur-md transition-all duration-200 ease-out hover:bg-black/18 active:scale-[0.97] motion-reduce:transition-none"
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </button>
+
               <div data-testid="add-quest-editor-header" className="flex flex-col items-center text-center pt-1 text-white">
                 <div className="w-full max-w-md pr-12 text-left">
                   <div className={QUEST_FORM_STYLES.titleFieldShell}>
@@ -512,13 +579,8 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                 </button>
               </div>
 
-              {/* Compact Difficulty Selector */}
               <div className="mt-3 flex justify-center gap-2">
-                {([
-                  { value: "easy" as const, icon: Zap, label: "Easy" },
-                  { value: "medium" as const, icon: Flame, label: "Medium" },
-                  { value: "hard" as const, icon: Mountain, label: "Hard" },
-                ]).map(({ value, icon: Icon, label }) => (
+                {difficultyOptions.map(({ value, icon: Icon, label }) => (
                   <button
                     key={value}
                     onClick={() => setDifficulty(value)}
@@ -531,8 +593,30 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                   </button>
                 ))}
               </div>
-            </>
-          ) : (
+            </div>
+          )
+        ) : isDesktopPanel ? (
+          <div className={cn("flex-shrink-0 px-5 py-4", QUEST_FORM_STYLES.desktopPanelHeader)}>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-white/42">
+                  Quest Shortcuts
+                </p>
+                <p className="mt-1 text-sm text-white/62">
+                  Pick a common quest or one you already use a lot.
+                </p>
+              </div>
+              <button
+                onClick={() => requestOpenChange(false)}
+                className={QUEST_FORM_STYLES.desktopPanelCloseButton}
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className={cn("relative isolate overflow-hidden px-4 pt-3 pb-4 flex-shrink-0", colors.bg)}>
             <div className="flex min-h-[128px] flex-col items-center justify-center pt-2 text-center text-white">
               <div className={QUEST_FORM_STYLES.heroIcon}>
                 <History className="h-5 w-5" />
@@ -542,13 +626,13 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                 Pick a common quest or one you already use a lot.
               </p>
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Scrollable Body */}
-        <div className={cn("flex-1 overflow-y-auto overflow-x-hidden", QUEST_FORM_STYLES.body)}>
+        <div className={cn("flex-1 min-h-0 overflow-y-auto overflow-x-hidden", QUEST_FORM_STYLES.body)}>
           {sheetView === "editor" ? (
-            <div className="px-4 py-4 space-y-4">
+            <div className={cn(isDesktopPanel ? "px-5 py-5 space-y-5" : "px-4 py-4 space-y-4")}>
               {topPersonalTemplates.length > 0 && (
                 <div className={cn(QUEST_FORM_STYLES.sectionCard, "px-4 py-4")}>
                   <div className="flex items-center justify-between gap-3">
@@ -584,247 +668,241 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                   </div>
                 </div>
               )}
-            {/* Date & Time Chips side by side */}
-            <div className="flex gap-2">
-              {/* Date Chip */}
-              <Popover open={showDatePicker} onOpenChange={setShowDatePicker}>
-                <PopoverTrigger asChild>
-                  <button className={cn(
-                    "flex-1 flex items-center justify-center gap-2 text-sm font-semibold text-white",
-                    QUEST_FORM_STYLES.selectorChip,
-                    taskDate
-                      ? ""
-                      : QUEST_FORM_STYLES.selectorChipMuted
-                  )}>
-                    <CalendarIcon className="h-4 w-4" />
-                    {taskDate ? format(dateObj, "MMM d") : "Date"}
-                  </button>
-                </PopoverTrigger>
-                <PopoverContent className={cn("w-auto p-1 z-[100]", QUEST_FORM_STYLES.popover)} align="start">
-                  <Calendar
-                    mode="single"
-                    selected={dateObj}
-                    onSelect={(date) => {
-                      setTaskDate(date ? format(date, "yyyy-MM-dd") : null);
-                      if (date) {
-                        setShowDatePicker(false);
-                      }
-                    }}
-                    className="pointer-events-auto"
-                  />
-                </PopoverContent>
-              </Popover>
+              <div className={cn(isDesktopPanel ? "grid grid-cols-1 items-start gap-3 sm:grid-cols-3" : "space-y-4")}>
+                <Popover open={showDatePicker} onOpenChange={setShowDatePicker}>
+                  <PopoverTrigger asChild>
+                    <button className={cn(
+                      "flex items-center justify-center gap-2 text-sm font-semibold text-white",
+                      QUEST_FORM_STYLES.selectorChip,
+                      taskDate
+                        ? ""
+                        : QUEST_FORM_STYLES.selectorChipMuted
+                    )}>
+                      <CalendarIcon className="h-4 w-4" />
+                      {taskDate ? format(dateObj, "MMM d") : "Date"}
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className={cn("w-auto p-1 z-[100]", QUEST_FORM_STYLES.popover)} align="start">
+                    <Calendar
+                      mode="single"
+                      selected={dateObj}
+                      onSelect={(date) => {
+                        setTaskDate(date ? format(date, "yyyy-MM-dd") : null);
+                        if (date) {
+                          setShowDatePicker(false);
+                        }
+                      }}
+                      className="pointer-events-auto"
+                    />
+                  </PopoverContent>
+                </Popover>
 
-              <TimePickerField
-                value={scheduledTime}
-                onChange={setScheduledTime}
-                placeholder="Time"
-                ariaLabel="Custom quest time"
-                variant="quest-soft"
-                tone={difficulty}
-                stepMinutes={30}
-                seedValueOnOpen={() => getNextTimeForStep(30)}
-                endTimeHint={endTime}
-                className="flex-1"
-                triggerProps={{
-                  "data-tour": "add-quest-time-chip",
-                }}
-                inputProps={{
-                  "data-tour": "add-quest-time-input",
-                }}
-                getSlotButtonProps={(slot) => ({
-                  "data-tour": "add-quest-time-slot",
-                  "data-time-slot": slot,
-                })}
-              />
-            </div>
+                <TimePickerField
+                  value={scheduledTime}
+                  onChange={setScheduledTime}
+                  placeholder="Time"
+                  ariaLabel="Custom quest time"
+                  variant="quest-soft"
+                  tone={difficulty}
+                  stepMinutes={30}
+                  seedValueOnOpen={() => getNextTimeForStep(30)}
+                  endTimeHint={endTime}
+                  className={isDesktopPanel ? "" : "flex-1"}
+                  triggerProps={{
+                    "data-tour": "add-quest-time-chip",
+                  }}
+                  inputProps={{
+                    "data-tour": "add-quest-time-input",
+                  }}
+                  getSlotButtonProps={(slot) => ({
+                    "data-tour": "add-quest-time-slot",
+                    "data-time-slot": slot,
+                  })}
+                />
 
-            <DurationPickerField
-              value={estimatedDuration}
-              onChange={setEstimatedDuration}
-              variant="quest-soft"
-              tone={difficulty}
-            />
-
-            {/* Subtasks + Notes Card */}
-            <div className={cn(QUEST_FORM_STYLES.sectionCard, "overflow-hidden")}>
-              {subtasks.map((st, idx) => (
-                <div key={idx} className={cn("group flex items-center gap-2 px-4 py-3", `border-b ${QUEST_FORM_STYLES.divider}`)}>
-                  <Checkbox disabled className="h-4 w-4 border-white/18 opacity-60" />
-                  <input
-                    ref={(el) => { subtaskInputRefs.current[idx] = el; }}
-                    value={st}
-                    onChange={(e) => handleSubtaskChange(idx, e.target.value)}
-                    onKeyDown={(e) => handleSubtaskKeyDown(idx, e)}
-                    placeholder="Subtask"
-                    className="flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/42"
-                  />
-                  <button
-                    onClick={() => handleDeleteSubtask(idx)}
-                    className="rounded-full p-1 opacity-0 transition-all hover:bg-white/[0.08] text-white/44 hover:text-white group-hover:opacity-100"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              ))}
-
-              <div
-                role="button"
-                tabIndex={0}
-                onClick={handleAddSubtaskRow}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    handleAddSubtaskRow();
-                  }
-                }}
-                className={cn("flex w-full cursor-pointer items-center gap-2 px-4 py-3 text-left transition-colors hover:bg-white/[0.05]", `border-b ${QUEST_FORM_STYLES.divider}`)}
-              >
-                <Checkbox disabled className="h-4 w-4 border-white/14 opacity-40" />
-                <span className="text-sm text-white/48">Add Subtask</span>
+                <DurationPickerField
+                  value={estimatedDuration}
+                  onChange={setEstimatedDuration}
+                  variant="quest-soft"
+                  tone={difficulty}
+                />
               </div>
 
-              <Textarea
-                value={moreInformation || ""}
-                onChange={(e) => setMoreInformation(e.target.value || null)}
-                placeholder="Add notes, meeting links or phone numbers..."
-                className="min-h-[88px] border-0 rounded-none bg-transparent resize-none px-4 py-4 text-sm text-white placeholder:text-white/42 focus-visible:ring-0 focus-visible:ring-offset-0"
-                style={{ touchAction: "pan-y", WebkitTapHighlightColor: "transparent" }}
-                data-vaul-no-drag
-              />
-            </div>
+              <div className={cn(QUEST_FORM_STYLES.sectionCard, "overflow-hidden")}>
+                {subtasks.map((st, idx) => (
+                  <div key={idx} className={cn("group flex items-center gap-2 px-4 py-3", `border-b ${QUEST_FORM_STYLES.divider}`)}>
+                    <Checkbox disabled className="h-4 w-4 border-white/18 opacity-60" />
+                    <input
+                      ref={(el) => { subtaskInputRefs.current[idx] = el; }}
+                      value={st}
+                      onChange={(e) => handleSubtaskChange(idx, e.target.value)}
+                      onKeyDown={(e) => handleSubtaskKeyDown(idx, e)}
+                      placeholder="Subtask"
+                      className="flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/42"
+                    />
+                    <button
+                      onClick={() => handleDeleteSubtask(idx)}
+                      className="rounded-full p-1 opacity-0 transition-all hover:bg-white/[0.08] text-white/44 hover:text-white group-hover:opacity-100"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
 
-            {/* Recurrence (always visible) */}
-            <div className="px-1">
-              <AdvancedQuestOptions
-                scheduledTime={scheduledTime}
-                estimatedDuration={estimatedDuration}
-                recurrencePattern={recurrencePattern}
-                recurrenceDays={recurrenceDays}
-                recurrenceMonthDays={recurrenceMonthDays}
-                recurrenceCustomPeriod={recurrenceCustomPeriod}
-                reminderEnabled={reminderEnabled}
-                reminderMinutesBefore={reminderMinutesBefore}
-                onScheduledTimeChange={setScheduledTime}
-                onEstimatedDurationChange={setEstimatedDuration}
-                onRecurrencePatternChange={setRecurrencePattern}
-                onRecurrenceDaysChange={setRecurrenceDays}
-                onRecurrenceMonthDaysChange={setRecurrenceMonthDays}
-                onRecurrenceCustomPeriodChange={setRecurrenceCustomPeriod}
-                onReminderEnabledChange={setReminderEnabled}
-                onReminderMinutesBeforeChange={setReminderMinutesBefore}
-                moreInformation={moreInformation}
-                onMoreInformationChange={setMoreInformation}
-                location={location}
-                onLocationChange={setLocation}
-                selectedDate={dateObj}
-                taskDifficulty={difficulty}
-                hideScheduledTime
-                hideDuration
-                hideMoreInformation
-                hideReminder
-                hideLocation
-                requireScheduledTimeForRecurrence
-                visualStyle="quest-soft"
-              />
-            </div>
-
-            <div className={cn(QUEST_FORM_STYLES.sectionCard, "space-y-3 px-4 py-4")}>
-              <Label className={cn("text-sm font-semibold", QUEST_FORM_STYLES.label)}>Photo / Files</Label>
-              <QuestAttachmentPicker
-                attachments={attachments}
-                onAttachmentsChange={setAttachments}
-                visualStyle="quest-soft"
-              />
-            </div>
-
-            {scheduledTime && (
-              <AdvancedQuestOptions
-                scheduledTime={scheduledTime}
-                estimatedDuration={estimatedDuration}
-                recurrencePattern={recurrencePattern}
-                recurrenceDays={recurrenceDays}
-                recurrenceMonthDays={recurrenceMonthDays}
-                recurrenceCustomPeriod={recurrenceCustomPeriod}
-                reminderEnabled={reminderEnabled}
-                reminderMinutesBefore={reminderMinutesBefore}
-                onScheduledTimeChange={setScheduledTime}
-                onEstimatedDurationChange={setEstimatedDuration}
-                onRecurrencePatternChange={setRecurrencePattern}
-                onRecurrenceDaysChange={setRecurrenceDays}
-                onRecurrenceMonthDaysChange={setRecurrenceMonthDays}
-                onRecurrenceCustomPeriodChange={setRecurrenceCustomPeriod}
-                onReminderEnabledChange={setReminderEnabled}
-                onReminderMinutesBeforeChange={setReminderMinutesBefore}
-                moreInformation={moreInformation}
-                onMoreInformationChange={setMoreInformation}
-                location={location}
-                onLocationChange={setLocation}
-                selectedDate={dateObj}
-                taskDifficulty={difficulty}
-                hideScheduledTime
-                hideDuration
-                hideMoreInformation
-                hideRecurrence
-                hideLocation
-                requireScheduledTimeForRecurrence
-                visualStyle="quest-soft"
-              />
-            )}
-
-            {/* Advanced Settings (collapsible) */}
-            <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
-              <CollapsibleTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className={QUEST_FORM_STYLES.advancedTrigger}
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={handleAddSubtaskRow}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      handleAddSubtaskRow();
+                    }
+                  }}
+                  className={cn("flex w-full cursor-pointer items-center gap-2 px-4 py-3 text-left transition-colors hover:bg-white/[0.05]", `border-b ${QUEST_FORM_STYLES.divider}`)}
                 >
-                  <span className="flex items-center gap-2">
-                    <Sliders className="w-4 h-4" />
-                    Advanced Settings
-                  </span>
-                  <span className="text-xs">{showAdvanced ? "▲" : "▼"}</span>
-                </Button>
-              </CollapsibleTrigger>
-
-              <CollapsibleContent>
-                <div className="mt-3 space-y-4">
-                  {/* Reminders + Location */}
-                  <AdvancedQuestOptions
-                    scheduledTime={scheduledTime}
-                    estimatedDuration={estimatedDuration}
-                    recurrencePattern={recurrencePattern}
-                    recurrenceDays={recurrenceDays}
-                    recurrenceMonthDays={recurrenceMonthDays}
-                    recurrenceCustomPeriod={recurrenceCustomPeriod}
-                    reminderEnabled={reminderEnabled}
-                    reminderMinutesBefore={reminderMinutesBefore}
-                    onScheduledTimeChange={setScheduledTime}
-                    onEstimatedDurationChange={setEstimatedDuration}
-                    onRecurrencePatternChange={setRecurrencePattern}
-                    onRecurrenceDaysChange={setRecurrenceDays}
-                    onRecurrenceMonthDaysChange={setRecurrenceMonthDays}
-                    onRecurrenceCustomPeriodChange={setRecurrenceCustomPeriod}
-                    onReminderEnabledChange={setReminderEnabled}
-                    onReminderMinutesBeforeChange={setReminderMinutesBefore}
-                    moreInformation={moreInformation}
-                    onMoreInformationChange={setMoreInformation}
-                    location={location}
-                    onLocationChange={setLocation}
-                    selectedDate={dateObj}
-                    taskDifficulty={difficulty}
-                    hideScheduledTime
-                    hideDuration
-                    hideMoreInformation
-                    hideReminder
-                    hideRecurrence
-                    requireScheduledTimeForRecurrence
-                    visualStyle="quest-soft"
-                  />
+                  <Checkbox disabled className="h-4 w-4 border-white/14 opacity-40" />
+                  <span className="text-sm text-white/48">Add Subtask</span>
                 </div>
-              </CollapsibleContent>
-            </Collapsible>
+
+                <Textarea
+                  value={moreInformation || ""}
+                  onChange={(e) => setMoreInformation(e.target.value || null)}
+                  placeholder="Add notes, meeting links or phone numbers..."
+                  className="min-h-[88px] border-0 rounded-none bg-transparent resize-none px-4 py-4 text-sm text-white placeholder:text-white/42 focus-visible:ring-0 focus-visible:ring-offset-0"
+                  style={{ touchAction: "pan-y", WebkitTapHighlightColor: "transparent" }}
+                  data-vaul-no-drag
+                />
+              </div>
+
+              <div className="px-1">
+                <AdvancedQuestOptions
+                  scheduledTime={scheduledTime}
+                  estimatedDuration={estimatedDuration}
+                  recurrencePattern={recurrencePattern}
+                  recurrenceDays={recurrenceDays}
+                  recurrenceMonthDays={recurrenceMonthDays}
+                  recurrenceCustomPeriod={recurrenceCustomPeriod}
+                  reminderEnabled={reminderEnabled}
+                  reminderMinutesBefore={reminderMinutesBefore}
+                  onScheduledTimeChange={setScheduledTime}
+                  onEstimatedDurationChange={setEstimatedDuration}
+                  onRecurrencePatternChange={setRecurrencePattern}
+                  onRecurrenceDaysChange={setRecurrenceDays}
+                  onRecurrenceMonthDaysChange={setRecurrenceMonthDays}
+                  onRecurrenceCustomPeriodChange={setRecurrenceCustomPeriod}
+                  onReminderEnabledChange={setReminderEnabled}
+                  onReminderMinutesBeforeChange={setReminderMinutesBefore}
+                  moreInformation={moreInformation}
+                  onMoreInformationChange={setMoreInformation}
+                  location={location}
+                  onLocationChange={setLocation}
+                  selectedDate={dateObj}
+                  taskDifficulty={difficulty}
+                  hideScheduledTime
+                  hideDuration
+                  hideMoreInformation
+                  hideReminder
+                  hideLocation
+                  requireScheduledTimeForRecurrence
+                  visualStyle="quest-soft"
+                />
+              </div>
+
+              <div className={cn(QUEST_FORM_STYLES.sectionCard, "space-y-3 px-4 py-4")}>
+                <Label className={cn("text-sm font-semibold", QUEST_FORM_STYLES.label)}>Photo / Files</Label>
+                <QuestAttachmentPicker
+                  attachments={attachments}
+                  onAttachmentsChange={setAttachments}
+                  visualStyle="quest-soft"
+                />
+              </div>
+
+              {scheduledTime && (
+                <AdvancedQuestOptions
+                  scheduledTime={scheduledTime}
+                  estimatedDuration={estimatedDuration}
+                  recurrencePattern={recurrencePattern}
+                  recurrenceDays={recurrenceDays}
+                  recurrenceMonthDays={recurrenceMonthDays}
+                  recurrenceCustomPeriod={recurrenceCustomPeriod}
+                  reminderEnabled={reminderEnabled}
+                  reminderMinutesBefore={reminderMinutesBefore}
+                  onScheduledTimeChange={setScheduledTime}
+                  onEstimatedDurationChange={setEstimatedDuration}
+                  onRecurrencePatternChange={setRecurrencePattern}
+                  onRecurrenceDaysChange={setRecurrenceDays}
+                  onRecurrenceMonthDaysChange={setRecurrenceMonthDays}
+                  onRecurrenceCustomPeriodChange={setRecurrenceCustomPeriod}
+                  onReminderEnabledChange={setReminderEnabled}
+                  onReminderMinutesBeforeChange={setReminderMinutesBefore}
+                  moreInformation={moreInformation}
+                  onMoreInformationChange={setMoreInformation}
+                  location={location}
+                  onLocationChange={setLocation}
+                  selectedDate={dateObj}
+                  taskDifficulty={difficulty}
+                  hideScheduledTime
+                  hideDuration
+                  hideMoreInformation
+                  hideRecurrence
+                  hideLocation
+                  requireScheduledTimeForRecurrence
+                  visualStyle="quest-soft"
+                />
+              )}
+
+              <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
+                <CollapsibleTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className={QUEST_FORM_STYLES.advancedTrigger}
+                  >
+                    <span className="flex items-center gap-2">
+                      <Sliders className="w-4 h-4" />
+                      Advanced Settings
+                    </span>
+                    <span className="text-xs">{showAdvanced ? "▲" : "▼"}</span>
+                  </Button>
+                </CollapsibleTrigger>
+
+                <CollapsibleContent>
+                  <div className="mt-3 space-y-4">
+                    <AdvancedQuestOptions
+                      scheduledTime={scheduledTime}
+                      estimatedDuration={estimatedDuration}
+                      recurrencePattern={recurrencePattern}
+                      recurrenceDays={recurrenceDays}
+                      recurrenceMonthDays={recurrenceMonthDays}
+                      recurrenceCustomPeriod={recurrenceCustomPeriod}
+                      reminderEnabled={reminderEnabled}
+                      reminderMinutesBefore={reminderMinutesBefore}
+                      onScheduledTimeChange={setScheduledTime}
+                      onEstimatedDurationChange={setEstimatedDuration}
+                      onRecurrencePatternChange={setRecurrencePattern}
+                      onRecurrenceDaysChange={setRecurrenceDays}
+                      onRecurrenceMonthDaysChange={setRecurrenceMonthDays}
+                      onRecurrenceCustomPeriodChange={setRecurrenceCustomPeriod}
+                      onReminderEnabledChange={setReminderEnabled}
+                      onReminderMinutesBeforeChange={setReminderMinutesBefore}
+                      moreInformation={moreInformation}
+                      onMoreInformationChange={setMoreInformation}
+                      location={location}
+                      onLocationChange={setLocation}
+                      selectedDate={dateObj}
+                      taskDifficulty={difficulty}
+                      hideScheduledTime
+                      hideDuration
+                      hideMoreInformation
+                      hideReminder
+                      hideRecurrence
+                      requireScheduledTimeForRecurrence
+                      visualStyle="quest-soft"
+                    />
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
             </div>
           ) : (
             <QuestTemplateBrowser
@@ -837,7 +915,12 @@ export const AddQuestSheet = memo(function AddQuestSheet({
         </div>
 
         {sheetView === "editor" && (
-          <div className="flex-shrink-0 flex flex-col gap-3 border-t border-white/8 px-5 pt-4 pb-6">
+          <div
+            className={cn(
+              "flex-shrink-0 flex flex-col gap-3 px-5 pt-4",
+              isDesktopPanel ? `${QUEST_FORM_STYLES.desktopPanelFooter} pb-5` : "border-t border-white/8 pb-6",
+            )}
+          >
             <div className={QUEST_FORM_STYLES.footerReview}>
               <p className="text-xs text-white/74">
                 {reviewTitle} · {reviewTimeLabel} · {reviewDateLabel}

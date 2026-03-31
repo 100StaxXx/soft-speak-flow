@@ -125,6 +125,22 @@ describe("AddQuestSheet", () => {
     expect(screen.queryByRole("button", { name: /next/i })).not.toBeInTheDocument();
   });
 
+  it("renders the desktop panel presentation when requested", () => {
+    render(
+      <AddQuestSheet
+        open
+        presentation="desktop-panel"
+        onOpenChange={vi.fn()}
+        selectedDate={selectedDate}
+        onAdd={vi.fn().mockResolvedValue(undefined)}
+      />
+    );
+
+    expect(screen.getByTestId("add-quest-desktop-panel")).toBeInTheDocument();
+    expect(screen.queryByTestId("add-quest-mobile-sheet")).not.toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Quest Title")).toBeInTheDocument();
+  });
+
   it("renders Advanced Settings below Photo / Files", () => {
     render(
       <AddQuestSheet

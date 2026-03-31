@@ -1141,6 +1141,7 @@ const Journeys = () => {
           isAdding={isAdding}
           prefilledTime={prefilledTime}
           autoFillTimeOnFirstTap={shouldAutoFillTutorialTime}
+          presentation={isMacHostedIOSApp ? "desktop-panel" : "mobile-sheet"}
           onCreateCampaign={() => setShowPathfinder(true)}
         />
         
@@ -1156,6 +1157,7 @@ const Journeys = () => {
           isSendingToCalendar={sendTaskToCalendar.isPending}
           onDelete={handleDeleteEditingQuest}
           isDeleting={isDeleting}
+          presentation={isMacHostedIOSApp ? "desktop-panel" : "mobile-sheet"}
         />
         
         {/* Edit Ritual Sheet (for habits/rituals with two-way sync) */}

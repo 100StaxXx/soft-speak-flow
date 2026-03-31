@@ -26,6 +26,7 @@ import { useSubtasks } from "@/features/tasks/hooks/useSubtasks";
 import {
   DIFFICULTY_COLORS,
   QUEST_FORM_STYLES,
+  type QuestComposerPresentation,
   getQuestDifficultyIconClasses,
   getQuestDifficultyOptionClasses,
 } from "@/components/quest-shared";
@@ -90,6 +91,7 @@ interface EditQuestDialogProps {
   onSendToCalendar?: (taskId: string) => Promise<void> | void;
   hasCalendarLink?: boolean;
   isSendingToCalendar?: boolean;
+  presentation?: QuestComposerPresentation;
 }
 
 export function EditQuestDialog({
@@ -103,6 +105,7 @@ export function EditQuestDialog({
   onSendToCalendar,
   hasCalendarLink = false,
   isSendingToCalendar = false,
+  presentation = "mobile-sheet",
 }: EditQuestDialogProps) {
   const [taskText, setTaskText] = useState("");
   const [taskDate, setTaskDate] = useState<string | null>(null);
@@ -218,6 +221,12 @@ export function EditQuestDialog({
   const colors = DIFFICULTY_COLORS[difficulty];
   const dateObj = parsedTaskDate ?? new Date();
   const hasRecurrenceWithoutTime = recurrenceRequiresScheduledTime(recurrencePattern, scheduledTime);
+  const isDesktopPanel = presentation === "desktop-panel";
+  const difficultyOptions = [
+    { value: "easy" as const, icon: Zap, label: "Easy" },
+    { value: "medium" as const, icon: Flame, label: "Medium" },
+    { value: "hard" as const, icon: Mountain, label: "Hard" },
+  ];
 
   const handleSave = useCallback(async () => {
     if (!task || !taskText.trim() || hasRecurrenceWithoutTime) return;
@@ -259,10 +268,13 @@ export function EditQuestDialog({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
-        side="bottom"
+        side={isDesktopPanel ? "right" : "bottom"}
+        data-testid={isDesktopPanel ? "edit-quest-desktop-panel" : "edit-quest-mobile-sheet"}
         className={cn(
-          "h-[92vh] rounded-t-[34px] flex flex-col p-0 gap-0 overflow-hidden",
-          QUEST_FORM_STYLES.sheet,
+          isDesktopPanel
+            ? "!top-4 !bottom-4 !left-auto !right-4 !h-[calc(100dvh-2rem)] !w-[calc(100vw-2rem)] !max-w-[640px] !rounded-[32px] flex flex-col !p-0 !gap-0 overflow-hidden sm:!w-[620px]"
+            : "h-[92vh] rounded-t-[34px] flex flex-col p-0 gap-0 overflow-hidden",
+          isDesktopPanel ? QUEST_FORM_STYLES.desktopPanelShell : QUEST_FORM_STYLES.sheet,
         )}
       >
         <SheetTitle className="sr-only">Edit Quest</SheetTitle>
@@ -270,72 +282,109 @@ export function EditQuestDialog({
           Update this quest details, schedule, and reminders.
         </SheetDescription>
 
-        {/* Header Banner - difficulty colored, editable title */}
-        <div className={cn("relative isolate overflow-hidden px-4 pt-3 pb-4 flex-shrink-0", colors.bg)}>
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.26),transparent_72%)] opacity-80" />
-          <div className="pointer-events-none absolute -left-10 top-10 h-24 w-24 rounded-full bg-white/[0.10] blur-2xl" />
-          <div className="pointer-events-none absolute -right-8 bottom-5 h-28 w-28 rounded-full bg-black/10 blur-2xl" />
-          <div className="flex items-center gap-2.5">
-            <button
-              onClick={() => onOpenChange(false)}
-              className="rounded-full border border-white/22 bg-black/10 p-2 text-white shadow-[0_10px_18px_rgba(0,0,0,0.14)] backdrop-blur-md transition-all duration-200 ease-out hover:bg-black/18 active:scale-[0.97] motion-reduce:transition-none"
-              aria-label="Close"
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </button>
-            <div className="flex-1 min-w-0">
-              <div className={QUEST_FORM_STYLES.titleFieldShell}>
-                <div className={QUEST_FORM_STYLES.titleFieldInner}>
-                  <Input
-                    value={taskText}
-                    onChange={(e) => setTaskText(e.target.value)}
-                    className={QUEST_FORM_STYLES.titleInput}
-                    placeholder="Quest title"
-                  />
-                </div>
+        {isDesktopPanel ? (
+          <div className={cn("flex-shrink-0 px-5 py-5", QUEST_FORM_STYLES.desktopPanelHeader)}>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-white/42">
+                  Edit Quest
+                </p>
+                <p className="mt-1 text-sm text-white/62">{summaryLine}</p>
               </div>
-              <p className="mt-1.5 text-sm text-white/80">{summaryLine}</p>
-            </div>
-            <button
-              onClick={() => onOpenChange(false)}
-              className="rounded-full border border-white/22 bg-black/10 p-2 text-white shadow-[0_10px_18px_rgba(0,0,0,0.14)] backdrop-blur-md transition-all duration-200 ease-out hover:bg-black/18 active:scale-[0.97] motion-reduce:transition-none"
-              aria-label="Close"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-
-          {/* Compact Difficulty Selector */}
-          <div className="mt-3 flex justify-center gap-2">
-            {([
-              { value: "easy" as const, icon: Zap, label: "Easy" },
-              { value: "medium" as const, icon: Flame, label: "Medium" },
-              { value: "hard" as const, icon: Mountain, label: "Hard" },
-            ]).map(({ value, icon: Icon, label }) => (
               <button
-                key={value}
-                onClick={() => setDifficulty(value)}
-                className={getQuestDifficultyOptionClasses(value, difficulty === value)}
+                onClick={() => onOpenChange(false)}
+                className={QUEST_FORM_STYLES.desktopPanelCloseButton}
+                aria-label="Close"
               >
-                <span className={getQuestDifficultyIconClasses(value, difficulty === value)}>
-                  <Icon className="h-3.5 w-3.5" />
-                </span>
-                <span className="font-fredoka text-[12px] leading-none">{label}</span>
+                <X className="h-4 w-4" />
               </button>
-            ))}
+            </div>
+
+            <div className={cn("mt-4 space-y-4", QUEST_FORM_STYLES.desktopPanelHeaderCard)}>
+              <Input
+                value={taskText}
+                onChange={(e) => setTaskText(e.target.value)}
+                className={QUEST_FORM_STYLES.desktopPanelInput}
+                placeholder="Quest title"
+              />
+
+              <div className="flex flex-wrap items-center gap-2">
+                {difficultyOptions.map(({ value, icon: Icon, label }) => (
+                  <button
+                    key={value}
+                    onClick={() => setDifficulty(value)}
+                    className={getQuestDifficultyOptionClasses(value, difficulty === value)}
+                  >
+                    <span className={getQuestDifficultyIconClasses(value, difficulty === value)}>
+                      <Icon className="h-3.5 w-3.5" />
+                    </span>
+                    <span className="font-fredoka text-[12px] leading-none">{label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className={cn("relative isolate overflow-hidden px-4 pt-3 pb-4 flex-shrink-0", colors.bg)}>
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.26),transparent_72%)] opacity-80" />
+            <div className="pointer-events-none absolute -left-10 top-10 h-24 w-24 rounded-full bg-white/[0.10] blur-2xl" />
+            <div className="pointer-events-none absolute -right-8 bottom-5 h-28 w-28 rounded-full bg-black/10 blur-2xl" />
+            <div className="flex items-center gap-2.5">
+              <button
+                onClick={() => onOpenChange(false)}
+                className="rounded-full border border-white/22 bg-black/10 p-2 text-white shadow-[0_10px_18px_rgba(0,0,0,0.14)] backdrop-blur-md transition-all duration-200 ease-out hover:bg-black/18 active:scale-[0.97] motion-reduce:transition-none"
+                aria-label="Close"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </button>
+              <div className="flex-1 min-w-0">
+                <div className={QUEST_FORM_STYLES.titleFieldShell}>
+                  <div className={QUEST_FORM_STYLES.titleFieldInner}>
+                    <Input
+                      value={taskText}
+                      onChange={(e) => setTaskText(e.target.value)}
+                      className={QUEST_FORM_STYLES.titleInput}
+                      placeholder="Quest title"
+                    />
+                  </div>
+                </div>
+                <p className="mt-1.5 text-sm text-white/80">{summaryLine}</p>
+              </div>
+              <button
+                onClick={() => onOpenChange(false)}
+                className="rounded-full border border-white/22 bg-black/10 p-2 text-white shadow-[0_10px_18px_rgba(0,0,0,0.14)] backdrop-blur-md transition-all duration-200 ease-out hover:bg-black/18 active:scale-[0.97] motion-reduce:transition-none"
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="mt-3 flex justify-center gap-2">
+              {difficultyOptions.map(({ value, icon: Icon, label }) => (
+                <button
+                  key={value}
+                  onClick={() => setDifficulty(value)}
+                  className={getQuestDifficultyOptionClasses(value, difficulty === value)}
+                >
+                  <span className={getQuestDifficultyIconClasses(value, difficulty === value)}>
+                    <Icon className="h-3.5 w-3.5" />
+                  </span>
+                  <span className="font-fredoka text-[12px] leading-none">{label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Scrollable Body */}
-        <div className={cn("flex-1 overflow-y-auto", QUEST_FORM_STYLES.body)}>
-          <div className="px-4 py-4 space-y-4">
-            {/* Date & Time Chips side by side */}
-            <div className="flex gap-2">
+        <div className={cn("flex-1 min-h-0 overflow-y-auto", QUEST_FORM_STYLES.body)}>
+          <div className={cn(isDesktopPanel ? "px-5 py-5 space-y-5" : "px-4 py-4 space-y-4")}>
+            <div className={cn(isDesktopPanel ? "grid grid-cols-1 items-start gap-3 sm:grid-cols-3" : "space-y-4")}>
               {/* Date Chip */}
               <Popover>
                 <PopoverTrigger asChild>
                   <button className={cn(
-                    "flex-1 flex items-center justify-center gap-2 text-sm font-semibold text-white",
+                    "flex items-center justify-center gap-2 text-sm font-semibold text-white",
                     QUEST_FORM_STYLES.selectorChip,
                     taskDate
                       ? ""
@@ -365,15 +414,14 @@ export function EditQuestDialog({
                 stepMinutes={30}
                 seedValueOnOpen={() => getNextTimeForStep(30)}
                 endTimeHint={endTime}
-                className="flex-1"
+              />
+              <DurationPickerField
+                value={estimatedDuration}
+                onChange={setEstimatedDuration}
+                variant="quest-soft"
+                tone={difficulty}
               />
             </div>
-            <DurationPickerField
-              value={estimatedDuration}
-              onChange={setEstimatedDuration}
-              variant="quest-soft"
-              tone={difficulty}
-            />
 
             {/* Subtasks + Notes Card */}
             <div className={cn(QUEST_FORM_STYLES.sectionCard, "overflow-hidden")}>
@@ -522,17 +570,22 @@ export function EditQuestDialog({
         </div>
 
         {/* Footer */}
-        <div className="flex-shrink-0 flex flex-col gap-3 border-t border-white/8 px-5 pt-4 pb-6">
-            <Button
-              onClick={handleSave}
-              disabled={isSaving || !taskText.trim() || hasRecurrenceWithoutTime}
-              className={cn(
-                "h-14 w-full rounded-[28px] font-fredoka text-[1.05rem] tracking-[0.01em] disabled:opacity-100",
-                taskText.trim() && !hasRecurrenceWithoutTime ? colors.primaryButton : colors.primaryButtonDisabled,
-              )}
-            >
-              {isSaving ? "Saving..." : "Save Changes"}
-            </Button>
+        <div
+          className={cn(
+            "flex-shrink-0 flex flex-col gap-3 px-5 pt-4",
+            isDesktopPanel ? `${QUEST_FORM_STYLES.desktopPanelFooter} pb-5` : "border-t border-white/8 pb-6",
+          )}
+        >
+          <Button
+            onClick={handleSave}
+            disabled={isSaving || !taskText.trim() || hasRecurrenceWithoutTime}
+            className={cn(
+              "h-14 w-full rounded-[28px] font-fredoka text-[1.05rem] tracking-[0.01em] disabled:opacity-100",
+              taskText.trim() && !hasRecurrenceWithoutTime ? colors.primaryButton : colors.primaryButtonDisabled,
+            )}
+          >
+            {isSaving ? "Saving..." : "Save Changes"}
+          </Button>
           {onSendToCalendar && (
             <Button
               variant="outline"

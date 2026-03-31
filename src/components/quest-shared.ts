@@ -39,6 +39,7 @@ export const DIFFICULTY_COLORS = {
 } as const;
 
 export type QuestFormDifficulty = keyof typeof DIFFICULTY_COLORS;
+export type QuestComposerPresentation = "mobile-sheet" | "desktop-panel";
 
 export const DifficultyIconMap = {
   easy: Zap,
@@ -104,6 +105,20 @@ export const QUEST_FORM_STYLES = {
     "rounded-[26px] border border-white/10 bg-[linear-gradient(180deg,rgba(43,37,60,0.98),rgba(33,28,47,0.98))] p-2 text-white shadow-[0_20px_36px_rgba(0,0,0,0.28)] backdrop-blur-2xl",
   footerLink:
     "text-sm text-white/68 transition-colors hover:text-white/90",
+  desktopPanelShell:
+    "border border-white/10 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.06),transparent_24%),linear-gradient(180deg,rgba(31,27,44,0.985),rgba(23,20,34,0.985))] shadow-[0_28px_60px_rgba(0,0,0,0.38)]",
+  desktopPanelHeader:
+    "border-b border-white/8 bg-[linear-gradient(180deg,rgba(40,35,57,0.96),rgba(28,24,41,0.98))]",
+  desktopPanelHeaderCard:
+    "rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.09),rgba(255,255,255,0.03))] p-4 shadow-[0_14px_28px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.06)]",
+  desktopPanelFooter:
+    "border-t border-white/8 bg-[linear-gradient(180deg,rgba(31,27,44,0.92),rgba(23,20,34,0.98))] backdrop-blur-xl",
+  desktopPanelCloseButton:
+    "rounded-full border border-white/12 bg-white/[0.06] p-2 text-white/72 shadow-[0_10px_18px_rgba(0,0,0,0.14)] transition-all duration-200 ease-out hover:bg-white/[0.1] hover:text-white active:scale-[0.97] motion-reduce:transition-none",
+  desktopPanelToolbarButton:
+    "inline-flex items-center gap-2 rounded-[18px] border border-white/10 bg-white/[0.05] px-3 py-2 text-sm font-semibold text-white/74 shadow-[0_10px_18px_rgba(0,0,0,0.12)] transition-all duration-200 ease-out hover:bg-white/[0.09] hover:text-white motion-reduce:transition-none",
+  desktopPanelInput:
+    "h-12 rounded-[20px] border-white/10 bg-white/[0.06] px-4 text-[15px] font-semibold text-white placeholder:text-white/40 focus-visible:ring-1 focus-visible:ring-white/15 focus-visible:ring-offset-0",
 } as const;
 
 export const QUEST_TEMPLATE_BROWSER_STYLES = {

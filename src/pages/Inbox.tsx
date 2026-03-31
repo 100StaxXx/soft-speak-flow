@@ -1,4 +1,4 @@
-import { useState, useCallback, memo } from "react";
+import { useState, useCallback, useMemo, memo } from "react";
 import { format } from "date-fns";
 import { motion, useReducedMotion } from "framer-motion";
 import { Inbox as InboxIcon, Check, Trash2, Pencil } from "lucide-react";
@@ -22,6 +22,7 @@ import { useQuestCalendarSync } from "@/hooks/useQuestCalendarSync";
 import { useCalendarIntegrations } from "@/hooks/useCalendarIntegrations";
 import { useMainTabVisibility } from "@/contexts/MainTabVisibilityContext";
 import { SEND_TO_CALENDAR_ENABLED } from "@/utils/calendarFeatureFlags";
+import { isMacDesignedForIPadIOSApp } from "@/utils/platformTargets";
 
 const TIME_24H_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const DATE_INPUT_REGEX = /^\d{4}-\d{2}-\d{2}$/;
@@ -37,6 +38,7 @@ const isQueuedTaskMutationResult = (
 const InboxPage = memo(function InboxPage() {
   const prefersReducedMotion = useReducedMotion();
   const navigate = useNavigate();
+  const isMacHostedIOSApp = useMemo(() => isMacDesignedForIPadIOSApp(), []);
   const { user } = useAuth();
   const { isTabActive } = useMainTabVisibility();
   const queryClient = useQueryClient();
@@ -328,6 +330,7 @@ const InboxPage = memo(function InboxPage() {
           onOpenChange={setShowAddQuest}
           selectedDate={new Date()}
           onAdd={handleAddQuest}
+          presentation={isMacHostedIOSApp ? "desktop-panel" : "mobile-sheet"}
         />
 
         <EditQuestDialog
@@ -344,6 +347,7 @@ const InboxPage = memo(function InboxPage() {
             setEditingTask(null);
           }}
           isDeleting={false}
+          presentation={isMacHostedIOSApp ? "desktop-panel" : "mobile-sheet"}
         />
 
       </div>

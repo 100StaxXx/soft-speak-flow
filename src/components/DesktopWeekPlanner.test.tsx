@@ -71,9 +71,10 @@ describe("DesktopWeekPlanner", () => {
 
     expect(screen.getByTestId("desktop-week-day-2026-03-29")).toBeInTheDocument();
     expect(screen.getByTestId("desktop-week-day-2026-04-04")).toBeInTheDocument();
+    expect(screen.getByTestId("desktop-week-hour-6")).toBeInTheDocument();
   });
 
-  it("groups tasks by day and sorts timed quests before anytime quests", () => {
+  it("places timed tasks into hour rows and anytime tasks into the anytime lane", () => {
     render(
       <DesktopWeekPlanner
         selectedDate={selectedDate}
@@ -103,16 +104,9 @@ describe("DesktopWeekPlanner", () => {
       />,
     );
 
-    const tuesdayColumn = screen.getByTestId("desktop-week-day-2026-03-31");
-    const renderedTaskIds = within(tuesdayColumn)
-      .getAllByTestId(/desktop-week-task-/)
-      .map((node) => node.getAttribute("data-testid"));
-
-    expect(renderedTaskIds).toEqual([
-      "desktop-week-task-timed-task",
-      "desktop-week-task-anytime-task",
-    ]);
-    expect(within(screen.getByTestId("desktop-week-day-2026-04-01")).getByText("Wednesday review")).toBeInTheDocument();
+    expect(screen.getByTestId("desktop-week-task-timed-task")).toBeInTheDocument();
+    expect(within(screen.getByTestId("desktop-week-anytime-2026-03-31")).getByText("Loose planning")).toBeInTheDocument();
+    expect(screen.getByText("Wednesday review")).toBeInTheDocument();
   });
 
   it("keeps week actions wired to the provided callbacks", () => {

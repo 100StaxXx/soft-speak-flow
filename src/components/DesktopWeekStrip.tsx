@@ -61,27 +61,27 @@ export function DesktopWeekStrip({
 
   return (
     <section>
-      <div className="journeys-week-strip rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(24,21,39,0.94),rgba(14,12,24,0.88))] p-5 shadow-[0_24px_48px_rgba(0,0,0,0.24)] backdrop-blur-xl">
-        <div className="mb-4 flex items-start justify-between gap-4">
+      <div className="journeys-week-strip rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(24,21,39,0.94),rgba(14,12,24,0.88))] p-4 shadow-[0_24px_48px_rgba(0,0,0,0.24)] backdrop-blur-xl">
+        <div className="mb-3 flex items-start justify-between gap-4">
           <div className="space-y-1">
             <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-muted-foreground/80">
               Week View
             </p>
             <div>
-              <h2 className="text-2xl font-semibold tracking-tight text-foreground">
+              <h2 className="text-[1.55rem] font-semibold tracking-tight text-foreground">
                 {format(weekStart, "MMMM yyyy")}
               </h2>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-[13px] text-muted-foreground">
                 {format(weekStart, "MMM d")} - {format(weekEnd, "MMM d")} · {weekCompleted}/{weekTotal} completed
               </p>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {plannerMode && onPlannerModeChange ? (
                 <div
-                  className="flex items-center gap-1 rounded-2xl border border-white/10 bg-white/5 p-1"
+                  className="flex items-center gap-1 rounded-[18px] border border-white/10 bg-white/5 p-1"
                   role="group"
                   aria-label="Desktop planner mode"
                 >
@@ -90,7 +90,7 @@ export function DesktopWeekStrip({
                     variant={plannerMode === "week" ? "secondary" : "ghost"}
                     size="sm"
                     className={cn(
-                      "h-8 rounded-xl px-3 text-xs",
+                      "h-8 rounded-[14px] px-3 text-xs",
                       plannerMode === "week"
                         ? "bg-white/12 text-white hover:bg-white/15"
                         : "text-muted-foreground hover:bg-white/8 hover:text-foreground",
@@ -105,7 +105,7 @@ export function DesktopWeekStrip({
                     variant={plannerMode === "day" ? "secondary" : "ghost"}
                     size="sm"
                     className={cn(
-                      "h-8 rounded-xl px-3 text-xs",
+                      "h-8 rounded-[14px] px-3 text-xs",
                       plannerMode === "day"
                         ? "bg-white/12 text-white hover:bg-white/15"
                         : "text-muted-foreground hover:bg-white/8 hover:text-foreground",
@@ -120,7 +120,7 @@ export function DesktopWeekStrip({
               <Button
                 variant="outline"
                 size="icon"
-                className="h-10 w-10 rounded-2xl border-white/10 bg-white/5 hover:bg-white/10"
+                className="h-9 w-9 rounded-[18px] border-white/10 bg-white/5 hover:bg-white/10"
                 onClick={() => onDateSelect(subWeeks(selectedDate, 1))}
                 aria-label="Previous week"
               >
@@ -129,7 +129,7 @@ export function DesktopWeekStrip({
               <Button
                 variant="outline"
                 size="sm"
-                className="rounded-2xl border-white/10 bg-white/5 hover:bg-white/10"
+                className="h-9 rounded-[18px] border-white/10 bg-white/5 px-3 text-xs hover:bg-white/10"
                 onClick={() => onDateSelect(new Date())}
               >
                 Today
@@ -137,7 +137,7 @@ export function DesktopWeekStrip({
               <Button
                 variant="outline"
                 size="icon"
-                className="h-10 w-10 rounded-2xl border-white/10 bg-white/5 hover:bg-white/10"
+                className="h-9 w-9 rounded-[18px] border-white/10 bg-white/5 hover:bg-white/10"
                 onClick={() => onDateSelect(addWeeks(selectedDate, 1))}
                 aria-label="Next week"
               >
@@ -146,7 +146,7 @@ export function DesktopWeekStrip({
               <Button
                 variant="outline"
                 size="sm"
-                className="rounded-2xl border-white/10 bg-white/5 hover:bg-white/10"
+                className="h-9 rounded-[18px] border-white/10 bg-white/5 px-3 text-xs hover:bg-white/10"
                 onClick={onOpenMonthView}
               >
                 <CalendarDays className="h-4 w-4" />
@@ -157,7 +157,7 @@ export function DesktopWeekStrip({
             {onAddQuest ? (
               <Button
                 size="sm"
-                className="h-10 rounded-2xl px-4 shadow-[0_14px_28px_rgba(122,61,255,0.2)]"
+                className="h-9 rounded-[18px] px-4 shadow-[0_14px_28px_rgba(122,61,255,0.2)]"
                 onClick={onAddQuest}
               >
                 <Plus className="h-4 w-4" />
@@ -173,7 +173,7 @@ export function DesktopWeekStrip({
           </div>
         </div>
 
-        <div className="grid grid-cols-7 gap-3">
+        <div className="grid grid-cols-7 gap-2.5">
           {weekDays.map((day) => {
             const dateKey = format(day, "yyyy-MM-dd");
             const stats = dayStats.get(dateKey) ?? { total: 0, completed: 0, scheduled: 0 };
@@ -187,7 +187,7 @@ export function DesktopWeekStrip({
                 type="button"
                 onClick={() => onDateSelect(day)}
                 className={cn(
-                  "rounded-[24px] border px-4 py-4 text-left transition-all duration-200",
+                  "rounded-[20px] border px-3.5 py-3 text-left transition-all duration-200",
                   "bg-white/[0.03] hover:bg-white/[0.06]",
                   selected
                     ? "border-primary/60 bg-primary/14 shadow-[0_18px_34px_rgba(122,61,255,0.18)]"
@@ -195,7 +195,7 @@ export function DesktopWeekStrip({
                   today && !selected && "border-celestial-blue/30 bg-celestial-blue/[0.08]",
                 )}
               >
-                <div className="mb-3 flex items-start justify-between gap-2">
+                <div className="mb-2.5 flex items-start justify-between gap-2">
                   <div>
                     <p
                       className={cn(
@@ -209,7 +209,7 @@ export function DesktopWeekStrip({
                     >
                       {format(day, "EEE")}
                     </p>
-                    <p className="mt-1 text-3xl font-semibold leading-none text-foreground">
+                    <p className="mt-1 text-[1.9rem] font-semibold leading-none text-foreground">
                       {format(day, "d")}
                     </p>
                   </div>

@@ -124,6 +124,23 @@ describe("EditQuestDialog", () => {
     expect(screen.getByRole("button", { name: "Save Changes" })).toBeEnabled();
   });
 
+  it("renders the desktop panel presentation when requested", () => {
+    render(
+      <EditQuestDialog
+        task={legacyTask}
+        open
+        presentation="desktop-panel"
+        onOpenChange={vi.fn()}
+        onSave={vi.fn().mockResolvedValue(undefined)}
+        isSaving={false}
+      />,
+    );
+
+    expect(screen.getByTestId("edit-quest-desktop-panel")).toBeInTheDocument();
+    expect(screen.queryByTestId("edit-quest-mobile-sheet")).not.toBeInTheDocument();
+    expect(screen.getByDisplayValue("Legacy quest")).toBeInTheDocument();
+  });
+
   it("renders duration below time controls and above subtasks", () => {
     render(
       <EditQuestDialog

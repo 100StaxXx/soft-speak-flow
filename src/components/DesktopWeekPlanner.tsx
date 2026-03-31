@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { Fragment, useMemo } from "react";
 import { addDays, format, isSameDay, isToday, startOfWeek } from "date-fns";
 import {
   CalendarArrowUp,
@@ -68,6 +68,14 @@ interface DayStats {
   timed: number;
 }
 
+interface DayBuckets {
+  anytime: DailyTask[];
+  timedByHour: Map<number, DailyTask[]>;
+}
+
+const DEFAULT_TIMELINE_START_HOUR = 6;
+const DEFAULT_TIMELINE_END_HOUR = 21;
+
 const formatTime = (time: string | null | undefined) => {
   if (!time) return "Anytime";
   const [hours, minutes] = time.split(":");
@@ -76,6 +84,32 @@ const formatTime = (time: string | null | undefined) => {
   const meridiem = hour >= 12 ? "PM" : "AM";
   const displayHour = hour % 12 || 12;
   return `${displayHour}:${minutes} ${meridiem}`;
+};
+
+const formatHourLabel = (hour: number) => format(new Date(2000, 0, 1, hour, 0), "h a");
+
+const formatDuration = (minutes: number | null | undefined) => {
+  if (!minutes) return null;
+  if (minutes === 1440) return "All day";
+  if (minutes < 60) return `${minutes}m`;
+  const hours = minutes / 60;
+  return Number.isInteger(hours) ? `${hours}h` : `${hours.toFixed(1)}h`;
+};
+
+const parseHour = (time: string | null | undefined) => {
+  if (!time) return null;
+  const [hours] = time.split(":");
+  const parsed = Number.parseInt(hours, 10);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const parseMinute = (time: string | null | undefined) => {
+  if (!time) return null;
+  const [hours, minutes] = time.split(":");
+  const parsedHours = Number.parseInt(hours, 10);
+  const parsedMinutes = Number.parseInt(minutes ?? "0", 10);
+  if (!Number.isFinite(parsedHours) || !Number.isFinite(parsedMinutes)) return null;
+  return (parsedHours * 60) + parsedMinutes;
 };
 
 const getEffectiveTaskXP = (task: Pick<DailyTask, "xp_reward" | "is_main_quest">) => (
@@ -159,6 +193,71 @@ export function DesktopWeekPlanner({
     return stats;
   }, [tasksByDate]);
 
+  const dayBucketsByDate = useMemo(() => {
+    const buckets = new Map<string, DayBuckets>();
+
+    weekDays.forEach((day) => {
+      buckets.set(format(day, "yyyy-MM-dd"), {
+        anytime: [],
+        timedByHour: new Map<number, DailyTask[]>(),
+      });
+    });
+
+    tasksByDate.forEach((dayTasks, dateKey) => {
+      const anytime: DailyTask[] = [];
+      const timedByHour = new Map<number, DailyTask[]>();
+
+      dayTasks.forEach((task) => {
+        const hour = parseHour(task.scheduled_time);
+        if (hour === null) {
+          anytime.push(task);
+          return;
+        }
+
+        const existing = timedByHour.get(hour) ?? [];
+        existing.push(task);
+        timedByHour.set(hour, existing);
+      });
+
+      timedByHour.forEach((hourTasks, hour) => {
+        timedByHour.set(hour, hourTasks.slice().sort(sortWeekTasks));
+      });
+
+      buckets.set(dateKey, {
+        anytime,
+        timedByHour,
+      });
+    });
+
+    return buckets;
+  }, [tasksByDate, weekDays]);
+
+  const timelineHours = useMemo(() => {
+    const scheduledMinutes = tasks
+      .map((task) => parseMinute(task.scheduled_time))
+      .filter((value): value is number => value !== null);
+
+    if (scheduledMinutes.length === 0) {
+      return Array.from(
+        { length: DEFAULT_TIMELINE_END_HOUR - DEFAULT_TIMELINE_START_HOUR + 1 },
+        (_, index) => DEFAULT_TIMELINE_START_HOUR + index,
+      );
+    }
+
+    const earliestHour = Math.floor(Math.min(...scheduledMinutes) / 60);
+    const latestHour = tasks.reduce((latest, task) => {
+      const startMinute = parseMinute(task.scheduled_time);
+      if (startMinute === null) return latest;
+      const endMinute = startMinute + Math.max(task.estimated_duration ?? 30, 30) - 1;
+      return Math.max(latest, Math.floor(endMinute / 60));
+    }, DEFAULT_TIMELINE_END_HOUR);
+
+    const startHour = Math.max(0, Math.min(DEFAULT_TIMELINE_START_HOUR, earliestHour));
+    const endHour = Math.min(23, Math.max(DEFAULT_TIMELINE_END_HOUR, latestHour));
+
+    return Array.from({ length: endHour - startHour + 1 }, (_, index) => startHour + index);
+  }, [tasks]);
+
   const ritualTasks = useMemo(
     () => tasks.filter((task) => !!task.habit_source_id),
     [tasks],
@@ -199,24 +298,163 @@ export function DesktopWeekPlanner({
   }, [activeEpics, ritualTasks]);
 
   const desktopRailCardClass =
-    "journeys-desktop-rail-card rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(23,20,38,0.94),rgba(16,13,27,0.9))] p-5 shadow-[0_20px_40px_rgba(0,0,0,0.2)]";
+    "journeys-desktop-rail-card rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(23,20,38,0.94),rgba(16,13,27,0.9))] p-5 shadow-[0_20px_40px_rgba(0,0,0,0.2)]";
+
+  const renderTaskCard = (task: DailyTask, compact = false) => {
+    const effectiveTaskXP = getEffectiveTaskXP(task);
+    const isComplete = !!task.completed;
+    const isRitual = !!task.habit_source_id;
+    const duration = formatDuration(task.estimated_duration);
+
+    return (
+      <div
+        key={task.id}
+        className={cn(
+          "rounded-[18px] border border-white/10 bg-white/[0.05] p-2.5 shadow-[0_12px_22px_rgba(0,0,0,0.14)]",
+          compact && "rounded-[16px] p-2",
+          isComplete && "opacity-65",
+        )}
+        data-testid={`desktop-week-task-${task.id}`}
+      >
+        <div className="flex items-start gap-2.5">
+          <button
+            type="button"
+            onClick={() => {
+              if (isComplete && onUndoToggle) {
+                onUndoToggle(task.id, effectiveTaskXP);
+                return;
+              }
+              onToggle(task.id, !isComplete, effectiveTaskXP);
+            }}
+            className={cn(
+              "mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border-2 transition-colors",
+              isComplete
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-white/25 text-transparent hover:border-primary/70",
+            )}
+            aria-label={isComplete ? "Mark task as incomplete" : "Mark task as complete"}
+          >
+            <Check className="h-3 w-3" />
+          </button>
+
+          <div className="min-w-0 flex-1">
+            <div className="flex items-start justify-between gap-2">
+              <p
+                className={cn(
+                  compact ? "text-xs" : "text-sm",
+                  "line-clamp-2 font-medium text-foreground",
+                  isComplete && "text-muted-foreground line-through",
+                )}
+              >
+                {task.task_text}
+              </p>
+              {task.is_main_quest ? (
+                <Badge
+                  variant="outline"
+                  className="h-5 shrink-0 border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[10px]"
+                >
+                  Main
+                </Badge>
+              ) : null}
+            </div>
+
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
+              <span className="inline-flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                {formatTime(task.scheduled_time)}
+              </span>
+              {duration ? (
+                <span className="rounded-full border border-white/8 bg-white/[0.04] px-1.5 py-0.5 text-white/66">
+                  {duration}
+                </span>
+              ) : null}
+              {isRitual ? (
+                <span className="inline-flex items-center gap-1">
+                  <Repeat className="h-3 w-3" />
+                  Ritual
+                </span>
+              ) : null}
+              <span className="font-semibold text-stardust-gold/85">+{effectiveTaskXP} XP</span>
+            </div>
+
+            {!isComplete && (onEditQuest || onSendToCalendar || onMoveQuestToNextDay || onDeleteQuest) ? (
+              <div className="mt-2 flex flex-wrap items-center gap-1">
+                {onEditQuest ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 rounded-xl px-2"
+                    onClick={() => onEditQuest(task)}
+                    aria-label={`Edit ${task.task_text}`}
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                ) : null}
+                {onSendToCalendar ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 rounded-xl px-2"
+                    onClick={() => onSendToCalendar(task.id)}
+                    aria-label={
+                      hasCalendarLink?.(task.id)
+                        ? `Re-send ${task.task_text} to calendar`
+                        : `Send ${task.task_text} to calendar`
+                    }
+                  >
+                    <CalendarPlus className="h-3.5 w-3.5" />
+                  </Button>
+                ) : null}
+                {onMoveQuestToNextDay && !isRitual ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 rounded-xl px-2"
+                    onClick={() => onMoveQuestToNextDay(task)}
+                    aria-label={`Move ${task.task_text} to tomorrow`}
+                  >
+                    <CalendarArrowUp className="h-3.5 w-3.5" />
+                  </Button>
+                ) : null}
+                {onDeleteQuest ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 rounded-xl px-2 text-destructive hover:text-destructive"
+                    onClick={() => onDeleteQuest(task)}
+                    aria-label={`Delete ${task.task_text}`}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div
-      className="grid grid-cols-[minmax(0,1fr)_340px] items-start gap-6"
+      className="grid grid-cols-[minmax(0,1fr)_320px] items-start gap-5"
       data-testid="desktop-week-planner"
     >
-      <div className="journeys-desktop-shell flex min-h-0 flex-col rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgba(24,21,39,0.95),rgba(13,11,23,0.92))] px-5 py-5 shadow-[0_28px_54px_rgba(0,0,0,0.24)]">
-        <div className="mb-5 flex items-center justify-between gap-4">
+      <div className="journeys-desktop-shell flex min-h-0 flex-col rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgba(24,21,39,0.95),rgba(13,11,23,0.92))] px-4 py-4 shadow-[0_28px_54px_rgba(0,0,0,0.24)]">
+        <div className="mb-4 flex items-start justify-between gap-4">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-muted-foreground/75">
               Week Planner
             </p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
+            <h2 className="mt-2 text-[1.65rem] font-semibold tracking-tight text-foreground">
               {format(weekStart, "MMMM d")} - {format(addDays(weekStart, 6), "MMMM d")}
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Keep the full week visible while still jumping into any selected day.
+              Keep the full week visible with timed quests placed into a desktop schedule.
             </p>
           </div>
 
@@ -228,223 +466,158 @@ export function DesktopWeekPlanner({
           ) : null}
         </div>
 
-        <div className="overflow-x-auto pb-1">
-          <div className="grid min-w-[980px] grid-cols-7 gap-3">
-            {weekDays.map((day) => {
-              const dateKey = format(day, "yyyy-MM-dd");
-              const dayTasks = tasksByDate.get(dateKey) ?? [];
-              const dayStats = dayStatsByDate.get(dateKey) ?? { total: 0, completed: 0, timed: 0 };
-              const dayPercent = dayStats.total > 0 ? (dayStats.completed / dayStats.total) * 100 : 0;
-              const isSelected = isSameDay(day, selectedDate);
-              const dayIsToday = isToday(day);
+        <div className="overflow-hidden rounded-[28px] border border-white/8 bg-black/10">
+          <div className="overflow-auto" style={{ maxHeight: "min(72vh, 820px)" }}>
+            <div className="grid min-w-[1120px] grid-cols-[72px_repeat(7,minmax(150px,1fr))]">
+              <div className="sticky left-0 top-0 z-40 border-b border-r border-white/8 bg-[rgba(19,16,29,0.98)] px-3 py-4 backdrop-blur-xl">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground/75">
+                  Schedule
+                </p>
+              </div>
 
-              return (
-                <section
-                  key={dateKey}
-                  className={cn(
-                    "flex min-h-[520px] flex-col rounded-[28px] border bg-white/[0.03] p-4 transition-colors",
-                    isSelected
-                      ? "border-primary/60 bg-primary/[0.08] shadow-[0_18px_34px_rgba(122,61,255,0.16)]"
-                      : "border-white/8",
-                    dayIsToday && !isSelected && "border-celestial-blue/30 bg-celestial-blue/[0.06]",
-                  )}
-                  data-testid={`desktop-week-day-${dateKey}`}
-                >
-                  <button
-                    type="button"
-                    onClick={() => onDateSelect(day)}
-                    className="rounded-2xl text-left transition-opacity hover:opacity-90"
+              {weekDays.map((day) => {
+                const dateKey = format(day, "yyyy-MM-dd");
+                const dayStats = dayStatsByDate.get(dateKey) ?? { total: 0, completed: 0, timed: 0 };
+                const isSelected = isSameDay(day, selectedDate);
+                const dayIsToday = isToday(day);
+
+                return (
+                  <div
+                    key={dateKey}
+                    data-testid={`desktop-week-day-${dateKey}`}
+                    className={cn(
+                      "sticky top-0 z-30 border-b border-r border-white/8 px-3 py-3 backdrop-blur-xl",
+                      isSelected
+                        ? "bg-primary/[0.12]"
+                        : dayIsToday
+                        ? "bg-celestial-blue/[0.1]"
+                        : "bg-[rgba(24,21,38,0.98)]",
+                    )}
                   >
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <p
-                          className={cn(
-                            "text-[11px] font-semibold uppercase tracking-[0.18em]",
-                            isSelected
-                              ? "text-primary-foreground/78"
-                              : dayIsToday
-                              ? "text-celestial-blue"
-                              : "text-muted-foreground/75",
-                          )}
-                        >
-                          {format(day, "EEE")}
-                        </p>
-                        <h3 className="mt-1 text-3xl font-semibold leading-none text-foreground">
-                          {format(day, "d")}
-                        </h3>
-                        <p className="mt-2 text-xs text-muted-foreground">
-                          {format(day, "MMMM d")}
-                        </p>
-                      </div>
-                      {dayIsToday ? (
-                        <span
-                          className={cn(
-                            "rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-wide",
-                            isSelected ? "bg-white/14 text-white" : "bg-celestial-blue/15 text-celestial-blue",
-                          )}
-                        >
-                          Today
-                        </span>
-                      ) : null}
-                    </div>
-                  </button>
-
-                  <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
-                    <span>{dayStats.total === 0 ? "Open day" : `${dayStats.completed}/${dayStats.total} done`}</span>
-                    <span>{dayStats.timed} timed</span>
-                  </div>
-                  <div className="mt-2 h-1.5 rounded-full bg-white/[0.06]">
-                    <div
-                      className={cn(
-                        "h-full rounded-full transition-[width] duration-200",
-                        isSelected ? "bg-white/90" : dayIsToday ? "bg-celestial-blue" : "bg-primary/85",
-                      )}
-                      style={{ width: `${dayPercent}%` }}
-                    />
-                  </div>
-
-                  <div className="mt-4 flex flex-1 flex-col gap-3">
-                    {dayTasks.length > 0 ? (
-                      dayTasks.map((task) => {
-                        const effectiveTaskXP = getEffectiveTaskXP(task);
-                        const isComplete = !!task.completed;
-                        const isRitual = !!task.habit_source_id;
-
-                        return (
-                          <div
-                            key={task.id}
+                    <button
+                      type="button"
+                      onClick={() => onDateSelect(day)}
+                      className="w-full rounded-2xl text-left transition-opacity hover:opacity-90"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p
                             className={cn(
-                              "rounded-[22px] border border-white/8 bg-black/10 p-3",
-                              isComplete && "opacity-65",
+                              "text-[11px] font-semibold uppercase tracking-[0.18em]",
+                              isSelected
+                                ? "text-primary-foreground/78"
+                                : dayIsToday
+                                ? "text-celestial-blue"
+                                : "text-muted-foreground/75",
                             )}
-                            data-testid={`desktop-week-task-${task.id}`}
                           >
-                            <div className="flex items-start gap-3">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (isComplete && onUndoToggle) {
-                                    onUndoToggle(task.id, effectiveTaskXP);
-                                    return;
-                                  }
-                                  onToggle(task.id, !isComplete, effectiveTaskXP);
-                                }}
-                                className={cn(
-                                  "mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full border-2 transition-colors",
-                                  isComplete
-                                    ? "border-primary bg-primary text-primary-foreground"
-                                    : "border-white/25 text-transparent hover:border-primary/70",
-                                )}
-                                aria-label={isComplete ? "Mark task as incomplete" : "Mark task as complete"}
-                              >
-                                <Check className="h-3.5 w-3.5" />
-                              </button>
+                            {format(day, "EEE")}
+                          </p>
+                          <h3 className="mt-1 text-2xl font-semibold leading-none text-foreground">
+                            {format(day, "d")}
+                          </h3>
+                          <p className="mt-1 text-xs text-muted-foreground">{format(day, "MMMM d")}</p>
+                        </div>
+                        {dayIsToday ? (
+                          <span
+                            className={cn(
+                              "rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-wide",
+                              isSelected ? "bg-white/14 text-white" : "bg-celestial-blue/15 text-celestial-blue",
+                            )}
+                          >
+                            Today
+                          </span>
+                        ) : null}
+                      </div>
 
-                              <div className="min-w-0 flex-1">
-                                <p
-                                  className={cn(
-                                    "line-clamp-2 text-sm font-medium text-foreground",
-                                    isComplete && "text-muted-foreground line-through",
-                                  )}
-                                >
-                                  {task.task_text}
-                                </p>
+                      <div className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground">
+                        <span>{dayStats.total === 0 ? "Open day" : `${dayStats.completed}/${dayStats.total} done`}</span>
+                        <span>{dayStats.timed} timed</span>
+                      </div>
+                    </button>
+                  </div>
+                );
+              })}
 
-                                <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                                  <span className="inline-flex items-center gap-1">
-                                    <Clock className="h-3 w-3" />
-                                    {formatTime(task.scheduled_time)}
-                                  </span>
-                                  {isRitual ? (
-                                    <span className="inline-flex items-center gap-1">
-                                      <Repeat className="h-3 w-3" />
-                                      Ritual
-                                    </span>
-                                  ) : null}
-                                  {task.is_main_quest ? (
-                                    <Badge variant="outline" className="h-5 border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[10px]">
-                                      Main
-                                    </Badge>
-                                  ) : null}
-                                  <span className="font-semibold text-stardust-gold/85">+{effectiveTaskXP} XP</span>
-                                </div>
+              <div className="sticky left-0 z-20 border-b border-r border-white/8 bg-[rgba(19,16,29,0.98)] px-3 py-3 backdrop-blur-xl">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/75">
+                  Anytime
+                </p>
+              </div>
 
-                                {!isComplete && (onEditQuest || onSendToCalendar || onMoveQuestToNextDay || onDeleteQuest) ? (
-                                  <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                                    {onEditQuest ? (
-                                      <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-7 rounded-xl px-2"
-                                        onClick={() => onEditQuest(task)}
-                                        aria-label={`Edit ${task.task_text}`}
-                                      >
-                                        <Pencil className="h-3.5 w-3.5" />
-                                      </Button>
-                                    ) : null}
-                                    {onSendToCalendar ? (
-                                      <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-7 rounded-xl px-2"
-                                        onClick={() => onSendToCalendar(task.id)}
-                                        aria-label={
-                                          hasCalendarLink?.(task.id)
-                                            ? `Re-send ${task.task_text} to calendar`
-                                            : `Send ${task.task_text} to calendar`
-                                        }
-                                      >
-                                        <CalendarPlus className="h-3.5 w-3.5" />
-                                      </Button>
-                                    ) : null}
-                                    {onMoveQuestToNextDay && !isRitual ? (
-                                      <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-7 rounded-xl px-2"
-                                        onClick={() => onMoveQuestToNextDay(task)}
-                                        aria-label={`Move ${task.task_text} to tomorrow`}
-                                      >
-                                        <CalendarArrowUp className="h-3.5 w-3.5" />
-                                      </Button>
-                                    ) : null}
-                                    {onDeleteQuest ? (
-                                      <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-7 rounded-xl px-2 text-destructive hover:text-destructive"
-                                        onClick={() => onDeleteQuest(task)}
-                                        aria-label={`Delete ${task.task_text}`}
-                                      >
-                                        <Trash2 className="h-3.5 w-3.5" />
-                                      </Button>
-                                    ) : null}
-                                  </div>
-                                ) : null}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })
+              {weekDays.map((day) => {
+                const dateKey = format(day, "yyyy-MM-dd");
+                const buckets = dayBucketsByDate.get(dateKey) ?? { anytime: [], timedByHour: new Map<number, DailyTask[]>() };
+                const isSelected = isSameDay(day, selectedDate);
+                const dayIsToday = isToday(day);
+
+                return (
+                  <div
+                    key={`${dateKey}-anytime`}
+                    data-testid={`desktop-week-anytime-${dateKey}`}
+                    className={cn(
+                      "min-h-[92px] border-b border-r border-white/8 p-2 align-top",
+                      isSelected
+                        ? "bg-primary/[0.05]"
+                        : dayIsToday
+                        ? "bg-celestial-blue/[0.04]"
+                        : "bg-white/[0.01]",
+                    )}
+                  >
+                    {buckets.anytime.length > 0 ? (
+                      <div className="space-y-2">
+                        {buckets.anytime.map((task) => renderTaskCard(task, true))}
+                      </div>
                     ) : (
-                      <div
-                        className="flex flex-1 flex-col items-center justify-center rounded-[22px] border border-dashed border-white/10 bg-white/[0.02] px-3 py-6 text-center"
-                        data-testid={`desktop-week-empty-${dateKey}`}
-                      >
-                        <p className="text-sm font-medium text-foreground">Open day</p>
-                        <p className="mt-2 text-xs text-muted-foreground">
-                          No quests scheduled yet for this day.
-                        </p>
+                      <div className="flex min-h-[72px] items-center justify-center rounded-[18px] border border-dashed border-white/8 bg-white/[0.02] px-3 text-center text-[11px] text-muted-foreground">
+                        No anytime quests
                       </div>
                     )}
                   </div>
-                </section>
-              );
-            })}
+                );
+              })}
+
+              {timelineHours.map((hour) => (
+                <Fragment key={hour}>
+                  <div
+                    className="sticky left-0 z-10 border-b border-r border-white/8 bg-[rgba(19,16,29,0.98)] px-3 py-3 text-right text-[11px] font-semibold text-muted-foreground/75 backdrop-blur-xl"
+                    data-testid={`desktop-week-hour-${hour}`}
+                  >
+                    {formatHourLabel(hour)}
+                  </div>
+
+                  {weekDays.map((day) => {
+                    const dateKey = format(day, "yyyy-MM-dd");
+                    const buckets = dayBucketsByDate.get(dateKey) ?? { anytime: [], timedByHour: new Map<number, DailyTask[]>() };
+                    const hourTasks = buckets.timedByHour.get(hour) ?? [];
+                    const isSelected = isSameDay(day, selectedDate);
+                    const dayIsToday = isToday(day);
+
+                    return (
+                      <div
+                        key={`${dateKey}-${hour}`}
+                        className={cn(
+                          "min-h-[84px] border-b border-r border-white/8 p-2 align-top",
+                          isSelected
+                            ? "bg-primary/[0.04]"
+                            : dayIsToday
+                            ? "bg-celestial-blue/[0.03]"
+                            : "bg-transparent",
+                        )}
+                      >
+                        {hourTasks.length > 0 ? (
+                          <div className="space-y-2">
+                            {hourTasks.map((task) => renderTaskCard(task))}
+                          </div>
+                        ) : (
+                          <div className="min-h-[68px] rounded-[16px] border border-dashed border-transparent" />
+                        )}
+                      </div>
+                    );
+                  })}
+                </Fragment>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -502,7 +675,7 @@ export function DesktopWeekPlanner({
             />
           </div>
           <p className="mt-2 text-xs text-muted-foreground">
-            Week mode keeps every day visible so you can plan and adjust without losing context.
+            Week mode keeps every day visible with a fixed hour gutter so planning feels closer to desktop calendar tools.
           </p>
         </section>
 
@@ -559,9 +732,7 @@ export function DesktopWeekPlanner({
               <Trophy className="h-5 w-5 text-stardust-gold/75" />
             </div>
             <p className="mt-2 text-xs text-muted-foreground">
-              {standaloneRitualCount > 0
-                ? `${standaloneRitualCount} ritual${standaloneRitualCount === 1 ? "" : "s"} are not attached to a campaign.`
-                : "All surfaced rituals are currently tied to campaigns."}
+              {standaloneRitualCount} standalone ritual{standaloneRitualCount === 1 ? "" : "s"} surfaced outside campaigns.
             </p>
           </div>
         </section>

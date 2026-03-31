@@ -47,7 +47,7 @@ const mocks = vi.hoisted(() => ({
     task_date: string | null;
   }>,
   lastDatePillSelectedDate: null as Date | null,
-  lastAddQuestSheetProps: null as null | { autoFillTimeOnFirstTap?: boolean; open?: boolean },
+  lastAddQuestSheetProps: null as null | { autoFillTimeOnFirstTap?: boolean; open?: boolean; presentation?: string },
   tutorialGuidance: {
     isActive: false,
     currentStep: null as string | null,
@@ -138,7 +138,7 @@ vi.mock("@/components/DatePillsScroller", () => ({
 }));
 
 vi.mock("@/components/AddQuestSheet", () => ({
-  AddQuestSheet: (props: { autoFillTimeOnFirstTap?: boolean; open?: boolean }) => {
+  AddQuestSheet: (props: { autoFillTimeOnFirstTap?: boolean; open?: boolean; presentation?: string }) => {
     mocks.lastAddQuestSheetProps = props;
     return null;
   },
@@ -593,6 +593,7 @@ describe("Journeys row drag integration", () => {
     expect(screen.getByText("⌘N")).toBeInTheDocument();
     expect(screen.queryByTestId("draggable-fab")).not.toBeInTheDocument();
     expect(mocks.draggableFabRenderCount).toBe(0);
+    expect(mocks.lastAddQuestSheetProps?.presentation).toBe("desktop-panel");
   });
 
   it("opens the add flow with meta+n on Mac-hosted iOS", async () => {
