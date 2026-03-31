@@ -9,6 +9,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { PageTransition } from "@/components/PageTransition";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { TodaysAgenda } from "@/components/TodaysAgenda";
+import { DesktopWeekPlanner } from "@/components/DesktopWeekPlanner";
 import { cn } from "@/lib/utils";
 
 import { DatePillsScroller } from "@/components/DatePillsScroller";
@@ -26,6 +27,7 @@ import { EditQuestDialog } from "@/features/quests/components/EditQuestDialog";
 import { EditRitualSheet, RitualData } from "@/components/EditRitualSheet";
 import { useDailyTasks } from "@/hooks/useDailyTasks";
 import { useCalendarTasks } from "@/hooks/useCalendarTasks";
+import type { DailyTask } from "@/services/dailyTasksRemote";
 import { useStreakMultiplier } from "@/hooks/useStreakMultiplier";
 import { useHabitSurfacing } from "@/hooks/useHabitSurfacing";
 import { useRecurringTaskSpawner } from "@/hooks/useRecurringTaskSpawner";
@@ -81,6 +83,8 @@ interface CreatedCampaignData {
   habits: Array<{ title: string }>;
 }
 
+type DesktopPlannerMode = "week" | "day";
+
 const Journeys = () => {
   const prefersReducedMotion = useReducedMotion();
   const location = useLocation();
@@ -93,6 +97,7 @@ const Journeys = () => {
   const [showPageInfo, setShowPageInfo] = useState(false);
   const [showAddSheet, setShowAddSheet] = useState(false);
   const [showMonthView, setShowMonthView] = useState(false);
+  const [desktopPlannerMode, setDesktopPlannerMode] = useState<DesktopPlannerMode>("week");
   
   const [prefilledTime, setPrefilledTime] = useState<string | null>(null);
   const [showQuickAdjust, setShowQuickAdjust] = useState(false);
@@ -762,6 +767,92 @@ const Journeys = () => {
     setEditingTask(null);
   }, [deleteTask, trackDailyPlanOutcome, syncTaskDelete]);
 
+  const createRestorableTaskData = useCallback((task: DailyTask) => ({
+    task_text: task.task_text,
+    task_date: task.task_date,
+    xp_reward: task.xp_reward,
+    difficulty: task.difficulty,
+    scheduled_time: task.scheduled_time,
+    estimated_duration: task.estimated_duration,
+    is_main_quest: !!task.is_main_quest,
+    epic_id: task.epic_id,
+    sort_order: task.sort_order,
+    priority: task.priority,
+    category: task.category,
+    habit_source_id: task.habit_source_id,
+    is_recurring: !!task.is_recurring,
+    recurrence_pattern: task.recurrence_pattern,
+    recurrence_days: task.recurrence_days,
+    recurrence_month_days: task.recurrence_month_days,
+    recurrence_custom_period: task.recurrence_custom_period,
+    recurrence_end_date: task.recurrence_end_date,
+    reminder_enabled: !!task.reminder_enabled,
+    reminder_minutes_before: task.reminder_minutes_before,
+    notes: task.notes,
+    source: task.source,
+  }), []);
+
+  const handleDeleteQuestFromWeekPlanner = useCallback(async (task: DailyTask) => {
+    const taskData = createRestorableTaskData(task);
+
+    if (task.ai_generated) {
+      trackDailyPlanOutcome(task.id, 'deleted');
+    }
+
+    try {
+      await Haptics.impact({ style: ImpactStyle.Medium });
+    } catch (e) {
+      // Haptics not available on web
+    }
+
+    await syncTaskDelete.mutateAsync({ taskId: task.id }).catch(() => {
+      toast.error("Failed to remove linked calendar event");
+    });
+    await deleteTask(task.id);
+
+    toast("Quest deleted", {
+      duration: QUEST_ACTION_TOAST_DURATION_MS,
+      action: {
+        label: "Undo",
+        onClick: async () => {
+          try {
+            await restoreTask(taskData);
+            toast.success("Quest restored");
+          } catch {
+            toast.error("Failed to restore quest");
+          }
+        },
+      },
+    });
+  }, [createRestorableTaskData, deleteTask, restoreTask, syncTaskDelete, trackDailyPlanOutcome]);
+
+  const handleMoveQuestToNextDayFromWeekPlanner = useCallback(async (task: DailyTask) => {
+    if (!task.task_date) return;
+
+    try {
+      await Haptics.impact({ style: ImpactStyle.Light });
+    } catch (e) {
+      // Haptics not available on web
+    }
+
+    const taskDate = new Date(`${task.task_date}T12:00:00`);
+    const nextDay = addDays(taskDate, 1);
+    const nextDayStr = format(nextDay, 'yyyy-MM-dd');
+
+    moveTaskToDate({ taskId: task.id, targetDate: nextDayStr });
+
+    toast(`Moved to ${format(nextDay, "EEEE, MMM d")}`, {
+      duration: QUEST_ACTION_TOAST_DURATION_MS,
+      action: {
+        label: "Undo",
+        onClick: () => {
+          moveTaskToDate({ taskId: task.id, targetDate: task.task_date! });
+          toast.success("Move undone");
+        },
+      },
+    });
+  }, [moveTaskToDate]);
+
   const handleToggleInboxQuest = useCallback((taskId: string, completed: boolean) => {
     toggleInboxTask({ taskId, completed });
   }, [toggleInboxTask]);
@@ -828,89 +919,17 @@ const Journeys = () => {
 
   // Handle swipe-to-delete quest with undo
   const handleSwipeDeleteQuest = useCallback(async (taskId: string) => {
-    // Capture task data before deletion for potential restore
     const taskToDelete = dailyTasks.find(t => t.id === taskId);
     if (!taskToDelete) return;
-    
-    const taskData = {
-      task_text: taskToDelete.task_text,
-      task_date: taskToDelete.task_date,
-      xp_reward: taskToDelete.xp_reward,
-      difficulty: taskToDelete.difficulty,
-      scheduled_time: taskToDelete.scheduled_time,
-      estimated_duration: taskToDelete.estimated_duration,
-      is_main_quest: taskToDelete.is_main_quest,
-      epic_id: taskToDelete.epic_id,
-      sort_order: taskToDelete.sort_order,
-      priority: taskToDelete.priority,
-      category: taskToDelete.category,
-      habit_source_id: taskToDelete.habit_source_id,
-      is_recurring: taskToDelete.is_recurring,
-      recurrence_pattern: taskToDelete.recurrence_pattern,
-      recurrence_days: taskToDelete.recurrence_days,
-      recurrence_month_days: taskToDelete.recurrence_month_days,
-      recurrence_custom_period: taskToDelete.recurrence_custom_period,
-      reminder_enabled: taskToDelete.reminder_enabled,
-      reminder_minutes_before: taskToDelete.reminder_minutes_before,
-    };
-    
-    try {
-      await Haptics.impact({ style: ImpactStyle.Medium });
-    } catch (e) {
-      // Haptics not available on web
-    }
-    
-    await syncTaskDelete.mutateAsync({ taskId }).catch(() => {
-      toast.error("Failed to remove linked calendar event");
-    });
-    await deleteTask(taskId);
-    
-    toast("Quest deleted", {
-      duration: QUEST_ACTION_TOAST_DURATION_MS,
-      action: {
-        label: "Undo",
-        onClick: async () => {
-          try {
-            await restoreTask(taskData);
-            toast.success("Quest restored");
-          } catch {
-            toast.error("Failed to restore quest");
-          }
-        },
-      },
-    });
-  }, [dailyTasks, deleteTask, restoreTask, syncTaskDelete]);
+    await handleDeleteQuestFromWeekPlanner(taskToDelete);
+  }, [dailyTasks, handleDeleteQuestFromWeekPlanner]);
 
   // Handle swipe-to-move-to-next-day with undo
   const handleSwipeMoveToNextDay = useCallback(async (taskId: string) => {
-    // Capture original date for undo
     const taskToMove = dailyTasks.find(t => t.id === taskId);
-    const originalDate = taskToMove?.task_date;
-    
-    try {
-      await Haptics.impact({ style: ImpactStyle.Light });
-    } catch (e) {
-      // Haptics not available on web
-    }
-    
-    const nextDay = addDays(selectedDate, 1);
-    const nextDayStr = format(nextDay, 'yyyy-MM-dd');
-    
-    moveTaskToDate({ taskId, targetDate: nextDayStr });
-    
-    toast(`Moved to ${format(nextDay, "EEEE, MMM d")}`, {
-      duration: QUEST_ACTION_TOAST_DURATION_MS,
-      action: {
-        label: "Undo",
-        onClick: () => {
-          if (originalDate) {
-            moveTaskToDate({ taskId, targetDate: originalDate });
-            toast.success("Move undone");
-          }
-        },
-      },
-    });
-  }, [dailyTasks, selectedDate, moveTaskToDate]);
+    if (!taskToMove) return;
+    await handleMoveQuestToNextDayFromWeekPlanner(taskToMove);
+  }, [dailyTasks, handleMoveQuestToNextDayFromWeekPlanner]);
 
   // Pull external updates for full-sync providers on an interval.
   useEffect(() => {
@@ -1022,6 +1041,8 @@ const Journeys = () => {
                 onDateSelect={setSelectedDate}
                 onOpenMonthView={() => setShowMonthView(true)}
                 onAddQuest={isMacHostedIOSApp ? () => openAddQuestSheet() : undefined}
+                plannerMode={desktopPlannerMode}
+                onPlannerModeChange={setDesktopPlannerMode}
               />
             ) : (
               <DatePillsScroller
@@ -1060,35 +1081,54 @@ const Journeys = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: prefersReducedMotion ? 0 : 0.1, duration: prefersReducedMotion ? 0 : 0.2 }}
           >
-            {/* Today's Agenda */}
-            <TodaysAgenda
-              tasks={dailyTasks}
-              selectedDate={selectedDate}
-              layoutMode={journeysLayoutMode}
-              hideDesktopRailAddButton={isMacHostedIOSApp}
-              isVisible={location.pathname === JOURNEYS_ROUTE}
-              disableTimelineDrag={showAddSheet || !!editingTask || !!editingRitual}
-              onToggle={handleToggleTask}
-              onAddQuest={() => openAddQuestSheet()}
-              completedCount={completedCount}
-              totalCount={totalCount}
-              currentStreak={currentStreak}
-              onUndoToggle={handleUndoToggle}
-              onEditQuest={handleEditQuest}
-              weekTasks={weekCalendarTasks}
-              activeEpics={activeEpics}
-              isCampaignsLoading={epicsLoading}
-              onDeleteQuest={handleSwipeDeleteQuest}
-              onSendToCalendar={SEND_TO_CALENDAR_ENABLED ? handleSendTaskToCalendar : undefined}
-              hasCalendarLink={hasLinkedEvent}
-              onMoveQuestToNextDay={handleSwipeMoveToNextDay}
-              onUpdateScheduledTime={handleTimelineScheduledTimeUpdate}
-              onOpenMonthView={() => setShowMonthView(true)}
-              onTimeSlotLongPress={(date, time) => {
-                openAddQuestSheet({ date, time });
-              }}
-              onTimelineDragPreviewTimeChange={setHeaderDragTime}
-            />
+            {isDesktopLayout && desktopPlannerMode === "week" ? (
+              <DesktopWeekPlanner
+                selectedDate={selectedDate}
+                tasks={weekCalendarTasks}
+                currentStreak={currentStreak}
+                activeEpics={activeEpics}
+                isCampaignsLoading={epicsLoading}
+                showInlineAddButton={!isMacHostedIOSApp}
+                onDateSelect={setSelectedDate}
+                onToggle={handleToggleTask}
+                onAddQuest={() => openAddQuestSheet()}
+                onUndoToggle={handleUndoToggle}
+                onEditQuest={handleEditQuest}
+                onDeleteQuest={handleDeleteQuestFromWeekPlanner}
+                onSendToCalendar={SEND_TO_CALENDAR_ENABLED ? handleSendTaskToCalendar : undefined}
+                hasCalendarLink={hasLinkedEvent}
+                onMoveQuestToNextDay={handleMoveQuestToNextDayFromWeekPlanner}
+              />
+            ) : (
+              <TodaysAgenda
+                tasks={dailyTasks}
+                selectedDate={selectedDate}
+                layoutMode={journeysLayoutMode}
+                hideDesktopRailAddButton={isMacHostedIOSApp}
+                isVisible={location.pathname === JOURNEYS_ROUTE}
+                disableTimelineDrag={showAddSheet || !!editingTask || !!editingRitual}
+                onToggle={handleToggleTask}
+                onAddQuest={() => openAddQuestSheet()}
+                completedCount={completedCount}
+                totalCount={totalCount}
+                currentStreak={currentStreak}
+                onUndoToggle={handleUndoToggle}
+                onEditQuest={handleEditQuest}
+                weekTasks={weekCalendarTasks}
+                activeEpics={activeEpics}
+                isCampaignsLoading={epicsLoading}
+                onDeleteQuest={handleSwipeDeleteQuest}
+                onSendToCalendar={SEND_TO_CALENDAR_ENABLED ? handleSendTaskToCalendar : undefined}
+                hasCalendarLink={hasLinkedEvent}
+                onMoveQuestToNextDay={handleSwipeMoveToNextDay}
+                onUpdateScheduledTime={handleTimelineScheduledTimeUpdate}
+                onOpenMonthView={() => setShowMonthView(true)}
+                onTimeSlotLongPress={(date, time) => {
+                  openAddQuestSheet({ date, time });
+                }}
+                onTimelineDragPreviewTimeChange={setHeaderDragTime}
+              />
+            )}
           </motion.div>
         </QuestsErrorBoundary>
 

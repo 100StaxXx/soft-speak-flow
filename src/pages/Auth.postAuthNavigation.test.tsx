@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -11,6 +11,8 @@ const mocks = vi.hoisted(() => {
   const getSessionMock = vi.fn();
   const onAuthStateChangeMock = vi.fn();
   const invokeMock = vi.fn();
+  const setSessionMock = vi.fn();
+  const appleAuthorizeMock = vi.fn();
   const maybeSingleMock = vi.fn();
 
   const selectEqMock = vi.fn(() => ({ maybeSingle: maybeSingleMock }));
@@ -26,10 +28,15 @@ const mocks = vi.hoisted(() => {
     getSessionMock,
     onAuthStateChangeMock,
     invokeMock,
+    setSessionMock,
+    appleAuthorizeMock,
     maybeSingleMock,
     selectEqMock,
     selectMock,
     fromMock,
+    isNativePlatform: false,
+    platform: "web",
+    applePluginAvailable: false,
   };
 });
 
@@ -69,15 +76,18 @@ vi.mock("@/components/StaticBackgroundImage", () => ({
 
 vi.mock("@capacitor/core", () => ({
   Capacitor: {
-    isNativePlatform: () => false,
-    isPluginAvailable: () => false,
-    getPlatform: () => "web",
+    isNativePlatform: () => mocks.isNativePlatform,
+    isPluginAvailable: (name: string) => {
+      if (name === "SignInWithApple") return mocks.applePluginAvailable;
+      return false;
+    },
+    getPlatform: () => mocks.platform,
   },
 }));
 
 vi.mock("@capacitor-community/apple-sign-in", () => ({
   SignInWithApple: {
-    authorize: vi.fn(),
+    authorize: mocks.appleAuthorizeMock,
   },
 }));
 
@@ -91,7 +101,7 @@ vi.mock("@/integrations/supabase/client", () => ({
       signUp: vi.fn(),
       resetPasswordForEmail: vi.fn(),
       signInWithOAuth: vi.fn(),
-      setSession: vi.fn(),
+      setSession: mocks.setSessionMock,
     },
     from: mocks.fromMock,
     functions: {
@@ -124,9 +134,44 @@ const signedInSession = {
   },
 };
 
+const primeNativeAppleFlow = () => {
+  mocks.isNativePlatform = true;
+  mocks.platform = "ios";
+  mocks.applePluginAvailable = true;
+  mocks.getSessionMock.mockResolvedValue({
+    data: {
+      session: null,
+    },
+  });
+  mocks.appleAuthorizeMock.mockResolvedValue({
+    response: {
+      identityToken: "apple-identity-token",
+      email: signedInSession.user.email,
+      user: "apple-user-1",
+    },
+  });
+  mocks.invokeMock.mockResolvedValue({
+    data: {
+      access_token: "access-token",
+      refresh_token: "refresh-token",
+      user: signedInSession.user,
+    },
+    error: null,
+  });
+  mocks.setSessionMock.mockResolvedValue({
+    data: {
+      session: signedInSession,
+    },
+    error: null,
+  });
+};
+
 describe("Auth post-auth navigation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.isNativePlatform = false;
+    mocks.platform = "web";
+    mocks.applePluginAvailable = false;
 
     mocks.getSessionMock.mockResolvedValue({
       data: {
@@ -145,6 +190,19 @@ describe("Auth post-auth navigation", () => {
     mocks.ensureProfileMock.mockResolvedValue(undefined);
     mocks.getAuthRedirectPathMock.mockResolvedValue("/tasks");
     mocks.getProfileAwareAuthFallbackPathMock.mockResolvedValue("/tasks");
+    mocks.setSessionMock.mockResolvedValue({
+      data: {
+        session: signedInSession,
+      },
+      error: null,
+    });
+    mocks.appleAuthorizeMock.mockResolvedValue({
+      response: {
+        identityToken: "apple-identity-token",
+        email: signedInSession.user.email,
+        user: "apple-user-1",
+      },
+    });
 
     mocks.maybeSingleMock.mockResolvedValue({
       data: {
@@ -301,6 +359,60 @@ describe("Auth post-auth navigation", () => {
         title: "Check your email",
       }),
     );
+  });
+
+  it("routes native Apple sign-in timeout fallbacks to / instead of /onboarding", async () => {
+    vi.useFakeTimers();
+    primeNativeAppleFlow();
+    mocks.getAuthRedirectPathMock.mockImplementation(() => new Promise(() => {}));
+    mocks.getProfileAwareAuthFallbackPathMock.mockResolvedValue("/onboarding");
+
+    renderAuth();
+    await flushMicrotasks();
+
+    fireEvent.click(screen.getByRole("button", { name: /sign in with apple/i }));
+
+    await flushMicrotasks();
+    await flushMicrotasks();
+
+    expect(mocks.setSessionMock).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000);
+    });
+    await flushMicrotasks();
+
+    expect(mocks.safeNavigateMock).toHaveBeenCalledWith(expect.any(Function), "/");
+    expect(mocks.safeNavigateMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("routes native Apple sign-in core redirects to / instead of /onboarding", async () => {
+    primeNativeAppleFlow();
+    mocks.getAuthRedirectPathMock.mockResolvedValue("/onboarding");
+
+    renderAuth();
+    await flushMicrotasks();
+
+    fireEvent.click(screen.getByRole("button", { name: /sign in with apple/i }));
+
+    await waitFor(() => {
+      expect(mocks.safeNavigateMock).toHaveBeenCalledWith(expect.any(Function), "/");
+    });
+  });
+
+  it("keeps native Apple sign-up routing to /onboarding", async () => {
+    primeNativeAppleFlow();
+    mocks.getAuthRedirectPathMock.mockResolvedValue("/onboarding");
+
+    renderAuth();
+    await flushMicrotasks();
+
+    fireEvent.click(screen.getByRole("button", { name: /need an account\? sign up/i }));
+    fireEvent.click(screen.getByRole("button", { name: /sign up with apple/i }));
+
+    await waitFor(() => {
+      expect(mocks.safeNavigateMock).toHaveBeenCalledWith(expect.any(Function), "/onboarding");
+    });
   });
 
   it("routes incomplete users to /onboarding when core redirect hangs and timeout fallback runs", async () => {

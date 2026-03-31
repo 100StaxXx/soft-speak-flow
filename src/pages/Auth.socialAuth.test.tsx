@@ -201,6 +201,7 @@ describe("Auth social auth intent guard", () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     window.history.replaceState({}, "", "/auth");
   });
 
@@ -250,6 +251,33 @@ describe("Auth social auth intent guard", () => {
       "We couldn't find an existing account for Apple sign-in.",
     );
     expect(mocks.safeNavigateMock).not.toHaveBeenCalled();
+  });
+
+  it("routes native Apple sign-in timeout fallbacks to guarded home instead of onboarding", async () => {
+    vi.useFakeTimers();
+    mocks.isNativePlatform = true;
+    mocks.platform = "ios";
+    mocks.applePluginAvailable = true;
+    mocks.getAuthRedirectPathMock.mockImplementation(() => new Promise(() => {}));
+    mocks.getProfileAwareAuthFallbackPathMock.mockResolvedValue("/onboarding");
+
+    renderAuth();
+    await flushMicrotasks();
+
+    fireEvent.click(screen.getByRole("button", { name: /sign in with apple/i }));
+
+    await flushMicrotasks();
+    await flushMicrotasks();
+
+    expect(mocks.setSessionMock).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000);
+    });
+    await flushMicrotasks();
+
+    expect(mocks.safeNavigateMock).toHaveBeenCalledWith(expect.any(Function), "/");
+    expect(mocks.safeNavigateMock).toHaveBeenCalledTimes(1);
   });
 
   it("sends sign_up intent for Apple in signup mode and still allows onboarding", async () => {

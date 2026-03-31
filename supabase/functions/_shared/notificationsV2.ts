@@ -37,7 +37,36 @@ interface TimeParts {
   second: number;
 }
 
+export interface DeliveryBudgetState {
+  sentTodayCount: number;
+  lastSentAt: Date | null;
+}
+
+export interface HabitReminderResolutionInput {
+  now: Date;
+  localDate: string;
+  timezone: string;
+  preferredTime: string;
+  reminderMinutesBefore: number;
+  frequency: string;
+  customDays: number[] | null;
+  lastSentForDate?: string | null;
+  allowedLatenessMinutes?: number;
+}
+
+export interface HabitReminderResolution {
+  habitLocalDate: string;
+  reminderAt: Date;
+}
+
 const CRITICAL_TYPES: ReadonlySet<NotificationType> = new Set([
+  "task_start",
+  "task_reminder",
+  "habit_reminder",
+  "contact_reminder",
+]);
+
+const ENGAGEMENT_BUDGET_EXEMPT_TYPES: ReadonlySet<NotificationType> = new Set([
   "task_start",
   "task_reminder",
   "habit_reminder",
@@ -72,6 +101,10 @@ export function isCriticalNotification(type: NotificationType): boolean {
   return CRITICAL_TYPES.has(type);
 }
 
+export function shouldApplyEngagementBudget(type: NotificationType): boolean {
+  return !ENGAGEMENT_BUDGET_EXEMPT_TYPES.has(type);
+}
+
 export function parseIntEnv(name: string, fallback: number): number {
   const raw = Deno.env.get(name);
   if (!raw) return fallback;
@@ -104,6 +137,30 @@ function parseDateParts(localDate: string | null): DateParts | null {
   }
 
   return { year, month, day };
+}
+
+export function addDaysToIsoDate(localDate: string, days: number): string | null {
+  const parts = parseDateParts(localDate);
+  if (!parts) return null;
+
+  const value = new Date(Date.UTC(parts.year, parts.month - 1, parts.day));
+  if (Number.isNaN(value.getTime())) return null;
+
+  value.setUTCDate(value.getUTCDate() + days);
+
+  const year = String(value.getUTCFullYear()).padStart(4, "0");
+  const month = String(value.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(value.getUTCDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+export function getWeekdayIndexForIsoDate(localDate: string): number | null {
+  const parts = parseDateParts(localDate);
+  if (!parts) return null;
+
+  const value = new Date(Date.UTC(parts.year, parts.month - 1, parts.day));
+  if (Number.isNaN(value.getTime())) return null;
+  return value.getUTCDay();
 }
 
 export function parseTimeParts(value: string | null | undefined): TimeParts | null {
@@ -360,4 +417,89 @@ export function addMinutes(date: Date, minutes: number): Date {
 
 export function minutesBetween(a: Date, b: Date): number {
   return Math.floor((a.getTime() - b.getTime()) / 60_000);
+}
+
+export function decideEngagementBudget(input: {
+  notificationType: NotificationType;
+  state: DeliveryBudgetState;
+  now: Date;
+}): { allow: boolean; reason?: string } {
+  const { notificationType, state, now } = input;
+
+  if (!shouldApplyEngagementBudget(notificationType)) {
+    return { allow: true };
+  }
+
+  if (state.sentTodayCount >= 2) {
+    return { allow: false, reason: "daily_cap_reached" };
+  }
+
+  if (state.sentTodayCount === 1) {
+    return { allow: false, reason: "soft_target_enforced" };
+  }
+
+  if (state.lastSentAt && minutesBetween(now, state.lastSentAt) < 240) {
+    return { allow: false, reason: "spacing_guard" };
+  }
+
+  return { allow: true };
+}
+
+function isHabitDueOnLocalDate(input: {
+  frequency: string;
+  customDays: number[] | null;
+  localDate: string;
+}): boolean {
+  if (input.frequency === "daily") {
+    return true;
+  }
+
+  if (input.frequency !== "custom" || !Array.isArray(input.customDays) || input.customDays.length === 0) {
+    return false;
+  }
+
+  const weekday = getWeekdayIndexForIsoDate(input.localDate);
+  return weekday !== null && input.customDays.includes(weekday);
+}
+
+export function resolveDueHabitReminder(
+  input: HabitReminderResolutionInput,
+): HabitReminderResolution | null {
+  const latenessWindow = Math.max(0, input.allowedLatenessMinutes ?? 360);
+  const reminderMinutesBefore = Math.max(0, Math.trunc(input.reminderMinutesBefore));
+  const candidateDates = [-1, 0, 1]
+    .map((days) => addDaysToIsoDate(input.localDate, days))
+    .filter((value): value is string => typeof value === "string");
+
+  for (const candidateLocalDate of candidateDates) {
+    if (input.lastSentForDate === candidateLocalDate) {
+      continue;
+    }
+
+    if (!isHabitDueOnLocalDate({
+      frequency: input.frequency,
+      customDays: input.customDays,
+      localDate: candidateLocalDate,
+    })) {
+      continue;
+    }
+
+    const scheduledAt = toScheduledDateTime(candidateLocalDate, input.preferredTime, input.timezone);
+    if (!scheduledAt) {
+      continue;
+    }
+
+    const reminderAt = addMinutes(scheduledAt, -reminderMinutesBefore);
+    const overdueMinutes = minutesBetween(input.now, reminderAt);
+    if (overdueMinutes < 0 || overdueMinutes > latenessWindow) {
+      continue;
+    }
+
+    return {
+      habitLocalDate: candidateLocalDate,
+      reminderAt,
+    };
+  }
+
+  return null;
 }

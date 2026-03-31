@@ -5,14 +5,15 @@ import { requireInternalRequest } from "../_shared/auth.ts";
 import { sendAPNSNotification } from "../_shared/apns.ts";
 import {
   addMinutes,
+  decideEngagementBudget,
+  type DeliveryBudgetState,
   getLocalDateTimeParts,
   getRetryDelayMinutes,
-  isCriticalNotification,
   isUserInRolloutCohort,
-  minutesBetween,
   normalizeTimezone,
   parseIntEnv,
   resolveDispatchMode,
+  shouldApplyEngagementBudget,
   type NotificationType,
 } from "../_shared/notificationsV2.ts";
 
@@ -28,13 +29,6 @@ interface QueueRow {
   payload: Record<string, unknown> | null;
   attempt_count: number | null;
   status: string;
-}
-
-interface DeliveryBudgetState {
-  timezone: string;
-  localDate: string;
-  sentTodayCount: number;
-  lastSentAt: Date | null;
 }
 
 interface DeviceTokenRow {
@@ -123,7 +117,13 @@ async function acknowledgeSourceDelivery(
   }
 
   if (sourceTable === "habits") {
-    await supabase.from("habits").update({ reminder_sent_today: true }).eq("id", sourceId);
+    const payloadLocalDate = row.payload?.local_date;
+    const reminderLocalDate = typeof payloadLocalDate === "string" ? payloadLocalDate : null;
+
+    await supabase
+      .from("habits")
+      .update({ reminder_last_sent_for_date: reminderLocalDate })
+      .eq("id", sourceId);
     return;
   }
 
@@ -160,7 +160,7 @@ async function loadBudgetState(
   const sinceIso = new Date(now.getTime() - 48 * 60 * 60_000).toISOString();
   const { data: sentRows } = await supabase
     .from("push_notification_queue")
-    .select("delivered_at")
+    .select("delivered_at, notification_type")
     .eq("user_id", userId)
     .eq("status", "sent")
     .not("delivered_at", "is", null)
@@ -172,6 +172,11 @@ async function loadBudgetState(
   let lastSentAt: Date | null = null;
 
   for (const sentRow of sentRows ?? []) {
+    const notificationType = sentRow.notification_type as NotificationType | null | undefined;
+    if (!notificationType || !shouldApplyEngagementBudget(notificationType)) {
+      continue;
+    }
+
     const deliveredAt = toDateOrNull(sentRow.delivered_at as string | null | undefined);
     if (!deliveredAt) continue;
 
@@ -185,39 +190,7 @@ async function loadBudgetState(
     }
   }
 
-  return { timezone, localDate, sentTodayCount, lastSentAt };
-}
-
-function budgetDecision(input: {
-  row: QueueRow;
-  state: DeliveryBudgetState;
-  now: Date;
-}): { allow: boolean; reason?: string } {
-  const { row, state, now } = input;
-  const isCritical = isCriticalNotification(row.notification_type);
-
-  if (state.sentTodayCount >= 2) {
-    return { allow: false, reason: "daily_cap_reached" };
-  }
-
-  if (state.sentTodayCount === 1 && !isCritical) {
-    return { allow: false, reason: "soft_target_enforced" };
-  }
-
-  if (state.lastSentAt) {
-    const minutesSinceLast = minutesBetween(now, state.lastSentAt);
-    if (minutesSinceLast < 240) {
-      const scheduledFor = toDateOrNull(row.scheduled_for);
-      const overdueMinutes = scheduledFor ? minutesBetween(now, scheduledFor) : 0;
-      const allowCriticalOverride = isCritical && overdueMinutes > 30;
-
-      if (!allowCriticalOverride) {
-        return { allow: false, reason: "spacing_guard" };
-      }
-    }
-  }
-
-  return { allow: true };
+  return { sentTodayCount, lastSentAt };
 }
 
 serve(async (req) => {
@@ -325,7 +298,11 @@ serve(async (req) => {
       }
       const budgetState = budgetCache.get(row.user_id)!;
 
-      const budget = budgetDecision({ row, state: budgetState, now });
+      const budget = decideEngagementBudget({
+        notificationType: row.notification_type,
+        state: budgetState,
+        now,
+      });
       if (!budget.allow) {
         skippedBudget += 1;
         await updateQueueStatus(supabase, row.id, {
@@ -435,8 +412,10 @@ serve(async (req) => {
         });
         await acknowledgeSourceDelivery(supabase, row, nowIso);
 
-        budgetState.sentTodayCount += 1;
-        budgetState.lastSentAt = now;
+        if (shouldApplyEngagementBudget(row.notification_type)) {
+          budgetState.sentTodayCount += 1;
+          budgetState.lastSentAt = now;
+        }
         continue;
       }
 

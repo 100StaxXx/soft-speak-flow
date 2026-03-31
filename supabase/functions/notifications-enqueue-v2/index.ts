@@ -5,11 +5,11 @@ import { requireInternalRequest } from "../_shared/auth.ts";
 import {
   computeDeterministicJitterMinutes,
   getLocalDateTimeParts,
-  getLocalWeekdayIndex,
   getNotificationPriority,
   normalizeTimezone,
   parseIntEnv,
   pickDeterministicDailyQuote,
+  resolveDueHabitReminder,
   toDailyScheduledDateTime,
   toScheduledDateTime,
   type NotificationType,
@@ -608,10 +608,9 @@ serve(async (req) => {
     // 4) Habit reminders
     const { data: habitCandidates, error: habitError } = await supabase
       .from("habits")
-      .select("id, user_id, title, preferred_time, reminder_minutes_before, frequency, custom_days, reminder_sent_today")
+      .select("id, user_id, title, preferred_time, reminder_minutes_before, frequency, custom_days, reminder_last_sent_for_date")
       .eq("reminder_enabled", true)
       .eq("is_active", true)
-      .eq("reminder_sent_today", false)
       .not("preferred_time", "is", null)
       .limit(maxHabit);
 
@@ -632,47 +631,43 @@ serve(async (req) => {
 
       const timezone = normalizeTimezone(profile.timezone);
       const local = getLocalDateTimeParts(now, timezone);
-      const weekday = getLocalWeekdayIndex(now, timezone);
-
-      const isDueToday = habit.frequency === "daily" ||
-        (habit.frequency === "custom" && Array.isArray(habit.custom_days) && habit.custom_days.includes(weekday));
-      if (!isDueToday) continue;
+      const preferredTime = String(habit.preferred_time);
+      const reminderMinutesBefore = typeof habit.reminder_minutes_before === "number" ? habit.reminder_minutes_before : 15;
+      const reminder = resolveDueHabitReminder({
+        now,
+        localDate: local.localDate,
+        timezone,
+        preferredTime,
+        reminderMinutesBefore,
+        frequency: habit.frequency,
+        customDays: Array.isArray(habit.custom_days) ? habit.custom_days : null,
+        lastSentForDate: habit.reminder_last_sent_for_date,
+      });
+      if (!reminder) continue;
 
       const { data: completion } = await supabase
         .from("habit_completions")
         .select("id")
         .eq("habit_id", habit.id)
-        .eq("date", local.localDate)
+        .eq("date", reminder.habitLocalDate)
         .limit(1)
         .maybeSingle();
 
       if (completion) continue;
-
-      const preferred = String(habit.preferred_time);
-      const [hoursRaw, minutesRaw] = preferred.split(":");
-      const hours = Number.parseInt(hoursRaw, 10);
-      const minutes = Number.parseInt(minutesRaw, 10);
-      if (!Number.isFinite(hours) || !Number.isFinite(minutes)) continue;
-
-      const reminderMinutesBefore = typeof habit.reminder_minutes_before === "number" ? habit.reminder_minutes_before : 15;
-      const targetMinutes = (hours * 60 + minutes) - reminderMinutesBefore;
-      const nowLocalMinutes = local.hour * 60 + local.minute;
-      const lateness = nowLocalMinutes - targetMinutes;
-      if (lateness < 0 || lateness > 360) continue;
 
       inserts.push(rowForQueue({
         userId: habit.user_id,
         type: "habit_reminder",
         sourceTable: "habits",
         sourceId: habit.id,
-        dedupeKey: `habit_reminder:${habit.id}:${local.localDate}`,
-        scheduledFor: nowIso,
+        dedupeKey: `habit_reminder:${habit.id}:${reminder.habitLocalDate}`,
+        scheduledFor: reminder.reminderAt.toISOString(),
         payload: {
           habit_id: habit.id,
           habit_title: habit.title,
-          local_date: local.localDate,
+          local_date: reminder.habitLocalDate,
           type: "habit_reminder",
-          url: "/habits",
+          url: "/tasks",
         },
       }));
     }

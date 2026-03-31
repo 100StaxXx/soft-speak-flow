@@ -4369,6 +4369,7 @@ export type Database = {
           longest_streak: number | null
           preferred_time: string | null
           reminder_enabled: boolean | null
+          reminder_last_sent_for_date: string | null
           reminder_minutes_before: number | null
           reminder_sent_today: boolean | null
           sort_order: number | null
@@ -4390,6 +4391,7 @@ export type Database = {
           longest_streak?: number | null
           preferred_time?: string | null
           reminder_enabled?: boolean | null
+          reminder_last_sent_for_date?: string | null
           reminder_minutes_before?: number | null
           reminder_sent_today?: boolean | null
           sort_order?: number | null
@@ -4411,6 +4413,7 @@ export type Database = {
           longest_streak?: number | null
           preferred_time?: string | null
           reminder_enabled?: boolean | null
+          reminder_last_sent_for_date?: string | null
           reminder_minutes_before?: number | null
           reminder_sent_today?: boolean | null
           sort_order?: number | null

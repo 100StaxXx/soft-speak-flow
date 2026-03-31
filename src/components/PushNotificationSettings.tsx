@@ -39,6 +39,37 @@ type QueueDebugRow = Pick<
   "id" | "notification_type" | "status" | "scheduled_for" | "delivered_at" | "last_error"
 >;
 
+const RECENT_QUEUE_LIMIT = 12;
+
+const formatRelativeTokenAge = (value: string | null): string => {
+  if (!value) {
+    return "No token on file";
+  }
+
+  const timestamp = new Date(value);
+  if (Number.isNaN(timestamp.getTime())) {
+    return "Unknown";
+  }
+
+  const ageMs = Date.now() - timestamp.getTime();
+  if (ageMs < 60_000) {
+    return "Just now";
+  }
+
+  const ageMinutes = Math.floor(ageMs / 60_000);
+  if (ageMinutes < 60) {
+    return `${ageMinutes}m ago`;
+  }
+
+  const ageHours = Math.floor(ageMinutes / 60);
+  if (ageHours < 24) {
+    return `${ageHours}h ago`;
+  }
+
+  const ageDays = Math.floor(ageHours / 24);
+  return `${ageDays}d ago`;
+};
+
 export const PushNotificationSettings = memo(() => {
   const { profile } = useProfile();
   const { user } = useAuth();
@@ -437,10 +468,14 @@ const PushDebugPanel = memo(({ userId }: { userId?: string }) => {
     isSupported: boolean;
     permissionStatus: string;
     hasToken: boolean;
+    profileTimezone: string | null;
     tokenCount: number;
     latestTokenUpdatedAt: string | null;
     latestTokenPreview: string | null;
     recentQueueRows: QueueDebugRow[];
+    recentSkippedBudget: boolean;
+    recentFailedTerminal: boolean;
+    recentNoDeviceTokens: boolean;
     error?: string;
   } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -455,15 +490,19 @@ const PushDebugPanel = memo(({ userId }: { userId?: string }) => {
         setDebugInfo({
           ...info,
           hasToken: false,
+          profileTimezone: null,
           tokenCount: 0,
           latestTokenUpdatedAt: null,
           latestTokenPreview: null,
           recentQueueRows: [],
+          recentSkippedBudget: false,
+          recentFailedTerminal: false,
+          recentNoDeviceTokens: false,
         });
         return;
       }
 
-      const [hasToken, tokenSnapshot, queueResult] = await Promise.all([
+      const [hasToken, tokenSnapshot, queueResult, profileResult] = await Promise.all([
         hasActiveNativePushSubscription(userId),
         getNativePushTokenDebugSnapshot(userId),
         supabase
@@ -471,20 +510,34 @@ const PushDebugPanel = memo(({ userId }: { userId?: string }) => {
           .select("id, notification_type, status, scheduled_for, delivered_at, last_error")
           .eq("user_id", userId)
           .order("scheduled_for", { ascending: false })
-          .limit(8),
+          .limit(RECENT_QUEUE_LIMIT),
+        supabase
+          .from("profiles")
+          .select("timezone")
+          .eq("id", userId)
+          .maybeSingle(),
       ]);
 
       if (queueResult.error) {
         throw queueResult.error;
       }
+      if (profileResult.error) {
+        throw profileResult.error;
+      }
+
+      const recentQueueRows = (queueResult.data ?? []) as QueueDebugRow[];
 
       setDebugInfo({
         ...info,
         hasToken,
+        profileTimezone: profileResult.data?.timezone ?? null,
         tokenCount: tokenSnapshot.tokenCount,
         latestTokenUpdatedAt: tokenSnapshot.latestUpdatedAt,
         latestTokenPreview: tokenSnapshot.latestTokenPreview,
-        recentQueueRows: (queueResult.data ?? []) as QueueDebugRow[],
+        recentQueueRows,
+        recentSkippedBudget: recentQueueRows.some((row) => row.status === "skipped_budget"),
+        recentFailedTerminal: recentQueueRows.some((row) => row.status === "failed_terminal"),
+        recentNoDeviceTokens: recentQueueRows.some((row) => row.last_error === "no_device_tokens"),
       });
     } catch (error) {
       console.error('Debug info error:', error);
@@ -589,18 +642,54 @@ const PushDebugPanel = memo(({ userId }: { userId?: string }) => {
                 <span className="text-muted-foreground">iOS Tokens:</span>
                 <span className="text-foreground">{debugInfo.tokenCount}</span>
               </div>
+              <div className="flex items-center gap-2 col-span-2">
+                <span className="text-muted-foreground">Profile Timezone:</span>
+                <span className="text-foreground font-mono text-xs">{debugInfo.profileTimezone ?? "Unknown"}</span>
+              </div>
               {debugInfo.latestTokenUpdatedAt && (
                 <div className="flex items-center gap-2 col-span-2">
                   <span className="text-muted-foreground">Latest Token Updated:</span>
                   <span className="text-foreground font-mono text-xs">{new Date(debugInfo.latestTokenUpdatedAt).toLocaleString()}</span>
                 </div>
               )}
+              <div className="flex items-center gap-2 col-span-2">
+                <span className="text-muted-foreground">Token Freshness:</span>
+                <span className="text-foreground">{formatRelativeTokenAge(debugInfo.latestTokenUpdatedAt)}</span>
+              </div>
               {debugInfo.latestTokenPreview && (
                 <div className="flex items-center gap-2 col-span-2">
                   <span className="text-muted-foreground">Latest Token:</span>
                   <span className="text-foreground font-mono text-xs">{debugInfo.latestTokenPreview}</span>
                 </div>
               )}
+            </div>
+
+            <div className="space-y-2 pt-2 border-t border-border">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Recent Queue Signals</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {debugInfo.recentSkippedBudget && (
+                  <span className="rounded-full border border-yellow-500/40 bg-yellow-500/10 px-2 py-1 text-xs text-yellow-700 dark:text-yellow-300">
+                    Recent skipped_budget
+                  </span>
+                )}
+                {debugInfo.recentFailedTerminal && (
+                  <span className="rounded-full border border-red-500/40 bg-red-500/10 px-2 py-1 text-xs text-red-700 dark:text-red-300">
+                    Recent failed_terminal
+                  </span>
+                )}
+                {debugInfo.recentNoDeviceTokens && (
+                  <span className="rounded-full border border-red-500/40 bg-red-500/10 px-2 py-1 text-xs text-red-700 dark:text-red-300">
+                    Recent no_device_tokens
+                  </span>
+                )}
+                {!debugInfo.recentSkippedBudget && !debugInfo.recentFailedTerminal && !debugInfo.recentNoDeviceTokens && (
+                  <span className="rounded-full border border-border bg-background px-2 py-1 text-xs text-muted-foreground">
+                    No recent queue failures
+                  </span>
+                )}
+              </div>
             </div>
             
             {debugInfo.error && (
@@ -658,7 +747,7 @@ const PushDebugPanel = memo(({ userId }: { userId?: string }) => {
                       </div>
                       {row.last_error && (
                         <div className="text-xs text-destructive break-all">
-                          Error: {row.last_error}
+                          Reason: {row.last_error}
                         </div>
                       )}
                     </div>

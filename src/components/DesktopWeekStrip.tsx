@@ -12,6 +12,8 @@ interface DesktopWeekStripProps {
   onDateSelect: (date: Date) => void;
   onOpenMonthView: () => void;
   onAddQuest?: () => void;
+  plannerMode?: "week" | "day";
+  onPlannerModeChange?: (mode: "week" | "day") => void;
 }
 
 interface DayStats {
@@ -26,6 +28,8 @@ export function DesktopWeekStrip({
   onDateSelect,
   onOpenMonthView,
   onAddQuest,
+  plannerMode,
+  onPlannerModeChange,
 }: DesktopWeekStripProps) {
   const weekStart = startOfWeek(selectedDate, { weekStartsOn: 0 });
   const weekEnd = addDays(weekStart, 6);
@@ -75,6 +79,44 @@ export function DesktopWeekStrip({
 
           <div className="flex flex-wrap items-center justify-end gap-2">
             <div className="flex items-center gap-2">
+              {plannerMode && onPlannerModeChange ? (
+                <div
+                  className="flex items-center gap-1 rounded-2xl border border-white/10 bg-white/5 p-1"
+                  role="group"
+                  aria-label="Desktop planner mode"
+                >
+                  <Button
+                    type="button"
+                    variant={plannerMode === "week" ? "secondary" : "ghost"}
+                    size="sm"
+                    className={cn(
+                      "h-8 rounded-xl px-3 text-xs",
+                      plannerMode === "week"
+                        ? "bg-white/12 text-white hover:bg-white/15"
+                        : "text-muted-foreground hover:bg-white/8 hover:text-foreground",
+                    )}
+                    aria-pressed={plannerMode === "week"}
+                    onClick={() => onPlannerModeChange("week")}
+                  >
+                    Week
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={plannerMode === "day" ? "secondary" : "ghost"}
+                    size="sm"
+                    className={cn(
+                      "h-8 rounded-xl px-3 text-xs",
+                      plannerMode === "day"
+                        ? "bg-white/12 text-white hover:bg-white/15"
+                        : "text-muted-foreground hover:bg-white/8 hover:text-foreground",
+                    )}
+                    aria-pressed={plannerMode === "day"}
+                    onClick={() => onPlannerModeChange("day")}
+                  >
+                    Day
+                  </Button>
+                </div>
+              ) : null}
               <Button
                 variant="outline"
                 size="icon"

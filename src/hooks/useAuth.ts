@@ -79,7 +79,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const syncAuthenticatedQueries = useCallback(async () => {
-    await queryClient.refetchQueries({ queryKey: ["profile"] });
+    await Promise.all([
+      queryClient.refetchQueries({ queryKey: ["profile"] }),
+      queryClient.refetchQueries({ queryKey: ["companion"] }),
+    ]);
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ["mentor-page-data"] }),
       queryClient.invalidateQueries({ queryKey: ["mentor-personality"] }),

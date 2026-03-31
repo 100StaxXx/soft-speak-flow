@@ -1,10 +1,14 @@
 import {
   computeDeterministicJitterMinutes,
+  decideEngagementBudget,
   getNotificationPriority,
   isCriticalNotification,
   pickDeterministicDailyQuote,
+  resolveDueHabitReminder,
   resolveDispatchMode,
+  shouldApplyEngagementBudget,
   toDailyScheduledDateTime,
+  toScheduledDateTime,
 } from "./notificationsV2.ts";
 import { composeNotificationCopy } from "./notificationComposer.ts";
 
@@ -35,6 +39,42 @@ Deno.test("priority and critical classification are aligned", () => {
 
   if (criticalPriority <= nonCriticalPriority) {
     throw new Error("Critical notification should have higher priority");
+  }
+});
+
+Deno.test("scheduled reminders bypass engagement budget while daily content stays budgeted", () => {
+  if (shouldApplyEngagementBudget("task_reminder")) {
+    throw new Error("task_reminder should bypass the engagement budget");
+  }
+
+  if (!shouldApplyEngagementBudget("daily_pep")) {
+    throw new Error("daily_pep should count toward the engagement budget");
+  }
+
+  const blockedDailyPep = decideEngagementBudget({
+    notificationType: "daily_pep",
+    state: {
+      sentTodayCount: 1,
+      lastSentAt: new Date("2026-03-27T15:00:00.000Z"),
+    },
+    now: new Date("2026-03-27T16:00:00.000Z"),
+  });
+
+  if (blockedDailyPep.allow || blockedDailyPep.reason !== "soft_target_enforced") {
+    throw new Error(`Expected daily_pep to be blocked by soft target, got ${JSON.stringify(blockedDailyPep)}`);
+  }
+
+  const allowedTaskReminder = decideEngagementBudget({
+    notificationType: "task_reminder",
+    state: {
+      sentTodayCount: 2,
+      lastSentAt: new Date("2026-03-27T15:00:00.000Z"),
+    },
+    now: new Date("2026-03-27T16:00:00.000Z"),
+  });
+
+  if (!allowedTaskReminder.allow) {
+    throw new Error(`Expected task_reminder to bypass engagement budget, got ${JSON.stringify(allowedTaskReminder)}`);
   }
 });
 
@@ -91,6 +131,89 @@ Deno.test("daily schedule conversion falls back to the configured window", () =>
 
   if (scheduled.toISOString() !== "2026-03-28T02:00:00.000Z") {
     throw new Error(`Expected 2026-03-28T02:00:00.000Z, got ${scheduled.toISOString()}`);
+  }
+});
+
+Deno.test("scheduled date conversion rejects nonexistent spring-forward times", () => {
+  const scheduled = toScheduledDateTime(
+    "2026-03-08",
+    "02:30:00",
+    "America/Los_Angeles",
+  );
+
+  if (scheduled !== null) {
+    throw new Error(`Expected nonexistent DST time to resolve to null, got ${scheduled.toISOString()}`);
+  }
+});
+
+Deno.test("habit reminder resolution works for same-day timezones like Tokyo", () => {
+  const due = resolveDueHabitReminder({
+    now: new Date("2026-03-26T23:20:00.000Z"),
+    localDate: "2026-03-27",
+    timezone: "Asia/Tokyo",
+    preferredTime: "08:30:00",
+    reminderMinutesBefore: 15,
+    frequency: "daily",
+    customDays: null,
+    lastSentForDate: null,
+  });
+
+  if (!due) {
+    throw new Error("Expected a Tokyo habit reminder to be due");
+  }
+
+  if (due.habitLocalDate !== "2026-03-27") {
+    throw new Error(`Expected habitLocalDate 2026-03-27, got ${due.habitLocalDate}`);
+  }
+
+  if (due.reminderAt.toISOString() !== "2026-03-26T23:15:00.000Z") {
+    throw new Error(`Unexpected Tokyo reminderAt: ${due.reminderAt.toISOString()}`);
+  }
+});
+
+Deno.test("habit reminder resolution handles pre-midnight reminders for the next local day", () => {
+  const due = resolveDueHabitReminder({
+    now: new Date("2026-03-28T06:58:00.000Z"),
+    localDate: "2026-03-27",
+    timezone: "America/Los_Angeles",
+    preferredTime: "00:10:00",
+    reminderMinutesBefore: 15,
+    frequency: "daily",
+    customDays: null,
+    lastSentForDate: null,
+  });
+
+  if (!due) {
+    throw new Error("Expected a Los Angeles near-midnight habit reminder to be due");
+  }
+
+  if (due.habitLocalDate !== "2026-03-28") {
+    throw new Error(`Expected habitLocalDate 2026-03-28, got ${due.habitLocalDate}`);
+  }
+
+  if (due.reminderAt.toISOString() !== "2026-03-28T06:55:00.000Z") {
+    throw new Error(`Unexpected Los Angeles reminderAt: ${due.reminderAt.toISOString()}`);
+  }
+});
+
+Deno.test("habit reminder resolution allows the next local day after a prior send", () => {
+  const due = resolveDueHabitReminder({
+    now: new Date("2026-03-28T15:20:00.000Z"),
+    localDate: "2026-03-28",
+    timezone: "America/Los_Angeles",
+    preferredTime: "08:30:00",
+    reminderMinutesBefore: 15,
+    frequency: "daily",
+    customDays: null,
+    lastSentForDate: "2026-03-27",
+  });
+
+  if (!due) {
+    throw new Error("Expected the next local day to be eligible after the previous date was already sent");
+  }
+
+  if (due.habitLocalDate !== "2026-03-28") {
+    throw new Error(`Expected habitLocalDate 2026-03-28, got ${due.habitLocalDate}`);
   }
 });
 

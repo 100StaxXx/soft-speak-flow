@@ -36,6 +36,19 @@ const FUNCTION_TRANSPORT_ERROR_MESSAGES = new Set([
 ]);
 
 type AuthGatewayAction = "sign_in_password" | "sign_up_password" | "reset_password";
+type PostAuthProvider = "apple" | null;
+
+interface PostAuthNavigationContext {
+  provider: PostAuthProvider;
+  intent: SocialAuthIntent | null;
+  preferGuardedLanding: boolean;
+}
+
+const DEFAULT_POST_AUTH_NAVIGATION_CONTEXT: PostAuthNavigationContext = {
+  provider: null,
+  intent: null,
+  preferGuardedLanding: false,
+};
 
 const hasOAuthCallbackParams = (): boolean => {
   if (typeof window === "undefined") return false;
@@ -189,15 +202,78 @@ const Auth = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
+  const pendingPostAuthNavigationContextRef = useRef<
+    (PostAuthNavigationContext & { userId: string }) | null
+  >(null);
   
   const backgroundImage = signinBackground;
 
-  const handlePostAuthNavigation = useCallback(async (session: Session | null, source: string) => {
+  const setPendingPostAuthNavigationContext = useCallback(
+    (userId: string, context: PostAuthNavigationContext) => {
+      pendingPostAuthNavigationContextRef.current = {
+        ...context,
+        userId,
+      };
+    },
+    [],
+  );
+
+  const clearPendingPostAuthNavigationContext = useCallback((userId?: string | null) => {
+    const pendingContext = pendingPostAuthNavigationContextRef.current;
+    if (!pendingContext) return;
+    if (!userId || pendingContext.userId === userId) {
+      pendingPostAuthNavigationContextRef.current = null;
+    }
+  }, []);
+
+  const resolvePostAuthNavigationContext = useCallback(
+    (
+      session: Session | null,
+      context?: PostAuthNavigationContext,
+    ): PostAuthNavigationContext => {
+      if (context) {
+        return context;
+      }
+
+      const pendingContext = pendingPostAuthNavigationContextRef.current;
+      if (!session?.user?.id || !pendingContext || pendingContext.userId !== session.user.id) {
+        return DEFAULT_POST_AUTH_NAVIGATION_CONTEXT;
+      }
+
+      return {
+        provider: pendingContext.provider,
+        intent: pendingContext.intent,
+        preferGuardedLanding: pendingContext.preferGuardedLanding,
+      };
+    },
+    [],
+  );
+
+  const normalizePostAuthPath = useCallback(
+    (path: string, context: PostAuthNavigationContext): string => {
+      if (context.preferGuardedLanding && path === POST_AUTH_DEFAULT_PATH) {
+        return "/";
+      }
+
+      return path;
+    },
+    [],
+  );
+
+  const handlePostAuthNavigation = useCallback(async (
+    session: Session | null,
+    source: string,
+    context?: PostAuthNavigationContext,
+  ) => {
     const startTime = Date.now();
+    const navigationContext = resolvePostAuthNavigationContext(session, context);
     logger.info(`[Auth ${source}] handlePostAuthNavigation START`, {
       hasSession: !!session,
       hasRedirected: hasRedirected.current,
-      userId: session?.user?.id?.substring(0, 8)
+      userId: session?.user?.id?.substring(0, 8),
+      provider: navigationContext.provider,
+      intent: navigationContext.intent,
+      preferGuardedLanding: navigationContext.preferGuardedLanding,
     });
 
     // Synchronous guard - check and set IMMEDIATELY before any async work
@@ -214,11 +290,19 @@ const Auth = () => {
         return false;
       }
 
+      const normalizedPath = normalizePostAuthPath(path, navigationContext);
       navigationFinalized = true;
       logger.info(
-        `[Auth ${source}] Finalizing navigation to ${path} via ${reason} (total time: ${Date.now() - startTime}ms)`,
+        `[Auth ${source}] Finalizing navigation to ${normalizedPath} via ${reason} (total time: ${Date.now() - startTime}ms)`,
+        {
+          rawPath: path,
+          normalizedPath,
+          provider: navigationContext.provider,
+          intent: navigationContext.intent,
+          preferGuardedLanding: navigationContext.preferGuardedLanding,
+        },
       );
-      safeNavigate(navigate, path);
+      safeNavigate(navigate, normalizedPath);
 
       // Safety valve: if routing fails and we are still on /auth, allow retry.
       setTimeout(() => {
@@ -311,7 +395,7 @@ const Auth = () => {
     if (winner === "deadline") {
       logger.warn(`[Auth ${source}] Navigation deadline won race; continuing in background if needed`);
     }
-  }, [navigate, toast]);
+  }, [navigate, normalizePostAuthPath, resolvePostAuthNavigationContext, toast]);
   
   // Ref to track Apple OAuth fallback timeout (for cleanup)
   const appleFallbackTimeout = useRef<NodeJS.Timeout | null>(null);
@@ -329,6 +413,7 @@ const Auth = () => {
     async (attempt: PendingSocialAuthAttempt, source: string) => {
       logger.warn(`[Auth ${source}] Blocking social sign-in with no returning account match`, attempt);
       clearPendingSocialAuthAttempt();
+      clearPendingPostAuthNavigationContext();
 
       try {
         await supabase.auth.signOut();
@@ -341,7 +426,7 @@ const Auth = () => {
       setIsForgotPassword(false);
       setInlineError(getSocialAccountNotFoundMessage(attempt.provider));
     },
-    [],
+    [clearPendingPostAuthNavigationContext],
   );
 
   const handleResolvedSocialAuth = useCallback(
@@ -512,6 +597,7 @@ const Auth = () => {
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setInlineError(null);
+    clearPendingPostAuthNavigationContext();
 
     // Sanitize inputs before validation
     const sanitizedEmail = email.trim().toLowerCase();
@@ -630,6 +716,7 @@ const Auth = () => {
     const socialAuthIntent: SocialAuthIntent = getSocialAuthIntent(isLogin);
     let storedPendingSocialAuth = false;
 
+    clearPendingPostAuthNavigationContext();
     setInlineError(null);
     setOauthLoading(provider);
     console.log(`[OAuth Debug] Starting ${provider} sign-in flow`);
@@ -643,6 +730,11 @@ const Auth = () => {
       // Native Apple Sign-In for iOS
       if (provider === 'apple' && providerSupportsNative && appleNativeReady) {
         const appleFlowStart = Date.now();
+        const applePostAuthNavigationContext: PostAuthNavigationContext = {
+          provider: "apple",
+          intent: socialAuthIntent,
+          preferGuardedLanding: socialAuthIntent === "sign_in",
+        };
         console.log('[Apple OAuth] Initiating native Apple sign-in');
         
         // Generate secure random nonce (Supabase provides this method)
@@ -730,7 +822,20 @@ const Auth = () => {
           );
         }
         if (!sessionData?.access_token || !sessionData?.refresh_token) {
+          clearPendingPostAuthNavigationContext();
           throw new Error('Failed to get session tokens from edge function');
+        }
+
+        const nativeAppleSessionUserId =
+          sessionData?.user && typeof sessionData.user === "object" && "id" in sessionData.user
+            ? (sessionData.user.id as string | undefined)
+            : undefined;
+
+        if (nativeAppleSessionUserId) {
+          setPendingPostAuthNavigationContext(
+            nativeAppleSessionUserId,
+            applePostAuthNavigationContext,
+          );
         }
 
         // Set the session with tokens from edge function
@@ -741,20 +846,33 @@ const Auth = () => {
         });
         console.log(`[Apple OAuth] setSession completed in ${Date.now() - setSessionStart}ms`);
 
-        if (sessionError) throw sessionError;
+        if (sessionError) {
+          clearPendingPostAuthNavigationContext(nativeAppleSessionUserId);
+          throw sessionError;
+        }
 
         // Ensure Supabase client state reflects the session before navigating
         const { data: { session: currentSession } } = await supabase.auth.getSession();
         const sessionToUse = newSession ?? currentSession;
 
         if (!sessionToUse) {
+          clearPendingPostAuthNavigationContext(nativeAppleSessionUserId);
           throw new Error('Failed to establish Supabase session after Apple sign-in');
         }
+
+        setPendingPostAuthNavigationContext(
+          sessionToUse.user.id,
+          applePostAuthNavigationContext,
+        );
 
         const sessionSetTime = Date.now();
         console.log(`[Apple OAuth] Session set successfully at ${sessionSetTime}, proceeding to navigation`);
         console.log('[Apple OAuth] Triggering post-auth navigation');
-        void handlePostAuthNavigation(sessionToUse, 'appleNative');
+        void handlePostAuthNavigation(
+          sessionToUse,
+          'appleNative',
+          applePostAuthNavigationContext,
+        );
         console.log(`[Apple OAuth] Total native flow completed in ${Date.now() - appleFlowStart}ms`);
 
         // Fallback: manually redirect if onAuthStateChange doesn't fire (increased to 800ms to avoid race conditions)
@@ -767,11 +885,15 @@ const Auth = () => {
                 return;
               }
               console.log(`[Apple OAuth Fallback] Executing manual redirect at ${Date.now()} (${Date.now() - sessionSetTime}ms since session set)`);
-              await handlePostAuthNavigation(sessionToUse, 'appleNativeFallback');
+              await handlePostAuthNavigation(
+                sessionToUse,
+                'appleNativeFallback',
+                applePostAuthNavigationContext,
+              );
             } catch (error) {
               console.error('[Apple OAuth Fallback] Error during redirect:', error);
-              // Fallback to onboarding if something goes wrong
-              navigate('/onboarding');
+              // Fallback to guarded home for native Apple sign-in, or onboarding otherwise.
+              navigate(applePostAuthNavigationContext.preferGuardedLanding ? '/' : '/onboarding');
             }
           }, 800);
         }
@@ -806,6 +928,7 @@ const Auth = () => {
 
       if (error) throw error;
     } catch (error) {
+      clearPendingPostAuthNavigationContext();
       if (storedPendingSocialAuth) {
         clearPendingSocialAuthAttempt();
       }

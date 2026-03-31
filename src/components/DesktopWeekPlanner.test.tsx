@@ -1,0 +1,182 @@
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import { format } from "date-fns";
+import { describe, expect, it, vi } from "vitest";
+
+import { DesktopWeekPlanner } from "./DesktopWeekPlanner";
+import type { DailyTask } from "@/services/dailyTasksRemote";
+
+vi.mock("@/features/tasks/components/ProgressRing", () => ({
+  ProgressRing: ({ percent }: { percent: number }) => <div data-testid="progress-ring">{percent}</div>,
+}));
+
+const selectedDate = new Date(2026, 2, 31, 12, 0, 0, 0);
+
+const baseTask = (overrides: Partial<DailyTask> = {}): DailyTask => ({
+  id: "task-1",
+  user_id: "user-1",
+  task_text: "Week quest",
+  difficulty: "medium",
+  xp_reward: 20,
+  task_date: "2026-03-31",
+  completed: false,
+  completed_at: null,
+  is_main_quest: false,
+  scheduled_time: "09:00",
+  estimated_duration: 30,
+  recurrence_pattern: null,
+  recurrence_days: null,
+  recurrence_month_days: null,
+  recurrence_custom_period: null,
+  recurrence_end_date: null,
+  is_recurring: false,
+  reminder_enabled: false,
+  reminder_minutes_before: null,
+  reminder_sent: false,
+  parent_template_id: null,
+  category: null,
+  is_bonus: false,
+  created_at: "2026-03-31T08:00:00.000Z",
+  priority: null,
+  is_top_three: false,
+  actual_time_spent: null,
+  ai_generated: false,
+  context_id: null,
+  source: "manual",
+  habit_source_id: null,
+  epic_id: null,
+  epic_title: null,
+  sort_order: null,
+  contact_id: null,
+  auto_log_interaction: false,
+  contact: null,
+  image_url: null,
+  attachments: [],
+  notes: null,
+  location: null,
+  subtasks: [],
+  ...overrides,
+});
+
+describe("DesktopWeekPlanner", () => {
+  it("renders all seven days for the selected week", () => {
+    render(
+      <DesktopWeekPlanner
+        selectedDate={selectedDate}
+        tasks={[]}
+        onDateSelect={vi.fn()}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("desktop-week-day-2026-03-29")).toBeInTheDocument();
+    expect(screen.getByTestId("desktop-week-day-2026-04-04")).toBeInTheDocument();
+  });
+
+  it("groups tasks by day and sorts timed quests before anytime quests", () => {
+    render(
+      <DesktopWeekPlanner
+        selectedDate={selectedDate}
+        tasks={[
+          baseTask({
+            id: "timed-task",
+            task_text: "Morning check-in",
+            task_date: "2026-03-31",
+            scheduled_time: "08:00",
+          }),
+          baseTask({
+            id: "anytime-task",
+            task_text: "Loose planning",
+            task_date: "2026-03-31",
+            scheduled_time: null,
+          }),
+          baseTask({
+            id: "other-day-task",
+            task_text: "Wednesday review",
+            task_date: "2026-04-01",
+            scheduled_time: "10:00",
+          }),
+        ]}
+        onDateSelect={vi.fn()}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+      />,
+    );
+
+    const tuesdayColumn = screen.getByTestId("desktop-week-day-2026-03-31");
+    const renderedTaskIds = within(tuesdayColumn)
+      .getAllByTestId(/desktop-week-task-/)
+      .map((node) => node.getAttribute("data-testid"));
+
+    expect(renderedTaskIds).toEqual([
+      "desktop-week-task-timed-task",
+      "desktop-week-task-anytime-task",
+    ]);
+    expect(within(screen.getByTestId("desktop-week-day-2026-04-01")).getByText("Wednesday review")).toBeInTheDocument();
+  });
+
+  it("keeps week actions wired to the provided callbacks", () => {
+    const onDateSelect = vi.fn();
+    const onToggle = vi.fn();
+    const onUndoToggle = vi.fn();
+    const onEditQuest = vi.fn();
+    const onDeleteQuest = vi.fn();
+    const onMoveQuestToNextDay = vi.fn();
+    const onSendToCalendar = vi.fn();
+
+    const completedTask = baseTask({
+      id: "completed-task",
+      task_text: "Completed quest",
+      completed: true,
+    });
+    const editableTask = baseTask({
+      id: "editable-task",
+      task_text: "Editable quest",
+      scheduled_time: "07:30",
+    });
+
+    render(
+      <DesktopWeekPlanner
+        selectedDate={selectedDate}
+        tasks={[
+          completedTask,
+          editableTask,
+        ]}
+        onDateSelect={onDateSelect}
+        onToggle={onToggle}
+        onAddQuest={vi.fn()}
+        onUndoToggle={onUndoToggle}
+        onEditQuest={onEditQuest}
+        onDeleteQuest={onDeleteQuest}
+        onMoveQuestToNextDay={onMoveQuestToNextDay}
+        onSendToCalendar={onSendToCalendar}
+        hasCalendarLink={(taskId) => taskId === "editable-task"}
+      />,
+    );
+
+    fireEvent.click(screen.getByLabelText("Mark task as incomplete"));
+    expect(onUndoToggle).toHaveBeenCalledWith("completed-task", 20);
+
+    fireEvent.click(screen.getByLabelText("Mark task as complete"));
+    expect(onToggle).toHaveBeenCalledWith("editable-task", true, 20);
+
+    fireEvent.click(screen.getByLabelText("Edit Editable quest"));
+    expect(onEditQuest).toHaveBeenCalledWith(expect.objectContaining({ id: "editable-task" }));
+
+    fireEvent.click(screen.getByLabelText("Re-send Editable quest to calendar"));
+    expect(onSendToCalendar).toHaveBeenCalledWith("editable-task");
+
+    fireEvent.click(screen.getByLabelText("Move Editable quest to tomorrow"));
+    expect(onMoveQuestToNextDay).toHaveBeenCalledWith(expect.objectContaining({ id: "editable-task" }));
+
+    fireEvent.click(screen.getByLabelText("Delete Editable quest"));
+    expect(onDeleteQuest).toHaveBeenCalledWith(expect.objectContaining({ id: "editable-task" }));
+
+    const wednesdayColumn = screen.getByTestId("desktop-week-day-2026-04-01");
+    fireEvent.click(within(wednesdayColumn).getByRole("button"));
+
+    expect(onDateSelect).toHaveBeenCalledWith(expect.any(Date));
+    const selectedDateArg = onDateSelect.mock.calls[0]?.[0] as Date;
+    expect(format(selectedDateArg, "yyyy-MM-dd")).toBe("2026-04-01");
+  });
+});

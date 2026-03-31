@@ -261,4 +261,43 @@ describe("useAuth provider", () => {
     );
     expect(result.current.user?.id).toBe("user-2");
   });
+
+  it("refetches profile and companion queries on sign-in events", async () => {
+    mocks.getSessionMock.mockResolvedValueOnce({ data: { session: null }, error: null });
+
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+      },
+    });
+    const refetchQueriesSpy = vi.spyOn(queryClient, "refetchQueries");
+    const invalidateQueriesSpy = vi.spyOn(queryClient, "invalidateQueries");
+
+    renderHook(() => useAuth(), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await waitFor(() => {
+      expect(authStateChangeCallback).toBeTypeOf("function");
+    });
+
+    const signedInSession = {
+      user: { id: "user-4", email: "fresh@example.com" },
+    } as Session;
+
+    await act(async () => {
+      authStateChangeCallback?.("SIGNED_IN", signedInSession);
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(refetchQueriesSpy).toHaveBeenCalledWith({ queryKey: ["profile"] });
+      expect(refetchQueriesSpy).toHaveBeenCalledWith({ queryKey: ["companion"] });
+    });
+
+    expect(invalidateQueriesSpy).toHaveBeenCalledWith({ queryKey: ["mentor-page-data"] });
+    expect(invalidateQueriesSpy).toHaveBeenCalledWith({ queryKey: ["mentor-personality"] });
+    expect(invalidateQueriesSpy).toHaveBeenCalledWith({ queryKey: ["mentor"] });
+    expect(invalidateQueriesSpy).toHaveBeenCalledWith({ queryKey: ["selected-mentor"] });
+  });
 });

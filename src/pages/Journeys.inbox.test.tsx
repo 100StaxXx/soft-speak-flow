@@ -82,6 +82,17 @@ const mocks = vi.hoisted(() => ({
     end_date?: string | null;
     epic_habits?: Array<{ habit_id: string }>;
   }>,
+  layoutMode: "mobile" as "mobile" | "desktop",
+  weekCalendarTasks: [] as Array<{
+    id: string;
+    task_text: string;
+    completed: boolean;
+    xp_reward: number;
+    task_date: string;
+    scheduled_time: string | null;
+    difficulty: string;
+    is_main_quest: boolean;
+  }>,
 }));
 
 vi.mock("@/components/PageTransition", () => ({
@@ -97,19 +108,38 @@ vi.mock("@/components/DatePillsScroller", () => ({
 }));
 
 vi.mock("@/components/DesktopWeekStrip", () => ({
-  DesktopWeekStrip: () => <div data-testid="desktop-week-strip" />,
+  DesktopWeekStrip: ({
+    plannerMode,
+    onPlannerModeChange,
+  }: {
+    plannerMode?: "week" | "day";
+    onPlannerModeChange?: (mode: "week" | "day") => void;
+  }) => (
+    <div data-testid="desktop-week-strip">
+      <div data-testid="desktop-week-strip-mode">{plannerMode ?? "unset"}</div>
+      <button type="button" onClick={() => onPlannerModeChange?.("week")}>
+        set-week-mode
+      </button>
+      <button type="button" onClick={() => onPlannerModeChange?.("day")}>
+        set-day-mode
+      </button>
+    </div>
+  ),
 }));
 
 vi.mock("@/components/TodaysAgenda", () => ({
   TodaysAgenda: ({
     tasks,
     activeEpics,
+    selectedDate,
   }: {
     tasks: Array<{ id: string; task_text: string; habit_source_id?: string | null }>;
     activeEpics: Array<{ id: string; title: string }>;
+    selectedDate: Date;
   }) => (
     <div data-testid="todays-agenda">
       <div>agenda</div>
+      <div data-testid="todays-agenda-selected-date">{selectedDate.toISOString()}</div>
       <div data-testid="agenda-task-list">
         {tasks.map((task) => (
           <div key={task.id}>
@@ -123,6 +153,26 @@ vi.mock("@/components/TodaysAgenda", () => ({
           <div key={epic.id}>{epic.title}</div>
         ))}
       </div>
+    </div>
+  ),
+}));
+
+vi.mock("@/components/DesktopWeekPlanner", () => ({
+  DesktopWeekPlanner: ({
+    selectedDate,
+    onDateSelect,
+  }: {
+    selectedDate: Date;
+    onDateSelect: (date: Date) => void;
+  }) => (
+    <div data-testid="desktop-week-planner">
+      <div data-testid="desktop-week-planner-selected-date">{selectedDate.toISOString()}</div>
+      <button
+        type="button"
+        onClick={() => onDateSelect(new Date("2026-03-28T12:00:00.000Z"))}
+      >
+        select-desktop-week-date
+      </button>
     </div>
   ),
 }));
@@ -266,8 +316,8 @@ vi.mock("@/hooks/useInboxTasks", () => ({
 }));
 
 vi.mock("@/hooks/useCalendarTasks", () => ({
-  useCalendarTasks: () => ({
-    tasks: [],
+  useCalendarTasks: (_selectedDate: Date, view: "list" | "month" | "week") => ({
+    tasks: view === "week" ? mocks.weekCalendarTasks : [],
   }),
 }));
 
@@ -382,7 +432,7 @@ vi.mock("@/contexts/MainTabVisibilityContext", () => ({
 }));
 
 vi.mock("@/hooks/useJourneysLayoutMode", () => ({
-  useJourneysLayoutMode: () => "mobile",
+  useJourneysLayoutMode: () => mocks.layoutMode,
 }));
 
 vi.mock("@/utils/platformTargets", () => ({
@@ -426,6 +476,8 @@ describe("Journeys inbox integration", () => {
     mocks.deleteInboxTask.mockClear();
     mocks.scrollIntoView.mockClear();
     mocks.activeEpics = [];
+    mocks.layoutMode = "mobile";
+    mocks.weekCalendarTasks = [];
 
     vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback: FrameRequestCallback) => {
       callback(0);
@@ -605,5 +657,35 @@ describe("Journeys inbox integration", () => {
     expect(screen.getByText("Nutrition Tracking (ritual)")).toBeInTheDocument();
     expect(screen.getByText("Summer Gains")).toBeInTheDocument();
     expect(screen.getByText("Get Money")).toBeInTheDocument();
+  });
+
+  it("defaults desktop quests to week mode and preserves the selected date when switching back to day", async () => {
+    mocks.layoutMode = "desktop";
+    mocks.weekCalendarTasks = [
+      {
+        id: "week-1",
+        task_text: "Week task",
+        completed: false,
+        xp_reward: 10,
+        task_date: "2026-03-28",
+        scheduled_time: "08:00",
+        difficulty: "medium",
+        is_main_quest: false,
+      },
+    ];
+
+    renderJourneys();
+
+    expect(screen.getByTestId("desktop-week-strip-mode")).toHaveTextContent("week");
+    expect(screen.getByTestId("desktop-week-planner")).toBeInTheDocument();
+    expect(screen.queryByTestId("todays-agenda")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "select-desktop-week-date" }));
+    fireEvent.click(screen.getByRole("button", { name: "set-day-mode" }));
+
+    expect(screen.getByTestId("desktop-week-strip-mode")).toHaveTextContent("day");
+    expect(screen.getByTestId("todays-agenda")).toBeInTheDocument();
+    expect(screen.queryByTestId("desktop-week-planner")).not.toBeInTheDocument();
+    expect(screen.getByTestId("todays-agenda-selected-date")).toHaveTextContent("2026-03-28");
   });
 });
