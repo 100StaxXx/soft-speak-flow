@@ -1,0 +1,22 @@
+Create a single square 1:1 fantasy illustration laid out as a clean 3x2 grid (matching the provided six-panel reference layout): three panels on the top row and three on the bottom row. Full-bleed panels with crisp, even seams between them; no outer border.
+
+Use the uploaded six-panel dragon reference ONLY for rendering quality, age target, panel layout, lighting richness, palette intensity, and premium mobile-game collectible polish. Do NOT copy dragon anatomy.
+
+Subject for ALL six panels: Pegasus species at stage 2 (Youngling). Consistent identity and anatomy across panels: a cute young pegasus foal with feathered wings, windswept mane and tail, athletic horse build, expressive large eyes. Anatomy lock: exactly 4 legs + 2 feathered wings. No horn. No scales. No spikes, frills, or dragon traits. Horse-like muzzle, soft short fur, layered feathers, equine ears. Keep the same centered seated/tucked pose and the same approximate framing and composition across all six panels so only elemental treatment and creature coloration change. Wings visible in every panel.
+
+Overall style: premium collectible mascot for a fantasy mobile game; high detail; gentle subsurface scattering, glossy eye highlights, rich volumetric lighting, soft bloom, tasteful particles per element; ultra-clean polish; broad appeal; no text, no labels, no watermark, no logo, no props, no rider, no border ornaments.
+
+Panel order top row left-to-right, then bottom row left-to-right:
+1) FIRE (top-left): Warm ember reds and oranges. Flame halo behind the pegasus, drifting sparks, scorched glow and molten light. Shift the pegasus’s fur and feathers toward ember-red/orange tones with subtle darker tips, warm amber highlights. Background reads as radiant heat and fire. 
+
+2) ICE (top-center): Fully glacial. Palette of cold blue to cyan. Crystalline frost patterns on the ground/wing edges, sharp ice shards, snow drift, frozen mist, luminous icy highlights. Shift fur and feathers into frozen blue-cyan tones with frosted tips. Absolutely NO liquid splash or wave motifs.
+
+3) STORM (top-right): Lightning forks and charged clouds. Electric rim light and slate-violet sky energy; tempest atmosphere. Push body coloration toward stormy indigo and electric violet, with subtle static speckles on feathers. 
+
+4) NATURE (bottom-left): Verdant greens and warm organic light. Living leaves, soft flowers, mossy textures, sunlit plant growth, grounded calm. Shift body coloration toward leaf-green and natural earthy tones; gentle sun-dappled highlights on fur and feathers. 
+
+5) VOID (bottom-center): Deep violet cosmic shadow with nebula particles and faint astral glow; strong dark contrast and floating arcane energy. Deepen body coloration into rich purple-black cosmic hues with subtle starry flecks along the mane and wings. 
+
+6) LIGHT (bottom-right): Radiant gold and ivory. Halo bloom, celestial dust motes, sunburst warmth, soft divine luminance. Brighten body coloration into creamy gold and warm light-infused tones; soft glowing feather edges.
+
+Global constraints: identical youngling age, same pose, same camera/framing per panel; creature’s fur and feather coloration visibly changes per element, not only the background/effects. Keep wings clearly feathered and visible; ensure horse-like features; absolutely no horn in any panel. Ultra-clean, premium, high-resolution output.

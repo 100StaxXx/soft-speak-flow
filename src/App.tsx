@@ -13,6 +13,7 @@ import { XPProvider } from "@/contexts/XPContext";
 import { EvolutionProvider } from "@/contexts/EvolutionContext";
 import { CelebrationProvider } from "@/contexts/CelebrationContext";
 import { CompanionPresenceProvider } from "@/contexts/CompanionPresenceContext";
+import { CompanionMotionProvider } from "@/contexts/CompanionMotionContext";
 import { DeepLinkProvider } from "@/contexts/DeepLinkContext";
 
 import { useProfile } from "@/hooks/useProfile";
@@ -309,22 +310,23 @@ const AppContent = memo(() => {
         <MentorConnectedThemeProvider>
           <ResilienceStatusBanner />
           <ViewModeProvider>
-            <XPProvider>
-              <PostOnboardingMentorGuidanceProvider>
-                <WeeklyRecapProvider>
-                  <CompanionPresenceProvider>
-                    <TalkPopupProvider>
-                      <RealtimeSyncProvider>
-                      <AstralEncounterProvider>
-                      <Suspense fallback={<LoadingFallback />}>
-                      <EvolutionAwareContent />
-                      {activeMainTabPath ? (
-                        <ProtectedRoute>
-                          <MainTabsKeepAlive activePath={activeMainTabPath} />
-                        </ProtectedRoute>
-                      ) : (
-                      <AnimatePresence mode="sync" initial={false}>
-                        <Routes location={location} key={location.pathname}>
+            <CompanionMotionProvider>
+              <XPProvider>
+                <PostOnboardingMentorGuidanceProvider>
+                  <WeeklyRecapProvider>
+                    <CompanionPresenceProvider>
+                      <TalkPopupProvider>
+                        <RealtimeSyncProvider>
+                        <AstralEncounterProvider>
+                        <Suspense fallback={<LoadingFallback />}>
+                        <EvolutionAwareContent />
+                        {activeMainTabPath ? (
+                          <ProtectedRoute>
+                            <MainTabsKeepAlive activePath={activeMainTabPath} />
+                          </ProtectedRoute>
+                        ) : (
+                        <AnimatePresence mode="sync" initial={false}>
+                          <Routes location={location} key={location.pathname}>
                   <Route path="/welcome" element={<Welcome />} />
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/calendar/oauth/callback" element={<CalendarOAuthCallback />} />
@@ -368,19 +370,20 @@ const AppContent = memo(() => {
                   <Route path="/test-scroll" element={<TestScroll />} />
                   <Route path="/test-day-planner" element={<TestDayPlanner />} />
                   <Route path="*" element={<NotFound />} />
-                      </Routes>
-                      </AnimatePresence>
-                      )}
-                      {showBottomNav && <BottomNav />}
-                      <MentorTutorialLayer />
-                      </Suspense>
-                      </AstralEncounterProvider>
-                      </RealtimeSyncProvider>
-                    </TalkPopupProvider>
-                  </CompanionPresenceProvider>
-                </WeeklyRecapProvider>
-              </PostOnboardingMentorGuidanceProvider>
-            </XPProvider>
+                          </Routes>
+                          </AnimatePresence>
+                        )}
+                        {showBottomNav && <BottomNav />}
+                        <MentorTutorialLayer />
+                        </Suspense>
+                        </AstralEncounterProvider>
+                        </RealtimeSyncProvider>
+                      </TalkPopupProvider>
+                    </CompanionPresenceProvider>
+                  </WeeklyRecapProvider>
+                </PostOnboardingMentorGuidanceProvider>
+              </XPProvider>
+            </CompanionMotionProvider>
           </ViewModeProvider>
         </MentorConnectedThemeProvider>
       </MentorConnectionProvider>

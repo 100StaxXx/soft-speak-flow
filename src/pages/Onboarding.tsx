@@ -16,9 +16,14 @@ export default function Onboarding() {
   const { companion, isLoading: companionLoading } = useCompanion();
   const navigate = useNavigate();
   const onboardingSelfHealAttemptedRef = useRef(false);
+  const hasCompanion = Boolean(companion);
+  const hasPresetCompanion = Boolean(companion?.preset_id);
+  const companionStage = companion?.current_stage ?? null;
   const onboardingGate = getOnboardingGateState({
     profile,
-    hasCompanion: Boolean(companion),
+    hasCompanion,
+    hasPresetCompanion,
+    companionStage,
   });
   const onboardingGateReady =
     status !== "loading" &&
@@ -34,7 +39,9 @@ export default function Onboarding() {
 
     const patch = buildEstablishedProfileSelfHealPatch({
       profile,
-      hasCompanion: Boolean(companion),
+      hasCompanion,
+      hasPresetCompanion,
+      companionStage,
     });
     if (!patch) return;
 
@@ -42,7 +49,7 @@ export default function Onboarding() {
 
     void supabase
       .from("profiles")
-      .update(patch)
+      .update(patch as any)
       .eq("id", user.id)
       .then(({ error }) => {
         if (error) {
@@ -50,7 +57,7 @@ export default function Onboarding() {
           console.warn("Failed to self-heal established profile flags:", error);
         }
       });
-  }, [user, onboardingGateReady, profile, companion]);
+  }, [user, onboardingGateReady, profile, hasCompanion, hasPresetCompanion, companionStage]);
 
   useEffect(() => {
     if (!user || !onboardingGateReady) return;
@@ -67,5 +74,16 @@ export default function Onboarding() {
     return null;
   }
 
-  return <StoryOnboarding />;
+  return (
+    <StoryOnboarding
+      mode={
+        onboardingGate.needsProgressionReset
+          ? "reset"
+          : onboardingGate.needsCompanionMigration
+            ? "migration"
+            : "standard"
+      }
+      existingCompanion={companion}
+    />
+  );
 }

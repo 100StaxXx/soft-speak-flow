@@ -45,7 +45,7 @@ const fetchAuthRedirectProfile = (userId: string) =>
 const fetchAuthRedirectCompanion = (userId: string) =>
   supabase
     .from("user_companion")
-    .select("id")
+    .select("id, preset_id, current_stage")
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
     .limit(1)
@@ -70,6 +70,8 @@ const readAuthRedirectContext = async (
   profile: AuthRedirectProfile | null;
   profileError: string | null;
   hasCompanion: boolean;
+  hasPresetCompanion: boolean;
+  companionStage: number | null;
 }> => {
   const [profileResult, companionResult] = await Promise.allSettled([
     withTimeout(
@@ -87,6 +89,8 @@ const readAuthRedirectContext = async (
   let profile: AuthRedirectProfile | null = null;
   let profileError: string | null = null;
   let hasCompanion = false;
+  let hasPresetCompanion = false;
+  let companionStage: number | null = null;
 
   if (profileResult.status === "fulfilled") {
     profile = (profileResult.value.data ?? null) as AuthRedirectProfile | null;
@@ -103,7 +107,11 @@ const readAuthRedirectContext = async (
         error: companionResult.value.error.message,
       });
     } else {
-      hasCompanion = Boolean(companionResult.value.data);
+      hasCompanion = Boolean(companionResult.value.data?.id);
+      hasPresetCompanion = Boolean(companionResult.value.data?.preset_id);
+      companionStage = typeof companionResult.value.data?.current_stage === "number"
+        ? companionResult.value.data.current_stage
+        : null;
     }
   } else {
     logger.warn("[authRedirect] Companion lookup timed out, continuing without companion signal", {
@@ -111,21 +119,28 @@ const readAuthRedirectContext = async (
     });
   }
 
-  return { profile, profileError, hasCompanion };
+  return { profile, profileError, hasCompanion, hasPresetCompanion, companionStage };
 };
 
 const scheduleEstablishedProfileSelfHeal = (
   userId: string,
   profile: AuthRedirectProfile | null,
   hasCompanion: boolean,
+  hasPresetCompanion: boolean,
+  companionStage: number | null,
 ) => {
-  const patch = buildEstablishedProfileSelfHealPatch({ profile, hasCompanion });
+  const patch = buildEstablishedProfileSelfHealPatch({
+    profile,
+    hasCompanion,
+    hasPresetCompanion,
+    companionStage,
+  });
   if (!patch) return;
 
   Promise.resolve(
     supabase
       .from("profiles")
-      .update(patch)
+      .update(patch as any)
       .eq("id", userId),
   )
     .then(({ error }) => {
@@ -143,7 +158,7 @@ const scheduleEstablishedProfileSelfHeal = (
  */
 const isReturningUser = async (userId: string): Promise<boolean> => {
   try {
-    const { profile, profileError, hasCompanion } = await readAuthRedirectContext(
+    const { profile, profileError, hasCompanion, hasPresetCompanion, companionStage } = await readAuthRedirectContext(
       userId,
       RETURNING_USER_QUERY_TIMEOUT_MS,
     );
@@ -151,9 +166,9 @@ const isReturningUser = async (userId: string): Promise<boolean> => {
       throw new Error(profileError);
     }
 
-    const gate = getOnboardingGateState({ profile, hasCompanion });
+    const gate = getOnboardingGateState({ profile, hasCompanion, hasPresetCompanion, companionStage });
     if (gate.isEstablished) {
-      scheduleEstablishedProfileSelfHeal(userId, profile, hasCompanion);
+      scheduleEstablishedProfileSelfHeal(userId, profile, hasCompanion, hasPresetCompanion, companionStage);
     }
 
     return gate.isEstablished;
@@ -189,7 +204,7 @@ const resolveAuthRedirectPath = async (userId: string): Promise<string> => {
   try {
     logger.debug("[getAuthRedirectPath] Fetching profile...", { userId: userId.substring(0, 8) });
 
-    const { profile, profileError, hasCompanion } = await readAuthRedirectContext(
+    const { profile, profileError, hasCompanion, hasPresetCompanion, companionStage } = await readAuthRedirectContext(
       userId,
       PROFILE_QUERY_TIMEOUT_MS,
     );
@@ -202,16 +217,19 @@ const resolveAuthRedirectPath = async (userId: string): Promise<string> => {
     const resolvedMentorId = getResolvedMentorId(profile);
     const onboardingMentorId = getOnboardingMentorId(profile);
     const walkthroughCompleted = hasWalkthroughCompleted(profile?.onboarding_data);
-    const gate = getOnboardingGateState({ profile, hasCompanion });
+    const gate = getOnboardingGateState({ profile, hasCompanion, hasPresetCompanion, companionStage });
     logger.debug("[getAuthRedirectPath] Profile fetched", {
       hasProfile: !!profile,
       onboardingCompleted: profile?.onboarding_completed,
       walkthroughCompleted,
       hasCompanion,
+      hasPresetCompanion,
+      companionStage,
       hasMentor: !!profile?.selected_mentor_id,
       onboardingMentorId: onboardingMentorId?.substring(0, 8),
       resolvedMentorId: resolvedMentorId?.substring(0, 8),
       gateReason: gate.reason,
+      needsCompanionMigration: gate.needsCompanionMigration,
     });
 
     if (profile?.onboarding_completed && !profile.selected_mentor_id && onboardingMentorId) {
@@ -250,7 +268,7 @@ const resolveAuthRedirectPath = async (userId: string): Promise<string> => {
     }
 
     if (gate.isEstablished) {
-      scheduleEstablishedProfileSelfHeal(userId, profile, hasCompanion);
+      scheduleEstablishedProfileSelfHeal(userId, profile, hasCompanion, hasPresetCompanion, companionStage);
       logger.debug("[getAuthRedirectPath] Established account, redirecting to /tasks", {
         reason: gate.reason,
       });

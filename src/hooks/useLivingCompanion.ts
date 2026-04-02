@@ -8,12 +8,23 @@
  import { useReactionBudget } from "@/hooks/useReactionBudget";
  import { useReactionSelector } from "@/hooks/useReactionSelector";
 import { useTalkPopupContext, useTalkPopupContextSafe } from "@/contexts/TalkPopupContext";
+import { useCompanionMotionSafe } from "@/contexts/CompanionMotionContext";
  import { 
    type SourceSystem, 
    type MomentType, 
    type ContextTag,
    DEFAULT_MOMENT_TYPE 
  } from "@/config/reactionPools";
+import type { CompanionMotionEventType } from "@/config/companionMotion";
+
+const resolveMotionEventType = (
+  source: SourceSystem,
+  momentType: MomentType,
+): CompanionMotionEventType => {
+  if (source === "ritual" || momentType === "breakthrough") return "streak";
+  if (source === "quest" || source === "pomodoro" || source === "resist") return "quest_complete";
+  return "quest_complete";
+};
  
  interface TriggerOptions {
    momentType?: MomentType;
@@ -27,6 +38,7 @@ import { useTalkPopupContext, useTalkPopupContextSafe } from "@/contexts/TalkPop
    const { checkBudget, incrementBudget } = useReactionBudget();
    const { selectReaction, recordReaction } = useReactionSelector();
    const { show } = useTalkPopupContext();
+   const { triggerEvent } = useCompanionMotionSafe();
  
    /**
     * Trigger a companion reaction for a specific source/event
@@ -66,6 +78,11 @@ import { useTalkPopupContext, useTalkPopupContextSafe } from "@/contexts/TalkPop
  
      // 3. Show the popup
      await show({ message: reaction.text });
+     triggerEvent({
+       type: resolveMotionEventType(source, momentType),
+       intensity: momentType === 'breakthrough' ? 'heroic' : 'medium',
+       reason: reaction.text,
+     });
  
      // 4. Record to history and increment budget
      await Promise.all([
@@ -75,7 +92,7 @@ import { useTalkPopupContext, useTalkPopupContextSafe } from "@/contexts/TalkPop
  
      console.log(`[LivingCompanion] Showed reaction: "${reaction.text}" (${reaction.tone_tag})`);
      return true;
-   }, [user?.id, checkBudget, selectReaction, show, recordReaction, incrementBudget]);
+   }, [user?.id, checkBudget, selectReaction, show, recordReaction, incrementBudget, triggerEvent]);
  
    /**
     * Helper to check if late night (11pm-4am local time)
@@ -159,6 +176,7 @@ export const useLivingCompanionSafe = () => {
   const talkPopup = useTalkPopupContextSafe();
   const { checkBudget, incrementBudget } = useReactionBudget();
   const { selectReaction, recordReaction } = useReactionSelector();
+  const { triggerEvent } = useCompanionMotionSafe();
 
   const triggerReaction = useCallback(async (
     source: SourceSystem,
@@ -192,6 +210,11 @@ export const useLivingCompanionSafe = () => {
     }
 
     await talkPopup.show({ message: reaction.text });
+    triggerEvent({
+      type: resolveMotionEventType(source, momentType),
+      intensity: momentType === 'breakthrough' ? 'heroic' : 'medium',
+      reason: reaction.text,
+    });
 
     await Promise.all([
       recordReaction(reaction, source, momentType),
@@ -200,7 +223,7 @@ export const useLivingCompanionSafe = () => {
 
     console.log(`[LivingCompanion] Showed reaction: "${reaction.text}" (${reaction.tone_tag})`);
     return true;
-  }, [user?.id, checkBudget, selectReaction, talkPopup, recordReaction, incrementBudget]);
+  }, [user?.id, checkBudget, selectReaction, talkPopup, recordReaction, incrementBudget, triggerEvent]);
 
   const isLateNight = useCallback((): boolean => {
     const hour = new Date().getHours();

@@ -122,7 +122,7 @@ function getSpeciesType(spiritAnimal: string): SpeciesTag {
   }
   
   // Mythic creatures (that aren't primarily flying/aquatic)
-  if (['unicorn', 'griffin', 'chimera', 'sphinx', 'basilisk', 'hydra', 'cerberus', 'pegasus', 'thunderbird'].some(a => animal.includes(a))) {
+  if (['unicorn', 'griffin', 'chimera', 'sphinx', 'basilisk', 'hydra', 'cerberus', 'pegasus', 'thunderbird', 'kitsune'].some(a => animal.includes(a))) {
     return 'mythic';
   }
   

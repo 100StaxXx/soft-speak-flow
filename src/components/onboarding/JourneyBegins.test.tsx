@@ -40,7 +40,7 @@ describe("JourneyBegins", () => {
       render(
         <JourneyBegins
           userName="Nova"
-          companionAnimal="Fox"
+          companionAnimal="Kitsune"
           onComplete={vi.fn()}
         />,
       );

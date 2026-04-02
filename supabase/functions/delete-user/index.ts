@@ -9,7 +9,7 @@ interface CleanupWarning {
   details?: Record<string, unknown>;
 }
 
-type SupabaseAdminClient = ReturnType<typeof createClient>;
+type SupabaseAdminClient = ReturnType<typeof createClient<any>>;
 
 const STORAGE_PATH_REGEX = /\/storage\/v1\/object\/(?:public|sign|authenticated)\/([^/]+)\/(.+)$/i;
 const STORAGE_REMOVE_BATCH_SIZE = 100;
@@ -102,7 +102,7 @@ const addStorageTarget = (
 ): void => {
   const normalizedBucket = bucket.trim();
   const normalizedPath = normalizeStoragePath(path);
-  if (!normalizedBucket || !normalizedPath) return;
+  if (!normalizedBucket || !normalizedPath || normalizedBucket === "companion-presets") return;
 
   const bucketTargets = targets.get(normalizedBucket) ?? new Set<string>();
   bucketTargets.add(normalizedPath);
@@ -451,7 +451,7 @@ serve(async (req) => {
       throw new Error("Server configuration error");
     }
 
-    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+    const supabase: SupabaseAdminClient = createClient<any>(supabaseUrl, serviceRoleKey, {
       auth: {
         autoRefreshToken: false,
         persistSession: false,

@@ -1,59 +1,50 @@
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import {
+  PROGRESSION_THRESHOLDS,
+  getProgressionThreshold,
+  getProgressionTier,
+  getProgressionTierLabelForLevel,
+} from "@/config/progression";
 
 export interface EvolutionThreshold {
   stage: number;
   xp_required: number;
   stage_name: string;
+  tier: string;
+  evolves_at_boundary: boolean;
 }
 
-/**
- * Hook to load evolution thresholds from database
- * Single source of truth for XP requirements
- */
+const THRESHOLDS: readonly EvolutionThreshold[] = PROGRESSION_THRESHOLDS.map((threshold) => ({
+  stage: threshold.level,
+  xp_required: threshold.xpRequired,
+  stage_name: getProgressionTierLabelForLevel(threshold.level),
+  tier: getProgressionTier(threshold.level),
+  evolves_at_boundary: threshold.evolvesAtBoundary,
+}));
+
+const THRESHOLD_MAP = THRESHOLDS.reduce<Record<number, number>>((acc, threshold) => {
+  acc[threshold.stage] = threshold.xp_required;
+  return acc;
+}, {});
+
 export const useEvolutionThresholds = () => {
-  const { data: thresholds, isLoading, error } = useQuery({
-    queryKey: ['evolution-thresholds'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('evolution_thresholds')
-        .select('*')
-        .order('stage', { ascending: true });
-
-      if (error) throw error;
-      return data as EvolutionThreshold[];
-    },
-    staleTime: Infinity, // Never refetch - thresholds rarely change
-    gcTime: Infinity, // Keep in cache forever (renamed from cacheTime in React Query v5)
-  });
-
-  // Create lookup map for quick access
-  const thresholdMap = thresholds?.reduce((acc, t) => {
-    acc[t.stage] = t.xp_required;
-    return acc;
-  }, {} as Record<number, number>);
-
-  // Helper function: get XP required for a specific stage
   const getThreshold = (stage: number): number | null => {
-    return thresholdMap?.[stage] ?? null;
+    return getProgressionThreshold(stage);
   };
 
-  // Helper function: check if evolution is possible
   const shouldEvolve = (currentStage: number, currentXP: number): boolean => {
     const nextThreshold = getThreshold(currentStage + 1);
     return nextThreshold !== null && currentXP >= nextThreshold;
   };
 
-  // Helper function: get next stage name
   const getStageName = (stage: number): string => {
-    return thresholds?.find(t => t.stage === stage)?.stage_name ?? `Stage ${stage}`;
+    return getProgressionTierLabelForLevel(stage);
   };
 
   return {
-    thresholds,
-    thresholdMap,
-    isLoading,
-    error,
+    thresholds: THRESHOLDS,
+    thresholdMap: THRESHOLD_MAP,
+    isLoading: false,
+    error: null,
     getThreshold,
     shouldEvolve,
     getStageName,

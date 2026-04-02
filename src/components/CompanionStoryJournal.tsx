@@ -1,15 +1,30 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionStory } from "@/hooks/useCompanionStory";
-import { supabase } from "@/integrations/supabase/client";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
-import { BookOpen, ChevronLeft, ChevronRight, Sparkles, Loader2, Lock, Grid3x3, Heart, Lightbulb } from "lucide-react";
+import {
+  BookOpen,
+  ChevronLeft,
+  ChevronRight,
+  Sparkles,
+  Loader2,
+  Lock,
+  Grid3x3,
+  Heart,
+  Lightbulb,
+} from "lucide-react";
 import { Separator } from "./ui/separator";
-import { getStageName } from "@/config/companionStages";
 import { toast } from "sonner";
-
+import {
+  getPresetCompanionAssetUrl,
+  getUniversalEggAssetUrl,
+} from "@/lib/companionAssetResolver";
+import {
+  PROGRESSION_STORY_CHECKPOINT_LEVELS,
+  getProgressionLevelDisplay,
+} from "@/config/progression";
 import { StoryJournalInfoTooltip } from "./StoryJournalInfoTooltip";
 import { cn } from "@/lib/utils";
 import type { CompanionLayoutMode } from "@/hooks/useCompanionLayoutMode";
@@ -20,66 +35,62 @@ interface CompanionStoryJournalProps {
 
 export const CompanionStoryJournal = ({ layoutMode = "mobile" }: CompanionStoryJournalProps) => {
   const { companion, isLoading: companionLoading } = useCompanion();
-  const [viewingStage, setViewingStage] = useState(0);
-  const [debouncedStage, setDebouncedStage] = useState(0);
+  const [viewingLevel, setViewingLevel] = useState(0);
+  const [debouncedLevel, setDebouncedLevel] = useState(0);
   const [showGallery, setShowGallery] = useState(false);
   const isDesktop = layoutMode === "desktop";
-  
-  // Debounce stage changes to prevent race conditions
+
   useEffect(() => {
     const timer = setTimeout(() => {
-      setDebouncedStage(viewingStage);
+      setDebouncedLevel(viewingLevel);
     }, 300);
-    
+
     return () => clearTimeout(timer);
-  }, [viewingStage]);
-  
-  
+  }, [viewingLevel]);
+
   const { story, allStories, isLoading, generateStory } = useCompanionStory(
     companion?.id,
-    debouncedStage
+    debouncedLevel,
   );
 
-  // Fetch companion evolution image for current stage with Stage 0 handling
-  const { data: evolutionImage } = useQuery<string | null>({
-    queryKey: ["companion-evolution-image", companion?.id, debouncedStage],
+  const checkpointLevels = useMemo<number[]>(
+    () => [...PROGRESSION_STORY_CHECKPOINT_LEVELS],
+    [],
+  );
+
+  const { data: chapterImage } = useQuery<string | null>({
+    queryKey: ["companion-story-image", companion?.id, debouncedLevel],
     queryFn: async () => {
       if (!companion) return null;
-      
-      try {
-        // Query companion_evolutions for the specific stage (including stage 0)
-        const { data, error } = await supabase
-          .from("companion_evolutions")
-          .select("image_url")
-          .eq("companion_id", companion.id)
-          .eq("stage", debouncedStage)
-          .maybeSingle();
-        
-        if (error && error.code !== 'PGRST116') {
-          console.error('Failed to fetch evolution image:', error);
-        }
-        
-        // If we found an image for this stage, use it
-        if (data?.image_url) {
-          return data.image_url;
-        }
-        
-        // Fallback for stage 0 (egg) if no evolution record exists
-        if (debouncedStage === 0) {
-          return '/placeholder-egg.svg';
-        }
-        
-        // Fallback for other stages
-        return companion.current_image_url || '/placeholder-companion.svg';
-      } catch (error) {
-        console.error('Error in evolution image query:', error);
-        return debouncedStage === 0 ? '/placeholder-egg.svg' : (companion.current_image_url || '/placeholder-companion.svg');
+
+      if (debouncedLevel === 0) {
+        return (
+          companion.initial_image_url
+          || companion.current_image_url
+          || getUniversalEggAssetUrl(companion.core_element)
+          || "/placeholder-egg.svg"
+        );
       }
+
+      if (companion.preset_id) {
+        const presetImageUrl = getPresetCompanionAssetUrl({
+          presetId: companion.preset_id,
+          stage: debouncedLevel,
+          element: companion.core_element,
+          state: "normal",
+        });
+
+        if (presetImageUrl) {
+          return presetImageUrl;
+        }
+      }
+
+      return companion.current_image_url || "/placeholder-companion.svg";
     },
     enabled: !!companion,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 30 * 60 * 1000, // 30 minutes
-    placeholderData: (previousData) => previousData, // Prevent flashing during navigation
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    placeholderData: (previousData) => previousData,
   });
 
   const handleGenerate = useCallback(() => {
@@ -87,25 +98,33 @@ export const CompanionStoryJournal = ({ layoutMode = "mobile" }: CompanionStoryJ
       toast.error("Companion not loaded. Please refresh the page.");
       return;
     }
+
     generateStory.mutate({
       companionId: companion.id,
-      stage: debouncedStage,
+      stage: debouncedLevel,
     });
-  }, [companion, debouncedStage, generateStory]);
+  }, [companion, debouncedLevel, generateStory]);
 
-  // Check if this stage can be accessed (must be at or below companion's current stage)
-  const canAccessStage = useCallback((stage: number) => {
+  const canAccessLevel = useCallback((level: number) => {
     if (!companion) return false;
-    return stage <= companion.current_stage;
+    return level <= companion.current_stage;
   }, [companion]);
 
-  const isStageUnlocked = canAccessStage(debouncedStage);
+  const isLevelUnlocked = canAccessLevel(debouncedLevel);
+  const unlockedCheckpointCount = checkpointLevels.filter((level) => canAccessLevel(level)).length;
+  const nextCheckpoint = checkpointLevels.find((level) => !canAccessLevel(level)) ?? null;
+  const visibleLevels = nextCheckpoint === null
+    ? checkpointLevels
+    : checkpointLevels.filter((level) => level <= nextCheckpoint);
 
-  // Calculate which stages to show in gallery (unlocked + 1 preview)
-  const maxVisibleStage = companion ? Math.min(companion.current_stage + 1, 20) : 0;
-  const galleryStages = Array.from({ length: maxVisibleStage + 1 }, (_, i) => i);
+  const currentIndex = checkpointLevels.indexOf(viewingLevel);
+  const previousLevel = currentIndex > 0 ? checkpointLevels[currentIndex - 1] : null;
+  const nextLevel = currentIndex >= 0 && currentIndex < checkpointLevels.length - 1
+    ? checkpointLevels[currentIndex + 1]
+    : null;
+  const hasStory = allStories?.some((entry) => entry.stage === debouncedLevel) ?? false;
+  const chapterLabel = debouncedLevel === 0 ? "Prologue" : getProgressionLevelDisplay(debouncedLevel);
 
-  // Show loading state
   if (companionLoading) {
     return (
       <Card className="p-8 text-center">
@@ -117,7 +136,6 @@ export const CompanionStoryJournal = ({ layoutMode = "mobile" }: CompanionStoryJ
     );
   }
 
-  // Show empty state if no companion
   if (!companion) {
     return (
       <Card className="p-8 text-center">
@@ -140,38 +158,38 @@ export const CompanionStoryJournal = ({ layoutMode = "mobile" }: CompanionStoryJ
             </Button>
           </div>
           <div className={cn("grid gap-3", isDesktop ? "grid-cols-4 xl:grid-cols-6" : "grid-cols-3 sm:grid-cols-4 md:grid-cols-6")}>
-            {galleryStages.map((i) => {
-              const isUnlocked = canAccessStage(i);
-              const hasStory = allStories?.some(s => s.stage === i);
+            {visibleLevels.map((level) => {
+              const isUnlocked = canAccessLevel(level);
+              const levelHasStory = allStories?.some((entry) => entry.stage === level);
               return (
                 <button
-                  key={i}
+                  key={level}
                   onClick={() => {
                     if (isUnlocked) {
-                      setViewingStage(i);
+                      setViewingLevel(level);
                       setShowGallery(false);
                     }
                   }}
                   disabled={!isUnlocked}
                   className={`
                     relative aspect-square rounded-lg border-2 p-2 flex flex-col items-center justify-center gap-1 transition-all
-                    ${isUnlocked 
-                      ? 'border-primary/30 hover:border-primary hover:bg-primary/5 cursor-pointer' 
-                      : 'border-muted bg-muted/30 cursor-not-allowed opacity-50'
+                    ${isUnlocked
+                      ? "border-primary/30 hover:border-primary hover:bg-primary/5 cursor-pointer"
+                      : "border-muted bg-muted/30 cursor-not-allowed opacity-50"
                     }
-                    ${viewingStage === i ? 'ring-2 ring-primary bg-primary/10' : ''}
+                    ${viewingLevel === level ? "ring-2 ring-primary bg-primary/10" : ""}
                   `}
                 >
                   {isUnlocked ? (
                     <>
-                      <BookOpen className={`w-4 h-4 ${hasStory ? 'text-primary' : 'text-muted-foreground'}`} />
-                      <span className="text-xs font-medium">{i === 0 ? 'P' : i}</span>
-                      {hasStory && <div className="absolute top-1 right-1 w-2 h-2 rounded-full bg-primary" />}
+                      <BookOpen className={`w-4 h-4 ${levelHasStory ? "text-primary" : "text-muted-foreground"}`} />
+                      <span className="text-xs font-medium">{level === 0 ? "P" : `L${level}`}</span>
+                      {levelHasStory && <div className="absolute top-1 right-1 w-2 h-2 rounded-full bg-primary" />}
                     </>
                   ) : (
                     <>
                       <Lock className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-xs text-muted-foreground">{i}</span>
+                      <span className="text-xs text-muted-foreground">{level}</span>
                     </>
                   )}
                 </button>
@@ -181,7 +199,6 @@ export const CompanionStoryJournal = ({ layoutMode = "mobile" }: CompanionStoryJ
         </Card>
       )}
 
-      {/* Header */}
       <div className={cn("space-y-2", isDesktop ? "text-left" : "text-center")}>
         <div className={cn("flex items-center gap-2", isDesktop ? "justify-start" : "justify-center")}>
           <h1 className="text-3xl font-heading font-black bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
@@ -190,14 +207,13 @@ export const CompanionStoryJournal = ({ layoutMode = "mobile" }: CompanionStoryJ
           <StoryJournalInfoTooltip />
         </div>
         <p className="text-muted-foreground">
-          Your companion's epic journey - unlock new chapters as they evolve
+          New chapters unlock at key companion tiers, from the first hatch through Ascended.
         </p>
       </div>
 
-      {/* Progress indicator & Gallery button */}
       <div className={cn("flex items-center gap-4", isDesktop ? "justify-between" : "justify-center")}>
         <div className="text-sm text-muted-foreground">
-          Unlocked: Prologue + {companion.current_stage} Chapters ({allStories?.length || 0} written)
+          Unlocked: {unlockedCheckpointCount} of {checkpointLevels.length} checkpoints ({allStories?.length || 0} written)
         </div>
         <Button
           variant="outline"
@@ -209,26 +225,23 @@ export const CompanionStoryJournal = ({ layoutMode = "mobile" }: CompanionStoryJ
         </Button>
       </div>
 
-      {/* Navigation */}
       <Card className={cn(isDesktop ? "p-8" : "p-6")}>
-        {/* Companion Image at current stage */}
-        {evolutionImage && isStageUnlocked && (
+        {chapterImage && isLevelUnlocked && (
           <div className="flex justify-center mb-6">
             <div className="relative w-48 h-48 rounded-2xl overflow-hidden border-2 border-primary/20 shadow-glow">
-              <img 
-                src={evolutionImage} 
-                alt={`${companion.spirit_animal} at ${getStageName(debouncedStage)}`}
+              <img
+                src={chapterImage}
+                alt={`${companion.spirit_animal} at ${chapterLabel}`}
                 className="w-full h-full object-cover"
-                onError={(e) => {
-                  console.error('Image failed to load:', evolutionImage);
-                  e.currentTarget.src = debouncedStage === 0 
-                    ? '/placeholder-egg.svg' 
-                    : '/placeholder-companion.svg';
+                onError={(event) => {
+                  event.currentTarget.src = debouncedLevel === 0
+                    ? "/placeholder-egg.svg"
+                    : "/placeholder-companion.svg";
                 }}
               />
               <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background/90 to-transparent p-2">
                 <p className="text-xs text-center font-medium text-foreground">
-                  {getStageName(debouncedStage)}
+                  {chapterLabel}
                 </p>
               </div>
             </div>
@@ -239,8 +252,12 @@ export const CompanionStoryJournal = ({ layoutMode = "mobile" }: CompanionStoryJ
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setViewingStage(Math.max(0, viewingStage - 1))}
-            disabled={viewingStage === 0}
+            onClick={() => {
+              if (previousLevel !== null) {
+                setViewingLevel(previousLevel);
+              }
+            }}
+            disabled={previousLevel === null}
             className="flex-shrink-0 px-2 sm:px-3"
           >
             <ChevronLeft className="w-4 h-4" />
@@ -249,21 +266,20 @@ export const CompanionStoryJournal = ({ layoutMode = "mobile" }: CompanionStoryJ
 
           <div className="text-center min-w-0 flex-1">
             <p className="text-xs sm:text-sm text-muted-foreground truncate">
-              {debouncedStage === 0 ? "Prologue" : `Chapter ${debouncedStage}`}
+              {debouncedLevel === 0 ? "Origin checkpoint" : "Tier checkpoint"}
             </p>
-            <p className="font-semibold text-sm sm:text-base truncate">{getStageName(debouncedStage)}</p>
+            <p className="font-semibold text-sm sm:text-base truncate">{chapterLabel}</p>
           </div>
 
           <Button
             variant="outline"
             size="sm"
             onClick={() => {
-              const nextStage = viewingStage + 1;
-              if (canAccessStage(nextStage)) {
-                setViewingStage(nextStage);
+              if (nextLevel !== null && canAccessLevel(nextLevel)) {
+                setViewingLevel(nextLevel);
               }
             }}
-            disabled={viewingStage === 20 || !canAccessStage(viewingStage + 1)}
+            disabled={nextLevel === null || !canAccessLevel(nextLevel)}
             className="flex-shrink-0 px-2 sm:px-3"
           >
             <span className="hidden sm:inline mr-1">Next</span>
@@ -273,34 +289,29 @@ export const CompanionStoryJournal = ({ layoutMode = "mobile" }: CompanionStoryJ
 
         <Separator className="my-6" />
 
-        {/* Stage Locked Message */}
-        {!isStageUnlocked && (
+        {!isLevelUnlocked && (
           <Card className="p-8 text-center">
             <Lock className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
             <h3 className="text-xl font-semibold mb-2">Chapter Locked</h3>
             <p className="text-muted-foreground">
-              {debouncedStage === 0 
+              {debouncedLevel === 0
                 ? "Complete companion creation to unlock the Prologue"
-                : `This chapter unlocks when your companion reaches Stage ${debouncedStage}`
-              }
+                : `This chapter unlocks when your companion reaches ${getProgressionLevelDisplay(debouncedLevel)}`}
             </p>
           </Card>
         )}
 
-        {/* Story Display - 5 Sections */}
-        {isStageUnlocked && story ? (
+        {isLevelUnlocked && story ? (
           <div className="space-y-6">
-            {/* Section 1: Chapter Header */}
             <div className="space-y-2 text-center">
               <h2 className="text-2xl font-bold">
-                {debouncedStage === 0 ? "Prologue" : `Chapter ${debouncedStage}`}: {story.chapter_title}
+                {chapterLabel}: {story.chapter_title}
               </h2>
               <p className="text-lg text-muted-foreground italic">"{story.intro_line}"</p>
             </div>
 
             <Separator />
 
-            {/* Section 2: The Journey (Main Story) */}
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                 <BookOpen className="w-4 h-4" />
@@ -309,7 +320,6 @@ export const CompanionStoryJournal = ({ layoutMode = "mobile" }: CompanionStoryJ
               <p className="text-foreground leading-relaxed whitespace-pre-wrap">{story.main_story}</p>
             </div>
 
-            {/* Section 3: Bond Moment */}
             <div className="bg-primary/5 p-4 rounded-lg border border-primary/20">
               <div className="flex items-center gap-2 text-sm font-semibold mb-2 text-primary">
                 <Heart className="w-4 h-4" />
@@ -318,7 +328,6 @@ export const CompanionStoryJournal = ({ layoutMode = "mobile" }: CompanionStoryJ
               <p className="text-sm text-foreground/90">{story.bond_moment}</p>
             </div>
 
-            {/* Section 4: Wisdom Gained */}
             {story.life_lesson && (
               <div className="bg-amber-500/10 p-4 rounded-lg border border-amber-500/20">
                 <div className="flex items-center gap-2 text-sm font-semibold mb-2 text-amber-600 dark:text-amber-400">
@@ -328,23 +337,21 @@ export const CompanionStoryJournal = ({ layoutMode = "mobile" }: CompanionStoryJ
                 <p className="text-sm text-foreground/90">{story.life_lesson}</p>
               </div>
             )}
-
           </div>
-        ) : isStageUnlocked ? (
+        ) : isLevelUnlocked ? (
           <Card className="p-8 text-center space-y-4">
             <BookOpen className="w-16 h-16 mx-auto text-muted-foreground" />
             <div>
               <h3 className="text-xl font-semibold mb-2">Chapter Not Yet Written</h3>
               <p className="text-muted-foreground mb-6">
-                {debouncedStage === 0 
+                {debouncedLevel === 0
                   ? "The beginning of your companion's story awaits..."
-                  : `Write this chapter of your companion's story to continue the journey.`
-                }
+                  : `Write the ${chapterLabel} chapter to continue the journey.`}
               </p>
-              
+
               <Button
                 onClick={handleGenerate}
-                disabled={generateStory.isPending || isLoading}
+                disabled={generateStory.isPending || isLoading || hasStory}
                 className="w-full max-w-sm mx-auto"
               >
                 {generateStory.isPending ? (
@@ -355,7 +362,7 @@ export const CompanionStoryJournal = ({ layoutMode = "mobile" }: CompanionStoryJ
                 ) : (
                   <>
                     <Sparkles className="w-4 h-4 mr-2" />
-                    Write {debouncedStage === 0 ? "Prologue" : `Chapter ${debouncedStage}`}
+                    Write {chapterLabel}
                   </>
                 )}
               </Button>
@@ -363,7 +370,6 @@ export const CompanionStoryJournal = ({ layoutMode = "mobile" }: CompanionStoryJ
           </Card>
         ) : null}
       </Card>
-
     </div>
   );
 };

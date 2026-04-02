@@ -214,12 +214,11 @@ export const useAchievements = () => {
   };
 
   const checkCompanionAchievements = async (stage: number) => {
-    // Silver: Stage 3 (early bonding)
-    if (stage === 3) {
+    if (stage === 5) {
       await awardAchievement({
-        type: "companion_stage_3",
+        type: "companion_level_5",
         title: "Growing Together",
-        description: "Your companion reached Stage 3",
+        description: "Your companion reached Level 5 • Initiate",
         icon: "sparkles",
         tier: "silver",
         metadata: {
@@ -230,66 +229,47 @@ export const useAchievements = () => {
         }
       });
     }
-    // Gold: Stage 5 (meaningful progress)
-    else if (stage === 5) {
+    else if (stage === 21) {
       await awardAchievement({
-        type: "companion_stage_5",
+        type: "companion_level_21",
         title: "Deep Bond",
-        description: "Your companion reached Stage 5",
+        description: "Your companion reached Level 21 • Guardian",
         icon: "sparkles",
         tier: "gold",
         metadata: {
           stage,
           pepTalkDuration: "4-5 min",
-          pepTalkMessage: "Stage 5. You're both different now.",
+          pepTalkMessage: "Guardian tier. The bond is undeniable now.",
           pepTalkCategory: "discipline"
         }
       });
     } 
-    // Gold: Stage 10 (major milestone)
-    else if (stage === 10) {
+    else if (stage === 56) {
       await awardAchievement({
-        type: "companion_stage_10",
+        type: "companion_level_56",
         title: "Evolution Master",
-        description: "Your companion reached Stage 10",
+        description: "Your companion reached Level 56 • Mythic",
         icon: "star",
         tier: "gold",
         metadata: {
           stage,
           pepTalkDuration: "4-5 min",
-          pepTalkMessage: "Stage 10. This is discipline and consistency made visible.",
+          pepTalkMessage: "Mythic tier. This is discipline and consistency made visible.",
           pepTalkCategory: "discipline"
         }
       });
     } 
-    // Platinum: Stage 15+ (transformation)
-    else if (stage === 15) {
+    else if (stage === 100) {
       await awardAchievement({
-        type: "companion_stage_15",
-        title: "Transcendent Bond",
-        description: "Your companion reached Stage 15",
+        type: "companion_level_100",
+        title: "Ultimate Bond",
+        description: "Your companion reached Level 100 • Ascended",
         icon: "crown",
         tier: "platinum",
         metadata: {
           stage,
           pepTalkDuration: "7-10 min",
-          pepTalkMessage: "You've come so far together. This bond is real.",
-          pepTalkCategory: "breakthrough"
-        }
-      });
-    }
-    // Platinum: Stage 20 (ultimate achievement)
-    else if (stage === 20) {
-      await awardAchievement({
-        type: "companion_max",
-        title: "Legendary Bond",
-        description: "Your companion reached maximum evolution",
-        icon: "crown",
-        tier: "platinum",
-        metadata: {
-          stage,
-          pepTalkDuration: "7-10 min",
-          pepTalkMessage: "Stage 20. You didn't just evolve your companion. You evolved yourself.",
+          pepTalkMessage: "Level 100. This bond has become legend.",
           pepTalkCategory: "breakthrough"
         }
       });

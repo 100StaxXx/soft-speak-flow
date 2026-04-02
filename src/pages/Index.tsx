@@ -218,6 +218,8 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
       getOnboardingGateState({
         profile,
         hasCompanion: Boolean(companion),
+        hasPresetCompanion: Boolean(companion?.preset_id),
+        companionStage: companion?.current_stage ?? null,
       }),
     [profile, companion],
   );
@@ -254,6 +256,8 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
     const patch = buildEstablishedProfileSelfHealPatch({
       profile,
       hasCompanion: Boolean(companion),
+      hasPresetCompanion: Boolean(companion?.preset_id),
+      companionStage: companion?.current_stage ?? null,
     });
     if (!patch) return;
 
@@ -261,7 +265,7 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
 
     void supabase
       .from("profiles")
-      .update(patch)
+      .update(patch as any)
       .eq("id", user.id)
       .then(({ error }) => {
         if (error) {

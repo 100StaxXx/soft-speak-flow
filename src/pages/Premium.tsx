@@ -181,7 +181,7 @@ export default function Premium() {
                 {
                   icon: Sparkles,
                   title: "Full Companion Evolution",
-                  description: "Watch your companion grow through all 21 evolution stages"
+                  description: "Watch your companion grow from Level 0 • Egg to Level 100 • Ascended"
                 },
                 {
                   icon: Moon,

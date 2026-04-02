@@ -1,6 +1,11 @@
 import { createContext, useContext, useState, ReactNode, useCallback, useMemo } from "react";
 import { XPToast } from "@/components/XPToast";
 import { playXPGain } from "@/utils/soundEffects";
+import { useCompanionMotionSafe } from "@/contexts/CompanionMotionContext";
+import {
+  getCompanionMotionEventTypeFromReason,
+  getCompanionMotionIntensityFromXp,
+} from "@/config/companionMotion";
 
 interface XPContextType {
   showXPToast: (xp: number, reason: string) => void;
@@ -9,6 +14,7 @@ interface XPContextType {
 const XPContext = createContext<XPContextType | null>(null);
 
 export const XPProvider = ({ children }: { children: ReactNode }) => {
+  const { triggerEvent } = useCompanionMotionSafe();
   const [toastData, setToastData] = useState<{ xp: number; reason: string; show: boolean }>({
     xp: 0,
     reason: "",
@@ -18,7 +24,12 @@ export const XPProvider = ({ children }: { children: ReactNode }) => {
   const showXPToast = useCallback((xp: number, reason: string) => {
     setToastData({ xp, reason, show: true });
     playXPGain();
-  }, []);
+    triggerEvent({
+      type: getCompanionMotionEventTypeFromReason(reason),
+      intensity: getCompanionMotionIntensityFromXp(xp),
+      reason,
+    });
+  }, [triggerEvent]);
 
   const handleComplete = useCallback(() => {
     setToastData(prev => ({ ...prev, show: false }));

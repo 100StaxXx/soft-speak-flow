@@ -9,15 +9,28 @@ import { useEvolutionThresholds } from "./useEvolutionThresholds";
 import { SYSTEM_XP_REWARDS } from "@/config/xpRewards";
 import type { CreateCompanionIfNotExistsResult } from "@/types/referral-functions";
 import { logger } from "@/utils/logger";
-import { generateWithValidation } from "@/utils/validateCompanionImage";
+import {
+  coerceCompanionElementId,
+  getCompanionElementAnchorColor,
+  getCompanionPreset,
+} from "@/config/companionCatalog";
+import {
+  getPresetCompanionAssetUrl,
+  getUniversalEggAssetUrl,
+} from "@/lib/companionAssetResolver";
 import {
   parseFunctionInvokeError,
   toUserFacingFunctionError,
 } from "@/utils/supabaseFunctionErrors";
+import {
+  HATCH_READY_LEVEL,
+  getProgressionTierLabelForLevel,
+} from "@/config/progression";
 
 export interface Companion {
   id: string;
   user_id: string;
+  preset_id?: string | null;
   favorite_color: string;
   spirit_animal: string;
   core_element: string;
@@ -77,6 +90,19 @@ interface DirectEvolutionResponse {
   evolution_id?: string;
 }
 
+interface HatchCompanionResponse {
+  id: string;
+  preset_id: string;
+  spirit_animal: string;
+  favorite_color: string;
+  core_element: string;
+  story_tone: string;
+  current_stage: number;
+  current_image_url: string;
+  initial_image_url: string;
+  evolution_id: string;
+}
+
 type EvolutionFailureClass = "terminal" | "retryable_infrastructure" | "non_retryable";
 
 interface EvolutionResolvedFailure {
@@ -93,6 +119,10 @@ type AwardXpResult = {
   xp_awarded: number;
   cap_applied: boolean;
   next_threshold: number | null;
+  level_before?: number | null;
+  level_after?: number | null;
+  tier_before?: string | null;
+  tier_after?: string | null;
 };
 
 type SupabaseRpcError = {
@@ -350,7 +380,7 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
   const queryClient = useQueryClient();
   const { checkCompanionAchievements } = useAchievements();
   const { isEvolvingLoading, setIsEvolvingLoading } = useEvolution();
-  const { getThreshold, shouldEvolve } = useEvolutionThresholds();
+  const { getThreshold } = useEvolutionThresholds();
 
   // Prevent duplicate evolution/XP/companion creation requests during lag
   const evolutionInProgress = useRef(false);
@@ -374,6 +404,7 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
 
   const createCompanion = useMutation({
     mutationFn: async (data: {
+      presetId?: string | null;
       favoriteColor: string;
       spiritAnimal: string;
       coreElement: string;
@@ -392,59 +423,46 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
         logger.log("Starting companion creation process...");
         logger.info("Companion creation started", {
           userId: user.id,
+          presetId: data.presetId ?? null,
           spiritAnimal: data.spiritAnimal,
           coreElement: data.coreElement,
           stage: 0,
         });
 
-        // Determine consistent colors for the companion's lifetime
-        const eyeColor = "";
-        const furColor = "";
-
-        // Generate initial companion image with validation (retries on anatomical issues)
-        logger.log("Generating companion image with validation...");
-        const { imageUrl, validationPassed, retryCount } = await generateWithValidation(
-          {
-            favoriteColor: data.favoriteColor,
-            spiritAnimal: data.spiritAnimal,
-            element: data.coreElement,
-            stage: 0,
-            eyeColor,
-            furColor,
-            storyTone: data.storyTone,
-            flowType: "onboarding",
-          },
-          {
-            // Adaptive retry policy: onboarding (stage 0) prioritizes reliability/latency.
-            maxRetries: 0,
-            onRetry: (attempt) => {
-              logger.log(`Validation failed, retrying image generation (attempt ${attempt})...`);
-            },
-            onValidating: () => {
-              logger.log("Validating generated image for anatomical issues...");
-            },
-          }
-        );
-
-        if (retryCount > 0) {
-          logger.log(`Image generated after ${retryCount} validation retry(ies), passed: ${validationPassed}`);
-        } else {
-          logger.log(`Image generated on first attempt, validation passed: ${validationPassed}`);
+        const preset = data.presetId ? getCompanionPreset(data.presetId) : null;
+        if (data.presetId && !preset) {
+          throw new Error("Unknown companion preset");
         }
 
-        const imageData = { imageUrl };
+        const normalizedElement = coerceCompanionElementId(data.coreElement);
+        const resolvedFavoriteColor = getCompanionElementAnchorColor(normalizedElement);
+        const resolvedSpiritAnimal = data.spiritAnimal?.trim() || preset?.displayName || "Egg";
 
-        logger.log("Image generated successfully, creating companion record...");
+        const eyeColor = "";
+        const furColor = "";
+        const currentImageUrl = preset
+          ? (
+            getPresetCompanionAssetUrl({
+              presetId: preset.id,
+              stage: 0,
+              state: "normal",
+              element: normalizedElement,
+            }) ?? getUniversalEggAssetUrl(normalizedElement)
+          )
+          : getUniversalEggAssetUrl(normalizedElement);
+
+        logger.log("Stage 0 asset resolved successfully, creating companion record...");
 
         // Use atomic database function to create companion (prevents duplicates)
         const result = await supabase.rpc('create_companion_if_not_exists', {
           p_user_id: user.id,
-          p_favorite_color: data.favoriteColor,
-          p_spirit_animal: data.spiritAnimal,
-          p_core_element: data.coreElement,
+          p_preset_id: preset?.id ?? null,
+          p_favorite_color: resolvedFavoriteColor,
+          p_spirit_animal: resolvedSpiritAnimal,
+          p_core_element: normalizedElement,
           p_story_tone: data.storyTone,
-          p_current_image_url: imageData.imageUrl,
-          p_initial_image_url: imageData.imageUrl,
+          p_current_image_url: currentImageUrl,
+          p_initial_image_url: currentImageUrl,
           p_eye_color: eyeColor,
           p_fur_color: furColor,
         }) as { data: CreateCompanionIfNotExistsResult[] | null; error: Error | null };
@@ -484,7 +502,7 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
           .insert({
             companion_id: companionData.id,
             stage: 0,
-            image_url: imageData.imageUrl,
+            image_url: currentImageUrl,
             xp_at_evolution: 0,
           })
           .select()
@@ -500,40 +518,42 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
           throw new Error("Unable to record stage 0 evolution");
         }
 
-        // Generate stage 0 card in background (don't await - don't block onboarding)
-        const generateStageZeroCard = async () => {
-          try {
-            const { data: fullCompanionData } = await supabase
-              .from("user_companion")
-              .select("*")
-              .eq("id", companionData.id)
-              .single();
+        if (resolvedSpiritAnimal !== "Egg") {
+          // Generate stage 0 card in background (don't await - don't block onboarding)
+          const generateStageZeroCard = async () => {
+            try {
+              const { data: fullCompanionData } = await supabase
+                .from("user_companion")
+                .select("*")
+                .eq("id", companionData.id)
+                .single();
 
-            await supabase.functions.invoke("generate-evolution-card", {
-              body: {
-                companionId: companionData.id,
-                evolutionId: stageZeroEvolution.id,
-                stage: 0,
-                species: companionData.spirit_animal,
-                element: companionData.core_element,
-                color: companionData.favorite_color,
-                userAttributes: {
-                  vitality: fullCompanionData?.vitality || 300,
-                  wisdom: fullCompanionData?.wisdom || 300,
-                  discipline: fullCompanionData?.discipline || 300,
-                  resolve: fullCompanionData?.resolve || 300,
-                  creativity: fullCompanionData?.creativity || 300,
-                  alignment: fullCompanionData?.alignment || 300,
+              await supabase.functions.invoke("generate-evolution-card", {
+                body: {
+                  companionId: companionData.id,
+                  evolutionId: stageZeroEvolution.id,
+                  stage: 0,
+                  species: companionData.spirit_animal,
+                  element: companionData.core_element,
+                  color: companionData.favorite_color,
+                  userAttributes: {
+                    vitality: fullCompanionData?.vitality || 300,
+                    wisdom: fullCompanionData?.wisdom || 300,
+                    discipline: fullCompanionData?.discipline || 300,
+                    resolve: fullCompanionData?.resolve || 300,
+                    creativity: fullCompanionData?.creativity || 300,
+                    alignment: fullCompanionData?.alignment || 300,
+                  },
                 },
-              },
-            });
-            queryClient.invalidateQueries({ queryKey: ["evolution-cards"] });
-          } catch (cardError) {
-            console.error("Stage 0 card generation failed (non-critical):", cardError);
-          }
-        };
+              });
+              queryClient.invalidateQueries({ queryKey: ["evolution-cards"] });
+            } catch (cardError) {
+              console.error("Stage 0 card generation failed (non-critical):", cardError);
+            }
+          };
 
-        generateStageZeroCard(); // Fire and forget - don't block onboarding
+          generateStageZeroCard(); // Fire and forget - don't block onboarding
+        }
       }
 
       // Generate story only for new companions
@@ -581,6 +601,7 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
 
       logger.info("Companion creation completed", {
         userId: user.id,
+        presetId: data.presetId ?? null,
         durationMs: Date.now() - creationStartedAt,
       });
       return companionData;
@@ -605,6 +626,111 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
       companionCreationInProgress.current = false;
       console.error("Failed to create companion:", error);
       // Don't show toast here - let the parent component handle error display
+    },
+  });
+
+  const hatchCompanion = useMutation({
+    mutationFn: async ({ presetId }: { presetId: string }) => {
+      if (!user || !companion) {
+        throw new Error("No companion found");
+      }
+
+      if (companion.current_stage !== 0 || companion.preset_id) {
+        throw new Error("This companion is not waiting to hatch.");
+      }
+
+      const preset = getCompanionPreset(presetId);
+      if (!preset) {
+        throw new Error("Unknown companion preset");
+      }
+
+      const normalizedElement = coerceCompanionElementId(companion.core_element);
+      const currentImageUrl = getPresetCompanionAssetUrl({
+        presetId: preset.id,
+        stage: 1,
+        state: "normal",
+        element: normalizedElement,
+      }) ?? "/placeholder-companion.svg";
+      const initialImageUrl = companion.initial_image_url
+        ?? companion.current_image_url
+        ?? getUniversalEggAssetUrl(normalizedElement);
+      const favoriteColor = getCompanionElementAnchorColor(normalizedElement);
+
+      const result = await supabase.rpc("hatch_companion_with_preset", {
+        p_companion_id: companion.id,
+        p_preset_id: preset.id,
+        p_spirit_animal: preset.displayName,
+        p_favorite_color: favoriteColor,
+        p_core_element: normalizedElement,
+        p_story_tone: companion.story_tone ?? "epic_adventure",
+        p_initial_image_url: initialImageUrl,
+        p_current_image_url: currentImageUrl,
+        p_xp_at_evolution: companion.current_xp,
+      }) as { data: HatchCompanionResponse[] | null; error: Error | null };
+
+      if (result.error) {
+        throw result.error;
+      }
+
+      const hatchResult = result.data?.[0] ?? null;
+      if (!hatchResult) {
+        throw new Error("Hatch completed without returning companion data.");
+      }
+
+      const generateStageOneArtifacts = async () => {
+        try {
+          await supabase.functions.invoke("generate-evolution-card", {
+            body: {
+              companionId: companion.id,
+              evolutionId: hatchResult.evolution_id,
+              stage: 1,
+              species: preset.displayName,
+              element: normalizedElement,
+              color: favoriteColor,
+              userAttributes: {
+                vitality: companion.vitality || 300,
+                wisdom: companion.wisdom || 300,
+                discipline: companion.discipline || 300,
+                resolve: companion.resolve || 300,
+                creativity: companion.creativity || 300,
+                alignment: companion.alignment || 300,
+              },
+            },
+          });
+          queryClient.invalidateQueries({ queryKey: ["evolution-cards"] });
+        } catch (cardError) {
+          console.error("Stage 1 card generation failed (non-critical):", cardError);
+        }
+
+        try {
+          await supabase.functions.invoke("generate-companion-story", {
+            body: {
+              companionId: companion.id,
+              stage: 1,
+            },
+          });
+          queryClient.invalidateQueries({ queryKey: ["companion-story"] });
+          queryClient.invalidateQueries({ queryKey: ["companion-stories-all"] });
+        } catch (storyError) {
+          console.error("Stage 1 story generation failed (non-critical):", storyError);
+        }
+      };
+
+      void generateStageOneArtifacts();
+
+      return hatchResult;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["companion"] });
+      queryClient.invalidateQueries({ queryKey: ["companion-story"] });
+      queryClient.invalidateQueries({ queryKey: ["companion-stories-all"] });
+      queryClient.invalidateQueries({ queryKey: ["companion-evolution-image"] });
+      queryClient.invalidateQueries({ queryKey: ["evolution-cards"] });
+      queryClient.invalidateQueries({ queryKey: ["current-evolution-card"] });
+    },
+    onError: (error) => {
+      console.error("Hatch failed:", error);
+      toast.error(error instanceof Error ? error.message : "Unable to hatch your companion right now.");
     },
   });
 
@@ -637,15 +763,19 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
 
       return await performXPAward(companionToUse, xpAmount, eventType, metadata, user, idempotencyKey);
     },
-    onSuccess: async ({ shouldEvolve, newStage }) => {
+    onSuccess: async ({ shouldEvolve, previousLevel, newStage }) => {
       queryClient.invalidateQueries({ queryKey: ["companion"] });
-      
-      if (shouldEvolve) {
-        // Check for companion stage achievements
+
+      if (newStage > previousLevel) {
         await checkCompanionAchievements(newStage);
-        
-        // Show notification that evolution is available - but DON'T auto-trigger
-        toast.success("✨ Your companion is ready to evolve! Visit your companion page.", {
+
+        if (shouldEvolve) {
+          toast.success(`Reached Level ${newStage} • ${getProgressionTierLabelForLevel(newStage)}!`, {
+            duration: 5000,
+          });
+        }
+      } else if (shouldEvolve) {
+        toast.success(`Reached ${getProgressionTierLabelForLevel(newStage)} tier!`, {
           duration: 5000,
         });
       }
@@ -710,25 +840,33 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
       throw new Error("XP award returned no data");
     }
 
-    const shouldEvolveNow = Boolean(awardResult.should_evolve);
+    const previousLevel = typeof awardResult.level_before === "number"
+      ? awardResult.level_before
+      : companionData.current_stage;
     const newXP = awardResult.xp_after ?? companionData.current_xp;
-    const newStage = shouldEvolveNow ? companionData.current_stage + 1 : companionData.current_stage;
+    const newStage = typeof awardResult.level_after === "number"
+      ? awardResult.level_after
+      : companionData.current_stage;
+    const shouldEvolveNow = Boolean(awardResult.should_evolve);
 
     logger.log("[XP Award Debug]", {
       eventType,
       requestedXP: xpAmount,
       awardedXP: awardResult.xp_awarded,
       capApplied: awardResult.cap_applied,
-      currentStage: companionData.current_stage,
+      currentLevel: companionData.current_stage,
       currentXP: awardResult.xp_before,
       newXP,
+      previousLevel,
+      newLevel: newStage,
       nextThreshold: awardResult.next_threshold,
-      shouldEvolve: shouldEvolveNow,
+      crossedTierBoundary: shouldEvolveNow,
       idempotencyKey: requestIdempotencyKey,
     });
 
     return {
       shouldEvolve: shouldEvolveNow,
+      previousLevel,
       newStage,
       newXP,
       xpAwarded: awardResult.xp_awarded ?? 0,
@@ -859,6 +997,11 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
     },
   });
 
+  const requiresHatchSelection = useMemo(
+    () => Boolean(companion && companion.current_stage === 0 && !companion.preset_id),
+    [companion],
+  );
+
   // Memoize calculated values to prevent unnecessary recalculations
   const nextEvolutionXP = useMemo(() => {
     if (!companion) return null;
@@ -874,17 +1017,18 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
     return Math.min(100, Math.max(0, progress));
   }, [companion, getThreshold, nextEvolutionXP]);
 
-  // Check if companion can evolve (XP meets threshold for next stage)
   const canEvolve = useMemo(() => {
     if (!companion) return false;
-    return shouldEvolve(companion.current_stage, companion.current_xp);
-  }, [companion, shouldEvolve]);
+    if (!requiresHatchSelection) return false;
+    const hatchThreshold = getThreshold(HATCH_READY_LEVEL);
+    return hatchThreshold !== null && companion.current_xp >= hatchThreshold;
+  }, [companion, getThreshold, requiresHatchSelection]);
 
-  const isEvolutionBusy = evolveCompanion.isPending;
+  const isEvolutionBusy = evolveCompanion.isPending || hatchCompanion.isPending;
 
   // Manual evolution trigger function
   const triggerManualEvolution = useCallback(() => {
-    if (!companion || isEvolutionBusy || !canEvolve) return;
+    if (!companion || isEvolutionBusy || !canEvolve || requiresHatchSelection) return;
     
     const nextStage = companion.current_stage + 1;
     
@@ -896,7 +1040,7 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
       newStage: nextStage, 
       currentXP: companion.current_xp 
     });
-  }, [companion, canEvolve, evolveCompanion, isEvolutionBusy, setIsEvolvingLoading]);
+  }, [companion, canEvolve, evolveCompanion, isEvolutionBusy, requiresHatchSelection, setIsEvolvingLoading]);
 
   return {
     companion,
@@ -910,7 +1054,9 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
     progressToNext,
     isEvolvingLoading,
     canEvolve,
+    requiresHatchSelection,
     isEvolutionBusy,
     triggerManualEvolution,
+    hatchCompanion,
   };
 };

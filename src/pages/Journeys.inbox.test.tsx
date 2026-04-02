@@ -433,6 +433,7 @@ vi.mock("@/hooks/useJourneysLayoutMode", () => ({
 
 vi.mock("@/utils/platformTargets", () => ({
   isMacDesignedForIPadIOSApp: () => false,
+  isMacSession: () => false,
 }));
 
 const renderJourneys = (initialEntry = "/journeys") => {

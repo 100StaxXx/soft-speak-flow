@@ -22,6 +22,12 @@ import {
   buildSpiritLockRetryFeedback,
   resolveCompanionSpiritLockProfile,
 } from "../_shared/companionSpiritLock.ts";
+import {
+  COMPANION_PRESET_BUCKET,
+  coerceCompanionElementId,
+  coerceCompanionPresetId,
+  resolveCompanionAssetPath,
+} from "../../../src/config/companionCatalog.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -261,37 +267,7 @@ serve(async (req) => {
       );
     }
 
-    if (!openAIApiKey) {
-      return new Response(JSON.stringify({
-        error: "OPENAI_API_KEY not configured",
-        code: "openai_api_key_missing",
-      }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const imageSize = resolveCompanionImageSizeForUser(resolvedUserId);
-    console.log(`[CompanionEvolutionPolicy] user=${resolvedUserId} image_size=${imageSize}`);
-
     const supabase = createClient(supabaseUrl, supabaseKey);
-    const costGuardrails = createCostGuardrailSession({
-      supabase,
-      endpointKey: "generate-companion-evolution",
-      featureKey: "ai_companion_evolution",
-      userId: resolvedUserId,
-    });
-    const guardedFetch = costGuardrails.wrapFetch(fetch);
-    await costGuardrails.enforceAccess({
-      capabilities: ["image", "text"],
-      providers: ["openai"],
-    });
-
-    // Rate limiting check - evolution is expensive
-    const rateLimit = await checkRateLimit(supabase, resolvedUserId, 'companion-evolution', RATE_LIMITS['companion-evolution']);
-    if (!rateLimit.allowed) {
-      return createRateLimitResponse(rateLimit, corsHeaders);
-    }
 
     console.log("Fetching companion for user:", resolvedUserId);
 
@@ -362,6 +338,94 @@ serve(async (req) => {
 
     const nextStage = currentStage + 1;
     console.log("Evolution triggered! Moving to stage:", nextStage);
+
+    const normalizedPresetId = coerceCompanionPresetId(companion.preset_id);
+    if (normalizedPresetId) {
+      const assetPath = resolveCompanionAssetPath({
+        presetId: normalizedPresetId,
+        stage: nextStage,
+        state: "normal",
+        element: coerceCompanionElementId(companion.core_element),
+      });
+      const newImageUrl = supabase.storage
+        .from(COMPANION_PRESET_BUCKET)
+        .getPublicUrl(assetPath).data.publicUrl;
+
+      const { data: evolutionRecord, error: evolutionError } = await supabase
+        .from("companion_evolutions")
+        .insert({
+          companion_id: companion.id,
+          stage: nextStage,
+          image_url: newImageUrl,
+          xp_at_evolution: currentXP,
+          evolved_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+      if (evolutionError) {
+        console.error("Preset evolution record error:", evolutionError);
+        throw new Error("Failed to save evolution record");
+      }
+
+      const { error: updateError } = await supabase
+        .from("user_companion")
+        .update({
+          current_stage: nextStage,
+          current_image_url: newImageUrl,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", companion.id);
+
+      if (updateError) {
+        console.error("Preset companion update error:", updateError);
+        throw new Error("Failed to update companion");
+      }
+
+      return new Response(
+        JSON.stringify({
+          evolved: true,
+          previous_stage: currentStage,
+          new_stage: nextStage,
+          image_url: newImageUrl,
+          xp_at_evolution: currentXP,
+          evolution_id: evolutionRecord.id,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    if (!openAIApiKey) {
+      return new Response(JSON.stringify({
+        error: "OPENAI_API_KEY not configured",
+        code: "openai_api_key_missing",
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const imageSize = resolveCompanionImageSizeForUser(resolvedUserId);
+    console.log(`[CompanionEvolutionPolicy] user=${resolvedUserId} image_size=${imageSize}`);
+
+    const costGuardrails = createCostGuardrailSession({
+      supabase,
+      endpointKey: "generate-companion-evolution",
+      featureKey: "ai_companion_evolution",
+      userId: resolvedUserId,
+    });
+    const guardedFetch = costGuardrails.wrapFetch(fetch);
+    await costGuardrails.enforceAccess({
+      capabilities: ["image", "text"],
+      providers: ["openai"],
+    });
+
+    // Rate limiting check - evolution is expensive
+    const rateLimit = await checkRateLimit(supabase, resolvedUserId, 'companion-evolution', RATE_LIMITS['companion-evolution']);
+    if (!rateLimit.allowed) {
+      return createRateLimitResponse(rateLimit, corsHeaders);
+    }
+
     const spiritLockProfile = resolveCompanionSpiritLockProfile(companion.spirit_animal);
     const spiritLockPromptBlock = spiritLockProfile
       ? buildSpiritLockPromptBlock(spiritLockProfile, "image")
@@ -641,11 +705,11 @@ Be extremely specific and detailed. This will be used to maintain 95% continuity
       }
 
       // 5. Build evolution prompt with ultra-strict continuity
-      // Progressive creative freedom based on stage
-      // Early stages (2-10): Strict realism
-      // Mid stages (11-14): Allow mythic enhancements
-      // Late stages (15-20): Full grandiose creativity
-      const stageLevel = nextStage <= 10 ? 'realistic' : nextStage <= 14 ? 'mythic' : 'legendary';
+      // Progressive creative freedom based on the 15-stage ladder
+      // Early stages (2-7): Strict realism
+      // Mid stages (8-11): Allow mythic enhancements
+      // Late stages (12-14): Full grandiose creativity
+      const stageLevel = nextStage <= 7 ? 'realistic' : nextStage <= 11 ? 'mythic' : 'legendary';
       
       // Special handling for aquatic creatures to prevent legs (applies to ALL tiers including legendary)
       const aquaticCreatures = ['shark', 'whale', 'dolphin', 'fish', 'orca', 'manta ray', 'stingray', 'seahorse', 'jellyfish', 'octopus', 'squid', 'sea turtle', 'kraken', 'leviathan'];
@@ -1151,25 +1215,19 @@ function getStageGuidance(stage: number): string {
   const guidance: Record<number, string> = {
     0: "Pristine mystical egg containing the champion's divine destiny, silhouette of ultimate form barely visible within",
     1: "Newborn hatchling emerging with first breath of life, tiny and vulnerable yet radiating pure potential",
-    2: "Young guardian taking first steps, anatomically accurate infant form with oversized features, gaining confidence",
-    3: "Early adolescent form, lengthening body with developing musculature, playful energy and growing coordination",
-    4: "Juvenile warrior, balanced proportions emerging, signature features becoming prominent, athletic and agile",
-    5: "Young adult reaching full size, powerful stance, all anatomical features fully developed and majestic",
-    6: "Seasoned protector with battle scars and experience, peak physical conditioning, commanding presence",
-    7: "Elite guardian radiating heroic energy, perfected anatomy, elemental mastery evident in every movement",
-    8: "Legendary champion, imposing scale, flawless physique, environmental reality bending to its power",
-    9: "Mythic warrior at absolute peak, battle-hardened yet elegant, aura of invincibility and wisdom",
-    10: "Veteran legend, refined grace, every detail telling stories of countless victories, museum-quality perfection",
-    11: "Transcendent being achieving weightlessness, gravitational defiance, ethereal trails and elevated consciousness",
-    12: "Ascended entity hovering in pure energy, species perfection enhanced by cosmiq power, reality-bending presence",
-    13: "Ether-born avatar phasing between dimensions, sacred geometry manifesting, cosmiq patterns on biological form",
-    14: "Primordial aspect at titan scale, ancient power condensed into runic energy wrapping anatomically perfect form",
-    15: "Colossal divine champion, monumental scale yet every detail pristine, environmental phenomena manifest its presence",
-    16: "Cosmiq guardian merged with nebula and stars, eyes containing galaxies, biological perfection meets stellar phenomenon",
-    17: "Astral overlord transcending dimensions, multiple temporal echoes, reality fragmenting around ultimate power",
-    18: "Universal sovereign at planetary scale, apocalyptic environmental forces, godlike yet anatomically unchanged",
-    19: "Mythic apex standing as deity of its species, divine proportions, golden ratio perfection, worshipful grandeur",
-    20: "Origin of Creation - the primordial first, absolute divine completion, universe-birthing presence, perfection incarnate"
+    2: "Youngling form finding balance, oversized features softening into a confident exploratory silhouette",
+    3: "Juvenile form with longer proportions, agile movement, and signature features clearly emerging",
+    4: "Scout stage with athletic readiness, keen posture, and a sharper sense of purpose",
+    5: "Warrior presence taking shape, stronger frame, bolder stance, and fully readable elemental identity",
+    6: "Guardian maturity with disciplined strength, protective energy, and polished anatomical confidence",
+    7: "Champion form radiating heroic mastery, refined proportions, and unmistakable earned power",
+    8: "Ascended presence with elevated grace, luminous aura, and controlled mythic momentum",
+    9: "Titan form carrying immense scale and gravity, awe-inspiring while staying anatomically true",
+    10: "Mythic being with legendary detail, sacred energy, and species perfection pushed beyond mortal limits",
+    11: "Prime mastery with immaculate balance, sovereign poise, and elemental force woven into every feature",
+    12: "Transcendent form hovering at the edge of reality, ethereal power amplifying the core identity",
+    13: "Apex incarnation with reality-bending grandeur, divine confidence, and perfect continuity of form",
+    14: "Ultimate form, the final perfected expression of this companion's destiny, vast and transcendent yet unmistakably the same being"
   };
 
   return guidance[stage] || "Continued evolution with enhanced power and presence";

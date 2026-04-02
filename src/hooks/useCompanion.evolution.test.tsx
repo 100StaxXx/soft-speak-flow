@@ -57,6 +57,13 @@ vi.mock("@/integrations/supabase/client", () => ({
       invoke: mocks.invokeMock,
     },
     from: mocks.fromMock,
+    storage: {
+      from: () => ({
+        getPublicUrl: () => ({
+          data: { publicUrl: "https://example.com/preset-stage0.png" },
+        }),
+      }),
+    },
   },
 }));
 
@@ -390,6 +397,7 @@ describe("useCompanion evolveCompanion", () => {
 
     await act(async () => {
       await result.current.createCompanion.mutateAsync({
+        presetId: "wolf",
         favoriteColor: "#FF6B35",
         spiritAnimal: "Wolf",
         coreElement: "Fire",
@@ -397,24 +405,127 @@ describe("useCompanion evolveCompanion", () => {
       });
     });
 
-    expect(mocks.generateWithValidationMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        flowType: "onboarding",
-        stage: 0,
-        eyeColor: "",
-        furColor: "",
-      }),
-      expect.objectContaining({
-        maxRetries: 0,
-      }),
-    );
+    expect(mocks.generateWithValidationMock).not.toHaveBeenCalled();
 
     expect(mocks.rpcMock).toHaveBeenCalledWith(
       "create_companion_if_not_exists",
       expect.objectContaining({
         p_eye_color: "",
         p_fur_color: "",
+        p_preset_id: "wolf",
       }),
     );
+  });
+
+  it("creates an egg-first companion without a preset", async () => {
+    mocks.rpcMock.mockResolvedValueOnce({
+      data: [
+        {
+          ...companionFixture,
+          preset_id: null,
+          spirit_animal: "Egg",
+          core_element: "void",
+          current_image_url: "/companion-eggs/egg__t0_egg__normal__void.png",
+          is_new: false,
+        },
+      ],
+      error: null,
+    });
+
+    const { result } = await renderUseCompanion();
+
+    await act(async () => {
+      await result.current.createCompanion.mutateAsync({
+        presetId: null,
+        favoriteColor: "#000000",
+        spiritAnimal: "Egg",
+        coreElement: "void",
+        storyTone: "epic_adventure",
+      });
+    });
+
+    expect(mocks.rpcMock).toHaveBeenCalledWith(
+      "create_companion_if_not_exists",
+      expect.objectContaining({
+        p_preset_id: null,
+        p_spirit_animal: "Egg",
+        p_core_element: "void",
+        p_current_image_url: "/companion-eggs/egg__t0_egg__normal__void.png",
+        p_initial_image_url: "/companion-eggs/egg__t0_egg__normal__void.png",
+      }),
+    );
+  });
+
+  it("holds manual evolution until hatch selection is completed", async () => {
+    const { result } = await renderUseCompanion();
+
+    expect(result.current.requiresHatchSelection).toBe(true);
+
+    act(() => {
+      result.current.triggerManualEvolution();
+    });
+
+    expect(mocks.invokeMock).not.toHaveBeenCalledWith("generate-companion-evolution", expect.anything());
+    expect(mocks.setIsEvolvingLoadingMock).not.toHaveBeenCalled();
+  });
+
+  it("hatches an egg into the selected preset and preserves the original egg image", async () => {
+    mocks.rpcMock.mockResolvedValueOnce({
+      data: [
+        {
+          id: companionFixture.id,
+          preset_id: "dragon",
+          spirit_animal: "Dragon",
+          favorite_color: "#FF6B35",
+          core_element: "fire",
+          story_tone: "epic_adventure",
+          current_stage: 1,
+          current_image_url: "/companion-presets/dragon/t1_youth/normal/dragon__t1_youth__normal__fire.png",
+          initial_image_url: companionFixture.current_image_url,
+          evolution_id: "evo-1",
+        },
+      ],
+      error: null,
+    });
+
+    const { result } = await renderUseCompanion();
+
+    await act(async () => {
+      await result.current.hatchCompanion.mutateAsync({
+        presetId: "dragon",
+      });
+    });
+
+    expect(mocks.rpcMock).toHaveBeenCalledWith(
+      "hatch_companion_with_preset",
+      expect.objectContaining({
+        p_companion_id: companionFixture.id,
+        p_preset_id: "dragon",
+        p_initial_image_url: companionFixture.current_image_url,
+      }),
+    );
+
+    await waitFor(() => {
+      expect(mocks.invokeMock).toHaveBeenCalledWith(
+        "generate-evolution-card",
+        expect.objectContaining({
+          body: expect.objectContaining({
+            companionId: companionFixture.id,
+            evolutionId: "evo-1",
+            stage: 1,
+            species: "Dragon",
+          }),
+        }),
+      );
+      expect(mocks.invokeMock).toHaveBeenCalledWith(
+        "generate-companion-story",
+        expect.objectContaining({
+          body: expect.objectContaining({
+            companionId: companionFixture.id,
+            stage: 1,
+          }),
+        }),
+      );
+    });
   });
 });

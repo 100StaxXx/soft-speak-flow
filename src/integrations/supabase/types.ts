@@ -1418,6 +1418,89 @@ export type Database = {
           },
         ]
       }
+      companion_preset_assets: {
+        Row: {
+          bucket_name: string
+          created_at: string
+          element: string
+          preset_id: string
+          stage_end: number
+          stage_start: number
+          state: string
+          storage_path: string
+          tier: string
+          updated_at: string
+        }
+        Insert: {
+          bucket_name?: string
+          created_at?: string
+          element: string
+          preset_id: string
+          stage_end: number
+          stage_start: number
+          state: string
+          storage_path: string
+          tier: string
+          updated_at?: string
+        }
+        Update: {
+          bucket_name?: string
+          created_at?: string
+          element?: string
+          preset_id?: string
+          stage_end?: number
+          stage_start?: number
+          state?: string
+          storage_path?: string
+          tier?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "companion_preset_assets_preset_id_fkey"
+            columns: ["preset_id"]
+            isOneToOne: false
+            referencedRelation: "companion_presets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      companion_presets: {
+        Row: {
+          anatomy_lock: string
+          carousel_order: number
+          created_at: string
+          display_name: string
+          id: string
+          reveal_copy: string
+          role: string
+          signature_identity: string
+          updated_at: string
+        }
+        Insert: {
+          anatomy_lock: string
+          carousel_order: number
+          created_at?: string
+          display_name: string
+          id: string
+          reveal_copy: string
+          role: string
+          signature_identity: string
+          updated_at?: string
+        }
+        Update: {
+          anatomy_lock?: string
+          carousel_order?: number
+          created_at?: string
+          display_name?: string
+          id?: string
+          reveal_copy?: string
+          role?: string
+          signature_identity?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       companion_memorials: {
         Row: {
           companion_name: string
@@ -6973,6 +7056,7 @@ export type Database = {
           neglected_image_url: string | null
           path_determination_date: string | null
           power: number | null
+          preset_id: string | null
           recovery_progress: number | null
           resolve: number | null
           scar_history: Json | null
@@ -7041,6 +7125,7 @@ export type Database = {
           neglected_image_url?: string | null
           path_determination_date?: string | null
           power?: number | null
+          preset_id?: string | null
           recovery_progress?: number | null
           resolve?: number | null
           scar_history?: Json | null
@@ -7109,6 +7194,7 @@ export type Database = {
           neglected_image_url?: string | null
           path_determination_date?: string | null
           power?: number | null
+          preset_id?: string | null
           recovery_progress?: number | null
           resolve?: number | null
           scar_history?: Json | null
@@ -7124,6 +7210,13 @@ export type Database = {
           wisdom?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "user_companion_preset_id_fkey"
+            columns: ["preset_id"]
+            isOneToOne: false
+            referencedRelation: "companion_presets"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "user_companion_user_id_fkey"
             columns: ["user_id"]
@@ -8002,6 +8095,55 @@ export type Database = {
           success: boolean
         }[]
       }
+      apply_companion_preset_selection: {
+        Args: {
+          p_companion_id: string
+          p_core_element: string
+          p_current_image_url: string
+          p_current_stage: number
+          p_favorite_color: string
+          p_initial_image_url: string
+          p_preset_id: string
+          p_spirit_animal: string
+          p_story_tone: string
+        }
+        Returns: {
+          core_element: string
+          current_image_url: string
+          current_stage: number
+          favorite_color: string
+          id: string
+          initial_image_url: string
+          preset_id: string
+          spirit_animal: string
+          story_tone: string
+        }[]
+      }
+      hatch_companion_with_preset: {
+        Args: {
+          p_companion_id: string
+          p_core_element: string
+          p_current_image_url: string
+          p_favorite_color: string
+          p_initial_image_url: string
+          p_preset_id: string
+          p_spirit_animal: string
+          p_story_tone: string
+          p_xp_at_evolution: number
+        }
+        Returns: {
+          core_element: string
+          current_image_url: string
+          current_stage: number
+          evolution_id: string
+          favorite_color: string
+          id: string
+          initial_image_url: string
+          preset_id: string
+          spirit_animal: string
+          story_tone: string
+        }[]
+      }
       consume_companion_regeneration: {
         Args: { p_companion_id: string; p_image_url: string }
         Returns: {
@@ -8028,6 +8170,7 @@ export type Database = {
           p_favorite_color: string
           p_fur_color: string
           p_initial_image_url: string
+          p_preset_id: string | null
           p_spirit_animal: string
           p_story_tone: string
           p_user_id: string
@@ -8049,6 +8192,7 @@ export type Database = {
           last_energy_update: string
           last_mood_update: string
           mind: number
+          preset_id: string | null
           soul: number
           spirit_animal: string
           story_tone: string

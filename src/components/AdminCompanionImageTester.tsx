@@ -13,27 +13,26 @@ import { Progress } from "@/components/ui/progress";
 
 // Complete creature list from edge function, organized by category
 const CREATURE_OPTIONS = {
-  "Canines": ["Wolf", "Fox", "Arctic Fox", "Fennec Fox", "Dog", "Hyena", "Tanuki"],
+  "Canines": ["Wolf", "Kitsune", "Arctic Fox", "Fennec Fox", "Dog", "Hyena", "Tanuki"],
   "Mythical Canines": ["Fenrir"],
   "Felines": ["Cat", "Lion", "Tiger", "Panther", "Snow Leopard", "Cheetah", "Jaguar", "Lynx", "Puma / Cougar"],
   "Mythical Felines": ["Sphinx", "Kitsune"],
-  "Dragons & Reptiles": ["Dragon", "Wyvern", "Hydra", "Basilisk", "T-Rex", "Velociraptor", "Crocodile", "Snake", "Sea Turtle"],
+  "Dragons & Reptiles": ["Dragon", "Mechanical Dragon", "Wyvern", "Hydra", "Basilisk", "T-Rex", "Velociraptor", "Crocodile", "Snake", "Sea Turtle"],
   "Birds": ["Eagle", "Falcon", "Hawk", "Owl", "Raven", "Parrot", "Hummingbird", "Penguin"],
-  "Mythical Birds": ["Phoenix", "Thunderbird"],
+  "Mythical Birds": ["Phoenix", "Thunderbird", "Griffin"],
   "Equines": ["Horse (Stallion)", "Unicorn", "Pegasus"],
   "Aquatic": ["Dolphin", "Shark", "Orca", "Blue Whale", "Jellyfish", "Octopus", "Manta Ray"],
   "Mythical Aquatic": ["Kraken", "Leviathan"],
   "Other Mammals": ["Bear", "Deer", "Elephant", "Gorilla", "Rhino", "Hippo", "Mammoth", "Kangaroo", "Koala", "Red Panda", "Panda", "Sloth", "Rabbit", "Mouse", "Chinchilla", "Raccoon", "Bat"],
 };
 
-const ELEMENTS = ["Fire", "Water", "Earth", "Air", "Lightning", "Ice", "Nature", "Light", "Shadow", "Cosmic"];
+const ELEMENTS = ["Fire", "Ice", "Storm", "Nature", "Void", "Light"];
 const STORY_TONES = ["", "whimsical", "epic", "cozy", "mysterious", "triumphant", "melancholic", "playful"];
 
 const STAGE_NAMES = [
-  "Egg", "Hatchling", "Sproutling", "Cub", "Juvenile",
-  "Apprentice", "Scout", "Fledgling", "Warrior", "Guardian",
-  "Champion", "Ascended", "Vanguard", "Titan", "Mythic",
-  "Prime", "Regal", "Eternal", "Transcendent", "Apex", "Ultimate Form"
+  "Egg", "Hatchling", "Youngling", "Juvenile", "Scout",
+  "Warrior", "Guardian", "Champion", "Ascended", "Titan",
+  "Mythic", "Prime", "Transcendent", "Apex", "Ultimate Form"
 ];
 
 interface QualityScore {
@@ -90,12 +89,12 @@ export const AdminCompanionImageTester = () => {
   const [currentPrompt, setCurrentPrompt] = useState<string | null>(null);
   const [selectedPreviewStage, setSelectedPreviewStage] = useState<number | null>(null);
 
-  // All stages now use T2I, but stages 2-14 extract metadata from previous image
+  // All stages now use T2I, but later tiers can still reference prior output for consistency.
   const getGenerationMode = (stage: number, hasPreviousImage: boolean): string => {
-    // Text-to-image for stages 0, 1, and cosmic stages 15-20
+    // Text-to-image for stages 0, 1, and the final mythic/apex stretch
     if (stage <= 1) return "Text-to-Image (Egg Stage)";
-    if (stage >= 15) return "Text-to-Image (Cosmic Stage)";
-    // Stages 2-14 use T2I but extract visual metadata from previous image for consistency
+    if (stage >= 12) return "Text-to-Image (Final Tier)";
+    // Mid stages use T2I with visual metadata from the previous image for consistency
     return hasPreviousImage ? "Text-to-Image (with Visual Metadata)" : "Text-to-Image (No Reference)";
   };
 
@@ -303,7 +302,7 @@ export const AdminCompanionImageTester = () => {
             type="range"
             id="stage"
             min="0"
-            max="20"
+            max="14"
             value={testData.stage}
             onChange={(e) => setTestData({ ...testData, stage: parseInt(e.target.value) })}
             className="w-full h-10 cursor-pointer"
@@ -516,7 +515,7 @@ export const AdminCompanionImageTester = () => {
           <div className="space-y-3">
             <Label>Evolution Chain Gallery ({chainCount} images)</Label>
             <div className="flex gap-2 overflow-x-auto pb-2">
-              {Array.from({ length: 21 }, (_, i) => i).map(stage => {
+              {Array.from({ length: 15 }, (_, i) => i).map(stage => {
                 const image = generatedChain[stage];
                 if (!image) return null;
                 

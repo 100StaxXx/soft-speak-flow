@@ -1,0 +1,18 @@
+Create a single, square fantasy illustration rendered as a clean 3x2 grid (three columns by two rows) of six full-bleed panels with tiny even gutters and no outer border. Use the uploaded six‑panel dragon reference ONLY for rendering quality, age target, panel layout, lighting richness, palette intensity, and premium mobile‑game collectible polish—not for species traits.
+
+Subject in every panel: Owl species, Stage 2 (Youngling). Features: round facial disk, small ear tufts, bright moon‑eyes, short curved beak. Anatomy lock: exactly 2 legs + 2 wings. Pose: compact upright perch, wings folded or slightly lifted, readable facial disk. Keep the same silhouette, framing, and pose across all six panels; only the elemental treatment and body feather color shift should change. Absolutely not a dragon—no horns, no scales, no spines, no long snout, no rider, no props.
+
+Panel order left‑to‑right, top‑to‑bottom must be exact:
+1) Fire: Warm ember reds and oranges; flame halo, drifting sparks, scorched glow, molten rim light. Owl’s feathers clearly shift to ember reds/oranges with subtle charcoal tips.
+2) Ice: Fully glacial; cold blue→cyan palette, crystalline frost, faceted ice shards, snow drift, frozen mist, luminous frozen highlights. Owl’s feathers shift to icy blues/cyans. Absolutely no liquid, splash, or wave motifs.
+3) Storm: Lightning forks, charged clouds, electric rim light, slate‑violet sky energy, tempest atmosphere. Owl’s body coloration pushed toward stormy indigo and electric violet.
+4) Nature: Verdant greens, living leaves, mossy warmth, soft flowers, sunlit plant growth, grounded organic calm. Owl’s feathers shift toward leaf‑green and natural tones.
+5) Void: Deep violet cosmic shadow, nebula particles, astral glow, dark contrast, floating arcane energy. Owl’s coloration deepened into rich purple‑black cosmic hues.
+6) Light: Radiant gold and ivory, halo bloom, celestial dust, sunburst warmth, soft divine luminance. Owl’s feathers brightened into creamy gold and warm light‑infused tones.
+
+General rendering notes:
+- Cute, premium creature‑collector mascot look with broad appeal and expressive, glossy eyes.
+- Downy feather texture; soft subsurface bounce; polished fantasy game lighting.
+- Consistent youngling scale, camera distance, head‑to‑body proportions, and silhouette across all panels.
+- Distinct elemental backdrops and color grading per panel, all full‑bleed to their cells.
+- No text, labels, watermarks, logos, border ornaments, props, or riders.

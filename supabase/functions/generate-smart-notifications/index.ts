@@ -61,6 +61,17 @@ const normalizeCompanionName = (value: string | null | undefined): string | null
   return trimmed.length > 0 ? trimmed : null;
 };
 
+const resolveVoiceTemplate = (
+  templateMap: Map<string, VoiceTemplate>,
+  spiritAnimal: string,
+): VoiceTemplate | null => {
+  const normalizedSpecies = spiritAnimal.toLowerCase();
+  return (
+    templateMap.get(normalizedSpecies)
+    ?? (normalizedSpecies === 'kitsune' ? templateMap.get('fox') ?? null : null)
+  );
+};
+
 // Calculate lunar phase (simplified)
 const getLunarPhase = (): 'new_moon' | 'full_moon' | 'first_quarter' | 'last_quarter' | null => {
   const now = new Date();
@@ -620,7 +631,7 @@ serve(async (req) => {
         const notificationType = selectNotificationType(userContext);
         
         // Get voice template for this species
-        const voiceTemplate = templateMap.get(userContext.companion.spiritAnimal.toLowerCase()) || null;
+        const voiceTemplate = resolveVoiceTemplate(templateMap, userContext.companion.spiritAnimal);
 
         // Generate notification content
         const { title, body } = await generateNotificationContent(

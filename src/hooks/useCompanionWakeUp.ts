@@ -4,6 +4,7 @@ import { useCompanion } from './useCompanion';
 import { useAuth } from './useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { resolveCompanionName } from '@/lib/companionName';
+import { useCompanionMotionSafe } from '@/contexts/CompanionMotionContext';
 
 const WAKE_UP_SEEN_KEY = 'companion_wake_up_seen';
 
@@ -25,6 +26,7 @@ export function useCompanionWakeUp(): WakeUpState {
   const { user } = useAuth();
   const { companion } = useCompanion();
   const { care, isLoading } = useCompanionCareSignals();
+  const { triggerEvent } = useCompanionMotionSafe();
   
   const [showCelebration, setShowCelebration] = useState(false);
   const [companionName, setCompanionName] = useState('Companion');
@@ -104,6 +106,12 @@ export function useCompanionWakeUp(): WakeUpState {
       if (!hasBeenSeen()) {
         setShowCelebration(true);
         markAsSeen();
+        triggerEvent({
+          type: 'wake',
+          intensity: 'heroic',
+          element: companion?.core_element ?? null,
+          stage: companion?.current_stage ?? null,
+        });
         
         // Create recovery memory (only once per wake-up)
         if (!memoryTriggered.current && user?.id && companion?.id) {
@@ -128,7 +136,17 @@ export function useCompanionWakeUp(): WakeUpState {
     }
 
     previousDormantRef.current = isDormant;
-  }, [care, isLoading, hasBeenSeen, markAsSeen, user?.id, companion?.id]);
+  }, [
+    care,
+    isLoading,
+    hasBeenSeen,
+    markAsSeen,
+    user?.id,
+    companion?.id,
+    companion?.core_element,
+    companion?.current_stage,
+    triggerEvent,
+  ]);
 
   const dismissCelebration = useCallback(() => {
     setShowCelebration(false);

@@ -123,6 +123,37 @@ describe("DesktopWeekPlanner", () => {
     expect(within(timedCard).queryByText("+20 XP")).not.toBeInTheDocument();
   });
 
+  it("hides the anytime row when requested for a mac session", () => {
+    render(
+      <DesktopWeekPlanner
+        selectedDate={selectedDate}
+        hideAnytimeRow
+        tasks={[
+          baseTask({
+            id: "timed-task",
+            task_text: "Morning check-in",
+            task_date: "2026-03-31",
+            scheduled_time: "08:00",
+          }),
+          baseTask({
+            id: "anytime-task",
+            task_text: "Loose planning",
+            task_date: "2026-03-31",
+            scheduled_time: null,
+          }),
+        ]}
+        onDateSelect={vi.fn()}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("desktop-week-task-timed-task")).toBeInTheDocument();
+    expect(screen.queryByText("Anytime")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("desktop-week-anytime-2026-03-31")).not.toBeInTheDocument();
+    expect(screen.queryByText("Loose planning")).not.toBeInTheDocument();
+  });
+
   it("keeps checkbox, popover details, double-click edit, and day selection wired correctly", async () => {
     const onDateSelect = vi.fn();
     const onToggle = vi.fn();

@@ -1,0 +1,15 @@
+Create a single square fantasy illustration as a clean 2x3 grid of six equal, full-bleed panels with thin, simple internal dividers and no decorative outer border. Use the uploaded six‑panel dragon reference ONLY for rendering quality, age target, panel layout, lighting richness, palette intensity, and premium mobile‑game collectible polish. Do not copy dragon anatomy.
+
+Subject for all six panels: Wolf species, Stage 2 (Youngling). Identity: thick neck ruff, alert pricked ears, confident forward stance. Anatomy lock: exactly 4 legs; no wings, no horns, no scales, no spikes, no armor, no clothing, no props, no riders. Furred canine features only. Pose: grounded seated pose, front paws forward together, back legs tucked, head slightly turned in a 3/4 view at eye level. Maintain the same youngling age, the same approximate framing, and the same core pose/composition in every panel so only elemental treatment changes. Keep a consistent character: silver‑gray coat with cream muzzle and chest, darker neck ruff; fluffy tail barely visible by the hip; bright, alert eyes. Emphasize a strong neck‑ruff silhouette and upright ears.
+
+Overall look: high‑detail fur rendering, rich global illumination, crisp rim lights keyed to each element, soft depth of field, premium mobile‑game collectible polish. No text, labels, logos, watermarks, or border ornaments.
+
+Panel order (left to right, top row then bottom row) must be exact:
+1) Fire — Warm ember reds and oranges; a soft flame halo around the wolf’s silhouette; drifting sparks and ember motes; subtle scorched ground glow; molten orange rim light and warm bounce light. Avoid dragon traits.
+2) Ice — Fully glacial: cold blue→cyan palette; crystalline frost textures; faceted ice shards; wind‑carved snow drift beneath/around paws; frozen mist; luminous frosty highlights on fur; ABSOLUTELY NO liquid, water waves, or splash motifs.
+3) Storm — Slate‑violet tempest sky; charged storm clouds; multiple lightning forks behind and subtly wrapping the silhouette; electric blue‑violet rim light; airborne charged particles; dramatic yet dry atmosphere.
+4) Nature — Verdant greens; living leaves and soft flowers; mossy warmth and grounded organic calm; sun‑dappled shafts of light; gentle green‑gold bounce light on fur.
+5) Void — Deep violet cosmic shadow; nebula particles; astral glow; high contrast with floating arcane energy wisps; subtle starfield; purple rim light without introducing non‑canine features.
+6) Light — Radiant gold and ivory; halo bloom; celestial dust; sunburst warmth; soft divine luminance with gentle golden rim light and airy glow.
+
+Ensure each panel’s backdrop and color grading are distinct while preserving the identical wolf identity, anatomy, and seated pose across all six. Ultra‑clean, high‑resolution square output (around 2048×2048 or higher).

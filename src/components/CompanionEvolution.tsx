@@ -10,6 +10,10 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { EvolutionErrorFallback } from "@/components/ErrorFallback";
 import { getEvolutionTheme, type EvoTheme, type ParticleStyle } from "@/config/evolutionThemes";
 import { logger } from "@/utils/logger";
+import { useMotionProfile } from "@/hooks/useMotionProfile";
+import { CompanionMotionLayer } from "@/components/companion/motion/CompanionMotionLayer";
+import { useCompanionMotionSafe } from "@/contexts/CompanionMotionContext";
+import type { CompanionMotionEvent } from "@/config/companionMotion";
 
 interface CompanionEvolutionProps {
   isEvolving: boolean;
@@ -28,17 +32,19 @@ const log = logger.scope('CompanionEvolution');
 // Convergence particles - spawn in ring, drift inward
 const ConvergenceParticles = ({ 
   phase, 
-  particleStyle 
+  particleStyle,
+  particleCount,
 }: { 
   phase: EvolutionPhase; 
   particleStyle: ParticleStyle;
+  particleCount: number;
 }) => {
   const particles = useMemo(() =>
-    Array.from({ length: 12 }, (_, i) => ({
+    Array.from({ length: particleCount }, (_, i) => ({
       id: i,
-      angle: (i / 12) * Math.PI * 2,
+      angle: (i / particleCount) * Math.PI * 2,
       startRadius: 180,
-    })), []
+    })), [particleCount]
   );
 
   if (phase === 'settle') return null;
@@ -192,11 +198,26 @@ const CompanionEvolutionContent = ({
     getEvolutionTheme(element, isFirstEvolution), 
     [element, isFirstEvolution]
   );
-
-  // Check for reduced motion preference
-  const prefersReducedMotion = useMemo(() => 
-    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  , []);
+  const { profile, capabilities, signals } = useMotionProfile();
+  const { triggerEvent } = useCompanionMotionSafe();
+  const prefersReducedMotion = profile === "reduced" || signals.prefersReducedMotion;
+  const convergenceParticleCount = Math.max(
+    4,
+    Math.min(12, Math.round(capabilities.maxParticles * 0.5)),
+  );
+  const confettiParticleCount = profile === "enhanced"
+    ? theme.confettiParticleCount
+    : Math.min(theme.confettiParticleCount, 90);
+  const evolutionMotionEvent = useMemo<CompanionMotionEvent>(() => ({
+    id: `evolution-${phase}-${newStage}`,
+    type: phase === "reveal" || phase === "settle" ? "evolution_reveal" : "evolution_start",
+    intensity: isFirstEvolution || newStage >= 56 ? "heroic" : "medium",
+    durationMs: 0,
+    createdAt: 0,
+    element: element ?? null,
+    stage: newStage,
+    reason: null,
+  }), [element, isFirstEvolution, newStage, phase]);
 
   const cleanupAudio = useCallback(() => {
     if (audioRef.current) {
@@ -308,6 +329,12 @@ const CompanionEvolutionContent = ({
     timersRef.current.push(setTimeout(() => {
       if (!isMounted) return;
       setPhase('reveal');
+      triggerEvent({
+        type: "evolution_reveal",
+        intensity: isFirstEvolution || newStage >= 56 ? "heroic" : "medium",
+        element: element ?? null,
+        stage: newStage,
+      });
       playEvolutionSuccess();
       
       // Play voice
@@ -319,7 +346,7 @@ const CompanionEvolutionContent = ({
       if (!prefersReducedMotion) {
         setTimeout(() => {
           confetti({
-            particleCount: theme.confettiParticleCount,
+            particleCount: confettiParticleCount,
             spread: theme.confettiSpread,
             origin: { y: 0.5 },
             colors: theme.confettiColors,
@@ -370,7 +397,21 @@ const CompanionEvolutionContent = ({
       }
       cleanupAudio();
     };
-  }, [isEvolving, imagePreloaded, isLoadingVoice, mentorSlug, userId, newStage, cleanupAudio, prefersReducedMotion, isFirstEvolution, theme]);
+  }, [
+    isEvolving,
+    imagePreloaded,
+    isLoadingVoice,
+    mentorSlug,
+    userId,
+    newStage,
+    cleanupAudio,
+    prefersReducedMotion,
+    isFirstEvolution,
+    theme,
+    triggerEvent,
+    element,
+    confettiParticleCount,
+  ]);
 
   const handleDismiss = (e: React.MouseEvent) => {
     if (!canDismiss) {
@@ -477,9 +518,21 @@ const CompanionEvolutionContent = ({
             />
           )}
 
+          <CompanionMotionLayer
+            variant="evolution"
+            stage={newStage}
+            element={element}
+            event={evolutionMotionEvent}
+            className="absolute inset-0 z-[1]"
+          />
+
           {/* Convergence particles - theme aware */}
           {!prefersReducedMotion && (
-            <ConvergenceParticles phase={phase} particleStyle={theme.particleStyle} />
+            <ConvergenceParticles
+              phase={phase}
+              particleStyle={theme.particleStyle}
+              particleCount={convergenceParticleCount}
+            />
           )}
 
           {/* Hatching overlay for first evolution */}

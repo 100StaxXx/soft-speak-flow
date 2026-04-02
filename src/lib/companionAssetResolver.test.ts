@@ -1,0 +1,105 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const getPublicUrlMock = vi.hoisted(() =>
+  vi.fn((assetPath: string) => ({
+    data: {
+      publicUrl: `https://example.supabase.co/storage/v1/object/public/companion-presets/${assetPath}`,
+    },
+  })),
+);
+
+vi.mock("@/integrations/supabase/client", () => ({
+  supabase: {
+    storage: {
+      from: () => ({
+        getPublicUrl: getPublicUrlMock,
+      }),
+    },
+  },
+}));
+
+import {
+  getPresetCompanionAssetUrl,
+  resolveCompanionVisualAssetUrl,
+} from "./companionAssetResolver";
+
+describe("companion asset resolver", () => {
+  beforeEach(() => {
+    getPublicUrlMock.mockClear();
+  });
+
+  it("keeps bundled youth art for early stages", () => {
+    expect(
+      getPresetCompanionAssetUrl({
+        presetId: "griffin",
+        stage: 1,
+        element: "fire",
+        state: "normal",
+      }),
+    ).toBe("/companion-presets/griffin/t1_youth/normal/griffin__t1_youth__normal__fire.png");
+    expect(getPublicUrlMock).not.toHaveBeenCalled();
+  });
+
+  it("resolves Initiate normal art from remote storage for newly covered presets", () => {
+    expect(
+      getPresetCompanionAssetUrl({
+        presetId: "griffin",
+        stage: 5,
+        element: "fire",
+        state: "normal",
+      }),
+    ).toBe(
+      "https://example.supabase.co/storage/v1/object/public/companion-presets/griffin/t2_guardian/normal/griffin__t2_guardian__normal__fire.png",
+    );
+  });
+
+  it("falls back for missing Initiate neglected and dormant preset art", () => {
+    expect(
+      getPresetCompanionAssetUrl({
+        presetId: "griffin",
+        stage: 5,
+        element: "fire",
+        state: "neglected",
+      }),
+    ).toBeNull();
+
+    expect(
+      resolveCompanionVisualAssetUrl(
+        {
+          preset_id: "griffin",
+          current_stage: 5,
+          core_element: "fire",
+          current_image_url: "https://example.com/current.png",
+          neglected_image_url: "https://example.com/neglected.png",
+        },
+        "neglected",
+      ),
+    ).toBe("https://example.com/neglected.png");
+
+    expect(
+      resolveCompanionVisualAssetUrl(
+        {
+          preset_id: "griffin",
+          current_stage: 5,
+          core_element: "fire",
+          current_image_url: "https://example.com/current.png",
+          dormant_image_url: null,
+        },
+        "dormant",
+      ),
+    ).toBe("https://example.com/current.png");
+  });
+
+  it("preserves higher-tier remote coverage for existing remote presets", () => {
+    expect(
+      getPresetCompanionAssetUrl({
+        presetId: "dragon",
+        stage: 21,
+        element: "storm",
+        state: "dormant",
+      }),
+    ).toBe(
+      "https://example.supabase.co/storage/v1/object/public/companion-presets/dragon/t3_champion/dormant/dragon__t3_champion__dormant__storm.png",
+    );
+  });
+});

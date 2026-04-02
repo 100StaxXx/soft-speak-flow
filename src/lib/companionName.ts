@@ -38,12 +38,14 @@ const RESERVED_COMPANION_NAMES = new Set([
 
 const NAME_PREFIXES: Record<string, readonly string[]> = {
   fire: ["sol", "pyra", "igni", "kae", "ember"],
+  storm: ["vol", "zira", "tesa", "arca", "rael"],
+  void: ["vora", "noxa", "zael", "xyra", "khae"],
+  nature: ["gaia", "verd", "syl", "mora", "bryn"],
   water: ["aqua", "mar", "thal", "nera", "sere"],
   earth: ["gaia", "bryn", "terra", "mora", "verd"],
   air: ["aero", "zeph", "lyra", "cael", "syl"],
   light: ["luma", "heli", "auri", "cira", "sera"],
   shadow: ["nyx", "umbra", "vela", "mora", "shade"],
-  void: ["vora", "noxa", "zael", "xyra", "khae"],
   electric: ["vol", "zira", "tesa", "arca", "rael"],
   cosmic: ["nova", "astra", "oria", "cela", "vexa"],
   default: ["kae", "lyra", "sera", "nova", "aeri"],

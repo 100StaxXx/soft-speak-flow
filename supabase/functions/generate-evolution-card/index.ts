@@ -11,6 +11,10 @@ import {
   resolveCompanionSpiritLockProfile,
 } from "../_shared/companionSpiritLock.ts";
 import { checkRateLimit, createRateLimitResponse, RATE_LIMITS } from "../_shared/rateLimiter.ts";
+import {
+  getCompanionEvolutionCardRarity,
+  MAX_COMPANION_STAGE,
+} from "../../../src/config/companionCatalog.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -219,15 +223,7 @@ serve(async (req) => {
     const randomHex = crypto.randomUUID().split('-')[0].toUpperCase();
     const cardId = `ALP-${species.toUpperCase()}-${user.id.split('-')[0].toUpperCase()}-E${stage}-${randomHex}`;
 
-    // Determine rarity based on stage (21-stage system: 0-20)
-    let rarity = 'Common';
-    if (stage >= 19) rarity = 'Origin';       // Stage 19-20: Apex, Ultimate
-    else if (stage >= 16) rarity = 'Primal';  // Stage 16-18: Regal, Eternal, Transcendent
-    else if (stage >= 13) rarity = 'Celestial'; // Stage 13-15: Titan, Mythic, Prime
-    else if (stage >= 10) rarity = 'Mythic';  // Stage 10-12: Champion, Ascended, Vanguard
-    else if (stage >= 7) rarity = 'Legendary'; // Stage 7-9: Fledgling, Warrior, Guardian
-    else if (stage >= 4) rarity = 'Epic';      // Stage 4-6: Juvenile, Apprentice, Scout
-    else if (stage >= 1) rarity = 'Rare';      // Stage 1-3: Hatchling, Sproutling, Cub
+    const rarity = getCompanionEvolutionCardRarity(stage);
 
     const stats = normalizeStats(userAttributes ?? {});
     const energyCost = calculateEnergyCost(stage);
@@ -251,9 +247,9 @@ serve(async (req) => {
         ? 'wise and imaginative'
         : 'steadfast and deeply aligned';
     
-    const vibes = stage >= 15 ? 'ancient, radiant, transcendent' :
-                 stage >= 10 ? 'majestic, powerful, legendary' :
-                 stage >= 5 ? 'fierce, loyal, determined' :
+    const vibes = stage >= 11 ? 'ancient, radiant, transcendent' :
+                 stage >= 7 ? 'majestic, powerful, legendary' :
+                 stage >= 4 ? 'fierce, loyal, determined' :
                  'curious, cute, eager';
     const spiritLockProfile = resolveCompanionSpiritLockProfile(species);
     const spiritLockPromptBlock = spiritLockProfile
@@ -266,17 +262,16 @@ serve(async (req) => {
       function: "generate-evolution-card",
     });
 
-    // Stage 20 Special: Generate personalized ultimate title
+    // Final-stage special: generate a personalized ultimate title
     let finalCreatureName = existingName;
     let skipAI = false;
     
-    if (stage === 20 && !existingName) {
-      // Generate ultimate personalized title for Stage 20 first evolution
+    if (stage === MAX_COMPANION_STAGE && !existingName) {
       const powerTitles = ['Sovereign', 'Apex', 'Colossus', 'Warlord', 'Primeborn', 'Overlord', 'Sentinel', 'Emperor', 'Archon', 'Omega'];
       const randomTitle = powerTitles[Math.floor(Math.random() * powerTitles.length)];
       finalCreatureName = `${element} ${randomTitle} ${species}`;
-      skipAI = true; // Use the generated title, no AI needed
-      console.log('Generated Stage 20 ultimate title:', finalCreatureName);
+      skipAI = true;
+      console.log('Generated final-stage ultimate title:', finalCreatureName);
     }
 
     let aiPrompt;
@@ -289,7 +284,7 @@ CREATURE ATTRIBUTES:
 - Name: ${existingName} (DO NOT CHANGE THIS)
 - Species: ${species}
 - Element: ${element}
-- Evolution Stage: ${stage}/20 (evolved from stage ${stage - 1})
+- Evolution Stage: ${stage}/${MAX_COMPANION_STAGE} (evolved from stage ${stage - 1})
 - Rarity: ${rarity}
 - Personality: ${personality}
 
@@ -317,7 +312,7 @@ CREATURE ATTRIBUTES:
 - Secondary Color: ${element} undertones
 - Personality: ${personality}
 - Vibes: ${vibes}
-- Evolution Stage: ${stage}/20
+- Evolution Stage: ${stage}/${MAX_COMPANION_STAGE}
 - Rarity: ${rarity}
 
 NAME GENERATION RULES:
@@ -354,14 +349,14 @@ Make it LEGENDARY. This is the birth of a companion.`;
     let cardData;
     
     if (skipAI) {
-      // For Stage 20 ultimate form, use pre-generated title
+      // For the final stage, use the pre-generated title
       cardData = {
         creature_name: finalCreatureName,
         traits: ['Ultimate Power', 'Legendary Presence', 'Peak Evolution', 'Unstoppable Force', 'Eternal Bond'],
         story_text: `At the pinnacle of evolution, ${finalCreatureName} stands as the ultimate manifestation of power and bond. This legendary ${species} has transcended all limits, becoming a force of nature itself. The ${element.toLowerCase()} energy that flows through them is unmatched, a testament to the countless battles fought and lessons learned throughout their journey.\n\nTheir bond with their companion has reached its absolute peak, creating a connection that goes beyond the physical realm. Every action, every thought, perfectly synchronized. They are no longer just partners—they are one.\n\nThe world trembles at the mere presence of ${finalCreatureName}, not out of fear, but in awe of what dedication and perseverance can achieve. This is the ultimate form—the peak of all possibilities.`,
         lore_seed: `Legends speak of ${finalCreatureName} as the harbinger of a new era, where the boundaries between companion and master dissolve into pure unity.`
       };
-      console.log('Using pre-generated Stage 20 card data');
+      console.log('Using pre-generated final-stage card data');
     } else {
       const generateCardDataFromPrompt = async (prompt: string): Promise<EvolutionCardContent> => {
         const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {

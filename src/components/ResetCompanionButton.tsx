@@ -56,6 +56,7 @@ export const ResetCompanionButton = memo(() => {
   };
 
   const handleCreateCompanion = async (data: {
+    presetId: string | null;
     favoriteColor: string;
     spiritAnimal: string;
     coreElement: string;
@@ -63,7 +64,7 @@ export const ResetCompanionButton = memo(() => {
   }) => {
     await createCompanion.mutateAsync(data);
     setCreateDialogOpen(false);
-    toast.success('Your new companion has been created!');
+    toast.success(data.presetId ? 'Your new companion has been created!' : 'Your new egg has been chosen!');
   };
 
   return (
@@ -96,12 +97,13 @@ export const ResetCompanionButton = memo(() => {
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-2xl font-heading font-black">
-              Create Your New Companion
+              Choose Your New Egg
             </DialogTitle>
           </DialogHeader>
           <CompanionPersonalization
             onComplete={handleCreateCompanion}
             isLoading={createCompanion.isPending}
+            layout="compact"
           />
         </DialogContent>
       </Dialog>

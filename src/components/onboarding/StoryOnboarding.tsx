@@ -23,6 +23,14 @@ import { useCompanion } from "@/hooks/useCompanion";
 import { pollWithDeadline } from "@/utils/asyncTimeout";
 import { logger } from "@/utils/logger";
 import { isAssignedCompanionName, resolveCompanionName } from "@/lib/companionName";
+import { getPresetCompanionAssetUrl } from "@/lib/companionAssetResolver";
+import {
+  getCompanionElement,
+  getCompanionElementAnchorColor,
+  getCompanionPreset,
+  resolveCompanionStageFromXp,
+  type CompanionPresetId,
+} from "@/config/companionCatalog";
 import {
   filterMentorsByEnergyPreference,
   type EnergyPreference,
@@ -149,14 +157,31 @@ const DISPLAY_NAME_DEADLINE_MS = 20_000;
 const DISPLAY_NAME_INTERVAL_MS = 1_000;
 const onboardingLog = logger.scope("StoryOnboarding");
 
+type StoryOnboardingMode = "standard" | "migration" | "reset";
 
-export const StoryOnboarding = () => {
+interface StoryOnboardingProps {
+  mode?: StoryOnboardingMode;
+  existingCompanion?: {
+    id: string;
+    current_stage: number;
+    current_xp: number;
+    preset_id?: string | null;
+  } | null;
+}
+
+export const StoryOnboarding = ({
+  mode = "standard",
+  existingCompanion = null,
+}: StoryOnboardingProps) => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { createCompanion } = useCompanion();
-  
-  const [stage, setStage] = useState<OnboardingStage>("prologue");
+  const isMigrationMode = mode === "migration";
+  const isResetMode = mode === "reset";
+  const startsAtCompanion = isMigrationMode || isResetMode;
+
+  const [stage, setStage] = useState<OnboardingStage>(startsAtCompanion ? "companion" : "prologue");
   const [userName, setUserName] = useState("");
 
   // Auto scroll to top when stage changes
@@ -519,6 +544,7 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
   };
 
   const handleCompanionComplete = async (preferences: {
+    presetId: CompanionPresetId | null;
     favoriteColor: string;
     spiritAnimal: string;
     coreElement: string;
@@ -529,6 +555,8 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
     const startedAt = Date.now();
     let onboardingFinalized = false;
     setIsCreatingCompanion(true);
+    const eggDisplayName = `${getCompanionElement(preferences.coreElement).label} Egg`;
+    const selectionDisplayName = preferences.presetId ? preferences.spiritAnimal : eggDisplayName;
 
     const finalizeCompanionOnboarding = async (
       companionId: string,
@@ -551,25 +579,31 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
 
       const existingData = (profile?.onboarding_data as Record<string, unknown>) || {};
       const nowIso = new Date().toISOString();
+      const onboardingData: Record<string, unknown> = {
+        ...existingData,
+        walkthrough_completed: true,
+        story_tone: preferences.storyTone,
+        progression_reset_required: false,
+      };
+
+      if (!isResetMode) {
+        onboardingData.guided_tutorial = {
+          version: 2,
+          flowVersion: 3,
+          eligible: true,
+          completedSteps: [],
+          xpAwardedSteps: [],
+          dismissed: false,
+          completed: false,
+          lastUpdatedAt: nowIso,
+        };
+      }
+
       const { error: completionError } = await supabase
         .from("profiles")
         .update({
           onboarding_completed: true,
-          onboarding_data: {
-            ...existingData,
-            walkthrough_completed: true,
-            story_tone: preferences.storyTone,
-            guided_tutorial: {
-              version: 2,
-              flowVersion: 3,
-              eligible: true,
-              completedSteps: [],
-              xpAwardedSteps: [],
-              dismissed: false,
-              completed: false,
-              lastUpdatedAt: nowIso,
-            },
-          },
+          onboarding_data: onboardingData as any,
         })
         .eq("id", user.id);
 
@@ -592,7 +626,9 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
           memory_date: today,
           memory_context: {
             title: "Our First Meeting",
-            description: `The day we met - a ${preferences.spiritAnimal} appeared and our journey began.`,
+            description: preferences.presetId
+              ? `The day we met - a ${preferences.spiritAnimal} appeared and our journey began.`
+              : `The day we found your ${eggDisplayName.toLowerCase()}, humming with possibility.`,
             emotion: "wonder",
             details: {
               spiritAnimal: preferences.spiritAnimal,
@@ -611,6 +647,13 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
         });
 
       setCompanionAnimal(fallbackName);
+
+      if (isResetMode) {
+        toast.success("Your companion has been reset and reselected.");
+        safeNavigate(navigate, "/journeys");
+        return;
+      }
+
       setStage("journey-begins");
 
       logger.info("Companion onboarding finalized", {
@@ -621,57 +664,147 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
       });
 
       // Non-blocking display name hydration.
-      void waitForCompanionDisplayName(
-        companionId,
-        preferences.spiritAnimal,
-        preferences.coreElement,
-      )
-        .then((displayName) => {
-          if (!displayName) {
-            logger.warn("Companion display name not ready before deadline", {
+      if (preferences.presetId) {
+        void waitForCompanionDisplayName(
+          companionId,
+          preferences.spiritAnimal,
+          preferences.coreElement,
+        )
+          .then((displayName) => {
+            if (!displayName) {
+              logger.warn("Companion display name not ready before deadline", {
+                userId: user.id,
+                companionId,
+              });
+              return;
+            }
+            setCompanionAnimal(displayName);
+            void supabase
+              .from("user_companion")
+              .update({ cached_creature_name: displayName })
+              .eq("id", companionId)
+              .then(({ error: cacheError }) => {
+                if (cacheError) {
+                  logger.warn("Failed to cache companion display name", {
+                    userId: user.id,
+                    companionId,
+                    error: cacheError.message,
+                  });
+                }
+              });
+            logger.info("Companion display name hydrated", {
               userId: user.id,
               companionId,
             });
-            return;
-          }
-          setCompanionAnimal(displayName);
-          void supabase
-            .from("user_companion")
-            .update({ cached_creature_name: displayName })
-            .eq("id", companionId)
-            .then(({ error: cacheError }) => {
-              if (cacheError) {
-                logger.warn("Failed to cache companion display name", {
-                  userId: user.id,
-                  companionId,
-                  error: cacheError.message,
-                });
-              }
+          })
+          .catch((displayNameError) => {
+            logger.warn("Companion display name hydration failed", {
+              userId: user.id,
+              companionId,
+              error:
+                displayNameError instanceof Error
+                  ? displayNameError.message
+                  : String(displayNameError),
             });
-          logger.info("Companion display name hydrated", {
-            userId: user.id,
-            companionId,
           });
-        })
-        .catch((displayNameError) => {
-          logger.warn("Companion display name hydration failed", {
-            userId: user.id,
-            companionId,
-            error:
-              displayNameError instanceof Error
-                ? displayNameError.message
-                : String(displayNameError),
-          });
-        });
+      }
     };
 
     try {
+      const preset = preferences.presetId ? getCompanionPreset(preferences.presetId) : null;
+      if ((isMigrationMode || preferences.presetId) && !preset) {
+        throw new Error("Unknown companion preset");
+      }
+
+      if (isMigrationMode) {
+        const latestCompanion = existingCompanion ?? (
+          await supabase
+            .from("user_companion")
+            .select("id, current_xp, current_stage, preset_id")
+            .eq("user_id", user.id)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle()
+        ).data;
+
+        if (!latestCompanion?.id) {
+          throw new Error("No companion found to migrate.");
+        }
+
+        const normalizedElement = preferences.coreElement;
+        const resolvedStage = resolveCompanionStageFromXp(latestCompanion.current_xp ?? 0);
+        const currentImageUrl = getPresetCompanionAssetUrl({
+          presetId: preset.id,
+          stage: resolvedStage,
+          element: normalizedElement,
+          state: "normal",
+        }) ?? "/placeholder-companion.svg";
+        const initialImageUrl = getPresetCompanionAssetUrl({
+          presetId: preset.id,
+          stage: 0,
+          element: normalizedElement,
+          state: "normal",
+        }) ?? "/placeholder-egg.svg";
+
+        const { error: companionUpdateError } = await supabase.rpc(
+          "apply_companion_preset_selection",
+          {
+            p_companion_id: latestCompanion.id,
+            p_preset_id: preset.id,
+            p_spirit_animal: preset.displayName,
+            p_favorite_color: getCompanionElementAnchorColor(normalizedElement),
+            p_core_element: normalizedElement,
+            p_story_tone: preferences.storyTone,
+            p_current_stage: resolvedStage,
+            p_current_image_url: currentImageUrl,
+            p_initial_image_url: initialImageUrl,
+          },
+        );
+
+        if (companionUpdateError) {
+          throw companionUpdateError;
+        }
+
+        const { data: profile, error: profileError } = await supabase
+          .from("profiles")
+          .select("onboarding_data")
+          .eq("id", user.id)
+          .maybeSingle();
+
+        if (profileError) {
+          throw profileError;
+        }
+
+        const existingData = (profile?.onboarding_data as Record<string, unknown>) || {};
+        const { error: profileUpdateError } = await supabase
+          .from("profiles")
+          .update({
+            onboarding_data: {
+              ...existingData,
+              story_tone: preferences.storyTone,
+            },
+          })
+          .eq("id", user.id);
+
+        if (profileUpdateError) {
+          throw profileUpdateError;
+        }
+
+        await queryClient.refetchQueries({ queryKey: ["profile", user.id] });
+        await queryClient.refetchQueries({ queryKey: ["companion", user.id] });
+        toast.success(`${preset.displayName} is now your companion form.`);
+        safeNavigate(navigate, "/journeys");
+        return;
+      }
+
       logger.info("Companion creation started from onboarding", {
         userId: user.id,
-        spiritAnimal: preferences.spiritAnimal,
+        presetId: preset?.id ?? null,
+        spiritAnimal: selectionDisplayName,
       });
 
       const companionData = await createCompanion.mutateAsync({
+        presetId: preset?.id ?? null,
         favoriteColor: preferences.favoriteColor,
         spiritAnimal: preferences.spiritAnimal,
         coreElement: preferences.coreElement,
@@ -682,7 +815,7 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
         throw new Error("Companion record missing ID after creation.");
       }
 
-      await finalizeCompanionOnboarding(companionData.id, preferences.spiritAnimal, false);
+      await finalizeCompanionOnboarding(companionData.id, selectionDisplayName, false);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       const normalizedErrorMessage = errorMessage.toUpperCase();
@@ -740,7 +873,9 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
           toast.success("Your companion finished taking shape. Continuing your journey...");
           await finalizeCompanionOnboarding(
             recoveredCompanion.id,
-            recoveredCompanion.spirit_animal || preferences.spiritAnimal,
+            recoveredCompanion.spirit_animal === "Egg"
+              ? selectionDisplayName
+              : recoveredCompanion.spirit_animal || selectionDisplayName,
             true,
           );
           return;
@@ -887,9 +1022,9 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
           </motion.div>
         )}
 
-        {stage === "companion" && faction && (
+        {stage === "companion" && (faction || startsAtCompanion) && (
           <motion.div
-            key="companion"
+            key={isMigrationMode ? "companion-migration" : isResetMode ? "companion-reset" : "companion"}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -898,6 +1033,7 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
             <CompanionPersonalization
               onComplete={handleCompanionComplete}
               isLoading={isCreatingCompanion}
+              mode={isMigrationMode ? "migration" : "onboarding"}
             />
           </motion.div>
         )}

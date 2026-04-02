@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => {
 
   return {
     navigate: vi.fn(),
+    storyOnboardingProps: null as Record<string, unknown> | null,
     status: "authenticated" as "loading" | "recovering" | "authenticated" | "unauthenticated",
     user: { id: "user-1" } as { id: string } | null,
     profile: {
@@ -25,7 +26,7 @@ const mocks = vi.hoisted(() => {
       onboarding_data: {},
     } as Record<string, unknown> | null,
     profileLoading: false,
-    companion: null as { id: string } | null,
+    companion: null as { id: string; preset_id?: string | null; current_stage?: number | null } | null,
     companionLoading: false,
     profilesUpdateEqMock,
     profilesUpdateMock,
@@ -69,7 +70,10 @@ vi.mock("@/integrations/supabase/client", () => ({
 }));
 
 vi.mock("@/components/onboarding", () => ({
-  StoryOnboarding: () => <div>StoryOnboarding</div>,
+  StoryOnboarding: (props: Record<string, unknown>) => {
+    mocks.storyOnboardingProps = props;
+    return <div>StoryOnboarding</div>;
+  },
 }));
 
 import Onboarding from "./Onboarding";
@@ -85,6 +89,7 @@ describe("Onboarding route guard", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.status = "authenticated";
+    mocks.storyOnboardingProps = null;
     mocks.user = { id: "user-1" };
     mocks.profile = {
       onboarding_completed: false,
@@ -97,7 +102,7 @@ describe("Onboarding route guard", () => {
   });
 
   it("redirects companion-backed established accounts away from onboarding", async () => {
-    mocks.companion = { id: "companion-1" };
+    mocks.companion = { id: "companion-1", preset_id: "dragon", current_stage: 1 };
 
     renderOnboarding();
 
@@ -119,5 +124,23 @@ describe("Onboarding route guard", () => {
 
     expect(screen.getByText("StoryOnboarding")).toBeInTheDocument();
     expect(mocks.navigate).not.toHaveBeenCalled();
+  });
+
+  it("starts reset mode when progression reset is required", () => {
+    mocks.profile = {
+      onboarding_completed: true,
+      selected_mentor_id: "mentor-1",
+      onboarding_data: {
+        walkthrough_completed: true,
+        progression_reset_required: true,
+      },
+    };
+
+    renderOnboarding();
+
+    expect(screen.getByText("StoryOnboarding")).toBeInTheDocument();
+    expect(mocks.storyOnboardingProps).toMatchObject({
+      mode: "reset",
+    });
   });
 });

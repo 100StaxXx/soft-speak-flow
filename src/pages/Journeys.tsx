@@ -61,7 +61,7 @@ import { isOnboardingCleanupEligible } from "@/pages/journeysCleanupEligibility"
 import { useMainTabVisibility } from "@/contexts/MainTabVisibilityContext";
 import { SEND_TO_CALENDAR_ENABLED } from "@/utils/calendarFeatureFlags";
 import { useJourneysLayoutMode } from "@/hooks/useJourneysLayoutMode";
-import { isMacDesignedForIPadIOSApp } from "@/utils/platformTargets";
+import { isMacDesignedForIPadIOSApp, isMacSession } from "@/utils/platformTargets";
 import { QuestInboxSection } from "@/components/QuestInboxSection";
 import { QUEST_ACTION_TOAST_DURATION_MS } from "@/constants/questToast";
 
@@ -91,6 +91,7 @@ const Journeys = () => {
   const journeysLayoutMode = useJourneysLayoutMode();
   const isDesktopLayout = journeysLayoutMode === "desktop";
   const isMacHostedIOSApp = useMemo(() => isMacDesignedForIPadIOSApp(), []);
+  const isMacDesktopSession = useMemo(() => isMacSession(), []);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showPageInfo, setShowPageInfo] = useState(false);
   const [showAddSheet, setShowAddSheet] = useState(false);
@@ -1075,6 +1076,7 @@ const Journeys = () => {
                 currentStreak={currentStreak}
                 activeEpics={activeEpics}
                 isCampaignsLoading={epicsLoading}
+                hideAnytimeRow={isMacDesktopSession}
                 plannerMode={desktopPlannerMode}
                 desktopInteractionResetKey={desktopInteractionResetKey}
                 onDateSelect={setSelectedDate}

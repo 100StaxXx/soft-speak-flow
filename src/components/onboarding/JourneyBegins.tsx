@@ -11,7 +11,7 @@ interface JourneyBeginsProps {
 
 const narrativeLines = [
   "A bond has been forged across the cosmos...",
-  "Your companion stirs, awakening to your presence.",
+  "Your egg stirs, answering your presence from within the shell.",
   "Together, you will write a story the stars themselves will remember.",
   "Every quest completed, every habit built, every moment of growth...",
   "...will shape both your destinies.",
@@ -138,7 +138,7 @@ export const JourneyBegins = ({ userName, companionAnimal, onComplete }: Journey
                   transition={{ delay: 0.8 }}
                   className="text-white/60 text-base"
                 >
-                  An unbreakable bond, a shared destiny.
+                  An unbreakable bond, a shared destiny waiting to hatch.
                 </motion.p>
                 
                 <motion.div

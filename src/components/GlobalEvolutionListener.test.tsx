@@ -189,12 +189,12 @@ describe("GlobalEvolutionListener", () => {
         eventType: "UPDATE",
         new: {
           id: "companion-1",
-          current_stage: 2,
-          current_image_url: "https://example.com/stage-2.png",
+          current_stage: 5,
+          current_image_url: "https://example.com/stage-5.png",
         },
         old: {
           id: "companion-1",
-          current_stage: 1,
+          current_stage: 4,
         },
       });
     });

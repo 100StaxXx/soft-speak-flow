@@ -83,25 +83,19 @@ function sanitizeHexCodes(text: string): string {
 const EVOLUTION_THEMES = [
   "Fate sleeping",              // Stage 0: Egg
   "First awakening",            // Stage 1: Hatchling
-  "Tender growth",              // Stage 2: Sproutling
-  "Young courage",              // Stage 3: Cub
-  "Coming of age",              // Stage 4: Juvenile
-  "Training begins",            // Stage 5: Apprentice
-  "Swift explorer",             // Stage 6: Scout
-  "Wings unfurled",             // Stage 7: Fledgling
-  "Battle-forged",              // Stage 8: Warrior
-  "Sacred protector",           // Stage 9: Guardian
-  "Glory earned",               // Stage 10: Champion
-  "Transcendent shift",         // Stage 11: Ascended
-  "Vanguard rises",             // Stage 12: Vanguard
-  "Colossal might",             // Stage 13: Titan
-  "Mythic power",               // Stage 14: Mythic
-  "Apex mastery",               // Stage 15: Prime
-  "Royal majesty",              // Stage 16: Regal
-  "Timeless sovereign",         // Stage 17: Eternal
-  "Reality transcends",         // Stage 18: Transcendent
-  "Apex achieved",              // Stage 19: Apex
-  "Ultimate existence"          // Stage 20: Ultimate
+  "Young courage",              // Stage 2: Youngling
+  "Curious growth",             // Stage 3: Juvenile
+  "A path appears",             // Stage 4: Scout
+  "Strength takes form",        // Stage 5: Warrior
+  "A vow to protect",           // Stage 6: Guardian
+  "Victory calls",              // Stage 7: Champion
+  "Power ascends",              // Stage 8: Ascended
+  "Titanic presence",           // Stage 9: Titan
+  "Mythic calling",             // Stage 10: Mythic
+  "Prime mastery",              // Stage 11: Prime
+  "Transcendent horizon",       // Stage 12: Transcendent
+  "Apex becoming",              // Stage 13: Apex
+  "Ultimate existence"          // Stage 14: Ultimate Form
 ];
 
 // Species anatomical traits for accuracy - ALL 66 ANIMALS SUPPORTED
@@ -161,7 +155,7 @@ const SPECIES_TRAITS: Record<string, string> = {
   "Griffin": "Hybrid with eagle head and wings, lion body and legs, sharp talons, and a long tail",
   "Gryphon": "Hybrid with eagle head and wings, lion body and legs, sharp talons, and a long tail",
   "Hippogriff": "Hybrid with eagle head and wings, horse body and legs, sharp talons on front limbs, and hooves on hind legs",
-  "Sphinx": "Hybrid with human head, lion body, eagle wings, and riddle-speaking intelligence",
+  "Sphinx": "Winged lion oracle with a regal feline face, feathered wings, poised posture, and riddle-speaking intelligence",
   "Cerberus": "Three-headed canine with muscular body, multiple snarling heads, serpent tail, and guardian instinct",
   "Hydra": "Multi-headed serpentine dragon with regenerating heads, venomous breath, long necks, and aquatic build",
   "Fenrir": "Massive wolf with apocalyptic size, chain-breaking strength, iron fangs, and prophesied destiny",
@@ -195,7 +189,8 @@ const SPECIES_TRAITS: Record<string, string> = {
   
   // Mythical & Folkloric
   "Kitsune": "Mystical fox with multiple tails, shapeshifting ability, fox-fire magic, and ancient wisdom",
-  "Tanuki": "Magical raccoon-dog with transformative powers, large testicles (folkloric), playful nature, and trickster spirit",
+  "Tanuki": "Magical raccoon-dog with transformative powers, a round playful silhouette, mischievous charm, and trickster spirit",
+  "Egg": "A living elemental egg with a smooth shell, swirling inner light, subtle warmth, and dormant potential",
 };
 
 const getSpeciesTraits = (creature: string): string => {
@@ -309,7 +304,7 @@ serve(async (req) => {
       }
     }
 
-    const speciesTraits = SPECIES_TRAITS[companion.spirit_animal] || `A ${companion.spirit_animal.toLowerCase()} with its natural anatomical structure and movement patterns`;
+    const speciesTraits = getSpeciesTraits(companion.spirit_animal);
     const spiritLockProfile = resolveCompanionSpiritLockProfile(companion.spirit_animal);
     const spiritLockPromptBlock = spiritLockProfile
       ? buildSpiritLockPromptBlock(spiritLockProfile, "story")
@@ -371,10 +366,10 @@ STRUCTURE FOR EACH CHAPTER:
    • include at least one "Goal Mirror Moment" tied to "${userGoal}"
    ${stage > 0 ? `• reference at least one detail from: ${memoryNotes}` : ''}
    • escalate danger appropriate to stage tier:
-       ∙ Stages 0–5: local/natural threats
-       ∙ Stages 6–10: named foes or magical dangers
-      ∙ Stages 11–14: ancient/legendary forces
-      ∙ Stages 15–20: cosmiq/titanic threats
+       ∙ Stages 0–4: local or natural threats
+       ∙ Stages 5–8: named foes or magical dangers
+       ∙ Stages 9–11: ancient or legendary forces
+       ∙ Stages 12–14: cosmiq or titanic threats
    • deepen the bond between user and creature
    • feel like part of a larger mythic arc
 

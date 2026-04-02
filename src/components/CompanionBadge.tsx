@@ -1,8 +1,8 @@
 import { Badge } from "@/components/ui/badge";
 import { Sparkles, Flame, Zap, Droplet, Wind, Leaf, Mountain, Star, Snowflake, Moon } from "lucide-react";
-import { getStageName } from "@/config/companionStages";
 import { formatDisplayLabel } from "@/lib/utils";
 import { deriveCompanionPalette } from "@/lib/companionPalette";
+import { getProgressionLevelDisplay } from "@/config/progression";
 
 interface CompanionBadgeProps {
   element: string;
@@ -15,15 +15,17 @@ interface CompanionBadgeProps {
 
 const elementIcons: Record<string, typeof Sparkles> = {
   fire: Flame,
+  storm: Zap,
+  void: Moon,
+  nature: Leaf,
+  light: Star,
   water: Droplet,
   earth: Mountain,
   air: Wind,
   lightning: Zap,
   ice: Snowflake,
-  light: Star,
   shadow: Moon,
   cosmic: Star,
-  nature: Leaf,
   energy: Zap,
   spirit: Sparkles
 };
@@ -43,13 +45,13 @@ export const CompanionBadge = ({
     stage,
     companionId,
   });
-  const stageName = getStageName(stage);
+  const stageLabel = getProgressionLevelDisplay(stage);
   
   // Get stage tier overlay
   const getStageOverlay = () => {
-    if (stage >= 16) return "bg-gradient-to-r from-stage-tier-4-start/10 via-stage-tier-4-mid/10 to-stage-tier-4-end/10"; // Prismatic
-    if (stage >= 11) return "bg-gradient-to-r from-stage-tier-3/10"; // Gold shimmer
-    if (stage >= 6) return "bg-gradient-to-r from-stage-tier-2/10"; // Silver shimmer
+    if (stage >= 13) return "bg-gradient-to-r from-stage-tier-4-start/10 via-stage-tier-4-mid/10 to-stage-tier-4-end/10";
+    if (stage >= 10) return "bg-gradient-to-r from-stage-tier-3/10";
+    if (stage >= 7) return "bg-gradient-to-r from-stage-tier-2/10";
     return ""; // Base tier
   };
   
@@ -69,7 +71,7 @@ export const CompanionBadge = ({
       {showStage && stage !== undefined && (
         <>
           <span className="text-xs opacity-50">•</span>
-          <span className="text-xs font-medium">{stageName}</span>
+          <span className="text-xs font-medium">{stageLabel}</span>
         </>
       )}
     </Badge>

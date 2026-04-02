@@ -72,6 +72,7 @@ export interface OnboardingData {
   mentorName?: string;
   mentorEnergyPreference?: string;
   walkthrough_completed?: boolean;
+  progression_reset_required?: boolean;
   quests_tutorial_seen?: boolean;
   guided_tutorial?: GuidedTutorialProgress;
   birthdate?: string;

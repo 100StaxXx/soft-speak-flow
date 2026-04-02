@@ -63,7 +63,7 @@ describe("generateWithValidation", () => {
 
     await generateWithValidation({
       favoriteColor: "#7B68EE",
-      spiritAnimal: "Fox",
+      spiritAnimal: "Kitsune",
       element: "Air",
       stage: 4,
       flowType: "regenerate",
@@ -72,7 +72,7 @@ describe("generateWithValidation", () => {
     const [, invokeArgs] = invokeMock.mock.calls[0];
     expect(invokeArgs.body).toMatchObject({
       favoriteColor: "#7B68EE",
-      spiritAnimal: "Fox",
+      spiritAnimal: "Kitsune",
       element: "Air",
       stage: 4,
       flowType: "regenerate",

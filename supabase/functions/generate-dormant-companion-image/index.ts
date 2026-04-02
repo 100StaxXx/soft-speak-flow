@@ -10,6 +10,12 @@ import {
   createCostGuardrailSession,
   isCostGuardrailBlockedError,
 } from "../_shared/costGuardrails.ts";
+import {
+  COMPANION_PRESET_BUCKET,
+  coerceCompanionElementId,
+  coerceCompanionPresetId,
+  resolveCompanionAssetPath,
+} from "../../../src/config/companionCatalog.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -60,7 +66,7 @@ export async function handleGenerateDormantCompanionImage(
     const supabase = deps.createSupabaseClient();
     const { data: companion, error: companionError } = await supabase
       .from("user_companion")
-      .select("id, user_id, current_image_url, dormant_image_url, spirit_animal, companion_name")
+      .select("id, user_id, current_image_url, dormant_image_url, spirit_animal, companion_name, core_element, current_stage, preset_id")
       .eq("id", companionId)
       .maybeSingle();
 
@@ -71,6 +77,37 @@ export async function handleGenerateDormantCompanionImage(
 
     if (!companion) {
       return errorResponse(404, "Companion not found", corsHeaders);
+    }
+
+    const normalizedPresetId = coerceCompanionPresetId(companion.preset_id);
+    if (normalizedPresetId) {
+      const imageUrl = supabase.storage
+        .from(COMPANION_PRESET_BUCKET)
+        .getPublicUrl(
+          resolveCompanionAssetPath({
+            presetId: normalizedPresetId,
+            stage: companion.current_stage ?? 0,
+            state: "dormant",
+            element: coerceCompanionElementId(companion.core_element),
+          }),
+        ).data.publicUrl;
+
+      if (companion.dormant_image_url !== imageUrl) {
+        const { error: updateError } = await supabase
+          .from("user_companion")
+          .update({ dormant_image_url: imageUrl })
+          .eq("id", companionId);
+
+        if (updateError) {
+          console.error("[Dormant Image] Failed to save preset image:", updateError);
+          throw updateError;
+        }
+      }
+
+      return new Response(
+        JSON.stringify({ success: true, imageUrl, cached: companion.dormant_image_url === imageUrl }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
 
     const imageSize = resolveCompanionImageSizeForUser(companion.user_id);

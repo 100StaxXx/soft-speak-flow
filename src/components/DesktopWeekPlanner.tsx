@@ -51,6 +51,7 @@ interface DesktopWeekPlannerProps {
   currentStreak?: number;
   activeEpics?: ActiveEpic[];
   isCampaignsLoading?: boolean;
+  hideAnytimeRow?: boolean;
   plannerMode?: "week" | "day";
   desktopInteractionResetKey?: string | number;
   onDateSelect: (date: Date) => void;
@@ -239,6 +240,7 @@ export function DesktopWeekPlanner({
   currentStreak = 0,
   activeEpics = [],
   isCampaignsLoading = false,
+  hideAnytimeRow = false,
   plannerMode = "week",
   desktopInteractionResetKey,
   onDateSelect,
@@ -616,43 +618,47 @@ export function DesktopWeekPlanner({
                 );
               })}
 
-              <div className="sticky left-0 z-20 border-b border-r border-white/8 bg-[rgba(19,16,29,0.98)] px-3 py-3 backdrop-blur-xl">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/75">
-                  Anytime
-                </p>
-              </div>
-
-              {weekDays.map((day) => {
-                const dateKey = format(day, "yyyy-MM-dd");
-                const buckets = dayBucketsByDate.get(dateKey) ?? { anytime: [], timedByHour: new Map<number, DailyTask[]>() };
-                const isSelected = isSameDay(day, selectedDate);
-                const dayIsToday = isToday(day);
-
-                return (
-                  <div
-                    key={`${dateKey}-anytime`}
-                    data-testid={`desktop-week-anytime-${dateKey}`}
-                    className={cn(
-                      "min-h-[92px] border-b border-r border-white/8 p-2 align-top",
-                      isSelected
-                        ? "bg-primary/[0.05]"
-                        : dayIsToday
-                        ? "bg-celestial-blue/[0.04]"
-                        : "bg-white/[0.01]",
-                    )}
-                  >
-                    {buckets.anytime.length > 0 ? (
-                      <div className="space-y-2">
-                        {buckets.anytime.map((task) => renderTaskCard(task, true))}
-                      </div>
-                    ) : (
-                      <div className="flex min-h-[72px] items-center justify-center rounded-[18px] border border-dashed border-white/8 bg-white/[0.02] px-3 text-center text-[11px] text-muted-foreground">
-                        No anytime quests
-                      </div>
-                    )}
+              {hideAnytimeRow ? null : (
+                <>
+                  <div className="sticky left-0 z-20 border-b border-r border-white/8 bg-[rgba(19,16,29,0.98)] px-3 py-3 backdrop-blur-xl">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/75">
+                      Anytime
+                    </p>
                   </div>
-                );
-              })}
+
+                  {weekDays.map((day) => {
+                    const dateKey = format(day, "yyyy-MM-dd");
+                    const buckets = dayBucketsByDate.get(dateKey) ?? { anytime: [], timedByHour: new Map<number, DailyTask[]>() };
+                    const isSelected = isSameDay(day, selectedDate);
+                    const dayIsToday = isToday(day);
+
+                    return (
+                      <div
+                        key={`${dateKey}-anytime`}
+                        data-testid={`desktop-week-anytime-${dateKey}`}
+                        className={cn(
+                          "min-h-[92px] border-b border-r border-white/8 p-2 align-top",
+                          isSelected
+                            ? "bg-primary/[0.05]"
+                            : dayIsToday
+                            ? "bg-celestial-blue/[0.04]"
+                            : "bg-white/[0.01]",
+                        )}
+                      >
+                        {buckets.anytime.length > 0 ? (
+                          <div className="space-y-2">
+                            {buckets.anytime.map((task) => renderTaskCard(task, true))}
+                          </div>
+                        ) : (
+                          <div className="flex min-h-[72px] items-center justify-center rounded-[18px] border border-dashed border-white/8 bg-white/[0.02] px-3 text-center text-[11px] text-muted-foreground">
+                            No anytime quests
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </>
+              )}
 
               {timelineHours.map((hour) => (
                 <div key={hour} className="contents">

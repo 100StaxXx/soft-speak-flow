@@ -11,11 +11,12 @@ interface AttributeTooltipProps {
 }
 
 const ATTRIBUTE_INFO: Record<string, string> = {
-  "Spirit Animal": "Your companion's spirit represents your inner strength and personality. It influences how your companion appears as it evolves.",
-  "Element": "The elemental force that powers your companion's growth. Each element brings unique visual themes to your companion's evolution.",
+  "Spirit Animal": "Your companion's spirit represents your inner strength and personality. It shapes how your companion appears as it grows through the progression ladder.",
+  "Element": "The elemental force that powers your companion's growth. Each element brings unique visual themes to your companion's progression.",
   "Favorite Color": "The primary color that defines your companion's appearance and energy. This was chosen based on your personal preferences.",
-  "Stage": "Your companion's current evolution stage. There are 21 stages total, from Egg to Ultimate. Earn XP to unlock the next stage!",
-  "XP Progress": "Experience points earned through completing habits, missions, and challenges. Fill the bar to trigger your companion's next evolution!",
+  "Stage": "Your companion's current level and tier. The unified progression ladder runs from Level 0 to Level 100, from Egg through Ascended.",
+  "Progression": "Your companion's current level and tier. The unified progression ladder runs from Level 0 to Level 100, from Egg through Ascended.",
+  "XP Progress": "Experience points earned through completing habits, missions, and challenges. Fill the bar to reach the next level and eventually the next tier.",
 };
 
 export const AttributeTooltip = ({ title, description }: AttributeTooltipProps) => {

@@ -1,0 +1,122 @@
+import { supabase } from "@/integrations/supabase/client";
+import {
+  COMPANION_PRESET_BUCKET,
+  COMPANION_PREVIEW_TIER,
+  coerceCompanionElementId,
+  coerceCompanionPresetId,
+  hasBundledYouthCompanionPresetAssets,
+  hasRemoteCompanionPresetStageAssetCoverage,
+  resolveCompanionAssetPath,
+  resolveBundledYouthCompanionAssetPath,
+  resolveCompanionArtTier,
+  type CompanionVisualState,
+} from "@/config/companionCatalog";
+
+const UNIVERSAL_EGG_ASSET_DIR = "companion-eggs";
+
+interface CompanionAssetSource {
+  preset_id?: string | null;
+  current_stage?: number | null;
+  core_element?: string | null;
+  current_image_url?: string | null;
+  dormant_image_url?: string | null;
+  neglected_image_url?: string | null;
+}
+
+export const resolveUniversalEggAssetPath = ({
+  element,
+}: {
+  element: string;
+}): string => {
+  const normalizedElement = coerceCompanionElementId(element);
+  return `${UNIVERSAL_EGG_ASSET_DIR}/egg__t0_egg__normal__${normalizedElement}.png`;
+};
+
+export const getUniversalEggAssetUrl = (element: string): string =>
+  `/${resolveUniversalEggAssetPath({ element })}`;
+
+export const getPresetCompanionAssetUrl = ({
+  presetId,
+  stage,
+  element,
+  state = "normal",
+}: {
+  presetId: string;
+  stage: number;
+  element: string;
+  state?: CompanionVisualState;
+}): string | null => {
+  const normalizedPresetId = coerceCompanionPresetId(presetId);
+  if (!normalizedPresetId) return null;
+  const normalizedElement = coerceCompanionElementId(element);
+  const tier = resolveCompanionArtTier(stage);
+  const hasRemoteStageCoverage = hasRemoteCompanionPresetStageAssetCoverage({
+    presetId: normalizedPresetId,
+    stage,
+    state,
+  });
+  const bundledYouthUrl = hasBundledYouthCompanionPresetAssets(normalizedPresetId)
+    ? `/${COMPANION_PRESET_BUCKET}/${resolveBundledYouthCompanionAssetPath({
+      presetId: normalizedPresetId,
+      element: normalizedElement,
+    })}`
+    : null;
+
+  // Preserve the generic egg when this preset has no remote stage-0 art,
+  // rather than showing youth art before the companion hatches.
+  if (stage <= 0 && !hasRemoteStageCoverage) {
+    return null;
+  }
+
+  if (state === "normal" && tier === COMPANION_PREVIEW_TIER && bundledYouthUrl) {
+    return bundledYouthUrl;
+  }
+
+  if (hasRemoteStageCoverage) {
+    return supabase.storage
+      .from(COMPANION_PRESET_BUCKET)
+      .getPublicUrl(
+        resolveCompanionAssetPath({
+          presetId: normalizedPresetId,
+          stage,
+          state,
+          element: normalizedElement,
+        }),
+      )
+      .data.publicUrl;
+  }
+
+  return state === "normal" ? bundledYouthUrl : null;
+};
+
+export const resolveCompanionVisualAssetUrl = (
+  companion: CompanionAssetSource | null | undefined,
+  state: CompanionVisualState = "normal",
+): string | null => {
+  if (!companion) return null;
+
+  const normalizedElement = companion.core_element ?? "fire";
+
+  const presetUrl = companion.preset_id
+    ? getPresetCompanionAssetUrl({
+      presetId: companion.preset_id,
+      stage: companion.current_stage ?? 0,
+      element: normalizedElement,
+      state,
+    })
+    : null;
+
+  if (presetUrl) return presetUrl;
+
+  if ((companion.current_stage ?? 0) <= 0 && state === "normal") {
+    return companion.current_image_url ?? getUniversalEggAssetUrl(normalizedElement);
+  }
+
+  if (state === "dormant") {
+    return companion.dormant_image_url ?? companion.current_image_url ?? null;
+  }
+  if (state === "neglected") {
+    return companion.neglected_image_url ?? companion.current_image_url ?? null;
+  }
+  return companion.current_image_url ?? null;
+};

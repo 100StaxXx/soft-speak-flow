@@ -43,6 +43,7 @@ export interface DecrementReferralCountArgs {
 // RPC function type definitions for type-safe calls
 export interface CreateCompanionIfNotExistsArgs {
   p_user_id: string;
+  p_preset_id: string | null;
   p_favorite_color: string;
   p_spirit_animal: string;
   p_core_element: string;
@@ -56,6 +57,7 @@ export interface CreateCompanionIfNotExistsArgs {
 export interface CreateCompanionIfNotExistsResult {
   id: string;
   user_id: string;
+  preset_id: string | null;
   favorite_color: string;
   spirit_animal: string;
   core_element: string;

@@ -3,28 +3,32 @@ const DEFAULT_STAGE = 1;
 
 type CanonicalElement =
   | "fire"
+  | "ice"
+  | "storm"
+  | "nature"
+  | "void"
+  | "light"
   | "water"
   | "earth"
   | "air"
   | "lightning"
-  | "ice"
-  | "light"
   | "shadow"
-  | "nature"
   | "cosmic"
   | "energy"
   | "spirit";
 
 const ELEMENT_HUES: Record<CanonicalElement, number> = {
   fire: 18,
+  ice: 190,
+  storm: 220,
+  nature: 128,
+  void: 272,
+  light: 48,
   water: 202,
   earth: 38,
   air: 192,
   lightning: 50,
-  ice: 190,
-  light: 48,
   shadow: 266,
-  nature: 128,
   cosmic: 292,
   energy: 322,
   spirit: 272,
@@ -32,16 +36,20 @@ const ELEMENT_HUES: Record<CanonicalElement, number> = {
 
 const ELEMENT_ALIASES: Record<string, CanonicalElement> = {
   fire: "fire",
+  ice: "ice",
+  storm: "storm",
+  nature: "nature",
+  void: "void",
+  light: "light",
   water: "water",
   earth: "earth",
   air: "air",
   lightning: "lightning",
-  storm: "lightning",
-  ice: "ice",
+  thunder: "storm",
+  tempest: "storm",
   frost: "ice",
-  light: "light",
-  shadow: "shadow",
-  nature: "nature",
+  shadow: "void",
+  dark: "void",
   cosmic: "cosmic",
   energy: "energy",
   spirit: "spirit",

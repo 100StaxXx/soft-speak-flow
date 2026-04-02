@@ -16,12 +16,55 @@ describe("getOnboardingGateState", () => {
           onboarding_data: {},
         },
         hasCompanion: true,
+        hasPresetCompanion: true,
       }),
     ).toMatchObject({
       isEstablished: true,
       needsOnboarding: false,
       reason: "companion_exists",
       shouldSelfHeal: true,
+    });
+  });
+
+  it("treats stage 0 egg-only companions as established", () => {
+    expect(
+      getOnboardingGateState({
+        profile: {
+          onboarding_completed: false,
+          selected_mentor_id: "mentor-1",
+          onboarding_data: {},
+        },
+        hasCompanion: true,
+        hasPresetCompanion: false,
+        companionStage: 0,
+      }),
+    ).toMatchObject({
+      isEstablished: true,
+      needsOnboarding: false,
+      reason: "egg_selected",
+      needsCompanionMigration: false,
+      shouldSelfHeal: true,
+    });
+  });
+
+  it("keeps post-stage-0 companions without presets in migration", () => {
+    expect(
+      getOnboardingGateState({
+        profile: {
+          onboarding_completed: false,
+          selected_mentor_id: "mentor-1",
+          onboarding_data: {},
+        },
+        hasCompanion: true,
+        hasPresetCompanion: false,
+        companionStage: 2,
+      }),
+    ).toMatchObject({
+      isEstablished: false,
+      needsOnboarding: true,
+      reason: null,
+      needsCompanionMigration: true,
+      shouldSelfHeal: false,
     });
   });
 
@@ -73,6 +116,24 @@ describe("getOnboardingGateState", () => {
       isEstablished: true,
       needsOnboarding: false,
       reason: "walkthrough_completed",
+      shouldSelfHeal: false,
+    });
+  });
+
+  it("forces onboarding when a progression reset is pending", () => {
+    expect(
+      getOnboardingGateState({
+        profile: {
+          onboarding_completed: true,
+          selected_mentor_id: "mentor-1",
+          onboarding_data: { walkthrough_completed: true, progression_reset_required: true },
+        },
+        hasCompanion: false,
+      }),
+    ).toMatchObject({
+      isEstablished: false,
+      needsOnboarding: true,
+      needsProgressionReset: true,
       shouldSelfHeal: false,
     });
   });
@@ -129,6 +190,16 @@ describe("isReturningProfile", () => {
     ).toBe(false);
   });
 
+  it("returns false when progression reset is required", () => {
+    expect(
+      isReturningProfile({
+        onboarding_completed: true,
+        selected_mentor_id: "mentor-1",
+        onboarding_data: { walkthrough_completed: true, progression_reset_required: true },
+      }),
+    ).toBe(false);
+  });
+
   it("returns true when a stale profile already has a companion", () => {
     expect(
       isReturningProfile(
@@ -137,7 +208,7 @@ describe("isReturningProfile", () => {
           selected_mentor_id: "mentor-1",
           onboarding_data: {},
         },
-        { hasCompanion: true },
+        { hasCompanion: true, hasPresetCompanion: true },
       ),
     ).toBe(true);
   });
@@ -158,6 +229,7 @@ describe("buildEstablishedProfileSelfHealPatch", () => {
           },
         },
         hasCompanion: true,
+        hasPresetCompanion: true,
       }),
     ).toEqual({
       onboarding_completed: true,
@@ -169,5 +241,21 @@ describe("buildEstablishedProfileSelfHealPatch", () => {
         walkthrough_completed: true,
       },
     });
+  });
+
+  it("does not self-heal profiles waiting for progression reset", () => {
+    expect(
+      buildEstablishedProfileSelfHealPatch({
+        profile: {
+          onboarding_completed: true,
+          selected_mentor_id: "mentor-1",
+          onboarding_data: {
+            walkthrough_completed: true,
+            progression_reset_required: true,
+          },
+        },
+        hasCompanion: false,
+      }),
+    ).toBeNull();
   });
 });

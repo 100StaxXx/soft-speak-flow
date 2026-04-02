@@ -363,10 +363,9 @@ const Admin = () => {
 
   const getStageNameForAdmin = (stage: number): string => {
     const stageNames = [
-      "Egg", "Hatchling", "Sproutling", "Cub", "Juvenile",
-      "Apprentice", "Scout", "Fledgling", "Warrior", "Guardian",
-      "Champion", "Ascended", "Vanguard", "Titan", "Mythic",
-      "Prime", "Regal", "Eternal", "Transcendent", "Apex", "Ultimate Form"
+      "Egg", "Hatchling", "Youngling", "Juvenile", "Scout",
+      "Warrior", "Guardian", "Champion", "Ascended", "Titan",
+      "Mythic", "Prime", "Transcendent", "Apex", "Ultimate Form"
     ];
     return stageNames[stage] || "Unknown";
   };
@@ -570,7 +569,7 @@ const Admin = () => {
                   <option value="whale">Whale</option>
                   <option value="dolphin">Dolphin</option>
                   <option value="owl">Owl</option>
-                  <option value="fox">Fox</option>
+                  <option value="fox">Kitsune</option>
                   <option value="panther">Panther</option>
                   <option value="hawk">Hawk</option>
                   <option value="lynx">Lynx</option>
@@ -603,7 +602,7 @@ const Admin = () => {
                 type="range"
                 id="cardStage"
                 min="0"
-                max="20"
+                max="14"
                 value={sampleCardData.stage}
                 onChange={(e) => setSampleCardData({ ...sampleCardData, stage: parseInt(e.target.value) })}
                 className="w-full h-10 cursor-pointer"
@@ -773,7 +772,7 @@ const Admin = () => {
                   className="w-full p-3 min-h-[44px] border rounded-2xl bg-background text-base"
                 >
                   <option value="wolf">Wolf</option>
-                  <option value="fox">Fox</option>
+                  <option value="fox">Kitsune</option>
                   <option value="tiger">Tiger</option>
                   <option value="lion">Lion</option>
                   <option value="bear">Bear</option>

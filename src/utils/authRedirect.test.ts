@@ -65,7 +65,10 @@ vi.mock("./logger", () => ({
 import { ensureProfile, getAuthRedirectPath, getProfileAwareAuthFallbackPath } from "./authRedirect";
 
 const noCompanion = { data: null, error: null };
-const existingCompanion = { data: { id: "companion-1" }, error: null };
+const existingCompanion = {
+  data: { id: "companion-1", preset_id: "dragon", current_stage: 1 },
+  error: null,
+};
 
 const flushMicrotasks = async () => {
   await Promise.resolve();
@@ -157,6 +160,22 @@ describe("getAuthRedirectPath", () => {
     });
 
     await expect(getAuthRedirectPath("12345678-user")).resolves.toBe("/onboarding");
+  });
+
+  it("routes to /onboarding when progression reset is pending", async () => {
+    mocks.profilesMaybeSingleMock.mockResolvedValueOnce({
+      data: {
+        selected_mentor_id: "mentor-2",
+        onboarding_completed: true,
+        onboarding_data: {
+          walkthrough_completed: true,
+          progression_reset_required: true,
+        },
+      },
+      error: null,
+    });
+
+    await expect(getAuthRedirectPath("progression-reset-user")).resolves.toBe("/onboarding");
   });
 
   it("keeps legacy compatibility for null onboarding_completed when mentor is resolved", async () => {
@@ -371,11 +390,10 @@ describe("ensureProfile", () => {
     await ensureProfile("profile-missing-user", "new@example.com");
 
     expect(mocks.profilesUpsertMock).toHaveBeenCalledTimes(1);
-    const firstCall = mocks.profilesUpsertMock.mock.calls.at(0);
-    expect(firstCall).toBeDefined();
-
-    const payload = firstCall?.[0] as Record<string, unknown>;
-    const options = firstCall?.[1];
+    const upsertCalls = mocks.profilesUpsertMock.mock.calls as Array<
+      [Record<string, unknown>, { onConflict?: string; ignoreDuplicates?: boolean }?]
+    >;
+    const [payload, options] = upsertCalls[0] ?? [{}];
 
     expect(payload).toEqual(
       expect.objectContaining({

@@ -10,6 +10,12 @@ import {
   createCostGuardrailSession,
   isCostGuardrailBlockedError,
 } from "../_shared/costGuardrails.ts";
+import {
+  COMPANION_PRESET_BUCKET,
+  coerceCompanionElementId,
+  coerceCompanionPresetId,
+  resolveCompanionAssetPath,
+} from "../../../src/config/companionCatalog.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -60,7 +66,7 @@ export async function handleGenerateNeglectedCompanionImage(
     const supabase = deps.createSupabaseClient();
     const { data: companion, error: companionError } = await supabase
       .from("user_companion")
-      .select("id, user_id, current_image_url, spirit_animal, core_element, favorite_color, current_stage, neglected_image_url")
+      .select("id, user_id, current_image_url, spirit_animal, core_element, favorite_color, current_stage, neglected_image_url, preset_id")
       .eq("id", companionId)
       .maybeSingle();
 
@@ -71,6 +77,37 @@ export async function handleGenerateNeglectedCompanionImage(
 
     if (!companion) {
       return errorResponse(404, "Companion not found", corsHeaders);
+    }
+
+    const normalizedPresetId = coerceCompanionPresetId(companion.preset_id);
+    if (normalizedPresetId) {
+      const imageUrl = supabase.storage
+        .from(COMPANION_PRESET_BUCKET)
+        .getPublicUrl(
+          resolveCompanionAssetPath({
+            presetId: normalizedPresetId,
+            stage: companion.current_stage ?? 0,
+            state: "neglected",
+            element: coerceCompanionElementId(companion.core_element),
+          }),
+        ).data.publicUrl;
+
+      if (companion.neglected_image_url !== imageUrl) {
+        const { error: updateError } = await supabase
+          .from("user_companion")
+          .update({ neglected_image_url: imageUrl })
+          .eq("id", companionId);
+
+        if (updateError) {
+          console.error("[Neglected Image] Failed to save preset image:", updateError);
+          throw updateError;
+        }
+      }
+
+      return new Response(
+        JSON.stringify({ success: true, imageUrl, cached: companion.neglected_image_url === imageUrl }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
 
     const imageSize = resolveCompanionImageSizeForUser(companion.user_id);

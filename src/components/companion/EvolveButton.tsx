@@ -5,6 +5,9 @@ import { useEvolution } from "@/contexts/EvolutionContext";
 interface EvolveButtonProps {
   onEvolve: () => void;
   isEvolving: boolean;
+  actionLabel?: string;
+  loadingLabel?: string;
+  durationLabel?: string;
 }
 
 const LONG_RUNNING_MESSAGE_DELAY_MS = 75_000;
@@ -12,6 +15,9 @@ const LONG_RUNNING_MESSAGE_DELAY_MS = 75_000;
 export const EvolveButton = memo(({
   onEvolve,
   isEvolving,
+  actionLabel = "EVOLVE",
+  loadingLabel = "EVOLVING...",
+  durationLabel = "About 1 minute",
 }: EvolveButtonProps) => {
   const { isEvolvingLoading } = useEvolution();
   const isProcessing = isEvolving || isEvolvingLoading;
@@ -137,7 +143,7 @@ export const EvolveButton = memo(({
               animate={{ opacity: [1, 0.5, 1] }}
               transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}
             >
-              EVOLVING...
+              {loadingLabel}
             </motion.span>
           ) : (
             <span 
@@ -146,7 +152,7 @@ export const EvolveButton = memo(({
                 textShadow: "0 0 20px rgba(255,255,255,0.5), 0 0 40px rgba(255,255,255,0.3)",
               }}
             >
-              EVOLVE
+              {actionLabel}
             </span>
           )}
         </div>
@@ -156,7 +162,7 @@ export const EvolveButton = memo(({
           <p className="text-sm text-muted-foreground">
             {showLongRunningMessage
               ? "Taking longer than usual, can take up to ~2 minutes"
-              : "About 1 minute"}
+              : durationLabel}
           </p>
           <p className="text-xs text-muted-foreground/80">
             You can leave this screen and come back when it is ready.

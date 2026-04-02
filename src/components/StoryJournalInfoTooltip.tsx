@@ -17,10 +17,10 @@ export const StoryJournalInfoTooltip = () => {
         <div className="space-y-2 text-sm">
           <p className="font-semibold">Story Journal</p>
           <ul className="space-y-1 text-muted-foreground">
-            <li>• Each evolution stage unlocks a new chapter</li>
+            <li>• Each tier checkpoint unlocks a new chapter</li>
             <li>• Stories unique to your journey</li>
             <li>• Learn life lessons through your companion's tale</li>
-            <li>• Prologue + 20 chapters to unlock</li>
+            <li>• Prologue + 7 major tier chapters to unlock</li>
           </ul>
         </div>
       </PopoverContent>
