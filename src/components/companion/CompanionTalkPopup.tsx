@@ -7,7 +7,8 @@
  import { motion, AnimatePresence } from "framer-motion";
  import { X } from "lucide-react";
  import { cn } from "@/lib/utils";
- import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+ import { CompanionImage } from "@/components/CompanionImage";
  import { Progress } from "@/components/ui/progress";
  
  interface CompanionTalkPopupProps {
@@ -16,6 +17,8 @@
    message: string;
    companionName: string;
    companionImageUrl: string | null;
+   companionImageFocalX?: number | null;
+   companionImageFocalY?: number | null;
  }
  
  // Calculate auto-dismiss duration based on message length
@@ -31,6 +34,8 @@ export const CompanionTalkPopup = memo(({
    message,
    companionName,
    companionImageUrl,
+   companionImageFocalX,
+   companionImageFocalY,
 }: CompanionTalkPopupProps) => {
   const [progress, setProgress] = useState(0);
   const duration = getAutoDismissDuration(message);
@@ -120,9 +125,12 @@ export const CompanionTalkPopup = memo(({
                  )}>
                    <Avatar className="h-16 w-16 rounded-xl">
                      {companionImageUrl ? (
-                       <AvatarImage 
+                       <CompanionImage 
+                         variant="avatar"
                          src={companionImageUrl} 
                          alt={companionName}
+                         focalX={companionImageFocalX}
+                         focalY={companionImageFocalY}
                          className="object-cover"
                        />
                      ) : null}

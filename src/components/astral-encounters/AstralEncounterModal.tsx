@@ -569,6 +569,8 @@ export const AstralEncounterModal = ({
                       adversary={adversary}
                       adversaryImageUrl={adversaryImageUrl || undefined}
                       companionImageUrl={companion?.current_image_url || undefined}
+                      companionImageFocalX={companion?.current_image_focal_x ?? null}
+                      companionImageFocalY={companion?.current_image_focal_y ?? null}
                       companionName={resolvedCompanionName}
                       companionStage={companion?.current_stage || 0}
                       onReady={handleBeginBattle}
@@ -668,6 +670,8 @@ export const AstralEncounterModal = ({
                       }
                       tiltBonus={finalResult.tiltBonus}
                       companionImageUrl={companion?.current_image_url || undefined}
+                      companionImageFocalX={companion?.current_image_focal_x ?? null}
+                      companionImageFocalY={companion?.current_image_focal_y ?? null}
                       companionName={resolvedCompanionName}
                     />
                   </motion.div>

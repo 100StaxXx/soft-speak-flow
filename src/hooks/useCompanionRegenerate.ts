@@ -52,7 +52,13 @@ export const useCompanionRegenerate = () => {
       setGenerationPhase('generating');
 
       // Use shared validation helper for consistent behavior with initial hatching
-      const { imageUrl, validationPassed, retryCount: finalRetryCount } = await generateWithValidation(
+      const {
+        imageUrl,
+        imageFocalX,
+        imageFocalY,
+        validationPassed,
+        retryCount: finalRetryCount,
+      } = await generateWithValidation(
         {
           favoriteColor: companion.favorite_color,
           spiritAnimal: companion.spirit_animal,
@@ -85,6 +91,8 @@ export const useCompanionRegenerate = () => {
         .rpc("consume_companion_regeneration", {
           p_companion_id: companion.id,
           p_image_url: imageUrl,
+          p_image_focal_x: imageFocalX,
+          p_image_focal_y: imageFocalY,
         })
         .single();
 
@@ -108,6 +116,8 @@ export const useCompanionRegenerate = () => {
 
       return { 
         imageUrl, 
+        imageFocalX,
+        imageFocalY,
         imageRegenerationsUsed: totalUsed,
         regenerationsRemaining: Math.max(0, MAX_REGENERATIONS - totalUsed),
         validationPassed,
@@ -122,8 +132,14 @@ export const useCompanionRegenerate = () => {
           return {
             ...(cachedCompanion as Record<string, unknown>),
             current_image_url: data.imageUrl,
+            current_image_focal_x: data.imageFocalX,
+            current_image_focal_y: data.imageFocalY,
             dormant_image_url: null,
+            dormant_image_focal_x: null,
+            dormant_image_focal_y: null,
             neglected_image_url: null,
+            neglected_image_focal_x: null,
+            neglected_image_focal_y: null,
             scarred_image_url: null,
             image_regenerations_used: data.imageRegenerationsUsed,
             updated_at: new Date().toISOString(),
@@ -138,7 +154,11 @@ export const useCompanionRegenerate = () => {
           return {
             ...(cachedHealth as Record<string, unknown>),
             current_image_url: data.imageUrl,
+            current_image_focal_x: data.imageFocalX,
+            current_image_focal_y: data.imageFocalY,
             neglected_image_url: null,
+            neglected_image_focal_x: null,
+            neglected_image_focal_y: null,
           };
         },
       );
@@ -165,6 +185,8 @@ export const useCompanionRegenerate = () => {
               companion: {
                 ...typedMember.companion,
                 current_image_url: data.imageUrl,
+                current_image_focal_x: data.imageFocalX,
+                current_image_focal_y: data.imageFocalY,
               },
             };
           });

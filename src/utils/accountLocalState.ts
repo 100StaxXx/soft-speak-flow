@@ -1,4 +1,5 @@
 import { safeLocalStorage } from "@/utils/storage";
+import { getGuidedTutorialLocalProgressKey } from "@/utils/guidedTutorial";
 
 const WEEKLY_RECAP_DISMISSED_PREFIX = "recap-dismissed-";
 const LEGACY_WEEKLY_RECAP_PATTERN = /^recap-dismissed-\d{4}-\d{2}-\d{2}$/;
@@ -30,9 +31,10 @@ export const clearUserAccountLocalState = (userId: string | null | undefined): v
 
   const userRecapPrefix = `${WEEKLY_RECAP_DISMISSED_PREFIX}${userId}-`;
   const encounterKey = getEncounterPassesStorageKey(userId);
+  const guidedTutorialKey = getGuidedTutorialLocalProgressKey(userId);
 
   for (const key of getLocalStorageKeys()) {
-    if (key.startsWith(userRecapPrefix) || key === encounterKey) {
+    if (key.startsWith(userRecapPrefix) || key === encounterKey || key === guidedTutorialKey) {
       safeLocalStorage.removeItem(key);
     }
   }

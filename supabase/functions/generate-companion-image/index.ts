@@ -955,7 +955,11 @@ Slightly brighter exposure with lifted midtones and clearer highlights for reada
       limbCount: number; 
       speciesFidelity: number; 
       colorMatch: number;
+      subjectCenterX?: number;
+      subjectCenterY?: number;
+      centeringScore?: number;
       materialFidelity?: number;
+      compositionIssues?: string[];
       materialIssues?: string[];
       issues: string[];
       shouldRetry: boolean;
@@ -1074,12 +1078,16 @@ Slightly brighter exposure with lifted midtones and clearer highlights for reada
                 actualLimbCount: { type: "number", description: "How many limbs does the creature appear to have?" },
                 speciesFidelityScore: { type: "number", description: "Score 0-100: How well does this look like the intended species?" },
                 colorMatchScore: { type: "number", description: "Score 0-100: How well do the colors match the expected palette?" },
+                subjectCenterX: { type: "number", description: "Normalized 0-1 horizontal center of the visible subject mass. 0.5 means perfectly centered horizontally." },
+                subjectCenterY: { type: "number", description: "Normalized 0-1 vertical center of the visible subject mass. 0.5 means perfectly centered vertically." },
+                centeringScore: { type: "number", description: "Score 0-100: How naturally centered is the subject within the frame?" },
+                compositionIssues: { type: "array", items: { type: "string" }, description: "List any composition issues such as subject too high, low, left, right, cropped, or visually off-center." },
                 anatomyIssues: { type: "array", items: { type: "string" }, description: "List any anatomical issues (extra limbs, wrong body parts, mutations)" },
                 overallQuality: { type: "number", description: "Overall quality score 0-100 considering all factors" },
                 materialFidelityScore: { type: "number", description: "Score 0-100: For mechanical species, how well the output preserves mechanical identity (metallic scales, articulated joints, gear motifs, engineered energy core)." },
                 materialIssues: { type: "array", items: { type: "string" }, description: "List spirit-lock issues such as organic drift, missing mechanical anchors, or biological textures." }
               },
-              required: ["limbCountScore", "actualLimbCount", "speciesFidelityScore", "colorMatchScore", "anatomyIssues", "overallQuality"],
+              required: ["limbCountScore", "actualLimbCount", "speciesFidelityScore", "colorMatchScore", "subjectCenterX", "subjectCenterY", "centeringScore", "compositionIssues", "anatomyIssues", "overallQuality"],
               additionalProperties: false
             }
           }
@@ -1094,6 +1102,8 @@ Expected characteristics:
 - Body type: ${anatomy.bodyType}
 - Primary color should be: ${favoriteColor}
 - Color variety is allowed: ${favoriteColor} must remain clearly visible as the anchor, while secondary/tertiary accent colors are acceptable
+- Estimate the visible subject center as normalized coordinates where the full frame is 0..1 in each direction
+- Score how naturally centered the subject appears in the frame; images with the subject pushed too high/low/left/right should score poorly
 ${extractedMetadata ? `- Reference eye color: ${extractedMetadata.hexEyeColor}` : ''}
 ${spiritLockActive ? `- SPIRIT LOCK: Mechanical Dragon must remain mechanical.
 - Required anchors: metallic scales, articulated joints, gear/clockwork motifs, engineered energy core.
@@ -1133,12 +1143,32 @@ Score each aspect from 0-100 and list any issues.`;
           
           if (toolCall?.function?.arguments) {
             const scores = JSON.parse(toolCall.function.arguments);
+            const subjectCenterX = typeof scores.subjectCenterX === "number"
+              ? Math.max(0, Math.min(1, scores.subjectCenterX))
+              : undefined;
+            const subjectCenterY = typeof scores.subjectCenterY === "number"
+              ? Math.max(0, Math.min(1, scores.subjectCenterY))
+              : undefined;
+            const centeringScore = typeof scores.centeringScore === "number"
+              ? scores.centeringScore
+              : undefined;
+            const compositionIssues = Array.isArray(scores.compositionIssues)
+              ? scores.compositionIssues.filter((value: unknown): value is string => typeof value === "string")
+              : [];
             const materialFidelity = typeof scores.materialFidelityScore === "number"
               ? scores.materialFidelityScore
               : undefined;
             const materialIssues = Array.isArray(scores.materialIssues)
               ? scores.materialIssues
               : [];
+            const centeringDistance = typeof subjectCenterX === "number" && typeof subjectCenterY === "number"
+              ? Math.hypot(subjectCenterX - 0.5, subjectCenterY - 0.5)
+              : null;
+            const centeringRetryRequired = (
+              typeof centeringScore === "number" ? centeringScore < 65 : false
+            ) || (
+              centeringDistance !== null ? centeringDistance > 0.18 : false
+            );
             const materialRetryRequired = spiritLockActive
               ? (typeof materialFidelity === "number" ? materialFidelity < 70 : true) || materialIssues.length > 0
               : false;
@@ -1147,10 +1177,21 @@ Score each aspect from 0-100 and list any issues.`;
               limbCount: scores.limbCountScore || 0,
               speciesFidelity: scores.speciesFidelityScore || 0,
               colorMatch: scores.colorMatchScore || 0,
+              subjectCenterX,
+              subjectCenterY,
+              centeringScore,
+              compositionIssues,
               materialFidelity,
               materialIssues,
-              issues: scores.anatomyIssues || [],
-              shouldRetry: scores.overallQuality < 60 || scores.limbCountScore < 50 || materialRetryRequired
+              issues: [
+                ...(Array.isArray(scores.anatomyIssues) ? scores.anatomyIssues : []),
+                ...compositionIssues,
+              ],
+              shouldRetry:
+                scores.overallQuality < 60
+                || scores.limbCountScore < 50
+                || materialRetryRequired
+                || centeringRetryRequired,
             };
             console.log("Quality analysis:", qualityScore);
             if (spiritLockActive) {
@@ -1179,7 +1220,9 @@ Score each aspect from 0-100 and list any issues.`;
 
       // Check if we should retry
       if (qualityScore?.shouldRetry && currentAttempt < MAX_INTERNAL_RETRIES) {
-        console.log(`Quality too low (overall: ${qualityScore.overall}, limbs: ${qualityScore.limbCount}), retrying... (${currentAttempt + 1}/${MAX_INTERNAL_RETRIES})`);
+        console.log(
+          `Quality too low (overall: ${qualityScore.overall}, limbs: ${qualityScore.limbCount}, centering: ${qualityScore.centeringScore ?? "n/a"}), retrying... (${currentAttempt + 1}/${MAX_INTERNAL_RETRIES})`,
+        );
         currentAttempt++;
         continue;
       }
@@ -1223,6 +1266,8 @@ Score each aspect from 0-100 and list any issues.`;
     // Return response with quality score
     const responseData: Record<string, unknown> = {
       imageUrl: publicUrl,
+      imageFocalX: qualityScore?.subjectCenterX ?? 0.5,
+      imageFocalY: qualityScore?.subjectCenterY ?? 0.5,
     };
     if (debug === true) {
       responseData.prompt = fullPrompt;

@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -32,6 +32,7 @@ const mocks = vi.hoisted(() => ({
   hatchCompanion: {
     mutateAsync: vi.fn(),
   },
+  isRegenerating: true,
 }));
 
 vi.mock("@/hooks/useCompanion", () => ({
@@ -93,7 +94,7 @@ vi.mock("@/hooks/useCompanionVisualState", () => ({
 vi.mock("@/hooks/useCompanionRegenerate", () => ({
   useCompanionRegenerate: () => ({
     regenerate: mocks.regenerate,
-    isRegenerating: true,
+    isRegenerating: mocks.isRegenerating,
     maxRegenerations: 3,
     generationPhase: "idle",
     retryCount: 0,
@@ -212,6 +213,7 @@ describe("CompanionDisplay overlay stack", () => {
     mocks.regenerate.mockClear();
     mocks.triggerManualEvolution.mockClear();
     mocks.hatchCompanion.mutateAsync.mockClear();
+    mocks.isRegenerating = true;
   });
 
   afterEach(() => {
@@ -233,5 +235,24 @@ describe("CompanionDisplay overlay stack", () => {
     expect(
       screen.getByText("Your companion has fallen into a deep sleep"),
     ).toBeInTheDocument();
+  });
+
+  it("starts subtle idle drift once the companion art has loaded", async () => {
+    mocks.isRegenerating = false;
+
+    render(<CompanionDisplay />);
+
+    const shell = screen.getByTestId("companion-image-shell");
+    const image = screen.getByAltText(/companion at level 8/i);
+
+    expect(shell).toHaveAttribute("data-companion-idle-motion", "inactive");
+
+    fireEvent.load(image);
+
+    await waitFor(() => {
+      expect(shell).toHaveAttribute("data-companion-idle-motion", "active");
+    });
+
+    expect(shell).toHaveClass("animate-companion-idle-drift");
   });
 });

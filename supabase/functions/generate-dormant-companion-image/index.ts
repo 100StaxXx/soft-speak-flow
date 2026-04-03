@@ -66,7 +66,7 @@ export async function handleGenerateDormantCompanionImage(
     const supabase = deps.createSupabaseClient();
     const { data: companion, error: companionError } = await supabase
       .from("user_companion")
-      .select("id, user_id, current_image_url, dormant_image_url, spirit_animal, companion_name, core_element, current_stage, preset_id")
+      .select("id, user_id, current_image_url, current_image_focal_x, current_image_focal_y, dormant_image_url, dormant_image_focal_x, dormant_image_focal_y, spirit_animal, companion_name, core_element, current_stage, preset_id")
       .eq("id", companionId)
       .maybeSingle();
 
@@ -95,7 +95,11 @@ export async function handleGenerateDormantCompanionImage(
       if (companion.dormant_image_url !== imageUrl) {
         const { error: updateError } = await supabase
           .from("user_companion")
-          .update({ dormant_image_url: imageUrl })
+          .update({
+            dormant_image_url: imageUrl,
+            dormant_image_focal_x: companion.current_image_focal_x ?? 0.5,
+            dormant_image_focal_y: companion.current_image_focal_y ?? 0.5,
+          })
           .eq("id", companionId);
 
         if (updateError) {
@@ -212,7 +216,11 @@ export async function handleGenerateDormantCompanionImage(
 
     const { error: updateError } = await supabase
       .from("user_companion")
-      .update({ dormant_image_url: publicUrl.publicUrl })
+      .update({
+        dormant_image_url: publicUrl.publicUrl,
+        dormant_image_focal_x: companion.current_image_focal_x ?? 0.5,
+        dormant_image_focal_y: companion.current_image_focal_y ?? 0.5,
+      })
       .eq("id", companionId);
 
     if (updateError) {

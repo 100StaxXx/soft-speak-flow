@@ -1,6 +1,11 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { clearAuthScopedClientState } from "@/services/authScopedClientState";
+import {
+  parseFunctionInvokeError,
+  toUserFacingFunctionError,
+  type ParsedFunctionInvokeError,
+} from "@/utils/supabaseFunctionErrors";
 
 export interface AccountDeletionWarning {
   code?: string;
@@ -11,6 +16,8 @@ export interface AccountDeletionWarning {
 interface DeleteUserFunctionResponse {
   success?: boolean;
   error?: string;
+  code?: string;
+  status?: number;
   warnings?: unknown;
 }
 
@@ -19,6 +26,20 @@ interface DeleteAccountOptions {
   userId: string;
   signOut: () => Promise<void>;
 }
+
+const ACCOUNT_DELETION_TEMPORARILY_UNAVAILABLE_MESSAGE =
+  "Account deletion is temporarily unavailable. Please try again later.";
+const ACCOUNT_DELETION_NOT_FOUND_MESSAGE =
+  "We couldn't find this account anymore. Please sign in again.";
+
+const ACCOUNT_DELETION_AUTH_CODES = new Set(["ACCOUNT_DELETION_AUTH_REQUIRED"]);
+const ACCOUNT_DELETION_NOT_FOUND_CODES = new Set(["ACCOUNT_DELETION_NOT_FOUND"]);
+const ACCOUNT_DELETION_TEMPORARY_CODES = new Set([
+  "ACCOUNT_DELETION_AUTH_DELETE_FAILED",
+  "ACCOUNT_DELETION_BACKEND_UNAVAILABLE",
+  "ACCOUNT_DELETION_CONFIG_ERROR",
+  "ACCOUNT_DELETION_UNKNOWN",
+]);
 
 const normalizeWarnings = (raw: unknown): AccountDeletionWarning[] => {
   if (!Array.isArray(raw)) return [];
@@ -57,6 +78,41 @@ export const isAccountDeletionAuthError = (error: unknown): boolean => {
   );
 };
 
+const createAccountDeletionError = (message: string, cause?: unknown): Error => {
+  const error = new Error(message);
+  if (cause !== undefined) {
+    (error as Error & { cause?: unknown }).cause = cause;
+  }
+  return error;
+};
+
+const mapAccountDeletionCodeToMessage = (code?: string): string | null => {
+  if (!code) return null;
+  if (ACCOUNT_DELETION_AUTH_CODES.has(code)) {
+    return "Session expired. Please sign in again.";
+  }
+  if (ACCOUNT_DELETION_NOT_FOUND_CODES.has(code)) {
+    return ACCOUNT_DELETION_NOT_FOUND_MESSAGE;
+  }
+  if (ACCOUNT_DELETION_TEMPORARY_CODES.has(code)) {
+    return ACCOUNT_DELETION_TEMPORARILY_UNAVAILABLE_MESSAGE;
+  }
+  return null;
+};
+
+const toAccountDeletionErrorMessage = (parsed: ParsedFunctionInvokeError): string => {
+  const mappedFromCode = mapAccountDeletionCodeToMessage(parsed.code ?? parsed.responsePayload?.code);
+  if (mappedFromCode) {
+    return mappedFromCode;
+  }
+
+  if (parsed.status === 404) {
+    return ACCOUNT_DELETION_NOT_FOUND_MESSAGE;
+  }
+
+  return toUserFacingFunctionError(parsed, { action: "delete your account" });
+};
+
 export const deleteCurrentAccount = async ({ queryClient, userId, signOut }: DeleteAccountOptions) => {
   const {
     data: { session },
@@ -74,11 +130,13 @@ export const deleteCurrentAccount = async ({ queryClient, userId, signOut }: Del
   });
 
   if (error) {
-    throw new Error(error.message || "Unable to delete account");
+    const parsedError = await parseFunctionInvokeError(error);
+    throw createAccountDeletionError(toAccountDeletionErrorMessage(parsedError), error);
   }
 
   if (!data?.success) {
-    throw new Error(data?.error || "Unable to delete account");
+    const mappedMessage = mapAccountDeletionCodeToMessage(data?.code);
+    throw createAccountDeletionError(mappedMessage ?? data?.error ?? "Unable to delete account", data);
   }
 
   await clearAuthScopedClientState(queryClient, { previousUserId: userId, clearLegacyLocalState: true });

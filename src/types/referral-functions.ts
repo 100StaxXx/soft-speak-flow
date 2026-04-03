@@ -49,7 +49,11 @@ export interface CreateCompanionIfNotExistsArgs {
   p_core_element: string;
   p_story_tone: string;
   p_current_image_url: string;
+  p_current_image_focal_x: number | null;
+  p_current_image_focal_y: number | null;
   p_initial_image_url: string;
+  p_initial_image_focal_x: number | null;
+  p_initial_image_focal_y: number | null;
   p_eye_color: string;
   p_fur_color: string;
 }
@@ -65,7 +69,11 @@ export interface CreateCompanionIfNotExistsResult {
   current_stage: number;
   current_xp: number;
   current_image_url: string;
+  current_image_focal_x: number | null;
+  current_image_focal_y: number | null;
   initial_image_url: string;
+  initial_image_focal_x: number | null;
+  initial_image_focal_y: number | null;
   eye_color: string;
   fur_color: string;
   mind: number;

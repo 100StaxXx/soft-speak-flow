@@ -23,6 +23,7 @@ import { CompanionMotionSurface } from "@/components/companion/motion/CompanionM
 import { WakeUpCelebration } from "@/components/companion/WakeUpCelebration";
 import { CompanionAttributes } from "@/components/CompanionAttributes";
 import { CompanionPersonalization } from "@/components/CompanionPersonalization";
+import { CompanionImage } from "@/components/CompanionImage";
 import {
   Dialog,
   DialogContent,
@@ -142,7 +143,11 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
     dismissCelebration: dismissWakeUpCelebration,
     companionName: wakeUpCompanionName,
     companionImageUrl: wakeUpCompanionImageUrl,
+    companionImageFocalX: wakeUpCompanionImageFocalX,
+    companionImageFocalY: wakeUpCompanionImageFocalY,
     dormantImageUrl: wakeUpDormantImageUrl,
+    dormantImageFocalX: wakeUpDormantImageFocalX,
+    dormantImageFocalY: wakeUpDormantImageFocalY,
     bondLevel: wakeUpBondLevel,
   } = useCompanionWakeUp();
   
@@ -352,6 +357,36 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
   }, [companion, health.isNeglected, health.neglectedImageUrl, isDormant]);
   
   const effectiveImageUrl = displayImageUrl || COMPANION_PLACEHOLDER;
+  const effectiveImageFocal = useMemo(() => {
+    if (!companion) return { x: null, y: null };
+
+    if (isDormant) {
+      return {
+        x: companion.dormant_image_focal_x ?? companion.current_image_focal_x ?? null,
+        y: companion.dormant_image_focal_y ?? companion.current_image_focal_y ?? null,
+      };
+    }
+
+    if (health.isNeglected) {
+      return {
+        x: health.neglectedImageFocalX ?? companion.neglected_image_focal_x ?? companion.current_image_focal_x ?? null,
+        y: health.neglectedImageFocalY ?? companion.neglected_image_focal_y ?? companion.current_image_focal_y ?? null,
+      };
+    }
+
+    return {
+      x: health.imageFocalX ?? companion.current_image_focal_x ?? null,
+      y: health.imageFocalY ?? companion.current_image_focal_y ?? null,
+    };
+  }, [
+    companion,
+    health.imageFocalX,
+    health.imageFocalY,
+    health.isNeglected,
+    health.neglectedImageFocalX,
+    health.neglectedImageFocalY,
+    isDormant,
+  ]);
 
   // Track image URL changes to reset loading state
   useEffect(() => {
@@ -418,6 +453,7 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
   const isMaxStage = companion.current_stage >= MAX_COMPANION_STAGE;
   const nextTierBoundary = getNextTierBoundary(companion.current_stage);
   const nextTierLabel = nextTierBoundary === null ? null : getProgressionTierLabelForLevel(nextTierBoundary);
+  const shouldAnimateIdleDrift = !prefersReducedMotion && imageLoaded && !imageError && !isRegenerating;
 
   const handleEvolvePress = () => {
     if (requiresHatchSelection) {
@@ -550,77 +586,89 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
               {/* Twinkling star particles around companion */}
               <div className={`absolute inset-0 rounded-2xl ${!prefersReducedMotion ? 'star-shimmer' : ''}`} aria-hidden="true" />
               <div className={`absolute inset-0 bg-gradient-to-br from-nebula-pink/30 to-celestial-blue/30 rounded-2xl blur-xl ${!prefersReducedMotion ? 'animate-pulse' : ''}`} aria-hidden="true" />
-              <CompanionMotionSurface
-                variant="companion"
-                stage={companion.current_stage}
-                element={companion.core_element}
-                event={companionMotionEvent}
-                primaryColor={companionPalette.accentText}
-                secondaryColor={companionPalette.badgeText}
-                className={cn("rounded-2xl", imageSizeClass)}
-                contentClassName="flex items-center justify-center"
+              <div
+                className={cn(
+                  "relative",
+                  imageSizeClass,
+                  shouldAnimateIdleDrift && "animate-companion-idle-drift",
+                )}
+                data-testid="companion-image-shell"
+                data-companion-idle-motion={shouldAnimateIdleDrift ? "active" : "inactive"}
               >
-                <>
-                  {!imageLoaded && !imageError && (
-                    <div
-                      className="relative h-full w-full rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 animate-pulse flex items-center justify-center"
-                      role="status"
-                      aria-live="polite"
-                      aria-label="Loading companion image"
-                    >
-                      <Sparkles className="h-12 w-12 text-primary/50 animate-spin" aria-hidden="true" />
-                      <span className="sr-only">Loading companion image</span>
-                    </div>
-                  )}
-                  {imageError && (
-                    <div
-                      className="relative h-full w-full rounded-2xl bg-gradient-to-br from-destructive/20 to-destructive/10 flex items-center justify-center border-2 border-destructive/30"
-                      role="alert"
-                      aria-live="assertive"
-                    >
-                      <div className="text-center p-4">
-                        <p className="text-sm text-muted-foreground mb-2" id="image-error-message">Image unavailable</p>
-                        <button
-                          onClick={() => {
-                            setImageError(false);
-                            setImageLoaded(false);
-                            setImageKey(prev => prev + 1); // Force image reload with new key
-                          }}
-                          className="text-xs text-primary hover:underline focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded px-2 py-1"
-                          aria-label="Retry loading companion image"
-                          aria-describedby="image-error-message"
-                        >
-                          Try again
-                        </button>
+                <CompanionMotionSurface
+                  variant="companion"
+                  stage={companion.current_stage}
+                  element={companion.core_element}
+                  event={companionMotionEvent}
+                  primaryColor={companionPalette.accentText}
+                  secondaryColor={companionPalette.badgeText}
+                  className="h-full w-full rounded-2xl"
+                  contentClassName="flex items-center justify-center"
+                >
+                  <>
+                    {!imageLoaded && !imageError && (
+                      <div
+                        className="relative h-full w-full rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 animate-pulse flex items-center justify-center"
+                        role="status"
+                        aria-live="polite"
+                        aria-label="Loading companion image"
+                      >
+                        <Sparkles className="h-12 w-12 text-primary/50 animate-spin" aria-hidden="true" />
+                        <span className="sr-only">Loading companion image</span>
                       </div>
-                    </div>
-                  )}
-                  <img
-                    key={imageKey}
-                    src={effectiveImageUrl}
-                    alt={`${tierName} companion at level ${companion.current_stage}`}
-                    className={cn(
-                      "relative h-full w-full object-cover rounded-2xl shadow-2xl ring-4 transition-all duration-500 group-hover:scale-105",
-                      imageLoaded ? "opacity-100" : "opacity-0 absolute",
-                      health.isNeglected ? "ring-destructive/50" : "ring-primary/30",
-                      isRegenerating && "animate-pulse",
-                      animationClass,
                     )}
-                    style={{ ...skinStyles, ...careStyles, ...equippedCosmeticStyles }}
-                    onLoad={() => {
-                      setImageLoaded(true);
-                      setImageError(false);
-                    }}
-                    onError={() => {
-                      setImageError(true);
-                      setImageLoaded(false);
-                    }}
-                    loading="lazy"
-                    decoding="async"
-                    draggable={false}
-                  />
-                </>
-              </CompanionMotionSurface>
+                    {imageError && (
+                      <div
+                        className="relative h-full w-full rounded-2xl bg-gradient-to-br from-destructive/20 to-destructive/10 flex items-center justify-center border-2 border-destructive/30"
+                        role="alert"
+                        aria-live="assertive"
+                      >
+                        <div className="text-center p-4">
+                          <p className="text-sm text-muted-foreground mb-2" id="image-error-message">Image unavailable</p>
+                          <button
+                            onClick={() => {
+                              setImageError(false);
+                              setImageLoaded(false);
+                              setImageKey(prev => prev + 1); // Force image reload with new key
+                            }}
+                            className="text-xs text-primary hover:underline focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded px-2 py-1"
+                            aria-label="Retry loading companion image"
+                            aria-describedby="image-error-message"
+                          >
+                            Try again
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    <CompanionImage
+                      key={imageKey}
+                      src={effectiveImageUrl}
+                      alt={`${tierName} companion at level ${companion.current_stage}`}
+                      focalX={effectiveImageFocal.x}
+                      focalY={effectiveImageFocal.y}
+                      className={cn(
+                        "relative h-full w-full object-cover rounded-2xl shadow-2xl ring-4 transition-all duration-500 group-hover:scale-105",
+                        imageLoaded ? "opacity-100" : "opacity-0 absolute",
+                        health.isNeglected ? "ring-destructive/50" : "ring-primary/30",
+                        isRegenerating && "animate-pulse",
+                        animationClass,
+                      )}
+                      style={{ ...skinStyles, ...careStyles, ...equippedCosmeticStyles }}
+                      onLoad={() => {
+                        setImageLoaded(true);
+                        setImageError(false);
+                      }}
+                      onError={() => {
+                        setImageError(true);
+                        setImageLoaded(false);
+                      }}
+                      loading="lazy"
+                      decoding="async"
+                      draggable={false}
+                    />
+                  </>
+                </CompanionMotionSurface>
+              </div>
               {isRegenerating && (
                 <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-2xl bg-background/50 backdrop-blur-sm" role="status" aria-live="polite" aria-label="Refreshing companion look">
                   <div className="rounded-full border border-primary/35 bg-card/80 px-4 py-2 text-xs font-medium text-foreground shadow-lg">
@@ -733,7 +781,11 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
         onClose={dismissWakeUpCelebration}
         companionName={wakeUpCompanionName}
         companionImageUrl={wakeUpCompanionImageUrl}
+        companionImageFocalX={wakeUpCompanionImageFocalX}
+        companionImageFocalY={wakeUpCompanionImageFocalY}
         dormantImageUrl={wakeUpDormantImageUrl}
+        dormantImageFocalX={wakeUpDormantImageFocalX}
+        dormantImageFocalY={wakeUpDormantImageFocalY}
         bondLevel={wakeUpBondLevel}
       />
 

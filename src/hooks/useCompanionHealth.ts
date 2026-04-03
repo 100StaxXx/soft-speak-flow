@@ -12,7 +12,11 @@ interface CompanionHealth {
   isNeglected: boolean;
   daysInactive: number;
   imageUrl: string | null;
+  imageFocalX: number | null;
+  imageFocalY: number | null;
   neglectedImageUrl: string | null;
+  neglectedImageFocalX: number | null;
+  neglectedImageFocalY: number | null;
   body: number;
   mind: number;
   soul: number;
@@ -50,7 +54,7 @@ export const useCompanionHealth = () => {
       
       const { data, error } = await supabase
         .from('user_companion')
-        .select('inactive_days, last_activity_date, neglected_image_url, current_mood, body, mind, soul, current_image_url, is_alive, hunger, happiness, care_score, recovery_progress')
+        .select('inactive_days, last_activity_date, neglected_image_url, neglected_image_focal_x, neglected_image_focal_y, current_mood, body, mind, soul, current_image_url, current_image_focal_x, current_image_focal_y, is_alive, hunger, happiness, care_score, recovery_progress')
         .eq('user_id', user.id)
         .maybeSingle();
 
@@ -121,6 +125,12 @@ export const useCompanionHealth = () => {
     const imageUrl = shouldShowNeglectedImage 
       ? companionHealthData.neglected_image_url 
       : (companionHealthData?.current_image_url || companion?.current_image_url || null);
+    const imageFocalX = shouldShowNeglectedImage
+      ? companionHealthData?.neglected_image_focal_x ?? null
+      : companionHealthData?.current_image_focal_x ?? companion?.current_image_focal_x ?? null;
+    const imageFocalY = shouldShowNeglectedImage
+      ? companionHealthData?.neglected_image_focal_y ?? null
+      : companionHealthData?.current_image_focal_y ?? companion?.current_image_focal_y ?? null;
 
     return {
       healthPercentage,
@@ -128,7 +138,11 @@ export const useCompanionHealth = () => {
       isNeglected,
       daysInactive: inactiveDays,
       imageUrl,
+      imageFocalX,
+      imageFocalY,
       neglectedImageUrl: companionHealthData?.neglected_image_url || null,
+      neglectedImageFocalX: companionHealthData?.neglected_image_focal_x ?? null,
+      neglectedImageFocalY: companionHealthData?.neglected_image_focal_y ?? null,
       body,
       mind,
       soul,

@@ -12,6 +12,8 @@ const companionFixture = {
   current_stage: 0,
   current_xp: 14,
   current_image_url: "https://example.com/stage0.png",
+  current_image_focal_x: 0.5,
+  current_image_focal_y: 0.5,
   created_at: "2026-02-19T00:00:00.000Z",
   updated_at: "2026-02-19T00:00:00.000Z",
 };
@@ -207,6 +209,8 @@ describe("useCompanion evolveCompanion", () => {
     mocks.invokeMock.mockResolvedValue({ data: null, error: null });
     mocks.generateWithValidationMock.mockResolvedValue({
       imageUrl: "https://example.com/generated-companion.png",
+      imageFocalX: 0.5,
+      imageFocalY: 0.5,
       validationPassed: true,
       retryCount: 0,
     });
@@ -458,7 +462,11 @@ describe("useCompanion evolveCompanion", () => {
         p_spirit_animal: "Egg",
         p_core_element: "void",
         p_current_image_url: "/companion-eggs/egg__t0_egg__normal__void.png",
+        p_current_image_focal_x: 0.486804,
+        p_current_image_focal_y: 0.429688,
         p_initial_image_url: "/companion-eggs/egg__t0_egg__normal__void.png",
+        p_initial_image_focal_x: 0.486804,
+        p_initial_image_focal_y: 0.429688,
       }),
     );
   });
@@ -641,6 +649,10 @@ describe("useCompanion evolveCompanion", () => {
         p_companion_id: companionFixture.id,
         p_preset_id: "dragon",
         p_initial_image_url: companionFixture.current_image_url,
+        p_initial_image_focal_x: null,
+        p_initial_image_focal_y: null,
+        p_current_image_focal_x: 0.533724,
+        p_current_image_focal_y: 0.495117,
       }),
     );
 

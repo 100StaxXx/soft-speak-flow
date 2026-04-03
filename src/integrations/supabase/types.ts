@@ -7020,6 +7020,8 @@ export type Database = {
           core_element: string
           created_at: string
           creativity: number | null
+          current_image_focal_x: number | null
+          current_image_focal_y: number | null
           current_image_url: string | null
           current_mood: string | null
           current_stage: number
@@ -7029,6 +7031,8 @@ export type Database = {
           discipline: number | null
           dormancy_count: number | null
           dormancy_recovery_days: number | null
+          dormant_image_focal_x: number | null
+          dormant_image_focal_y: number | null
           dormant_image_url: string | null
           dormant_since: string | null
           evolution_path: string | null
@@ -7041,6 +7045,8 @@ export type Database = {
           id: string
           image_regenerations_used: number
           inactive_days: number | null
+          initial_image_focal_x: number | null
+          initial_image_focal_y: number | null
           initial_image_url: string | null
           is_alive: boolean | null
           last_7_days_activity: Json | null
@@ -7053,6 +7059,8 @@ export type Database = {
           last_weekly_maintenance_date: string | null
           legacy_traits: Json | null
           mind: number | null
+          neglected_image_focal_x: number | null
+          neglected_image_focal_y: number | null
           neglected_image_url: string | null
           path_determination_date: string | null
           power: number | null
@@ -7089,6 +7097,8 @@ export type Database = {
           core_element: string
           created_at?: string
           creativity?: number | null
+          current_image_focal_x?: number | null
+          current_image_focal_y?: number | null
           current_image_url?: string | null
           current_mood?: string | null
           current_stage?: number
@@ -7098,6 +7108,8 @@ export type Database = {
           discipline?: number | null
           dormancy_count?: number | null
           dormancy_recovery_days?: number | null
+          dormant_image_focal_x?: number | null
+          dormant_image_focal_y?: number | null
           dormant_image_url?: string | null
           dormant_since?: string | null
           evolution_path?: string | null
@@ -7110,6 +7122,8 @@ export type Database = {
           id?: string
           image_regenerations_used?: number
           inactive_days?: number | null
+          initial_image_focal_x?: number | null
+          initial_image_focal_y?: number | null
           initial_image_url?: string | null
           is_alive?: boolean | null
           last_7_days_activity?: Json | null
@@ -7122,6 +7136,8 @@ export type Database = {
           last_weekly_maintenance_date?: string | null
           legacy_traits?: Json | null
           mind?: number | null
+          neglected_image_focal_x?: number | null
+          neglected_image_focal_y?: number | null
           neglected_image_url?: string | null
           path_determination_date?: string | null
           power?: number | null
@@ -7158,6 +7174,8 @@ export type Database = {
           core_element?: string
           created_at?: string
           creativity?: number | null
+          current_image_focal_x?: number | null
+          current_image_focal_y?: number | null
           current_image_url?: string | null
           current_mood?: string | null
           current_stage?: number
@@ -7167,6 +7185,8 @@ export type Database = {
           discipline?: number | null
           dormancy_count?: number | null
           dormancy_recovery_days?: number | null
+          dormant_image_focal_x?: number | null
+          dormant_image_focal_y?: number | null
           dormant_image_url?: string | null
           dormant_since?: string | null
           evolution_path?: string | null
@@ -7179,6 +7199,8 @@ export type Database = {
           id?: string
           image_regenerations_used?: number
           inactive_days?: number | null
+          initial_image_focal_x?: number | null
+          initial_image_focal_y?: number | null
           initial_image_url?: string | null
           is_alive?: boolean | null
           last_7_days_activity?: Json | null
@@ -7191,6 +7213,8 @@ export type Database = {
           last_weekly_maintenance_date?: string | null
           legacy_traits?: Json | null
           mind?: number | null
+          neglected_image_focal_x?: number | null
+          neglected_image_focal_y?: number | null
           neglected_image_url?: string | null
           path_determination_date?: string | null
           power?: number | null
@@ -8124,8 +8148,12 @@ export type Database = {
           p_companion_id: string
           p_core_element: string
           p_current_image_url: string
+          p_current_image_focal_x: number | null
+          p_current_image_focal_y: number | null
           p_favorite_color: string
           p_initial_image_url: string
+          p_initial_image_focal_x: number | null
+          p_initial_image_focal_y: number | null
           p_preset_id: string
           p_spirit_animal: string
           p_story_tone: string
@@ -8133,11 +8161,15 @@ export type Database = {
         }
         Returns: {
           core_element: string
+          current_image_focal_x: number | null
+          current_image_focal_y: number | null
           current_image_url: string
           current_stage: number
           evolution_id: string
           favorite_color: string
           id: string
+          initial_image_focal_x: number | null
+          initial_image_focal_y: number | null
           initial_image_url: string
           preset_id: string
           spirit_animal: string
@@ -8145,8 +8177,15 @@ export type Database = {
         }[]
       }
       consume_companion_regeneration: {
-        Args: { p_companion_id: string; p_image_url: string }
+        Args: {
+          p_companion_id: string
+          p_image_focal_x: number | null
+          p_image_focal_y: number | null
+          p_image_url: string
+        }
         Returns: {
+          current_image_focal_x: number | null
+          current_image_focal_y: number | null
           current_image_url: string
           image_regenerations_used: number
         }[]
@@ -8166,10 +8205,14 @@ export type Database = {
         Args: {
           p_core_element: string
           p_current_image_url: string
+          p_current_image_focal_x: number | null
+          p_current_image_focal_y: number | null
           p_eye_color: string
           p_favorite_color: string
           p_fur_color: string
           p_initial_image_url: string
+          p_initial_image_focal_x: number | null
+          p_initial_image_focal_y: number | null
           p_preset_id: string | null
           p_spirit_animal: string
           p_story_tone: string
@@ -8179,6 +8222,8 @@ export type Database = {
           body: number
           core_element: string
           created_at: string
+          current_image_focal_x: number | null
+          current_image_focal_y: number | null
           current_image_url: string
           current_mood: string
           current_stage: number
@@ -8187,6 +8232,8 @@ export type Database = {
           favorite_color: string
           fur_color: string
           id: string
+          initial_image_focal_x: number | null
+          initial_image_focal_y: number | null
           initial_image_url: string
           is_new: boolean
           last_energy_update: string

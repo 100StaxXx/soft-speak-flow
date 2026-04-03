@@ -3,6 +3,7 @@ import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { CompanionCreationLoader } from "./CompanionCreationLoader";
+import { CompanionImage } from "./CompanionImage";
 import {
   COMPANION_ELEMENTS,
   COMPANION_PRESETS,
@@ -150,10 +151,11 @@ export const CompanionPersonalization = ({
                       ].join(" ")}
                     >
                       <div className="relative h-[220px] bg-gradient-to-br from-slate-950/80 via-slate-900/80 to-slate-950/95">
-                        <img
+                        <CompanionImage
                           src={getEggPreviewUrl(element.id)}
                           alt={`${element.label} Egg`}
-                          className="h-full w-full object-contain p-4"
+                          fit="contain"
+                          className="h-full w-full p-4"
                           loading="lazy"
                         />
                         <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-slate-950 via-slate-950/90 to-transparent">
@@ -207,10 +209,11 @@ export const CompanionPersonalization = ({
                     >
                       <div className="relative h-[260px] bg-gradient-to-br from-slate-950/80 via-slate-900/80 to-slate-950/95">
                         {!brokenPreviewKeys[previewKey] ? (
-                          <img
+                          <CompanionImage
                             src={previewUrl}
                             alt={preset.displayName}
-                            className="h-full w-full object-contain p-4"
+                            fit="contain"
+                            className="h-full w-full p-4"
                             loading="lazy"
                             onError={() =>
                               setBrokenPreviewKeys((current) => ({
@@ -284,10 +287,11 @@ export const CompanionPersonalization = ({
                 {isEggSelectionMode ? (
                   <div className="space-y-3">
                     <div className="mx-auto h-44 w-44">
-                      <img
+                      <CompanionImage
                         src={getEggPreviewUrl(selectedElement)}
                         alt={`${selectedElementMeta.label} Egg`}
-                        className="h-full w-full object-contain"
+                        fit="contain"
+                        className="h-full w-full"
                       />
                     </div>
                     <div className="text-sm font-medium text-foreground">{selectedElementMeta.label} Egg</div>

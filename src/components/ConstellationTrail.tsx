@@ -8,6 +8,7 @@ import { Haptics, ImpactStyle, NotificationType } from "@capacitor/haptics";
 import { cosmicPathBackgrounds, getStaticBackgroundSrcSet } from "@/assets/backgrounds";
 import { useJourneyPathImage } from "@/hooks/useJourneyPathImage";
 import { getJourneyPathCardImageUrl } from "@/utils/journeyPathUrls";
+import { CompanionImage } from "@/components/CompanionImage";
 
 // Milestone from epic_milestones table
 interface TrailMilestone {
@@ -28,6 +29,8 @@ interface ConstellationTrailProps {
   targetDays: number;
   className?: string;
   companionImageUrl?: string;
+  companionImageFocalX?: number | null;
+  companionImageFocalY?: number | null;
   companionMood?: string;
   showCompanion?: boolean;
   milestones?: TrailMilestone[]; // Actual milestones from database
@@ -851,6 +854,8 @@ export const ConstellationTrail = memo(function ConstellationTrail({
   targetDays: _targetDays,
   className,
   companionImageUrl,
+  companionImageFocalX,
+  companionImageFocalY,
   companionMood,
   showCompanion = true,
   milestones: propMilestones,
@@ -1136,9 +1141,11 @@ export const ConstellationTrail = memo(function ConstellationTrail({
               getMoodStyles(companionMood)
             )}
           >
-            <img 
+            <CompanionImage 
               src={companionImageUrl} 
               alt="Companion" 
+              focalX={companionImageFocalX}
+              focalY={companionImageFocalY}
               className="w-full h-full object-cover"
             />
           </div>

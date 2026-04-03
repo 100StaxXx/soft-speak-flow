@@ -41,6 +41,11 @@ import {
   getDesiredIntensityFromGuidanceTone,
   getEnergyPreferenceFromAnswers,
 } from "@/utils/onboardingMentorMatching";
+import {
+  createInitialGuidedTutorialProgress,
+  getGuidedTutorialLocalProgressKey,
+} from "@/utils/guidedTutorial";
+import { safeLocalStorage } from "@/utils/storage";
 import { resolveAssignedMentorFromActiveMentors } from "@/config/onboardingMentorAssignments";
 
 // Removed duplicate outer function - using inner component method instead
@@ -210,11 +215,15 @@ interface StoryOnboardingProps {
     current_xp: number;
     preset_id?: string | null;
   } | null;
+  onJourneyCinematicStart?: () => void;
+  onJourneyCinematicComplete?: () => void;
 }
 
 export const StoryOnboarding = ({
   mode = "standard",
   existingCompanion = null,
+  onJourneyCinematicStart,
+  onJourneyCinematicComplete,
 }: StoryOnboardingProps) => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -658,6 +667,9 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
 
       const existingData = (profile?.onboarding_data as Record<string, unknown>) || {};
       const nowIso = new Date().toISOString();
+      const initialGuidedTutorialProgress = !isResetMode
+        ? createInitialGuidedTutorialProgress(nowIso)
+        : null;
       const onboardingData: Record<string, unknown> = {
         ...existingData,
         walkthrough_completed: true,
@@ -665,17 +677,8 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
         progression_reset_required: false,
       };
 
-      if (!isResetMode) {
-        onboardingData.guided_tutorial = {
-          version: 2,
-          flowVersion: 3,
-          eligible: true,
-          completedSteps: [],
-          xpAwardedSteps: [],
-          dismissed: false,
-          completed: false,
-          lastUpdatedAt: nowIso,
-        };
+      if (initialGuidedTutorialProgress) {
+        onboardingData.guided_tutorial = initialGuidedTutorialProgress;
       }
 
       const { error: completionError } = await supabase
@@ -688,6 +691,19 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
 
       if (completionError) {
         throw completionError;
+      }
+
+      if (initialGuidedTutorialProgress) {
+        safeLocalStorage.setItem(
+          getGuidedTutorialLocalProgressKey(user.id),
+          JSON.stringify(initialGuidedTutorialProgress),
+        );
+      } else {
+        safeLocalStorage.removeItem(getGuidedTutorialLocalProgressKey(user.id));
+      }
+
+      if (!isResetMode) {
+        onJourneyCinematicStart?.();
       }
 
       // Force immediate refetch to ensure fresh data (invalidateQueries only marks stale)
@@ -798,6 +814,7 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
         await finalizeCompanionOnboarding(companionId, fallbackName, recoveredAfterTimeout);
         return true;
       } catch (error) {
+        onJourneyCinematicComplete?.();
         logger.error("Companion onboarding finalization failed", {
           userId: user.id,
           companionId,
@@ -892,6 +909,7 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
 
         await queryClient.refetchQueries({ queryKey: ["profile", user.id] });
         await queryClient.refetchQueries({ queryKey: ["companion", user.id] });
+        safeLocalStorage.removeItem(getGuidedTutorialLocalProgressKey(user.id));
         toast.success(`${preset.displayName} is now your companion form.`);
         safeNavigate(navigate, "/journeys");
         return;
@@ -1045,7 +1063,7 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
             elapsedMs: Date.now() - startedAt,
           });
           toast.success("Your companion finished taking shape. Continuing your journey...");
-          await finalizeCompanionOnboarding(
+          await tryFinalizeCompanionOnboarding(
             recoveredCompanion.id,
             recoveredCompanion.spirit_animal === "Egg"
               ? selectionDisplayName
@@ -1076,6 +1094,7 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
   };
 
   const handleJourneyComplete = () => {
+    onJourneyCinematicComplete?.();
     toast.success("Welcome to Cosmiq! Your journey begins.");
     safeNavigate(navigate, "/journeys");
   };

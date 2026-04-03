@@ -223,7 +223,9 @@ describe("Index onboarding guard", () => {
     };
     mocks.companion = {
       id: "companion-1",
-    } as { id: string };
+      preset_id: "dragon",
+      current_stage: 1,
+    } as { id: string; preset_id: string; current_stage: number };
 
     renderIndex();
 

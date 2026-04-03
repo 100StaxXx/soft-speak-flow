@@ -26,6 +26,7 @@ import {
   getProgressionLevelDisplay,
 } from "@/config/progression";
 import { StoryJournalInfoTooltip } from "./StoryJournalInfoTooltip";
+import { CompanionImage } from "./CompanionImage";
 import { cn } from "@/lib/utils";
 import type { CompanionLayoutMode } from "@/hooks/useCompanionLayoutMode";
 
@@ -124,6 +125,23 @@ export const CompanionStoryJournal = ({ layoutMode = "mobile" }: CompanionStoryJ
     : null;
   const hasStory = allStories?.some((entry) => entry.stage === debouncedLevel) ?? false;
   const chapterLabel = debouncedLevel === 0 ? "Prologue" : getProgressionLevelDisplay(debouncedLevel);
+  const chapterImageFocal = useMemo(() => {
+    if (!companion) return { x: null, y: null };
+    if (debouncedLevel === 0) {
+      return {
+        x: companion.initial_image_focal_x ?? companion.current_image_focal_x ?? null,
+        y: companion.initial_image_focal_y ?? companion.current_image_focal_y ?? null,
+      };
+    }
+
+    return {
+      x: companion.current_image_focal_x ?? null,
+      y: companion.current_image_focal_y ?? null,
+    };
+  }, [
+    companion,
+    debouncedLevel,
+  ]);
 
   if (companionLoading) {
     return (
@@ -229,9 +247,11 @@ export const CompanionStoryJournal = ({ layoutMode = "mobile" }: CompanionStoryJ
         {chapterImage && isLevelUnlocked && (
           <div className="flex justify-center mb-6">
             <div className="relative w-48 h-48 rounded-2xl overflow-hidden border-2 border-primary/20 shadow-glow">
-              <img
+              <CompanionImage
                 src={chapterImage}
                 alt={`${companion.spirit_animal} at ${chapterLabel}`}
+                focalX={chapterImageFocal.x}
+                focalY={chapterImageFocal.y}
                 className="w-full h-full object-cover"
                 onError={(event) => {
                   event.currentTarget.src = debouncedLevel === 0

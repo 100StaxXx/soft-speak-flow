@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -162,6 +162,54 @@ describe("Onboarding route guard", () => {
     expect(screen.getByText("StoryOnboarding")).toBeInTheDocument();
     expect(mocks.storyOnboardingProps).toMatchObject({
       mode: "reset",
+    });
+  });
+
+  it("holds the redirect while the final onboarding cinematic is showing", async () => {
+    const view = renderOnboarding();
+
+    const storyOnboardingProps = mocks.storyOnboardingProps as {
+      onJourneyCinematicStart?: () => void;
+      onJourneyCinematicComplete?: () => void;
+    } | null;
+
+    expect(storyOnboardingProps?.onJourneyCinematicStart).toBeTypeOf("function");
+    expect(storyOnboardingProps?.onJourneyCinematicComplete).toBeTypeOf("function");
+
+    act(() => {
+      storyOnboardingProps?.onJourneyCinematicStart?.();
+    });
+
+    mocks.profile = {
+      onboarding_completed: true,
+      selected_mentor_id: "mentor-1",
+      onboarding_data: {
+        walkthrough_completed: true,
+      },
+    };
+    mocks.companion = { id: "companion-egg", preset_id: null, current_stage: 0 };
+
+    view.rerender(
+      <MemoryRouter initialEntries={["/onboarding"]}>
+        <Onboarding />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("StoryOnboarding")).toBeInTheDocument();
+    expect(mocks.navigate).not.toHaveBeenCalled();
+
+    act(() => {
+      storyOnboardingProps?.onJourneyCinematicComplete?.();
+    });
+
+    view.rerender(
+      <MemoryRouter initialEntries={["/onboarding"]}>
+        <Onboarding />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(mocks.navigate).toHaveBeenCalledWith("/journeys", { replace: true });
     });
   });
 

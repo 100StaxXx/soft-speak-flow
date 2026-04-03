@@ -12,6 +12,8 @@ interface ShowOptions {
   message: string;
   companionName?: string | null;
   companionImageUrl?: string;
+  companionImageFocalX?: number | null;
+  companionImageFocalY?: number | null;
 }
  
  interface TalkPopupContextType {
@@ -32,6 +34,8 @@ export const TalkPopupProvider = memo(({ children }: TalkPopupProviderProps) => 
   const [message, setMessage] = useState("");
   const [companionName, setCompanionName] = useState("");
   const [companionImageUrl, setCompanionImageUrl] = useState<string | null>(null);
+  const [companionImageFocalX, setCompanionImageFocalX] = useState<number | null>(null);
+  const [companionImageFocalY, setCompanionImageFocalY] = useState<number | null>(null);
    
    // Queue for pending messages
    const queueRef = useRef<ShowOptions[]>([]);
@@ -53,10 +57,14 @@ export const TalkPopupProvider = memo(({ children }: TalkPopupProviderProps) => 
       fallback: "empty",
     });
     const imageUrl = options.companionImageUrl || companion?.current_image_url || null;
+    const imageFocalX = options.companionImageFocalX ?? companion?.current_image_focal_x ?? null;
+    const imageFocalY = options.companionImageFocalY ?? companion?.current_image_focal_y ?? null;
      
      setMessage(options.message);
      setCompanionName(name);
      setCompanionImageUrl(imageUrl);
+     setCompanionImageFocalX(imageFocalX);
+     setCompanionImageFocalY(imageFocalY);
      setIsVisible(true);
   }, [companion]);
    
@@ -82,6 +90,8 @@ export const TalkPopupProvider = memo(({ children }: TalkPopupProviderProps) => 
          message={message}
          companionName={companionName}
          companionImageUrl={companionImageUrl}
+         companionImageFocalX={companionImageFocalX}
+         companionImageFocalY={companionImageFocalY}
        />
      </TalkPopupContext.Provider>
    );

@@ -253,6 +253,29 @@ describe("Auth social auth intent guard", () => {
     expect(mocks.safeNavigateMock).not.toHaveBeenCalled();
   });
 
+  it("shows a friendly inline error when native Apple auth cannot reach the edge function", async () => {
+    mocks.isNativePlatform = true;
+    mocks.platform = "ios";
+    mocks.applePluginAvailable = true;
+    mocks.invokeMock.mockResolvedValue({
+      data: null,
+      error: {
+        name: "FunctionsFetchError",
+        message: "Failed to send a request to the Edge Function",
+      },
+    });
+
+    renderAuth();
+    await flushMicrotasks();
+
+    fireEvent.click(screen.getByRole("button", { name: /sign in with apple/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "We couldn't reach the server to sign you in with Apple. Check your connection and try again.",
+    );
+    expect(mocks.safeNavigateMock).not.toHaveBeenCalled();
+  });
+
   it("routes native Apple sign-in timeout fallbacks to guarded home instead of onboarding", async () => {
     vi.useFakeTimers();
     mocks.isNativePlatform = true;

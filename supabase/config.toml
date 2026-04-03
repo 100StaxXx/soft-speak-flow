@@ -175,6 +175,9 @@ verify_jwt = true
 [functions.generate-companion-image]
 verify_jwt = true
 
+[functions.backfill-companion-image-focal]
+verify_jwt = true
+
 [functions.generate-companion-story]
 verify_jwt = false
 

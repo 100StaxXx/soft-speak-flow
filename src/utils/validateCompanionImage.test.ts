@@ -21,6 +21,8 @@ describe("generateWithValidation", () => {
     invokeMock.mockResolvedValue({
       data: {
         imageUrl: "https://example.com/companion.png",
+        imageFocalX: 0.51,
+        imageFocalY: 0.46,
         qualityScore: {
           overallScore: 85,
           shouldRetry: false,
@@ -30,7 +32,7 @@ describe("generateWithValidation", () => {
       error: null,
     });
 
-    await generateWithValidation(
+    await expect(generateWithValidation(
       {
         favoriteColor: "#FF6B35",
         spiritAnimal: "Wolf",
@@ -39,7 +41,11 @@ describe("generateWithValidation", () => {
         flowType: "onboarding",
       },
       { maxRetries: 0 },
-    );
+    )).resolves.toMatchObject({
+      imageUrl: "https://example.com/companion.png",
+      imageFocalX: 0.51,
+      imageFocalY: 0.46,
+    });
 
     expect(invokeMock).toHaveBeenCalledWith("generate-companion-image", {
       body: expect.objectContaining({
@@ -61,12 +67,15 @@ describe("generateWithValidation", () => {
       error: null,
     });
 
-    await generateWithValidation({
+    await expect(generateWithValidation({
       favoriteColor: "#7B68EE",
       spiritAnimal: "Kitsune",
       element: "Air",
       stage: 4,
       flowType: "regenerate",
+    })).resolves.toMatchObject({
+      imageFocalX: null,
+      imageFocalY: null,
     });
 
     const [, invokeArgs] = invokeMock.mock.calls[0];

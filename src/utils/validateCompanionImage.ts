@@ -2,6 +2,8 @@ import { supabase } from "@/integrations/supabase/client";
 
 interface GenerateWithValidationResult {
   imageUrl: string;
+  imageFocalX: number | null;
+  imageFocalY: number | null;
   validationPassed: boolean;
   retryCount: number;
 }
@@ -99,6 +101,8 @@ export async function generateWithValidation(
 
   return {
     imageUrl: imageResult.imageUrl,
+    imageFocalX: typeof imageResult.imageFocalX === "number" ? imageResult.imageFocalX : null,
+    imageFocalY: typeof imageResult.imageFocalY === "number" ? imageResult.imageFocalY : null,
     validationPassed,
     retryCount,
   };

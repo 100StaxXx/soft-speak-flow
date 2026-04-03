@@ -14,7 +14,12 @@ import { getAuthRedirectPath, getProfileAwareAuthFallbackPath, ensureProfile } f
 import { logger } from "@/utils/logger";
 import { hasWalkthroughCompleted } from "@/utils/profileOnboarding";
 import { getRedirectUrlWithPath, getRedirectUrl } from '@/utils/redirectUrl';
-import { parseFunctionInvokeError, toUserFacingFunctionError } from "@/utils/supabaseFunctionErrors";
+import {
+  isRetriableFunctionInvokeError,
+  parseFunctionInvokeError,
+  toUserFacingFunctionError,
+} from "@/utils/supabaseFunctionErrors";
+import { retryWithBackoff } from "@/utils/retry";
 import {
   clearPendingSocialAuthAttempt,
   getSocialAccountNotFoundMessage,
@@ -24,11 +29,10 @@ import {
   type PendingSocialAuthAttempt,
   type SocialAuthIntent,
 } from "@/utils/socialAuth";
-import { signinBackground } from "@/assets/backgrounds";
-import { StaticBackgroundImage } from "@/components/StaticBackgroundImage";
 
 const POST_AUTH_NAVIGATION_TIMEOUT_MS = 5000;
 const POST_AUTH_DEFAULT_PATH = '/onboarding';
+const AUTH_GATEWAY_RETRY_DELAY_MS = 350;
 const FUNCTION_TRANSPORT_ERROR_MESSAGES = new Set([
   "edge function returned a non-2xx status code",
   "failed to send a request to the edge function",
@@ -114,7 +118,10 @@ const getAppleErrorDescription = (error: unknown): string => {
   if (
     normalized.includes("network") ||
     normalized.includes("failed to fetch") ||
-    normalized.includes("timeout")
+    normalized.includes("timeout") ||
+    normalized.includes("failed to send a request to the edge function") ||
+    normalized.includes("relay error invoking the edge function") ||
+    normalized.includes("functionsfetcherror")
   ) {
     return "Network issue while signing in with Apple. Check your connection and try again.";
   }
@@ -156,6 +163,37 @@ const getAuthGatewayErrorMessage = async (
   });
 };
 
+const getAppleAuthActionDescription = (intent: SocialAuthIntent): string =>
+  intent === "sign_in" ? "sign you in with Apple" : "create your account with Apple";
+
+const getAppleAuthErrorMessage = async (
+  error: unknown,
+  intent: SocialAuthIntent,
+): Promise<string> => {
+  const parsed = await parseFunctionInvokeError(error);
+
+  if (
+    typeof parsed.backendMessage === "string" &&
+    parsed.backendMessage.trim() &&
+    !isFunctionTransportErrorMessage(parsed.backendMessage)
+  ) {
+    return parsed.backendMessage;
+  }
+
+  const directMessage = getErrorMessage(error).trim();
+  if (
+    directMessage &&
+    !isFunctionTransportErrorMessage(directMessage) &&
+    !directMessage.toLowerCase().includes("functionsfetcherror")
+  ) {
+    return directMessage;
+  }
+
+  return toUserFacingFunctionError(parsed, {
+    action: getAppleAuthActionDescription(intent),
+  });
+};
+
 interface AuthGatewayPayload {
   action: AuthGatewayAction;
   email?: string;
@@ -165,15 +203,31 @@ interface AuthGatewayPayload {
 }
 
 const invokeAuthGateway = async (payload: AuthGatewayPayload) => {
-  const { data, error } = await supabase.functions.invoke("auth-gateway", {
-    body: payload,
-  });
+  try {
+    const data = await retryWithBackoff(
+      async () => {
+        const { data, error } = await supabase.functions.invoke("auth-gateway", {
+          body: payload,
+        });
 
-  if (error) {
+        if (error) {
+          throw error;
+        }
+
+        return (data ?? {}) as Record<string, unknown>;
+      },
+      {
+        maxAttempts: 2,
+        initialDelay: AUTH_GATEWAY_RETRY_DELAY_MS,
+        maxDelay: AUTH_GATEWAY_RETRY_DELAY_MS,
+        shouldRetry: isRetriableFunctionInvokeError,
+      },
+    );
+
+    return data;
+  } catch (error) {
     throw new Error(await getAuthGatewayErrorMessage(error, payload.action));
   }
-
-  return (data ?? {}) as Record<string, unknown>;
 };
 
 const readFunctionErrorContext = async (error: unknown) => {
@@ -205,9 +259,6 @@ const Auth = () => {
   const pendingPostAuthNavigationContextRef = useRef<
     (PostAuthNavigationContext & { userId: string }) | null
   >(null);
-  
-  const backgroundImage = signinBackground;
-
   const setPendingPostAuthNavigationContext = useCallback(
     (userId: string, context: PostAuthNavigationContext) => {
       pendingPostAuthNavigationContextRef.current = {
@@ -815,11 +866,7 @@ const Auth = () => {
             throw new Error('Apple Sign-In security check failed. Please try again.');
           }
 
-          throw new Error(
-            typeof functionErrorBody?.error === 'string'
-              ? functionErrorBody.error
-              : functionError.message || 'Apple Sign-In failed',
-          );
+          throw new Error(await getAppleAuthErrorMessage(functionError, socialAuthIntent));
         }
         if (!sessionData?.access_token || !sessionData?.refresh_token) {
           clearPendingPostAuthNavigationContext();
@@ -953,9 +1000,9 @@ const Auth = () => {
     }
   };
 
-  const fieldLabelClassName = "text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-white/[0.62]";
+  const fieldLabelClassName = "text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-white/[0.5]";
   const fieldInputClassName =
-    "h-14 rounded-full border border-white/[0.08] bg-[rgba(16,10,39,0.62)] px-5 text-[0.95rem] text-white shadow-[0_18px_36px_rgba(7,2,24,0.42),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl placeholder:text-white/[0.42] focus-visible:border-white/[0.18] focus-visible:ring-white/[0.12] focus-visible:ring-offset-0";
+    "h-[3.35rem] rounded-[1.15rem] border border-[#2a1a49] bg-[#12091f] px-5 text-[0.98rem] font-medium text-white shadow-[0_0_0_1px_rgba(255,255,255,0.01),0_10px_28px_rgba(5,2,16,0.45),inset_0_1px_0_rgba(255,255,255,0.03)] placeholder:text-white/[0.34] focus-visible:border-[#4b2c7e] focus-visible:ring-[3px] focus-visible:ring-[#b86dff]/15 focus-visible:ring-offset-0";
   const switchMode = () => {
     setInlineError(null);
     if (isForgotPassword) {
@@ -969,27 +1016,23 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen relative overflow-hidden bg-[#080313] text-pure-white">
-      <StaticBackgroundImage
-        background={backgroundImage}
-        className="fixed inset-0 -z-20 h-full w-full scale-[1.02] object-cover object-center pointer-events-none select-none"
-      />
-      <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_50%_12%,rgba(255,220,240,0.24),transparent_17%),radial-gradient(circle_at_52%_44%,rgba(201,109,255,0.18),transparent_22%),linear-gradient(180deg,rgba(10,8,31,0.14)_0%,rgba(12,10,38,0.32)_44%,rgba(7,5,23,0.9)_100%)]" />
-      <div className="absolute inset-x-0 bottom-0 -z-10 h-[45vh] bg-gradient-to-t from-[#050313] via-[#050313]/70 to-transparent" />
+    <div className="min-h-screen relative overflow-hidden bg-[#090311] text-pure-white">
+      <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_50%_82%,rgba(179,92,255,0.16),transparent_28%),radial-gradient(circle_at_50%_18%,rgba(39,18,71,0.3),transparent_38%),linear-gradient(180deg,#090311_0%,#0a0314_38%,#09020f_100%)]" />
+      <div className="absolute inset-x-0 bottom-0 -z-10 h-[30vh] bg-[radial-gradient(circle_at_50%_100%,rgba(209,100,255,0.12),transparent_52%)]" />
       <section
         id="auth-form"
-        className="min-h-screen relative flex items-end justify-center px-5 pb-[max(2rem,env(safe-area-inset-bottom))] pt-[max(3.5rem,env(safe-area-inset-top))] md:items-center md:px-6"
+        className="min-h-screen relative flex items-center justify-center px-6 pb-[max(2rem,env(safe-area-inset-bottom))] pt-[max(4.5rem,env(safe-area-inset-top)+2.75rem)]"
       >
-        <div className="relative z-10 w-full max-w-[23rem] pb-5 md:max-w-md md:pb-0">
+        <div className="relative z-10 w-full max-w-[20.5rem] py-4 sm:max-w-[21.75rem]">
           <h1 className="sr-only">
             {isForgotPassword ? "Reset password" : isLogin ? "Sign in" : "Create account"}
           </h1>
 
-          <div className="space-y-6">
+          <div className="space-y-5">
             {isForgotPassword ? (
               <form onSubmit={handleForgotPassword} className="space-y-5">
-                <div className="space-y-1">
-                  <p className="text-sm leading-6 text-white/70">
+                <div className="space-y-2 pb-1">
+                  <p className="text-sm leading-6 text-white/[0.72]">
                     Enter your email and we&apos;ll send a reset link.
                   </p>
                 </div>
@@ -1014,7 +1057,7 @@ const Auth = () => {
                 </div>
                 <Button
                   type="submit"
-                  className="h-14 w-full rounded-[18px] bg-gradient-to-r from-[#c25eff] via-[#b45fff] to-[#e26cff] text-base font-bold text-pure-white shadow-[0_18px_42px_rgba(165,78,255,0.38)] hover:brightness-105"
+                  className="h-[3.35rem] w-full rounded-[1.1rem] bg-gradient-to-r from-[#b254ea] via-[#c45ff3] to-[#df67dc] text-[0.98rem] font-semibold text-pure-white shadow-[0_20px_38px_rgba(143,54,224,0.34)] hover:brightness-105"
                   disabled={loading}
                 >
                   {loading ? "Sending..." : "Send Reset Link"}
@@ -1027,7 +1070,7 @@ const Auth = () => {
                   <Input
                     id="email"
                     type="email"
-                    placeholder="you@example.com"
+                    placeholder="best@best12.com"
                     value={email}
                     onChange={(e) => {
                       setInlineError(null);
@@ -1063,7 +1106,7 @@ const Auth = () => {
                         setInlineError(null);
                         setIsForgotPassword(true);
                       }}
-                      className="pl-1 text-xs font-medium text-white/[0.72] transition-colors hover:text-pure-white"
+                      className="pl-1 pt-0.5 text-[0.74rem] font-medium text-white/[0.6] transition-colors hover:text-pure-white"
                     >
                       Forgot password?
                     </button>
@@ -1089,7 +1132,7 @@ const Auth = () => {
                 )}
                 <Button
                   type="submit"
-                  className="h-14 w-full rounded-[18px] bg-gradient-to-r from-[#c25eff] via-[#b45fff] to-[#e26cff] text-base font-bold text-pure-white shadow-[0_18px_42px_rgba(165,78,255,0.38)] hover:brightness-105"
+                  className="h-[3.35rem] w-full rounded-[1.1rem] bg-gradient-to-r from-[#b254ea] via-[#c45ff3] to-[#df67dc] text-[0.98rem] font-semibold text-pure-white shadow-[0_22px_42px_rgba(148,58,230,0.38)] hover:brightness-105"
                   disabled={loading}
                 >
                   {loading ? "Loading..." : isLogin ? "Sign In" : "Get Started"}
@@ -1099,12 +1142,12 @@ const Auth = () => {
 
             {!isForgotPassword && (
               <>
-                <div className="relative my-1">
+                <div className="relative pt-1">
                   <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-white/[0.16]" />
+                    <div className="w-full border-t border-white/[0.12]" />
                   </div>
                   <div className="relative flex justify-center text-sm">
-                    <span className="rounded-[6px] bg-[#1d1438]/90 px-3 py-0.5 text-[0.75rem] text-white/[0.72] shadow-[0_8px_18px_rgba(8,3,24,0.35)]">
+                    <span className="rounded-[0.45rem] bg-[#171023] px-2.5 py-0.5 text-[0.72rem] text-white/[0.58] shadow-[0_10px_20px_rgba(0,0,0,0.3)]">
                       or
                     </span>
                   </div>
@@ -1114,13 +1157,13 @@ const Auth = () => {
                   type="button"
                   onClick={() => handleOAuthSignIn('apple')}
                   disabled={loading || oauthLoading !== null}
-                  className="h-12 w-full rounded-[14px] bg-white text-base font-semibold text-black shadow-[0_16px_30px_rgba(0,0,0,0.28)] hover:bg-white/95"
+                  className="h-[3.15rem] w-full rounded-[1rem] bg-white text-[0.98rem] font-semibold text-black shadow-[0_16px_30px_rgba(0,0,0,0.26)] hover:bg-white/95"
                 >
                   {oauthLoading === 'apple' ? (
                     <div className="animate-spin h-5 w-5 border-2 border-black/20 border-t-black rounded-full" />
                   ) : (
                     <>
-                      <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+                      <svg className="h-[1.05rem] w-[1.05rem]" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
                       </svg>
                       {isLogin ? 'Sign in with Apple' : 'Sign up with Apple'}
@@ -1133,18 +1176,18 @@ const Auth = () => {
             {inlineError ? (
               <div
                 role="alert"
-                className="rounded-[22px] bg-[#ea5a54]/95 px-5 py-5 shadow-[0_22px_48px_rgba(61,8,17,0.36)]"
+                className="rounded-[1.35rem] bg-[#ea5d57] px-5 py-5 shadow-[0_22px_46px_rgba(60,8,16,0.34)]"
               >
-                <p className="text-sm font-bold text-pure-white">Error</p>
-                <p className="mt-1 text-sm leading-6 text-pure-white/[0.84]">{inlineError}</p>
+                <p className="text-[0.95rem] font-semibold text-pure-white">Error</p>
+                <p className="mt-1 text-sm leading-6 text-pure-white/[0.88]">{inlineError}</p>
               </div>
             ) : null}
 
-            <div className="text-center">
+            <div className="pt-0.5 text-center">
               <button
                 type="button"
                 onClick={switchMode}
-                className="text-sm font-medium text-white/[0.86] underline underline-offset-4 transition-colors hover:text-white"
+                className="text-[0.93rem] font-medium text-white/[0.72] underline underline-offset-[3px] transition-colors hover:text-white"
               >
                 {isForgotPassword 
                   ? "Back to Sign In" 

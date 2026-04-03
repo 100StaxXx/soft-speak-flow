@@ -5,9 +5,12 @@ import { Adversary, AdversaryTier } from "@/types/astralEncounters";
 import { Button } from "@/components/ui/button";
 import { getStageName } from "@/config/companionStages";
 import { formatDisplayLabel } from "@/lib/utils";
+import { CompanionImage } from "@/components/CompanionImage";
 
 interface BattleVSScreenProps {
   companionImageUrl?: string;
+  companionImageFocalX?: number | null;
+  companionImageFocalY?: number | null;
   companionName?: string;
   companionStage?: number;
   adversary: Adversary;
@@ -26,6 +29,8 @@ const TIER_COLORS: Record<AdversaryTier, { primary: string; glow: string; bg: st
 
 export const BattleVSScreen = ({
   companionImageUrl,
+  companionImageFocalX,
+  companionImageFocalY,
   companionName = "Companion",
   companionStage = 0,
   adversary,
@@ -166,9 +171,11 @@ export const BattleVSScreen = ({
               {/* Image frame */}
               <div className="relative w-full h-full rounded-2xl overflow-hidden border-2 border-primary/40 shadow-[0_0_30px_hsl(var(--primary)/0.3)]">
                 {companionImageUrl ? (
-                  <img
+                  <CompanionImage
                     src={companionImageUrl}
                     alt={companionName}
+                    focalX={companionImageFocalX}
+                    focalY={companionImageFocalY}
                     className="w-full h-full object-cover"
                   />
                 ) : (

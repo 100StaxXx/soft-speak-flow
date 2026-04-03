@@ -23,7 +23,7 @@ const mocks = vi.hoisted(() => ({
       completedSteps: ["create_quest", "meet_companion"],
       xpAwardedSteps: [] as string[],
       milestonesCompleted: ["open_mentor_tab"],
-    } as Record<string, unknown>,
+    } as Record<string, unknown> | null,
     profileUpdatePayloads: [] as Array<Record<string, unknown>>,
     queryClient: {
       invalidateQueries: vi.fn().mockResolvedValue(undefined),
@@ -42,6 +42,31 @@ const mocks = vi.hoisted(() => ({
       | null,
   },
 }));
+
+const storageMocks = vi.hoisted(() => {
+  const store = new Map<string, string>();
+
+  return {
+    safeLocalStorage: {
+      getItem: vi.fn((key: string) => store.get(key) ?? null),
+      setItem: vi.fn((key: string, value: string) => {
+        store.set(key, value);
+        return true;
+      }),
+      removeItem: vi.fn((key: string) => {
+        store.delete(key);
+        return true;
+      }),
+      clear: vi.fn(() => {
+        store.clear();
+        return true;
+      }),
+    },
+    reset: () => {
+      store.clear();
+    },
+  };
+});
 
 vi.mock("@tanstack/react-query", async () => {
   const actual =
@@ -78,6 +103,10 @@ vi.mock("@/hooks/useXPRewards", () => ({
 
 vi.mock("@/hooks/useMentorPersonality", () => ({
   useMentorPersonality: () => mocks.state.personality,
+}));
+
+vi.mock("@/utils/storage", () => ({
+  safeLocalStorage: storageMocks.safeLocalStorage,
 }));
 
 vi.mock("@/integrations/supabase/client", () => ({
@@ -313,7 +342,7 @@ describe("guided tutorial intro dialogue sequence", () => {
     mocks.state.queryClient.invalidateQueries.mockClear();
     mocks.state.awardCustomXP.mockClear();
     mocks.state.personality = null;
-    globalThis.localStorage?.removeItem?.("guided_tutorial_progress_user-1");
+    storageMocks.reset();
   });
 
   const createWrapper = (path = "/journeys") =>
@@ -355,6 +384,35 @@ describe("guided tutorial intro dialogue sequence", () => {
       expect(result.current.currentStep).toBe("quests_campaigns_intro");
       expect(result.current.dialogueActionLabel).toBe("Continue");
       expect(result.current.onDialogueAction).toBeDefined();
+    });
+  });
+
+  it("starts the tutorial from fresh local onboarding progress before the profile refresh catches up", async () => {
+    mocks.state.guidedTutorial = null;
+    storageMocks.safeLocalStorage.setItem(
+      "guided_tutorial_progress_user-1",
+      JSON.stringify({
+        version: 2,
+        flowVersion: 3,
+        eligible: true,
+        dismissed: false,
+        completed: false,
+        completedSteps: [],
+        xpAwardedSteps: [],
+        milestonesCompleted: [],
+        lastUpdatedAt: "2026-04-03T00:00:00.000Z",
+      }),
+    );
+
+    const { result } = renderHook(() => usePostOnboardingMentorGuidance(), {
+      wrapper: createWrapper("/journeys"),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isActive).toBe(true);
+      expect(result.current.isIntroDialogueActive).toBe(true);
+      expect(result.current.currentStep).toBe("quests_campaigns_intro");
+      expect(result.current.dialogueActionLabel).toBe("Start Tutorial");
     });
   });
 
@@ -457,7 +515,7 @@ describe("guided tutorial intro dialogue sequence", () => {
         xpAwardedSteps: [],
         milestonesCompleted: ["mentor_intro_hello"],
       };
-      globalThis.localStorage?.removeItem?.("guided_tutorial_progress_user-1");
+      storageMocks.safeLocalStorage.removeItem("guided_tutorial_progress_user-1");
 
       const { result } = renderHook(() => usePostOnboardingMentorGuidance(), {
         wrapper: createWrapper("/journeys"),
@@ -473,7 +531,7 @@ describe("guided tutorial intro dialogue sequence", () => {
   );
 
   it("uses different mentor-specific intro copy while keeping shared quests copy", async () => {
-    globalThis.localStorage?.removeItem?.("guided_tutorial_progress_user-1");
+    storageMocks.safeLocalStorage.removeItem("guided_tutorial_progress_user-1");
 
     mocks.state.personality = {
       name: "Atlas",
@@ -503,7 +561,7 @@ describe("guided tutorial intro dialogue sequence", () => {
     });
     unmountAtlasIntro();
 
-    globalThis.localStorage?.removeItem?.("guided_tutorial_progress_user-1");
+    storageMocks.safeLocalStorage.removeItem("guided_tutorial_progress_user-1");
     mocks.state.personality = {
       name: "Stryker",
       slug: "stryker",
@@ -534,7 +592,7 @@ describe("guided tutorial intro dialogue sequence", () => {
 
     expect(atlasIntroText).not.toEqual(strykerIntroText);
 
-    globalThis.localStorage?.removeItem?.("guided_tutorial_progress_user-1");
+    storageMocks.safeLocalStorage.removeItem("guided_tutorial_progress_user-1");
     mocks.state.personality = {
       name: "Atlas",
       slug: "atlas",
@@ -563,7 +621,7 @@ describe("guided tutorial intro dialogue sequence", () => {
     });
     unmountAtlasQuests();
 
-    globalThis.localStorage?.removeItem?.("guided_tutorial_progress_user-1");
+    storageMocks.safeLocalStorage.removeItem("guided_tutorial_progress_user-1");
     mocks.state.personality = {
       name: "Stryker",
       slug: "stryker",

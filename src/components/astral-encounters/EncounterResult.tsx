@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { useEffect, useMemo } from 'react';
 import confetti from 'canvas-confetti';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
+import { CompanionImage } from '@/components/CompanionImage';
 
 interface EncounterResultProps {
   adversary: Adversary;
@@ -15,6 +16,8 @@ interface EncounterResultProps {
   retryAvailableAt?: string;
   tiltBonus?: boolean;
   companionImageUrl?: string;
+  companionImageFocalX?: number | null;
+  companionImageFocalY?: number | null;
   companionName?: string;
 }
 
@@ -115,6 +118,8 @@ export const EncounterResultScreen = ({
   retryAvailableAt,
   tiltBonus,
   companionImageUrl,
+  companionImageFocalX,
+  companionImageFocalY,
   companionName,
 }: EncounterResultProps) => {
   const config = RESULT_CONFIG[result];
@@ -264,9 +269,11 @@ export const EncounterResultScreen = ({
           
           {/* Companion image */}
           <div className={`relative w-28 h-28 rounded-full overflow-hidden border-2 ${isSuccess ? 'border-primary/50 shadow-lg shadow-primary/30' : 'border-slate-500/40 shadow-lg shadow-purple-900/30'}`}>
-            <img 
+            <CompanionImage 
               src={companionImageUrl} 
               alt={companionName || 'Companion'} 
+              focalX={companionImageFocalX}
+              focalY={companionImageFocalY}
               className={`w-full h-full object-cover ${!isSuccess ? 'saturate-75' : ''}`}
             />
             

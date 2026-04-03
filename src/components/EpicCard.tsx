@@ -310,6 +310,8 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
           targetDays={epic.target_days}
           className="mb-3"
           companionImageUrl={health?.imageUrl || companion?.current_image_url}
+          companionImageFocalX={health?.imageFocalX ?? companion?.current_image_focal_x ?? null}
+          companionImageFocalY={health?.imageFocalY ?? companion?.current_image_focal_y ?? null}
           companionMood={health?.moodState}
           showCompanion={true}
           milestones={trailMilestones}

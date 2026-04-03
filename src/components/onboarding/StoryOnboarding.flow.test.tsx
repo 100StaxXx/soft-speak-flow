@@ -60,10 +60,36 @@ const mocks = vi.hoisted(() => ({
   questionnaireUpsert: vi.fn(),
   createCompanionMutateAsync: vi.fn(),
   toastError: vi.fn(),
+  toastSuccess: vi.fn(),
   loggerError: vi.fn(),
   loggerWarn: vi.fn(),
   loggerInfo: vi.fn(),
 }));
+
+const storageMocks = vi.hoisted(() => {
+  const store = new Map<string, string>();
+
+  return {
+    safeLocalStorage: {
+      getItem: vi.fn((key: string) => store.get(key) ?? null),
+      setItem: vi.fn((key: string, value: string) => {
+        store.set(key, value);
+        return true;
+      }),
+      removeItem: vi.fn((key: string) => {
+        store.delete(key);
+        return true;
+      }),
+      clear: vi.fn(() => {
+        store.clear();
+        return true;
+      }),
+    },
+    reset: () => {
+      store.clear();
+    },
+  };
+});
 
 vi.mock("framer-motion", async () => {
   const React = await import("react");
@@ -123,6 +149,7 @@ vi.mock("@/utils/logger", () => ({
 vi.mock("sonner", () => ({
   toast: {
     error: mocks.toastError,
+    success: mocks.toastSuccess,
   },
 }));
 
@@ -170,6 +197,10 @@ vi.mock("@/integrations/supabase/client", () => ({
       };
     },
   },
+}));
+
+vi.mock("@/utils/storage", () => ({
+  safeLocalStorage: storageMocks.safeLocalStorage,
 }));
 
 vi.mock("@/components/StarfieldBackground", () => ({
@@ -329,7 +360,14 @@ vi.mock("@/components/CompanionPersonalization", () => ({
 }));
 
 vi.mock("./JourneyBegins", () => ({
-  JourneyBegins: () => <div data-testid="journey-begins-stage">Journey Begins</div>,
+  JourneyBegins: ({ onComplete }: { onComplete: () => void }) => (
+    <div data-testid="journey-begins-stage">
+      Journey Begins
+      <button type="button" onClick={onComplete}>
+        finish-journey
+      </button>
+    </div>
+  ),
 }));
 
 const renderOnboarding = () => {
@@ -372,6 +410,7 @@ describe("StoryOnboarding questionnaire submission flow", () => {
     mocks.questionnaireUpsert.mockReset();
     mocks.createCompanionMutateAsync.mockReset();
     mocks.toastError.mockReset();
+    mocks.toastSuccess.mockReset();
     mocks.loggerError.mockReset();
     mocks.loggerWarn.mockReset();
     mocks.loggerInfo.mockReset();
@@ -381,6 +420,7 @@ describe("StoryOnboarding questionnaire submission flow", () => {
     mocks.mentorsEq.mockResolvedValue({ data: [ACTIVE_MENTOR], error: null });
     mocks.questionnaireUpsert.mockResolvedValue({ error: null });
     mocks.createCompanionMutateAsync.mockResolvedValue({ id: "companion-1" });
+    storageMocks.reset();
   });
 
   it("moves to calculating immediately, then returns to questionnaire on timeout failure", async () => {
@@ -475,6 +515,47 @@ describe("StoryOnboarding questionnaire submission flow", () => {
     }
   });
 
+  it("seeds first-run guided tutorial progress before leaving onboarding", async () => {
+    renderOnboarding();
+    await advanceToQuestionnaire();
+
+    vi.useFakeTimers();
+    try {
+      fireEvent.click(screen.getByRole("button", { name: "questionnaire-submit" }));
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(CALCULATING_STAGE_DURATION_MS);
+        await Promise.resolve();
+      });
+
+      vi.useRealTimers();
+
+      await advanceFromMentorToEggSelection();
+      fireEvent.click(screen.getByRole("button", { name: "complete-companion" }));
+
+      await screen.findByTestId("journey-begins-stage");
+
+      const rawProgress = storageMocks.safeLocalStorage.getItem(
+        "guided_tutorial_progress_user-1",
+      );
+      expect(rawProgress).toBeTruthy();
+
+      const guidedTutorial = JSON.parse(rawProgress ?? "{}");
+      expect(guidedTutorial).toMatchObject({
+        version: 2,
+        flowVersion: 3,
+        eligible: true,
+        completed: false,
+        dismissed: false,
+        completedSteps: [],
+        xpAwardedSteps: [],
+        milestonesCompleted: [],
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("passes through story tone via story-tone page and egg prelude before companion creation", async () => {
     renderOnboarding();
     await advanceToQuestionnaire();
@@ -512,6 +593,54 @@ describe("StoryOnboarding questionnaire submission flow", () => {
         coreElement: "ice",
         storyTone: "dark_intense",
       });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("signals the final cinematic lifecycle around the journey-begins stage", async () => {
+    const onJourneyCinematicStart = vi.fn();
+    const onJourneyCinematicComplete = vi.fn();
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+        },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <StoryOnboarding
+            onJourneyCinematicStart={onJourneyCinematicStart}
+            onJourneyCinematicComplete={onJourneyCinematicComplete}
+          />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await advanceToQuestionnaire();
+
+    vi.useFakeTimers();
+    try {
+      fireEvent.click(screen.getByRole("button", { name: "questionnaire-submit" }));
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(CALCULATING_STAGE_DURATION_MS);
+        await Promise.resolve();
+      });
+
+      vi.useRealTimers();
+
+      await advanceFromMentorToEggSelection();
+      fireEvent.click(screen.getByRole("button", { name: "complete-companion" }));
+
+      await screen.findByTestId("journey-begins-stage");
+      expect(onJourneyCinematicStart).toHaveBeenCalledTimes(1);
+
+      fireEvent.click(screen.getByRole("button", { name: "finish-journey" }));
+      expect(onJourneyCinematicComplete).toHaveBeenCalledTimes(1);
     } finally {
       vi.useRealTimers();
     }

@@ -13,7 +13,11 @@ interface WakeUpState {
   dismissCelebration: () => void;
   companionName: string;
   companionImageUrl: string;
+  companionImageFocalX: number | null;
+  companionImageFocalY: number | null;
   dormantImageUrl: string | null;
+  dormantImageFocalX: number | null;
+  dormantImageFocalY: number | null;
   bondLevel: number;
 }
 
@@ -159,7 +163,11 @@ export function useCompanionWakeUp(): WakeUpState {
     dismissCelebration,
     companionName,
     companionImageUrl: companion?.current_image_url || '',
+    companionImageFocalX: companion?.current_image_focal_x ?? null,
+    companionImageFocalY: companion?.current_image_focal_y ?? null,
     dormantImageUrl: companion?.dormant_image_url || null,
+    dormantImageFocalX: companion?.dormant_image_focal_x ?? null,
+    dormantImageFocalY: companion?.dormant_image_focal_y ?? null,
     bondLevel: care?.bond?.level || 1,
   };
 }

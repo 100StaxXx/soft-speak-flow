@@ -15,6 +15,8 @@ export interface GuildMemberPresence {
   status: 'online' | 'away' | 'busy';
   lastActivity?: string;
   companionImageUrl?: string;
+  companionImageFocalX?: number | null;
+  companionImageFocalY?: number | null;
   displayName?: string;
 }
 
@@ -40,7 +42,7 @@ export const useGuildPresence = ({ epicId, communityId }: UseGuildPresenceOption
   const fetchUserInfo = useCallback(async (userId: string) => {
     const [profileRes, companionRes] = await Promise.all([
       supabase.from("profiles").select("email, onboarding_data").eq("id", userId).maybeSingle(),
-      supabase.from("user_companion").select("current_image_url").eq("user_id", userId).maybeSingle(),
+      supabase.from("user_companion").select("current_image_url, current_image_focal_x, current_image_focal_y").eq("user_id", userId).maybeSingle(),
     ]);
 
     const profile = profileRes.data;
@@ -57,6 +59,8 @@ export const useGuildPresence = ({ epicId, communityId }: UseGuildPresenceOption
     return {
       displayName,
       companionImageUrl: companion?.current_image_url || undefined,
+      companionImageFocalX: companion?.current_image_focal_x ?? null,
+      companionImageFocalY: companion?.current_image_focal_y ?? null,
     };
   }, []);
 
@@ -82,6 +86,8 @@ export const useGuildPresence = ({ epicId, communityId }: UseGuildPresenceOption
             status: 'online' | 'away' | 'busy';
             display_name?: string;
             companion_image_url?: string;
+            companion_image_focal_x?: number | null;
+            companion_image_focal_y?: number | null;
           };
           
           members.push({
@@ -90,6 +96,8 @@ export const useGuildPresence = ({ epicId, communityId }: UseGuildPresenceOption
             status: presence.status || 'online',
             displayName: presence.display_name,
             companionImageUrl: presence.companion_image_url,
+            companionImageFocalX: presence.companion_image_focal_x ?? null,
+            companionImageFocalY: presence.companion_image_focal_y ?? null,
           });
         }
       });
@@ -121,6 +129,8 @@ export const useGuildPresence = ({ epicId, communityId }: UseGuildPresenceOption
           status: 'online',
           display_name: userInfo.displayName,
           companion_image_url: userInfo.companionImageUrl,
+          companion_image_focal_x: userInfo.companionImageFocalX,
+          companion_image_focal_y: userInfo.companionImageFocalY,
         });
       } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
         logger.warn('Guild presence subscription error', { status, error: err?.message });
@@ -147,6 +157,8 @@ export const useGuildPresence = ({ epicId, communityId }: UseGuildPresenceOption
       status,
       display_name: userInfo.displayName,
       companion_image_url: userInfo.companionImageUrl,
+      companion_image_focal_x: userInfo.companionImageFocalX,
+      companion_image_focal_y: userInfo.companionImageFocalY,
     });
   }, [channel, user, fetchUserInfo]);
 

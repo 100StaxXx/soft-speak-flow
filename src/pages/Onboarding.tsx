@@ -23,6 +23,7 @@ export default function Onboarding() {
   const onboardingSelfHealAttemptedRef = useRef(false);
   const legacyAccountDeletionAttemptedRef = useRef(false);
   const [isDeletingLegacyAccount, setIsDeletingLegacyAccount] = useState(false);
+  const [isShowingJourneyCinematic, setIsShowingJourneyCinematic] = useState(false);
   const hasCompanion = Boolean(companion);
   const hasPresetCompanion = Boolean(companion?.preset_id);
   const companionStage = companion?.current_stage ?? null;
@@ -41,6 +42,7 @@ export default function Onboarding() {
     onboardingSelfHealAttemptedRef.current = false;
     legacyAccountDeletionAttemptedRef.current = false;
     setIsDeletingLegacyAccount(false);
+    setIsShowingJourneyCinematic(false);
   }, [user?.id]);
 
   useEffect(() => {
@@ -116,9 +118,10 @@ export default function Onboarding() {
   useEffect(() => {
     if (!user || !onboardingGateReady) return;
     if (!onboardingGate.isEstablished) return;
+    if (isShowingJourneyCinematic) return;
 
     navigate("/journeys", { replace: true });
-  }, [user, onboardingGateReady, onboardingGate.isEstablished, navigate]);
+  }, [user, onboardingGateReady, onboardingGate.isEstablished, isShowingJourneyCinematic, navigate]);
 
   if (status === "loading" || status === "recovering") {
     return null;
@@ -128,13 +131,15 @@ export default function Onboarding() {
     return <PageLoader message="Resetting your account so you can restart onboarding..." />;
   }
 
-  if (user && (profileLoading || companionLoading || onboardingGate.isEstablished)) {
+  if (user && (profileLoading || companionLoading || (onboardingGate.isEstablished && !isShowingJourneyCinematic))) {
     return null;
   }
 
   return (
     <StoryOnboarding
       mode={onboardingGate.needsProgressionReset ? "reset" : "standard"}
+      onJourneyCinematicStart={() => setIsShowingJourneyCinematic(true)}
+      onJourneyCinematicComplete={() => setIsShowingJourneyCinematic(false)}
     />
   );
 }

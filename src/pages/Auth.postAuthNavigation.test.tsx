@@ -310,6 +310,69 @@ describe("Auth post-auth navigation", () => {
     );
   });
 
+  it("retries transient auth-gateway transport failures during password sign-up", async () => {
+    vi.useFakeTimers();
+    mocks.getSessionMock.mockResolvedValue({
+      data: {
+        session: null,
+      },
+    });
+
+    mocks.invokeMock
+      .mockResolvedValueOnce({
+        data: null,
+        error: {
+          name: "FunctionsFetchError",
+          message: "Failed to send a request to the Edge Function",
+        },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          access_token: null,
+          refresh_token: null,
+          user: {
+            id: "new-user-1",
+            email: "new@example.com",
+          },
+          requiresEmailConfirmation: true,
+        },
+        error: null,
+      });
+
+    renderAuth();
+    await flushMicrotasks();
+
+    fireEvent.click(screen.getByRole("button", { name: /need an account\? sign up/i }));
+    fireEvent.change(screen.getByLabelText(/email/i), {
+      target: { value: "new@example.com" },
+    });
+    fireEvent.change(screen.getByLabelText(/^password$/i), {
+      target: { value: "Password123" },
+    });
+    fireEvent.change(screen.getByLabelText(/confirm password/i), {
+      target: { value: "Password123" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /^get started$/i }));
+
+    await flushMicrotasks();
+    expect(mocks.invokeMock).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(400);
+    });
+    await flushMicrotasks();
+    await flushMicrotasks();
+
+    expect(mocks.invokeMock).toHaveBeenCalledTimes(2);
+
+    expect(mocks.toastMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Check your email",
+      }),
+    );
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
   it("submits password sign-up requests and shows the confirmation email toast", async () => {
     mocks.getSessionMock.mockResolvedValue({
       data: {

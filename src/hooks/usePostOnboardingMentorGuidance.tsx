@@ -16,6 +16,11 @@ import { useProfile } from "@/hooks/useProfile";
 import { useXPRewards } from "@/hooks/useXPRewards";
 import { getCompanionQueryKey, type Companion } from "@/hooks/useCompanion";
 import { useMentorPersonality } from "@/hooks/useMentorPersonality";
+import {
+  GUIDED_TUTORIAL_FLOW_VERSION,
+  GUIDED_TUTORIAL_VERSION,
+  getGuidedTutorialLocalProgressKey,
+} from "@/utils/guidedTutorial";
 import { safeLocalStorage } from "@/utils/storage";
 import type {
   CreateQuestSubstepId,
@@ -25,8 +30,6 @@ import type {
   GuidedTutorialStepId,
 } from "@/types/profile";
 
-const GUIDED_TUTORIAL_VERSION = 2;
-const GUIDED_TUTORIAL_FLOW_VERSION = 3;
 const TARGET_RESOLVE_POLL_MS = 250;
 const TARGET_MISSING_FALLBACK_MS = 1400;
 const CLOSEOUT_AUTO_COMPLETE_MS = 2600;
@@ -464,11 +467,9 @@ export const safeAwardedSteps = (value: unknown): GuidedTutorialStepId[] => {
   return value.filter(isGuidedStepId);
 };
 
-const getLocalProgressKey = (userId: string) => `guided_tutorial_progress_${userId}`;
-
 const readLocalProgress = (userId: string | undefined): GuidedTutorialProgressSnapshot | null => {
   if (!userId) return null;
-  const raw = safeLocalStorage.getItem(getLocalProgressKey(userId));
+  const raw = safeLocalStorage.getItem(getGuidedTutorialLocalProgressKey(userId));
   if (!raw) return null;
 
   try {
@@ -746,7 +747,8 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
   const remoteProgress = useMemo(() => readRemoteProgress(onboardingData), [onboardingData]);
 
   const tutorialEligible =
-    remoteProgress?.version === GUIDED_TUTORIAL_VERSION && remoteProgress?.eligible === true;
+    (remoteProgress?.version === GUIDED_TUTORIAL_VERSION && remoteProgress?.eligible === true) ||
+    (localProgress?.version === GUIDED_TUTORIAL_VERSION && localProgress?.eligible === true);
   const persistedDismissed = Boolean(remoteProgress?.dismissed || localProgress?.dismissed);
 
   useEffect(() => {
@@ -925,7 +927,10 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
         eligible: true,
         lastUpdatedAt: nowIso,
       };
-      safeLocalStorage.setItem(getLocalProgressKey(user.id), JSON.stringify(localNext));
+      safeLocalStorage.setItem(
+        getGuidedTutorialLocalProgressKey(user.id),
+        JSON.stringify(localNext),
+      );
 
       const baseData = (profile?.onboarding_data as Record<string, unknown> | null) ?? {};
       const currentGuided =

@@ -2,7 +2,8 @@ import { memo, useState, useEffect, useCallback, useMemo, type KeyboardEvent } f
 import { motion, AnimatePresence } from "framer-motion";
 import { useCompanionDialogue, DialogueMood } from "@/hooks/useCompanionDialogue";
 import { useCompanion } from "@/hooks/useCompanion";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { CompanionImage } from "@/components/CompanionImage";
 import {
   Dialog,
   DialogContent,
@@ -221,9 +222,12 @@ export const CompanionDialogue = memo(({ className, companionName }: CompanionDi
             )}>
               <Avatar className="h-10 w-10 rounded-lg">
                 {companionImageUrl ? (
-                  <AvatarImage
+                  <CompanionImage
+                    variant="avatar"
                     src={companionImageUrl}
                     alt={resolvedCompanionName}
+                    focalX={companion?.current_image_focal_x ?? null}
+                    focalY={companion?.current_image_focal_y ?? null}
                     className="object-cover"
                   />
                 ) : null}
@@ -281,9 +285,12 @@ export const CompanionDialogue = memo(({ className, companionName }: CompanionDi
             <div className="flex items-center gap-3">
               <Avatar className={cn("h-12 w-12 rounded-lg ring-2", config.ringColor)}>
                 {companionImageUrl ? (
-                  <AvatarImage
+                  <CompanionImage
+                    variant="avatar"
                     src={companionImageUrl}
                     alt={resolvedCompanionName}
+                    focalX={companion?.current_image_focal_x ?? null}
+                    focalY={companion?.current_image_focal_y ?? null}
                     className="object-cover"
                   />
                 ) : null}

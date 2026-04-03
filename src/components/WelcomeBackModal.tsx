@@ -7,6 +7,7 @@ import { useCompanionHealth, CompanionMoodState } from "@/hooks/useCompanionHeal
 import { useCompanion } from "@/hooks/useCompanion";
 import { useXPRewards } from "@/hooks/useXPRewards";
 import { useLivingCompanionSafe } from "@/hooks/useLivingCompanion";
+import { CompanionImage } from "@/components/CompanionImage";
 
 interface WelcomeBackModalProps {
   isOpen: boolean;
@@ -106,9 +107,11 @@ export const WelcomeBackModal = ({ isOpen, onClose }: WelcomeBackModalProps) => 
                   className="relative"
                 >
                   {/* Sad state - use neglected image or filtered normal image */}
-                  <img
+                  <CompanionImage
                     src={health.neglectedImageUrl || companion.current_image_url || ""}
                     alt="Your sad companion"
+                    focalX={health.neglectedImageFocalX ?? companion.current_image_focal_x ?? null}
+                    focalY={health.neglectedImageFocalY ?? companion.current_image_focal_y ?? null}
                     className="w-48 h-48 object-cover rounded-2xl"
                     style={{
                       filter: !health.neglectedImageUrl 
@@ -131,9 +134,11 @@ export const WelcomeBackModal = ({ isOpen, onClose }: WelcomeBackModalProps) => 
                   className="relative"
                 >
                   {/* Happy state - normal image */}
-                  <img
+                  <CompanionImage
                     src={companion.current_image_url || ""}
                     alt="Your happy companion"
+                    focalX={companion.current_image_focal_x ?? null}
+                    focalY={companion.current_image_focal_y ?? null}
                     className="w-48 h-48 object-cover rounded-2xl ring-4 ring-primary/50"
                   />
                   <motion.div 

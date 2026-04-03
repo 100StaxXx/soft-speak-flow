@@ -7,7 +7,8 @@ import { motion } from "framer-motion";
 import { Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { GuildMemberPresence } from "@/hooks/useGuildPresence";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { CompanionImage } from "@/components/CompanionImage";
 
 interface GuildOnlineBannerProps {
   onlineMembers: GuildMemberPresence[];
@@ -62,7 +63,13 @@ export const GuildOnlineBanner = ({
             transition={{ delay: index * 0.1 }}
           >
             <Avatar className="h-6 w-6 border-2 border-background">
-              <AvatarImage src={member.companionImageUrl} />
+              <CompanionImage
+                variant="avatar"
+                src={member.companionImageUrl}
+                alt={member.displayName || "Guild member companion"}
+                focalX={member.companionImageFocalX}
+                focalY={member.companionImageFocalY}
+              />
               <AvatarFallback className="text-xs bg-green-500/20">
                 {member.displayName?.slice(0, 1).toUpperCase() || '?'}
               </AvatarFallback>

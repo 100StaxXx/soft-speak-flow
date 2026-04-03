@@ -4,13 +4,18 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Sparkles, Heart, Sun, Star } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { CompanionImage } from '@/components/CompanionImage';
 
 interface WakeUpCelebrationProps {
   isOpen: boolean;
   onClose: () => void;
   companionName: string;
   companionImageUrl: string;
+  companionImageFocalX?: number | null;
+  companionImageFocalY?: number | null;
   dormantImageUrl?: string | null;
+  dormantImageFocalX?: number | null;
+  dormantImageFocalY?: number | null;
   bondLevel: number;
 }
 
@@ -35,7 +40,11 @@ export const WakeUpCelebration = memo(({
   onClose,
   companionName,
   companionImageUrl,
+  companionImageFocalX,
+  companionImageFocalY,
   dormantImageUrl,
+  dormantImageFocalX,
+  dormantImageFocalY,
   bondLevel,
 }: WakeUpCelebrationProps) => {
   const [showAwakeImage, setShowAwakeImage] = useState(false);
@@ -143,19 +152,24 @@ export const WakeUpCelebration = memo(({
             {/* Dormant image (fades out) */}
             <AnimatePresence>
               {!showAwakeImage && dormantImageUrl && (
-                <motion.img
-                  src={dormantImageUrl}
-                  alt={`Sleeping ${companionName}`}
-                  className="absolute inset-0 w-full h-full object-cover rounded-2xl"
-                  style={{ filter: 'grayscale(0.5) brightness(0.6)' }}
+                <motion.div
+                  className="absolute inset-0"
                   initial={{ opacity: 1, scale: 0.95 }}
                   exit={{ 
                     opacity: 0, 
                     scale: 0.8,
-                    filter: 'grayscale(0) brightness(1.5)',
                   }}
                   transition={{ duration: 1 }}
-                />
+                >
+                  <CompanionImage
+                    src={dormantImageUrl}
+                    alt={`Sleeping ${companionName}`}
+                    focalX={dormantImageFocalX}
+                    focalY={dormantImageFocalY}
+                    className="absolute inset-0 w-full h-full rounded-2xl"
+                    style={{ filter: 'grayscale(0.5) brightness(0.6)' }}
+                  />
+                </motion.div>
               )}
             </AnimatePresence>
 
@@ -181,9 +195,11 @@ export const WakeUpCelebration = memo(({
                 }}
                 transition={{ duration: 2, repeat: Infinity }}
               />
-              <img
+              <CompanionImage
                 src={companionImageUrl}
                 alt={`Awakened ${companionName}`}
+                focalX={companionImageFocalX}
+                focalY={companionImageFocalY}
                 className="w-full h-full object-cover rounded-2xl ring-4 ring-amber-400/50"
               />
               

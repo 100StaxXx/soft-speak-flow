@@ -40,6 +40,20 @@
   0%, 100% { transform: scale(1); opacity: 0.9; }
   50% { transform: scale(1.015); opacity: 0.95; }
 }
+@keyframes companion-idle-drift {
+  0%, 100% {
+    transform: translate3d(0, 0, 0) rotate(0deg) scale(1);
+  }
+  25% {
+    transform: translate3d(1px, -3px, 0) rotate(-0.35deg) scale(1.006);
+  }
+  50% {
+    transform: translate3d(0, -6px, 0) rotate(0deg) scale(1.012);
+  }
+  75% {
+    transform: translate3d(-1px, -2px, 0) rotate(0.35deg) scale(1.004);
+  }
+}
 
 .animate-companion-bounce { animation: companion-bounce 2s ease-in-out infinite; }
 .animate-companion-pulse { animation: companion-pulse 4s ease-in-out infinite; }
@@ -47,6 +61,11 @@
 .animate-companion-droop { animation: companion-droop 3s ease-in-out infinite; }
 .animate-companion-dormant { animation: companion-dormant 6s ease-in-out infinite; }
 .animate-companion-slow-breathe { animation: companion-slow-breathe 5s ease-in-out infinite; }
+.animate-companion-idle-drift {
+  animation: companion-idle-drift 7.5s ease-in-out infinite;
+  transform-origin: center bottom;
+  will-change: transform;
+}
 
 /* ===== ONBOARDING EGG CHAMBER ===== */
 

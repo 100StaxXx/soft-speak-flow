@@ -9,6 +9,42 @@ interface CleanupWarning {
   details?: Record<string, unknown>;
 }
 
+const ACCOUNT_DELETION_TEMPORARILY_UNAVAILABLE_MESSAGE =
+  "Account deletion is temporarily unavailable. Please try again later.";
+
+const ACCOUNT_DELETION_ERROR_CODES = {
+  AUTH_DELETE_FAILED: "ACCOUNT_DELETION_AUTH_DELETE_FAILED",
+  AUTH_REQUIRED: "ACCOUNT_DELETION_AUTH_REQUIRED",
+  BACKEND_UNAVAILABLE: "ACCOUNT_DELETION_BACKEND_UNAVAILABLE",
+  CONFIG_ERROR: "ACCOUNT_DELETION_CONFIG_ERROR",
+  NOT_FOUND: "ACCOUNT_DELETION_NOT_FOUND",
+  UNKNOWN: "ACCOUNT_DELETION_UNKNOWN",
+} as const;
+
+type AccountDeletionErrorCode =
+  (typeof ACCOUNT_DELETION_ERROR_CODES)[keyof typeof ACCOUNT_DELETION_ERROR_CODES];
+
+interface SanitizedDeleteUserError {
+  code: AccountDeletionErrorCode;
+  message: string;
+  status: number;
+}
+
+class AccountDeletionError extends Error {
+  status: number;
+  code: AccountDeletionErrorCode;
+
+  constructor(message: string, options: { status: number; code: AccountDeletionErrorCode; cause?: unknown }) {
+    super(message);
+    this.name = "AccountDeletionError";
+    this.status = options.status;
+    this.code = options.code;
+    if (options.cause !== undefined) {
+      (this as Error & { cause?: unknown }).cause = options.cause;
+    }
+  }
+}
+
 type SupabaseAdminClient = ReturnType<typeof createClient<any>>;
 
 const STORAGE_PATH_REGEX = /\/storage\/v1\/object\/(?:public|sign|authenticated)\/([^/]+)\/(.+)$/i;
@@ -21,36 +57,81 @@ const PREFIX_SWEEPS: Array<{ bucket: string; prefix: (userId: string) => string 
   { bucket: "evolution-cards", prefix: (userId) => `postcards/${userId}` },
 ];
 
-/**
- * Sanitize error messages for client responses
- * Logs full error server-side, returns generic message to client
- */
-function sanitizeError(error: unknown): { message: string; status: number } {
-  // Log full error details server-side for debugging
-  console.error("Full error details:", error);
+const createUnauthorizedError = (cause?: unknown) =>
+  new AccountDeletionError("Unauthorized", {
+    status: 401,
+    code: ACCOUNT_DELETION_ERROR_CODES.AUTH_REQUIRED,
+    cause,
+  });
+
+const createTemporaryUnavailableError = (
+  code:
+    | typeof ACCOUNT_DELETION_ERROR_CODES.AUTH_DELETE_FAILED
+    | typeof ACCOUNT_DELETION_ERROR_CODES.BACKEND_UNAVAILABLE
+    | typeof ACCOUNT_DELETION_ERROR_CODES.CONFIG_ERROR
+    | typeof ACCOUNT_DELETION_ERROR_CODES.UNKNOWN,
+  cause?: unknown,
+) =>
+  new AccountDeletionError(ACCOUNT_DELETION_TEMPORARILY_UNAVAILABLE_MESSAGE, {
+    status: 500,
+    code,
+    cause,
+  });
+
+function sanitizeError(error: unknown): SanitizedDeleteUserError {
+  console.error("[delete-user] full error details", error);
+
+  if (error instanceof AccountDeletionError) {
+    return {
+      message: error.message,
+      status: error.status,
+      code: error.code,
+    };
+  }
 
   if (error instanceof Error) {
     const msg = error.message.toLowerCase();
 
-    // Authorization errors - safe to indicate
     if (msg.includes("unauthorized") || msg.includes("invalid token") || msg.includes("jwt")) {
-      return { message: "Unauthorized", status: 401 };
+      return {
+        message: "Unauthorized",
+        status: 401,
+        code: ACCOUNT_DELETION_ERROR_CODES.AUTH_REQUIRED,
+      };
     }
 
-    // Permission errors
-    if (msg.includes("permission denied") || msg.includes("access denied")) {
-      return { message: "Access denied", status: 403 };
-    }
-
-    // Not found
     if (msg.includes("not found") || msg.includes("no rows")) {
-      return { message: "User not found", status: 404 };
+      return {
+        message: "User not found",
+        status: 404,
+        code: ACCOUNT_DELETION_ERROR_CODES.NOT_FOUND,
+      };
     }
   }
 
-  // Generic error for everything else - don't leak internal details
-  return { message: "An error occurred during account deletion. Please try again.", status: 500 };
+  return {
+    message: ACCOUNT_DELETION_TEMPORARILY_UNAVAILABLE_MESSAGE,
+    status: 500,
+    code: ACCOUNT_DELETION_ERROR_CODES.UNKNOWN,
+  };
 }
+
+const createErrorResponse = (
+  corsHeaders: HeadersInit,
+  details: SanitizedDeleteUserError,
+): Response =>
+  new Response(
+    JSON.stringify({
+      success: false,
+      error: details.message,
+      code: details.code,
+      status: details.status,
+    }),
+    {
+      status: details.status,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    },
+  );
 
 const pushCleanupWarning = (
   warnings: CleanupWarning[],
@@ -447,8 +528,11 @@ serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
     if (!supabaseUrl || !serviceRoleKey) {
-      console.error("Missing Supabase environment variables");
-      throw new Error("Server configuration error");
+      console.error("[delete-user] missing required env", {
+        hasSupabaseUrl: Boolean(supabaseUrl),
+        hasServiceRoleKey: Boolean(serviceRoleKey),
+      });
+      throw createTemporaryUnavailableError(ACCOUNT_DELETION_ERROR_CODES.CONFIG_ERROR);
     }
 
     const supabase: SupabaseAdminClient = createClient<any>(supabaseUrl, serviceRoleKey, {
@@ -460,31 +544,23 @@ serve(async (req) => {
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
-      return new Response(JSON.stringify({ success: false, error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return createErrorResponse(corsHeaders, sanitizeError(createUnauthorizedError()));
     }
 
     const token = authHeader.replace("Bearer", "").trim();
     if (!token) {
-      return new Response(JSON.stringify({ success: false, error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return createErrorResponse(corsHeaders, sanitizeError(createUnauthorizedError()));
     }
 
     const { data: userResult, error: userError } = await supabase.auth.getUser(token);
     if (userError) {
-      throw userError;
+      console.error("[delete-user] auth.getUser failed", userError);
+      throw createUnauthorizedError(userError);
     }
 
     const user = userResult?.user;
     if (!user) {
-      return new Response(JSON.stringify({ success: false, error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return createErrorResponse(corsHeaders, sanitizeError(createUnauthorizedError()));
     }
 
     const userId = user.id;
@@ -494,14 +570,16 @@ serve(async (req) => {
 
     const { error: deleteDataError } = await supabase.rpc("delete_user_account", { p_user_id: userId });
     if (deleteDataError) {
-      throw deleteDataError;
+      console.error("[delete-user] delete_user_account rpc failed", deleteDataError);
+      throw createTemporaryUnavailableError(ACCOUNT_DELETION_ERROR_CODES.BACKEND_UNAVAILABLE, deleteDataError);
     }
 
     await runStorageCleanup(supabase, userId, storageTargets, cleanupWarnings);
 
     const { error: authDeleteError } = await supabase.auth.admin.deleteUser(userId);
     if (authDeleteError) {
-      throw authDeleteError;
+      console.error("[delete-user] auth.admin.deleteUser failed", authDeleteError);
+      throw createTemporaryUnavailableError(ACCOUNT_DELETION_ERROR_CODES.AUTH_DELETE_FAILED, authDeleteError);
     }
 
     return new Response(
@@ -515,12 +593,7 @@ serve(async (req) => {
       },
     );
   } catch (error) {
-    console.error("delete-user edge function error", error);
-    const { message, status } = sanitizeError(error);
-
-    return new Response(JSON.stringify({ success: false, error: message }), {
-      status,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    console.error("[delete-user] request failed", error);
+    return createErrorResponse(corsHeaders, sanitizeError(error));
   }
 });

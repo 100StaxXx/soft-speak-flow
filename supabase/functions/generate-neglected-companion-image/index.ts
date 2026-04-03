@@ -66,7 +66,7 @@ export async function handleGenerateNeglectedCompanionImage(
     const supabase = deps.createSupabaseClient();
     const { data: companion, error: companionError } = await supabase
       .from("user_companion")
-      .select("id, user_id, current_image_url, spirit_animal, core_element, favorite_color, current_stage, neglected_image_url, preset_id")
+      .select("id, user_id, current_image_url, current_image_focal_x, current_image_focal_y, spirit_animal, core_element, favorite_color, current_stage, neglected_image_url, neglected_image_focal_x, neglected_image_focal_y, preset_id")
       .eq("id", companionId)
       .maybeSingle();
 
@@ -95,7 +95,11 @@ export async function handleGenerateNeglectedCompanionImage(
       if (companion.neglected_image_url !== imageUrl) {
         const { error: updateError } = await supabase
           .from("user_companion")
-          .update({ neglected_image_url: imageUrl })
+          .update({
+            neglected_image_url: imageUrl,
+            neglected_image_focal_x: companion.current_image_focal_x ?? 0.5,
+            neglected_image_focal_y: companion.current_image_focal_y ?? 0.5,
+          })
           .eq("id", companionId);
 
         if (updateError) {
@@ -214,6 +218,8 @@ OUTPUT: Same composition and framing as the original image`;
       .from("user_companion")
       .update({
         neglected_image_url: editedImageUrl,
+        neglected_image_focal_x: companion.current_image_focal_x ?? 0.5,
+        neglected_image_focal_y: companion.current_image_focal_y ?? 0.5,
       })
       .eq("id", companionId);
 

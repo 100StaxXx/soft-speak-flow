@@ -5,12 +5,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => {
   const fromMock = vi.fn();
+  const rpcMock = vi.fn();
   const generateWithValidationMock = vi.fn();
   const toastSuccessMock = vi.fn();
   const toastErrorMock = vi.fn();
 
   return {
     fromMock,
+    rpcMock,
     generateWithValidationMock,
     toastSuccessMock,
     toastErrorMock,
@@ -20,6 +22,7 @@ const mocks = vi.hoisted(() => {
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: mocks.fromMock,
+    rpc: mocks.rpcMock,
   },
 }));
 
@@ -82,8 +85,16 @@ describe("useCompanionRegenerate", () => {
       }
       throw new Error(`Unexpected table: ${table}`);
     });
+    mocks.rpcMock.mockReturnValue({
+      single: vi.fn(async () => ({
+        data: { image_regenerations_used: 1 },
+        error: null,
+      })),
+    });
     mocks.generateWithValidationMock.mockResolvedValue({
       imageUrl: "https://example.com/new-image.png",
+      imageFocalX: 0.52,
+      imageFocalY: 0.47,
       validationPassed: true,
       retryCount: 0,
     });
@@ -116,5 +127,11 @@ describe("useCompanionRegenerate", () => {
         maxRetries: 1,
       }),
     );
+    expect(mocks.rpcMock).toHaveBeenCalledWith("consume_companion_regeneration", {
+      p_companion_id: "companion-1",
+      p_image_url: "https://example.com/new-image.png",
+      p_image_focal_x: 0.52,
+      p_image_focal_y: 0.47,
+    });
   });
 });

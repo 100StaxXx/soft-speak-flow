@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { useAchievements } from "./useAchievements";
 import { toast } from "sonner";
-import { useRef, useMemo, useCallback } from "react";
+import { useRef, useMemo, useCallback, useEffect } from "react";
 import { useEvolution } from "@/contexts/EvolutionContext";
 import { useEvolutionThresholds } from "./useEvolutionThresholds";
 import { SYSTEM_XP_REWARDS } from "@/config/xpRewards";
@@ -18,6 +18,10 @@ import {
   getPresetCompanionAssetUrl,
   getUniversalEggAssetUrl,
 } from "@/lib/companionAssetResolver";
+import {
+  getBundledCompanionImageFocalPoint,
+  shouldBackfillCompanionImageFocal,
+} from "@/lib/companionImageFocal";
 import {
   parseFunctionInvokeError,
   toUserFacingFunctionError,
@@ -38,8 +42,14 @@ export interface Companion {
   current_stage: number;
   current_xp: number;
   current_image_url: string | null;
+  current_image_focal_x?: number | null;
+  current_image_focal_y?: number | null;
   initial_image_url?: string | null;
+  initial_image_focal_x?: number | null;
+  initial_image_focal_y?: number | null;
   dormant_image_url?: string | null;
+  dormant_image_focal_x?: number | null;
+  dormant_image_focal_y?: number | null;
   eye_color?: string;
   fur_color?: string;
   cached_creature_name?: string | null;
@@ -56,6 +66,8 @@ export interface Companion {
   last_energy_update?: string;
   inactive_days?: number;
   neglected_image_url?: string | null;
+  neglected_image_focal_x?: number | null;
+  neglected_image_focal_y?: number | null;
   image_regenerations_used?: number;
   created_at: string;
   updated_at: string;
@@ -99,7 +111,11 @@ interface HatchCompanionResponse {
   story_tone: string;
   current_stage: number;
   current_image_url: string;
+  current_image_focal_x: number | null;
+  current_image_focal_y: number | null;
   initial_image_url: string;
+  initial_image_focal_x: number | null;
+  initial_image_focal_y: number | null;
   evolution_id: string;
 }
 
@@ -132,7 +148,7 @@ type SupabaseRpcError = {
   hint?: string | null;
 };
 
-type CreateCompanionRpcArgs = Record<string, string | null>;
+type CreateCompanionRpcArgs = Record<string, string | number | null>;
 
 type CreateCompanionRpcResult = {
   data: CreateCompanionIfNotExistsResult[] | null;
@@ -419,6 +435,7 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
   const evolutionInProgress = useRef(false);
   const evolutionPromise = useRef<Promise<unknown> | null>(null);
   const companionCreationInProgress = useRef(false);
+  const focalBackfillRequestedRef = useRef<string | null>(null);
 
   const { data: companion, isLoading, error, refetch } = useQuery({
     queryKey: getCompanionQueryKey(user?.id),
@@ -434,6 +451,87 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
     retry: 3, // Increased from 2 to 3 for better reliability after onboarding
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000), // Exponential backoff
   });
+
+  useEffect(() => {
+    if (!companion?.id) {
+      focalBackfillRequestedRef.current = null;
+      return;
+    }
+
+    const needsBackfill = [
+      shouldBackfillCompanionImageFocal(
+        companion.current_image_url,
+        companion.current_image_focal_x,
+        companion.current_image_focal_y,
+      ),
+      shouldBackfillCompanionImageFocal(
+        companion.initial_image_url,
+        companion.initial_image_focal_x,
+        companion.initial_image_focal_y,
+      ),
+      shouldBackfillCompanionImageFocal(
+        companion.dormant_image_url,
+        companion.dormant_image_focal_x,
+        companion.dormant_image_focal_y,
+      ),
+      shouldBackfillCompanionImageFocal(
+        companion.neglected_image_url,
+        companion.neglected_image_focal_x,
+        companion.neglected_image_focal_y,
+      ),
+    ].some(Boolean);
+
+    if (!needsBackfill) {
+      focalBackfillRequestedRef.current = null;
+      return;
+    }
+
+    if (focalBackfillRequestedRef.current === companion.id) {
+      return;
+    }
+
+    focalBackfillRequestedRef.current = companion.id;
+
+    void supabase.functions.invoke("backfill-companion-image-focal", {
+      body: {
+        companionId: companion.id,
+      },
+    }).then(({ error: invokeError }) => {
+      if (invokeError) {
+        logger.warn("Companion image focal backfill failed", {
+          companionId: companion.id,
+          error: invokeError.message,
+        });
+        focalBackfillRequestedRef.current = null;
+        return;
+      }
+
+      queryClient.invalidateQueries({ queryKey: getCompanionQueryKey(user?.id) });
+      queryClient.invalidateQueries({ queryKey: ["companion-health", user?.id] });
+    }).catch((invokeError) => {
+      logger.warn("Companion image focal backfill request threw", {
+        companionId: companion.id,
+        error: invokeError instanceof Error ? invokeError.message : String(invokeError),
+      });
+      focalBackfillRequestedRef.current = null;
+    });
+  }, [
+    companion?.id,
+    companion?.current_image_url,
+    companion?.current_image_focal_x,
+    companion?.current_image_focal_y,
+    companion?.initial_image_url,
+    companion?.initial_image_focal_x,
+    companion?.initial_image_focal_y,
+    companion?.dormant_image_url,
+    companion?.dormant_image_focal_x,
+    companion?.dormant_image_focal_y,
+    companion?.neglected_image_url,
+    companion?.neglected_image_focal_x,
+    companion?.neglected_image_focal_y,
+    queryClient,
+    user?.id,
+  ]);
 
   const createCompanion = useMutation({
     mutationFn: async (data: {
@@ -483,6 +581,7 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
             }) ?? getUniversalEggAssetUrl(normalizedElement)
           )
           : getUniversalEggAssetUrl(normalizedElement);
+        const currentImageFocal = getBundledCompanionImageFocalPoint(currentImageUrl);
 
         logger.log("Stage 0 asset resolved successfully, creating companion record...");
 
@@ -503,7 +602,11 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
           p_core_element: normalizedElement,
           p_story_tone: data.storyTone,
           p_current_image_url: currentImageUrl,
+          p_current_image_focal_x: currentImageFocal?.x ?? null,
+          p_current_image_focal_y: currentImageFocal?.y ?? null,
           p_initial_image_url: currentImageUrl,
+          p_initial_image_focal_x: currentImageFocal?.x ?? null,
+          p_initial_image_focal_y: currentImageFocal?.y ?? null,
           p_eye_color: eyeColor,
           p_fur_color: furColor,
         };
@@ -698,9 +801,11 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
         state: "normal",
         element: normalizedElement,
       }) ?? "/placeholder-companion.svg";
+      const currentImageFocal = getBundledCompanionImageFocalPoint(currentImageUrl);
       const initialImageUrl = companion.initial_image_url
         ?? companion.current_image_url
         ?? getUniversalEggAssetUrl(normalizedElement);
+      const initialImageFocal = getBundledCompanionImageFocalPoint(initialImageUrl);
       const favoriteColor = getCompanionElementAnchorColor(normalizedElement);
 
       const result = await supabase.rpc("hatch_companion_with_preset", {
@@ -711,7 +816,11 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
         p_core_element: normalizedElement,
         p_story_tone: companion.story_tone ?? "epic_adventure",
         p_initial_image_url: initialImageUrl,
+        p_initial_image_focal_x: companion.initial_image_focal_x ?? initialImageFocal?.x ?? null,
+        p_initial_image_focal_y: companion.initial_image_focal_y ?? initialImageFocal?.y ?? null,
         p_current_image_url: currentImageUrl,
+        p_current_image_focal_x: currentImageFocal?.x ?? null,
+        p_current_image_focal_y: currentImageFocal?.y ?? null,
         p_xp_at_evolution: companion.current_xp,
       }) as { data: HatchCompanionResponse[] | null; error: Error | null };
 
