@@ -22,47 +22,111 @@ vi.mock("framer-motion", async () => {
   };
 });
 
+const renderQuestionnaire = (isSubmitting = false) => {
+  const onComplete = vi.fn();
+  render(
+    <StoryQuestionnaire
+      faction="stellar"
+      onComplete={onComplete}
+      isSubmitting={isSubmitting}
+    />,
+  );
+
+  return { onComplete };
+};
+
+const clickContinue = () => {
+  fireEvent.click(screen.getByRole("button", { name: /continue/i }));
+};
+
+const answerCurrentQuestion = (answerName: RegExp | string) => {
+  fireEvent.click(screen.getByRole("button", { name: answerName }));
+  clickContinue();
+};
+
 describe("StoryQuestionnaire", () => {
-  it("disables back and answer buttons while submitting", () => {
-    const onComplete = vi.fn();
-    render(
-      <StoryQuestionnaire
-        faction="starfall"
-        onComplete={onComplete}
-        isSubmitting={true}
-      />,
-    );
+  it("disables back, answer buttons, and continue while submitting", () => {
+    const { onComplete } = renderQuestionnaire(true);
 
     const backButton = screen.getByRole("button", { name: /back/i });
     const firstOption = screen.getByRole("button", { name: /feminine presence/i });
+    const continueButton = screen.getByRole("button", { name: /continue/i });
 
     expect(backButton).toBeDisabled();
     expect(firstOption).toBeDisabled();
+    expect(continueButton).toBeDisabled();
 
     fireEvent.click(firstOption);
     expect(onComplete).not.toHaveBeenCalled();
   });
 
-  it("calls onComplete once on rapid double tap of the final answer", () => {
-    const onComplete = vi.fn();
-    render(<StoryQuestionnaire faction="stellar" onComplete={onComplete} />);
+  it("selects an answer first and advances only after continue", () => {
+    renderQuestionnaire();
 
-    fireEvent.click(screen.getByRole("button", { name: /feminine presence/i }));
-    fireEvent.click(screen.getByRole("button", { name: /clarity & mindset/i }));
-    fireEvent.click(screen.getByRole("button", { name: /gentle & compassionate/i }));
+    const firstOption = screen.getByRole("button", { name: /feminine presence/i });
+    const continueButton = screen.getByRole("button", { name: /continue/i });
 
-    const finalOption = screen.getByRole("button", { name: /clear principles and logic/i });
-    fireEvent.click(finalOption);
-    fireEvent.click(finalOption);
+    expect(firstOption).toHaveAttribute("aria-pressed", "false");
+    expect(continueButton).toBeDisabled();
+
+    fireEvent.touchStart(firstOption);
+
+    expect(screen.getByRole("button", { name: /feminine presence/i })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: /continue/i })).not.toBeDisabled();
+    expect(screen.getByText(/what kind of guide energy resonates with you/i)).toBeInTheDocument();
+
+    fireEvent.touchStart(screen.getByRole("button", { name: /continue/i }));
+
+    expect(screen.getByText(/what do you want to work on right now/i)).toBeInTheDocument();
+  });
+
+  it("restores the previous selection when moving back", () => {
+    renderQuestionnaire();
+
+    answerCurrentQuestion(/feminine presence/i);
+    fireEvent.click(screen.getByRole("button", { name: /emotions & healing/i }));
+    clickContinue();
+
+    fireEvent.click(screen.getByRole("button", { name: /back/i }));
+
+    expect(screen.getByText(/what do you want to work on right now/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /emotions & healing/i })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: /continue/i })).not.toBeDisabled();
+  });
+
+  it("dedupes touchstart and click on the final continue action", () => {
+    const { onComplete } = renderQuestionnaire();
+
+    answerCurrentQuestion(/feminine presence/i);
+    answerCurrentQuestion(/clarity & mindset/i);
+    answerCurrentQuestion(/gentle & compassionate/i);
+    fireEvent.click(screen.getByRole("button", { name: /clear principles and logic/i }));
+
+    const continueButton = screen.getByRole("button", { name: /continue/i });
+    fireEvent.touchStart(continueButton);
+    fireEvent.click(continueButton);
 
     expect(onComplete).toHaveBeenCalledTimes(1);
-    expect(onComplete).toHaveBeenCalledWith(
-      expect.arrayContaining([
-        expect.objectContaining({ questionId: "mentor_energy", optionId: "feminine_presence" }),
-        expect.objectContaining({ questionId: "focus_area", optionId: "clarity_mindset" }),
-        expect.objectContaining({ questionId: "guidance_tone", optionId: "gentle_compassionate" }),
-        expect.objectContaining({ questionId: "progress_style", optionId: "principles_logic" }),
-      ]),
-    );
-  }, 10000);
+    expect(onComplete).toHaveBeenCalledWith([
+      expect.objectContaining({ questionId: "mentor_energy", optionId: "feminine_presence" }),
+      expect.objectContaining({ questionId: "focus_area", optionId: "clarity_mindset" }),
+      expect.objectContaining({ questionId: "guidance_tone", optionId: "gentle_compassionate" }),
+      expect.objectContaining({ questionId: "progress_style", optionId: "principles_logic" }),
+    ]);
+  });
+
+  it("dedupes pointerdown and click on the final continue action", () => {
+    const { onComplete } = renderQuestionnaire();
+
+    answerCurrentQuestion(/feminine presence/i);
+    answerCurrentQuestion(/clarity & mindset/i);
+    answerCurrentQuestion(/gentle & compassionate/i);
+    fireEvent.click(screen.getByRole("button", { name: /clear principles and logic/i }));
+
+    const continueButton = screen.getByRole("button", { name: /continue/i });
+    fireEvent.pointerDown(continueButton, { pointerType: "mouse" });
+    fireEvent.click(continueButton);
+
+    expect(onComplete).toHaveBeenCalledTimes(1);
+  });
 });

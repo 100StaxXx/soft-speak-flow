@@ -1070,7 +1070,7 @@ const Auth = () => {
                   <Input
                     id="email"
                     type="email"
-                    placeholder="best@best12.com"
+                    placeholder="you@example.com"
                     value={email}
                     onChange={(e) => {
                       setInlineError(null);
