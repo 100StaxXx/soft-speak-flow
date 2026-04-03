@@ -79,6 +79,7 @@ export interface CompanionPresetDefinition {
 export interface CompanionElementDefinition {
   id: CompanionElementId;
   label: string;
+  productLabel: string;
   anchorColor: string;
   accentColor: string;
   summary: string;
@@ -276,6 +277,7 @@ export const COMPANION_ELEMENTS: readonly CompanionElementDefinition[] = [
   {
     id: "fire",
     label: "Fire",
+    productLabel: "Ember",
     anchorColor: "#F97316",
     accentColor: "#FDBA74",
     summary: "Molten highlights and ember heat.",
@@ -283,6 +285,7 @@ export const COMPANION_ELEMENTS: readonly CompanionElementDefinition[] = [
   {
     id: "ice",
     label: "Ice",
+    productLabel: "Frost",
     anchorColor: "#60A5FA",
     accentColor: "#BFDBFE",
     summary: "Glacial blues and crisp luminous edges.",
@@ -290,6 +293,7 @@ export const COMPANION_ELEMENTS: readonly CompanionElementDefinition[] = [
   {
     id: "storm",
     label: "Storm",
+    productLabel: "Storm",
     anchorColor: "#38BDF8",
     accentColor: "#C4B5FD",
     summary: "Lightning charge, wind streaks, and electric skies.",
@@ -297,6 +301,7 @@ export const COMPANION_ELEMENTS: readonly CompanionElementDefinition[] = [
   {
     id: "nature",
     label: "Nature",
+    productLabel: "Terra",
     anchorColor: "#34D399",
     accentColor: "#86EFAC",
     summary: "Verdant glow, mossy warmth, and living energy.",
@@ -304,6 +309,7 @@ export const COMPANION_ELEMENTS: readonly CompanionElementDefinition[] = [
   {
     id: "void",
     label: "Void",
+    productLabel: "Void",
     anchorColor: "#7C3AED",
     accentColor: "#C084FC",
     summary: "Nebula shadows, deep contrast, and astral hush.",
@@ -311,6 +317,7 @@ export const COMPANION_ELEMENTS: readonly CompanionElementDefinition[] = [
   {
     id: "light",
     label: "Light",
+    productLabel: "Light",
     anchorColor: "#FACC15",
     accentColor: "#FDE68A",
     summary: "Radiant gold, halo shimmer, and celestial bloom.",
@@ -551,6 +558,10 @@ export const getCompanionElement = (elementId: string | null | undefined): Compa
   const normalized = coerceCompanionElementId(elementId);
   return ELEMENT_LOOKUP.get(normalized) ?? COMPANION_ELEMENTS[0];
 };
+
+export const getCompanionElementProductLabel = (
+  elementId: string | null | undefined,
+): string => getCompanionElement(elementId).productLabel;
 
 export const resolveCompanionArtTier = (stage: number): CompanionArtTier => {
   const safeStage = clampProgressionLevel(stage);

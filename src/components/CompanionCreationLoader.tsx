@@ -4,17 +4,17 @@ import { Progress } from "@/components/ui/progress";
 import { Sparkles } from "lucide-react";
 
 const CREATION_MESSAGES = [
-  "Opening the cosmic hatchery...",
+  "Opening the hatchery...",
   "Attuning your chosen egg...",
-  "Sealing the element inside...",
-  "Locking your companion story tone...",
+  "Binding the creature spirit...",
+  "Sealing the element and story tone...",
   "Preparing the first stage...",
   "Almost there...",
 ];
 
 const CREATION_TIPS = [
-  "Your egg locks the element now, and the creature form is chosen at the first hatch",
-  "Element shapes the visuals, while story tone shapes the narrative",
+  "Your chosen species, element, and story tone are being bound together now",
+  "Element shapes the visuals, while story tone shapes the narrative flavor",
   "Your companion will keep growing as you complete quests",
 ];
 

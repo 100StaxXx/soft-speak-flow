@@ -5,8 +5,11 @@ import type { FactionType } from "./FactionSelector";
 export type OnboardingBackdropStage =
   | "prologue"
   | "destiny"
+  | "faction"
   | "questionnaire"
   | "calculating"
+  | "companion-form"
+  | "companion-egg"
   | "journey-begins";
 
 export type OnboardingMotionLevel = "subtle" | "balanced" | "high";
@@ -43,6 +46,16 @@ export const ONBOARDING_BACKDROP_PRESETS: Record<OnboardingBackdropStage, Onboar
     centerMaskOpacity: 0.38,
     vignetteOpacity: 0.5,
   },
+  faction: {
+    ringScale: 1.04,
+    ringOpacity: 0.26,
+    ringSpread: 0.22,
+    hazeOpacity: 0.6,
+    particleDensity: 14,
+    accentStrength: 0.28,
+    centerMaskOpacity: 0.34,
+    vignetteOpacity: 0.5,
+  },
   questionnaire: {
     ringScale: 1.02,
     ringOpacity: 0.23,
@@ -62,6 +75,26 @@ export const ONBOARDING_BACKDROP_PRESETS: Record<OnboardingBackdropStage, Onboar
     accentStrength: 0.3,
     centerMaskOpacity: 0.34,
     vignetteOpacity: 0.52,
+  },
+  "companion-form": {
+    ringScale: 1.06,
+    ringOpacity: 0.28,
+    ringSpread: 0.22,
+    hazeOpacity: 0.58,
+    particleDensity: 13,
+    accentStrength: 0.24,
+    centerMaskOpacity: 0.36,
+    vignetteOpacity: 0.52,
+  },
+  "companion-egg": {
+    ringScale: 1.12,
+    ringOpacity: 0.32,
+    ringSpread: 0.24,
+    hazeOpacity: 0.6,
+    particleDensity: 14,
+    accentStrength: 0.26,
+    centerMaskOpacity: 0.34,
+    vignetteOpacity: 0.54,
   },
   "journey-begins": {
     ringScale: 1.1,

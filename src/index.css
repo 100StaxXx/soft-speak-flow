@@ -1694,6 +1694,197 @@ All colors MUST be HSL.
     animation-iteration-count: infinite;
   }
 
+  .onb-stage-shell {
+    --onb-stage-accent: 38 88% 70%;
+    --onb-stage-gold: 39 86% 72%;
+    --onb-stage-ink: 36 74% 93%;
+    --onb-stage-shadow: 14 42% 12%;
+    position: relative;
+  }
+
+  .onb-stage-shell::before {
+    content: "";
+    position: absolute;
+    inset: -8% -10% 12%;
+    background:
+      radial-gradient(40% 28% at 50% 2%, hsl(var(--onb-stage-accent) / 0.22), transparent 74%),
+      radial-gradient(28% 26% at 14% 24%, hsl(18 88% 52% / 0.14), transparent 78%),
+      radial-gradient(28% 26% at 86% 24%, hsl(270 54% 48% / 0.14), transparent 78%);
+    opacity: 0.92;
+    pointer-events: none;
+  }
+
+  .onb-stage-shell::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(90deg, hsl(10 38% 12% / 0.44) 0%, transparent 16%, transparent 84%, hsl(10 38% 12% / 0.44) 100%),
+      linear-gradient(180deg, hsl(18 44% 16% / 0.34) 0%, transparent 22%, transparent 78%, hsl(10 42% 10% / 0.56) 100%);
+    pointer-events: none;
+  }
+
+  .onb-stage-grid {
+    background:
+      radial-gradient(circle at 8% 24%, hsl(var(--onb-stage-gold) / 0.55) 0 4px, transparent 5px) 0 0 / 148px 60px repeat-x,
+      radial-gradient(circle at 92% 24%, hsl(var(--onb-stage-gold) / 0.55) 0 4px, transparent 5px) 0 0 / 148px 60px repeat-x,
+      linear-gradient(180deg, hsl(var(--onb-stage-gold) / 0.1), transparent 56%);
+    mask-image: linear-gradient(180deg, hsl(0 0% 0% / 0.92), transparent 88%);
+  }
+
+  .onb-stage-aurora {
+    background:
+      radial-gradient(36% 24% at 50% 10%, hsl(var(--onb-stage-accent) / 0.26), transparent 76%),
+      radial-gradient(28% 32% at 18% 42%, hsl(22 95% 54% / 0.16), transparent 80%),
+      radial-gradient(34% 34% at 82% 28%, hsl(272 68% 52% / 0.14), transparent 82%),
+      linear-gradient(180deg, hsl(24 48% 16% / 0.14), transparent 28%, transparent 72%, hsl(12 44% 10% / 0.24));
+  }
+
+  .onb-stage-halo {
+    background:
+      radial-gradient(circle at center, hsl(var(--onb-stage-accent) / 0.34) 0%, hsl(var(--onb-stage-accent) / 0.1) 44%, transparent 78%);
+    filter: blur(56px);
+  }
+
+  .onb-stage-vignette {
+    background:
+      radial-gradient(130% 115% at 50% 50%, transparent 30%, hsl(14 42% 10% / 0.46) 68%, hsl(12 48% 7% / 0.86) 100%);
+  }
+
+  .onb-stage-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 2rem;
+    width: fit-content;
+    border-radius: 9999px;
+    border: 1px solid hsl(var(--onb-stage-gold) / 0.28);
+    background:
+      linear-gradient(180deg, hsl(var(--onb-stage-accent) / 0.22), hsl(22 62% 28% / 0.52));
+    padding: 0.5rem 0.875rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.26em;
+    text-transform: uppercase;
+    color: hsl(var(--onb-stage-ink) / 0.92);
+    backdrop-filter: blur(22px);
+    box-shadow:
+      inset 0 1px 0 hsl(0 0% 100% / 0.08),
+      0 14px 34px hsl(var(--onb-stage-shadow) / 0.28);
+  }
+
+  .onb-stage-panel {
+    position: relative;
+    border-radius: 2rem;
+    border: 1px solid hsl(var(--onb-stage-gold) / 0.2);
+    background:
+      linear-gradient(180deg, hsl(20 42% 18% / 0.82), hsl(10 32% 12% / 0.92));
+    box-shadow:
+      inset 0 1px 0 hsl(0 0% 100% / 0.08),
+      0 24px 70px hsl(var(--onb-stage-shadow) / 0.4),
+      0 0 0 1px hsl(var(--onb-stage-accent) / 0.08);
+    backdrop-filter: blur(26px);
+    overflow: hidden;
+  }
+
+  .onb-stage-panel::before {
+    content: "";
+    position: absolute;
+    inset: 0.85rem;
+    border-radius: 1.4rem;
+    border: 1px solid hsl(var(--onb-stage-gold) / 0.08);
+    pointer-events: none;
+  }
+
+  .onb-stage-card {
+    position: relative;
+    border-radius: 1.5rem;
+    border: 1px solid hsl(var(--onb-stage-gold) / 0.12);
+    background:
+      linear-gradient(180deg, hsl(0 0% 100% / 0.06), hsl(19 34% 18% / 0.42));
+    box-shadow:
+      inset 0 1px 0 hsl(0 0% 100% / 0.04),
+      0 12px 28px hsl(var(--onb-stage-shadow) / 0.22);
+    backdrop-filter: blur(20px);
+  }
+
+  .onb-stage-divider {
+    height: 1px;
+    width: 100%;
+    background: linear-gradient(90deg, transparent, hsl(var(--onb-stage-gold) / 0.24), transparent);
+  }
+
+  .onb-stage-emblem {
+    position: relative;
+    display: grid;
+    place-items: center;
+    height: 7rem;
+    width: 7rem;
+    border-radius: 9999px;
+    border: 1px solid hsl(var(--onb-stage-gold) / 0.28);
+    background:
+      radial-gradient(circle at 50% 38%, hsl(var(--onb-stage-accent) / 0.42), hsl(var(--onb-stage-accent) / 0.12) 58%, transparent 100%),
+      linear-gradient(180deg, hsl(32 50% 26% / 0.9), hsl(14 42% 13% / 0.96));
+    box-shadow:
+      inset 0 0 22px hsl(var(--onb-stage-accent) / 0.2),
+      0 0 60px hsl(var(--onb-stage-accent) / 0.22);
+    backdrop-filter: blur(22px);
+  }
+
+  .onb-stage-emblem::before {
+    content: "";
+    position: absolute;
+    inset: -14px;
+    border-radius: 9999px;
+    border: 1px solid hsl(var(--onb-stage-gold) / 0.2);
+    opacity: 0.7;
+  }
+
+  .onb-stage-emblem::after {
+    content: "";
+    position: absolute;
+    inset: -30px;
+    border-radius: 9999px;
+    border: 1px solid hsl(var(--onb-stage-gold) / 0.08);
+    opacity: 0.45;
+  }
+
+  .onb-stage-cta {
+    color: hsl(var(--onb-stage-ink) / 0.96);
+    background:
+      linear-gradient(135deg, hsl(41 94% 75%) 0%, hsl(33 82% 58%) 45%, hsl(24 76% 42%) 100%);
+    box-shadow:
+      inset 0 1px 0 hsl(0 0% 100% / 0.22),
+      0 18px 42px hsl(23 80% 12% / 0.34);
+  }
+
+  .onb-stage-cta:hover:not(:disabled) {
+    filter: brightness(1.03);
+  }
+
+  .onb-stage-cta:disabled {
+    background: linear-gradient(135deg, hsl(29 18% 32%) 0%, hsl(20 20% 24%) 100%);
+    color: hsl(36 28% 72% / 0.7);
+    box-shadow: none;
+  }
+
+  .onb-stage-creature-frame {
+    position: relative;
+    display: grid;
+    place-items: center;
+    height: 7rem;
+    width: 7rem;
+    overflow: hidden;
+    border-radius: 1.6rem;
+    border: 1px solid hsl(var(--onb-stage-gold) / 0.18);
+    background:
+      radial-gradient(circle at 50% 28%, hsl(var(--onb-stage-accent) / 0.16), transparent 66%),
+      linear-gradient(180deg, hsl(30 42% 20% / 0.8), hsl(12 34% 12% / 0.94));
+    box-shadow:
+      inset 0 1px 0 hsl(0 0% 100% / 0.08),
+      0 16px 36px hsl(var(--onb-stage-shadow) / 0.26);
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .onb-animated {
       animation: none !important;

@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Check, ArrowRight } from "lucide-react";
 import { MentorAvatar } from "@/components/MentorAvatar";
+import { cn } from "@/lib/utils";
 
 interface Mentor {
   id: string;
@@ -24,6 +25,7 @@ interface MentorResultProps {
   onSeeAll: () => void;
   isConfirming?: boolean;
   seeAllLabel?: string;
+  appearance?: "default" | "onboarding";
 }
 
 export const MentorResult = ({
@@ -34,9 +36,117 @@ export const MentorResult = ({
   onSeeAll,
   isConfirming = false,
   seeAllLabel = "See All Guides",
+  appearance = "default",
 }: MentorResultProps) => {
+  if (appearance === "onboarding") {
+    return (
+      <div
+        className="min-h-screen px-4 pt-safe-top pb-safe-lg relative z-10 flex items-center justify-center"
+        data-appearance="onboarding"
+        data-testid="mentor-result-root"
+      >
+        <div className="w-full max-w-4xl space-y-6">
+          <div className="mx-auto flex w-fit items-center gap-2 rounded-full border border-[#f3cd84]/18 bg-black/25 px-4 py-2 text-[11px] uppercase tracking-[0.32em] text-[#f4d39b]/78 backdrop-blur-md">
+            <span
+              className="h-2.5 w-2.5 rounded-full"
+              style={{ backgroundColor: mentor.primary_color, boxShadow: `0 0 16px ${mentor.primary_color}` }}
+            />
+            Guide Found
+          </div>
+
+          <div className="onb-stage-panel overflow-hidden p-6 sm:p-8 md:p-10">
+            <div className="grid gap-8 md:grid-cols-[0.95fr_1.05fr] md:items-center">
+              <div className="space-y-5 text-center md:text-left">
+                <div className="flex justify-center md:justify-start">
+                  <MentorAvatar
+                    mentorSlug={mentor.slug}
+                    mentorName={mentor.name}
+                    primaryColor={mentor.primary_color}
+                    avatarUrl={mentor.avatar_url}
+                    size="lg"
+                    showGlow
+                    className="shadow-[0_0_60px_rgba(255,255,255,0.08)]"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <p className="text-xs uppercase tracking-[0.28em] text-[#f4d39b]/58">
+                    Your Guide Match
+                  </p>
+                  <h1 className="font-cinzel text-4xl font-semibold text-[#fff4df] md:text-5xl">
+                    {mentor.name}
+                  </h1>
+                  <p className="text-base uppercase tracking-[0.22em] text-[#f7ead6]/64">
+                    {explanation.subtitle}
+                  </p>
+                </div>
+                <p className="text-base leading-7 text-[#f7ead6]/72 md:text-lg">
+                  {explanation.paragraph}
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                <div className="rounded-[1.6rem] border border-[#f3cd84]/14 bg-black/18 p-5 backdrop-blur-xl">
+                  <h2 className="mb-4 text-xs uppercase tracking-[0.3em] text-[#f4d39b]/58">
+                    How They&apos;ll Help You
+                  </h2>
+                  <div className="space-y-3">
+                    {explanation.bullets.map((bullet, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-start gap-3 rounded-[1.15rem] border border-[#f3cd84]/10 bg-black/18 p-4"
+                      >
+                        <div
+                          className="mt-2 h-2 w-2 flex-shrink-0 rounded-full"
+                          style={{ backgroundColor: mentor.primary_color }}
+                        />
+                        <p className="text-sm leading-6 text-[#fff4df]/80">{bullet}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-3 sm:flex-row">
+                  <Button
+                    onClick={onConfirm}
+                    disabled={isConfirming}
+                    size="lg"
+                    className="onb-stage-cta h-14 flex-1 rounded-full text-base font-semibold"
+                    style={{
+                      background: `linear-gradient(135deg, ${mentor.primary_color}, rgba(213,155,77,0.92))`,
+                    }}
+                  >
+                    {isConfirming ? (
+                      <>Confirming...</>
+                    ) : (
+                      <>
+                        <Check className="h-5 w-5" />
+                        Continue with {mentor.name}
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={onSeeAll}
+                    className="h-14 rounded-full border-[#f3cd84]/20 bg-black/20 px-6 text-[#fff4df] hover:bg-black/30"
+                  >
+                    {seeAllLabel}
+                    <ArrowRight className="h-5 w-5" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen flex items-center justify-center px-6 pt-safe pb-safe-lg relative z-10">
+    <div
+      className="min-h-screen flex items-center justify-center px-6 pt-safe pb-safe-lg relative z-10"
+      data-appearance={appearance}
+      data-testid="mentor-result-root"
+    >
       <div className="max-w-3xl w-full space-y-12 animate-fade-in">
         {/* Header */}
         <div className="text-center space-y-4">
@@ -57,7 +167,7 @@ export const MentorResult = ({
               avatarUrl={mentor.avatar_url}
               size="lg"
               showGlow
-              className="animate-scale-in"
+              className={cn("animate-scale-in")}
             />
           </div>
 

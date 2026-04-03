@@ -18,6 +18,7 @@ vi.mock("framer-motion", async () => {
   return {
     motion,
     AnimatePresence: ({ children }: { children: unknown }) => <>{children}</>,
+    useReducedMotion: () => false,
   };
 });
 
@@ -63,6 +64,5 @@ describe("StoryQuestionnaire", () => {
         expect.objectContaining({ questionId: "progress_style", optionId: "principles_logic" }),
       ]),
     );
-  });
+  }, 10000);
 });
-

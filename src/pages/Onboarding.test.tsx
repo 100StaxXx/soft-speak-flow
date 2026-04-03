@@ -18,6 +18,10 @@ const mocks = vi.hoisted(() => {
   return {
     navigate: vi.fn(),
     storyOnboardingProps: null as Record<string, unknown> | null,
+    queryClient: { invalidateQueries: vi.fn(), refetchQueries: vi.fn() },
+    signOut: vi.fn(() => Promise.resolve()),
+    deleteCurrentAccount: vi.fn(() => Promise.resolve({ warnings: [] })),
+    isAccountDeletionAuthError: vi.fn(() => false),
     status: "authenticated" as "loading" | "recovering" | "authenticated" | "unauthenticated",
     user: { id: "user-1" } as { id: string } | null,
     profile: {
@@ -46,7 +50,12 @@ vi.mock("@/hooks/useAuth", () => ({
   useAuth: () => ({
     user: mocks.user,
     status: mocks.status,
+    signOut: mocks.signOut,
   }),
+}));
+
+vi.mock("@tanstack/react-query", () => ({
+  useQueryClient: () => mocks.queryClient,
 }));
 
 vi.mock("@/hooks/useProfile", () => ({
@@ -67,6 +76,15 @@ vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: mocks.fromMock,
   },
+}));
+
+vi.mock("@/services/accountDeletion", () => ({
+  deleteCurrentAccount: (options: unknown) => mocks.deleteCurrentAccount(options),
+  isAccountDeletionAuthError: (error: unknown) => mocks.isAccountDeletionAuthError(error),
+}));
+
+vi.mock("@/components/PageLoader", () => ({
+  PageLoader: ({ message }: { message: string }) => <div>{message}</div>,
 }));
 
 vi.mock("@/components/onboarding", () => ({
@@ -90,6 +108,9 @@ describe("Onboarding route guard", () => {
     vi.clearAllMocks();
     mocks.status = "authenticated";
     mocks.storyOnboardingProps = null;
+    mocks.signOut.mockResolvedValue(undefined);
+    mocks.deleteCurrentAccount.mockResolvedValue({ warnings: [] });
+    mocks.isAccountDeletionAuthError.mockReturnValue(false);
     mocks.user = { id: "user-1" };
     mocks.profile = {
       onboarding_completed: false,
@@ -142,5 +163,32 @@ describe("Onboarding route guard", () => {
     expect(mocks.storyOnboardingProps).toMatchObject({
       mode: "reset",
     });
+  });
+
+  it("deletes legacy companion accounts instead of rendering the removed migration flow", async () => {
+    mocks.companion = { id: "companion-legacy", preset_id: null, current_stage: 2 };
+
+    renderOnboarding();
+
+    expect(screen.getByText("Resetting your account so you can restart onboarding...")).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(mocks.deleteCurrentAccount).toHaveBeenCalledWith({
+        queryClient: mocks.queryClient,
+        userId: "user-1",
+        signOut: mocks.signOut,
+      });
+    });
+
+    await waitFor(() => {
+      expect(mocks.navigate).toHaveBeenCalledWith("/auth", {
+        replace: true,
+        state: {
+          message: "Your previous account was removed so you can restart onboarding with the new companion system.",
+        },
+      });
+    });
+
+    expect(screen.queryByText("StoryOnboarding")).not.toBeInTheDocument();
   });
 });

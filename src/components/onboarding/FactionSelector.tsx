@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { ChevronRight, ArrowLeft } from "lucide-react";
+import { ChevronRight, ArrowLeft, Sparkles } from "lucide-react";
 import { factions, FactionType } from "@/config/factions";
 import { isMacDesignedForIPadIOSApp } from "@/utils/platformTargets";
+import { OnboardingStageShell } from "./OnboardingStageShell";
 
 export type { FactionType } from "@/config/factions";
 
@@ -30,54 +31,79 @@ export const FactionSelector = ({ onComplete }: FactionSelectorProps) => {
   const expandedData = expandedFaction ? factions.find(f => f.id === expandedFaction) : null;
 
   return (
-    <div className="min-h-screen relative overflow-hidden flex flex-col bg-background">
-      {/* Header with iOS safe area */}
-      <header className="sticky top-0 z-20 bg-background pt-safe-top">
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center px-6 py-6"
-        >
-          <h1 className="text-2xl font-bold text-foreground mb-1">Choose Your Path</h1>
-          <p className="text-muted-foreground text-sm">
-            Your faction shapes your cosmic journey
-          </p>
-        </motion.div>
-      </header>
+    <div className="relative flex min-h-screen flex-col overflow-hidden bg-[#090507]">
+      <OnboardingStageShell
+        width="full"
+        align="top"
+        accent="36 90% 70%"
+        eyebrow="Faction Selection"
+        title="Choose Your Path"
+        description="Each faction carries a different vow, a different fire, and a different way of crossing the world. Open a banner to hear the oath before you join."
+        bodyClassName="mx-auto w-full max-w-6xl"
+      >
+        <div className="grid gap-4 md:grid-cols-3">
+          {factions.map((faction, index) => (
+            <motion.button
+              key={faction.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.08 }}
+              onClick={() => handleFactionTap(faction.id)}
+              className="group relative min-h-[250px] overflow-hidden rounded-[2rem] border border-[#f3cd84]/12 bg-black/20 text-left shadow-[0_20px_60px_rgba(0,0,0,0.24)] backdrop-blur-xl"
+            >
+              <img
+                src={faction.image}
+                alt={faction.name}
+                className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+              />
+              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(23,12,9,0.12),rgba(18,10,8,0.42),rgba(9,6,7,0.94))]" />
+              <div
+                className="absolute inset-x-6 top-6 h-20 rounded-full blur-3xl"
+                style={{ backgroundColor: `${faction.color}45` }}
+              />
 
-      {/* Faction Cards Grid */}
-      <div className="flex-1 px-4 pb-6 flex flex-col gap-3">
-        {factions.map((faction, index) => (
-          <motion.button
-            key={faction.id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
-            onClick={() => handleFactionTap(faction.id)}
-            className="relative flex-1 min-h-[140px] rounded-2xl overflow-hidden group"
-          >
-            {/* Background Image */}
-            <img
-              src={faction.image}
-              alt={faction.name}
-              className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-            />
-            
-            {/* Gradient Overlay */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-            
-            {/* Faction Name */}
-            <div className="absolute inset-0 flex items-end p-5">
-              <h2 
-                className="text-2xl text-white"
-                style={faction.nameStyle}
-              >
-                {faction.name}
-              </h2>
-            </div>
-          </motion.button>
-        ))}
-      </div>
+              <div className="relative flex h-full flex-col justify-between p-6">
+                <div className="flex items-start justify-between gap-4">
+                  <div
+                    className="inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-[#f3cd84]/16 bg-black/30 backdrop-blur-md"
+                    style={{ boxShadow: `0 0 30px ${faction.color}40` }}
+                  >
+                    <faction.icon size={22} style={{ color: faction.color }} />
+                  </div>
+                  <span className="rounded-full border border-[#f3cd84]/14 bg-black/25 px-3 py-1 text-[11px] uppercase tracking-[0.28em] text-[#f4d39b]/72">
+                    Open Banner
+                  </span>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <p className="text-xs uppercase tracking-[0.34em] text-[#f4d39b]/62">
+                      {faction.subtitle}
+                    </p>
+                    <h2 className="text-4xl text-[#fff4df]" style={faction.nameStyle}>
+                      {faction.name}
+                    </h2>
+                    <p className="max-w-sm text-sm leading-6 text-[#f7ead6]/72">
+                      {faction.description}
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    {faction.traits.slice(0, 3).map((trait) => (
+                      <span
+                        key={trait}
+                        className="rounded-full border border-[#f3cd84]/12 bg-black/25 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-[#f7ead6]/78"
+                      >
+                        {trait}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </motion.button>
+          ))}
+        </div>
+      </OnboardingStageShell>
 
       {/* Fullscreen Expanded View */}
       <AnimatePresence>
@@ -95,23 +121,22 @@ export const FactionSelector = ({ onComplete }: FactionSelectorProps) => {
               animate={{ scale: 1 }}
               exit={{ scale: 1.1, opacity: 0 }}
               transition={{ duration: 0.5 }}
-              className="absolute inset-0"
-            >
+                className="absolute inset-0"
+              >
               <img
                 src={expandedData.image}
                 alt={expandedData.name}
                 className="w-full h-full object-cover"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/45 to-transparent" />
             </motion.div>
 
-            {/* Back Button */}
             <motion.button
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.2 }}
               onClick={handleClose}
-              className="absolute left-4 flex items-center gap-2 px-4 py-2 rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors z-10"
+              className="absolute left-4 z-10 flex items-center gap-2 rounded-full border border-[#f3cd84]/18 bg-black/40 px-4 py-2 text-[#fff4df] backdrop-blur-md transition-colors hover:bg-black/55"
               style={{ top: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}
             >
               <ArrowLeft size={20} />
@@ -125,74 +150,71 @@ export const FactionSelector = ({ onComplete }: FactionSelectorProps) => {
                   initial={{ y: 40, opacity: 0 }}
                   animate={{ y: 0, opacity: 1 }}
                   transition={{ delay: 0.15, duration: 0.4 }}
-                  className="space-y-5"
+                  className="onb-stage-panel space-y-5 p-6 md:p-8"
                 >
-                  {/* Faction Icon & Name */}
                   <div className="flex items-center gap-3">
-                    <div 
-                      className="p-2 rounded-lg"
+                    <div
+                      className="rounded-2xl border border-[#f3cd84]/14 p-3"
                       style={{ backgroundColor: `${expandedData.color}30` }}
                     >
-                      <expandedData.icon 
-                        size={24} 
+                      <expandedData.icon
+                        size={24}
                         style={{ color: expandedData.color }}
                       />
                     </div>
                     <div>
-                      <h2 
-                        className="text-3xl text-white"
+                      <div className="mb-1 flex items-center gap-2 text-[11px] uppercase tracking-[0.28em] text-[#f4d39b]/60">
+                        <Sparkles className="h-3 w-3 text-[#ffe2a3]" />
+                        <span>Faction Oath</span>
+                      </div>
+                      <h2
+                        className="text-4xl text-[#fff4df] md:text-5xl"
                         style={expandedData.nameStyle}
                       >
                         {expandedData.name}
                       </h2>
-                      <p className="text-white/70 text-sm">{expandedData.subtitle}</p>
+                      <p className="text-sm text-[#f7ead6]/68">{expandedData.subtitle}</p>
                     </div>
                   </div>
 
-                  {/* Description */}
-                  <motion.p 
+                  <motion.p
                     initial={{ y: 20, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
                     transition={{ delay: 0.2 }}
-                    className="text-white/85 text-base leading-relaxed"
+                    className="text-base leading-7 text-[#f7ead6]/80"
                   >
                     {expandedData.description}
                   </motion.p>
-                  
-                  {/* Motto */}
-                  <motion.div 
+
+                  <motion.div
                     initial={{ y: 20, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
                     transition={{ delay: 0.25 }}
-                    className="bg-black/40 backdrop-blur-sm rounded-xl p-4 border-l-2"
-                    style={{ borderColor: expandedData.color }}
+                    className="rounded-[1.5rem] border border-[#f3cd84]/14 bg-black/30 p-5 backdrop-blur-md"
+                    style={{ boxShadow: `0 0 0 1px ${expandedData.color}24` }}
                   >
-                    <p className="text-white italic text-lg">
+                    <p className="font-cinzel text-xl italic leading-relaxed text-[#fff4df]">
                       "{expandedData.motto}"
                     </p>
                   </motion.div>
 
-                  {/* Traits */}
                   <motion.div
                     initial={{ y: 20, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
                     transition={{ delay: 0.3 }}
                   >
-                    <h3 className="text-white/60 text-xs uppercase tracking-wider mb-2">Traits</h3>
+                    <h3 className="mb-3 text-xs uppercase tracking-[0.28em] text-[#f4d39b]/58">Traits</h3>
                     <div className="flex flex-wrap gap-2">
                       {expandedData.traits.map((trait, i) => (
-                        <span 
+                        <span
                           key={i}
-                          className="px-3 py-1 rounded-full text-sm text-white/90 bg-white/10 backdrop-blur-sm"
+                          className="rounded-full border border-[#f3cd84]/12 bg-black/25 px-3 py-1 text-sm text-[#fff4df]/88 backdrop-blur-sm"
                         >
                           {trait}
                         </span>
                       ))}
                     </div>
                   </motion.div>
-                  
-
-                  {/* Select Button */}
                   <motion.div
                     initial={{ y: 20, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
@@ -201,7 +223,8 @@ export const FactionSelector = ({ onComplete }: FactionSelectorProps) => {
                   >
                     <Button
                       onClick={() => handleSelect(expandedData.id)}
-                      className="w-full py-6 text-lg font-semibold"
+                      size="lg"
+                      className="h-14 w-full rounded-full text-base font-semibold text-[#fff4df] shadow-[0_20px_45px_rgba(0,0,0,0.28)]"
                       style={{
                         background: `linear-gradient(135deg, ${expandedData.color}, ${expandedData.color}80)`,
                       }}

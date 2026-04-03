@@ -1,21 +1,28 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { StoryOnboarding } from "@/components/onboarding";
+import { PageLoader } from "@/components/PageLoader";
 import { useAuth } from "@/hooks/useAuth";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useProfile } from "@/hooks/useProfile";
 import { supabase } from "@/integrations/supabase/client";
+import { deleteCurrentAccount, isAccountDeletionAuthError } from "@/services/accountDeletion";
 import {
   buildEstablishedProfileSelfHealPatch,
   getOnboardingGateState,
 } from "@/utils/profileOnboarding";
 
 export default function Onboarding() {
-  const { user, status } = useAuth();
+  const { user, status, signOut } = useAuth();
   const { profile, loading: profileLoading } = useProfile();
   const { companion, isLoading: companionLoading } = useCompanion();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const onboardingSelfHealAttemptedRef = useRef(false);
+  const legacyAccountDeletionAttemptedRef = useRef(false);
+  const [isDeletingLegacyAccount, setIsDeletingLegacyAccount] = useState(false);
   const hasCompanion = Boolean(companion);
   const hasPresetCompanion = Boolean(companion?.preset_id);
   const companionStage = companion?.current_stage ?? null;
@@ -32,6 +39,8 @@ export default function Onboarding() {
 
   useEffect(() => {
     onboardingSelfHealAttemptedRef.current = false;
+    legacyAccountDeletionAttemptedRef.current = false;
+    setIsDeletingLegacyAccount(false);
   }, [user?.id]);
 
   useEffect(() => {
@@ -60,6 +69,51 @@ export default function Onboarding() {
   }, [user, onboardingGateReady, profile, hasCompanion, hasPresetCompanion, companionStage]);
 
   useEffect(() => {
+    if (!user || !onboardingGateReady || !onboardingGate.needsCompanionMigration) return;
+    if (legacyAccountDeletionAttemptedRef.current) return;
+
+    legacyAccountDeletionAttemptedRef.current = true;
+    setIsDeletingLegacyAccount(true);
+
+    void (async () => {
+      try {
+        await deleteCurrentAccount({
+          queryClient,
+          userId: user.id,
+          signOut,
+        });
+
+        navigate("/auth", {
+          replace: true,
+          state: {
+            message: "Your previous account was removed so you can restart onboarding with the new companion system.",
+          },
+        });
+      } catch (error) {
+        legacyAccountDeletionAttemptedRef.current = false;
+        setIsDeletingLegacyAccount(false);
+
+        if (isAccountDeletionAuthError(error)) {
+          toast.error("Your session expired. Please sign in again.");
+          try {
+            await signOut();
+          } catch (signOutError) {
+            console.warn("Sign out after legacy account deletion auth error failed:", signOutError);
+          }
+          navigate("/auth", { replace: true });
+          return;
+        }
+
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "We couldn't reset your legacy account automatically. Please try again.",
+        );
+      }
+    })();
+  }, [user, onboardingGateReady, onboardingGate.needsCompanionMigration, navigate, queryClient, signOut]);
+
+  useEffect(() => {
     if (!user || !onboardingGateReady) return;
     if (!onboardingGate.isEstablished) return;
 
@@ -70,20 +124,17 @@ export default function Onboarding() {
     return null;
   }
 
+  if (isDeletingLegacyAccount || (user && onboardingGate.needsCompanionMigration)) {
+    return <PageLoader message="Resetting your account so you can restart onboarding..." />;
+  }
+
   if (user && (profileLoading || companionLoading || onboardingGate.isEstablished)) {
     return null;
   }
 
   return (
     <StoryOnboarding
-      mode={
-        onboardingGate.needsProgressionReset
-          ? "reset"
-          : onboardingGate.needsCompanionMigration
-            ? "migration"
-            : "standard"
-      }
-      existingCompanion={companion}
+      mode={onboardingGate.needsProgressionReset ? "reset" : "standard"}
     />
   );
 }

@@ -1,10 +1,11 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ChevronRight, Sparkles } from "lucide-react";
+import { ChevronRight, Crown, Sparkles } from "lucide-react";
 import { LegalDocumentViewer } from "@/components/LegalDocumentViewer";
+import { OnboardingStageShell } from "./OnboardingStageShell";
 
 interface StoryPrologueProps {
   onComplete: (name: string) => void;
@@ -17,15 +18,6 @@ export const StoryPrologue = ({ onComplete }: StoryPrologueProps) => {
   const [showTerms, setShowTerms] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
 
-  // Memoize star positions to prevent them from jumping on re-render
-  const starPositions = useMemo(() => 
-    [...Array(30)].map(() => ({
-      left: `${Math.random() * 100}%`,
-      top: `${Math.random() * 100}%`,
-      duration: 2 + Math.random() * 2,
-      delay: Math.random() * 2,
-    })), []);
-
   const canContinue = name.trim().length >= 2 && ageConfirmed && legalAccepted;
 
   const handleContinue = () => {
@@ -35,152 +27,124 @@ export const StoryPrologue = ({ onComplete }: StoryPrologueProps) => {
   };
 
   return (
-    <div className="min-h-screen relative overflow-hidden flex flex-col items-center justify-center px-6 pt-safe pb-safe-lg">
-      {/* Animated Stars Background */}
-      <div className="absolute inset-0 overflow-hidden">
-        {starPositions.map((star, i) => (
-          <motion.div
-            key={i}
-            className="absolute w-1 h-1 bg-white rounded-full"
-            style={{
-              left: star.left,
-              top: star.top,
-            }}
-            animate={{
-              opacity: [0.2, 0.8, 0.2],
-              scale: [0.5, 1, 0.5],
-            }}
-            transition={{
-              duration: star.duration,
-              repeat: Infinity,
-              delay: star.delay,
-            }}
-          />
-        ))}
-      </div>
-
-      {/* Cinematic Opening */}
+    <OnboardingStageShell
+      width="md"
+      accent="38 88% 70%"
+      hero={
+        <div className="onb-stage-emblem">
+          <div className="relative flex items-center justify-center">
+            <Crown className="h-10 w-10 text-[#ffe2a3]" />
+            <motion.div
+              className="absolute -right-4 -top-4 rounded-full border border-[#f3cd84]/18 bg-black/25 p-2 text-[#ffe2a3] backdrop-blur-md"
+              animate={{ y: [0, -5, 0], opacity: [0.7, 1, 0.7] }}
+              transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
+            >
+              <Sparkles className="h-4 w-4" />
+            </motion.div>
+          </div>
+        </div>
+      }
+      eyebrow="Hall of Origins"
+      title="Welcome, Traveler"
+      description="The hatchery ledger is open, the stage lamps are lit, and your first inscription is waiting. Choose the name your guide and companion will speak when this story begins."
+      bodyClassName="mx-auto w-full max-w-2xl"
+    >
       <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 1 }}
-        className="w-full max-w-md z-10"
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.45, delay: 0.12 }}
+        className="onb-stage-panel overflow-hidden p-5 sm:p-6 md:p-8"
       >
-        {/* Icon */}
-        <motion.div
-          initial={{ scale: 0, rotate: -180 }}
-          animate={{ scale: 1, rotate: 0 }}
-          transition={{ type: "spring", delay: 0.3, duration: 0.8 }}
-          className="w-24 h-24 mx-auto mb-8 rounded-full bg-primary/20 flex items-center justify-center"
-        >
-          <Sparkles className="w-12 h-12 text-primary" />
-        </motion.div>
-
-        {/* Title */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-          className="text-center mb-8"
-        >
-          <h1 className="text-4xl font-bold text-white mb-3">
-            Welcome, Traveler
-          </h1>
-          <p className="text-white/70 text-lg">
-            A cosmic journey awaits those who dare to begin
-          </p>
-        </motion.div>
-
-        {/* Name Input */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.7 }}
-          className="bg-card/50 backdrop-blur-sm rounded-2xl p-6 border border-white/10 mb-6"
-        >
-          <label className="block text-white/80 text-sm mb-2">
-            What shall we call you?
-          </label>
-          <Input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Enter your name"
-            className="bg-background/50 border-white/20 text-white placeholder:text-white/40 text-lg py-6"
-            maxLength={30}
-          />
-        </motion.div>
-
-        {/* Age & Legal Checkboxes */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.9 }}
-          className="mb-8 space-y-4"
-        >
-          <div className="flex items-start gap-3">
-            <Checkbox
-              id="age"
-              checked={ageConfirmed}
-              onCheckedChange={(checked) => setAgeConfirmed(checked === true)}
-              className="mt-1"
-            />
-            <label htmlFor="age" className="text-white/70 text-sm leading-relaxed">
-              I confirm that I am 13 years of age or older
+        <div className="space-y-5">
+          <div className="onb-stage-card p-5 sm:p-6">
+            <label
+              htmlFor="onboarding-name"
+              className="mb-3 block text-xs font-semibold uppercase tracking-[0.24em] text-[#f4d39b]/62"
+            >
+              Name for the ledger
             </label>
-          </div>
-          <div className="flex items-start gap-3">
-            <Checkbox
-              id="legal"
-              checked={legalAccepted}
-              onCheckedChange={(checked) => setLegalAccepted(checked === true)}
-              className="mt-1"
+            <Input
+              id="onboarding-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Enter your name"
+              className="h-14 rounded-full border-[#f3cd84]/18 bg-black/25 px-5 text-base text-[#fff4df] placeholder:text-[#f7ead6]/34 focus-visible:ring-[#f3cd84]/55 focus-visible:ring-offset-0"
+              maxLength={30}
             />
-            <label htmlFor="legal" className="text-white/70 text-sm leading-relaxed">
-              I accept the{" "}
-              <button
-                onClick={() => setShowTerms(true)}
-                className="text-primary underline hover:text-primary/80"
-              >
-                Terms of Service
-              </button>
-              ,{" "}
-              <button
-                onClick={() => setShowPrivacy(true)}
-                className="text-primary underline hover:text-primary/80"
-              >
-                Privacy Policy
-              </button>
-              , and{" "}
-              <a
-                href="https://www.apple.com/legal/internet-services/itunes/dev/stdeula/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary underline hover:text-primary/80"
-              >
-                Apple's EULA
-              </a>
-            </label>
+            <p className="mt-3 text-sm leading-6 text-[#f7ead6]/66">
+              This is the name inscribed into your guide reveal, your companion bond, and the
+              opening page of your journey.
+            </p>
           </div>
-        </motion.div>
 
-        {/* Continue Button */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1.1 }}
-        >
+          <div className="space-y-3">
+            <div className="onb-stage-card flex items-start gap-4 p-4 sm:p-5">
+              <Checkbox
+                id="age"
+                aria-label="I confirm that I am 13 years of age or older"
+                checked={ageConfirmed}
+                onCheckedChange={(checked) => setAgeConfirmed(checked === true)}
+                className="mt-1 h-5 w-5 rounded-md border-[#f3cd84]/28 bg-white/5 data-[state=checked]:border-[#ffe2a3] data-[state=checked]:bg-[#ffe2a3] data-[state=checked]:text-[#3a220d]"
+              />
+              <label htmlFor="age" className="flex-1 text-sm leading-6 text-[#f7ead6]/76">
+                I confirm that I am 13 years of age or older
+              </label>
+            </div>
+
+            <div className="onb-stage-card flex items-start gap-4 p-4 sm:p-5">
+              <Checkbox
+                id="legal"
+                aria-label="I accept the Terms of Service, Privacy Policy, and Apple's EULA"
+                checked={legalAccepted}
+                onCheckedChange={(checked) => setLegalAccepted(checked === true)}
+                className="mt-1 h-5 w-5 rounded-md border-[#f3cd84]/28 bg-white/5 data-[state=checked]:border-[#ffe2a3] data-[state=checked]:bg-[#ffe2a3] data-[state=checked]:text-[#3a220d]"
+              />
+              <div className="flex-1 text-sm leading-6 text-[#f7ead6]/70">
+                <label htmlFor="legal" className="inline">
+                  I accept the{" "}
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowTerms(true)}
+                  className="text-[#ffe2a3] underline decoration-[#f3cd84]/40 underline-offset-4 transition hover:text-[#fff4df]"
+                >
+                  Terms of Service
+                </button>
+                ,{" "}
+                <button
+                  type="button"
+                  onClick={() => setShowPrivacy(true)}
+                  className="text-[#ffe2a3] underline decoration-[#f3cd84]/40 underline-offset-4 transition hover:text-[#fff4df]"
+                >
+                  Privacy Policy
+                </button>
+                , and{" "}
+                <a
+                  href="https://www.apple.com/legal/internet-services/itunes/dev/stdeula/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[#ffe2a3] underline decoration-[#f3cd84]/40 underline-offset-4 transition hover:text-[#fff4df]"
+                >
+                  Apple&apos;s EULA
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <div className="onb-stage-divider" />
+
           <Button
             onClick={handleContinue}
             disabled={!canContinue}
-            className="w-full py-6 text-lg font-semibold bg-primary hover:bg-primary/90"
+            size="lg"
+            className="onb-stage-cta h-14 w-full rounded-full text-base font-semibold"
           >
             Begin My Journey
-            <ChevronRight className="ml-2" />
+            <ChevronRight className="h-5 w-5" />
           </Button>
-        </motion.div>
+        </div>
       </motion.div>
 
-      {/* Legal Document Modals */}
       <LegalDocumentViewer
         open={showTerms}
         onOpenChange={setShowTerms}
@@ -191,6 +155,6 @@ export const StoryPrologue = ({ onComplete }: StoryPrologueProps) => {
         onOpenChange={setShowPrivacy}
         documentType="privacy"
       />
-    </div>
+    </OnboardingStageShell>
   );
 };

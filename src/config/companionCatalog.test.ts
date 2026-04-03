@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  getCompanionElement,
+  getCompanionElementProductLabel,
   hasRemoteCompanionPresetAssetCoverage,
   hasRemoteCompanionPresetStageAssetCoverage,
 } from "./companionCatalog";
@@ -85,5 +87,15 @@ describe("companion preset asset coverage", () => {
         state: "normal",
       }),
     ).toBe(true);
+  });
+
+  it("keeps canonical internal labels while exposing renamed product-facing labels", () => {
+    expect(getCompanionElement("fire").label).toBe("Fire");
+    expect(getCompanionElement("ice").label).toBe("Ice");
+    expect(getCompanionElement("nature").label).toBe("Nature");
+
+    expect(getCompanionElementProductLabel("fire")).toBe("Ember");
+    expect(getCompanionElementProductLabel("ice")).toBe("Frost");
+    expect(getCompanionElementProductLabel("nature")).toBe("Terra");
   });
 });
