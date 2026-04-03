@@ -81,6 +81,8 @@ describe("resolveOnboardingBackdropStage", () => {
     expect(resolveOnboardingBackdropStage("destiny")).toBe("destiny");
     expect(resolveOnboardingBackdropStage("questionnaire")).toBe("questionnaire");
     expect(resolveOnboardingBackdropStage("calculating")).toBe("calculating");
+    expect(resolveOnboardingBackdropStage("story-tone")).toBe("questionnaire");
+    expect(resolveOnboardingBackdropStage("egg-prelude")).toBe("journey-begins");
     expect(resolveOnboardingBackdropStage("journey-begins")).toBe("journey-begins");
   });
 

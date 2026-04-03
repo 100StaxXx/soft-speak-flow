@@ -15,26 +15,26 @@ describe("OnboardingEggSelection", () => {
     mocks.reducedMotion = false;
   });
 
-  it("renders all six eggs and keeps continue disabled until a selection is made", () => {
-    render(<OnboardingEggSelection onComplete={vi.fn()} />);
+  it("keeps continue disabled until a selection is made and does not show egg labels or tone controls", () => {
+    render(<OnboardingEggSelection onComplete={vi.fn()} storyTone="epic_adventure" />);
 
-    expect(screen.getByText("Ember")).toBeInTheDocument();
-    expect(screen.getByText("Frost")).toBeInTheDocument();
-    expect(screen.getByText("Terra")).toBeInTheDocument();
-    expect(screen.getByText("Void")).toBeInTheDocument();
-    expect(screen.getByText("Storm")).toBeInTheDocument();
-    expect(screen.getByText("Light")).toBeInTheDocument();
-
+    expect(screen.getByText(/Story Tone: Epic Adventure/i)).toBeInTheDocument();
+    expect(screen.queryByText("Ember")).not.toBeInTheDocument();
+    expect(screen.queryByText("Frost")).not.toBeInTheDocument();
+    expect(screen.queryByText("Terra")).not.toBeInTheDocument();
+    expect(screen.queryByText("Void")).not.toBeInTheDocument();
+    expect(screen.queryByText("Storm")).not.toBeInTheDocument();
+    expect(screen.queryByText("Light")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Dark & Intense/i })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
   });
 
-  it("marks only the selected egg and submits the same onboarding payload shape", () => {
+  it("marks only the selected egg and submits the provided story tone unchanged", () => {
     const onComplete = vi.fn();
 
-    render(<OnboardingEggSelection onComplete={onComplete} />);
+    render(<OnboardingEggSelection onComplete={onComplete} storyTone="dark_intense" />);
 
     fireEvent.click(screen.getByRole("button", { name: "Select Frost egg" }));
-    fireEvent.click(screen.getByRole("button", { name: /Dark & Intense/i }));
 
     expect(screen.getByTestId("egg-slot-ice")).toHaveAttribute("data-selected", "true");
     expect(screen.getByTestId("egg-slot-fire")).toHaveAttribute("data-selected", "false");
@@ -54,7 +54,7 @@ describe("OnboardingEggSelection", () => {
   it("disables looping bounce classes when reduced motion is requested", () => {
     mocks.reducedMotion = true;
 
-    render(<OnboardingEggSelection onComplete={vi.fn()} />);
+    render(<OnboardingEggSelection onComplete={vi.fn()} storyTone="epic_adventure" />);
 
     expect(screen.getByTestId("onboarding-egg-chamber")).toHaveAttribute("data-reduced-motion", "true");
     expect(screen.getByTestId("egg-float-fire")).toHaveAttribute("data-bouncing", "false");

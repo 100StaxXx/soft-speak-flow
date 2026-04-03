@@ -13,6 +13,8 @@ import { DestinyReveal } from "./DestinyReveal";
 import { FactionSelector, type FactionType } from "./FactionSelector";
 import { StoryQuestionnaire, type OnboardingAnswer } from "./StoryQuestionnaire";
 import { MentorCalculating } from "./MentorCalculating";
+import { OnboardingStoryToneSelection } from "./OnboardingStoryToneSelection";
+import { EggSelectionPrelude } from "./EggSelectionPrelude";
 import { OnboardingEggSelection } from "./OnboardingEggSelection";
 import { OnboardingCosmicBackdrop, type OnboardingBackdropStage } from "./OnboardingCosmicBackdrop";
 import { CompanionPersonalization } from "@/components/CompanionPersonalization";
@@ -30,6 +32,7 @@ import {
   getCompanionElementAnchorColor,
   getCompanionPreset,
   resolveCompanionStageFromXp,
+  type CompanionStoryTone,
   type CompanionPresetId,
 } from "@/config/companionCatalog";
 import {
@@ -50,6 +53,8 @@ type OnboardingStage =
   | "calculating"
   | "mentor-result" 
   | "mentor-grid"
+  | "story-tone"
+  | "egg-prelude"
   | "companion"
   | "journey-begins";
 
@@ -64,6 +69,12 @@ export const resolveOnboardingBackdropStage = (
     || stage === "journey-begins"
   ) {
     return stage;
+  }
+  if (stage === "story-tone") {
+    return "questionnaire";
+  }
+  if (stage === "egg-prelude") {
+    return "journey-begins";
   }
   return null;
 };
@@ -182,7 +193,9 @@ export const StoryOnboarding = ({
   const isResetMode = mode === "reset";
   const startsAtCompanion = isMigrationMode || isResetMode;
 
-  const [stage, setStage] = useState<OnboardingStage>(startsAtCompanion ? "companion" : "prologue");
+  const [stage, setStage] = useState<OnboardingStage>(
+    isMigrationMode ? "companion" : isResetMode ? "story-tone" : "prologue",
+  );
   const [userName, setUserName] = useState("");
 
   // Auto scroll to top when stage changes
@@ -196,6 +209,7 @@ export const StoryOnboarding = ({
   const [recommendedMentor, setRecommendedMentor] = useState<Mentor | null>(null);
   const [mentorExplanation, setMentorExplanation] = useState<MentorExplanation | null>(null);
   const [companionAnimal, setCompanionAnimal] = useState("");
+  const [selectedStoryTone, setSelectedStoryTone] = useState<CompanionStoryTone>("epic_adventure");
   const [isCreatingCompanion, setIsCreatingCompanion] = useState(false);
   const [isSubmittingQuestionnaire, setIsSubmittingQuestionnaire] = useState(false);
   const [compatibilityScore, setCompatibilityScore] = useState<number | null>(null);
@@ -520,7 +534,7 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
       await queryClient.refetchQueries({ queryKey: ["profile", user.id] });
     }
     
-    setStage("companion");
+    setStage("story-tone");
   };
 
   const handleSeeAllMentors = () => {
@@ -545,6 +559,19 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
   };
 
   const handleCompanionBack = useCallback(() => {
+    setStage("story-tone");
+  }, []);
+
+  const handleStoryToneComplete = useCallback((storyTone: CompanionStoryTone) => {
+    setSelectedStoryTone(storyTone);
+    setStage("egg-prelude");
+  }, []);
+
+  const handleStoryToneBack = useCallback(() => {
+    if (isResetMode) {
+      return;
+    }
+
     if (recommendedMentor && mentorExplanation) {
       setStage("mentor-result");
       return;
@@ -553,7 +580,15 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
     if (mentors.length > 0) {
       setStage("mentor-grid");
     }
-  }, [mentorExplanation, mentors.length, recommendedMentor]);
+  }, [isResetMode, mentorExplanation, mentors.length, recommendedMentor]);
+
+  const handleEggPreludeComplete = useCallback(() => {
+    setStage("companion");
+  }, []);
+
+  const handleEggPreludeBack = useCallback(() => {
+    setStage("story-tone");
+  }, []);
 
   const handleCompanionComplete = async (preferences: {
     presetId: CompanionPresetId | null;
@@ -1034,6 +1069,38 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
           </motion.div>
         )}
 
+        {stage === "story-tone" && (
+          <motion.div
+            key="story-tone"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="relative z-10 w-full"
+          >
+            <OnboardingStoryToneSelection
+              initialTone={selectedStoryTone}
+              onComplete={handleStoryToneComplete}
+              onBack={isResetMode ? undefined : handleStoryToneBack}
+            />
+          </motion.div>
+        )}
+
+        {stage === "egg-prelude" && (
+          <motion.div
+            key="egg-prelude"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="relative z-10 w-full"
+          >
+            <EggSelectionPrelude
+              storyTone={selectedStoryTone}
+              onComplete={handleEggPreludeComplete}
+              onBack={handleEggPreludeBack}
+            />
+          </motion.div>
+        )}
+
         {stage === "companion" && (faction || startsAtCompanion) && (
           <motion.div
             key={isMigrationMode ? "companion-migration" : isResetMode ? "companion-reset" : "companion"}
@@ -1042,16 +1109,17 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
             exit={{ opacity: 0 }}
             className="relative z-10 w-full"
           >
-            {isMigrationMode || isResetMode ? (
+            {isMigrationMode ? (
               <CompanionPersonalization
                 onComplete={handleCompanionComplete}
                 isLoading={isCreatingCompanion}
-                mode={isMigrationMode ? "migration" : "onboarding"}
+                mode="migration"
               />
             ) : (
               <OnboardingEggSelection
                 onComplete={handleCompanionComplete}
                 isLoading={isCreatingCompanion}
+                storyTone={selectedStoryTone}
                 onBack={handleCompanionBack}
               />
             )}

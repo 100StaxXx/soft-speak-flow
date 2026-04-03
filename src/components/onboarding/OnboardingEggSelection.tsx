@@ -1,5 +1,6 @@
 import { useState, type CSSProperties } from "react";
 import { useReducedMotion } from "framer-motion";
+import { Button } from "@/components/ui/button";
 import { CompanionCreationLoader } from "@/components/CompanionCreationLoader";
 import {
   COMPANION_ELEMENTS,
@@ -41,8 +42,8 @@ interface OnboardingCompanionSelectionData {
 export interface OnboardingEggSelectionProps {
   onComplete: (data: OnboardingCompanionSelectionData) => void;
   isLoading?: boolean;
+  storyTone: CompanionStoryTone;
   initialElement?: CompanionElementId | null;
-  initialStoryTone?: CompanionStoryTone;
   onBack?: () => void;
 }
 
@@ -87,11 +88,11 @@ const CHAMBER_SLOTS: Record<CompanionElementId, ChamberSlotConfig> = {
   },
   void: {
     centerX: "18.6%",
-    centerY: "58.9%",
+    centerY: "56.7%",
     width: "27.5%",
     height: "30.5%",
     eggWidth: "71%",
-    eggBottom: "16.5%",
+    eggBottom: "19%",
     bounceDelay: "-1.7s",
     bounceDuration: "4.1s",
     eggSrc: `${CHAMBER_ASSET_BASE}/void_eggclear.png`,
@@ -99,11 +100,11 @@ const CHAMBER_SLOTS: Record<CompanionElementId, ChamberSlotConfig> = {
   },
   storm: {
     centerX: "49.9%",
-    centerY: "58.8%",
+    centerY: "56.6%",
     width: "28.5%",
     height: "31%",
     eggWidth: "72%",
-    eggBottom: "16.5%",
+    eggBottom: "19%",
     bounceDelay: "-2.2s",
     bounceDuration: "3.7s",
     eggSrc: `${CHAMBER_ASSET_BASE}/storm_eggclear.png`,
@@ -111,11 +112,11 @@ const CHAMBER_SLOTS: Record<CompanionElementId, ChamberSlotConfig> = {
   },
   light: {
     centerX: "81.2%",
-    centerY: "58.8%",
+    centerY: "56.6%",
     width: "28.5%",
     height: "31%",
-    eggWidth: "70%",
-    eggBottom: "16.5%",
+    eggWidth: "65%",
+    eggBottom: "19.2%",
     bounceDelay: "-0.5s",
     bounceDuration: "3.5s",
     eggSrc: `${CHAMBER_ASSET_BASE}/light_eggclear.png`,
@@ -126,19 +127,18 @@ const CHAMBER_SLOTS: Record<CompanionElementId, ChamberSlotConfig> = {
 export const OnboardingEggSelection = ({
   onComplete,
   isLoading = false,
+  storyTone,
   initialElement = null,
-  initialStoryTone = "epic_adventure",
   onBack,
 }: OnboardingEggSelectionProps) => {
   const prefersReducedMotion = useReducedMotion();
   const [selectedElement, setSelectedElement] = useState<CompanionElementId | null>(initialElement);
-  const [selectedTone, setSelectedTone] = useState<CompanionStoryTone>(initialStoryTone);
 
   const selectedElementMeta = selectedElement
     ? COMPANION_ELEMENTS.find((element) => element.id === selectedElement) ?? null
     : null;
   const selectedToneMeta =
-    COMPANION_STORY_TONES.find((tone) => tone.value === selectedTone) ?? COMPANION_STORY_TONES[0];
+    COMPANION_STORY_TONES.find((tone) => tone.value === storyTone) ?? COMPANION_STORY_TONES[0];
 
   if (isLoading) {
     return <CompanionCreationLoader />;
@@ -146,8 +146,46 @@ export const OnboardingEggSelection = ({
 
   return (
     <div className="relative z-10 min-h-screen px-4 pt-safe-top pb-safe-bottom">
-      <div className="mx-auto flex min-h-screen max-w-6xl flex-col items-center justify-center gap-6 py-6">
-        <h1 className="sr-only">Choose your element</h1>
+      <div className="mx-auto flex min-h-screen max-w-5xl flex-col items-center justify-center gap-4 py-6">
+        <div className="w-full max-w-[42rem]">
+          <div className="flex flex-col gap-4 rounded-[28px] border border-white/[0.10] bg-[linear-gradient(180deg,rgba(27,18,41,0.92),rgba(18,13,31,0.92))] p-4 shadow-[0_20px_52px_rgba(0,0,0,0.28)] backdrop-blur-xl sm:p-5">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="space-y-3">
+                <span className="inline-flex rounded-full border border-white/[0.12] bg-white/[0.08] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/[0.72]">
+                  Final Choice
+                </span>
+                <div className="space-y-1.5">
+                  <h1 className="text-2xl font-semibold text-white sm:text-[2rem]">Choose Your Egg</h1>
+                  <p className="max-w-2xl text-sm leading-6 text-white/[0.72] sm:text-base">
+                    Let the chamber answer with the shell that feels most like the beginning of your companion bond.
+                  </p>
+                </div>
+              </div>
+
+              {onBack ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={onBack}
+                  className="self-start rounded-full border border-white/[0.12] bg-white/[0.06] px-5 text-white/[0.86] hover:bg-white/[0.10]"
+                >
+                  Back
+                </Button>
+              ) : null}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full border border-sky-300/[0.20] bg-sky-300/[0.10] px-3 py-1 text-sm font-semibold text-sky-100">
+                Story Tone: {selectedToneMeta.label}
+              </span>
+              {selectedElementMeta ? (
+                <span className="rounded-full border border-amber-300/[0.25] bg-amber-300/[0.10] px-3 py-1 text-sm font-semibold text-amber-100">
+                  {selectedElementMeta.productLabel} Egg
+                </span>
+              ) : null}
+            </div>
+          </div>
+        </div>
 
         <div
           className="onboarding-egg-chamber w-full max-w-[42rem]"
@@ -223,9 +261,6 @@ export const OnboardingEggSelection = ({
                       loading="lazy"
                     />
                   </span>
-                  <span className="onboarding-egg-slot__label" aria-hidden="true">
-                    {element.productLabel}
-                  </span>
                 </button>
               );
             })}
@@ -243,7 +278,7 @@ export const OnboardingEggSelection = ({
                   favoriteColor: getCompanionElementAnchorColor(selectedElement),
                   spiritAnimal: "Egg",
                   coreElement: selectedElement,
-                  storyTone: selectedTone,
+                  storyTone,
                 });
               }}
               disabled={!selectedElement}
@@ -253,71 +288,6 @@ export const OnboardingEggSelection = ({
             </button>
           </div>
         </div>
-
-        <section className="w-full max-w-5xl rounded-[28px] border border-white/[0.10] bg-[linear-gradient(180deg,rgba(27,18,41,0.92),rgba(18,13,31,0.92))] p-4 shadow-[0_24px_60px_rgba(0,0,0,0.34)] backdrop-blur-xl sm:p-5">
-          <div className="flex flex-col gap-5">
-            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-              <div className="space-y-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full border border-white/[0.12] bg-white/[0.08] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/[0.72]">
-                    Element
-                  </span>
-                  <span className="rounded-full border border-amber-300/[0.25] bg-amber-300/[0.10] px-3 py-1 text-sm font-semibold text-amber-100">
-                    {selectedElementMeta ? `${selectedElementMeta.productLabel} Egg` : "Choose an Egg"}
-                  </span>
-                  <span className="rounded-full border border-sky-300/[0.20] bg-sky-300/[0.10] px-3 py-1 text-sm font-semibold text-sky-100">
-                    {selectedToneMeta.label}
-                  </span>
-                </div>
-                <p className="max-w-3xl text-sm leading-6 text-white/[0.74]">
-                  {selectedElementMeta
-                    ? `${selectedElementMeta.productLabel} sets your companion's element from the very beginning. Story tone shapes how the bond unfolds once the shell opens.`
-                    : "Choose the egg that feels like your starting energy, then pick the tone you want your story to carry forward."}
-                </p>
-              </div>
-
-              {onBack ? (
-                <button
-                  type="button"
-                  onClick={onBack}
-                  className="inline-flex min-h-11 items-center justify-center rounded-full border border-white/[0.12] bg-white/[0.06] px-4 text-sm font-semibold text-white/[0.82] transition-colors duration-200 hover:bg-white/[0.10] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/[0.60]"
-                >
-                  Back
-                </button>
-              ) : null}
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-semibold text-white/[0.88]">Story Tone</p>
-                <p className="text-xs uppercase tracking-[0.2em] text-white/[0.48]">Affects story flavor, not element</p>
-              </div>
-
-              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
-                {COMPANION_STORY_TONES.map((tone) => {
-                  const isSelected = tone.value === selectedTone;
-
-                  return (
-                    <button
-                      key={tone.value}
-                      type="button"
-                      onClick={() => setSelectedTone(tone.value)}
-                      className={cn(
-                        "rounded-[22px] border px-4 py-3 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60",
-                        isSelected
-                          ? "border-amber-300/[0.45] bg-amber-300/[0.14] text-white shadow-[0_18px_32px_rgba(255,199,84,0.16)]"
-                          : "border-white/[0.10] bg-white/[0.05] text-white/[0.84] hover:bg-white/[0.08]",
-                      )}
-                    >
-                      <div className="text-sm font-semibold">{tone.label}</div>
-                      <p className="mt-1 text-xs leading-5 text-white/[0.58]">{tone.summary}</p>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </section>
       </div>
     </div>
   );

@@ -1,6 +1,8 @@
 // Onboarding components
 export { StoryOnboarding } from "./StoryOnboarding";
 export { OnboardingEggSelection, type OnboardingEggSelectionProps } from "./OnboardingEggSelection";
+export { OnboardingStoryToneSelection } from "./OnboardingStoryToneSelection";
+export { EggSelectionPrelude } from "./EggSelectionPrelude";
 export { StoryPrologue } from "./StoryPrologue";
 export { DestinyReveal } from "./DestinyReveal";
 export { FactionSelector, type FactionType } from "./FactionSelector";

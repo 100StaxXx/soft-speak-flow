@@ -107,13 +107,8 @@
   outline: none;
 }
 
-.onboarding-egg-slot:focus-visible .onboarding-egg-slot__label {
-  box-shadow:
-    0 0 0 2px rgba(255, 255, 255, 0.72),
-    0 0 0 6px rgba(255, 255, 255, 0.16);
-}
-
 .onboarding-egg-slot:hover,
+.onboarding-egg-slot:focus-visible,
 .onboarding-egg-slot[data-selected="true"] {
   transform: translate(-50%, calc(-50% - 8px)) scale(1.02);
 }
@@ -182,47 +177,22 @@
   -webkit-user-drag: none;
 }
 
-.onboarding-egg-slot__label {
-  position: absolute;
-  left: 50%;
-  bottom: 0;
-  min-width: 56%;
-  max-width: 70%;
-  transform: translateX(-50%);
-  border-radius: 14px;
-  border: 1px solid rgba(255, 230, 172, 0.16);
-  background: linear-gradient(180deg, rgba(44, 27, 8, 0.35), rgba(27, 15, 6, 0.6));
-  box-shadow:
-    0 8px 20px rgba(0, 0, 0, 0.26),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  padding: 0.38rem 0.75rem 0.48rem;
-  color: rgba(255, 248, 227, 0.94);
-  font-size: clamp(0.82rem, 1.95vw, 1.15rem);
-  font-weight: 700;
-  letter-spacing: 0.01em;
-  line-height: 1;
-  text-align: center;
-  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.55);
-  transition:
-    transform 220ms ease,
-    background 220ms ease,
-    border-color 220ms ease,
-    box-shadow 220ms ease;
-}
-
 .onboarding-egg-slot:hover .onboarding-egg-slot__pedestal-flare,
+.onboarding-egg-slot:focus-visible .onboarding-egg-slot__pedestal-flare,
 .onboarding-egg-slot[data-selected="true"] .onboarding-egg-slot__pedestal-flare {
   opacity: 0.4;
   transform: translateX(-50%) scale(1);
 }
 
 .onboarding-egg-slot:hover .onboarding-egg-slot__egg-aura,
+.onboarding-egg-slot:focus-visible .onboarding-egg-slot__egg-aura,
 .onboarding-egg-slot[data-selected="true"] .onboarding-egg-slot__egg-aura {
   opacity: 0.32;
   transform: translateX(-50%) scale(1);
 }
 
 .onboarding-egg-slot:hover .onboarding-egg-slot__egg,
+.onboarding-egg-slot:focus-visible .onboarding-egg-slot__egg,
 .onboarding-egg-slot[data-selected="true"] .onboarding-egg-slot__egg {
   transform: translateX(-50%) scale(1.045);
   filter:
@@ -239,21 +209,6 @@
 .onboarding-egg-slot[data-selected="true"] .onboarding-egg-slot__egg-aura {
   opacity: 0.66;
   filter: blur(30px);
-}
-
-.onboarding-egg-slot:hover .onboarding-egg-slot__label,
-.onboarding-egg-slot[data-selected="true"] .onboarding-egg-slot__label {
-  border-color: rgba(255, 234, 180, 0.5);
-  background: linear-gradient(180deg, rgba(107, 71, 22, 0.6), rgba(56, 31, 8, 0.92));
-  box-shadow:
-    0 18px 34px rgba(0, 0, 0, 0.32),
-    0 0 24px rgba(255, 218, 128, 0.24),
-    inset 0 1px 0 rgba(255, 248, 222, 0.2);
-  transform: translateX(-50%) translateY(-2px);
-}
-
-.onboarding-egg-slot[data-selected="true"] .onboarding-egg-slot__label {
-  color: rgba(255, 251, 242, 1);
 }
 
 .onboarding-egg-chamber__continue {
@@ -304,12 +259,6 @@
     border-radius: 26px;
   }
 
-  .onboarding-egg-slot__label {
-    min-width: 58%;
-    padding: 0.32rem 0.65rem 0.42rem;
-    font-size: clamp(0.72rem, 3vw, 0.92rem);
-  }
-
   .onboarding-egg-chamber__continue {
     min-width: 42%;
     border-radius: 14px;
@@ -323,7 +272,6 @@
   .onboarding-egg-slot__egg,
   .onboarding-egg-slot__pedestal-flare,
   .onboarding-egg-slot__egg-aura,
-  .onboarding-egg-slot__label,
   .onboarding-egg-chamber__continue {
     transition: none;
   }

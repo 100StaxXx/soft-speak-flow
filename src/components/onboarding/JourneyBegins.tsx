@@ -138,7 +138,7 @@ export const JourneyBegins = ({ userName, companionAnimal, onComplete }: Journey
                   transition={{ delay: 0.8 }}
                   className="text-white/60 text-base"
                 >
-                  An unbreakable bond, a shared destiny waiting to hatch.
+                  Your companion egg is in your care now, and its true form will awaken as your bond grows.
                 </motion.p>
                 
                 <motion.div
@@ -148,7 +148,7 @@ export const JourneyBegins = ({ userName, companionAnimal, onComplete }: Journey
                   className="pt-2"
                 >
                   <p className="text-white/70 text-lg">
-                    The cosmos holds infinite possibilities.
+                    The first steps of your bond begin now.
                   </p>
                   <p className="text-white/50 text-sm mt-1">
                     Your first quest awaits...

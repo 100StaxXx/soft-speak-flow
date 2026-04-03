@@ -242,9 +242,58 @@ vi.mock("@/components/MentorGrid", () => ({
   MentorGrid: () => <div data-testid="mentor-grid-stage">Mentor Grid</div>,
 }));
 
+vi.mock("./OnboardingStoryToneSelection", () => ({
+  OnboardingStoryToneSelection: ({
+    initialTone,
+    onComplete,
+    onBack,
+  }: {
+    initialTone: string;
+    onComplete: (tone: string) => void;
+    onBack?: () => void;
+  }) => (
+    <div data-testid="story-tone-stage">
+      <div data-testid="story-tone-initial">{initialTone}</div>
+      {onBack ? (
+        <button type="button" onClick={onBack}>
+          story-tone-back
+        </button>
+      ) : null}
+      <button type="button" onClick={() => onComplete("dark_intense")}>
+        story-tone-next
+      </button>
+    </div>
+  ),
+}));
+
+vi.mock("./EggSelectionPrelude", () => ({
+  EggSelectionPrelude: ({
+    storyTone,
+    onComplete,
+    onBack,
+  }: {
+    storyTone: string;
+    onComplete: () => void;
+    onBack?: () => void;
+  }) => (
+    <div data-testid="egg-prelude-stage">
+      <div data-testid="egg-prelude-tone">{storyTone}</div>
+      {onBack ? (
+        <button type="button" onClick={onBack}>
+          egg-prelude-back
+        </button>
+      ) : null}
+      <button type="button" onClick={onComplete}>
+        egg-prelude-next
+      </button>
+    </div>
+  ),
+}));
+
 vi.mock("./OnboardingEggSelection", () => ({
   OnboardingEggSelection: ({
     onComplete,
+    storyTone,
   }: {
     onComplete: (payload: {
       presetId: null;
@@ -253,8 +302,10 @@ vi.mock("./OnboardingEggSelection", () => ({
       coreElement: string;
       storyTone: string;
     }) => void;
+    storyTone: string;
   }) => (
     <div data-testid="companion-stage">
+      <div data-testid="egg-stage-tone">{storyTone}</div>
       <button
         type="button"
         onClick={() =>
@@ -263,7 +314,7 @@ vi.mock("./OnboardingEggSelection", () => ({
             favoriteColor: "#60A5FA",
             spiritAnimal: "Egg",
             coreElement: "ice",
-            storyTone: "dark_intense",
+            storyTone,
           })
         }
       >
@@ -304,6 +355,13 @@ const advanceToQuestionnaire = async () => {
   fireEvent.click(await screen.findByRole("button", { name: "destiny-next" }));
   fireEvent.click(await screen.findByRole("button", { name: "faction-next" }));
   await screen.findByRole("button", { name: "questionnaire-submit" });
+};
+
+const advanceFromMentorToEggSelection = async () => {
+  fireEvent.click(screen.getByRole("button", { name: "mentor-confirm" }));
+  fireEvent.click(await screen.findByRole("button", { name: "story-tone-next" }));
+  fireEvent.click(await screen.findByRole("button", { name: "egg-prelude-next" }));
+  await screen.findByRole("button", { name: "complete-companion" });
 };
 
 describe("StoryOnboarding questionnaire submission flow", () => {
@@ -400,8 +458,8 @@ describe("StoryOnboarding questionnaire submission flow", () => {
 
       vi.useRealTimers();
 
-      fireEvent.click(screen.getByRole("button", { name: "mentor-confirm" }));
-      fireEvent.click(await screen.findByRole("button", { name: "complete-companion" }));
+      await advanceFromMentorToEggSelection();
+      fireEvent.click(screen.getByRole("button", { name: "complete-companion" }));
 
       await screen.findByTestId("journey-begins-stage");
 
@@ -415,5 +473,72 @@ describe("StoryOnboarding questionnaire submission flow", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("passes through story tone via story-tone page and egg prelude before companion creation", async () => {
+    renderOnboarding();
+    await advanceToQuestionnaire();
+
+    vi.useFakeTimers();
+    try {
+      fireEvent.click(screen.getByRole("button", { name: "questionnaire-submit" }));
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(CALCULATING_STAGE_DURATION_MS);
+        await Promise.resolve();
+      });
+
+      vi.useRealTimers();
+
+      fireEvent.click(screen.getByRole("button", { name: "mentor-confirm" }));
+      expect(await screen.findByTestId("story-tone-stage")).toBeInTheDocument();
+      expect(screen.getByTestId("story-tone-initial")).toHaveTextContent("epic_adventure");
+
+      fireEvent.click(screen.getByRole("button", { name: "story-tone-next" }));
+      expect(await screen.findByTestId("egg-prelude-stage")).toBeInTheDocument();
+      expect(screen.getByTestId("egg-prelude-tone")).toHaveTextContent("dark_intense");
+
+      fireEvent.click(screen.getByRole("button", { name: "egg-prelude-next" }));
+      expect(await screen.findByTestId("companion-stage")).toBeInTheDocument();
+      expect(screen.getByTestId("egg-stage-tone")).toHaveTextContent("dark_intense");
+
+      fireEvent.click(screen.getByRole("button", { name: "complete-companion" }));
+      await screen.findByTestId("journey-begins-stage");
+
+      expect(mocks.createCompanionMutateAsync).toHaveBeenCalledWith({
+        presetId: null,
+        favoriteColor: "#60A5FA",
+        spiritAnimal: "Egg",
+        coreElement: "ice",
+        storyTone: "dark_intense",
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("starts reset mode at the story-tone stage", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+        },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <StoryOnboarding mode="reset" />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(screen.getByTestId("story-tone-stage")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "prologue-next" })).not.toBeInTheDocument();
   });
 });
