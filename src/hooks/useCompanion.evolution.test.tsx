@@ -146,6 +146,13 @@ const createQueryBuilder = (table: string) => {
     in: vi.fn(() => builder),
     order: vi.fn(() => builder),
     limit: vi.fn(() => builder),
+    single: vi.fn(async () => {
+      if (table === "user_companion") {
+        return mocks.userCompanionResponses.shift() ?? { data: companionFixture, error: null };
+      }
+
+      return { data: null, error: null };
+    }),
     maybeSingle: vi.fn(async () => {
       if (table === "user_companion") {
         return mocks.userCompanionResponses.shift() ?? { data: companionFixture, error: null };
@@ -452,6 +459,49 @@ describe("useCompanion evolveCompanion", () => {
         p_core_element: "void",
         p_current_image_url: "/companion-eggs/egg__t0_egg__normal__void.png",
         p_initial_image_url: "/companion-eggs/egg__t0_egg__normal__void.png",
+      }),
+    );
+  });
+
+  it("does not fail onboarding when stage 0 evolution is not readable yet", async () => {
+    mocks.rpcMock.mockResolvedValueOnce({
+      data: [
+        {
+          ...companionFixture,
+          preset_id: null,
+          spirit_animal: "Egg",
+          core_element: "void",
+          current_image_url: "/companion-eggs/egg__t0_egg__normal__void.png",
+          initial_image_url: "/companion-eggs/egg__t0_egg__normal__void.png",
+          is_new: true,
+        },
+      ],
+      error: null,
+    });
+    mocks.companionEvolutionResponses.push({ data: null, error: null });
+
+    const { result } = await renderUseCompanion();
+
+    let createdCompanion: Awaited<ReturnType<typeof result.current.createCompanion.mutateAsync>>;
+    await act(async () => {
+      createdCompanion = await result.current.createCompanion.mutateAsync({
+        presetId: null,
+        favoriteColor: "#000000",
+        spiritAnimal: "Egg",
+        coreElement: "void",
+        storyTone: "epic_adventure",
+      });
+    });
+
+    expect(createdCompanion!).toMatchObject({
+      id: companionFixture.id,
+      preset_id: null,
+      spirit_animal: "Egg",
+    });
+    expect(mocks.loggerWarnMock).toHaveBeenCalledWith(
+      "Stage 0 evolution missing after companion creation",
+      expect.objectContaining({
+        companionId: companionFixture.id,
       }),
     );
   });

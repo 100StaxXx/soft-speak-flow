@@ -475,50 +475,38 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
         const companionResult = result.data;
 
         logger.log("RPC call successful, result:", companionResult);
-      
-      if (!companionResult || companionResult.length === 0) {
-        logger.error("No companion data returned from function");
-        throw new Error("Failed to create companion record. Please try again.");
-      }
 
-      const companionData = companionResult[0] as unknown as CreateCompanionIfNotExistsResult;
-      const isNewCompanion = companionData.is_new;
+        if (!companionResult || companionResult.length === 0) {
+          logger.error("No companion data returned from function");
+          throw new Error("Failed to create companion record. Please try again.");
+        }
 
-      logger.log(`Companion ${isNewCompanion ? 'created' : 'already exists'}:`, companionData.id);
+        const companionData = companionResult[0] as unknown as CreateCompanionIfNotExistsResult;
+        const isNewCompanion = companionData.is_new;
 
-      // Check if stage 0 evolution exists (regardless of whether companion is new)
-      const { data: existingEvolution } = await supabase
-        .from("companion_evolutions")
-        .select("id")
-        .eq("companion_id", companionData.id)
-        .eq("stage", 0)
-        .maybeSingle();
+        logger.log(`Companion ${isNewCompanion ? "created" : "already exists"}:`, companionData.id);
 
-      // Create stage 0 evolution if missing
-      if (!existingEvolution) {
-        logger.log("Creating stage 0 evolution...");
-        const { data: stageZeroEvolution, error: stageZeroInsertError } = await supabase
+        // Stage 0 history is now created by the security-definer RPC so onboarding
+        // does not depend on client-side INSERT access to companion_evolutions.
+        const { data: stageZeroEvolution, error: stageZeroEvolutionError } = await supabase
           .from("companion_evolutions")
-          .insert({
-            companion_id: companionData.id,
-            stage: 0,
-            image_url: currentImageUrl,
-            xp_at_evolution: 0,
-          })
-          .select()
+          .select("id")
+          .eq("companion_id", companionData.id)
+          .eq("stage", 0)
           .maybeSingle();
 
-        if (stageZeroInsertError) {
-          console.error("Failed to create stage 0 evolution:", stageZeroInsertError);
-          throw new Error(`Unable to record stage 0 evolution: ${stageZeroInsertError.message}`);
+        if (stageZeroEvolutionError) {
+          logger.warn("Stage 0 evolution lookup failed after companion creation", {
+            companionId: companionData.id,
+            error: stageZeroEvolutionError.message,
+          });
+        } else if (!stageZeroEvolution?.id) {
+          logger.warn("Stage 0 evolution missing after companion creation", {
+            companionId: companionData.id,
+          });
         }
 
-        if (!stageZeroEvolution) {
-          console.error("Stage 0 evolution insert returned no data");
-          throw new Error("Unable to record stage 0 evolution");
-        }
-
-        if (resolvedSpiritAnimal !== "Egg") {
+        if (resolvedSpiritAnimal !== "Egg" && isNewCompanion && stageZeroEvolution?.id) {
           // Generate stage 0 card in background (don't await - don't block onboarding)
           const generateStageZeroCard = async () => {
             try {
@@ -554,57 +542,56 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
 
           generateStageZeroCard(); // Fire and forget - don't block onboarding
         }
-      }
 
-      // Generate story only for new companions
-      if (isNewCompanion) {
-        // Auto-generate the first chapter of the companion's story in background with retry
-        const generateStoryWithRetry = async (attempts = 3) => {
-          for (let attempt = 1; attempt <= attempts; attempt++) {
-            try {
-              const { error } = await supabase.functions.invoke('generate-companion-story', {
-                body: {
-                  companionId: companionData.id,
-                  stage: 0,
+        // Generate story only for new companions
+        if (isNewCompanion) {
+          // Auto-generate the first chapter of the companion's story in background with retry
+          const generateStoryWithRetry = async (attempts = 3) => {
+            for (let attempt = 1; attempt <= attempts; attempt++) {
+              try {
+                const { error } = await supabase.functions.invoke("generate-companion-story", {
+                  body: {
+                    companionId: companionData.id,
+                    stage: 0,
+                  }
+                });
+
+                if (error) throw error;
+
+                logger.log("Stage 0 story generation started");
+                queryClient.invalidateQueries({ queryKey: ["companion-story"] });
+                queryClient.invalidateQueries({ queryKey: ["companion-stories-all"] });
+                return;
+              } catch (storyError) {
+                const errorMessage = storyError instanceof Error ? storyError.message : String(storyError);
+                const isTransient = errorMessage.includes("network") ||
+                                   errorMessage.includes("timeout") ||
+                                   errorMessage.includes("temporarily unavailable");
+
+                if (attempt < attempts && isTransient) {
+                  logger.log(`Story generation attempt ${attempt} failed, retrying...`);
+                  await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
+                  continue;
                 }
-              });
 
-              if (error) throw error;
-
-              logger.log("Stage 0 story generation started");
-              queryClient.invalidateQueries({ queryKey: ["companion-story"] });
-              queryClient.invalidateQueries({ queryKey: ["companion-stories-all"] });
-              return;
-            } catch (storyError) {
-              const errorMessage = storyError instanceof Error ? storyError.message : String(storyError);
-              const isTransient = errorMessage.includes('network') ||
-                                 errorMessage.includes('timeout') ||
-                                 errorMessage.includes('temporarily unavailable');
-
-              if (attempt < attempts && isTransient) {
-                logger.log(`Story generation attempt ${attempt} failed, retrying...`);
-                await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
-                continue;
+                console.error(`Failed to auto-generate stage 0 story after ${attempt} attempts:`, storyError);
+                break;
               }
-
-              console.error(`Failed to auto-generate stage 0 story after ${attempt} attempts:`, storyError);
-              break;
             }
-          }
-        };
+          };
 
-        // Start story generation in background (don't await)
-        generateStoryWithRetry().catch((error) => {
-          console.warn('Story generation failed (non-critical):', error?.message || error);
+          // Start story generation in background (don't await)
+          generateStoryWithRetry().catch((error) => {
+            console.warn("Story generation failed (non-critical):", error?.message || error);
+          });
+        }
+
+        logger.info("Companion creation completed", {
+          userId: user.id,
+          presetId: data.presetId ?? null,
+          durationMs: Date.now() - creationStartedAt,
         });
-      }
-
-      logger.info("Companion creation completed", {
-        userId: user.id,
-        presetId: data.presetId ?? null,
-        durationMs: Date.now() - creationStartedAt,
-      });
-      return companionData;
+        return companionData;
       } catch (error) {
         // Reset flag on error
         companionCreationInProgress.current = false;
