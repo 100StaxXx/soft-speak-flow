@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { CompanionCreationLoader } from "@/components/CompanionCreationLoader";
 import {
   COMPANION_ELEMENTS,
-  COMPANION_STORY_TONES,
   getCompanionElementAnchorColor,
   type CompanionElementId,
   type CompanionPresetId,
@@ -88,7 +87,7 @@ const CHAMBER_SLOTS: Record<CompanionElementId, ChamberSlotConfig> = {
   },
   void: {
     centerX: "18.6%",
-    centerY: "56.7%",
+    centerY: "55.0%",
     width: "27.5%",
     height: "30.5%",
     eggWidth: "71%",
@@ -100,7 +99,7 @@ const CHAMBER_SLOTS: Record<CompanionElementId, ChamberSlotConfig> = {
   },
   storm: {
     centerX: "49.9%",
-    centerY: "56.6%",
+    centerY: "55.8%",
     width: "28.5%",
     height: "31%",
     eggWidth: "72%",
@@ -112,7 +111,7 @@ const CHAMBER_SLOTS: Record<CompanionElementId, ChamberSlotConfig> = {
   },
   light: {
     centerX: "81.2%",
-    centerY: "56.6%",
+    centerY: "55.0%",
     width: "28.5%",
     height: "31%",
     eggWidth: "65%",
@@ -134,11 +133,19 @@ export const OnboardingEggSelection = ({
   const prefersReducedMotion = useReducedMotion();
   const [selectedElement, setSelectedElement] = useState<CompanionElementId | null>(initialElement);
 
-  const selectedElementMeta = selectedElement
-    ? COMPANION_ELEMENTS.find((element) => element.id === selectedElement) ?? null
-    : null;
-  const selectedToneMeta =
-    COMPANION_STORY_TONES.find((tone) => tone.value === storyTone) ?? COMPANION_STORY_TONES[0];
+  const handleContinue = () => {
+    if (!selectedElement) {
+      return;
+    }
+
+    onComplete({
+      presetId: null,
+      favoriteColor: getCompanionElementAnchorColor(selectedElement),
+      spiritAnimal: "Egg",
+      coreElement: selectedElement,
+      storyTone,
+    });
+  };
 
   if (isLoading) {
     return <CompanionCreationLoader />;
@@ -146,53 +153,14 @@ export const OnboardingEggSelection = ({
 
   return (
     <div className="relative z-10 min-h-screen px-4 pt-safe-top pb-safe-bottom">
-      <div className="mx-auto flex min-h-screen max-w-5xl flex-col items-center justify-center gap-4 py-6">
-        <div className="w-full max-w-[42rem]">
-          <div className="flex flex-col gap-4 rounded-[28px] border border-white/[0.10] bg-[linear-gradient(180deg,rgba(27,18,41,0.92),rgba(18,13,31,0.92))] p-4 shadow-[0_20px_52px_rgba(0,0,0,0.28)] backdrop-blur-xl sm:p-5">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-              <div className="space-y-3">
-                <span className="inline-flex rounded-full border border-white/[0.12] bg-white/[0.08] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/[0.72]">
-                  Final Choice
-                </span>
-                <div className="space-y-1.5">
-                  <h1 className="text-2xl font-semibold text-white sm:text-[2rem]">Choose Your Egg</h1>
-                  <p className="max-w-2xl text-sm leading-6 text-white/[0.72] sm:text-base">
-                    Let the chamber answer with the shell that feels most like the beginning of your companion bond.
-                  </p>
-                </div>
-              </div>
-
-              {onBack ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={onBack}
-                  className="self-start rounded-full border border-white/[0.12] bg-white/[0.06] px-5 text-white/[0.86] hover:bg-white/[0.10]"
-                >
-                  Back
-                </Button>
-              ) : null}
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full border border-sky-300/[0.20] bg-sky-300/[0.10] px-3 py-1 text-sm font-semibold text-sky-100">
-                Story Tone: {selectedToneMeta.label}
-              </span>
-              {selectedElementMeta ? (
-                <span className="rounded-full border border-amber-300/[0.25] bg-amber-300/[0.10] px-3 py-1 text-sm font-semibold text-amber-100">
-                  {selectedElementMeta.productLabel} Egg
-                </span>
-              ) : null}
-            </div>
-          </div>
-        </div>
-
+      <div className="mx-auto flex min-h-screen max-w-[46rem] items-center justify-center py-4 sm:py-6">
         <div
           className="onboarding-egg-chamber w-full max-w-[42rem]"
           data-reduced-motion={prefersReducedMotion ? "true" : "false"}
           data-selected-element={selectedElement ?? ""}
           data-testid="onboarding-egg-chamber"
         >
+          <h1 className="sr-only">Choose your element</h1>
           <div className="onboarding-egg-chamber__scene">
             <img
               src={CHAMBER_BACKGROUND_SRC}
@@ -208,6 +176,17 @@ export const OnboardingEggSelection = ({
               className="onboarding-egg-chamber__pedestal-overlay"
               loading="eager"
             />
+
+            {onBack ? (
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={onBack}
+                className="onboarding-egg-chamber__back"
+              >
+                Back
+              </Button>
+            ) : null}
 
             {ELEMENT_ORDER.map((elementId) => {
               const slot = CHAMBER_SLOTS[elementId];
@@ -268,24 +247,10 @@ export const OnboardingEggSelection = ({
             <button
               type="button"
               className="onboarding-egg-chamber__continue"
-              onClick={() => {
-                if (!selectedElement) {
-                  return;
-                }
-
-                onComplete({
-                  presetId: null,
-                  favoriteColor: getCompanionElementAnchorColor(selectedElement),
-                  spiritAnimal: "Egg",
-                  coreElement: selectedElement,
-                  storyTone,
-                });
-              }}
+              onClick={handleContinue}
               disabled={!selectedElement}
               aria-label="Continue"
-            >
-              Continue
-            </button>
+            />
           </div>
         </div>
       </div>

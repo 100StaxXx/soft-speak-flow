@@ -15,10 +15,12 @@ describe("OnboardingEggSelection", () => {
     mocks.reducedMotion = false;
   });
 
-  it("keeps continue disabled until a selection is made and does not show egg labels or tone controls", () => {
+  it("keeps continue disabled until a selection is made and removes the top onboarding chrome", () => {
     render(<OnboardingEggSelection onComplete={vi.fn()} storyTone="epic_adventure" />);
 
-    expect(screen.getByText(/Story Tone: Epic Adventure/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Final Choice/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Choose Your Egg/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Story Tone:/i)).not.toBeInTheDocument();
     expect(screen.queryByText("Ember")).not.toBeInTheDocument();
     expect(screen.queryByText("Frost")).not.toBeInTheDocument();
     expect(screen.queryByText("Terra")).not.toBeInTheDocument();
@@ -27,6 +29,20 @@ describe("OnboardingEggSelection", () => {
     expect(screen.queryByText("Light")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Dark & Intense/i })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
+  });
+
+  it("renders the floating back button only when back navigation is available", () => {
+    const onBack = vi.fn();
+    const { rerender } = render(
+      <OnboardingEggSelection onComplete={vi.fn()} storyTone="epic_adventure" onBack={onBack} />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    expect(onBack).toHaveBeenCalledTimes(1);
+
+    rerender(<OnboardingEggSelection onComplete={vi.fn()} storyTone="epic_adventure" />);
+
+    expect(screen.queryByRole("button", { name: "Back" })).not.toBeInTheDocument();
   });
 
   it("marks only the selected egg and submits the provided story tone unchanged", () => {

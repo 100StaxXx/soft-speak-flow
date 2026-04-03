@@ -86,6 +86,28 @@
   mix-blend-mode: screen;
 }
 
+.onboarding-egg-chamber__back {
+  position: absolute;
+  top: 5.2%;
+  left: 5%;
+  z-index: 3;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(29, 17, 43, 0.52);
+  color: rgba(255, 255, 255, 0.9);
+  box-shadow:
+    0 10px 28px rgba(0, 0, 0, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.onboarding-egg-chamber__back:hover,
+.onboarding-egg-chamber__back:focus-visible {
+  background: rgba(40, 24, 58, 0.68);
+  color: rgba(255, 255, 255, 0.98);
+}
+
 .onboarding-egg-slot {
   position: absolute;
   left: var(--egg-slot-x);
@@ -214,44 +236,31 @@
 .onboarding-egg-chamber__continue {
   position: absolute;
   left: 50%;
-  bottom: 5.9%;
-  min-width: min(38%, 14rem);
+  bottom: 4.7%;
+  z-index: 3;
+  width: min(36%, 13.5rem);
+  height: 8.4%;
   transform: translateX(-50%);
-  border-radius: 16px;
-  border: 1px solid rgba(255, 220, 145, 0.42);
-  background: linear-gradient(180deg, rgba(183, 110, 34, 0.92), rgba(121, 64, 17, 0.96));
-  box-shadow:
-    0 16px 36px rgba(0, 0, 0, 0.26),
-    0 0 24px rgba(255, 176, 59, 0.28),
-    inset 0 1px 0 rgba(255, 240, 211, 0.32);
-  padding: 0.9rem 1.5rem;
-  color: rgba(255, 245, 219, 0.98);
-  font-size: clamp(0.95rem, 2.3vw, 1.2rem);
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  transition:
-    transform 220ms ease,
-    opacity 220ms ease,
-    box-shadow 220ms ease;
+  border: 0;
+  border-radius: 18px;
+  background: transparent;
+  padding: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: box-shadow 220ms ease, opacity 220ms ease;
 }
 
 .onboarding-egg-chamber__continue:disabled {
   cursor: not-allowed;
-  opacity: 0.5;
-  box-shadow:
-    0 10px 24px rgba(0, 0, 0, 0.2),
-    inset 0 1px 0 rgba(255, 240, 211, 0.18);
 }
 
-.onboarding-egg-chamber__continue:not(:disabled):hover,
-.onboarding-egg-chamber__continue:not(:disabled):focus-visible {
-  transform: translateX(-50%) translateY(-2px);
+.onboarding-egg-chamber__continue:focus-visible {
   outline: none;
   box-shadow:
-    0 20px 40px rgba(0, 0, 0, 0.28),
-    0 0 28px rgba(255, 192, 84, 0.38),
-    inset 0 1px 0 rgba(255, 248, 228, 0.38);
+    0 0 0 2px rgba(255, 227, 154, 0.58),
+    0 0 24px rgba(255, 188, 85, 0.36);
 }
 
 @media (max-width: 640px) {
@@ -259,11 +268,17 @@
     border-radius: 26px;
   }
 
+  .onboarding-egg-chamber__back {
+    top: 4.6%;
+    left: 4.6%;
+    min-height: 2.5rem;
+    padding-inline: 1rem;
+  }
+
   .onboarding-egg-chamber__continue {
-    min-width: 42%;
-    border-radius: 14px;
-    padding: 0.78rem 1rem;
-    font-size: clamp(0.84rem, 3.2vw, 1rem);
+    bottom: 4.6%;
+    width: 39%;
+    height: 8.8%;
   }
 }
 
