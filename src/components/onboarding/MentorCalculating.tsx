@@ -4,11 +4,11 @@ import { Sparkles } from "lucide-react";
 import { OnboardingStageShell } from "./OnboardingStageShell";
 
 const LOADING_MESSAGES = [
-  "Reading the oath-scrolls...",
-  "Listening for your best guide...",
-  "Matching your answers to the right voice...",
-  "Opening the chamber of guides...",
-  "Preparing your introduction...",
+  "Reading the stars...",
+  "Aligning your cosmic path...",
+  "Finding your perfect guide...",
+  "The universe is revealing your guide...",
+  "Calculating your destiny...",
 ];
 
 export const MentorCalculating = () => {
@@ -24,10 +24,10 @@ export const MentorCalculating = () => {
   return (
     <OnboardingStageShell
       width="sm"
-      accent="38 88% 70%"
+      accent="264 88% 70%"
       eyebrow="Guide Alignment"
-      title="Reading The Ledger"
-      description="We&apos;re comparing your answers against the voice, discipline, and energy of every guide in the chamber."
+      title="Reading The Pattern"
+      description="We're comparing your answers against the voice, energy, and temperament of every guide in the constellation."
       bodyClassName="mx-auto w-full max-w-2xl"
     >
       <div className="onb-stage-panel p-8 text-center sm:p-10">
@@ -35,7 +35,7 @@ export const MentorCalculating = () => {
           {[...Array(8)].map((_, i) => (
             <motion.div
               key={i}
-              className="absolute h-2 w-2 rounded-full bg-white/80"
+              className="absolute h-2 w-2 rounded-full bg-primary/80"
               style={{
                 top: "50%",
                 left: "50%",
@@ -65,18 +65,18 @@ export const MentorCalculating = () => {
                 animate={{ rotate: 360 }}
                 transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
               >
-                <Sparkles className="h-10 w-10 text-[#ffe2a3]" />
+                <Sparkles className="h-10 w-10 text-white" />
               </motion.div>
             </div>
           </motion.div>
 
           <motion.div
-            className="absolute inset-0 rounded-full border border-[#f3cd84]/18"
+            className="absolute inset-0 rounded-full border border-primary/18"
             animate={{ rotate: 360 }}
             transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
           />
           <motion.div
-            className="absolute inset-4 rounded-full border border-[#f3cd84]/10"
+            className="absolute inset-4 rounded-full border border-primary/10"
             animate={{ rotate: -360 }}
             transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
           />
@@ -87,7 +87,7 @@ export const MentorCalculating = () => {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -10 }}
-          className="font-cinzel text-xl text-[#fff4df]/84"
+          className="text-xl text-white/84"
         >
           {LOADING_MESSAGES[messageIndex]}
         </motion.p>
@@ -96,7 +96,7 @@ export const MentorCalculating = () => {
           {[0, 1, 2].map((i) => (
             <motion.div
               key={i}
-              className="h-2 w-2 rounded-full bg-white/65"
+              className="h-2 w-2 rounded-full bg-primary/65"
               animate={{
                 scale: [1, 1.4, 1],
                 opacity: [0.35, 1, 0.35],

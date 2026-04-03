@@ -10,10 +10,10 @@ interface DestinyRevealProps {
 }
 
 const narrativeLines = [
-  "The hall has welcomed countless travelers before you...",
-  "But only a few arrive carrying a story bright enough to wake the hatchery.",
-  "You are one of them.",
-  "The chamber has been waiting for your name.",
+  "The stars have watched countless souls wander through the cosmos...",
+  "But few possess the spark to shape their own destiny.",
+  "You are different.",
+  "The universe has been waiting for you.",
 ];
 
 export const DestinyReveal = ({ userName, onComplete }: DestinyRevealProps) => {
@@ -57,22 +57,22 @@ export const DestinyReveal = ({ userName, onComplete }: DestinyRevealProps) => {
   return (
     <OnboardingStageShell
       width="md"
-      accent="34 92% 70%"
+      accent="264 88% 72%"
       hero={
         <div className="onb-stage-emblem">
-          <Sparkles className="h-10 w-10 text-[#ffe2a3]" />
+          <Sparkles className="h-10 w-10 text-white" />
         </div>
       }
-      eyebrow="Opening Overture"
-      title="The Hall Has Been Waiting"
-      description="The lamps brighten, the banners rise, and the next chamber opens only after you hear the oath being offered to you."
+      eyebrow="Destiny Reveal"
+      title="The Stars Have Been Waiting"
+      description="Take in the moment. Your path is about to open, and your first choice is waiting just beyond this breath."
       bodyClassName="mx-auto w-full max-w-3xl"
     >
       <div className="relative overflow-hidden rounded-[2rem] onb-stage-panel px-6 py-8 sm:px-8 sm:py-10">
         {particlePositions.map((particle, i) => (
           <motion.div
             key={i}
-            className="absolute h-1 w-1 rounded-full bg-white/60"
+            className="absolute h-1 w-1 rounded-full bg-primary/70"
             initial={{
               x: particle.x,
               y: particle.y,
@@ -105,7 +105,7 @@ export const DestinyReveal = ({ userName, onComplete }: DestinyRevealProps) => {
                     animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
                     exit={{ opacity: 0, y: -10, filter: "blur(8px)" }}
                     transition={{ duration: 0.8 }}
-                    className="font-cinzel text-lg italic leading-relaxed text-[#fff4df]/82 md:text-2xl"
+                    className="text-lg italic leading-relaxed text-white/82 md:text-2xl"
                   >
                     {line}
                   </motion.p>
@@ -120,31 +120,30 @@ export const DestinyReveal = ({ userName, onComplete }: DestinyRevealProps) => {
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.9, ease: "easeOut" }}
-                className="mx-auto max-w-2xl space-y-5 rounded-[1.75rem] border border-[#f3cd84]/16 bg-[linear-gradient(180deg,rgba(63,34,20,0.72),rgba(28,14,11,0.92))] p-6 shadow-[0_18px_60px_rgba(0,0,0,0.24)] backdrop-blur-xl"
+                className="mx-auto max-w-2xl space-y-5 rounded-[1.75rem] border border-white/10 bg-white/[0.05] p-6 shadow-[0_18px_60px_rgba(0,0,0,0.24)] backdrop-blur-xl"
               >
-                <div className="flex items-center justify-center gap-3 text-[#f4d39b]/78">
-                  <Sparkles className="h-4 w-4 text-[#ffe2a3]" />
+                <div className="flex items-center justify-center gap-3 text-primary/80">
+                  <Sparkles className="h-4 w-4 text-primary" />
                   <span className="text-xs uppercase tracking-[0.36em]">Your Path Awaits</span>
-                  <Sparkles className="h-4 w-4 text-[#ffe2a3]" />
+                  <Sparkles className="h-4 w-4 text-primary" />
                 </div>
 
                 <motion.h2
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.25 }}
-                  className="font-cinzel text-3xl font-semibold text-[#fff4df] md:text-4xl"
+                  className="text-3xl font-semibold text-white md:text-4xl"
                 >
-                  Welcome, <span className="text-[#ffe8b6]">{userName}</span>
+                  Welcome, <span className="text-primary">{userName}</span>
                 </motion.h2>
 
                 <motion.p
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ delay: 0.38 }}
-                  className="text-base leading-7 text-[#f7ead6]/72 md:text-lg"
+                  className="text-base leading-7 text-white/72 md:text-lg"
                 >
-                  Every legend opens with an oath. Choose your faction and let the first act of
-                  your story take the stage.
+                  Every legend begins with a choice. Choose your faction and let your story begin.
                 </motion.p>
               </motion.div>
             )}

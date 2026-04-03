@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { ArrowRight, BookOpen, Crown, Sparkles } from "lucide-react";
+import { ArrowRight, BookOpen, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { OnboardingStageShell } from "./OnboardingStageShell";
@@ -41,23 +41,23 @@ export const OnboardingCompanionSetup = ({
   const selectedPreset = COMPANION_PRESETS.find((preset) => preset.id === selectedPresetId) ?? null;
   const selectedTone = COMPANION_STORY_TONES.find((tone) => tone.value === selectedStoryTone) ?? null;
   const canContinue = Boolean(selectedPreset && selectedTone);
-  const eyebrow = mode === "reset" ? "Companion Rebinding" : "Companion Oath";
+  const eyebrow = mode === "reset" ? "Companion Rebinding" : "Companion Bond";
   const title = mode === "reset" ? "Choose Your Companion Again" : "Choose The Form Of Your Companion";
   const description = mode === "reset"
     ? "Your previous bond has been cleared. Select the creature spirit and story feeling you want to carry into this new beginning."
-    : "Before the hatchery seals an egg, it records the creature spirit and story cadence bound inside. Choose both now, then step into the chamber.";
+    : "First choose the creature spirit and story feeling you want beside you. Once both are set, you'll choose the egg element that carries them forward.";
 
   return (
     <OnboardingStageShell
       width="full"
       align="top"
-      accent="38 88% 70%"
+      accent="198 95% 68%"
       eyebrow={eyebrow}
       title={title}
       description={description}
       hero={
         <div className="onb-stage-emblem">
-          <Crown className="h-9 w-9 text-[#ffe2a3]" />
+          <Sparkles className="h-9 w-9 text-white" />
         </div>
       }
       bodyClassName="mx-auto w-full max-w-6xl"
@@ -66,14 +66,14 @@ export const OnboardingCompanionSetup = ({
         <div className="onb-stage-panel overflow-hidden p-5 sm:p-6 md:p-7">
           <div className="mb-5 flex items-center justify-between gap-4">
             <div>
-              <p className="text-[11px] uppercase tracking-[0.34em] text-[#f4d39b]/68">
+              <p className="text-[11px] uppercase tracking-[0.34em] text-white/58">
                 Creature Spirit
               </p>
-              <h2 className="mt-2 font-cinzel text-2xl font-semibold text-[#fff4df] md:text-3xl">
-                Choose the form waiting inside the shell
+              <h2 className="mt-2 text-2xl font-semibold text-white md:text-3xl">
+                Choose the companion who will hatch beside you
               </h2>
             </div>
-            <div className="hidden rounded-full border border-[#f4d39b]/18 bg-black/20 px-4 py-2 text-[11px] uppercase tracking-[0.28em] text-[#f4d39b]/70 md:block">
+            <div className="hidden rounded-full border border-white/10 bg-black/20 px-4 py-2 text-[11px] uppercase tracking-[0.28em] text-white/58 md:block">
               13 forms
             </div>
           </div>
@@ -92,39 +92,41 @@ export const OnboardingCompanionSetup = ({
                   className={cn(
                     "group relative overflow-hidden rounded-[1.55rem] border p-4 text-left transition duration-200",
                     isSelected
-                      ? "border-[#f3cd84]/70 bg-[linear-gradient(180deg,rgba(92,53,19,0.72),rgba(42,20,13,0.92))] shadow-[0_20px_60px_rgba(243,205,132,0.16)]"
-                      : "border-[#f3cd84]/12 bg-[linear-gradient(180deg,rgba(36,19,13,0.76),rgba(20,10,10,0.92))] hover:border-[#f3cd84]/30 hover:bg-[linear-gradient(180deg,rgba(51,28,18,0.8),rgba(20,10,10,0.95))]",
+                      ? "border-primary/45 bg-white/[0.09] shadow-[0_20px_60px_rgba(61,184,245,0.16)]"
+                      : "border-white/10 bg-black/20 hover:border-white/18 hover:bg-white/[0.05]",
                   )}
                   aria-pressed={isSelected}
                 >
                   <div
-                    className="pointer-events-none absolute inset-x-6 top-2 h-16 rounded-full blur-3xl"
+                    className="pointer-events-none absolute inset-x-6 top-4 h-20 rounded-full blur-3xl"
                     style={{
                       background: isSelected
-                        ? "radial-gradient(circle, rgba(249, 191, 92, 0.28) 0%, transparent 72%)"
-                        : "radial-gradient(circle, rgba(255, 238, 203, 0.12) 0%, transparent 72%)",
+                        ? "radial-gradient(circle, rgba(61, 184, 245, 0.3) 0%, transparent 72%)"
+                        : "radial-gradient(circle, rgba(181, 196, 255, 0.14) 0%, transparent 72%)",
                     }}
                   />
 
-                  <div className="relative flex items-start gap-4">
-                    <div className="onb-stage-creature-frame shrink-0">
+                  <div className="relative">
+                    <div
+                      className="mb-4 flex min-h-[13.5rem] items-end justify-center overflow-visible rounded-[1.4rem] border border-white/8 bg-white/[0.04] px-4 pt-4"
+                      data-testid={`species-preview-stage-${preset.id}`}
+                    >
                       <img
                         src={getSpeciesPreviewUrl(preset.id)}
                         alt={preset.displayName}
-                        className="h-24 w-24 object-contain drop-shadow-[0_14px_30px_rgba(0,0,0,0.38)]"
+                        data-testid={`species-preview-image-${preset.id}`}
+                        className="h-48 w-full object-contain object-bottom drop-shadow-[0_18px_34px_rgba(0,0,0,0.38)]"
                       />
                     </div>
 
-                    <div className="min-w-0 flex-1 space-y-2">
-                      <div>
-                        <p className="text-[10px] uppercase tracking-[0.3em] text-[#f4d39b]/54">
-                          {preset.role}
-                        </p>
-                        <h3 className="mt-2 font-cinzel text-xl font-semibold text-[#fff4df]">
-                          {preset.displayName}
-                        </h3>
-                      </div>
-                      <p className="text-sm leading-6 text-[#f7ead6]/72">
+                    <div className="space-y-2">
+                      <p className="text-[10px] uppercase tracking-[0.3em] text-white/48">
+                        {preset.role}
+                      </p>
+                      <h3 className="text-xl font-semibold text-white">
+                        {preset.displayName}
+                      </h3>
+                      <p className="text-sm leading-6 text-white/68">
                         {preset.revealCopy}
                       </p>
                     </div>
@@ -138,14 +140,14 @@ export const OnboardingCompanionSetup = ({
         <div className="space-y-6">
           <div className="onb-stage-panel p-5 sm:p-6">
             <div className="mb-5 flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-full border border-[#f3cd84]/18 bg-black/20 text-[#ffe2a3]">
+              <div className="flex h-11 w-11 items-center justify-center rounded-full border border-white/12 bg-black/20 text-white">
                 <BookOpen className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-[11px] uppercase tracking-[0.3em] text-[#f4d39b]/60">
+                <p className="text-[11px] uppercase tracking-[0.3em] text-white/60">
                   Story Tone
                 </p>
-                <h2 className="mt-1 font-cinzel text-2xl font-semibold text-[#fff4df]">
+                <h2 className="mt-1 text-2xl font-semibold text-white">
                   Choose the feeling of your tale
                 </h2>
               </div>
@@ -165,20 +167,20 @@ export const OnboardingCompanionSetup = ({
                     className={cn(
                       "rounded-[1.25rem] border p-4 text-left transition",
                       isSelected
-                        ? "border-[#f3cd84]/65 bg-[linear-gradient(180deg,rgba(96,56,20,0.7),rgba(48,24,14,0.9))] shadow-[0_18px_45px_rgba(243,205,132,0.14)]"
-                        : "border-[#f3cd84]/10 bg-black/20 hover:border-[#f3cd84]/26 hover:bg-black/28",
+                        ? "border-primary/45 bg-white/[0.08] shadow-[0_18px_45px_rgba(61,184,245,0.14)]"
+                        : "border-white/10 bg-black/20 hover:border-white/18 hover:bg-white/[0.05]",
                     )}
                     aria-pressed={isSelected}
                   >
                     <div className="flex items-start gap-4">
-                      <div className="mt-1 flex h-8 w-8 items-center justify-center rounded-full border border-[#f3cd84]/18 bg-black/20 text-[11px] font-semibold text-[#f4d39b]/72">
+                      <div className="mt-1 flex h-8 w-8 items-center justify-center rounded-full border border-white/14 bg-black/20 text-[11px] font-semibold text-primary/80">
                         {index + 1}
                       </div>
                       <div className="space-y-1.5">
-                        <div className="font-cinzel text-lg font-semibold text-[#fff4df]">
+                        <div className="text-lg font-semibold text-white">
                           {tone.label}
                         </div>
-                        <p className="text-sm leading-6 text-[#f7ead6]/70">
+                        <p className="text-sm leading-6 text-white/70">
                           {tone.summary}
                         </p>
                       </div>
@@ -190,32 +192,44 @@ export const OnboardingCompanionSetup = ({
           </div>
 
           <div className="onb-stage-panel p-5 sm:p-6">
-            <div className="mb-4 flex items-center gap-2 text-[11px] uppercase tracking-[0.34em] text-[#f4d39b]/64">
+            <div className="mb-4 flex items-center gap-2 text-[11px] uppercase tracking-[0.34em] text-white/60">
               <Sparkles className="h-3.5 w-3.5" />
-              Selection Ledger
+              Your Bond So Far
             </div>
 
             <div className="space-y-4">
+              {selectedPreset ? (
+                <div className="onb-stage-card overflow-hidden p-4">
+                  <div className="flex min-h-[11rem] items-end justify-center rounded-[1.25rem] border border-white/8 bg-white/[0.04] px-4 pt-4">
+                    <img
+                      src={getSpeciesPreviewUrl(selectedPreset.id)}
+                      alt={selectedPreset.displayName}
+                      className="h-44 w-full object-contain object-bottom drop-shadow-[0_20px_34px_rgba(0,0,0,0.4)]"
+                    />
+                  </div>
+                </div>
+              ) : null}
+
               <div className="onb-stage-card p-4">
-                <p className="text-xs uppercase tracking-[0.22em] text-[#f4d39b]/58">
+                <p className="text-xs uppercase tracking-[0.22em] text-white/54">
                   Chosen form
                 </p>
-                <p className="mt-2 font-cinzel text-2xl font-semibold text-[#fff4df]">
+                <p className="mt-2 text-2xl font-semibold text-white">
                   {selectedPreset?.displayName ?? "Awaiting your choice"}
                 </p>
-                <p className="mt-2 text-sm leading-6 text-[#f7ead6]/68">
+                <p className="mt-2 text-sm leading-6 text-white/68">
                   {selectedPreset?.signatureIdentity ?? "Pick the creature spirit that best matches the companion you want beside you."}
                 </p>
               </div>
 
               <div className="onb-stage-card p-4">
-                <p className="text-xs uppercase tracking-[0.22em] text-[#f4d39b]/58">
+                <p className="text-xs uppercase tracking-[0.22em] text-white/54">
                   Story promise
                 </p>
-                <p className="mt-2 font-cinzel text-2xl font-semibold text-[#fff4df]">
+                <p className="mt-2 text-2xl font-semibold text-white">
                   {selectedTone?.label ?? "Awaiting your choice"}
                 </p>
-                <p className="mt-2 text-sm leading-6 text-[#f7ead6]/68">
+                <p className="mt-2 text-sm leading-6 text-white/68">
                   {selectedTone?.summary ?? "Choose the emotional texture you want carried through your companion's future story beats."}
                 </p>
               </div>

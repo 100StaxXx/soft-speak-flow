@@ -106,14 +106,14 @@ export const OnboardingStageShell = ({
               </div>
             ) : null}
             {title ? (
-              <h1 className="text-balance font-cinzel text-4xl font-semibold tracking-[0.02em] text-[#fff4df] md:text-5xl">
+              <h1 className="text-balance text-4xl font-semibold tracking-tight text-white md:text-5xl">
                 {title}
               </h1>
             ) : null}
             {description ? (
               <p
                 className={cn(
-                  "text-pretty text-sm leading-7 text-[#f7ead6]/72 md:text-base",
+                  "text-pretty text-sm leading-7 text-white/70 md:text-base",
                   headerAlign === "center" ? "mx-auto max-w-2xl" : "max-w-3xl",
                 )}
               >

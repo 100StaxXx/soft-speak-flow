@@ -12,10 +12,10 @@ interface JourneyBeginsProps {
 }
 
 const narrativeLines = [
-  "A bond has been sealed beneath the stage lights...",
-  "Your egg answers from within the shell, already carrying the shape you chose for it.",
-  "Together, you will write a story the chamber will remember.",
-  "Every quest completed, every habit built, every vow honored...",
+  "A bond has been forged across the cosmos...",
+  "Your egg stirs, answering your presence from within the shell.",
+  "Together, you will write a story the stars themselves will remember.",
+  "Every quest completed, every habit built, every moment of growth...",
   "...will shape both your destinies.",
 ];
 
@@ -67,15 +67,15 @@ export const JourneyBegins = ({
   return (
     <OnboardingStageShell
       width="lg"
-      accent="38 96% 72%"
+      accent="268 94% 72%"
       hero={
         <div className="onb-stage-emblem">
-          <Sparkles className="h-10 w-10 text-[#ffe2a3]" />
+          <Sparkles className="h-10 w-10 text-white" />
         </div>
       }
       eyebrow="Bond Forged"
       title="The First Chapter Begins"
-      description="Your guide has found you, your companion has been sealed into its first egg, and the hatchery doors are beginning to open."
+      description="Your guide has found you, your companion has answered, and the first chapter of your journey is about to open."
       bodyClassName="mx-auto w-full max-w-4xl"
     >
       {particlePositions.map((particle, i) => (
@@ -136,12 +136,12 @@ export const JourneyBegins = ({
                     animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
                     exit={{ opacity: 0, y: -10, filter: "blur(2px)" }}
                     transition={{ duration: 0.9 }}
-                    className="mx-auto max-w-3xl font-cinzel text-lg italic leading-relaxed text-[#fff4df]/82 md:text-2xl"
-                  >
-                    {line}
-                  </motion.p>
-                )
-              ))}
+                  className="mx-auto max-w-3xl text-lg italic leading-relaxed text-white/82 md:text-2xl"
+                >
+                  {line}
+                </motion.p>
+              )
+            ))}
             </AnimatePresence>
 
             <AnimatePresence>
@@ -150,26 +150,26 @@ export const JourneyBegins = ({
                   initial={{ opacity: 0, scale: 0.94 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ duration: 1.05, ease: "easeOut" }}
-                  className="mx-auto max-w-3xl space-y-6 rounded-[1.85rem] border border-[#f3cd84]/16 bg-[linear-gradient(180deg,rgba(63,34,20,0.72),rgba(28,14,11,0.92))] p-6 shadow-[0_18px_60px_rgba(0,0,0,0.24)] backdrop-blur-xl"
-                >
+                className="mx-auto max-w-3xl space-y-6 rounded-[1.85rem] border border-white/10 bg-white/[0.05] p-6 shadow-[0_18px_60px_rgba(0,0,0,0.24)] backdrop-blur-xl"
+              >
                   <motion.div
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.2 }}
                     className="flex items-center justify-center gap-3"
                   >
-                    <Star className="h-4 w-4 text-amber-200" />
-                    <span className="text-xs uppercase tracking-[0.4em] text-[#f4d39b]/80">
+                    <Star className="h-4 w-4 text-primary" />
+                    <span className="text-xs uppercase tracking-[0.4em] text-primary/80">
                       Your Journey Awaits
                     </span>
-                    <Star className="h-4 w-4 text-amber-200" />
+                    <Star className="h-4 w-4 text-primary" />
                   </motion.div>
 
                   <motion.h2
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.45 }}
-                    className="font-cinzel text-3xl font-semibold text-[#fff4df] md:text-5xl"
+                    className="text-3xl font-semibold text-white md:text-5xl"
                   >
                     {userName} &amp; {companionAnimal}
                   </motion.h2>
@@ -178,11 +178,11 @@ export const JourneyBegins = ({
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.7 }}
-                    className="mx-auto max-w-2xl text-base leading-7 text-[#f7ead6]/70 md:text-lg"
+                    className="mx-auto max-w-2xl text-base leading-7 text-white/70 md:text-lg"
                   >
                     {eggElementLabel
                       ? `An unbreakable bond now rests inside a ${eggElementLabel.toLowerCase()} shell, carrying the spirit of your ${companionAnimal.toLowerCase()} into its first chapter.`
-                      : "An unbreakable bond has been sealed, and the hatchery has opened the way forward."}
+                      : "An unbreakable bond has been sealed, and the way forward is open."}
                   </motion.p>
 
                   <motion.div
@@ -191,11 +191,11 @@ export const JourneyBegins = ({
                     transition={{ delay: 0.95 }}
                     className="space-y-1"
                   >
-                    <p className="text-lg text-[#fff4df]/78">The chamber beyond is full of possibility.</p>
-                    <p className="text-sm uppercase tracking-[0.26em] text-[#f4d39b]/46">
-                      Your first quest awaits...
-                    </p>
-                  </motion.div>
+                  <p className="text-lg text-white/78">The cosmos holds infinite possibility.</p>
+                  <p className="text-sm uppercase tracking-[0.26em] text-white/46">
+                    Your first quest awaits...
+                  </p>
+                </motion.div>
                 </motion.div>
               )}
             </AnimatePresence>

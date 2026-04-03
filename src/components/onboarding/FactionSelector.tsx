@@ -35,10 +35,10 @@ export const FactionSelector = ({ onComplete }: FactionSelectorProps) => {
       <OnboardingStageShell
         width="full"
         align="top"
-        accent="36 90% 70%"
+        accent="258 92% 72%"
         eyebrow="Faction Selection"
         title="Choose Your Path"
-        description="Each faction carries a different vow, a different fire, and a different way of crossing the world. Open a banner to hear the oath before you join."
+        description="Each faction shapes your journey in a different way. Open a path to learn what kind of future it offers before you choose."
         bodyClassName="mx-auto w-full max-w-6xl"
       >
         <div className="grid gap-4 md:grid-cols-3">
@@ -49,7 +49,7 @@ export const FactionSelector = ({ onComplete }: FactionSelectorProps) => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.08 }}
               onClick={() => handleFactionTap(faction.id)}
-              className="group relative min-h-[250px] overflow-hidden rounded-[2rem] border border-[#f3cd84]/12 bg-black/20 text-left shadow-[0_20px_60px_rgba(0,0,0,0.24)] backdrop-blur-xl"
+              className="group relative min-h-[250px] overflow-hidden rounded-[2rem] border border-white/10 bg-black/20 text-left shadow-[0_20px_60px_rgba(0,0,0,0.24)] backdrop-blur-xl"
             >
               <img
                 src={faction.image}
@@ -65,25 +65,25 @@ export const FactionSelector = ({ onComplete }: FactionSelectorProps) => {
               <div className="relative flex h-full flex-col justify-between p-6">
                 <div className="flex items-start justify-between gap-4">
                   <div
-                    className="inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-[#f3cd84]/16 bg-black/30 backdrop-blur-md"
+                    className="inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-white/12 bg-black/30 backdrop-blur-md"
                     style={{ boxShadow: `0 0 30px ${faction.color}40` }}
                   >
                     <faction.icon size={22} style={{ color: faction.color }} />
                   </div>
-                  <span className="rounded-full border border-[#f3cd84]/14 bg-black/25 px-3 py-1 text-[11px] uppercase tracking-[0.28em] text-[#f4d39b]/72">
-                    Open Banner
+                  <span className="rounded-full border border-white/10 bg-black/25 px-3 py-1 text-[11px] uppercase tracking-[0.28em] text-white/62">
+                    View Path
                   </span>
                 </div>
 
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <p className="text-xs uppercase tracking-[0.34em] text-[#f4d39b]/62">
+                    <p className="text-xs uppercase tracking-[0.34em] text-white/58">
                       {faction.subtitle}
                     </p>
-                    <h2 className="text-4xl text-[#fff4df]" style={faction.nameStyle}>
+                    <h2 className="text-4xl text-white" style={faction.nameStyle}>
                       {faction.name}
                     </h2>
-                    <p className="max-w-sm text-sm leading-6 text-[#f7ead6]/72">
+                    <p className="max-w-sm text-sm leading-6 text-white/70">
                       {faction.description}
                     </p>
                   </div>
@@ -92,7 +92,7 @@ export const FactionSelector = ({ onComplete }: FactionSelectorProps) => {
                     {faction.traits.slice(0, 3).map((trait) => (
                       <span
                         key={trait}
-                        className="rounded-full border border-[#f3cd84]/12 bg-black/25 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-[#f7ead6]/78"
+                        className="rounded-full border border-white/10 bg-black/25 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-white/72"
                       >
                         {trait}
                       </span>
@@ -136,7 +136,7 @@ export const FactionSelector = ({ onComplete }: FactionSelectorProps) => {
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.2 }}
               onClick={handleClose}
-              className="absolute left-4 z-10 flex items-center gap-2 rounded-full border border-[#f3cd84]/18 bg-black/40 px-4 py-2 text-[#fff4df] backdrop-blur-md transition-colors hover:bg-black/55"
+              className="absolute left-4 z-10 flex items-center gap-2 rounded-full border border-white/12 bg-black/40 px-4 py-2 text-white backdrop-blur-md transition-colors hover:bg-black/55"
               style={{ top: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}
             >
               <ArrowLeft size={20} />
@@ -154,7 +154,7 @@ export const FactionSelector = ({ onComplete }: FactionSelectorProps) => {
                 >
                   <div className="flex items-center gap-3">
                     <div
-                      className="rounded-2xl border border-[#f3cd84]/14 p-3"
+                      className="rounded-2xl border border-white/10 p-3"
                       style={{ backgroundColor: `${expandedData.color}30` }}
                     >
                       <expandedData.icon
@@ -163,17 +163,17 @@ export const FactionSelector = ({ onComplete }: FactionSelectorProps) => {
                       />
                     </div>
                     <div>
-                      <div className="mb-1 flex items-center gap-2 text-[11px] uppercase tracking-[0.28em] text-[#f4d39b]/60">
-                        <Sparkles className="h-3 w-3 text-[#ffe2a3]" />
-                        <span>Faction Oath</span>
+                      <div className="mb-1 flex items-center gap-2 text-[11px] uppercase tracking-[0.28em] text-white/60">
+                        <Sparkles className="h-3 w-3 text-primary" />
+                        <span>Faction Path</span>
                       </div>
                       <h2
-                        className="text-4xl text-[#fff4df] md:text-5xl"
+                        className="text-4xl text-white md:text-5xl"
                         style={expandedData.nameStyle}
                       >
                         {expandedData.name}
                       </h2>
-                      <p className="text-sm text-[#f7ead6]/68">{expandedData.subtitle}</p>
+                      <p className="text-sm text-white/68">{expandedData.subtitle}</p>
                     </div>
                   </div>
 
@@ -181,7 +181,7 @@ export const FactionSelector = ({ onComplete }: FactionSelectorProps) => {
                     initial={{ y: 20, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
                     transition={{ delay: 0.2 }}
-                    className="text-base leading-7 text-[#f7ead6]/80"
+                    className="text-base leading-7 text-white/80"
                   >
                     {expandedData.description}
                   </motion.p>
@@ -190,10 +190,10 @@ export const FactionSelector = ({ onComplete }: FactionSelectorProps) => {
                     initial={{ y: 20, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
                     transition={{ delay: 0.25 }}
-                    className="rounded-[1.5rem] border border-[#f3cd84]/14 bg-black/30 p-5 backdrop-blur-md"
+                    className="rounded-[1.5rem] border border-white/10 bg-black/30 p-5 backdrop-blur-md"
                     style={{ boxShadow: `0 0 0 1px ${expandedData.color}24` }}
                   >
-                    <p className="font-cinzel text-xl italic leading-relaxed text-[#fff4df]">
+                    <p className="text-xl italic leading-relaxed text-white">
                       "{expandedData.motto}"
                     </p>
                   </motion.div>
@@ -203,12 +203,12 @@ export const FactionSelector = ({ onComplete }: FactionSelectorProps) => {
                     animate={{ y: 0, opacity: 1 }}
                     transition={{ delay: 0.3 }}
                   >
-                    <h3 className="mb-3 text-xs uppercase tracking-[0.28em] text-[#f4d39b]/58">Traits</h3>
+                    <h3 className="mb-3 text-xs uppercase tracking-[0.28em] text-white/58">Traits</h3>
                     <div className="flex flex-wrap gap-2">
                       {expandedData.traits.map((trait, i) => (
                         <span
                           key={i}
-                          className="rounded-full border border-[#f3cd84]/12 bg-black/25 px-3 py-1 text-sm text-[#fff4df]/88 backdrop-blur-sm"
+                          className="rounded-full border border-white/10 bg-black/25 px-3 py-1 text-sm text-white/84 backdrop-blur-sm"
                         >
                           {trait}
                         </span>
@@ -224,7 +224,7 @@ export const FactionSelector = ({ onComplete }: FactionSelectorProps) => {
                     <Button
                       onClick={() => handleSelect(expandedData.id)}
                       size="lg"
-                      className="h-14 w-full rounded-full text-base font-semibold text-[#fff4df] shadow-[0_20px_45px_rgba(0,0,0,0.28)]"
+                      className="h-14 w-full rounded-full text-base font-semibold text-white shadow-[0_20px_45px_rgba(0,0,0,0.28)]"
                       style={{
                         background: `linear-gradient(135deg, ${expandedData.color}, ${expandedData.color}80)`,
                       }}

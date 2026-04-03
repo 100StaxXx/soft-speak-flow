@@ -172,7 +172,7 @@ export const StoryQuestionnaire = ({
       width="lg"
       align="top"
       accent={factionAccent[faction]}
-      eyebrow={`Scroll ${currentIndex + 1} of ${questions.length}`}
+      eyebrow={`Question ${currentIndex + 1} of ${questions.length}`}
       title={currentQuestion.question}
       description={getFactionNarrative(faction, currentIndex)}
       bodyClassName="mx-auto w-full max-w-4xl"
@@ -182,32 +182,32 @@ export const StoryQuestionnaire = ({
         animate={{ opacity: 1, y: 0 }}
         className="onb-stage-panel p-4 sm:p-5"
       >
-        <div className="mb-4 flex items-center gap-3 text-[#f7ead6]/74">
+        <div className="mb-4 flex items-center gap-3 text-white/74">
           <Button
             type="button"
             variant="ghost"
             size="sm"
             onClick={handleBack}
             disabled={!canGoBack}
-            className="gap-2 rounded-full border border-[#f3cd84]/14 bg-black/25 px-3 text-[#fff4df] hover:bg-black/35 hover:text-[#fff4df] disabled:opacity-40"
+            className="gap-2 rounded-full border border-white/12 bg-black/25 px-3 text-white hover:bg-black/35 hover:text-white disabled:opacity-40"
           >
             <ChevronLeft className="h-4 w-4" />
             Back
           </Button>
           <div className="flex flex-1 items-center gap-3">
-            <Progress value={progress} className="h-2 flex-1 bg-white/10 [&>div]:bg-[linear-gradient(90deg,#f7d17d,#e88c3d)]" />
+            <Progress value={progress} className="h-2 flex-1 bg-white/10 [&>div]:bg-[linear-gradient(90deg,rgba(255,255,255,0.92),rgba(137,81,204,0.95))]" />
             <span className="min-w-[82px] text-right text-sm font-medium tabular-nums">
               {currentIndex + 1}/{questions.length}
             </span>
           </div>
         </div>
-        <div className="flex items-center justify-between gap-3 text-xs uppercase tracking-[0.22em] text-[#f4d39b]/58">
+        <div className="flex items-center justify-between gap-3 text-xs uppercase tracking-[0.22em] text-white/58">
           <div className="inline-flex items-center gap-2">
             <Sparkles className="h-3.5 w-3.5" style={{ color: factionColor }} />
             <span>{faction}</span>
           </div>
           {isSubmitting ? (
-            <span className="text-[#fff4df]/78">Matching your guide...</span>
+            <span className="text-white/78">Matching your guide...</span>
           ) : (
             <span>Answer from instinct</span>
           )}
@@ -234,7 +234,7 @@ export const StoryQuestionnaire = ({
                 variant="outline"
                 onClick={() => handleAnswer(option)}
                 disabled={controlsLocked}
-                className="group relative min-h-[96px] w-full overflow-hidden rounded-[1.6rem] border-[#f3cd84]/12 bg-[linear-gradient(180deg,rgba(45,24,15,0.76),rgba(20,10,10,0.94))] px-5 py-5 text-left text-[#fff4df] shadow-[0_20px_50px_rgba(0,0,0,0.26)] backdrop-blur-xl hover:border-[#f3cd84]/26 hover:bg-[linear-gradient(180deg,rgba(64,34,20,0.82),rgba(20,10,10,0.96))]"
+                className="group relative min-h-[96px] w-full overflow-hidden rounded-[1.6rem] border-white/10 bg-black/20 px-5 py-5 text-left text-white shadow-[0_20px_50px_rgba(0,0,0,0.26)] backdrop-blur-xl hover:border-white/18 hover:bg-white/[0.05]"
               >
                 <span
                   className="absolute inset-y-4 left-3 w-1 rounded-full opacity-90"
@@ -242,12 +242,12 @@ export const StoryQuestionnaire = ({
                 />
                 <span className="flex w-full items-center gap-4 sm:gap-5">
                   <span
-                    className="flex h-11 w-11 items-center justify-center rounded-full border border-[#f3cd84]/16 bg-black/20 text-base font-bold tracking-wide"
+                    className="flex h-11 w-11 items-center justify-center rounded-full border border-white/12 bg-black/20 text-base font-bold tracking-wide"
                     style={{ boxShadow: `0 0 20px ${factionColor}28`, color: factionColor }}
                   >
                     {String.fromCharCode(65 + index)}
                   </span>
-                  <span className="flex-1 whitespace-normal break-words text-sm leading-6 text-[#fff4df]/84 sm:text-base">
+                  <span className="flex-1 whitespace-normal break-words text-sm leading-6 text-white/84 sm:text-base">
                     {option.text}
                   </span>
                 </span>

@@ -79,7 +79,7 @@ export const MentorGrid = ({
           className={cn(
             "fixed inset-0 z-50 overflow-y-auto ios-scroll-container",
             isOnboardingAppearance
-              ? "bg-[linear-gradient(180deg,rgba(7,7,12,0.9),rgba(7,7,12,0.98))]"
+              ? "bg-[linear-gradient(180deg,rgba(7,7,16,0.9),rgba(7,7,16,0.98))]"
               : "bg-obsidian animate-fade-in",
           )}
         >
@@ -114,7 +114,7 @@ export const MentorGrid = ({
             className={cn(
               "absolute left-8 z-50 group cursor-pointer transition-colors",
               isOnboardingAppearance
-                ? "flex h-12 items-center gap-2 rounded-full border border-[#f3cd84]/18 bg-black/35 px-4 text-[#fff4df] backdrop-blur-md hover:bg-black/50"
+                ? "flex h-12 items-center gap-2 rounded-full border border-white/12 bg-black/35 px-4 text-white backdrop-blur-md hover:bg-black/50"
                 : "flex items-center justify-center w-12 h-12 text-pure-white hover:text-royal-gold",
             )}
             style={{ top: topControlOffset }}
@@ -130,7 +130,7 @@ export const MentorGrid = ({
               className={cn(
                 "absolute right-8 z-10 flex items-center gap-2 px-4 py-2 rounded-full",
                 isOnboardingAppearance
-                  ? "border border-[#f3cd84]/18 bg-black/35 text-[#fff4df] backdrop-blur-md"
+                  ? "border border-white/12 bg-black/35 text-white backdrop-blur-md"
                   : "bg-royal-gold/20 border border-royal-gold",
               )}
               style={{ top: topControlOffset }}
@@ -162,7 +162,7 @@ export const MentorGrid = ({
               {/* Name & Title */}
               <div className="space-y-4">
                 {isOnboardingAppearance ? (
-                  <div className="inline-flex items-center gap-2 rounded-full border border-[#f3cd84]/18 bg-black/25 px-4 py-2 text-[11px] uppercase tracking-[0.3em] text-[#f4d39b]/76 backdrop-blur-md">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-black/25 px-4 py-2 text-[11px] uppercase tracking-[0.3em] text-white/72 backdrop-blur-md">
                     <span
                       className="h-2.5 w-2.5 rounded-full"
                       style={{ backgroundColor: activeMentor.primary_color }}
@@ -181,7 +181,7 @@ export const MentorGrid = ({
                 >
                   {activeMentor.short_title}
                 </p>
-                <p className="text-xl text-steel italic max-w-2xl">
+                <p className={cn("max-w-2xl text-xl italic", isOnboardingAppearance ? "text-white/70" : "text-steel")}>
                   {activeMentor.archetype}
                 </p>
               </div>
@@ -201,20 +201,36 @@ export const MentorGrid = ({
 
               {/* Key Info */}
               <div className="grid md:grid-cols-2 gap-6 max-w-3xl">
-                <div className="space-y-3 p-6 bg-charcoal/80 backdrop-blur-sm rounded-lg border border-steel/20">
-                  <h3 className="text-sm font-bold text-royal-gold uppercase tracking-wide">
+                <div className={cn(
+                  "space-y-3 rounded-lg p-6 backdrop-blur-sm",
+                  isOnboardingAppearance
+                    ? "border border-white/10 bg-white/[0.04]"
+                    : "border border-steel/20 bg-charcoal/80",
+                )}>
+                  <h3 className={cn(
+                    "text-sm font-bold uppercase tracking-wide",
+                    isOnboardingAppearance ? "text-white/62" : "text-royal-gold",
+                  )}>
                     How they guide
                   </h3>
-                  <p className="text-steel leading-relaxed">
+                  <p className={cn("leading-relaxed", isOnboardingAppearance ? "text-white/74" : "text-steel")}>
                     {activeMentor.tone_description}
                   </p>
                 </div>
                 
-                <div className="space-y-3 p-6 bg-charcoal/80 backdrop-blur-sm rounded-lg border border-steel/20">
-                  <h3 className="text-sm font-bold text-royal-gold uppercase tracking-wide">
+                <div className={cn(
+                  "space-y-3 rounded-lg p-6 backdrop-blur-sm",
+                  isOnboardingAppearance
+                    ? "border border-white/10 bg-white/[0.04]"
+                    : "border border-steel/20 bg-charcoal/80",
+                )}>
+                  <h3 className={cn(
+                    "text-sm font-bold uppercase tracking-wide",
+                    isOnboardingAppearance ? "text-white/62" : "text-royal-gold",
+                  )}>
                     Best for
                   </h3>
-                  <p className="text-steel leading-relaxed">
+                  <p className={cn("leading-relaxed", isOnboardingAppearance ? "text-white/74" : "text-steel")}>
                     {activeMentor.target_user}
                   </p>
                 </div>
@@ -233,7 +249,7 @@ export const MentorGrid = ({
                       : "bg-transparent border-2 border-royal-purple text-pure-white hover:bg-royal-purple/10 shadow-[0_0_20px_rgba(137,81,204,0.5)] hover:shadow-[0_0_30px_rgba(137,81,204,0.7)]",
                   )}
                   style={isOnboardingAppearance ? {
-                    background: `linear-gradient(135deg, ${activeMentor.primary_color}, rgba(213,155,77,0.92))`,
+                    background: `linear-gradient(135deg, ${activeMentor.primary_color}, rgba(137,81,204,0.92))`,
                   } : undefined}
                 >
                   {isSelecting ? (

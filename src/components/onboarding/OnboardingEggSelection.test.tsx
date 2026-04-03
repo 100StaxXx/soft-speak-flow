@@ -4,6 +4,10 @@ import { describe, expect, it, vi } from "vitest";
 import type { CompanionElementId } from "@/config/companionCatalog";
 import { OnboardingEggSelection } from "./OnboardingEggSelection";
 
+const mocks = vi.hoisted(() => ({
+  reducedMotion: false,
+}));
+
 vi.mock("framer-motion", async () => {
   const React = await import("react");
 
@@ -20,7 +24,7 @@ vi.mock("framer-motion", async () => {
   return {
     motion,
     AnimatePresence: ({ children }: { children: unknown }) => <>{children}</>,
-    useReducedMotion: () => false,
+    useReducedMotion: () => mocks.reducedMotion,
   };
 });
 
@@ -50,6 +54,7 @@ const Harness = ({ onContinue }: { onContinue: () => void }) => {
 
 describe("OnboardingEggSelection", () => {
   it("shows the renamed product labels and gates continue until an egg is selected", () => {
+    mocks.reducedMotion = false;
     const onContinue = vi.fn();
 
     render(<Harness onContinue={onContinue} />);
@@ -62,9 +67,21 @@ describe("OnboardingEggSelection", () => {
     expect(continueButton).toBeDisabled();
 
     fireEvent.click(screen.getByRole("button", { name: /ember egg/i }));
+
     expect(screen.getByRole("button", { name: /seal my egg/i })).toBeEnabled();
+    expect(screen.getByTestId("egg-slot-fire")).toHaveAttribute("data-selected", "true");
+    expect(screen.getByTestId("egg-slot-ice")).toHaveAttribute("data-selected", "false");
 
     fireEvent.click(screen.getByRole("button", { name: /seal my egg/i }));
     expect(onContinue).toHaveBeenCalledTimes(1);
-  }, 10000);
+  });
+
+  it("disables looping chamber animation when reduced motion is enabled", () => {
+    mocks.reducedMotion = true;
+
+    render(<Harness onContinue={vi.fn()} />);
+
+    expect(screen.getByTestId("egg-slot-fire")).toHaveAttribute("data-animated", "false");
+    expect(screen.getByTestId("egg-slot-void")).toHaveAttribute("data-animated", "false");
+  });
 });

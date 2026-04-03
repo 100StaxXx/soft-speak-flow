@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ChevronRight, Crown, Sparkles } from "lucide-react";
+import { ChevronRight, Sparkles } from "lucide-react";
 import { LegalDocumentViewer } from "@/components/LegalDocumentViewer";
 import { OnboardingStageShell } from "./OnboardingStageShell";
 
@@ -29,13 +29,13 @@ export const StoryPrologue = ({ onComplete }: StoryPrologueProps) => {
   return (
     <OnboardingStageShell
       width="md"
-      accent="38 88% 70%"
+      accent="268 94% 72%"
       hero={
         <div className="onb-stage-emblem">
           <div className="relative flex items-center justify-center">
-            <Crown className="h-10 w-10 text-[#ffe2a3]" />
+            <Sparkles className="h-10 w-10 text-white" />
             <motion.div
-              className="absolute -right-4 -top-4 rounded-full border border-[#f3cd84]/18 bg-black/25 p-2 text-[#ffe2a3] backdrop-blur-md"
+              className="absolute -right-4 -top-4 rounded-full border border-white/12 bg-white/10 p-2 text-white backdrop-blur-md"
               animate={{ y: [0, -5, 0], opacity: [0.7, 1, 0.7] }}
               transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
             >
@@ -44,9 +44,9 @@ export const StoryPrologue = ({ onComplete }: StoryPrologueProps) => {
           </div>
         </div>
       }
-      eyebrow="Hall of Origins"
+      eyebrow="First Light"
       title="Welcome, Traveler"
-      description="The hatchery ledger is open, the stage lamps are lit, and your first inscription is waiting. Choose the name your guide and companion will speak when this story begins."
+      description="A cosmic journey awaits those who dare to begin. Enter the name your guide and companion will know you by when your story opens."
       bodyClassName="mx-auto w-full max-w-2xl"
     >
       <motion.div
@@ -59,21 +59,21 @@ export const StoryPrologue = ({ onComplete }: StoryPrologueProps) => {
           <div className="onb-stage-card p-5 sm:p-6">
             <label
               htmlFor="onboarding-name"
-              className="mb-3 block text-xs font-semibold uppercase tracking-[0.24em] text-[#f4d39b]/62"
+              className="mb-3 block text-xs font-semibold uppercase tracking-[0.24em] text-white/60"
             >
-              Name for the ledger
+              What shall we call you?
             </label>
             <Input
               id="onboarding-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Enter your name"
-              className="h-14 rounded-full border-[#f3cd84]/18 bg-black/25 px-5 text-base text-[#fff4df] placeholder:text-[#f7ead6]/34 focus-visible:ring-[#f3cd84]/55 focus-visible:ring-offset-0"
+              className="h-14 rounded-full border-white/14 bg-black/25 px-5 text-base text-white placeholder:text-white/35 focus-visible:ring-primary/55 focus-visible:ring-offset-0"
               maxLength={30}
             />
-            <p className="mt-3 text-sm leading-6 text-[#f7ead6]/66">
-              This is the name inscribed into your guide reveal, your companion bond, and the
-              opening page of your journey.
+            <p className="mt-3 text-sm leading-6 text-white/65">
+              This name will appear in your guide reveal, your companion bond, and the opening
+              page of your journey.
             </p>
           </div>
 
@@ -84,9 +84,9 @@ export const StoryPrologue = ({ onComplete }: StoryPrologueProps) => {
                 aria-label="I confirm that I am 13 years of age or older"
                 checked={ageConfirmed}
                 onCheckedChange={(checked) => setAgeConfirmed(checked === true)}
-                className="mt-1 h-5 w-5 rounded-md border-[#f3cd84]/28 bg-white/5 data-[state=checked]:border-[#ffe2a3] data-[state=checked]:bg-[#ffe2a3] data-[state=checked]:text-[#3a220d]"
+                className="mt-1 h-5 w-5 rounded-md border-white/20 bg-white/5 data-[state=checked]:border-primary data-[state=checked]:bg-primary data-[state=checked]:text-[#120a20]"
               />
-              <label htmlFor="age" className="flex-1 text-sm leading-6 text-[#f7ead6]/76">
+              <label htmlFor="age" className="flex-1 text-sm leading-6 text-white/76">
                 I confirm that I am 13 years of age or older
               </label>
             </div>
@@ -97,16 +97,16 @@ export const StoryPrologue = ({ onComplete }: StoryPrologueProps) => {
                 aria-label="I accept the Terms of Service, Privacy Policy, and Apple's EULA"
                 checked={legalAccepted}
                 onCheckedChange={(checked) => setLegalAccepted(checked === true)}
-                className="mt-1 h-5 w-5 rounded-md border-[#f3cd84]/28 bg-white/5 data-[state=checked]:border-[#ffe2a3] data-[state=checked]:bg-[#ffe2a3] data-[state=checked]:text-[#3a220d]"
+                className="mt-1 h-5 w-5 rounded-md border-white/20 bg-white/5 data-[state=checked]:border-primary data-[state=checked]:bg-primary data-[state=checked]:text-[#120a20]"
               />
-              <div className="flex-1 text-sm leading-6 text-[#f7ead6]/70">
+              <div className="flex-1 text-sm leading-6 text-white/70">
                 <label htmlFor="legal" className="inline">
                   I accept the{" "}
                 </label>
                 <button
                   type="button"
                   onClick={() => setShowTerms(true)}
-                  className="text-[#ffe2a3] underline decoration-[#f3cd84]/40 underline-offset-4 transition hover:text-[#fff4df]"
+                  className="text-primary underline decoration-primary/40 underline-offset-4 transition hover:text-white"
                 >
                   Terms of Service
                 </button>
@@ -114,7 +114,7 @@ export const StoryPrologue = ({ onComplete }: StoryPrologueProps) => {
                 <button
                   type="button"
                   onClick={() => setShowPrivacy(true)}
-                  className="text-[#ffe2a3] underline decoration-[#f3cd84]/40 underline-offset-4 transition hover:text-[#fff4df]"
+                  className="text-primary underline decoration-primary/40 underline-offset-4 transition hover:text-white"
                 >
                   Privacy Policy
                 </button>
@@ -123,7 +123,7 @@ export const StoryPrologue = ({ onComplete }: StoryPrologueProps) => {
                   href="https://www.apple.com/legal/internet-services/itunes/dev/stdeula/"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-[#ffe2a3] underline decoration-[#f3cd84]/40 underline-offset-4 transition hover:text-[#fff4df]"
+                  className="text-primary underline decoration-primary/40 underline-offset-4 transition hover:text-white"
                 >
                   Apple&apos;s EULA
                 </a>

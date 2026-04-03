@@ -87,6 +87,11 @@ describe("OnboardingCompanionSetup", () => {
 
     render(<Harness onContinue={onContinue} />);
 
+    expect(screen.getByTestId("species-preview-stage-dragon")).toBeInTheDocument();
+    expect(screen.getByTestId("species-preview-image-dragon")).toHaveClass("object-contain");
+    expect(screen.getByTestId("species-preview-image-dragon")).toHaveClass("h-48");
+    expect(screen.getByTestId("species-preview-image-dragon")).not.toHaveClass("h-24");
+
     const continueButton = screen.getByRole("button", { name: /continue to egg chamber/i });
     expect(continueButton).toBeDisabled();
 
