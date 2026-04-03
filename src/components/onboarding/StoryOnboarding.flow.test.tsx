@@ -58,6 +58,7 @@ const mocks = vi.hoisted(() => ({
   profilesUpdateEq: vi.fn(),
   profilesMaybeSingle: vi.fn(),
   questionnaireUpsert: vi.fn(),
+  createCompanionMutateAsync: vi.fn(),
   toastError: vi.fn(),
   loggerError: vi.fn(),
   loggerWarn: vi.fn(),
@@ -91,7 +92,9 @@ vi.mock("@/hooks/useAuth", () => ({
 
 vi.mock("@/hooks/useCompanion", () => ({
   useCompanion: () => ({
-    createCompanion: vi.fn(),
+    createCompanion: {
+      mutateAsync: mocks.createCompanionMutateAsync,
+    },
   }),
 }));
 
@@ -223,11 +226,51 @@ vi.mock("./MentorCalculating", () => ({
 }));
 
 vi.mock("@/components/MentorResult", () => ({
-  MentorResult: () => <div data-testid="mentor-result-stage">Mentor Result</div>,
+  MentorResult: ({ onConfirm, onSeeAll }: { onConfirm: () => void; onSeeAll: () => void }) => (
+    <div data-testid="mentor-result-stage">
+      <button type="button" onClick={onConfirm}>
+        mentor-confirm
+      </button>
+      <button type="button" onClick={onSeeAll}>
+        mentor-see-all
+      </button>
+    </div>
+  ),
 }));
 
 vi.mock("@/components/MentorGrid", () => ({
   MentorGrid: () => <div data-testid="mentor-grid-stage">Mentor Grid</div>,
+}));
+
+vi.mock("./OnboardingEggSelection", () => ({
+  OnboardingEggSelection: ({
+    onComplete,
+  }: {
+    onComplete: (payload: {
+      presetId: null;
+      favoriteColor: string;
+      spiritAnimal: string;
+      coreElement: string;
+      storyTone: string;
+    }) => void;
+  }) => (
+    <div data-testid="companion-stage">
+      <button
+        type="button"
+        onClick={() =>
+          onComplete({
+            presetId: null,
+            favoriteColor: "#60A5FA",
+            spiritAnimal: "Egg",
+            coreElement: "ice",
+            storyTone: "dark_intense",
+          })
+        }
+      >
+        complete-companion
+      </button>
+    </div>
+  ),
 }));
 
 vi.mock("@/components/CompanionPersonalization", () => ({
@@ -269,6 +312,7 @@ describe("StoryOnboarding questionnaire submission flow", () => {
     mocks.profilesMaybeSingle.mockReset();
     mocks.profilesUpdateEq.mockReset();
     mocks.questionnaireUpsert.mockReset();
+    mocks.createCompanionMutateAsync.mockReset();
     mocks.toastError.mockReset();
     mocks.loggerError.mockReset();
     mocks.loggerWarn.mockReset();
@@ -278,6 +322,7 @@ describe("StoryOnboarding questionnaire submission flow", () => {
     mocks.profilesUpdateEq.mockResolvedValue({ error: null });
     mocks.mentorsEq.mockResolvedValue({ data: [ACTIVE_MENTOR], error: null });
     mocks.questionnaireUpsert.mockResolvedValue({ error: null });
+    mocks.createCompanionMutateAsync.mockResolvedValue({ id: "companion-1" });
   });
 
   it("moves to calculating immediately, then returns to questionnaire on timeout failure", async () => {
@@ -335,6 +380,38 @@ describe("StoryOnboarding questionnaire submission flow", () => {
 
       expect(mocks.questionnaireUpsert).toHaveBeenCalledTimes(4);
       expect(mocks.toastError).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("uses the onboarding egg chamber and submits the selected element payload unchanged", async () => {
+    renderOnboarding();
+    await advanceToQuestionnaire();
+
+    vi.useFakeTimers();
+    try {
+      fireEvent.click(screen.getByRole("button", { name: "questionnaire-submit" }));
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(CALCULATING_STAGE_DURATION_MS);
+        await Promise.resolve();
+      });
+
+      vi.useRealTimers();
+
+      fireEvent.click(screen.getByRole("button", { name: "mentor-confirm" }));
+      fireEvent.click(await screen.findByRole("button", { name: "complete-companion" }));
+
+      await screen.findByTestId("journey-begins-stage");
+
+      expect(mocks.createCompanionMutateAsync).toHaveBeenCalledWith({
+        presetId: null,
+        favoriteColor: "#60A5FA",
+        spiritAnimal: "Egg",
+        coreElement: "ice",
+        storyTone: "dark_intense",
+      });
     } finally {
       vi.useRealTimers();
     }

@@ -13,6 +13,7 @@ import { DestinyReveal } from "./DestinyReveal";
 import { FactionSelector, type FactionType } from "./FactionSelector";
 import { StoryQuestionnaire, type OnboardingAnswer } from "./StoryQuestionnaire";
 import { MentorCalculating } from "./MentorCalculating";
+import { OnboardingEggSelection } from "./OnboardingEggSelection";
 import { OnboardingCosmicBackdrop, type OnboardingBackdropStage } from "./OnboardingCosmicBackdrop";
 import { CompanionPersonalization } from "@/components/CompanionPersonalization";
 import { JourneyBegins } from "./JourneyBegins";
@@ -543,6 +544,17 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
     await handleMentorConfirm(selectedMentor, explanation);
   };
 
+  const handleCompanionBack = useCallback(() => {
+    if (recommendedMentor && mentorExplanation) {
+      setStage("mentor-result");
+      return;
+    }
+
+    if (mentors.length > 0) {
+      setStage("mentor-grid");
+    }
+  }, [mentorExplanation, mentors.length, recommendedMentor]);
+
   const handleCompanionComplete = async (preferences: {
     presetId: CompanionPresetId | null;
     favoriteColor: string;
@@ -1030,11 +1042,19 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
             exit={{ opacity: 0 }}
             className="relative z-10 w-full"
           >
-            <CompanionPersonalization
-              onComplete={handleCompanionComplete}
-              isLoading={isCreatingCompanion}
-              mode={isMigrationMode ? "migration" : "onboarding"}
-            />
+            {isMigrationMode || isResetMode ? (
+              <CompanionPersonalization
+                onComplete={handleCompanionComplete}
+                isLoading={isCreatingCompanion}
+                mode={isMigrationMode ? "migration" : "onboarding"}
+              />
+            ) : (
+              <OnboardingEggSelection
+                onComplete={handleCompanionComplete}
+                isLoading={isCreatingCompanion}
+                onBack={handleCompanionBack}
+              />
+            )}
           </motion.div>
         )}
 
