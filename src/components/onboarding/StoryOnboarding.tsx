@@ -113,6 +113,37 @@ export const runWithTimeout = async <T,>(
   });
 };
 
+const getErrorMessage = (error: unknown, fallback: string): string => {
+  if (error instanceof Error && error.message.trim().length > 0) {
+    return error.message;
+  }
+
+  if (typeof error === "string" && error.trim().length > 0) {
+    return error;
+  }
+
+  if (
+    error
+    && typeof error === "object"
+    && "message" in error
+    && typeof error.message === "string"
+    && error.message.trim().length > 0
+  ) {
+    return error.message;
+  }
+
+  return fallback;
+};
+
+const isCompanionCreationTimeoutError = (error: unknown): boolean => {
+  const normalizedErrorMessage = getErrorMessage(error, "").toUpperCase();
+  return (
+    normalizedErrorMessage.includes("GENERATION_TIMEOUT")
+    || normalizedErrorMessage.includes("AI_TIMEOUT")
+    || normalizedErrorMessage.includes("TIMED OUT")
+  );
+};
+
 interface Mentor {
   id: string;
   name: string;
@@ -601,6 +632,7 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
 
     const startedAt = Date.now();
     let onboardingFinalized = false;
+    const finalizationFailureToast = "Your egg was created, but we couldn't finish setup. Please try again.";
     setIsCreatingCompanion(true);
     const eggDisplayName = `${getCompanionElement(preferences.coreElement).label} Egg`;
     const selectionDisplayName = preferences.presetId ? preferences.spiritAnimal : eggDisplayName;
@@ -757,6 +789,27 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
       }
     };
 
+    const tryFinalizeCompanionOnboarding = async (
+      companionId: string,
+      fallbackName: string,
+      recoveredAfterTimeout: boolean,
+    ) => {
+      try {
+        await finalizeCompanionOnboarding(companionId, fallbackName, recoveredAfterTimeout);
+        return true;
+      } catch (error) {
+        logger.error("Companion onboarding finalization failed", {
+          userId: user.id,
+          companionId,
+          recoveredAfterTimeout,
+          elapsedMs: Date.now() - startedAt,
+          error: getErrorMessage(error, "Unknown finalization error"),
+        });
+        toast.error(finalizationFailureToast);
+        return false;
+      }
+    };
+
     try {
       const preset = preferences.presetId ? getCompanionPreset(preferences.presetId) : null;
       if ((isMigrationMode || preferences.presetId) && !preset) {
@@ -850,28 +903,102 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
         spiritAnimal: selectionDisplayName,
       });
 
-      const companionData = await createCompanion.mutateAsync({
-        presetId: preset?.id ?? null,
-        favoriteColor: preferences.favoriteColor,
-        spiritAnimal: preferences.spiritAnimal,
-        coreElement: preferences.coreElement,
-        storyTone: preferences.storyTone,
-      });
+      let companionData: Awaited<ReturnType<typeof createCompanion.mutateAsync>>;
+      try {
+        companionData = await createCompanion.mutateAsync({
+          presetId: preset?.id ?? null,
+          favoriteColor: preferences.favoriteColor,
+          spiritAnimal: preferences.spiritAnimal,
+          coreElement: preferences.coreElement,
+          storyTone: preferences.storyTone,
+        });
 
-      if (!companionData?.id) {
-        throw new Error("Companion record missing ID after creation.");
+        if (!companionData?.id) {
+          throw new Error("Companion record missing ID after creation.");
+        }
+      } catch (error) {
+        const errorMessage = getErrorMessage(error, "Something went wrong. Please try again.");
+
+        if (isCompanionCreationTimeoutError(error)) {
+          logger.warn("Companion creation timed out; starting recovery poll", {
+            userId: user.id,
+            reason: errorMessage,
+            elapsedMs: Date.now() - startedAt,
+          });
+
+          const recoveredCompanion = await pollWithDeadline<{ id: string; spirit_animal: string | null }>({
+            deadlineMs: COMPANION_RECOVERY_DEADLINE_MS,
+            intervalMs: COMPANION_RECOVERY_INTERVAL_MS,
+            task: async () => {
+              const { data, error: fetchError } = await supabase
+                .from("user_companion")
+                .select("id, spirit_animal")
+                .eq("user_id", user.id)
+                .order("created_at", { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
+              if (fetchError) {
+                throw fetchError;
+              }
+
+              if (!data?.id) {
+                return null;
+              }
+
+              return {
+                id: data.id,
+                spirit_animal: data.spirit_animal ?? null,
+              };
+            },
+            onPollError: (pollError) => {
+              logger.warn("Companion recovery poll attempt failed", {
+                userId: user.id,
+                error: pollError instanceof Error ? pollError.message : String(pollError),
+              });
+            },
+          });
+
+          if (recoveredCompanion?.id) {
+            logger.warn("Companion recovery succeeded after timeout", {
+              userId: user.id,
+              companionId: recoveredCompanion.id,
+              elapsedMs: Date.now() - startedAt,
+            });
+            toast.success("Your companion finished taking shape. Continuing your journey...");
+            await tryFinalizeCompanionOnboarding(
+              recoveredCompanion.id,
+              recoveredCompanion.spirit_animal === "Egg"
+                ? selectionDisplayName
+                : recoveredCompanion.spirit_animal || selectionDisplayName,
+              true,
+            );
+            return;
+          }
+
+          logger.error("Companion recovery failed after timeout", {
+            userId: user.id,
+            recoveryWindowMs: COMPANION_RECOVERY_DEADLINE_MS,
+            elapsedMs: Date.now() - startedAt,
+          });
+          toast.error("This is taking longer than expected. Tap Begin Your Journey to try again.");
+          return;
+        }
+
+        logger.error("Companion creation failed during onboarding", {
+          userId: user.id,
+          elapsedMs: Date.now() - startedAt,
+          error: errorMessage,
+        });
+        toast.error(errorMessage);
+        return;
       }
 
-      await finalizeCompanionOnboarding(companionData.id, selectionDisplayName, false);
+      await tryFinalizeCompanionOnboarding(companionData.id, selectionDisplayName, false);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      const normalizedErrorMessage = errorMessage.toUpperCase();
-      const isTimeout =
-        normalizedErrorMessage.includes("GENERATION_TIMEOUT") ||
-        normalizedErrorMessage.includes("AI_TIMEOUT") ||
-        normalizedErrorMessage.includes("TIMED OUT");
+      const errorMessage = getErrorMessage(error, "Something went wrong. Please try again.");
 
-      if (isTimeout) {
+      if (isCompanionCreationTimeoutError(error)) {
         logger.warn("Companion creation timed out; starting recovery poll", {
           userId: user.id,
           reason: errorMessage,
@@ -937,12 +1064,12 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
         return;
       }
 
-      logger.error("Error creating companion during onboarding", {
+      logger.error("Error completing companion onboarding flow", {
         userId: user.id,
         elapsedMs: Date.now() - startedAt,
-        error: error instanceof Error ? error.message : String(error),
+        error: errorMessage,
       });
-      toast.error("Something went wrong. Please try again.");
+      toast.error(errorMessage);
     } finally {
       setIsCreatingCompanion(false);
     }

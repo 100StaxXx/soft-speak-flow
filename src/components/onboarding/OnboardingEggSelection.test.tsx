@@ -53,7 +53,7 @@ describe("OnboardingEggSelection", () => {
 
     expect(lightSlot.style.getPropertyValue("--egg-slot-y")).toBe("54.2%");
     expect(lightSlot.style.getPropertyValue("--egg-width")).toBe("61%");
-    expect(lightSlot.style.getPropertyValue("--egg-bottom")).toBe("20.2%");
+    expect(lightSlot.style.getPropertyValue("--egg-bottom")).toBe("22.8%");
   });
 
   it("marks only the selected egg and submits the provided story tone unchanged", () => {

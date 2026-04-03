@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -512,6 +512,75 @@ describe("StoryOnboarding questionnaire submission flow", () => {
         coreElement: "ice",
         storyTone: "dark_intense",
       });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("surfaces the create-step failure toast when companion creation fails", async () => {
+    mocks.createCompanionMutateAsync.mockRejectedValueOnce(
+      new Error("Companion setup is still syncing. Please try again in a moment."),
+    );
+
+    renderOnboarding();
+    await advanceToQuestionnaire();
+
+    vi.useFakeTimers();
+    try {
+      fireEvent.click(screen.getByRole("button", { name: "questionnaire-submit" }));
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(CALCULATING_STAGE_DURATION_MS);
+        await Promise.resolve();
+      });
+
+      vi.useRealTimers();
+
+      await advanceFromMentorToEggSelection();
+      fireEvent.click(screen.getByRole("button", { name: "complete-companion" }));
+
+      await waitFor(() => {
+        expect(mocks.toastError).toHaveBeenCalledWith(
+          "Companion setup is still syncing. Please try again in a moment.",
+        );
+      });
+      expect(screen.queryByTestId("journey-begins-stage")).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("shows a finalization-specific toast when companion creation succeeds but onboarding completion fails", async () => {
+    mocks.profilesUpdateEq.mockReset();
+    mocks.profilesUpdateEq
+      .mockResolvedValueOnce({ error: null })
+      .mockResolvedValueOnce({ error: null })
+      .mockResolvedValueOnce({ error: null })
+      .mockResolvedValueOnce({ error: { message: "finalization failed" } });
+
+    renderOnboarding();
+    await advanceToQuestionnaire();
+
+    vi.useFakeTimers();
+    try {
+      fireEvent.click(screen.getByRole("button", { name: "questionnaire-submit" }));
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(CALCULATING_STAGE_DURATION_MS);
+        await Promise.resolve();
+      });
+
+      vi.useRealTimers();
+
+      await advanceFromMentorToEggSelection();
+      fireEvent.click(screen.getByRole("button", { name: "complete-companion" }));
+
+      await waitFor(() => {
+        expect(mocks.toastError).toHaveBeenCalledWith(
+          "Your egg was created, but we couldn't finish setup. Please try again.",
+        );
+      });
+      expect(screen.queryByTestId("journey-begins-stage")).not.toBeInTheDocument();
     } finally {
       vi.useRealTimers();
     }

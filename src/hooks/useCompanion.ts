@@ -132,7 +132,15 @@ type SupabaseRpcError = {
   hint?: string | null;
 };
 
+type CreateCompanionRpcArgs = Record<string, string | null>;
+
+type CreateCompanionRpcResult = {
+  data: CreateCompanionIfNotExistsResult[] | null;
+  error: SupabaseRpcError | null;
+};
+
 const AWARD_XP_UNAVAILABLE_MESSAGE = "XP service is temporarily unavailable. Please try again shortly.";
+const CREATE_COMPANION_SIGNATURE_FALLBACK_MESSAGE = "Companion setup is still syncing. Please try again in a moment.";
 
 const normalizeEvolutionErrorCode = (value: string | null | undefined): string | null => {
   if (!value) return null;
@@ -142,6 +150,12 @@ const normalizeEvolutionErrorCode = (value: string | null | undefined): string |
     .replace(/^_+|_+$/g, "");
   return normalized.length > 0 ? normalized : null;
 };
+
+const getNormalizedRpcErrorSource = (error: SupabaseRpcError | null | undefined) =>
+  [error?.message, error?.details, error?.hint]
+    .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+    .join(" ")
+    .toLowerCase();
 
 const isAwardXpFunctionMissingError = (error: SupabaseRpcError | null | undefined) => {
   if (!error) return false;
@@ -156,6 +170,25 @@ const isAwardXpFunctionMissingError = (error: SupabaseRpcError | null | undefine
 
   return (
     normalizedSource.includes("award_xp_v2")
+    && (
+      normalizedSource.includes("could not find function")
+      || normalizedSource.includes("does not exist")
+      || normalizedSource.includes("schema cache")
+      || normalizedSource.includes("undefined function")
+      || normalizedSource.includes("function not found")
+    )
+  );
+};
+
+const isLegacyCreateCompanionRpcSignatureError = (error: SupabaseRpcError | null | undefined) => {
+  if (!error) return false;
+
+  const normalizedCode = normalizeEvolutionErrorCode(error.code);
+  if (normalizedCode === "42883") return true;
+
+  const normalizedSource = getNormalizedRpcErrorSource(error);
+  return (
+    normalizedSource.includes("create_companion_if_not_exists")
     && (
       normalizedSource.includes("could not find function")
       || normalizedSource.includes("does not exist")
@@ -453,8 +486,18 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
 
         logger.log("Stage 0 asset resolved successfully, creating companion record...");
 
-        // Use atomic database function to create companion (prevents duplicates)
-        const result = await supabase.rpc('create_companion_if_not_exists', {
+        const invokeCreateCompanionRpc = async (
+          args: CreateCompanionRpcArgs,
+        ): Promise<CreateCompanionRpcResult> => {
+          const rpc = supabase.rpc as unknown as (
+            fn: string,
+            rpcArgs: CreateCompanionRpcArgs,
+          ) => Promise<CreateCompanionRpcResult>;
+
+          return await rpc("create_companion_if_not_exists", args);
+        };
+
+        const createCompanionRpcArgs: CreateCompanionRpcArgs = {
           p_user_id: user.id,
           p_preset_id: preset?.id ?? null,
           p_favorite_color: resolvedFavoriteColor,
@@ -465,11 +508,27 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
           p_initial_image_url: currentImageUrl,
           p_eye_color: eyeColor,
           p_fur_color: furColor,
-        }) as { data: CreateCompanionIfNotExistsResult[] | null; error: Error | null };
+        };
+
+        // Use atomic database function to create companion (prevents duplicates)
+        let result = await invokeCreateCompanionRpc(createCompanionRpcArgs);
+
+        if (!preset && result.error && isLegacyCreateCompanionRpcSignatureError(result.error)) {
+          logger.warn("Create companion RPC signature mismatch; retrying legacy egg-first call", {
+            userId: user.id,
+            coreElement: normalizedElement,
+          });
+          const { p_preset_id: _ignoredPresetId, ...legacyCreateCompanionRpcArgs } = createCompanionRpcArgs;
+          result = await invokeCreateCompanionRpc(legacyCreateCompanionRpcArgs);
+        }
 
         if (result.error) {
           console.error("Database error creating companion:", result.error);
-          throw new Error(`Failed to save companion to database: ${result.error.message}`);
+          if (!preset && isLegacyCreateCompanionRpcSignatureError(result.error)) {
+            throw new Error(CREATE_COMPANION_SIGNATURE_FALLBACK_MESSAGE);
+          }
+
+          throw new Error(result.error.message?.trim() || "Failed to save companion to database.");
         }
         
         const companionResult = result.data;
@@ -481,7 +540,10 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
           throw new Error("Failed to create companion record. Please try again.");
         }
 
-        const companionData = companionResult[0] as unknown as CreateCompanionIfNotExistsResult;
+        const companionData = {
+          preset_id: companionResult[0]?.preset_id ?? null,
+          ...companionResult[0],
+        } as CreateCompanionIfNotExistsResult;
         const isNewCompanion = companionData.is_new;
 
         logger.log(`Companion ${isNewCompanion ? "created" : "already exists"}:`, companionData.id);

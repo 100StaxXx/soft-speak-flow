@@ -463,6 +463,95 @@ describe("useCompanion evolveCompanion", () => {
     );
   });
 
+  it("retries egg-first creation against the legacy RPC signature when the new signature is unavailable", async () => {
+    mocks.rpcMock
+      .mockResolvedValueOnce({
+        data: null,
+        error: {
+          code: "42883",
+          message: "Could not find the function public.create_companion_if_not_exists(p_user_id, p_preset_id, p_favorite_color, p_spirit_animal, p_core_element, p_story_tone, p_current_image_url, p_initial_image_url, p_eye_color, p_fur_color) in the schema cache",
+          details: null,
+          hint: null,
+        },
+      })
+      .mockResolvedValueOnce({
+        data: [
+          {
+            ...companionFixture,
+            spirit_animal: "Egg",
+            core_element: "void",
+            current_image_url: "/companion-eggs/egg__t0_egg__normal__void.png",
+            initial_image_url: "/companion-eggs/egg__t0_egg__normal__void.png",
+            is_new: true,
+          },
+        ],
+        error: null,
+      });
+
+    const { result } = await renderUseCompanion();
+
+    let createdCompanion: Awaited<ReturnType<typeof result.current.createCompanion.mutateAsync>>;
+    await act(async () => {
+      createdCompanion = await result.current.createCompanion.mutateAsync({
+        presetId: null,
+        favoriteColor: "#000000",
+        spiritAnimal: "Egg",
+        coreElement: "void",
+        storyTone: "epic_adventure",
+      });
+    });
+
+    expect(createdCompanion!).toMatchObject({
+      id: companionFixture.id,
+      preset_id: null,
+      spirit_animal: "Egg",
+    });
+    expect(mocks.rpcMock).toHaveBeenCalledTimes(2);
+    expect(mocks.rpcMock).toHaveBeenNthCalledWith(
+      1,
+      "create_companion_if_not_exists",
+      expect.objectContaining({
+        p_preset_id: null,
+        p_spirit_animal: "Egg",
+      }),
+    );
+    expect(mocks.rpcMock).toHaveBeenNthCalledWith(
+      2,
+      "create_companion_if_not_exists",
+      expect.not.objectContaining({
+        p_preset_id: null,
+      }),
+    );
+  });
+
+  it("does not retry the legacy RPC signature for preset-based creation", async () => {
+    mocks.rpcMock.mockResolvedValueOnce({
+      data: null,
+      error: {
+        code: "42883",
+        message: "Could not find the function public.create_companion_if_not_exists(p_user_id, p_preset_id, p_favorite_color, p_spirit_animal, p_core_element, p_story_tone, p_current_image_url, p_initial_image_url, p_eye_color, p_fur_color) in the schema cache",
+        details: null,
+        hint: null,
+      },
+    });
+
+    const { result } = await renderUseCompanion();
+
+    await act(async () => {
+      await expect(
+        result.current.createCompanion.mutateAsync({
+          presetId: "wolf",
+          favoriteColor: "#FF6B35",
+          spiritAnimal: "Wolf",
+          coreElement: "fire",
+          storyTone: "epic_adventure",
+        }),
+      ).rejects.toThrow("Could not find the function public.create_companion_if_not_exists");
+    });
+
+    expect(mocks.rpcMock).toHaveBeenCalledTimes(1);
+  });
+
   it("does not fail onboarding when stage 0 evolution is not readable yet", async () => {
     mocks.rpcMock.mockResolvedValueOnce({
       data: [
