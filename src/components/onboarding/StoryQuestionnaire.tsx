@@ -2,9 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { ChevronLeft, Sparkles } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 import { type FactionType } from "./FactionSelector";
-import { OnboardingStageShell } from "./OnboardingStageShell";
 
 interface QuestionOption {
   optionId: string;
@@ -113,20 +112,25 @@ export const StoryQuestionnaire = ({
   const [isTransitioning, setIsTransitioning] = useState(false);
   const answerLockRef = useRef(false);
 
+  // Memoize star positions to prevent them from jumping on re-render
+  const starPositions = useMemo(() => 
+    [...Array(30)].map(() => ({
+      left: `${Math.random() * 100}%`,
+      top: `${Math.random() * 100}%`,
+      duration: 2 + Math.random() * 2,
+      delay: Math.random() * 2,
+    })), []);
+
   const currentQuestion = questions[currentIndex];
   const progress = ((currentIndex + 1) / questions.length) * 100;
 
+  // Get faction-specific colors
   const factionColors: Record<FactionType, string> = {
     starfall: "#FF6600",
     void: "#7F26D9",
     stellar: "#3DB8F5",
   };
   const factionColor = factionColors[faction];
-  const factionAccent: Record<FactionType, string> = useMemo(() => ({
-    starfall: "20 100% 60%",
-    void: "272 78% 60%",
-    stellar: "198 86% 62%",
-  }), []);
 
   const controlsLocked = isSubmitting || isTransitioning;
   const canGoBack = currentIndex > 0 && !controlsLocked;
@@ -168,94 +172,125 @@ export const StoryQuestionnaire = ({
   };
 
   return (
-    <OnboardingStageShell
-      width="lg"
-      align="top"
-      accent={factionAccent[faction]}
-      eyebrow={`Question ${currentIndex + 1} of ${questions.length}`}
-      title={currentQuestion.question}
-      description={getFactionNarrative(faction, currentIndex)}
-      bodyClassName="mx-auto w-full max-w-4xl"
-    >
+    <div className="min-h-screen relative overflow-hidden flex flex-col px-6 pb-safe-lg pt-safe-top">
+      {/* Background Stars */}
+      <div className="absolute inset-0 overflow-hidden">
+        {starPositions.map((star, i) => (
+          <motion.div
+            key={i}
+            className="absolute w-1 h-1 bg-white rounded-full"
+            style={{
+              left: star.left,
+              top: star.top,
+            }}
+            animate={{
+              opacity: [0.2, 0.8, 0.2],
+            }}
+            transition={{
+              duration: star.duration,
+              repeat: Infinity,
+              delay: star.delay,
+            }}
+          />
+        ))}
+      </div>
+
+      {/* Progress Bar */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="onb-stage-panel p-4 sm:p-5"
+        className="mb-8 z-10"
       >
-        <div className="mb-4 flex items-center gap-3 text-white/74">
+        <div className="flex items-center justify-between text-white/70 text-xs uppercase tracking-wide mb-4 gap-3">
           <Button
             type="button"
             variant="ghost"
             size="sm"
             onClick={handleBack}
             disabled={!canGoBack}
-            className="gap-2 rounded-full border border-white/12 bg-black/25 px-3 text-white hover:bg-black/35 hover:text-white disabled:opacity-40"
+            className="gap-2 text-white/80 hover:text-white disabled:opacity-40 disabled:hover:text-white/70 border border-white/10 rounded-full px-3 py-1 bg-black/30 backdrop-blur-sm"
           >
             <ChevronLeft className="h-4 w-4" />
             Back
           </Button>
-          <div className="flex flex-1 items-center gap-3">
-            <Progress value={progress} className="h-2 flex-1 bg-white/10 [&>div]:bg-[linear-gradient(90deg,rgba(255,255,255,0.92),rgba(137,81,204,0.95))]" />
-            <span className="min-w-[82px] text-right text-sm font-medium tabular-nums">
-              {currentIndex + 1}/{questions.length}
-            </span>
-          </div>
+          <span className="flex-1" />
+          <span className="text-sm font-medium tabular-nums min-w-[72px] text-right">
+            {currentIndex + 1} of {questions.length}
+          </span>
         </div>
-        <div className="flex items-center justify-between gap-3 text-xs uppercase tracking-[0.22em] text-white/58">
-          <div className="inline-flex items-center gap-2">
-            <Sparkles className="h-3.5 w-3.5" style={{ color: factionColor }} />
-            <span>{faction}</span>
-          </div>
-          {isSubmitting ? (
-            <span className="text-white/78">Matching your guide...</span>
-          ) : (
-            <span>Answer from instinct</span>
-          )}
-        </div>
+        <Progress value={progress} className="h-2" />
+        {isSubmitting ? (
+          <p className="mt-3 text-center text-xs uppercase tracking-[0.14em] text-white/70">
+            Matching your guide...
+          </p>
+        ) : null}
       </motion.div>
 
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={currentIndex}
-          initial={{ opacity: 0, x: 50 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -50 }}
-          transition={{ duration: 0.3 }}
-          className="space-y-4"
-        >
-          {currentQuestion.options.map((option, index) => (
-            <motion.div
-              key={option.text}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.08 + index * 0.06 }}
+      {/* Question Content */}
+      <div className="flex-1 flex flex-col justify-center items-center z-10">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={currentIndex}
+            initial={{ opacity: 0, x: 50 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -50 }}
+            transition={{ duration: 0.3 }}
+            className="w-full max-w-2xl"
+          >
+            {/* Narrative Text */}
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.2 }}
+              className="text-white/60 text-sm italic mb-5 text-center leading-relaxed px-2"
             >
-              <Button
-                variant="outline"
-                onClick={() => handleAnswer(option)}
-                disabled={controlsLocked}
-                className="group relative min-h-[96px] w-full overflow-hidden rounded-[1.6rem] border-white/10 bg-black/20 px-5 py-5 text-left text-white shadow-[0_20px_50px_rgba(0,0,0,0.26)] backdrop-blur-xl hover:border-white/18 hover:bg-white/[0.05]"
-              >
-                <span
-                  className="absolute inset-y-4 left-3 w-1 rounded-full opacity-90"
-                  style={{ backgroundColor: factionColor }}
-                />
-                <span className="flex w-full items-center gap-4 sm:gap-5">
-                  <span
-                    className="flex h-11 w-11 items-center justify-center rounded-full border border-white/12 bg-black/20 text-base font-bold tracking-wide"
-                    style={{ boxShadow: `0 0 20px ${factionColor}28`, color: factionColor }}
+              {getFactionNarrative(faction, currentIndex)}
+            </motion.p>
+
+            {/* Question */}
+            <motion.h2
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              className="text-xl sm:text-2xl font-bold text-white text-center mb-8 sm:mb-10 leading-tight sm:leading-snug px-4"
+            >
+              {currentQuestion.question}
+            </motion.h2>
+
+            {/* Options */}
+            <div className="space-y-4 w-full max-w-xl mx-auto">
+              {currentQuestion.options.map((option, index) => (
+                <motion.div
+                  key={option.text}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.4 + index * 0.1 }}
+                >
+                  <Button
+                    variant="outline"
+                    onClick={() => handleAnswer(option)}
+                    disabled={controlsLocked}
+                    className="w-full flex items-center text-left gap-4 sm:gap-5 min-h-[88px] py-5 px-5 text-white border border-white/15 rounded-2xl hover:border-white/40 bg-black/30 backdrop-blur-xl hover:bg-black/40 transition-all shadow-[0_10px_40px_rgba(0,0,0,0.35)]"
+                    style={{
+                      ["--hover-bg" as string]: `${factionColor}20`,
+                    }}
                   >
-                    {String.fromCharCode(65 + index)}
-                  </span>
-                  <span className="flex-1 whitespace-normal break-words text-sm leading-6 text-white/84 sm:text-base">
-                    {option.text}
-                  </span>
-                </span>
-              </Button>
-            </motion.div>
-          ))}
-        </motion.div>
-      </AnimatePresence>
-    </OnboardingStageShell>
+                    <span
+                      className="w-11 h-11 rounded-full flex items-center justify-center text-base font-bold border border-white/20 bg-white/5 text-white tracking-wide"
+                      style={{ boxShadow: `0 0 15px ${factionColor}33`, color: factionColor }}
+                    >
+                      {String.fromCharCode(65 + index)}
+                    </span>
+                    <span className="text-sm sm:text-base leading-relaxed whitespace-normal break-words flex-1">
+                      {option.text}
+                    </span>
+                  </Button>
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
+        </AnimatePresence>
+      </div>
+    </div>
   );
 };

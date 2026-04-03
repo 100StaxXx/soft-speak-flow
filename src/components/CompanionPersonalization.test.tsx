@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { CompanionPersonalization } from "./CompanionPersonalization";
 
 vi.mock("framer-motion", async () => {
@@ -19,15 +19,7 @@ vi.mock("framer-motion", async () => {
 });
 
 describe("CompanionPersonalization", () => {
-  beforeAll(() => {
-    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
-      configurable: true,
-      value: vi.fn(),
-      writable: true,
-    });
-  });
-
-  it("lets onboarding users move left or right through eggs and submit the centered choice", () => {
+  it("lets onboarding users choose an egg and story tone before beginning the journey", () => {
     const onComplete = vi.fn();
 
     render(
@@ -38,17 +30,13 @@ describe("CompanionPersonalization", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: /ember egg/i })).toHaveAttribute("aria-pressed", "true");
-
-    fireEvent.click(screen.getByRole("button", { name: /next egg/i }));
-    fireEvent.click(screen.getByRole("button", { name: /next egg/i }));
+    fireEvent.click(screen.getByRole("button", { name: /ice egg/i }));
     fireEvent.click(screen.getByRole("button", { name: /whimsical & playful/i }));
     fireEvent.click(screen.getByRole("button", { name: /begin your journey/i }));
 
-    expect(screen.getByRole("button", { name: /storm egg/i })).toHaveAttribute("aria-pressed", "true");
     expect(onComplete).toHaveBeenCalledWith({
-      coreElement: "storm",
-      favoriteColor: "#38BDF8",
+      coreElement: "ice",
+      favoriteColor: "#60A5FA",
       presetId: null,
       spiritAnimal: "Egg",
       storyTone: "whimsical_playful",

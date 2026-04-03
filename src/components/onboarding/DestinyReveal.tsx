@@ -1,8 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, ArrowRight } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { OnboardingStageShell } from "./OnboardingStageShell";
 
 interface DestinyRevealProps {
   userName: string;
@@ -55,120 +54,121 @@ export const DestinyReveal = ({ userName, onComplete }: DestinyRevealProps) => {
   }, [showFinalMessage]);
 
   return (
-    <OnboardingStageShell
-      width="md"
-      accent="264 88% 72%"
-      hero={
-        <div className="onb-stage-emblem">
-          <Sparkles className="h-10 w-10 text-white" />
-        </div>
-      }
-      eyebrow="Destiny Reveal"
-      title="The Stars Have Been Waiting"
-      description="Take in the moment. Your path is about to open, and your first choice is waiting just beyond this breath."
-      bodyClassName="mx-auto w-full max-w-3xl"
-    >
-      <div className="relative overflow-hidden rounded-[2rem] onb-stage-panel px-6 py-8 sm:px-8 sm:py-10">
-        {particlePositions.map((particle, i) => (
-          <motion.div
-            key={i}
-            className="absolute h-1 w-1 rounded-full bg-primary/70"
-            initial={{
-              x: particle.x,
-              y: particle.y,
-              opacity: 0,
-            }}
-            animate={{
-              y: [null, -100],
-              opacity: [0, 0.8, 0],
-            }}
-            transition={{
-              duration: particle.duration,
-              repeat: Infinity,
-              delay: i * 0.8,
-            }}
-            style={{
-              left: particle.left,
-              top: particle.top,
-            }}
-          />
-        ))}
+    <div className="min-h-screen flex flex-col items-center justify-center px-6 pt-safe-top safe-area-bottom relative">
+      {/* Ambient glow */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <div className="w-[500px] h-[500px] bg-primary/10 rounded-full blur-[120px] animate-pulse" />
+      </div>
 
-        <div className="relative z-10 min-h-[260px] space-y-8 text-center">
-          <div className="min-h-[128px]">
-            <AnimatePresence mode="wait">
-              {narrativeLines.map((line, index) => (
-                index === currentLine - 1 && index < narrativeLines.length && (
-                  <motion.p
-                    key={index}
-                    initial={{ opacity: 0, y: 20, filter: "blur(8px)" }}
-                    animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                    exit={{ opacity: 0, y: -10, filter: "blur(8px)" }}
-                    transition={{ duration: 0.8 }}
-                    className="text-lg italic leading-relaxed text-white/82 md:text-2xl"
-                  >
-                    {line}
-                  </motion.p>
-                )
-              ))}
-            </AnimatePresence>
-          </div>
+      <div className="relative z-10 max-w-lg text-center space-y-8">
+        {/* Narrative lines */}
+        <div className="min-h-[200px] flex flex-col items-center justify-center space-y-6">
+          <AnimatePresence mode="wait">
+            {narrativeLines.map((line, index) => (
+              index === currentLine - 1 && index < narrativeLines.length && (
+                <motion.p
+                  key={index}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.8 }}
+                  className="text-lg md:text-xl text-muted-foreground italic leading-relaxed"
+                >
+                  {line}
+                </motion.p>
+              )
+            ))}
+          </AnimatePresence>
 
+          {/* Final personalized message */}
           <AnimatePresence>
             {showFinalMessage && (
               <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
+                initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.9, ease: "easeOut" }}
-                className="mx-auto max-w-2xl space-y-5 rounded-[1.75rem] border border-white/10 bg-white/[0.05] p-6 shadow-[0_18px_60px_rgba(0,0,0,0.24)] backdrop-blur-xl"
+                transition={{ duration: 1, ease: "easeOut" }}
+                className="space-y-4"
               >
-                <div className="flex items-center justify-center gap-3 text-primary/80">
-                  <Sparkles className="h-4 w-4 text-primary" />
-                  <span className="text-xs uppercase tracking-[0.36em]">Your Path Awaits</span>
-                  <Sparkles className="h-4 w-4 text-primary" />
-                </div>
-
-                <motion.h2
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.3 }}
+                  className="flex items-center justify-center gap-2 text-primary"
+                >
+                  <Sparkles className="h-5 w-5" />
+                  <span className="text-sm uppercase tracking-[0.3em] font-medium">Your Path Awaits</span>
+                  <Sparkles className="h-5 w-5" />
+                </motion.div>
+                
+                <motion.h1
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.25 }}
-                  className="text-3xl font-semibold text-white md:text-4xl"
+                  transition={{ delay: 0.6 }}
+                  className="text-3xl md:text-4xl font-bold text-foreground"
                 >
                   Welcome, <span className="text-primary">{userName}</span>
-                </motion.h2>
-
+                </motion.h1>
+                
                 <motion.p
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  transition={{ delay: 0.38 }}
-                  className="text-base leading-7 text-white/72 md:text-lg"
+                  transition={{ delay: 0.9 }}
+                  className="text-muted-foreground text-lg"
                 >
-                  Every legend begins with a choice. Choose your faction and let your story begin.
+                  Every legend begins with a choice.
+                  <br />
+                  <span className="text-foreground/80">Choose your allegiance.</span>
                 </motion.p>
               </motion.div>
             )}
           </AnimatePresence>
-
-          <AnimatePresence>
-            {showButton && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.45 }}
-              >
-                <Button
-                  onClick={onComplete}
-                  size="lg"
-                  className="onb-stage-cta h-14 rounded-full px-8 text-base"
-                >
-                  Choose My Faction
-                  <ArrowRight className="h-5 w-5" />
-                </Button>
-              </motion.div>
-            )}
-          </AnimatePresence>
         </div>
+
+        {/* Continue button */}
+        <AnimatePresence>
+          {showButton && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+            >
+              <Button
+                onClick={onComplete}
+                size="lg"
+                className="px-8 py-6 text-lg bg-primary hover:bg-primary/90"
+              >
+                Choose My Faction
+              </Button>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
-    </OnboardingStageShell>
+
+      {/* Floating particles */}
+      {particlePositions.map((particle, i) => (
+        <motion.div
+          key={i}
+          className="absolute w-1 h-1 bg-primary/40 rounded-full"
+          initial={{ 
+            x: particle.x, 
+            y: particle.y,
+            opacity: 0 
+          }}
+          animate={{ 
+            y: [null, -100],
+            opacity: [0, 0.8, 0],
+          }}
+          transition={{
+            duration: particle.duration,
+            repeat: Infinity,
+            delay: i * 0.8,
+          }}
+          style={{
+            left: particle.left,
+            top: particle.top,
+          }}
+        />
+      ))}
+    </div>
   );
 };

@@ -6,9 +6,6 @@ export { FactionSelector, type FactionType } from "./FactionSelector";
 export { StoryQuestionnaire, type OnboardingAnswer } from "./StoryQuestionnaire";
 export { MentorCalculating } from "./MentorCalculating";
 export { JourneyBegins } from "./JourneyBegins";
-export { OnboardingStageShell } from "./OnboardingStageShell";
-export { OnboardingCompanionSetup } from "./OnboardingCompanionSetup";
-export { OnboardingEggSelection } from "./OnboardingEggSelection";
 export {
   OnboardingCosmicBackdrop,
   type OnboardingBackdropPreset,

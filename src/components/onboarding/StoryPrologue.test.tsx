@@ -39,7 +39,11 @@ describe("StoryPrologue", () => {
       target: { value: "N" },
     });
     fireEvent.click(screen.getByLabelText(/13 years of age or older/i));
-    fireEvent.click(screen.getByLabelText(/terms of service, privacy policy/i));
+    fireEvent.click(
+      screen.getByRole("checkbox", {
+        name: /i accept the.*terms of service.*privacy policy.*eula/i,
+      }),
+    );
     expect(button).toBeDisabled();
 
     fireEvent.change(screen.getByPlaceholderText(/enter your name/i), {

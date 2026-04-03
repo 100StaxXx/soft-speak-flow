@@ -58,7 +58,6 @@ const mocks = vi.hoisted(() => ({
   profilesUpdateEq: vi.fn(),
   profilesMaybeSingle: vi.fn(),
   questionnaireUpsert: vi.fn(),
-  createCompanionMutateAsync: vi.fn(),
   toastError: vi.fn(),
   loggerError: vi.fn(),
   loggerWarn: vi.fn(),
@@ -92,9 +91,7 @@ vi.mock("@/hooks/useAuth", () => ({
 
 vi.mock("@/hooks/useCompanion", () => ({
   useCompanion: () => ({
-    createCompanion: {
-      mutateAsync: mocks.createCompanionMutateAsync,
-    },
+    createCompanion: vi.fn(),
   }),
 }));
 
@@ -178,7 +175,6 @@ vi.mock("@/components/StarfieldBackground", () => ({
 
 vi.mock("./OnboardingCosmicBackdrop", () => ({
   OnboardingCosmicBackdrop: () => <div data-testid="cosmic-bg" />,
-  resolveFactionAccent: () => "20 100% 58%",
 }));
 
 vi.mock("./StoryPrologue", () => ({
@@ -227,61 +223,15 @@ vi.mock("./MentorCalculating", () => ({
 }));
 
 vi.mock("@/components/MentorResult", () => ({
-  MentorResult: ({ onConfirm }: { onConfirm: () => void }) => (
-    <div data-testid="mentor-result-stage">
-      Mentor Result
-      <button type="button" onClick={onConfirm}>
-        mentor-confirm
-      </button>
-    </div>
-  ),
+  MentorResult: () => <div data-testid="mentor-result-stage">Mentor Result</div>,
 }));
 
 vi.mock("@/components/MentorGrid", () => ({
   MentorGrid: () => <div data-testid="mentor-grid-stage">Mentor Grid</div>,
 }));
 
-vi.mock("./OnboardingCompanionSetup", () => ({
-  OnboardingCompanionSetup: ({
-    onSelectPreset,
-    onSelectStoryTone,
-    onContinue,
-  }: {
-    onSelectPreset: (presetId: "dragon") => void;
-    onSelectStoryTone: (tone: "epic_adventure") => void;
-    onContinue: () => void;
-  }) => (
-    <div data-testid="companion-setup-stage">
-      <button type="button" onClick={() => onSelectPreset("dragon")}>
-        choose-dragon
-      </button>
-      <button type="button" onClick={() => onSelectStoryTone("epic_adventure")}>
-        choose-epic
-      </button>
-      <button type="button" onClick={onContinue}>
-        companion-setup-continue
-      </button>
-    </div>
-  ),
-}));
-
-vi.mock("./OnboardingEggSelection", () => ({
-  OnboardingEggSelection: ({
-    onSelectElement,
-    onContinue,
-  }: {
-    onSelectElement: (element: "storm") => void;
-    onContinue: () => void;
-  }) => (
-    <div data-testid="companion-egg-stage">
-      <button type="button" onClick={() => onSelectElement("storm")}>
-        choose-storm
-      </button>
-      <button type="button" onClick={onContinue}>
-        companion-egg-continue
-      </button>
-    </div>
-  ),
+vi.mock("@/components/CompanionPersonalization", () => ({
+  CompanionPersonalization: () => <div data-testid="companion-stage">Companion</div>,
 }));
 
 vi.mock("./JourneyBegins", () => ({
@@ -319,7 +269,6 @@ describe("StoryOnboarding questionnaire submission flow", () => {
     mocks.profilesMaybeSingle.mockReset();
     mocks.profilesUpdateEq.mockReset();
     mocks.questionnaireUpsert.mockReset();
-    mocks.createCompanionMutateAsync.mockReset();
     mocks.toastError.mockReset();
     mocks.loggerError.mockReset();
     mocks.loggerWarn.mockReset();
@@ -329,7 +278,6 @@ describe("StoryOnboarding questionnaire submission flow", () => {
     mocks.profilesUpdateEq.mockResolvedValue({ error: null });
     mocks.mentorsEq.mockResolvedValue({ data: [ACTIVE_MENTOR], error: null });
     mocks.questionnaireUpsert.mockResolvedValue({ error: null });
-    mocks.createCompanionMutateAsync.mockResolvedValue({ id: "companion-1", spirit_animal: "Dragon" });
   });
 
   it("moves to calculating immediately, then returns to questionnaire on timeout failure", async () => {
@@ -391,62 +339,4 @@ describe("StoryOnboarding questionnaire submission flow", () => {
       vi.useRealTimers();
     }
   });
-
-  it("submits preset, element, and story tone after the new companion setup flow", async () => {
-    renderOnboarding();
-    await advanceToQuestionnaire();
-
-    vi.useFakeTimers();
-    try {
-      fireEvent.click(screen.getByRole("button", { name: "questionnaire-submit" }));
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(CALCULATING_STAGE_DURATION_MS);
-        await Promise.resolve();
-      });
-
-      await act(async () => {
-        fireEvent.click(screen.getByRole("button", { name: "mentor-confirm" }));
-        await Promise.resolve();
-      });
-
-      expect(screen.getByTestId("companion-setup-stage")).toBeInTheDocument();
-
-      await act(async () => {
-        fireEvent.click(screen.getByRole("button", { name: "choose-dragon" }));
-        fireEvent.click(screen.getByRole("button", { name: "choose-epic" }));
-        await Promise.resolve();
-      });
-
-      await act(async () => {
-        fireEvent.click(screen.getByRole("button", { name: "companion-setup-continue" }));
-        await Promise.resolve();
-      });
-
-      expect(screen.getByTestId("companion-egg-stage")).toBeInTheDocument();
-
-      await act(async () => {
-        fireEvent.click(screen.getByRole("button", { name: "choose-storm" }));
-        await Promise.resolve();
-      });
-
-      await act(async () => {
-        fireEvent.click(screen.getByRole("button", { name: "companion-egg-continue" }));
-        await Promise.resolve();
-        await Promise.resolve();
-      });
-
-      expect(mocks.createCompanionMutateAsync).toHaveBeenCalledWith({
-        presetId: "dragon",
-        favoriteColor: "#38BDF8",
-        spiritAnimal: "Dragon",
-        coreElement: "storm",
-        storyTone: "epic_adventure",
-      });
-
-      expect(screen.getByTestId("journey-begins-stage")).toBeInTheDocument();
-    } finally {
-      vi.useRealTimers();
-    }
-  }, 10000);
 });
