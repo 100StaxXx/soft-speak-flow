@@ -489,12 +489,10 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
         const invokeCreateCompanionRpc = async (
           args: CreateCompanionRpcArgs,
         ): Promise<CreateCompanionRpcResult> => {
-          const rpc = supabase.rpc as unknown as (
-            fn: string,
-            rpcArgs: CreateCompanionRpcArgs,
-          ) => Promise<CreateCompanionRpcResult>;
-
-          return await rpc("create_companion_if_not_exists", args);
+          return await supabase.rpc(
+            "create_companion_if_not_exists",
+            args,
+          ) as unknown as CreateCompanionRpcResult;
         };
 
         const createCompanionRpcArgs: CreateCompanionRpcArgs = {
