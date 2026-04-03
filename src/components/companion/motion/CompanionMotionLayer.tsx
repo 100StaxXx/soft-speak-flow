@@ -16,7 +16,12 @@ import {
   type CompanionMotionEvent,
   type CompanionMotionSceneId,
 } from "@/config/companionMotion";
-import { getCompanionElement } from "@/config/companionCatalog";
+import {
+  resolveCompanionElementOverlayRecipe,
+  type CompanionMotionOverlayVariant,
+  type OverlayPlane,
+  type ParticleStyleKind,
+} from "@/config/companionElementOverlayRecipes";
 import { useMotionProfile } from "@/hooks/useMotionProfile";
 import { cn } from "@/lib/utils";
 
@@ -61,11 +66,9 @@ const CONSTELLATION_LINES = [
   { left: "42%", top: "54%", width: "18%", rotate: "-18deg" },
 ] as const;
 
-type MotionLayerVariant = "companion" | "evolution";
-type ParticleStyleKind = "ember" | "crystal" | "spark" | "leaf" | "star" | "halo";
-
 interface CompanionMotionLayerProps {
-  variant: MotionLayerVariant;
+  variant: CompanionMotionOverlayVariant;
+  plane?: OverlayPlane;
   stage: number;
   element?: string | null;
   event?: CompanionMotionEvent | null;
@@ -74,32 +77,10 @@ interface CompanionMotionLayerProps {
   secondaryColor?: string | null;
 }
 
-interface AuraTheme {
-  id: string;
-  primary: string;
-  secondary: string;
-  accent: string;
-  particleStyle: ParticleStyleKind;
-  hazeGradient: string;
-  veilGradient: string;
-  orbitGradient: string;
-  crownGradient: string;
-  beamGradient: string;
-}
-
-const hexToRgba = (hex: string, alpha: number) => {
-  const normalized = hex.replace("#", "");
-  if (normalized.length !== 6) return `rgba(255,255,255,${alpha})`;
-
-  const r = Number.parseInt(normalized.slice(0, 2), 16);
-  const g = Number.parseInt(normalized.slice(2, 4), 16);
-  const b = Number.parseInt(normalized.slice(4, 6), 16);
-
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-};
-
-const getSceneId = (variant: MotionLayerVariant, stage: number): CompanionMotionSceneId =>
-  variant === "evolution" ? "evolution_hero" : getCompanionMotionSceneForStage(stage);
+const getSceneId = (
+  variant: CompanionMotionOverlayVariant,
+  stage: number,
+): CompanionMotionSceneId => (variant === "evolution" ? "evolution_hero" : getCompanionMotionSceneForStage(stage));
 
 const getEventStrength = (event: CompanionMotionEvent | null | undefined) => {
   if (!event) return 0.45;
@@ -108,110 +89,21 @@ const getEventStrength = (event: CompanionMotionEvent | null | undefined) => {
   return 0.58;
 };
 
-const resolveAuraTheme = (
-  elementId: string | null | undefined,
-  primaryColor: string,
-  secondaryColor: string,
-): AuraTheme => {
-  const element = getCompanionElement(elementId);
-  const accent = element.accentColor;
-
-  switch (element.id) {
-    case "fire":
-      return {
-        id: "fire",
-        primary: primaryColor,
-        secondary: secondaryColor,
-        accent,
-        particleStyle: "ember",
-        hazeGradient: `radial-gradient(circle at 50% 55%, ${hexToRgba(primaryColor, 0.42)} 0%, ${hexToRgba(accent, 0.22)} 36%, transparent 74%)`,
-        veilGradient: `linear-gradient(180deg, ${hexToRgba(accent, 0.12)} 0%, transparent 40%, ${hexToRgba(primaryColor, 0.18)} 100%)`,
-        orbitGradient: `conic-gradient(from 0deg, transparent 0deg, ${hexToRgba(primaryColor, 0.2)} 72deg, transparent 138deg, ${hexToRgba(accent, 0.18)} 216deg, transparent 300deg, ${hexToRgba(primaryColor, 0.16)} 360deg)`,
-        crownGradient: `repeating-conic-gradient(from 0deg, transparent 0deg 20deg, ${hexToRgba(accent, 0.22)} 20deg 28deg, transparent 28deg 50deg)`,
-        beamGradient: `radial-gradient(circle at 50% 50%, ${hexToRgba(accent, 0.34)} 0%, transparent 60%)`,
-      };
-    case "ice":
-      return {
-        id: "ice",
-        primary: primaryColor,
-        secondary: secondaryColor,
-        accent,
-        particleStyle: "crystal",
-        hazeGradient: `radial-gradient(circle at 50% 48%, ${hexToRgba(primaryColor, 0.3)} 0%, ${hexToRgba(accent, 0.18)} 42%, transparent 72%)`,
-        veilGradient: `linear-gradient(180deg, ${hexToRgba(accent, 0.18)} 0%, transparent 36%, ${hexToRgba(primaryColor, 0.12)} 100%)`,
-        orbitGradient: `conic-gradient(from 0deg, transparent 0deg, ${hexToRgba(accent, 0.2)} 52deg, transparent 112deg, ${hexToRgba(primaryColor, 0.18)} 200deg, transparent 272deg, ${hexToRgba(accent, 0.14)} 360deg)`,
-        crownGradient: `repeating-conic-gradient(from 0deg, transparent 0deg 16deg, ${hexToRgba(secondaryColor, 0.24)} 16deg 20deg, transparent 20deg 42deg)`,
-        beamGradient: `radial-gradient(circle at 50% 50%, ${hexToRgba(secondaryColor, 0.3)} 0%, transparent 62%)`,
-      };
-    case "storm":
-      return {
-        id: "storm",
-        primary: primaryColor,
-        secondary: secondaryColor,
-        accent,
-        particleStyle: "spark",
-        hazeGradient: `radial-gradient(circle at 50% 50%, ${hexToRgba(primaryColor, 0.34)} 0%, ${hexToRgba(accent, 0.16)} 40%, transparent 72%)`,
-        veilGradient: `linear-gradient(135deg, ${hexToRgba(primaryColor, 0.12)} 0%, transparent 35%, ${hexToRgba(accent, 0.16)} 100%)`,
-        orbitGradient: `conic-gradient(from 0deg, transparent 0deg, ${hexToRgba(primaryColor, 0.22)} 34deg, transparent 64deg, ${hexToRgba(accent, 0.2)} 116deg, transparent 168deg, ${hexToRgba(primaryColor, 0.14)} 260deg, transparent 360deg)`,
-        crownGradient: `repeating-conic-gradient(from 0deg, transparent 0deg 14deg, ${hexToRgba(primaryColor, 0.22)} 14deg 18deg, transparent 18deg 36deg)`,
-        beamGradient: `linear-gradient(135deg, transparent 0%, ${hexToRgba(accent, 0.3)} 50%, transparent 100%)`,
-      };
-    case "nature":
-      return {
-        id: "nature",
-        primary: primaryColor,
-        secondary: secondaryColor,
-        accent,
-        particleStyle: "leaf",
-        hazeGradient: `radial-gradient(circle at 50% 52%, ${hexToRgba(primaryColor, 0.34)} 0%, ${hexToRgba(accent, 0.18)} 38%, transparent 74%)`,
-        veilGradient: `linear-gradient(180deg, ${hexToRgba(accent, 0.12)} 0%, transparent 32%, ${hexToRgba(primaryColor, 0.16)} 100%)`,
-        orbitGradient: `conic-gradient(from 0deg, transparent 0deg, ${hexToRgba(primaryColor, 0.16)} 68deg, transparent 130deg, ${hexToRgba(accent, 0.2)} 220deg, transparent 288deg, ${hexToRgba(primaryColor, 0.12)} 360deg)`,
-        crownGradient: `repeating-conic-gradient(from 0deg, transparent 0deg 24deg, ${hexToRgba(accent, 0.18)} 24deg 28deg, transparent 28deg 50deg)`,
-        beamGradient: `radial-gradient(circle at 50% 50%, ${hexToRgba(accent, 0.28)} 0%, transparent 58%)`,
-      };
-    case "light":
-      return {
-        id: "light",
-        primary: primaryColor,
-        secondary: secondaryColor,
-        accent,
-        particleStyle: "halo",
-        hazeGradient: `radial-gradient(circle at 50% 48%, ${hexToRgba(primaryColor, 0.32)} 0%, ${hexToRgba(accent, 0.24)} 34%, transparent 74%)`,
-        veilGradient: `linear-gradient(180deg, ${hexToRgba(accent, 0.18)} 0%, transparent 34%, ${hexToRgba(primaryColor, 0.14)} 100%)`,
-        orbitGradient: `conic-gradient(from 0deg, transparent 0deg, ${hexToRgba(accent, 0.22)} 88deg, transparent 152deg, ${hexToRgba(primaryColor, 0.16)} 248deg, transparent 320deg, ${hexToRgba(accent, 0.14)} 360deg)`,
-        crownGradient: `repeating-conic-gradient(from 0deg, transparent 0deg 18deg, ${hexToRgba(accent, 0.24)} 18deg 24deg, transparent 24deg 48deg)`,
-        beamGradient: `radial-gradient(circle at 50% 50%, ${hexToRgba(accent, 0.36)} 0%, transparent 62%)`,
-      };
-    case "void":
-    default:
-      return {
-        id: "void",
-        primary: primaryColor,
-        secondary: secondaryColor,
-        accent,
-        particleStyle: "star",
-        hazeGradient: `radial-gradient(circle at 50% 50%, ${hexToRgba(primaryColor, 0.34)} 0%, ${hexToRgba(accent, 0.18)} 38%, transparent 74%)`,
-        veilGradient: `linear-gradient(180deg, ${hexToRgba(accent, 0.12)} 0%, transparent 30%, ${hexToRgba(primaryColor, 0.18)} 100%)`,
-        orbitGradient: `conic-gradient(from 0deg, transparent 0deg, ${hexToRgba(primaryColor, 0.2)} 72deg, transparent 148deg, ${hexToRgba(accent, 0.22)} 218deg, transparent 298deg, ${hexToRgba(primaryColor, 0.12)} 360deg)`,
-        crownGradient: `repeating-conic-gradient(from 0deg, transparent 0deg 22deg, ${hexToRgba(accent, 0.18)} 22deg 26deg, transparent 26deg 46deg)`,
-        beamGradient: `radial-gradient(circle at 50% 50%, ${hexToRgba(accent, 0.3)} 0%, transparent 58%)`,
-      };
-  }
-};
-
 const getParticleStyle = (
-  theme: AuraTheme,
+  particleStyle: ParticleStyleKind,
   index: number,
-  variant: MotionLayerVariant,
+  variant: CompanionMotionOverlayVariant,
+  primaryColor: string,
+  accentColor: string,
 ): CSSProperties => {
   const isEvolution = variant === "evolution";
   const baseStyle: CSSProperties = {
-    background: index % 2 === 0 ? theme.primary : theme.accent,
-    boxShadow: `0 0 ${isEvolution ? 18 : 14}px ${index % 2 === 0 ? theme.primary : theme.accent}`,
+    background: index % 2 === 0 ? primaryColor : accentColor,
+    boxShadow: `0 0 ${isEvolution ? 18 : 14}px ${index % 2 === 0 ? primaryColor : accentColor}`,
     filter: "blur(0px)",
   };
 
-  switch (theme.particleStyle) {
+  switch (particleStyle) {
     case "ember":
       return {
         ...baseStyle,
@@ -248,7 +140,7 @@ const getParticleStyle = (
         width: isEvolution ? 10 : 8,
         height: isEvolution ? 10 : 8,
         borderRadius: "999px",
-        boxShadow: `0 0 ${isEvolution ? 24 : 18}px ${theme.accent}`,
+        boxShadow: `0 0 ${isEvolution ? 24 : 18}px ${accentColor}`,
       };
     case "star":
     default:
@@ -262,10 +154,10 @@ const getParticleStyle = (
 };
 
 const getParticleAnimation = (
-  theme: AuraTheme,
+  particleStyle: ParticleStyleKind,
   index: number,
 ): CSSProperties & Record<string, string[] | number[]> => {
-  switch (theme.particleStyle) {
+  switch (particleStyle) {
     case "ember":
       return {
         opacity: [0.1, 0.46, 0.08],
@@ -311,30 +203,9 @@ const getParticleAnimation = (
   }
 };
 
-const getEventBurstProfile = (event: CompanionMotionEvent | null | undefined) => {
-  if (!event) return null;
-
-  switch (event.type) {
-    case "xp_gain":
-      return { ringInset: "18%", secondaryInset: "26%", rays: false, swirl: false, beam: false };
-    case "quest_complete":
-      return { ringInset: "16%", secondaryInset: "22%", rays: false, swirl: true, beam: false };
-    case "streak":
-      return { ringInset: "12%", secondaryInset: "18%", rays: true, swirl: true, beam: false };
-    case "wake":
-      return { ringInset: "10%", secondaryInset: "16%", rays: true, swirl: false, beam: true };
-    case "evolution_start":
-      return { ringInset: "8%", secondaryInset: "14%", rays: false, swirl: true, beam: true };
-    case "evolution_reveal":
-      return { ringInset: "4%", secondaryInset: "10%", rays: true, swirl: true, beam: true };
-    case "idle":
-    default:
-      return { ringInset: "18%", secondaryInset: "24%", rays: false, swirl: false, beam: false };
-  }
-};
-
 const FallbackMotionScene = memo(({
   variant,
+  plane,
   stage,
   element,
   event,
@@ -344,7 +215,8 @@ const FallbackMotionScene = memo(({
   particleCount,
   animated,
 }: {
-  variant: MotionLayerVariant;
+  variant: CompanionMotionOverlayVariant;
+  plane: OverlayPlane;
   stage: number;
   element?: string | null;
   event?: CompanionMotionEvent | null;
@@ -356,241 +228,337 @@ const FallbackMotionScene = memo(({
 }) => {
   const stagePower = getCompanionMotionStagePower(stage);
   const eventStrength = getEventStrength(event);
-  const showEggTreatment = variant === "companion" && stage <= 0;
-  const showGuardianCrown = stage >= 21;
-  const showMythicGeometry = stage >= 56;
-  const showAscendedConstellation = stage >= 81 || variant === "evolution";
   const pulseScale = variant === "evolution" ? 1.16 : 1.06 + stagePower * 0.04;
   const particlePositions = variant === "evolution"
     ? EVOLUTION_PARTICLE_POSITIONS.slice(0, particleCount)
     : COMPANION_PARTICLE_POSITIONS.slice(0, particleCount);
-  const theme = resolveAuraTheme(element, primaryColor, secondaryColor);
-  const eventBurst = getEventBurstProfile(event);
-  const centralInset = variant === "evolution" ? "6%" : "10%";
+  const recipe = useMemo(
+    () =>
+      resolveCompanionElementOverlayRecipe({
+        elementId: element,
+        plane,
+        variant,
+        stage,
+        event,
+        primaryColor,
+        secondaryColor,
+      }),
+    [element, event, plane, primaryColor, secondaryColor, stage, variant],
+  );
+  const hasEventBurst = Boolean(event) && Object.values(recipe.eventBurst.visuals).some(Boolean);
 
   return (
-    <div className={cn("absolute inset-0 overflow-hidden pointer-events-none", className)} aria-hidden="true">
-      <motion.div
-        className="absolute inset-[-10%]"
-        animate={animated ? {
-          opacity: [0.2 + stagePower * 0.08, 0.34 + stagePower * 0.12, 0.2 + stagePower * 0.08],
-          scale: [0.98, pulseScale, 0.98],
-        } : undefined}
-        transition={animated ? {
-          duration: variant === "evolution" ? 5.2 : 6.1,
-          repeat: Infinity,
-          ease: "easeInOut",
-        } : undefined}
-        style={{
-          background: theme.hazeGradient,
-          filter: variant === "evolution" ? "blur(34px)" : "blur(26px)",
-          opacity: 0.32,
-        }}
-      />
+    <div
+      className={cn("absolute inset-0 overflow-hidden pointer-events-none", className)}
+      aria-hidden="true"
+      data-motion-element={recipe.id}
+      data-motion-plane={plane}
+      data-motion-animated={animated ? "true" : "false"}
+    >
+      {recipe.visuals.haze && (
+        <motion.div
+          className="absolute inset-[-10%]"
+          data-overlay-layer="haze"
+          animate={animated
+            ? {
+                opacity: [0.2 + stagePower * 0.08, 0.34 + stagePower * 0.12, 0.2 + stagePower * 0.08],
+                scale: [0.98, pulseScale, 0.98],
+              }
+            : undefined}
+          transition={animated
+            ? {
+                duration: variant === "evolution" ? 5.2 : 6.1,
+                repeat: Infinity,
+                ease: "easeInOut",
+              }
+            : undefined}
+          style={{
+            background: recipe.gradients.haze,
+            filter: variant === "evolution" ? "blur(34px)" : "blur(26px)",
+            opacity: 0.32,
+          }}
+        />
+      )}
 
-      <motion.div
-        className="absolute inset-0"
-        animate={animated ? {
-          opacity: [0.14, 0.28, 0.14],
-        } : undefined}
-        transition={animated ? {
-          duration: 8.5,
-          repeat: Infinity,
-          ease: "easeInOut",
-        } : undefined}
-        style={{
-          background: theme.veilGradient,
-          mixBlendMode: "screen",
-        }}
-      />
+      {recipe.visuals.veil && (
+        <motion.div
+          className="absolute inset-0"
+          data-overlay-layer="veil"
+          animate={animated ? { opacity: [0.14, 0.28, 0.14] } : undefined}
+          transition={animated
+            ? {
+                duration: 8.5,
+                repeat: Infinity,
+                ease: "easeInOut",
+              }
+            : undefined}
+          style={{
+            background: recipe.gradients.veil,
+            mixBlendMode: "screen",
+          }}
+        />
+      )}
 
-      <motion.div
-        className="absolute inset-[8%]"
-        animate={animated ? {
-          rotate: [0, 360],
-          opacity: [0.18 + stagePower * 0.08, 0.28 + stagePower * 0.12, 0.18 + stagePower * 0.08],
-          scale: [0.97, 1.01 + stagePower * 0.03, 0.97],
-        } : undefined}
-        transition={animated ? {
-          duration: variant === "evolution" ? 17 : 20,
-          repeat: Infinity,
-          ease: "linear",
-        } : undefined}
-        style={{
-          background: theme.orbitGradient,
-          borderRadius: "999px",
-          filter: "blur(8px)",
-          mixBlendMode: "screen",
-        }}
-      />
+      {recipe.visuals.orbit && (
+        <motion.div
+          className="absolute inset-[8%]"
+          data-overlay-layer="orbit"
+          animate={animated
+            ? {
+                rotate: [0, 360],
+                opacity: [0.18 + stagePower * 0.08, 0.28 + stagePower * 0.12, 0.18 + stagePower * 0.08],
+                scale: [0.97, 1.01 + stagePower * 0.03, 0.97],
+              }
+            : undefined}
+          transition={animated
+            ? {
+                duration: variant === "evolution" ? 17 : 20,
+                repeat: Infinity,
+                ease: "linear",
+              }
+            : undefined}
+          style={{
+            background: recipe.gradients.orbit,
+            borderRadius: "999px",
+            filter: "blur(8px)",
+            mixBlendMode: "screen",
+          }}
+        />
+      )}
 
-      <motion.div
-        className="absolute"
-        animate={animated ? {
-          rotate: [0, variant === "evolution" ? -360 : -240],
-          scale: [0.98, 1.03, 0.98],
-        } : undefined}
-        transition={animated ? {
-          duration: variant === "evolution" ? 22 : 26,
-          repeat: Infinity,
-          ease: "linear",
-        } : undefined}
-        style={{
-          inset: centralInset,
-          borderRadius: "42% 58% 52% 48% / 46% 42% 58% 54%",
-          background: `radial-gradient(circle at 50% 50%, ${hexToRgba(theme.secondary, 0.1 + stagePower * 0.08)} 0%, ${hexToRgba(theme.primary, 0.18 + stagePower * 0.12)} 34%, transparent 76%)`,
-          filter: variant === "evolution" ? "blur(18px)" : "blur(12px)",
-          mixBlendMode: "screen",
-        }}
-      />
+      {recipe.visuals.core && (
+        <motion.div
+          className="absolute"
+          data-overlay-layer="core"
+          animate={animated
+            ? {
+                rotate: [0, variant === "evolution" ? -360 : -240],
+                scale: [0.98, 1.03, 0.98],
+              }
+            : undefined}
+          transition={animated
+            ? {
+                duration: variant === "evolution" ? 22 : 26,
+                repeat: Infinity,
+                ease: "linear",
+              }
+            : undefined}
+          style={{
+            inset: recipe.safeFrameInset,
+            borderRadius: "42% 58% 52% 48% / 46% 42% 58% 54%",
+            background: recipe.gradients.core,
+            filter: variant === "evolution" ? "blur(18px)" : "blur(12px)",
+            mixBlendMode: "screen",
+          }}
+        />
+      )}
 
-      {showGuardianCrown && (
+      {recipe.visuals.edgeGlow && (
+        <motion.div
+          className="absolute inset-[12%] rounded-[30%]"
+          data-overlay-layer="edge-glow"
+          animate={animated
+            ? {
+                opacity: [0.12, 0.28 + stagePower * 0.08, 0.12],
+                scale: [0.98, 1.02, 0.98],
+              }
+            : undefined}
+          transition={animated
+            ? {
+                duration: 6.4,
+                repeat: Infinity,
+                ease: "easeInOut",
+              }
+            : undefined}
+          style={{
+            background: recipe.gradients.edgeGlow,
+            filter: plane === "foreground" ? "blur(6px)" : "blur(10px)",
+            mixBlendMode: "screen",
+          }}
+        />
+      )}
+
+      {recipe.visuals.crown && (
         <motion.div
           className="absolute inset-[14%] rounded-full"
-          animate={animated ? {
-            rotate: [0, 360],
-            opacity: [0.1 + stagePower * 0.06, 0.24 + stagePower * 0.1, 0.1 + stagePower * 0.06],
-          } : undefined}
-          transition={animated ? {
-            duration: 28,
-            repeat: Infinity,
-            ease: "linear",
-          } : undefined}
+          data-overlay-layer="crown"
+          animate={animated
+            ? {
+                rotate: [0, 360],
+                opacity: [0.1 + stagePower * 0.06, 0.24 + stagePower * 0.1, 0.1 + stagePower * 0.06],
+              }
+            : undefined}
+          transition={animated
+            ? {
+                duration: 28,
+                repeat: Infinity,
+                ease: "linear",
+              }
+            : undefined}
           style={{
-            background: theme.crownGradient,
+            background: recipe.gradients.crown,
             filter: "blur(4px)",
           }}
         />
       )}
 
-      {showMythicGeometry && (
+      {recipe.visuals.geometry && (
         <>
           <motion.div
             className="absolute inset-[20%]"
-            animate={animated ? {
-              rotate: [0, 180],
-              opacity: [0.08, 0.18, 0.08],
-              scale: [0.94, 1, 0.94],
-            } : undefined}
-            transition={animated ? {
-              duration: 18,
-              repeat: Infinity,
-              ease: "linear",
-            } : undefined}
+            data-overlay-layer="geometry-outer"
+            animate={animated
+              ? {
+                  rotate: [0, 180],
+                  opacity: [0.08, 0.18, 0.08],
+                  scale: [0.94, 1, 0.94],
+                }
+              : undefined}
+            transition={animated
+              ? {
+                  duration: 18,
+                  repeat: Infinity,
+                  ease: "linear",
+                }
+              : undefined}
             style={{
-              background: `linear-gradient(135deg, transparent 16%, ${hexToRgba(theme.accent, 0.22)} 50%, transparent 84%)`,
+              background: `linear-gradient(135deg, transparent 16%, ${recipe.colors.accent}33 50%, transparent 84%)`,
               clipPath: "polygon(50% 0%, 86% 20%, 100% 50%, 86% 80%, 50% 100%, 14% 80%, 0% 50%, 14% 20%)",
               filter: "blur(1px)",
             }}
           />
           <motion.div
             className="absolute inset-[24%]"
-            animate={animated ? {
-              rotate: [180, 0],
-              opacity: [0.06, 0.14, 0.06],
-            } : undefined}
-            transition={animated ? {
-              duration: 24,
-              repeat: Infinity,
-              ease: "linear",
-            } : undefined}
+            data-overlay-layer="geometry-inner"
+            animate={animated
+              ? {
+                  rotate: [180, 0],
+                  opacity: [0.06, 0.14, 0.06],
+                }
+              : undefined}
+            transition={animated
+              ? {
+                  duration: 24,
+                  repeat: Infinity,
+                  ease: "linear",
+                }
+              : undefined}
             style={{
-              background: `linear-gradient(45deg, transparent 12%, ${hexToRgba(theme.primary, 0.18)} 50%, transparent 88%)`,
+              background: `linear-gradient(45deg, transparent 12%, ${recipe.colors.primary}2e 50%, transparent 88%)`,
               clipPath: "polygon(50% 4%, 94% 50%, 50% 96%, 6% 50%)",
             }}
           />
         </>
       )}
 
-      {showAscendedConstellation && (
+      {recipe.visuals.constellation && (
         <>
           {CONSTELLATION_LINES.map((line) => (
             <motion.span
-              key={`${line.left}-${line.top}-${line.width}`}
+              key={`${plane}-${line.left}-${line.top}-${line.width}`}
               className="absolute h-px"
-              animate={animated ? {
-                opacity: [0.05, 0.16, 0.05],
-              } : undefined}
-              transition={animated ? {
-                duration: 6.8,
-                repeat: Infinity,
-                ease: "easeInOut",
-              } : undefined}
+              data-overlay-layer="constellation-line"
+              animate={animated ? { opacity: [0.05, 0.16, 0.05] } : undefined}
+              transition={animated
+                ? {
+                    duration: 6.8,
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                  }
+                : undefined}
               style={{
                 left: line.left,
                 top: line.top,
                 width: line.width,
                 transform: `rotate(${line.rotate})`,
                 transformOrigin: "left center",
-                background: `linear-gradient(90deg, transparent 0%, ${hexToRgba(theme.accent, 0.28)} 50%, transparent 100%)`,
+                background: `linear-gradient(90deg, transparent 0%, ${recipe.colors.accent}47 50%, transparent 100%)`,
               }}
             />
           ))}
           {CONSTELLATION_POINTS.map((point, index) => (
             <motion.span
-              key={`${point.left}-${point.top}`}
+              key={`${plane}-${point.left}-${point.top}`}
               className="absolute rounded-full"
-              animate={animated ? {
-                opacity: [0.12, 0.42, 0.12],
-                scale: [0.7, index % 2 === 0 ? 1.18 : 1.02, 0.7],
-              } : undefined}
-              transition={animated ? {
-                duration: 4.4 + index * 0.3,
-                repeat: Infinity,
-                ease: "easeInOut",
-              } : undefined}
+              data-overlay-layer="constellation-point"
+              animate={animated
+                ? {
+                    opacity: [0.12, 0.42, 0.12],
+                    scale: [0.7, index % 2 === 0 ? 1.18 : 1.02, 0.7],
+                  }
+                : undefined}
+              transition={animated
+                ? {
+                    duration: 4.4 + index * 0.3,
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                  }
+                : undefined}
               style={{
                 left: point.left,
                 top: point.top,
                 width: 4,
                 height: 4,
-                background: theme.accent,
-                boxShadow: `0 0 14px ${theme.accent}`,
+                background: recipe.colors.accent,
+                boxShadow: `0 0 14px ${recipe.colors.accent}`,
               }}
             />
           ))}
         </>
       )}
 
-      {showEggTreatment && (
+      {recipe.visuals.eggAura && (
         <>
           <motion.div
             className="absolute inset-[18%] rounded-full"
-            animate={animated ? {
-              opacity: [0.16, 0.34, 0.16],
-              scale: [0.96, 1.04, 0.96],
-            } : undefined}
+            data-overlay-layer="egg-aura"
+            animate={animated
+              ? {
+                  opacity: [0.16, 0.34, 0.16],
+                  scale: [0.96, 1.04, 0.96],
+                }
+              : undefined}
             transition={animated ? { duration: 4.8, repeat: Infinity, ease: "easeInOut" } : undefined}
             style={{
-              background: `radial-gradient(circle at 50% 48%, ${hexToRgba(theme.primary, 0.22)} 0%, ${hexToRgba(theme.accent, 0.12)} 44%, transparent 74%)`,
+              background: `radial-gradient(circle at 50% 48%, ${recipe.colors.primary}38 0%, ${recipe.colors.accent}1f 44%, transparent 74%)`,
               filter: "blur(8px)",
             }}
           />
           <motion.div
             className="absolute inset-[26%] rounded-full"
-            animate={animated ? {
-              rotate: [0, 360],
-              opacity: [0.08, 0.18, 0.08],
-            } : undefined}
+            data-overlay-layer="egg-orbit"
+            animate={animated
+              ? {
+                  rotate: [0, 360],
+                  opacity: [0.08, 0.18, 0.08],
+                }
+              : undefined}
             transition={animated ? { duration: 16, repeat: Infinity, ease: "linear" } : undefined}
             style={{
-              background: `conic-gradient(from 0deg, transparent 0deg, ${hexToRgba(theme.accent, 0.16)} 88deg, transparent 180deg, ${hexToRgba(theme.primary, 0.12)} 272deg, transparent 360deg)`,
+              background: `conic-gradient(from 0deg, transparent 0deg, ${recipe.colors.accent}29 88deg, transparent 180deg, ${recipe.colors.primary}1f 272deg, transparent 360deg)`,
               filter: "blur(5px)",
             }}
           />
         </>
       )}
 
-      {animated && particlePositions.map((position, index) => (
+      {animated && recipe.visuals.particles && particlePositions.map((position, index) => (
         <motion.span
-          key={`${variant}-${position.left}-${position.top}`}
+          key={`${plane}-${variant}-${position.left}-${position.top}`}
           className="absolute"
+          data-overlay-layer="particle"
           style={{
             left: position.left,
             top: position.top,
-            ...getParticleStyle(theme, index, variant),
+            ...getParticleStyle(
+              recipe.particleStyle,
+              index,
+              variant,
+              recipe.colors.primary,
+              recipe.colors.accent,
+            ),
           }}
-          animate={getParticleAnimation(theme, index)}
+          animate={getParticleAnimation(recipe.particleStyle, index)}
           transition={{
             duration: 3.6 + index * 0.28,
             repeat: Infinity,
@@ -601,46 +569,59 @@ const FallbackMotionScene = memo(({
       ))}
 
       <AnimatePresence>
-        {event && eventBurst && (
+        {event && hasEventBurst && (
           <motion.div
-            key={event.id}
+            key={`${plane}-${event.id}`}
             className="absolute inset-0"
+            data-overlay-layer="event-burst"
             initial={{ opacity: 0.96 }}
             animate={{ opacity: 0 }}
             exit={{ opacity: 0 }}
             transition={{ duration: Math.max(0.55, event.durationMs / 1000), ease: "easeOut" }}
           >
-            <motion.div
-              className="absolute rounded-full"
-              initial={{ opacity: 0.48, scale: 0.82 }}
-              animate={{ opacity: 0, scale: variant === "evolution" ? 1.28 : 1.18 }}
-              transition={{ duration: Math.max(0.55, event.durationMs / 1000), ease: "easeOut" }}
-              style={{
-                inset: eventBurst.ringInset,
-                border: `1px solid ${hexToRgba(theme.secondary, 0.46)}`,
-                boxShadow: `0 0 42px ${hexToRgba(theme.primary, 0.26)}`,
-                background: theme.beamGradient,
-              }}
-            />
-            <motion.div
-              className="absolute rounded-full"
-              initial={{ opacity: 0.32, scale: 0.88 }}
-              animate={{ opacity: 0, scale: variant === "evolution" ? 1.18 : 1.12 }}
-              transition={{ duration: Math.max(0.45, event.durationMs / 1200), ease: "easeOut", delay: 0.04 }}
-              style={{
-                inset: eventBurst.secondaryInset,
-                border: `1px solid ${hexToRgba(theme.accent, 0.34)}`,
-              }}
-            />
+            {recipe.eventBurst.visuals.ring && (
+              <motion.div
+                className="absolute rounded-full"
+                data-overlay-layer="event-ring"
+                initial={{ opacity: 0.48, scale: 0.82 }}
+                animate={{ opacity: 0, scale: variant === "evolution" ? 1.28 : 1.18 }}
+                transition={{ duration: Math.max(0.55, event.durationMs / 1000), ease: "easeOut" }}
+                style={{
+                  inset: recipe.eventBurst.ringInset,
+                  border: `1px solid ${recipe.colors.secondary}75`,
+                  boxShadow: `0 0 42px ${recipe.colors.primary}42`,
+                  background: recipe.gradients.beam,
+                }}
+              />
+            )}
 
-            {eventBurst.rays && (
+            {recipe.eventBurst.visuals.secondaryRing && (
+              <motion.div
+                className="absolute rounded-full"
+                data-overlay-layer="event-secondary-ring"
+                initial={{ opacity: 0.32, scale: 0.88 }}
+                animate={{ opacity: 0, scale: variant === "evolution" ? 1.18 : 1.12 }}
+                transition={{
+                  duration: Math.max(0.45, event.durationMs / 1200),
+                  ease: "easeOut",
+                  delay: 0.04,
+                }}
+                style={{
+                  inset: recipe.eventBurst.secondaryInset,
+                  border: `1px solid ${recipe.colors.accent}57`,
+                }}
+              />
+            )}
+
+            {recipe.eventBurst.rays && (
               <motion.div
                 className="absolute inset-[6%] rounded-full"
+                data-overlay-layer="event-rays"
                 initial={{ opacity: 0.24, scale: 0.9 }}
                 animate={{ opacity: 0, scale: 1.18 }}
                 transition={{ duration: Math.max(0.6, event.durationMs / 1000), ease: "easeOut" }}
                 style={{
-                  background: `repeating-conic-gradient(from 0deg, transparent 0deg 18deg, ${hexToRgba(theme.accent, 0.24 * eventStrength)} 18deg 24deg, transparent 24deg 42deg)`,
+                  background: `repeating-conic-gradient(from 0deg, transparent 0deg 18deg, ${recipe.colors.accent}${Math.round(61 * eventStrength).toString(16).padStart(2, "0")} 18deg 24deg, transparent 24deg 42deg)`,
                   filter: "blur(4px)",
                   maskImage: "radial-gradient(circle at center, transparent 0%, black 42%, transparent 76%)",
                   WebkitMaskImage: "radial-gradient(circle at center, transparent 0%, black 42%, transparent 76%)",
@@ -648,27 +629,29 @@ const FallbackMotionScene = memo(({
               />
             )}
 
-            {eventBurst.swirl && (
+            {recipe.eventBurst.swirl && (
               <motion.div
                 className="absolute inset-[10%] rounded-full"
+                data-overlay-layer="event-swirl"
                 initial={{ opacity: 0.2, rotate: 0 }}
                 animate={{ opacity: 0, rotate: variant === "evolution" ? 180 : 120 }}
                 transition={{ duration: Math.max(0.7, event.durationMs / 1000), ease: "easeOut" }}
                 style={{
-                  background: theme.orbitGradient,
+                  background: recipe.gradients.orbit,
                   filter: "blur(6px)",
                 }}
               />
             )}
 
-            {eventBurst.beam && (
+            {recipe.eventBurst.beam && (
               <motion.div
                 className="absolute inset-[16%]"
+                data-overlay-layer="event-beam"
                 initial={{ opacity: 0.28, scaleY: 0.7 }}
                 animate={{ opacity: 0, scaleY: 1.28 }}
                 transition={{ duration: Math.max(0.6, event.durationMs / 1000), ease: "easeOut" }}
                 style={{
-                  background: `linear-gradient(180deg, transparent 0%, ${hexToRgba(theme.accent, 0.3)} 50%, transparent 100%)`,
+                  background: `linear-gradient(180deg, transparent 0%, ${recipe.colors.accent}4d 50%, transparent 100%)`,
                   filter: "blur(10px)",
                   borderRadius: "999px",
                 }}
@@ -685,6 +668,7 @@ FallbackMotionScene.displayName = "FallbackMotionScene";
 
 export const CompanionMotionLayer = memo(({
   variant,
+  plane = "backdrop",
   stage,
   element,
   event,
@@ -696,10 +680,20 @@ export const CompanionMotionLayer = memo(({
   const { profile, capabilities, signals } = useMotionProfile();
   const sceneId = getSceneId(variant, stage);
   const sceneConfig = getCompanionMotionSceneConfig(sceneId);
-  const elementDefinition = getCompanionElement(element);
+  const resolvedRecipe = useMemo(
+    () =>
+      resolveCompanionElementOverlayRecipe({
+        elementId: element,
+        plane,
+        variant,
+        stage,
+        event,
+        primaryColor,
+        secondaryColor,
+      }),
+    [element, event, plane, primaryColor, secondaryColor, stage, variant],
+  );
 
-  const resolvedPrimaryColor = primaryColor ?? elementDefinition.anchorColor;
-  const resolvedSecondaryColor = secondaryColor ?? elementDefinition.accentColor;
   const particleCount = useMemo(() => {
     const budgetScale = variant === "evolution" ? 0.4 : 0.24;
     const count = Math.max(2, Math.round(capabilities.maxParticles * budgetScale));
@@ -709,12 +703,13 @@ export const CompanionMotionLayer = memo(({
   const fallback = (
     <FallbackMotionScene
       variant={variant}
+      plane={plane}
       stage={stage}
       element={element}
       event={event}
       className={className}
-      primaryColor={resolvedPrimaryColor}
-      secondaryColor={resolvedSecondaryColor}
+      primaryColor={resolvedRecipe.colors.primary}
+      secondaryColor={resolvedRecipe.colors.secondary}
       particleCount={profile === "reduced" ? 0 : particleCount}
       animated={profile !== "reduced"}
     />
@@ -724,7 +719,8 @@ export const CompanionMotionLayer = memo(({
     && !signals.prefersReducedMotion
     && profile !== "reduced"
     && shouldAttemptRiveScene(sceneId)
-    && Boolean(sceneConfig.src);
+    && Boolean(sceneConfig.src)
+    && plane === "backdrop";
 
   if (!shouldUseRive) {
     return fallback;

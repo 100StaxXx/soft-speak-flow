@@ -19,7 +19,7 @@ import { EvolveButton } from "@/components/companion/EvolveButton";
 import { EvolutionPathBadge } from "@/components/companion/EvolutionPathBadge";
 import { DormancyWarning, DormantOverlay } from "@/components/companion/DormancyWarning";
 import { CompanionDialogue } from "@/components/companion/CompanionDialogue";
-import { CompanionMotionLayer } from "@/components/companion/motion/CompanionMotionLayer";
+import { CompanionMotionSurface } from "@/components/companion/motion/CompanionMotionSurface";
 import { WakeUpCelebration } from "@/components/companion/WakeUpCelebration";
 import { CompanionAttributes } from "@/components/CompanionAttributes";
 import { CompanionPersonalization } from "@/components/CompanionPersonalization";
@@ -550,15 +550,77 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
               {/* Twinkling star particles around companion */}
               <div className={`absolute inset-0 rounded-2xl ${!prefersReducedMotion ? 'star-shimmer' : ''}`} aria-hidden="true" />
               <div className={`absolute inset-0 bg-gradient-to-br from-nebula-pink/30 to-celestial-blue/30 rounded-2xl blur-xl ${!prefersReducedMotion ? 'animate-pulse' : ''}`} aria-hidden="true" />
-              <CompanionMotionLayer
+              <CompanionMotionSurface
                 variant="companion"
                 stage={companion.current_stage}
                 element={companion.core_element}
                 event={companionMotionEvent}
-                className="absolute inset-0 z-10 rounded-2xl"
                 primaryColor={companionPalette.accentText}
                 secondaryColor={companionPalette.badgeText}
-              />
+                className={cn("rounded-2xl", imageSizeClass)}
+                contentClassName="flex items-center justify-center"
+              >
+                <>
+                  {!imageLoaded && !imageError && (
+                    <div
+                      className="relative h-full w-full rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 animate-pulse flex items-center justify-center"
+                      role="status"
+                      aria-live="polite"
+                      aria-label="Loading companion image"
+                    >
+                      <Sparkles className="h-12 w-12 text-primary/50 animate-spin" aria-hidden="true" />
+                      <span className="sr-only">Loading companion image</span>
+                    </div>
+                  )}
+                  {imageError && (
+                    <div
+                      className="relative h-full w-full rounded-2xl bg-gradient-to-br from-destructive/20 to-destructive/10 flex items-center justify-center border-2 border-destructive/30"
+                      role="alert"
+                      aria-live="assertive"
+                    >
+                      <div className="text-center p-4">
+                        <p className="text-sm text-muted-foreground mb-2" id="image-error-message">Image unavailable</p>
+                        <button
+                          onClick={() => {
+                            setImageError(false);
+                            setImageLoaded(false);
+                            setImageKey(prev => prev + 1); // Force image reload with new key
+                          }}
+                          className="text-xs text-primary hover:underline focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded px-2 py-1"
+                          aria-label="Retry loading companion image"
+                          aria-describedby="image-error-message"
+                        >
+                          Try again
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  <img
+                    key={imageKey}
+                    src={effectiveImageUrl}
+                    alt={`${tierName} companion at level ${companion.current_stage}`}
+                    className={cn(
+                      "relative h-full w-full object-cover rounded-2xl shadow-2xl ring-4 transition-all duration-500 group-hover:scale-105",
+                      imageLoaded ? "opacity-100" : "opacity-0 absolute",
+                      health.isNeglected ? "ring-destructive/50" : "ring-primary/30",
+                      isRegenerating && "animate-pulse",
+                      animationClass,
+                    )}
+                    style={{ ...skinStyles, ...careStyles, ...equippedCosmeticStyles }}
+                    onLoad={() => {
+                      setImageLoaded(true);
+                      setImageError(false);
+                    }}
+                    onError={() => {
+                      setImageError(true);
+                      setImageLoaded(false);
+                    }}
+                    loading="lazy"
+                    decoding="async"
+                    draggable={false}
+                  />
+                </>
+              </CompanionMotionSurface>
               {isRegenerating && (
                 <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-2xl bg-background/50 backdrop-blur-sm" role="status" aria-live="polite" aria-label="Refreshing companion look">
                   <div className="rounded-full border border-primary/35 bg-card/80 px-4 py-2 text-xs font-medium text-foreground shadow-lg">
@@ -569,56 +631,6 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
                   </div>
                 </div>
               )}
-              {!imageLoaded && !imageError && (
-                <div className={cn("relative rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 animate-pulse flex items-center justify-center", imageSizeClass)} role="status" aria-live="polite" aria-label="Loading companion image">
-                  <Sparkles className="h-12 w-12 text-primary/50 animate-spin" aria-hidden="true" />
-                  <span className="sr-only">Loading companion image</span>
-                </div>
-              )}
-              {imageError && (
-                <div className={cn("relative rounded-2xl bg-gradient-to-br from-destructive/20 to-destructive/10 flex items-center justify-center border-2 border-destructive/30", imageSizeClass)} role="alert" aria-live="assertive">
-                  <div className="text-center p-4">
-                    <p className="text-sm text-muted-foreground mb-2" id="image-error-message">Image unavailable</p>
-                    <button 
-                      onClick={() => {
-                        setImageError(false);
-                        setImageLoaded(false);
-                        setImageKey(prev => prev + 1); // Force image reload with new key
-                      }}
-                      className="text-xs text-primary hover:underline focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded px-2 py-1"
-                      aria-label="Retry loading companion image"
-                      aria-describedby="image-error-message"
-                    >
-                      Try again
-                    </button>
-                  </div>
-                </div>
-              )}
-              <img
-                key={imageKey}
-                src={effectiveImageUrl}
-                alt={`${tierName} companion at level ${companion.current_stage}`}
-                className={cn(
-                  "relative object-cover rounded-2xl shadow-2xl ring-4 transition-all duration-500 group-hover:scale-105",
-                  imageSizeClass,
-                  imageLoaded ? "opacity-100" : "opacity-0 absolute",
-                  health.isNeglected ? "ring-destructive/50" : "ring-primary/30",
-                  isRegenerating && "animate-pulse",
-                  animationClass,
-                )}
-                style={{ ...skinStyles, ...careStyles, ...equippedCosmeticStyles }}
-                onLoad={() => {
-                  setImageLoaded(true);
-                  setImageError(false);
-                }}
-                onError={() => {
-                  setImageError(true);
-                  setImageLoaded(false);
-                }}
-                loading="lazy"
-                decoding="async"
-                draggable={false}
-              />
               {/* Dormancy warning component */}
               <DormancyWarning 
                 show={hasDormancyWarning && !isDormant}

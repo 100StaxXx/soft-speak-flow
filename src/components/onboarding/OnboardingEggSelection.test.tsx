@@ -15,19 +15,17 @@ describe("OnboardingEggSelection", () => {
     mocks.reducedMotion = false;
   });
 
-  it("keeps continue disabled until a selection is made and removes the top onboarding chrome", () => {
+  it("renders a live chamber heading and labels while keeping continue disabled until a selection is made", () => {
     render(<OnboardingEggSelection onComplete={vi.fn()} storyTone="epic_adventure" />);
 
-    expect(screen.queryByText(/Final Choice/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Choose Your Egg/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Story Tone:/i)).not.toBeInTheDocument();
-    expect(screen.queryByText("Ember")).not.toBeInTheDocument();
-    expect(screen.queryByText("Frost")).not.toBeInTheDocument();
-    expect(screen.queryByText("Terra")).not.toBeInTheDocument();
-    expect(screen.queryByText("Void")).not.toBeInTheDocument();
-    expect(screen.queryByText("Storm")).not.toBeInTheDocument();
-    expect(screen.queryByText("Light")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Dark & Intense/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Choose Your Element/i })).toBeInTheDocument();
+    expect(screen.getByTestId("pedestal-label-fire")).toHaveTextContent("Ember");
+    expect(screen.getByTestId("pedestal-label-ice")).toHaveTextContent("Frost");
+    expect(screen.getByTestId("pedestal-label-nature")).toHaveTextContent("Terra");
+    expect(screen.getByTestId("pedestal-label-void")).toHaveTextContent("Void");
+    expect(screen.getByTestId("pedestal-label-storm")).toHaveTextContent("Storm");
+    expect(screen.getByTestId("pedestal-label-light")).toHaveTextContent("Light");
+    expect(screen.getByTestId("element-chip-storm")).toHaveTextContent("Storm");
     expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
   });
 
@@ -45,17 +43,18 @@ describe("OnboardingEggSelection", () => {
     expect(screen.queryByRole("button", { name: "Back" })).not.toBeInTheDocument();
   });
 
-  it("uses the tuned light egg slot variables", () => {
+  it("uses the rebuilt light egg slot variables for pedestal and plaque placement", () => {
     render(<OnboardingEggSelection onComplete={vi.fn()} storyTone="epic_adventure" />);
 
     const lightSlot = screen.getByTestId("egg-slot-light");
 
-    expect(lightSlot.style.getPropertyValue("--egg-slot-y")).toBe("54.2%");
-    expect(lightSlot.style.getPropertyValue("--egg-width")).toBe("61%");
-    expect(lightSlot.style.getPropertyValue("--egg-bottom")).toBe("20.2%");
+    expect(lightSlot.style.getPropertyValue("--egg-slot-y")).toBe("57.2%");
+    expect(lightSlot.style.getPropertyValue("--egg-width")).toBe("59%");
+    expect(lightSlot.style.getPropertyValue("--pedestal-bottom")).toBe("11%");
+    expect(lightSlot.style.getPropertyValue("--plaque-width")).toBe("64%");
   });
 
-  it("marks only the selected egg and submits the provided story tone unchanged", () => {
+  it("marks only the selected egg, mirrors the chip state, and submits the provided story tone unchanged", () => {
     const onComplete = vi.fn();
 
     render(<OnboardingEggSelection onComplete={onComplete} storyTone="dark_intense" />);
@@ -65,6 +64,8 @@ describe("OnboardingEggSelection", () => {
     expect(screen.getByTestId("egg-slot-ice")).toHaveAttribute("data-selected", "true");
     expect(screen.getByTestId("egg-slot-fire")).toHaveAttribute("data-selected", "false");
     expect(screen.getByTestId("egg-slot-nature")).toHaveAttribute("data-selected", "false");
+    expect(screen.getByTestId("element-chip-ice")).toHaveAttribute("data-selected", "true");
+    expect(screen.getByTestId("element-chip-fire")).toHaveAttribute("data-selected", "false");
 
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
