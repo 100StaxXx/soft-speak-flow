@@ -59,6 +59,21 @@
   }
 }
 
+.onboarding-egg-selection__layout {
+  padding-left: max(4px, env(safe-area-inset-left, 0px));
+  padding-right: max(4px, env(safe-area-inset-right, 0px));
+  padding-top: 0.25rem;
+  padding-bottom: 0.5rem;
+}
+
+.onboarding-egg-chamber {
+  width: min(
+    42rem,
+    calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 0.5rem),
+    calc((100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 0.75rem) * 2 / 3)
+  );
+}
+
 .onboarding-egg-chamber__scene {
   position: relative;
   width: 100%;
@@ -264,8 +279,13 @@
 }
 
 @media (max-width: 640px) {
+  .onboarding-egg-selection__layout {
+    padding-top: 0.125rem;
+    padding-bottom: 0.25rem;
+  }
+
   .onboarding-egg-chamber__scene {
-    border-radius: 26px;
+    border-radius: 24px;
   }
 
   .onboarding-egg-chamber__back {

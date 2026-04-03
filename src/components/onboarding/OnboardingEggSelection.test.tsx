@@ -45,6 +45,16 @@ describe("OnboardingEggSelection", () => {
     expect(screen.queryByRole("button", { name: "Back" })).not.toBeInTheDocument();
   });
 
+  it("uses the tuned light egg slot variables", () => {
+    render(<OnboardingEggSelection onComplete={vi.fn()} storyTone="epic_adventure" />);
+
+    const lightSlot = screen.getByTestId("egg-slot-light");
+
+    expect(lightSlot.style.getPropertyValue("--egg-slot-y")).toBe("54.2%");
+    expect(lightSlot.style.getPropertyValue("--egg-width")).toBe("61%");
+    expect(lightSlot.style.getPropertyValue("--egg-bottom")).toBe("20.2%");
+  });
+
   it("marks only the selected egg and submits the provided story tone unchanged", () => {
     const onComplete = vi.fn();
 

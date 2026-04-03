@@ -111,11 +111,11 @@ const CHAMBER_SLOTS: Record<CompanionElementId, ChamberSlotConfig> = {
   },
   light: {
     centerX: "81.2%",
-    centerY: "55.0%",
+    centerY: "54.2%",
     width: "28.5%",
     height: "31%",
-    eggWidth: "65%",
-    eggBottom: "19.2%",
+    eggWidth: "61%",
+    eggBottom: "20.2%",
     bounceDelay: "-0.5s",
     bounceDuration: "3.5s",
     eggSrc: `${CHAMBER_ASSET_BASE}/light_eggclear.png`,
@@ -152,10 +152,10 @@ export const OnboardingEggSelection = ({
   }
 
   return (
-    <div className="relative z-10 min-h-screen px-4 pt-safe-top pb-safe-bottom">
-      <div className="mx-auto flex min-h-screen max-w-[46rem] items-center justify-center py-4 sm:py-6">
+    <div className="relative z-10 min-h-screen pt-safe-top pb-safe-bottom">
+      <div className="onboarding-egg-selection__layout mx-auto flex min-h-screen w-full max-w-[46rem] items-center justify-center">
         <div
-          className="onboarding-egg-chamber w-full max-w-[42rem]"
+          className="onboarding-egg-chamber"
           data-reduced-motion={prefersReducedMotion ? "true" : "false"}
           data-selected-element={selectedElement ?? ""}
           data-testid="onboarding-egg-chamber"
