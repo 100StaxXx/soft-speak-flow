@@ -21,6 +21,7 @@ export interface Profile {
   current_habit_streak: number | null;
   longest_habit_streak: number | null;
   onboarding_completed: boolean | null;
+  onboarding_step: string | null;
   onboarding_data: Record<string, unknown> | null;
   // Astrology fields
   zodiac_sign: string | null;
@@ -70,6 +71,7 @@ export const useProfile = () => {
           current_habit_streak,
           longest_habit_streak,
           onboarding_completed,
+          onboarding_step,
           onboarding_data,
           zodiac_sign,
           birthdate,
@@ -123,6 +125,7 @@ export const useProfile = () => {
             current_habit_streak,
             longest_habit_streak,
             onboarding_completed,
+            onboarding_step,
             onboarding_data,
             zodiac_sign,
             birthdate,

@@ -32,13 +32,13 @@ const buildProfileBootstrapPayload = (
 
 type AuthRedirectProfile = Pick<
   Database["public"]["Tables"]["profiles"]["Row"],
-  "selected_mentor_id" | "onboarding_completed" | "onboarding_data"
+  "selected_mentor_id" | "onboarding_completed" | "onboarding_step" | "onboarding_data"
 >;
 
 const fetchAuthRedirectProfile = (userId: string) =>
   supabase
     .from("profiles")
-    .select("selected_mentor_id, onboarding_completed, onboarding_data")
+    .select("selected_mentor_id, onboarding_completed, onboarding_step, onboarding_data")
     .eq("id", userId)
     .maybeSingle();
 
@@ -221,6 +221,7 @@ const resolveAuthRedirectPath = async (userId: string): Promise<string> => {
     logger.debug("[getAuthRedirectPath] Profile fetched", {
       hasProfile: !!profile,
       onboardingCompleted: profile?.onboarding_completed,
+      onboardingStep: profile?.onboarding_step,
       walkthroughCompleted,
       hasCompanion,
       hasPresetCompanion,

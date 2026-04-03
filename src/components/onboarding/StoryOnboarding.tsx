@@ -204,8 +204,16 @@ const DISPLAY_NAME_INITIAL_DELAY_MS = 2_000;
 const DISPLAY_NAME_DEADLINE_MS = 20_000;
 const DISPLAY_NAME_INTERVAL_MS = 1_000;
 const onboardingLog = logger.scope("StoryOnboarding");
+const JOURNEY_FINALIZATION_FAILURE_TOAST =
+  "Your egg was created, but we couldn't finish setup. Please try again.";
 
 type StoryOnboardingMode = "standard" | "migration" | "reset";
+
+export interface StoryOnboardingResumeState {
+  stage: "journey-begins";
+  userName?: string | null;
+  companionLabel?: string | null;
+}
 
 interface StoryOnboardingProps {
   mode?: StoryOnboardingMode;
@@ -215,6 +223,7 @@ interface StoryOnboardingProps {
     current_xp: number;
     preset_id?: string | null;
   } | null;
+  resumeState?: StoryOnboardingResumeState | null;
   onJourneyCinematicStart?: () => void;
   onJourneyCinematicComplete?: () => void;
 }
@@ -222,6 +231,7 @@ interface StoryOnboardingProps {
 export const StoryOnboarding = ({
   mode = "standard",
   existingCompanion = null,
+  resumeState = null,
   onJourneyCinematicStart,
   onJourneyCinematicComplete,
 }: StoryOnboardingProps) => {
@@ -232,11 +242,18 @@ export const StoryOnboarding = ({
   const isMigrationMode = mode === "migration";
   const isResetMode = mode === "reset";
   const startsAtCompanion = isMigrationMode || isResetMode;
+  const resumesAtJourneyBegins = resumeState?.stage === "journey-begins";
 
   const [stage, setStage] = useState<OnboardingStage>(
-    isMigrationMode ? "companion" : isResetMode ? "story-tone" : "prologue",
+    resumesAtJourneyBegins
+      ? "journey-begins"
+      : isMigrationMode
+        ? "companion"
+        : isResetMode
+          ? "story-tone"
+          : "prologue",
   );
-  const [userName, setUserName] = useState("");
+  const [userName, setUserName] = useState(resumeState?.userName ?? "");
 
   // Auto scroll to top when stage changes
   useEffect(() => {
@@ -248,12 +265,13 @@ export const StoryOnboarding = ({
   const [mentors, setMentors] = useState<Mentor[]>([]);
   const [recommendedMentor, setRecommendedMentor] = useState<Mentor | null>(null);
   const [mentorExplanation, setMentorExplanation] = useState<MentorExplanation | null>(null);
-  const [companionAnimal, setCompanionAnimal] = useState("");
+  const [companionAnimal, setCompanionAnimal] = useState(resumeState?.companionLabel ?? "");
   const [selectedStoryTone, setSelectedStoryTone] = useState<CompanionStoryTone>("epic_adventure");
   const [isCreatingCompanion, setIsCreatingCompanion] = useState(false);
   const [isSubmittingQuestionnaire, setIsSubmittingQuestionnaire] = useState(false);
   const [compatibilityScore, setCompatibilityScore] = useState<number | null>(null);
   const mentorRevealTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const journeyCinematicStartedRef = useRef(false);
   const backdropStage = resolveOnboardingBackdropStage(stage);
 
   const clearMentorRevealTimeout = useCallback(() => {
@@ -268,6 +286,52 @@ export const StoryOnboarding = ({
       clearMentorRevealTimeout();
     };
   }, [clearMentorRevealTimeout]);
+
+  useEffect(() => {
+    if (!resumesAtJourneyBegins) return;
+
+    setStage("journey-begins");
+    setUserName(resumeState?.userName ?? "");
+    setCompanionAnimal(resumeState?.companionLabel ?? "");
+  }, [resumeState?.companionLabel, resumeState?.userName, resumesAtJourneyBegins]);
+
+  useEffect(() => {
+    if (isResetMode || stage !== "journey-begins" || journeyCinematicStartedRef.current) return;
+
+    journeyCinematicStartedRef.current = true;
+    onJourneyCinematicStart?.();
+  }, [isResetMode, onJourneyCinematicStart, stage]);
+
+  const loadExistingOnboardingData = useCallback(async () => {
+    if (!user) {
+      throw new Error("Not authenticated");
+    }
+
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("onboarding_data")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (profileError) {
+      throw profileError;
+    }
+
+    return (profile?.onboarding_data as Record<string, unknown>) || {};
+  }, [user]);
+
+  const persistOnboardingStep = useCallback(async (nextStep: string) => {
+    if (!user) return;
+
+    const { error } = await supabase
+      .from("profiles")
+      .update({ onboarding_step: nextStep })
+      .eq("id", user.id);
+
+    if (error) {
+      throw error;
+    }
+  }, [user]);
 
   const fetchActiveMentors = useCallback(async (): Promise<Mentor[]> => {
     const { data, error } = await supabase
@@ -624,7 +688,13 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
 
   const handleEggPreludeComplete = useCallback(() => {
     setStage("companion");
-  }, []);
+    void persistOnboardingStep("companion").catch((error: unknown) => {
+      onboardingLog.warn("Failed to persist onboarding companion step", {
+        userId: user?.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
+  }, [persistOnboardingStep, user?.id]);
 
   const handleEggPreludeBack = useCallback(() => {
     setStage("story-tone");
@@ -641,7 +711,6 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
 
     const startedAt = Date.now();
     let onboardingFinalized = false;
-    const finalizationFailureToast = "Your egg was created, but we couldn't finish setup. Please try again.";
     setIsCreatingCompanion(true);
     const eggDisplayName = `${getCompanionElement(preferences.coreElement).label} Egg`;
     const selectionDisplayName = preferences.presetId ? preferences.spiritAnimal : eggDisplayName;
@@ -654,57 +723,39 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
       if (onboardingFinalized) return;
       onboardingFinalized = true;
 
-      // Mark onboarding complete and save story tone
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("onboarding_data")
-        .eq("id", user.id)
-        .maybeSingle();
-
-      if (profileError) {
-        throw profileError;
-      }
-
-      const existingData = (profile?.onboarding_data as Record<string, unknown>) || {};
-      const nowIso = new Date().toISOString();
-      const initialGuidedTutorialProgress = !isResetMode
-        ? createInitialGuidedTutorialProgress(nowIso)
-        : null;
-      const onboardingData: Record<string, unknown> = {
-        ...existingData,
-        walkthrough_completed: true,
-        story_tone: preferences.storyTone,
-        progression_reset_required: false,
-      };
-
-      if (initialGuidedTutorialProgress) {
-        onboardingData.guided_tutorial = initialGuidedTutorialProgress;
-      }
-
+      const existingData = await loadExistingOnboardingData();
+      const { walkthrough_completed: _walkthroughCompleted, guided_tutorial: _guidedTutorial, ...inProgressData } =
+        existingData;
       const { error: completionError } = await supabase
         .from("profiles")
-        .update({
-          onboarding_completed: true,
-          onboarding_data: onboardingData as any,
-        })
+        .update(
+          isResetMode
+            ? {
+                onboarding_completed: true,
+                onboarding_step: "complete",
+                onboarding_data: {
+                  ...existingData,
+                  walkthrough_completed: true,
+                  story_tone: preferences.storyTone,
+                  progression_reset_required: false,
+                } as any,
+              }
+            : {
+                onboarding_step: "journey-begins",
+                onboarding_data: {
+                  ...inProgressData,
+                  story_tone: preferences.storyTone,
+                  progression_reset_required: false,
+                } as any,
+              },
+        )
         .eq("id", user.id);
 
       if (completionError) {
         throw completionError;
       }
 
-      if (initialGuidedTutorialProgress) {
-        safeLocalStorage.setItem(
-          getGuidedTutorialLocalProgressKey(user.id),
-          JSON.stringify(initialGuidedTutorialProgress),
-        );
-      } else {
-        safeLocalStorage.removeItem(getGuidedTutorialLocalProgressKey(user.id));
-      }
-
-      if (!isResetMode) {
-        onJourneyCinematicStart?.();
-      }
+      safeLocalStorage.removeItem(getGuidedTutorialLocalProgressKey(user.id));
 
       // Force immediate refetch to ensure fresh data (invalidateQueries only marks stale)
       await queryClient.refetchQueries({ queryKey: ["profile", user.id] });
@@ -751,7 +802,7 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
 
       setStage("journey-begins");
 
-      logger.info("Companion onboarding finalized", {
+      logger.info("Companion onboarding prepared for journey cinematic", {
         userId: user.id,
         companionId,
         recoveredAfterTimeout,
@@ -822,7 +873,7 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
           elapsedMs: Date.now() - startedAt,
           error: getErrorMessage(error, "Unknown finalization error"),
         });
-        toast.error(finalizationFailureToast);
+        toast.error(JOURNEY_FINALIZATION_FAILURE_TOAST);
         return false;
       }
     };
@@ -1093,10 +1144,52 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
     }
   };
 
-  const handleJourneyComplete = () => {
-    onJourneyCinematicComplete?.();
-    toast.success("Welcome to Cosmiq! Your journey begins.");
-    safeNavigate(navigate, "/journeys");
+  const handleJourneyComplete = async () => {
+    if (!user) return;
+
+    try {
+      const existingData = await loadExistingOnboardingData();
+      const nowIso = new Date().toISOString();
+      const initialGuidedTutorialProgress = createInitialGuidedTutorialProgress(nowIso);
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          onboarding_completed: true,
+          onboarding_step: "complete",
+          onboarding_data: {
+            ...existingData,
+            walkthrough_completed: true,
+            story_tone:
+              typeof existingData.story_tone === "string"
+                ? existingData.story_tone
+                : selectedStoryTone,
+            progression_reset_required: false,
+            guided_tutorial: initialGuidedTutorialProgress,
+          } as any,
+        })
+        .eq("id", user.id);
+
+      if (error) {
+        throw error;
+      }
+
+      safeLocalStorage.setItem(
+        getGuidedTutorialLocalProgressKey(user.id),
+        JSON.stringify(initialGuidedTutorialProgress),
+      );
+      await queryClient.refetchQueries({ queryKey: ["profile", user.id] });
+      await queryClient.refetchQueries({ queryKey: ["companion", user.id] });
+
+      onJourneyCinematicComplete?.();
+      toast.success("Welcome to Cosmiq! Your journey begins.");
+      safeNavigate(navigate, "/journeys");
+    } catch (error) {
+      logger.error("Journey completion finalization failed", {
+        userId: user.id,
+        error: getErrorMessage(error, "Unknown journey completion error"),
+      });
+      toast.error(JOURNEY_FINALIZATION_FAILURE_TOAST);
+    }
   };
 
   return (

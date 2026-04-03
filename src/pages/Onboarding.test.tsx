@@ -147,6 +147,45 @@ describe("Onboarding route guard", () => {
     expect(mocks.navigate).not.toHaveBeenCalled();
   });
 
+  it("keeps stage 0 egg accounts on onboarding and resumes the final cinematic", () => {
+    mocks.profile = {
+      onboarding_completed: true,
+      selected_mentor_id: "mentor-1",
+      onboarding_step: null,
+      onboarding_data: {
+        userName: "Nova",
+      },
+    };
+    mocks.companion = {
+      id: "companion-egg",
+      preset_id: null,
+      current_stage: 0,
+      core_element: "ice",
+      spirit_animal: "Egg",
+      cached_creature_name: null,
+    } as {
+      id: string;
+      preset_id: null;
+      current_stage: number;
+      core_element: string;
+      spirit_animal: string;
+      cached_creature_name: string | null;
+    };
+
+    renderOnboarding();
+
+    expect(screen.getByText("StoryOnboarding")).toBeInTheDocument();
+    expect(mocks.navigate).not.toHaveBeenCalled();
+    expect(mocks.storyOnboardingProps).toMatchObject({
+      resumeState: {
+        stage: "journey-begins",
+        userName: "Nova",
+        companionLabel: "Ice Egg",
+      },
+    });
+    expect(mocks.profilesUpdateMock).not.toHaveBeenCalled();
+  });
+
   it("starts reset mode when progression reset is required", () => {
     mocks.profile = {
       onboarding_completed: true,
@@ -182,6 +221,7 @@ describe("Onboarding route guard", () => {
 
     mocks.profile = {
       onboarding_completed: true,
+      onboarding_step: "complete",
       selected_mentor_id: "mentor-1",
       onboarding_data: {
         walkthrough_completed: true,

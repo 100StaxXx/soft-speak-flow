@@ -26,7 +26,7 @@ describe("getOnboardingGateState", () => {
     });
   });
 
-  it("treats stage 0 egg-only companions as established", () => {
+  it("treats stage 0 egg-only companions without tutorial progress as pending journey-begins recovery", () => {
     expect(
       getOnboardingGateState({
         profile: {
@@ -39,10 +39,33 @@ describe("getOnboardingGateState", () => {
         companionStage: 0,
       }),
     ).toMatchObject({
+      isEstablished: false,
+      needsOnboarding: true,
+      reason: null,
+      resumeStep: "journey-begins",
+      needsCompanionMigration: false,
+      shouldSelfHeal: false,
+    });
+  });
+
+  it("treats a complete onboarding step as established even with a stage 0 egg", () => {
+    expect(
+      getOnboardingGateState({
+        profile: {
+          onboarding_completed: false,
+          onboarding_step: "complete",
+          selected_mentor_id: "mentor-1",
+          onboarding_data: {},
+        },
+        hasCompanion: true,
+        hasPresetCompanion: false,
+        companionStage: 0,
+      }),
+    ).toMatchObject({
       isEstablished: true,
       needsOnboarding: false,
-      reason: "egg_selected",
-      needsCompanionMigration: false,
+      reason: "onboarding_step_complete",
+      resumeStep: null,
       shouldSelfHeal: true,
     });
   });
@@ -212,6 +235,19 @@ describe("isReturningProfile", () => {
       ),
     ).toBe(true);
   });
+
+  it("returns false for a stage 0 egg waiting on journey-begins recovery", () => {
+    expect(
+      isReturningProfile(
+        {
+          onboarding_completed: true,
+          selected_mentor_id: "mentor-1",
+          onboarding_data: {},
+        },
+        { hasCompanion: true, hasPresetCompanion: false, companionStage: 0 },
+      ),
+    ).toBe(false);
+  });
 });
 
 describe("buildEstablishedProfileSelfHealPatch", () => {
@@ -255,6 +291,20 @@ describe("buildEstablishedProfileSelfHealPatch", () => {
           },
         },
         hasCompanion: false,
+      }),
+    ).toBeNull();
+  });
+
+  it("does not self-heal stage 0 egg accounts still waiting on journey-begins", () => {
+    expect(
+      buildEstablishedProfileSelfHealPatch({
+        profile: {
+          onboarding_completed: true,
+          onboarding_data: {},
+        },
+        hasCompanion: true,
+        hasPresetCompanion: false,
+        companionStage: 0,
       }),
     ).toBeNull();
   });

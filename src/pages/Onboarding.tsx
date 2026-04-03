@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/components/ui/sonner";
@@ -13,6 +13,7 @@ import {
   buildEstablishedProfileSelfHealPatch,
   getOnboardingGateState,
 } from "@/utils/profileOnboarding";
+import { getCompanionElement, getCompanionPreset } from "@/config/companionCatalog";
 
 export default function Onboarding() {
   const { user, status, signOut } = useAuth();
@@ -24,6 +25,7 @@ export default function Onboarding() {
   const legacyAccountDeletionAttemptedRef = useRef(false);
   const [isDeletingLegacyAccount, setIsDeletingLegacyAccount] = useState(false);
   const [isShowingJourneyCinematic, setIsShowingJourneyCinematic] = useState(false);
+  const onboardingData = (profile?.onboarding_data as Record<string, unknown> | null) ?? null;
   const hasCompanion = Boolean(companion);
   const hasPresetCompanion = Boolean(companion?.preset_id);
   const companionStage = companion?.current_stage ?? null;
@@ -37,6 +39,32 @@ export default function Onboarding() {
     status !== "loading" &&
     status !== "recovering" &&
     (!user || (!profileLoading && !companionLoading));
+  const journeyResumeState = useMemo(() => {
+    if (onboardingGate.resumeStep !== "journey-begins") return null;
+
+    const trimmedUserName =
+      typeof onboardingData?.userName === "string" ? onboardingData.userName.trim() : "";
+    const cachedCompanionName =
+      typeof companion?.cached_creature_name === "string"
+        ? companion.cached_creature_name.trim()
+        : "";
+    const spiritAnimal =
+      typeof companion?.spirit_animal === "string" ? companion.spirit_animal.trim() : "";
+    const presetName = companion?.preset_id
+      ? getCompanionPreset(companion.preset_id)?.displayName ?? null
+      : null;
+    const elementalEggLabel = `${getCompanionElement(companion?.core_element).label} Egg`;
+    const companionLabel =
+      cachedCompanionName
+      || presetName
+      || (spiritAnimal.length > 0 && spiritAnimal !== "Egg" ? spiritAnimal : elementalEggLabel);
+
+    return {
+      stage: "journey-begins" as const,
+      userName: trimmedUserName || "You",
+      companionLabel,
+    };
+  }, [companion, onboardingData, onboardingGate.resumeStep]);
 
   useEffect(() => {
     onboardingSelfHealAttemptedRef.current = false;
@@ -138,6 +166,7 @@ export default function Onboarding() {
   return (
     <StoryOnboarding
       mode={onboardingGate.needsProgressionReset ? "reset" : "standard"}
+      resumeState={journeyResumeState}
       onJourneyCinematicStart={() => setIsShowingJourneyCinematic(true)}
       onJourneyCinematicComplete={() => setIsShowingJourneyCinematic(false)}
     />

@@ -69,6 +69,10 @@ const existingCompanion = {
   data: { id: "companion-1", preset_id: "dragon", current_stage: 1 },
   error: null,
 };
+const stageZeroEggCompanion = {
+  data: { id: "companion-egg", preset_id: null, current_stage: 0 },
+  error: null,
+};
 
 const flushMicrotasks = async () => {
   await Promise.resolve();
@@ -160,6 +164,45 @@ describe("getAuthRedirectPath", () => {
     });
 
     await expect(getAuthRedirectPath("12345678-user")).resolves.toBe("/onboarding");
+  });
+
+  it("routes stage 0 egg accounts without guided tutorial progress back to /onboarding", async () => {
+    mocks.profilesMaybeSingleMock.mockResolvedValueOnce({
+      data: {
+        selected_mentor_id: "mentor-2",
+        onboarding_completed: true,
+        onboarding_step: null,
+        onboarding_data: {},
+      },
+      error: null,
+    });
+    mocks.companionMaybeSingleMock.mockResolvedValueOnce(stageZeroEggCompanion);
+
+    await expect(getAuthRedirectPath("egg-recovery-user")).resolves.toBe("/onboarding");
+  });
+
+  it("routes stage 0 egg accounts with a complete onboarding step to /tasks", async () => {
+    mocks.profilesMaybeSingleMock.mockResolvedValueOnce({
+      data: {
+        selected_mentor_id: "mentor-2",
+        onboarding_completed: false,
+        onboarding_step: "complete",
+        onboarding_data: {},
+      },
+      error: null,
+    });
+    mocks.companionMaybeSingleMock.mockResolvedValueOnce(stageZeroEggCompanion);
+
+    await expect(getAuthRedirectPath("egg-complete-user")).resolves.toBe("/tasks");
+    await flushMicrotasks();
+
+    expect(mocks.profilesUpdateEqMock).toHaveBeenCalledWith("id", "egg-complete-user");
+    expect(mocks.profilesUpdateMock).toHaveBeenCalledWith({
+      onboarding_completed: true,
+      onboarding_data: {
+        walkthrough_completed: true,
+      },
+    });
   });
 
   it("routes to /onboarding when progression reset is pending", async () => {
@@ -342,6 +385,21 @@ describe("getProfileAwareAuthFallbackPath", () => {
     mocks.companionMaybeSingleMock.mockResolvedValueOnce(existingCompanion);
 
     await expect(getProfileAwareAuthFallbackPath("companion-fallback-user")).resolves.toBe("/tasks");
+  });
+
+  it("returns /onboarding for stage 0 egg accounts without guided tutorial progress", async () => {
+    mocks.profilesMaybeSingleMock.mockResolvedValueOnce({
+      data: {
+        onboarding_completed: true,
+        onboarding_step: null,
+        selected_mentor_id: "mentor-2",
+        onboarding_data: {},
+      },
+      error: null,
+    });
+    mocks.companionMaybeSingleMock.mockResolvedValueOnce(stageZeroEggCompanion);
+
+    await expect(getProfileAwareAuthFallbackPath("egg-fallback-user")).resolves.toBe("/onboarding");
   });
 
   it("returns /onboarding for incomplete users", async () => {

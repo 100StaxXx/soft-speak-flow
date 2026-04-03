@@ -360,8 +360,17 @@ vi.mock("@/components/CompanionPersonalization", () => ({
 }));
 
 vi.mock("./JourneyBegins", () => ({
-  JourneyBegins: ({ onComplete }: { onComplete: () => void }) => (
+  JourneyBegins: ({
+    userName,
+    companionAnimal,
+    onComplete,
+  }: {
+    userName: string;
+    companionAnimal: string;
+    onComplete: () => void;
+  }) => (
     <div data-testid="journey-begins-stage">
+      <div data-testid="journey-begins-summary">{`${userName}:${companionAnimal}`}</div>
       Journey Begins
       <button type="button" onClick={onComplete}>
         finish-journey
@@ -370,7 +379,9 @@ vi.mock("./JourneyBegins", () => ({
   ),
 }));
 
-const renderOnboarding = () => {
+const renderOnboarding = (
+  props: Partial<Parameters<typeof StoryOnboarding>[0]> = {},
+) => {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
@@ -382,7 +393,7 @@ const renderOnboarding = () => {
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter>
-        <StoryOnboarding />
+        <StoryOnboarding {...props} />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -445,6 +456,7 @@ describe("StoryOnboarding questionnaire submission flow", () => {
       expect(screen.getByRole("button", { name: "questionnaire-submit" })).toBeInTheDocument();
       expect(mocks.toastError).toHaveBeenCalledWith(
         "We hit a temporary snag matching your guide. Please try again.",
+        expect.objectContaining({ duration: expect.any(Number) }),
       );
     } finally {
       vi.useRealTimers();
@@ -515,7 +527,7 @@ describe("StoryOnboarding questionnaire submission flow", () => {
     }
   });
 
-  it("seeds first-run guided tutorial progress before leaving onboarding", async () => {
+  it("seeds first-run guided tutorial progress when journey begins is completed", async () => {
     renderOnboarding();
     await advanceToQuestionnaire();
 
@@ -534,10 +546,19 @@ describe("StoryOnboarding questionnaire submission flow", () => {
       fireEvent.click(screen.getByRole("button", { name: "complete-companion" }));
 
       await screen.findByTestId("journey-begins-stage");
+      expect(
+        storageMocks.safeLocalStorage.getItem("guided_tutorial_progress_user-1"),
+      ).toBeNull();
 
-      const rawProgress = storageMocks.safeLocalStorage.getItem(
-        "guided_tutorial_progress_user-1",
-      );
+      fireEvent.click(screen.getByRole("button", { name: "finish-journey" }));
+
+      let rawProgress: string | null = null;
+      await waitFor(() => {
+        rawProgress = storageMocks.safeLocalStorage.getItem(
+          "guided_tutorial_progress_user-1",
+        );
+        expect(rawProgress).toBeTruthy();
+      });
       expect(rawProgress).toBeTruthy();
 
       const guidedTutorial = JSON.parse(rawProgress ?? "{}");
@@ -637,10 +658,14 @@ describe("StoryOnboarding questionnaire submission flow", () => {
       fireEvent.click(screen.getByRole("button", { name: "complete-companion" }));
 
       await screen.findByTestId("journey-begins-stage");
-      expect(onJourneyCinematicStart).toHaveBeenCalledTimes(1);
+      await waitFor(() => {
+        expect(onJourneyCinematicStart).toHaveBeenCalledTimes(1);
+      });
 
       fireEvent.click(screen.getByRole("button", { name: "finish-journey" }));
-      expect(onJourneyCinematicComplete).toHaveBeenCalledTimes(1);
+      await waitFor(() => {
+        expect(onJourneyCinematicComplete).toHaveBeenCalledTimes(1);
+      });
     } finally {
       vi.useRealTimers();
     }
@@ -671,6 +696,7 @@ describe("StoryOnboarding questionnaire submission flow", () => {
       await waitFor(() => {
         expect(mocks.toastError).toHaveBeenCalledWith(
           "Companion setup is still syncing. Please try again in a moment.",
+          expect.objectContaining({ duration: expect.any(Number) }),
         );
       });
       expect(screen.queryByTestId("journey-begins-stage")).not.toBeInTheDocument();
@@ -682,6 +708,8 @@ describe("StoryOnboarding questionnaire submission flow", () => {
   it("shows a finalization-specific toast when companion creation succeeds but onboarding completion fails", async () => {
     mocks.profilesUpdateEq.mockReset();
     mocks.profilesUpdateEq
+      .mockResolvedValueOnce({ error: null })
+      .mockResolvedValueOnce({ error: null })
       .mockResolvedValueOnce({ error: null })
       .mockResolvedValueOnce({ error: null })
       .mockResolvedValueOnce({ error: null })
@@ -703,16 +731,74 @@ describe("StoryOnboarding questionnaire submission flow", () => {
 
       await advanceFromMentorToEggSelection();
       fireEvent.click(screen.getByRole("button", { name: "complete-companion" }));
+      await screen.findByTestId("journey-begins-stage");
+      fireEvent.click(screen.getByRole("button", { name: "finish-journey" }));
 
       await waitFor(() => {
         expect(mocks.toastError).toHaveBeenCalledWith(
           "Your egg was created, but we couldn't finish setup. Please try again.",
+          expect.objectContaining({ duration: expect.any(Number) }),
         );
       });
-      expect(screen.queryByTestId("journey-begins-stage")).not.toBeInTheDocument();
+      expect(screen.getByTestId("journey-begins-stage")).toBeInTheDocument();
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("resumes journey-begins recovery and backfills tutorial progress on completion", async () => {
+    mocks.profilesMaybeSingle.mockResolvedValue({
+      data: {
+        onboarding_data: {
+          story_tone: "dark_intense",
+        },
+      },
+      error: null,
+    });
+
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+        },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <StoryOnboarding
+            resumeState={{
+              stage: "journey-begins",
+              userName: "Nova",
+              companionLabel: "Ice Egg",
+            }}
+          />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("journey-begins-stage")).toBeInTheDocument();
+    });
+    expect(screen.getByTestId("journey-begins-summary")).toHaveTextContent("Nova:Ice Egg");
+    expect(mocks.createCompanionMutateAsync).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "finish-journey" }));
+
+    let rawProgress: string | null = null;
+    await waitFor(() => {
+      rawProgress = storageMocks.safeLocalStorage.getItem(
+        "guided_tutorial_progress_user-1",
+      );
+      expect(rawProgress).toBeTruthy();
+    });
+    expect(rawProgress).toBeTruthy();
+    expect(mocks.profilesUpdateEq).toHaveBeenCalled();
+    expect(mocks.toastSuccess).toHaveBeenCalledWith(
+      "Welcome to Cosmiq! Your journey begins.",
+      expect.objectContaining({ duration: expect.any(Number) }),
+    );
   });
 
   it("starts reset mode at the story-tone stage", async () => {

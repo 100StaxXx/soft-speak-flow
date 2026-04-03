@@ -235,6 +235,46 @@ describe("Index onboarding guard", () => {
     });
   });
 
+  it("sends stage 0 egg accounts without tutorial progress back to onboarding", () => {
+    mocks.profile = {
+      onboarding_completed: true,
+      onboarding_step: null,
+      selected_mentor_id: "mentor-legacy",
+      onboarding_data: {},
+    };
+    mocks.companion = {
+      id: "companion-egg",
+      preset_id: null,
+      current_stage: 0,
+    } as { id: string; preset_id: null; current_stage: number };
+
+    renderIndex();
+
+    expect(mocks.navigate).toHaveBeenCalledWith("/onboarding");
+    expect(mocks.navigate).not.toHaveBeenCalledWith("/journeys", { replace: true });
+  });
+
+  it("keeps completed stage 0 egg accounts on the app shell when onboarding_step is complete", async () => {
+    mocks.profile = {
+      onboarding_completed: false,
+      onboarding_step: "complete",
+      selected_mentor_id: "mentor-legacy",
+      onboarding_data: {},
+    };
+    mocks.companion = {
+      id: "companion-egg",
+      preset_id: null,
+      current_stage: 0,
+    } as { id: string; preset_id: null; current_stage: number };
+
+    renderIndex();
+
+    expect(mocks.navigate).not.toHaveBeenCalledWith("/onboarding");
+    await waitFor(() => {
+      expect(mocks.navigate).toHaveBeenCalledWith("/journeys", { replace: true });
+    });
+  });
+
   it("still sends explicitly incomplete users to onboarding", () => {
     mocks.profile = {
       onboarding_completed: false,
