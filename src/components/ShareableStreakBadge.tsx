@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Share2, Download, Flame } from "lucide-react";
 import { toPng } from 'html-to-image';
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 
 interface ShareableStreakBadgeProps {
   streak: number;

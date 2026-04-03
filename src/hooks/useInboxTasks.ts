@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useCallback } from "react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { normalizeTaskSchedulingState } from "@/utils/taskSchedulingRules";
 import { useResilience } from "@/contexts/ResilienceContext";
 import { isQueueableWriteError } from "@/utils/networkErrors";

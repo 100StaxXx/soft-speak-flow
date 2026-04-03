@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { format, addDays } from 'date-fns';
-import { toast } from 'sonner';
+import { toast } from "@/components/ui/sonner";
 import { useQueryClient } from '@tanstack/react-query';
 import { normalizeTaskSchedulingState } from '@/utils/taskSchedulingRules';
 

@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 
 export interface CompanionStory {
   id: string;
@@ -71,13 +71,16 @@ export const useCompanionStory = (companionId?: string, stage?: number) => {
   });
 
   const generateStory = useMutation({
+    onMutate: (params: { companionId: string; stage: number }) => {
+      const loadingToastId = `story-gen:${params.companionId}:${params.stage}`;
+      toast.loading("Your story is being written...", { id: loadingToastId });
+      return { loadingToastId };
+    },
     mutationFn: async (params: {
       companionId: string;
       stage: number;
     }) => {
       if (!user) throw new Error("Not authenticated");
-
-      toast.loading("Your story is being written...", { id: "story-gen" });
 
       const { data, error } = await supabase.functions.invoke(
         "generate-companion-story",
@@ -96,15 +99,18 @@ export const useCompanionStory = (companionId?: string, stage?: number) => {
       return data as CompanionStory;
     },
     onSuccess: () => {
-      toast.dismiss("story-gen");
       toast.success("📖 New chapter unlocked!");
       queryClient.invalidateQueries({ queryKey: ["companion-story"] });
       queryClient.invalidateQueries({ queryKey: ["companion-stories-all"] });
     },
     onError: (error) => {
-      toast.dismiss("story-gen");
       console.error("Story generation failed:", error);
       toast.error(error instanceof Error ? error.message : "Something went wrong. Please try again.");
+    },
+    onSettled: (_data, _error, _variables, context) => {
+      if (context?.loadingToastId) {
+        toast.dismiss(context.loadingToastId);
+      }
     },
   });
 

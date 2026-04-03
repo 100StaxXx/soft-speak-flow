@@ -47,7 +47,7 @@ import { useEpics } from '@/hooks/useEpics';
 import { useHabits } from '@/features/habits';
 import { useAIInteractionTracker } from '@/hooks/useAIInteractionTracker';
 import { format, parseISO } from 'date-fns';
-import { toast } from 'sonner';
+import { toast } from "@/components/ui/sonner";
 import { Leaf } from 'lucide-react';
 import { parseNaturalLanguage } from '../hooks/useNaturalLanguageParser';
 

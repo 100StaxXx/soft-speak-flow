@@ -23,7 +23,7 @@ import {
   getResultFromAccuracy 
 } from '@/utils/adversaryGenerator';
 import { isMacSession } from '@/utils/platformTargets';
-import { toast } from 'sonner';
+import { toast } from "@/components/ui/sonner";
 import { useLivingCompanionSafe } from '@/hooks/useLivingCompanion';
 
 export type EncounterTriggerReason =

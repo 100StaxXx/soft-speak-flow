@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Share2, Download, Copy } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toPng } from "html-to-image";
 import { safeClipboardWrite, getClipboardErrorMessage } from "@/utils/clipboard";

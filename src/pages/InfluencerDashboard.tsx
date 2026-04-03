@@ -17,7 +17,7 @@ import {
   Loader2,
   Banknote,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { Share } from "@capacitor/share";
 import { Capacitor } from "@capacitor/core";
 import { safeLocalStorage, safeSessionStorage } from "@/utils/storage";

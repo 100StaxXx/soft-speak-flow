@@ -16,7 +16,7 @@ import {
   Lightbulb,
 } from "lucide-react";
 import { Separator } from "./ui/separator";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import {
   getPresetCompanionAssetUrl,
   getUniversalEggAssetUrl,

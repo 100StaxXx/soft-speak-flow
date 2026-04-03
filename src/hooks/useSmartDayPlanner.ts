@@ -4,7 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { useHapticFeedback } from '@/hooks/useHapticFeedback';
-import { toast } from 'sonner';
+import { toast } from "@/components/ui/sonner";
 import { warmDailyTasksQueryFromRemote } from "@/utils/plannerSync";
 
 export type EnergyLevel = 'low' | 'medium' | 'high';

@@ -1,7 +1,7 @@
 import { useState, memo } from "react";
 import { Button } from "@/components/ui/button";
 import { Share2 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { safeClipboardWrite, getClipboardErrorMessage } from "@/utils/clipboard";
 
 interface ShareButtonProps {

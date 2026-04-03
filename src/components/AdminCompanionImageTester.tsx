@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { Loader2, Download, Share, ImageIcon, Zap, Link as LinkIcon } from "lucide-react";
 import { downloadImage } from "@/utils/imageDownload";
 import { Capacitor } from '@capacitor/core';

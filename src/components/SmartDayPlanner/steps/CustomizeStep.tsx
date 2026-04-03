@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { PlanContext, HardCommitment } from '@/hooks/useSmartDayPlanner';
 import { TimeRangePickerField } from '@/components/scheduling';
 import { Clock, Plus, X, MessageSquare, Calendar, Sparkles } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from "@/components/ui/sonner";
 
 interface CustomizeStepProps {
   context: PlanContext;

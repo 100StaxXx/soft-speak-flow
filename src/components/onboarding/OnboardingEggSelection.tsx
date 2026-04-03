@@ -115,7 +115,7 @@ const CHAMBER_SLOTS: Record<CompanionElementId, ChamberSlotConfig> = {
     width: "28.5%",
     height: "31%",
     eggWidth: "61%",
-    eggBottom: "22.8%",
+    eggBottom: "26%",
     bounceDelay: "-0.5s",
     bounceDuration: "3.5s",
     eggSrc: `${CHAMBER_ASSET_BASE}/light_eggclear.png`,

@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { requestJourneyPathGeneration } from "@/utils/journeyPathCache";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { useCallback, useState } from "react";
 
 export interface CompanionPostcard {

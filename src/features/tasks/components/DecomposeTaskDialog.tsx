@@ -26,7 +26,7 @@ import {
 import { useTaskDecomposition, SuggestedSubtask } from '@/hooks/useTaskDecomposition';
 import { useSubtasks } from '../hooks/useSubtasks';
 import { cn } from '@/lib/utils';
-import { toast } from 'sonner';
+import { toast } from "@/components/ui/sonner";
 
 interface DecomposeTaskDialogProps {
   open: boolean;

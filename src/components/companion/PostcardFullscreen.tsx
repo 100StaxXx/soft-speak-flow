@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { Capacitor } from "@capacitor/core";
 import { Share } from "@capacitor/share";
 import { useNarrativeEpic } from "@/hooks/useCosmicLibrary";

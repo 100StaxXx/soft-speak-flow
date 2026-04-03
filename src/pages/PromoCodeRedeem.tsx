@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { usePromoCode, PromoCodeRedeemError } from "@/hooks/usePromoCode";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 
 const PromoCodeRedeem = () => {
   const navigate = useNavigate();

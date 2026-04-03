@@ -7,7 +7,7 @@ import { QuestDragCard } from "./QuestDragCard";
 import { QuestDropZone } from "./QuestDropZone";
 import { useCallback, useState } from "react";
 import { playSound } from "@/utils/soundEffects";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { CalendarTask } from "@/types/quest";
 
 interface CalendarWeekViewProps {

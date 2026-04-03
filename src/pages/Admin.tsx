@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Card } from "@/components/ui/card";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { Trash2, Edit, Plus, Upload, X, Loader2, Music, Download } from "lucide-react";
 import { AdminPayouts } from "@/components/AdminPayouts";
 import { AdminReferralCodes } from "@/components/AdminReferralCodes";

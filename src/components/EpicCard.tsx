@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Trophy, Flame, Target, Calendar, Zap, Share2, Check, X } from "lucide-react";
 import { motion } from "framer-motion";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { ConstellationTrail } from "./ConstellationTrail";
 import { EpicCheckInDrawer } from "./EpicCheckInDrawer";

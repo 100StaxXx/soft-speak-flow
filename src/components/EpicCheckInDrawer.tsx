@@ -11,7 +11,7 @@ import { FrequencyPicker } from "@/components/FrequencyPicker";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { format } from "date-fns";
 import { motion } from "framer-motion";
 import { Haptics, ImpactStyle } from '@capacitor/haptics';

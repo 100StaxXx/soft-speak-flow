@@ -13,7 +13,7 @@ import {
   parseISO,
   startOfDay,
 } from "date-fns";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { getClampedMonthDays } from "@/utils/habitSchedule";
 import { hasScheduledTimeValue } from "@/utils/recurrenceValidation";
 import type { DailyTask } from "@/services/dailyTasksRemote";

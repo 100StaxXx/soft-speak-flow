@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { useAchievements } from "./useAchievements";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { useRef, useMemo, useCallback, useEffect } from "react";
 import { useEvolution } from "@/contexts/EvolutionContext";
 import { useEvolutionThresholds } from "./useEvolutionThresholds";
@@ -157,6 +157,20 @@ type CreateCompanionRpcResult = {
 
 const AWARD_XP_UNAVAILABLE_MESSAGE = "XP service is temporarily unavailable. Please try again shortly.";
 const CREATE_COMPANION_SIGNATURE_FALLBACK_MESSAGE = "Companion setup is still syncing. Please try again in a moment.";
+
+const getCreateCompanionArgsWithoutFocalPoints = ({
+  p_current_image_focal_x: _ignoredCurrentImageFocalX,
+  p_current_image_focal_y: _ignoredCurrentImageFocalY,
+  p_initial_image_focal_x: _ignoredInitialImageFocalX,
+  p_initial_image_focal_y: _ignoredInitialImageFocalY,
+  ...legacyCreateCompanionRpcArgs
+}: CreateCompanionRpcArgs): CreateCompanionRpcArgs => legacyCreateCompanionRpcArgs;
+
+const getCreateCompanionArgsWithoutPresetOrFocalPoints = ({
+  p_preset_id: _ignoredPresetId,
+  ...createCompanionRpcArgsWithoutPreset
+}: CreateCompanionRpcArgs): CreateCompanionRpcArgs =>
+  getCreateCompanionArgsWithoutFocalPoints(createCompanionRpcArgsWithoutPreset);
 
 const normalizeEvolutionErrorCode = (value: string | null | undefined): string | null => {
   if (!value) return null;
@@ -615,12 +629,23 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
         let result = await invokeCreateCompanionRpc(createCompanionRpcArgs);
 
         if (!preset && result.error && isLegacyCreateCompanionRpcSignatureError(result.error)) {
-          logger.warn("Create companion RPC signature mismatch; retrying legacy egg-first call", {
+          logger.warn("Create companion RPC signature mismatch; retrying preset-aware legacy egg-first call", {
             userId: user.id,
             coreElement: normalizedElement,
           });
-          const { p_preset_id: _ignoredPresetId, ...legacyCreateCompanionRpcArgs } = createCompanionRpcArgs;
-          result = await invokeCreateCompanionRpc(legacyCreateCompanionRpcArgs);
+          result = await invokeCreateCompanionRpc(
+            getCreateCompanionArgsWithoutFocalPoints(createCompanionRpcArgs),
+          );
+        }
+
+        if (!preset && result.error && isLegacyCreateCompanionRpcSignatureError(result.error)) {
+          logger.warn("Create companion RPC signature mismatch; retrying pre-preset legacy egg-first call", {
+            userId: user.id,
+            coreElement: normalizedElement,
+          });
+          result = await invokeCreateCompanionRpc(
+            getCreateCompanionArgsWithoutPresetOrFocalPoints(createCompanionRpcArgs),
+          );
         }
 
         if (result.error) {

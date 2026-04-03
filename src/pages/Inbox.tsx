@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo, memo } from "react";
 import { format } from "date-fns";
 import { motion, useReducedMotion } from "framer-motion";
 import { Inbox as InboxIcon, Check, Trash2, Pencil } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { PageTransition } from "@/components/PageTransition";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { EmptyState } from "@/components/EmptyState";

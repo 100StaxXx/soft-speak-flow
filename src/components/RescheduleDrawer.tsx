@@ -29,7 +29,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { format } from "date-fns";
 import { cn, formatDisplayLabel } from "@/lib/utils";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { useJourneySchedule, JourneyMilestone, JourneyPhase, JourneyRitual } from "@/hooks/useJourneySchedule";
 import { useMilestones } from "@/hooks/useMilestones";
 import { supabase } from "@/integrations/supabase/client";

@@ -19,7 +19,7 @@ import { getEffectiveDailyDate } from "@/utils/timezone";
 import { globalAudio } from "@/utils/globalAudio";
 import { createIOSOptimizedAudio, isIOS, iosAudioManager, safePlay } from "@/utils/iosAudio";
 import { logger } from "@/utils/logger";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 
 interface CaptionWord {
   word: string;

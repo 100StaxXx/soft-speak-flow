@@ -5,7 +5,7 @@ import { useTimelineDrag } from "@/hooks/useTimelineDrag";
 import { addDays, format, isSameDay } from "date-fns";
 import { AnimatePresence, motion, useMotionValue, useReducedMotion, type MotionValue } from "framer-motion";
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { 
   Flame, 
   Trophy, 

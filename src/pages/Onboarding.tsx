@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { StoryOnboarding } from "@/components/onboarding";
 import { PageLoader } from "@/components/PageLoader";
 import { useAuth } from "@/hooks/useAuth";

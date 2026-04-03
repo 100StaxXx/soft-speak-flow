@@ -2,7 +2,7 @@ import { useEffect, useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { useResilience } from "@/contexts/ResilienceContext";
 import {
   createOfflinePlannerId,

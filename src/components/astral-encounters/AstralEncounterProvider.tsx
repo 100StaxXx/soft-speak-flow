@@ -8,7 +8,7 @@ import { AdversaryTier } from '@/types/astralEncounters';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { isMacSession } from '@/utils/platformTargets';
-import { toast } from 'sonner';
+import { toast } from "@/components/ui/sonner";
 
 interface AstralEncounterProviderProps {
   children: React.ReactNode;

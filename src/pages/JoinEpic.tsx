@@ -6,7 +6,7 @@ import { PageTransition } from "@/components/PageTransition";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { Target, Calendar, Zap, Users, Loader2, ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
 

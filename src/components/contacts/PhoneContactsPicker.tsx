@@ -15,7 +15,7 @@ import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { usePhoneContacts, PhoneContact } from '@/hooks/usePhoneContacts';
 import { useContacts } from '@/hooks/useContacts';
-import { toast } from 'sonner';
+import { toast } from "@/components/ui/sonner";
 import { ContactsPermissionDialog } from './ContactsPermissionDialog';
 
 interface PhoneContactsPickerProps {

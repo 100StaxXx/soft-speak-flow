@@ -471,7 +471,7 @@ describe("useCompanion evolveCompanion", () => {
     );
   });
 
-  it("retries egg-first creation against the legacy RPC signature when the new signature is unavailable", async () => {
+  it("retries egg-first creation against the preset-aware legacy RPC signature when focal args are unavailable", async () => {
     mocks.rpcMock
       .mockResolvedValueOnce({
         data: null,
@@ -526,10 +526,80 @@ describe("useCompanion evolveCompanion", () => {
     expect(mocks.rpcMock).toHaveBeenNthCalledWith(
       2,
       "create_companion_if_not_exists",
-      expect.not.objectContaining({
+      expect.objectContaining({
         p_preset_id: null,
+        p_spirit_animal: "Egg",
       }),
     );
+    expect(mocks.rpcMock.mock.calls[1]?.[1]).not.toHaveProperty("p_current_image_focal_x");
+    expect(mocks.rpcMock.mock.calls[1]?.[1]).not.toHaveProperty("p_current_image_focal_y");
+    expect(mocks.rpcMock.mock.calls[1]?.[1]).not.toHaveProperty("p_initial_image_focal_x");
+    expect(mocks.rpcMock.mock.calls[1]?.[1]).not.toHaveProperty("p_initial_image_focal_y");
+  });
+
+  it("retries egg-first creation against the pre-preset legacy RPC signature when preset-aware creation is unavailable", async () => {
+    mocks.rpcMock
+      .mockResolvedValueOnce({
+        data: null,
+        error: {
+          code: "42883",
+          message: "Could not find the function public.create_companion_if_not_exists(p_user_id, p_preset_id, p_favorite_color, p_spirit_animal, p_core_element, p_story_tone, p_current_image_url, p_current_image_focal_x, p_current_image_focal_y, p_initial_image_url, p_initial_image_focal_x, p_initial_image_focal_y, p_eye_color, p_fur_color) in the schema cache",
+          details: null,
+          hint: null,
+        },
+      })
+      .mockResolvedValueOnce({
+        data: null,
+        error: {
+          code: "42883",
+          message: "Could not find the function public.create_companion_if_not_exists(p_user_id, p_preset_id, p_favorite_color, p_spirit_animal, p_core_element, p_story_tone, p_current_image_url, p_initial_image_url, p_eye_color, p_fur_color) in the schema cache",
+          details: null,
+          hint: null,
+        },
+      })
+      .mockResolvedValueOnce({
+        data: [
+          {
+            ...companionFixture,
+            spirit_animal: "Egg",
+            core_element: "void",
+            current_image_url: "/companion-eggs/egg__t0_egg__normal__void.png",
+            initial_image_url: "/companion-eggs/egg__t0_egg__normal__void.png",
+            is_new: true,
+          },
+        ],
+        error: null,
+      });
+
+    const { result } = await renderUseCompanion();
+
+    await act(async () => {
+      await expect(
+        result.current.createCompanion.mutateAsync({
+          presetId: null,
+          favoriteColor: "#000000",
+          spiritAnimal: "Egg",
+          coreElement: "void",
+          storyTone: "epic_adventure",
+        }),
+      ).resolves.toMatchObject({
+        id: companionFixture.id,
+        preset_id: null,
+        spirit_animal: "Egg",
+      });
+    });
+
+    expect(mocks.rpcMock).toHaveBeenCalledTimes(3);
+    expect(mocks.rpcMock.mock.calls[1]?.[1]).toHaveProperty("p_preset_id", null);
+    expect(mocks.rpcMock.mock.calls[1]?.[1]).not.toHaveProperty("p_current_image_focal_x");
+    expect(mocks.rpcMock.mock.calls[1]?.[1]).not.toHaveProperty("p_current_image_focal_y");
+    expect(mocks.rpcMock.mock.calls[1]?.[1]).not.toHaveProperty("p_initial_image_focal_x");
+    expect(mocks.rpcMock.mock.calls[1]?.[1]).not.toHaveProperty("p_initial_image_focal_y");
+    expect(mocks.rpcMock.mock.calls[2]?.[1]).not.toHaveProperty("p_preset_id");
+    expect(mocks.rpcMock.mock.calls[2]?.[1]).not.toHaveProperty("p_current_image_focal_x");
+    expect(mocks.rpcMock.mock.calls[2]?.[1]).not.toHaveProperty("p_current_image_focal_y");
+    expect(mocks.rpcMock.mock.calls[2]?.[1]).not.toHaveProperty("p_initial_image_focal_x");
+    expect(mocks.rpcMock.mock.calls[2]?.[1]).not.toHaveProperty("p_initial_image_focal_y");
   });
 
   it("does not retry the legacy RPC signature for preset-based creation", async () => {

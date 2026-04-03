@@ -5,7 +5,7 @@ import { safeNavigate } from "@/utils/nativeNavigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { StoryPrologue } from "./StoryPrologue";

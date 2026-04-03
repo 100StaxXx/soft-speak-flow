@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format, getDay, parseISO } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { getHabitXP } from "@/config/xpRewards";
 import { useResilience } from "@/contexts/ResilienceContext";
 import { categorizeQuest } from "@/utils/questCategorization";

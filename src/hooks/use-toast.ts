@@ -1,9 +1,10 @@
 import * as React from "react";
 
+import { TOAST_REMOVE_DELAY_MS, clampToastDuration } from "@/constants/toast";
 import type { ToastActionElement, ToastProps } from "@/components/ui/toast";
 
 const TOAST_LIMIT = 1;
-const TOAST_REMOVE_DELAY = 1000000;
+const TOAST_REMOVE_DELAY = TOAST_REMOVE_DELAY_MS;
 
 type ToasterToast = ToastProps & {
   id: string;
@@ -140,7 +141,13 @@ function toast({ ...props }: Toast) {
   const update = (props: ToasterToast) =>
     dispatch({
       type: "UPDATE_TOAST",
-      toast: { ...props, id },
+      toast: {
+        ...props,
+        ...(Object.prototype.hasOwnProperty.call(props, "duration")
+          ? { duration: clampToastDuration(props.duration) }
+          : {}),
+        id,
+      },
     });
   const dismiss = () => dispatch({ type: "DISMISS_TOAST", toastId: id });
 
@@ -148,6 +155,7 @@ function toast({ ...props }: Toast) {
     type: "ADD_TOAST",
     toast: {
       ...props,
+      duration: clampToastDuration(props.duration),
       id,
       open: true,
       onOpenChange: (open) => {

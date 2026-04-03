@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { toast } from 'sonner';
+import { toast } from "@/components/ui/sonner";
 import { ATTACHMENT_INPUT_ACCEPT, MAX_ATTACHMENTS_PER_TASK } from '@/constants/questAttachments';
 import { validateAttachmentFiles } from '@/utils/questAttachmentValidation';
 import type { QuestAttachmentInput } from '@/types/questAttachments';

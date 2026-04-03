@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Share, Copy, Users, Gift } from "lucide-react";
 import { useReferrals } from "@/hooks/useReferrals";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { Share as CapacitorShare } from "@capacitor/share";
 import { Capacitor } from "@capacitor/core";
 import { safeClipboardWrite } from "@/utils/clipboard";

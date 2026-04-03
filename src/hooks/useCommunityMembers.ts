@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 
 export interface CommunityMember {
   id: string;

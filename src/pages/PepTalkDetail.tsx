@@ -6,7 +6,7 @@ import { AudioPlayer } from "@/components/AudioPlayer";
 import { TimedCaptions } from "@/components/TimedCaptions";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, FileText, Quote, Sparkles } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { PageTransition } from "@/components/PageTransition";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { GlassCard } from "@/components/ui/glass-card";

@@ -14,7 +14,7 @@ import {
 import { Trophy, Flame, Target, Calendar, Zap, Share2, Check, X, Flag, Star } from "lucide-react";
 import type { StorySeed } from "@/types/narrativeTypes";
 import { motion } from "framer-motion";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { ConstellationTrail } from "./ConstellationTrail";
 import { EpicCheckInDrawer } from "./EpicCheckInDrawer";
 import { SmartAdjustPlanDrawer } from "./SmartAdjustPlanDrawer";

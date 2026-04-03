@@ -1,7 +1,7 @@
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
-import { toast } from 'sonner';
+import { toast } from "@/components/ui/sonner";
 import { toPng } from 'html-to-image';
 
 interface ShareOptions {
@@ -63,17 +63,15 @@ export const downloadCardElement = async (
   filename: string,
   shareOptions?: ShareOptions
 ) => {
+  const loadingToastId = toast.loading('Capturing card...');
+
   try {
-    toast.loading('Capturing card...');
-    
     // Capture the element as PNG
     const dataUrl = await toPng(element, {
       quality: 1,
       pixelRatio: 2, // Higher quality
       backgroundColor: 'transparent',
     });
-    
-    toast.dismiss();
 
     if (Capacitor.isNativePlatform()) {
       // Native iOS/Android: Use Filesystem + Share
@@ -104,9 +102,10 @@ export const downloadCardElement = async (
       toast.success('Card downloaded!');
     }
   } catch (error) {
-    toast.dismiss();
     console.error('Error capturing card:', error);
     toast.error('Failed to capture card');
+  } finally {
+    toast.dismiss(loadingToastId);
   }
 };
 
