@@ -165,7 +165,15 @@ describe("guided tutorial route restoration", () => {
       .forEach((element) => element.remove());
   });
 
-  const renderWithProviders = (initialPath = "/journeys") => {
+  const renderWithProviders = (
+    initialPath = "/journeys",
+    options?: {
+      seedCompanion?: {
+        id: string;
+        current_stage: number;
+      } | null;
+    },
+  ) => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: {
@@ -173,6 +181,10 @@ describe("guided tutorial route restoration", () => {
         },
       },
     });
+
+    if (options?.seedCompanion) {
+      queryClient.setQueryData(["companion", "user-1"], options.seedCompanion);
+    }
 
     return render(
       <QueryClientProvider client={queryClient}>
@@ -396,6 +408,45 @@ describe("guided tutorial route restoration", () => {
       block: "center",
       inline: "nearest",
       behavior: "auto",
+    });
+  });
+
+  it("does not skip evolve step from companion cache alone before the hatch starts", async () => {
+    mocks.guidedTutorial = createEvolveStepTutorial();
+    renderWithProviders("/companion", {
+      seedCompanion: {
+        id: "companion-1",
+        current_stage: 1,
+      },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("path")).toHaveTextContent("/companion");
+      expect(screen.getByTestId("step")).toHaveTextContent("evolve_companion");
+    });
+  });
+
+  it("recovers to the post-evolution step when hatch had already started", async () => {
+    mocks.guidedTutorial = {
+      ...createEvolveStepTutorial(),
+      milestonesCompleted: [
+        "mentor_intro_hello",
+        "companion_tab_intro",
+        "tap_evolve_companion",
+      ],
+      evolutionInFlight: true,
+    };
+
+    renderWithProviders("/companion", {
+      seedCompanion: {
+        id: "companion-1",
+        current_stage: 1,
+      },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("path")).toHaveTextContent("/companion");
+      expect(screen.getByTestId("step")).toHaveTextContent("post_evolution_companion_intro");
     });
   });
 });

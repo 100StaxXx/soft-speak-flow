@@ -166,7 +166,7 @@ const getTargetSelectorsForMilestone = (milestoneId: GuidedMilestoneId): string[
     case "open_mentor_tab":
       return ['[data-tour="mentor-tab"]'];
     case "submit_morning_checkin":
-      return ['[data-tour="checkin-submit"]', '[data-tour="morning-checkin"]'];
+      return ['[data-tour="morning-checkin"]', '[data-tour="checkin-submit"]'];
     case "tap_evolve_companion":
       return ['[data-tour="evolve-companion-button"]'];
     case "complete_companion_evolution":
@@ -1167,13 +1167,28 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
       const cachedCompanion = user?.id
         ? queryClient.getQueryData<Companion | null>(getCompanionQueryKey(user.id))
         : null;
+      const hasRecordedEvolutionStart =
+        milestoneSet.has("tap_evolve_companion") ||
+        evolutionInFlight ||
+        Boolean(migratedProgress.evolutionStartedAt) ||
+        Boolean(migratedProgress.evolutionCompletedAt);
 
       if (
         cachedCompanion &&
         cachedCompanion.current_stage > 0 &&
-        !milestoneSet.has("complete_companion_evolution")
+        hasRecordedEvolutionStart
       ) {
-        markMilestoneComplete("complete_companion_evolution");
+        if (evolutionInFlight) {
+          setSessionEvolutionInFlight(false);
+        }
+        void persistProgress({
+          evolutionInFlight: false,
+          evolutionCompletedAt:
+            migratedProgress.evolutionCompletedAt ?? new Date().toISOString(),
+        });
+        if (!milestoneSet.has("complete_companion_evolution")) {
+          markMilestoneComplete("complete_companion_evolution");
+        }
         markStepComplete("evolve_companion");
       }
       return;
@@ -1209,9 +1224,13 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     markCreateQuestSubstepComplete,
     markMilestoneComplete,
     markStepComplete,
+    persistProgress,
     queryClient,
     milestoneSet,
+    evolutionInFlight,
     hasPendingIntroDialogue,
+    migratedProgress.evolutionCompletedAt,
+    migratedProgress.evolutionStartedAt,
     tutorialSuppressed,
     tutorialReady,
     user?.id,

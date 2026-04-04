@@ -134,6 +134,14 @@ vi.mock("@/utils/logger", () => ({
 
 import { CompanionEvolution } from "./CompanionEvolution";
 
+const FULL_SEQUENCE_MS = {
+  hold: 800,
+  charge: 3200,
+  conceal: 600,
+  reveal: 2400,
+  dismissBuffer: 3000,
+} as const;
+
 class MockPreloadImage {
   onload: ((event: Event) => void) | null = null;
   onerror: ((event: Event) => void) | null = null;
@@ -229,26 +237,26 @@ describe("CompanionEvolution", () => {
     fireEvent.click(dialog);
     expect(props.onComplete).not.toHaveBeenCalled();
 
-    await flushTimers(300);
+    await flushTimers(FULL_SEQUENCE_MS.hold);
     expect(dialog).toHaveAttribute("data-phase", "charge");
 
-    await flushTimers(900);
+    await flushTimers(FULL_SEQUENCE_MS.charge);
     expect(dialog).toHaveAttribute("data-phase", "conceal");
 
     fireEvent.click(dialog);
     expect(props.onComplete).not.toHaveBeenCalled();
 
-    await flushTimers(250);
+    await flushTimers(FULL_SEQUENCE_MS.conceal);
     expect(dialog).toHaveAttribute("data-phase", "reveal");
     expect(screen.getByText("Evolved!")).toBeInTheDocument();
 
-    await flushTimers(900);
+    await flushTimers(FULL_SEQUENCE_MS.reveal);
     expect(dialog).toHaveAttribute("data-phase", "settle");
 
     fireEvent.click(dialog);
     expect(props.onComplete).not.toHaveBeenCalled();
 
-    await flushTimers(450);
+    await flushTimers(FULL_SEQUENCE_MS.dismissBuffer);
     expect(screen.getByText("Tap anywhere to continue")).toBeInTheDocument();
 
     fireEvent.click(dialog);
@@ -310,7 +318,7 @@ describe("CompanionEvolution", () => {
       />,
     );
     await prepareEvolution();
-    await flushTimers(300);
+    await flushTimers(FULL_SEQUENCE_MS.hold);
 
     expect(screen.getByTestId("evolution-hatching-overlay")).toBeInTheDocument();
   });
@@ -318,7 +326,7 @@ describe("CompanionEvolution", () => {
   it("does not show hatch visuals for later evolutions", async () => {
     render(<CompanionEvolution {...buildProps()} />);
     await prepareEvolution();
-    await flushTimers(300);
+    await flushTimers(FULL_SEQUENCE_MS.hold);
 
     expect(screen.queryByTestId("evolution-hatching-overlay")).not.toBeInTheDocument();
   });
@@ -328,14 +336,18 @@ describe("CompanionEvolution", () => {
     const { rerender } = render(<CompanionEvolution {...props} />);
 
     await prepareEvolution();
-    await flushTimers(300);
+    await flushTimers(FULL_SEQUENCE_MS.hold);
 
     expect(mocks.playEvolutionStartMock).toHaveBeenCalledTimes(1);
     expect(mocks.invokeMock).toHaveBeenCalledTimes(1);
 
     rerender(<CompanionEvolution {...props} />);
 
-    await flushTimers(1150);
+    await flushTimers(
+      FULL_SEQUENCE_MS.charge +
+      FULL_SEQUENCE_MS.conceal +
+      FULL_SEQUENCE_MS.reveal,
+    );
 
     expect(mocks.playEvolutionStartMock).toHaveBeenCalledTimes(1);
     expect(mocks.playEvolutionSuccessMock).toHaveBeenCalledTimes(1);

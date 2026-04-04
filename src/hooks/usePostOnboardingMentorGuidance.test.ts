@@ -197,7 +197,7 @@ describe("getMentorInstructionLines", () => {
     expect(getMentorInstructionLines("create_quest", "submit_create_quest")[0]).toContain("Tap Add Quest");
     expect(getMentorInstructionLines("morning_checkin", null)[0]).toContain("Open Guide");
     expect(getMentorInstructionLines("companion_tab_intro", null)[0]).toContain("Companion Tab");
-    expect(getMentorInstructionLines("evolve_companion", null)[0]).toContain("Tap Evolve to ascend");
+    expect(getMentorInstructionLines("evolve_companion", null)[0]).toContain("Tap Hatch to awaken it");
     expect(getMentorInstructionLines("post_evolution_companion_intro", null)[0]).toContain(
       "first step to greatness"
     );
@@ -384,6 +384,30 @@ describe("guided tutorial intro dialogue sequence", () => {
       expect(result.current.currentStep).toBe("quests_campaigns_intro");
       expect(result.current.dialogueActionLabel).toBe("Continue");
       expect(result.current.onDialogueAction).toBeDefined();
+    });
+  });
+
+  it("prefers outlining the full morning check-in card for the submit milestone", async () => {
+    mocks.state.guidedTutorial = {
+      version: 2,
+      eligible: true,
+      completed: false,
+      completedSteps: ["create_quest", "meet_companion"],
+      xpAwardedSteps: [],
+      milestonesCompleted: ["mentor_intro_hello", "open_mentor_tab"],
+    };
+
+    const { result } = renderHook(() => usePostOnboardingMentorGuidance(), {
+      wrapper: createWrapper("/mentor"),
+    });
+
+    await waitFor(() => {
+      expect(result.current.currentStep).toBe("morning_checkin");
+      expect(result.current.activeTargetSelectors).toEqual([
+        '[data-tour="morning-checkin"]',
+        '[data-tour="checkin-submit"]',
+      ]);
+      expect(result.current.isStrictLockActive).toBe(false);
     });
   });
 

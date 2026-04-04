@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, memo } from "react";
+import { useState, useEffect, useCallback, memo, type FormEvent, type PointerEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -35,7 +35,6 @@ import { applyMentorChange } from "@/pages/profileMentorChange";
 import { deleteCurrentAccount, isAccountDeletionAuthError } from "@/services/accountDeletion";
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -116,6 +115,14 @@ const DevTriggerHeader = memo(({ onNavigate }: { onNavigate: () => void }) => {
   );
 });
 DevTriggerHeader.displayName = 'DevTriggerHeader';
+
+const blurActiveElement = () => {
+  if (typeof document === "undefined") return;
+  const activeElement = document.activeElement;
+  if (activeElement instanceof HTMLElement) {
+    activeElement.blur();
+  }
+};
 
 const Profile = () => {
   const { user, signOut } = useAuth();
@@ -291,6 +298,18 @@ const Profile = () => {
       setIsDeletingAccount(false);
     }
   }, [user, isDeletingAccount, isDeleteConfirmationValid, queryClient, toast, signOut, navigate]);
+
+  const handleDeleteAccountSubmit = useCallback(
+    (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      void handleDeleteAccount();
+    },
+    [handleDeleteAccount],
+  );
+
+  const handleDeleteButtonPointerDown = useCallback((_: PointerEvent<HTMLButtonElement>) => {
+    blurActiveElement();
+  }, []);
 
 
 
@@ -608,30 +627,36 @@ const Profile = () => {
               This will permanently delete your account, companion, and progress. This can't be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="space-y-2">
-            <Label htmlFor="delete-confirmation-input">Type "delete" to confirm</Label>
-            <Input
-              id="delete-confirmation-input"
-              value={deleteConfirmationText}
-              onChange={(e) => setDeleteConfirmationText(e.target.value)}
-              placeholder='Type "delete"'
-              autoComplete="off"
-              autoCapitalize="none"
-              autoCorrect="off"
-              spellCheck={false}
-              disabled={isDeletingAccount}
-            />
-          </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeletingAccount}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={handleDeleteAccount}
-              disabled={isDeletingAccount || !isDeleteConfirmationValid}
-            >
-              {isDeletingAccount ? "Deleting..." : "Delete"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
+          <form className="space-y-4" onSubmit={handleDeleteAccountSubmit}>
+            <div className="space-y-2">
+              <Label htmlFor="delete-confirmation-input">Type "delete" to confirm</Label>
+              <Input
+                id="delete-confirmation-input"
+                value={deleteConfirmationText}
+                onChange={(e) => setDeleteConfirmationText(e.target.value)}
+                placeholder='Type "delete"'
+                autoComplete="off"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                enterKeyHint="done"
+                disabled={isDeletingAccount}
+              />
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogCancel type="button" disabled={isDeletingAccount}>
+                Cancel
+              </AlertDialogCancel>
+              <Button
+                type="submit"
+                variant="destructive"
+                onPointerDown={handleDeleteButtonPointerDown}
+                disabled={isDeletingAccount || !isDeleteConfirmationValid}
+              >
+                {isDeletingAccount ? "Deleting..." : "Delete"}
+              </Button>
+            </AlertDialogFooter>
+          </form>
         </AlertDialogContent>
       </AlertDialog>
 

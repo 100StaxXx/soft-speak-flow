@@ -912,9 +912,6 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
       queryClient.invalidateQueries({ queryKey: ["companion-evolution-image"] });
       queryClient.invalidateQueries({ queryKey: ["evolution-cards"] });
       queryClient.invalidateQueries({ queryKey: ["current-evolution-card"] });
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new CustomEvent("companion-evolved"));
-      }
     },
     onError: (error) => {
       setIsEvolvingLoading(false);

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState, type FormEvent, type PointerEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Crown, Sparkles, MessageCircle, Lock, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,6 @@ import { useNavigate } from "react-router-dom";
 import { deleteCurrentAccount, isAccountDeletionAuthError } from "@/services/accountDeletion";
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -28,6 +27,14 @@ export type TrialGateVariant = "pre_trial_signup" | "trial_expired";
 interface TrialExpiredPaywallProps {
   variant?: TrialGateVariant;
 }
+
+const blurActiveElement = () => {
+  if (typeof document === "undefined") return;
+  const activeElement = document.activeElement;
+  if (activeElement instanceof HTMLElement) {
+    activeElement.blur();
+  }
+};
 
 export const TrialExpiredPaywall = ({ variant = "pre_trial_signup" }: TrialExpiredPaywallProps) => {
   const [selectedPlan, setSelectedPlan] = useState<PlanType>("yearly");
@@ -111,6 +118,8 @@ export const TrialExpiredPaywall = ({ variant = "pre_trial_signup" }: TrialExpir
         signOut,
       });
 
+      setShowDeleteDialog(false);
+      setDeleteConfirmText("");
       navigate("/auth", {
         replace: true,
         state: { message: "Your account has been deleted." },
@@ -146,10 +155,25 @@ export const TrialExpiredPaywall = ({ variant = "pre_trial_signup" }: TrialExpir
       }
     } finally {
       setIsDeleting(false);
-      setShowDeleteDialog(false);
-      setDeleteConfirmText("");
     }
   };
+
+  const handleDeleteAccountSubmit = useCallback((event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    void handleDeleteAccount();
+  }, [handleDeleteAccount]);
+
+  const handleDeleteButtonPointerDown = useCallback((_: PointerEvent<HTMLButtonElement>) => {
+    blurActiveElement();
+  }, []);
+
+  const handleDeleteDialogOpenChange = useCallback((open: boolean) => {
+    if (isDeleting) return;
+    setShowDeleteDialog(open);
+    if (!open) {
+      setDeleteConfirmText("");
+    }
+  }, [isDeleting]);
 
   const plans = {
     monthly: {
@@ -364,44 +388,59 @@ export const TrialExpiredPaywall = ({ variant = "pre_trial_signup" }: TrialExpir
       </div>
 
       {/* Delete Account Confirmation Dialog */}
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+      <AlertDialog open={showDeleteDialog} onOpenChange={handleDeleteDialogOpenChange}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete your account?</AlertDialogTitle>
-            <AlertDialogDescription className="space-y-3">
-              <p>
-                This action is permanent and cannot be undone. All your data, 
-                including your companion, progress, and achievements will be 
-                permanently deleted.
-              </p>
-              <p className="font-medium text-foreground">
-                Type <span className="font-bold text-destructive">DELETE</span> to confirm:
-              </p>
-              <Input
-                value={deleteConfirmText}
-                onChange={(e) => setDeleteConfirmText(e.target.value)}
-                placeholder="Type DELETE"
-                className="mt-2"
-              />
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-sm text-muted-foreground">
+                <p>
+                  This action is permanent and cannot be undone. All your data,
+                  including your companion, progress, and achievements will be
+                  permanently deleted.
+                </p>
+                <p className="font-medium text-foreground">
+                  Type <span className="font-bold text-destructive">DELETE</span> to confirm:
+                </p>
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteAccount}
-              disabled={isDeleting || deleteConfirmText !== "DELETE"}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {isDeleting ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2" />
-                  Deleting...
-                </>
-              ) : (
-                "Delete Account"
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
+          <form className="space-y-4" onSubmit={handleDeleteAccountSubmit}>
+            <Input
+              id="trial-delete-confirmation-input"
+              aria-label="Type DELETE to confirm"
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder="Type DELETE"
+              className="mt-2"
+              autoComplete="off"
+              autoCapitalize="characters"
+              autoCorrect="off"
+              spellCheck={false}
+              enterKeyHint="done"
+              disabled={isDeleting}
+            />
+            <AlertDialogFooter>
+              <AlertDialogCancel type="button" disabled={isDeleting}>
+                Cancel
+              </AlertDialogCancel>
+              <Button
+                type="submit"
+                variant="destructive"
+                onPointerDown={handleDeleteButtonPointerDown}
+                disabled={isDeleting || deleteConfirmText !== "DELETE"}
+              >
+                {isDeleting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2" />
+                    Deleting...
+                  </>
+                ) : (
+                  "Delete Account"
+                )}
+              </Button>
+            </AlertDialogFooter>
+          </form>
         </AlertDialogContent>
       </AlertDialog>
     </div>

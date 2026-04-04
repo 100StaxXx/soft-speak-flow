@@ -1,5 +1,5 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   navigate: vi.fn(),
@@ -8,6 +8,8 @@ const mocks = vi.hoisted(() => ({
   handlePurchase: vi.fn(),
   handleRestore: vi.fn(),
   reloadProducts: vi.fn(),
+  deleteCurrentAccount: vi.fn(),
+  isAccountDeletionAuthError: vi.fn(() => false),
 }));
 
 vi.mock("@tanstack/react-query", () => ({
@@ -50,8 +52,8 @@ vi.mock("@/hooks/useAppleSubscription", () => ({
 }));
 
 vi.mock("@/services/accountDeletion", () => ({
-  deleteCurrentAccount: vi.fn(),
-  isAccountDeletionAuthError: vi.fn(() => false),
+  deleteCurrentAccount: mocks.deleteCurrentAccount,
+  isAccountDeletionAuthError: mocks.isAccountDeletionAuthError,
 }));
 
 import { TrialExpiredPaywall } from "./TrialExpiredPaywall";
@@ -63,7 +65,25 @@ const getRootContainer = () => {
   return root as HTMLDivElement;
 };
 
+const openDeleteDialog = () => {
+  fireEvent.click(screen.getByRole("button", { name: "Delete account" }));
+  return screen.getByRole("textbox");
+};
+
 describe("TrialExpiredPaywall layout", () => {
+  beforeEach(() => {
+    mocks.navigate.mockReset();
+    mocks.toast.mockReset();
+    mocks.signOut.mockReset();
+    mocks.handlePurchase.mockReset();
+    mocks.handleRestore.mockReset();
+    mocks.reloadProducts.mockReset();
+    mocks.deleteCurrentAccount.mockReset();
+    mocks.deleteCurrentAccount.mockResolvedValue({ warnings: [] });
+    mocks.isAccountDeletionAuthError.mockReset();
+    mocks.isAccountDeletionAuthError.mockReturnValue(false);
+  });
+
   it("uses top-aligned scroll layout instead of centered overflow layout", () => {
     render(<TrialExpiredPaywall variant="pre_trial_signup" />);
 
@@ -81,5 +101,85 @@ describe("TrialExpiredPaywall layout", () => {
     expect(root.className).toContain("pb-[var(--bottom-nav-runtime-offset,var(--bottom-nav-safe-offset))]");
     expect(screen.getByRole("button", { name: "Sign out" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Delete account" })).toBeInTheDocument();
+  });
+
+  it("submits account deletion on the first focused-input activation", async () => {
+    render(<TrialExpiredPaywall variant="trial_expired" />);
+
+    const input = openDeleteDialog();
+    fireEvent.change(input, { target: { value: "DELETE" } });
+    const activeElementSpy = vi.spyOn(document, "activeElement", "get").mockReturnValue(input);
+    const blurSpy = vi.spyOn(input, "blur");
+    const deleteButton = screen.getByRole("button", { name: "Delete Account" });
+    fireEvent.pointerDown(deleteButton);
+    fireEvent.click(deleteButton);
+
+    await waitFor(() => {
+      expect(mocks.deleteCurrentAccount).toHaveBeenCalledTimes(1);
+    });
+    expect(blurSpy).toHaveBeenCalled();
+    activeElementSpy.mockRestore();
+  });
+
+  it("closes and clears the dialog after a successful deletion", async () => {
+    render(<TrialExpiredPaywall variant="trial_expired" />);
+
+    const input = openDeleteDialog();
+    fireEvent.change(input, { target: { value: "DELETE" } });
+    fireEvent.click(screen.getByRole("button", { name: "Delete Account" }));
+
+    await waitFor(() => {
+      expect(mocks.navigate).toHaveBeenCalledWith("/auth", {
+        replace: true,
+        state: { message: "Your account has been deleted." },
+      });
+    });
+    await waitFor(() => {
+      expect(screen.queryByText("Delete your account?")).not.toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete account" }));
+    expect(screen.getByRole("textbox")).toHaveValue("");
+  });
+
+  it("keeps the dialog open and preserves confirmation text after a deletion failure", async () => {
+    mocks.deleteCurrentAccount.mockRejectedValueOnce(new Error("Delete failed"));
+
+    render(<TrialExpiredPaywall variant="trial_expired" />);
+
+    const input = openDeleteDialog();
+    fireEvent.change(input, { target: { value: "DELETE" } });
+    fireEvent.click(screen.getByRole("button", { name: "Delete Account" }));
+
+    await waitFor(() => {
+      expect(mocks.toast).toHaveBeenCalledWith({
+        title: "Error",
+        description: "Delete failed",
+        variant: "destructive",
+      });
+    });
+
+    expect(screen.getByText("Delete your account?")).toBeInTheDocument();
+    expect(screen.getByRole("textbox")).toHaveValue("DELETE");
+  });
+
+  it("blocks deletion when the confirmation text is invalid", async () => {
+    render(<TrialExpiredPaywall variant="trial_expired" />);
+
+    const input = openDeleteDialog();
+    fireEvent.change(input, { target: { value: "delete" } });
+
+    const deleteForm = input.closest("form");
+    expect(deleteForm).not.toBeNull();
+    fireEvent.submit(deleteForm!);
+
+    await waitFor(() => {
+      expect(mocks.toast).toHaveBeenCalledWith({
+        title: "Confirmation required",
+        description: "Please type DELETE to confirm account deletion.",
+        variant: "destructive",
+      });
+    });
+    expect(mocks.deleteCurrentAccount).not.toHaveBeenCalled();
   });
 });

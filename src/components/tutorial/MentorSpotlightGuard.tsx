@@ -7,8 +7,11 @@ interface SpotlightRect {
   height: number;
 }
 
+type MentorSpotlightMode = "spotlight" | "outline";
+
 interface MentorSpotlightGuardProps {
   active: boolean;
+  mode?: MentorSpotlightMode;
   targetSelector: string | null;
   panelSelector?: string;
 }
@@ -53,6 +56,7 @@ const getFocusableElements = (root: HTMLElement | null): HTMLElement[] => {
 
 export const MentorSpotlightGuard = ({
   active,
+  mode = "spotlight",
   targetSelector,
   panelSelector = '[data-tutorial="mentor-dialogue-panel"]',
 }: MentorSpotlightGuardProps) => {
@@ -89,7 +93,7 @@ export const MentorSpotlightGuard = ({
   }, [active, targetSelector]);
 
   useEffect(() => {
-    if (!active) {
+    if (!active || mode !== "spotlight") {
       setPanelElement(null);
       return;
     }
@@ -104,7 +108,7 @@ export const MentorSpotlightGuard = ({
     return () => {
       window.clearInterval(interval);
     };
-  }, [active, panelSelector]);
+  }, [active, mode, panelSelector]);
 
   useEffect(() => {
     if (!active || !targetElement) return;
@@ -116,7 +120,7 @@ export const MentorSpotlightGuard = ({
   }, [active, targetElement]);
 
   useEffect(() => {
-    if (!active || !targetElement) return;
+    if (!active || mode !== "spotlight" || !targetElement) return;
 
     const handleTab = (event: KeyboardEvent) => {
       if (event.key !== "Tab") return;
@@ -149,7 +153,7 @@ export const MentorSpotlightGuard = ({
     return () => {
       document.removeEventListener("keydown", handleTab);
     };
-  }, [active, panelElement, targetElement]);
+  }, [active, mode, panelElement, targetElement]);
 
   const blockedClickProps = {
     onPointerDown: (event: { preventDefault: () => void; stopPropagation: () => void }) => {
@@ -172,45 +176,54 @@ export const MentorSpotlightGuard = ({
   const viewportHeight = window.innerHeight;
 
   return (
-    <div className="mentor-spotlight-root" aria-hidden="true" data-testid="mentor-spotlight-guard">
-      <div
-        className="mentor-spotlight-mask"
-        style={{ top: 0, left: 0, width: "100%", height: `${spotlightRect.top}px` }}
-        {...blockedClickProps}
-      />
-      <div
-        className="mentor-spotlight-mask"
-        style={{
-          top: `${spotlightRect.top}px`,
-          left: 0,
-          width: `${spotlightRect.left}px`,
-          height: `${spotlightRect.height}px`,
-        }}
-        {...blockedClickProps}
-      />
-      <div
-        className="mentor-spotlight-mask"
-        style={{
-          top: `${spotlightRect.top}px`,
-          left: `${spotlightRect.left + spotlightRect.width}px`,
-          width: `${Math.max(0, viewportWidth - (spotlightRect.left + spotlightRect.width))}px`,
-          height: `${spotlightRect.height}px`,
-        }}
-        {...blockedClickProps}
-      />
-      <div
-        className="mentor-spotlight-mask"
-        style={{
-          top: `${spotlightRect.top + spotlightRect.height}px`,
-          left: 0,
-          width: "100%",
-          height: `${Math.max(0, viewportHeight - (spotlightRect.top + spotlightRect.height))}px`,
-        }}
-        {...blockedClickProps}
-      />
+    <div
+      className={`mentor-spotlight-root mentor-spotlight-root--${mode}`}
+      aria-hidden="true"
+      data-mode={mode}
+      data-testid="mentor-spotlight-guard"
+    >
+      {mode === "spotlight" ? (
+        <>
+          <div
+            className="mentor-spotlight-mask"
+            style={{ top: 0, left: 0, width: "100%", height: `${spotlightRect.top}px` }}
+            {...blockedClickProps}
+          />
+          <div
+            className="mentor-spotlight-mask"
+            style={{
+              top: `${spotlightRect.top}px`,
+              left: 0,
+              width: `${spotlightRect.left}px`,
+              height: `${spotlightRect.height}px`,
+            }}
+            {...blockedClickProps}
+          />
+          <div
+            className="mentor-spotlight-mask"
+            style={{
+              top: `${spotlightRect.top}px`,
+              left: `${spotlightRect.left + spotlightRect.width}px`,
+              width: `${Math.max(0, viewportWidth - (spotlightRect.left + spotlightRect.width))}px`,
+              height: `${spotlightRect.height}px`,
+            }}
+            {...blockedClickProps}
+          />
+          <div
+            className="mentor-spotlight-mask"
+            style={{
+              top: `${spotlightRect.top + spotlightRect.height}px`,
+              left: 0,
+              width: "100%",
+              height: `${Math.max(0, viewportHeight - (spotlightRect.top + spotlightRect.height))}px`,
+            }}
+            {...blockedClickProps}
+          />
+        </>
+      ) : null}
 
       <div
-        className="mentor-spotlight-ring"
+        className={`mentor-spotlight-ring mentor-spotlight-ring--${mode}`}
         style={{
           top: `${spotlightRect.top}px`,
           left: `${spotlightRect.left}px`,

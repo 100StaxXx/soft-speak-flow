@@ -2129,11 +2129,22 @@ All colors MUST be HSL.
     position: fixed;
     pointer-events: none;
     border-radius: 12px;
+    z-index: 101;
+  }
+
+  .mentor-spotlight-ring--spotlight {
     border: 2px solid hsl(var(--primary) / 0.92);
     box-shadow:
       0 0 0 8px hsl(var(--primary) / 0.2),
       0 16px 35px rgba(0, 0, 0, 0.35);
-    z-index: 101;
+  }
+
+  .mentor-spotlight-ring--outline {
+    border: 1.5px solid hsl(var(--primary) / 0.72);
+    border-radius: 20px;
+    box-shadow:
+      0 0 0 4px hsl(var(--primary) / 0.09),
+      0 10px 24px rgba(0, 0, 0, 0.18);
   }
 
   .mentor-spotlight-target-elevated {

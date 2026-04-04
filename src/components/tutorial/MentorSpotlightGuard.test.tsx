@@ -40,4 +40,32 @@ describe("MentorSpotlightGuard", () => {
     expect(clickSpy).not.toHaveBeenCalled();
     document.body.removeEventListener("click", clickSpy);
   });
+
+  it("renders a non-blocking outline without masks", () => {
+    document.body.innerHTML = `
+      <section data-tour="morning-checkin" style="position:fixed;left:20px;top:20px;width:280px;height:180px;">check-in</section>
+      <section data-tutorial="mentor-dialogue-panel"><button>panel</button></section>
+    `;
+
+    const target = document.querySelector('[data-tour="morning-checkin"]') as HTMLElement;
+    const clickSpy = vi.fn();
+    target.addEventListener("click", clickSpy);
+
+    render(
+      <MentorSpotlightGuard
+        active
+        mode="outline"
+        targetSelector='[data-tour="morning-checkin"]'
+      />
+    );
+
+    const guard = screen.getByTestId("mentor-spotlight-guard");
+    expect(guard).toHaveAttribute("data-mode", "outline");
+    expect(guard.querySelector(".mentor-spotlight-mask")).toBeNull();
+    expect(guard.querySelector(".mentor-spotlight-ring--outline")).toBeInTheDocument();
+
+    fireEvent.click(target);
+    expect(clickSpy).toHaveBeenCalledTimes(1);
+    target.removeEventListener("click", clickSpy);
+  });
 });

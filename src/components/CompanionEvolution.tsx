@@ -38,12 +38,12 @@ interface ArtReadiness {
 }
 
 const FULL_SEQUENCE_MS = {
-  hold: 300,
-  charge: 900,
-  conceal: 250,
-  reveal: 900,
-  settle: 1200,
-  dismissBuffer: 450,
+  hold: 800,
+  charge: 3200,
+  conceal: 600,
+  reveal: 2400,
+  settle: 1600,
+  dismissBuffer: 3000,
 } as const;
 
 const REDUCED_SEQUENCE_MS = {

@@ -171,7 +171,8 @@ const MentorTutorialLayer = memo(() => {
   return (
     <>
       <MentorSpotlightGuard
-        active={isActive && isStrictLockActive}
+        active={isActive}
+        mode={isStrictLockActive ? "spotlight" : "outline"}
         targetSelector={activeTargetSelector}
       />
       <MentorGuidanceCard />
