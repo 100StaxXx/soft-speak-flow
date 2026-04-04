@@ -78,7 +78,7 @@ const createTemporaryUnavailableError = (
     cause,
   });
 
-const isAuthUserAlreadyDeletedError = (error: unknown): boolean => {
+export const isAuthUserAlreadyDeletedError = (error: unknown): boolean => {
   if (!error || typeof error !== "object") return false;
 
   const combinedMessage = [
@@ -87,10 +87,17 @@ const isAuthUserAlreadyDeletedError = (error: unknown): boolean => {
     "name" in error ? error.name : undefined,
   ]
     .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
-    .join(" ")
-    .toLowerCase();
+    .join(" ");
 
-  return combinedMessage.includes("user not found") || combinedMessage.includes("not found");
+  const normalizedMessage = combinedMessage
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .toLowerCase()
+    .replace(/[_-]+/g, " ");
+  const compactMessage = normalizedMessage.replace(/[^a-z]+/g, "");
+
+  return normalizedMessage.includes("user not found")
+    || normalizedMessage.includes("not found")
+    || compactMessage.includes("usernotfound");
 };
 
 function sanitizeError(error: unknown): SanitizedDeleteUserError {
@@ -524,7 +531,7 @@ const runStorageCleanup = async (
   }
 };
 
-serve(async (req) => {
+export const handleDeleteUser = async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
     return handleCors(req);
   }
@@ -615,4 +622,8 @@ serve(async (req) => {
     console.error("[delete-user] request failed", error);
     return createErrorResponse(corsHeaders, sanitizeError(error));
   }
-});
+};
+
+if (Deno.env.get("SUPABASE_FUNCTIONS_TEST") !== "1") {
+  serve(handleDeleteUser);
+}
