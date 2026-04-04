@@ -161,7 +161,6 @@ export const OnboardingStoryToneSelection = ({
                             ) : null}
                           </div>
                           <p className="text-xs leading-5 text-white/[0.74]">{preset.revealCopy}</p>
-                          <p className="text-xs leading-5 text-white/[0.52]">{preset.signatureIdentity}</p>
                         </div>
 
                         {silhouetteSrc ? (

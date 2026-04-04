@@ -256,12 +256,9 @@ export const CompanionPersonalization = ({
                           </div>
                         </div>
                       </div>
-                      <div className="p-4 space-y-2">
+                      <div className="p-4">
                         <p className="text-sm text-foreground/90">
                           {preset.revealCopy}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {preset.signatureIdentity}
                         </p>
                       </div>
                     </button>
@@ -305,8 +302,6 @@ export const CompanionPersonalization = ({
                   <>
                     <div className="text-sm font-medium text-foreground">{selectedPreset.displayName}</div>
                     <div className="mt-1 text-xs uppercase tracking-[0.2em] text-muted-foreground">{selectedPreset.role}</div>
-                    <p className="mt-3 text-sm text-foreground/85">{selectedPreset.signatureIdentity}</p>
-                    <p className="mt-2 text-xs text-muted-foreground">{selectedPreset.anatomyLock}</p>
                   </>
                 )}
               </div>

@@ -106,6 +106,9 @@ INSERT INTO public.evolution_thresholds (stage, xp_required, stage_name) VALUES
   (99, 37580, 'Ascended'),
   (100, 38000, 'Ascended');
 
+DROP FUNCTION IF EXISTS public.get_next_evolution_threshold(INTEGER);
+DROP FUNCTION IF EXISTS public.should_evolve(INTEGER, BIGINT);
+
 CREATE OR REPLACE FUNCTION public.resolve_companion_stage_from_xp(p_xp BIGINT)
 RETURNS INTEGER
 LANGUAGE SQL
@@ -169,10 +172,15 @@ ALTER TABLE public.companion_preset_assets
 DROP CONSTRAINT IF EXISTS companion_preset_assets_tier_check;
 
 ALTER TABLE public.companion_preset_assets
+DROP CONSTRAINT IF EXISTS companion_preset_assets_check;
+
+ALTER TABLE public.companion_preset_assets
 DROP CONSTRAINT IF EXISTS companion_preset_assets_stage_start_check;
 
 ALTER TABLE public.companion_preset_assets
 DROP CONSTRAINT IF EXISTS companion_preset_assets_stage_end_check;
+
+DELETE FROM public.companion_preset_assets;
 
 ALTER TABLE public.companion_preset_assets
 ADD CONSTRAINT companion_preset_assets_tier_check
@@ -196,8 +204,6 @@ CHECK (stage_start >= 0 AND stage_start <= 100);
 ALTER TABLE public.companion_preset_assets
 ADD CONSTRAINT companion_preset_assets_stage_end_check
 CHECK (stage_end >= stage_start AND stage_end <= 100);
-
-DELETE FROM public.companion_preset_assets;
 
 WITH tiers AS (
   SELECT * FROM (VALUES
@@ -796,9 +802,15 @@ DELETE FROM public.companion_memories;
 DELETE FROM public.companion_evolutions;
 DELETE FROM public.companion_evolution_jobs;
 DELETE FROM public.xp_events;
-DELETE FROM public.achievements
-WHERE achievement_type LIKE 'companion_stage_%'
-   OR achievement_type LIKE 'companion_level_%';
+DO $$
+BEGIN
+  IF to_regclass('public.achievements') IS NOT NULL THEN
+    DELETE FROM public.achievements
+    WHERE achievement_type LIKE 'companion_stage_%'
+       OR achievement_type LIKE 'companion_level_%';
+  END IF;
+END
+$$;
 DELETE FROM public.user_companion;
 
 UPDATE public.profiles
