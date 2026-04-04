@@ -28,7 +28,7 @@ interface CompanionEvolutionProps {
   onComplete: () => void;
 }
 
-type EvolutionPhase = "hold" | "charge" | "conceal" | "strobe" | "reveal" | "settle";
+type EvolutionPhase = "hold" | "charge" | "conceal" | "strobe" | "apex" | "reveal" | "settle";
 type PreloadStatus = "idle" | "loading" | "loaded" | "error";
 
 interface ArtReadiness {
@@ -40,8 +40,9 @@ interface ArtReadiness {
 const FULL_SEQUENCE_MS = {
   hold: 800,
   charge: 3200,
-  conceal: 600,
-  strobe: 900,
+  conceal: 700,
+  strobe: 1800,
+  apex: 220,
   reveal: 2400,
   settle: 1600,
   dismissBuffer: 3000,
@@ -52,6 +53,7 @@ const REDUCED_SEQUENCE_MS = {
   charge: 280,
   conceal: 150,
   strobe: 0,
+  apex: 0,
   reveal: 500,
   settle: 480,
   dismissBuffer: 120,
@@ -59,6 +61,26 @@ const REDUCED_SEQUENCE_MS = {
 
 const EMERGENCY_EXIT_DELAY_MS = 15_000;
 const IMAGE_PRELOAD_TIMEOUT_MS = 2_000;
+const STROBE_BEAT_OFFSETS_MS = [
+  0,
+  220,
+  420,
+  600,
+  765,
+  915,
+  1050,
+  1170,
+  1275,
+  1365,
+  1440,
+  1505,
+  1565,
+  1620,
+  1670,
+  1715,
+] as const;
+const STROBE_PULSE_INTERVAL = 4;
+const LAST_STROBE_BEAT_INDEX = STROBE_BEAT_OFFSETS_MS.length - 1;
 
 const log = logger.scope("CompanionEvolution");
 
@@ -66,10 +88,12 @@ const ConvergenceParticles = ({
   phase,
   particleStyle,
   particleCount,
+  strobeBeatIndex,
 }: {
   phase: EvolutionPhase;
   particleStyle: ParticleStyle;
   particleCount: number;
+  strobeBeatIndex: number | null;
 }) => {
   const particles = useMemo(
     () =>
@@ -81,9 +105,32 @@ const ConvergenceParticles = ({
     [particleCount],
   );
 
-  if (phase !== "charge" && phase !== "conceal") {
+  if (phase !== "charge" && phase !== "conceal" && phase !== "strobe" && phase !== "apex") {
     return null;
   }
+
+  const strobeProgress = strobeBeatIndex === null ? 0 : strobeBeatIndex / LAST_STROBE_BEAT_INDEX;
+  const targetRadius = phase === "charge"
+    ? 40
+    : phase === "conceal"
+      ? 14
+      : phase === "strobe"
+        ? Math.max(0, 12 - strobeProgress * 10)
+        : 0;
+  const targetOpacity = phase === "charge"
+    ? 0.74
+    : phase === "conceal"
+      ? 0.18
+      : phase === "strobe"
+        ? Math.max(0.06, 0.24 - strobeProgress * 0.14)
+        : 0.04;
+  const targetScale = phase === "charge"
+    ? 0.96
+    : phase === "conceal"
+      ? 0.18
+      : phase === "strobe"
+        ? Math.max(0.04, 0.22 - strobeProgress * 0.15)
+        : 0.02;
 
   return (
     <div
@@ -104,17 +151,17 @@ const ConvergenceParticles = ({
             ? {
               x: Math.cos(particle.angle) * 40,
               y: Math.sin(particle.angle) * 40,
-              opacity: 0.74,
-              scale: 0.96,
+              opacity: targetOpacity,
+              scale: targetScale,
             }
             : {
-              x: 0,
-              y: 0,
-              opacity: 0.15,
-              scale: 0.16,
+              x: Math.cos(particle.angle) * targetRadius,
+              y: Math.sin(particle.angle) * targetRadius,
+              opacity: targetOpacity,
+              scale: targetScale,
             }}
           transition={{
-            duration: phase === "charge" ? 0.82 : 0.22,
+            duration: phase === "charge" ? 0.82 : phase === "strobe" ? 0.08 : 0.22,
             ease: [0.22, 1, 0.36, 1],
           }}
         />
@@ -243,6 +290,7 @@ const CompanionEvolutionContent = ({
   const [isLoadingVoice, setIsLoadingVoice] = useState(false);
   const [canDismiss, setCanDismiss] = useState(false);
   const [showEmergencyExit, setShowEmergencyExit] = useState(false);
+  const [strobeBeatIndex, setStrobeBeatIndex] = useState<number | null>(null);
   const [artReadiness, setArtReadiness] = useState<ArtReadiness>({
     previous: "idle",
     next: "idle",
@@ -298,11 +346,24 @@ const CompanionEvolutionContent = ({
       && artReadiness.next === "loaded",
   );
   const silhouetteStrobeEnabled = hasDualArt && !prefersReducedMotion;
+  const strobeDelayMs = silhouetteStrobeEnabled ? sequence.strobe + sequence.apex : 0;
   const revealDelayMs =
     sequence.hold
     + sequence.charge
     + sequence.conceal
-    + (silhouetteStrobeEnabled ? sequence.strobe : 0);
+    + strobeDelayMs;
+  const strobeTarget = phase === "strobe"
+    ? (strobeBeatIndex ?? 0) % 2 === 0
+      ? "previous"
+      : "next"
+    : phase === "apex" || phase === "reveal" || phase === "settle"
+      ? "next"
+      : "none";
+  const strobeProgress = phase === "strobe" && strobeBeatIndex !== null
+    ? strobeBeatIndex / LAST_STROBE_BEAT_INDEX
+    : phase === "apex"
+      ? 1
+      : 0;
 
   const anticipationTitle = isFirstEvolution ? "Something Stirs Within..." : "The Light Gathers...";
   const celebrationTitle = isFirstEvolution ? "Hatched!" : "Evolved!";
@@ -328,6 +389,7 @@ const CompanionEvolutionContent = ({
     if (!isEvolving) {
       animationKeyRef.current = null;
       voiceRequestKeyRef.current = null;
+      setStrobeBeatIndex(null);
       return;
     }
 
@@ -504,6 +566,7 @@ const CompanionEvolutionContent = ({
     setPhase("hold");
     setCanDismiss(false);
     setShowEmergencyExit(false);
+    setStrobeBeatIndex(null);
 
     emergencyTimeoutRef.current = window.setTimeout(() => {
       log.info("Evolution modal timeout reached, showing emergency exit");
@@ -529,12 +592,33 @@ const CompanionEvolutionContent = ({
     }, sequence.hold + sequence.charge);
 
     if (silhouetteStrobeEnabled) {
+      const strobeStartMs = sequence.hold + sequence.charge + sequence.conceal;
+
       queueTimeout(() => {
         setPhase("strobe");
-      }, sequence.hold + sequence.charge + sequence.conceal);
+        setStrobeBeatIndex(0);
+      }, strobeStartMs);
+
+      STROBE_BEAT_OFFSETS_MS.slice(1).forEach((offset, index) => {
+        const nextBeatIndex = index + 1;
+        queueTimeout(() => {
+          setStrobeBeatIndex(nextBeatIndex);
+
+          if ((nextBeatIndex + 1) % STROBE_PULSE_INTERVAL === 0) {
+            haptics.medium();
+          }
+        }, strobeStartMs + offset);
+      });
+
+      queueTimeout(() => {
+        setPhase("apex");
+        setStrobeBeatIndex(LAST_STROBE_BEAT_INDEX);
+        haptics.heavy();
+      }, strobeStartMs + sequence.strobe);
     }
 
     queueTimeout(() => {
+      setStrobeBeatIndex(null);
       setPhase("reveal");
       triggerEvent({
         type: "evolution_reveal",
@@ -590,6 +674,7 @@ const CompanionEvolutionContent = ({
     revealDelayMs,
     sequence,
     silhouetteStrobeEnabled,
+    strobeDelayMs,
     theme,
     triggerEvent,
   ]);
@@ -688,9 +773,11 @@ const CompanionEvolutionContent = ({
           style={{
             pointerEvents: "auto",
             touchAction: canDismiss ? "auto" : "none",
-            background: isFirstEvolution
-              ? "radial-gradient(circle at center, rgba(58, 44, 6, 0.82) 0%, rgba(0, 0, 0, 0.96) 66%, black 100%)"
-              : "radial-gradient(circle at center, rgba(8, 10, 22, 0.82) 0%, rgba(0, 0, 0, 0.96) 70%, black 100%)",
+            background: phase === "apex"
+              ? "radial-gradient(circle at center, rgba(0, 0, 0, 0.98) 0%, rgba(0, 0, 0, 1) 62%, black 100%)"
+              : isFirstEvolution
+                ? "radial-gradient(circle at center, rgba(58, 44, 6, 0.82) 0%, rgba(0, 0, 0, 0.96) 66%, black 100%)"
+                : "radial-gradient(circle at center, rgba(8, 10, 22, 0.82) 0%, rgba(0, 0, 0, 0.96) 70%, black 100%)",
             paddingTop: "env(safe-area-inset-top)",
             paddingBottom: "env(safe-area-inset-bottom)",
             paddingLeft: "env(safe-area-inset-left)",
@@ -703,14 +790,52 @@ const CompanionEvolutionContent = ({
             className="absolute inset-[-10%] pointer-events-none"
             initial={false}
             animate={{
-              opacity: phase === "hold" ? 0.18 : phase === "charge" ? 0.32 : phase === "conceal" ? 0.68 : 0.46,
-              scale: phase === "conceal" ? 1.08 : 1,
+              opacity: phase === "hold"
+                ? 0.18
+                : phase === "charge"
+                  ? 0.32
+                  : phase === "conceal"
+                    ? 0.68
+                    : phase === "strobe"
+                      ? 0.72 + strobeProgress * 0.16
+                      : phase === "apex"
+                        ? 0.94
+                        : 0.46,
+              scale: phase === "conceal"
+                ? 1.08
+                : phase === "strobe"
+                  ? 1.1 + strobeProgress * 0.12
+                  : phase === "apex"
+                    ? 1.24
+                    : 1,
             }}
-            transition={{ duration: 0.35 }}
+            transition={{ duration: phase === "strobe" ? 0.08 : 0.35 }}
             style={{
               background: `radial-gradient(circle at 50% 45%, hsl(${theme.glowA} / ${0.2 * theme.glowStrength}) 0%, hsl(${theme.glowB} / ${0.14 * theme.glowStrength}) 38%, transparent 72%)`,
             }}
           />
+
+          {silhouetteStrobeEnabled && (phase === "strobe" || phase === "apex") && (
+            <>
+              <motion.div
+                className="absolute inset-0 pointer-events-none evo-cinematic-eclipse"
+                initial={false}
+                animate={{
+                  opacity: phase === "apex" ? 1 : 0.62 + strobeProgress * 0.24,
+                  scale: phase === "apex" ? 1.16 : 1 + strobeProgress * 0.1,
+                }}
+                transition={{ duration: phase === "strobe" ? 0.08 : 0.14 }}
+              />
+              {phase === "apex" && (
+                <motion.div
+                  className="absolute inset-0 pointer-events-none evo-cinematic-apex-blackout"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.14 }}
+                />
+              )}
+            </>
+          )}
 
           {!prefersReducedMotion && (phase === "reveal" || phase === "settle") && (
             <motion.div
@@ -737,6 +862,7 @@ const CompanionEvolutionContent = ({
               phase={phase}
               particleStyle={theme.particleStyle}
               particleCount={convergenceParticleCount}
+              strobeBeatIndex={strobeBeatIndex}
             />
           )}
 
@@ -784,14 +910,38 @@ const CompanionEvolutionContent = ({
                 minHeight: "min(54vh, 470px)",
               }}
             >
-              <div
+              <motion.div
                 className="relative flex w-full max-w-[580px] items-center justify-center"
                 data-testid="evolution-art-stage"
                 data-art-presentation={hasDualArt ? "swap" : "single"}
                 data-strobe-enabled={silhouetteStrobeEnabled ? "true" : "false"}
+                data-strobe-beat={strobeBeatIndex === null ? "-1" : String(strobeBeatIndex)}
+                data-strobe-target={strobeTarget}
                 style={{
                   height: "min(54vh, 470px)",
                   ["--evo-strobe-duration" as string]: `${sequence.strobe / 1000}s`,
+                  ["--evo-strobe-progress" as string]: strobeProgress.toFixed(3),
+                }}
+                initial={false}
+                animate={{
+                  scale: phase === "hold"
+                    ? 1
+                    : phase === "charge"
+                      ? 1.03
+                      : phase === "conceal"
+                        ? 1.07
+                        : phase === "strobe"
+                          ? 1.1 + strobeProgress * 0.03
+                          : phase === "apex"
+                            ? 1.14
+                            : phase === "reveal"
+                              ? 1.03
+                              : 1,
+                  y: phase === "apex" ? -6 : 0,
+                }}
+                transition={{
+                  duration: phase === "strobe" ? 0.08 : phase === "apex" ? 0.16 : 0.32,
+                  ease: [0.22, 1, 0.36, 1],
                 }}
               >
                 <motion.div
@@ -801,16 +951,26 @@ const CompanionEvolutionContent = ({
                     opacity: phase === "conceal"
                       ? 0.95
                       : phase === "strobe"
-                        ? 0.72
+                        ? 0.34 + strobeProgress * 0.36
+                      : phase === "apex"
+                        ? 0.14
                       : phase === "reveal"
-                        ? 0.65
+                        ? 0.84
                         : phase === "charge"
                           ? 0.28
                           : 0,
-                    scale: phase === "conceal" ? 1.24 : phase === "strobe" ? 1.16 : phase === "reveal" ? 1.4 : 0.72,
+                    scale: phase === "conceal"
+                      ? 1.24
+                      : phase === "strobe"
+                        ? 0.98 + strobeProgress * 0.26
+                        : phase === "apex"
+                          ? 0.86
+                          : phase === "reveal"
+                            ? 1.54
+                            : 0.72,
                   }}
                   transition={{
-                    duration: phase === "conceal" ? sequence.conceal / 1000 : 0.42,
+                    duration: phase === "conceal" ? sequence.conceal / 1000 : phase === "strobe" ? 0.08 : 0.42,
                     ease: "easeOut",
                   }}
                   style={{
@@ -821,11 +981,17 @@ const CompanionEvolutionContent = ({
                 />
 
                 {silhouetteStrobeEnabled && phase === "strobe" && (
-                  <div
-                    className="absolute inset-[10%] rounded-full pointer-events-none evo-silhouette-strobe-stage"
+                  <motion.div
+                    className="absolute inset-[10%] rounded-full pointer-events-none evo-cinematic-bloom"
+                    initial={false}
+                    animate={{
+                      opacity: 0.34 + strobeProgress * 0.22,
+                      scale: 0.92 + strobeProgress * 0.26,
+                    }}
+                    transition={{ duration: 0.08 }}
                     style={{
                       background: `radial-gradient(circle, ${theme.flashCore} 0%, ${theme.flashGlow} 42%, transparent 74%)`,
-                      filter: "blur(20px)",
+                      filter: "blur(22px)",
                       mixBlendMode: "screen",
                     }}
                   />
@@ -833,20 +999,20 @@ const CompanionEvolutionContent = ({
 
                 {!prefersReducedMotion && phase === "reveal" && (
                   <motion.div
-                    className="absolute inset-[8%] pointer-events-none overflow-hidden rounded-[2rem]"
+                    className="absolute inset-[8%] pointer-events-none overflow-hidden rounded-[2rem] evo-cinematic-reveal-sweep"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: [0, 1, 0] }}
-                    transition={{ duration: 0.7, ease: "easeOut" }}
+                    transition={{ duration: 0.95, ease: "easeOut" }}
                   >
                     <motion.div
-                      className="absolute inset-y-0 w-1/2"
+                      className="absolute inset-y-0 w-[70%]"
                       initial={{ x: "-120%" }}
-                      animate={{ x: "240%" }}
-                      transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+                      animate={{ x: "215%" }}
+                      transition={{ duration: 0.95, ease: [0.22, 1, 0.36, 1] }}
                       style={{
                         background:
-                          "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.42) 48%, transparent 100%)",
-                        filter: "blur(6px)",
+                          "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.6) 48%, transparent 100%)",
+                        filter: "blur(9px)",
                       }}
                     />
                   </motion.div>
@@ -858,21 +1024,45 @@ const CompanionEvolutionContent = ({
                     src={previousDisplayImageUrl}
                     alt={`Companion before evolving at stage ${previousStage}`}
                     data-testid="evolution-previous-art"
-                    className={`absolute inset-0 h-full w-full rounded-[2rem] object-cover shadow-2xl ${
-                      phase === "strobe" && silhouetteStrobeEnabled ? "evo-silhouette-strobe-old" : ""
-                    }`}
+                    className="absolute inset-0 h-full w-full rounded-[2rem] object-cover shadow-2xl"
                     initial={false}
                     animate={{
-                      opacity: phase === "reveal" || phase === "settle" ? 0 : 1,
-                      scale: phase === "hold" ? 1 : phase === "charge" ? 1.04 : phase === "strobe" ? 1.09 : 1.09,
-                      filter: phase === "conceal" || phase === "strobe"
-                        ? "brightness(0) saturate(0) contrast(1.45) blur(4px)"
+                      opacity: phase === "reveal" || phase === "settle"
+                        ? 0
+                        : phase === "apex"
+                          ? 0.02
+                          : phase === "strobe"
+                            ? strobeTarget === "previous"
+                              ? 1
+                              : 0.08
+                            : 1,
+                      scale: phase === "hold"
+                        ? 1
+                        : phase === "charge"
+                          ? 1.05
+                          : phase === "conceal"
+                            ? 1.1
+                            : phase === "strobe"
+                              ? strobeTarget === "previous"
+                                ? 1.12 + strobeProgress * 0.03
+                                : 1.16 + strobeProgress * 0.02
+                              : phase === "apex"
+                                ? 1.19
+                                : 1.09,
+                      filter: phase === "conceal"
+                        ? "brightness(0) saturate(0) contrast(1.52) blur(5px)"
+                        : phase === "strobe"
+                          ? strobeTarget === "previous"
+                            ? "brightness(0) saturate(0) contrast(1.7) blur(4px)"
+                            : "brightness(0) saturate(0) contrast(2) blur(10px)"
+                          : phase === "apex"
+                            ? "brightness(0) saturate(0) contrast(2.2) blur(12px)"
                         : phase === "charge"
                           ? "brightness(1.14) saturate(1.12) contrast(1.02) blur(0px)"
                           : "brightness(1) saturate(1) contrast(1) blur(0px)",
                     }}
                     transition={{
-                      duration: phase === "conceal" ? sequence.conceal / 1000 : phase === "strobe" ? 0 : 0.34,
+                      duration: phase === "conceal" ? sequence.conceal / 1000 : phase === "strobe" ? 0.08 : 0.34,
                       ease: [0.22, 1, 0.36, 1],
                     }}
                     style={{
@@ -888,19 +1078,41 @@ const CompanionEvolutionContent = ({
                     src={revealDisplayImageUrl}
                     alt={`Companion after evolving at stage ${newStage}`}
                     data-testid="evolution-reveal-art"
-                    className={`absolute inset-0 h-full w-full rounded-[2rem] object-cover shadow-2xl ${
-                      phase === "strobe" && silhouetteStrobeEnabled ? "evo-silhouette-strobe-new" : ""
-                    }`}
+                    className="absolute inset-0 h-full w-full rounded-[2rem] object-cover shadow-2xl"
                     initial={false}
                     animate={hasDualArt
                       ? {
-                        opacity: phase === "strobe" || phase === "reveal" || phase === "settle" ? 1 : 0,
-                        scale: phase === "strobe" ? 1.12 : phase === "reveal" ? 1.07 : phase === "settle" ? 1 : 1.16,
+                        opacity: phase === "reveal" || phase === "settle"
+                          ? 1
+                          : phase === "apex"
+                            ? 0.22
+                            : phase === "strobe"
+                              ? strobeTarget === "next"
+                                ? 1
+                                : 0.08
+                              : 0,
+                        scale: phase === "strobe"
+                          ? strobeTarget === "next"
+                            ? 1.13 + strobeProgress * 0.03
+                            : 1.16 + strobeProgress * 0.02
+                          : phase === "apex"
+                            ? 1.16
+                            : phase === "reveal"
+                              ? 1.1
+                              : phase === "settle"
+                                ? 1
+                                : 1.16,
                         filter: phase === "reveal"
                           ? "brightness(1.16) saturate(1.08) contrast(1.05) blur(0px)"
                           : phase === "settle"
                             ? "brightness(1) saturate(1) contrast(1) blur(0px)"
-                            : "brightness(0) saturate(0) contrast(1.7) blur(10px)",
+                            : phase === "apex"
+                              ? "brightness(0) saturate(0) contrast(1.85) blur(7px)"
+                              : phase === "strobe"
+                                ? strobeTarget === "next"
+                                  ? "brightness(0) saturate(0) contrast(1.74) blur(4px)"
+                                  : "brightness(0) saturate(0) contrast(2) blur(10px)"
+                                : "brightness(0) saturate(0) contrast(1.7) blur(10px)",
                       }
                       : {
                         opacity: 1,
@@ -927,8 +1139,10 @@ const CompanionEvolutionContent = ({
                           ? sequence.reveal / 1000
                           : phase === "conceal"
                             ? sequence.conceal / 1000
+                            : phase === "apex"
+                              ? 0.16
                             : phase === "strobe"
-                              ? 0
+                              ? 0.08
                             : 0.34,
                       ease: [0.22, 1, 0.36, 1],
                     }}
@@ -969,7 +1183,7 @@ const CompanionEvolutionContent = ({
                     />
                   </>
                 )}
-              </div>
+              </motion.div>
             </div>
 
             <AnimatePresence mode="wait">

@@ -137,8 +137,9 @@ import { CompanionEvolution } from "./CompanionEvolution";
 const FULL_SEQUENCE_MS = {
   hold: 800,
   charge: 3200,
-  conceal: 600,
-  strobe: 900,
+  conceal: 700,
+  strobe: 1800,
+  apex: 220,
   reveal: 2400,
   dismissBuffer: 3000,
 } as const;
@@ -147,9 +148,29 @@ const REDUCED_SEQUENCE_MS = {
   hold: 150,
   charge: 280,
   conceal: 150,
+  apex: 0,
   reveal: 500,
   dismissBuffer: 120,
 } as const;
+
+const STROBE_BEAT_OFFSETS_MS = [
+  0,
+  220,
+  420,
+  600,
+  765,
+  915,
+  1050,
+  1170,
+  1275,
+  1365,
+  1440,
+  1505,
+  1565,
+  1620,
+  1670,
+  1715,
+] as const;
 
 class MockPreloadImage {
   onload: ((event: Event) => void) | null = null;
@@ -258,8 +279,15 @@ describe("CompanionEvolution", () => {
     await flushTimers(FULL_SEQUENCE_MS.conceal);
     expect(dialog).toHaveAttribute("data-phase", "strobe");
     expect(screen.getByTestId("evolution-art-stage")).toHaveAttribute("data-strobe-enabled", "true");
+    expect(screen.getByTestId("evolution-art-stage")).toHaveAttribute("data-strobe-beat", "0");
+    expect(screen.getByTestId("evolution-art-stage")).toHaveAttribute("data-strobe-target", "previous");
 
     await flushTimers(FULL_SEQUENCE_MS.strobe);
+    expect(dialog).toHaveAttribute("data-phase", "apex");
+    expect(screen.getByTestId("evolution-art-stage")).toHaveAttribute("data-strobe-beat", "15");
+    expect(screen.getByTestId("evolution-art-stage")).toHaveAttribute("data-strobe-target", "next");
+
+    await flushTimers(FULL_SEQUENCE_MS.apex);
     expect(dialog).toHaveAttribute("data-phase", "reveal");
     expect(screen.getByText("Evolved!")).toBeInTheDocument();
 
@@ -301,6 +329,8 @@ describe("CompanionEvolution", () => {
 
     expect(artStage).toHaveAttribute("data-art-presentation", "single");
     expect(artStage).toHaveAttribute("data-strobe-enabled", "false");
+    expect(artStage).toHaveAttribute("data-strobe-beat", "-1");
+    expect(artStage).toHaveAttribute("data-strobe-target", "none");
     expect(screen.queryByTestId("evolution-previous-art")).not.toBeInTheDocument();
     expect(screen.getByTestId("evolution-reveal-art")).toBeInTheDocument();
 
@@ -323,8 +353,11 @@ describe("CompanionEvolution", () => {
     await prepareEvolution();
 
     const dialog = screen.getByRole("alertdialog");
+    const artStage = screen.getByTestId("evolution-art-stage");
     expect(dialog).toHaveAttribute("data-reduced-motion", "true");
-    expect(screen.getByTestId("evolution-art-stage")).toHaveAttribute("data-strobe-enabled", "false");
+    expect(artStage).toHaveAttribute("data-strobe-enabled", "false");
+    expect(artStage).toHaveAttribute("data-strobe-beat", "-1");
+    expect(artStage).toHaveAttribute("data-strobe-target", "none");
     expect(screen.queryByTestId("evolution-convergence-particles")).not.toBeInTheDocument();
 
     await flushTimers(REDUCED_SEQUENCE_MS.hold);
@@ -341,6 +374,7 @@ describe("CompanionEvolution", () => {
 
     expect(props.onComplete).toHaveBeenCalledTimes(1);
     expect(mocks.confettiMock).not.toHaveBeenCalled();
+    expect(mocks.hapticsMediumMock).not.toHaveBeenCalled();
   });
 
   it("shows hatch visuals during first evolution", async () => {
@@ -367,7 +401,7 @@ describe("CompanionEvolution", () => {
     expect(screen.queryByTestId("evolution-hatching-overlay")).not.toBeInTheDocument();
   });
 
-  it("uses the silhouette strobe during first evolution when both art states are available", async () => {
+  it("uses the cinematic barrage and apex during first evolution when both art states are available", async () => {
     render(
       <CompanionEvolution
         {...buildProps()}
@@ -387,9 +421,90 @@ describe("CompanionEvolution", () => {
 
     await flushTimers(FULL_SEQUENCE_MS.conceal);
     expect(dialog).toHaveAttribute("data-phase", "strobe");
+    expect(screen.getByTestId("evolution-art-stage")).toHaveAttribute("data-strobe-target", "previous");
 
     await flushTimers(FULL_SEQUENCE_MS.strobe);
+    expect(dialog).toHaveAttribute("data-phase", "apex");
+
+    await flushTimers(FULL_SEQUENCE_MS.apex);
     expect(dialog).toHaveAttribute("data-phase", "reveal");
+  });
+
+  it("runs a deterministic 16-beat accelerating barrage before the apex", async () => {
+    render(<CompanionEvolution {...buildProps()} />);
+    await prepareEvolution();
+
+    const dialog = screen.getByRole("alertdialog");
+    const artStage = screen.getByTestId("evolution-art-stage");
+    const gaps = STROBE_BEAT_OFFSETS_MS.slice(1).map((offset, index) => offset - STROBE_BEAT_OFFSETS_MS[index]);
+
+    expect(gaps[0]).toBeGreaterThan(gaps[gaps.length - 1]);
+
+    await flushTimers(FULL_SEQUENCE_MS.hold + FULL_SEQUENCE_MS.charge + FULL_SEQUENCE_MS.conceal);
+    expect(dialog).toHaveAttribute("data-phase", "strobe");
+    expect(artStage).toHaveAttribute("data-strobe-beat", "0");
+    expect(artStage).toHaveAttribute("data-strobe-target", "previous");
+
+    let elapsed = 0;
+    for (const [index, offset] of STROBE_BEAT_OFFSETS_MS.slice(1).entries()) {
+      await flushTimers(offset - elapsed);
+      elapsed = offset;
+
+      const beatIndex = index + 1;
+      const expectedTarget = beatIndex % 2 === 0 ? "previous" : "next";
+      expect(dialog).toHaveAttribute("data-phase", "strobe");
+      expect(artStage).toHaveAttribute("data-strobe-beat", String(beatIndex));
+      expect(artStage).toHaveAttribute("data-strobe-target", expectedTarget);
+    }
+
+    await flushTimers(FULL_SEQUENCE_MS.strobe - elapsed);
+    expect(dialog).toHaveAttribute("data-phase", "apex");
+    expect(artStage).toHaveAttribute("data-strobe-beat", "15");
+    expect(artStage).toHaveAttribute("data-strobe-target", "next");
+  });
+
+  it("syncs haptics to the cinematic barrage, apex, and reveal", async () => {
+    render(<CompanionEvolution {...buildProps()} />);
+    await prepareEvolution();
+
+    const dialog = screen.getByRole("alertdialog");
+
+    await flushTimers(FULL_SEQUENCE_MS.hold);
+    expect(mocks.hapticsLightMock).toHaveBeenCalledTimes(1);
+    expect(dialog).toHaveAttribute("data-phase", "charge");
+
+    await flushTimers(FULL_SEQUENCE_MS.charge);
+    expect(mocks.hapticsHeavyMock).toHaveBeenCalledTimes(1);
+    expect(dialog).toHaveAttribute("data-phase", "conceal");
+
+    await flushTimers(FULL_SEQUENCE_MS.conceal);
+    expect(dialog).toHaveAttribute("data-phase", "strobe");
+
+    await flushTimers(FULL_SEQUENCE_MS.strobe - 1);
+    expect(dialog).toHaveAttribute("data-phase", "strobe");
+    expect(mocks.hapticsMediumMock).toHaveBeenCalledTimes(4);
+    expect(mocks.hapticsHeavyMock).toHaveBeenCalledTimes(1);
+
+    await flushTimers(1);
+    expect(dialog).toHaveAttribute("data-phase", "apex");
+    expect(mocks.hapticsHeavyMock).toHaveBeenCalledTimes(2);
+
+    await flushTimers(FULL_SEQUENCE_MS.apex);
+    expect(dialog).toHaveAttribute("data-phase", "reveal");
+    expect(mocks.hapticsMediumMock).toHaveBeenCalledTimes(5);
+    expect(mocks.playEvolutionStartMock).toHaveBeenCalledTimes(1);
+    expect(mocks.playEvolutionSuccessMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("still allows emergency exit during the longer cinematic sequence", async () => {
+    const props = buildProps();
+    render(<CompanionEvolution {...props} />);
+    await prepareEvolution();
+
+    await flushTimers(15_000);
+
+    fireEvent.click(screen.getByRole("button", { name: "Close evolution modal" }));
+    expect(props.onComplete).toHaveBeenCalledTimes(1);
   });
 
   it("plays animation side effects only once across rerenders", async () => {
@@ -408,6 +523,7 @@ describe("CompanionEvolution", () => {
       FULL_SEQUENCE_MS.charge +
       FULL_SEQUENCE_MS.conceal +
       FULL_SEQUENCE_MS.strobe +
+      FULL_SEQUENCE_MS.apex +
       FULL_SEQUENCE_MS.reveal,
     );
 
