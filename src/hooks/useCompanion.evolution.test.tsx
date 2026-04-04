@@ -2,6 +2,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { COMPANION_HATCH_STARTED_EVENT } from "@/lib/companionEvolutionEvents";
 
 const companionFixture = {
   id: "companion-1",
@@ -1026,6 +1027,76 @@ describe("useCompanion evolveCompanion", () => {
     });
 
     expect(mocks.setIsEvolvingLoadingMock).toHaveBeenCalledWith(true);
+  });
+
+  it("emits a local hatch-start event before invalidating companion queries", async () => {
+    const dispatchSpy = vi.spyOn(window, "dispatchEvent");
+    mocks.invokeMock.mockImplementation((fnName: string) => {
+      if (fnName === "generate-evolution-card" || fnName === "generate-companion-story") {
+        return new Promise(() => {});
+      }
+
+      return Promise.resolve({ data: null, error: null });
+    });
+    mocks.rpcMock.mockResolvedValueOnce({
+      data: [
+        {
+          id: companionFixture.id,
+          preset_id: "dragon",
+          spirit_animal: "Dragon",
+          favorite_color: "#FF6B35",
+          core_element: "fire",
+          story_tone: "epic_adventure",
+          current_stage: 1,
+          current_image_url: "/companion-presets/dragon/t1_youth/normal/dragon__t1_youth__normal__fire.png",
+          initial_image_url: companionFixture.current_image_url,
+          evolution_id: "evo-1",
+        },
+      ],
+      error: null,
+    });
+
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+    const { result } = await renderUseCompanion(queryClient);
+
+    await act(async () => {
+      await result.current.hatchCompanion.mutateAsync({
+        presetId: "dragon",
+      });
+    });
+
+    const hatchEventIndex = dispatchSpy.mock.calls.findIndex(([event]) =>
+      event instanceof CustomEvent && event.type === COMPANION_HATCH_STARTED_EVENT,
+    );
+    const companionInvalidateIndex = invalidateSpy.mock.calls.findIndex(
+      ([options]) => Array.isArray(options.queryKey) && options.queryKey[0] === "companion",
+    );
+
+    expect(hatchEventIndex).toBeGreaterThanOrEqual(0);
+    expect(companionInvalidateIndex).toBeGreaterThanOrEqual(0);
+
+    const hatchEvent = dispatchSpy.mock.calls[hatchEventIndex]?.[0];
+    expect(hatchEvent).toEqual(expect.objectContaining({
+      type: COMPANION_HATCH_STARTED_EVENT,
+      detail: expect.objectContaining({
+        companionId: companionFixture.id,
+        previousStage: 0,
+        newStage: 1,
+        previousImageUrl: companionFixture.current_image_url,
+        newImageUrl: "/companion-presets/dragon/t1_youth/normal/dragon__t1_youth__normal__fire.png",
+        element: "fire",
+      }),
+    }));
+
+    expect(dispatchSpy.mock.invocationCallOrder[hatchEventIndex]).toBeLessThan(
+      invalidateSpy.mock.invocationCallOrder[companionInvalidateIndex],
+    );
   });
 
   it("re-syncs stale stage 1 cache back to a hatchable egg before triggering the first hatch", async () => {

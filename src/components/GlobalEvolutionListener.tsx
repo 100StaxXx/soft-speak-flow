@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { CompanionEvolution } from "@/components/CompanionEvolution";
 import { supabase } from "@/integrations/supabase/client";
@@ -7,6 +7,10 @@ import { useEvolution } from "@/contexts/EvolutionContext";
 import { useCelebration } from "@/contexts/CelebrationContext";
 import { useMentorConnection } from "@/contexts/MentorConnectionContext";
 import { resolveCompanionVisualAssetUrl } from "@/lib/companionAssetResolver";
+import {
+  COMPANION_HATCH_STARTED_EVENT,
+  isCompanionHatchStartedDetail,
+} from "@/lib/companionEvolutionEvents";
 import { logger } from "@/utils/logger";
 import {
   didTierChange,
@@ -16,6 +20,7 @@ import {
 import { useCompanionMotionSafe } from "@/contexts/CompanionMotionContext";
 
 const EVOLUTION_RECORD_RETRY_DELAYS_MS = [0, 75, 150] as const;
+const LOCAL_HATCH_DEDUPE_WINDOW_MS = 15000;
 
 const waitForEvolutionPersistence = async ({
   companionId,
@@ -62,6 +67,7 @@ export const GlobalEvolutionListener = () => {
   const { triggerEvent } = useCompanionMotionSafe();
   const [isEvolving, setIsEvolving] = useState(false);
   const [evolutionData, setEvolutionData] = useState<{
+    companionId: string;
     previousLevel: number;
     level: number;
     previousImageUrl: string;
@@ -69,6 +75,150 @@ export const GlobalEvolutionListener = () => {
     mentorSlug?: string;
     element?: string;
   } | null>(null);
+  const activeEvolutionKeyRef = useRef<string | null>(null);
+  const recentLocalHatchKeysRef = useRef(new Map<string, number>());
+
+  const buildEvolutionKey = useCallback((companionId: string, stage: number) => (
+    `${companionId}:${stage}`
+  ), []);
+
+  const pruneRecentLocalHatchKeys = useCallback(() => {
+    const now = Date.now();
+    recentLocalHatchKeysRef.current.forEach((timestamp, key) => {
+      if (now - timestamp > LOCAL_HATCH_DEDUPE_WINDOW_MS) {
+        recentLocalHatchKeysRef.current.delete(key);
+      }
+    });
+  }, []);
+
+  const resolveMentorSlug = useCallback(async () => {
+    if (!resolvedMentorId) return undefined;
+
+    const { data: mentor } = await supabase
+      .from("mentors")
+      .select("slug")
+      .eq("id", resolvedMentorId)
+      .maybeSingle();
+
+    return mentor?.slug;
+  }, [resolvedMentorId]);
+
+  const recordEvolutionMemory = useCallback(({
+    companionId,
+    previousLevel,
+    level,
+  }: {
+    companionId: string;
+    previousLevel: number;
+    level: number;
+  }) => {
+    if (!user?.id) return;
+
+    const today = new Date().toISOString().split("T")[0];
+    const isFirstEvolution = level === 1;
+    const tierLabel = getProgressionTierLabelForLevel(level);
+    supabase.from("companion_memories").insert({
+      user_id: user.id,
+      companion_id: companionId,
+      memory_type: isFirstEvolution ? "first_evolution" : "evolution",
+      memory_date: today,
+      memory_context: {
+        title: isFirstEvolution ? "First Hatch" : `Reached ${getProgressionLevelDisplay(level)}`,
+        description: isFirstEvolution
+          ? "The shell cracked open, and your companion finally emerged."
+          : `Your companion crossed into the ${tierLabel} tier.`,
+        emotion: isFirstEvolution ? "pride" : "joy",
+        details: {
+          level,
+          previousLevel,
+          tier: tierLabel,
+        },
+      },
+      referenced_count: 0,
+    }).then(({ error }) => {
+      if (error) logger.error("Failed to create evolution memory:", error);
+    });
+  }, [user?.id]);
+
+  const startEvolutionPresentation = useCallback(async ({
+    companionId,
+    previousLevel,
+    level,
+    previousImageUrl,
+    imageUrl,
+    element,
+    dispatchLoadingStart = false,
+    markAsLocalHatch = false,
+  }: {
+    companionId: string;
+    previousLevel: number;
+    level: number;
+    previousImageUrl: string;
+    imageUrl: string;
+    element?: string;
+    dispatchLoadingStart?: boolean;
+    markAsLocalHatch?: boolean;
+  }) => {
+    const key = buildEvolutionKey(companionId, level);
+
+    if (activeEvolutionKeyRef.current === key) {
+      return false;
+    }
+
+    activeEvolutionKeyRef.current = key;
+
+    if (markAsLocalHatch) {
+      recentLocalHatchKeysRef.current.set(key, Date.now());
+    }
+
+    try {
+      const mentorSlug = await resolveMentorSlug();
+
+      setEvolutionData({
+        companionId,
+        previousLevel,
+        level,
+        previousImageUrl,
+        imageUrl,
+        mentorSlug,
+        element,
+      });
+      triggerEvent({
+        type: "evolution_start",
+        intensity: level >= 56 ? "heroic" : "medium",
+        element,
+        stage: level,
+      });
+      setIsEvolving(true);
+      setEvolutionInProgress(true);
+
+      if (dispatchLoadingStart) {
+        window.dispatchEvent(new CustomEvent("evolution-loading-start"));
+      }
+
+      recordEvolutionMemory({
+        companionId,
+        previousLevel,
+        level,
+      });
+
+      return true;
+    } catch (error) {
+      activeEvolutionKeyRef.current = null;
+      logger.error("Evolution listener: Failed to start evolution presentation", {
+        companionId,
+        level,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return false;
+    }
+  }, [
+    buildEvolutionKey,
+    recordEvolutionMemory,
+    resolveMentorSlug,
+    setEvolutionInProgress,
+    triggerEvent,
+  ]);
 
   useEffect(() => {
     if (!user) return;
@@ -130,6 +280,15 @@ export const GlobalEvolutionListener = () => {
             return;
           }
 
+          const evolutionKey = buildEvolutionKey(companionId, newLevel);
+          pruneRecentLocalHatchKeys();
+
+          const localHatchStartedAt = recentLocalHatchKeysRef.current.get(evolutionKey);
+          if (localHatchStartedAt && Date.now() - localHatchStartedAt <= LOCAL_HATCH_DEDUPE_WINDOW_MS) {
+            recentLocalHatchKeysRef.current.delete(evolutionKey);
+            return;
+          }
+
           const hasPersistedEvolution = await waitForEvolutionPersistence({
             companionId,
             stage: newLevel,
@@ -179,58 +338,14 @@ export const GlobalEvolutionListener = () => {
                 : null,
           }) ?? currentImageUrl;
 
-          let mentorSlug: string | undefined;
-          if (resolvedMentorId) {
-            const { data: mentor } = await supabase
-              .from("mentors")
-              .select("slug")
-              .eq("id", resolvedMentorId)
-              .maybeSingle();
-
-            mentorSlug = mentor?.slug;
-          }
-
-          setEvolutionData({
+          await startEvolutionPresentation({
+            companionId,
             previousLevel: oldLevel,
             level: newLevel,
             previousImageUrl,
             imageUrl,
-            mentorSlug,
             element,
-          });
-          triggerEvent({
-            type: "evolution_start",
-            intensity: newLevel >= 56 ? "heroic" : "medium",
-            element,
-            stage: newLevel,
-          });
-          setIsEvolving(true);
-          setEvolutionInProgress(true);
-          window.dispatchEvent(new CustomEvent("evolution-loading-start"));
-
-          const today = new Date().toISOString().split("T")[0];
-          const isFirstEvolution = newLevel === 1;
-          const tierLabel = getProgressionTierLabelForLevel(newLevel);
-          supabase.from("companion_memories").insert({
-            user_id: user.id,
-            companion_id: companionId,
-            memory_type: isFirstEvolution ? "first_evolution" : "evolution",
-            memory_date: today,
-            memory_context: {
-              title: isFirstEvolution ? "First Hatch" : `Reached ${getProgressionLevelDisplay(newLevel)}`,
-              description: isFirstEvolution
-                ? "The shell cracked open, and your companion finally emerged."
-                : `Your companion crossed into the ${tierLabel} tier.`,
-              emotion: isFirstEvolution ? "pride" : "joy",
-              details: {
-                level: newLevel,
-                previousLevel: oldLevel,
-                tier: tierLabel,
-              },
-            },
-            referenced_count: 0,
-          }).then(({ error }) => {
-            if (error) logger.error("Failed to create evolution memory:", error);
+            dispatchLoadingStart: true,
           });
         },
       )
@@ -247,7 +362,40 @@ export const GlobalEvolutionListener = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, user?.id, resolvedMentorId, queryClient, setEvolutionInProgress, triggerEvent]);
+  }, [
+    buildEvolutionKey,
+    pruneRecentLocalHatchKeys,
+    queryClient,
+    startEvolutionPresentation,
+    user,
+    user?.id,
+  ]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const handleHatchStarted = (event: Event) => {
+      const detail = (event as CustomEvent<unknown>).detail;
+      if (!isCompanionHatchStartedDetail(detail)) {
+        return;
+      }
+
+      void startEvolutionPresentation({
+        companionId: detail.companionId,
+        previousLevel: detail.previousStage,
+        level: detail.newStage,
+        previousImageUrl: detail.previousImageUrl,
+        imageUrl: detail.newImageUrl,
+        element: detail.element ?? undefined,
+        markAsLocalHatch: true,
+      });
+    };
+
+    window.addEventListener(COMPANION_HATCH_STARTED_EVENT, handleHatchStarted as EventListener);
+    return () => {
+      window.removeEventListener(COMPANION_HATCH_STARTED_EVENT, handleHatchStarted as EventListener);
+    };
+  }, [startEvolutionPresentation, user]);
 
   if (!isEvolving || !evolutionData) {
     return null;
@@ -266,6 +414,7 @@ export const GlobalEvolutionListener = () => {
       onComplete={() => {
         setIsEvolving(false);
         setEvolutionData(null);
+        activeEvolutionKeyRef.current = null;
         setIsEvolvingLoading(false);
         setEvolutionInProgress(false);
 

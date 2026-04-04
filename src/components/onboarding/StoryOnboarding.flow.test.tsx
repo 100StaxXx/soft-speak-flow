@@ -558,6 +558,49 @@ describe("StoryOnboarding questionnaire submission flow", () => {
     }
   });
 
+  it("enters journey-begins immediately and blocks completion while setup is still pending", async () => {
+    mocks.createCompanionMutateAsync.mockImplementation(() => new Promise(() => {
+      // Keep pending to verify the journey screen no longer waits on setup.
+    }));
+
+    renderOnboarding();
+    await advanceToQuestionnaire();
+
+    vi.useFakeTimers();
+    try {
+      fireEvent.click(screen.getByRole("button", { name: "questionnaire-submit" }));
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(CALCULATING_STAGE_DURATION_MS);
+        await Promise.resolve();
+      });
+
+      vi.useRealTimers();
+
+      await advanceFromMentorToEggSelection();
+      fireEvent.click(screen.getByRole("button", { name: "complete-companion" }));
+
+      await screen.findByTestId("journey-begins-stage");
+      await act(async () => {
+        await Promise.resolve();
+      });
+      mocks.profilesUpdateEq.mockClear();
+
+      fireEvent.click(screen.getByRole("button", { name: "finish-journey" }));
+
+      await waitFor(() => {
+        expect(mocks.toastError).toHaveBeenCalledWith(
+          "Your companion is still taking shape. Please try again in a moment.",
+          expect.objectContaining({ duration: expect.any(Number) }),
+        );
+      });
+      expect(mocks.createCompanionMutateAsync).toHaveBeenCalledTimes(1);
+      expect(mocks.profilesUpdateEq).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("seeds first-run guided tutorial progress when journey begins is completed", async () => {
     renderOnboarding();
     await advanceToQuestionnaire();
@@ -799,7 +842,57 @@ describe("StoryOnboarding questionnaire submission flow", () => {
           expect.objectContaining({ duration: expect.any(Number) }),
         );
       });
-      expect(screen.queryByTestId("journey-begins-stage")).not.toBeInTheDocument();
+      expect(screen.getByTestId("journey-begins-stage")).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("retries failed companion setup from the journey button using the cached selection", async () => {
+    mocks.createCompanionMutateAsync
+      .mockRejectedValueOnce(new Error("Companion setup is still syncing. Please try again in a moment."))
+      .mockResolvedValueOnce({ id: "companion-1" });
+
+    renderOnboarding();
+    await advanceToQuestionnaire();
+
+    vi.useFakeTimers();
+    try {
+      fireEvent.click(screen.getByRole("button", { name: "questionnaire-submit" }));
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(CALCULATING_STAGE_DURATION_MS);
+        await Promise.resolve();
+      });
+
+      vi.useRealTimers();
+
+      await advanceFromMentorToEggSelection();
+      fireEvent.click(screen.getByRole("button", { name: "complete-companion" }));
+
+      await screen.findByTestId("journey-begins-stage");
+      await waitFor(() => {
+        expect(mocks.toastError).toHaveBeenCalledWith(
+          "Companion setup is still syncing. Please try again in a moment.",
+          expect.objectContaining({ duration: expect.any(Number) }),
+        );
+      });
+
+      mocks.profilesUpdateEq.mockClear();
+      fireEvent.click(screen.getByRole("button", { name: "finish-journey" }));
+
+      await waitFor(() => {
+        expect(mocks.createCompanionMutateAsync).toHaveBeenCalledTimes(2);
+      });
+      await waitFor(() => {
+        expect(mocks.profilesUpdateEq).toHaveBeenCalled();
+      });
+      await waitFor(() => {
+        expect(mocks.toastSuccess).toHaveBeenCalledWith(
+          "Welcome to Cosmiq! Your journey begins.",
+          expect.objectContaining({ duration: expect.any(Number) }),
+        );
+      });
     } finally {
       vi.useRealTimers();
     }

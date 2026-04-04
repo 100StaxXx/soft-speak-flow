@@ -1,7 +1,6 @@
 import { useState, type CSSProperties } from "react";
 import { useReducedMotion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { CompanionCreationLoader } from "@/components/CompanionCreationLoader";
 import {
   getCompanionElement,
   getCompanionElementAnchorColor,
@@ -151,10 +150,6 @@ export const OnboardingEggSelection = ({
     });
   };
 
-  if (isLoading) {
-    return <CompanionCreationLoader />;
-  }
-
   return (
     <div className="relative z-10 min-h-screen pt-safe-top pb-safe-bottom">
       <div className="onboarding-egg-selection__layout">
@@ -192,6 +187,7 @@ export const OnboardingEggSelection = ({
                 type="button"
                 variant="ghost"
                 onClick={onBack}
+                disabled={isLoading}
                 className="onboarding-egg-chamber__back"
               >
                 Back
@@ -225,6 +221,7 @@ export const OnboardingEggSelection = ({
                   style={slotStyle}
                   aria-label={`Select ${element.productLabel} element`}
                   aria-pressed={isSelected}
+                  disabled={isLoading}
                   onClick={() => setSelectedElement(element.id)}
                 >
                   <span className="onboarding-egg-slot__pedestal-flare" aria-hidden="true" />
@@ -253,7 +250,7 @@ export const OnboardingEggSelection = ({
               type="button"
               className="onboarding-egg-chamber__continue"
               onClick={handleContinue}
-              disabled={!selectedElement}
+              disabled={isLoading || !selectedElement}
               aria-label="Continue"
             />
           </div>

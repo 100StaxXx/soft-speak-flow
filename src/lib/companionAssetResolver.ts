@@ -50,6 +50,7 @@ export const getPresetCompanionAssetUrl = ({
   if (!normalizedPresetId) return null;
   const normalizedElement = coerceCompanionElementId(element);
   const tier = resolveCompanionArtTier(stage);
+  const isStageZeroEgg = stage <= 0;
   const hasRemoteStageCoverage = hasRemoteCompanionPresetStageAssetCoverage({
     presetId: normalizedPresetId,
     stage,
@@ -62,9 +63,9 @@ export const getPresetCompanionAssetUrl = ({
     })}`
     : null;
 
-  // Preserve the generic egg when this preset has no remote stage-0 art,
-  // rather than showing youth art before the companion hatches.
-  if (stage <= 0 && !hasRemoteStageCoverage) {
+  // Stage 0 should stay on the shared elemental egg art until hatch.
+  // Even presets with remote coverage can point at stale or missing t0 assets.
+  if (isStageZeroEgg && state === "normal") {
     return null;
   }
 
@@ -98,6 +99,12 @@ export const resolveCompanionVisualAssetUrl = (
   const normalizedElement = companion.core_element ?? "fire";
   const isStageZeroEgg = (companion.current_stage ?? 0) <= 0;
 
+  // Level 0 always renders the shared elemental egg art. Persisted stage-0 URLs
+  // can be stale or point at preset art that does not exist yet.
+  if (isStageZeroEgg && state === "normal") {
+    return getUniversalEggAssetUrl(normalizedElement);
+  }
+
   const presetUrl = companion.preset_id
     ? getPresetCompanionAssetUrl({
       presetId: companion.preset_id,
@@ -108,12 +115,6 @@ export const resolveCompanionVisualAssetUrl = (
     : null;
 
   if (presetUrl) return presetUrl;
-
-  // Level 0 always renders the shared elemental egg art. Persisted stage-0 URLs
-  // can be stale or point at preset art that does not exist yet.
-  if (isStageZeroEgg && state === "normal") {
-    return getUniversalEggAssetUrl(normalizedElement);
-  }
 
   if (state === "dormant") {
     return companion.dormant_image_url ?? companion.current_image_url ?? null;

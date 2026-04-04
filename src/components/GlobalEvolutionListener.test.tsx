@@ -1,5 +1,6 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { COMPANION_HATCH_STARTED_EVENT } from "@/lib/companionEvolutionEvents";
 
 const mocks = vi.hoisted(() => {
   const invalidateQueriesMock = vi.fn().mockResolvedValue(undefined);
@@ -231,6 +232,88 @@ describe("GlobalEvolutionListener", () => {
         newStage: 5,
         previousImageUrl: "https://example.com/stage-4.png",
         newImageUrl: "https://example.com/stage-5.png",
+      }),
+    );
+  });
+
+  it("starts the first hatch animation from a local hatch event", async () => {
+    render(<GlobalEvolutionListener />);
+
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent(COMPANION_HATCH_STARTED_EVENT, {
+        detail: {
+          companionId: "companion-1",
+          previousStage: 0,
+          newStage: 1,
+          previousImageUrl: "https://example.com/egg.png",
+          newImageUrl: "https://example.com/hatchling.png",
+          element: "fire",
+        },
+      }));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("companion-evolution")).toBeInTheDocument();
+    });
+
+    expect(mocks.setEvolutionInProgressMock).toHaveBeenCalledTimes(1);
+    expect(mocks.companionEvolutionPropsMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        previousStage: 0,
+        newStage: 1,
+        previousImageUrl: "https://example.com/egg.png",
+        newImageUrl: "https://example.com/hatchling.png",
+      }),
+    );
+  });
+
+  it("dedupes the realtime 0 to 1 update after a local hatch start", async () => {
+    render(<GlobalEvolutionListener />);
+
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent(COMPANION_HATCH_STARTED_EVENT, {
+        detail: {
+          companionId: "companion-1",
+          previousStage: 0,
+          newStage: 1,
+          previousImageUrl: "https://example.com/egg.png",
+          newImageUrl: "https://example.com/hatchling.png",
+          element: "fire",
+        },
+      }));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("companion-evolution")).toBeInTheDocument();
+    });
+
+    await act(async () => {
+      await mocks.state.callback?.({
+        eventType: "UPDATE",
+        new: {
+          id: "companion-1",
+          current_stage: 1,
+          current_image_url: "https://example.com/hatchling.png",
+          core_element: "fire",
+          preset_id: "dragon",
+        },
+        old: {
+          id: "companion-1",
+          current_stage: 0,
+          current_image_url: "https://example.com/egg.png",
+          core_element: "fire",
+          preset_id: "dragon",
+        },
+      });
+    });
+
+    expect(mocks.setEvolutionInProgressMock).toHaveBeenCalledTimes(1);
+    expect(mocks.companionEvolutionPropsMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        previousStage: 0,
+        newStage: 1,
+        previousImageUrl: "https://example.com/egg.png",
+        newImageUrl: "https://example.com/hatchling.png",
       }),
     );
   });

@@ -23,6 +23,10 @@ import {
   shouldBackfillCompanionImageFocal,
 } from "@/lib/companionImageFocal";
 import {
+  COMPANION_HATCH_STARTED_EVENT,
+  type CompanionHatchStartedDetail,
+} from "@/lib/companionEvolutionEvents";
+import {
   parseFunctionInvokeError,
   toUserFacingFunctionError,
 } from "@/utils/supabaseFunctionErrors";
@@ -189,6 +193,10 @@ interface HatchCompanionResponse {
   initial_image_focal_x: number | null;
   initial_image_focal_y: number | null;
   evolution_id: string;
+}
+
+interface HatchCompanionMutationResult extends HatchCompanionResponse {
+  previous_image_url: string;
 }
 
 type EvolutionFailureClass = "terminal" | "retryable_infrastructure" | "non_retryable";
@@ -890,7 +898,7 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
     }: {
       presetId?: string | null;
       companionSnapshot?: Companion | null;
-    }) => {
+    }): Promise<HatchCompanionMutationResult> => {
       const companionToUse = companionSnapshot ?? companion;
 
       if (!user || !companionToUse) {
@@ -995,9 +1003,27 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
 
       void generateStageOneArtifacts();
 
-      return hatchResult;
+      return {
+        ...hatchResult,
+        previous_image_url: initialImageUrl,
+      };
     },
-    onSuccess: () => {
+    onSuccess: (hatchResult) => {
+      const hatchStartedDetail: CompanionHatchStartedDetail = {
+        companionId: hatchResult.id,
+        previousStage: 0,
+        newStage: 1,
+        previousImageUrl: hatchResult.previous_image_url,
+        newImageUrl: hatchResult.current_image_url,
+        element: hatchResult.core_element ?? null,
+      };
+
+      window.dispatchEvent(
+        new CustomEvent(COMPANION_HATCH_STARTED_EVENT, {
+          detail: hatchStartedDetail,
+        }),
+      );
+
       setIsEvolvingLoading(false);
       queryClient.invalidateQueries({ queryKey: ["companion"] });
       queryClient.invalidateQueries({ queryKey: ["companion-story"] });

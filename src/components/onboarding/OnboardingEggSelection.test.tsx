@@ -88,6 +88,25 @@ describe("OnboardingEggSelection", () => {
     expect(lightSlot.style.getPropertyValue("--egg-bottom")).toBe("26%");
   });
 
+  it("keeps the chamber visible and freezes controls while setup is saving", () => {
+    render(
+      <OnboardingEggSelection
+        onComplete={vi.fn()}
+        isLoading
+        storyTone="epic_adventure"
+        presetId="dragon"
+        spiritAnimal="Dragon"
+        onBack={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("onboarding-egg-chamber")).toBeInTheDocument();
+    expect(screen.queryByText("Opening the hatchery...")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Back" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Select Ember element" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
+  });
+
   it("marks only the selected element and submits the provided story tone unchanged", () => {
     const onComplete = vi.fn();
 

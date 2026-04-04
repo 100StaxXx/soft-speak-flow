@@ -105,6 +105,31 @@ describe("companion asset resolver", () => {
     ).toBe(getUniversalEggAssetUrl("storm"));
   });
 
+  it("keeps full-coverage presets on the shared egg art before hatch", () => {
+    expect(
+      getPresetCompanionAssetUrl({
+        presetId: "dragon",
+        stage: 0,
+        element: "light",
+        state: "normal",
+      }),
+    ).toBeNull();
+
+    expect(
+      resolveCompanionVisualAssetUrl(
+        {
+          preset_id: "dragon",
+          current_stage: 0,
+          core_element: "light",
+          current_image_url:
+            "https://example.supabase.co/storage/v1/object/public/companion-presets/dragon/t0_egg/normal/dragon__t0_egg__normal__light.png",
+        },
+        "normal",
+      ),
+    ).toBe(getUniversalEggAssetUrl("light"));
+    expect(getPublicUrlMock).not.toHaveBeenCalled();
+  });
+
   it("preserves higher-tier remote coverage for existing remote presets", () => {
     expect(
       getPresetCompanionAssetUrl({

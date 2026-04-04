@@ -227,6 +227,16 @@ interface StoryOnboardingProps {
   onJourneyCinematicComplete?: () => void;
 }
 
+type CompanionSelectionPreferences = {
+  presetId: CompanionPresetId | null;
+  favoriteColor: string;
+  spiritAnimal: string;
+  coreElement: string;
+  storyTone: string;
+};
+
+type CompanionSetupStatus = "idle" | "pending" | "ready" | "failed";
+
 export const StoryOnboarding = ({
   mode = "standard",
   existingCompanion = null,
@@ -268,6 +278,10 @@ export const StoryOnboarding = ({
   const [selectedStoryTone, setSelectedStoryTone] = useState<CompanionStoryTone>("epic_adventure");
   const [selectedPresetId, setSelectedPresetId] = useState<CompanionPresetId | null>(null);
   const [isCreatingCompanion, setIsCreatingCompanion] = useState(false);
+  const [companionSetupStatus, setCompanionSetupStatus] = useState<CompanionSetupStatus>(
+    resumesAtJourneyBegins ? "ready" : "idle",
+  );
+  const [pendingCompanionSetup, setPendingCompanionSetup] = useState<CompanionSelectionPreferences | null>(null);
   const [isSubmittingQuestionnaire, setIsSubmittingQuestionnaire] = useState(false);
   const [compatibilityScore, setCompatibilityScore] = useState<number | null>(null);
   const mentorRevealTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -293,6 +307,7 @@ export const StoryOnboarding = ({
     setStage("journey-begins");
     setUserName(resumeState?.userName ?? "");
     setCompanionAnimal(resumeState?.companionLabel ?? "");
+    setCompanionSetupStatus("ready");
   }, [resumeState?.companionLabel, resumeState?.userName, resumesAtJourneyBegins]);
 
   useEffect(() => {
@@ -650,20 +665,40 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
     setStage("story-tone");
   }, []);
 
-  const handleCompanionComplete = async (preferences: {
-    presetId: CompanionPresetId | null;
-    favoriteColor: string;
-    spiritAnimal: string;
-    coreElement: string;
-    storyTone: string;
-  }) => {
-    if (!user || isCreatingCompanion) return;
+  const getCompanionSelectionDisplayName = useCallback((preferences: CompanionSelectionPreferences) => {
+    const eggDisplayName = `${getCompanionElement(preferences.coreElement).label} Egg`;
+    return preferences.presetId ? preferences.spiritAnimal : eggDisplayName;
+  }, []);
+
+  const persistJourneyBeginsStep = useCallback(() => {
+    void persistOnboardingStep("journey-begins").catch((error: unknown) => {
+      onboardingLog.warn("Failed to persist onboarding journey-begins step", {
+        userId: user?.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
+  }, [persistOnboardingStep, user?.id]);
+
+  const runCompanionSetup = useCallback(async (
+    preferences: CompanionSelectionPreferences,
+    options: { enterJourneyImmediately?: boolean } = {},
+  ): Promise<boolean> => {
+    if (!user || isCreatingCompanion) return false;
 
     const startedAt = Date.now();
     let onboardingFinalized = false;
-    setIsCreatingCompanion(true);
+    const enterJourneyImmediately = options.enterJourneyImmediately === true;
     const eggDisplayName = `${getCompanionElement(preferences.coreElement).label} Egg`;
-    const selectionDisplayName = preferences.presetId ? preferences.spiritAnimal : eggDisplayName;
+    const selectionDisplayName = getCompanionSelectionDisplayName(preferences);
+
+    setPendingCompanionSetup(preferences);
+    setCompanionSetupStatus("pending");
+    if (enterJourneyImmediately) {
+      setCompanionAnimal(selectionDisplayName);
+      setStage("journey-begins");
+      persistJourneyBeginsStep();
+    }
+    setIsCreatingCompanion(true);
 
     const finalizeCompanionOnboarding = async (
       companionId: string,
@@ -707,11 +742,9 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
 
       safeLocalStorage.removeItem(getGuidedTutorialLocalProgressKey(user.id));
 
-      // Force immediate refetch to ensure fresh data (invalidateQueries only marks stale)
       await queryClient.refetchQueries({ queryKey: ["profile", user.id] });
       await queryClient.refetchQueries({ queryKey: ["companion", user.id] });
 
-      // Create first meeting memory (non-blocking)
       const today = new Date().toISOString().split("T")[0];
       supabase
         .from("companion_memories")
@@ -743,14 +776,13 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
         });
 
       setCompanionAnimal(fallbackName);
+      setCompanionSetupStatus("ready");
 
       if (isResetMode) {
         toast.success("Your companion has been reset and reselected.");
         safeNavigate(navigate, "/journeys");
         return;
       }
-
-      setStage("journey-begins");
 
       logger.info("Companion onboarding prepared for journey cinematic", {
         userId: user.id,
@@ -769,7 +801,7 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
         await finalizeCompanionOnboarding(companionId, fallbackName, recoveredAfterTimeout);
         return true;
       } catch (error) {
-        onJourneyCinematicComplete?.();
+        setCompanionSetupStatus("failed");
         logger.error("Companion onboarding finalization failed", {
           userId: user.id,
           companionId,
@@ -862,9 +894,10 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
         await queryClient.refetchQueries({ queryKey: ["profile", user.id] });
         await queryClient.refetchQueries({ queryKey: ["companion", user.id] });
         safeLocalStorage.removeItem(getGuidedTutorialLocalProgressKey(user.id));
+        setCompanionSetupStatus("ready");
         toast.success(`${preset.displayName} is now your companion form.`);
         safeNavigate(navigate, "/journeys");
-        return;
+        return true;
       }
 
       logger.info("Companion creation started from onboarding", {
@@ -936,117 +969,96 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
               elapsedMs: Date.now() - startedAt,
             });
             toast.success("Your companion finished taking shape. Continuing your journey...");
-            await tryFinalizeCompanionOnboarding(
+            return await tryFinalizeCompanionOnboarding(
               recoveredCompanion.id,
               recoveredCompanion.spirit_animal === "Egg"
                 ? selectionDisplayName
                 : recoveredCompanion.spirit_animal || selectionDisplayName,
               true,
             );
-            return;
           }
 
+          setCompanionSetupStatus("failed");
           logger.error("Companion recovery failed after timeout", {
             userId: user.id,
             recoveryWindowMs: COMPANION_RECOVERY_DEADLINE_MS,
             elapsedMs: Date.now() - startedAt,
           });
           toast.error("This is taking longer than expected. Tap Begin Your Journey to try again.");
-          return;
+          return false;
         }
 
+        setCompanionSetupStatus("failed");
         logger.error("Companion creation failed during onboarding", {
           userId: user.id,
           elapsedMs: Date.now() - startedAt,
           error: errorMessage,
         });
         toast.error(errorMessage);
-        return;
+        return false;
       }
 
-      await tryFinalizeCompanionOnboarding(companionData.id, selectionDisplayName, false);
+      return await tryFinalizeCompanionOnboarding(companionData.id, selectionDisplayName, false);
     } catch (error) {
+      setCompanionSetupStatus("failed");
       const errorMessage = getErrorMessage(error, "Something went wrong. Please try again.");
-
-      if (isCompanionCreationTimeoutError(error)) {
-        logger.warn("Companion creation timed out; starting recovery poll", {
-          userId: user.id,
-          reason: errorMessage,
-          elapsedMs: Date.now() - startedAt,
-        });
-
-        const recoveredCompanion = await pollWithDeadline<{ id: string; spirit_animal: string | null }>({
-          deadlineMs: COMPANION_RECOVERY_DEADLINE_MS,
-          intervalMs: COMPANION_RECOVERY_INTERVAL_MS,
-          task: async () => {
-            const { data, error: fetchError } = await supabase
-              .from("user_companion")
-              .select("id, spirit_animal")
-              .eq("user_id", user.id)
-              .order("created_at", { ascending: false })
-              .limit(1)
-              .maybeSingle();
-
-            if (fetchError) {
-              throw fetchError;
-            }
-
-            if (!data?.id) {
-              return null;
-            }
-
-            return {
-              id: data.id,
-              spirit_animal: data.spirit_animal ?? null,
-            };
-          },
-          onPollError: (pollError) => {
-            logger.warn("Companion recovery poll attempt failed", {
-              userId: user.id,
-              error: pollError instanceof Error ? pollError.message : String(pollError),
-            });
-          },
-        });
-
-        if (recoveredCompanion?.id) {
-          logger.warn("Companion recovery succeeded after timeout", {
-            userId: user.id,
-            companionId: recoveredCompanion.id,
-            elapsedMs: Date.now() - startedAt,
-          });
-          toast.success("Your companion finished taking shape. Continuing your journey...");
-          await tryFinalizeCompanionOnboarding(
-            recoveredCompanion.id,
-            recoveredCompanion.spirit_animal === "Egg"
-              ? selectionDisplayName
-              : recoveredCompanion.spirit_animal || selectionDisplayName,
-            true,
-          );
-          return;
-        }
-
-        logger.error("Companion recovery failed after timeout", {
-          userId: user.id,
-          recoveryWindowMs: COMPANION_RECOVERY_DEADLINE_MS,
-          elapsedMs: Date.now() - startedAt,
-        });
-        toast.error("This is taking longer than expected. Tap Begin Your Journey to try again.");
-        return;
-      }
-
       logger.error("Error completing companion onboarding flow", {
         userId: user.id,
         elapsedMs: Date.now() - startedAt,
         error: errorMessage,
       });
       toast.error(errorMessage);
+      return false;
     } finally {
       setIsCreatingCompanion(false);
     }
-  };
+  }, [
+    createCompanion,
+    existingCompanion,
+    getCompanionSelectionDisplayName,
+    isCreatingCompanion,
+    isMigrationMode,
+    isResetMode,
+    loadExistingOnboardingData,
+    navigate,
+    persistJourneyBeginsStep,
+    queryClient,
+    user,
+  ]);
+
+  const handleCompanionComplete = useCallback((preferences: CompanionSelectionPreferences) => {
+    if (!user || isCreatingCompanion) return;
+
+    void runCompanionSetup(preferences, {
+      enterJourneyImmediately: !isMigrationMode && !isResetMode,
+    });
+  }, [isCreatingCompanion, isMigrationMode, isResetMode, runCompanionSetup, user]);
 
   const handleJourneyComplete = async () => {
     if (!user) return;
+
+    if (companionSetupStatus === "pending") {
+      toast.error("Your companion is still taking shape. Please try again in a moment.");
+      return;
+    }
+
+    let setupReady = companionSetupStatus === "ready";
+    if (companionSetupStatus === "failed") {
+      if (!pendingCompanionSetup) {
+        toast.error("We couldn't recover your companion setup. Please restart onboarding.");
+        return;
+      }
+
+      setupReady = await runCompanionSetup(pendingCompanionSetup);
+      if (!setupReady) {
+        return;
+      }
+    }
+
+    if (!setupReady) {
+      toast.error("Your companion is still taking shape. Please try again in a moment.");
+      return;
+    }
 
     try {
       const existingData = await loadExistingOnboardingData();
