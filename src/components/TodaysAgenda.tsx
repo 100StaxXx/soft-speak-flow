@@ -2490,6 +2490,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             <Button
               variant="outline"
               size="sm"
+              data-tour="add-quest-launcher"
               className="mt-4 w-full rounded-2xl border-white/10 bg-white/[0.04] hover:bg-white/[0.08]"
               onClick={onAddQuest}
             >
@@ -2743,6 +2744,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
               <Button
                 type="button"
                 size="sm"
+                data-tour="add-quest-launcher"
                 className="h-9 rounded-[18px] px-4 shadow-[0_14px_28px_rgba(122,61,255,0.2)]"
                 onClick={onAddQuest}
               >
@@ -2815,6 +2817,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
               <Button
                 variant="outline"
                 size="sm"
+                data-tour="add-quest-launcher"
                 className="mt-4 rounded-2xl border-white/10 bg-white/[0.04] hover:bg-white/[0.08]"
                 onClick={onAddQuest}
               >

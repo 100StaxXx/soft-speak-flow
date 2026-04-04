@@ -193,7 +193,7 @@ vi.mock("@/components/CampaignCreatedAnimation", () => ({
 vi.mock("@/components/DraggableFAB", () => ({
   DraggableFAB: () => {
     mocks.draggableFabRenderCount += 1;
-    return <button type="button" data-testid="draggable-fab">fab</button>;
+    return <button type="button" data-testid="draggable-fab" data-tour="add-quest-fab">fab</button>;
   },
 }));
 
@@ -589,10 +589,32 @@ describe("Journeys row drag integration", () => {
       </QueryClientProvider>,
     );
 
-    expect(await screen.findByRole("button", { name: /add quest/i })).toBeInTheDocument();
+    const addQuestButton = await screen.findByRole("button", { name: /add quest/i });
+    expect(addQuestButton).toBeInTheDocument();
+    expect(addQuestButton).toHaveAttribute("data-tour", "add-quest-launcher");
     expect(screen.queryByTestId("draggable-fab")).not.toBeInTheDocument();
     expect(mocks.draggableFabRenderCount).toBe(0);
     expect(mocks.lastAddQuestSheetProps?.presentation).toBe("desktop-panel");
+  });
+
+  it("keeps the mobile floating add quest FAB targetable for the tutorial", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/journeys"]}>
+          <Journeys />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByTestId("draggable-fab")).toHaveAttribute("data-tour", "add-quest-fab");
+    expect(mocks.draggableFabRenderCount).toBe(1);
   });
 
   it("opens the add flow with meta+n on Mac-hosted iOS", async () => {

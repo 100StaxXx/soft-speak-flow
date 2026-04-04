@@ -84,6 +84,11 @@ export const CREATE_QUEST_SUBSTEP_ORDER: CreateQuestSubstepId[] = [
   "submit_create_quest",
 ];
 
+const QUEST_ADD_LAUNCHER_SELECTORS = [
+  '[data-tour="add-quest-fab"]',
+  '[data-tour="add-quest-launcher"]',
+];
+
 const ACTIVE_GUIDED_STEP_ID_SET = new Set<GuidedTutorialStepId>(GUIDED_STEPS.map((step) => step.id));
 const GUIDED_STEP_ID_SET = new Set<GuidedTutorialStepId>([
   ...GUIDED_STEPS.map((step) => step.id),
@@ -152,13 +157,13 @@ const getTargetSelectorsForMilestone = (milestoneId: GuidedMilestoneId): string[
     case "stay_on_quests":
       return ['[data-tour="quests-tab"]']; // legacy fallback
     case "open_add_quest":
-      return ['[data-tour="add-quest-fab"]'];
+      return QUEST_ADD_LAUNCHER_SELECTORS;
     case "enter_title":
       return ['[data-tour="add-quest-title-input"]'];
     case "select_time":
       return ['[data-tour="add-quest-time-chip"]', '[data-tour="add-quest-time-input"]'];
     case "submit_create_quest":
-      return ['[data-tour="add-quest-create-button"]'];
+      return ['[data-tour="add-quest-create-button"]', ...QUEST_ADD_LAUNCHER_SELECTORS];
     case "open_companion_tab":
       return ['[data-tour="companion-tab"]'];
     case "confirm_companion_progress":

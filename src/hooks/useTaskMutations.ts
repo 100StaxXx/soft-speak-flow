@@ -104,6 +104,19 @@ type TaskCreateMutationResult = Partial<DailyTask> & {
   syncPending?: boolean;
 };
 
+const emitTaskAddedEvent = (task: TaskCreateMutationResult | null | undefined) => {
+  if (!task?.task_date || !task?.scheduled_time) return;
+
+  window.dispatchEvent(
+    new CustomEvent("task-added", {
+      detail: {
+        taskDate: task.task_date,
+        scheduledTime: task.scheduled_time,
+      },
+    })
+  );
+};
+
 type SupabaseLikeError = {
   code?: string | null;
   message?: string | null;
@@ -1125,25 +1138,20 @@ export const useTaskMutations = (taskDate: string) => {
       queryClient.invalidateQueries({ queryKey: ['inbox-count'] });
     },
     onSuccess: (data) => {
-      if ((data as TaskCreateMutationResult | undefined)?.queued) {
+      const createdTask = data as TaskCreateMutationResult | undefined;
+      emitTaskAddedEvent(createdTask);
+
+      if (createdTask?.queued) {
         const queuedToast = getQueuedTaskCreateToastMessage(
-          (data as TaskCreateMutationResult | undefined)?.queueReason,
+          createdTask.queueReason,
         );
         toast(queuedToast);
         return;
       }
       toast({ title: "Quest added!" });
-      if (data?.attachmentsSkippedDueToSchema) {
+      if (createdTask?.attachmentsSkippedDueToSchema) {
         showAttachmentsUnavailableToast();
       }
-      window.dispatchEvent(
-        new CustomEvent('task-added', {
-          detail: {
-            taskDate: data?.task_date ?? null,
-            scheduledTime: data?.scheduled_time ?? null,
-          },
-        })
-      );
       
       // Track task creation for learning
       if (data) {

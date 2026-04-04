@@ -1,4 +1,4 @@
-// Edge function for account deletion - v4.0
+// Edge function for account deletion - v5.0
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
@@ -8,6 +8,11 @@ interface ErrorWithOptionalFields {
   code?: unknown;
   name?: unknown;
   status?: unknown;
+}
+
+interface StorageListEntry {
+  name?: unknown;
+  id?: unknown;
 }
 
 const ACCOUNT_DELETION_TEMPORARILY_UNAVAILABLE_MESSAGE =
@@ -20,6 +25,37 @@ const ACCOUNT_DELETION_ERROR_CODES = {
   NOT_FOUND: "ACCOUNT_DELETION_NOT_FOUND",
   UNKNOWN: "ACCOUNT_DELETION_UNKNOWN",
 } as const;
+
+const DELETE_USER_RETRY_DELAYS_MS = [500, 1500] as const;
+const RETRYABLE_ERROR_PATTERNS = [
+  "timeout",
+  "timed out",
+  "network",
+  "connection",
+  "econnreset",
+  "ecconnrefused",
+  "failed to fetch",
+  "fetch failed",
+  "service unavailable",
+  "temporarily unavailable",
+  "rate limit",
+  "too many requests",
+];
+const STORAGE_LIST_PAGE_SIZE = 100;
+const STORAGE_REMOVE_BATCH_SIZE = 100;
+const LEGACY_USER_STORAGE_PREFIX_TARGETS = [
+  { bucket: "quest-attachments", prefix: (userId: string) => userId },
+  { bucket: "mentors-avatars", prefix: (userId: string) => userId },
+  { bucket: "journey-paths", prefix: (userId: string) => userId },
+  { bucket: "evolution-cards", prefix: (userId: string) => `postcards/${userId}` },
+] as const;
+const LEGACY_USER_STORAGE_FILTER_TARGETS = [
+  {
+    bucket: "journey-paths",
+    prefix: "campaign-welcome",
+    matchesFileName: (fileName: string, userId: string) => fileName.startsWith(`welcome-${userId}-`),
+  },
+] as const;
 
 type AccountDeletionErrorCode =
   (typeof ACCOUNT_DELETION_ERROR_CODES)[keyof typeof ACCOUNT_DELETION_ERROR_CODES];
@@ -52,22 +88,6 @@ interface HandleDeleteUserDependencies {
   createAdminClient?: (supabaseUrl: string, serviceRoleKey: string) => SupabaseAdminClient;
   sleep?: (ms: number) => Promise<void>;
 }
-
-const DELETE_USER_RETRY_DELAYS_MS = [500, 1500] as const;
-const RETRYABLE_ERROR_PATTERNS = [
-  "timeout",
-  "timed out",
-  "network",
-  "connection",
-  "econnreset",
-  "ecconnrefused",
-  "failed to fetch",
-  "fetch failed",
-  "service unavailable",
-  "temporarily unavailable",
-  "rate limit",
-  "too many requests",
-];
 
 const createUnauthorizedError = (cause?: unknown) =>
   new AccountDeletionError("Unauthorized", {
@@ -155,6 +175,28 @@ const describeError = (error: unknown): Record<string, unknown> => ({
   status: getErrorStatus(error) ?? null,
   message: getErrorMessage(error) ?? String(error),
 });
+
+const buildStoragePath = (prefix: string, name: string): string =>
+  prefix ? `${prefix}/${name}` : name;
+
+const getStorageEntryName = (entry: StorageListEntry): string | undefined =>
+  asString(entry?.name);
+
+const isStorageFolderEntry = (entry: StorageListEntry): boolean =>
+  !asString(entry?.id);
+
+const isNotFoundStyleError = (error: unknown): boolean => {
+  const status = getErrorStatus(error);
+  const normalizedText = getNormalizedErrorText(error);
+
+  return status === 404 || normalizedText.includes("not found") || normalizedText.includes("no rows");
+};
+
+const isAlreadyDeletedAuthUserError = (error: unknown): boolean => {
+  const normalizedText = getNormalizedErrorText(error);
+
+  return isNotFoundStyleError(error) || normalizedText.includes("user not found");
+};
 
 export const isTransientDeleteUserInfrastructureError = (error: unknown): boolean => {
   const status = getErrorStatus(error);
@@ -289,6 +331,185 @@ const runDeleteStepWithRetry = async (
   }
 };
 
+const listStorageDirectoryEntries = async (
+  supabase: SupabaseAdminClient,
+  bucket: string,
+  prefix: string,
+  waitForRetry: (ms: number) => Promise<void>,
+): Promise<StorageListEntry[]> => {
+  const entries: StorageListEntry[] = [];
+
+  for (let offset = 0; ; offset += STORAGE_LIST_PAGE_SIZE) {
+    let pageEntries: StorageListEntry[] = [];
+
+    await runDeleteStepWithRetry(
+      `storage list ${bucket}/${prefix || "."}`,
+      async () => {
+        const { data, error } = await supabase.storage.from(bucket).list(prefix, {
+          limit: STORAGE_LIST_PAGE_SIZE,
+          offset,
+          sortBy: { column: "name", order: "asc" },
+        });
+
+        if (error) {
+          if (isNotFoundStyleError(error)) {
+            pageEntries = [];
+            return;
+          }
+
+          throw error;
+        }
+
+        pageEntries = Array.isArray(data) ? data as StorageListEntry[] : [];
+      },
+      ACCOUNT_DELETION_ERROR_CODES.BACKEND_UNAVAILABLE,
+      waitForRetry,
+    );
+
+    entries.push(...pageEntries);
+
+    if (pageEntries.length < STORAGE_LIST_PAGE_SIZE) {
+      break;
+    }
+  }
+
+  return entries;
+};
+
+const collectStoragePathsUnderPrefix = async (
+  supabase: SupabaseAdminClient,
+  bucket: string,
+  prefix: string,
+  waitForRetry: (ms: number) => Promise<void>,
+): Promise<string[]> => {
+  const entries = await listStorageDirectoryEntries(supabase, bucket, prefix, waitForRetry);
+  const filePaths: string[] = [];
+  const folderPaths: string[] = [];
+
+  for (const entry of entries) {
+    const entryName = getStorageEntryName(entry);
+    if (!entryName) {
+      continue;
+    }
+
+    const fullPath = buildStoragePath(prefix, entryName);
+    if (isStorageFolderEntry(entry)) {
+      folderPaths.push(fullPath);
+      continue;
+    }
+
+    filePaths.push(fullPath);
+  }
+
+  for (const folderPath of folderPaths) {
+    filePaths.push(...await collectStoragePathsUnderPrefix(supabase, bucket, folderPath, waitForRetry));
+  }
+
+  return filePaths;
+};
+
+const collectStoragePathsByFileName = async (
+  supabase: SupabaseAdminClient,
+  bucket: string,
+  prefix: string,
+  userId: string,
+  matchesFileName: (fileName: string, userId: string) => boolean,
+  waitForRetry: (ms: number) => Promise<void>,
+): Promise<string[]> => {
+  const entries = await listStorageDirectoryEntries(supabase, bucket, prefix, waitForRetry);
+  const filePaths: string[] = [];
+
+  for (const entry of entries) {
+    if (isStorageFolderEntry(entry)) {
+      continue;
+    }
+
+    const entryName = getStorageEntryName(entry);
+    if (!entryName || !matchesFileName(entryName, userId)) {
+      continue;
+    }
+
+    filePaths.push(buildStoragePath(prefix, entryName));
+  }
+
+  return filePaths;
+};
+
+const removeStoragePaths = async (
+  supabase: SupabaseAdminClient,
+  bucket: string,
+  paths: string[],
+  waitForRetry: (ms: number) => Promise<void>,
+): Promise<void> => {
+  const uniquePaths = Array.from(new Set(paths));
+
+  for (let index = 0; index < uniquePaths.length; index += STORAGE_REMOVE_BATCH_SIZE) {
+    const batch = uniquePaths.slice(index, index + STORAGE_REMOVE_BATCH_SIZE);
+
+    await runDeleteStepWithRetry(
+      `storage remove ${bucket}`,
+      async () => {
+        const { error } = await supabase.storage.from(bucket).remove(batch);
+        if (error && !isNotFoundStyleError(error)) {
+          throw error;
+        }
+      },
+      ACCOUNT_DELETION_ERROR_CODES.BACKEND_UNAVAILABLE,
+      waitForRetry,
+    );
+  }
+};
+
+const deleteUserStorageAssets = async (
+  supabase: SupabaseAdminClient,
+  userId: string,
+  waitForRetry: (ms: number) => Promise<void>,
+): Promise<void> => {
+  const storagePathsByBucket = new Map<string, string[]>();
+
+  for (const target of LEGACY_USER_STORAGE_PREFIX_TARGETS) {
+    const paths = await collectStoragePathsUnderPrefix(
+      supabase,
+      target.bucket,
+      target.prefix(userId),
+      waitForRetry,
+    );
+
+    if (paths.length === 0) {
+      continue;
+    }
+
+    const existing = storagePathsByBucket.get(target.bucket) ?? [];
+    storagePathsByBucket.set(target.bucket, [...existing, ...paths]);
+  }
+
+  for (const target of LEGACY_USER_STORAGE_FILTER_TARGETS) {
+    const paths = await collectStoragePathsByFileName(
+      supabase,
+      target.bucket,
+      target.prefix,
+      userId,
+      target.matchesFileName,
+      waitForRetry,
+    );
+
+    if (paths.length === 0) {
+      continue;
+    }
+
+    const existing = storagePathsByBucket.get(target.bucket) ?? [];
+    storagePathsByBucket.set(target.bucket, [...existing, ...paths]);
+  }
+
+  for (const [bucket, paths] of storagePathsByBucket.entries()) {
+    console.log("[delete-user] removing storage assets", {
+      bucket,
+      count: paths.length,
+    });
+    await removeStoragePaths(supabase, bucket, paths, waitForRetry);
+  }
+};
+
 export const handleDeleteUser = async (
   req: Request,
   dependencies: HandleDeleteUserDependencies = {},
@@ -345,11 +566,25 @@ export const handleDeleteUser = async (
       return createErrorResponse(corsHeaders, sanitizeError(createUnauthorizedError()));
     }
 
+    await deleteUserStorageAssets(supabase, user.id, waitForRetry);
+
     await runDeleteStepWithRetry(
       "delete_user_account rpc",
       async () => {
         const { error } = await supabase.rpc("delete_user_account", { p_user_id: user.id });
         if (error) {
+          throw error;
+        }
+      },
+      ACCOUNT_DELETION_ERROR_CODES.BACKEND_UNAVAILABLE,
+      waitForRetry,
+    );
+
+    await runDeleteStepWithRetry(
+      "auth.admin.deleteUser",
+      async () => {
+        const { error } = await supabase.auth.admin.deleteUser(user.id);
+        if (error && !isAlreadyDeletedAuthUserError(error)) {
           throw error;
         }
       },

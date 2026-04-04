@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import React, { type ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const createGuidedTutorial = () => ({
   version: 2,
@@ -363,6 +363,12 @@ describe("guided tutorial intro dialogue sequence", () => {
     storageMocks.reset();
   });
 
+  afterEach(() => {
+    document
+      .querySelectorAll('[data-tour="add-quest-launcher"], [data-tour="add-quest-create-button"]')
+      .forEach((element) => element.remove());
+  });
+
   const createWrapper = (path = "/journeys") =>
     ({ children }: { children: ReactNode }) =>
       React.createElement(
@@ -429,6 +435,35 @@ describe("guided tutorial intro dialogue sequence", () => {
     });
   });
 
+  it("targets both floating and shared add-quest launchers for open_add_quest", async () => {
+    mocks.state.guidedTutorial = {
+      version: 2,
+      eligible: true,
+      completed: false,
+      completedSteps: ["quests_campaigns_intro"],
+      xpAwardedSteps: [],
+      milestonesCompleted: ["mentor_intro_hello", "quests_campaigns_intro"],
+    };
+
+    const launcher = document.createElement("button");
+    launcher.setAttribute("data-tour", "add-quest-launcher");
+    document.body.appendChild(launcher);
+
+    const { result } = renderHook(() => usePostOnboardingMentorGuidance(), {
+      wrapper: createWrapper("/journeys"),
+    });
+
+    await waitFor(() => {
+      expect(result.current.currentStep).toBe("create_quest");
+      expect(result.current.currentSubstep).toBe("open_add_quest");
+      expect(result.current.activeTargetSelectors).toEqual([
+        '[data-tour="add-quest-fab"]',
+        '[data-tour="add-quest-launcher"]',
+      ]);
+      expect(result.current.activeTargetSelector).toBe('[data-tour="add-quest-launcher"]');
+    });
+  });
+
   it("starts the tutorial from fresh local onboarding progress before the profile refresh catches up", async () => {
     mocks.state.guidedTutorial = null;
     storageMocks.safeLocalStorage.setItem(
@@ -455,6 +490,96 @@ describe("guided tutorial intro dialogue sequence", () => {
       expect(result.current.isIntroDialogueActive).toBe(true);
       expect(result.current.currentStep).toBe("quests_campaigns_intro");
       expect(result.current.dialogueActionLabel).toBe("Start Tutorial");
+    });
+  });
+
+  it("completes create_quest from submit_create_quest when a scheduled task-added event arrives", async () => {
+    mocks.state.guidedTutorial = {
+      version: 2,
+      eligible: true,
+      completed: false,
+      completedSteps: ["quests_campaigns_intro"],
+      xpAwardedSteps: [],
+      milestonesCompleted: ["mentor_intro_hello", "quests_campaigns_intro"],
+      substeps: {
+        create_quest: {
+          current: "submit_create_quest",
+          completed: ["open_add_quest", "enter_title", "select_time"],
+        },
+      },
+    };
+
+    const { result } = renderHook(() => usePostOnboardingMentorGuidance(), {
+      wrapper: createWrapper("/journeys"),
+    });
+
+    await waitFor(() => {
+      expect(result.current.currentStep).toBe("create_quest");
+      expect(result.current.currentSubstep).toBe("submit_create_quest");
+    });
+
+    await act(async () => {
+      window.dispatchEvent(
+        new CustomEvent("task-added", {
+          detail: {
+            taskDate: "2026-04-04",
+            scheduledTime: "10:30",
+          },
+        })
+      );
+    });
+
+    await waitFor(() => {
+      expect(result.current.currentStep).toBe("morning_checkin");
+      expect(result.current.currentSubstep).toBeNull();
+    });
+  });
+
+  it("falls back to an add-quest launcher when submit_create_quest loses the sheet target, then reselects the create button when it returns", async () => {
+    mocks.state.guidedTutorial = {
+      version: 2,
+      eligible: true,
+      completed: false,
+      completedSteps: ["quests_campaigns_intro"],
+      xpAwardedSteps: [],
+      milestonesCompleted: ["mentor_intro_hello", "quests_campaigns_intro"],
+      substeps: {
+        create_quest: {
+          current: "submit_create_quest",
+          completed: ["open_add_quest", "enter_title", "select_time"],
+        },
+      },
+    };
+
+    const launcher = document.createElement("button");
+    launcher.setAttribute("data-tour", "add-quest-launcher");
+    document.body.appendChild(launcher);
+
+    const { result } = renderHook(() => usePostOnboardingMentorGuidance(), {
+      wrapper: createWrapper("/journeys"),
+    });
+
+    await waitFor(() => {
+      expect(result.current.currentStep).toBe("create_quest");
+      expect(result.current.currentSubstep).toBe("submit_create_quest");
+      expect(result.current.activeTargetSelectors).toEqual([
+        '[data-tour="add-quest-create-button"]',
+        '[data-tour="add-quest-fab"]',
+        '[data-tour="add-quest-launcher"]',
+      ]);
+      expect(result.current.activeTargetSelector).toBe('[data-tour="add-quest-launcher"]');
+    });
+
+    const createButton = document.createElement("button");
+    createButton.setAttribute("data-tour", "add-quest-create-button");
+    document.body.appendChild(createButton);
+
+    await act(async () => {
+      window.dispatchEvent(new Event("resize"));
+    });
+
+    await waitFor(() => {
+      expect(result.current.activeTargetSelector).toBe('[data-tour="add-quest-create-button"]');
     });
   });
 

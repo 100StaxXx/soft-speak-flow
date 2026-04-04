@@ -157,6 +157,7 @@ export function DesktopWeekStrip({
             {onAddQuest ? (
               <Button
                 size="sm"
+                data-tour="add-quest-launcher"
                 className="h-9 rounded-[18px] px-4 shadow-[0_14px_28px_rgba(122,61,255,0.2)]"
                 onClick={onAddQuest}
               >

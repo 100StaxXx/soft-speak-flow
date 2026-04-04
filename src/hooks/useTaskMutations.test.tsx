@@ -623,6 +623,50 @@ describe("useTaskMutations attachment handling", () => {
     }));
   });
 
+  it("dispatches task-added for scheduled quests that are queued offline", async () => {
+    setOnline(false);
+    mocks.resilienceState.shouldQueueWrites = true;
+
+    const dispatchSpy = vi.spyOn(window, "dispatchEvent");
+    const { result } = renderHook(() => useTaskMutations("2026-02-20"), {
+      wrapper: createWrapper(),
+    });
+
+    let createdTask: any;
+    await act(async () => {
+      createdTask = await result.current.addTask({
+        taskText: "Ship feature",
+        difficulty: "medium",
+        taskDate: "2026-02-20",
+        scheduledTime: "09:00",
+      });
+    });
+
+    expect(createdTask).toEqual(expect.objectContaining({
+      id: "task-local",
+      queued: true,
+      queueReason: "offline",
+      syncPending: true,
+      task_date: "2026-02-20",
+      scheduled_time: "09:00",
+    }));
+
+    const taskAddedEvent = dispatchSpy.mock.calls.find(
+      ([event]) => event instanceof CustomEvent && event.type === "task-added"
+    )?.[0] as CustomEvent<{ taskDate: string; scheduledTime: string }> | undefined;
+
+    expect(taskAddedEvent?.detail).toEqual({
+      taskDate: "2026-02-20",
+      scheduledTime: "09:00",
+    });
+    expect(mocks.toastMock).toHaveBeenCalledWith(expect.objectContaining({
+      title: "Quest saved offline",
+      description: "We'll sync it when you're back online.",
+    }));
+
+    dispatchSpy.mockRestore();
+  });
+
   it("still attempts a live quest insert while online during outage state", async () => {
     setOnline(true);
     mocks.resilienceState.state = "outage";
@@ -694,6 +738,7 @@ describe("useTaskMutations attachment handling", () => {
     const { result } = renderHook(() => useTaskMutations("2026-02-20"), {
       wrapper: createWrapper(),
     });
+    const dispatchSpy = vi.spyOn(window, "dispatchEvent");
 
     let createdTask: any;
     await act(async () => {
@@ -701,6 +746,7 @@ describe("useTaskMutations attachment handling", () => {
         taskText: "Ship feature",
         difficulty: "medium",
         taskDate: "2026-02-20",
+        scheduledTime: "09:00",
       });
     });
 
@@ -709,12 +755,22 @@ describe("useTaskMutations attachment handling", () => {
       queued: true,
       queueReason: "network_timeout",
       syncPending: true,
+      task_date: "2026-02-20",
+      scheduled_time: "09:00",
     }));
     expect(mocks.pollWithDeadlineMock).toHaveBeenCalledTimes(1);
     expect(mocks.queueTaskActionMock).toHaveBeenCalledTimes(1);
+    const taskAddedEvent = dispatchSpy.mock.calls.find(
+      ([event]) => event instanceof CustomEvent && event.type === "task-added"
+    )?.[0] as CustomEvent<{ taskDate: string; scheduledTime: string }> | undefined;
+    expect(taskAddedEvent?.detail).toEqual({
+      taskDate: "2026-02-20",
+      scheduledTime: "09:00",
+    });
     expect(mocks.toastMock).toHaveBeenCalledWith(expect.objectContaining({
       title: "Quest saved locally. Server sync will retry automatically.",
     }));
+    dispatchSpy.mockRestore();
   });
 
   it("creates a quest when task_attachments table is missing and shows warning", async () => {
