@@ -28,7 +28,7 @@ interface CompanionEvolutionProps {
   onComplete: () => void;
 }
 
-type EvolutionPhase = "hold" | "charge" | "conceal" | "reveal" | "settle";
+type EvolutionPhase = "hold" | "charge" | "conceal" | "strobe" | "reveal" | "settle";
 type PreloadStatus = "idle" | "loading" | "loaded" | "error";
 
 interface ArtReadiness {
@@ -41,6 +41,7 @@ const FULL_SEQUENCE_MS = {
   hold: 800,
   charge: 3200,
   conceal: 600,
+  strobe: 900,
   reveal: 2400,
   settle: 1600,
   dismissBuffer: 3000,
@@ -50,6 +51,7 @@ const REDUCED_SEQUENCE_MS = {
   hold: 150,
   charge: 280,
   conceal: 150,
+  strobe: 0,
   reveal: 500,
   settle: 480,
   dismissBuffer: 120,
@@ -295,6 +297,12 @@ const CompanionEvolutionContent = ({
       && previousDisplayImageUrl !== revealDisplayImageUrl
       && artReadiness.next === "loaded",
   );
+  const silhouetteStrobeEnabled = hasDualArt && !prefersReducedMotion;
+  const revealDelayMs =
+    sequence.hold
+    + sequence.charge
+    + sequence.conceal
+    + (silhouetteStrobeEnabled ? sequence.strobe : 0);
 
   const anticipationTitle = isFirstEvolution ? "Something Stirs Within..." : "The Light Gathers...";
   const celebrationTitle = isFirstEvolution ? "Hatched!" : "Evolved!";
@@ -520,6 +528,12 @@ const CompanionEvolutionContent = ({
       }
     }, sequence.hold + sequence.charge);
 
+    if (silhouetteStrobeEnabled) {
+      queueTimeout(() => {
+        setPhase("strobe");
+      }, sequence.hold + sequence.charge + sequence.conceal);
+    }
+
     queueTimeout(() => {
       setPhase("reveal");
       triggerEvent({
@@ -543,15 +557,15 @@ const CompanionEvolutionContent = ({
         });
         haptics.medium();
       }
-    }, sequence.hold + sequence.charge + sequence.conceal);
+    }, revealDelayMs);
 
     queueTimeout(() => {
       setPhase("settle");
-    }, sequence.hold + sequence.charge + sequence.conceal + sequence.reveal);
+    }, revealDelayMs + sequence.reveal);
 
     queueTimeout(() => {
       setCanDismiss(true);
-    }, sequence.hold + sequence.charge + sequence.conceal + sequence.reveal + sequence.dismissBuffer);
+    }, revealDelayMs + sequence.reveal + sequence.dismissBuffer);
 
     return () => {
       timersRef.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
@@ -573,7 +587,9 @@ const CompanionEvolutionContent = ({
     prefersReducedMotion,
     previousImageUrl,
     previousStage,
+    revealDelayMs,
     sequence,
+    silhouetteStrobeEnabled,
     theme,
     triggerEvent,
   ]);
@@ -772,8 +788,10 @@ const CompanionEvolutionContent = ({
                 className="relative flex w-full max-w-[580px] items-center justify-center"
                 data-testid="evolution-art-stage"
                 data-art-presentation={hasDualArt ? "swap" : "single"}
+                data-strobe-enabled={silhouetteStrobeEnabled ? "true" : "false"}
                 style={{
                   height: "min(54vh, 470px)",
+                  ["--evo-strobe-duration" as string]: `${sequence.strobe / 1000}s`,
                 }}
               >
                 <motion.div
@@ -782,12 +800,14 @@ const CompanionEvolutionContent = ({
                   animate={{
                     opacity: phase === "conceal"
                       ? 0.95
+                      : phase === "strobe"
+                        ? 0.72
                       : phase === "reveal"
                         ? 0.65
                         : phase === "charge"
                           ? 0.28
                           : 0,
-                    scale: phase === "conceal" ? 1.24 : phase === "reveal" ? 1.4 : 0.72,
+                    scale: phase === "conceal" ? 1.24 : phase === "strobe" ? 1.16 : phase === "reveal" ? 1.4 : 0.72,
                   }}
                   transition={{
                     duration: phase === "conceal" ? sequence.conceal / 1000 : 0.42,
@@ -799,6 +819,17 @@ const CompanionEvolutionContent = ({
                     mixBlendMode: "screen",
                   }}
                 />
+
+                {silhouetteStrobeEnabled && phase === "strobe" && (
+                  <div
+                    className="absolute inset-[10%] rounded-full pointer-events-none evo-silhouette-strobe-stage"
+                    style={{
+                      background: `radial-gradient(circle, ${theme.flashCore} 0%, ${theme.flashGlow} 42%, transparent 74%)`,
+                      filter: "blur(20px)",
+                      mixBlendMode: "screen",
+                    }}
+                  />
+                )}
 
                 {!prefersReducedMotion && phase === "reveal" && (
                   <motion.div
@@ -827,19 +858,21 @@ const CompanionEvolutionContent = ({
                     src={previousDisplayImageUrl}
                     alt={`Companion before evolving at stage ${previousStage}`}
                     data-testid="evolution-previous-art"
-                    className="absolute inset-0 h-full w-full rounded-[2rem] object-cover shadow-2xl"
+                    className={`absolute inset-0 h-full w-full rounded-[2rem] object-cover shadow-2xl ${
+                      phase === "strobe" && silhouetteStrobeEnabled ? "evo-silhouette-strobe-old" : ""
+                    }`}
                     initial={false}
                     animate={{
                       opacity: phase === "reveal" || phase === "settle" ? 0 : 1,
-                      scale: phase === "hold" ? 1 : phase === "charge" ? 1.04 : 1.09,
-                      filter: phase === "conceal"
+                      scale: phase === "hold" ? 1 : phase === "charge" ? 1.04 : phase === "strobe" ? 1.09 : 1.09,
+                      filter: phase === "conceal" || phase === "strobe"
                         ? "brightness(0) saturate(0) contrast(1.45) blur(4px)"
                         : phase === "charge"
                           ? "brightness(1.14) saturate(1.12) contrast(1.02) blur(0px)"
                           : "brightness(1) saturate(1) contrast(1) blur(0px)",
                     }}
                     transition={{
-                      duration: phase === "conceal" ? sequence.conceal / 1000 : 0.34,
+                      duration: phase === "conceal" ? sequence.conceal / 1000 : phase === "strobe" ? 0 : 0.34,
                       ease: [0.22, 1, 0.36, 1],
                     }}
                     style={{
@@ -855,12 +888,14 @@ const CompanionEvolutionContent = ({
                     src={revealDisplayImageUrl}
                     alt={`Companion after evolving at stage ${newStage}`}
                     data-testid="evolution-reveal-art"
-                    className="absolute inset-0 h-full w-full rounded-[2rem] object-cover shadow-2xl"
+                    className={`absolute inset-0 h-full w-full rounded-[2rem] object-cover shadow-2xl ${
+                      phase === "strobe" && silhouetteStrobeEnabled ? "evo-silhouette-strobe-new" : ""
+                    }`}
                     initial={false}
                     animate={hasDualArt
                       ? {
-                        opacity: phase === "reveal" || phase === "settle" ? 1 : 0,
-                        scale: phase === "reveal" ? 1.07 : phase === "settle" ? 1 : 1.16,
+                        opacity: phase === "strobe" || phase === "reveal" || phase === "settle" ? 1 : 0,
+                        scale: phase === "strobe" ? 1.12 : phase === "reveal" ? 1.07 : phase === "settle" ? 1 : 1.16,
                         filter: phase === "reveal"
                           ? "brightness(1.16) saturate(1.08) contrast(1.05) blur(0px)"
                           : phase === "settle"
@@ -892,6 +927,8 @@ const CompanionEvolutionContent = ({
                           ? sequence.reveal / 1000
                           : phase === "conceal"
                             ? sequence.conceal / 1000
+                            : phase === "strobe"
+                              ? 0
                             : 0.34,
                       ease: [0.22, 1, 0.36, 1],
                     }}

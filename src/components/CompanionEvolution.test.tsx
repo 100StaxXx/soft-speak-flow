@@ -138,8 +138,17 @@ const FULL_SEQUENCE_MS = {
   hold: 800,
   charge: 3200,
   conceal: 600,
+  strobe: 900,
   reveal: 2400,
   dismissBuffer: 3000,
+} as const;
+
+const REDUCED_SEQUENCE_MS = {
+  hold: 150,
+  charge: 280,
+  conceal: 150,
+  reveal: 500,
+  dismissBuffer: 120,
 } as const;
 
 class MockPreloadImage {
@@ -247,6 +256,10 @@ describe("CompanionEvolution", () => {
     expect(props.onComplete).not.toHaveBeenCalled();
 
     await flushTimers(FULL_SEQUENCE_MS.conceal);
+    expect(dialog).toHaveAttribute("data-phase", "strobe");
+    expect(screen.getByTestId("evolution-art-stage")).toHaveAttribute("data-strobe-enabled", "true");
+
+    await flushTimers(FULL_SEQUENCE_MS.strobe);
     expect(dialog).toHaveAttribute("data-phase", "reveal");
     expect(screen.getByText("Evolved!")).toBeInTheDocument();
 
@@ -283,9 +296,22 @@ describe("CompanionEvolution", () => {
     );
     await prepareEvolution();
 
-    expect(screen.getByTestId("evolution-art-stage")).toHaveAttribute("data-art-presentation", "single");
+    const dialog = screen.getByRole("alertdialog");
+    const artStage = screen.getByTestId("evolution-art-stage");
+
+    expect(artStage).toHaveAttribute("data-art-presentation", "single");
+    expect(artStage).toHaveAttribute("data-strobe-enabled", "false");
     expect(screen.queryByTestId("evolution-previous-art")).not.toBeInTheDocument();
     expect(screen.getByTestId("evolution-reveal-art")).toBeInTheDocument();
+
+    await flushTimers(FULL_SEQUENCE_MS.hold);
+    expect(dialog).toHaveAttribute("data-phase", "charge");
+
+    await flushTimers(FULL_SEQUENCE_MS.charge);
+    expect(dialog).toHaveAttribute("data-phase", "conceal");
+
+    await flushTimers(FULL_SEQUENCE_MS.conceal);
+    expect(dialog).toHaveAttribute("data-phase", "reveal");
   });
 
   it("uses the reduced-motion fast path without convergence particles", async () => {
@@ -298,7 +324,17 @@ describe("CompanionEvolution", () => {
 
     const dialog = screen.getByRole("alertdialog");
     expect(dialog).toHaveAttribute("data-reduced-motion", "true");
+    expect(screen.getByTestId("evolution-art-stage")).toHaveAttribute("data-strobe-enabled", "false");
     expect(screen.queryByTestId("evolution-convergence-particles")).not.toBeInTheDocument();
+
+    await flushTimers(REDUCED_SEQUENCE_MS.hold);
+    expect(dialog).toHaveAttribute("data-phase", "charge");
+
+    await flushTimers(REDUCED_SEQUENCE_MS.charge);
+    expect(dialog).toHaveAttribute("data-phase", "conceal");
+
+    await flushTimers(REDUCED_SEQUENCE_MS.conceal);
+    expect(dialog).toHaveAttribute("data-phase", "reveal");
 
     await flushTimers(1400);
     fireEvent.click(dialog);
@@ -331,6 +367,31 @@ describe("CompanionEvolution", () => {
     expect(screen.queryByTestId("evolution-hatching-overlay")).not.toBeInTheDocument();
   });
 
+  it("uses the silhouette strobe during first evolution when both art states are available", async () => {
+    render(
+      <CompanionEvolution
+        {...buildProps()}
+        previousStage={0}
+        newStage={1}
+        previousImageUrl="https://example.com/egg.png"
+        newImageUrl="https://example.com/hatchling.png"
+      />,
+    );
+    await prepareEvolution();
+
+    const dialog = screen.getByRole("alertdialog");
+    expect(screen.getByTestId("evolution-art-stage")).toHaveAttribute("data-strobe-enabled", "true");
+
+    await flushTimers(FULL_SEQUENCE_MS.hold + FULL_SEQUENCE_MS.charge);
+    expect(dialog).toHaveAttribute("data-phase", "conceal");
+
+    await flushTimers(FULL_SEQUENCE_MS.conceal);
+    expect(dialog).toHaveAttribute("data-phase", "strobe");
+
+    await flushTimers(FULL_SEQUENCE_MS.strobe);
+    expect(dialog).toHaveAttribute("data-phase", "reveal");
+  });
+
   it("plays animation side effects only once across rerenders", async () => {
     const props = buildProps();
     const { rerender } = render(<CompanionEvolution {...props} />);
@@ -346,6 +407,7 @@ describe("CompanionEvolution", () => {
     await flushTimers(
       FULL_SEQUENCE_MS.charge +
       FULL_SEQUENCE_MS.conceal +
+      FULL_SEQUENCE_MS.strobe +
       FULL_SEQUENCE_MS.reveal,
     );
 
