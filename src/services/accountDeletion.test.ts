@@ -3,7 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   clearAuthScopedClientState: vi.fn(),
   getSession: vi.fn(),
-  rpc: vi.fn(),
+  invoke: vi.fn(),
+  parseFunctionInvokeError: vi.fn(),
 }));
 
 vi.mock("@/integrations/supabase/client", () => ({
@@ -11,12 +12,18 @@ vi.mock("@/integrations/supabase/client", () => ({
     auth: {
       getSession: mocks.getSession,
     },
-    rpc: mocks.rpc,
+    functions: {
+      invoke: mocks.invoke,
+    },
   },
 }));
 
 vi.mock("@/services/authScopedClientState", () => ({
   clearAuthScopedClientState: mocks.clearAuthScopedClientState,
+}));
+
+vi.mock("@/utils/supabaseFunctionErrors", () => ({
+  parseFunctionInvokeError: mocks.parseFunctionInvokeError,
 }));
 
 import { deleteCurrentAccount, isAccountDeletionAuthError } from "./accountDeletion";
@@ -29,7 +36,20 @@ describe("accountDeletion", () => {
     vi.clearAllMocks();
     signOut.mockResolvedValue(undefined);
     mocks.clearAuthScopedClientState.mockResolvedValue(undefined);
-    mocks.rpc.mockResolvedValue({ error: null });
+    mocks.invoke.mockResolvedValue({ data: { success: true }, error: null });
+    mocks.parseFunctionInvokeError.mockResolvedValue({
+      category: "unknown",
+      status: 500,
+      message: undefined,
+      backendMessage: undefined,
+      code: undefined,
+      responsePayload: undefined,
+      retryAfterSeconds: undefined,
+      upstreamStatus: undefined,
+      upstreamError: undefined,
+      isOffline: false,
+      name: undefined,
+    });
     mocks.getSession.mockResolvedValue({
       data: {
         session: {
@@ -54,16 +74,32 @@ describe("accountDeletion", () => {
       }),
     ).rejects.toThrow("Session expired. Please sign in again.");
 
-    expect(mocks.rpc).not.toHaveBeenCalled();
+    expect(mocks.invoke).not.toHaveBeenCalled();
     expect(mocks.clearAuthScopedClientState).not.toHaveBeenCalled();
     expect(signOut).not.toHaveBeenCalled();
   });
 
-  it("maps rpc auth failures to a session-expired error", async () => {
-    mocks.rpc.mockResolvedValue({
-      error: {
-        message: "Unauthorized: You can only delete your own account",
+  it("maps edge function auth failures to a session-expired error", async () => {
+    const rawError = new Error("Unauthorized");
+    mocks.invoke.mockResolvedValue({
+      data: null,
+      error: rawError,
+    });
+    mocks.parseFunctionInvokeError.mockResolvedValue({
+      category: "auth",
+      status: 401,
+      message: "Unauthorized",
+      backendMessage: "Unauthorized",
+      code: "ACCOUNT_DELETION_AUTH_REQUIRED",
+      responsePayload: {
+        error: "Unauthorized",
+        code: "ACCOUNT_DELETION_AUTH_REQUIRED",
       },
+      retryAfterSeconds: undefined,
+      upstreamStatus: undefined,
+      upstreamError: undefined,
+      isOffline: false,
+      name: "FunctionsHttpError",
     });
 
     const error = await deleteCurrentAccount({
@@ -79,12 +115,27 @@ describe("accountDeletion", () => {
     expect(signOut).not.toHaveBeenCalled();
   });
 
-  it("maps technical rpc failures to a friendly temporary-unavailable message", async () => {
-    mocks.rpc.mockResolvedValue({
-      error: {
-        code: "23503",
-        message: "update or delete on table \"profiles\" violates foreign key constraint",
+  it("maps technical edge function failures to a friendly temporary-unavailable message", async () => {
+    const rawError = new Error("Edge function returned a non-2xx status code");
+    mocks.invoke.mockResolvedValue({
+      data: null,
+      error: rawError,
+    });
+    mocks.parseFunctionInvokeError.mockResolvedValue({
+      category: "http",
+      status: 500,
+      message: "Edge function returned a non-2xx status code",
+      backendMessage: "Account deletion is temporarily unavailable. Please try again later.",
+      code: "ACCOUNT_DELETION_BACKEND_UNAVAILABLE",
+      responsePayload: {
+        error: "Account deletion is temporarily unavailable. Please try again later.",
+        code: "ACCOUNT_DELETION_BACKEND_UNAVAILABLE",
       },
+      retryAfterSeconds: undefined,
+      upstreamStatus: undefined,
+      upstreamError: undefined,
+      isOffline: false,
+      name: "FunctionsHttpError",
     });
 
     const error = await deleteCurrentAccount({
@@ -100,7 +151,16 @@ describe("accountDeletion", () => {
     expect(signOut).not.toHaveBeenCalled();
   });
 
-  it("clears local state and signs out after rpc success", async () => {
+  it("clears local state and signs out after edge function success", async () => {
+    const warnings = [{ code: "storage_cleanup_partial", message: "Some files are still cleaning up." }];
+    mocks.invoke.mockResolvedValue({
+      data: {
+        success: true,
+        warnings,
+      },
+      error: null,
+    });
+
     await expect(
       deleteCurrentAccount({
         queryClient,
@@ -108,11 +168,13 @@ describe("accountDeletion", () => {
         signOut,
       }),
     ).resolves.toEqual({
-      warnings: [],
+      warnings,
     });
 
-    expect(mocks.rpc).toHaveBeenCalledWith("delete_user_account", {
-      p_user_id: "user-1",
+    expect(mocks.invoke).toHaveBeenCalledWith("delete-user", {
+      headers: {
+        Authorization: "Bearer access-token",
+      },
     });
     expect(mocks.clearAuthScopedClientState).toHaveBeenCalledWith(queryClient, {
       previousUserId: "user-1",

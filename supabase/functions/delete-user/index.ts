@@ -78,6 +78,21 @@ const createTemporaryUnavailableError = (
     cause,
   });
 
+const isAuthUserAlreadyDeletedError = (error: unknown): boolean => {
+  if (!error || typeof error !== "object") return false;
+
+  const combinedMessage = [
+    "message" in error ? error.message : undefined,
+    "code" in error ? error.code : undefined,
+    "name" in error ? error.name : undefined,
+  ]
+    .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+    .join(" ")
+    .toLowerCase();
+
+  return combinedMessage.includes("user not found") || combinedMessage.includes("not found");
+};
+
 function sanitizeError(error: unknown): SanitizedDeleteUserError {
   console.error("[delete-user] full error details", error);
 
@@ -578,8 +593,12 @@ serve(async (req) => {
 
     const { error: authDeleteError } = await supabase.auth.admin.deleteUser(userId);
     if (authDeleteError) {
-      console.error("[delete-user] auth.admin.deleteUser failed", authDeleteError);
-      throw createTemporaryUnavailableError(ACCOUNT_DELETION_ERROR_CODES.AUTH_DELETE_FAILED, authDeleteError);
+      if (isAuthUserAlreadyDeletedError(authDeleteError)) {
+        console.warn("[delete-user] auth user already removed before admin delete", { userId });
+      } else {
+        console.error("[delete-user] auth.admin.deleteUser failed", authDeleteError);
+        throw createTemporaryUnavailableError(ACCOUNT_DELETION_ERROR_CODES.AUTH_DELETE_FAILED, authDeleteError);
+      }
     }
 
     return new Response(
