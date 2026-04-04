@@ -59,6 +59,8 @@ const mocks = vi.hoisted(() => ({
   profilesMaybeSingle: vi.fn(),
   questionnaireUpsert: vi.fn(),
   createCompanionMutateAsync: vi.fn(),
+  userCompanionUpdate: vi.fn(),
+  userCompanionUpdateEq: vi.fn(),
   toastError: vi.fn(),
   toastSuccess: vi.fn(),
   loggerError: vi.fn(),
@@ -180,6 +182,17 @@ vi.mock("@/integrations/supabase/client", () => ({
       if (table === "questionnaire_responses") {
         return {
           upsert: mocks.questionnaireUpsert,
+        };
+      }
+
+      if (table === "user_companion") {
+        return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: vi.fn(async () => ({ data: null, error: null })),
+            }),
+          }),
+          update: mocks.userCompanionUpdate,
         };
       }
 
@@ -432,6 +445,8 @@ describe("StoryOnboarding questionnaire submission flow", () => {
     mocks.profilesUpdateEq.mockReset();
     mocks.questionnaireUpsert.mockReset();
     mocks.createCompanionMutateAsync.mockReset();
+    mocks.userCompanionUpdate.mockReset();
+    mocks.userCompanionUpdateEq.mockReset();
     mocks.toastError.mockReset();
     mocks.toastSuccess.mockReset();
     mocks.loggerError.mockReset();
@@ -443,6 +458,10 @@ describe("StoryOnboarding questionnaire submission flow", () => {
     mocks.mentorsEq.mockResolvedValue({ data: [ACTIVE_MENTOR], error: null });
     mocks.questionnaireUpsert.mockResolvedValue({ error: null });
     mocks.createCompanionMutateAsync.mockResolvedValue({ id: "companion-1" });
+    mocks.userCompanionUpdate.mockReturnValue({
+      eq: mocks.userCompanionUpdateEq,
+    });
+    mocks.userCompanionUpdateEq.mockResolvedValue({ error: null });
     storageMocks.reset();
   });
 
@@ -630,6 +649,34 @@ describe("StoryOnboarding questionnaire submission flow", () => {
         coreElement: "ice",
         storyTone: "dark_intense",
       });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps the egg-era reveal free of cached companion names before hatching", async () => {
+    renderOnboarding();
+    await advanceToQuestionnaire();
+
+    vi.useFakeTimers();
+    try {
+      fireEvent.click(screen.getByRole("button", { name: "questionnaire-submit" }));
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(CALCULATING_STAGE_DURATION_MS);
+        await Promise.resolve();
+      });
+
+      vi.useRealTimers();
+
+      await advanceFromMentorToEggSelection();
+      fireEvent.click(screen.getByRole("button", { name: "complete-companion" }));
+
+      await screen.findByTestId("journey-begins-stage");
+
+      expect(screen.getByTestId("journey-begins-summary")).toHaveTextContent("Nova:Dragon");
+      expect(screen.getByTestId("journey-begins-summary")).not.toHaveTextContent("Ignisyl");
+      expect(mocks.userCompanionUpdate).not.toHaveBeenCalled();
     } finally {
       vi.useRealTimers();
     }

@@ -118,11 +118,12 @@ export const JourneyCard = memo(function JourneyCard({ journey, onComplete, onAb
   const postcardProgress = getProgressToNextPostcard();
   const journeyHealth = getJourneyHealth(journey.start_date, resolvedEndDate ?? undefined);
   const companionDisplayName = useMemo(() => {
+    if ((companion?.current_stage ?? 0) <= 0) return undefined;
     const rawName = companion?.cached_creature_name;
     if (typeof rawName !== "string") return undefined;
     const trimmed = rawName.trim();
     return trimmed.length > 0 ? trimmed : undefined;
-  }, [companion?.cached_creature_name]);
+  }, [companion?.cached_creature_name, companion?.current_stage]);
   
   const trailMilestones = useMemo(() => {
     if (!milestones || milestones.length === 0) return undefined;

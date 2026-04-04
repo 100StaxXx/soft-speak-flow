@@ -3,7 +3,7 @@ import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { CompanionCreationLoader } from "./CompanionCreationLoader";
-import { CompanionImage } from "./CompanionImage";
+import { CompanionImage, CompanionPortraitShell } from "./CompanionImage";
 import {
   COMPANION_ELEMENTS,
   COMPANION_PRESETS,
@@ -209,19 +209,27 @@ export const CompanionPersonalization = ({
                     >
                       <div className="relative h-[260px] bg-gradient-to-br from-slate-950/80 via-slate-900/80 to-slate-950/95">
                         {!brokenPreviewKeys[previewKey] ? (
-                          <CompanionImage
+                          <CompanionPortraitShell
                             src={previewUrl}
-                            alt={preset.displayName}
-                            fit="contain"
-                            className="h-full w-full p-4"
-                            loading="lazy"
-                            onError={() =>
-                              setBrokenPreviewKeys((current) => ({
-                                ...current,
-                                [previewKey]: true,
-                              }))
-                            }
-                          />
+                            element={selectedElement}
+                            className="h-full w-full"
+                            contentClassName="h-full w-full p-4"
+                          >
+                            <CompanionImage
+                              src={previewUrl}
+                              alt={preset.displayName}
+                              fit="portrait"
+                              element={selectedElement}
+                              className="h-full w-full"
+                              loading="lazy"
+                              onError={() =>
+                                setBrokenPreviewKeys((current) => ({
+                                  ...current,
+                                  [previewKey]: true,
+                                }))
+                              }
+                            />
+                          </CompanionPortraitShell>
                         ) : (
                           <div className="h-full w-full p-5 flex flex-col justify-between">
                             <div

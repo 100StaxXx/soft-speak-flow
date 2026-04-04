@@ -19,6 +19,8 @@ const mocks = vi.hoisted(() => ({
   isTabActive: true,
   useCompanionCalls: [] as Array<Record<string, unknown> | undefined>,
   layoutMode: "mobile" as "mobile" | "desktop",
+  guidedStep: null as string | null,
+  isEvolvingLoading: false,
 }));
 
 vi.mock("@tanstack/react-query", () => ({
@@ -115,6 +117,7 @@ vi.mock("@/hooks/useCompanion", () => ({
       companion: mocks.companion,
       nextEvolutionXP: 200,
       progressToNext: 60,
+      canEvolve: false,
       isLoading: mocks.isLoading,
       error: mocks.error,
       refetch: mocks.refetch,
@@ -124,6 +127,21 @@ vi.mock("@/hooks/useCompanion", () => ({
 
 vi.mock("@/hooks/useCompanionLayoutMode", () => ({
   useCompanionLayoutMode: () => mocks.layoutMode,
+}));
+
+vi.mock("@/hooks/usePostOnboardingMentorGuidance", () => ({
+  usePostOnboardingMentorGuidance: () => ({
+    currentStep: mocks.guidedStep,
+  }),
+}));
+
+vi.mock("@/contexts/EvolutionContext", () => ({
+  useEvolution: () => ({
+    isEvolvingLoading: mocks.isEvolvingLoading,
+    setIsEvolvingLoading: vi.fn(),
+    onEvolutionComplete: null,
+    setOnEvolutionComplete: vi.fn(),
+  }),
 }));
 
 vi.mock("@/hooks/useCompanionStory", () => ({
@@ -195,7 +213,25 @@ vi.mock("@/components/CompanionDisplay", () => ({
 }));
 
 vi.mock("@/components/NextEvolutionPreview", () => ({
-  NextEvolutionPreview: () => <div data-testid="next-evolution" />,
+  NextEvolutionPreview: ({
+    currentStage,
+    currentXP,
+    nextEvolutionXP,
+    progressPercent,
+  }: {
+    currentStage: number;
+    currentXP: number;
+    nextEvolutionXP: number;
+    progressPercent: number;
+  }) => (
+    <div
+      data-testid="next-evolution"
+      data-current-stage={String(currentStage)}
+      data-current-xp={String(currentXP)}
+      data-next-evolution-xp={String(nextEvolutionXP)}
+      data-progress-percent={String(progressPercent)}
+    />
+  ),
 }));
 
 vi.mock("@/components/XPBreakdown", () => ({
@@ -280,6 +316,8 @@ describe("Companion tabs performance behavior", () => {
     mocks.isTabActive = true;
     mocks.useCompanionCalls = [];
     mocks.layoutMode = "mobile";
+    mocks.guidedStep = null;
+    mocks.isEvolvingLoading = false;
   });
 
   afterEach(() => {
@@ -429,6 +467,40 @@ describe("Companion tabs performance behavior", () => {
     expect(screen.getByTestId("companion-desktop-rail")).toBeInTheDocument();
     expect(screen.getByTestId("companion-desktop-workspace")).toBeInTheDocument();
     expect(screen.getByTestId("companion-display")).toHaveAttribute("data-layout-mode", "desktop");
+  });
+
+  it("forces the overview progress card to stay on stage 0 during the evolve tutorial step", () => {
+    mocks.guidedStep = "evolve_companion";
+    mocks.companion = {
+      id: "companion-1",
+      current_xp: 14,
+      current_stage: 1,
+      core_element: "fire",
+      initial_image_url: "/companion-eggs/egg__t0_egg__normal__fire.png",
+    };
+
+    renderCompanion();
+
+    expect(screen.getByTestId("next-evolution")).toHaveAttribute("data-current-stage", "0");
+    expect(screen.getByTestId("next-evolution")).toHaveAttribute("data-next-evolution-xp", "10");
+    expect(screen.getByTestId("next-evolution")).toHaveAttribute("data-progress-percent", "100");
+  });
+
+  it("stops forcing the stage 0 overview after hatch has started", () => {
+    mocks.guidedStep = "evolve_companion";
+    mocks.isEvolvingLoading = true;
+    mocks.companion = {
+      id: "companion-1",
+      current_xp: 14,
+      current_stage: 1,
+      core_element: "fire",
+      initial_image_url: "/companion-eggs/egg__t0_egg__normal__fire.png",
+    };
+
+    renderCompanion();
+
+    expect(screen.getByTestId("next-evolution")).toHaveAttribute("data-current-stage", "1");
+    expect(screen.getByTestId("next-evolution")).toHaveAttribute("data-next-evolution-xp", "200");
   });
 
   it("disables companion query and idle prefetch while tab is inactive", async () => {

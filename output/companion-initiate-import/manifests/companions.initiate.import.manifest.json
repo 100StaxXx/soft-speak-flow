@@ -24,7 +24,11 @@
           "outputFilename": "dragon__t2_guardian__normal__fire.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/dragon/t2_guardian/normal/dragon__t2_guardian__normal__fire.png",
           "storagePath": "dragon/t2_guardian/normal/dragon__t2_guardian__normal__fire.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 144544,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "dragon",
@@ -35,7 +39,11 @@
           "outputFilename": "dragon__t2_guardian__normal__ice.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/dragon/t2_guardian/normal/dragon__t2_guardian__normal__ice.png",
           "storagePath": "dragon/t2_guardian/normal/dragon__t2_guardian__normal__ice.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 144124,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "dragon",
@@ -46,7 +54,11 @@
           "outputFilename": "dragon__t2_guardian__normal__storm.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/dragon/t2_guardian/normal/dragon__t2_guardian__normal__storm.png",
           "storagePath": "dragon/t2_guardian/normal/dragon__t2_guardian__normal__storm.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 144544,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "dragon",
@@ -57,7 +69,11 @@
           "outputFilename": "dragon__t2_guardian__normal__nature.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/dragon/t2_guardian/normal/dragon__t2_guardian__normal__nature.png",
           "storagePath": "dragon/t2_guardian/normal/dragon__t2_guardian__normal__nature.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 144544,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "dragon",
@@ -68,7 +84,11 @@
           "outputFilename": "dragon__t2_guardian__normal__void.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/dragon/t2_guardian/normal/dragon__t2_guardian__normal__void.png",
           "storagePath": "dragon/t2_guardian/normal/dragon__t2_guardian__normal__void.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 144124,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "dragon",
@@ -79,7 +99,11 @@
           "outputFilename": "dragon__t2_guardian__normal__light.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/dragon/t2_guardian/normal/dragon__t2_guardian__normal__light.png",
           "storagePath": "dragon/t2_guardian/normal/dragon__t2_guardian__normal__light.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 144544,
+          "edgeBleedPixels": 0
         }
       ]
     },
@@ -99,7 +123,11 @@
           "outputFilename": "wolf__t2_guardian__normal__fire.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/wolf/t2_guardian/normal/wolf__t2_guardian__normal__fire.png",
           "storagePath": "wolf/t2_guardian/normal/wolf__t2_guardian__normal__fire.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 148406,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "wolf",
@@ -110,7 +138,11 @@
           "outputFilename": "wolf__t2_guardian__normal__ice.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/wolf/t2_guardian/normal/wolf__t2_guardian__normal__ice.png",
           "storagePath": "wolf/t2_guardian/normal/wolf__t2_guardian__normal__ice.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 159274,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "wolf",
@@ -121,7 +153,11 @@
           "outputFilename": "wolf__t2_guardian__normal__storm.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/wolf/t2_guardian/normal/wolf__t2_guardian__normal__storm.png",
           "storagePath": "wolf/t2_guardian/normal/wolf__t2_guardian__normal__storm.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 157215,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "wolf",
@@ -132,7 +168,11 @@
           "outputFilename": "wolf__t2_guardian__normal__nature.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/wolf/t2_guardian/normal/wolf__t2_guardian__normal__nature.png",
           "storagePath": "wolf/t2_guardian/normal/wolf__t2_guardian__normal__nature.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 128861,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "wolf",
@@ -143,7 +183,11 @@
           "outputFilename": "wolf__t2_guardian__normal__void.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/wolf/t2_guardian/normal/wolf__t2_guardian__normal__void.png",
           "storagePath": "wolf/t2_guardian/normal/wolf__t2_guardian__normal__void.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 152978,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "wolf",
@@ -154,7 +198,11 @@
           "outputFilename": "wolf__t2_guardian__normal__light.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/wolf/t2_guardian/normal/wolf__t2_guardian__normal__light.png",
           "storagePath": "wolf/t2_guardian/normal/wolf__t2_guardian__normal__light.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 149278,
+          "edgeBleedPixels": 0
         }
       ]
     },
@@ -174,7 +222,11 @@
           "outputFilename": "fox__t2_guardian__normal__fire.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/fox/t2_guardian/normal/fox__t2_guardian__normal__fire.png",
           "storagePath": "fox/t2_guardian/normal/fox__t2_guardian__normal__fire.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 144544,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "fox",
@@ -185,7 +237,11 @@
           "outputFilename": "fox__t2_guardian__normal__ice.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/fox/t2_guardian/normal/fox__t2_guardian__normal__ice.png",
           "storagePath": "fox/t2_guardian/normal/fox__t2_guardian__normal__ice.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 144124,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "fox",
@@ -196,7 +252,11 @@
           "outputFilename": "fox__t2_guardian__normal__storm.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/fox/t2_guardian/normal/fox__t2_guardian__normal__storm.png",
           "storagePath": "fox/t2_guardian/normal/fox__t2_guardian__normal__storm.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 144544,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "fox",
@@ -207,7 +267,11 @@
           "outputFilename": "fox__t2_guardian__normal__nature.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/fox/t2_guardian/normal/fox__t2_guardian__normal__nature.png",
           "storagePath": "fox/t2_guardian/normal/fox__t2_guardian__normal__nature.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 139358,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "fox",
@@ -218,7 +282,11 @@
           "outputFilename": "fox__t2_guardian__normal__void.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/fox/t2_guardian/normal/fox__t2_guardian__normal__void.png",
           "storagePath": "fox/t2_guardian/normal/fox__t2_guardian__normal__void.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 144124,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "fox",
@@ -229,7 +297,11 @@
           "outputFilename": "fox__t2_guardian__normal__light.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/fox/t2_guardian/normal/fox__t2_guardian__normal__light.png",
           "storagePath": "fox/t2_guardian/normal/fox__t2_guardian__normal__light.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 144544,
+          "edgeBleedPixels": 0
         }
       ]
     },
@@ -249,7 +321,11 @@
           "outputFilename": "owl__t2_guardian__normal__fire.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/owl/t2_guardian/normal/owl__t2_guardian__normal__fire.png",
           "storagePath": "owl/t2_guardian/normal/owl__t2_guardian__normal__fire.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 144544,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "owl",
@@ -260,7 +336,11 @@
           "outputFilename": "owl__t2_guardian__normal__ice.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/owl/t2_guardian/normal/owl__t2_guardian__normal__ice.png",
           "storagePath": "owl/t2_guardian/normal/owl__t2_guardian__normal__ice.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 144124,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "owl",
@@ -271,7 +351,11 @@
           "outputFilename": "owl__t2_guardian__normal__storm.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/owl/t2_guardian/normal/owl__t2_guardian__normal__storm.png",
           "storagePath": "owl/t2_guardian/normal/owl__t2_guardian__normal__storm.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 144544,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "owl",
@@ -282,7 +366,11 @@
           "outputFilename": "owl__t2_guardian__normal__nature.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/owl/t2_guardian/normal/owl__t2_guardian__normal__nature.png",
           "storagePath": "owl/t2_guardian/normal/owl__t2_guardian__normal__nature.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 144544,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "owl",
@@ -293,7 +381,11 @@
           "outputFilename": "owl__t2_guardian__normal__void.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/owl/t2_guardian/normal/owl__t2_guardian__normal__void.png",
           "storagePath": "owl/t2_guardian/normal/owl__t2_guardian__normal__void.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 144124,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "owl",
@@ -304,7 +396,11 @@
           "outputFilename": "owl__t2_guardian__normal__light.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/owl/t2_guardian/normal/owl__t2_guardian__normal__light.png",
           "storagePath": "owl/t2_guardian/normal/owl__t2_guardian__normal__light.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 144544,
+          "edgeBleedPixels": 0
         }
       ]
     },
@@ -324,7 +420,11 @@
           "outputFilename": "lion__t2_guardian__normal__fire.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/lion/t2_guardian/normal/lion__t2_guardian__normal__fire.png",
           "storagePath": "lion/t2_guardian/normal/lion__t2_guardian__normal__fire.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 126979,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "lion",
@@ -335,7 +435,11 @@
           "outputFilename": "lion__t2_guardian__normal__ice.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/lion/t2_guardian/normal/lion__t2_guardian__normal__ice.png",
           "storagePath": "lion/t2_guardian/normal/lion__t2_guardian__normal__ice.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 135902,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "lion",
@@ -346,7 +450,11 @@
           "outputFilename": "lion__t2_guardian__normal__storm.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/lion/t2_guardian/normal/lion__t2_guardian__normal__storm.png",
           "storagePath": "lion/t2_guardian/normal/lion__t2_guardian__normal__storm.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 133736,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "lion",
@@ -357,7 +465,11 @@
           "outputFilename": "lion__t2_guardian__normal__nature.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/lion/t2_guardian/normal/lion__t2_guardian__normal__nature.png",
           "storagePath": "lion/t2_guardian/normal/lion__t2_guardian__normal__nature.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 120161,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "lion",
@@ -368,7 +480,11 @@
           "outputFilename": "lion__t2_guardian__normal__void.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/lion/t2_guardian/normal/lion__t2_guardian__normal__void.png",
           "storagePath": "lion/t2_guardian/normal/lion__t2_guardian__normal__void.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 117808,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "lion",
@@ -379,7 +495,11 @@
           "outputFilename": "lion__t2_guardian__normal__light.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/lion/t2_guardian/normal/lion__t2_guardian__normal__light.png",
           "storagePath": "lion/t2_guardian/normal/lion__t2_guardian__normal__light.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 124139,
+          "edgeBleedPixels": 0
         }
       ]
     },
@@ -399,7 +519,11 @@
           "outputFilename": "phoenix__t2_guardian__normal__fire.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/phoenix/t2_guardian/normal/phoenix__t2_guardian__normal__fire.png",
           "storagePath": "phoenix/t2_guardian/normal/phoenix__t2_guardian__normal__fire.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 137694,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "phoenix",
@@ -410,7 +534,11 @@
           "outputFilename": "phoenix__t2_guardian__normal__ice.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/phoenix/t2_guardian/normal/phoenix__t2_guardian__normal__ice.png",
           "storagePath": "phoenix/t2_guardian/normal/phoenix__t2_guardian__normal__ice.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 148654,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "phoenix",
@@ -421,7 +549,11 @@
           "outputFilename": "phoenix__t2_guardian__normal__storm.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/phoenix/t2_guardian/normal/phoenix__t2_guardian__normal__storm.png",
           "storagePath": "phoenix/t2_guardian/normal/phoenix__t2_guardian__normal__storm.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 140777,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "phoenix",
@@ -432,7 +564,11 @@
           "outputFilename": "phoenix__t2_guardian__normal__nature.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/phoenix/t2_guardian/normal/phoenix__t2_guardian__normal__nature.png",
           "storagePath": "phoenix/t2_guardian/normal/phoenix__t2_guardian__normal__nature.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 133655,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "phoenix",
@@ -443,7 +579,11 @@
           "outputFilename": "phoenix__t2_guardian__normal__void.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/phoenix/t2_guardian/normal/phoenix__t2_guardian__normal__void.png",
           "storagePath": "phoenix/t2_guardian/normal/phoenix__t2_guardian__normal__void.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 137046,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "phoenix",
@@ -454,7 +594,11 @@
           "outputFilename": "phoenix__t2_guardian__normal__light.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/phoenix/t2_guardian/normal/phoenix__t2_guardian__normal__light.png",
           "storagePath": "phoenix/t2_guardian/normal/phoenix__t2_guardian__normal__light.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 134496,
+          "edgeBleedPixels": 0
         }
       ]
     },
@@ -474,7 +618,11 @@
           "outputFilename": "pegasus__t2_guardian__normal__fire.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/pegasus/t2_guardian/normal/pegasus__t2_guardian__normal__fire.png",
           "storagePath": "pegasus/t2_guardian/normal/pegasus__t2_guardian__normal__fire.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 134178,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "pegasus",
@@ -485,7 +633,11 @@
           "outputFilename": "pegasus__t2_guardian__normal__ice.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/pegasus/t2_guardian/normal/pegasus__t2_guardian__normal__ice.png",
           "storagePath": "pegasus/t2_guardian/normal/pegasus__t2_guardian__normal__ice.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 144124,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "pegasus",
@@ -496,7 +648,11 @@
           "outputFilename": "pegasus__t2_guardian__normal__storm.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/pegasus/t2_guardian/normal/pegasus__t2_guardian__normal__storm.png",
           "storagePath": "pegasus/t2_guardian/normal/pegasus__t2_guardian__normal__storm.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 144544,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "pegasus",
@@ -507,7 +663,11 @@
           "outputFilename": "pegasus__t2_guardian__normal__nature.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/pegasus/t2_guardian/normal/pegasus__t2_guardian__normal__nature.png",
           "storagePath": "pegasus/t2_guardian/normal/pegasus__t2_guardian__normal__nature.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 124279,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "pegasus",
@@ -518,7 +678,11 @@
           "outputFilename": "pegasus__t2_guardian__normal__void.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/pegasus/t2_guardian/normal/pegasus__t2_guardian__normal__void.png",
           "storagePath": "pegasus/t2_guardian/normal/pegasus__t2_guardian__normal__void.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 144124,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "pegasus",
@@ -529,7 +693,11 @@
           "outputFilename": "pegasus__t2_guardian__normal__light.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/pegasus/t2_guardian/normal/pegasus__t2_guardian__normal__light.png",
           "storagePath": "pegasus/t2_guardian/normal/pegasus__t2_guardian__normal__light.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 144544,
+          "edgeBleedPixels": 0
         }
       ]
     },
@@ -549,7 +717,11 @@
           "outputFilename": "griffin__t2_guardian__normal__fire.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/griffin/t2_guardian/normal/griffin__t2_guardian__normal__fire.png",
           "storagePath": "griffin/t2_guardian/normal/griffin__t2_guardian__normal__fire.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 144544,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "griffin",
@@ -560,7 +732,11 @@
           "outputFilename": "griffin__t2_guardian__normal__ice.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/griffin/t2_guardian/normal/griffin__t2_guardian__normal__ice.png",
           "storagePath": "griffin/t2_guardian/normal/griffin__t2_guardian__normal__ice.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 144124,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "griffin",
@@ -571,7 +747,11 @@
           "outputFilename": "griffin__t2_guardian__normal__storm.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/griffin/t2_guardian/normal/griffin__t2_guardian__normal__storm.png",
           "storagePath": "griffin/t2_guardian/normal/griffin__t2_guardian__normal__storm.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 144544,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "griffin",
@@ -582,7 +762,11 @@
           "outputFilename": "griffin__t2_guardian__normal__nature.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/griffin/t2_guardian/normal/griffin__t2_guardian__normal__nature.png",
           "storagePath": "griffin/t2_guardian/normal/griffin__t2_guardian__normal__nature.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 144544,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "griffin",
@@ -593,7 +777,11 @@
           "outputFilename": "griffin__t2_guardian__normal__void.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/griffin/t2_guardian/normal/griffin__t2_guardian__normal__void.png",
           "storagePath": "griffin/t2_guardian/normal/griffin__t2_guardian__normal__void.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 144124,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "griffin",
@@ -604,7 +792,11 @@
           "outputFilename": "griffin__t2_guardian__normal__light.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/griffin/t2_guardian/normal/griffin__t2_guardian__normal__light.png",
           "storagePath": "griffin/t2_guardian/normal/griffin__t2_guardian__normal__light.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 144544,
+          "edgeBleedPixels": 0
         }
       ]
     },
@@ -624,7 +816,11 @@
           "outputFilename": "sphinx__t2_guardian__normal__fire.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/sphinx/t2_guardian/normal/sphinx__t2_guardian__normal__fire.png",
           "storagePath": "sphinx/t2_guardian/normal/sphinx__t2_guardian__normal__fire.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 144544,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "sphinx",
@@ -635,7 +831,11 @@
           "outputFilename": "sphinx__t2_guardian__normal__ice.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/sphinx/t2_guardian/normal/sphinx__t2_guardian__normal__ice.png",
           "storagePath": "sphinx/t2_guardian/normal/sphinx__t2_guardian__normal__ice.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 144124,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "sphinx",
@@ -646,7 +846,11 @@
           "outputFilename": "sphinx__t2_guardian__normal__storm.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/sphinx/t2_guardian/normal/sphinx__t2_guardian__normal__storm.png",
           "storagePath": "sphinx/t2_guardian/normal/sphinx__t2_guardian__normal__storm.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 144544,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "sphinx",
@@ -657,7 +861,11 @@
           "outputFilename": "sphinx__t2_guardian__normal__nature.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/sphinx/t2_guardian/normal/sphinx__t2_guardian__normal__nature.png",
           "storagePath": "sphinx/t2_guardian/normal/sphinx__t2_guardian__normal__nature.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 141604,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "sphinx",
@@ -668,7 +876,11 @@
           "outputFilename": "sphinx__t2_guardian__normal__void.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/sphinx/t2_guardian/normal/sphinx__t2_guardian__normal__void.png",
           "storagePath": "sphinx/t2_guardian/normal/sphinx__t2_guardian__normal__void.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 144124,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "sphinx",
@@ -679,7 +891,11 @@
           "outputFilename": "sphinx__t2_guardian__normal__light.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/sphinx/t2_guardian/normal/sphinx__t2_guardian__normal__light.png",
           "storagePath": "sphinx/t2_guardian/normal/sphinx__t2_guardian__normal__light.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 144544,
+          "edgeBleedPixels": 0
         }
       ]
     },
@@ -699,7 +915,11 @@
           "outputFilename": "leviathan__t2_guardian__normal__fire.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/leviathan/t2_guardian/normal/leviathan__t2_guardian__normal__fire.png",
           "storagePath": "leviathan/t2_guardian/normal/leviathan__t2_guardian__normal__fire.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 144544,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "leviathan",
@@ -710,7 +930,11 @@
           "outputFilename": "leviathan__t2_guardian__normal__ice.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/leviathan/t2_guardian/normal/leviathan__t2_guardian__normal__ice.png",
           "storagePath": "leviathan/t2_guardian/normal/leviathan__t2_guardian__normal__ice.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 144124,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "leviathan",
@@ -721,7 +945,11 @@
           "outputFilename": "leviathan__t2_guardian__normal__storm.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/leviathan/t2_guardian/normal/leviathan__t2_guardian__normal__storm.png",
           "storagePath": "leviathan/t2_guardian/normal/leviathan__t2_guardian__normal__storm.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 144544,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "leviathan",
@@ -732,7 +960,11 @@
           "outputFilename": "leviathan__t2_guardian__normal__nature.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/leviathan/t2_guardian/normal/leviathan__t2_guardian__normal__nature.png",
           "storagePath": "leviathan/t2_guardian/normal/leviathan__t2_guardian__normal__nature.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 144544,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "leviathan",
@@ -743,7 +975,11 @@
           "outputFilename": "leviathan__t2_guardian__normal__void.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/leviathan/t2_guardian/normal/leviathan__t2_guardian__normal__void.png",
           "storagePath": "leviathan/t2_guardian/normal/leviathan__t2_guardian__normal__void.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 144124,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "leviathan",
@@ -754,7 +990,11 @@
           "outputFilename": "leviathan__t2_guardian__normal__light.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/leviathan/t2_guardian/normal/leviathan__t2_guardian__normal__light.png",
           "storagePath": "leviathan/t2_guardian/normal/leviathan__t2_guardian__normal__light.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 144544,
+          "edgeBleedPixels": 0
         }
       ]
     },
@@ -774,7 +1014,11 @@
           "outputFilename": "mechanicaldragon__t2_guardian__normal__fire.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/mechanicaldragon/t2_guardian/normal/mechanicaldragon__t2_guardian__normal__fire.png",
           "storagePath": "mechanicaldragon/t2_guardian/normal/mechanicaldragon__t2_guardian__normal__fire.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 140521,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "mechanicaldragon",
@@ -785,7 +1029,11 @@
           "outputFilename": "mechanicaldragon__t2_guardian__normal__ice.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/mechanicaldragon/t2_guardian/normal/mechanicaldragon__t2_guardian__normal__ice.png",
           "storagePath": "mechanicaldragon/t2_guardian/normal/mechanicaldragon__t2_guardian__normal__ice.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 144124,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "mechanicaldragon",
@@ -796,7 +1044,11 @@
           "outputFilename": "mechanicaldragon__t2_guardian__normal__storm.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/mechanicaldragon/t2_guardian/normal/mechanicaldragon__t2_guardian__normal__storm.png",
           "storagePath": "mechanicaldragon/t2_guardian/normal/mechanicaldragon__t2_guardian__normal__storm.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 144544,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "mechanicaldragon",
@@ -807,7 +1059,11 @@
           "outputFilename": "mechanicaldragon__t2_guardian__normal__nature.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/mechanicaldragon/t2_guardian/normal/mechanicaldragon__t2_guardian__normal__nature.png",
           "storagePath": "mechanicaldragon/t2_guardian/normal/mechanicaldragon__t2_guardian__normal__nature.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 144544,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "mechanicaldragon",
@@ -818,7 +1074,11 @@
           "outputFilename": "mechanicaldragon__t2_guardian__normal__void.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/mechanicaldragon/t2_guardian/normal/mechanicaldragon__t2_guardian__normal__void.png",
           "storagePath": "mechanicaldragon/t2_guardian/normal/mechanicaldragon__t2_guardian__normal__void.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 144124,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "mechanicaldragon",
@@ -829,7 +1089,11 @@
           "outputFilename": "mechanicaldragon__t2_guardian__normal__light.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/mechanicaldragon/t2_guardian/normal/mechanicaldragon__t2_guardian__normal__light.png",
           "storagePath": "mechanicaldragon/t2_guardian/normal/mechanicaldragon__t2_guardian__normal__light.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 144544,
+          "edgeBleedPixels": 0
         }
       ]
     },
@@ -849,7 +1113,11 @@
           "outputFilename": "tanuki__t2_guardian__normal__fire.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/tanuki/t2_guardian/normal/tanuki__t2_guardian__normal__fire.png",
           "storagePath": "tanuki/t2_guardian/normal/tanuki__t2_guardian__normal__fire.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 144544,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "tanuki",
@@ -860,7 +1128,11 @@
           "outputFilename": "tanuki__t2_guardian__normal__ice.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/tanuki/t2_guardian/normal/tanuki__t2_guardian__normal__ice.png",
           "storagePath": "tanuki/t2_guardian/normal/tanuki__t2_guardian__normal__ice.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 144124,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "tanuki",
@@ -871,7 +1143,11 @@
           "outputFilename": "tanuki__t2_guardian__normal__storm.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/tanuki/t2_guardian/normal/tanuki__t2_guardian__normal__storm.png",
           "storagePath": "tanuki/t2_guardian/normal/tanuki__t2_guardian__normal__storm.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 144544,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "tanuki",
@@ -882,7 +1158,11 @@
           "outputFilename": "tanuki__t2_guardian__normal__nature.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/tanuki/t2_guardian/normal/tanuki__t2_guardian__normal__nature.png",
           "storagePath": "tanuki/t2_guardian/normal/tanuki__t2_guardian__normal__nature.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 144544,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "tanuki",
@@ -893,7 +1173,11 @@
           "outputFilename": "tanuki__t2_guardian__normal__void.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/tanuki/t2_guardian/normal/tanuki__t2_guardian__normal__void.png",
           "storagePath": "tanuki/t2_guardian/normal/tanuki__t2_guardian__normal__void.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 144124,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "tanuki",
@@ -904,7 +1188,11 @@
           "outputFilename": "tanuki__t2_guardian__normal__light.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/tanuki/t2_guardian/normal/tanuki__t2_guardian__normal__light.png",
           "storagePath": "tanuki/t2_guardian/normal/tanuki__t2_guardian__normal__light.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 144544,
+          "edgeBleedPixels": 0
         }
       ]
     },
@@ -924,7 +1212,11 @@
           "outputFilename": "buttercat__t2_guardian__normal__fire.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/buttercat/t2_guardian/normal/buttercat__t2_guardian__normal__fire.png",
           "storagePath": "buttercat/t2_guardian/normal/buttercat__t2_guardian__normal__fire.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 144544,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "buttercat",
@@ -935,7 +1227,11 @@
           "outputFilename": "buttercat__t2_guardian__normal__ice.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/buttercat/t2_guardian/normal/buttercat__t2_guardian__normal__ice.png",
           "storagePath": "buttercat/t2_guardian/normal/buttercat__t2_guardian__normal__ice.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 144124,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "buttercat",
@@ -946,7 +1242,11 @@
           "outputFilename": "buttercat__t2_guardian__normal__storm.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/buttercat/t2_guardian/normal/buttercat__t2_guardian__normal__storm.png",
           "storagePath": "buttercat/t2_guardian/normal/buttercat__t2_guardian__normal__storm.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 144544,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "buttercat",
@@ -957,7 +1257,11 @@
           "outputFilename": "buttercat__t2_guardian__normal__nature.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/buttercat/t2_guardian/normal/buttercat__t2_guardian__normal__nature.png",
           "storagePath": "buttercat/t2_guardian/normal/buttercat__t2_guardian__normal__nature.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 108793,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "buttercat",
@@ -968,7 +1272,11 @@
           "outputFilename": "buttercat__t2_guardian__normal__void.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/buttercat/t2_guardian/normal/buttercat__t2_guardian__normal__void.png",
           "storagePath": "buttercat/t2_guardian/normal/buttercat__t2_guardian__normal__void.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 144124,
+          "edgeBleedPixels": 0
         },
         {
           "presetId": "buttercat",
@@ -979,10 +1287,14 @@
           "outputFilename": "buttercat__t2_guardian__normal__light.png",
           "outputPath": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets/buttercat/t2_guardian/normal/buttercat__t2_guardian__normal__light.png",
           "storagePath": "buttercat/t2_guardian/normal/buttercat__t2_guardian__normal__light.png",
-          "cropped": true
+          "cropped": true,
+          "outputWidth": 512,
+          "outputHeight": 512,
+          "transparentPixels": 144544,
+          "edgeBleedPixels": 0
         }
       ]
     }
   ],
-  "generatedAt": "2026-04-02T16:30:40.754Z"
+  "generatedAt": "2026-04-04T05:54:48.689Z"
 }

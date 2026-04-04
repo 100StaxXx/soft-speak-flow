@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import sharp from "sharp";
+import { processSheetPanel } from "./companion-portrait-pipeline.mjs";
 
 const ELEMENT_ORDER = ["fire", "ice", "storm", "nature", "void", "light"];
 
@@ -49,15 +50,10 @@ async function cropSheet(sourcePath, outputRoot, presetId) {
     throw new Error(`Could not read dimensions for ${sourcePath}`);
   }
 
-  const tileWidth = Math.floor(width / 3);
-  const tileHeight = Math.floor(height / 2);
-
   for (let index = 0; index < ELEMENT_ORDER.length; index += 1) {
     const element = ELEMENT_ORDER[index];
     const column = index % 3;
     const row = Math.floor(index / 3);
-    const left = column * tileWidth;
-    const top = row * tileHeight;
     const outputDir = path.join(outputRoot, presetId, "t1_youth", "normal");
     const outputPath = path.join(
       outputDir,
@@ -65,10 +61,14 @@ async function cropSheet(sourcePath, outputRoot, presetId) {
     );
 
     ensureDir(outputDir);
-    await sharp(sourcePath)
-      .extract({ left, top, width: tileWidth, height: tileHeight })
-      .png()
-      .toFile(outputPath);
+    await processSheetPanel({
+      sourcePath,
+      width,
+      height,
+      row,
+      column,
+      outputPath,
+    });
   }
 }
 

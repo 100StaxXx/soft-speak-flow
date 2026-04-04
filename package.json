@@ -27,6 +27,7 @@
     "companions:stage2:generate-sheets": "node --import tsx scripts/generate-companion-stage2-sheets.ts",
     "companions:stage2:extract-sheet": "node --import tsx scripts/extract-companion-element-sheet.ts",
     "companions:stage2:sheets": "node --import tsx scripts/render-companion-stage2-contact-sheets.ts",
+    "companions:portraits:refresh": "node scripts/refresh-companion-portrait-assets.mjs",
     "companions:initiate:import": "node --import tsx scripts/import-companion-initiate-assets.ts",
     "companions:initiate:sync": "node --import tsx scripts/sync-companion-initiate-assets.ts",
     "companions:initiate:pipeline": "npm run companions:initiate:import && npm run companions:initiate:sync",

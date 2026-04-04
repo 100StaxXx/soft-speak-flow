@@ -867,16 +867,24 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
   });
 
   const hatchCompanion = useMutation({
-    mutationFn: async ({ presetId }: { presetId?: string | null }) => {
-      if (!user || !companion) {
+    mutationFn: async ({
+      presetId,
+      companionSnapshot,
+    }: {
+      presetId?: string | null;
+      companionSnapshot?: Companion | null;
+    }) => {
+      const companionToUse = companionSnapshot ?? companion;
+
+      if (!user || !companionToUse) {
         throw new Error("No companion found");
       }
 
-      if (companion.current_stage !== 0) {
+      if (companionToUse.current_stage !== 0) {
         throw new Error("This companion is not waiting to hatch.");
       }
 
-      const lockedPresetId = companion.preset_id?.trim() || null;
+      const lockedPresetId = companionToUse.preset_id?.trim() || null;
       const resolvedPresetId = presetId?.trim() || lockedPresetId;
       if (!resolvedPresetId) {
         throw new Error("Choose a companion form before hatching.");
@@ -890,7 +898,7 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
         throw new Error("Unknown companion preset");
       }
 
-      const normalizedElement = coerceCompanionElementId(companion.core_element);
+      const normalizedElement = coerceCompanionElementId(companionToUse.core_element);
       const currentImageUrl = getPresetCompanionAssetUrl({
         presetId: preset.id,
         stage: 1,
@@ -898,26 +906,26 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
         element: normalizedElement,
       }) ?? "/placeholder-companion.svg";
       const currentImageFocal = getBundledCompanionImageFocalPoint(currentImageUrl);
-      const initialImageUrl = companion.initial_image_url
-        ?? companion.current_image_url
+      const initialImageUrl = companionToUse.initial_image_url
+        ?? companionToUse.current_image_url
         ?? getUniversalEggAssetUrl(normalizedElement);
       const initialImageFocal = getBundledCompanionImageFocalPoint(initialImageUrl);
       const favoriteColor = getCompanionElementAnchorColor(normalizedElement);
 
       const result = await supabase.rpc("hatch_companion_with_preset", {
-        p_companion_id: companion.id,
+        p_companion_id: companionToUse.id,
         p_preset_id: preset.id,
         p_spirit_animal: preset.displayName,
         p_favorite_color: favoriteColor,
         p_core_element: normalizedElement,
-        p_story_tone: companion.story_tone ?? "epic_adventure",
+        p_story_tone: companionToUse.story_tone ?? "epic_adventure",
         p_initial_image_url: initialImageUrl,
-        p_initial_image_focal_x: companion.initial_image_focal_x ?? initialImageFocal?.x ?? null,
-        p_initial_image_focal_y: companion.initial_image_focal_y ?? initialImageFocal?.y ?? null,
+        p_initial_image_focal_x: companionToUse.initial_image_focal_x ?? initialImageFocal?.x ?? null,
+        p_initial_image_focal_y: companionToUse.initial_image_focal_y ?? initialImageFocal?.y ?? null,
         p_current_image_url: currentImageUrl,
         p_current_image_focal_x: currentImageFocal?.x ?? null,
         p_current_image_focal_y: currentImageFocal?.y ?? null,
-        p_xp_at_evolution: companion.current_xp,
+        p_xp_at_evolution: companionToUse.current_xp,
       }) as { data: HatchCompanionResponse[] | null; error: Error | null };
 
       if (result.error) {
@@ -933,19 +941,19 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
         try {
           await supabase.functions.invoke("generate-evolution-card", {
             body: {
-              companionId: companion.id,
+              companionId: companionToUse.id,
               evolutionId: hatchResult.evolution_id,
               stage: 1,
               species: preset.displayName,
               element: normalizedElement,
               color: favoriteColor,
               userAttributes: {
-                vitality: companion.vitality || 300,
-                wisdom: companion.wisdom || 300,
-                discipline: companion.discipline || 300,
-                resolve: companion.resolve || 300,
-                creativity: companion.creativity || 300,
-                alignment: companion.alignment || 300,
+                vitality: companionToUse.vitality || 300,
+                wisdom: companionToUse.wisdom || 300,
+                discipline: companionToUse.discipline || 300,
+                resolve: companionToUse.resolve || 300,
+                creativity: companionToUse.creativity || 300,
+                alignment: companionToUse.alignment || 300,
               },
             },
           });
@@ -957,7 +965,7 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
         try {
           await supabase.functions.invoke("generate-companion-story", {
             body: {
-              companionId: companion.id,
+              companionId: companionToUse.id,
               stage: 1,
             },
           });
@@ -1301,33 +1309,57 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
   const isEvolutionBusy = evolveCompanion.isPending || hatchCompanion.isPending;
 
   // Manual evolution trigger function
-  const triggerManualEvolution = useCallback(() => {
-    if (!companion || isEvolutionBusy || !canEvolve) return;
+  const triggerManualEvolution = useCallback(async () => {
+    if (!user || isEvolutionBusy) return;
 
-    if (companion.current_stage === 0) {
-      if (!companion.preset_id) return;
+    let latestCompanion: Companion | null = null;
+    try {
+      latestCompanion = await fetchCompanion(user.id);
+    } catch (error) {
+      logger.warn("Failed to refresh companion state before manual evolution", {
+        userId: user.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      toast.error("Unable to refresh your companion right now. Please try again.");
+      return;
+    }
+
+    queryClient.setQueryData(getCompanionQueryKey(user.id), latestCompanion);
+
+    if (!latestCompanion) return;
+
+    const latestEarnedLevel = resolveProgressionLevelFromXp(latestCompanion.current_xp);
+    const latestCanEvolve = latestEarnedLevel > latestCompanion.current_stage;
+
+    if (!latestCanEvolve) {
+      if (latestCompanion.current_stage > 0) {
+        window.dispatchEvent(new CustomEvent("companion-evolved"));
+      }
+      return;
+    }
+
+    if (latestCompanion.current_stage === 0) {
+      if (!latestCompanion.preset_id) return;
 
       setIsEvolvingLoading(true);
-      window.dispatchEvent(new CustomEvent('evolution-loading-start'));
+      window.dispatchEvent(new CustomEvent("evolution-loading-start"));
       hatchCompanion.mutate({
-        presetId: companion.preset_id,
+        presetId: latestCompanion.preset_id,
+        companionSnapshot: latestCompanion,
       });
       return;
     }
 
-    if (requiresHatchSelection) return;
+    const nextStage = latestCompanion.current_stage + 1;
 
-    const nextStage = companion.current_stage + 1;
-
-    // Show loading overlay
     setIsEvolvingLoading(true);
-    window.dispatchEvent(new CustomEvent('evolution-loading-start'));
+    window.dispatchEvent(new CustomEvent("evolution-loading-start"));
 
     evolveCompanion.mutate({
       newStage: nextStage,
-      currentXP: companion.current_xp
+      currentXP: latestCompanion.current_xp,
     });
-  }, [companion, canEvolve, evolveCompanion, hatchCompanion, isEvolutionBusy, requiresHatchSelection, setIsEvolvingLoading]);
+  }, [evolveCompanion, hatchCompanion, isEvolutionBusy, queryClient, setIsEvolvingLoading, user]);
 
   return {
     companion,

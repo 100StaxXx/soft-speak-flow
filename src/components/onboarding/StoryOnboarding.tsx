@@ -26,7 +26,6 @@ import { generateMentorExplanation, type MentorExplanation } from "@/utils/mento
 import { useCompanion } from "@/hooks/useCompanion";
 import { pollWithDeadline } from "@/utils/asyncTimeout";
 import { logger } from "@/utils/logger";
-import { isAssignedCompanionName, resolveCompanionName } from "@/lib/companionName";
 import {
   getPresetCompanionAssetUrl,
   getUniversalEggAssetUrl,
@@ -204,9 +203,6 @@ export const deriveOnboardingMentorCandidates = <T extends MentorEnergyCandidate
 
 const COMPANION_RECOVERY_DEADLINE_MS = 30_000;
 const COMPANION_RECOVERY_INTERVAL_MS = 3_000;
-const DISPLAY_NAME_INITIAL_DELAY_MS = 2_000;
-const DISPLAY_NAME_DEADLINE_MS = 20_000;
-const DISPLAY_NAME_INTERVAL_MS = 1_000;
 const onboardingLog = logger.scope("StoryOnboarding");
 const JOURNEY_FINALIZATION_FAILURE_TOAST =
   "Your egg was created, but we couldn't finish setup. Please try again.";
@@ -374,57 +370,6 @@ export const StoryOnboarding = ({
       gender_energy: mentorRow.gender_energy ?? null,
     }));
   }, []);
-
-  const waitForCompanionDisplayName = async (
-    companionId: string,
-    spiritAnimal: string,
-    coreElement: string,
-  ) => {
-    await new Promise((resolve) => setTimeout(resolve, DISPLAY_NAME_INITIAL_DELAY_MS));
-
-    const polledName = await pollWithDeadline<string>({
-      deadlineMs: DISPLAY_NAME_DEADLINE_MS,
-      intervalMs: DISPLAY_NAME_INTERVAL_MS,
-      task: async () => {
-        const { data, error } = await supabase
-          .from("companion_evolution_cards")
-          .select("creature_name")
-          .eq("companion_id", companionId)
-          .order("evolution_stage", { ascending: true })
-          .limit(1)
-          .maybeSingle();
-
-        if (error) {
-          throw error;
-        }
-
-        return isAssignedCompanionName(data?.creature_name, spiritAnimal)
-          ? data?.creature_name ?? null
-          : null;
-      },
-      onPollError: (error) => {
-        logger.warn("Companion display name poll failed", {
-          companionId,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      },
-    });
-
-    if (polledName) {
-      return polledName;
-    }
-
-    return resolveCompanionName({
-      companion: {
-        id: companionId,
-        current_stage: 0,
-        cached_creature_name: null,
-        spirit_animal: spiritAnimal,
-        core_element: coreElement,
-      },
-      fallback: "companion",
-    });
-  };
 
   // Load mentors on mount
   useEffect(() => {
@@ -814,52 +759,6 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
         recoveredAfterTimeout,
         durationMs: Date.now() - startedAt,
       });
-
-      // Non-blocking display name hydration.
-      if (preferences.presetId) {
-        void waitForCompanionDisplayName(
-          companionId,
-          preferences.spiritAnimal,
-          preferences.coreElement,
-        )
-          .then((displayName) => {
-            if (!displayName) {
-              logger.warn("Companion display name not ready before deadline", {
-                userId: user.id,
-                companionId,
-              });
-              return;
-            }
-            setCompanionAnimal(displayName);
-            void supabase
-              .from("user_companion")
-              .update({ cached_creature_name: displayName })
-              .eq("id", companionId)
-              .then(({ error: cacheError }) => {
-                if (cacheError) {
-                  logger.warn("Failed to cache companion display name", {
-                    userId: user.id,
-                    companionId,
-                    error: cacheError.message,
-                  });
-                }
-              });
-            logger.info("Companion display name hydrated", {
-              userId: user.id,
-              companionId,
-            });
-          })
-          .catch((displayNameError) => {
-            logger.warn("Companion display name hydration failed", {
-              userId: user.id,
-              companionId,
-              error:
-                displayNameError instanceof Error
-                  ? displayNameError.message
-                  : String(displayNameError),
-            });
-          });
-      }
     };
 
     const tryFinalizeCompanionOnboarding = async (

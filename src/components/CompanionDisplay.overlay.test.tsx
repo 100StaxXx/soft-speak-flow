@@ -35,6 +35,8 @@ const mocks = vi.hoisted(() => ({
   canEvolve: false,
   requiresHatchSelection: false,
   isRegenerating: true,
+  guidedStep: null as string | null,
+  isEvolvingLoading: false,
 }));
 
 vi.mock("@/hooks/useCompanion", () => ({
@@ -122,7 +124,18 @@ vi.mock("@/hooks/useEpicRewards", () => ({
 }));
 
 vi.mock("@/contexts/EvolutionContext", () => ({
-  useEvolution: () => undefined,
+  useEvolution: () => ({
+    isEvolvingLoading: mocks.isEvolvingLoading,
+    setIsEvolvingLoading: vi.fn(),
+    onEvolutionComplete: null,
+    setOnEvolutionComplete: vi.fn(),
+  }),
+}));
+
+vi.mock("@/hooks/usePostOnboardingMentorGuidance", () => ({
+  usePostOnboardingMentorGuidance: () => ({
+    currentStep: mocks.guidedStep,
+  }),
 }));
 
 vi.mock("@/hooks/useMotionProfile", () => ({
@@ -225,13 +238,22 @@ vi.mock("@/lib/companionName", () => ({
 }));
 
 vi.mock("@/lib/companionAssetResolver", () => ({
-  resolveCompanionVisualAssetUrl: vi.fn().mockReturnValue("/companion.png"),
+  resolveCompanionVisualAssetUrl: vi.fn().mockImplementation((companion: {
+    current_stage?: number | null;
+    core_element?: string | null;
+    current_image_url?: string | null;
+  }) => (
+    (companion.current_stage ?? 0) <= 0
+      ? `/companion-eggs/egg__t0_egg__normal__${String(companion.core_element ?? "fire").toLowerCase()}.png`
+      : (companion.current_image_url ?? "/companion.png")
+  )),
 }));
 
 import { CompanionDisplay } from "./CompanionDisplay";
 
 describe("CompanionDisplay overlay stack", () => {
   beforeEach(() => {
+    window.history.pushState({}, "", "/companion");
     mocks.resetProgress.mockClear();
     mocks.regenerate.mockClear();
     mocks.triggerManualEvolution.mockClear();
@@ -239,6 +261,8 @@ describe("CompanionDisplay overlay stack", () => {
     mocks.canEvolve = false;
     mocks.requiresHatchSelection = false;
     mocks.isRegenerating = true;
+    mocks.guidedStep = null;
+    mocks.isEvolvingLoading = false;
     mocks.companion = {
       id: "companion-1",
       current_xp: 180,
@@ -256,7 +280,8 @@ describe("CompanionDisplay overlay stack", () => {
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    window.history.pushState({}, "", "/");
+    vi.clearAllMocks();
   });
 
   it("keeps backdrop and foreground motion planes active alongside regeneration and dormant overlays", async () => {
@@ -332,5 +357,56 @@ describe("CompanionDisplay overlay stack", () => {
 
     expect(mocks.triggerManualEvolution).not.toHaveBeenCalled();
     expect(screen.getByText("Hatch chooser")).toBeInTheDocument();
+  });
+
+  it("renders the tutorial hatch step as a stage 0 egg even when live companion data is already stage 1", async () => {
+    mocks.guidedStep = "evolve_companion";
+    mocks.canEvolve = false;
+    mocks.companion = {
+      ...mocks.companion,
+      current_stage: 1,
+      current_xp: 14,
+      core_element: "fire",
+      current_image_url: "/companion-presets/fox/t1_youth/normal/fox__t1_youth__normal__fire.png",
+      initial_image_url: "/companion-eggs/egg__t0_egg__normal__fire.png",
+      preset_id: "fox",
+      spirit_animal: "Fox",
+      cached_creature_name: "Ignisyl",
+    };
+
+    render(<CompanionDisplay />);
+
+    expect(screen.getByText("Fire Egg")).toBeInTheDocument();
+    expect(screen.queryByText("Ignisyl")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Ready to evolve to Level 1").length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: "HATCH" })).toBeInTheDocument();
+
+    const image = screen.getByAltText(/egg companion at level 0/i);
+    expect(image).toHaveAttribute(
+      "src",
+      expect.stringContaining("/companion-eggs/egg__t0_egg__normal__fire.png"),
+    );
+  });
+
+  it("returns to the normal stage 1 reveal after the tutorial advances past the hatch prompt", async () => {
+    mocks.guidedStep = "post_evolution_companion_intro";
+    mocks.companion = {
+      ...mocks.companion,
+      current_stage: 1,
+      current_xp: 14,
+      core_element: "fire",
+      current_image_url: "/companion-presets/fox/t1_youth/normal/fox__t1_youth__normal__fire.png",
+      preset_id: "fox",
+      spirit_animal: "Fox",
+      cached_creature_name: "Nova",
+    };
+
+    render(<CompanionDisplay />);
+
+    expect(await screen.findByText("Nova")).toBeInTheDocument();
+    expect(screen.queryByText("Fire Egg")).not.toBeInTheDocument();
+    const image = screen.getByAltText(/hatchling companion at level 1/i);
+    expect(image).toBeInTheDocument();
+    expect(image).toHaveAttribute("data-companion-image-fit", "portrait");
   });
 });

@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useCompanionDialogue, DialogueMood } from "@/hooks/useCompanionDialogue";
 import { useCompanion } from "@/hooks/useCompanion";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { CompanionImage } from "@/components/CompanionImage";
+import { CompanionImage, CompanionPortraitShell } from "@/components/CompanionImage";
 import {
   Dialog,
   DialogContent,
@@ -15,6 +15,7 @@ import { useTalkPopupContextSafe } from "@/contexts/TalkPopupContext";
 import { cn } from "@/lib/utils";
 import type { CompanionShimmerType } from "@/config/companionDialoguePacks";
 import { isNearEvolution } from "@/lib/companionEvolutionSignals";
+import { isCompanionPresetImageSource } from "@/lib/companionImageFocal";
 
 interface MoodConfig {
   color: string;
@@ -118,9 +119,14 @@ export const CompanionDialogue = memo(({ className, companionName }: CompanionDi
   const { companion, progressToNext, canEvolve } = useCompanion();
   const { dismiss: dismissTalkPopup } = useTalkPopupContextSafe();
   const companionImageUrl = companion?.current_image_url;
+  const usesPortraitAvatar = isCompanionPresetImageSource(companionImageUrl);
+  const cachedCompanionName =
+    companion && companion.current_stage > 0
+      ? normalizeCompanionName(companion.cached_creature_name)
+      : null;
   const resolvedCompanionName =
     normalizeCompanionName(companionName)
-    ?? normalizeCompanionName(companion?.cached_creature_name)
+    ?? cachedCompanionName
     ?? "Companion";
 
   const nearEvolution = isNearEvolution({ progressToNext, canEvolve });
@@ -220,16 +226,35 @@ export const CompanionDialogue = memo(({ className, companionName }: CompanionDi
               "flex-shrink-0 rounded-lg overflow-hidden",
               "ring-2", avatarRingClass
             )}>
-              <Avatar className="h-10 w-10 rounded-lg">
+              <Avatar className={cn("h-10 w-10 rounded-lg", usesPortraitAvatar && "bg-transparent")}>
                 {companionImageUrl ? (
-                  <CompanionImage
-                    variant="avatar"
-                    src={companionImageUrl}
-                    alt={resolvedCompanionName}
-                    focalX={companion?.current_image_focal_x ?? null}
-                    focalY={companion?.current_image_focal_y ?? null}
-                    className="object-cover"
-                  />
+                  usesPortraitAvatar ? (
+                    <CompanionPortraitShell
+                      src={companionImageUrl}
+                      element={companion?.core_element}
+                      className="h-full w-full rounded-lg"
+                    >
+                      <CompanionImage
+                        variant="avatar"
+                        src={companionImageUrl}
+                        alt={resolvedCompanionName}
+                        fit="portrait"
+                        element={companion?.core_element}
+                        focalX={companion?.current_image_focal_x ?? null}
+                        focalY={companion?.current_image_focal_y ?? null}
+                        className="rounded-lg"
+                      />
+                    </CompanionPortraitShell>
+                  ) : (
+                    <CompanionImage
+                      variant="avatar"
+                      src={companionImageUrl}
+                      alt={resolvedCompanionName}
+                      focalX={companion?.current_image_focal_x ?? null}
+                      focalY={companion?.current_image_focal_y ?? null}
+                      className="object-cover"
+                    />
+                  )
                 ) : null}
                 <AvatarFallback className="rounded-lg bg-primary/20 text-primary">
                   {resolvedCompanionName.charAt(0).toUpperCase()}
@@ -283,16 +308,35 @@ export const CompanionDialogue = memo(({ className, companionName }: CompanionDi
           <div className="relative space-y-4">
           <DialogHeader className="text-left">
             <div className="flex items-center gap-3">
-              <Avatar className={cn("h-12 w-12 rounded-lg ring-2", config.ringColor)}>
+              <Avatar className={cn("h-12 w-12 rounded-lg ring-2", config.ringColor, usesPortraitAvatar && "bg-transparent")}>
                 {companionImageUrl ? (
-                  <CompanionImage
-                    variant="avatar"
-                    src={companionImageUrl}
-                    alt={resolvedCompanionName}
-                    focalX={companion?.current_image_focal_x ?? null}
-                    focalY={companion?.current_image_focal_y ?? null}
-                    className="object-cover"
-                  />
+                  usesPortraitAvatar ? (
+                    <CompanionPortraitShell
+                      src={companionImageUrl}
+                      element={companion?.core_element}
+                      className="h-full w-full rounded-lg"
+                    >
+                      <CompanionImage
+                        variant="avatar"
+                        src={companionImageUrl}
+                        alt={resolvedCompanionName}
+                        fit="portrait"
+                        element={companion?.core_element}
+                        focalX={companion?.current_image_focal_x ?? null}
+                        focalY={companion?.current_image_focal_y ?? null}
+                        className="rounded-lg"
+                      />
+                    </CompanionPortraitShell>
+                  ) : (
+                    <CompanionImage
+                      variant="avatar"
+                      src={companionImageUrl}
+                      alt={resolvedCompanionName}
+                      focalX={companion?.current_image_focal_x ?? null}
+                      focalY={companion?.current_image_focal_y ?? null}
+                      className="object-cover"
+                    />
+                  )
                 ) : null}
                 <AvatarFallback className="rounded-lg bg-primary/20 text-primary">
                   {resolvedCompanionName.charAt(0).toUpperCase()}

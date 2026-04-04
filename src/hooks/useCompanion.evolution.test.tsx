@@ -895,32 +895,52 @@ describe("useCompanion evolveCompanion", () => {
 
   it("directly hatches preset-backed eggs once they are ready", async () => {
     mocks.userCompanionResponses.length = 0;
-    mocks.userCompanionResponses.push({
-      data: {
-        ...companionFixture,
-        preset_id: "dragon",
-        spirit_animal: "Dragon",
-        core_element: "fire",
-        current_image_url: "/companion-eggs/egg__t0_egg__normal__fire.png",
-      },
-      error: null,
-    });
-    mocks.rpcMock.mockResolvedValueOnce({
-      data: [
-        {
-          id: companionFixture.id,
+    mocks.userCompanionResponses.push(
+      {
+        data: {
+          ...companionFixture,
           preset_id: "dragon",
           spirit_animal: "Dragon",
-          favorite_color: "#FF6B35",
           core_element: "fire",
-          story_tone: "epic_adventure",
-          current_stage: 1,
-          current_image_url: "/companion-presets/dragon/t1_youth/normal/dragon__t1_youth__normal__fire.png",
+          current_image_url: "/companion-eggs/egg__t0_egg__normal__fire.png",
           initial_image_url: "/companion-eggs/egg__t0_egg__normal__fire.png",
-          evolution_id: "evo-1",
         },
-      ],
-      error: null,
+        error: null,
+      },
+      {
+        data: {
+          ...companionFixture,
+          preset_id: "dragon",
+          spirit_animal: "Dragon",
+          core_element: "fire",
+          current_image_url: "/companion-eggs/egg__t0_egg__normal__fire.png",
+          initial_image_url: "/companion-eggs/egg__t0_egg__normal__fire.png",
+        },
+        error: null,
+      },
+    );
+    mocks.rpcMock.mockImplementation(async (fnName: string) => {
+      if (fnName === "hatch_companion_with_preset") {
+        return {
+          data: [
+            {
+              id: companionFixture.id,
+              preset_id: "dragon",
+              spirit_animal: "Dragon",
+              favorite_color: "#FF6B35",
+              core_element: "fire",
+              story_tone: "epic_adventure",
+              current_stage: 1,
+              current_image_url: "/companion-presets/dragon/t1_youth/normal/dragon__t1_youth__normal__fire.png",
+              initial_image_url: "/companion-eggs/egg__t0_egg__normal__fire.png",
+              evolution_id: "evo-1",
+            },
+          ],
+          error: null,
+        };
+      }
+
+      return { data: null, error: null };
     });
 
     const { result } = await renderUseCompanion();
@@ -943,6 +963,151 @@ describe("useCompanion evolveCompanion", () => {
     });
 
     expect(mocks.setIsEvolvingLoadingMock).toHaveBeenCalledWith(true);
+  });
+
+  it("re-syncs stale stage 1 cache back to a hatchable egg before triggering the first hatch", async () => {
+    mocks.userCompanionResponses.length = 0;
+    mocks.userCompanionResponses.push(
+      {
+        data: {
+          ...companionFixture,
+          current_stage: 1,
+          current_xp: 14,
+          preset_id: "dragon",
+          spirit_animal: "Dragon",
+          current_image_url: "/companion-presets/dragon/t1_youth/normal/dragon__t1_youth__normal__fire.png",
+        },
+        error: null,
+      },
+      {
+        data: {
+          ...companionFixture,
+          current_stage: 0,
+          current_xp: 14,
+          preset_id: "dragon",
+          spirit_animal: "Dragon",
+          current_image_url: "/companion-eggs/egg__t0_egg__normal__fire.png",
+          initial_image_url: "/companion-eggs/egg__t0_egg__normal__fire.png",
+        },
+        error: null,
+      },
+    );
+    mocks.rpcMock.mockImplementation(async (fnName: string) => {
+      if (fnName === "repair_auto_advanced_companion_state") {
+        return {
+          data: [
+            {
+              repaired: false,
+              current_stage: 1,
+              last_real_stage: 1,
+              current_image_url: "/companion-presets/dragon/t1_youth/normal/dragon__t1_youth__normal__fire.png",
+              current_image_focal_x: null,
+              current_image_focal_y: null,
+            },
+          ],
+          error: null,
+        };
+      }
+
+      if (fnName === "hatch_companion_with_preset") {
+        return {
+          data: [
+            {
+              id: companionFixture.id,
+              preset_id: "dragon",
+              spirit_animal: "Dragon",
+              favorite_color: "#FF6B35",
+              core_element: "fire",
+              story_tone: "epic_adventure",
+              current_stage: 1,
+              current_image_url: "/companion-presets/dragon/t1_youth/normal/dragon__t1_youth__normal__fire.png",
+              initial_image_url: "/companion-eggs/egg__t0_egg__normal__fire.png",
+              evolution_id: "evo-1",
+            },
+          ],
+          error: null,
+        };
+      }
+
+      return { data: null, error: null };
+    });
+
+    const { result } = await renderUseCompanion();
+
+    await act(async () => {
+      await result.current.triggerManualEvolution();
+    });
+
+    await waitFor(() => {
+      expect(mocks.rpcMock).toHaveBeenCalledWith(
+        "hatch_companion_with_preset",
+        expect.objectContaining({
+          p_companion_id: companionFixture.id,
+          p_preset_id: "dragon",
+        }),
+      );
+    });
+  });
+
+  it("treats a freshly synced stage 1 companion as already hatched instead of rehatching", async () => {
+    const dispatchSpy = vi.spyOn(window, "dispatchEvent");
+
+    mocks.userCompanionResponses.length = 0;
+    mocks.userCompanionResponses.push(
+      {
+        data: {
+          ...companionFixture,
+          current_stage: 0,
+          current_xp: 14,
+          preset_id: "dragon",
+          spirit_animal: "Dragon",
+          current_image_url: "/companion-eggs/egg__t0_egg__normal__fire.png",
+          initial_image_url: "/companion-eggs/egg__t0_egg__normal__fire.png",
+        },
+        error: null,
+      },
+      {
+        data: {
+          ...companionFixture,
+          current_stage: 1,
+          current_xp: 14,
+          preset_id: "dragon",
+          spirit_animal: "Dragon",
+          current_image_url: "/companion-presets/dragon/t1_youth/normal/dragon__t1_youth__normal__fire.png",
+          initial_image_url: "/companion-eggs/egg__t0_egg__normal__fire.png",
+        },
+        error: null,
+      },
+    );
+    mocks.rpcMock.mockResolvedValueOnce({
+      data: [
+        {
+          repaired: false,
+          current_stage: 1,
+          last_real_stage: 1,
+          current_image_url: "/companion-presets/dragon/t1_youth/normal/dragon__t1_youth__normal__fire.png",
+          current_image_focal_x: null,
+          current_image_focal_y: null,
+        },
+      ],
+      error: null,
+    });
+
+    const { result } = await renderUseCompanion();
+
+    await act(async () => {
+      await result.current.triggerManualEvolution();
+    });
+
+    expect(mocks.rpcMock).not.toHaveBeenCalledWith(
+      "hatch_companion_with_preset",
+      expect.anything(),
+    );
+    expect(mocks.invokeMock).not.toHaveBeenCalledWith(
+      "generate-companion-evolution",
+      expect.anything(),
+    );
+    expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: "companion-evolved" }));
   });
 
   it("rejects hatch requests that conflict with a preset-locked egg", async () => {

@@ -11,7 +11,7 @@ export interface CompanionImageFocalPoint {
 
 export interface CompanionImagePresentationOptions {
   src?: string | null;
-  fit?: "cover" | "contain";
+  fit?: "cover" | "contain" | "portrait";
   focalX?: number | null;
   focalY?: number | null;
   containerAspectRatio?: number;
@@ -68,6 +68,15 @@ export const getBundledCompanionImageAssetKey = (src?: string | null): string | 
   const prefix = BUNDLED_COMPANION_PREFIXES.find((value) => normalized.includes(value));
   return prefix ? normalized.slice(normalized.indexOf(prefix)) : null;
 };
+
+export const getCompanionPresetImageAssetKey = (src?: string | null): string | null => {
+  const assetKey = getBundledCompanionImageAssetKey(src);
+  if (!assetKey?.startsWith("companion-presets/")) return null;
+  return assetKey;
+};
+
+export const isCompanionPresetImageSource = (src?: string | null): boolean =>
+  getCompanionPresetImageAssetKey(src) !== null;
 
 export const getBundledCompanionImageFocalEntry = (
   src?: string | null,
@@ -154,7 +163,7 @@ export const resolveCompanionImagePresentation = ({
     };
   }
 
-  if (fit === "contain") {
+  if (fit === "contain" || fit === "portrait") {
     return {
       focalPoint,
       focalSource,

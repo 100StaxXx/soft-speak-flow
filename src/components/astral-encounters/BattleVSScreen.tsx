@@ -5,7 +5,8 @@ import { Adversary, AdversaryTier } from "@/types/astralEncounters";
 import { Button } from "@/components/ui/button";
 import { getStageName } from "@/config/companionStages";
 import { formatDisplayLabel } from "@/lib/utils";
-import { CompanionImage } from "@/components/CompanionImage";
+import { CompanionImage, CompanionPortraitShell } from "@/components/CompanionImage";
+import { isCompanionPresetImageSource } from "@/lib/companionImageFocal";
 
 interface BattleVSScreenProps {
   companionImageUrl?: string;
@@ -171,13 +172,29 @@ export const BattleVSScreen = ({
               {/* Image frame */}
               <div className="relative w-full h-full rounded-2xl overflow-hidden border-2 border-primary/40 shadow-[0_0_30px_hsl(var(--primary)/0.3)]">
                 {companionImageUrl ? (
-                  <CompanionImage
-                    src={companionImageUrl}
-                    alt={companionName}
-                    focalX={companionImageFocalX}
-                    focalY={companionImageFocalY}
-                    className="w-full h-full object-cover"
-                  />
+                  isCompanionPresetImageSource(companionImageUrl) ? (
+                    <CompanionPortraitShell
+                      src={companionImageUrl}
+                      className="h-full w-full rounded-2xl"
+                    >
+                      <CompanionImage
+                        src={companionImageUrl}
+                        alt={companionName}
+                        fit="portrait"
+                        focalX={companionImageFocalX}
+                        focalY={companionImageFocalY}
+                        className="w-full h-full rounded-2xl"
+                      />
+                    </CompanionPortraitShell>
+                  ) : (
+                    <CompanionImage
+                      src={companionImageUrl}
+                      alt={companionName}
+                      focalX={companionImageFocalX}
+                      focalY={companionImageFocalY}
+                      className="w-full h-full object-cover"
+                    />
+                  )
                 ) : (
                   <div className="w-full h-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center">
                     <Sparkles className="w-12 h-12 text-primary" />

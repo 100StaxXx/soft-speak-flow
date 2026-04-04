@@ -123,7 +123,9 @@ export const AstralEncounterModal = ({
 
   const resolvedCompanionName =
     normalizeCompanionName(currentCard?.creature_name)
-    ?? normalizeCompanionName(companion?.cached_creature_name)
+    ?? ((companion?.current_stage ?? 0) > 0
+      ? normalizeCompanionName(companion?.cached_creature_name)
+      : null)
     ?? 'Companion';
 
   // Initialize battle state

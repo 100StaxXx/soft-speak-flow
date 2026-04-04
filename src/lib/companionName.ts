@@ -155,6 +155,10 @@ export const resolveCompanionName = async ({
     return resolveFallbackName(fallback);
   }
 
+  if (companion.current_stage <= 0) {
+    return resolveFallbackName(fallback, companion.spirit_animal);
+  }
+
   const cachedName = normalizeName(companion.cached_creature_name);
   if (isAssignedCompanionName(cachedName, companion.spirit_animal)) {
     return cachedName;

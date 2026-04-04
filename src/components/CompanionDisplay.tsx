@@ -8,6 +8,7 @@ import { useCompanionVisualState } from "@/hooks/useCompanionVisualState";
 import { useCompanionRegenerate } from "@/hooks/useCompanionRegenerate";
 import { useCompanionWakeUp } from "@/hooks/useCompanionWakeUp";
 import { useEpicRewards } from "@/hooks/useEpicRewards";
+import { useCompanionTutorialPresentation } from "@/hooks/useCompanionTutorialPresentation";
 import { useEvolution } from "@/contexts/EvolutionContext";
 import { CompanionSkeleton } from "@/components/CompanionSkeleton";
 import { AttributeTooltip } from "@/components/AttributeTooltip";
@@ -23,7 +24,7 @@ import { CompanionMotionSurface } from "@/components/companion/motion/CompanionM
 import { WakeUpCelebration } from "@/components/companion/WakeUpCelebration";
 import { CompanionAttributes } from "@/components/CompanionAttributes";
 import { CompanionPersonalization } from "@/components/CompanionPersonalization";
-import { CompanionImage } from "@/components/CompanionImage";
+import { CompanionImage, CompanionPortraitShell } from "@/components/CompanionImage";
 import {
   Dialog,
   DialogContent,
@@ -35,6 +36,7 @@ import { cn, formatDisplayLabel } from "@/lib/utils";
 import { deriveCompanionPalette } from "@/lib/companionPalette";
 import { resolveCompanionName } from "@/lib/companionName";
 import { resolveCompanionVisualAssetUrl } from "@/lib/companionAssetResolver";
+import { isCompanionPresetImageSource } from "@/lib/companionImageFocal";
 import { useMotionProfile } from "@/hooks/useMotionProfile";
 import { useCompanionMotionSafe } from "@/contexts/CompanionMotionContext";
 import {
@@ -131,6 +133,12 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
     requiresHatchSelection,
     hatchCompanion,
   } = useCompanion();
+  const tutorialPresentation = useCompanionTutorialPresentation({
+    companion,
+    canEvolve,
+    nextEvolutionXP,
+    progressToNext,
+  });
   const { unlockedSkins } = useReferrals();
   const { health, needsWelcomeBack } = useCompanionHealth();
   const { regenerate, isRegenerating, maxRegenerations, generationPhase, retryCount, resetProgress } = useCompanionRegenerate();
@@ -339,53 +347,85 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
     }
   }, [needsWelcomeBack, welcomeBackDismissed, companion]);
 
+  const displayCompanion = tutorialPresentation.companion;
+  const displayCanEvolve = tutorialPresentation.canEvolve;
+  const displayNextEvolutionXP = tutorialPresentation.nextEvolutionXP;
+  const displayProgressToNext = tutorialPresentation.progressToNext;
+
   // Calculate effective image URL (must be before the useEffect that depends on it)
   // Priority: dormant image > neglected image > current image
   const displayImageUrl = useMemo(() => {
-    if (!companion) return null;
+    if (!displayCompanion) return null;
+
+    if (tutorialPresentation.isStageZeroOverrideActive) {
+      return resolveCompanionVisualAssetUrl(displayCompanion, "normal");
+    }
 
     if (isDormant) {
-      return resolveCompanionVisualAssetUrl(companion, "dormant");
+      return resolveCompanionVisualAssetUrl(displayCompanion, "dormant");
     }
     if (health.isNeglected && health.neglectedImageUrl) {
       return health.neglectedImageUrl;
     }
     if (health.isNeglected) {
-      return resolveCompanionVisualAssetUrl(companion, "neglected");
+      return resolveCompanionVisualAssetUrl(displayCompanion, "neglected");
     }
-    return resolveCompanionVisualAssetUrl(companion, "normal");
-  }, [companion, health.isNeglected, health.neglectedImageUrl, isDormant]);
+    return resolveCompanionVisualAssetUrl(displayCompanion, "normal");
+  }, [
+    displayCompanion,
+    health.isNeglected,
+    health.neglectedImageUrl,
+    isDormant,
+    tutorialPresentation.isStageZeroOverrideActive,
+  ]);
   
   const effectiveImageUrl = displayImageUrl || COMPANION_PLACEHOLDER;
+  const usesPresetPortraitShell = isCompanionPresetImageSource(effectiveImageUrl);
   const effectiveImageFocal = useMemo(() => {
-    if (!companion) return { x: null, y: null };
+    if (!displayCompanion) return { x: null, y: null };
+
+    if (tutorialPresentation.isStageZeroOverrideActive) {
+      return {
+        x: displayCompanion.current_image_focal_x ?? null,
+        y: displayCompanion.current_image_focal_y ?? null,
+      };
+    }
 
     if (isDormant) {
       return {
-        x: companion.dormant_image_focal_x ?? companion.current_image_focal_x ?? null,
-        y: companion.dormant_image_focal_y ?? companion.current_image_focal_y ?? null,
+        x: displayCompanion.dormant_image_focal_x ?? displayCompanion.current_image_focal_x ?? null,
+        y: displayCompanion.dormant_image_focal_y ?? displayCompanion.current_image_focal_y ?? null,
       };
     }
 
     if (health.isNeglected) {
       return {
-        x: health.neglectedImageFocalX ?? companion.neglected_image_focal_x ?? companion.current_image_focal_x ?? null,
-        y: health.neglectedImageFocalY ?? companion.neglected_image_focal_y ?? companion.current_image_focal_y ?? null,
+        x:
+          health.neglectedImageFocalX ??
+          displayCompanion.neglected_image_focal_x ??
+          displayCompanion.current_image_focal_x ??
+          null,
+        y:
+          health.neglectedImageFocalY ??
+          displayCompanion.neglected_image_focal_y ??
+          displayCompanion.current_image_focal_y ??
+          null,
       };
     }
 
     return {
-      x: health.imageFocalX ?? companion.current_image_focal_x ?? null,
-      y: health.imageFocalY ?? companion.current_image_focal_y ?? null,
+      x: health.imageFocalX ?? displayCompanion.current_image_focal_x ?? null,
+      y: health.imageFocalY ?? displayCompanion.current_image_focal_y ?? null,
     };
   }, [
-    companion,
+    displayCompanion,
     health.imageFocalX,
     health.imageFocalY,
     health.isNeglected,
     health.neglectedImageFocalX,
     health.neglectedImageFocalY,
     isDormant,
+    tutorialPresentation.isStageZeroOverrideActive,
   ]);
 
   // Track image URL changes to reset loading state
@@ -399,12 +439,17 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
   const companionPalette = useMemo(
     () =>
       deriveCompanionPalette({
-        coreElement: companion?.core_element,
-        favoriteColor: companion?.favorite_color,
-        stage: companion?.current_stage,
-        companionId: companion?.id,
+        coreElement: displayCompanion?.core_element,
+        favoriteColor: displayCompanion?.favorite_color,
+        stage: displayCompanion?.current_stage,
+        companionId: displayCompanion?.id,
       }),
-    [companion?.core_element, companion?.favorite_color, companion?.current_stage, companion?.id],
+    [
+      displayCompanion?.core_element,
+      displayCompanion?.favorite_color,
+      displayCompanion?.current_stage,
+      displayCompanion?.id,
+    ],
   );
 
   const companionMotionEvent = useMemo(() => {
@@ -419,15 +464,15 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
   useEffect(() => {
     let cancelled = false;
     const fetchCreatureName = async () => {
-      if (!companion) return;
+      if (!displayCompanion) return;
 
-      if (companion.current_stage === 0 && !companion.preset_id) {
-        setCreatureName(`${formatDisplayLabel(companion.core_element)} Egg`);
+      if (displayCompanion.current_stage === 0) {
+        setCreatureName(`${formatDisplayLabel(displayCompanion.core_element)} Egg`);
         return;
       }
 
       const resolvedName = await resolveCompanionName({
-        companion,
+        companion: displayCompanion,
         fallback: "companion",
       });
 
@@ -441,21 +486,30 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
     return () => {
       cancelled = true;
     };
-  }, [companion?.id, companion?.current_stage, companion?.cached_creature_name, companion?.spirit_animal]);
+  }, [
+    displayCompanion?.id,
+    displayCompanion?.current_stage,
+    displayCompanion?.cached_creature_name,
+    displayCompanion?.spirit_animal,
+    displayCompanion?.core_element,
+  ]);
 
   if (isLoading) return <CompanionSkeleton />;
-  if (!companion) return null;
+  if (!companion || !displayCompanion) return null;
 
-  const tierName = getStageName(companion.current_stage);
-  const levelDisplay = getProgressionLevelDisplay(companion.current_stage);
-  const colorName = getColorName(companion.favorite_color);
-  const safeNextEvolutionXP = nextEvolutionXP ?? companion.current_xp;
-  const isMaxStage = companion.current_stage >= MAX_COMPANION_STAGE;
-  const isStageZeroEgg = companion.current_stage === 0;
-  const nextClaimedLevel = Math.min(companion.current_stage + 1, MAX_COMPANION_STAGE);
-  const nextTierBoundary = getNextTierBoundary(companion.current_stage);
+  const tierName = getStageName(displayCompanion.current_stage);
+  const levelDisplay = getProgressionLevelDisplay(displayCompanion.current_stage);
+  const colorName = getColorName(displayCompanion.favorite_color);
+  const safeNextEvolutionXP = displayNextEvolutionXP ?? displayCompanion.current_xp;
+  const isMaxStage = displayCompanion.current_stage >= MAX_COMPANION_STAGE;
+  const isStageZeroEgg = displayCompanion.current_stage === 0;
+  const nextClaimedLevel = Math.min(displayCompanion.current_stage + 1, MAX_COMPANION_STAGE);
+  const nextTierBoundary = getNextTierBoundary(displayCompanion.current_stage);
   const nextTierLabel = nextTierBoundary === null ? null : getProgressionTierLabelForLevel(nextTierBoundary);
   const shouldAnimateIdleDrift = !prefersReducedMotion && imageLoaded && !imageError && !isRegenerating;
+  const displayedCreatureName = isStageZeroEgg
+    ? `${formatDisplayLabel(displayCompanion.core_element)} Egg`
+    : (creatureName || "Companion");
 
   const handleEvolvePress = () => {
     if (requiresHatchSelection) {
@@ -531,7 +585,7 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
               <p className="text-sm text-muted-foreground font-medium">
                 {isMaxStage
                   ? "Maximum level reached"
-                  : canEvolve
+                  : displayCanEvolve
                     ? `Ready to evolve to Level ${nextClaimedLevel}`
                   : nextTierBoundary === null || !nextTierLabel
                     ? `Next level at ${safeNextEvolutionXP} XP`
@@ -559,16 +613,16 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
             )}
             style={{ color: companionPalette.accentText }}
           >
-            {creatureName || 'Companion'}
+            {displayedCreatureName}
           </p>
 
           {/* Companion Image */}
-          <div className="flex justify-center py-2 relative group" role="img" aria-label={`Your companion at level ${companion.current_stage}: ${tierName}`}>
+          <div className="flex justify-center py-2 relative group" role="img" aria-label={`Your companion at level ${displayCompanion.current_stage}: ${tierName}`}>
             {/* Cosmiq orbital glow effect */}
             <div 
               className={`absolute inset-0 blur-3xl opacity-50 group-hover:opacity-70 transition-opacity duration-500 ${prefersReducedMotion ? 'animate-none' : 'animate-orbit'}`}
               style={{
-                background: `radial-gradient(circle, hsl(var(--celestial-blue) / ${(companion.vitality ?? 300) / 600}), hsl(var(--nebula-pink) / ${(companion.vitality ?? 300) / 600}), transparent)`,
+                background: `radial-gradient(circle, hsl(var(--celestial-blue) / ${(displayCompanion.vitality ?? 300) / 600}), hsl(var(--nebula-pink) / ${(displayCompanion.vitality ?? 300) / 600}), transparent)`,
               }}
               aria-hidden="true" 
             />
@@ -601,8 +655,8 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
               >
                 <CompanionMotionSurface
                   variant="companion"
-                  stage={companion.current_stage}
-                  element={companion.core_element}
+                  stage={displayCompanion.current_stage}
+                  element={displayCompanion.core_element}
                   event={companionMotionEvent}
                   primaryColor={companionPalette.accentText}
                   secondaryColor={companionPalette.badgeText}
@@ -644,32 +698,71 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
                         </div>
                       </div>
                     )}
-                    <CompanionImage
-                      key={imageKey}
-                      src={effectiveImageUrl}
-                      alt={`${tierName} companion at level ${companion.current_stage}`}
-                      focalX={effectiveImageFocal.x}
-                      focalY={effectiveImageFocal.y}
-                      className={cn(
-                        "relative h-full w-full object-cover rounded-2xl shadow-2xl ring-4 transition-all duration-500 group-hover:scale-105",
-                        imageLoaded ? "opacity-100" : "opacity-0 absolute",
-                        health.isNeglected ? "ring-destructive/50" : "ring-primary/30",
-                        isRegenerating && "animate-pulse",
-                        animationClass,
-                      )}
-                      style={{ ...skinStyles, ...careStyles, ...equippedCosmeticStyles }}
-                      onLoad={() => {
-                        setImageLoaded(true);
-                        setImageError(false);
-                      }}
-                      onError={() => {
-                        setImageError(true);
-                        setImageLoaded(false);
-                      }}
-                      loading="lazy"
-                      decoding="async"
-                      draggable={false}
-                    />
+                    {usesPresetPortraitShell ? (
+                      <CompanionPortraitShell
+                        src={effectiveImageUrl}
+                        element={displayCompanion.core_element}
+                        className={cn(
+                          "h-full w-full rounded-2xl ring-4 shadow-2xl transition-all duration-500 group-hover:scale-105",
+                          imageLoaded ? "opacity-100" : "opacity-0 absolute inset-0",
+                          health.isNeglected ? "ring-destructive/50" : "ring-primary/30",
+                          isRegenerating && "animate-pulse",
+                          animationClass,
+                        )}
+                      >
+                        <CompanionImage
+                          key={imageKey}
+                          src={effectiveImageUrl}
+                          alt={`${tierName} companion at level ${displayCompanion.current_stage}`}
+                          fit="portrait"
+                          element={displayCompanion.core_element}
+                          focalX={effectiveImageFocal.x}
+                          focalY={effectiveImageFocal.y}
+                          className="relative h-full w-full rounded-2xl"
+                          style={{ ...skinStyles, ...careStyles, ...equippedCosmeticStyles }}
+                          onLoad={() => {
+                            setImageLoaded(true);
+                            setImageError(false);
+                          }}
+                          onError={() => {
+                            setImageError(true);
+                            setImageLoaded(false);
+                          }}
+                          loading="lazy"
+                          decoding="async"
+                          draggable={false}
+                        />
+                      </CompanionPortraitShell>
+                    ) : (
+                      <CompanionImage
+                        key={imageKey}
+                        src={effectiveImageUrl}
+                        alt={`${tierName} companion at level ${displayCompanion.current_stage}`}
+                        fit="cover"
+                        element={displayCompanion.core_element}
+                        focalX={effectiveImageFocal.x}
+                        focalY={effectiveImageFocal.y}
+                        className={cn(
+                          "relative h-full w-full rounded-2xl shadow-2xl ring-4 transition-all duration-500 group-hover:scale-105",
+                          imageLoaded ? "opacity-100" : "opacity-0 absolute",
+                          health.isNeglected ? "ring-destructive/50" : "ring-primary/30",
+                          isRegenerating && "animate-pulse",
+                          animationClass,
+                        )}
+                        style={{ ...skinStyles, ...careStyles, ...equippedCosmeticStyles }}
+                        onLoad={() => {
+                          setImageLoaded(true);
+                          setImageError(false);
+                        }}
+                        onError={() => {
+                          setImageError(true);
+                          setImageLoaded(false);
+                        }}
+                        loading="lazy"
+                        decoding="async"
+                        draggable={false}
+                      />
+                    )}
                   </>
                 </CompanionMotionSurface>
               </div>
@@ -700,27 +793,27 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
           <div className="space-y-3">
             <div className="flex justify-center items-center gap-3 mb-3 flex-wrap">
               <CompanionBadge 
-                element={companion.core_element} 
-                stage={companion.current_stage}
+                element={displayCompanion.core_element} 
+                stage={displayCompanion.current_stage}
                 showStage={true}
-                favoriteColor={companion.favorite_color}
-                companionId={companion.id}
+                favoriteColor={displayCompanion.favorite_color}
+                companionId={displayCompanion.id}
               />
               <CompanionBondBadge />
             </div>
             <div className="text-center">
               <p className="text-sm font-medium text-muted-foreground mb-2" id="xp-progress-label">
                 {isMaxStage
-                  ? `Level ${companion.current_stage} maxed`
-                  : canEvolve
+                  ? `Level ${displayCompanion.current_stage} maxed`
+                  : displayCanEvolve
                     ? `Ready to evolve to Level ${nextClaimedLevel}`
-                    : `${companion.current_xp} / ${safeNextEvolutionXP} XP to Level ${nextClaimedLevel}`}
+                    : `${displayCompanion.current_xp} / ${safeNextEvolutionXP} XP to Level ${nextClaimedLevel}`}
               </p>
               <Progress 
-                value={progressToNext} 
+                value={displayProgressToNext} 
                 className="h-3 rounded-full shadow-inner" 
                 aria-labelledby="xp-progress-label"
-                aria-valuenow={Math.min(companion.current_xp, safeNextEvolutionXP)}
+                aria-valuenow={Math.min(displayCompanion.current_xp, safeNextEvolutionXP)}
                 aria-valuemin={0}
                 aria-valuemax={safeNextEvolutionXP}
               />
@@ -733,16 +826,16 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
               </div>
               <div className="text-center p-3 rounded-xl bg-gradient-to-br from-accent/5 to-primary/5 border border-accent/10 hover:border-accent/30 transition-all">
                 <p className="text-xs text-muted-foreground mb-1">Spirit</p>
-                <p className="font-medium text-sm">{formatDisplayLabel(companion.spirit_animal)}</p>
+                <p className="font-medium text-sm">{formatDisplayLabel(displayCompanion.spirit_animal)}</p>
               </div>
               <div className="text-center p-3 rounded-xl bg-gradient-to-br from-primary/5 to-accent/5 border border-primary/10 hover:border-primary/30 transition-all">
                 <p className="text-xs text-muted-foreground mb-1">Element</p>
-                <p className="font-medium text-sm">{formatDisplayLabel(companion.core_element)}</p>
+                <p className="font-medium text-sm">{formatDisplayLabel(displayCompanion.core_element)}</p>
               </div>
             </div>
 
             {/* 7-Stat Companion Attributes Grid */}
-            <CompanionAttributes companion={companion} />
+            <CompanionAttributes companion={displayCompanion} />
           </div>
 
           {/* Evolution Path Badge - visible indicator of care patterns */}
@@ -756,11 +849,11 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
           </div>
 
           {/* Companion Dialogue - emotional responses based on care signals */}
-          <CompanionDialogue className="mt-2" companionName={creatureName} />
+          <CompanionDialogue className="mt-2" companionName={displayedCreatureName} />
 
           {/* Evolve Button - shows when ready */}
           <AnimatePresence>
-            {canEvolve && (
+            {displayCanEvolve && (
               <EvolveButton
                 onEvolve={handleEvolvePress}
                 isEvolving={isEvolutionBusy}

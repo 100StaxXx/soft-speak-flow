@@ -186,6 +186,43 @@ describe("Onboarding route guard", () => {
     expect(mocks.profilesUpdateMock).not.toHaveBeenCalled();
   });
 
+  it("ignores cached creature names for preset-backed stage 0 eggs during journey-begins recovery", () => {
+    mocks.profile = {
+      onboarding_completed: true,
+      selected_mentor_id: "mentor-1",
+      onboarding_step: null,
+      onboarding_data: {
+        userName: "Nova",
+      },
+    };
+    mocks.companion = {
+      id: "companion-egg",
+      preset_id: "dragon",
+      current_stage: 0,
+      core_element: "fire",
+      spirit_animal: "Dragon",
+      cached_creature_name: "Ignisyl",
+    } as {
+      id: string;
+      preset_id: string;
+      current_stage: number;
+      core_element: string;
+      spirit_animal: string;
+      cached_creature_name: string | null;
+    };
+
+    renderOnboarding();
+
+    expect(screen.getByText("StoryOnboarding")).toBeInTheDocument();
+    expect(mocks.storyOnboardingProps).toMatchObject({
+      resumeState: {
+        stage: "journey-begins",
+        userName: "Nova",
+        companionLabel: "Dragon",
+      },
+    });
+  });
+
   it("keeps explicit journey-begins recovery on onboarding even when the companion is already stage 1", () => {
     mocks.profile = {
       onboarding_completed: true,

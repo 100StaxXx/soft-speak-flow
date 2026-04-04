@@ -172,7 +172,7 @@ describe("resolveCompanionName", () => {
     expect(isAssignedCompanionName("Zephyra", "Mechanical Dragon")).toBe(true);
   });
 
-  it("synthesizes and caches a stable proper name when cached name is just the species", async () => {
+  it("does not reveal or cache a proper name before stage 1 when using the companion fallback", async () => {
     const value = await resolveCompanionName({
       companion: {
         id: "comp-7",
@@ -184,12 +184,12 @@ describe("resolveCompanionName", () => {
       fallback: "companion",
     });
 
-    expect(value).not.toBe("Mechanical Dragon");
-    expect(value).not.toBe("Companion");
-    expect(mocks.updateEq).toHaveBeenCalledWith("id", "comp-7");
+    expect(value).toBe("Companion");
+    expect(mocks.evolutionMaybeSingle).not.toHaveBeenCalled();
+    expect(mocks.updateEq).not.toHaveBeenCalled();
   });
 
-  it("ignores invalid card names that mirror the species and synthesizes a proper name", async () => {
+  it("can still use the species fallback before stage 1 without querying or caching names", async () => {
     mocks.evolutionMaybeSingle
       .mockResolvedValueOnce({ data: { creature_name: "Mechanical Dragon" } })
       .mockResolvedValueOnce({ data: { creature_name: "Mechanical Dragon" } });
@@ -202,12 +202,11 @@ describe("resolveCompanionName", () => {
         spirit_animal: "Mechanical Dragon",
         core_element: "water",
       },
-      fallback: "companion",
+      fallback: "species",
     });
 
-    expect(value).not.toBe("Mechanical Dragon");
-    expect(value).not.toBe("Companion");
-    expect(mocks.evolutionMaybeSingle).toHaveBeenCalledTimes(2);
-    expect(mocks.updateEq).toHaveBeenCalledWith("id", "comp-8");
+    expect(value).toBe("Mechanical Dragon");
+    expect(mocks.evolutionMaybeSingle).not.toHaveBeenCalled();
+    expect(mocks.updateEq).not.toHaveBeenCalled();
   });
 });

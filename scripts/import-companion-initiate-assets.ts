@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import sharp from "sharp";
 import { ensureDir, writeJson } from "./badge-reward-preview-utils";
-import { getSliceBounds, PANEL_COLUMNS, PANEL_ROWS, parseArgs } from "./companion-stage2-preview-utils";
+import { parseArgs } from "./companion-stage2-preview-utils";
 import {
   DEFAULT_INITIATE_SOURCE_DIR,
   INITIATE_ART_TIER,
@@ -15,6 +15,7 @@ import {
   countInitiatePlannedAssets,
   type InitiateSheetPlan,
 } from "./companion-initiate-import-utils";
+import { processSheetPanel } from "./companion-portrait-pipeline.mjs";
 
 interface InspectedSheet {
   width: number;
@@ -45,25 +46,30 @@ async function cropSheet({
   plan: InitiateSheetPlan;
   width: number;
   height: number;
-}): Promise<void> {
-  const image = sharp(plan.sourcePath);
+}): Promise<Array<{ outputPath: string; width: number; height: number; transparentPixels: number; edgeBleedPixels: number }>> {
+  const results = [];
 
   for (const asset of plan.assets) {
-    const xBounds = getSliceBounds(width, PANEL_COLUMNS, asset.column);
-    const yBounds = getSliceBounds(height, PANEL_ROWS, asset.row);
-
     ensureDir(path.dirname(asset.outputPath));
-    await image
-      .clone()
-      .extract({
-        left: xBounds.start,
-        top: yBounds.start,
-        width: xBounds.size,
-        height: yBounds.size,
-      })
-      .png()
-      .toFile(asset.outputPath);
+    const result = await processSheetPanel({
+      sourcePath: plan.sourcePath,
+      width,
+      height,
+      row: asset.row,
+      column: asset.column,
+      outputPath: asset.outputPath,
+    });
+
+    results.push({
+      outputPath: asset.outputPath,
+      width: result.width,
+      height: result.height,
+      transparentPixels: result.transparentPixels,
+      edgeBleedPixels: result.edgeBleedPixels,
+    });
   }
+
+  return results;
 }
 
 async function main() {
@@ -79,12 +85,19 @@ async function main() {
 
   for (const plan of plans) {
     const inspected = await inspectSheet(plan.sourcePath);
+    const outputStatsByPath = new Map<
+      string,
+      { width: number; height: number; transparentPixels: number; edgeBleedPixels: number }
+    >();
     if (!dryRun) {
-      await cropSheet({
+      const outputStats = await cropSheet({
         plan,
         width: inspected.width,
         height: inspected.height,
       });
+      for (const item of outputStats) {
+        outputStatsByPath.set(item.outputPath, item);
+      }
     }
 
     inspectedSheets.push({
@@ -103,6 +116,10 @@ async function main() {
         outputPath: asset.outputPath,
         storagePath: asset.storagePath,
         cropped: dryRun ? false : fs.existsSync(asset.outputPath),
+        outputWidth: outputStatsByPath.get(asset.outputPath)?.width ?? null,
+        outputHeight: outputStatsByPath.get(asset.outputPath)?.height ?? null,
+        transparentPixels: outputStatsByPath.get(asset.outputPath)?.transparentPixels ?? null,
+        edgeBleedPixels: outputStatsByPath.get(asset.outputPath)?.edgeBleedPixels ?? null,
       })),
     });
   }

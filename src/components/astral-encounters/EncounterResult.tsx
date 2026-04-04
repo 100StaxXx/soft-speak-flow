@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button';
 import { useEffect, useMemo } from 'react';
 import confetti from 'canvas-confetti';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
-import { CompanionImage } from '@/components/CompanionImage';
+import { CompanionImage, CompanionPortraitShell } from '@/components/CompanionImage';
+import { isCompanionPresetImageSource } from '@/lib/companionImageFocal';
 
 interface EncounterResultProps {
   adversary: Adversary;
@@ -269,13 +270,29 @@ export const EncounterResultScreen = ({
           
           {/* Companion image */}
           <div className={`relative w-28 h-28 rounded-full overflow-hidden border-2 ${isSuccess ? 'border-primary/50 shadow-lg shadow-primary/30' : 'border-slate-500/40 shadow-lg shadow-purple-900/30'}`}>
-            <CompanionImage 
-              src={companionImageUrl} 
-              alt={companionName || 'Companion'} 
-              focalX={companionImageFocalX}
-              focalY={companionImageFocalY}
-              className={`w-full h-full object-cover ${!isSuccess ? 'saturate-75' : ''}`}
-            />
+            {isCompanionPresetImageSource(companionImageUrl) ? (
+              <CompanionPortraitShell
+                src={companionImageUrl}
+                className="h-full w-full rounded-full"
+              >
+                <CompanionImage 
+                  src={companionImageUrl} 
+                  alt={companionName || 'Companion'} 
+                  fit="portrait"
+                  focalX={companionImageFocalX}
+                  focalY={companionImageFocalY}
+                  className={`w-full h-full rounded-full ${!isSuccess ? 'saturate-75' : ''}`}
+                />
+              </CompanionPortraitShell>
+            ) : (
+              <CompanionImage 
+                src={companionImageUrl} 
+                alt={companionName || 'Companion'} 
+                focalX={companionImageFocalX}
+                focalY={companionImageFocalY}
+                className={`w-full h-full object-cover ${!isSuccess ? 'saturate-75' : ''}`}
+              />
+            )}
             
             {/* Overlay for defeat - subtle darkening */}
             {!isSuccess && (

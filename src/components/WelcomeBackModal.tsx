@@ -7,7 +7,8 @@ import { useCompanionHealth, CompanionMoodState } from "@/hooks/useCompanionHeal
 import { useCompanion } from "@/hooks/useCompanion";
 import { useXPRewards } from "@/hooks/useXPRewards";
 import { useLivingCompanionSafe } from "@/hooks/useLivingCompanion";
-import { CompanionImage } from "@/components/CompanionImage";
+import { CompanionImage, CompanionPortraitShell } from "@/components/CompanionImage";
+import { isCompanionPresetImageSource } from "@/lib/companionImageFocal";
 
 interface WelcomeBackModalProps {
   isOpen: boolean;
@@ -21,6 +22,10 @@ export const WelcomeBackModal = ({ isOpen, onClose }: WelcomeBackModalProps) => 
   const { triggerComeback } = useLivingCompanionSafe();
   const [showReunion, setShowReunion] = useState(false);
   const [hasAwarded, setHasAwarded] = useState(false);
+  const sadImageUrl = health.neglectedImageUrl || companion?.current_image_url || "";
+  const usesSadPortraitShell = isCompanionPresetImageSource(sadImageUrl);
+  const happyImageUrl = companion?.current_image_url || "";
+  const usesHappyPortraitShell = isCompanionPresetImageSource(happyImageUrl);
 
   // Calculate stats lost during absence
   const statsLost = Math.min(health.daysInactive * 5, 50); // -5 per day, max 50
@@ -107,18 +112,41 @@ export const WelcomeBackModal = ({ isOpen, onClose }: WelcomeBackModalProps) => 
                   className="relative"
                 >
                   {/* Sad state - use neglected image or filtered normal image */}
-                  <CompanionImage
-                    src={health.neglectedImageUrl || companion.current_image_url || ""}
-                    alt="Your sad companion"
-                    focalX={health.neglectedImageFocalX ?? companion.current_image_focal_x ?? null}
-                    focalY={health.neglectedImageFocalY ?? companion.current_image_focal_y ?? null}
-                    className="w-48 h-48 object-cover rounded-2xl"
-                    style={{
-                      filter: !health.neglectedImageUrl 
-                        ? 'saturate(0.4) brightness(0.8)' 
-                        : undefined
-                    }}
-                  />
+                  {usesSadPortraitShell ? (
+                    <CompanionPortraitShell
+                      src={sadImageUrl}
+                      element={companion.core_element}
+                      className="h-48 w-48 rounded-2xl"
+                    >
+                      <CompanionImage
+                        src={sadImageUrl}
+                        alt="Your sad companion"
+                        fit="portrait"
+                        element={companion.core_element}
+                        focalX={health.neglectedImageFocalX ?? companion.current_image_focal_x ?? null}
+                        focalY={health.neglectedImageFocalY ?? companion.current_image_focal_y ?? null}
+                        className="w-full h-full rounded-2xl"
+                        style={{
+                          filter: !health.neglectedImageUrl
+                            ? "saturate(0.4) brightness(0.8)"
+                            : undefined,
+                        }}
+                      />
+                    </CompanionPortraitShell>
+                  ) : (
+                    <CompanionImage
+                      src={sadImageUrl}
+                      alt="Your sad companion"
+                      focalX={health.neglectedImageFocalX ?? companion.current_image_focal_x ?? null}
+                      focalY={health.neglectedImageFocalY ?? companion.current_image_focal_y ?? null}
+                      className="w-48 h-48 rounded-2xl"
+                      style={{
+                        filter: !health.neglectedImageUrl
+                          ? "saturate(0.4) brightness(0.8)"
+                          : undefined,
+                      }}
+                    />
+                  )}
                   <div className="absolute -bottom-2 -right-2 text-4xl">💔</div>
                 </motion.div>
               ) : (
@@ -134,13 +162,31 @@ export const WelcomeBackModal = ({ isOpen, onClose }: WelcomeBackModalProps) => 
                   className="relative"
                 >
                   {/* Happy state - normal image */}
-                  <CompanionImage
-                    src={companion.current_image_url || ""}
-                    alt="Your happy companion"
-                    focalX={companion.current_image_focal_x ?? null}
-                    focalY={companion.current_image_focal_y ?? null}
-                    className="w-48 h-48 object-cover rounded-2xl ring-4 ring-primary/50"
-                  />
+                  {usesHappyPortraitShell ? (
+                    <CompanionPortraitShell
+                      src={happyImageUrl}
+                      element={companion.core_element}
+                      className="h-48 w-48 rounded-2xl ring-4 ring-primary/50"
+                    >
+                      <CompanionImage
+                        src={happyImageUrl}
+                        alt="Your happy companion"
+                        fit="portrait"
+                        element={companion.core_element}
+                        focalX={companion.current_image_focal_x ?? null}
+                        focalY={companion.current_image_focal_y ?? null}
+                        className="w-full h-full rounded-2xl"
+                      />
+                    </CompanionPortraitShell>
+                  ) : (
+                    <CompanionImage
+                      src={happyImageUrl}
+                      alt="Your happy companion"
+                      focalX={companion.current_image_focal_x ?? null}
+                      focalY={companion.current_image_focal_y ?? null}
+                      className="w-48 h-48 rounded-2xl ring-4 ring-primary/50"
+                    />
+                  )}
                   <motion.div 
                     className="absolute -top-2 -right-2 text-4xl"
                     animate={{ 

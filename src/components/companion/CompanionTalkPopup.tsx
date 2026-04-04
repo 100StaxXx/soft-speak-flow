@@ -5,11 +5,12 @@
  
  import { memo, useEffect, useState, useCallback } from "react";
  import { motion, AnimatePresence } from "framer-motion";
- import { X } from "lucide-react";
- import { cn } from "@/lib/utils";
- import { Avatar, AvatarFallback } from "@/components/ui/avatar";
- import { CompanionImage } from "@/components/CompanionImage";
- import { Progress } from "@/components/ui/progress";
+import { X } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { CompanionImage, CompanionPortraitShell } from "@/components/CompanionImage";
+import { Progress } from "@/components/ui/progress";
+import { isCompanionPresetImageSource } from "@/lib/companionImageFocal";
  
  interface CompanionTalkPopupProps {
    isVisible: boolean;
@@ -18,8 +19,10 @@
    companionName: string;
    companionImageUrl: string | null;
    companionImageFocalX?: number | null;
-   companionImageFocalY?: number | null;
- }
+  companionImageFocalY?: number | null;
+}
+
+const usesPortraitAvatar = (imageUrl?: string | null) => isCompanionPresetImageSource(imageUrl);
  
  // Calculate auto-dismiss duration based on message length
  const getAutoDismissDuration = (message: string): number => {
@@ -123,16 +126,33 @@ export const CompanionTalkPopup = memo(({
                    "ring-2 ring-primary/30",
                    "shadow-md shadow-primary/20"
                  )}>
-                   <Avatar className="h-16 w-16 rounded-xl">
+                   <Avatar className={cn("h-16 w-16 rounded-xl", usesPortraitAvatar(companionImageUrl) && "bg-transparent")}>
                      {companionImageUrl ? (
-                       <CompanionImage 
-                         variant="avatar"
-                         src={companionImageUrl} 
-                         alt={companionName}
-                         focalX={companionImageFocalX}
-                         focalY={companionImageFocalY}
-                         className="object-cover"
-                       />
+                       usesPortraitAvatar(companionImageUrl) ? (
+                         <CompanionPortraitShell
+                           src={companionImageUrl}
+                           className="h-full w-full rounded-xl"
+                         >
+                           <CompanionImage 
+                             variant="avatar"
+                             src={companionImageUrl} 
+                             alt={companionName}
+                             fit="portrait"
+                             focalX={companionImageFocalX}
+                             focalY={companionImageFocalY}
+                             className="rounded-xl"
+                           />
+                         </CompanionPortraitShell>
+                       ) : (
+                         <CompanionImage 
+                           variant="avatar"
+                           src={companionImageUrl} 
+                           alt={companionName}
+                           focalX={companionImageFocalX}
+                           focalY={companionImageFocalY}
+                           className="object-cover"
+                         />
+                       )
                      ) : null}
                      <AvatarFallback className="rounded-xl bg-primary/20 text-primary text-lg font-bold">
                        {companionName.charAt(0)}

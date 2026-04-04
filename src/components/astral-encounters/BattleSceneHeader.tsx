@@ -1,7 +1,8 @@
 import { motion } from "framer-motion";
 import { Swords, Skull } from "lucide-react";
 import { Adversary, AdversaryTier } from "@/types/astralEncounters";
-import { CompanionImage } from "@/components/CompanionImage";
+import { CompanionImage, CompanionPortraitShell } from "@/components/CompanionImage";
+import { isCompanionPresetImageSource } from "@/lib/companionImageFocal";
 
 interface BattleSceneHeaderProps {
   companionImageUrl?: string;
@@ -68,13 +69,29 @@ export const BattleSceneHeader = ({
             {/* Portrait container - larger size */}
             <div className="relative w-24 h-24 rounded-2xl overflow-hidden border-2 border-primary/50 bg-gradient-to-br from-primary/20 to-accent/20 shadow-lg shadow-primary/20">
               {companionImageUrl ? (
-                <CompanionImage
-                  src={companionImageUrl}
-                  alt={companionName}
-                  focalX={companionImageFocalX}
-                  focalY={companionImageFocalY}
-                  className="w-full h-full object-cover"
-                />
+                isCompanionPresetImageSource(companionImageUrl) ? (
+                  <CompanionPortraitShell
+                    src={companionImageUrl}
+                    className="h-full w-full rounded-2xl"
+                  >
+                    <CompanionImage
+                      src={companionImageUrl}
+                      alt={companionName}
+                      fit="portrait"
+                      focalX={companionImageFocalX}
+                      focalY={companionImageFocalY}
+                      className="w-full h-full rounded-2xl"
+                    />
+                  </CompanionPortraitShell>
+                ) : (
+                  <CompanionImage
+                    src={companionImageUrl}
+                    alt={companionName}
+                    focalX={companionImageFocalX}
+                    focalY={companionImageFocalY}
+                    className="w-full h-full object-cover"
+                  />
+                )
               ) : (
                 <div className="w-full h-full flex items-center justify-center bg-primary/10">
                   <span className="text-3xl">🌟</span>

@@ -4,7 +4,8 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Sparkles, Heart, Sun, Star } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { CompanionImage } from '@/components/CompanionImage';
+import { CompanionImage, CompanionPortraitShell } from '@/components/CompanionImage';
+import { isCompanionPresetImageSource } from '@/lib/companionImageFocal';
 
 interface WakeUpCelebrationProps {
   isOpen: boolean;
@@ -26,6 +27,8 @@ const WAKE_UP_MESSAGES = [
   "I dreamed of this moment. You're really here.",
   "My heart feels warm again. Thank you for believing in me.",
 ];
+
+const usesPortraitShell = (imageUrl?: string | null) => isCompanionPresetImageSource(imageUrl);
 
 const BOND_MILESTONE_MESSAGES: Record<number, string> = {
   1: "A bond has been renewed.",
@@ -161,14 +164,31 @@ export const WakeUpCelebration = memo(({
                   }}
                   transition={{ duration: 1 }}
                 >
-                  <CompanionImage
-                    src={dormantImageUrl}
-                    alt={`Sleeping ${companionName}`}
-                    focalX={dormantImageFocalX}
-                    focalY={dormantImageFocalY}
-                    className="absolute inset-0 w-full h-full rounded-2xl"
-                    style={{ filter: 'grayscale(0.5) brightness(0.6)' }}
-                  />
+                  {usesPortraitShell(dormantImageUrl) ? (
+                    <CompanionPortraitShell
+                      src={dormantImageUrl}
+                      className="absolute inset-0 rounded-2xl"
+                    >
+                      <CompanionImage
+                        src={dormantImageUrl}
+                        alt={`Sleeping ${companionName}`}
+                        fit="portrait"
+                        focalX={dormantImageFocalX}
+                        focalY={dormantImageFocalY}
+                        className="absolute inset-0 w-full h-full rounded-2xl"
+                        style={{ filter: 'grayscale(0.5) brightness(0.6)' }}
+                      />
+                    </CompanionPortraitShell>
+                  ) : (
+                    <CompanionImage
+                      src={dormantImageUrl}
+                      alt={`Sleeping ${companionName}`}
+                      focalX={dormantImageFocalX}
+                      focalY={dormantImageFocalY}
+                      className="absolute inset-0 w-full h-full rounded-2xl"
+                      style={{ filter: 'grayscale(0.5) brightness(0.6)' }}
+                    />
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>
@@ -195,13 +215,29 @@ export const WakeUpCelebration = memo(({
                 }}
                 transition={{ duration: 2, repeat: Infinity }}
               />
-              <CompanionImage
-                src={companionImageUrl}
-                alt={`Awakened ${companionName}`}
-                focalX={companionImageFocalX}
-                focalY={companionImageFocalY}
-                className="w-full h-full object-cover rounded-2xl ring-4 ring-amber-400/50"
-              />
+              {usesPortraitShell(companionImageUrl) ? (
+                <CompanionPortraitShell
+                  src={companionImageUrl}
+                  className="h-full w-full rounded-2xl ring-4 ring-amber-400/50"
+                >
+                  <CompanionImage
+                    src={companionImageUrl}
+                    alt={`Awakened ${companionName}`}
+                    fit="portrait"
+                    focalX={companionImageFocalX}
+                    focalY={companionImageFocalY}
+                    className="w-full h-full rounded-2xl"
+                  />
+                </CompanionPortraitShell>
+              ) : (
+                <CompanionImage
+                  src={companionImageUrl}
+                  alt={`Awakened ${companionName}`}
+                  focalX={companionImageFocalX}
+                  focalY={companionImageFocalY}
+                  className="w-full h-full rounded-2xl ring-4 ring-amber-400/50"
+                />
+              )}
               
               {/* Sparkles around the awakened companion */}
               {[...Array(6)].map((_, i) => (
