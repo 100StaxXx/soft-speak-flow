@@ -513,7 +513,16 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
       return;
     }
 
-    triggerManualEvolution();
+    triggerManualEvolution(
+      isStageZeroEgg
+        ? {
+          hatchAnimationSnapshot: {
+            previousImageUrl: effectiveImageUrl,
+            element: displayCompanion.core_element ?? null,
+          },
+        }
+        : undefined,
+    );
   };
 
   const handleHatchSelection = async (data: {

@@ -17,6 +17,7 @@ import {
 import {
   getPresetCompanionAssetUrl,
   getUniversalEggAssetUrl,
+  resolveCompanionVisualAssetUrl,
 } from "@/lib/companionAssetResolver";
 import {
   getBundledCompanionImageFocalPoint,
@@ -233,6 +234,11 @@ type RepairAutoAdvancedCompanionStateResult = {
   current_image_focal_x: number | null;
   current_image_focal_y: number | null;
 };
+
+interface HatchAnimationSnapshot {
+  previousImageUrl: string;
+  element?: string | null;
+}
 
 type SupabaseRpcError = {
   code?: string | null;
@@ -1350,7 +1356,11 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
   const isEvolutionBusy = evolveCompanion.isPending || hatchCompanion.isPending;
 
   // Manual evolution trigger function
-  const triggerManualEvolution = useCallback(async () => {
+  const triggerManualEvolution = useCallback(async (
+    options?: {
+      hatchAnimationSnapshot?: HatchAnimationSnapshot;
+    },
+  ) => {
     if (!user || isEvolutionBusy) return;
 
     let latestCompanion: Companion | null = null;
@@ -1371,8 +1381,34 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
 
     const latestEarnedLevel = resolveProgressionLevelFromXp(latestCompanion.current_xp);
     const latestCanEvolve = latestEarnedLevel > latestCompanion.current_stage;
+    const hatchAnimationSnapshot = options?.hatchAnimationSnapshot;
 
     if (!latestCanEvolve) {
+      if (
+        hatchAnimationSnapshot
+        && latestCompanion.current_stage === 1
+      ) {
+        const newImageUrl = resolveCompanionVisualAssetUrl(latestCompanion)
+          ?? latestCompanion.current_image_url
+          ?? hatchAnimationSnapshot.previousImageUrl;
+
+        setIsEvolvingLoading(true);
+        window.dispatchEvent(new CustomEvent("evolution-loading-start"));
+        window.dispatchEvent(
+          new CustomEvent<CompanionHatchStartedDetail>(COMPANION_HATCH_STARTED_EVENT, {
+            detail: {
+              companionId: latestCompanion.id,
+              previousStage: 0,
+              newStage: 1,
+              previousImageUrl: hatchAnimationSnapshot.previousImageUrl,
+              newImageUrl,
+              element: latestCompanion.core_element ?? hatchAnimationSnapshot.element ?? null,
+            },
+          }),
+        );
+        return;
+      }
+
       if (latestCompanion.current_stage > 0) {
         window.dispatchEvent(new CustomEvent("companion-evolved"));
       }

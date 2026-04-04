@@ -339,6 +339,14 @@ describe("CompanionDisplay overlay stack", () => {
     fireEvent.click(screen.getByRole("button", { name: "HATCH" }));
 
     expect(mocks.triggerManualEvolution).toHaveBeenCalledTimes(1);
+    expect(mocks.triggerManualEvolution).toHaveBeenCalledWith(
+      expect.objectContaining({
+        hatchAnimationSnapshot: expect.objectContaining({
+          previousImageUrl: expect.any(String),
+          element: "fire",
+        }),
+      }),
+    );
     expect(screen.queryByText("Hatch chooser")).not.toBeInTheDocument();
   });
 
