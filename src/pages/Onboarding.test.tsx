@@ -223,7 +223,7 @@ describe("Onboarding route guard", () => {
     });
   });
 
-  it("keeps explicit journey-begins recovery on onboarding even when the companion is already stage 1", () => {
+  it("keeps journey-begins recovery on onboarding without revealing a hatched creature name", () => {
     mocks.profile = {
       onboarding_completed: true,
       selected_mentor_id: "mentor-1",
@@ -256,7 +256,7 @@ describe("Onboarding route guard", () => {
       resumeState: {
         stage: "journey-begins",
         userName: "Nova",
-        companionLabel: "Frostbite",
+        companionLabel: "Dragon",
       },
     });
     expect(mocks.profilesUpdateMock).not.toHaveBeenCalled();

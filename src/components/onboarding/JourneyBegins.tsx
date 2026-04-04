@@ -128,7 +128,7 @@ export const JourneyBegins = ({ userName, companionAnimal, onComplete }: Journey
                   className="text-3xl md:text-4xl font-bold"
                 >
                   <span className="bg-gradient-to-r from-white via-primary-foreground to-white bg-clip-text text-transparent">
-                    {userName} & {companionAnimal}
+                    {userName}
                   </span>
                 </motion.h1>
 

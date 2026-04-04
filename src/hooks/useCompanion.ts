@@ -1051,7 +1051,7 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
           ? ` ${pendingEvolutionCount} evolutions are ready.`
           : "";
 
-        toast.success(`Ready to evolve to Level ${nextClaimedLevel}.${extraReadyCopy}`, {
+        toast.success(`Ready to evolve to Stage ${nextClaimedLevel}.${extraReadyCopy}`, {
           duration: 5000,
         });
       }

@@ -11,6 +11,7 @@ import { FocusTab } from "@/components/companion/FocusTab";
 import { MemoryWhisper } from "@/components/companion/MemoryWhisper";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useAuth } from "@/hooks/useAuth";
+import { usePostOnboardingMentorGuidance } from "@/hooks/usePostOnboardingMentorGuidance";
 import {
   fetchCompanionStoriesAll,
   getCompanionStoriesAllQueryKey,
@@ -28,6 +29,7 @@ import {
   Suspense,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
 } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -41,6 +43,7 @@ import {
   useCompanionLayoutMode,
   type CompanionLayoutMode,
 } from "@/hooks/useCompanionLayoutMode";
+import { deriveCompanionDisplayState } from "@/lib/companionDisplayState";
 import { cn } from "@/lib/utils";
 
 type CompanionTab = "overview" | "focus" | "stories" | "collection";
@@ -216,10 +219,15 @@ const Companion = () => {
     companion,
     nextEvolutionXP,
     progressToNext,
+    canEvolve,
     isLoading,
     error,
     refetch,
   } = useCompanion({ enabled: isTabActive });
+  const {
+    currentStep: tutorialStep,
+    isPreHatchCompanionStep,
+  } = usePostOnboardingMentorGuidance();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<CompanionTab>("overview");
@@ -227,7 +235,23 @@ const Companion = () => {
   const prefetchedResourceKeyRef = useRef<string | null>(null);
   const location = useLocation();
   const previousPathRef = useRef(location.pathname);
+  const tutorialRefetchStepRef = useRef<string | null>(null);
   const navigate = useNavigate();
+  const {
+    displayCompanion,
+    displayNextEvolutionXP,
+    displayProgressToNext,
+  } = useMemo(
+    () =>
+      deriveCompanionDisplayState({
+        companion,
+        nextEvolutionXP: nextEvolutionXP ?? 0,
+        progressToNext,
+        canEvolve,
+        forcePreHatchDisplay: isPreHatchCompanionStep,
+      }),
+    [canEvolve, companion, isPreHatchCompanionStep, nextEvolutionXP, progressToNext],
+  );
 
   const markTabMounted = useCallback((tab: CompanionTab) => {
     setMountedTabs((previous) => (previous[tab] ? previous : { ...previous, [tab]: true }));
@@ -314,6 +338,22 @@ const Companion = () => {
   }, [location.pathname]);
 
   useEffect(() => {
+    const shouldRefreshForTutorial =
+      tutorialStep === "companion_tab_intro" || tutorialStep === "evolve_companion";
+
+    if (!shouldRefreshForTutorial) {
+      tutorialRefetchStepRef.current = null;
+      return;
+    }
+
+    if (!isTabActive || location.pathname !== "/companion") return;
+    if (tutorialRefetchStepRef.current === tutorialStep) return;
+
+    tutorialRefetchStepRef.current = tutorialStep;
+    void refetch();
+  }, [isTabActive, location.pathname, refetch, tutorialStep]);
+
+  useEffect(() => {
     if (!isTabActive) return;
     if (!companion?.id || !user?.id) return;
 
@@ -376,9 +416,9 @@ const Companion = () => {
           >
             {mountedTabs.overview && (
               <OverviewTab
-                companion={companion}
-                nextEvolutionXP={nextEvolutionXP ?? 0}
-                progressToNext={progressToNext}
+                companion={displayCompanion}
+                nextEvolutionXP={displayNextEvolutionXP}
+                progressToNext={displayProgressToNext}
                 layoutMode={layoutMode}
               />
             )}

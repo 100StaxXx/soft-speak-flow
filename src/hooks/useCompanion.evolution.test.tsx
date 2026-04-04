@@ -446,7 +446,7 @@ describe("useCompanion evolveCompanion", () => {
     });
 
     expect(mocks.toastSuccessMock).toHaveBeenCalledWith(
-      "Ready to evolve to Level 1.",
+      "Ready to evolve to Stage 1.",
       expect.any(Object),
     );
     expect(mocks.checkCompanionAchievementsMock).not.toHaveBeenCalled();

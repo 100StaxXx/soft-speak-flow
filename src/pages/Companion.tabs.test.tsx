@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => ({
   useCompanionCalls: [] as Array<Record<string, unknown> | undefined>,
   layoutMode: "mobile" as "mobile" | "desktop",
   guidedStep: null as string | null,
+  isPreHatchCompanionStep: false,
   isEvolvingLoading: false,
   nextEvolutionXP: 200,
   progressToNext: 60,
@@ -135,6 +136,7 @@ vi.mock("@/hooks/useCompanionLayoutMode", () => ({
 vi.mock("@/hooks/usePostOnboardingMentorGuidance", () => ({
   usePostOnboardingMentorGuidance: () => ({
     currentStep: mocks.guidedStep,
+    isPreHatchCompanionStep: mocks.isPreHatchCompanionStep,
   }),
 }));
 
@@ -312,6 +314,7 @@ describe("Companion tabs performance behavior", () => {
     mocks.isLoading = false;
     mocks.error = null;
     mocks.user = { id: "user-1" };
+    mocks.refetch.mockClear();
     mocks.prefetchQuery.mockClear();
     mocks.focusMountCount = 0;
     mocks.collectionMountCount = 0;
@@ -320,6 +323,7 @@ describe("Companion tabs performance behavior", () => {
     mocks.useCompanionCalls = [];
     mocks.layoutMode = "mobile";
     mocks.guidedStep = null;
+    mocks.isPreHatchCompanionStep = false;
     mocks.isEvolvingLoading = false;
     mocks.nextEvolutionXP = 200;
     mocks.progressToNext = 60;
@@ -475,15 +479,34 @@ describe("Companion tabs performance behavior", () => {
     expect(screen.getByTestId("companion-display")).toHaveAttribute("data-layout-mode", "desktop");
   });
 
-  it("shows real stage 0 progress during the companion intro step", () => {
+  it("forces stale stage 1 companion data back to stage 0 during the companion intro step", async () => {
     mocks.guidedStep = "companion_tab_intro";
-    mocks.nextEvolutionXP = 10;
-    mocks.progressToNext = 100;
-    mocks.canEvolve = true;
+    mocks.isPreHatchCompanionStep = true;
     mocks.companion = {
       id: "companion-1",
       current_xp: 14,
-      current_stage: 0,
+      current_stage: 1,
+      core_element: "fire",
+      initial_image_url: "/companion-eggs/egg__t0_egg__normal__fire.png",
+    };
+
+    renderCompanion();
+
+    await waitFor(() => {
+      expect(mocks.refetch).toHaveBeenCalledTimes(1);
+    });
+    expect(screen.getByTestId("next-evolution")).toHaveAttribute("data-current-stage", "0");
+    expect(screen.getByTestId("next-evolution")).toHaveAttribute("data-next-evolution-xp", "10");
+    expect(screen.getByTestId("next-evolution")).toHaveAttribute("data-progress-percent", "100");
+  });
+
+  it("keeps the evolve tutorial step pre-hatch until evolution actually starts", () => {
+    mocks.guidedStep = "evolve_companion";
+    mocks.isPreHatchCompanionStep = true;
+    mocks.companion = {
+      id: "companion-1",
+      current_xp: 14,
+      current_stage: 1,
       core_element: "fire",
       initial_image_url: "/companion-eggs/egg__t0_egg__normal__fire.png",
     };
@@ -492,11 +515,10 @@ describe("Companion tabs performance behavior", () => {
 
     expect(screen.getByTestId("next-evolution")).toHaveAttribute("data-current-stage", "0");
     expect(screen.getByTestId("next-evolution")).toHaveAttribute("data-next-evolution-xp", "10");
-    expect(screen.getByTestId("next-evolution")).toHaveAttribute("data-progress-percent", "100");
   });
 
-  it("does not fake a stage 0 overview once the companion is actually stage 1", () => {
-    mocks.guidedStep = "evolve_companion";
+  it("does not fake a stage 0 overview once the tutorial reaches the post-evolution companion intro", () => {
+    mocks.guidedStep = "post_evolution_companion_intro";
     mocks.companion = {
       id: "companion-1",
       current_xp: 14,

@@ -521,6 +521,7 @@ export interface PostOnboardingMentorGuidanceState {
   isIntroDialogueActive: boolean;
   isActive: boolean;
   currentStep: GuidedTutorialStepId | null;
+  isPreHatchCompanionStep: boolean;
   currentSubstep: CreateQuestSubstepId | null;
   stepRoute: string | null;
   mentorInstructionLines: string[];
@@ -545,6 +546,7 @@ const DEFAULT_GUIDANCE_STATE: PostOnboardingMentorGuidanceState = {
   isIntroDialogueActive: false,
   isActive: false,
   currentStep: null,
+  isPreHatchCompanionStep: false,
   currentSubstep: null,
   stepRoute: null,
   mentorInstructionLines: [],
@@ -1680,11 +1682,16 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
   const strictLockEnabled = milestoneUsesStrictLock(currentMilestone);
   const skipTutorialLabel =
     !tutorialSuppressed && !isIntroDialogueActive ? "Skip tutorial" : undefined;
+  const isPreHatchCompanionStep =
+    !tutorialSuppressed &&
+    (currentStepId === "companion_tab_intro" ||
+      (currentStepId === "evolve_companion" && !evolutionInFlight));
 
   return {
     isIntroDialogueActive,
     isActive,
     currentStep: tutorialSuppressed ? null : currentStepId,
+    isPreHatchCompanionStep,
     currentSubstep: tutorialSuppressed ? null : currentSubstep,
     stepRoute: tutorialSuppressed ? null : stepRoute,
     mentorInstructionLines: tutorialSuppressed ? [] : mentorInstructionLines,

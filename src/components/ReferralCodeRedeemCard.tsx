@@ -35,7 +35,7 @@ export const ReferralCodeRedeemCard = memo(() => {
           <Gift className="h-5 w-5 text-primary" />
           <div>
             <CardTitle>Enter a Referral Code</CardTitle>
-            <CardDescription>Entering a friend's code simply lets them earn cosmetic skins when you reach Level 5 • Initiate.</CardDescription>
+            <CardDescription>Entering a friend's code simply lets them earn cosmetic skins when you reach Stage 5 • Initiate.</CardDescription>
           </div>
         </div>
       </CardHeader>
@@ -46,7 +46,7 @@ export const ReferralCodeRedeemCard = memo(() => {
             <div className="space-y-1">
               <p className="font-medium text-foreground">Referral code already applied</p>
               <p className="text-sm text-muted-foreground">
-                Your friend will get their cosmetic reward once you hit Level 5 • Initiate; nothing changes on your account.
+                Your friend will get their cosmetic reward once you hit Stage 5 • Initiate; nothing changes on your account.
               </p>
             </div>
           </div>

@@ -56,11 +56,11 @@ const HelpCenter = () => {
         },
         {
           title: "How does my Companion work?",
-          content: "Your companion begins as a mystical egg and grows alongside you. As you complete quests, habits, and engage with the app, it earns XP across a unified Level 0 to Level 100 progression ladder. During onboarding, you choose the creature form, then lock the egg's story tone and element before the shell ever cracks. The first hatch is the reveal of that already-chosen companion."
+          content: "Your companion begins as a mystical egg and grows alongside you. As you complete quests, habits, and engage with the app, it earns XP across a unified Stage 0 to Stage 100 progression ladder. During onboarding, you choose the creature form, then lock the egg's story tone and element before the shell ever cracks. The first hatch is the reveal of that already-chosen companion."
         },
         {
           title: "Understanding XP & Evolution",
-          content: "XP (Experience Points) is earned by completing quests, habits, and interacting with your guide. Every XP gain pushes your companion up the shared level ladder, and major tier changes happen at key level boundaries. Streak multipliers boost repeatable effort events (quests, habits, focus sessions): 7+ days = 1.25x, 30+ = 1.5x, 60+ = 1.75x. Completing your Main Quest each day gives a 1.5x quest bonus."
+          content: "XP (Experience Points) is earned by completing quests, habits, and interacting with your guide. Every XP gain pushes your companion up the shared stage ladder, and major tier changes happen at key stage boundaries. Streak multipliers boost repeatable effort events (quests, habits, focus sessions): 7+ days = 1.25x, 30+ = 1.5x, 60+ = 1.75x. Completing your Main Quest each day gives a 1.5x quest bonus."
         },
         {
           title: "What are Factions?",
@@ -75,8 +75,8 @@ const HelpCenter = () => {
       color: "text-primary",
       items: [
         {
-          title: "Levels & Tiers",
-          content: "Your companion now grows through a unified Level 0 to Level 100 progression system. Level 0 is Egg, then the major tiers unfold as Hatchling, Initiate, Awakened, Guardian, Champion, Mythic, and Ascended. The egg uses shared elemental art, while the species you chose during onboarding stays locked in until hatch and carries forward through later tiers."
+          title: "Stages & Tiers",
+          content: "Your companion now grows through a unified Stage 0 to Stage 100 progression system. Stage 0 is Egg, then the major tiers unfold as Hatchling, Initiate, Awakened, Guardian, Champion, Mythic, and Ascended. The egg uses shared elemental art, while the species you chose during onboarding stays locked in until hatch and carries forward through later tiers."
         },
         {
           title: "Earning XP",
@@ -84,7 +84,7 @@ const HelpCenter = () => {
         },
         {
           title: "Companion Skins",
-          content: "Unlock exclusive cosmetic skins for your companion through the referral program. When friends you refer reach Level 5 • Initiate, you earn rare skin variants. Skins are purely cosmetic and change your companion's visual effects—frames, glows, and particle effects. Check your collection in Command Center."
+          content: "Unlock exclusive cosmetic skins for your companion through the referral program. When friends you refer reach Stage 5 • Initiate, you earn rare skin variants. Skins are purely cosmetic and change your companion's visual effects, including frames, glows, and particle effects. Check your collection in Command Center."
         },
         {
           title: "Postcards & Stories",
@@ -236,11 +236,11 @@ const HelpCenter = () => {
         },
         {
           title: "Earning Rewards",
-          content: "When a friend you referred reaches Level 5 • Initiate with their companion, you automatically unlock an exclusive companion skin. Refer more friends to unlock rarer skins. Rewards are purely cosmetic—no gameplay advantages."
+          content: "When a friend you referred reaches Stage 5 • Initiate with their companion, you automatically unlock an exclusive companion skin. Refer more friends to unlock rarer skins. Rewards are purely cosmetic with no gameplay advantages."
         },
         {
           title: "Redeeming Codes",
-          content: "New users can enter a friend's referral code in Command Center. This tags you as their referral but doesn't unlock anything for you—the referrer earns the reward when you reach Level 5 • Initiate. It's a way to credit the friend who introduced you!"
+          content: "New users can enter a friend's referral code in Command Center. This tags you as their referral but doesn't unlock anything for you. The referrer earns the reward when you reach Stage 5 • Initiate. It's a way to credit the friend who introduced you."
         },
         {
           title: "Available Skins",

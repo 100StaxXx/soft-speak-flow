@@ -36,6 +36,7 @@ const mocks = vi.hoisted(() => ({
   requiresHatchSelection: false,
   isRegenerating: true,
   guidedStep: null as string | null,
+  isPreHatchCompanionStep: false,
   isEvolvingLoading: false,
 }));
 
@@ -135,6 +136,7 @@ vi.mock("@/contexts/EvolutionContext", () => ({
 vi.mock("@/hooks/usePostOnboardingMentorGuidance", () => ({
   usePostOnboardingMentorGuidance: () => ({
     currentStep: mocks.guidedStep,
+    isPreHatchCompanionStep: mocks.isPreHatchCompanionStep,
   }),
 }));
 
@@ -262,6 +264,7 @@ describe("CompanionDisplay overlay stack", () => {
     mocks.requiresHatchSelection = false;
     mocks.isRegenerating = true;
     mocks.guidedStep = null;
+    mocks.isPreHatchCompanionStep = false;
     mocks.isEvolvingLoading = false;
     mocks.companion = {
       id: "companion-1",
@@ -307,7 +310,7 @@ describe("CompanionDisplay overlay stack", () => {
     render(<CompanionDisplay />);
 
     const shell = screen.getByTestId("companion-image-shell");
-    const image = screen.getByAltText(/companion at level 8/i);
+    const image = screen.getByAltText(/companion at stage 8/i);
 
     expect(shell).toHaveAttribute("data-companion-idle-motion", "inactive");
 
@@ -359,32 +362,55 @@ describe("CompanionDisplay overlay stack", () => {
     expect(screen.getByText("Hatch chooser")).toBeInTheDocument();
   });
 
-  it("renders a real stage 0 egg during the companion intro step", async () => {
+  it("forces stale stage 1 companion data back to a stage 0 egg during the companion intro step", async () => {
     mocks.guidedStep = "companion_tab_intro";
-    mocks.canEvolve = true;
+    mocks.isPreHatchCompanionStep = true;
     mocks.companion = {
       ...mocks.companion,
-      current_stage: 0,
+      current_stage: 1,
       current_xp: 14,
       core_element: "fire",
-      current_image_url: "/companion-eggs/egg__t0_egg__normal__fire.png",
+      current_image_url: "/companion-presets/fox/t1_youth/normal/fox__t1_youth__normal__fire.png",
       initial_image_url: "/companion-eggs/egg__t0_egg__normal__fire.png",
       preset_id: "fox",
       spirit_animal: "Fox",
-      cached_creature_name: null,
+      cached_creature_name: "Nova",
     };
 
     render(<CompanionDisplay />);
 
     expect(screen.getByText("Fire Egg")).toBeInTheDocument();
-    expect(screen.getAllByText("Ready to evolve to Level 1").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Nova")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Ready to evolve to Stage 1").length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: "HATCH" })).toBeInTheDocument();
 
-    const image = screen.getByAltText(/egg companion at level 0/i);
+    const image = screen.getByAltText(/egg companion at stage 0/i);
     expect(image).toHaveAttribute(
       "src",
       expect.stringContaining("/companion-eggs/egg__t0_egg__normal__fire.png"),
     );
+  });
+
+  it("keeps the evolve tutorial step visually pre-hatch until hatch actually starts", async () => {
+    mocks.guidedStep = "evolve_companion";
+    mocks.isPreHatchCompanionStep = true;
+    mocks.companion = {
+      ...mocks.companion,
+      current_stage: 1,
+      current_xp: 14,
+      core_element: "fire",
+      current_image_url: "/companion-presets/fox/t1_youth/normal/fox__t1_youth__normal__fire.png",
+      initial_image_url: "/companion-eggs/egg__t0_egg__normal__fire.png",
+      preset_id: "fox",
+      spirit_animal: "Fox",
+      cached_creature_name: "Nova",
+    };
+
+    render(<CompanionDisplay />);
+
+    expect(screen.getByText("Fire Egg")).toBeInTheDocument();
+    expect(screen.queryByText("Nova")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "HATCH" })).toBeInTheDocument();
   });
 
   it("renders the normal stage 1 reveal after hatch succeeds", async () => {
@@ -403,7 +429,7 @@ describe("CompanionDisplay overlay stack", () => {
 
     expect(await screen.findByText("Nova")).toBeInTheDocument();
     expect(screen.queryByText("Fire Egg")).not.toBeInTheDocument();
-    const image = screen.getByAltText(/hatchling companion at level 1/i);
+    const image = screen.getByAltText(/hatchling companion at stage 1/i);
     expect(image).toBeInTheDocument();
     expect(image).toHaveAttribute("data-companion-image-fit", "portrait");
   });

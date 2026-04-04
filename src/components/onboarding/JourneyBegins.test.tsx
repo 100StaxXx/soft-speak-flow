@@ -66,6 +66,8 @@ describe("JourneyBegins", () => {
       });
 
       expect(screen.getByText("Your Journey Awaits")).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Nova" })).toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: "Nova & Kitsune" })).not.toBeInTheDocument();
       expect(
         screen.getByText(/Your companion egg now carries the spirit of Kitsune, and its true form will awaken as your bond grows\./i),
       ).toBeInTheDocument();

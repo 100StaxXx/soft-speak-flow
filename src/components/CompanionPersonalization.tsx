@@ -165,7 +165,7 @@ export const CompanionPersonalization = ({
                                 {element.label} Egg
                               </div>
                               <div className="text-xs uppercase tracking-[0.2em] text-white/55">
-                                Level 0 • Egg
+                                Stage 0 • Egg
                               </div>
                             </div>
                             {isSelected && (
@@ -303,7 +303,7 @@ export const CompanionPersonalization = ({
                     <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Creature form revealed at first hatch</div>
                     <p className="text-sm text-foreground/85">{selectedElementMeta.summary}</p>
                     <p className="text-xs text-muted-foreground">
-                      Level 0 is shared across the roster. The egg locks your element now, and you&apos;ll choose the creature form when it hatches.
+                      Stage 0 is shared across the roster. The egg locks your element now, and you&apos;ll choose the creature form when it hatches.
                     </p>
                   </div>
                 ) : (

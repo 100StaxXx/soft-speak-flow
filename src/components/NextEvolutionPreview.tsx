@@ -67,7 +67,7 @@ export const NextEvolutionPreview = memo(({
           <div>
             <h3 className="font-heading font-bold text-sm">Maximum Evolution!</h3>
             <p className="text-xs text-muted-foreground">
-              Your companion has reached Level 100 • Ascended
+              Your companion has reached Stage 100 • Ascended
             </p>
           </div>
         </div>
@@ -84,7 +84,7 @@ export const NextEvolutionPreview = memo(({
             <TrendingUp className="h-5 w-5 text-primary" />
           </div>
           <div className="flex-1">
-            <h3 className="font-heading font-bold text-sm">Next Level</h3>
+            <h3 className="font-heading font-bold text-sm">Next Stage</h3>
             <p className="text-xs text-muted-foreground">
               {nextLevelLabel}
             </p>
@@ -99,7 +99,7 @@ export const NextEvolutionPreview = memo(({
           <div className="flex justify-between text-xs">
             <span className="text-muted-foreground">Progress</span>
             <span className="font-medium text-primary">
-              {xpNeeded > 0 ? `${xpNeeded} XP needed` : `Ready to evolve to Level ${nextStage}`}
+              {xpNeeded > 0 ? `${xpNeeded} XP needed` : `Ready to evolve to Stage ${nextStage}`}
             </span>
           </div>
           <Progress value={progressPercent} className="h-2" />
@@ -108,7 +108,7 @@ export const NextEvolutionPreview = memo(({
           </p>
           {!isMaxStage && nextTierBoundary !== null && nextTierLabel && (
             <p className="text-xs text-muted-foreground">
-              Next tier: Level {nextTierBoundary} • {nextTierLabel}
+              Next tier: Stage {nextTierBoundary} • {nextTierLabel}
             </p>
           )}
         </div>

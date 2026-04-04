@@ -44,11 +44,6 @@ export default function Onboarding() {
 
     const trimmedUserName =
       typeof onboardingData?.userName === "string" ? onboardingData.userName.trim() : "";
-    const cachedCompanionName =
-      typeof companion?.cached_creature_name === "string"
-        ? companion.cached_creature_name.trim()
-        : "";
-    const canRevealCompanionName = (companion?.current_stage ?? 0) > 0;
     const spiritAnimal =
       typeof companion?.spirit_animal === "string" ? companion.spirit_animal.trim() : "";
     const presetName = companion?.preset_id
@@ -56,8 +51,7 @@ export default function Onboarding() {
       : null;
     const elementalEggLabel = `${getCompanionElement(companion?.core_element).label} Egg`;
     const companionLabel =
-      (canRevealCompanionName ? cachedCompanionName : "")
-      || presetName
+      presetName
       || (spiritAnimal.length > 0 && spiritAnimal !== "Egg" ? spiritAnimal : elementalEggLabel);
 
     return {

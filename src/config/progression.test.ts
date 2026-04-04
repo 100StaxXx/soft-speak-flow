@@ -49,9 +49,9 @@ describe("progression helpers", () => {
     expect(getProgressPercentToNextLevel(100, 38000)).toBe(100);
   });
 
-  it("detects tier changes and formats level labels", () => {
+  it("detects tier changes and formats stage labels", () => {
     expect(didTierChange(4, 5)).toBe(true);
     expect(didTierChange(5, 12)).toBe(false);
-    expect(getProgressionLevelDisplay(56)).toBe("Level 56 • Mythic");
+    expect(getProgressionLevelDisplay(56)).toBe("Stage 56 • Mythic");
   });
 });

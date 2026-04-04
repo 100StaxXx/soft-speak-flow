@@ -1,7 +1,7 @@
 import { memo, useState, useEffect, useCallback, useMemo, type KeyboardEvent } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCompanionDialogue, DialogueMood } from "@/hooks/useCompanionDialogue";
-import { useCompanion } from "@/hooks/useCompanion";
+import { useCompanion, type Companion } from "@/hooks/useCompanion";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { CompanionImage, CompanionPortraitShell } from "@/components/CompanionImage";
 import {
@@ -88,6 +88,9 @@ const NEAR_EVOLUTION_LINES = [
 interface CompanionDialogueProps {
   className?: string;
   companionName?: string | null;
+  companionOverride?: Companion | null;
+  progressToNextOverride?: number;
+  canEvolveOverride?: boolean;
 }
 
 const normalizeCompanionName = (value: string | null | undefined) => {
@@ -104,7 +107,13 @@ const hashSeed = (value: string): number => {
   return Math.abs(hash);
 };
 
-export const CompanionDialogue = memo(({ className, companionName }: CompanionDialogueProps) => {
+export const CompanionDialogue = memo(({
+  className,
+  companionName,
+  companionOverride,
+  progressToNextOverride,
+  canEvolveOverride,
+}: CompanionDialogueProps) => {
   const {
     greeting,
     bondDialogue,
@@ -116,7 +125,14 @@ export const CompanionDialogue = memo(({ className, companionName }: CompanionDi
     refreshDialogue,
   } = useCompanionDialogue();
 
-  const { companion, progressToNext, canEvolve } = useCompanion();
+  const {
+    companion: rawCompanion,
+    progressToNext: rawProgressToNext,
+    canEvolve: rawCanEvolve,
+  } = useCompanion();
+  const companion = companionOverride ?? rawCompanion;
+  const progressToNext = progressToNextOverride ?? rawProgressToNext;
+  const canEvolve = canEvolveOverride ?? rawCanEvolve;
   const { dismiss: dismissTalkPopup } = useTalkPopupContextSafe();
   const companionImageUrl = companion?.current_image_url;
   const usesPortraitAvatar = isCompanionPresetImageSource(companionImageUrl);

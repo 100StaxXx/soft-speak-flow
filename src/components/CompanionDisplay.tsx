@@ -8,6 +8,7 @@ import { useCompanionVisualState } from "@/hooks/useCompanionVisualState";
 import { useCompanionRegenerate } from "@/hooks/useCompanionRegenerate";
 import { useCompanionWakeUp } from "@/hooks/useCompanionWakeUp";
 import { useEpicRewards } from "@/hooks/useEpicRewards";
+import { usePostOnboardingMentorGuidance } from "@/hooks/usePostOnboardingMentorGuidance";
 import { useEvolution } from "@/contexts/EvolutionContext";
 import { CompanionSkeleton } from "@/components/CompanionSkeleton";
 import { AttributeTooltip } from "@/components/AttributeTooltip";
@@ -33,6 +34,7 @@ import {
 import { AnimatePresence } from "framer-motion";
 import { cn, formatDisplayLabel } from "@/lib/utils";
 import { deriveCompanionPalette } from "@/lib/companionPalette";
+import { deriveCompanionDisplayState } from "@/lib/companionDisplayState";
 import { resolveCompanionName } from "@/lib/companionName";
 import { resolveCompanionVisualAssetUrl } from "@/lib/companionAssetResolver";
 import { isCompanionPresetImageSource } from "@/lib/companionImageFocal";
@@ -129,13 +131,13 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
     canEvolve,
     triggerManualEvolution,
     isEvolutionBusy,
-    requiresHatchSelection,
     hatchCompanion,
   } = useCompanion();
   const { unlockedSkins } = useReferrals();
   const { health, needsWelcomeBack } = useCompanionHealth();
   const { regenerate, isRegenerating, maxRegenerations, generationPhase, retryCount, resetProgress } = useCompanionRegenerate();
   const { equippedRewards } = useEpicRewards();
+  const { isPreHatchCompanionStep } = usePostOnboardingMentorGuidance();
   useEvolution();
   
   // Wake-up celebration detection
@@ -186,11 +188,30 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
   const previousImageUrl = useRef<string | null>(null);
   const regenerationsUsed = companion?.image_regenerations_used ?? 0;
   const regenerationsRemaining = Math.max(0, maxRegenerations - regenerationsUsed);
+  const {
+    displayCompanion,
+    displayNextEvolutionXP,
+    displayProgressToNext,
+    displayCanEvolve,
+  } = useMemo(
+    () =>
+      deriveCompanionDisplayState({
+        companion,
+        nextEvolutionXP,
+        progressToNext,
+        canEvolve,
+        forcePreHatchDisplay: isPreHatchCompanionStep,
+      }),
+    [canEvolve, companion, isPreHatchCompanionStep, nextEvolutionXP, progressToNext],
+  );
+  const displayRequiresHatchSelection = Boolean(
+    displayCompanion && displayCompanion.current_stage === 0 && !displayCompanion.preset_id,
+  );
 
   const handlePressStart = useCallback((
     event: ReactMouseEvent<HTMLDivElement> | ReactTouchEvent<HTMLDivElement>,
   ) => {
-    if (!companion || isRegenerating || regenerationsRemaining <= 0) return;
+    if (!displayCompanion || isRegenerating || regenerationsRemaining <= 0) return;
 
     if ("touches" in event && event.touches[0]) {
       const touch = event.touches[0];
@@ -203,7 +224,7 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
       resetProgress();
       setShowRegenerateDialog(true);
     }, LONG_PRESS_DURATION_MS);
-  }, [companion, isRegenerating, regenerationsRemaining, resetProgress]);
+  }, [displayCompanion, isRegenerating, regenerationsRemaining, resetProgress]);
 
   const handlePressEnd = useCallback(() => {
     if (longPressTimer.current) {
@@ -231,9 +252,9 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
     if (event.key !== "Enter" && event.key !== " ") return;
 
     event.preventDefault();
-    if (!companion || isRegenerating || regenerationsRemaining <= 0) return;
+    if (!displayCompanion || isRegenerating || regenerationsRemaining <= 0) return;
     setShowRegenerateDialog(true);
-  }, [companion, isRegenerating, regenerationsRemaining]);
+  }, [displayCompanion, isRegenerating, regenerationsRemaining]);
 
   const handleRegenerateConfirm = useCallback(() => {
     if (!companion) return;
@@ -339,11 +360,6 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
       setShowWelcomeBack(true);
     }
   }, [needsWelcomeBack, welcomeBackDismissed, companion]);
-
-  const displayCompanion = companion;
-  const displayCanEvolve = canEvolve;
-  const displayNextEvolutionXP = nextEvolutionXP;
-  const displayProgressToNext = progressToNext;
 
   // Calculate effective image URL (must be before the useEffect that depends on it)
   // Priority: dormant image > neglected image > current image
@@ -492,7 +508,7 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
     : (creatureName || "Companion");
 
   const handleEvolvePress = () => {
-    if (requiresHatchSelection) {
+    if (displayRequiresHatchSelection) {
       setHatchDialogOpen(true);
       return;
     }
@@ -548,7 +564,7 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
         )}
         
         <div className={cn("relative space-y-6", isDesktop ? "p-7" : "p-6")}>
-          {/* Level badge */}
+          {/* Stage badge */}
           <div className="flex items-center justify-between">
             <div className="flex flex-col gap-1">
               <div className="flex items-center">
@@ -560,16 +576,16 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
                 >
                   {levelDisplay}
                 </h2>
-                <AttributeTooltip title="Progression" description="Your companion's current level and tier." />
+                <AttributeTooltip title="Progression" description="Your companion's current stage and tier." />
               </div>
               <p className="text-sm text-muted-foreground font-medium">
                 {isMaxStage
-                  ? "Maximum level reached"
+                  ? "Maximum stage reached"
                   : displayCanEvolve
-                    ? `Ready to evolve to Level ${nextClaimedLevel}`
+                    ? `Ready to evolve to Stage ${nextClaimedLevel}`
                   : nextTierBoundary === null || !nextTierLabel
-                    ? `Next level at ${safeNextEvolutionXP} XP`
-                    : `Next tier at Level ${nextTierBoundary} • ${nextTierLabel}`}
+                    ? `Next stage at ${safeNextEvolutionXP} XP`
+                    : `Next tier at Stage ${nextTierBoundary} • ${nextTierLabel}`}
               </p>
             </div>
             <div
@@ -597,7 +613,7 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
           </p>
 
           {/* Companion Image */}
-          <div className="flex justify-center py-2 relative group" role="img" aria-label={`Your companion at level ${displayCompanion.current_stage}: ${tierName}`}>
+          <div className="flex justify-center py-2 relative group" role="img" aria-label={`Your companion at stage ${displayCompanion.current_stage}: ${tierName}`}>
             {/* Cosmiq orbital glow effect */}
             <div 
               className={`absolute inset-0 blur-3xl opacity-50 group-hover:opacity-70 transition-opacity duration-500 ${prefersReducedMotion ? 'animate-none' : 'animate-orbit'}`}
@@ -693,7 +709,7 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
                         <CompanionImage
                           key={imageKey}
                           src={effectiveImageUrl}
-                          alt={`${tierName} companion at level ${displayCompanion.current_stage}`}
+                          alt={`${tierName} companion at stage ${displayCompanion.current_stage}`}
                           fit="portrait"
                           element={displayCompanion.core_element}
                           focalX={effectiveImageFocal.x}
@@ -717,7 +733,7 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
                       <CompanionImage
                         key={imageKey}
                         src={effectiveImageUrl}
-                        alt={`${tierName} companion at level ${displayCompanion.current_stage}`}
+                        alt={`${tierName} companion at stage ${displayCompanion.current_stage}`}
                         fit="cover"
                         element={displayCompanion.core_element}
                         focalX={effectiveImageFocal.x}
@@ -784,10 +800,10 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
             <div className="text-center">
               <p className="text-sm font-medium text-muted-foreground mb-2" id="xp-progress-label">
                 {isMaxStage
-                  ? `Level ${displayCompanion.current_stage} maxed`
+                  ? `Stage ${displayCompanion.current_stage} maxed`
                   : displayCanEvolve
-                    ? `Ready to evolve to Level ${nextClaimedLevel}`
-                    : `${displayCompanion.current_xp} / ${safeNextEvolutionXP} XP to Level ${nextClaimedLevel}`}
+                    ? `Ready to evolve to Stage ${nextClaimedLevel}`
+                    : `${displayCompanion.current_xp} / ${safeNextEvolutionXP} XP to Stage ${nextClaimedLevel}`}
               </p>
               <Progress 
                 value={displayProgressToNext} 
@@ -829,7 +845,13 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
           </div>
 
           {/* Companion Dialogue - emotional responses based on care signals */}
-          <CompanionDialogue className="mt-2" companionName={displayedCreatureName} />
+          <CompanionDialogue
+            className="mt-2"
+            companionName={displayedCreatureName}
+            companionOverride={displayCompanion}
+            progressToNextOverride={displayProgressToNext}
+            canEvolveOverride={displayCanEvolve}
+          />
 
           {/* Evolve Button - shows when ready */}
           <AnimatePresence>
