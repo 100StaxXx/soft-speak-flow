@@ -32,6 +32,8 @@ const mocks = vi.hoisted(() => ({
   hatchCompanion: {
     mutateAsync: vi.fn(),
   },
+  canEvolve: false,
+  requiresHatchSelection: false,
   isRegenerating: true,
 }));
 
@@ -41,10 +43,10 @@ vi.mock("@/hooks/useCompanion", () => ({
     nextEvolutionXP: 240,
     progressToNext: 75,
     isLoading: false,
-    canEvolve: false,
+    canEvolve: mocks.canEvolve,
     triggerManualEvolution: mocks.triggerManualEvolution,
     isEvolutionBusy: false,
-    requiresHatchSelection: false,
+    requiresHatchSelection: mocks.requiresHatchSelection,
     hatchCompanion: mocks.hatchCompanion,
   }),
 }));
@@ -173,8 +175,28 @@ vi.mock("@/components/CompanionRegenerateDialog", () => ({
   CompanionRegenerateDialog: () => null,
 }));
 
+vi.mock("@/components/ui/dialog", () => ({
+  Dialog: ({ open, children }: { open?: boolean; children: React.ReactNode }) =>
+    open ? <>{children}</> : null,
+  DialogContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DialogHeader: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DialogTitle: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+}));
+
 vi.mock("@/components/companion/EvolveButton", () => ({
-  EvolveButton: () => null,
+  EvolveButton: ({
+    onEvolve,
+    actionLabel = "EVOLVE",
+    isEvolving,
+  }: {
+    onEvolve: () => void;
+    actionLabel?: string;
+    isEvolving: boolean;
+  }) => (
+    <button type="button" onClick={onEvolve} disabled={isEvolving}>
+      {actionLabel}
+    </button>
+  ),
 }));
 
 vi.mock("@/components/companion/EvolutionPathBadge", () => ({
@@ -194,7 +216,8 @@ vi.mock("@/components/CompanionAttributes", () => ({
 }));
 
 vi.mock("@/components/CompanionPersonalization", () => ({
-  CompanionPersonalization: () => null,
+  CompanionPersonalization: ({ mode }: { mode?: string }) =>
+    mode === "hatch" ? <div>Hatch chooser</div> : null,
 }));
 
 vi.mock("@/lib/companionName", () => ({
@@ -213,7 +236,23 @@ describe("CompanionDisplay overlay stack", () => {
     mocks.regenerate.mockClear();
     mocks.triggerManualEvolution.mockClear();
     mocks.hatchCompanion.mutateAsync.mockClear();
+    mocks.canEvolve = false;
+    mocks.requiresHatchSelection = false;
     mocks.isRegenerating = true;
+    mocks.companion = {
+      id: "companion-1",
+      current_xp: 180,
+      current_stage: 8,
+      spirit_animal: "phoenix",
+      core_element: "fire",
+      favorite_color: "#FF6B35",
+      vitality: 420,
+      eye_color: "#FFFFFF",
+      fur_color: "#AA5522",
+      image_regenerations_used: 1,
+      story_tone: "epic_adventure",
+      cached_creature_name: "Nova",
+    };
   });
 
   afterEach(() => {
@@ -254,5 +293,44 @@ describe("CompanionDisplay overlay stack", () => {
     });
 
     expect(shell).toHaveClass("animate-companion-idle-drift");
+  });
+
+  it("shows a direct HATCH action for preset-backed stage 0 eggs", async () => {
+    mocks.canEvolve = true;
+    mocks.companion = {
+      ...mocks.companion,
+      current_stage: 0,
+      current_xp: 14,
+      preset_id: "dragon",
+      spirit_animal: "Dragon",
+      cached_creature_name: null,
+    };
+
+    render(<CompanionDisplay />);
+
+    fireEvent.click(screen.getByRole("button", { name: "HATCH" }));
+
+    expect(mocks.triggerManualEvolution).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("Hatch chooser")).not.toBeInTheDocument();
+  });
+
+  it("keeps the hatch chooser for legacy presetless eggs", async () => {
+    mocks.canEvolve = true;
+    mocks.requiresHatchSelection = true;
+    mocks.companion = {
+      ...mocks.companion,
+      current_stage: 0,
+      current_xp: 14,
+      preset_id: null,
+      spirit_animal: "Egg",
+      cached_creature_name: null,
+    };
+
+    render(<CompanionDisplay />);
+
+    fireEvent.click(screen.getByRole("button", { name: "HATCH" }));
+
+    expect(mocks.triggerManualEvolution).not.toHaveBeenCalled();
+    expect(screen.getByText("Hatch chooser")).toBeInTheDocument();
   });
 });

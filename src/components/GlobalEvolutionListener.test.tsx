@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => {
   const setEvolutionInProgressMock = vi.fn();
   const loggerWarnMock = vi.fn();
   const loggerErrorMock = vi.fn();
+  const companionEvolutionPropsMock = vi.fn();
   const state = {
     callback: null as null | ((payload: Record<string, unknown>) => Promise<void>),
   };
@@ -27,6 +28,7 @@ const mocks = vi.hoisted(() => {
     setEvolutionInProgressMock,
     loggerWarnMock,
     loggerErrorMock,
+    companionEvolutionPropsMock,
     state,
   };
 });
@@ -65,8 +67,24 @@ vi.mock("@/contexts/CelebrationContext", () => ({
 }));
 
 vi.mock("@/components/CompanionEvolution", () => ({
-  CompanionEvolution: ({ isEvolving }: { isEvolving: boolean }) =>
-    isEvolving ? <div data-testid="companion-evolution" /> : null,
+  CompanionEvolution: (props: {
+    isEvolving: boolean;
+    previousStage: number;
+    newStage: number;
+    previousImageUrl: string;
+    newImageUrl: string;
+  }) => {
+    mocks.companionEvolutionPropsMock(props);
+    return props.isEvolving ? (
+      <div
+        data-testid="companion-evolution"
+        data-previous-stage={props.previousStage}
+        data-new-stage={props.newStage}
+        data-previous-image-url={props.previousImageUrl}
+        data-new-image-url={props.newImageUrl}
+      />
+    ) : null;
+  },
 }));
 
 vi.mock("@/utils/logger", () => ({
@@ -195,6 +213,7 @@ describe("GlobalEvolutionListener", () => {
         old: {
           id: "companion-1",
           current_stage: 4,
+          current_image_url: "https://example.com/stage-4.png",
         },
       });
     });
@@ -204,5 +223,13 @@ describe("GlobalEvolutionListener", () => {
     });
 
     expect(mocks.setEvolutionInProgressMock).toHaveBeenCalledWith(true);
+    expect(mocks.companionEvolutionPropsMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        previousStage: 4,
+        newStage: 5,
+        previousImageUrl: "https://example.com/stage-4.png",
+        newImageUrl: "https://example.com/stage-5.png",
+      }),
+    );
   });
 });

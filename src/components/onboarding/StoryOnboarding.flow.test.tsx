@@ -276,21 +276,24 @@ vi.mock("@/components/MentorGrid", () => ({
 vi.mock("./OnboardingStoryToneSelection", () => ({
   OnboardingStoryToneSelection: ({
     initialTone,
+    initialPresetId,
     onComplete,
     onBack,
   }: {
     initialTone: string;
-    onComplete: (tone: string) => void;
+    initialPresetId?: string | null;
+    onComplete: (selection: { storyTone: string; presetId: string }) => void;
     onBack?: () => void;
   }) => (
     <div data-testid="story-tone-stage">
       <div data-testid="story-tone-initial">{initialTone}</div>
+      <div data-testid="story-tone-initial-preset">{initialPresetId ?? ""}</div>
       {onBack ? (
         <button type="button" onClick={onBack}>
           story-tone-back
         </button>
       ) : null}
-      <button type="button" onClick={() => onComplete("dark_intense")}>
+      <button type="button" onClick={() => onComplete({ storyTone: "dark_intense", presetId: "dragon" })}>
         story-tone-next
       </button>
     </div>
@@ -300,15 +303,18 @@ vi.mock("./OnboardingStoryToneSelection", () => ({
 vi.mock("./EggSelectionPrelude", () => ({
   EggSelectionPrelude: ({
     storyTone,
+    speciesName,
     onComplete,
     onBack,
   }: {
     storyTone: string;
+    speciesName: string;
     onComplete: () => void;
     onBack?: () => void;
   }) => (
     <div data-testid="egg-prelude-stage">
       <div data-testid="egg-prelude-tone">{storyTone}</div>
+      <div data-testid="egg-prelude-species">{speciesName}</div>
       {onBack ? (
         <button type="button" onClick={onBack}>
           egg-prelude-back
@@ -325,25 +331,31 @@ vi.mock("./OnboardingEggSelection", () => ({
   OnboardingEggSelection: ({
     onComplete,
     storyTone,
+    presetId,
+    spiritAnimal,
   }: {
     onComplete: (payload: {
-      presetId: null;
+      presetId: string;
       favoriteColor: string;
       spiritAnimal: string;
       coreElement: string;
       storyTone: string;
     }) => void;
     storyTone: string;
+    presetId: string;
+    spiritAnimal: string;
   }) => (
     <div data-testid="companion-stage">
       <div data-testid="egg-stage-tone">{storyTone}</div>
+      <div data-testid="egg-stage-preset">{presetId}</div>
+      <div data-testid="egg-stage-species">{spiritAnimal}</div>
       <button
         type="button"
         onClick={() =>
           onComplete({
-            presetId: null,
+            presetId,
             favoriteColor: "#60A5FA",
-            spiritAnimal: "Egg",
+            spiritAnimal,
             coreElement: "ice",
             storyTone,
           })
@@ -516,9 +528,9 @@ describe("StoryOnboarding questionnaire submission flow", () => {
       await screen.findByTestId("journey-begins-stage");
 
       expect(mocks.createCompanionMutateAsync).toHaveBeenCalledWith({
-        presetId: null,
+        presetId: "dragon",
         favoriteColor: "#60A5FA",
-        spiritAnimal: "Egg",
+        spiritAnimal: "Dragon",
         coreElement: "ice",
         storyTone: "dark_intense",
       });
@@ -595,25 +607,66 @@ describe("StoryOnboarding questionnaire submission flow", () => {
       fireEvent.click(screen.getByRole("button", { name: "mentor-confirm" }));
       expect(await screen.findByTestId("story-tone-stage")).toBeInTheDocument();
       expect(screen.getByTestId("story-tone-initial")).toHaveTextContent("epic_adventure");
+      expect(screen.getByTestId("story-tone-initial-preset")).toHaveTextContent("");
 
       fireEvent.click(screen.getByRole("button", { name: "story-tone-next" }));
       expect(await screen.findByTestId("egg-prelude-stage")).toBeInTheDocument();
       expect(screen.getByTestId("egg-prelude-tone")).toHaveTextContent("dark_intense");
+      expect(screen.getByTestId("egg-prelude-species")).toHaveTextContent("Dragon");
 
       fireEvent.click(screen.getByRole("button", { name: "egg-prelude-next" }));
       expect(await screen.findByTestId("companion-stage")).toBeInTheDocument();
       expect(screen.getByTestId("egg-stage-tone")).toHaveTextContent("dark_intense");
+      expect(screen.getByTestId("egg-stage-preset")).toHaveTextContent("dragon");
+      expect(screen.getByTestId("egg-stage-species")).toHaveTextContent("Dragon");
 
       fireEvent.click(screen.getByRole("button", { name: "complete-companion" }));
       await screen.findByTestId("journey-begins-stage");
 
       expect(mocks.createCompanionMutateAsync).toHaveBeenCalledWith({
-        presetId: null,
+        presetId: "dragon",
         favoriteColor: "#60A5FA",
-        spiritAnimal: "Egg",
+        spiritAnimal: "Dragon",
         coreElement: "ice",
         storyTone: "dark_intense",
       });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("preserves the chosen tone and species when returning from the egg prelude", async () => {
+    renderOnboarding();
+    await advanceToQuestionnaire();
+
+    vi.useFakeTimers();
+    try {
+      fireEvent.click(screen.getByRole("button", { name: "questionnaire-submit" }));
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(CALCULATING_STAGE_DURATION_MS);
+        await Promise.resolve();
+      });
+
+      vi.useRealTimers();
+
+      fireEvent.click(screen.getByRole("button", { name: "mentor-confirm" }));
+      fireEvent.click(await screen.findByRole("button", { name: "story-tone-next" }));
+
+      expect(screen.getByTestId("egg-prelude-tone")).toHaveTextContent("dark_intense");
+      expect(screen.getByTestId("egg-prelude-species")).toHaveTextContent("Dragon");
+
+      fireEvent.click(screen.getByRole("button", { name: "egg-prelude-back" }));
+
+      expect(await screen.findByTestId("story-tone-stage")).toBeInTheDocument();
+      expect(screen.getByTestId("story-tone-initial")).toHaveTextContent("dark_intense");
+      expect(screen.getByTestId("story-tone-initial-preset")).toHaveTextContent("dragon");
+
+      fireEvent.click(screen.getByRole("button", { name: "story-tone-next" }));
+
+      expect(await screen.findByTestId("egg-prelude-stage")).toBeInTheDocument();
+      expect(screen.getByTestId("egg-prelude-tone")).toHaveTextContent("dark_intense");
+      expect(screen.getByTestId("egg-prelude-species")).toHaveTextContent("Dragon");
     } finally {
       vi.useRealTimers();
     }

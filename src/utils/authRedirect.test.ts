@@ -73,6 +73,10 @@ const stageZeroEggCompanion = {
   data: { id: "companion-egg", preset_id: null, current_stage: 0 },
   error: null,
 };
+const stageZeroPresetCompanion = {
+  data: { id: "companion-egg", preset_id: "dragon", current_stage: 0 },
+  error: null,
+};
 
 const flushMicrotasks = async () => {
   await Promise.resolve();
@@ -179,6 +183,21 @@ describe("getAuthRedirectPath", () => {
     mocks.companionMaybeSingleMock.mockResolvedValueOnce(stageZeroEggCompanion);
 
     await expect(getAuthRedirectPath("egg-recovery-user")).resolves.toBe("/onboarding");
+  });
+
+  it("routes preset-backed stage 0 egg accounts without guided tutorial progress back to /onboarding", async () => {
+    mocks.profilesMaybeSingleMock.mockResolvedValueOnce({
+      data: {
+        selected_mentor_id: "mentor-2",
+        onboarding_completed: true,
+        onboarding_step: null,
+        onboarding_data: {},
+      },
+      error: null,
+    });
+    mocks.companionMaybeSingleMock.mockResolvedValueOnce(stageZeroPresetCompanion);
+
+    await expect(getAuthRedirectPath("preset-egg-recovery-user")).resolves.toBe("/onboarding");
   });
 
   it("routes stage 0 egg accounts with a complete onboarding step to /tasks", async () => {
@@ -400,6 +419,23 @@ describe("getProfileAwareAuthFallbackPath", () => {
     mocks.companionMaybeSingleMock.mockResolvedValueOnce(stageZeroEggCompanion);
 
     await expect(getProfileAwareAuthFallbackPath("egg-fallback-user")).resolves.toBe("/onboarding");
+  });
+
+  it("returns /onboarding for preset-backed stage 0 egg accounts without guided tutorial progress", async () => {
+    mocks.profilesMaybeSingleMock.mockResolvedValueOnce({
+      data: {
+        onboarding_completed: true,
+        onboarding_step: null,
+        selected_mentor_id: "mentor-2",
+        onboarding_data: {},
+      },
+      error: null,
+    });
+    mocks.companionMaybeSingleMock.mockResolvedValueOnce(stageZeroPresetCompanion);
+
+    await expect(getProfileAwareAuthFallbackPath("preset-egg-fallback-user")).resolves.toBe(
+      "/onboarding",
+    );
   });
 
   it("returns /onboarding for incomplete users", async () => {

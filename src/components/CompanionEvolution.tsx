@@ -1,8 +1,8 @@
-import { useEffect, useState, useRef, useCallback, useMemo } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import confetti from "canvas-confetti";
-import { haptics } from "@/utils/haptics";
 import { Sparkles } from "lucide-react";
+import { haptics } from "@/utils/haptics";
 import { supabase } from "@/integrations/supabase/client";
 import { playEvolutionStart, playEvolutionSuccess } from "@/utils/soundEffects";
 import { globalAudio } from "@/utils/globalAudio";
@@ -13,11 +13,14 @@ import { logger } from "@/utils/logger";
 import { useMotionProfile } from "@/hooks/useMotionProfile";
 import { CompanionMotionLayer } from "@/components/companion/motion/CompanionMotionLayer";
 import { useCompanionMotionSafe } from "@/contexts/CompanionMotionContext";
+import { getProgressionLevelDisplay } from "@/config/progression";
 import type { CompanionMotionEvent } from "@/config/companionMotion";
 
 interface CompanionEvolutionProps {
   isEvolving: boolean;
+  previousStage: number;
   newStage: number;
+  previousImageUrl: string;
   newImageUrl: string;
   mentorSlug?: string;
   userId?: string;
@@ -25,51 +28,92 @@ interface CompanionEvolutionProps {
   onComplete: () => void;
 }
 
-// 4-phase emotional arc
-type EvolutionPhase = 'anticipation' | 'impact' | 'reveal' | 'settle';
-const log = logger.scope('CompanionEvolution');
+type EvolutionPhase = "hold" | "charge" | "conceal" | "reveal" | "settle";
+type PreloadStatus = "idle" | "loading" | "loaded" | "error";
 
-// Convergence particles - spawn in ring, drift inward
-const ConvergenceParticles = ({ 
-  phase, 
+interface ArtReadiness {
+  previous: PreloadStatus;
+  next: PreloadStatus;
+  ready: boolean;
+}
+
+const FULL_SEQUENCE_MS = {
+  hold: 300,
+  charge: 900,
+  conceal: 250,
+  reveal: 900,
+  settle: 1200,
+  dismissBuffer: 450,
+} as const;
+
+const REDUCED_SEQUENCE_MS = {
+  hold: 150,
+  charge: 280,
+  conceal: 150,
+  reveal: 500,
+  settle: 480,
+  dismissBuffer: 120,
+} as const;
+
+const EMERGENCY_EXIT_DELAY_MS = 15_000;
+const IMAGE_PRELOAD_TIMEOUT_MS = 2_000;
+
+const log = logger.scope("CompanionEvolution");
+
+const ConvergenceParticles = ({
+  phase,
   particleStyle,
   particleCount,
-}: { 
-  phase: EvolutionPhase; 
+}: {
+  phase: EvolutionPhase;
   particleStyle: ParticleStyle;
   particleCount: number;
 }) => {
-  const particles = useMemo(() =>
-    Array.from({ length: particleCount }, (_, i) => ({
-      id: i,
-      angle: (i / particleCount) * Math.PI * 2,
-      startRadius: 180,
-    })), [particleCount]
+  const particles = useMemo(
+    () =>
+      Array.from({ length: particleCount }, (_, index) => ({
+        id: index,
+        angle: (index / particleCount) * Math.PI * 2,
+        startRadius: 190,
+      })),
+    [particleCount],
   );
 
-  if (phase === 'settle') return null;
+  if (phase !== "charge" && phase !== "conceal") {
+    return null;
+  }
 
   return (
-    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-      {particles.map((p) => (
+    <div
+      className="absolute inset-0 flex items-center justify-center pointer-events-none"
+      data-testid="evolution-convergence-particles"
+    >
+      {particles.map((particle) => (
         <motion.div
-          key={p.id}
+          key={particle.id}
           className={`absolute w-2 h-2 evo-particle evo-particle-${particleStyle}`}
           initial={{
-            x: Math.cos(p.angle) * p.startRadius,
-            y: Math.sin(p.angle) * p.startRadius,
-            opacity: 0.3,
-            scale: 1,
+            x: Math.cos(particle.angle) * particle.startRadius,
+            y: Math.sin(particle.angle) * particle.startRadius,
+            opacity: 0.2,
+            scale: 0.65,
           }}
-          animate={{
-            x: phase === 'impact' ? 0 : Math.cos(p.angle) * 60,
-            y: phase === 'impact' ? 0 : Math.sin(p.angle) * 60,
-            opacity: phase === 'impact' ? 0 : 0.7,
-            scale: phase === 'impact' ? 0.2 : 0.8,
-          }}
+          animate={phase === "charge"
+            ? {
+              x: Math.cos(particle.angle) * 40,
+              y: Math.sin(particle.angle) * 40,
+              opacity: 0.74,
+              scale: 0.96,
+            }
+            : {
+              x: 0,
+              y: 0,
+              opacity: 0.15,
+              scale: 0.16,
+            }}
           transition={{
-            duration: phase === 'impact' ? 0.6 : 1.2,
-            ease: [0.25, 0.1, 0.25, 1],
+            duration: phase === "charge" ? 0.82 : 0.22,
+            ease: [0.22, 1, 0.36, 1],
           }}
         />
       ))}
@@ -77,258 +121,407 @@ const ConvergenceParticles = ({
   );
 };
 
-// Hatching overlay for first evolution (Egg → Hatchling)
-const HatchingOverlay = ({ phase, show }: { phase: EvolutionPhase; show: boolean }) => {
+const HatchingOverlay = ({
+  phase,
+  show,
+  flashGlow,
+}: {
+  phase: EvolutionPhase;
+  show: boolean;
+  flashGlow: string;
+}) => {
   if (!show) return null;
 
-  const isDrawing = phase === 'anticipation' || phase === 'impact';
-  const isFlashing = phase === 'impact';
+  const isDrawing = phase === "charge" || phase === "conceal";
+  const isBursting = phase === "conceal";
 
   return (
-    <div className="absolute inset-0 pointer-events-none z-10 flex items-center justify-center">
-      {/* Egg silhouette vignette */}
+    <div
+      className="absolute inset-0 pointer-events-none z-20 flex items-center justify-center"
+      data-testid="evolution-hatching-overlay"
+    >
       <motion.div
         className="absolute inset-0"
-        initial={{ opacity: 0.6 }}
-        animate={{ opacity: phase === 'reveal' || phase === 'settle' ? 0 : 0.4 }}
-        transition={{ duration: 0.5 }}
+        initial={false}
+        animate={{
+          opacity: phase === "hold" ? 0.38 : phase === "charge" ? 0.56 : phase === "conceal" ? 0.22 : 0,
+        }}
+        transition={{ duration: 0.28 }}
         style={{
-          background: 'radial-gradient(ellipse 60% 70% at 50% 50%, transparent 40%, hsl(45, 50%, 15%) 100%)',
+          background:
+            "radial-gradient(ellipse 60% 72% at 50% 50%, transparent 38%, hsl(40 52% 18% / 0.94) 100%)",
         }}
       />
 
-      {/* Crack lines SVG */}
       <svg className="absolute w-full h-full" viewBox="0 0 400 400" preserveAspectRatio="xMidYMid slice">
         <motion.path
           d="M200 100 L210 150 L195 180 L205 220 L190 280"
           fill="none"
-          stroke="hsl(50, 100%, 80%)"
+          stroke="hsl(50 100% 82%)"
           strokeWidth="3"
           className={isDrawing ? "evo-crack-path drawing" : "evo-crack-path"}
           initial={{ opacity: 0 }}
           animate={{ opacity: isDrawing ? 1 : 0 }}
-          style={{ filter: "drop-shadow(0 0 8px hsl(50, 100%, 70%))" }}
+          style={{ filter: `drop-shadow(0 0 8px ${flashGlow})` }}
         />
         <motion.path
           d="M200 100 L185 155 L200 190 L180 240 L195 300"
           fill="none"
-          stroke="hsl(50, 100%, 80%)"
+          stroke="hsl(50 100% 82%)"
           strokeWidth="2"
           className={isDrawing ? "evo-crack-path drawing delay-100" : "evo-crack-path"}
           initial={{ opacity: 0 }}
           animate={{ opacity: isDrawing ? 1 : 0 }}
-          style={{ filter: "drop-shadow(0 0 6px hsl(50, 100%, 70%))" }}
+          style={{ filter: `drop-shadow(0 0 6px ${flashGlow})` }}
         />
         <motion.path
           d="M200 100 L220 140 L210 200 L230 260"
           fill="none"
-          stroke="hsl(50, 100%, 80%)"
+          stroke="hsl(50 100% 82%)"
           strokeWidth="2"
           className={isDrawing ? "evo-crack-path drawing delay-150" : "evo-crack-path"}
           initial={{ opacity: 0 }}
           animate={{ opacity: isDrawing ? 1 : 0 }}
-          style={{ filter: "drop-shadow(0 0 6px hsl(50, 100%, 70%))" }}
+          style={{ filter: `drop-shadow(0 0 6px ${flashGlow})` }}
         />
       </svg>
 
-      {/* Light spill seam flash */}
-      {isFlashing && (
-        <motion.div
-          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-48 evo-seam-flash"
-          style={{
-            background: 'linear-gradient(180deg, transparent 0%, hsl(50, 100%, 90%) 50%, transparent 100%)',
-          }}
-        />
-      )}
-
-      {/* Shell fragments fly outward at impact */}
-      {phase === 'impact' && (
-        <div className="absolute inset-0 flex items-center justify-center">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <motion.div
-              key={i}
-              className="absolute w-3 h-4 bg-gradient-to-br from-amber-100 to-amber-200 rounded-sm"
-              initial={{ x: 0, y: 0, rotate: 0, opacity: 1, scale: 1 }}
-              animate={{
-                x: Math.cos((i / 8) * Math.PI * 2) * 140,
-                y: Math.sin((i / 8) * Math.PI * 2) * 110 + 40,
-                rotate: Math.random() * 360,
-                opacity: 0,
-                scale: 0.3,
-              }}
-              transition={{
-                duration: 1,
-                ease: "easeOut",
-                delay: i * 0.02,
-              }}
-            />
-          ))}
-        </div>
+      {isBursting && (
+        <>
+          <motion.div
+            className="absolute left-1/2 top-1/2 h-56 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full"
+            initial={{ opacity: 0, scaleY: 0.2 }}
+            animate={{ opacity: [0, 1, 0], scaleY: [0.2, 1, 1.25] }}
+            transition={{ duration: 0.45, ease: "easeOut" }}
+            style={{
+              background: `linear-gradient(180deg, transparent 0%, ${flashGlow} 45%, transparent 100%)`,
+              filter: "blur(6px)",
+            }}
+          />
+          <div className="absolute inset-0 flex items-center justify-center">
+            {Array.from({ length: 8 }).map((_, index) => (
+              <motion.div
+                key={index}
+                className="absolute h-4 w-3 rounded-sm bg-gradient-to-br from-amber-50 to-amber-200"
+                initial={{ x: 0, y: 0, rotate: 0, opacity: 1, scale: 1 }}
+                animate={{
+                  x: Math.cos((index / 8) * Math.PI * 2) * 145,
+                  y: Math.sin((index / 8) * Math.PI * 2) * 118 + 26,
+                  rotate: (index % 2 === 0 ? 1 : -1) * 110,
+                  opacity: 0,
+                  scale: 0.34,
+                }}
+                transition={{
+                  duration: 0.9,
+                  ease: "easeOut",
+                  delay: index * 0.015,
+                }}
+              />
+            ))}
+          </div>
+        </>
       )}
     </div>
   );
 };
 
-const CompanionEvolutionContent = ({ 
-  isEvolving, 
-  newStage, 
+const CompanionEvolutionContent = ({
+  isEvolving,
+  previousStage,
+  newStage,
+  previousImageUrl,
   newImageUrl,
   mentorSlug,
   userId,
   element,
-  onComplete 
+  onComplete,
 }: CompanionEvolutionProps) => {
-  const [phase, setPhase] = useState<EvolutionPhase>('anticipation');
-  const [voiceLine, setVoiceLine] = useState<string>("");
-  const [isLoadingVoice, setIsLoadingVoice] = useState(true);
+  const [phase, setPhase] = useState<EvolutionPhase>("hold");
+  const [voiceLine, setVoiceLine] = useState("");
+  const [isLoadingVoice, setIsLoadingVoice] = useState(false);
   const [canDismiss, setCanDismiss] = useState(false);
   const [showEmergencyExit, setShowEmergencyExit] = useState(false);
-  const [imagePreloaded, setImagePreloaded] = useState(false);
-  const [imageLoaded, setImageLoaded] = useState(false);
+  const [artReadiness, setArtReadiness] = useState<ArtReadiness>({
+    previous: "idle",
+    next: "idle",
+    ready: false,
+  });
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const emergencyTimeoutRef = useRef<number | null>(null);
-  const timersRef = useRef<NodeJS.Timeout[]>([]);
+  const timersRef = useRef<number[]>([]);
+  const animationKeyRef = useRef<string | null>(null);
+  const voiceRequestKeyRef = useRef<string | null>(null);
+  const voicePlayedRef = useRef(false);
+  const dismissHandledRef = useRef(false);
 
-  // First evolution detection (Egg → Stage 1)
   const isFirstEvolution = newStage === 1;
-  
-  // Get theme based on element and evolution type
-  const theme: EvoTheme = useMemo(() => 
-    getEvolutionTheme(element, isFirstEvolution), 
-    [element, isFirstEvolution]
+  const theme: EvoTheme = useMemo(
+    () => getEvolutionTheme(element, isFirstEvolution),
+    [element, isFirstEvolution],
   );
+  const levelDisplay = useMemo(() => getProgressionLevelDisplay(newStage), [newStage]);
   const { profile, capabilities, signals } = useMotionProfile();
   const { triggerEvent } = useCompanionMotionSafe();
   const prefersReducedMotion = profile === "reduced" || signals.prefersReducedMotion;
-  const convergenceParticleCount = Math.max(
-    4,
-    Math.min(12, Math.round(capabilities.maxParticles * 0.5)),
-  );
+  const sequence = prefersReducedMotion ? REDUCED_SEQUENCE_MS : FULL_SEQUENCE_MS;
+  const convergenceParticleCount = Math.max(4, Math.min(12, Math.round(capabilities.maxParticles * 0.5)));
   const confettiParticleCount = profile === "enhanced"
     ? theme.confettiParticleCount
-    : Math.min(theme.confettiParticleCount, 90);
-  const evolutionMotionEvent = useMemo<CompanionMotionEvent>(() => ({
-    id: `evolution-${phase}-${newStage}`,
-    type: phase === "reveal" || phase === "settle" ? "evolution_reveal" : "evolution_start",
-    intensity: isFirstEvolution || newStage >= 56 ? "heroic" : "medium",
-    durationMs: 0,
-    createdAt: 0,
-    element: element ?? null,
-    stage: newStage,
-    reason: null,
-  }), [element, isFirstEvolution, newStage, phase]);
+    : Math.min(theme.confettiParticleCount, 88);
+  const evolutionMotionEvent = useMemo<CompanionMotionEvent>(
+    () => ({
+      id: `evolution-${phase}-${newStage}`,
+      type: phase === "reveal" || phase === "settle" ? "evolution_reveal" : "evolution_start",
+      intensity: isFirstEvolution || newStage >= 56 ? "heroic" : "medium",
+      durationMs: 0,
+      createdAt: 0,
+      element: element ?? null,
+      stage: newStage,
+      reason: null,
+    }),
+    [element, isFirstEvolution, newStage, phase],
+  );
+
+  const previousDisplayImageUrl = artReadiness.previous === "loaded" ? previousImageUrl : null;
+  const revealDisplayImageUrl = artReadiness.next === "loaded"
+    ? newImageUrl
+    : artReadiness.previous === "loaded"
+      ? previousImageUrl
+      : newImageUrl || previousImageUrl;
+  const hasDualArt = Boolean(
+    previousDisplayImageUrl
+      && revealDisplayImageUrl
+      && previousDisplayImageUrl !== revealDisplayImageUrl
+      && artReadiness.next === "loaded",
+  );
+
+  const anticipationTitle = isFirstEvolution ? "Something Stirs Within..." : "The Light Gathers...";
+  const celebrationTitle = isFirstEvolution ? "Hatched!" : "Evolved!";
+  const celebrationDescription = isFirstEvolution
+    ? "Your companion has emerged."
+    : `Your companion reached ${levelDisplay}.`;
 
   const cleanupAudio = useCallback(() => {
-    if (audioRef.current) {
-      try {
-        audioRef.current.pause();
-        audioRef.current.currentTime = 0;
-        audioRef.current.src = '';
-      } catch (error) {
-        log.error('Error cleaning up audio', { error });
-      } finally {
-        audioRef.current = null;
-      }
+    if (!audioRef.current) return;
+
+    try {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      audioRef.current.src = "";
+    } catch (error) {
+      log.error("Error cleaning up audio", { error });
+    } finally {
+      audioRef.current = null;
     }
   }, []);
 
-  // Preload image before starting animation
   useEffect(() => {
-    if (!isEvolving || !newImageUrl) return;
+    if (!isEvolving) {
+      animationKeyRef.current = null;
+      voiceRequestKeyRef.current = null;
+      return;
+    }
 
-    setImagePreloaded(false);
-    
-    const img = new Image();
-    img.src = newImageUrl;
-    img.onload = () => setImagePreloaded(true);
-    img.onerror = () => setImagePreloaded(true); // Fallback on error
-    
-    // Fallback timeout - start after 2s even if not loaded
-    const timeout = setTimeout(() => setImagePreloaded(true), 2000);
-    
-    return () => clearTimeout(timeout);
-  }, [isEvolving, newImageUrl]);
+    let active = true;
+    let previousSettled = !previousImageUrl;
+    let nextSettled = !newImageUrl;
 
-  // Main animation sequence - only starts after image preloaded
-  useEffect(() => {
-    if (!isEvolving || !imagePreloaded) return;
+    setArtReadiness({
+      previous: previousImageUrl ? "loading" : "error",
+      next: newImageUrl ? "loading" : "error",
+      ready: false,
+    });
 
-    let isMounted = true;
+    const maybeComplete = () => {
+      if (!active || (!previousSettled || !nextSettled)) return;
 
-    // Reset state
-    setPhase('anticipation');
-    setCanDismiss(false);
+      setArtReadiness((current) => ({
+        ...current,
+        ready: true,
+      }));
+    };
 
-    playEvolutionStart();
-    haptics.light();
+    const markSettled = (kind: "previous" | "next", status: Exclude<PreloadStatus, "idle" | "loading">) => {
+      if (!active) return;
 
-    // Generate AI voice line
-    const generateVoice = async () => {
-      if (!mentorSlug || !userId) {
-        if (isMounted) setIsLoadingVoice(false);
+      setArtReadiness((current) => ({
+        ...current,
+        [kind]: status,
+      }));
+
+      if (kind === "previous") {
+        previousSettled = true;
+      } else {
+        nextSettled = true;
+      }
+
+      maybeComplete();
+    };
+
+    const preload = (url: string | null | undefined, kind: "previous" | "next") => {
+      if (!url) {
+        markSettled(kind, "error");
         return;
       }
 
-      try {
-        const { data, error } = await supabase.functions.invoke('generate-evolution-voice', {
-          body: { mentorSlug, newStage, userId, isFirstEvolution }
-        });
+      const image = new Image();
+      image.onload = () => markSettled(kind, "loaded");
+      image.onerror = () => markSettled(kind, "error");
+      image.src = url;
+    };
 
+    preload(previousImageUrl, "previous");
+    preload(newImageUrl, "next");
+
+    const timeoutId = window.setTimeout(() => {
+      if (!active) return;
+
+      setArtReadiness((current) => ({
+        previous: current.previous === "loading" ? "error" : current.previous,
+        next: current.next === "loading" ? "error" : current.next,
+        ready: true,
+      }));
+      previousSettled = true;
+      nextSettled = true;
+    }, IMAGE_PRELOAD_TIMEOUT_MS);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timeoutId);
+    };
+  }, [isEvolving, newImageUrl, previousImageUrl]);
+
+  useEffect(() => {
+    if (!isEvolving || !artReadiness.ready) return;
+
+    const requestKey = [
+      previousStage,
+      newStage,
+      previousImageUrl,
+      newImageUrl,
+      mentorSlug ?? "none",
+      userId ?? "none",
+    ].join("::");
+
+    if (voiceRequestKeyRef.current === requestKey) return;
+    voiceRequestKeyRef.current = requestKey;
+
+    setVoiceLine("");
+    cleanupAudio();
+    voicePlayedRef.current = false;
+
+    if (!mentorSlug || !userId) {
+      setIsLoadingVoice(false);
+      return;
+    }
+
+    let cancelled = false;
+    setIsLoadingVoice(true);
+
+    supabase.functions
+      .invoke("generate-evolution-voice", {
+        body: { mentorSlug, newStage, userId, isFirstEvolution },
+      })
+      .then(({ data, error }) => {
+        if (cancelled) return;
         if (error) throw error;
-        if (!isMounted) return;
 
-        if (data?.voiceLine) setVoiceLine(data.voiceLine);
+        if (data?.voiceLine) {
+          setVoiceLine(data.voiceLine);
+        } else {
+          setVoiceLine(
+            isFirstEvolution
+              ? "A new companion stands beside you."
+              : "A new form answers your companion's growth.",
+          );
+        }
+
         if (data?.audioContent) {
           audioRef.current = new Audio(`data:audio/mp3;base64,${data.audioContent}`);
         }
-        setIsLoadingVoice(false);
-      } catch (error) {
-        log.error('Failed to generate evolution voice', { error });
-        if (isMounted) {
-          setVoiceLine(isFirstEvolution 
-            ? "A new companion has hatched! Your journey together begins now." 
-            : "Your companion has evolved to a new stage!"
-          );
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        log.error("Failed to generate evolution voice", { error });
+        setVoiceLine(
+          isFirstEvolution
+            ? "A new companion stands beside you."
+            : "A new form answers your companion's growth.",
+        );
+      })
+      .finally(() => {
+        if (!cancelled) {
           setIsLoadingVoice(false);
         }
-      }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    artReadiness.ready,
+    cleanupAudio,
+    isEvolving,
+    isFirstEvolution,
+    mentorSlug,
+    newImageUrl,
+    newStage,
+    previousImageUrl,
+    previousStage,
+    userId,
+  ]);
+
+  useEffect(() => {
+    if (!isEvolving || !artReadiness.ready) return;
+
+    const animationKey = [
+      previousStage,
+      newStage,
+      previousImageUrl,
+      newImageUrl,
+      prefersReducedMotion ? "reduced" : "full",
+    ].join("::");
+
+    if (animationKeyRef.current === animationKey) return;
+    animationKeyRef.current = animationKey;
+    dismissHandledRef.current = false;
+
+    const queueTimeout = (callback: () => void, delay: number) => {
+      const timeoutId = window.setTimeout(callback, delay);
+      timersRef.current.push(timeoutId);
+      return timeoutId;
     };
 
-    generateVoice();
+    setPhase("hold");
+    setCanDismiss(false);
+    setShowEmergencyExit(false);
 
-    // Emergency timeout - 15 seconds
     emergencyTimeoutRef.current = window.setTimeout(() => {
-      if (isMounted) {
-        log.info('Evolution modal timeout reached, showing emergency exit');
-        setShowEmergencyExit(true);
-      }
-    }, 15000);
+      log.info("Evolution modal timeout reached, showing emergency exit");
+      setShowEmergencyExit(true);
+    }, EMERGENCY_EXIT_DELAY_MS);
 
-    timersRef.current = [];
-    
-    // 4-PHASE TIMELINE (total ~4.5s)
-    // Phase 1: Anticipation (0 - 1.2s) - already set
-    
-    // Phase 2: Impact (1.2s)
-    timersRef.current.push(setTimeout(() => {
-      if (!isMounted) return;
-      setPhase('impact');
+    queueTimeout(() => {
+      setPhase("charge");
+      playEvolutionStart();
+      haptics.light();
+    }, sequence.hold);
+
+    queueTimeout(() => {
+      setPhase("conceal");
       haptics.heavy();
-      
-      // Add pulse effect to container
-      if (containerRef.current && !prefersReducedMotion) {
-        containerRef.current.classList.add('animate-evolution-pulse-hit');
-        setTimeout(() => {
-          containerRef.current?.classList.remove('animate-evolution-pulse-hit');
+
+      if (!prefersReducedMotion) {
+        containerRef.current?.classList.add("animate-evolution-pulse-hit");
+        queueTimeout(() => {
+          containerRef.current?.classList.remove("animate-evolution-pulse-hit");
         }, 600);
       }
-    }, 1200));
+    }, sequence.hold + sequence.charge);
 
-    // Phase 3: Reveal (2.2s)
-    timersRef.current.push(setTimeout(() => {
-      if (!isMounted) return;
-      setPhase('reveal');
+    queueTimeout(() => {
+      setPhase("reveal");
       triggerEvent({
         type: "evolution_reveal",
         intensity: isFirstEvolution || newStage >= 56 ? "heroic" : "medium",
@@ -336,125 +529,121 @@ const CompanionEvolutionContent = ({
         stage: newStage,
       });
       playEvolutionSuccess();
-      
-      // Play voice
-      if (audioRef.current && !isLoadingVoice && !globalAudio.getMuted()) {
-        audioRef.current.play().catch((error) => log.error('Audio play failed', { error }));
-      }
-      
-      // Confetti 100ms AFTER reveal starts (not during)
-      if (!prefersReducedMotion) {
-        setTimeout(() => {
-          confetti({
-            particleCount: confettiParticleCount,
-            spread: theme.confettiSpread,
-            origin: { y: 0.5 },
-            colors: theme.confettiColors,
-            ticks: 400,
-            gravity: theme.confettiGravity,
-            scalar: isFirstEvolution ? 1.8 : 1.5,
-          });
-          
-          haptics.medium();
-          
-          // Secondary bursts
-          setTimeout(() => {
-            confetti({
-              particleCount: 50,
-              spread: 60,
-              origin: { y: 0.7, x: 0.25 },
-              colors: theme.confettiColors.slice(0, 2),
-            });
-            confetti({
-              particleCount: 50,
-              spread: 60,
-              origin: { y: 0.7, x: 0.75 },
-              colors: theme.confettiColors.slice(2),
-            });
-          }, 200);
-        }, 100);
-      }
-    }, 2200));
 
-    // Phase 4: Settle (3.6s)
-    timersRef.current.push(setTimeout(() => {
-      if (!isMounted) return;
-      setPhase('settle');
-      
-      // Enable dismiss after settle begins
-      setTimeout(() => {
-        if (isMounted) setCanDismiss(true);
-      }, 800);
-    }, 3600));
+      if (!prefersReducedMotion) {
+        confetti({
+          particleCount: confettiParticleCount,
+          spread: theme.confettiSpread,
+          origin: { y: 0.52 },
+          colors: theme.confettiColors,
+          ticks: 340,
+          gravity: theme.confettiGravity,
+          scalar: isFirstEvolution ? 1.4 : 1.22,
+          drift: 0,
+        });
+        haptics.medium();
+      }
+    }, sequence.hold + sequence.charge + sequence.conceal);
+
+    queueTimeout(() => {
+      setPhase("settle");
+    }, sequence.hold + sequence.charge + sequence.conceal + sequence.reveal);
+
+    queueTimeout(() => {
+      setCanDismiss(true);
+    }, sequence.hold + sequence.charge + sequence.conceal + sequence.reveal + sequence.dismissBuffer);
 
     return () => {
-      isMounted = false;
-      timersRef.current.forEach(clearTimeout);
+      timersRef.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
       timersRef.current = [];
       if (emergencyTimeoutRef.current) {
-        clearTimeout(emergencyTimeoutRef.current);
+        window.clearTimeout(emergencyTimeoutRef.current);
         emergencyTimeoutRef.current = null;
       }
-      cleanupAudio();
+      containerRef.current?.classList.remove("animate-evolution-pulse-hit");
     };
   }, [
+    artReadiness.ready,
+    confettiParticleCount,
+    element,
     isEvolving,
-    imagePreloaded,
-    isLoadingVoice,
-    mentorSlug,
-    userId,
-    newStage,
-    cleanupAudio,
-    prefersReducedMotion,
     isFirstEvolution,
+    newImageUrl,
+    newStage,
+    prefersReducedMotion,
+    previousImageUrl,
+    previousStage,
+    sequence,
     theme,
     triggerEvent,
-    element,
-    confettiParticleCount,
   ]);
 
-  const handleDismiss = (e: React.MouseEvent) => {
-    if (!canDismiss) {
-      e.preventDefault();
-      e.stopPropagation();
+  useEffect(() => {
+    if (phase !== "settle" || isLoadingVoice || !audioRef.current || voicePlayedRef.current || globalAudio.getMuted()) {
       return;
     }
-    
+
+    voicePlayedRef.current = true;
+    audioRef.current.play().catch((error) => {
+      log.error("Audio play failed", { error });
+      voicePlayedRef.current = false;
+    });
+  }, [isLoadingVoice, phase]);
+
+  useEffect(() => () => {
+    timersRef.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
+    if (emergencyTimeoutRef.current) {
+      window.clearTimeout(emergencyTimeoutRef.current);
+    }
     cleanupAudio();
-    log.debug('Dispatching evolution events and closing modal');
-    window.dispatchEvent(new CustomEvent('companion-evolved'));
-    window.dispatchEvent(new CustomEvent('evolution-complete'));
-    window.dispatchEvent(new CustomEvent('evolution-modal-closed'));
-    
+  }, [cleanupAudio]);
+
+  const finishEvolution = useCallback(() => {
+    if (dismissHandledRef.current) return;
+    dismissHandledRef.current = true;
+
+    cleanupAudio();
+    if (emergencyTimeoutRef.current) {
+      window.clearTimeout(emergencyTimeoutRef.current);
+      emergencyTimeoutRef.current = null;
+    }
+
+    window.dispatchEvent(new CustomEvent("companion-evolved"));
+    window.dispatchEvent(new CustomEvent("evolution-complete"));
+    window.dispatchEvent(new CustomEvent("evolution-modal-closed"));
+
     onComplete();
+  }, [cleanupAudio, onComplete]);
+
+  const handleDismiss = (event: React.MouseEvent) => {
+    if (!canDismiss) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+
+    finishEvolution();
   };
 
   const handleEmergencyExit = () => {
-    log.info('Emergency exit triggered');
-    cleanupAudio();
-    if (emergencyTimeoutRef.current) {
-      clearTimeout(emergencyTimeoutRef.current);
-      emergencyTimeoutRef.current = null;
-    }
-    window.dispatchEvent(new CustomEvent('evolution-modal-closed'));
-    onComplete();
+    log.info("Emergency exit triggered");
+    finishEvolution();
   };
 
   if (!isEvolving) return null;
 
-  // Waiting for image preload
-  if (!imagePreloaded) {
+  if (!artReadiness.ready) {
     return (
-      <div 
+      <div
         className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/90"
         style={{
-          paddingTop: 'env(safe-area-inset-top)',
-          paddingBottom: 'env(safe-area-inset-bottom)',
+          paddingTop: "env(safe-area-inset-top)",
+          paddingBottom: "env(safe-area-inset-bottom)",
         }}
       >
         <motion.div
-          animate={{ scale: [1, 1.1, 1], opacity: [0.5, 1, 0.5] }}
-          transition={{ duration: 1.5, repeat: Infinity }}
+          animate={{ scale: [1, 1.08, 1], opacity: [0.55, 1, 0.55] }}
+          transition={{ duration: 1.2, repeat: Infinity }}
           className="text-primary text-xl font-medium"
         >
           Preparing evolution...
@@ -471,50 +660,51 @@ const CompanionEvolutionContent = ({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.5 }}
+          transition={{ duration: 0.35 }}
           role="alertdialog"
           aria-labelledby="evolution-title"
           aria-describedby="evolution-description"
-          className={`fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden gpu-layer evo-card ${canDismiss ? 'cursor-pointer' : ''}`}
+          className={`fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden gpu-layer ${canDismiss ? "cursor-pointer" : ""}`}
           onClick={handleDismiss}
-          onTouchStart={(e) => !canDismiss && e.preventDefault()}
-          data-particles={theme.particleStyle}
-          style={{ 
-            pointerEvents: 'auto', 
-            touchAction: canDismiss ? 'auto' : 'none',
+          onTouchStart={(event) => !canDismiss && event.preventDefault()}
+          data-phase={phase}
+          data-reduced-motion={prefersReducedMotion ? "true" : "false"}
+          style={{
+            pointerEvents: "auto",
+            touchAction: canDismiss ? "auto" : "none",
             background: isFirstEvolution
-              ? 'radial-gradient(circle at center, rgba(50, 40, 0, 0.8) 0%, rgba(0, 0, 0, 0.95) 60%, black 100%)'
-              : 'radial-gradient(circle at center, rgba(0, 0, 0, 0.7) 0%, rgba(0, 0, 0, 0.95) 70%, black 100%)',
-            paddingTop: 'env(safe-area-inset-top)',
-            paddingBottom: 'env(safe-area-inset-bottom)',
-            paddingLeft: 'env(safe-area-inset-left)',
-            paddingRight: 'env(safe-area-inset-right)',
-            ['--evo-glow-a' as string]: theme.glowA,
-            ['--evo-glow-b' as string]: theme.glowB,
+              ? "radial-gradient(circle at center, rgba(58, 44, 6, 0.82) 0%, rgba(0, 0, 0, 0.96) 66%, black 100%)"
+              : "radial-gradient(circle at center, rgba(8, 10, 22, 0.82) 0%, rgba(0, 0, 0, 0.96) 70%, black 100%)",
+            paddingTop: "env(safe-area-inset-top)",
+            paddingBottom: "env(safe-area-inset-bottom)",
+            paddingLeft: "env(safe-area-inset-left)",
+            paddingRight: "env(safe-area-inset-right)",
+            ["--evo-glow-a" as string]: theme.glowA,
+            ["--evo-glow-b" as string]: theme.glowB,
           }}
         >
-          {/* Vignette overlay */}
-          <div 
-            className="absolute inset-0 pointer-events-none"
+          <motion.div
+            className="absolute inset-[-10%] pointer-events-none"
+            initial={false}
+            animate={{
+              opacity: phase === "hold" ? 0.18 : phase === "charge" ? 0.32 : phase === "conceal" ? 0.68 : 0.46,
+              scale: phase === "conceal" ? 1.08 : 1,
+            }}
+            transition={{ duration: 0.35 }}
             style={{
-              background: 'radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.6) 100%)',
+              background: `radial-gradient(circle at 50% 45%, hsl(${theme.glowA} / ${0.2 * theme.glowStrength}) 0%, hsl(${theme.glowB} / ${0.14 * theme.glowStrength}) 38%, transparent 72%)`,
             }}
           />
 
-          {/* Animated background glow - theme aware */}
-          {(phase === 'reveal' || phase === 'settle') && !prefersReducedMotion && (
-            <motion.div 
-              className="absolute inset-0 will-change-transform evo-glow"
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ 
-                opacity: [0.3, 0.5, 0.3],
-                scale: [1, 1.1, 1],
+          {!prefersReducedMotion && (phase === "reveal" || phase === "settle") && (
+            <motion.div
+              className="absolute inset-0 pointer-events-none evo-glow"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{
+                opacity: [0.25 * theme.glowStrength, 0.42 * theme.glowStrength, 0.25 * theme.glowStrength],
+                scale: [1, 1.08, 1],
               }}
-              transition={{
-                duration: 3,
-                repeat: Infinity,
-                ease: "easeInOut",
-              }}
+              transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
             />
           )}
 
@@ -526,7 +716,6 @@ const CompanionEvolutionContent = ({
             className="absolute inset-0 z-[1]"
           />
 
-          {/* Convergence particles - theme aware */}
           {!prefersReducedMotion && (
             <ConvergenceParticles
               phase={phase}
@@ -535,190 +724,268 @@ const CompanionEvolutionContent = ({
             />
           )}
 
-          {/* Hatching overlay for first evolution */}
-          {isFirstEvolution && <HatchingOverlay phase={phase} show={phase !== 'settle'} />}
+          {isFirstEvolution && (
+            <HatchingOverlay
+              phase={phase}
+              show={phase === "charge" || phase === "conceal"}
+              flashGlow={theme.flashGlow}
+            />
+          )}
 
-          <div className="flex flex-col items-center justify-center gap-6 max-w-4xl w-full px-6 relative z-10">
-            {/* Prophetic text - Anticipation phase */}
+          <div className="relative z-10 flex w-full max-w-5xl flex-col items-center justify-center gap-8 px-6">
             <AnimatePresence mode="wait">
-              {phase === 'anticipation' && (
+              {(phase === "hold" || phase === "charge" || phase === "conceal") && (
                 <motion.div
-                  key="prophetic-text"
-                  initial={{ opacity: 0, scale: 0.9, filter: 'blur(10px)' }}
-                  animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
-                  exit={{ opacity: 0, scale: 1.05, filter: 'blur(5px)' }}
-                  transition={{ duration: 0.6 }}
-                  className="text-center will-change-transform"
+                  key={`anticipation-${phase}`}
+                  initial={{ opacity: 0, scale: 0.96, y: 8 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 1.02, y: -10 }}
+                  transition={{ duration: 0.28 }}
+                  className="text-center"
                 >
-                  <h2 
+                  <h2
                     id="evolution-title"
-                    className="text-3xl sm:text-4xl md:text-5xl font-black text-white tracking-wider"
+                    className="text-3xl font-black tracking-[0.18em] text-white sm:text-4xl md:text-5xl"
                     style={{
-                      textShadow: `0 0 30px hsl(${theme.glowA}), 0 0 60px hsl(${theme.glowB} / 0.6)`
+                      textShadow: `0 0 28px hsl(${theme.glowA}), 0 0 56px hsl(${theme.glowB} / 0.48)`,
                     }}
                   >
-                    {isFirstEvolution ? "Something Stirs Within..." : "Evolution Awakens..."}
+                    {anticipationTitle}
                   </h2>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Companion image - Reveal & Settle phases */}
-            <AnimatePresence>
-              {(phase === 'reveal' || phase === 'settle') && (
-                <motion.div
-                  key="companion-wrapper"
-                  initial={{ opacity: 0, scale: 0.92, filter: 'blur(12px)' }}
-                  animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
-                  transition={{ 
-                    duration: 1,
-                    ease: [0.22, 1, 0.36, 1]
-                  }}
-                  className="relative flex items-center justify-center will-change-transform"
-                  style={{
-                    width: '100%',
-                    maxWidth: '600px',
-                    height: '55vh',
-                    maxHeight: '450px',
-                  }}
-                >
-                  {/* Pulsing glow - theme aware */}
-                  <motion.div 
-                    className="absolute inset-0 will-change-transform"
-                    animate={phase === 'settle' ? {
-                      scale: [1, 1.08, 1],
-                      opacity: [0.4, 0.6, 0.4],
-                    } : {}}
-                    transition={{
-                      duration: 3,
-                      repeat: Infinity,
-                      ease: "easeInOut",
-                    }}
-                    style={{
-                      background: `radial-gradient(circle, hsl(${theme.glowA} / 0.35) 0%, transparent 70%)`,
-                      filter: 'blur(30px)',
-                    }}
-                  />
-
-                  {/* Corner sparkles */}
-                  <Sparkles className="absolute -top-4 -left-4 w-10 h-10 text-primary animate-pulse will-change-transform" style={{ filter: "drop-shadow(0 0 12px currentColor)" }} />
-                  <Sparkles className="absolute -top-4 -right-4 w-10 h-10 text-accent animate-pulse will-change-transform" style={{ filter: "drop-shadow(0 0 12px currentColor)", animationDelay: '0.2s' }} />
-                  <Sparkles className="absolute -bottom-4 -left-4 w-10 h-10 text-accent animate-pulse will-change-transform" style={{ filter: "drop-shadow(0 0 12px currentColor)", animationDelay: '0.4s' }} />
-                  <Sparkles className="absolute -bottom-4 -right-4 w-10 h-10 text-primary animate-pulse will-change-transform" style={{ filter: "drop-shadow(0 0 12px currentColor)", animationDelay: '0.6s' }} />
-
-                  {/* Image container with breathing animation in settle phase */}
-                  <motion.div
-                    className="relative rounded-2xl overflow-hidden will-change-transform"
-                    animate={phase === 'settle' ? {
-                      scale: [1, 1.01, 1],
-                    } : {}}
-                    transition={{
-                      duration: 3,
-                      repeat: Infinity,
-                      ease: "easeInOut",
-                    }}
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      maxWidth: '520px',
-                      border: `3px solid hsl(${theme.glowA} / 0.6)`,
-                      boxShadow: `0 0 40px hsl(${theme.glowA} / 0.4), inset 0 0 30px hsl(${theme.glowB} / 0.1)`,
-                    }}
-                  >
-                    {/* Shimmer overlay */}
-                    {!prefersReducedMotion && (
-                      <motion.div 
-                        className="absolute inset-0 pointer-events-none z-10"
-                        animate={{
-                          backgroundPosition: ['200% 0%', '-200% 0%'],
-                        }}
-                        transition={{
-                          duration: 2.5,
-                          repeat: Infinity,
-                          ease: "linear",
-                        }}
-                        style={{
-                          background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.15) 50%, transparent 100%)',
-                          backgroundSize: '200% 100%',
-                        }}
-                      />
-                    )}
-
-                    {/* Image - only fades in, no separate scale animation */}
-                    <img
-                      src={newImageUrl}
-                      alt="Evolved companion"
-                      className="w-full h-full object-cover transition-opacity duration-300"
-                      style={{ opacity: imageLoaded ? 1 : 0 }}
-                      loading="eager"
-                      onLoad={() => setImageLoaded(true)}
-                    />
-                  </motion.div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Evolution announcement - Reveal & Settle */}
-            <AnimatePresence>
-              {(phase === 'reveal' || phase === 'settle') && (
-                <motion.div
-                  key="announcement"
-                  initial={{ opacity: 0, y: 20, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  transition={{ type: "spring", stiffness: 150, damping: 18, delay: 0.2 }}
-                  className="text-center space-y-3 will-change-transform"
-                >
-                  <motion.h1
-                    className="text-4xl sm:text-5xl md:text-6xl font-black uppercase tracking-tight"
-                    style={{
-                      background: isFirstEvolution
-                        ? 'linear-gradient(135deg, #FFD700, #FFA500, #FFD700)'
-                        : `linear-gradient(135deg, hsl(${theme.glowA}), hsl(${theme.glowB}), hsl(${theme.glowA}))`,
-                      backgroundSize: '200% 200%',
-                      WebkitBackgroundClip: 'text',
-                      WebkitTextFillColor: 'transparent',
-                      backgroundClip: 'text',
-                      filter: `drop-shadow(0 0 20px hsl(${theme.glowA} / 0.6))`,
-                    }}
-                    animate={{
-                      backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'],
-                    }}
-                    transition={{
-                      duration: 4,
-                      repeat: Infinity,
-                      ease: "linear",
-                    }}
-                  >
-                    {isFirstEvolution ? "Hatched!" : "Evolved!"}
-                  </motion.h1>
-                  
                   <p
                     id="evolution-description"
-                    className="text-lg sm:text-xl md:text-2xl font-semibold text-white/90"
-                    style={{
-                      textShadow: "0 0 15px rgba(255, 255, 255, 0.5)"
-                    }}
+                    className="mt-3 text-sm font-medium uppercase tracking-[0.28em] text-white/70 sm:text-base"
                   >
-                    {isFirstEvolution
-                      ? "Your companion has emerged!"
-                      : "Your companion grows stronger!"}
+                    {phase === "hold" ? "A new form is drawing near" : "The transformation takes shape"}
+                  </p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <div
+              className="relative flex w-full items-center justify-center"
+              style={{
+                minHeight: "min(54vh, 470px)",
+              }}
+            >
+              <div
+                className="relative flex w-full max-w-[580px] items-center justify-center"
+                data-testid="evolution-art-stage"
+                data-art-presentation={hasDualArt ? "swap" : "single"}
+                style={{
+                  height: "min(54vh, 470px)",
+                }}
+              >
+                <motion.div
+                  className="absolute inset-[10%] rounded-full pointer-events-none"
+                  initial={false}
+                  animate={{
+                    opacity: phase === "conceal"
+                      ? 0.95
+                      : phase === "reveal"
+                        ? 0.65
+                        : phase === "charge"
+                          ? 0.28
+                          : 0,
+                    scale: phase === "conceal" ? 1.24 : phase === "reveal" ? 1.4 : 0.72,
+                  }}
+                  transition={{
+                    duration: phase === "conceal" ? sequence.conceal / 1000 : 0.42,
+                    ease: "easeOut",
+                  }}
+                  style={{
+                    background: `radial-gradient(circle, ${theme.flashCore} 0%, ${theme.flashGlow} 35%, transparent 72%)`,
+                    filter: "blur(18px)",
+                    mixBlendMode: "screen",
+                  }}
+                />
+
+                {!prefersReducedMotion && phase === "reveal" && (
+                  <motion.div
+                    className="absolute inset-[8%] pointer-events-none overflow-hidden rounded-[2rem]"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: [0, 1, 0] }}
+                    transition={{ duration: 0.7, ease: "easeOut" }}
+                  >
+                    <motion.div
+                      className="absolute inset-y-0 w-1/2"
+                      initial={{ x: "-120%" }}
+                      animate={{ x: "240%" }}
+                      transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+                      style={{
+                        background:
+                          "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.42) 48%, transparent 100%)",
+                        filter: "blur(6px)",
+                      }}
+                    />
+                  </motion.div>
+                )}
+
+                {hasDualArt && previousDisplayImageUrl && (
+                  <motion.img
+                    key={`previous-art-${previousDisplayImageUrl}`}
+                    src={previousDisplayImageUrl}
+                    alt={`Companion before evolving at stage ${previousStage}`}
+                    data-testid="evolution-previous-art"
+                    className="absolute inset-0 h-full w-full rounded-[2rem] object-cover shadow-2xl"
+                    initial={false}
+                    animate={{
+                      opacity: phase === "reveal" || phase === "settle" ? 0 : 1,
+                      scale: phase === "hold" ? 1 : phase === "charge" ? 1.04 : 1.09,
+                      filter: phase === "conceal"
+                        ? "brightness(0) saturate(0) contrast(1.45) blur(4px)"
+                        : phase === "charge"
+                          ? "brightness(1.14) saturate(1.12) contrast(1.02) blur(0px)"
+                          : "brightness(1) saturate(1) contrast(1) blur(0px)",
+                    }}
+                    transition={{
+                      duration: phase === "conceal" ? sequence.conceal / 1000 : 0.34,
+                      ease: [0.22, 1, 0.36, 1],
+                    }}
+                    style={{
+                      border: `2px solid hsl(${theme.glowA} / 0.34)`,
+                      boxShadow: `0 0 28px hsl(${theme.glowA} / 0.24)`,
+                    }}
+                  />
+                )}
+
+                {revealDisplayImageUrl ? (
+                  <motion.img
+                    key={`reveal-art-${revealDisplayImageUrl}`}
+                    src={revealDisplayImageUrl}
+                    alt={`Companion after evolving at stage ${newStage}`}
+                    data-testid="evolution-reveal-art"
+                    className="absolute inset-0 h-full w-full rounded-[2rem] object-cover shadow-2xl"
+                    initial={false}
+                    animate={hasDualArt
+                      ? {
+                        opacity: phase === "reveal" || phase === "settle" ? 1 : 0,
+                        scale: phase === "reveal" ? 1.07 : phase === "settle" ? 1 : 1.16,
+                        filter: phase === "reveal"
+                          ? "brightness(1.16) saturate(1.08) contrast(1.05) blur(0px)"
+                          : phase === "settle"
+                            ? "brightness(1) saturate(1) contrast(1) blur(0px)"
+                            : "brightness(0) saturate(0) contrast(1.7) blur(10px)",
+                      }
+                      : {
+                        opacity: 1,
+                        scale: phase === "hold"
+                          ? 1
+                          : phase === "charge"
+                            ? 1.03
+                            : phase === "conceal"
+                              ? 1.08
+                              : phase === "reveal"
+                                ? 1.05
+                                : 1,
+                        filter: phase === "conceal"
+                          ? "brightness(0) saturate(0) contrast(1.45) blur(5px)"
+                          : phase === "reveal"
+                            ? "brightness(1.14) saturate(1.1) contrast(1.04) blur(0px)"
+                            : phase === "charge"
+                              ? "brightness(1.08) saturate(1.05) contrast(1.02) blur(0px)"
+                              : "brightness(1) saturate(1) contrast(1) blur(0px)",
+                      }}
+                    transition={{
+                      duration:
+                        phase === "reveal"
+                          ? sequence.reveal / 1000
+                          : phase === "conceal"
+                            ? sequence.conceal / 1000
+                            : 0.34,
+                      ease: [0.22, 1, 0.36, 1],
+                    }}
+                    style={{
+                      border: `3px solid hsl(${theme.glowA} / ${phase === "reveal" || phase === "settle" ? 0.62 : 0.24})`,
+                      boxShadow:
+                        phase === "reveal" || phase === "settle"
+                          ? `0 0 54px ${theme.revealBurstColor}, inset 0 0 26px hsl(${theme.glowB} / 0.18)`
+                          : `0 0 24px hsl(${theme.glowA} / 0.18)`,
+                    }}
+                  />
+                ) : (
+                  <div
+                    className="absolute inset-0 flex items-center justify-center rounded-[2rem] border border-white/10 bg-white/5 text-white/70"
+                    data-testid="evolution-art-fallback"
+                  >
+                    Evolution complete
+                  </div>
+                )}
+
+                {(phase === "reveal" || phase === "settle") && (
+                  <>
+                    <Sparkles
+                      className="absolute -left-4 -top-4 h-10 w-10 text-white/80"
+                      style={{ filter: `drop-shadow(0 0 14px ${theme.revealBurstColor})` }}
+                    />
+                    <Sparkles
+                      className="absolute -right-4 -top-4 h-10 w-10 text-white/80"
+                      style={{ filter: `drop-shadow(0 0 14px ${theme.revealBurstColor})` }}
+                    />
+                    <Sparkles
+                      className="absolute -bottom-4 -left-4 h-10 w-10 text-white/70"
+                      style={{ filter: `drop-shadow(0 0 12px ${theme.revealBurstColor})` }}
+                    />
+                    <Sparkles
+                      className="absolute -bottom-4 -right-4 h-10 w-10 text-white/70"
+                      style={{ filter: `drop-shadow(0 0 12px ${theme.revealBurstColor})` }}
+                    />
+                  </>
+                )}
+              </div>
+            </div>
+
+            <AnimatePresence mode="wait">
+              {(phase === "reveal" || phase === "settle") && (
+                <motion.div
+                  key={`celebration-${phase}`}
+                  initial={{ opacity: 0, y: 18, scale: 0.96 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -12, scale: 1.02 }}
+                  transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
+                  className="text-center"
+                >
+                  <motion.h1
+                    id="evolution-title"
+                    className="text-4xl font-black uppercase tracking-[0.18em] sm:text-5xl md:text-6xl"
+                    style={{
+                      background: `linear-gradient(135deg, ${theme.flashCore}, hsl(${theme.glowA}), hsl(${theme.glowB}), ${theme.flashCore})`,
+                      backgroundSize: "200% 200%",
+                      WebkitBackgroundClip: "text",
+                      WebkitTextFillColor: "transparent",
+                      backgroundClip: "text",
+                      filter: `drop-shadow(0 0 20px ${theme.revealBurstColor})`,
+                    }}
+                    animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
+                    transition={{ duration: 3.8, repeat: Infinity, ease: "linear" }}
+                  >
+                    {celebrationTitle}
+                  </motion.h1>
+                  <p
+                    id="evolution-description"
+                    className="mt-3 text-lg font-semibold text-white/90 sm:text-xl md:text-2xl"
+                    style={{ textShadow: "0 0 16px rgba(255,255,255,0.34)" }}
+                  >
+                    {celebrationDescription}
+                  </p>
+                  <p className="mt-2 text-sm font-medium uppercase tracking-[0.28em] text-white/60 sm:text-base">
+                    {levelDisplay}
                   </p>
 
-                  {/* Voice line - Settle phase */}
-                  {phase === 'settle' && voiceLine && (
+                  {phase === "settle" && voiceLine && (
                     <motion.div
-                      initial={{ opacity: 0, y: 15, scale: 0.95 }}
+                      initial={{ opacity: 0, y: 12, scale: 0.97 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
-                      transition={{ delay: 0.3, duration: 0.4 }}
-                      className="max-w-lg mx-auto mt-5"
+                      transition={{ delay: 0.14, duration: 0.32 }}
+                      className="mx-auto mt-5 max-w-xl"
                     >
-                      <div 
-                        className="relative p-5 rounded-xl bg-white/5 border border-white/20 backdrop-blur-md"
+                      <div
+                        className="rounded-2xl border border-white/15 bg-white/8 px-5 py-4 text-left backdrop-blur-md"
                         style={{
-                          boxShadow: "0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255,255,255,0.1)"
+                          boxShadow: `0 12px 34px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255,255,255,0.08)`,
                         }}
                       >
-                        <p className="text-base sm:text-lg text-white/95 font-medium italic leading-relaxed">
+                        <p className="text-base font-medium italic leading-relaxed text-white/94 sm:text-lg">
                           "{voiceLine}"
                         </p>
                       </div>
@@ -728,50 +995,45 @@ const CompanionEvolutionContent = ({
               )}
             </AnimatePresence>
 
-            {/* Tap to continue indicator */}
             <AnimatePresence>
               {canDismiss && !showEmergencyExit && (
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0 }}
-                  transition={{ delay: 0.2 }}
-                  className="absolute left-1/2 transform -translate-x-1/2"
-                  style={{ 
-                    bottom: 'calc(1.5rem + env(safe-area-inset-bottom, 0px))'
-                  }}
+                  className="absolute left-1/2 -translate-x-1/2"
+                  style={{ bottom: "calc(1.5rem + env(safe-area-inset-bottom, 0px))" }}
                 >
-                  <motion.p 
-                    className="text-white/90 text-base sm:text-lg font-medium"
-                    animate={{ opacity: [0.6, 1, 0.6] }}
-                    transition={{ duration: 2, repeat: Infinity }}
+                  <motion.p
+                    className="text-base font-medium text-white/90 sm:text-lg"
+                    animate={{ opacity: [0.58, 1, 0.58] }}
+                    transition={{ duration: 1.8, repeat: Infinity }}
                   >
-                    Tap anywhere to continue ✨
+                    Tap anywhere to continue
                   </motion.p>
                 </motion.div>
               )}
             </AnimatePresence>
 
-            {/* Emergency exit button */}
             {showEmergencyExit && (
               <motion.div
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 className="absolute z-[10002]"
                 style={{
-                  top: 'calc(1rem + env(safe-area-inset-top, 0px))',
-                  right: 'calc(1rem + env(safe-area-inset-right, 0px))',
+                  top: "calc(1rem + env(safe-area-inset-top, 0px))",
+                  right: "calc(1rem + env(safe-area-inset-right, 0px))",
                 }}
               >
                 <button
-                  onClick={(e) => {
-                    e.stopPropagation();
+                  onClick={(event) => {
+                    event.stopPropagation();
                     handleEmergencyExit();
                   }}
-                  className="bg-destructive/90 hover:bg-destructive text-destructive-foreground font-bold px-4 py-2 rounded-lg shadow-lg transition-colors"
+                  className="rounded-lg bg-destructive/90 px-4 py-2 font-bold text-destructive-foreground shadow-lg transition-colors hover:bg-destructive"
                   aria-label="Close evolution modal"
                 >
-                  ✕ Close
+                  Close
                 </button>
               </motion.div>
             )}

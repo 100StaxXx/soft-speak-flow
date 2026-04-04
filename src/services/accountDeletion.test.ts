@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   clearAuthScopedClientState: vi.fn(),
   getSession: vi.fn(),
-  invoke: vi.fn(),
+  rpc: vi.fn(),
 }));
 
 vi.mock("@/integrations/supabase/client", () => ({
@@ -11,9 +11,7 @@ vi.mock("@/integrations/supabase/client", () => ({
     auth: {
       getSession: mocks.getSession,
     },
-    functions: {
-      invoke: mocks.invoke,
-    },
+    rpc: mocks.rpc,
   },
 }));
 
@@ -31,6 +29,7 @@ describe("accountDeletion", () => {
     vi.clearAllMocks();
     signOut.mockResolvedValue(undefined);
     mocks.clearAuthScopedClientState.mockResolvedValue(undefined);
+    mocks.rpc.mockResolvedValue({ error: null });
     mocks.getSession.mockResolvedValue({
       data: {
         session: {
@@ -55,30 +54,15 @@ describe("accountDeletion", () => {
       }),
     ).rejects.toThrow("Session expired. Please sign in again.");
 
-    expect(mocks.invoke).not.toHaveBeenCalled();
+    expect(mocks.rpc).not.toHaveBeenCalled();
     expect(mocks.clearAuthScopedClientState).not.toHaveBeenCalled();
     expect(signOut).not.toHaveBeenCalled();
   });
 
-  it("maps auth failures to a session-expired error", async () => {
-    const response = new Response(
-      JSON.stringify({
-        error: "Unauthorized",
-        code: "ACCOUNT_DELETION_AUTH_REQUIRED",
-        status: 401,
-      }),
-      {
-        status: 401,
-        headers: { "Content-Type": "application/json" },
-      },
-    );
-
-    mocks.invoke.mockResolvedValue({
-      data: null,
+  it("maps rpc auth failures to a session-expired error", async () => {
+    mocks.rpc.mockResolvedValue({
       error: {
-        name: "FunctionsHttpError",
-        message: "Edge Function returned a non-2xx status code",
-        context: response,
+        message: "Unauthorized: You can only delete your own account",
       },
     });
 
@@ -95,25 +79,11 @@ describe("accountDeletion", () => {
     expect(signOut).not.toHaveBeenCalled();
   });
 
-  it("maps backend failures to a friendly temporary-unavailable message", async () => {
-    const response = new Response(
-      JSON.stringify({
-        error: "Account deletion is temporarily unavailable. Please try again later.",
-        code: "ACCOUNT_DELETION_BACKEND_UNAVAILABLE",
-        status: 500,
-      }),
-      {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
-      },
-    );
-
-    mocks.invoke.mockResolvedValue({
-      data: null,
+  it("maps technical rpc failures to a friendly temporary-unavailable message", async () => {
+    mocks.rpc.mockResolvedValue({
       error: {
-        name: "FunctionsHttpError",
-        message: "Edge Function returned a non-2xx status code",
-        context: response,
+        code: "23503",
+        message: "update or delete on table \"profiles\" violates foreign key constraint",
       },
     });
 
@@ -125,27 +95,12 @@ describe("accountDeletion", () => {
 
     expect(error).toBeInstanceOf(Error);
     expect((error as Error).message).toBe("Account deletion is temporarily unavailable. Please try again later.");
-    expect((error as Error).message).not.toContain("Edge Function returned a non-2xx status code");
 
     expect(mocks.clearAuthScopedClientState).not.toHaveBeenCalled();
     expect(signOut).not.toHaveBeenCalled();
   });
 
-  it("returns normalized warnings on success", async () => {
-    mocks.invoke.mockResolvedValue({
-      data: {
-        success: true,
-        warnings: [
-          {
-            code: "storage_cleanup_warning",
-            message: "Cleanup will finish in the background.",
-            details: { bucket: "evolution-cards" },
-          },
-        ],
-      },
-      error: null,
-    });
-
+  it("clears local state and signs out after rpc success", async () => {
     await expect(
       deleteCurrentAccount({
         queryClient,
@@ -153,15 +108,12 @@ describe("accountDeletion", () => {
         signOut,
       }),
     ).resolves.toEqual({
-      warnings: [
-        {
-          code: "storage_cleanup_warning",
-          message: "Cleanup will finish in the background.",
-          details: { bucket: "evolution-cards" },
-        },
-      ],
+      warnings: [],
     });
 
+    expect(mocks.rpc).toHaveBeenCalledWith("delete_user_account", {
+      p_user_id: "user-1",
+    });
     expect(mocks.clearAuthScopedClientState).toHaveBeenCalledWith(queryClient, {
       previousUserId: "user-1",
       clearLegacyLocalState: true,

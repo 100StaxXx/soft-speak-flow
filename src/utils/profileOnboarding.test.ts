@@ -17,12 +17,35 @@ describe("getOnboardingGateState", () => {
         },
         hasCompanion: true,
         hasPresetCompanion: true,
+        companionStage: 1,
       }),
     ).toMatchObject({
       isEstablished: true,
       needsOnboarding: false,
       reason: "companion_exists",
       shouldSelfHeal: true,
+    });
+  });
+
+  it("keeps preset-backed stage 0 eggs in onboarding recovery until onboarding is complete", () => {
+    expect(
+      getOnboardingGateState({
+        profile: {
+          onboarding_completed: false,
+          selected_mentor_id: "mentor-1",
+          onboarding_data: {},
+        },
+        hasCompanion: true,
+        hasPresetCompanion: true,
+        companionStage: 0,
+      }),
+    ).toMatchObject({
+      isEstablished: false,
+      needsOnboarding: true,
+      reason: null,
+      resumeStep: "journey-begins",
+      needsCompanionMigration: false,
+      shouldSelfHeal: false,
     });
   });
 

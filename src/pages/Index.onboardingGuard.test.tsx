@@ -254,6 +254,25 @@ describe("Index onboarding guard", () => {
     expect(mocks.navigate).not.toHaveBeenCalledWith("/journeys", { replace: true });
   });
 
+  it("sends preset-backed stage 0 egg accounts without tutorial progress back to onboarding", () => {
+    mocks.profile = {
+      onboarding_completed: true,
+      onboarding_step: null,
+      selected_mentor_id: "mentor-legacy",
+      onboarding_data: {},
+    };
+    mocks.companion = {
+      id: "companion-egg",
+      preset_id: "dragon",
+      current_stage: 0,
+    } as { id: string; preset_id: string; current_stage: number };
+
+    renderIndex();
+
+    expect(mocks.navigate).toHaveBeenCalledWith("/onboarding");
+    expect(mocks.navigate).not.toHaveBeenCalledWith("/journeys", { replace: true });
+  });
+
   it("keeps completed stage 0 egg accounts on the app shell when onboarding_step is complete", async () => {
     mocks.profile = {
       onboarding_completed: false,

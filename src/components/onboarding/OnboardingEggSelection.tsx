@@ -42,6 +42,8 @@ export interface OnboardingEggSelectionProps {
   onComplete: (data: OnboardingCompanionSelectionData) => void;
   isLoading?: boolean;
   storyTone: CompanionStoryTone;
+  presetId: CompanionPresetId;
+  spiritAnimal: string;
   initialElement?: CompanionElementId | null;
   onBack?: () => void;
 }
@@ -127,6 +129,8 @@ export const OnboardingEggSelection = ({
   onComplete,
   isLoading = false,
   storyTone,
+  presetId,
+  spiritAnimal,
   initialElement = null,
   onBack,
 }: OnboardingEggSelectionProps) => {
@@ -139,9 +143,9 @@ export const OnboardingEggSelection = ({
     }
 
     onComplete({
-      presetId: null,
+      presetId,
       favoriteColor: getCompanionElementAnchorColor(selectedElement),
-      spiritAnimal: "Egg",
+      spiritAnimal,
       coreElement: selectedElement,
       storyTone,
     });
@@ -193,6 +197,16 @@ export const OnboardingEggSelection = ({
                 Back
               </Button>
             ) : null}
+
+            <div className="absolute left-1/2 top-[calc(env(safe-area-inset-top,0px)+1rem)] z-10 w-[min(88vw,420px)] -translate-x-1/2 rounded-2xl border border-white/10 bg-black/35 px-4 py-3 text-center shadow-[0_14px_36px_rgba(0,0,0,0.28)] backdrop-blur-md">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-white/50">
+                Locked Species
+              </p>
+              <p className="mt-1 text-sm font-semibold text-white">{spiritAnimal}</p>
+              <p className="mt-1 text-xs leading-5 text-white/65">
+                Choose the egg element now. Your {spiritAnimal.toLowerCase()} will sleep within the shell until it hatches.
+              </p>
+            </div>
 
             {ELEMENT_ORDER.map((elementId) => {
               const slot = CHAMBER_SLOTS[elementId];

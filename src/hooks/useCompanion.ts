@@ -443,7 +443,7 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
   const queryClient = useQueryClient();
   const { checkCompanionAchievements } = useAchievements();
   const { isEvolvingLoading, setIsEvolvingLoading } = useEvolution();
-  const { getThreshold } = useEvolutionThresholds();
+  const { getThreshold, shouldEvolve } = useEvolutionThresholds();
 
   // Prevent duplicate evolution/XP/companion creation requests during lag
   const evolutionInProgress = useRef(false);
@@ -585,16 +585,9 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
 
         const eyeColor = "";
         const furColor = "";
-        const currentImageUrl = preset
-          ? (
-            getPresetCompanionAssetUrl({
-              presetId: preset.id,
-              stage: 0,
-              state: "normal",
-              element: normalizedElement,
-            }) ?? getUniversalEggAssetUrl(normalizedElement)
-          )
-          : getUniversalEggAssetUrl(normalizedElement);
+        // Stage 0 always uses the shared elemental egg art. A locked preset only
+        // determines the future hatch result, not the egg's visual at creation time.
+        const currentImageUrl = getUniversalEggAssetUrl(normalizedElement);
         const currentImageFocal = getBundledCompanionImageFocalPoint(currentImageUrl);
 
         logger.log("Stage 0 asset resolved successfully, creating companion record...");
@@ -805,16 +798,25 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
   });
 
   const hatchCompanion = useMutation({
-    mutationFn: async ({ presetId }: { presetId: string }) => {
+    mutationFn: async ({ presetId }: { presetId?: string | null }) => {
       if (!user || !companion) {
         throw new Error("No companion found");
       }
 
-      if (companion.current_stage !== 0 || companion.preset_id) {
+      if (companion.current_stage !== 0) {
         throw new Error("This companion is not waiting to hatch.");
       }
 
-      const preset = getCompanionPreset(presetId);
+      const lockedPresetId = companion.preset_id?.trim() || null;
+      const resolvedPresetId = presetId?.trim() || lockedPresetId;
+      if (!resolvedPresetId) {
+        throw new Error("Choose a companion form before hatching.");
+      }
+      if (lockedPresetId && lockedPresetId !== resolvedPresetId) {
+        throw new Error("This egg is already bound to another companion form.");
+      }
+
+      const preset = getCompanionPreset(resolvedPresetId);
       if (!preset) {
         throw new Error("Unknown companion preset");
       }
@@ -902,14 +904,19 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
       return hatchResult;
     },
     onSuccess: () => {
+      setIsEvolvingLoading(false);
       queryClient.invalidateQueries({ queryKey: ["companion"] });
       queryClient.invalidateQueries({ queryKey: ["companion-story"] });
       queryClient.invalidateQueries({ queryKey: ["companion-stories-all"] });
       queryClient.invalidateQueries({ queryKey: ["companion-evolution-image"] });
       queryClient.invalidateQueries({ queryKey: ["evolution-cards"] });
       queryClient.invalidateQueries({ queryKey: ["current-evolution-card"] });
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("companion-evolved"));
+      }
     },
     onError: (error) => {
+      setIsEvolvingLoading(false);
       console.error("Hatch failed:", error);
       toast.error(error instanceof Error ? error.message : "Unable to hatch your companion right now.");
     },
@@ -1200,28 +1207,43 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
 
   const canEvolve = useMemo(() => {
     if (!companion) return false;
-    if (!requiresHatchSelection) return false;
-    const hatchThreshold = getThreshold(HATCH_READY_LEVEL);
-    return hatchThreshold !== null && companion.current_xp >= hatchThreshold;
-  }, [companion, getThreshold, requiresHatchSelection]);
+    if (companion.current_stage === 0) {
+      const hatchThreshold = getThreshold(HATCH_READY_LEVEL);
+      return hatchThreshold !== null && companion.current_xp >= hatchThreshold;
+    }
+    return shouldEvolve(companion.current_stage, companion.current_xp);
+  }, [companion, getThreshold, shouldEvolve]);
 
   const isEvolutionBusy = evolveCompanion.isPending || hatchCompanion.isPending;
 
   // Manual evolution trigger function
   const triggerManualEvolution = useCallback(() => {
-    if (!companion || isEvolutionBusy || !canEvolve || requiresHatchSelection) return;
-    
+    if (!companion || isEvolutionBusy || !canEvolve) return;
+
+    if (companion.current_stage === 0) {
+      if (!companion.preset_id) return;
+
+      setIsEvolvingLoading(true);
+      window.dispatchEvent(new CustomEvent('evolution-loading-start'));
+      hatchCompanion.mutate({
+        presetId: companion.preset_id,
+      });
+      return;
+    }
+
+    if (requiresHatchSelection) return;
+
     const nextStage = companion.current_stage + 1;
-    
+
     // Show loading overlay
     setIsEvolvingLoading(true);
     window.dispatchEvent(new CustomEvent('evolution-loading-start'));
-    
-    evolveCompanion.mutate({ 
-      newStage: nextStage, 
-      currentXP: companion.current_xp 
+
+    evolveCompanion.mutate({
+      newStage: nextStage,
+      currentXP: companion.current_xp
     });
-  }, [companion, canEvolve, evolveCompanion, isEvolutionBusy, requiresHatchSelection, setIsEvolvingLoading]);
+  }, [companion, canEvolve, evolveCompanion, hatchCompanion, isEvolutionBusy, requiresHatchSelection, setIsEvolvingLoading]);
 
   return {
     companion,

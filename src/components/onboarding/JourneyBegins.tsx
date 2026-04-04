@@ -11,7 +11,7 @@ interface JourneyBeginsProps {
 
 const narrativeLines = [
   "A bond has been forged across the cosmos...",
-  "Your egg stirs, answering your presence from within the shell.",
+  "Within the shell, your companion stirs and answers your presence.",
   "Together, you will write a story the stars themselves will remember.",
   "Every quest completed, every habit built, every moment of growth...",
   "...will shape both your destinies.",
@@ -138,7 +138,7 @@ export const JourneyBegins = ({ userName, companionAnimal, onComplete }: Journey
                   transition={{ delay: 0.8 }}
                   className="text-white/60 text-base"
                 >
-                  Your companion egg is in your care now, and its true form will awaken as your bond grows.
+                  Your companion egg now carries the spirit of {companionAnimal}, and its true form will awaken as your bond grows.
                 </motion.p>
                 
                 <motion.div

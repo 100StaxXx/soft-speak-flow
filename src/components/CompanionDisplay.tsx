@@ -451,6 +451,7 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
   const colorName = getColorName(companion.favorite_color);
   const safeNextEvolutionXP = nextEvolutionXP ?? companion.current_xp;
   const isMaxStage = companion.current_stage >= MAX_COMPANION_STAGE;
+  const isStageZeroEgg = companion.current_stage === 0;
   const nextTierBoundary = getNextTierBoundary(companion.current_stage);
   const nextTierLabel = nextTierBoundary === null ? null : getProgressionTierLabelForLevel(nextTierBoundary);
   const shouldAnimateIdleDrift = !prefersReducedMotion && imageLoaded && !imageError && !isRegenerating;
@@ -758,8 +759,8 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
               <EvolveButton
                 onEvolve={handleEvolvePress}
                 isEvolving={isEvolutionBusy}
-                actionLabel={requiresHatchSelection ? "HATCH" : "EVOLVE"}
-                loadingLabel={requiresHatchSelection ? "HATCHING..." : "EVOLVING..."}
+                actionLabel={isStageZeroEgg ? "HATCH" : "EVOLVE"}
+                loadingLabel={isStageZeroEgg ? "HATCHING..." : "EVOLVING..."}
               />
             )}
           </AnimatePresence>

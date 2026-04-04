@@ -9,6 +9,7 @@ import {
 
 interface EggSelectionPreludeProps {
   storyTone: CompanionStoryTone;
+  speciesName: string;
   onComplete: () => void;
   onBack?: () => void;
 }
@@ -29,6 +30,7 @@ const TONE_PRELUDE_COPY: Record<CompanionStoryTone, string> = {
 
 export const EggSelectionPrelude = ({
   storyTone,
+  speciesName,
   onComplete,
   onBack,
 }: EggSelectionPreludeProps) => {
@@ -135,7 +137,8 @@ export const EggSelectionPrelude = ({
                 </h1>
 
                 <p className="text-base leading-7 text-white/[0.74] md:text-lg">
-                  {TONE_PRELUDE_COPY[storyTone]} Your story tone is set to{" "}
+                  {TONE_PRELUDE_COPY[storyTone]} A <span className="font-semibold text-white">{speciesName}</span>{" "}
+                  already sleeps inside the shell waiting for your bond to wake it. Your story tone is set to{" "}
                   <span className="font-semibold text-white">{storyToneMeta.label}</span>.
                 </p>
               </motion.div>
@@ -159,7 +162,9 @@ export const EggSelectionPrelude = ({
               >
                 Choose My Egg
               </Button>
-              <p className="text-sm text-white/[0.48]">Element shapes the shell. Tone shapes the story ahead.</p>
+              <p className="text-sm text-white/[0.48]">
+                Species sleeps within. Element shapes the shell. Tone shapes the story ahead.
+              </p>
             </motion.div>
           ) : null}
         </AnimatePresence>

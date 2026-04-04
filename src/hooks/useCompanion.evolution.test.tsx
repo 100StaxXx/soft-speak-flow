@@ -264,7 +264,10 @@ describe("useCompanion evolveCompanion", () => {
       ).rejects.toThrow("Your companion is not ready to evolve yet.");
     });
 
-    expect(mocks.toastErrorMock).toHaveBeenCalledWith("Your companion is not ready to evolve yet.");
+    expect(mocks.toastErrorMock).toHaveBeenCalledWith(
+      "Your companion is not ready to evolve yet.",
+      expect.objectContaining({ duration: 3000 }),
+    );
     expect(mocks.setIsEvolvingLoadingMock).toHaveBeenCalledWith(false);
   });
 
@@ -320,6 +323,7 @@ describe("useCompanion evolveCompanion", () => {
     expect(generateInvokeCalls).toHaveLength(2);
     expect(mocks.toastErrorMock).toHaveBeenCalledWith(
       "Evolution service is temporarily unavailable. Please try again in a minute.",
+      expect.objectContaining({ duration: 3000 }),
     );
   });
 
@@ -382,7 +386,10 @@ describe("useCompanion evolveCompanion", () => {
       ).rejects.toThrow("XP service is temporarily unavailable. Please try again shortly.");
     });
 
-    expect(mocks.toastErrorMock).toHaveBeenCalledWith("XP service is temporarily unavailable. Please try again shortly.");
+    expect(mocks.toastErrorMock).toHaveBeenCalledWith(
+      "XP service is temporarily unavailable. Please try again shortly.",
+      expect.objectContaining({ duration: 3000 }),
+    );
     expect(mocks.loggerErrorMock).toHaveBeenCalledWith(
       "award_xp_v2 unavailable during XP award",
       expect.objectContaining({
@@ -424,6 +431,12 @@ describe("useCompanion evolveCompanion", () => {
         p_eye_color: "",
         p_fur_color: "",
         p_preset_id: "wolf",
+        p_current_image_url: "/companion-eggs/egg__t0_egg__normal__fire.png",
+        p_current_image_focal_x: 0.508798,
+        p_current_image_focal_y: 0.458008,
+        p_initial_image_url: "/companion-eggs/egg__t0_egg__normal__fire.png",
+        p_initial_image_focal_x: 0.508798,
+        p_initial_image_focal_y: 0.458008,
       }),
     );
   });
@@ -684,6 +697,86 @@ describe("useCompanion evolveCompanion", () => {
 
     expect(mocks.invokeMock).not.toHaveBeenCalledWith("generate-companion-evolution", expect.anything());
     expect(mocks.setIsEvolvingLoadingMock).not.toHaveBeenCalled();
+  });
+
+  it("directly hatches preset-backed eggs once they are ready", async () => {
+    mocks.userCompanionResponses.length = 0;
+    mocks.userCompanionResponses.push({
+      data: {
+        ...companionFixture,
+        preset_id: "dragon",
+        spirit_animal: "Dragon",
+        core_element: "fire",
+        current_image_url: "/companion-eggs/egg__t0_egg__normal__fire.png",
+      },
+      error: null,
+    });
+    mocks.rpcMock.mockResolvedValueOnce({
+      data: [
+        {
+          id: companionFixture.id,
+          preset_id: "dragon",
+          spirit_animal: "Dragon",
+          favorite_color: "#FF6B35",
+          core_element: "fire",
+          story_tone: "epic_adventure",
+          current_stage: 1,
+          current_image_url: "/companion-presets/dragon/t1_youth/normal/dragon__t1_youth__normal__fire.png",
+          initial_image_url: "/companion-eggs/egg__t0_egg__normal__fire.png",
+          evolution_id: "evo-1",
+        },
+      ],
+      error: null,
+    });
+
+    const { result } = await renderUseCompanion();
+
+    expect(result.current.requiresHatchSelection).toBe(false);
+    expect(result.current.canEvolve).toBe(true);
+
+    act(() => {
+      result.current.triggerManualEvolution();
+    });
+
+    await waitFor(() => {
+      expect(mocks.rpcMock).toHaveBeenCalledWith(
+        "hatch_companion_with_preset",
+        expect.objectContaining({
+          p_companion_id: companionFixture.id,
+          p_preset_id: "dragon",
+        }),
+      );
+    });
+
+    expect(mocks.setIsEvolvingLoadingMock).toHaveBeenCalledWith(true);
+  });
+
+  it("rejects hatch requests that conflict with a preset-locked egg", async () => {
+    mocks.userCompanionResponses.length = 0;
+    mocks.userCompanionResponses.push({
+      data: {
+        ...companionFixture,
+        preset_id: "dragon",
+        spirit_animal: "Dragon",
+        core_element: "fire",
+      },
+      error: null,
+    });
+
+    const { result } = await renderUseCompanion();
+
+    await act(async () => {
+      await expect(
+        result.current.hatchCompanion.mutateAsync({
+          presetId: "wolf",
+        }),
+      ).rejects.toThrow("This egg is already bound to another companion form.");
+    });
+
+    expect(mocks.rpcMock).not.toHaveBeenCalledWith(
+      "hatch_companion_with_preset",
+      expect.anything(),
+    );
   });
 
   it("hatches an egg into the selected preset and preserves the original egg image", async () => {

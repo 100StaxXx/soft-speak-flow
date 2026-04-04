@@ -2,14 +2,22 @@ import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import {
+  COMPANION_PRESETS,
   COMPANION_STORY_TONES,
+  type CompanionPresetId,
   type CompanionStoryTone,
 } from "@/config/companionCatalog";
 import { cn } from "@/lib/utils";
 
+export interface OnboardingStoryToneSelectionValue {
+  storyTone: CompanionStoryTone;
+  presetId: CompanionPresetId;
+}
+
 interface OnboardingStoryToneSelectionProps {
   initialTone?: CompanionStoryTone;
-  onComplete: (tone: CompanionStoryTone) => void;
+  initialPresetId?: CompanionPresetId | null;
+  onComplete: (selection: OnboardingStoryToneSelectionValue) => void;
   onBack?: () => void;
 }
 
@@ -23,14 +31,20 @@ const TONE_INTROS: Record<CompanionStoryTone, string> = {
 
 export const OnboardingStoryToneSelection = ({
   initialTone = "epic_adventure",
+  initialPresetId = null,
   onComplete,
   onBack,
 }: OnboardingStoryToneSelectionProps) => {
   const [selectedTone, setSelectedTone] = useState<CompanionStoryTone>(initialTone);
+  const [selectedPresetId, setSelectedPresetId] = useState<CompanionPresetId | null>(initialPresetId);
 
   const selectedToneMeta = useMemo(
     () => COMPANION_STORY_TONES.find((tone) => tone.value === selectedTone) ?? COMPANION_STORY_TONES[0],
     [selectedTone],
+  );
+  const selectedPresetMeta = useMemo(
+    () => COMPANION_PRESETS.find((preset) => preset.id === selectedPresetId) ?? null,
+    [selectedPresetId],
   );
 
   return (
@@ -98,13 +112,83 @@ export const OnboardingStoryToneSelection = ({
               })}
             </div>
 
-            <div className="rounded-[28px] border border-white/[0.10] bg-black/20 p-5">
+            <div className="space-y-4">
               <div className="space-y-2">
-                <p className="text-xs uppercase tracking-[0.22em] text-white/[0.48]">Selected Mood</p>
-                <h2 className="text-xl font-semibold text-white">{selectedToneMeta.label}</h2>
-                <p className="text-sm leading-6 text-white/[0.72]">
-                  {TONE_INTROS[selectedToneMeta.value]} {selectedToneMeta.summary}
+                <p className="text-xs uppercase tracking-[0.22em] text-white/[0.48]">Companion Form</p>
+                <h2 className="text-2xl font-semibold text-white">Choose The Species</h2>
+                <p className="max-w-3xl text-sm leading-6 text-white/[0.72]">
+                  Lock the creature sleeping inside your egg now. You&apos;ll still choose the egg&apos;s
+                  element in the chamber next.
                 </p>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {COMPANION_PRESETS.map((preset, index) => {
+                  const isSelected = preset.id === selectedPresetId;
+
+                  return (
+                    <motion.button
+                      key={preset.id}
+                      type="button"
+                      initial={{ opacity: 0, y: 18 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.03 }}
+                      onClick={() => setSelectedPresetId(preset.id)}
+                      className={cn(
+                        "rounded-[26px] border px-4 py-4 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60",
+                        isSelected
+                          ? "border-emerald-300/[0.45] bg-emerald-300/[0.14] text-white shadow-[0_20px_40px_rgba(52,211,153,0.14)]"
+                          : "border-white/[0.10] bg-white/[0.05] text-white/[0.86] hover:border-white/[0.2] hover:bg-white/[0.08]",
+                      )}
+                      data-selected={isSelected ? "true" : "false"}
+                      aria-pressed={isSelected}
+                    >
+                      <div className="space-y-2">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <div className="text-sm font-semibold">{preset.displayName}</div>
+                            <p className="mt-1 text-[11px] uppercase tracking-[0.2em] text-white/[0.45]">
+                              {preset.role}
+                            </p>
+                          </div>
+                          {isSelected ? (
+                            <span className="rounded-full border border-white/15 bg-white/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/85">
+                              Selected
+                            </span>
+                          ) : null}
+                        </div>
+                        <p className="text-xs leading-5 text-white/[0.74]">{preset.revealCopy}</p>
+                        <p className="text-xs leading-5 text-white/[0.52]">{preset.signatureIdentity}</p>
+                      </div>
+                    </motion.button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="grid gap-3 lg:grid-cols-2">
+              <div className="rounded-[28px] border border-white/[0.10] bg-black/20 p-5">
+                <div className="space-y-2">
+                  <p className="text-xs uppercase tracking-[0.22em] text-white/[0.48]">Selected Mood</p>
+                  <h2 className="text-xl font-semibold text-white">{selectedToneMeta.label}</h2>
+                  <p className="text-sm leading-6 text-white/[0.72]">
+                    {TONE_INTROS[selectedToneMeta.value]} {selectedToneMeta.summary}
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-[28px] border border-white/[0.10] bg-black/20 p-5">
+                <div className="space-y-2">
+                  <p className="text-xs uppercase tracking-[0.22em] text-white/[0.48]">Locked Species</p>
+                  <h2 className="text-xl font-semibold text-white">
+                    {selectedPresetMeta?.displayName ?? "Choose a species"}
+                  </h2>
+                  <p className="text-sm leading-6 text-white/[0.72]">
+                    {selectedPresetMeta
+                      ? `${selectedPresetMeta.revealCopy} This choice stays sleeping inside the egg until the first hatch.`
+                      : "Choose the creature form first so the egg chamber can focus only on element."}
+                  </p>
+                </div>
               </div>
             </div>
 
@@ -112,7 +196,14 @@ export const OnboardingStoryToneSelection = ({
               <Button
                 type="button"
                 size="lg"
-                onClick={() => onComplete(selectedTone)}
+                onClick={() => {
+                  if (!selectedPresetId) return;
+                  onComplete({
+                    storyTone: selectedTone,
+                    presetId: selectedPresetId,
+                  });
+                }}
+                disabled={!selectedPresetId}
                 className="min-w-[220px] rounded-full px-8"
               >
                 Continue

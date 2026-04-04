@@ -56,7 +56,7 @@ const HelpCenter = () => {
         },
         {
           title: "How does my Companion work?",
-          content: "Your companion begins as a mystical egg and grows alongside you. As you complete quests, habits, and engage with the app, it earns XP across a unified Level 0 to Level 100 progression ladder. The egg you choose during onboarding locks the element and the story tone shapes the narrative. At the first hatch, you choose the creature form that will carry that identity forward."
+          content: "Your companion begins as a mystical egg and grows alongside you. As you complete quests, habits, and engage with the app, it earns XP across a unified Level 0 to Level 100 progression ladder. During onboarding, you choose the creature form, then lock the egg's story tone and element before the shell ever cracks. The first hatch is the reveal of that already-chosen companion."
         },
         {
           title: "Understanding XP & Evolution",
@@ -76,7 +76,7 @@ const HelpCenter = () => {
       items: [
         {
           title: "Levels & Tiers",
-          content: "Your companion now grows through a unified Level 0 to Level 100 progression system. Level 0 is Egg, then the major tiers unfold as Hatchling, Initiate, Awakened, Guardian, Champion, Mythic, and Ascended. The egg uses shared elemental art, and once it hatches you choose the creature preset that keeps a consistent identity across later tiers."
+          content: "Your companion now grows through a unified Level 0 to Level 100 progression system. Level 0 is Egg, then the major tiers unfold as Hatchling, Initiate, Awakened, Guardian, Champion, Mythic, and Ascended. The egg uses shared elemental art, while the species you chose during onboarding stays locked in until hatch and carries forward through later tiers."
         },
         {
           title: "Earning XP",

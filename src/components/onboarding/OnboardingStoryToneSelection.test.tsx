@@ -19,19 +19,28 @@ vi.mock("framer-motion", async () => {
 });
 
 describe("OnboardingStoryToneSelection", () => {
-  it("submits the default tone when the user continues without changing it", () => {
+  it("requires a species selection before continuing and submits the chosen tone and species", () => {
     const onComplete = vi.fn();
 
     render(<OnboardingStoryToneSelection onComplete={onComplete} initialTone="epic_adventure" />);
 
     expect(screen.getByRole("button", { name: /Epic Adventure/i })).toHaveAttribute("data-selected", "true");
+    expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
+
+    const dragonCard = screen.getByText("Dragon").closest("button");
+    expect(dragonCard).not.toBeNull();
+    fireEvent.click(dragonCard!);
+    expect(screen.getByRole("button", { name: "Continue" })).toBeEnabled();
 
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
-    expect(onComplete).toHaveBeenCalledWith("epic_adventure");
+    expect(onComplete).toHaveBeenCalledWith({
+      storyTone: "epic_adventure",
+      presetId: "dragon",
+    });
   });
 
-  it("lets the user change the tone and use the back action", () => {
+  it("lets the user change the tone and species and use the back action", () => {
     const onComplete = vi.fn();
     const onBack = vi.fn();
 
@@ -44,10 +53,14 @@ describe("OnboardingStoryToneSelection", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: /Whimsical & Playful/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Kitsune/i }));
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
     expect(onBack).toHaveBeenCalled();
-    expect(onComplete).toHaveBeenCalledWith("whimsical_playful");
+    expect(onComplete).toHaveBeenCalledWith({
+      storyTone: "whimsical_playful",
+      presetId: "fox",
+    });
   });
 });

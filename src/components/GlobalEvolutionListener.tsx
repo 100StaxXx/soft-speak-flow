@@ -24,7 +24,9 @@ export const GlobalEvolutionListener = () => {
   const { triggerEvent } = useCompanionMotionSafe();
   const [isEvolving, setIsEvolving] = useState(false);
   const [evolutionData, setEvolutionData] = useState<{
+    previousLevel: number;
     level: number;
+    previousImageUrl: string;
     imageUrl: string;
     mentorSlug?: string;
     element?: string;
@@ -100,6 +102,30 @@ export const GlobalEvolutionListener = () => {
             dormant_image_url: typeof newData.dormant_image_url === "string" ? newData.dormant_image_url : null,
             neglected_image_url: typeof newData.neglected_image_url === "string" ? newData.neglected_image_url : null,
           }) ?? currentImageUrl;
+          const previousImageUrl = resolveCompanionVisualAssetUrl({
+            preset_id: typeof oldData.preset_id === "string"
+              ? oldData.preset_id
+              : typeof newData.preset_id === "string"
+                ? newData.preset_id
+                : null,
+            current_stage: oldLevel,
+            core_element: typeof oldData.core_element === "string"
+              ? oldData.core_element
+              : element ?? null,
+            current_image_url: typeof oldData.current_image_url === "string"
+              ? oldData.current_image_url
+              : currentImageUrl,
+            dormant_image_url: typeof oldData.dormant_image_url === "string"
+              ? oldData.dormant_image_url
+              : typeof newData.dormant_image_url === "string"
+                ? newData.dormant_image_url
+                : null,
+            neglected_image_url: typeof oldData.neglected_image_url === "string"
+              ? oldData.neglected_image_url
+              : typeof newData.neglected_image_url === "string"
+                ? newData.neglected_image_url
+                : null,
+          }) ?? currentImageUrl;
 
           let mentorSlug: string | undefined;
           if (resolvedMentorId) {
@@ -113,7 +139,9 @@ export const GlobalEvolutionListener = () => {
           }
 
           setEvolutionData({
+            previousLevel: oldLevel,
             level: newLevel,
+            previousImageUrl,
             imageUrl,
             mentorSlug,
             element,
@@ -176,7 +204,9 @@ export const GlobalEvolutionListener = () => {
   return (
     <CompanionEvolution
       isEvolving={isEvolving}
+      previousStage={evolutionData.previousLevel}
       newStage={evolutionData.level}
+      previousImageUrl={evolutionData.previousImageUrl}
       newImageUrl={evolutionData.imageUrl}
       mentorSlug={evolutionData.mentorSlug}
       element={evolutionData.element}

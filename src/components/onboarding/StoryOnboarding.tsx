@@ -14,6 +14,7 @@ import { FactionSelector, type FactionType } from "./FactionSelector";
 import { StoryQuestionnaire, type OnboardingAnswer } from "./StoryQuestionnaire";
 import { MentorCalculating } from "./MentorCalculating";
 import { OnboardingStoryToneSelection } from "./OnboardingStoryToneSelection";
+import type { OnboardingStoryToneSelectionValue } from "./OnboardingStoryToneSelection";
 import { EggSelectionPrelude } from "./EggSelectionPrelude";
 import { OnboardingEggSelection } from "./OnboardingEggSelection";
 import { OnboardingCosmicBackdrop, type OnboardingBackdropStage } from "./OnboardingCosmicBackdrop";
@@ -267,6 +268,7 @@ export const StoryOnboarding = ({
   const [mentorExplanation, setMentorExplanation] = useState<MentorExplanation | null>(null);
   const [companionAnimal, setCompanionAnimal] = useState(resumeState?.companionLabel ?? "");
   const [selectedStoryTone, setSelectedStoryTone] = useState<CompanionStoryTone>("epic_adventure");
+  const [selectedPresetId, setSelectedPresetId] = useState<CompanionPresetId | null>(null);
   const [isCreatingCompanion, setIsCreatingCompanion] = useState(false);
   const [isSubmittingQuestionnaire, setIsSubmittingQuestionnaire] = useState(false);
   const [compatibilityScore, setCompatibilityScore] = useState<number | null>(null);
@@ -666,8 +668,9 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
     setStage("story-tone");
   }, []);
 
-  const handleStoryToneComplete = useCallback((storyTone: CompanionStoryTone) => {
-    setSelectedStoryTone(storyTone);
+  const handleStoryToneComplete = useCallback((selection: OnboardingStoryToneSelectionValue) => {
+    setSelectedStoryTone(selection.storyTone);
+    setSelectedPresetId(selection.presetId);
     setStage("egg-prelude");
   }, []);
 
@@ -773,7 +776,7 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
           memory_context: {
             title: "Our First Meeting",
             description: preferences.presetId
-              ? `The day we met - a ${preferences.spiritAnimal} appeared and our journey began.`
+              ? `The day we found your ${eggDisplayName.toLowerCase()}, already carrying the spirit of ${preferences.spiritAnimal}.`
               : `The day we found your ${eggDisplayName.toLowerCase()}, humming with possibility.`,
             emotion: "wonder",
             details: {
@@ -1318,6 +1321,7 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
           >
             <OnboardingStoryToneSelection
               initialTone={selectedStoryTone}
+              initialPresetId={selectedPresetId}
               onComplete={handleStoryToneComplete}
               onBack={isResetMode ? undefined : handleStoryToneBack}
             />
@@ -1334,6 +1338,7 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
           >
             <EggSelectionPrelude
               storyTone={selectedStoryTone}
+              speciesName={getCompanionPreset(selectedPresetId)?.displayName ?? "companion"}
               onComplete={handleEggPreludeComplete}
               onBack={handleEggPreludeBack}
             />
@@ -1359,6 +1364,8 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
                 onComplete={handleCompanionComplete}
                 isLoading={isCreatingCompanion}
                 storyTone={selectedStoryTone}
+                presetId={selectedPresetId ?? "dragon"}
+                spiritAnimal={getCompanionPreset(selectedPresetId)?.displayName ?? "Dragon"}
                 onBack={handleCompanionBack}
               />
             )}

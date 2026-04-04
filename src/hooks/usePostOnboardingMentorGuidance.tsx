@@ -604,7 +604,7 @@ export const getMentorInstructionLines = (
   }
 
   if (currentStep === "evolve_companion") {
-    return ["Your companion has gathered enough strength. Tap Evolve to ascend."];
+    return ["Your companion has gathered enough strength. Tap Hatch to awaken it."];
   }
 
   if (currentStep === "post_evolution_companion_intro") {
@@ -676,8 +676,8 @@ const getMilestoneDialogue = (
       };
     case "tap_evolve_companion":
       return {
-        text: "Your companion has gathered enough strength. Tap Evolve to ascend.",
-        support: "Effort becomes growth here.",
+        text: "Your companion has gathered enough strength. Tap Hatch to awaken it.",
+        support: "The form you chose during onboarding is ready to emerge.",
       };
     case "complete_companion_evolution":
       return {

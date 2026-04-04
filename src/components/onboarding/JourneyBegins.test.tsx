@@ -67,7 +67,7 @@ describe("JourneyBegins", () => {
 
       expect(screen.getByText("Your Journey Awaits")).toBeInTheDocument();
       expect(
-        screen.getByText(/Your companion egg is in your care now, and its true form will awaken as your bond grows\./i),
+        screen.getByText(/Your companion egg now carries the spirit of Kitsune, and its true form will awaken as your bond grows\./i),
       ).toBeInTheDocument();
     } finally {
       vi.useRealTimers();

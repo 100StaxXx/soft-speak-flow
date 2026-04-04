@@ -12,10 +12,14 @@ export interface EvoTheme {
   confettiSpread: number;
   confettiGravity: number;
   confettiParticleCount: number;
+  flashCore: string;
+  flashGlow: string;
+  glowStrength: number;
+  revealBurstColor: string;
 }
 
 export const ELEMENT_THEMES: Record<string, EvoTheme> = {
-  Fire: {
+  fire: {
     name: "Inferno",
     glowA: "20, 100%, 55%",
     glowB: "35, 100%, 60%",
@@ -24,8 +28,12 @@ export const ELEMENT_THEMES: Record<string, EvoTheme> = {
     confettiSpread: 100,
     confettiGravity: 0.8,
     confettiParticleCount: 150,
+    flashCore: "rgba(255, 243, 214, 0.95)",
+    flashGlow: "hsla(24, 100%, 58%, 0.8)",
+    glowStrength: 1,
+    revealBurstColor: "hsla(20, 100%, 55%, 0.8)",
   },
-  Water: {
+  water: {
     name: "Tidal",
     glowA: "195, 90%, 55%",
     glowB: "210, 85%, 50%",
@@ -34,8 +42,12 @@ export const ELEMENT_THEMES: Record<string, EvoTheme> = {
     confettiSpread: 140,
     confettiGravity: 0.4,
     confettiParticleCount: 120,
+    flashCore: "rgba(235, 250, 255, 0.95)",
+    flashGlow: "hsla(197, 96%, 60%, 0.76)",
+    glowStrength: 0.88,
+    revealBurstColor: "hsla(200, 90%, 60%, 0.68)",
   },
-  Earth: {
+  earth: {
     name: "Terran",
     glowA: "25, 40%, 45%",
     glowB: "100, 50%, 45%",
@@ -44,8 +56,12 @@ export const ELEMENT_THEMES: Record<string, EvoTheme> = {
     confettiSpread: 90,
     confettiGravity: 0.9,
     confettiParticleCount: 130,
+    flashCore: "rgba(255, 248, 230, 0.9)",
+    flashGlow: "hsla(88, 52%, 45%, 0.72)",
+    glowStrength: 0.82,
+    revealBurstColor: "hsla(94, 45%, 44%, 0.62)",
   },
-  Air: {
+  air: {
     name: "Zephyr",
     glowA: "200, 80%, 80%",
     glowB: "190, 70%, 90%",
@@ -54,8 +70,12 @@ export const ELEMENT_THEMES: Record<string, EvoTheme> = {
     confettiSpread: 180,
     confettiGravity: 0.3,
     confettiParticleCount: 100,
+    flashCore: "rgba(255, 255, 255, 0.96)",
+    flashGlow: "hsla(198, 86%, 82%, 0.74)",
+    glowStrength: 0.76,
+    revealBurstColor: "hsla(192, 75%, 86%, 0.62)",
   },
-  Lightning: {
+  lightning: {
     name: "Storm",
     glowA: "50, 100%, 55%",
     glowB: "270, 70%, 60%",
@@ -64,8 +84,12 @@ export const ELEMENT_THEMES: Record<string, EvoTheme> = {
     confettiSpread: 120,
     confettiGravity: 1.0,
     confettiParticleCount: 160,
+    flashCore: "rgba(255, 252, 214, 0.98)",
+    flashGlow: "hsla(52, 100%, 58%, 0.82)",
+    glowStrength: 1.06,
+    revealBurstColor: "hsla(47, 100%, 55%, 0.84)",
   },
-  Ice: {
+  ice: {
     name: "Frost",
     glowA: "185, 70%, 70%",
     glowB: "190, 50%, 92%",
@@ -74,8 +98,12 @@ export const ELEMENT_THEMES: Record<string, EvoTheme> = {
     confettiSpread: 100,
     confettiGravity: 0.5,
     confettiParticleCount: 130,
+    flashCore: "rgba(244, 252, 255, 0.96)",
+    flashGlow: "hsla(189, 72%, 80%, 0.76)",
+    glowStrength: 0.9,
+    revealBurstColor: "hsla(190, 72%, 78%, 0.7)",
   },
-  Nature: {
+  nature: {
     name: "Verdant",
     glowA: "120, 50%, 50%",
     glowB: "100, 50%, 70%",
@@ -84,8 +112,12 @@ export const ELEMENT_THEMES: Record<string, EvoTheme> = {
     confettiSpread: 110,
     confettiGravity: 0.6,
     confettiParticleCount: 140,
+    flashCore: "rgba(246, 255, 240, 0.94)",
+    flashGlow: "hsla(118, 55%, 58%, 0.72)",
+    glowStrength: 0.86,
+    revealBurstColor: "hsla(118, 48%, 52%, 0.68)",
   },
-  Light: {
+  light: {
     name: "Radiant",
     glowA: "50, 100%, 75%",
     glowB: "0, 0%, 100%",
@@ -94,8 +126,12 @@ export const ELEMENT_THEMES: Record<string, EvoTheme> = {
     confettiSpread: 150,
     confettiGravity: 0.4,
     confettiParticleCount: 160,
+    flashCore: "rgba(255, 255, 249, 1)",
+    flashGlow: "hsla(52, 100%, 82%, 0.84)",
+    glowStrength: 1.1,
+    revealBurstColor: "hsla(50, 100%, 78%, 0.8)",
   },
-  Shadow: {
+  shadow: {
     name: "Umbral",
     glowA: "270, 50%, 50%",
     glowB: "260, 60%, 25%",
@@ -104,8 +140,12 @@ export const ELEMENT_THEMES: Record<string, EvoTheme> = {
     confettiSpread: 80,
     confettiGravity: 0.7,
     confettiParticleCount: 120,
+    flashCore: "rgba(239, 228, 255, 0.94)",
+    flashGlow: "hsla(268, 68%, 58%, 0.78)",
+    glowStrength: 0.92,
+    revealBurstColor: "hsla(266, 64%, 54%, 0.72)",
   },
-  Cosmic: {
+  cosmic: {
     name: "Celestial",
     glowA: "285, 60%, 55%",
     glowB: "230, 50%, 40%",
@@ -114,6 +154,10 @@ export const ELEMENT_THEMES: Record<string, EvoTheme> = {
     confettiSpread: 160,
     confettiGravity: 0.35,
     confettiParticleCount: 180,
+    flashCore: "rgba(248, 240, 255, 0.96)",
+    flashGlow: "hsla(282, 72%, 62%, 0.8)",
+    glowStrength: 1.04,
+    revealBurstColor: "hsla(276, 70%, 58%, 0.76)",
   },
 };
 
@@ -127,6 +171,10 @@ export const HATCH_THEME: EvoTheme = {
   confettiSpread: 140,
   confettiGravity: 0.6,
   confettiParticleCount: 200,
+  flashCore: "rgba(255, 252, 220, 0.98)",
+  flashGlow: "hsla(43, 100%, 62%, 0.82)",
+  glowStrength: 1.08,
+  revealBurstColor: "hsla(42, 100%, 64%, 0.82)",
 };
 
 // Default fallback theme (cosmic/purple)
@@ -139,6 +187,10 @@ export const DEFAULT_THEME: EvoTheme = {
   confettiSpread: 120,
   confettiGravity: 0.6,
   confettiParticleCount: 150,
+  flashCore: "rgba(245, 238, 255, 0.95)",
+  flashGlow: "hsla(274, 78%, 64%, 0.78)",
+  glowStrength: 0.96,
+  revealBurstColor: "hsla(280, 80%, 64%, 0.74)",
 };
 
 export const getEvolutionTheme = (element?: string, isFirstEvolution?: boolean): EvoTheme => {
@@ -146,8 +198,10 @@ export const getEvolutionTheme = (element?: string, isFirstEvolution?: boolean):
     return HATCH_THEME;
   }
   
-  if (element && ELEMENT_THEMES[element]) {
-    return ELEMENT_THEMES[element];
+  const normalizedElement = element?.trim().toLowerCase();
+
+  if (normalizedElement && ELEMENT_THEMES[normalizedElement]) {
+    return ELEMENT_THEMES[normalizedElement];
   }
   
   return DEFAULT_THEME;

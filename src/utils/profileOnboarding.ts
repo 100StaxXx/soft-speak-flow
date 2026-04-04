@@ -71,12 +71,12 @@ export const getOnboardingGateState = ({
   companionStage?: number | null;
 }): OnboardingGateState => {
   const needsProgressionReset = hasProgressionResetPending(profile?.onboarding_data);
-  const hasEggCompanion = hasCompanion && !hasPresetCompanion && companionStage === 0;
+  const hasStageZeroEggCompanion = hasCompanion && companionStage === 0;
   const needsCompanionMigration = hasCompanion && !hasPresetCompanion && companionStage !== 0;
   const onboardingStep = normalizeOnboardingStep(profile?.onboarding_step);
   const isCompletionStep = onboardingStep === "complete";
   const needsJourneyBeginsRecovery =
-    hasEggCompanion
+    hasStageZeroEggCompanion
     && !isCompletionStep
     && (
       onboardingStep === "journey-begins"
@@ -97,7 +97,7 @@ export const getOnboardingGateState = ({
     reason = "onboarding_completed";
   } else if (hasWalkthroughCompleted(profile?.onboarding_data)) {
     reason = "walkthrough_completed";
-  } else if (hasPresetCompanion) {
+  } else if (hasPresetCompanion && !hasStageZeroEggCompanion) {
     reason = "companion_exists";
   } else if (profile?.onboarding_completed == null && getResolvedMentorId(profile)) {
     reason = "legacy_resolved_mentor";

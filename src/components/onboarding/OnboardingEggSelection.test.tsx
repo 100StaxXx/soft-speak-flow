@@ -16,7 +16,14 @@ describe("OnboardingEggSelection", () => {
   });
 
   it("renders the chamber art layers while keeping continue disabled until a selection is made", () => {
-    render(<OnboardingEggSelection onComplete={vi.fn()} storyTone="epic_adventure" />);
+    render(
+      <OnboardingEggSelection
+        onComplete={vi.fn()}
+        storyTone="epic_adventure"
+        presetId="dragon"
+        spiritAnimal="Dragon"
+      />,
+    );
 
     expect(screen.getByRole("heading", { name: /Choose Your Element/i })).toBeInTheDocument();
     expect(screen.getByTestId("onboarding-egg-chamber-underlay")).toHaveAttribute(
@@ -35,19 +42,39 @@ describe("OnboardingEggSelection", () => {
   it("renders the floating back button only when back navigation is available", () => {
     const onBack = vi.fn();
     const { rerender } = render(
-      <OnboardingEggSelection onComplete={vi.fn()} storyTone="epic_adventure" onBack={onBack} />,
+      <OnboardingEggSelection
+        onComplete={vi.fn()}
+        storyTone="epic_adventure"
+        presetId="dragon"
+        spiritAnimal="Dragon"
+        onBack={onBack}
+      />,
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
     expect(onBack).toHaveBeenCalledTimes(1);
 
-    rerender(<OnboardingEggSelection onComplete={vi.fn()} storyTone="epic_adventure" />);
+    rerender(
+      <OnboardingEggSelection
+        onComplete={vi.fn()}
+        storyTone="epic_adventure"
+        presetId="dragon"
+        spiritAnimal="Dragon"
+      />,
+    );
 
     expect(screen.queryByRole("button", { name: "Back" })).not.toBeInTheDocument();
   });
 
   it("uses the tuned light egg slot variables aligned to the painted pedestal art", () => {
-    render(<OnboardingEggSelection onComplete={vi.fn()} storyTone="epic_adventure" />);
+    render(
+      <OnboardingEggSelection
+        onComplete={vi.fn()}
+        storyTone="epic_adventure"
+        presetId="dragon"
+        spiritAnimal="Dragon"
+      />,
+    );
 
     const lightSlot = screen.getByTestId("egg-slot-light");
 
@@ -59,7 +86,14 @@ describe("OnboardingEggSelection", () => {
   it("marks only the selected egg and submits the provided story tone unchanged", () => {
     const onComplete = vi.fn();
 
-    render(<OnboardingEggSelection onComplete={onComplete} storyTone="dark_intense" />);
+    render(
+      <OnboardingEggSelection
+        onComplete={onComplete}
+        storyTone="dark_intense"
+        presetId="wolf"
+        spiritAnimal="Wolf"
+      />,
+    );
 
     fireEvent.click(screen.getByRole("button", { name: "Select Frost egg" }));
 
@@ -70,9 +104,9 @@ describe("OnboardingEggSelection", () => {
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
     expect(onComplete).toHaveBeenCalledWith({
-      presetId: null,
+      presetId: "wolf",
       favoriteColor: "#60A5FA",
-      spiritAnimal: "Egg",
+      spiritAnimal: "Wolf",
       coreElement: "ice",
       storyTone: "dark_intense",
     });
@@ -81,7 +115,14 @@ describe("OnboardingEggSelection", () => {
   it("disables looping bounce classes when reduced motion is requested", () => {
     mocks.reducedMotion = true;
 
-    render(<OnboardingEggSelection onComplete={vi.fn()} storyTone="epic_adventure" />);
+    render(
+      <OnboardingEggSelection
+        onComplete={vi.fn()}
+        storyTone="epic_adventure"
+        presetId="dragon"
+        spiritAnimal="Dragon"
+      />,
+    );
 
     expect(screen.getByTestId("onboarding-egg-chamber")).toHaveAttribute("data-reduced-motion", "true");
     expect(screen.getByTestId("egg-float-fire")).toHaveAttribute("data-bouncing", "false");
