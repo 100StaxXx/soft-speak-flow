@@ -223,6 +223,22 @@ export const LEGACY_COMPANION_PRESETS: readonly CompanionPresetDefinition[] = [
   },
 ] as const;
 
+export const COMPANION_ONBOARDING_SILHOUETTE_SOURCES = {
+  dragon: "/onboarding/locked-species-silhouettes/dragon.png",
+  wolf: "/onboarding/locked-species-silhouettes/wolf.png",
+  fox: "/onboarding/locked-species-silhouettes/fox.png",
+  owl: "/onboarding/locked-species-silhouettes/owl.png",
+  lion: "/onboarding/locked-species-silhouettes/lion.png",
+  phoenix: "/onboarding/locked-species-silhouettes/phoenix.png",
+  pegasus: "/onboarding/locked-species-silhouettes/pegasus.png",
+  griffin: "/onboarding/locked-species-silhouettes/griffin.png",
+  sphinx: "/onboarding/locked-species-silhouettes/sphinx.png",
+  leviathan: "/onboarding/locked-species-silhouettes/leviathan.png",
+  mechanicaldragon: "/onboarding/locked-species-silhouettes/mechanicaldragon.png",
+  tanuki: "/onboarding/locked-species-silhouettes/tanuki.png",
+  buttercat: "/onboarding/locked-species-silhouettes/buttercat.png",
+} as const satisfies Partial<Record<CompanionPresetId, string>>;
+
 const ALL_COMPANION_PRESETS: readonly CompanionPresetDefinition[] = [
   ...COMPANION_PRESETS,
   ...LEGACY_COMPANION_PRESETS,

@@ -34,6 +34,11 @@ describe("OnboardingEggSelection", () => {
       "src",
       expect.stringContaining("choose-your-element-selection-screen.png"),
     );
+    expect(screen.getByText(/Locked Species/i)).toBeInTheDocument();
+    expect(screen.getByText("Dragon")).toBeInTheDocument();
+    expect(
+      screen.getByText("Choose the element now. Your dragon will sleep within the shell until it hatches."),
+    ).toBeInTheDocument();
     expect(screen.queryByText("Ember")).not.toBeInTheDocument();
     expect(screen.queryByText("Frost")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
@@ -83,7 +88,7 @@ describe("OnboardingEggSelection", () => {
     expect(lightSlot.style.getPropertyValue("--egg-bottom")).toBe("26%");
   });
 
-  it("marks only the selected egg and submits the provided story tone unchanged", () => {
+  it("marks only the selected element and submits the provided story tone unchanged", () => {
     const onComplete = vi.fn();
 
     render(
@@ -95,7 +100,7 @@ describe("OnboardingEggSelection", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Select Frost egg" }));
+    fireEvent.click(screen.getByRole("button", { name: "Select Frost element" }));
 
     expect(screen.getByTestId("egg-slot-ice")).toHaveAttribute("data-selected", "true");
     expect(screen.getByTestId("egg-slot-fire")).toHaveAttribute("data-selected", "false");

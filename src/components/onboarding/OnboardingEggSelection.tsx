@@ -204,7 +204,7 @@ export const OnboardingEggSelection = ({
               </p>
               <p className="mt-1 text-sm font-semibold text-white">{spiritAnimal}</p>
               <p className="mt-1 text-xs leading-5 text-white/65">
-                Choose the egg element now. Your {spiritAnimal.toLowerCase()} will sleep within the shell until it hatches.
+                Choose the element now. Your {spiritAnimal.toLowerCase()} will sleep within the shell until it hatches.
               </p>
             </div>
 
@@ -233,7 +233,7 @@ export const OnboardingEggSelection = ({
                   data-element={element.id}
                   data-testid={`egg-slot-${element.id}`}
                   style={slotStyle}
-                  aria-label={`Select ${element.productLabel} egg`}
+                  aria-label={`Select ${element.productLabel} element`}
                   aria-pressed={isSelected}
                   onClick={() => setSelectedElement(element.id)}
                 >

@@ -621,9 +621,10 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
         // Use atomic database function to create companion (prevents duplicates)
         let result = await invokeCreateCompanionRpc(createCompanionRpcArgs);
 
-        if (!preset && result.error && isLegacyCreateCompanionRpcSignatureError(result.error)) {
-          logger.warn("Create companion RPC signature mismatch; retrying preset-aware legacy egg-first call", {
+        if (result.error && isLegacyCreateCompanionRpcSignatureError(result.error)) {
+          logger.warn("Create companion RPC signature mismatch; retrying legacy preset-aware call without focal points", {
             userId: user.id,
+            presetId: preset?.id ?? null,
             coreElement: normalizedElement,
           });
           result = await invokeCreateCompanionRpc(
@@ -643,7 +644,7 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
 
         if (result.error) {
           console.error("Database error creating companion:", result.error);
-          if (!preset && isLegacyCreateCompanionRpcSignatureError(result.error)) {
+          if (isLegacyCreateCompanionRpcSignatureError(result.error)) {
             throw new Error(CREATE_COMPANION_SIGNATURE_FALLBACK_MESSAGE);
           }
 
