@@ -17,11 +17,14 @@ import { logger } from "@/utils/logger";
 import { useLivingCompanionSafe } from "@/hooks/useLivingCompanion";
 import { loadMentorImage } from "@/utils/mentorImageLoader";
 import { setPendingMentorMood } from "@/utils/mentorMoodSignal";
+import { usePostOnboardingMentorGuidance } from "@/hooks/usePostOnboardingMentorGuidance";
+import { cn } from "@/lib/utils";
 
 const MorningCheckInContent = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const personality = useMentorPersonality();
+  const { isActive: isTutorialActive, currentStep: tutorialStep } = usePostOnboardingMentorGuidance();
   const queryClient = useQueryClient();
   const { awardCheckInComplete, XP_REWARDS } = useXPRewards();
   const { checkFirstTimeAchievements } = useAchievements();
@@ -32,6 +35,7 @@ const MorningCheckInContent = () => {
   const [mentorPortraitUrl, setMentorPortraitUrl] = useState("");
   // Use ref for pollStartTime to avoid stale closure in refetchInterval callback
   const pollStartTimeRef = useRef<number | null>(null);
+  const isTutorialMorningCheckinStep = isTutorialActive && tutorialStep === "morning_checkin";
 
   const today = new Date().toLocaleDateString('en-CA');
   const MAX_POLL_DURATION = 30000; // 30 seconds max polling
@@ -324,22 +328,28 @@ const MorningCheckInContent = () => {
         <Button 
           onClick={submitCheckIn} 
           data-tour="checkin-submit"
+          data-tutorial-highlight={isTutorialMorningCheckinStep ? "true" : undefined}
           disabled={isSubmitting || !mood || !intention.trim() || !!existingCheckIn}
           variant="cta"
-          className="w-full h-13 text-base"
+          className={cn(
+            "w-full h-13 text-base",
+            isTutorialMorningCheckinStep && "tutorial-checkin-cta"
+          )}
           size="lg"
         >
-          {isSubmitting ? (
-            <>
-              <div className="h-4 w-4 animate-spin rounded-full border-2 border-background border-t-transparent" />
-              Setting Intention...
-            </>
-          ) : (
-            <>
-              Check in
-              <span className="ml-1 px-2 py-0.5 rounded-full bg-white/20 text-xs">+{XP_REWARDS.CHECK_IN} XP</span>
-            </>
-          )}
+          <span className="relative z-[1] inline-flex items-center gap-2">
+            {isSubmitting ? (
+              <>
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-background border-t-transparent" />
+                Setting Intention...
+              </>
+            ) : (
+              <>
+                Check in
+                <span className="ml-1 px-2 py-0.5 rounded-full bg-white/20 text-xs">+{XP_REWARDS.CHECK_IN} XP</span>
+              </>
+            )}
+          </span>
         </Button>
       </div>
     </div>

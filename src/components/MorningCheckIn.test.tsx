@@ -31,6 +31,10 @@ const mocks = vi.hoisted(() => ({
   awardCheckInComplete: vi.fn(),
   checkFirstTimeAchievements: vi.fn().mockResolvedValue(undefined),
   triggerReaction: vi.fn().mockResolvedValue(undefined),
+  guidance: {
+    isActive: false,
+    currentStep: null as string | null,
+  },
 }));
 
 vi.mock("@tanstack/react-query", () => ({
@@ -75,6 +79,10 @@ vi.mock("@/utils/mentorImageLoader", () => ({
   loadMentorImage: mocks.loadMentorImage,
 }));
 
+vi.mock("@/hooks/usePostOnboardingMentorGuidance", () => ({
+  usePostOnboardingMentorGuidance: () => mocks.guidance,
+}));
+
 vi.mock("@/components/ErrorBoundary", () => ({
   ErrorBoundary: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
@@ -101,6 +109,10 @@ describe("MorningCheckIn completion portrait", () => {
     mocks.awardCheckInComplete.mockClear();
     mocks.checkFirstTimeAchievements.mockClear();
     mocks.triggerReaction.mockClear();
+    mocks.guidance = {
+      isActive: false,
+      currentStep: null,
+    };
   });
 
   it("renders portrait tile and quote with direct avatar URL", async () => {
@@ -155,5 +167,34 @@ describe("MorningCheckIn completion portrait", () => {
     expect(screen.getByText("Preparing your personalized message...")).toBeInTheDocument();
     expect(screen.getByTestId("mentor-response-body")).toHaveClass("flow-root");
     expect(await screen.findByTestId("mentor-portrait-tile")).toHaveClass("float-right");
+  });
+
+  it("adds the tutorial highlight treatment to the submit button during Step 3", () => {
+    mocks.existingCheckIn = null;
+    mocks.guidance = {
+      isActive: true,
+      currentStep: "morning_checkin",
+    };
+
+    render(<MorningCheckIn />);
+
+    const submitButton = screen.getByRole("button", { name: /check in/i });
+    expect(submitButton).toBeDisabled();
+    expect(submitButton).toHaveAttribute("data-tutorial-highlight", "true");
+    expect(submitButton.className).toContain("tutorial-checkin-cta");
+  });
+
+  it("keeps the default submit button styling outside the tutorial Step 3 state", () => {
+    mocks.existingCheckIn = null;
+    mocks.guidance = {
+      isActive: true,
+      currentStep: "create_quest",
+    };
+
+    render(<MorningCheckIn />);
+
+    const submitButton = screen.getByRole("button", { name: /check in/i });
+    expect(submitButton).not.toHaveAttribute("data-tutorial-highlight");
+    expect(submitButton.className).not.toContain("tutorial-checkin-cta");
   });
 });

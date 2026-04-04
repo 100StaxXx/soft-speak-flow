@@ -2713,6 +2713,73 @@ All colors MUST be HSL.
     animation: cosmic-button-glow 3s ease-in-out infinite;
   }
 
+  @keyframes tutorial-checkin-glow {
+    0%, 100% {
+      box-shadow:
+        0 0 0 1px rgba(216, 132, 255, 0.26),
+        0 0 18px rgba(168, 85, 247, 0.28),
+        0 12px 26px rgba(126, 34, 206, 0.24);
+      filter: brightness(1);
+    }
+    50% {
+      box-shadow:
+        0 0 0 1px rgba(244, 161, 255, 0.45),
+        0 0 30px rgba(217, 70, 239, 0.34),
+        0 18px 36px rgba(168, 85, 247, 0.3);
+      filter: brightness(1.08);
+    }
+  }
+
+  .tutorial-checkin-cta {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+    animation: tutorial-checkin-glow 2.2s ease-in-out infinite;
+  }
+
+  .tutorial-checkin-cta::before,
+  .tutorial-checkin-cta::after {
+    content: "";
+    position: absolute;
+    pointer-events: none;
+    border-radius: inherit;
+  }
+
+  .tutorial-checkin-cta::before {
+    inset: 0;
+    background:
+      radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0) 72%),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0));
+    opacity: 0.55;
+    z-index: 0;
+  }
+
+  .tutorial-checkin-cta::after {
+    top: -20%;
+    bottom: -20%;
+    left: -35%;
+    width: 42%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.38), transparent);
+    mix-blend-mode: screen;
+    opacity: 0.9;
+    z-index: 0;
+    animation: shimmer-sweep 2.4s ease-in-out infinite;
+  }
+
+  .tutorial-checkin-cta > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  .tutorial-checkin-cta:disabled {
+    opacity: 1;
+    box-shadow:
+      0 0 0 1px rgba(216, 132, 255, 0.26),
+      0 0 18px rgba(168, 85, 247, 0.28),
+      0 12px 26px rgba(126, 34, 206, 0.24);
+    filter: saturate(1.05);
+  }
+
   /* ========== SMITE-INSPIRED FRAME ANIMATIONS ========== */
   
   /* Frame shimmer effect - light sweep across border */

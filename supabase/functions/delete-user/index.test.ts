@@ -1,9 +1,3 @@
-function assert(condition: unknown, message = "Assertion failed"): asserts condition {
-  if (!condition) {
-    throw new Error(message);
-  }
-}
-
 function assertEquals<T>(actual: T, expected: T, message = "Expected values to match"): void {
   if (actual !== expected) {
     throw new Error(`${message}\nExpected: ${JSON.stringify(expected)}\nReceived: ${JSON.stringify(actual)}`);
@@ -39,21 +33,18 @@ const createRequest = (authorization = "Bearer test-token") =>
     headers: authorization ? new Headers({ Authorization: authorization }) : undefined,
   });
 
-type DeleteStepResult = { error: unknown | null };
+type RpcResult = { error: unknown | null };
 
-const createDeleteStepResult = (error: unknown | null = null): DeleteStepResult => ({ error });
+const createRpcResult = (error: unknown | null = null): RpcResult => ({ error });
 
 const createHandleDeleteUserHarness = ({
-  rpcResults = [createDeleteStepResult()],
-  authDeleteResults = [createDeleteStepResult()],
+  rpcResults = [createRpcResult()],
   getUserResult,
 }: {
-  rpcResults?: DeleteStepResult[];
-  authDeleteResults?: DeleteStepResult[];
+  rpcResults?: RpcResult[];
   getUserResult?: { data: { user: { id: string } | null } | null; error: unknown | null };
 } = {}) => {
   let rpcCallCount = 0;
-  let authDeleteCallCount = 0;
   const sleepCalls: number[] = [];
 
   const client = {
@@ -63,10 +54,6 @@ const createHandleDeleteUserHarness = ({
           data: { user: { id: USER_ID } },
           error: null,
         },
-      admin: {
-        deleteUser: async () =>
-          authDeleteResults[Math.min(authDeleteCallCount++, authDeleteResults.length - 1)],
-      },
     },
     rpc: async () => rpcResults[Math.min(rpcCallCount++, rpcResults.length - 1)],
   };
@@ -74,8 +61,6 @@ const createHandleDeleteUserHarness = ({
   const dependencies = {
     env: createEnv(),
     createAdminClient: () => client as never,
-    collectStorageTargets: async () => new Map<string, Set<string>>(),
-    cleanupStorage: async () => {},
     sleep: async (ms: number) => {
       sleepCalls.push(ms);
     },
@@ -84,49 +69,16 @@ const createHandleDeleteUserHarness = ({
   return {
     dependencies,
     getRpcCallCount: () => rpcCallCount,
-    getAuthDeleteCallCount: () => authDeleteCallCount,
     sleepCalls,
   };
 };
 
-Deno.test("delete-user treats already-deleted auth users as non-fatal", () => {
-  const cases = [
-    new Error("User not found"),
-    { message: "Auth api error: user not found" },
-    { code: "USER_NOT_FOUND" },
-    { name: "UserNotFoundError" },
-  ];
-
-  for (const candidate of cases) {
-    assert(
-      module.isAuthUserAlreadyDeletedError(candidate),
-      `Expected ${JSON.stringify(candidate)} to be treated as an already-deleted auth user`,
-    );
-  }
-});
-
-Deno.test("delete-user keeps unrelated auth deletion failures fatal", () => {
-  const cases = [
-    new Error("permission denied"),
-    { message: "rate limit exceeded" },
-    { code: "unexpected_failure" },
-    null,
-  ];
-
-  for (const candidate of cases) {
-    assert(
-      !module.isAuthUserAlreadyDeletedError(candidate),
-      `Expected ${JSON.stringify(candidate)} to remain a fatal auth deletion error`,
-    );
-  }
-});
-
 Deno.test("delete-user retries transient rpc failures and succeeds", async () => {
   const harness = createHandleDeleteUserHarness({
     rpcResults: [
-      createDeleteStepResult({ status: 503, message: "Service unavailable" }),
-      createDeleteStepResult({ message: "network connection reset by peer" }),
-      createDeleteStepResult(),
+      createRpcResult({ status: 503, message: "Service unavailable" }),
+      createRpcResult({ message: "network connection reset by peer" }),
+      createRpcResult(),
     ],
   });
 
@@ -136,45 +88,12 @@ Deno.test("delete-user retries transient rpc failures and succeeds", async () =>
   assertEquals(response.status, 200, "Expected delete-user to succeed after retrying rpc failures");
   assertEquals(body.success, true, "Expected success response body");
   assertEquals(harness.getRpcCallCount(), 3, "Expected rpc step to be attempted three times");
-  assertEquals(harness.getAuthDeleteCallCount(), 1, "Expected auth delete to run once after rpc recovery");
   assertArrayEquals(harness.sleepCalls, [500, 1500], "Expected rpc retries to use the configured backoff");
-});
-
-Deno.test("delete-user retries transient auth deletion failures and succeeds", async () => {
-  const harness = createHandleDeleteUserHarness({
-    authDeleteResults: [
-      createDeleteStepResult({ status: 503, message: "Service unavailable" }),
-      createDeleteStepResult(),
-    ],
-  });
-
-  const response = await module.handleDeleteUser(createRequest(), harness.dependencies);
-  const body = await response.json();
-
-  assertEquals(response.status, 200, "Expected delete-user to succeed after retrying auth deletion");
-  assertEquals(body.success, true, "Expected success response body");
-  assertEquals(harness.getRpcCallCount(), 1, "Expected rpc step to run once");
-  assertEquals(harness.getAuthDeleteCallCount(), 2, "Expected auth delete step to retry once");
-  assertArrayEquals(harness.sleepCalls, [500], "Expected auth delete retry to use the first backoff delay");
-});
-
-Deno.test("delete-user treats already-deleted auth users as a successful delete flow", async () => {
-  const harness = createHandleDeleteUserHarness({
-    authDeleteResults: [createDeleteStepResult(new Error("User not found"))],
-  });
-
-  const response = await module.handleDeleteUser(createRequest(), harness.dependencies);
-  const body = await response.json();
-
-  assertEquals(response.status, 200, "Expected already-deleted auth users to remain non-fatal");
-  assertEquals(body.success, true, "Expected success response body");
-  assertEquals(harness.getAuthDeleteCallCount(), 1, "Expected auth delete to stop after the non-fatal result");
-  assertArrayEquals(harness.sleepCalls, [], "Expected no retry delay for already-deleted auth users");
 });
 
 Deno.test("delete-user does not retry non-transient rpc authorization failures", async () => {
   const harness = createHandleDeleteUserHarness({
-    rpcResults: [createDeleteStepResult({ status: 401, message: "Unauthorized" })],
+    rpcResults: [createRpcResult({ status: 401, message: "Unauthorized" })],
   });
 
   const response = await module.handleDeleteUser(createRequest(), harness.dependencies);
@@ -185,4 +104,44 @@ Deno.test("delete-user does not retry non-transient rpc authorization failures",
   assertEquals(body.code, "ACCOUNT_DELETION_AUTH_REQUIRED", "Expected auth-required error code");
   assertEquals(harness.getRpcCallCount(), 1, "Expected no retry for non-transient rpc auth failures");
   assertArrayEquals(harness.sleepCalls, [], "Expected no retry delay for terminal auth failures");
+});
+
+Deno.test("delete-user returns unauthorized when auth lookup fails", async () => {
+  const harness = createHandleDeleteUserHarness({
+    getUserResult: {
+      data: null,
+      error: { status: 401, message: "JWT expired" },
+    },
+  });
+
+  const response = await module.handleDeleteUser(createRequest(), harness.dependencies);
+  const body = await response.json();
+
+  assertEquals(response.status, 401, "Expected auth lookup failures to remain terminal");
+  assertEquals(body.success, false, "Expected failure response body");
+  assertEquals(body.code, "ACCOUNT_DELETION_AUTH_REQUIRED", "Expected auth-required error code");
+  assertEquals(harness.getRpcCallCount(), 0, "Expected rpc deletion not to run when auth lookup fails");
+});
+
+Deno.test("delete-user classifies transient infrastructure failures conservatively", () => {
+  assertEquals(
+    module.isTransientDeleteUserInfrastructureError({ status: 503, message: "Service unavailable" }),
+    true,
+    "Expected 503 infrastructure failures to be retriable",
+  );
+  assertEquals(
+    module.isTransientDeleteUserInfrastructureError({ message: "network connection reset by peer" }),
+    true,
+    "Expected network failures to be retriable",
+  );
+  assertEquals(
+    module.isTransientDeleteUserInfrastructureError({ status: 401, message: "Unauthorized" }),
+    false,
+    "Expected auth failures not to be retriable",
+  );
+  assertEquals(
+    module.isTransientDeleteUserInfrastructureError({ status: 404, message: "User not found" }),
+    false,
+    "Expected not-found failures not to be retriable",
+  );
 });

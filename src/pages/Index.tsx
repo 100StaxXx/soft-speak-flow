@@ -32,6 +32,7 @@ import { cn } from "@/lib/utils";
 import { useMentorConnection } from "@/contexts/MentorConnectionContext";
 import { getEffectiveDailyDate } from "@/utils/timezone";
 import { safeSessionStorage } from "@/utils/storage";
+import { usePostOnboardingMentorGuidance } from "@/hooks/usePostOnboardingMentorGuidance";
 
 type IndexProps = {
   enableOnboardingGuard?: boolean;
@@ -123,16 +124,33 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
   const queryClient = useQueryClient();
   const layoutMode = useMentorLayoutMode();
   const isDesktop = layoutMode === "desktop";
+  const { isActive: isTutorialActive, currentStep: tutorialStep } = usePostOnboardingMentorGuidance();
   const onboardingSelfHealAttemptedRef = useRef(false);
+  const didAutoScrollTutorialMorningCheckinRef = useRef(false);
   const pepTalkDate = useMemo(
     () => getEffectiveDailyDate(profile?.timezone ?? undefined),
     [profile?.timezone],
   );
+  const isTutorialMorningCheckinStep = !isDesktop && isTutorialActive && tutorialStep === "morning_checkin";
 
   // Scroll to top on mount
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
+
+  useEffect(() => {
+    if (!isTutorialMorningCheckinStep) {
+      didAutoScrollTutorialMorningCheckinRef.current = false;
+      return;
+    }
+
+    if (didAutoScrollTutorialMorningCheckinRef.current) {
+      return;
+    }
+
+    didAutoScrollTutorialMorningCheckinRef.current = true;
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [isTutorialMorningCheckinStep]);
 
   const {
     mentorId: effectiveMentorId,
@@ -363,7 +381,10 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
 
   const mobileContent = (
     <div
-      className="max-w-6xl mx-auto px-3 sm:px-4 pt-28 sm:pt-24 md:pt-20 space-y-4 sm:space-y-6 md:space-y-8"
+      className={cn(
+        "max-w-6xl mx-auto px-3 sm:px-4 sm:pt-24 md:pt-20 space-y-4 sm:space-y-6 md:space-y-8",
+        isTutorialMorningCheckinStep ? "pt-16" : "pt-28"
+      )}
       data-testid="mentor-mobile-layout"
     >
       {mentorConnectionIssue && (

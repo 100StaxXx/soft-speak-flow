@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 
@@ -23,6 +23,10 @@ const mocks = vi.hoisted(() => ({
   },
   queryClient: {
     refetchQueries: vi.fn().mockResolvedValue(undefined),
+  },
+  guidance: {
+    isActive: false,
+    currentStep: null as string | null,
   },
 }));
 
@@ -73,6 +77,10 @@ vi.mock("@/contexts/ThemeContext", () => ({
 
 vi.mock("@/contexts/MainTabVisibilityContext", () => ({
   useMainTabVisibility: () => ({ isTabActive: true }),
+}));
+
+vi.mock("@/hooks/usePostOnboardingMentorGuidance", () => ({
+  usePostOnboardingMentorGuidance: () => mocks.guidance,
 }));
 
 vi.mock("@/hooks/useFirstTimeModal", () => ({
@@ -156,6 +164,10 @@ describe("Index mentor connection state", () => {
       isLoading: false,
       isError: false,
     };
+    mocks.guidance = {
+      isActive: false,
+      currentStep: null,
+    };
     mocks.effectiveMentorId = null;
     mocks.mentorStatus = "recovering";
   });
@@ -236,5 +248,59 @@ describe("Index mentor connection state", () => {
 
     expect(screen.getByText("Guide temporarily unavailable")).toBeInTheDocument();
     expect(screen.queryByText("Guide connection lost")).not.toBeInTheDocument();
+  });
+
+  it("switches to the compact mobile tutorial layout and scrolls to top once when entering Step 3", async () => {
+    mocks.mentorStatus = "ready";
+    mocks.effectiveMentorId = "mentor-1";
+    mocks.mentorQuery = {
+      data: {
+        mentorName: "Atlas",
+        mentorImage: "/mentor.png",
+        todaysQuote: { text: "Stay steady.", author: "Atlas" },
+      },
+      isLoading: false,
+      isError: false,
+    };
+
+    const { rerender } = render(
+      <MemoryRouter initialEntries={["/mentor"]}>
+        <Index enableOnboardingGuard={false} />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByTestId("mentor-mobile-layout").className).toContain("pt-28");
+
+    const scrollToMock = window.scrollTo as unknown as ReturnType<typeof vi.fn>;
+    scrollToMock.mockClear();
+
+    mocks.guidance = {
+      isActive: true,
+      currentStep: "morning_checkin",
+    };
+
+    rerender(
+      <MemoryRouter initialEntries={["/mentor"]}>
+        <Index enableOnboardingGuard={false} />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("mentor-mobile-layout").className).toContain("pt-16");
+      expect(scrollToMock).toHaveBeenCalledWith({ top: 0, left: 0, behavior: "auto" });
+    });
+
+    scrollToMock.mockClear();
+
+    rerender(
+      <MemoryRouter initialEntries={["/mentor"]}>
+        <Index enableOnboardingGuard={false} />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("mentor-mobile-layout").className).toContain("pt-16");
+    });
+    expect(scrollToMock).not.toHaveBeenCalled();
   });
 });
