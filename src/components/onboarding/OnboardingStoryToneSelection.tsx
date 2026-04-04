@@ -47,9 +47,6 @@ export const OnboardingStoryToneSelection = ({
     () => COMPANION_PRESETS.find((preset) => preset.id === selectedPresetId) ?? null,
     [selectedPresetId],
   );
-  const selectedPresetSilhouetteSrc = selectedPresetId
-    ? COMPANION_ONBOARDING_SILHOUETTE_SOURCES[selectedPresetId] ?? null
-    : null;
 
   return (
     <div className="relative z-10 min-h-screen px-4 pt-safe-top pb-safe-bottom">
@@ -129,6 +126,7 @@ export const OnboardingStoryToneSelection = ({
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                 {COMPANION_PRESETS.map((preset, index) => {
                   const isSelected = preset.id === selectedPresetId;
+                  const silhouetteSrc = COMPANION_ONBOARDING_SILHOUETTE_SOURCES[preset.id] ?? null;
 
                   return (
                     <motion.button
@@ -147,22 +145,40 @@ export const OnboardingStoryToneSelection = ({
                       data-selected={isSelected ? "true" : "false"}
                       aria-pressed={isSelected}
                     >
-                      <div className="space-y-2">
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <div className="text-sm font-semibold">{preset.displayName}</div>
-                            <p className="mt-1 text-[11px] uppercase tracking-[0.2em] text-white/[0.45]">
-                              {preset.role}
-                            </p>
+                      <div className="flex items-start gap-4">
+                        <div className="min-w-0 flex-1 space-y-2">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="text-sm font-semibold">{preset.displayName}</div>
+                              <p className="mt-1 text-[11px] uppercase tracking-[0.2em] text-white/[0.45]">
+                                {preset.role}
+                              </p>
+                            </div>
+                            {isSelected ? (
+                              <span className="rounded-full border border-white/15 bg-white/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/85">
+                                Selected
+                              </span>
+                            ) : null}
                           </div>
-                          {isSelected ? (
-                            <span className="rounded-full border border-white/15 bg-white/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/85">
-                              Selected
-                            </span>
-                          ) : null}
+                          <p className="text-xs leading-5 text-white/[0.74]">{preset.revealCopy}</p>
+                          <p className="text-xs leading-5 text-white/[0.52]">{preset.signatureIdentity}</p>
                         </div>
-                        <p className="text-xs leading-5 text-white/[0.74]">{preset.revealCopy}</p>
-                        <p className="text-xs leading-5 text-white/[0.52]">{preset.signatureIdentity}</p>
+
+                        {silhouetteSrc ? (
+                          <div className="pointer-events-none relative flex h-16 w-14 shrink-0 items-center justify-center self-center sm:h-[4.5rem] sm:w-16">
+                            <div
+                              className="absolute inset-x-1 bottom-2 h-8 rounded-full bg-white/[0.05] blur-lg"
+                              aria-hidden="true"
+                            />
+                            <img
+                              src={silhouetteSrc}
+                              alt=""
+                              aria-hidden="true"
+                              data-testid={`species-silhouette-${preset.id}`}
+                              className="relative h-full w-full object-contain brightness-0 contrast-200"
+                            />
+                          </div>
+                        ) : null}
                       </div>
                     </motion.button>
                   );
@@ -182,32 +198,16 @@ export const OnboardingStoryToneSelection = ({
               </div>
 
               <div className="rounded-[28px] border border-white/[0.10] bg-black/20 p-5">
-                <div className="space-y-4">
+                <div className="space-y-2">
                   <p className="text-xs uppercase tracking-[0.22em] text-white/[0.48]">Locked Species</p>
-                  <div className="space-y-2">
-                    <h2 className="text-xl font-semibold text-white">
-                      {selectedPresetMeta?.displayName ?? "Choose a species"}
-                    </h2>
-                    <p className="text-sm leading-6 text-white/[0.72]">
-                      {selectedPresetMeta
-                        ? `${selectedPresetMeta.revealCopy} This choice stays sleeping inside the egg until the first hatch.`
-                        : "Choose the creature form first so the egg chamber can focus only on element."}
-                    </p>
-                  </div>
-
-                  {selectedPresetSilhouetteSrc ? (
-                    <div className="w-full max-w-[220px]" data-testid="locked-species-silhouette-frame">
-                      <div className="aspect-square rounded-[24px] border border-white/[0.08] bg-white/[0.03] p-4">
-                        <img
-                          src={selectedPresetSilhouetteSrc}
-                          alt=""
-                          aria-hidden="true"
-                          data-testid="locked-species-silhouette"
-                          className="h-full w-full object-contain"
-                        />
-                      </div>
-                    </div>
-                  ) : null}
+                  <h2 className="text-xl font-semibold text-white">
+                    {selectedPresetMeta?.displayName ?? "Choose a species"}
+                  </h2>
+                  <p className="text-sm leading-6 text-white/[0.72]">
+                    {selectedPresetMeta
+                      ? `${selectedPresetMeta.revealCopy} This choice stays sleeping inside the egg until the first hatch.`
+                      : "Choose the creature form first so the egg chamber can focus only on element."}
+                  </p>
                 </div>
               </div>
             </div>

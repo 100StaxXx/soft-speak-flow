@@ -34,11 +34,11 @@ describe("OnboardingEggSelection", () => {
       "src",
       expect.stringContaining("choose-your-element-selection-screen.png"),
     );
-    expect(screen.getByText(/Locked Species/i)).toBeInTheDocument();
-    expect(screen.getByText("Dragon")).toBeInTheDocument();
+    expect(screen.queryByText(/Locked Species/i)).not.toBeInTheDocument();
+    expect(screen.queryByText("Dragon")).not.toBeInTheDocument();
     expect(
-      screen.getByText("Choose the element now. Your dragon will sleep within the shell until it hatches."),
-    ).toBeInTheDocument();
+      screen.queryByText("Choose the element now. Your dragon will sleep within the shell until it hatches."),
+    ).not.toBeInTheDocument();
     expect(screen.queryByText("Ember")).not.toBeInTheDocument();
     expect(screen.queryByText("Frost")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
