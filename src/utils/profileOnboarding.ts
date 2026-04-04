@@ -70,17 +70,20 @@ export const getOnboardingGateState = ({
   hasPresetCompanion?: boolean;
   companionStage?: number | null;
 }): OnboardingGateState => {
+  const walkthroughCompleted = hasWalkthroughCompleted(profile?.onboarding_data);
+  const hasGuidedTutorial = hasGuidedTutorialProgress(profile?.onboarding_data);
   const needsProgressionReset = hasProgressionResetPending(profile?.onboarding_data);
   const hasStageZeroEggCompanion = hasCompanion && companionStage === 0;
   const needsCompanionMigration = hasCompanion && !hasPresetCompanion && companionStage !== 0;
   const onboardingStep = normalizeOnboardingStep(profile?.onboarding_step);
   const isCompletionStep = onboardingStep === "complete";
   const needsJourneyBeginsRecovery =
-    hasStageZeroEggCompanion
+    hasCompanion
+    && !walkthroughCompleted
     && !isCompletionStep
     && (
       onboardingStep === "journey-begins"
-      || !hasGuidedTutorialProgress(profile?.onboarding_data)
+      || (hasStageZeroEggCompanion && !hasGuidedTutorial)
     );
   let reason: EstablishedAccountReason | null = null;
   let resumeStep: OnboardingResumeStep | null = null;
@@ -95,7 +98,7 @@ export const getOnboardingGateState = ({
     reason = "onboarding_step_complete";
   } else if (profile?.onboarding_completed === true) {
     reason = "onboarding_completed";
-  } else if (hasWalkthroughCompleted(profile?.onboarding_data)) {
+  } else if (walkthroughCompleted) {
     reason = "walkthrough_completed";
   } else if (hasPresetCompanion && !hasStageZeroEggCompanion) {
     reason = "companion_exists";

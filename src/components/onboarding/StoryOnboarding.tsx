@@ -27,7 +27,10 @@ import { useCompanion } from "@/hooks/useCompanion";
 import { pollWithDeadline } from "@/utils/asyncTimeout";
 import { logger } from "@/utils/logger";
 import { isAssignedCompanionName, resolveCompanionName } from "@/lib/companionName";
-import { getPresetCompanionAssetUrl } from "@/lib/companionAssetResolver";
+import {
+  getPresetCompanionAssetUrl,
+  getUniversalEggAssetUrl,
+} from "@/lib/companionAssetResolver";
 import {
   getCompanionElement,
   getCompanionElementAnchorColor,
@@ -904,18 +907,15 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
 
         const normalizedElement = preferences.coreElement;
         const resolvedStage = resolveCompanionStageFromXp(latestCompanion.current_xp ?? 0);
-        const currentImageUrl = getPresetCompanionAssetUrl({
-          presetId: preset.id,
-          stage: resolvedStage,
-          element: normalizedElement,
-          state: "normal",
-        }) ?? "/placeholder-companion.svg";
-        const initialImageUrl = getPresetCompanionAssetUrl({
-          presetId: preset.id,
-          stage: 0,
-          element: normalizedElement,
-          state: "normal",
-        }) ?? "/placeholder-egg.svg";
+        const initialImageUrl = getUniversalEggAssetUrl(normalizedElement);
+        const currentImageUrl = resolvedStage <= 0
+          ? initialImageUrl
+          : getPresetCompanionAssetUrl({
+            presetId: preset.id,
+            stage: resolvedStage,
+            element: normalizedElement,
+            state: "normal",
+          }) ?? "/placeholder-companion.svg";
 
         const { error: companionUpdateError } = await supabase.rpc(
           "apply_companion_preset_selection",

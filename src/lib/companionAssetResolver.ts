@@ -96,6 +96,7 @@ export const resolveCompanionVisualAssetUrl = (
   if (!companion) return null;
 
   const normalizedElement = companion.core_element ?? "fire";
+  const isStageZeroEgg = (companion.current_stage ?? 0) <= 0;
 
   const presetUrl = companion.preset_id
     ? getPresetCompanionAssetUrl({
@@ -108,8 +109,10 @@ export const resolveCompanionVisualAssetUrl = (
 
   if (presetUrl) return presetUrl;
 
-  if ((companion.current_stage ?? 0) <= 0 && state === "normal") {
-    return companion.current_image_url ?? getUniversalEggAssetUrl(normalizedElement);
+  // Level 0 always renders the shared elemental egg art. Persisted stage-0 URLs
+  // can be stale or point at preset art that does not exist yet.
+  if (isStageZeroEgg && state === "normal") {
+    return getUniversalEggAssetUrl(normalizedElement);
   }
 
   if (state === "dormant") {

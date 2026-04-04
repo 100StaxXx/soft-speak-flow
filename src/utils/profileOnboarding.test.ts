@@ -71,6 +71,29 @@ describe("getOnboardingGateState", () => {
     });
   });
 
+  it("keeps explicit journey-begins recovery active even when the companion has already advanced past stage 0", () => {
+    expect(
+      getOnboardingGateState({
+        profile: {
+          onboarding_completed: true,
+          onboarding_step: "journey-begins",
+          selected_mentor_id: "mentor-1",
+          onboarding_data: {},
+        },
+        hasCompanion: true,
+        hasPresetCompanion: true,
+        companionStage: 1,
+      }),
+    ).toMatchObject({
+      isEstablished: false,
+      needsOnboarding: true,
+      reason: null,
+      resumeStep: "journey-begins",
+      needsCompanionMigration: false,
+      shouldSelfHeal: false,
+    });
+  });
+
   it("treats a complete onboarding step as established even with a stage 0 egg", () => {
     expect(
       getOnboardingGateState({
@@ -271,6 +294,20 @@ describe("isReturningProfile", () => {
       ),
     ).toBe(false);
   });
+
+  it("returns false for a preset companion that is still marked as journey-begins", () => {
+    expect(
+      isReturningProfile(
+        {
+          onboarding_completed: true,
+          onboarding_step: "journey-begins",
+          selected_mentor_id: "mentor-1",
+          onboarding_data: {},
+        },
+        { hasCompanion: true, hasPresetCompanion: true, companionStage: 1 },
+      ),
+    ).toBe(false);
+  });
 });
 
 describe("buildEstablishedProfileSelfHealPatch", () => {
@@ -328,6 +365,21 @@ describe("buildEstablishedProfileSelfHealPatch", () => {
         hasCompanion: true,
         hasPresetCompanion: false,
         companionStage: 0,
+      }),
+    ).toBeNull();
+  });
+
+  it("does not self-heal companion-backed accounts that are still on journey-begins", () => {
+    expect(
+      buildEstablishedProfileSelfHealPatch({
+        profile: {
+          onboarding_completed: true,
+          onboarding_step: "journey-begins",
+          onboarding_data: {},
+        },
+        hasCompanion: true,
+        hasPresetCompanion: true,
+        companionStage: 1,
       }),
     ).toBeNull();
   });

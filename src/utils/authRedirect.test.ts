@@ -200,6 +200,21 @@ describe("getAuthRedirectPath", () => {
     await expect(getAuthRedirectPath("preset-egg-recovery-user")).resolves.toBe("/onboarding");
   });
 
+  it("routes companion-backed journey-begins recovery accounts back to /onboarding", async () => {
+    mocks.profilesMaybeSingleMock.mockResolvedValueOnce({
+      data: {
+        selected_mentor_id: "mentor-2",
+        onboarding_completed: true,
+        onboarding_step: "journey-begins",
+        onboarding_data: {},
+      },
+      error: null,
+    });
+    mocks.companionMaybeSingleMock.mockResolvedValueOnce(existingCompanion);
+
+    await expect(getAuthRedirectPath("journey-begins-recovery-user")).resolves.toBe("/onboarding");
+  });
+
   it("routes stage 0 egg accounts with a complete onboarding step to /tasks", async () => {
     mocks.profilesMaybeSingleMock.mockResolvedValueOnce({
       data: {

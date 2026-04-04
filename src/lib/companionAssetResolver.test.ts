@@ -20,6 +20,7 @@ vi.mock("@/integrations/supabase/client", () => ({
 
 import {
   getPresetCompanionAssetUrl,
+  getUniversalEggAssetUrl,
   resolveCompanionVisualAssetUrl,
 } from "./companionAssetResolver";
 
@@ -88,6 +89,20 @@ describe("companion asset resolver", () => {
         "dormant",
       ),
     ).toBe("https://example.com/current.png");
+  });
+
+  it("always uses the bundled elemental egg art at stage 0", () => {
+    expect(
+      resolveCompanionVisualAssetUrl(
+        {
+          preset_id: "griffin",
+          current_stage: 0,
+          core_element: "storm",
+          current_image_url: "https://example.com/broken-stage-zero-image.png",
+        },
+        "normal",
+      ),
+    ).toBe(getUniversalEggAssetUrl("storm"));
   });
 
   it("preserves higher-tier remote coverage for existing remote presets", () => {

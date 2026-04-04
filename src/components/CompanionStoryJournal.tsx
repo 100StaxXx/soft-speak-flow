@@ -65,12 +65,7 @@ export const CompanionStoryJournal = ({ layoutMode = "mobile" }: CompanionStoryJ
       if (!companion) return null;
 
       if (debouncedLevel === 0) {
-        return (
-          companion.initial_image_url
-          || companion.current_image_url
-          || getUniversalEggAssetUrl(companion.core_element)
-          || "/placeholder-egg.svg"
-        );
+        return getUniversalEggAssetUrl(companion.core_element) || "/placeholder-egg.svg";
       }
 
       if (companion.preset_id) {
