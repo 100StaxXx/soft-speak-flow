@@ -32,7 +32,7 @@ const elementIcons: Record<string, typeof Sparkles> = {
 
 export const CompanionBadge = ({
   element,
-  stage = 1,
+  stage = 0,
   showStage = true,
   favoriteColor,
   companionId,

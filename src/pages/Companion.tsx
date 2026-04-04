@@ -41,7 +41,6 @@ import {
   useCompanionLayoutMode,
   type CompanionLayoutMode,
 } from "@/hooks/useCompanionLayoutMode";
-import { useCompanionTutorialPresentation } from "@/hooks/useCompanionTutorialPresentation";
 import { cn } from "@/lib/utils";
 
 type CompanionTab = "overview" | "focus" | "stories" | "collection";
@@ -217,7 +216,6 @@ const Companion = () => {
     companion,
     nextEvolutionXP,
     progressToNext,
-    canEvolve,
     isLoading,
     error,
     refetch,
@@ -230,16 +228,6 @@ const Companion = () => {
   const location = useLocation();
   const previousPathRef = useRef(location.pathname);
   const navigate = useNavigate();
-  const tutorialPresentation = useCompanionTutorialPresentation({
-    companion,
-    canEvolve,
-    nextEvolutionXP,
-    progressToNext,
-    pathname: location.pathname,
-  });
-  const overviewCompanion = tutorialPresentation.companion;
-  const overviewNextEvolutionXP = tutorialPresentation.nextEvolutionXP ?? 0;
-  const overviewProgressToNext = tutorialPresentation.progressToNext;
 
   const markTabMounted = useCallback((tab: CompanionTab) => {
     setMountedTabs((previous) => (previous[tab] ? previous : { ...previous, [tab]: true }));
@@ -388,9 +376,9 @@ const Companion = () => {
           >
             {mountedTabs.overview && (
               <OverviewTab
-                companion={overviewCompanion}
-                nextEvolutionXP={overviewNextEvolutionXP}
-                progressToNext={overviewProgressToNext}
+                companion={companion}
+                nextEvolutionXP={nextEvolutionXP ?? 0}
+                progressToNext={progressToNext}
                 layoutMode={layoutMode}
               />
             )}

@@ -359,25 +359,24 @@ describe("CompanionDisplay overlay stack", () => {
     expect(screen.getByText("Hatch chooser")).toBeInTheDocument();
   });
 
-  it("renders the tutorial hatch step as a stage 0 egg even when live companion data is already stage 1", async () => {
-    mocks.guidedStep = "evolve_companion";
-    mocks.canEvolve = false;
+  it("renders a real stage 0 egg during the companion intro step", async () => {
+    mocks.guidedStep = "companion_tab_intro";
+    mocks.canEvolve = true;
     mocks.companion = {
       ...mocks.companion,
-      current_stage: 1,
+      current_stage: 0,
       current_xp: 14,
       core_element: "fire",
-      current_image_url: "/companion-presets/fox/t1_youth/normal/fox__t1_youth__normal__fire.png",
+      current_image_url: "/companion-eggs/egg__t0_egg__normal__fire.png",
       initial_image_url: "/companion-eggs/egg__t0_egg__normal__fire.png",
       preset_id: "fox",
       spirit_animal: "Fox",
-      cached_creature_name: "Ignisyl",
+      cached_creature_name: null,
     };
 
     render(<CompanionDisplay />);
 
     expect(screen.getByText("Fire Egg")).toBeInTheDocument();
-    expect(screen.queryByText("Ignisyl")).not.toBeInTheDocument();
     expect(screen.getAllByText("Ready to evolve to Level 1").length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: "HATCH" })).toBeInTheDocument();
 
@@ -388,8 +387,7 @@ describe("CompanionDisplay overlay stack", () => {
     );
   });
 
-  it("returns to the normal stage 1 reveal after the tutorial advances past the hatch prompt", async () => {
-    mocks.guidedStep = "post_evolution_companion_intro";
+  it("renders the normal stage 1 reveal after hatch succeeds", async () => {
     mocks.companion = {
       ...mocks.companion,
       current_stage: 1,

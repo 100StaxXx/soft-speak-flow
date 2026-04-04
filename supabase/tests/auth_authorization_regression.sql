@@ -60,6 +60,7 @@ do $$
 declare
   v_user_a uuid := '11111111-1111-1111-1111-111111111111';
   v_user_b uuid := '22222222-2222-2222-2222-222222222222';
+  v_user_c uuid := '99999999-9999-9999-9999-999999999999';
 begin
   insert into auth.users (
     instance_id,
@@ -100,6 +101,19 @@ begin
       '{}'::jsonb,
       now(),
       now()
+    ),
+    (
+      '00000000-0000-0000-0000-000000000000',
+      v_user_c,
+      'authenticated',
+      'authenticated',
+      'user-c@example.com',
+      crypt('password', gen_salt('bf')),
+      now(),
+      '{"provider":"email","providers":["email"]}'::jsonb,
+      '{}'::jsonb,
+      now(),
+      now()
     )
   on conflict (id) do nothing;
 
@@ -109,7 +123,7 @@ begin
     referred_by_code = null,
     streak_freezes_available = 1,
     life_status = 'alive'
-  where id in (v_user_a, v_user_b);
+  where id in (v_user_a, v_user_b, v_user_c);
 
   insert into public.account_entitlements (
     user_id,
@@ -120,7 +134,8 @@ begin
   )
   values
     (v_user_a, 'subscription', 'active', 'monthly', false),
-    (v_user_b, 'none', 'inactive', null, false)
+    (v_user_b, 'none', 'inactive', null, false),
+    (v_user_c, 'none', 'inactive', null, false)
   on conflict (user_id) do update
   set
     source = excluded.source,
@@ -312,6 +327,189 @@ begin
     )
     on conflict do nothing;
   end if;
+end
+$$;
+
+do $$
+declare
+  v_companion record;
+  v_award record;
+  v_preset_bound record;
+  v_hatched record;
+  v_stage0_count integer;
+  v_stage1_count integer;
+begin
+  execute 'set local role authenticated';
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '99999999-9999-9999-9999-999999999999', true);
+
+  select *
+  into v_companion
+  from public.create_companion_if_not_exists(
+    '99999999-9999-9999-9999-999999999999',
+    null,
+    '#33cc66',
+    'Egg',
+    'nature',
+    'epic_adventure',
+    '/companion-eggs/egg__t0_egg__normal__nature.png',
+    0.5,
+    0.45,
+    '/companion-eggs/egg__t0_egg__normal__nature.png',
+    0.5,
+    0.45,
+    '',
+    ''
+  )
+  limit 1;
+
+  perform public.test_assert(
+    coalesce(v_companion.current_stage, -1) = 0,
+    'create_companion_if_not_exists should create only a stage 0 companion'
+  );
+
+  select count(*)
+  into v_stage0_count
+  from public.companion_evolutions
+  where companion_id = v_companion.id
+    and stage = 0;
+
+  select count(*)
+  into v_stage1_count
+  from public.companion_evolutions
+  where companion_id = v_companion.id
+    and stage = 1;
+
+  perform public.test_assert(
+    v_stage0_count = 1,
+    'create_companion_if_not_exists should create exactly one stage 0 evolution row'
+  );
+
+  perform public.test_assert(
+    v_stage1_count = 0,
+    'create_companion_if_not_exists must not create a stage 1 evolution row'
+  );
+
+  select *
+  into v_award
+  from public.award_xp_v2(
+    'focus_session',
+    10,
+    '{}'::jsonb,
+    'stage0-earned-progress'
+  )
+  limit 1;
+
+  perform public.test_assert(
+    coalesce(v_award.should_evolve, false),
+    'pre-hatch XP at the level 1 threshold should mark the egg ready to hatch'
+  );
+
+  perform public.test_assert(
+    coalesce(v_award.claimed_stage_after, -1) = 0,
+    'pre-hatch XP must not claim stage 1'
+  );
+
+  perform public.test_assert(
+    coalesce(v_award.pending_evolution_count, -1) = 1,
+    'pre-hatch XP should report one pending evolution'
+  );
+
+  perform public.test_assert(
+    (
+      select current_stage = 0
+      from public.user_companion
+      where id = v_companion.id
+    ),
+    'pre-hatch XP must leave current_stage at 0'
+  );
+
+  perform public.test_assert(
+    (
+      select current_xp = 10
+      from public.user_companion
+      where id = v_companion.id
+    ),
+    'pre-hatch XP should still persist earned XP'
+  );
+
+  select *
+  into v_preset_bound
+  from public.apply_companion_preset_selection(
+    v_companion.id,
+    'fox',
+    'Fox',
+    '#33cc66',
+    'nature',
+    'epic_adventure',
+    1,
+    '/companion-presets/fox/t1_youth/normal/fox__t1_youth__normal__nature.png',
+    '/companion-eggs/egg__t0_egg__normal__nature.png'
+  )
+  limit 1;
+
+  perform public.test_assert(
+    coalesce(v_preset_bound.current_stage, -1) = 0,
+    'preset selection must not advance an unhatched companion past stage 0'
+  );
+
+  perform public.test_assert(
+    coalesce(v_preset_bound.current_image_url, '') = '/companion-eggs/egg__t0_egg__normal__nature.png',
+    'preset selection must keep the egg art until hatch'
+  );
+
+  select count(*)
+  into v_stage1_count
+  from public.companion_evolutions
+  where companion_id = v_companion.id
+    and stage = 1;
+
+  perform public.test_assert(
+    v_stage1_count = 0,
+    'preset selection must not create a stage 1 evolution row'
+  );
+
+  select *
+  into v_hatched
+  from public.hatch_companion_with_preset(
+    v_companion.id,
+    'fox',
+    'Fox',
+    '#33cc66',
+    'nature',
+    'epic_adventure',
+    '/companion-eggs/egg__t0_egg__normal__nature.png',
+    0.5,
+    0.45,
+    '/companion-presets/fox/t1_youth/normal/fox__t1_youth__normal__nature.png',
+    0.53,
+    0.49,
+    10
+  )
+  limit 1;
+
+  perform public.test_assert(
+    coalesce(v_hatched.current_stage, -1) = 1,
+    'hatch_companion_with_preset should be the first writer that claims stage 1'
+  );
+
+  perform public.test_assert(
+    coalesce(v_hatched.current_image_url, '') = '/companion-presets/fox/t1_youth/normal/fox__t1_youth__normal__nature.png',
+    'hatch_companion_with_preset should swap the egg art for stage 1 art'
+  );
+
+  select count(*)
+  into v_stage1_count
+  from public.companion_evolutions
+  where companion_id = v_companion.id
+    and stage = 1;
+
+  perform public.test_assert(
+    v_stage1_count = 1,
+    'only hatch_companion_with_preset should create the first stage 1 evolution row'
+  );
+
+  execute 'reset role';
 end
 $$;
 

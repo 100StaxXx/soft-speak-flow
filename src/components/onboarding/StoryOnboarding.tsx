@@ -34,7 +34,6 @@ import {
   getCompanionElement,
   getCompanionElementAnchorColor,
   getCompanionPreset,
-  resolveCompanionStageFromXp,
   type CompanionStoryTone,
   type CompanionPresetId,
 } from "@/config/companionCatalog";
@@ -805,13 +804,13 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
         }
 
         const normalizedElement = preferences.coreElement;
-        const resolvedStage = resolveCompanionStageFromXp(latestCompanion.current_xp ?? 0);
+        const claimedStage = Math.max(latestCompanion.current_stage ?? 0, 0);
         const initialImageUrl = getUniversalEggAssetUrl(normalizedElement);
-        const currentImageUrl = resolvedStage <= 0
+        const currentImageUrl = claimedStage <= 0
           ? initialImageUrl
           : getPresetCompanionAssetUrl({
             presetId: preset.id,
-            stage: resolvedStage,
+            stage: claimedStage,
             element: normalizedElement,
             state: "normal",
           }) ?? "/placeholder-companion.svg";
@@ -825,7 +824,7 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
             p_favorite_color: getCompanionElementAnchorColor(normalizedElement),
             p_core_element: normalizedElement,
             p_story_tone: preferences.storyTone,
-            p_current_stage: resolvedStage,
+            p_current_stage: claimedStage,
             p_current_image_url: currentImageUrl,
             p_initial_image_url: initialImageUrl,
           },

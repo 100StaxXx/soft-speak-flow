@@ -124,7 +124,24 @@ export const fetchCompanion = async (userId: string): Promise<Companion | null> 
     | RepairAutoAdvancedCompanionStateResult
     | null;
 
-  if (!repairResult?.repaired) {
+  if (!repairResult) {
+    logger.warn("Companion repair check returned no result", {
+      companionId: companion.id,
+      userId,
+      currentStage: companion.current_stage,
+    });
+    return companion;
+  }
+
+  if (!repairResult.repaired) {
+    if (repairResult.last_real_stage < companion.current_stage) {
+      logger.warn("Companion repair check left an impossible claimed stage unresolved", {
+        companionId: companion.id,
+        userId,
+        currentStage: companion.current_stage,
+        lastRealStage: repairResult.last_real_stage,
+      });
+    }
     return companion;
   }
 

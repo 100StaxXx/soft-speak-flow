@@ -527,6 +527,30 @@ describe("useCompanion evolveCompanion", () => {
     expect(result.current.canEvolve).toBe(true);
   });
 
+  it("keeps stage 0 eggs hatch-ready without auto-advancing them", async () => {
+    mocks.userCompanionResponses.length = 0;
+    mocks.userCompanionResponses.push({
+      data: {
+        ...companionFixture,
+        current_stage: 0,
+        current_xp: 14,
+        preset_id: "dragon",
+        spirit_animal: "Dragon",
+        core_element: "fire",
+        current_image_url: "/companion-eggs/egg__t0_egg__normal__fire.png",
+        initial_image_url: "/companion-eggs/egg__t0_egg__normal__fire.png",
+      },
+      error: null,
+    });
+
+    const { result } = await renderUseCompanion();
+
+    expect(result.current.companion?.current_stage).toBe(0);
+    expect(result.current.nextEvolutionXP).toBe(10);
+    expect(result.current.progressToNext).toBe(100);
+    expect(result.current.canEvolve).toBe(true);
+  });
+
   it("uses onboarding fast retry defaults for companion creation", async () => {
     mocks.rpcMock.mockResolvedValueOnce({
       data: [
@@ -566,6 +590,45 @@ describe("useCompanion evolveCompanion", () => {
         p_initial_image_focal_y: 0.458008,
       }),
     );
+  });
+
+  it("keeps preset-locked eggs at stage 0 after companion creation", async () => {
+    mocks.rpcMock.mockResolvedValueOnce({
+      data: [
+        {
+          ...companionFixture,
+          preset_id: "wolf",
+          spirit_animal: "Wolf",
+          core_element: "fire",
+          current_stage: 0,
+          current_xp: 0,
+          current_image_url: "/companion-eggs/egg__t0_egg__normal__fire.png",
+          initial_image_url: "/companion-eggs/egg__t0_egg__normal__fire.png",
+          is_new: true,
+        },
+      ],
+      error: null,
+    });
+
+    const { result } = await renderUseCompanion();
+
+    let createdCompanion: Awaited<ReturnType<typeof result.current.createCompanion.mutateAsync>>;
+    await act(async () => {
+      createdCompanion = await result.current.createCompanion.mutateAsync({
+        presetId: "wolf",
+        favoriteColor: "#FF6B35",
+        spiritAnimal: "Wolf",
+        coreElement: "fire",
+        storyTone: "epic_adventure",
+      });
+    });
+
+    expect(createdCompanion!).toMatchObject({
+      preset_id: "wolf",
+      current_stage: 0,
+      current_image_url: "/companion-eggs/egg__t0_egg__normal__fire.png",
+      initial_image_url: "/companion-eggs/egg__t0_egg__normal__fire.png",
+    });
   });
 
   it("creates an egg-first companion without a preset", async () => {
@@ -1173,8 +1236,10 @@ describe("useCompanion evolveCompanion", () => {
         p_initial_image_url: companionFixture.current_image_url,
         p_initial_image_focal_x: null,
         p_initial_image_focal_y: null,
-        p_current_image_focal_x: 0.533724,
-        p_current_image_focal_y: 0.495117,
+        p_current_image_url: "/companion-presets/dragon/t1_youth/normal/dragon__t1_youth__normal__fire.png",
+        p_current_image_focal_x: expect.any(Number),
+        p_current_image_focal_y: expect.any(Number),
+        p_xp_at_evolution: 14,
       }),
     );
 

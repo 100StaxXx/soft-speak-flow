@@ -8,7 +8,6 @@ import { useCompanionVisualState } from "@/hooks/useCompanionVisualState";
 import { useCompanionRegenerate } from "@/hooks/useCompanionRegenerate";
 import { useCompanionWakeUp } from "@/hooks/useCompanionWakeUp";
 import { useEpicRewards } from "@/hooks/useEpicRewards";
-import { useCompanionTutorialPresentation } from "@/hooks/useCompanionTutorialPresentation";
 import { useEvolution } from "@/contexts/EvolutionContext";
 import { CompanionSkeleton } from "@/components/CompanionSkeleton";
 import { AttributeTooltip } from "@/components/AttributeTooltip";
@@ -133,12 +132,6 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
     requiresHatchSelection,
     hatchCompanion,
   } = useCompanion();
-  const tutorialPresentation = useCompanionTutorialPresentation({
-    companion,
-    canEvolve,
-    nextEvolutionXP,
-    progressToNext,
-  });
   const { unlockedSkins } = useReferrals();
   const { health, needsWelcomeBack } = useCompanionHealth();
   const { regenerate, isRegenerating, maxRegenerations, generationPhase, retryCount, resetProgress } = useCompanionRegenerate();
@@ -347,19 +340,15 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
     }
   }, [needsWelcomeBack, welcomeBackDismissed, companion]);
 
-  const displayCompanion = tutorialPresentation.companion;
-  const displayCanEvolve = tutorialPresentation.canEvolve;
-  const displayNextEvolutionXP = tutorialPresentation.nextEvolutionXP;
-  const displayProgressToNext = tutorialPresentation.progressToNext;
+  const displayCompanion = companion;
+  const displayCanEvolve = canEvolve;
+  const displayNextEvolutionXP = nextEvolutionXP;
+  const displayProgressToNext = progressToNext;
 
   // Calculate effective image URL (must be before the useEffect that depends on it)
   // Priority: dormant image > neglected image > current image
   const displayImageUrl = useMemo(() => {
     if (!displayCompanion) return null;
-
-    if (tutorialPresentation.isStageZeroOverrideActive) {
-      return resolveCompanionVisualAssetUrl(displayCompanion, "normal");
-    }
 
     if (isDormant) {
       return resolveCompanionVisualAssetUrl(displayCompanion, "dormant");
@@ -376,20 +365,12 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
     health.isNeglected,
     health.neglectedImageUrl,
     isDormant,
-    tutorialPresentation.isStageZeroOverrideActive,
   ]);
   
   const effectiveImageUrl = displayImageUrl || COMPANION_PLACEHOLDER;
   const usesPresetPortraitShell = isCompanionPresetImageSource(effectiveImageUrl);
   const effectiveImageFocal = useMemo(() => {
     if (!displayCompanion) return { x: null, y: null };
-
-    if (tutorialPresentation.isStageZeroOverrideActive) {
-      return {
-        x: displayCompanion.current_image_focal_x ?? null,
-        y: displayCompanion.current_image_focal_y ?? null,
-      };
-    }
 
     if (isDormant) {
       return {
@@ -425,7 +406,6 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
     health.neglectedImageFocalX,
     health.neglectedImageFocalY,
     isDormant,
-    tutorialPresentation.isStageZeroOverrideActive,
   ]);
 
   // Track image URL changes to reset loading state
