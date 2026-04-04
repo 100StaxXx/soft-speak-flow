@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   getSession: vi.fn(),
   invoke: vi.fn(),
   parseFunctionInvokeError: vi.fn(),
+  toUserFacingFunctionError: vi.fn(),
 }));
 
 vi.mock("@/integrations/supabase/client", () => ({
@@ -24,6 +25,7 @@ vi.mock("@/services/authScopedClientState", () => ({
 
 vi.mock("@/utils/supabaseFunctionErrors", () => ({
   parseFunctionInvokeError: mocks.parseFunctionInvokeError,
+  toUserFacingFunctionError: mocks.toUserFacingFunctionError,
 }));
 
 import { deleteCurrentAccount, isAccountDeletionAuthError } from "./accountDeletion";
@@ -50,6 +52,7 @@ describe("accountDeletion", () => {
       isOffline: false,
       name: undefined,
     });
+    mocks.toUserFacingFunctionError.mockReturnValue("Unable to delete your account. Please try again.");
     mocks.getSession.mockResolvedValue({
       data: {
         session: {
@@ -147,6 +150,28 @@ describe("accountDeletion", () => {
     expect(error).toBeInstanceOf(Error);
     expect((error as Error).message).toBe("Account deletion is temporarily unavailable. Please try again later.");
 
+    expect(mocks.clearAuthScopedClientState).not.toHaveBeenCalled();
+    expect(signOut).not.toHaveBeenCalled();
+  });
+
+  it("maps non-success function payloads without clearing local state", async () => {
+    mocks.invoke.mockResolvedValue({
+      data: {
+        success: false,
+        code: "ACCOUNT_DELETION_BACKEND_UNAVAILABLE",
+        error: "Account deletion is temporarily unavailable. Please try again later.",
+      },
+      error: null,
+    });
+
+    const error = await deleteCurrentAccount({
+      queryClient,
+      userId: "user-1",
+      signOut,
+    }).catch((caughtError) => caughtError);
+
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toBe("Account deletion is temporarily unavailable. Please try again later.");
     expect(mocks.clearAuthScopedClientState).not.toHaveBeenCalled();
     expect(signOut).not.toHaveBeenCalled();
   });
