@@ -9,6 +9,13 @@ interface CleanupWarning {
   details?: Record<string, unknown>;
 }
 
+interface ErrorWithOptionalFields {
+  message?: unknown;
+  code?: unknown;
+  name?: unknown;
+  status?: unknown;
+}
+
 const ACCOUNT_DELETION_TEMPORARILY_UNAVAILABLE_MESSAGE =
   "Account deletion is temporarily unavailable. Please try again later.";
 
@@ -47,9 +54,32 @@ class AccountDeletionError extends Error {
 
 type SupabaseAdminClient = ReturnType<typeof createClient<any>>;
 
+interface HandleDeleteUserDependencies {
+  env?: Pick<typeof Deno.env, "get">;
+  createAdminClient?: (supabaseUrl: string, serviceRoleKey: string) => SupabaseAdminClient;
+  collectStorageTargets?: typeof collectUserStorageTargets;
+  cleanupStorage?: typeof runStorageCleanup;
+  sleep?: (ms: number) => Promise<void>;
+}
+
 const STORAGE_PATH_REGEX = /\/storage\/v1\/object\/(?:public|sign|authenticated)\/([^/]+)\/(.+)$/i;
 const STORAGE_REMOVE_BATCH_SIZE = 100;
 const STORAGE_LIST_PAGE_SIZE = 100;
+const DELETE_USER_RETRY_DELAYS_MS = [500, 1500] as const;
+const RETRYABLE_ERROR_PATTERNS = [
+  "timeout",
+  "timed out",
+  "network",
+  "connection",
+  "econnreset",
+  "ecconnrefused",
+  "failed to fetch",
+  "fetch failed",
+  "service unavailable",
+  "temporarily unavailable",
+  "rate limit",
+  "too many requests",
+];
 
 const PREFIX_SWEEPS: Array<{ bucket: string; prefix: (userId: string) => string }> = [
   { bucket: "quest-attachments", prefix: (userId) => userId },
@@ -78,21 +108,140 @@ const createTemporaryUnavailableError = (
     cause,
   });
 
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+const asString = (value: unknown): string | undefined =>
+  typeof value === "string" && value.trim().length > 0 ? value : undefined;
+
+const asNumber = (value: unknown): number | undefined =>
+  typeof value === "number" && Number.isFinite(value) ? value : undefined;
+
+const getErrorFieldRecord = (error: unknown): ErrorWithOptionalFields | null =>
+  error && typeof error === "object" ? (error as ErrorWithOptionalFields) : null;
+
+const getErrorMessage = (error: unknown): string | undefined => {
+  if (error instanceof Error && error.message.trim().length > 0) {
+    return error.message;
+  }
+
+  return asString(getErrorFieldRecord(error)?.message);
+};
+
+const getErrorCode = (error: unknown): string | undefined =>
+  asString(getErrorFieldRecord(error)?.code);
+
+const getErrorName = (error: unknown): string | undefined => {
+  if (error instanceof Error && error.name.trim().length > 0) {
+    return error.name;
+  }
+
+  return asString(getErrorFieldRecord(error)?.name);
+};
+
+const getErrorStatus = (error: unknown): number | undefined => {
+  if (error instanceof AccountDeletionError) {
+    return error.status;
+  }
+
+  return asNumber(getErrorFieldRecord(error)?.status);
+};
+
+const normalizeErrorText = (value: string): string =>
+  value
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .toLowerCase()
+    .replace(/[_-]+/g, " ")
+    .trim();
+
+const getNormalizedErrorText = (error: unknown): string =>
+  normalizeErrorText(
+    [getErrorName(error), getErrorCode(error), getErrorMessage(error)]
+      .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+      .join(" "),
+  );
+
+const describeError = (error: unknown): Record<string, unknown> => ({
+  name: getErrorName(error) ?? null,
+  code: getErrorCode(error) ?? null,
+  status: getErrorStatus(error) ?? null,
+  message: getErrorMessage(error) ?? String(error),
+});
+
+export const isTransientDeleteUserInfrastructureError = (error: unknown): boolean => {
+  const status = getErrorStatus(error);
+  const normalizedText = getNormalizedErrorText(error);
+
+  if (status === 401 || status === 403 || status === 404) {
+    return false;
+  }
+
+  if (
+    normalizedText.includes("unauthorized")
+    || normalizedText.includes("invalid token")
+    || normalizedText.includes("jwt")
+    || normalizedText.includes("user not found")
+    || normalizedText.includes("no rows")
+  ) {
+    return false;
+  }
+
+  if (status === 408 || status === 429) {
+    return true;
+  }
+
+  if (typeof status === "number" && status >= 500) {
+    return true;
+  }
+
+  return RETRYABLE_ERROR_PATTERNS.some((pattern) => normalizedText.includes(pattern));
+};
+
+const runDeleteStepWithRetry = async (
+  operationName: string,
+  perform: () => Promise<void>,
+  temporaryFailureCode:
+    | typeof ACCOUNT_DELETION_ERROR_CODES.AUTH_DELETE_FAILED
+    | typeof ACCOUNT_DELETION_ERROR_CODES.BACKEND_UNAVAILABLE,
+  waitForRetry: (ms: number) => Promise<void>,
+): Promise<void> => {
+  const totalAttempts = DELETE_USER_RETRY_DELAYS_MS.length + 1;
+
+  for (let attempt = 1; attempt <= totalAttempts; attempt += 1) {
+    try {
+      await perform();
+      return;
+    } catch (error) {
+      const retryable = isTransientDeleteUserInfrastructureError(error);
+
+      if (!retryable) {
+        throw error;
+      }
+
+      if (attempt === totalAttempts) {
+        console.error(`[delete-user] ${operationName} failed after retries`, {
+          attempt,
+          maxAttempts: totalAttempts,
+          ...describeError(error),
+        });
+        throw createTemporaryUnavailableError(temporaryFailureCode, error);
+      }
+
+      const delayMs = DELETE_USER_RETRY_DELAYS_MS[attempt - 1];
+      console.warn(`[delete-user] ${operationName} failed; retrying`, {
+        attempt,
+        nextAttempt: attempt + 1,
+        delayMs,
+        ...describeError(error),
+      });
+      await waitForRetry(delayMs);
+    }
+  }
+};
+
 export const isAuthUserAlreadyDeletedError = (error: unknown): boolean => {
   if (!error || typeof error !== "object") return false;
 
-  const combinedMessage = [
-    "message" in error ? error.message : undefined,
-    "code" in error ? error.code : undefined,
-    "name" in error ? error.name : undefined,
-  ]
-    .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
-    .join(" ");
-
-  const normalizedMessage = combinedMessage
-    .replace(/([a-z])([A-Z])/g, "$1 $2")
-    .toLowerCase()
-    .replace(/[_-]+/g, " ");
+  const normalizedMessage = getNormalizedErrorText(error);
   const compactMessage = normalizedMessage.replace(/[^a-z]+/g, "");
 
   return normalizedMessage.includes("user not found")
@@ -111,24 +260,33 @@ function sanitizeError(error: unknown): SanitizedDeleteUserError {
     };
   }
 
-  if (error instanceof Error) {
-    const msg = error.message.toLowerCase();
+  const status = getErrorStatus(error);
+  const normalizedMessage = getNormalizedErrorText(error);
 
-    if (msg.includes("unauthorized") || msg.includes("invalid token") || msg.includes("jwt")) {
-      return {
-        message: "Unauthorized",
-        status: 401,
-        code: ACCOUNT_DELETION_ERROR_CODES.AUTH_REQUIRED,
-      };
-    }
+  if (
+    status === 401
+    || status === 403
+    || normalizedMessage.includes("unauthorized")
+    || normalizedMessage.includes("invalid token")
+    || normalizedMessage.includes("jwt")
+  ) {
+    return {
+      message: "Unauthorized",
+      status: 401,
+      code: ACCOUNT_DELETION_ERROR_CODES.AUTH_REQUIRED,
+    };
+  }
 
-    if (msg.includes("not found") || msg.includes("no rows")) {
-      return {
-        message: "User not found",
-        status: 404,
-        code: ACCOUNT_DELETION_ERROR_CODES.NOT_FOUND,
-      };
-    }
+  if (
+    status === 404
+    || normalizedMessage.includes("not found")
+    || normalizedMessage.includes("no rows")
+  ) {
+    return {
+      message: "User not found",
+      status: 404,
+      code: ACCOUNT_DELETION_ERROR_CODES.NOT_FOUND,
+    };
   }
 
   return {
@@ -531,7 +689,10 @@ const runStorageCleanup = async (
   }
 };
 
-export const handleDeleteUser = async (req: Request): Promise<Response> => {
+export const handleDeleteUser = async (
+  req: Request,
+  dependencies: HandleDeleteUserDependencies = {},
+): Promise<Response> => {
   if (req.method === "OPTIONS") {
     return handleCors(req);
   }
@@ -546,8 +707,20 @@ export const handleDeleteUser = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const env = dependencies.env ?? Deno.env;
+    const createAdminClient = dependencies.createAdminClient ?? ((supabaseUrl: string, serviceRoleKey: string) =>
+      createClient<any>(supabaseUrl, serviceRoleKey, {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      }));
+    const collectStorageTargets = dependencies.collectStorageTargets ?? collectUserStorageTargets;
+    const cleanupStorage = dependencies.cleanupStorage ?? runStorageCleanup;
+    const waitForRetry = dependencies.sleep ?? sleep;
+
+    const supabaseUrl = env.get("SUPABASE_URL") ?? "";
+    const serviceRoleKey = env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
     if (!supabaseUrl || !serviceRoleKey) {
       console.error("[delete-user] missing required env", {
@@ -557,12 +730,7 @@ export const handleDeleteUser = async (req: Request): Promise<Response> => {
       throw createTemporaryUnavailableError(ACCOUNT_DELETION_ERROR_CODES.CONFIG_ERROR);
     }
 
-    const supabase: SupabaseAdminClient = createClient<any>(supabaseUrl, serviceRoleKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    });
+    const supabase = createAdminClient(supabaseUrl, serviceRoleKey);
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
@@ -588,25 +756,40 @@ export const handleDeleteUser = async (req: Request): Promise<Response> => {
     const userId = user.id;
     const cleanupWarnings: CleanupWarning[] = [];
 
-    const storageTargets = await collectUserStorageTargets(supabase, userId, cleanupWarnings);
+    const storageTargets = await collectStorageTargets(supabase, userId, cleanupWarnings);
 
-    const { error: deleteDataError } = await supabase.rpc("delete_user_account", { p_user_id: userId });
-    if (deleteDataError) {
-      console.error("[delete-user] delete_user_account rpc failed", deleteDataError);
-      throw createTemporaryUnavailableError(ACCOUNT_DELETION_ERROR_CODES.BACKEND_UNAVAILABLE, deleteDataError);
-    }
+    await runDeleteStepWithRetry(
+      "delete_user_account rpc",
+      async () => {
+        const { error: deleteDataError } = await supabase.rpc("delete_user_account", { p_user_id: userId });
+        if (deleteDataError) {
+          throw deleteDataError;
+        }
+      },
+      ACCOUNT_DELETION_ERROR_CODES.BACKEND_UNAVAILABLE,
+      waitForRetry,
+    );
 
-    await runStorageCleanup(supabase, userId, storageTargets, cleanupWarnings);
+    await cleanupStorage(supabase, userId, storageTargets, cleanupWarnings);
 
-    const { error: authDeleteError } = await supabase.auth.admin.deleteUser(userId);
-    if (authDeleteError) {
-      if (isAuthUserAlreadyDeletedError(authDeleteError)) {
-        console.warn("[delete-user] auth user already removed before admin delete", { userId });
-      } else {
-        console.error("[delete-user] auth.admin.deleteUser failed", authDeleteError);
-        throw createTemporaryUnavailableError(ACCOUNT_DELETION_ERROR_CODES.AUTH_DELETE_FAILED, authDeleteError);
-      }
-    }
+    await runDeleteStepWithRetry(
+      "auth.admin.deleteUser",
+      async () => {
+        const { error: authDeleteError } = await supabase.auth.admin.deleteUser(userId);
+        if (!authDeleteError) {
+          return;
+        }
+
+        if (isAuthUserAlreadyDeletedError(authDeleteError)) {
+          console.warn("[delete-user] auth user already removed before admin delete", { userId });
+          return;
+        }
+
+        throw authDeleteError;
+      },
+      ACCOUNT_DELETION_ERROR_CODES.AUTH_DELETE_FAILED,
+      waitForRetry,
+    );
 
     return new Response(
       JSON.stringify({
@@ -625,5 +808,5 @@ export const handleDeleteUser = async (req: Request): Promise<Response> => {
 };
 
 if (Deno.env.get("SUPABASE_FUNCTIONS_TEST") !== "1") {
-  serve(handleDeleteUser);
+  serve((req) => handleDeleteUser(req));
 }

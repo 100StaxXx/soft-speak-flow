@@ -168,8 +168,8 @@ export const MentorGuidanceCard = () => {
     speakerPrimaryColor,
     speakerSlug,
     speakerAvatarUrl,
-    skipTutorialLabel,
-    onSkipTutorial,
+    secondaryActionLabel,
+    onSecondaryAction,
     dialogueActionLabel,
     onDialogueAction,
   } = usePostOnboardingMentorGuidance();
@@ -285,7 +285,7 @@ export const MentorGuidanceCard = () => {
             {dialogueSupportText ? (
               <p className="mt-1 text-sm leading-relaxed text-white/80">{dialogueSupportText}</p>
             ) : null}
-            {canTemporarilyHide || onSkipTutorial || onDialogueAction ? (
+            {canTemporarilyHide || onSecondaryAction || onDialogueAction ? (
               <div className="mt-3 flex flex-wrap gap-2">
                 {canTemporarilyHide ? (
                   <Button
@@ -298,15 +298,15 @@ export const MentorGuidanceCard = () => {
                     Hide tutorial
                   </Button>
                 ) : null}
-                {onSkipTutorial ? (
+                {onSecondaryAction ? (
                   <Button
                     type="button"
                     variant="ghost"
-                    aria-label={skipTutorialLabel || "Skip tutorial"}
-                    onClick={onSkipTutorial}
+                    aria-label={secondaryActionLabel || "Skip tutorial"}
+                    onClick={onSecondaryAction}
                     className="pointer-events-auto h-9 rounded-xl border border-white/25 bg-black/45 text-white hover:bg-black/60"
                   >
-                    {skipTutorialLabel || "Skip tutorial"}
+                    {secondaryActionLabel || "Skip tutorial"}
                   </Button>
                 ) : null}
                 {onDialogueAction ? (

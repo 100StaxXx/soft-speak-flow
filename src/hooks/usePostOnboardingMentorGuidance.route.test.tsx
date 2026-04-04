@@ -25,6 +25,22 @@ const createEvolveStepTutorial = () => ({
   milestonesCompleted: ["mentor_intro_hello", "companion_tab_intro"] as const,
 });
 
+const createCloseoutTutorial = () => ({
+  version: 2,
+  eligible: true,
+  completed: false,
+  completedSteps: [
+    "quests_campaigns_intro",
+    "create_quest",
+    "morning_checkin",
+    "companion_tab_intro",
+    "evolve_companion",
+    "post_evolution_companion_intro",
+  ] as const,
+  xpAwardedSteps: ["create_quest", "morning_checkin"] as const,
+  milestonesCompleted: ["mentor_intro_hello", "post_evolution_companion_intro"] as const,
+});
+
 const mocks = vi.hoisted(() => ({
   guidedTutorial: {
     version: 2,
@@ -82,8 +98,8 @@ const RouteProbe = () => {
     dialogueActionLabel,
     onDialogueAction,
     currentStep,
-    skipTutorialLabel,
-    onSkipTutorial,
+    secondaryActionLabel,
+    onSecondaryAction,
   } = usePostOnboardingMentorGuidance();
 
   return (
@@ -92,12 +108,12 @@ const RouteProbe = () => {
       <div data-testid="step">{currentStep ?? ""}</div>
       <div data-testid="intro-active">{String(isIntroDialogueActive)}</div>
       <div data-testid="intro-action">{dialogueActionLabel || ""}</div>
-      <div data-testid="skip-action">{skipTutorialLabel || ""}</div>
+      <div data-testid="secondary-action">{secondaryActionLabel || ""}</div>
       <button type="button" onClick={() => onDialogueAction?.()}>
         intro-action
       </button>
-      <button type="button" onClick={() => onSkipTutorial?.()}>
-        skip
+      <button type="button" onClick={() => onSecondaryAction?.()}>
+        secondary
       </button>
       <button type="button" onClick={() => navigate(-1)}>
         back
@@ -220,7 +236,7 @@ describe("guided tutorial route restoration", () => {
       expect(screen.getByTestId("path")).toHaveTextContent("/mentor");
       expect(screen.getByTestId("intro-active")).toHaveTextContent("true");
       expect(screen.getByTestId("intro-action")).toHaveTextContent("Start Tutorial");
-      expect(screen.getByTestId("skip-action")).toHaveTextContent("");
+      expect(screen.getByTestId("secondary-action")).toHaveTextContent("");
     });
   });
 
@@ -321,20 +337,38 @@ describe("guided tutorial route restoration", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("intro-action")).toHaveTextContent("");
-      expect(screen.getByTestId("skip-action")).toHaveTextContent("Skip tutorial");
+      expect(screen.getByTestId("secondary-action")).toHaveTextContent("Skip tutorial");
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "skip" }));
+    fireEvent.click(screen.getByRole("button", { name: "secondary" }));
 
     await waitFor(() => {
       expect(screen.getByTestId("step")).toHaveTextContent("");
-      expect(screen.getByTestId("skip-action")).toHaveTextContent("");
+      expect(screen.getByTestId("secondary-action")).toHaveTextContent("");
     });
 
     fireEvent.click(screen.getByRole("button", { name: "go-journeys" }));
 
     await waitFor(() => {
       expect(screen.getByTestId("path")).toHaveTextContent("/journeys");
+    });
+  });
+
+  it("shows a complete tutorial action on the final closeout step", async () => {
+    mocks.guidedTutorial = createCloseoutTutorial();
+    renderWithProviders("/companion");
+
+    await waitFor(() => {
+      expect(screen.getByTestId("path")).toHaveTextContent("/companion");
+      expect(screen.getByTestId("step")).toHaveTextContent("mentor_closeout");
+      expect(screen.getByTestId("secondary-action")).toHaveTextContent("Complete tutorial");
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "secondary" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("step")).toHaveTextContent("");
+      expect(screen.getByTestId("secondary-action")).toHaveTextContent("");
     });
   });
 

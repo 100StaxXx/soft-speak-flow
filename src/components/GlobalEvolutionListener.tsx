@@ -140,7 +140,7 @@ export const GlobalEvolutionListener = () => {
     });
   }, [user?.id]);
 
-  const startEvolutionPresentation = useCallback(async ({
+  const startEvolutionPresentation = useCallback(({
     companionId,
     previousLevel,
     level,
@@ -172,15 +172,12 @@ export const GlobalEvolutionListener = () => {
     }
 
     try {
-      const mentorSlug = await resolveMentorSlug();
-
       setEvolutionData({
         companionId,
         previousLevel,
         level,
         previousImageUrl,
         imageUrl,
-        mentorSlug,
         element,
       });
       triggerEvent({
@@ -201,6 +198,40 @@ export const GlobalEvolutionListener = () => {
         previousLevel,
         level,
       });
+
+      void resolveMentorSlug()
+        .then((mentorSlug) => {
+          if (!mentorSlug) {
+            return;
+          }
+
+          setEvolutionData((current) => {
+            if (
+              !current
+              || current.companionId !== companionId
+              || current.previousLevel !== previousLevel
+              || current.level !== level
+            ) {
+              return current;
+            }
+
+            if (current.mentorSlug === mentorSlug) {
+              return current;
+            }
+
+            return {
+              ...current,
+              mentorSlug,
+            };
+          });
+        })
+        .catch((error) => {
+          logger.warn("Evolution listener: Failed to resolve mentor slug", {
+            companionId,
+            level,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        });
 
       return true;
     } catch (error) {

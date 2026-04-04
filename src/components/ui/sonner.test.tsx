@@ -1,9 +1,10 @@
-import { act } from "@testing-library/react";
+import { act, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MAX_TOAST_DURATION_MS } from "@/constants/toast";
 
 const sonnerMocks = vi.hoisted(() => ({
+  toaster: vi.fn(() => null),
   base: vi.fn(() => "base-id"),
   success: vi.fn(() => "success-id"),
   info: vi.fn(() => "info-id"),
@@ -34,12 +35,12 @@ vi.mock("sonner", () => {
   });
 
   return {
-    Toaster: () => null,
+    Toaster: sonnerMocks.toaster,
     toast,
   };
 });
 
-import { toast } from "./sonner";
+import { Toaster, toast } from "./sonner";
 
 describe("sonner toast wrapper", () => {
   beforeEach(() => {
@@ -52,7 +53,7 @@ describe("sonner toast wrapper", () => {
     Object.values(sonnerMocks).forEach((mockFn) => mockFn.mockReset());
   });
 
-  it("caps success toasts at three seconds", () => {
+  it("caps success toasts at two seconds", () => {
     toast.success("Saved", { duration: 5000 });
 
     expect(sonnerMocks.success).toHaveBeenCalledWith(
@@ -61,7 +62,28 @@ describe("sonner toast wrapper", () => {
     );
   });
 
-  it("auto-dismisses loading toasts after three seconds", () => {
+  it("hard-dismisses action toasts after two seconds", () => {
+    toast("Quest deleted", {
+      duration: 5000,
+      action: {
+        label: "Undo",
+        onClick: vi.fn(),
+      },
+    });
+
+    expect(sonnerMocks.base).toHaveBeenCalledWith(
+      "Quest deleted",
+      expect.objectContaining({ duration: MAX_TOAST_DURATION_MS }),
+    );
+
+    act(() => {
+      vi.advanceTimersByTime(MAX_TOAST_DURATION_MS);
+    });
+
+    expect(sonnerMocks.dismiss).toHaveBeenCalledWith("base-id");
+  });
+
+  it("auto-dismisses loading toasts after two seconds", () => {
     sonnerMocks.loading.mockReturnValueOnce("loading-id");
 
     toast.loading("Working...");
@@ -76,5 +98,20 @@ describe("sonner toast wrapper", () => {
     });
 
     expect(sonnerMocks.dismiss).toHaveBeenCalledWith("loading-id");
+  });
+
+  it("disables pause-when-hidden on the shared toaster", () => {
+    render(<Toaster />);
+
+    const sonnerProps = sonnerMocks.toaster.mock.calls[0]?.[0];
+
+    expect(sonnerProps).toEqual(expect.objectContaining({
+      className: "toaster group",
+      duration: MAX_TOAST_DURATION_MS,
+      pauseWhenPageIsHidden: false,
+      position: "bottom-center",
+      swipeDirections: ["bottom", "left", "right"],
+      theme: "dark",
+    }));
   });
 });

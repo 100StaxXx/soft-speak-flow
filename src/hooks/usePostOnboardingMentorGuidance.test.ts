@@ -12,6 +12,24 @@ const createGuidedTutorial = () => ({
   milestonesCompleted: ["open_mentor_tab"] as const,
 });
 
+const createCloseoutTutorial = () => ({
+  version: 2,
+  flowVersion: 3,
+  eligible: true,
+  dismissed: false,
+  completed: false,
+  completedSteps: [
+    "quests_campaigns_intro",
+    "create_quest",
+    "morning_checkin",
+    "companion_tab_intro",
+    "evolve_companion",
+    "post_evolution_companion_intro",
+  ] as const,
+  xpAwardedSteps: ["create_quest", "morning_checkin"] as const,
+  milestonesCompleted: ["mentor_intro_hello", "post_evolution_companion_intro"] as const,
+});
+
 const mocks = vi.hoisted(() => ({
   state: {
     user: { id: "user-1" } as { id: string } | null,
@@ -780,18 +798,18 @@ describe("guided tutorial intro dialogue sequence", () => {
     await waitFor(() => {
       expect(result.current.isActive).toBe(true);
       expect(result.current.currentStep).toBe("quests_campaigns_intro");
-      expect(result.current.skipTutorialLabel).toBe("Skip tutorial");
-      expect(result.current.onSkipTutorial).toBeDefined();
+      expect(result.current.secondaryActionLabel).toBe("Skip tutorial");
+      expect(result.current.onSecondaryAction).toBeDefined();
     });
 
     await act(async () => {
-      result.current.onSkipTutorial?.();
+      result.current.onSecondaryAction?.();
     });
 
     await waitFor(() => {
       expect(result.current.isActive).toBe(false);
       expect(result.current.currentStep).toBe(null);
-      expect(result.current.skipTutorialLabel).toBeUndefined();
+      expect(result.current.secondaryActionLabel).toBeUndefined();
       expect(result.current.dialogueText).toBe("");
     });
 
@@ -800,6 +818,87 @@ describe("guided tutorial intro dialogue sequence", () => {
       | undefined;
     expect(latestPayload?.onboarding_data?.guided_tutorial?.dismissed).toBe(true);
     expect(latestPayload?.onboarding_data?.guided_tutorial?.completed).toBe(false);
+  });
+
+  it("completes the final closeout step from the secondary action", async () => {
+    mocks.state.guidedTutorial = createCloseoutTutorial();
+
+    const { result } = renderHook(() => usePostOnboardingMentorGuidance(), {
+      wrapper: createWrapper("/companion"),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isActive).toBe(true);
+      expect(result.current.currentStep).toBe("mentor_closeout");
+      expect(result.current.secondaryActionLabel).toBe("Complete tutorial");
+      expect(result.current.onSecondaryAction).toBeDefined();
+    });
+
+    await act(async () => {
+      result.current.onSecondaryAction?.();
+    });
+
+    await waitFor(() => {
+      expect(result.current.isActive).toBe(false);
+      expect(result.current.currentStep).toBe(null);
+      expect(result.current.secondaryActionLabel).toBeUndefined();
+    });
+
+    const latestPayload = mocks.state.profileUpdatePayloads.at(-1) as
+      | {
+          onboarding_data?: {
+            guided_tutorial?: {
+              dismissed?: boolean;
+              completed?: boolean;
+              completedSteps?: string[];
+            };
+          };
+        }
+      | undefined;
+    expect(latestPayload?.onboarding_data?.guided_tutorial?.completed).toBe(true);
+    expect(latestPayload?.onboarding_data?.guided_tutorial?.completedSteps).toContain(
+      "mentor_closeout"
+    );
+    expect(latestPayload?.onboarding_data?.guided_tutorial?.dismissed).not.toBe(true);
+  });
+
+  it("auto-completes the closeout step after the fallback timeout", async () => {
+    vi.useFakeTimers();
+    try {
+      mocks.state.guidedTutorial = createCloseoutTutorial();
+
+      const { result } = renderHook(() => usePostOnboardingMentorGuidance(), {
+        wrapper: createWrapper("/companion"),
+      });
+
+      expect(result.current.currentStep).toBe("mentor_closeout");
+      expect(result.current.secondaryActionLabel).toBe("Complete tutorial");
+
+      await act(async () => {
+        vi.advanceTimersByTime(2600);
+        await Promise.resolve();
+      });
+
+      expect(result.current.currentStep).toBe(null);
+      expect(result.current.isActive).toBe(false);
+
+      const latestPayload = mocks.state.profileUpdatePayloads.at(-1) as
+        | {
+            onboarding_data?: {
+              guided_tutorial?: {
+                completed?: boolean;
+                completedSteps?: string[];
+              };
+            };
+          }
+        | undefined;
+      expect(latestPayload?.onboarding_data?.guided_tutorial?.completed).toBe(true);
+      expect(latestPayload?.onboarding_data?.guided_tutorial?.completedSteps).toContain(
+        "mentor_closeout"
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("keeps completed old tutorial completed after migration", async () => {

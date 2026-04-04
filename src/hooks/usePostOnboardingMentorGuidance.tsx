@@ -536,8 +536,8 @@ export interface PostOnboardingMentorGuidanceState {
   speakerPrimaryColor?: string;
   speakerSlug?: string;
   speakerAvatarUrl?: string;
-  skipTutorialLabel?: string;
-  onSkipTutorial?: () => void;
+  secondaryActionLabel?: string;
+  onSecondaryAction?: () => void;
   dialogueActionLabel?: string;
   onDialogueAction?: () => void;
 }
@@ -561,8 +561,8 @@ const DEFAULT_GUIDANCE_STATE: PostOnboardingMentorGuidanceState = {
   speakerPrimaryColor: "#f59e0b",
   speakerSlug: undefined,
   speakerAvatarUrl: undefined,
-  skipTutorialLabel: undefined,
-  onSkipTutorial: undefined,
+  secondaryActionLabel: undefined,
+  onSecondaryAction: undefined,
   dialogueActionLabel: undefined,
   onDialogueAction: undefined,
 };
@@ -1405,7 +1405,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     markMilestoneComplete(currentMilestone);
   }, [currentMilestone, markMilestoneComplete, supportsDialogueAction]);
 
-  const onSkipTutorial = useCallback(() => {
+  const dismissTutorial = useCallback(() => {
     if (!tutorialReady || tutorialMarkedComplete || tutorialDismissed) return;
 
     emitTutorialEvent("tutorial_skipped", {
@@ -1433,6 +1433,35 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     tutorialMarkedComplete,
     tutorialReady,
     user?.id,
+  ]);
+
+  const completeTutorial = useCallback(() => {
+    if (
+      !tutorialReady ||
+      tutorialMarkedComplete ||
+      tutorialDismissed ||
+      currentStepId !== "mentor_closeout"
+    ) {
+      return;
+    }
+
+    if (
+      currentMilestone === "mentor_closeout_message" &&
+      !milestoneSet.has("mentor_closeout_message")
+    ) {
+      markMilestoneComplete("mentor_closeout_message");
+    }
+
+    markStepComplete("mentor_closeout");
+  }, [
+    currentMilestone,
+    currentStepId,
+    markMilestoneComplete,
+    markStepComplete,
+    milestoneSet,
+    tutorialDismissed,
+    tutorialMarkedComplete,
+    tutorialReady,
   ]);
 
   const activeTargetSelectors = useMemo(
@@ -1680,8 +1709,17 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     ? "I'm waiting for this area to load. Stay on this screen and it'll highlight as soon as it's ready."
     : dialogue.support;
   const strictLockEnabled = milestoneUsesStrictLock(currentMilestone);
-  const skipTutorialLabel =
-    !tutorialSuppressed && !isIntroDialogueActive ? "Skip tutorial" : undefined;
+  const secondaryActionLabel =
+    !tutorialSuppressed && !isIntroDialogueActive
+      ? currentStepId === "mentor_closeout"
+        ? "Complete tutorial"
+        : "Skip tutorial"
+      : undefined;
+  const onSecondaryAction = secondaryActionLabel
+    ? currentStepId === "mentor_closeout"
+      ? completeTutorial
+      : dismissTutorial
+    : undefined;
   const isPreHatchCompanionStep =
     !tutorialSuppressed &&
     (currentStepId === "companion_tab_intro" ||
@@ -1706,8 +1744,8 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     speakerPrimaryColor: personality?.primary_color ?? "#f59e0b",
     speakerSlug: personality?.slug,
     speakerAvatarUrl: personality?.avatar_url,
-    skipTutorialLabel,
-    onSkipTutorial: skipTutorialLabel ? onSkipTutorial : undefined,
+    secondaryActionLabel,
+    onSecondaryAction,
     dialogueActionLabel: tutorialSuppressed ? undefined : dialogueActionLabel,
     onDialogueAction:
       tutorialSuppressed ? undefined : (supportsDialogueAction ? onDialogueAction : undefined),

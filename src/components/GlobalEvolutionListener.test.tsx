@@ -16,6 +16,8 @@ const mocks = vi.hoisted(() => {
   const companionEvolutionPropsMock = vi.fn();
   const state = {
     callback: null as null | ((payload: Record<string, unknown>) => Promise<void>),
+    mentorId: null as string | null,
+    mentorLookup: null as null | (() => Promise<{ data: unknown; error: unknown }>),
   };
   const companionEvolutionLookupResponses: Array<{ data: unknown; error: unknown }> = [];
 
@@ -50,7 +52,7 @@ vi.mock("@/hooks/useAuth", () => ({
 
 vi.mock("@/contexts/MentorConnectionContext", () => ({
   useMentorConnection: () => ({
-    mentorId: null,
+    mentorId: mocks.state.mentorId,
     status: "ready",
     refreshConnection: vi.fn(),
   }),
@@ -133,6 +135,21 @@ vi.mock("@/integrations/supabase/client", () => ({
         };
       }
 
+      if (table === "mentors") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              maybeSingle: vi.fn(() => (
+                mocks.state.mentorLookup?.() ?? Promise.resolve({
+                  data: { slug: "atlas" },
+                  error: null,
+                })
+              )),
+            })),
+          })),
+        };
+      }
+
       if (table === "companion_memories") {
         return {
           insert: vi.fn().mockResolvedValue({ error: null }),
@@ -156,6 +173,8 @@ describe("GlobalEvolutionListener", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.state.callback = null;
+    mocks.state.mentorId = null;
+    mocks.state.mentorLookup = null;
     mocks.companionEvolutionLookupResponses.length = 0;
 
     mocks.onMock.mockImplementation(
@@ -257,6 +276,39 @@ describe("GlobalEvolutionListener", () => {
     });
 
     expect(mocks.setEvolutionInProgressMock).toHaveBeenCalledTimes(1);
+    expect(mocks.companionEvolutionPropsMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        previousStage: 0,
+        newStage: 1,
+        previousImageUrl: "https://example.com/egg.png",
+        newImageUrl: "https://example.com/hatchling.png",
+      }),
+    );
+  });
+
+  it("opens the hatch overlay without waiting for mentor lookup", async () => {
+    mocks.state.mentorId = "mentor-1";
+    mocks.state.mentorLookup = () => new Promise(() => {});
+
+    render(<GlobalEvolutionListener />);
+
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent(COMPANION_HATCH_STARTED_EVENT, {
+        detail: {
+          companionId: "companion-1",
+          previousStage: 0,
+          newStage: 1,
+          previousImageUrl: "https://example.com/egg.png",
+          newImageUrl: "https://example.com/hatchling.png",
+          element: "fire",
+        },
+      }));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("companion-evolution")).toBeInTheDocument();
+    });
+
     expect(mocks.companionEvolutionPropsMock).toHaveBeenCalledWith(
       expect.objectContaining({
         previousStage: 0,

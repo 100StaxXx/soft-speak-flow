@@ -1,6 +1,8 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { MAX_TOAST_DURATION_MS } from "@/constants/toast";
+
 import { toast, useToast } from "./use-toast";
 
 describe("use-toast", () => {
@@ -50,7 +52,7 @@ describe("use-toast", () => {
     expect(result.current.toasts).toHaveLength(0);
   });
 
-  it("caps toast duration at three seconds", () => {
+  it("caps toast duration at two seconds", () => {
     const { result } = renderHook(() => useToast());
 
     act(() => {
@@ -58,6 +60,6 @@ describe("use-toast", () => {
     });
 
     expect(result.current.toasts).toHaveLength(1);
-    expect(result.current.toasts[0]?.duration).toBe(3000);
+    expect(result.current.toasts[0]?.duration).toBe(MAX_TOAST_DURATION_MS);
   });
 });

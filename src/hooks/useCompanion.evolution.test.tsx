@@ -2,6 +2,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { MAX_TOAST_DURATION_MS } from "@/constants/toast";
 import { COMPANION_HATCH_STARTED_EVENT } from "@/lib/companionEvolutionEvents";
 
 const companionFixture = {
@@ -280,7 +281,7 @@ describe("useCompanion evolveCompanion", () => {
 
     expect(mocks.toastErrorMock).toHaveBeenCalledWith(
       "Your companion is not ready to evolve yet.",
-      expect.objectContaining({ duration: 3000 }),
+      expect.objectContaining({ duration: MAX_TOAST_DURATION_MS }),
     );
     expect(mocks.setIsEvolvingLoadingMock).toHaveBeenCalledWith(false);
   });
@@ -337,7 +338,7 @@ describe("useCompanion evolveCompanion", () => {
     expect(generateInvokeCalls).toHaveLength(2);
     expect(mocks.toastErrorMock).toHaveBeenCalledWith(
       "Evolution service is temporarily unavailable. Please try again in a minute.",
-      expect.objectContaining({ duration: 3000 }),
+      expect.objectContaining({ duration: MAX_TOAST_DURATION_MS }),
     );
   });
 
@@ -402,7 +403,7 @@ describe("useCompanion evolveCompanion", () => {
 
     expect(mocks.toastErrorMock).toHaveBeenCalledWith(
       "XP service is temporarily unavailable. Please try again shortly.",
-      expect.objectContaining({ duration: 3000 }),
+      expect.objectContaining({ duration: MAX_TOAST_DURATION_MS }),
     );
     expect(mocks.loggerErrorMock).toHaveBeenCalledWith(
       "award_xp_v2 unavailable during XP award",
@@ -448,7 +449,7 @@ describe("useCompanion evolveCompanion", () => {
 
     expect(mocks.toastSuccessMock).toHaveBeenCalledWith(
       "Ready to evolve to Stage 1.",
-      expect.any(Object),
+      expect.objectContaining({ duration: MAX_TOAST_DURATION_MS }),
     );
     expect(mocks.checkCompanionAchievementsMock).not.toHaveBeenCalled();
   });
