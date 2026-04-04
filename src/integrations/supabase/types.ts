@@ -8105,8 +8105,16 @@ export type Database = {
         }
         Returns: {
           cap_applied: boolean
+          claimed_stage_after: number
+          earned_level_after: number
+          earned_tier_after: string
+          level_after: number
+          level_before: number
           next_threshold: number | null
+          pending_evolution_count: number
           should_evolve: boolean
+          tier_after: string
+          tier_before: string
           xp_after: number
           xp_awarded: number
           xp_before: number
@@ -8308,6 +8316,17 @@ export type Database = {
           job_id: string
           requested_stage: number
           status: string
+        }[]
+      }
+      repair_auto_advanced_companion_state: {
+        Args: { p_companion_id: string }
+        Returns: {
+          current_image_focal_x: number | null
+          current_image_focal_y: number | null
+          current_image_url: string | null
+          current_stage: number
+          last_real_stage: number
+          repaired: boolean
         }[]
       }
       should_evolve: {

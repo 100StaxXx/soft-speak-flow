@@ -3,6 +3,7 @@ import {
   getProgressionThreshold,
   getProgressionTier,
   getProgressionTierLabelForLevel,
+  resolveProgressionLevelFromXp,
 } from "@/config/progression";
 
 export interface EvolutionThreshold {
@@ -32,8 +33,7 @@ export const useEvolutionThresholds = () => {
   };
 
   const shouldEvolve = (currentStage: number, currentXP: number): boolean => {
-    const nextThreshold = getThreshold(currentStage + 1);
-    return nextThreshold !== null && currentXP >= nextThreshold;
+    return resolveProgressionLevelFromXp(currentXP) > currentStage;
   };
 
   const getStageName = (stage: number): string => {

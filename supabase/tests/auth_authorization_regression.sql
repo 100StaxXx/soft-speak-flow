@@ -447,6 +447,30 @@ begin
   perform set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
 
   begin
+    perform *
+    from public.repair_auto_advanced_companion_state(
+      'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
+    );
+    raise exception 'repair_auto_advanced_companion_state should reject cross-user companion writes';
+  exception
+    when others then
+      perform public.test_assert(
+        position('companion not found' in lower(sqlerrm)) > 0,
+        'repair_auto_advanced_companion_state should bind writes to auth.uid()'
+      );
+  end;
+
+  execute 'reset role';
+end
+$$;
+
+do $$
+begin
+  execute 'set local role authenticated';
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
+
+  begin
     update public.weekly_recaps
     set mentor_insight = 'Client tamper attempt'
     where id = '66666666-6666-6666-6666-666666666663';

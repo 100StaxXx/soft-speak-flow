@@ -107,9 +107,14 @@ describe("TrialExpiredPaywall layout", () => {
     render(<TrialExpiredPaywall variant="trial_expired" />);
 
     const input = openDeleteDialog();
-    fireEvent.change(input, { target: { value: "DELETE" } });
     const activeElementSpy = vi.spyOn(document, "activeElement", "get").mockReturnValue(input);
     const blurSpy = vi.spyOn(input, "blur");
+    fireEvent.change(input, { target: { value: "DELETE" } });
+
+    await waitFor(() => {
+      expect(blurSpy).toHaveBeenCalled();
+    });
+
     const deleteButton = screen.getByRole("button", { name: "Delete Account" });
     fireEvent.pointerDown(deleteButton);
     fireEvent.click(deleteButton);
@@ -117,7 +122,6 @@ describe("TrialExpiredPaywall layout", () => {
     await waitFor(() => {
       expect(mocks.deleteCurrentAccount).toHaveBeenCalledTimes(1);
     });
-    expect(blurSpy).toHaveBeenCalled();
     activeElementSpy.mockRestore();
   });
 

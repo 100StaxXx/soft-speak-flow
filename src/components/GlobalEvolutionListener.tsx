@@ -15,6 +15,44 @@ import {
 } from "@/config/progression";
 import { useCompanionMotionSafe } from "@/contexts/CompanionMotionContext";
 
+const EVOLUTION_RECORD_RETRY_DELAYS_MS = [0, 75, 150] as const;
+
+const waitForEvolutionPersistence = async ({
+  companionId,
+  stage,
+}: {
+  companionId: string;
+  stage: number;
+}) => {
+  for (const delayMs of EVOLUTION_RECORD_RETRY_DELAYS_MS) {
+    if (delayMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+
+    const { data, error } = await supabase
+      .from("companion_evolutions")
+      .select("id")
+      .eq("companion_id", companionId)
+      .eq("stage", stage)
+      .maybeSingle();
+
+    if (error) {
+      logger.warn("Evolution listener: Failed to verify persisted evolution", {
+        companionId,
+        stage,
+        error: error.message,
+      });
+      return false;
+    }
+
+    if (data?.id) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
 export const GlobalEvolutionListener = () => {
   const { user } = useAuth();
   const { mentorId: resolvedMentorId } = useMentorConnection();
@@ -89,6 +127,20 @@ export const GlobalEvolutionListener = () => {
           const companionId = typeof newData.id === "string" ? newData.id : null;
           if (!companionId) {
             logger.warn("Evolution listener: Missing companion id");
+            return;
+          }
+
+          const hasPersistedEvolution = await waitForEvolutionPersistence({
+            companionId,
+            stage: newLevel,
+          });
+
+          if (!hasPersistedEvolution) {
+            logger.warn("Evolution listener: Ignoring stage update without persisted evolution row", {
+              companionId,
+              oldLevel,
+              newLevel,
+            });
             return;
           }
 

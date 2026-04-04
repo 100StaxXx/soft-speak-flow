@@ -84,13 +84,26 @@ vi.mock("./useAchievements", () => ({
 vi.mock("./useEvolutionThresholds", () => ({
   useEvolutionThresholds: () => ({
     getThreshold: (stage: number) => {
-      if (stage === 0) return 0;
-      if (stage === 1) return 10;
-      return 100;
+      const thresholds: Record<number, number> = {
+        0: 0,
+        1: 10,
+        2: 30,
+        3: 60,
+        4: 80,
+        5: 100,
+      };
+      return thresholds[stage] ?? 100;
     },
     shouldEvolve: (currentStage: number, currentXP: number) => {
-      if (currentStage === 0) return currentXP >= 10;
-      return false;
+      const thresholds: Record<number, number> = {
+        1: 10,
+        2: 30,
+        3: 60,
+        4: 80,
+        5: 100,
+      };
+      const nextThreshold = thresholds[currentStage + 1];
+      return typeof nextThreshold === "number" && currentXP >= nextThreshold;
     },
   }),
 }));
@@ -398,6 +411,120 @@ describe("useCompanion evolveCompanion", () => {
         error_code: "42883",
       }),
     );
+  });
+
+  it("treats newly earned levels as manual evolution readiness instead of auto-claiming them", async () => {
+    mocks.rpcMock.mockResolvedValueOnce({
+      data: [
+        {
+          xp_awarded: 6,
+          xp_before: 4,
+          xp_after: 10,
+          should_evolve: true,
+          next_threshold: 10,
+          cap_applied: false,
+          level_before: 0,
+          level_after: 1,
+          tier_before: "Egg",
+          tier_after: "Hatchling",
+          earned_level_after: 1,
+          earned_tier_after: "Hatchling",
+          claimed_stage_after: 0,
+          pending_evolution_count: 1,
+        },
+      ],
+      error: null,
+    });
+
+    const { result } = await renderUseCompanion();
+
+    await act(async () => {
+      await result.current.awardXP.mutateAsync({
+        eventType: "focus_session",
+        xpAmount: 6,
+      });
+    });
+
+    expect(mocks.toastSuccessMock).toHaveBeenCalledWith(
+      "Ready to evolve to Level 1.",
+      expect.any(Object),
+    );
+    expect(mocks.checkCompanionAchievementsMock).not.toHaveBeenCalled();
+  });
+
+  it("repairs companions that loaded ahead of their actual evolution history", async () => {
+    mocks.userCompanionResponses.length = 0;
+    mocks.userCompanionResponses.push(
+      {
+        data: {
+          ...companionFixture,
+          current_stage: 1,
+          current_xp: 14,
+          preset_id: "dragon",
+          spirit_animal: "Dragon",
+          core_element: "fire",
+          current_image_url: "https://example.com/stage-1.png",
+        },
+        error: null,
+      },
+      {
+        data: {
+          ...companionFixture,
+          current_stage: 0,
+          current_xp: 14,
+          preset_id: "dragon",
+          spirit_animal: "Dragon",
+          core_element: "fire",
+          current_image_url: "https://example.com/stage-0.png",
+        },
+        error: null,
+      },
+    );
+    mocks.rpcMock.mockImplementation(async (fnName: string) => {
+      if (fnName === "repair_auto_advanced_companion_state") {
+        return {
+          data: [
+            {
+              repaired: true,
+              current_stage: 0,
+              last_real_stage: 0,
+              current_image_url: "https://example.com/stage-0.png",
+              current_image_focal_x: 0.5,
+              current_image_focal_y: 0.5,
+            },
+          ],
+          error: null,
+        };
+      }
+
+      return { data: null, error: null };
+    });
+
+    const { result } = await renderUseCompanion();
+
+    expect(result.current.companion?.current_stage).toBe(0);
+    expect(mocks.rpcMock).toHaveBeenCalledWith(
+      "repair_auto_advanced_companion_state",
+      { p_companion_id: companionFixture.id },
+    );
+  });
+
+  it("keeps later claimed stages ready without auto-advancing them", async () => {
+    mocks.userCompanionResponses.length = 0;
+    mocks.userCompanionResponses.push({
+      data: {
+        ...companionFixture,
+        current_stage: 2,
+        current_xp: 100,
+      },
+      error: null,
+    });
+
+    const { result } = await renderUseCompanion();
+
+    expect(result.current.nextEvolutionXP).toBe(60);
+    expect(result.current.progressToNext).toBe(100);
+    expect(result.current.canEvolve).toBe(true);
   });
 
   it("uses onboarding fast retry defaults for companion creation", async () => {

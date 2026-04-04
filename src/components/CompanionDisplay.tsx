@@ -452,6 +452,7 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
   const safeNextEvolutionXP = nextEvolutionXP ?? companion.current_xp;
   const isMaxStage = companion.current_stage >= MAX_COMPANION_STAGE;
   const isStageZeroEgg = companion.current_stage === 0;
+  const nextClaimedLevel = Math.min(companion.current_stage + 1, MAX_COMPANION_STAGE);
   const nextTierBoundary = getNextTierBoundary(companion.current_stage);
   const nextTierLabel = nextTierBoundary === null ? null : getProgressionTierLabelForLevel(nextTierBoundary);
   const shouldAnimateIdleDrift = !prefersReducedMotion && imageLoaded && !imageError && !isRegenerating;
@@ -530,6 +531,8 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
               <p className="text-sm text-muted-foreground font-medium">
                 {isMaxStage
                   ? "Maximum level reached"
+                  : canEvolve
+                    ? `Ready to evolve to Level ${nextClaimedLevel}`
                   : nextTierBoundary === null || !nextTierLabel
                     ? `Next level at ${safeNextEvolutionXP} XP`
                     : `Next tier at Level ${nextTierBoundary} • ${nextTierLabel}`}
@@ -709,13 +712,15 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
               <p className="text-sm font-medium text-muted-foreground mb-2" id="xp-progress-label">
                 {isMaxStage
                   ? `Level ${companion.current_stage} maxed`
-                  : `${companion.current_xp} / ${safeNextEvolutionXP} XP to Level ${companion.current_stage + 1}`}
+                  : canEvolve
+                    ? `Ready to evolve to Level ${nextClaimedLevel}`
+                    : `${companion.current_xp} / ${safeNextEvolutionXP} XP to Level ${nextClaimedLevel}`}
               </p>
               <Progress 
                 value={progressToNext} 
                 className="h-3 rounded-full shadow-inner" 
                 aria-labelledby="xp-progress-label"
-                aria-valuenow={companion.current_xp}
+                aria-valuenow={Math.min(companion.current_xp, safeNextEvolutionXP)}
                 aria-valuemin={0}
                 aria-valuemax={safeNextEvolutionXP}
               />

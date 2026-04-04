@@ -1174,6 +1174,27 @@ Rules:
       throw new Error("Failed to update companion");
     }
 
+    if (currentStage < 5 && nextStage >= 5) {
+      const { data: profileData, error: profileError } = await supabaseAdmin
+        .from("profiles")
+        .select("referred_by")
+        .eq("id", resolvedUserId)
+        .maybeSingle();
+
+      if (profileError) {
+        console.warn("Referral lookup failed during companion evolution:", profileError);
+      } else if (profileData?.referred_by) {
+        const { error: referralError } = await supabaseAdmin.rpc("complete_referral_stage3", {
+          p_referee_id: resolvedUserId,
+          p_referrer_id: profileData.referred_by,
+        });
+
+        if (referralError) {
+          console.warn("Referral completion failed during companion evolution:", referralError);
+        }
+      }
+    }
+
     console.log("Evolution complete!");
 
     // 10. Return success response

@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => {
   const state = {
     callback: null as null | ((payload: Record<string, unknown>) => Promise<void>),
   };
+  const companionEvolutionLookupResponses: Array<{ data: unknown; error: unknown }> = [];
 
   return {
     invalidateQueriesMock,
@@ -30,6 +31,7 @@ const mocks = vi.hoisted(() => {
     loggerErrorMock,
     companionEvolutionPropsMock,
     state,
+    companionEvolutionLookupResponses,
   };
 });
 
@@ -100,18 +102,17 @@ vi.mock("@/integrations/supabase/client", () => ({
     removeChannel: mocks.removeChannelMock,
     from: vi.fn((table: string) => {
       if (table === "companion_evolutions") {
+        const maybeSingleMock = vi.fn(async () =>
+          mocks.companionEvolutionLookupResponses.shift() ?? {
+            data: { id: "evo-1" },
+            error: null,
+          });
+
         return {
           select: vi.fn(() => ({
             eq: vi.fn(() => ({
               eq: vi.fn(() => ({
-                order: vi.fn(() => ({
-                  limit: vi.fn(() => ({
-                    maybeSingle: vi.fn().mockResolvedValue({
-                      data: { image_url: "https://example.com/evolved.png" },
-                      error: null,
-                    }),
-                  })),
-                })),
+                maybeSingle: maybeSingleMock,
               })),
             })),
           })),
@@ -154,6 +155,7 @@ describe("GlobalEvolutionListener", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.state.callback = null;
+    mocks.companionEvolutionLookupResponses.length = 0;
 
     mocks.onMock.mockImplementation(
       (_event: string, _config: Record<string, unknown>, callback: (payload: Record<string, unknown>) => Promise<void>) => {
@@ -229,6 +231,46 @@ describe("GlobalEvolutionListener", () => {
         newStage: 5,
         previousImageUrl: "https://example.com/stage-4.png",
         newImageUrl: "https://example.com/stage-5.png",
+      }),
+    );
+  });
+
+  it("ignores raw stage jumps when no persisted evolution row exists", async () => {
+    mocks.companionEvolutionLookupResponses.push(
+      { data: null, error: null },
+      { data: null, error: null },
+      { data: null, error: null },
+    );
+
+    render(<GlobalEvolutionListener />);
+
+    await act(async () => {
+      await mocks.state.callback?.({
+        eventType: "UPDATE",
+        new: {
+          id: "companion-1",
+          current_stage: 5,
+          current_image_url: "https://example.com/stage-5.png",
+        },
+        old: {
+          id: "companion-1",
+          current_stage: 4,
+          current_image_url: "https://example.com/stage-4.png",
+        },
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("companion-evolution")).not.toBeInTheDocument();
+    });
+
+    expect(mocks.setEvolutionInProgressMock).not.toHaveBeenCalledWith(true);
+    expect(mocks.loggerWarnMock).toHaveBeenCalledWith(
+      "Evolution listener: Ignoring stage update without persisted evolution row",
+      expect.objectContaining({
+        companionId: "companion-1",
+        oldLevel: 4,
+        newLevel: 5,
       }),
     );
   });

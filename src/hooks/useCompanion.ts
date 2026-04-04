@@ -27,8 +27,7 @@ import {
   toUserFacingFunctionError,
 } from "@/utils/supabaseFunctionErrors";
 import {
-  HATCH_READY_LEVEL,
-  getProgressionTierLabelForLevel,
+  resolveProgressionLevelFromXp,
 } from "@/config/progression";
 
 export interface Companion {
@@ -78,6 +77,17 @@ export const XP_REWARDS = SYSTEM_XP_REWARDS;
 export const getCompanionQueryKey = (userId: string | undefined) =>
   ["companion", userId] as const;
 
+const fetchCompanionById = async (companionId: string): Promise<Companion | null> => {
+  const { data, error } = await supabase
+    .from("user_companion")
+    .select("*")
+    .eq("id", companionId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data as Companion | null;
+};
+
 export const fetchCompanion = async (userId: string): Promise<Companion | null> => {
   const { data, error } = await supabase
     .from("user_companion")
@@ -88,7 +98,52 @@ export const fetchCompanion = async (userId: string): Promise<Companion | null> 
     .maybeSingle();
 
   if (error) throw error;
-  return data as Companion | null;
+
+  const companion = data as Companion | null;
+  if (!companion || companion.current_stage <= 0) {
+    return companion;
+  }
+
+  const { data: repairData, error: repairError } = await supabase.rpc(
+    "repair_auto_advanced_companion_state",
+    {
+      p_companion_id: companion.id,
+    },
+  );
+
+  if (repairError) {
+    logger.warn("Companion repair check failed", {
+      companionId: companion.id,
+      userId,
+      error: repairError.message,
+    });
+    return companion;
+  }
+
+  const repairResult = (Array.isArray(repairData) ? repairData[0] : repairData) as
+    | RepairAutoAdvancedCompanionStateResult
+    | null;
+
+  if (!repairResult?.repaired) {
+    return companion;
+  }
+
+  logger.warn("Repaired auto-advanced companion state", {
+    companionId: companion.id,
+    userId,
+    previousStage: companion.current_stage,
+    restoredStage: repairResult.current_stage,
+    lastRealStage: repairResult.last_real_stage,
+  });
+
+  const repairedCompanion = await fetchCompanionById(companion.id);
+  return repairedCompanion ?? {
+    ...companion,
+    current_stage: repairResult.current_stage,
+    current_image_url: repairResult.current_image_url,
+    current_image_focal_x: repairResult.current_image_focal_x,
+    current_image_focal_y: repairResult.current_image_focal_y,
+  };
 };
 
 interface DirectEvolutionResponse {
@@ -139,6 +194,19 @@ type AwardXpResult = {
   level_after?: number | null;
   tier_before?: string | null;
   tier_after?: string | null;
+  earned_level_after?: number | null;
+  earned_tier_after?: string | null;
+  claimed_stage_after?: number | null;
+  pending_evolution_count?: number | null;
+};
+
+type RepairAutoAdvancedCompanionStateResult = {
+  repaired: boolean;
+  current_stage: number;
+  last_real_stage: number;
+  current_image_url: string | null;
+  current_image_focal_x: number | null;
+  current_image_focal_y: number | null;
 };
 
 type SupabaseRpcError = {
@@ -443,7 +511,7 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
   const queryClient = useQueryClient();
   const { checkCompanionAchievements } = useAchievements();
   const { isEvolvingLoading, setIsEvolvingLoading } = useEvolution();
-  const { getThreshold, shouldEvolve } = useEvolutionThresholds();
+  const { getThreshold } = useEvolutionThresholds();
 
   // Prevent duplicate evolution/XP/companion creation requests during lag
   const evolutionInProgress = useRef(false);
@@ -949,19 +1017,16 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
 
       return await performXPAward(companionToUse, xpAmount, eventType, metadata, user, idempotencyKey);
     },
-    onSuccess: async ({ shouldEvolve, previousLevel, newStage }) => {
+    onSuccess: ({ shouldEvolve, claimedStage, earnedLevel, earnedLevelBefore, pendingEvolutionCount }) => {
       queryClient.invalidateQueries({ queryKey: ["companion"] });
 
-      if (newStage > previousLevel) {
-        await checkCompanionAchievements(newStage);
+      if (shouldEvolve && earnedLevel > earnedLevelBefore) {
+        const nextClaimedLevel = claimedStage + 1;
+        const extraReadyCopy = pendingEvolutionCount > 1
+          ? ` ${pendingEvolutionCount} evolutions are ready.`
+          : "";
 
-        if (shouldEvolve) {
-          toast.success(`Reached Level ${newStage} • ${getProgressionTierLabelForLevel(newStage)}!`, {
-            duration: 5000,
-          });
-        }
-      } else if (shouldEvolve) {
-        toast.success(`Reached ${getProgressionTierLabelForLevel(newStage)} tier!`, {
+        toast.success(`Ready to evolve to Level ${nextClaimedLevel}.${extraReadyCopy}`, {
           duration: 5000,
         });
       }
@@ -1030,10 +1095,21 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
       ? awardResult.level_before
       : companionData.current_stage;
     const newXP = awardResult.xp_after ?? companionData.current_xp;
-    const newStage = typeof awardResult.level_after === "number"
-      ? awardResult.level_after
+    const earnedLevelBefore = resolveProgressionLevelFromXp(
+      awardResult.xp_before ?? companionData.current_xp,
+    );
+    const earnedLevel = typeof awardResult.earned_level_after === "number"
+      ? awardResult.earned_level_after
+      : typeof awardResult.level_after === "number"
+        ? awardResult.level_after
+        : resolveProgressionLevelFromXp(newXP);
+    const claimedStage = typeof awardResult.claimed_stage_after === "number"
+      ? awardResult.claimed_stage_after
       : companionData.current_stage;
-    const shouldEvolveNow = Boolean(awardResult.should_evolve);
+    const pendingEvolutionCount = typeof awardResult.pending_evolution_count === "number"
+      ? awardResult.pending_evolution_count
+      : Math.max(earnedLevel - claimedStage, 0);
+    const shouldEvolveNow = Boolean(awardResult.should_evolve ?? pendingEvolutionCount > 0);
 
     logger.log("[XP Award Debug]", {
       eventType,
@@ -1044,20 +1120,26 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
       currentXP: awardResult.xp_before,
       newXP,
       previousLevel,
-      newLevel: newStage,
+      claimedStage,
+      earnedLevelBefore,
+      earnedLevel,
+      pendingEvolutionCount,
       nextThreshold: awardResult.next_threshold,
-      crossedTierBoundary: shouldEvolveNow,
+      readyToEvolve: shouldEvolveNow,
       idempotencyKey: requestIdempotencyKey,
     });
 
     return {
       shouldEvolve: shouldEvolveNow,
       previousLevel,
-      newStage,
+      claimedStage,
+      earnedLevel,
+      earnedLevelBefore,
       newXP,
       xpAwarded: awardResult.xp_awarded ?? 0,
       capApplied: Boolean(awardResult.cap_applied),
       nextThreshold: awardResult.next_threshold ?? null,
+      pendingEvolutionCount,
     };
   };
 
@@ -1158,11 +1240,14 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
         evolutionPromise.current = null;
       }
     },
-    onSuccess: (result) => {
+    onSuccess: async (result) => {
       evolutionInProgress.current = false;
       setIsEvolvingLoading(false);
 
       if (!result) return;
+      if (typeof result.newStage === "number") {
+        await checkCompanionAchievements(result.newStage);
+      }
       queryClient.invalidateQueries({ queryKey: ["companion"] });
       queryClient.invalidateQueries({ queryKey: ["companion-stories-all"] });
       queryClient.invalidateQueries({ queryKey: ["evolution-cards"] });
@@ -1194,6 +1279,11 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
     return getThreshold(companion.current_stage + 1);
   }, [companion, getThreshold]);
 
+  const earnedLevel = useMemo(() => {
+    if (!companion) return 0;
+    return resolveProgressionLevelFromXp(companion.current_xp);
+  }, [companion?.current_xp]);
+
   const progressToNext = useMemo(() => {
     if (!companion || !nextEvolutionXP) return 0;
     const currentStageThreshold = getThreshold(companion.current_stage) ?? 0;
@@ -1205,12 +1295,8 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
 
   const canEvolve = useMemo(() => {
     if (!companion) return false;
-    if (companion.current_stage === 0) {
-      const hatchThreshold = getThreshold(HATCH_READY_LEVEL);
-      return hatchThreshold !== null && companion.current_xp >= hatchThreshold;
-    }
-    return shouldEvolve(companion.current_stage, companion.current_xp);
-  }, [companion, getThreshold, shouldEvolve]);
+    return earnedLevel > companion.current_stage;
+  }, [companion, earnedLevel]);
 
   const isEvolutionBusy = evolveCompanion.isPending || hatchCompanion.isPending;
 

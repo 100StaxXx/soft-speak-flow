@@ -39,9 +39,9 @@ export const NextEvolutionPreview = memo(({
   const nextLevelLabel = getProgressionLevelDisplay(nextStage);
   const nextTierBoundary = getNextTierBoundary(currentStage);
   const nextTierLabel = nextTierBoundary === null ? null : getProgressionTierLabelForLevel(nextTierBoundary);
-  const xpNeeded = nextEvolutionXP - currentXP;
+  const xpNeeded = Math.max(0, nextEvolutionXP - currentXP);
   const isMaxStage = currentStage >= MAX_COMPANION_STAGE;
-  const canEvolve = xpNeeded <= 0;
+  const canEvolve = nextEvolutionXP > 0 && currentXP >= nextEvolutionXP;
   const nearEvolution = isNearEvolution({ progressToNext: progressPercent, canEvolve });
 
   const { currentBond, isLoading: bondLoading } = useCompanionMemories();
@@ -99,7 +99,7 @@ export const NextEvolutionPreview = memo(({
           <div className="flex justify-between text-xs">
             <span className="text-muted-foreground">Progress</span>
             <span className="font-medium text-primary">
-              {xpNeeded > 0 ? `${xpNeeded} XP needed` : "Ready!"}
+              {xpNeeded > 0 ? `${xpNeeded} XP needed` : `Ready to evolve to Level ${nextStage}`}
             </span>
           </div>
           <Progress value={progressPercent} className="h-2" />

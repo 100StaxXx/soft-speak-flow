@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, type FormEvent, type PointerEvent } from "react";
+import { useCallback, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type PointerEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Crown, Sparkles, MessageCircle, Lock, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -42,6 +42,8 @@ export const TrialExpiredPaywall = ({ variant = "pre_trial_signup" }: TrialExpir
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const deleteConfirmationInputRef = useRef<HTMLInputElement | null>(null);
+  const deleteSubmitButtonRef = useRef<HTMLButtonElement | null>(null);
   
   const { 
     handlePurchase, 
@@ -165,6 +167,24 @@ export const TrialExpiredPaywall = ({ variant = "pre_trial_signup" }: TrialExpir
 
   const handleDeleteButtonPointerDown = useCallback((_: PointerEvent<HTMLButtonElement>) => {
     blurActiveElement();
+  }, []);
+
+  const handleDeleteConfirmationChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    const nextValue = event.target.value;
+    setDeleteConfirmText(nextValue);
+
+    if (nextValue !== "DELETE") {
+      return;
+    }
+
+    window.setTimeout(() => {
+      if (document.activeElement !== deleteConfirmationInputRef.current) {
+        return;
+      }
+
+      deleteConfirmationInputRef.current?.blur();
+      deleteSubmitButtonRef.current?.focus();
+    }, 0);
   }, []);
 
   const handleDeleteDialogOpenChange = useCallback((open: boolean) => {
@@ -409,8 +429,9 @@ export const TrialExpiredPaywall = ({ variant = "pre_trial_signup" }: TrialExpir
             <Input
               id="trial-delete-confirmation-input"
               aria-label="Type DELETE to confirm"
+              ref={deleteConfirmationInputRef}
               value={deleteConfirmText}
-              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              onChange={handleDeleteConfirmationChange}
               placeholder="Type DELETE"
               className="mt-2"
               autoComplete="off"
@@ -425,6 +446,7 @@ export const TrialExpiredPaywall = ({ variant = "pre_trial_signup" }: TrialExpir
                 Cancel
               </AlertDialogCancel>
               <Button
+                ref={deleteSubmitButtonRef}
                 type="submit"
                 variant="destructive"
                 onPointerDown={handleDeleteButtonPointerDown}

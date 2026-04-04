@@ -190,9 +190,14 @@ describe("Profile account deletion dialog", () => {
     renderProfile();
 
     const input = openDeleteDialog();
-    fireEvent.change(input, { target: { value: "delete" } });
     const activeElementSpy = vi.spyOn(document, "activeElement", "get").mockReturnValue(input);
     const blurSpy = vi.spyOn(input, "blur");
+    fireEvent.change(input, { target: { value: "delete" } });
+
+    await waitFor(() => {
+      expect(blurSpy).toHaveBeenCalled();
+    });
+
     const deleteButton = screen.getByRole("button", { name: "Delete" });
     fireEvent.pointerDown(deleteButton);
     fireEvent.click(deleteButton);
@@ -200,7 +205,6 @@ describe("Profile account deletion dialog", () => {
     await waitFor(() => {
       expect(mocks.deleteCurrentAccount).toHaveBeenCalledTimes(1);
     });
-    expect(blurSpy).toHaveBeenCalled();
     activeElementSpy.mockRestore();
   });
 

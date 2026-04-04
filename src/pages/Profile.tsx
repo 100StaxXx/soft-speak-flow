@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, memo, type FormEvent, type PointerEvent } from "react";
+import { useState, useEffect, useCallback, memo, useRef, type ChangeEvent, type FormEvent, type PointerEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -140,6 +140,8 @@ const Profile = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [deleteConfirmationText, setDeleteConfirmationText] = useState("");
+  const deleteConfirmationInputRef = useRef<HTMLInputElement | null>(null);
+  const deleteSubmitButtonRef = useRef<HTMLButtonElement | null>(null);
   const isDeleteConfirmationValid = deleteConfirmationText.trim().toLowerCase() === "delete";
 
   // Check if we should open a specific tab from navigation state
@@ -309,6 +311,24 @@ const Profile = () => {
 
   const handleDeleteButtonPointerDown = useCallback((_: PointerEvent<HTMLButtonElement>) => {
     blurActiveElement();
+  }, []);
+
+  const handleDeleteConfirmationChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    const nextValue = event.target.value;
+    setDeleteConfirmationText(nextValue);
+
+    if (nextValue.trim().toLowerCase() !== "delete") {
+      return;
+    }
+
+    window.setTimeout(() => {
+      if (document.activeElement !== deleteConfirmationInputRef.current) {
+        return;
+      }
+
+      deleteConfirmationInputRef.current?.blur();
+      deleteSubmitButtonRef.current?.focus();
+    }, 0);
   }, []);
 
 
@@ -632,8 +652,9 @@ const Profile = () => {
               <Label htmlFor="delete-confirmation-input">Type "delete" to confirm</Label>
               <Input
                 id="delete-confirmation-input"
+                ref={deleteConfirmationInputRef}
                 value={deleteConfirmationText}
-                onChange={(e) => setDeleteConfirmationText(e.target.value)}
+                onChange={handleDeleteConfirmationChange}
                 placeholder='Type "delete"'
                 autoComplete="off"
                 autoCapitalize="none"
@@ -648,6 +669,7 @@ const Profile = () => {
                 Cancel
               </AlertDialogCancel>
               <Button
+                ref={deleteSubmitButtonRef}
                 type="submit"
                 variant="destructive"
                 onPointerDown={handleDeleteButtonPointerDown}
