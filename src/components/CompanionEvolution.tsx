@@ -40,9 +40,9 @@ interface ArtReadiness {
 const FULL_SEQUENCE_MS = {
   hold: 800,
   charge: 3200,
-  conceal: 700,
-  strobe: 1800,
-  apex: 220,
+  conceal: 850,
+  strobe: 2920,
+  apex: 340,
   reveal: 2400,
   settle: 1600,
   dismissBuffer: 3000,
@@ -63,21 +63,17 @@ const EMERGENCY_EXIT_DELAY_MS = 15_000;
 const IMAGE_PRELOAD_TIMEOUT_MS = 2_000;
 const STROBE_BEAT_OFFSETS_MS = [
   0,
-  220,
-  420,
-  600,
-  765,
-  915,
-  1050,
-  1170,
-  1275,
-  1365,
-  1440,
-  1505,
-  1565,
-  1620,
-  1670,
-  1715,
+  350,
+  685,
+  1005,
+  1305,
+  1585,
+  1845,
+  2085,
+  2305,
+  2495,
+  2660,
+  2800,
 ] as const;
 const STROBE_PULSE_INTERVAL = 4;
 const LAST_STROBE_BEAT_INDEX = STROBE_BEAT_OFFSETS_MS.length - 1;
@@ -115,21 +111,21 @@ const ConvergenceParticles = ({
     : phase === "conceal"
       ? 14
       : phase === "strobe"
-        ? Math.max(0, 12 - strobeProgress * 10)
+        ? Math.max(2, 18 - strobeProgress * 14)
         : 0;
   const targetOpacity = phase === "charge"
     ? 0.74
     : phase === "conceal"
       ? 0.18
       : phase === "strobe"
-        ? Math.max(0.06, 0.24 - strobeProgress * 0.14)
+        ? Math.max(0.08, 0.28 - strobeProgress * 0.14)
         : 0.04;
   const targetScale = phase === "charge"
     ? 0.96
     : phase === "conceal"
       ? 0.18
       : phase === "strobe"
-        ? Math.max(0.04, 0.22 - strobeProgress * 0.15)
+        ? Math.max(0.06, 0.26 - strobeProgress * 0.16)
         : 0.02;
 
   return (
@@ -161,7 +157,7 @@ const ConvergenceParticles = ({
               scale: targetScale,
             }}
           transition={{
-            duration: phase === "charge" ? 0.82 : phase === "strobe" ? 0.08 : 0.22,
+            duration: phase === "charge" ? 0.82 : phase === "strobe" ? 0.16 : 0.22,
             ease: [0.22, 1, 0.36, 1],
           }}
         />
@@ -797,19 +793,19 @@ const CompanionEvolutionContent = ({
                   : phase === "conceal"
                     ? 0.68
                     : phase === "strobe"
-                      ? 0.72 + strobeProgress * 0.16
+                      ? 0.62 + strobeProgress * 0.12
                       : phase === "apex"
                         ? 0.94
                         : 0.46,
               scale: phase === "conceal"
                 ? 1.08
                 : phase === "strobe"
-                  ? 1.1 + strobeProgress * 0.12
+                  ? 1.04 + strobeProgress * 0.08
                   : phase === "apex"
                     ? 1.24
                     : 1,
             }}
-            transition={{ duration: phase === "strobe" ? 0.08 : 0.35 }}
+            transition={{ duration: phase === "strobe" ? 0.16 : 0.35 }}
             style={{
               background: `radial-gradient(circle at 50% 45%, hsl(${theme.glowA} / ${0.2 * theme.glowStrength}) 0%, hsl(${theme.glowB} / ${0.14 * theme.glowStrength}) 38%, transparent 72%)`,
             }}
@@ -821,10 +817,10 @@ const CompanionEvolutionContent = ({
                 className="absolute inset-0 pointer-events-none evo-cinematic-eclipse"
                 initial={false}
                 animate={{
-                  opacity: phase === "apex" ? 1 : 0.62 + strobeProgress * 0.24,
-                  scale: phase === "apex" ? 1.16 : 1 + strobeProgress * 0.1,
+                  opacity: phase === "apex" ? 1 : 0.54 + strobeProgress * 0.18,
+                  scale: phase === "apex" ? 1.16 : 0.98 + strobeProgress * 0.08,
                 }}
-                transition={{ duration: phase === "strobe" ? 0.08 : 0.14 }}
+                transition={{ duration: phase === "strobe" ? 0.18 : 0.16 }}
               />
               {phase === "apex" && (
                 <motion.div
@@ -931,16 +927,16 @@ const CompanionEvolutionContent = ({
                       : phase === "conceal"
                         ? 1.07
                         : phase === "strobe"
-                          ? 1.1 + strobeProgress * 0.03
+                          ? 1.07 + strobeProgress * 0.02
                           : phase === "apex"
-                            ? 1.14
+                            ? 1.12
                             : phase === "reveal"
                               ? 1.03
                               : 1,
-                  y: phase === "apex" ? -6 : 0,
+                  y: phase === "apex" ? -4 : 0,
                 }}
                 transition={{
-                  duration: phase === "strobe" ? 0.08 : phase === "apex" ? 0.16 : 0.32,
+                  duration: phase === "strobe" ? 0.16 : phase === "apex" ? 0.22 : 0.32,
                   ease: [0.22, 1, 0.36, 1],
                 }}
               >
@@ -951,26 +947,26 @@ const CompanionEvolutionContent = ({
                     opacity: phase === "conceal"
                       ? 0.95
                       : phase === "strobe"
-                        ? 0.34 + strobeProgress * 0.36
+                        ? 0.46 + strobeProgress * 0.24
                       : phase === "apex"
                         ? 0.14
                       : phase === "reveal"
-                        ? 0.84
+                        ? 0.78
                         : phase === "charge"
                           ? 0.28
                           : 0,
                     scale: phase === "conceal"
                       ? 1.24
                       : phase === "strobe"
-                        ? 0.98 + strobeProgress * 0.26
+                        ? 1 + strobeProgress * 0.18
                         : phase === "apex"
                           ? 0.86
                           : phase === "reveal"
-                            ? 1.54
+                            ? 1.48
                             : 0.72,
                   }}
                   transition={{
-                    duration: phase === "conceal" ? sequence.conceal / 1000 : phase === "strobe" ? 0.08 : 0.42,
+                    duration: phase === "conceal" ? sequence.conceal / 1000 : phase === "strobe" ? 0.16 : 0.42,
                     ease: "easeOut",
                   }}
                   style={{
@@ -985,10 +981,10 @@ const CompanionEvolutionContent = ({
                     className="absolute inset-[10%] rounded-full pointer-events-none evo-cinematic-bloom"
                     initial={false}
                     animate={{
-                      opacity: 0.34 + strobeProgress * 0.22,
-                      scale: 0.92 + strobeProgress * 0.26,
+                      opacity: 0.26 + strobeProgress * 0.18,
+                      scale: 0.94 + strobeProgress * 0.18,
                     }}
-                    transition={{ duration: 0.08 }}
+                    transition={{ duration: 0.16 }}
                     style={{
                       background: `radial-gradient(circle, ${theme.flashCore} 0%, ${theme.flashGlow} 42%, transparent 74%)`,
                       filter: "blur(22px)",
@@ -1002,13 +998,13 @@ const CompanionEvolutionContent = ({
                     className="absolute inset-[8%] pointer-events-none overflow-hidden rounded-[2rem] evo-cinematic-reveal-sweep"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: [0, 1, 0] }}
-                    transition={{ duration: 0.95, ease: "easeOut" }}
+                    transition={{ duration: 1.15, ease: "easeOut" }}
                   >
                     <motion.div
                       className="absolute inset-y-0 w-[70%]"
                       initial={{ x: "-120%" }}
                       animate={{ x: "215%" }}
-                      transition={{ duration: 0.95, ease: [0.22, 1, 0.36, 1] }}
+                      transition={{ duration: 1.15, ease: [0.22, 1, 0.36, 1] }}
                       style={{
                         background:
                           "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.6) 48%, transparent 100%)",
@@ -1031,10 +1027,10 @@ const CompanionEvolutionContent = ({
                         ? 0
                         : phase === "apex"
                           ? 0.02
-                          : phase === "strobe"
+                        : phase === "strobe"
                             ? strobeTarget === "previous"
-                              ? 1
-                              : 0.08
+                              ? 0.92
+                              : 0.18
                             : 1,
                       scale: phase === "hold"
                         ? 1
@@ -1044,25 +1040,25 @@ const CompanionEvolutionContent = ({
                             ? 1.1
                             : phase === "strobe"
                               ? strobeTarget === "previous"
-                                ? 1.12 + strobeProgress * 0.03
-                                : 1.16 + strobeProgress * 0.02
+                                ? 1.1 + strobeProgress * 0.02
+                                : 1.13 + strobeProgress * 0.02
                               : phase === "apex"
-                                ? 1.19
+                                ? 1.16
                                 : 1.09,
                       filter: phase === "conceal"
-                        ? "brightness(0) saturate(0) contrast(1.52) blur(5px)"
+                        ? "brightness(0) saturate(0) contrast(1.48) blur(4px)"
                         : phase === "strobe"
                           ? strobeTarget === "previous"
-                            ? "brightness(0) saturate(0) contrast(1.7) blur(4px)"
-                            : "brightness(0) saturate(0) contrast(2) blur(10px)"
+                            ? "brightness(0) saturate(0) contrast(1.62) blur(4px)"
+                            : "brightness(0) saturate(0) contrast(1.82) blur(8px)"
                           : phase === "apex"
-                            ? "brightness(0) saturate(0) contrast(2.2) blur(12px)"
+                            ? "brightness(0) saturate(0) contrast(2) blur(10px)"
                         : phase === "charge"
                           ? "brightness(1.14) saturate(1.12) contrast(1.02) blur(0px)"
                           : "brightness(1) saturate(1) contrast(1) blur(0px)",
                     }}
                     transition={{
-                      duration: phase === "conceal" ? sequence.conceal / 1000 : phase === "strobe" ? 0.08 : 0.34,
+                      duration: phase === "conceal" ? sequence.conceal / 1000 : phase === "strobe" ? 0.16 : 0.34,
                       ease: [0.22, 1, 0.36, 1],
                     }}
                     style={{
@@ -1085,20 +1081,20 @@ const CompanionEvolutionContent = ({
                         opacity: phase === "reveal" || phase === "settle"
                           ? 1
                           : phase === "apex"
-                            ? 0.22
+                            ? 0.28
                             : phase === "strobe"
                               ? strobeTarget === "next"
-                                ? 1
-                                : 0.08
+                                ? 0.92
+                                : 0.18
                               : 0,
                         scale: phase === "strobe"
                           ? strobeTarget === "next"
-                            ? 1.13 + strobeProgress * 0.03
-                            : 1.16 + strobeProgress * 0.02
+                            ? 1.11 + strobeProgress * 0.02
+                            : 1.14 + strobeProgress * 0.02
                           : phase === "apex"
-                            ? 1.16
+                            ? 1.14
                             : phase === "reveal"
-                              ? 1.1
+                              ? 1.08
                               : phase === "settle"
                                 ? 1
                                 : 1.16,
@@ -1107,11 +1103,11 @@ const CompanionEvolutionContent = ({
                           : phase === "settle"
                             ? "brightness(1) saturate(1) contrast(1) blur(0px)"
                             : phase === "apex"
-                              ? "brightness(0) saturate(0) contrast(1.85) blur(7px)"
+                              ? "brightness(0) saturate(0) contrast(1.8) blur(6px)"
                               : phase === "strobe"
                                 ? strobeTarget === "next"
-                                  ? "brightness(0) saturate(0) contrast(1.74) blur(4px)"
-                                  : "brightness(0) saturate(0) contrast(2) blur(10px)"
+                                  ? "brightness(0) saturate(0) contrast(1.64) blur(4px)"
+                                  : "brightness(0) saturate(0) contrast(1.84) blur(8px)"
                                 : "brightness(0) saturate(0) contrast(1.7) blur(10px)",
                       }
                       : {
@@ -1140,9 +1136,9 @@ const CompanionEvolutionContent = ({
                           : phase === "conceal"
                             ? sequence.conceal / 1000
                             : phase === "apex"
-                              ? 0.16
+                              ? 0.22
                             : phase === "strobe"
-                              ? 0.08
+                              ? 0.16
                             : 0.34,
                       ease: [0.22, 1, 0.36, 1],
                     }}

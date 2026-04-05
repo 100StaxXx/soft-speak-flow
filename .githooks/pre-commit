@@ -1,4 +1,16 @@
 #!/bin/sh
 set -eu
 
+# Git hooks often run with a minimal PATH, so load nvm if this repo uses it.
+if ! command -v node >/dev/null 2>&1; then
+  NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+  if [ -s "$NVM_DIR/nvm.sh" ]; then
+    # shellcheck source=/dev/null
+    . "$NVM_DIR/nvm.sh"
+    if [ -f .nvmrc ]; then
+      nvm use --silent >/dev/null 2>&1 || true
+    fi
+  fi
+fi
+
 node scripts/scan-secrets.mjs --staged

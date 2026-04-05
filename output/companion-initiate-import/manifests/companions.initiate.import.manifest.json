@@ -1,5 +1,5 @@
 {
-  "sourceDir": "/Users/macbookair/Documents/Initiate",
+  "sourceDir": "/Users/macbookair/Documents/Cosmiq Companion Images/Initiates",
   "outputRoot": "/Users/macbookair/Developer/soft-speak-flow/output/companion-initiate-import/assets",
   "bucketName": "companion-presets",
   "tier": "t2_initiate",
@@ -10,8 +10,8 @@
   "sheets": [
     {
       "presetId": "dragon",
-      "sourceFilename": "DragonInitiate.png",
-      "sourcePath": "/Users/macbookair/Documents/Initiate/DragonInitiate.png",
+      "sourceFilename": "InitiateDragon.png",
+      "sourcePath": "/Users/macbookair/Documents/Cosmiq Companion Images/Initiates/InitiateDragon.png",
       "width": 1024,
       "height": 1024,
       "assets": [
@@ -27,8 +27,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 144544,
-          "edgeBleedPixels": 0
+          "transparentPixels": 129715,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 0,
+            "top": 58,
+            "width": 341,
+            "height": 364
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "dragon",
@@ -42,8 +49,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 144124,
-          "edgeBleedPixels": 0
+          "transparentPixels": 132869,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 319,
+            "top": 57,
+            "width": 335,
+            "height": 368
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "dragon",
@@ -57,8 +71,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 144544,
-          "edgeBleedPixels": 0
+          "transparentPixels": 134776,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 632,
+            "top": 53,
+            "width": 352,
+            "height": 368
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "dragon",
@@ -72,8 +93,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 144544,
-          "edgeBleedPixels": 0
+          "transparentPixels": 128640,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 0,
+            "top": 553,
+            "width": 336,
+            "height": 355
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "dragon",
@@ -87,8 +115,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 144124,
-          "edgeBleedPixels": 0
+          "transparentPixels": 123958,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 312,
+            "top": 554,
+            "width": 342,
+            "height": 352
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "dragon",
@@ -102,15 +137,22 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 144544,
-          "edgeBleedPixels": 0
+          "transparentPixels": 119524,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 640,
+            "top": 551,
+            "width": 360,
+            "height": 361
+          },
+          "overrideApplied": false
         }
       ]
     },
     {
       "presetId": "wolf",
-      "sourceFilename": "WolfInitiate.png",
-      "sourcePath": "/Users/macbookair/Documents/Initiate/WolfInitiate.png",
+      "sourceFilename": "InitiateWolf.png",
+      "sourcePath": "/Users/macbookair/Documents/Cosmiq Companion Images/Initiates/InitiateWolf.png",
       "width": 1024,
       "height": 1024,
       "assets": [
@@ -126,8 +168,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 148406,
-          "edgeBleedPixels": 0
+          "transparentPixels": 120605,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 0,
+            "top": 31,
+            "width": 396,
+            "height": 377
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "wolf",
@@ -141,8 +190,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 159274,
-          "edgeBleedPixels": 0
+          "transparentPixels": 124072,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 286,
+            "top": 43,
+            "width": 394,
+            "height": 364
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "wolf",
@@ -156,8 +212,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 157215,
-          "edgeBleedPixels": 0
+          "transparentPixels": 124209,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 637,
+            "top": 44,
+            "width": 387,
+            "height": 363
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "wolf",
@@ -171,8 +234,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 128861,
-          "edgeBleedPixels": 0
+          "transparentPixels": 121639,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 0,
+            "top": 548,
+            "width": 334,
+            "height": 346
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "wolf",
@@ -186,8 +256,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 152978,
-          "edgeBleedPixels": 0
+          "transparentPixels": 121913,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 314,
+            "top": 549,
+            "width": 343,
+            "height": 344
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "wolf",
@@ -201,15 +278,22 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 149278,
-          "edgeBleedPixels": 0
+          "transparentPixels": 119739,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 631,
+            "top": 524,
+            "width": 393,
+            "height": 374
+          },
+          "overrideApplied": false
         }
       ]
     },
     {
       "presetId": "fox",
-      "sourceFilename": "KitsuneInitiate.png",
-      "sourcePath": "/Users/macbookair/Documents/Initiate/KitsuneInitiate.png",
+      "sourceFilename": "InitiateKitsune.png",
+      "sourcePath": "/Users/macbookair/Documents/Cosmiq Companion Images/Initiates/InitiateKitsune.png",
       "width": 1024,
       "height": 1024,
       "assets": [
@@ -225,8 +309,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 144544,
-          "edgeBleedPixels": 0
+          "transparentPixels": 134740,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 0,
+            "top": 27,
+            "width": 355,
+            "height": 420
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "fox",
@@ -240,8 +331,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 144124,
-          "edgeBleedPixels": 0
+          "transparentPixels": 119355,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 328,
+            "top": 64,
+            "width": 349,
+            "height": 382
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "fox",
@@ -255,8 +353,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 144544,
-          "edgeBleedPixels": 0
+          "transparentPixels": 126055,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 657,
+            "top": 37,
+            "width": 367,
+            "height": 411
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "fox",
@@ -270,8 +375,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 139358,
-          "edgeBleedPixels": 0
+          "transparentPixels": 122640,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 0,
+            "top": 546,
+            "width": 347,
+            "height": 383
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "fox",
@@ -285,8 +397,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 144124,
-          "edgeBleedPixels": 0
+          "transparentPixels": 130823,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 326,
+            "top": 538,
+            "width": 353,
+            "height": 390
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "fox",
@@ -300,15 +419,22 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 144544,
-          "edgeBleedPixels": 0
+          "transparentPixels": 113725,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 650,
+            "top": 548,
+            "width": 370,
+            "height": 382
+          },
+          "overrideApplied": false
         }
       ]
     },
     {
       "presetId": "owl",
-      "sourceFilename": "OwlInitiate.png",
-      "sourcePath": "/Users/macbookair/Documents/Initiate/OwlInitiate.png",
+      "sourceFilename": "InitiateOwl.png",
+      "sourcePath": "/Users/macbookair/Documents/Cosmiq Companion Images/Initiates/InitiateOwl.png",
       "width": 1024,
       "height": 1024,
       "assets": [
@@ -324,8 +450,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 144544,
-          "edgeBleedPixels": 0
+          "transparentPixels": 155797,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 8,
+            "top": 40,
+            "width": 304,
+            "height": 408
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "owl",
@@ -339,8 +472,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 144124,
-          "edgeBleedPixels": 0
+          "transparentPixels": 141100,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 311,
+            "top": 55,
+            "width": 338,
+            "height": 400
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "owl",
@@ -354,8 +494,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 144544,
-          "edgeBleedPixels": 0
+          "transparentPixels": 125243,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 644,
+            "top": 72,
+            "width": 337,
+            "height": 365
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "owl",
@@ -369,8 +516,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 144544,
-          "edgeBleedPixels": 0
+          "transparentPixels": 133235,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 8,
+            "top": 633,
+            "width": 316,
+            "height": 358
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "owl",
@@ -384,8 +538,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 144124,
-          "edgeBleedPixels": 0
+          "transparentPixels": 125297,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 308,
+            "top": 592,
+            "width": 361,
+            "height": 398
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "owl",
@@ -399,15 +560,22 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 144544,
-          "edgeBleedPixels": 0
+          "transparentPixels": 127405,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 643,
+            "top": 608,
+            "width": 364,
+            "height": 383
+          },
+          "overrideApplied": false
         }
       ]
     },
     {
       "presetId": "lion",
-      "sourceFilename": "LionInitiate.png",
-      "sourcePath": "/Users/macbookair/Documents/Initiate/LionInitiate.png",
+      "sourceFilename": "InitiateLion.png",
+      "sourcePath": "/Users/macbookair/Documents/Cosmiq Companion Images/Initiates/InitiateLion.png",
       "width": 1024,
       "height": 1024,
       "assets": [
@@ -423,8 +591,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 126979,
-          "edgeBleedPixels": 0
+          "transparentPixels": 133896,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 0,
+            "top": 18,
+            "width": 377,
+            "height": 432
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "lion",
@@ -438,8 +613,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 135902,
-          "edgeBleedPixels": 0
+          "transparentPixels": 148563,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 314,
+            "top": 33,
+            "width": 379,
+            "height": 430
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "lion",
@@ -453,8 +635,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 133736,
-          "edgeBleedPixels": 0
+          "transparentPixels": 130062,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 648,
+            "top": 55,
+            "width": 362,
+            "height": 394
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "lion",
@@ -468,8 +657,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 120161,
-          "edgeBleedPixels": 0
+          "transparentPixels": 135074,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 3,
+            "top": 531,
+            "width": 356,
+            "height": 395
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "lion",
@@ -483,8 +679,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 117808,
-          "edgeBleedPixels": 0
+          "transparentPixels": 124997,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 286,
+            "top": 521,
+            "width": 397,
+            "height": 420
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "lion",
@@ -498,15 +701,22 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 124139,
-          "edgeBleedPixels": 0
+          "transparentPixels": 123675,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 651,
+            "top": 505,
+            "width": 373,
+            "height": 421
+          },
+          "overrideApplied": false
         }
       ]
     },
     {
       "presetId": "phoenix",
-      "sourceFilename": "PhoenixInitiate.png",
-      "sourcePath": "/Users/macbookair/Documents/Initiate/PhoenixInitiate.png",
+      "sourceFilename": "InitiatePhoenix.png",
+      "sourcePath": "/Users/macbookair/Documents/Cosmiq Companion Images/Initiates/InitiatePhoenix.png",
       "width": 1024,
       "height": 1024,
       "assets": [
@@ -522,8 +732,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 137694,
-          "edgeBleedPixels": 0
+          "transparentPixels": 130137,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 0,
+            "top": 36,
+            "width": 347,
+            "height": 373
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "phoenix",
@@ -537,8 +754,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 148654,
-          "edgeBleedPixels": 0
+          "transparentPixels": 128735,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 310,
+            "top": 50,
+            "width": 346,
+            "height": 358
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "phoenix",
@@ -552,8 +776,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 140777,
-          "edgeBleedPixels": 0
+          "transparentPixels": 140796,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 628,
+            "top": 53,
+            "width": 387,
+            "height": 352
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "phoenix",
@@ -567,8 +798,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 133655,
-          "edgeBleedPixels": 0
+          "transparentPixels": 124120,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 0,
+            "top": 509,
+            "width": 336,
+            "height": 359
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "phoenix",
@@ -582,8 +820,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 137046,
-          "edgeBleedPixels": 0
+          "transparentPixels": 126584,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 307,
+            "top": 505,
+            "width": 362,
+            "height": 361
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "phoenix",
@@ -597,15 +842,22 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 134496,
-          "edgeBleedPixels": 0
+          "transparentPixels": 121610,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 636,
+            "top": 506,
+            "width": 388,
+            "height": 363
+          },
+          "overrideApplied": false
         }
       ]
     },
     {
       "presetId": "pegasus",
-      "sourceFilename": "PegasusInitiate.png",
-      "sourcePath": "/Users/macbookair/Documents/Initiate/PegasusInitiate.png",
+      "sourceFilename": "InitiatePegasus.png",
+      "sourcePath": "/Users/macbookair/Documents/Cosmiq Companion Images/Initiates/InitiatePegasus.png",
       "width": 1024,
       "height": 1024,
       "assets": [
@@ -621,8 +873,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 134178,
-          "edgeBleedPixels": 0
+          "transparentPixels": 127966,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 4,
+            "top": 56,
+            "width": 324,
+            "height": 358
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "pegasus",
@@ -636,8 +895,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 144124,
-          "edgeBleedPixels": 0
+          "transparentPixels": 126446,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 291,
+            "top": 57,
+            "width": 335,
+            "height": 355
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "pegasus",
@@ -651,8 +917,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 144544,
-          "edgeBleedPixels": 0
+          "transparentPixels": 119986,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 628,
+            "top": 62,
+            "width": 339,
+            "height": 351
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "pegasus",
@@ -666,8 +939,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 124279,
-          "edgeBleedPixels": 0
+          "transparentPixels": 120822,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 0,
+            "top": 520,
+            "width": 328,
+            "height": 345
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "pegasus",
@@ -681,8 +961,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 144124,
-          "edgeBleedPixels": 0
+          "transparentPixels": 128049,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 295,
+            "top": 520,
+            "width": 343,
+            "height": 343
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "pegasus",
@@ -696,15 +983,22 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 144544,
-          "edgeBleedPixels": 0
+          "transparentPixels": 127810,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 628,
+            "top": 518,
+            "width": 367,
+            "height": 350
+          },
+          "overrideApplied": false
         }
       ]
     },
     {
       "presetId": "griffin",
-      "sourceFilename": "GriffinInitiate.png",
-      "sourcePath": "/Users/macbookair/Documents/Initiate/GriffinInitiate.png",
+      "sourceFilename": "InitiateGriffin.png",
+      "sourcePath": "/Users/macbookair/Documents/Cosmiq Companion Images/Initiates/InitiateGriffin.png",
       "width": 1024,
       "height": 1024,
       "assets": [
@@ -720,8 +1014,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 144544,
-          "edgeBleedPixels": 0
+          "transparentPixels": 141306,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 1,
+            "top": 24,
+            "width": 355,
+            "height": 418
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "griffin",
@@ -735,8 +1036,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 144124,
-          "edgeBleedPixels": 0
+          "transparentPixels": 135087,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 330,
+            "top": 55,
+            "width": 336,
+            "height": 385
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "griffin",
@@ -750,8 +1058,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 144544,
-          "edgeBleedPixels": 0
+          "transparentPixels": 139385,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 649,
+            "top": 36,
+            "width": 366,
+            "height": 410
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "griffin",
@@ -765,8 +1080,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 144544,
-          "edgeBleedPixels": 0
+          "transparentPixels": 127068,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 5,
+            "top": 533,
+            "width": 330,
+            "height": 381
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "griffin",
@@ -780,8 +1102,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 144124,
-          "edgeBleedPixels": 0
+          "transparentPixels": 134008,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 323,
+            "top": 534,
+            "width": 319,
+            "height": 362
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "griffin",
@@ -795,17 +1124,24 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 144544,
-          "edgeBleedPixels": 0
+          "transparentPixels": 113220,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 636,
+            "top": 533,
+            "width": 371,
+            "height": 381
+          },
+          "overrideApplied": false
         }
       ]
     },
     {
       "presetId": "sphinx",
-      "sourceFilename": "SphinxInitiate.png",
-      "sourcePath": "/Users/macbookair/Documents/Initiate/SphinxInitiate.png",
-      "width": 1024,
-      "height": 1024,
+      "sourceFilename": "InitiateSphinx.png",
+      "sourcePath": "/Users/macbookair/Documents/Cosmiq Companion Images/Initiates/InitiateSphinx.png",
+      "width": 2048,
+      "height": 2048,
       "assets": [
         {
           "presetId": "sphinx",
@@ -819,8 +1155,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 144544,
-          "edgeBleedPixels": 0
+          "transparentPixels": 119221,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 5,
+            "top": 118,
+            "width": 668,
+            "height": 684
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "sphinx",
@@ -834,8 +1177,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 144124,
-          "edgeBleedPixels": 0
+          "transparentPixels": 131719,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 639,
+            "top": 103,
+            "width": 666,
+            "height": 696
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "sphinx",
@@ -849,8 +1199,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 144544,
-          "edgeBleedPixels": 0
+          "transparentPixels": 124261,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 1276,
+            "top": 118,
+            "width": 751,
+            "height": 681
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "sphinx",
@@ -864,8 +1221,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 141604,
-          "edgeBleedPixels": 0
+          "transparentPixels": 122182,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 2,
+            "top": 1048,
+            "width": 663,
+            "height": 668
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "sphinx",
@@ -879,8 +1243,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 144124,
-          "edgeBleedPixels": 0
+          "transparentPixels": 119723,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 690,
+            "top": 1040,
+            "width": 610,
+            "height": 700
+          },
+          "overrideApplied": true
         },
         {
           "presetId": "sphinx",
@@ -894,15 +1265,22 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 144544,
-          "edgeBleedPixels": 0
+          "transparentPixels": 118611,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 1360,
+            "top": 1040,
+            "width": 620,
+            "height": 920
+          },
+          "overrideApplied": true
         }
       ]
     },
     {
       "presetId": "leviathan",
-      "sourceFilename": "LeviathanInitiate.png",
-      "sourcePath": "/Users/macbookair/Documents/Initiate/LeviathanInitiate.png",
+      "sourceFilename": "InitiateLeviathan.png",
+      "sourcePath": "/Users/macbookair/Documents/Cosmiq Companion Images/Initiates/InitiateLeviathan.png",
       "width": 1024,
       "height": 1024,
       "assets": [
@@ -918,8 +1296,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 144544,
-          "edgeBleedPixels": 0
+          "transparentPixels": 138174,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 1,
+            "top": 36,
+            "width": 339,
+            "height": 360
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "leviathan",
@@ -933,8 +1318,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 144124,
-          "edgeBleedPixels": 0
+          "transparentPixels": 139831,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 300,
+            "top": 33,
+            "width": 344,
+            "height": 364
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "leviathan",
@@ -948,8 +1340,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 144544,
-          "edgeBleedPixels": 0
+          "transparentPixels": 129723,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 628,
+            "top": 38,
+            "width": 337,
+            "height": 356
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "leviathan",
@@ -963,8 +1362,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 144544,
-          "edgeBleedPixels": 0
+          "transparentPixels": 135767,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 0,
+            "top": 513,
+            "width": 333,
+            "height": 362
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "leviathan",
@@ -978,8 +1384,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 144124,
-          "edgeBleedPixels": 0
+          "transparentPixels": 130629,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 287,
+            "top": 515,
+            "width": 350,
+            "height": 356
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "leviathan",
@@ -993,15 +1406,22 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 144544,
-          "edgeBleedPixels": 0
+          "transparentPixels": 128534,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 628,
+            "top": 513,
+            "width": 344,
+            "height": 362
+          },
+          "overrideApplied": false
         }
       ]
     },
     {
       "presetId": "mechanicaldragon",
-      "sourceFilename": "MechanicalDragonInitiate.png",
-      "sourcePath": "/Users/macbookair/Documents/Initiate/MechanicalDragonInitiate.png",
+      "sourceFilename": "InitiateMechanicalDragon.png",
+      "sourcePath": "/Users/macbookair/Documents/Cosmiq Companion Images/Initiates/InitiateMechanicalDragon.png",
       "width": 1024,
       "height": 1024,
       "assets": [
@@ -1017,8 +1437,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 140521,
-          "edgeBleedPixels": 0
+          "transparentPixels": 130385,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 1,
+            "top": 46,
+            "width": 336,
+            "height": 363
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "mechanicaldragon",
@@ -1032,8 +1459,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 144124,
-          "edgeBleedPixels": 0
+          "transparentPixels": 118943,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 308,
+            "top": 59,
+            "width": 334,
+            "height": 351
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "mechanicaldragon",
@@ -1047,8 +1481,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 144544,
-          "edgeBleedPixels": 0
+          "transparentPixels": 126933,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 745,
+            "top": 53,
+            "width": 207,
+            "height": 203
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "mechanicaldragon",
@@ -1062,8 +1503,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 144544,
-          "edgeBleedPixels": 0
+          "transparentPixels": 114378,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 4,
+            "top": 523,
+            "width": 338,
+            "height": 347
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "mechanicaldragon",
@@ -1077,8 +1525,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 144124,
-          "edgeBleedPixels": 0
+          "transparentPixels": 145595,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 388,
+            "top": 526,
+            "width": 228,
+            "height": 187
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "mechanicaldragon",
@@ -1092,15 +1547,22 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 144544,
-          "edgeBleedPixels": 0
+          "transparentPixels": 115825,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 629,
+            "top": 522,
+            "width": 359,
+            "height": 350
+          },
+          "overrideApplied": false
         }
       ]
     },
     {
       "presetId": "tanuki",
-      "sourceFilename": "TanukiInitiate.png",
-      "sourcePath": "/Users/macbookair/Documents/Initiate/TanukiInitiate.png",
+      "sourceFilename": "InitiateTanuki.png",
+      "sourcePath": "/Users/macbookair/Documents/Cosmiq Companion Images/Initiates/InitiateTanuki.png",
       "width": 1024,
       "height": 1024,
       "assets": [
@@ -1116,8 +1578,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 144544,
-          "edgeBleedPixels": 0
+          "transparentPixels": 130400,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 0,
+            "top": 42,
+            "width": 334,
+            "height": 365
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "tanuki",
@@ -1131,8 +1600,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 144124,
-          "edgeBleedPixels": 0
+          "transparentPixels": 123263,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 309,
+            "top": 59,
+            "width": 347,
+            "height": 347
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "tanuki",
@@ -1146,8 +1622,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 144544,
-          "edgeBleedPixels": 0
+          "transparentPixels": 135207,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 636,
+            "top": 63,
+            "width": 380,
+            "height": 344
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "tanuki",
@@ -1161,8 +1644,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 144544,
-          "edgeBleedPixels": 0
+          "transparentPixels": 118992,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 0,
+            "top": 553,
+            "width": 335,
+            "height": 341
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "tanuki",
@@ -1176,8 +1666,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 144124,
-          "edgeBleedPixels": 0
+          "transparentPixels": 118969,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 314,
+            "top": 552,
+            "width": 343,
+            "height": 341
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "tanuki",
@@ -1191,17 +1688,24 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 144544,
-          "edgeBleedPixels": 0
+          "transparentPixels": 124338,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 631,
+            "top": 527,
+            "width": 393,
+            "height": 368
+          },
+          "overrideApplied": false
         }
       ]
     },
     {
       "presetId": "buttercat",
-      "sourceFilename": "ButtercatInitiate.png",
-      "sourcePath": "/Users/macbookair/Documents/Initiate/ButtercatInitiate.png",
-      "width": 1024,
-      "height": 1024,
+      "sourceFilename": "InitiateButtercat.png",
+      "sourcePath": "/Users/macbookair/Documents/Cosmiq Companion Images/Initiates/InitiateButtercat.png",
+      "width": 2048,
+      "height": 2048,
       "assets": [
         {
           "presetId": "buttercat",
@@ -1215,8 +1719,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 144544,
-          "edgeBleedPixels": 0
+          "transparentPixels": 123368,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 25,
+            "top": 148,
+            "width": 594,
+            "height": 625
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "buttercat",
@@ -1230,8 +1741,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 144124,
-          "edgeBleedPixels": 0
+          "transparentPixels": 122574,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 638,
+            "top": 152,
+            "width": 589,
+            "height": 625
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "buttercat",
@@ -1245,8 +1763,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 144544,
-          "edgeBleedPixels": 0
+          "transparentPixels": 136408,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 1258,
+            "top": 155,
+            "width": 700,
+            "height": 618
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "buttercat",
@@ -1260,8 +1785,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 108793,
-          "edgeBleedPixels": 0
+          "transparentPixels": 114285,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 17,
+            "top": 1070,
+            "width": 604,
+            "height": 617
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "buttercat",
@@ -1275,8 +1807,15 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 144124,
-          "edgeBleedPixels": 0
+          "transparentPixels": 129437,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 605,
+            "top": 1076,
+            "width": 629,
+            "height": 611
+          },
+          "overrideApplied": false
         },
         {
           "presetId": "buttercat",
@@ -1290,11 +1829,18 @@
           "cropped": true,
           "outputWidth": 512,
           "outputHeight": 512,
-          "transparentPixels": 144544,
-          "edgeBleedPixels": 0
+          "transparentPixels": 131682,
+          "edgeBleedPixels": 0,
+          "sourceBounds": {
+            "left": 1256,
+            "top": 1070,
+            "width": 687,
+            "height": 621
+          },
+          "overrideApplied": false
         }
       ]
     }
   ],
-  "generatedAt": "2026-04-04T05:54:48.689Z"
+  "generatedAt": "2026-04-05T11:36:46.980Z"
 }

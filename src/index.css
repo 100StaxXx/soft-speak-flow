@@ -1287,7 +1287,7 @@ All colors MUST be HSL.
   }
 
   .evo-cinematic-reveal-sweep {
-    animation: evolution-cinematic-reveal-sweep 0.95s ease-out both;
+    animation: evolution-cinematic-reveal-sweep 1.15s ease-out both;
   }
 
   /* Theme-aware glow background */

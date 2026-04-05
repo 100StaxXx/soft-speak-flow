@@ -6,10 +6,24 @@ import sharp from "sharp";
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
 const PUBLIC_ROOT = path.join(ROOT, "public");
+const INITIATE_OUTPUT_ROOT = path.join(ROOT, "output", "companion-initiate-import", "assets");
 const OUTPUT_PATH = path.join(ROOT, "src", "generated", "companionImageFocalManifest.ts");
 const TARGET_DIRS = [
-  path.join(PUBLIC_ROOT, "companion-eggs"),
-  path.join(PUBLIC_ROOT, "companion-presets"),
+  {
+    dirPath: path.join(PUBLIC_ROOT, "companion-eggs"),
+    resolveAssetKey: (filePath) => path.relative(PUBLIC_ROOT, filePath).split(path.sep).join("/"),
+  },
+  {
+    dirPath: path.join(PUBLIC_ROOT, "companion-presets"),
+    resolveAssetKey: (filePath) => path.relative(PUBLIC_ROOT, filePath).split(path.sep).join("/"),
+  },
+  {
+    dirPath: INITIATE_OUTPUT_ROOT,
+    resolveAssetKey: (filePath) => {
+      const relativePath = path.relative(INITIATE_OUTPUT_ROOT, filePath).split(path.sep).join("/");
+      return `companion-presets/${relativePath}`;
+    },
+  },
 ];
 
 function walk(dirPath) {
@@ -18,10 +32,6 @@ function walk(dirPath) {
     if (entry.isDirectory()) return walk(entryPath);
     return [entryPath];
   });
-}
-
-function toPosixRelative(filePath) {
-  return path.relative(PUBLIC_ROOT, filePath).split(path.sep).join("/");
 }
 
 function formatNumber(value) {
@@ -71,14 +81,16 @@ async function getAlphaBounds(imagePath) {
 async function buildManifest() {
   const entries = [];
 
-  for (const dirPath of TARGET_DIRS) {
-    const files = walk(dirPath)
+  for (const target of TARGET_DIRS) {
+    if (!fs.existsSync(target.dirPath)) continue;
+
+    const files = walk(target.dirPath)
       .filter((filePath) => filePath.endsWith(".png"))
       .sort((left, right) => left.localeCompare(right));
 
     for (const filePath of files) {
       const bounds = await getAlphaBounds(filePath);
-      entries.push([toPosixRelative(filePath), bounds]);
+      entries.push([target.resolveAssetKey(filePath), bounds]);
     }
   }
 

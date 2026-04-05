@@ -137,9 +137,9 @@ import { CompanionEvolution } from "./CompanionEvolution";
 const FULL_SEQUENCE_MS = {
   hold: 800,
   charge: 3200,
-  conceal: 700,
-  strobe: 1800,
-  apex: 220,
+  conceal: 850,
+  strobe: 2920,
+  apex: 340,
   reveal: 2400,
   dismissBuffer: 3000,
 } as const;
@@ -155,21 +155,17 @@ const REDUCED_SEQUENCE_MS = {
 
 const STROBE_BEAT_OFFSETS_MS = [
   0,
-  220,
-  420,
-  600,
-  765,
-  915,
-  1050,
-  1170,
-  1275,
-  1365,
-  1440,
-  1505,
-  1565,
-  1620,
-  1670,
-  1715,
+  350,
+  685,
+  1005,
+  1305,
+  1585,
+  1845,
+  2085,
+  2305,
+  2495,
+  2660,
+  2800,
 ] as const;
 
 class MockPreloadImage {
@@ -284,7 +280,7 @@ describe("CompanionEvolution", () => {
 
     await flushTimers(FULL_SEQUENCE_MS.strobe);
     expect(dialog).toHaveAttribute("data-phase", "apex");
-    expect(screen.getByTestId("evolution-art-stage")).toHaveAttribute("data-strobe-beat", "15");
+    expect(screen.getByTestId("evolution-art-stage")).toHaveAttribute("data-strobe-beat", "11");
     expect(screen.getByTestId("evolution-art-stage")).toHaveAttribute("data-strobe-target", "next");
 
     await flushTimers(FULL_SEQUENCE_MS.apex);
@@ -430,7 +426,7 @@ describe("CompanionEvolution", () => {
     expect(dialog).toHaveAttribute("data-phase", "reveal");
   });
 
-  it("runs a deterministic 16-beat accelerating barrage before the apex", async () => {
+  it("runs a deterministic slower 12-beat barrage before the apex", async () => {
     render(<CompanionEvolution {...buildProps()} />);
     await prepareEvolution();
 
@@ -459,7 +455,7 @@ describe("CompanionEvolution", () => {
 
     await flushTimers(FULL_SEQUENCE_MS.strobe - elapsed);
     expect(dialog).toHaveAttribute("data-phase", "apex");
-    expect(artStage).toHaveAttribute("data-strobe-beat", "15");
+    expect(artStage).toHaveAttribute("data-strobe-beat", "11");
     expect(artStage).toHaveAttribute("data-strobe-target", "next");
   });
 
@@ -482,7 +478,7 @@ describe("CompanionEvolution", () => {
 
     await flushTimers(FULL_SEQUENCE_MS.strobe - 1);
     expect(dialog).toHaveAttribute("data-phase", "strobe");
-    expect(mocks.hapticsMediumMock).toHaveBeenCalledTimes(4);
+    expect(mocks.hapticsMediumMock).toHaveBeenCalledTimes(3);
     expect(mocks.hapticsHeavyMock).toHaveBeenCalledTimes(1);
 
     await flushTimers(1);
@@ -491,7 +487,7 @@ describe("CompanionEvolution", () => {
 
     await flushTimers(FULL_SEQUENCE_MS.apex);
     expect(dialog).toHaveAttribute("data-phase", "reveal");
-    expect(mocks.hapticsMediumMock).toHaveBeenCalledTimes(5);
+    expect(mocks.hapticsMediumMock).toHaveBeenCalledTimes(4);
     expect(mocks.playEvolutionStartMock).toHaveBeenCalledTimes(1);
     expect(mocks.playEvolutionSuccessMock).toHaveBeenCalledTimes(1);
   });

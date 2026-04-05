@@ -15,6 +15,8 @@ const PORTRAIT_PROFILE = {
   stepTolerance: 18,
   borderToleranceExtra: 22,
   maskBlurSigma: 1.05,
+  flatKeyHardThreshold: 16,
+  flatKeySoftThreshold: 44,
 };
 
 function clampChannel(value) {
@@ -208,6 +210,54 @@ async function borderFloodTransparent(input, profile = PORTRAIT_PROFILE) {
     }
 
     source[sourceIndex + 3] = softenedAlpha[pixelIndex];
+  }
+
+  return sharp(source, {
+    raw: {
+      width,
+      height,
+      channels: 4,
+    },
+  })
+    .png()
+    .toBuffer();
+}
+
+async function keyFlatBackgroundTransparent(input, profile = PORTRAIT_PROFILE) {
+  const [{ data: source, info }, { data: blurred }] = await Promise.all([
+    loadRawImage(input),
+    loadRawImage(input, profile.blurSigma / 2),
+  ]);
+
+  const width = info.width;
+  const height = info.height;
+  const borderSamples = collectBorderSamples(width, height);
+  const borderColor = estimateBorderColor(blurred, borderSamples);
+  const hardThreshold = Math.max(0, profile.flatKeyHardThreshold);
+  const softThreshold = Math.max(hardThreshold + 1, profile.flatKeySoftThreshold);
+
+  for (let pixelIndex = 0; pixelIndex < width * height; pixelIndex += 1) {
+    const sourceIndex = pixelIndex * 4;
+    const dr = source[sourceIndex] - borderColor[0];
+    const dg = source[sourceIndex + 1] - borderColor[1];
+    const db = source[sourceIndex + 2] - borderColor[2];
+    const distance = Math.sqrt(dr * dr + dg * dg + db * db);
+
+    let alpha = 255;
+    if (distance <= hardThreshold) {
+      alpha = 0;
+    } else if (distance < softThreshold) {
+      alpha = clampChannel(((distance - hardThreshold) / (softThreshold - hardThreshold)) * 255);
+    }
+
+    if (alpha > 0 && alpha < 255) {
+      const alphaRatio = alpha / 255;
+      source[sourceIndex] = clampChannel((source[sourceIndex] - borderColor[0] * (1 - alphaRatio)) / alphaRatio);
+      source[sourceIndex + 1] = clampChannel((source[sourceIndex + 1] - borderColor[1] * (1 - alphaRatio)) / alphaRatio);
+      source[sourceIndex + 2] = clampChannel((source[sourceIndex + 2] - borderColor[2] * (1 - alphaRatio)) / alphaRatio);
+    }
+
+    source[sourceIndex + 3] = alpha;
   }
 
   return sharp(source, {
@@ -558,6 +608,7 @@ async function isolatePortraitSource(input) {
 
   await pushCandidate("original", Promise.resolve(originalBuffer));
   await pushCandidate("border-flood", borderFloodTransparent(originalBuffer));
+  await pushCandidate("flat-key", keyFlatBackgroundTransparent(originalBuffer));
 
   const best = candidates.sort((left, right) => right.score - left.score)[0];
   return best?.buffer ?? originalBuffer;

@@ -51,7 +51,7 @@ describe("companionImageFocal", () => {
     expect(
       getBundledCompanionImageFocalPoint("/companion-presets/buttercat/t1_youth/normal/buttercat__t1_youth__normal__fire.png"),
     ).toEqual({
-      x: 0.500977,
+      x: 0.5,
       y: 0.470703,
     });
 
@@ -63,6 +63,30 @@ describe("companionImageFocal", () => {
     ).toMatchObject({
       focalSource: "manifest",
       assetKey: "companion-presets/buttercat/t1_youth/normal/buttercat__t1_youth__normal__fire.png",
+      style: {
+        transform: "translate(0.000%, 2.930%) scale(1.08)",
+      },
+    });
+  });
+
+  it("resolves remote initiate preset URLs from manifest metadata after import", () => {
+    expect(
+      getBundledCompanionImageFocalPoint(
+        "https://example.supabase.co/storage/v1/object/public/companion-presets/phoenix/t2_guardian/normal/phoenix__t2_guardian__normal__nature.png",
+      ),
+    ).toEqual({
+      x: 0.500977,
+      y: 0.470703,
+    });
+
+    expect(
+      resolveCompanionImagePresentation({
+        src: "https://example.supabase.co/storage/v1/object/public/companion-presets/phoenix/t2_guardian/normal/phoenix__t2_guardian__normal__nature.png",
+        fit: "portrait",
+      }),
+    ).toMatchObject({
+      focalSource: "manifest",
+      assetKey: "companion-presets/phoenix/t2_guardian/normal/phoenix__t2_guardian__normal__nature.png",
       style: {
         transform: "translate(-0.098%, 2.930%) scale(1.08)",
       },

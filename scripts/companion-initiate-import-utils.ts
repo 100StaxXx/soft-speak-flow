@@ -7,7 +7,7 @@ import {
 import { ELEMENT_PANEL_ORDER } from "./companion-stage2-preview-utils";
 
 export const PROJECT_ROOT = process.cwd();
-export const DEFAULT_INITIATE_SOURCE_DIR = "/Users/macbookair/Documents/Initiate";
+export const DEFAULT_INITIATE_SOURCE_DIR = "/Users/macbookair/Documents/Cosmiq Companion Images/Initiates";
 export const INITIATE_IMPORT_ROOT = path.join(PROJECT_ROOT, "output", "companion-initiate-import");
 export const INITIATE_ASSET_OUTPUT_DIR = path.join(INITIATE_IMPORT_ROOT, "assets");
 export const INITIATE_MANIFEST_DIR = path.join(INITIATE_IMPORT_ROOT, "manifests");
@@ -42,19 +42,19 @@ export interface InitiateSheetPlan {
 }
 
 const INITIATE_SHEET_SOURCES: readonly InitiateSheetSource[] = [
-  { presetId: "dragon", sourceFilename: "DragonInitiate.png" },
-  { presetId: "wolf", sourceFilename: "WolfInitiate.png" },
-  { presetId: "fox", sourceFilename: "KitsuneInitiate.png" },
-  { presetId: "owl", sourceFilename: "OwlInitiate.png" },
-  { presetId: "lion", sourceFilename: "LionInitiate.png" },
-  { presetId: "phoenix", sourceFilename: "PhoenixInitiate.png" },
-  { presetId: "pegasus", sourceFilename: "PegasusInitiate.png" },
-  { presetId: "griffin", sourceFilename: "GriffinInitiate.png" },
-  { presetId: "sphinx", sourceFilename: "SphinxInitiate.png" },
-  { presetId: "leviathan", sourceFilename: "LeviathanInitiate.png" },
-  { presetId: "mechanicaldragon", sourceFilename: "MechanicalDragonInitiate.png" },
-  { presetId: "tanuki", sourceFilename: "TanukiInitiate.png" },
-  { presetId: "buttercat", sourceFilename: "ButtercatInitiate.png" },
+  { presetId: "dragon", sourceFilename: "InitiateDragon.png" },
+  { presetId: "wolf", sourceFilename: "InitiateWolf.png" },
+  { presetId: "fox", sourceFilename: "InitiateKitsune.png" },
+  { presetId: "owl", sourceFilename: "InitiateOwl.png" },
+  { presetId: "lion", sourceFilename: "InitiateLion.png" },
+  { presetId: "phoenix", sourceFilename: "InitiatePhoenix.png" },
+  { presetId: "pegasus", sourceFilename: "InitiatePegasus.png" },
+  { presetId: "griffin", sourceFilename: "InitiateGriffin.png" },
+  { presetId: "sphinx", sourceFilename: "InitiateSphinx.png" },
+  { presetId: "leviathan", sourceFilename: "InitiateLeviathan.png" },
+  { presetId: "mechanicaldragon", sourceFilename: "InitiateMechanicalDragon.png" },
+  { presetId: "tanuki", sourceFilename: "InitiateTanuki.png" },
+  { presetId: "buttercat", sourceFilename: "InitiateButtercat.png" },
 ] as const;
 
 export const getInitiateSheetSources = (): readonly InitiateSheetSource[] =>
