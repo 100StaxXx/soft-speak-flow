@@ -18,6 +18,7 @@ import {
   isRetriableFunctionInvokeError,
   parseFunctionInvokeError,
   toUserFacingFunctionError,
+  type ParsedFunctionInvokeError,
 } from "@/utils/supabaseFunctionErrors";
 import { retryWithBackoff } from "@/utils/retry";
 import {
@@ -38,6 +39,20 @@ const FUNCTION_TRANSPORT_ERROR_MESSAGES = new Set([
   "failed to send a request to the edge function",
   "relay error invoking the edge function",
 ]);
+const AUTH_GATEWAY_OUTAGE_CODES = new Set([
+  "SERVICE_MISCONFIGURED",
+  "ABUSE_CHECK_FAILED",
+  "AUTH_GATEWAY_FAILED",
+]);
+const SOCIAL_AUTH_OUTAGE_CODES = new Set([
+  "ABUSE_CHECK_FAILED",
+  "APPLE_AUTH_UNAVAILABLE",
+  "GOOGLE_AUTH_UNAVAILABLE",
+]);
+const AUTH_TEMPORARY_OUTAGE_MESSAGE =
+  "Authentication is temporarily unavailable. Please try again in a moment.";
+const APPLE_AUTH_TEMPORARY_OUTAGE_MESSAGE =
+  "Sign in with Apple is temporarily unavailable. Please try again in a moment.";
 
 type AuthGatewayAction = "sign_in_password" | "sign_up_password" | "reset_password";
 type PostAuthProvider = "apple" | null;
@@ -143,11 +158,43 @@ const getAuthGatewayActionDescription = (action: AuthGatewayAction): string => {
 const isFunctionTransportErrorMessage = (message: string): boolean =>
   FUNCTION_TRANSPORT_ERROR_MESSAGES.has(message.trim().toLowerCase());
 
+const getParsedFunctionErrorCode = (parsed: ParsedFunctionInvokeError): string | undefined =>
+  parsed.code ?? parsed.responsePayload?.code;
+
+const getParsedFunctionRequestId = (parsed: ParsedFunctionInvokeError): string | undefined =>
+  parsed.requestId ?? parsed.responsePayload?.requestId;
+
+const logAuthFunctionError = (
+  label: string,
+  parsed: ParsedFunctionInvokeError,
+  extra: Record<string, unknown>,
+) => {
+  logger.error(label, {
+    ...extra,
+    category: parsed.category,
+    status: parsed.status,
+    code: getParsedFunctionErrorCode(parsed),
+    requestId: getParsedFunctionRequestId(parsed),
+    backendMessage: parsed.backendMessage,
+    retryAfterSeconds: parsed.retryAfterSeconds,
+    upstreamStatus: parsed.upstreamStatus,
+    upstreamError: parsed.upstreamError,
+  });
+};
+
 const getAuthGatewayErrorMessage = async (
   error: unknown,
   action: AuthGatewayAction,
 ): Promise<string> => {
   const parsed = await parseFunctionInvokeError(error);
+  logAuthFunctionError("[Auth Gateway] Password auth request failed", parsed, {
+    action,
+  });
+  const errorCode = getParsedFunctionErrorCode(parsed);
+
+  if (errorCode && AUTH_GATEWAY_OUTAGE_CODES.has(errorCode)) {
+    return AUTH_TEMPORARY_OUTAGE_MESSAGE;
+  }
 
   if (typeof parsed.backendMessage === "string" && parsed.backendMessage.trim()) {
     return parsed.backendMessage;
@@ -171,6 +218,14 @@ const getAppleAuthErrorMessage = async (
   intent: SocialAuthIntent,
 ): Promise<string> => {
   const parsed = await parseFunctionInvokeError(error);
+  logAuthFunctionError("[Auth Apple] Social auth request failed", parsed, {
+    intent,
+  });
+  const errorCode = getParsedFunctionErrorCode(parsed);
+
+  if (errorCode && SOCIAL_AUTH_OUTAGE_CODES.has(errorCode)) {
+    return APPLE_AUTH_TEMPORARY_OUTAGE_MESSAGE;
+  }
 
   if (
     typeof parsed.backendMessage === "string" &&

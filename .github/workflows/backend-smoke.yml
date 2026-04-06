@@ -30,6 +30,30 @@ jobs:
             exit 1
           fi
 
+      - name: Verify auth-gateway handles invalid credentials without backend outage
+        run: |
+          set -euo pipefail
+          email="codex-auth-smoke+${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}@example.invalid"
+          status=$(curl -sS -o /tmp/auth-gateway.json -w "%{http_code}" \
+            -X POST "https://${PROJECT_REF}.supabase.co/functions/v1/auth-gateway" \
+            -H "apikey: ${PUBLISHABLE_KEY}" \
+            -H "Content-Type: application/json" \
+            -d "{\"action\":\"sign_in_password\",\"email\":\"${email}\",\"password\":\"Password123!\"}")
+
+          echo "auth-gateway invalid credentials probe => HTTP ${status}"
+          cat /tmp/auth-gateway.json || true
+
+          if [ "$status" != "401" ]; then
+            echo "Expected auth-gateway invalid credentials probe to return 401" >&2
+            exit 1
+          fi
+
+          code=$(jq -r '.code // ""' /tmp/auth-gateway.json)
+          if [ "$code" != "INVALID_CREDENTIALS" ]; then
+            echo "Expected auth-gateway invalid credentials probe to return INVALID_CREDENTIALS, got ${code}" >&2
+            exit 1
+          fi
+
       - name: Verify protected functions reject anonymous requests
         run: |
           set -euo pipefail

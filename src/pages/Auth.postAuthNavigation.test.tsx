@@ -14,6 +14,11 @@ const mocks = vi.hoisted(() => {
   const setSessionMock = vi.fn();
   const appleAuthorizeMock = vi.fn();
   const maybeSingleMock = vi.fn();
+  const loggerDebugMock = vi.fn();
+  const loggerInfoMock = vi.fn();
+  const loggerWarnMock = vi.fn();
+  const loggerErrorMock = vi.fn();
+  const loggerLogMock = vi.fn();
 
   const selectEqMock = vi.fn(() => ({ maybeSingle: maybeSingleMock }));
   const selectMock = vi.fn(() => ({ eq: selectEqMock }));
@@ -34,6 +39,11 @@ const mocks = vi.hoisted(() => {
     selectEqMock,
     selectMock,
     fromMock,
+    loggerDebugMock,
+    loggerInfoMock,
+    loggerWarnMock,
+    loggerErrorMock,
+    loggerLogMock,
     isNativePlatform: false,
     platform: "web",
     applePluginAvailable: false,
@@ -58,11 +68,11 @@ vi.mock("@/hooks/use-toast", () => ({
 
 vi.mock("@/utils/logger", () => ({
   logger: {
-    debug: vi.fn(),
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-    log: vi.fn(),
+    debug: mocks.loggerDebugMock,
+    info: mocks.loggerInfoMock,
+    warn: mocks.loggerWarnMock,
+    error: mocks.loggerErrorMock,
+    log: mocks.loggerLogMock,
   },
 }));
 
@@ -420,6 +430,56 @@ describe("Auth post-auth navigation", () => {
     expect(mocks.toastMock).toHaveBeenCalledWith(
       expect.objectContaining({
         title: "Check your email",
+      }),
+    );
+  });
+
+  it("maps auth outage codes to a temporary auth message and logs requestId", async () => {
+    mocks.getSessionMock.mockResolvedValue({
+      data: {
+        session: null,
+      },
+    });
+
+    mocks.invokeMock.mockResolvedValue({
+      data: null,
+      error: {
+        name: "FunctionsHttpError",
+        message: "Edge Function returned a non-2xx status code",
+        context: {
+          json: async () => ({
+            error: "Request could not be processed right now",
+            code: "ABUSE_CHECK_FAILED",
+            requestId: "req-auth-outage-1",
+          }),
+        },
+      },
+    });
+
+    renderAuth();
+    await flushMicrotasks();
+
+    fireEvent.click(screen.getByRole("button", { name: /need an account\? sign up/i }));
+    fireEvent.change(screen.getByLabelText(/email/i), {
+      target: { value: "new@example.com" },
+    });
+    fireEvent.change(screen.getByLabelText(/^password$/i), {
+      target: { value: "Password123" },
+    });
+    fireEvent.change(screen.getByLabelText(/confirm password/i), {
+      target: { value: "Password123" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /^get started$/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Authentication is temporarily unavailable. Please try again in a moment.",
+    );
+    expect(mocks.loggerErrorMock).toHaveBeenCalledWith(
+      "[Auth Gateway] Password auth request failed",
+      expect.objectContaining({
+        code: "ABUSE_CHECK_FAILED",
+        requestId: "req-auth-outage-1",
+        action: "sign_up_password",
       }),
     );
   });

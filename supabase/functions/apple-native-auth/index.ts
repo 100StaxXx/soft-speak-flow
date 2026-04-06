@@ -3,10 +3,10 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
 import { createRemoteJWKSet, jwtVerify } from "https://esm.sh/jose@5.8.0";
 import {
   applyAbuseProtection,
-  createAbuseAdminClient,
   createSafeErrorResponse,
   getClientIpAddress,
 } from "../_shared/abuseProtection.ts";
+import { findMissingRequiredEnv, logAuthEvent, logAuthSafeError, readSafeErrorResponseContext, toAuthErrorMessage } from "../_shared/authLogging.ts";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
 
 type SocialAuthIntent = "sign_in" | "sign_up";
@@ -46,6 +46,12 @@ type AppleNativeAuthDeps = {
 };
 
 const appleJWKS = createRemoteJWKSet(new URL("https://appleid.apple.com/auth/keys"));
+const REQUIRED_ENV_KEYS = [
+  "SUPABASE_URL",
+  "SUPABASE_ANON_KEY",
+  "SUPABASE_SERVICE_ROLE_KEY",
+  "APPLE_SERVICE_ID",
+] as const;
 
 function jsonSuccess(req: Request, body: Record<string, unknown>, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -112,6 +118,30 @@ export async function handleAppleNativeAuth(
 
   const requestId = crypto.randomUUID();
   const ipAddress = getClientIpAddress(req);
+  let intent: SocialAuthIntent | undefined;
+
+  const createLoggedSafeErrorResponse = (
+    options: {
+      status: number;
+      code: string;
+      error: string;
+      retryAfterSeconds?: number | null;
+    },
+    context: Record<string, unknown> = {},
+  ): Response => {
+    logAuthSafeError("apple-native-auth", {
+      requestId,
+      status: options.status,
+      code: options.code,
+      error: options.error,
+      context,
+    });
+
+    return createSafeErrorResponse(req, {
+      requestId,
+      ...options,
+    });
+  };
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
@@ -119,17 +149,38 @@ export async function handleAppleNativeAuth(
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const appleServiceId = Deno.env.get("APPLE_SERVICE_ID");
     const iosBundleId = "com.darrylgraham.revolution";
+    const missingEnvKeys = findMissingRequiredEnv([...REQUIRED_ENV_KEYS]);
 
-    if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceKey || !appleServiceId) {
-      return createSafeErrorResponse(req, {
+    if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceKey || !appleServiceId || missingEnvKeys.length > 0) {
+      return createLoggedSafeErrorResponse({
         status: 500,
         code: "APPLE_AUTH_UNAVAILABLE",
         error: "Unable to sign in with Apple right now.",
-        requestId,
+      }, {
+        clientIpKnown: ipAddress !== "unknown",
+        missingEnvKeys: missingEnvKeys.join(","),
       });
     }
 
-    const preAuthProtection = await deps.applyAbuseProtectionFn(req, createAbuseAdminClient(), {
+    let supabaseAdmin: any;
+    try {
+      supabaseAdmin = deps.createAdminClient(supabaseUrl, supabaseServiceKey);
+      logAuthEvent("apple-native-auth", "info", "Admin client ready", {
+        requestId,
+        clientIpKnown: ipAddress !== "unknown",
+      });
+    } catch (error) {
+      return createLoggedSafeErrorResponse({
+        status: 500,
+        code: "APPLE_AUTH_UNAVAILABLE",
+        error: "Unable to sign in with Apple right now.",
+      }, {
+        clientIpKnown: ipAddress !== "unknown",
+        errorMessage: toAuthErrorMessage(error),
+      });
+    }
+
+    const preAuthProtection = await deps.applyAbuseProtectionFn(req, supabaseAdmin, {
       profileKey: "auth.sign_in",
       endpointName: "apple-native-auth",
       requestId,
@@ -142,69 +193,78 @@ export async function handleAppleNativeAuth(
     });
 
     if (preAuthProtection instanceof Response) {
+      logAuthEvent("apple-native-auth", preAuthProtection.status >= 500 ? "error" : "warn", "Pre-auth abuse protection blocked request", {
+        requestId,
+        clientIpKnown: ipAddress !== "unknown",
+        phase: "pre_auth",
+        ...(await readSafeErrorResponseContext(preAuthProtection)),
+      });
       return preAuthProtection;
     }
 
     const { identityToken, rawNonce, intent: rawIntent } = await req.json() as AppleNativeAuthRequest;
-    const intent = resolveIntent(rawIntent);
+    intent = resolveIntent(rawIntent);
+    const requestContext = {
+      intent,
+      clientIpKnown: ipAddress !== "unknown",
+      identityTokenProvided: typeof identityToken === "string" && identityToken.length > 0,
+      rawNonceProvided: typeof rawNonce === "string" && rawNonce.length > 0,
+    };
 
     if (!identityToken) {
-      return createSafeErrorResponse(req, {
+      return createLoggedSafeErrorResponse({
         status: 400,
         code: "APPLE_AUTH_FAILED",
         error: "Unable to sign in with Apple.",
-        requestId,
-      });
+      }, requestContext);
     }
 
     if (!rawNonce) {
-      return createSafeErrorResponse(req, {
+      return createLoggedSafeErrorResponse({
         status: 400,
         code: "APPLE_NONCE_MISSING",
         error: "Apple Sign-In security verification failed. Please try again.",
-        requestId,
-      });
+      }, requestContext);
     }
 
     let payload: Record<string, unknown>;
     try {
       payload = await deps.verifyIdentityToken(identityToken, appleServiceId, iosBundleId);
     } catch (jwtError) {
-      console.error("[apple-native-auth] JWT verification failed", jwtError);
-      return createSafeErrorResponse(req, {
+      logAuthEvent("apple-native-auth", "error", "JWT verification failed", {
+        ...requestContext,
+        requestId,
+        errorMessage: toAuthErrorMessage(jwtError),
+      });
+      return createLoggedSafeErrorResponse({
         status: 401,
         code: "APPLE_AUTH_FAILED",
         error: "Unable to sign in with Apple.",
-        requestId,
-      });
+      }, requestContext);
     }
 
     const tokenNonce = typeof payload.nonce === "string" ? payload.nonce : null;
     if (!tokenNonce) {
-      return createSafeErrorResponse(req, {
+      return createLoggedSafeErrorResponse({
         status: 400,
         code: "APPLE_NONCE_MISSING",
         error: "Apple Sign-In security verification failed. Please try again.",
-        requestId,
-      });
+      }, requestContext);
     }
 
     const expectedNonce = await deps.sha256HexFn(rawNonce);
     if (tokenNonce !== expectedNonce) {
-      return createSafeErrorResponse(req, {
+      return createLoggedSafeErrorResponse({
         status: 400,
         code: "APPLE_NONCE_MISMATCH",
         error: "Apple Sign-In security verification failed. Please try again.",
-        requestId,
-      });
+      }, requestContext);
     }
 
     const tokenInfo = {
       sub: typeof payload.sub === "string" ? payload.sub : "",
       email: typeof payload.email === "string" ? payload.email.toLowerCase() : null,
     };
-
-    const supabaseAdmin = deps.createAdminClient(supabaseUrl, supabaseServiceKey);
 
     const fetchUser = async (matchFn: (user: SupabaseAuthUser) => boolean) => {
       let page = 1;
@@ -217,8 +277,7 @@ export async function handleAppleNativeAuth(
         });
 
         if (listError) {
-          console.error("[apple-native-auth] Failed to list users", listError);
-          return null;
+          throw new Error(`Failed to list users: ${listError.message}`);
         }
 
         const users = (data?.users ?? []) as SupabaseAuthUser[];
@@ -240,13 +299,30 @@ export async function handleAppleNativeAuth(
     };
 
     let existingUser: SupabaseAuthUser | null = null;
+    try {
+      if (tokenInfo.email) {
+        existingUser = await fetchUser((user) => user.email?.toLowerCase() === tokenInfo.email);
+      }
 
-    if (tokenInfo.email) {
-      existingUser = await fetchUser((user) => user.email?.toLowerCase() === tokenInfo.email);
-    }
-
-    if (!existingUser && tokenInfo.sub) {
-      existingUser = await fetchUser((user) => user.user_metadata?.apple_user_id === tokenInfo.sub);
+      if (!existingUser && tokenInfo.sub) {
+        existingUser = await fetchUser((user) => user.user_metadata?.apple_user_id === tokenInfo.sub);
+      }
+    } catch (error) {
+      logAuthEvent("apple-native-auth", "error", "Failed to look up Apple account", {
+        ...requestContext,
+        requestId,
+        hasEmail: Boolean(tokenInfo.email),
+        providerSubjectPresent: Boolean(tokenInfo.sub),
+        errorMessage: toAuthErrorMessage(error),
+      });
+      return createLoggedSafeErrorResponse({
+        status: 500,
+        code: "APPLE_AUTH_UNAVAILABLE",
+        error: "Unable to sign in with Apple right now.",
+      }, {
+        ...requestContext,
+        phase: "account_lookup",
+      });
     }
 
     let userId: string;
@@ -254,16 +330,22 @@ export async function handleAppleNativeAuth(
 
     if (!existingUser) {
       if (intent === "sign_in") {
+        logAuthSafeError("apple-native-auth", {
+          requestId,
+          status: 404,
+          code: "ACCOUNT_NOT_FOUND",
+          error: "We couldn't find an existing account for this Apple sign-in.",
+          context: requestContext,
+        });
         return getAppleAccountNotFoundResponse(req, requestId);
       }
 
       if (!tokenInfo.email) {
-        return createSafeErrorResponse(req, {
+        return createLoggedSafeErrorResponse({
           status: 400,
           code: "APPLE_EMAIL_MISSING",
           error: "Apple did not share an email for this account. Remove this app from Sign in with Apple settings, then try again.",
-          requestId,
-        });
+        }, requestContext);
       }
 
       const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
@@ -276,23 +358,50 @@ export async function handleAppleNativeAuth(
       });
 
       if (createError && !(createError.message?.includes("already registered") || createError.message?.includes("already exists"))) {
-        console.error("[apple-native-auth] Failed to create user", createError);
-        return createSafeErrorResponse(req, {
+        logAuthEvent("apple-native-auth", "error", "Failed to create Apple auth user", {
+          ...requestContext,
+          requestId,
+          hasEmail: Boolean(tokenInfo.email),
+          providerSubjectPresent: Boolean(tokenInfo.sub),
+          errorMessage: createError.message,
+        });
+        return createLoggedSafeErrorResponse({
           status: 500,
           code: "APPLE_AUTH_FAILED",
           error: "Unable to sign in with Apple right now.",
-          requestId,
+        }, {
+          ...requestContext,
+          phase: "create_user",
         });
       }
 
       if (createError) {
-        existingUser = await fetchUser((user) => user.email?.toLowerCase() === tokenInfo.email);
+        try {
+          existingUser = await fetchUser((user) => user.email?.toLowerCase() === tokenInfo.email);
+        } catch (error) {
+          logAuthEvent("apple-native-auth", "error", "Failed to reload Apple account after duplicate create", {
+            ...requestContext,
+            requestId,
+            hasEmail: Boolean(tokenInfo.email),
+            errorMessage: toAuthErrorMessage(error),
+          });
+          return createLoggedSafeErrorResponse({
+            status: 500,
+            code: "APPLE_AUTH_UNAVAILABLE",
+            error: "Unable to sign in with Apple right now.",
+          }, {
+            ...requestContext,
+            phase: "reload_user",
+          });
+        }
         if (!existingUser) {
-          return createSafeErrorResponse(req, {
+          return createLoggedSafeErrorResponse({
             status: 500,
             code: "APPLE_AUTH_FAILED",
             error: "Unable to sign in with Apple right now.",
-            requestId,
+          }, {
+            ...requestContext,
+            phase: "reload_user",
           });
         }
 
@@ -301,11 +410,13 @@ export async function handleAppleNativeAuth(
       } else {
         const createdUser = newUser?.user;
         if (!createdUser) {
-          return createSafeErrorResponse(req, {
+          return createLoggedSafeErrorResponse({
             status: 500,
             code: "APPLE_AUTH_FAILED",
             error: "Unable to sign in with Apple right now.",
-            requestId,
+          }, {
+            ...requestContext,
+            phase: "create_user",
           });
         }
 
@@ -325,27 +436,34 @@ export async function handleAppleNativeAuth(
         });
 
         if (metadataError) {
-          console.error("[apple-native-auth] Failed to update Apple metadata", metadataError);
-          return createSafeErrorResponse(req, {
+          logAuthEvent("apple-native-auth", "error", "Failed to update Apple account metadata", {
+            ...requestContext,
+            requestId,
+            userId,
+            errorMessage: metadataError.message,
+          });
+          return createLoggedSafeErrorResponse({
             status: 500,
             code: "APPLE_AUTH_FAILED",
             error: "Unable to sign in with Apple right now.",
-            requestId,
+          }, {
+            ...requestContext,
+            phase: "metadata_sync",
+            userId,
           });
         }
       }
     }
 
     if (!userEmail) {
-      return createSafeErrorResponse(req, {
+      return createLoggedSafeErrorResponse({
         status: 400,
         code: "APPLE_ACCOUNT_EMAIL_MISSING",
         error: "Unable to determine the email for this Apple account.",
-        requestId,
-      });
+      }, requestContext);
     }
 
-    const postAuthProtection = await deps.applyAbuseProtectionFn(req, createAbuseAdminClient(), {
+    const postAuthProtection = await deps.applyAbuseProtectionFn(req, supabaseAdmin, {
       profileKey: "auth.sign_in",
       endpointName: "apple-native-auth",
       requestId: crypto.randomUUID(),
@@ -360,6 +478,13 @@ export async function handleAppleNativeAuth(
     });
 
     if (postAuthProtection instanceof Response) {
+      logAuthEvent("apple-native-auth", postAuthProtection.status >= 500 ? "error" : "warn", "Post-auth abuse protection blocked request", {
+        ...requestContext,
+        requestId,
+        phase: "post_auth",
+        userId,
+        ...(await readSafeErrorResponseContext(postAuthProtection)),
+      });
       return postAuthProtection;
     }
 
@@ -369,12 +494,20 @@ export async function handleAppleNativeAuth(
     });
 
     if (magicLinkError || !magicLinkData?.properties?.action_link) {
-      console.error("[apple-native-auth] Failed to generate magic link", magicLinkError);
-      return createSafeErrorResponse(req, {
+      logAuthEvent("apple-native-auth", "error", "Failed to generate Apple magic link", {
+        ...requestContext,
+        requestId,
+        userId,
+        errorMessage: magicLinkError?.message,
+      });
+      return createLoggedSafeErrorResponse({
         status: 500,
         code: "APPLE_AUTH_FAILED",
         error: "Unable to sign in with Apple right now.",
-        requestId,
+      }, {
+        ...requestContext,
+        phase: "magic_link",
+        userId,
       });
     }
 
@@ -383,11 +516,14 @@ export async function handleAppleNativeAuth(
     const verificationType = actionLink.searchParams.get("type") || "magiclink";
 
     if (!verificationToken) {
-      return createSafeErrorResponse(req, {
+      return createLoggedSafeErrorResponse({
         status: 500,
         code: "APPLE_AUTH_FAILED",
         error: "Unable to sign in with Apple right now.",
-        requestId,
+      }, {
+        ...requestContext,
+        phase: "magic_link",
+        userId,
       });
     }
 
@@ -401,12 +537,20 @@ export async function handleAppleNativeAuth(
 
     const verifiedSession = sessionData?.session;
     if (sessionError || !verifiedSession) {
-      console.error("[apple-native-auth] Failed to create session", sessionError);
-      return createSafeErrorResponse(req, {
+      logAuthEvent("apple-native-auth", "error", "Failed to create Apple session", {
+        ...requestContext,
+        requestId,
+        userId,
+        errorMessage: sessionError?.message,
+      });
+      return createLoggedSafeErrorResponse({
         status: 500,
         code: "APPLE_AUTH_FAILED",
         error: "Unable to sign in with Apple right now.",
-        requestId,
+      }, {
+        ...requestContext,
+        phase: "session_create",
+        userId,
       });
     }
 
@@ -416,12 +560,14 @@ export async function handleAppleNativeAuth(
       user: sessionData?.user,
     });
   } catch (error) {
-    console.error("[apple-native-auth] Unexpected error", error);
-    return createSafeErrorResponse(req, {
+    return createLoggedSafeErrorResponse({
       status: 500,
       code: "APPLE_AUTH_FAILED",
       error: "Unable to sign in with Apple right now.",
-      requestId,
+    }, {
+      intent,
+      clientIpKnown: ipAddress !== "unknown",
+      errorMessage: toAuthErrorMessage(error),
     });
   }
 }

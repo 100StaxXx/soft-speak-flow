@@ -1,18 +1,15 @@
 import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Capacitor } from "@capacitor/core";
-import { ArrowLeft, Mail, Send } from "lucide-react";
+import { ArrowLeft, Send } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
 import { PageTransition } from "@/components/PageTransition";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/useAuth";
 import { useResilience } from "@/contexts/ResilienceContext";
 import type { SupportReportCategory, SupportReportPayload } from "@/types/resilience";
 
@@ -48,24 +45,12 @@ export default function SupportReport() {
   const navigate = useNavigate();
   const location = useLocation();
   const locationState = (location.state as SupportReportLocationState) ?? null;
-  const { user } = useAuth();
   const { toast } = useToast();
-  const {
-    state,
-    backendHealth,
-    isOnline,
-    queueCount,
-    recentErrorFingerprints,
-    reportIssue,
-  } = useResilience();
+  const { reportIssue } = useResilience();
 
   const initialCategory = useMemo(() => resolveDefaultCategory(locationState), [locationState]);
   const [category, setCategory] = useState<SupportReportCategory>(initialCategory);
-  const [summary, setSummary] = useState("");
-  const [reproductionSteps, setReproductionSteps] = useState("");
-  const [expectedBehavior, setExpectedBehavior] = useState("");
-  const [actualBehavior, setActualBehavior] = useState("");
-  const [consentDiagnostics, setConsentDiagnostics] = useState(true);
+  const [message, setMessage] = useState("");
   const [screenshotDataUrl, setScreenshotDataUrl] = useState<string | undefined>(undefined);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -79,53 +64,11 @@ export default function SupportReport() {
   const pageDescription = isFeedbackCategory
     ? "Share ideas, feature requests, or anything that would make Cosmiq better. If you're offline or services are down, this feedback will be queued and sent later."
     : "Tell us what happened. If you're offline or services are down, this report will be queued and sent later.";
-  const summaryLabel = isFeedbackCategory ? "What would you like to share?" : "Summary";
-  const summaryPlaceholder = isFeedbackCategory ? "Idea, request, or general feedback" : "Short issue summary";
-  const reproductionLabel = isFeedbackCategory ? "More details (optional)" : "Reproduction steps";
-  const reproductionPlaceholder = isFeedbackCategory ? "What prompted this feedback?" : "Step-by-step reproduction";
-  const expectedLabel = isFeedbackCategory ? "What would you love to see? (optional)" : "Expected behavior";
-  const actualLabel = isFeedbackCategory ? "Anything getting in the way? (optional)" : "Actual behavior";
+  const messageLabel = isFeedbackCategory ? "What would you like to share?" : "What happened?";
+  const messagePlaceholder = isFeedbackCategory
+    ? "Idea, request, or general feedback"
+    : "Describe the problem you're running into";
   const submitLabel = isFeedbackCategory ? "Submit feedback" : "Submit report";
-  const emailLabel = isFeedbackCategory ? "Email feedback" : "Email support";
-
-  const diagnostics = useMemo(() => {
-    return {
-      appVersion: (import.meta.env.VITE_APP_VERSION as string | undefined) ?? import.meta.env.MODE,
-      platform: Capacitor.getPlatform(),
-      route: `${location.pathname}${location.search}`,
-      authState: user ? "authenticated" : "unauthenticated",
-      connectivity: {
-        isOnline,
-        resilienceState: state,
-        backendHealth,
-      },
-      queueDepth: queueCount,
-      recentErrorFingerprints,
-      userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "unknown",
-      capturedAt: new Date().toISOString(),
-    } as const;
-  }, [backendHealth, isOnline, location.pathname, location.search, queueCount, recentErrorFingerprints, state, user]);
-
-  const mailtoHref = useMemo(() => {
-    const body = [
-      `Category: ${category}`,
-      `Summary: ${summary || "(none)"}`,
-      "",
-      "Reproduction Steps:",
-      reproductionSteps || "(none)",
-      "",
-      "Expected:",
-      expectedBehavior || "(none)",
-      "",
-      "Actual:",
-      actualBehavior || "(none)",
-      "",
-      consentDiagnostics ? `Diagnostics:\n${JSON.stringify(diagnostics, null, 2)}` : "Diagnostics: not attached",
-    ].join("\n");
-
-    const subject = isFeedbackCategory ? "Cosmiq Feedback" : "Cosmiq Support Report";
-    return `mailto:admin@cosmiq.quest?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  }, [actualBehavior, category, consentDiagnostics, diagnostics, expectedBehavior, isFeedbackCategory, reproductionSteps, summary]);
 
   const handleScreenshotChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -156,12 +99,12 @@ export default function SupportReport() {
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
 
-    if (!summary.trim()) {
+    if (!message.trim()) {
       toast({
-        title: "Summary required",
+        title: "Message required",
         description: isFeedbackCategory
-          ? "Please share a short summary of your feedback."
-          : "Please provide a short description of the issue.",
+          ? "Please share your feedback before submitting."
+          : "Please describe the issue before submitting.",
         variant: "destructive",
       });
       return;
@@ -170,13 +113,12 @@ export default function SupportReport() {
     const payload: SupportReportPayload = {
       correlationId: createCorrelationId(),
       category,
-      summary: summary.trim(),
-      reproductionSteps: reproductionSteps.trim(),
-      expectedBehavior: expectedBehavior.trim(),
-      actualBehavior: actualBehavior.trim(),
+      summary: message.trim(),
+      reproductionSteps: "",
+      expectedBehavior: "",
+      actualBehavior: "",
       screenshotDataUrl,
-      consentDiagnostics,
-      diagnostics,
+      consentDiagnostics: false,
     };
 
     setIsSubmitting(true);
@@ -251,40 +193,13 @@ export default function SupportReport() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="summary">{summaryLabel}</Label>
-                  <Input
-                    id="summary"
-                    placeholder={summaryPlaceholder}
-                    value={summary}
-                    onChange={(event) => setSummary(event.target.value)}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="steps">{reproductionLabel}</Label>
+                  <Label htmlFor="message">{messageLabel}</Label>
                   <Textarea
-                    id="steps"
-                    placeholder={reproductionPlaceholder}
-                    value={reproductionSteps}
-                    onChange={(event) => setReproductionSteps(event.target.value)}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="expected">{expectedLabel}</Label>
-                  <Textarea
-                    id="expected"
-                    value={expectedBehavior}
-                    onChange={(event) => setExpectedBehavior(event.target.value)}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="actual">{actualLabel}</Label>
-                  <Textarea
-                    id="actual"
-                    value={actualBehavior}
-                    onChange={(event) => setActualBehavior(event.target.value)}
+                    id="message"
+                    placeholder={messagePlaceholder}
+                    value={message}
+                    onChange={(event) => setMessage(event.target.value)}
+                    className="min-h-32"
                   />
                 </div>
 
@@ -296,27 +211,10 @@ export default function SupportReport() {
                   )}
                 </div>
 
-                <div className="flex items-start gap-2">
-                  <Checkbox
-                    id="consent"
-                    checked={consentDiagnostics}
-                    onCheckedChange={(checked) => setConsentDiagnostics(Boolean(checked))}
-                  />
-                  <Label htmlFor="consent" className="text-sm font-normal leading-relaxed">
-                    Include diagnostics (platform, route, connectivity state, queue depth, recent error fingerprints)
-                  </Label>
-                </div>
-
                 <div className="flex flex-col gap-2 sm:flex-row">
                   <Button type="submit" disabled={isSubmitting}>
                     <Send className="mr-2 h-4 w-4" />
                     {isSubmitting ? "Submitting..." : submitLabel}
-                  </Button>
-                  <Button type="button" variant="outline" asChild>
-                    <a href={mailtoHref}>
-                      <Mail className="mr-2 h-4 w-4" />
-                      {emailLabel}
-                    </a>
                   </Button>
                 </div>
               </form>

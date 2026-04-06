@@ -121,6 +121,86 @@ Deno.test("auth-gateway allows normal password sign-up under limit", async () =>
   assertEquals(body.requiresEmailConfirmation, true, "Expected sign-up without a session to require email confirmation");
 });
 
+Deno.test("auth-gateway returns service misconfigured when admin client creation fails", async () => {
+  const response = await authGatewayModule.handleAuthGateway(
+    new Request("https://example.com/functions/v1/auth-gateway", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "sign_up_password",
+        email: "newuser@example.com",
+        password: "supersecret123",
+      }),
+    }),
+    {
+      createAdminClient: () => {
+        throw new Error("service role missing");
+      },
+      createAnonClient: () => ({
+        auth: {
+          signUp: async () => ({
+            data: { session: null, user: null },
+            error: null,
+          }),
+        },
+      }),
+      applyAbuseProtectionFn: async () => ({
+        requestId: "req-auth-misconfigured-1",
+        ipAddress: "203.0.113.14",
+        protection: null,
+      }) as any,
+    },
+  );
+
+  const body = await response.json();
+  assertEquals(response.status, 500, "Expected misconfigured admin client to fail closed");
+  assertEquals(body.code, "SERVICE_MISCONFIGURED", "Expected safe misconfiguration code");
+  assert(typeof body.requestId === "string" && body.requestId.length > 0, "Expected requestId in body");
+  assertEquals(response.headers.get("X-Request-Id"), body.requestId, "Expected requestId header to match body");
+});
+
+Deno.test("auth-gateway returns abuse check failed when limiter storage is unavailable", async () => {
+  const response = await authGatewayModule.handleAuthGateway(
+    new Request("https://example.com/functions/v1/auth-gateway", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "sign_up_password",
+        email: "newuser@example.com",
+        password: "supersecret123",
+      }),
+    }),
+    {
+      createAdminClient: () => ({}),
+      createAnonClient: () => ({
+        auth: {
+          signUp: async () => ({
+            data: { session: null, user: null },
+            error: null,
+          }),
+        },
+      }),
+      applyAbuseProtectionFn: async () => new Response(JSON.stringify({
+        error: "Request could not be processed right now",
+        code: "ABUSE_CHECK_FAILED",
+        requestId: "req-auth-abuse-failed-1",
+      }), {
+        status: 503,
+        headers: {
+          "Content-Type": "application/json",
+          "X-Request-Id": "req-auth-abuse-failed-1",
+        },
+      }),
+    },
+  );
+
+  const body = await response.json();
+  assertEquals(response.status, 503, "Expected limiter failure to fail closed");
+  assertEquals(body.code, "ABUSE_CHECK_FAILED", "Expected safe abuse-check error code");
+  assertEquals(body.requestId, "req-auth-abuse-failed-1", "Expected requestId in body");
+  assertEquals(response.headers.get("X-Request-Id"), "req-auth-abuse-failed-1", "Expected requestId header");
+});
+
 Deno.test("auth-gateway blocks burst abuse before auth is attempted", async () => {
   let anonCalled = false;
 

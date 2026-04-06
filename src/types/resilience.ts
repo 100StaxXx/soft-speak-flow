@@ -49,5 +49,5 @@ export interface SupportReportPayload {
   actualBehavior: string;
   screenshotDataUrl?: string;
   consentDiagnostics: boolean;
-  diagnostics: SupportReportDiagnostics;
+  diagnostics?: SupportReportDiagnostics;
 }

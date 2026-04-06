@@ -83,6 +83,6 @@ export function sanitizeSupportReportPayload(payload: SupportReportPayload): Sup
     reproductionSteps: sanitizedMeta.reproductionSteps,
     expectedBehavior: sanitizedMeta.expectedBehavior,
     actualBehavior: sanitizedMeta.actualBehavior,
-    diagnostics: sanitizeSupportDiagnostics(payload.diagnostics),
+    diagnostics: payload.diagnostics ? sanitizeSupportDiagnostics(payload.diagnostics) : undefined,
   };
 }

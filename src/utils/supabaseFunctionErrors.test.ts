@@ -18,10 +18,13 @@ describe("supabaseFunctionErrors", () => {
 
   it("parses context response payload and auth status", async () => {
     const response = new Response(
-      JSON.stringify({ message: "Unauthorized", code: "AUTH_EXPIRED" }),
+      JSON.stringify({ message: "Unauthorized", code: "AUTH_EXPIRED", requestId: "req-auth-1" }),
       {
         status: 401,
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "X-Request-Id": "req-auth-1",
+        },
       },
     );
 
@@ -33,8 +36,10 @@ describe("supabaseFunctionErrors", () => {
 
     expect(parsed.status).toBe(401);
     expect(parsed.category).toBe("auth");
+    expect(parsed.requestId).toBe("req-auth-1");
     expect(parsed.responsePayload?.message).toBe("Unauthorized");
     expect(parsed.responsePayload?.code).toBe("AUTH_EXPIRED");
+    expect(parsed.responsePayload?.requestId).toBe("req-auth-1");
   });
 
   it("parses JSON-readable function error contexts used in mocks", async () => {
@@ -51,6 +56,27 @@ describe("supabaseFunctionErrors", () => {
 
     expect(parsed.backendMessage).toBe("Invalid email or password.");
     expect(parsed.responsePayload?.code).toBe("INVALID_CREDENTIALS");
+  });
+
+  it("falls back to X-Request-Id when the function body omits requestId", async () => {
+    const response = new Response(
+      JSON.stringify({ error: "Request could not be processed right now", code: "ABUSE_CHECK_FAILED" }),
+      {
+        status: 503,
+        headers: {
+          "Content-Type": "application/json",
+          "X-Request-Id": "req-auth-header-only",
+        },
+      },
+    );
+
+    const parsed = await parseFunctionInvokeError({
+      name: "FunctionsHttpError",
+      message: "Edge Function returned a non-2xx status code",
+      context: response,
+    });
+
+    expect(parsed.requestId).toBe("req-auth-header-only");
   });
 
   it("classifies 429 as rate_limit and preserves backend message", async () => {

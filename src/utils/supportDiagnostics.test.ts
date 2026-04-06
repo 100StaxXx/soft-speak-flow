@@ -34,9 +34,9 @@ describe("sanitizeSupportReportPayload", () => {
   it("redacts token-like data from route and fingerprints", () => {
     const sanitized = sanitizeSupportReportPayload(basePayload);
 
-    expect(sanitized.diagnostics.route).toContain("access_token=[redacted]");
-    expect(sanitized.diagnostics.recentErrorFingerprints[0]).toContain("Bearer [redacted]");
-    expect(sanitized.diagnostics.recentErrorFingerprints[1]).toContain("[redacted-jwt]");
+    expect(sanitized.diagnostics?.route).toContain("access_token=[redacted]");
+    expect(sanitized.diagnostics?.recentErrorFingerprints[0]).toContain("Bearer [redacted]");
+    expect(sanitized.diagnostics?.recentErrorFingerprints[1]).toContain("[redacted-jwt]");
   });
 
   it("caps fingerprint list to the latest 20 entries", () => {
@@ -50,8 +50,8 @@ describe("sanitizeSupportReportPayload", () => {
 
     const sanitized = sanitizeSupportReportPayload(payload);
 
-    expect(sanitized.diagnostics.recentErrorFingerprints).toHaveLength(20);
-    expect(sanitized.diagnostics.recentErrorFingerprints[0]).toBe("error 10");
+    expect(sanitized.diagnostics?.recentErrorFingerprints).toHaveLength(20);
+    expect(sanitized.diagnostics?.recentErrorFingerprints[0]).toBe("error 10");
   });
 
   it("preserves the feedback category while sanitizing the payload", () => {
@@ -61,5 +61,16 @@ describe("sanitizeSupportReportPayload", () => {
     });
 
     expect(sanitized.category).toBe("feedback");
+  });
+
+  it("allows submissions without diagnostics", () => {
+    const sanitized = sanitizeSupportReportPayload({
+      ...basePayload,
+      consentDiagnostics: false,
+      diagnostics: undefined,
+    });
+
+    expect(sanitized.consentDiagnostics).toBe(false);
+    expect(sanitized.diagnostics).toBeUndefined();
   });
 });

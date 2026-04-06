@@ -82,11 +82,12 @@ describe("SupportReport", () => {
 
     expect(screen.getByText("Report a Problem")).toBeInTheDocument();
     expect(screen.getByLabelText("Category")).toHaveValue("bug");
-    expect(screen.getByLabelText("Reproduction steps")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Email support" })).toHaveAttribute(
-      "href",
-      expect.stringContaining("Cosmiq%20Support%20Report"),
-    );
+    expect(screen.getByLabelText("What happened?")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Summary")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Reproduction steps")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Expected behavior")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Actual behavior")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Email/i })).not.toBeInTheDocument();
   });
 
   it("defaults to feedback mode when opened from Command Center", () => {
@@ -95,10 +96,7 @@ describe("SupportReport", () => {
     expect(screen.getByText("Send Feedback")).toBeInTheDocument();
     expect(screen.getByLabelText("Category")).toHaveValue("feedback");
     expect(screen.getByLabelText("What would you like to share?")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Email feedback" })).toHaveAttribute(
-      "href",
-      expect.stringContaining("Cosmiq%20Feedback"),
-    );
+    expect(screen.queryByRole("link", { name: /Email/i })).not.toBeInTheDocument();
   });
 
   it("submits feedback payloads through the shared support pipeline", async () => {
@@ -107,23 +105,25 @@ describe("SupportReport", () => {
     fireEvent.change(screen.getByLabelText("What would you like to share?"), {
       target: { value: "A weekly review email would be amazing." },
     });
-    fireEvent.change(screen.getByLabelText("More details (optional)"), {
-      target: { value: "I looked for this from Command Center." },
-    });
     fireEvent.click(screen.getByRole("button", { name: "Submit feedback" }));
 
     await waitFor(() => {
-      expect(mocks.reportIssue).toHaveBeenCalledWith(
-        expect.objectContaining({
-          category: "feedback",
-          summary: "A weekly review email would be amazing.",
-          reproductionSteps: "I looked for this from Command Center.",
-        }),
-      );
+      expect(mocks.reportIssue).toHaveBeenCalledTimes(1);
     });
+
+    const payload = mocks.reportIssue.mock.calls[0]?.[0];
+    expect(payload).toMatchObject({
+      category: "feedback",
+      summary: "A weekly review email would be amazing.",
+      reproductionSteps: "",
+      expectedBehavior: "",
+      actualBehavior: "",
+      consentDiagnostics: false,
+    });
+    expect(payload).not.toHaveProperty("diagnostics");
   });
 
-  it("keeps screenshot attach, diagnostics toggle, and mail fallback working in feedback mode", async () => {
+  it("keeps screenshot attach working in feedback mode without extra controls", async () => {
     renderSupportReport({ defaultCategory: "feedback" });
 
     fireEvent.change(screen.getByLabelText("Optional screenshot"), {
@@ -135,17 +135,7 @@ describe("SupportReport", () => {
     await waitFor(() => {
       expect(screen.getByText("Screenshot attached")).toBeInTheDocument();
     });
-
-    const diagnosticsToggle = screen.getByRole("checkbox", {
-      name: /Include diagnostics/i,
-    });
-    expect(diagnosticsToggle).toBeChecked();
-
-    fireEvent.click(diagnosticsToggle);
-    expect(diagnosticsToggle).not.toBeChecked();
-    expect(screen.getByRole("link", { name: "Email feedback" })).toHaveAttribute(
-      "href",
-      expect.stringContaining("Diagnostics%3A%20not%20attached"),
-    );
+    expect(screen.queryByRole("checkbox", { name: /Include diagnostics/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Email/i })).not.toBeInTheDocument();
   });
 });

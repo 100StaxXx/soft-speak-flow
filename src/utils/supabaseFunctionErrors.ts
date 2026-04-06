@@ -11,10 +11,12 @@ export interface ParsedFunctionInvokeError {
   message?: string;
   status?: number;
   code?: string;
+  requestId?: string;
   responsePayload?: {
     message?: string;
     error?: string;
     code?: string;
+    requestId?: string;
     status?: string;
     retryAfterSeconds?: number;
     upstreamStatus?: number;
@@ -149,6 +151,7 @@ export async function parseFunctionInvokeError(
     error && typeof error === "object" ? asString((error as { code?: unknown }).code) : undefined;
   const status = getStatusFromError(error);
   const isOffline = getOfflineState();
+  const contextResponse = getContextResponse(error);
 
   let responsePayload: ParsedFunctionInvokeError["responsePayload"];
   const readContextJson = getContextJsonReader(error);
@@ -160,6 +163,7 @@ export async function parseFunctionInvokeError(
         const payloadMessage = asString(payloadRecord.message);
         const payloadError = asString(payloadRecord.error);
         const payloadCode = asString(payloadRecord.code);
+        const payloadRequestId = asString(payloadRecord.requestId);
         const payloadStatus = asString(payloadRecord.status);
         const payloadRetryAfterSeconds =
           asNumber(payloadRecord.retry_after_seconds) ?? asNumber(payloadRecord.retryAfterSeconds);
@@ -172,6 +176,7 @@ export async function parseFunctionInvokeError(
           payloadMessage ||
           payloadError ||
           payloadCode ||
+          payloadRequestId ||
           payloadStatus ||
           payloadRetryAfterSeconds ||
           payloadUpstreamStatus ||
@@ -181,6 +186,7 @@ export async function parseFunctionInvokeError(
             message: payloadMessage,
             error: payloadError,
             code: payloadCode,
+            requestId: payloadRequestId,
             status: payloadStatus,
             retryAfterSeconds: payloadRetryAfterSeconds,
             upstreamStatus: payloadUpstreamStatus,
@@ -193,6 +199,7 @@ export async function parseFunctionInvokeError(
     }
   }
 
+  const requestId = responsePayload?.requestId ?? asString(contextResponse?.headers.get("X-Request-Id"));
   const backendMessage = responsePayload?.message ?? responsePayload?.error;
   const retryAfterSeconds = responsePayload?.retryAfterSeconds;
   const upstreamStatus = responsePayload?.upstreamStatus;
@@ -210,6 +217,7 @@ export async function parseFunctionInvokeError(
     message,
     status,
     code,
+    requestId,
     responsePayload,
     backendMessage,
     retryAfterSeconds,

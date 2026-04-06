@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
 import { applyAbuseProtection, createAbuseAdminClient, createSafeErrorResponse, getClientIpAddress, normalizeEmailTarget } from "../_shared/abuseProtection.ts";
+import { findMissingRequiredEnv, logAuthEvent, logAuthSafeError, readSafeErrorResponseContext, toAuthErrorMessage } from "../_shared/authLogging.ts";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
 
 type AuthGatewayAction =
@@ -23,6 +24,7 @@ interface AuthGatewayDeps {
 }
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const REQUIRED_ENV_KEYS = ["SUPABASE_URL", "SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY"] as const;
 
 const defaultDeps: AuthGatewayDeps = {
   createAdminClient: () => createAbuseAdminClient(),
@@ -59,6 +61,21 @@ function sanitizeAuthError(message: string | undefined, fallback: string): strin
   return fallback;
 }
 
+function buildRequestContext(
+  action: string | undefined,
+  ipAddress: string,
+  payload?: AuthGatewayRequest | null,
+): Record<string, unknown> {
+  return {
+    action,
+    clientIpKnown: ipAddress !== "unknown",
+    emailProvided: Boolean(normalizeEmailTarget(payload?.email)),
+    passwordProvided: typeof payload?.password === "string" && payload.password.length > 0,
+    redirectToProvided: typeof payload?.redirectTo === "string" && payload.redirectTo.length > 0,
+    timezoneProvided: typeof payload?.timezone === "string" && payload.timezone.length > 0,
+  };
+}
+
 export async function handleAuthGateway(
   req: Request,
   deps: AuthGatewayDeps = defaultDeps,
@@ -69,63 +86,108 @@ export async function handleAuthGateway(
 
   const requestId = crypto.randomUUID();
   const ipAddress = getClientIpAddress(req);
+  let payload: AuthGatewayRequest | undefined;
+  let action: string | undefined;
+
+  const createLoggedSafeErrorResponse = (
+    options: {
+      status: number;
+      code: string;
+      error: string;
+      retryAfterSeconds?: number | null;
+    },
+    context: Record<string, unknown> = {},
+  ): Response => {
+    logAuthSafeError("auth-gateway", {
+      requestId,
+      status: options.status,
+      code: options.code,
+      error: options.error,
+      context,
+    });
+
+    return createSafeErrorResponse(req, {
+      requestId,
+      ...options,
+    });
+  };
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
+    const missingEnvKeys = findMissingRequiredEnv([...REQUIRED_ENV_KEYS]);
 
-    if (!supabaseUrl || !supabaseAnonKey) {
-      return createSafeErrorResponse(req, {
+    if (!supabaseUrl || !supabaseAnonKey || missingEnvKeys.length > 0) {
+      return createLoggedSafeErrorResponse({
         status: 500,
         code: "SERVICE_MISCONFIGURED",
         error: "Request could not be processed right now",
-        requestId,
+      }, {
+        action,
+        clientIpKnown: ipAddress !== "unknown",
+        missingEnvKeys: missingEnvKeys.join(","),
       });
     }
 
-    let payload: AuthGatewayRequest;
     try {
       payload = await req.json() as AuthGatewayRequest;
     } catch {
-      return createSafeErrorResponse(req, {
+      return createLoggedSafeErrorResponse({
         status: 400,
         code: "INVALID_REQUEST",
         error: "Invalid request payload",
-        requestId,
+      }, {
+        action,
+        clientIpKnown: ipAddress !== "unknown",
       });
     }
 
-    const action = payload.action;
+    action = payload.action;
     const email = normalizeEmailTarget(payload.email);
+    const requestContext = buildRequestContext(action, ipAddress, payload);
 
     if (!action || !["sign_in_password", "sign_up_password", "reset_password"].includes(action)) {
-      return createSafeErrorResponse(req, {
+      return createLoggedSafeErrorResponse({
         status: 400,
         code: "INVALID_ACTION",
         error: "Invalid request payload",
-        requestId,
-      });
+      }, requestContext);
     }
 
     if (!email || !EMAIL_REGEX.test(email)) {
-      return createSafeErrorResponse(req, {
+      return createLoggedSafeErrorResponse({
         status: 400,
         code: "INVALID_EMAIL",
         error: "Enter a valid email address",
+      }, requestContext);
+    }
+
+    let adminClient: any;
+    try {
+      adminClient = deps.createAdminClient();
+      logAuthEvent("auth-gateway", "info", "Admin client ready", {
         requestId,
+        action,
+        clientIpKnown: ipAddress !== "unknown",
+      });
+    } catch (error) {
+      return createLoggedSafeErrorResponse({
+        status: 500,
+        code: "SERVICE_MISCONFIGURED",
+        error: "Request could not be processed right now",
+      }, {
+        ...requestContext,
+        errorMessage: toAuthErrorMessage(error),
       });
     }
 
-    const adminClient = deps.createAdminClient();
-
     if (action === "sign_in_password") {
       if (!payload.password || payload.password.length < 8) {
-        return createSafeErrorResponse(req, {
+        return createLoggedSafeErrorResponse({
           status: 400,
           code: "INVALID_PASSWORD",
           error: "Enter a valid password",
-          requestId,
-        });
+        }, requestContext);
       }
 
       const ipProtection = await deps.applyAbuseProtectionFn(req, adminClient, {
@@ -142,6 +204,11 @@ export async function handleAuthGateway(
       });
 
       if (ipProtection instanceof Response) {
+        logAuthEvent("auth-gateway", ipProtection.status >= 500 ? "error" : "warn", "Pre-auth abuse protection blocked request", {
+          ...requestContext,
+          phase: "pre_auth",
+          ...(await readSafeErrorResponseContext(ipProtection)),
+        });
         return ipProtection;
       }
 
@@ -152,11 +219,13 @@ export async function handleAuthGateway(
       });
 
       if (error || !data.session || !data.user) {
-        return createSafeErrorResponse(req, {
+        return createLoggedSafeErrorResponse({
           status: 401,
           code: "INVALID_CREDENTIALS",
           error: sanitizeAuthError(error?.message, "Invalid email or password."),
-          requestId,
+        }, {
+          ...requestContext,
+          phase: "provider_auth",
         });
       }
 
@@ -174,6 +243,12 @@ export async function handleAuthGateway(
       });
 
       if (userProtection instanceof Response) {
+        logAuthEvent("auth-gateway", userProtection.status >= 500 ? "error" : "warn", "Post-auth abuse protection blocked request", {
+          ...requestContext,
+          phase: "post_auth",
+          userId: data.user.id,
+          ...(await readSafeErrorResponseContext(userProtection)),
+        });
         return userProtection;
       }
 
@@ -186,12 +261,11 @@ export async function handleAuthGateway(
 
     if (action === "sign_up_password") {
       if (!payload.password || payload.password.length < 8) {
-        return createSafeErrorResponse(req, {
+        return createLoggedSafeErrorResponse({
           status: 400,
           code: "INVALID_PASSWORD",
           error: "Enter a valid password",
-          requestId,
-        });
+        }, requestContext);
       }
 
       const protection = await deps.applyAbuseProtectionFn(req, adminClient, {
@@ -207,6 +281,11 @@ export async function handleAuthGateway(
       });
 
       if (protection instanceof Response) {
+        logAuthEvent("auth-gateway", protection.status >= 500 ? "error" : "warn", "Pre-auth abuse protection blocked request", {
+          ...requestContext,
+          phase: "pre_auth",
+          ...(await readSafeErrorResponseContext(protection)),
+        });
         return protection;
       }
 
@@ -223,11 +302,19 @@ export async function handleAuthGateway(
       });
 
       if (error) {
-        return createSafeErrorResponse(req, {
+        logAuthEvent("auth-gateway", "error", "Supabase password sign-up failed", {
+          ...requestContext,
+          requestId,
+          phase: "provider_auth",
+          providerErrorMessage: error.message,
+        });
+        return createLoggedSafeErrorResponse({
           status: 400,
           code: "SIGN_UP_FAILED",
           error: "Unable to create account.",
-          requestId,
+        }, {
+          ...requestContext,
+          phase: "provider_auth",
         });
       }
 
@@ -252,6 +339,11 @@ export async function handleAuthGateway(
     });
 
     if (protection instanceof Response) {
+      logAuthEvent("auth-gateway", protection.status >= 500 ? "error" : "warn", "Password reset abuse protection blocked request", {
+        ...requestContext,
+        phase: "pre_auth",
+        ...(await readSafeErrorResponseContext(protection)),
+      });
       return protection;
     }
 
@@ -261,11 +353,19 @@ export async function handleAuthGateway(
     });
 
     if (error) {
-      return createSafeErrorResponse(req, {
+      logAuthEvent("auth-gateway", "error", "Supabase password reset request failed", {
+        ...requestContext,
+        requestId,
+        phase: "provider_auth",
+        providerErrorMessage: error.message,
+      });
+      return createLoggedSafeErrorResponse({
         status: 500,
         code: "RESET_PASSWORD_FAILED",
         error: "Unable to process that request right now",
-        requestId,
+      }, {
+        ...requestContext,
+        phase: "provider_auth",
       });
     }
 
@@ -273,12 +373,13 @@ export async function handleAuthGateway(
       success: true,
     });
   } catch (error) {
-    console.error("[auth-gateway] Unexpected error", error);
-    return createSafeErrorResponse(req, {
+    return createLoggedSafeErrorResponse({
       status: 500,
       code: "AUTH_GATEWAY_FAILED",
       error: "Request could not be processed right now",
-      requestId,
+    }, {
+      ...buildRequestContext(action, ipAddress, payload),
+      errorMessage: toAuthErrorMessage(error),
     });
   }
 }
