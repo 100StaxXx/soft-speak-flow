@@ -45,7 +45,9 @@ const prettyAction = (actionKind: string) => {
 export function QueuedActionsSheet({ open, onOpenChange }: QueuedActionsSheetProps) {
   const { receipts, retryAll, retryAction, discardAction, queueCount } = useResilience();
 
-  const hasFailures = receipts.some((receipt) => receipt.status === "failed");
+  const queuedForSyncCount = receipts.filter((receipt) => receipt.status === "queued" || receipt.status === "syncing").length;
+  const failedCount = receipts.filter((receipt) => receipt.status === "failed").length;
+  const hasFailures = failedCount > 0;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -53,7 +55,7 @@ export function QueuedActionsSheet({ open, onOpenChange }: QueuedActionsSheetPro
         <SheetHeader>
           <SheetTitle>Queued Actions</SheetTitle>
           <SheetDescription>
-            {queueCount} pending action{queueCount === 1 ? "" : "s"}. Failed actions stay here until you retry or discard them.
+            {queuedForSyncCount} queued for sync. {failedCount} action{failedCount === 1 ? "" : "s"} need{failedCount === 1 ? "s" : ""} retry. {queueCount} active action{queueCount === 1 ? "" : "s"} total. Failed actions stay here until you retry or discard them.
           </SheetDescription>
         </SheetHeader>
 

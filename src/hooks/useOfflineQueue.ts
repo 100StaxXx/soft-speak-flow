@@ -552,7 +552,10 @@ export function useOfflineQueue() {
   const refreshQueueState = useCallback(async () => {
     if (!user?.id) {
       setState((prev) => ({ ...prev, pendingCount: 0, receipts: [] }));
-      return;
+      return {
+        pendingCount: 0,
+        receipts: [] as QueuedAction[],
+      };
     }
 
     const [pendingCount, receipts] = await Promise.all([
@@ -565,7 +568,33 @@ export function useOfflineQueue() {
       pendingCount,
       receipts,
     }));
+
+    return {
+      pendingCount,
+      receipts,
+    };
   }, [user?.id]);
+
+  const resetFailedActions = useCallback(
+    async (ids?: string[]) => {
+      if (!user?.id) return 0;
+
+      const targetIds = ids ? new Set(ids) : null;
+      const receipts = await getQueuedActions(user.id);
+      const failedReceipts = receipts.filter((receipt) =>
+        receipt.status === "failed" && (targetIds ? targetIds.has(receipt.id) : true),
+      );
+
+      if (failedReceipts.length === 0) {
+        return 0;
+      }
+
+      await Promise.all(failedReceipts.map((receipt) => retryQueuedAction(receipt.id)));
+      await refreshQueueState();
+      return failedReceipts.length;
+    },
+    [refreshQueueState, user?.id],
+  );
 
   useEffect(() => {
     let disposed = false;
@@ -651,12 +680,14 @@ export function useOfflineQueue() {
 
     let successCount = 0;
     let failedCount = 0;
+    let skippedFailedCount = 0;
 
     try {
       const actions = await getActiveQueuedActions(user.id);
 
       for (const action of actions) {
         if (action.status === "failed" && action.retry_count >= MAX_AUTO_RETRIES) {
+          skippedFailedCount += 1;
           continue;
         }
 
@@ -693,12 +724,19 @@ export function useOfflineQueue() {
         }
       }
 
-      await refreshQueueState();
+      const { receipts } = await refreshQueueState();
+      const remainingFailedCount = receipts.filter((receipt) => receipt.status === "failed").length;
+      const hasSkippedFailures = skippedFailedCount > 0;
+      const hasFailedReceipts = remainingFailedCount > 0;
+      const retryNeededCount = remainingFailedCount || skippedFailedCount || failedCount;
+      const retryMessage = hasFailedReceipts || hasSkippedFailures
+        ? `${retryNeededCount} action${retryNeededCount === 1 ? "" : "s"} need${retryNeededCount === 1 ? "s" : ""} retry.`
+        : null;
 
       setState((prev) => ({
         ...prev,
-        syncStatus: failedCount === 0 ? "success" : "error",
-        lastSyncError: failedCount > 0 ? `${failedCount} queued action${failedCount > 1 ? "s" : ""} failed to sync` : null,
+        syncStatus: hasFailedReceipts || hasSkippedFailures ? "error" : "success",
+        lastSyncError: retryMessage,
       }));
 
       if (successCount > 0) {
@@ -713,7 +751,7 @@ export function useOfflineQueue() {
         setState((prev) => ({ ...prev, syncStatus: "idle" }));
       }, 3000);
 
-      return { success: successCount, failed: failedCount };
+      return { success: successCount, failed: retryNeededCount };
     } catch (error) {
       console.error("Failed to sync queued actions:", error);
       const message = extractErrorMessage(error);
@@ -741,11 +779,10 @@ export function useOfflineQueue() {
 
   const retryAction = useCallback(
     async (id: string) => {
-      await retryQueuedAction(id);
-      await refreshQueueState();
+      await resetFailedActions([id]);
       await syncPendingActions();
     },
-    [refreshQueueState, syncPendingActions],
+    [resetFailedActions, syncPendingActions],
   );
 
   const discardAction = useCallback(
@@ -757,14 +794,9 @@ export function useOfflineQueue() {
   );
 
   const retryAllFailed = useCallback(async () => {
-    if (!user?.id) return;
-    const receipts = await getQueuedActions(user.id);
-    const failed = receipts.filter((receipt) => receipt.status === "failed");
-
-    await Promise.all(failed.map((receipt) => retryQueuedAction(receipt.id)));
-    await refreshQueueState();
+    await resetFailedActions();
     await syncPendingActions();
-  }, [refreshQueueState, syncPendingActions, user?.id]);
+  }, [resetFailedActions, syncPendingActions]);
 
   const triggerSync = useCallback(async () => {
     if (!user?.id) return;
@@ -777,8 +809,9 @@ export function useOfflineQueue() {
       return;
     }
 
+    await resetFailedActions();
     return syncPendingActions();
-  }, [syncPendingActions, toast, user?.id]);
+  }, [resetFailedActions, syncPendingActions, toast, user?.id]);
 
   return {
     pendingCount: state.pendingCount,

@@ -6,9 +6,10 @@ import { MAX_COMPANION_STAGE } from "@/config/companionCatalog";
 import { useCompanionMemories } from "@/hooks/useCompanionMemories";
 import { isNearEvolution } from "@/lib/companionEvolutionSignals";
 import {
-  getNextTierBoundary,
-  getProgressionLevelDisplay,
-  getProgressionTierLabelForLevel,
+  getNextVisualStageBoundaryLevel,
+  getProgressionLevelAndTierDisplay,
+  getProgressionLevelLabel,
+  getVisualStageDisplay,
 } from "@/config/progression";
 
 interface NextEvolutionPreviewProps {
@@ -36,9 +37,11 @@ export const NextEvolutionPreview = memo(({
   showBondProgress = true,
 }: NextEvolutionPreviewProps) => {
   const nextStage = Math.min(currentStage + 1, MAX_COMPANION_STAGE);
-  const nextLevelLabel = getProgressionLevelDisplay(nextStage);
-  const nextTierBoundary = getNextTierBoundary(currentStage);
-  const nextTierLabel = nextTierBoundary === null ? null : getProgressionTierLabelForLevel(nextTierBoundary);
+  const nextLevelLabel = getProgressionLevelAndTierDisplay(nextStage);
+  const nextVisualStageBoundaryLevel = getNextVisualStageBoundaryLevel(currentStage);
+  const nextVisualStageDisplay = nextVisualStageBoundaryLevel === null
+    ? null
+    : getVisualStageDisplay(nextVisualStageBoundaryLevel);
   const xpNeeded = Math.max(0, nextEvolutionXP - currentXP);
   const isMaxStage = currentStage >= MAX_COMPANION_STAGE;
   const canEvolve = nextEvolutionXP > 0 && currentXP >= nextEvolutionXP;
@@ -67,7 +70,7 @@ export const NextEvolutionPreview = memo(({
           <div>
             <h3 className="font-heading font-bold text-sm">Maximum Evolution!</h3>
             <p className="text-xs text-muted-foreground">
-              Your companion has reached Stage 100 • Ascended
+              Your companion has reached {getProgressionLevelAndTierDisplay(100)}
             </p>
           </div>
         </div>
@@ -84,7 +87,7 @@ export const NextEvolutionPreview = memo(({
             <TrendingUp className="h-5 w-5 text-primary" />
           </div>
           <div className="flex-1">
-            <h3 className="font-heading font-bold text-sm">Next Stage</h3>
+            <h3 className="font-heading font-bold text-sm">Next Level</h3>
             <p className="text-xs text-muted-foreground">
               {nextLevelLabel}
             </p>
@@ -99,16 +102,16 @@ export const NextEvolutionPreview = memo(({
           <div className="flex justify-between text-xs">
             <span className="text-muted-foreground">Progress</span>
             <span className="font-medium text-primary">
-              {xpNeeded > 0 ? `${xpNeeded} XP needed` : `Ready to evolve to Stage ${nextStage}`}
+              {xpNeeded > 0 ? `${xpNeeded} XP needed` : `Ready to evolve to ${getProgressionLevelLabel(nextStage)}`}
             </span>
           </div>
           <Progress value={progressPercent} className="h-2" />
           <p className="text-xs text-muted-foreground">
             {currentXP} / {nextEvolutionXP} XP
           </p>
-          {!isMaxStage && nextTierBoundary !== null && nextTierLabel && (
+          {!isMaxStage && nextVisualStageBoundaryLevel !== null && nextVisualStageDisplay && (
             <p className="text-xs text-muted-foreground">
-              Next tier: Stage {nextTierBoundary} • {nextTierLabel}
+              Next stage: {nextVisualStageDisplay} at {getProgressionLevelLabel(nextVisualStageBoundaryLevel)}
             </p>
           )}
         </div>

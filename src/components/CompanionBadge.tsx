@@ -2,7 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Sparkles, Flame, Zap, Droplet, Wind, Leaf, Mountain, Star, Snowflake, Moon } from "lucide-react";
 import { formatDisplayLabel } from "@/lib/utils";
 import { deriveCompanionPalette } from "@/lib/companionPalette";
-import { getProgressionLevelDisplay } from "@/config/progression";
+import { getVisualStageDisplay } from "@/config/progression";
 
 interface CompanionBadgeProps {
   element: string;
@@ -45,7 +45,7 @@ export const CompanionBadge = ({
     stage,
     companionId,
   });
-  const stageLabel = getProgressionLevelDisplay(stage);
+  const stageLabel = getVisualStageDisplay(stage);
   
   // Get stage tier overlay
   const getStageOverlay = () => {

@@ -50,7 +50,9 @@ describe("NextEvolutionPreview", () => {
       />,
     );
 
-    expect(screen.getByText("Ready to evolve to Stage 5")).toBeInTheDocument();
+    expect(screen.getByText("Ready to evolve to Level 5")).toBeInTheDocument();
+    expect(screen.getByText("Level 5 • Initiate")).toBeInTheDocument();
+    expect(screen.getByText("Next Level")).toBeInTheDocument();
     expect(screen.getByTestId("next-evolution-progress")).not.toHaveClass("motion-safe:animate-pulse");
   });
 });

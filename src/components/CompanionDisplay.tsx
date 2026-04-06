@@ -1,4 +1,5 @@
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { PawPrint, Sparkles } from "lucide-react";
 import { useCompanion } from "@/hooks/useCompanion";
@@ -51,7 +52,6 @@ import {
   type TouchEvent as ReactTouchEvent,
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
-import { getStageName } from "@/config/companionStages";
 import {
   MAX_COMPANION_STAGE,
   type CompanionElementId,
@@ -59,9 +59,10 @@ import {
 } from "@/config/companionCatalog";
 import type { CompanionLayoutMode } from "@/hooks/useCompanionLayoutMode";
 import {
-  getNextTierBoundary,
-  getProgressionLevelDisplay,
-  getProgressionTierLabelForLevel,
+  getNextVisualStageBoundaryLevel,
+  getProgressionLevelLabel,
+  getVisualStageDisplay,
+  getVisualStageLabelForLevel,
 } from "@/config/progression";
 
 interface CompanionDisplayProps {
@@ -493,15 +494,19 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
   if (isLoading) return <CompanionSkeleton />;
   if (!companion || !displayCompanion) return null;
 
-  const tierName = getStageName(displayCompanion.current_stage);
-  const levelDisplay = getProgressionLevelDisplay(displayCompanion.current_stage);
+  const visualStageLabel = getVisualStageLabelForLevel(displayCompanion.current_stage);
+  const visualStageDisplay = getVisualStageDisplay(displayCompanion.current_stage);
+  const currentLevelLabel = getProgressionLevelLabel(displayCompanion.current_stage);
   const colorName = getColorName(displayCompanion.favorite_color);
   const safeNextEvolutionXP = displayNextEvolutionXP ?? displayCompanion.current_xp;
   const isMaxStage = displayCompanion.current_stage >= MAX_COMPANION_STAGE;
   const isStageZeroEgg = displayCompanion.current_stage === 0;
   const nextClaimedLevel = Math.min(displayCompanion.current_stage + 1, MAX_COMPANION_STAGE);
-  const nextTierBoundary = getNextTierBoundary(displayCompanion.current_stage);
-  const nextTierLabel = nextTierBoundary === null ? null : getProgressionTierLabelForLevel(nextTierBoundary);
+  const nextLevelLabel = getProgressionLevelLabel(nextClaimedLevel);
+  const nextVisualStageBoundaryLevel = getNextVisualStageBoundaryLevel(displayCompanion.current_stage);
+  const nextVisualStageLabel = nextVisualStageBoundaryLevel === null
+    ? null
+    : getVisualStageLabelForLevel(nextVisualStageBoundaryLevel);
   const shouldAnimateIdleDrift = !prefersReducedMotion && imageLoaded && !imageError && !isRegenerating;
   const displayedCreatureName = isStageZeroEgg
     ? `${formatDisplayLabel(displayCompanion.core_element)} Egg`
@@ -578,23 +583,24 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
             <div className="flex flex-col gap-1">
               <div className="flex items-center">
                 <h2
+                  data-testid="companion-visual-stage"
                   className={`text-3xl font-heading font-black bg-clip-text text-transparent ${!prefersReducedMotion ? 'animate-gradient' : ''}`}
                   style={{
                     backgroundImage: `linear-gradient(90deg, ${companionPalette.accentText}, ${companionPalette.badgeText}, ${companionPalette.accentText})`,
                   }}
                 >
-                  {levelDisplay}
+                  {visualStageDisplay}
                 </h2>
-                <AttributeTooltip title="Progression" description="Your companion's current stage and tier." />
+                <AttributeTooltip title="Progression" description="Your companion's current visual stage." />
               </div>
               <p className="text-sm text-muted-foreground font-medium">
                 {isMaxStage
                   ? "Maximum stage reached"
                   : displayCanEvolve
-                    ? `Ready to evolve to Stage ${nextClaimedLevel}`
-                  : nextTierBoundary === null || !nextTierLabel
-                    ? `Next stage at ${safeNextEvolutionXP} XP`
-                    : `Next tier at Stage ${nextTierBoundary} • ${nextTierLabel}`}
+                    ? `Ready to evolve to ${nextLevelLabel}`
+                    : nextVisualStageBoundaryLevel === null || !nextVisualStageLabel
+                      ? `Final stage • ${visualStageLabel}`
+                      : `Next stage at Level ${nextVisualStageBoundaryLevel} • ${nextVisualStageLabel}`}
               </p>
             </div>
             <div
@@ -622,7 +628,11 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
           </p>
 
           {/* Companion Image */}
-          <div className="flex justify-center py-2 relative group" role="img" aria-label={`Your companion at stage ${displayCompanion.current_stage}: ${tierName}`}>
+          <div
+            className="flex justify-center py-2 relative group"
+            role="img"
+            aria-label={`Your companion at ${visualStageDisplay}, ${currentLevelLabel}`}
+          >
             {/* Cosmiq orbital glow effect */}
             <div 
               className={`absolute inset-0 blur-3xl opacity-50 group-hover:opacity-70 transition-opacity duration-500 ${prefersReducedMotion ? 'animate-none' : 'animate-orbit'}`}
@@ -718,7 +728,7 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
                         <CompanionImage
                           key={imageKey}
                           src={effectiveImageUrl}
-                          alt={`${tierName} companion at stage ${displayCompanion.current_stage}`}
+                          alt={`${visualStageLabel} companion at level ${displayCompanion.current_stage}`}
                           fit="portrait"
                           element={displayCompanion.core_element}
                           focalX={effectiveImageFocal.x}
@@ -742,7 +752,7 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
                       <CompanionImage
                         key={imageKey}
                         src={effectiveImageUrl}
-                        alt={`${tierName} companion at stage ${displayCompanion.current_stage}`}
+                        alt={`${visualStageLabel} companion at level ${displayCompanion.current_stage}`}
                         fit="cover"
                         element={displayCompanion.core_element}
                         focalX={effectiveImageFocal.x}
@@ -804,15 +814,28 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
                 favoriteColor={displayCompanion.favorite_color}
                 companionId={displayCompanion.id}
               />
+              <Badge
+                data-testid="companion-level-chip"
+                variant="outline"
+                className="px-3 py-1 text-xs font-medium"
+                style={{
+                  background: companionPalette.badgeBg,
+                  borderColor: companionPalette.badgeBorder,
+                  color: companionPalette.badgeText,
+                  boxShadow: `0 0 16px ${companionPalette.glow}`,
+                }}
+              >
+                {currentLevelLabel}
+              </Badge>
               <CompanionBondBadge />
             </div>
             <div className="text-center">
               <p className="text-sm font-medium text-muted-foreground mb-2" id="xp-progress-label">
                 {isMaxStage
-                  ? `Stage ${displayCompanion.current_stage} maxed`
+                  ? `${currentLevelLabel} maxed`
                   : displayCanEvolve
-                    ? `Ready to evolve to Stage ${nextClaimedLevel}`
-                    : `${displayCompanion.current_xp} / ${safeNextEvolutionXP} XP to Stage ${nextClaimedLevel}`}
+                    ? `Ready to evolve to ${nextLevelLabel}`
+                    : `${displayCompanion.current_xp} / ${safeNextEvolutionXP} XP to ${nextLevelLabel}`}
               </p>
               <Progress 
                 value={displayProgressToNext} 

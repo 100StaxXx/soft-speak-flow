@@ -5,9 +5,14 @@ import {
   didTierChange,
   getNextProgressionLevelXp,
   getNextTierBoundary,
+  getNextVisualStageBoundaryLevel,
   getProgressPercentToNextLevel,
+  getProgressionLevelAndTierDisplay,
+  getProgressionLevelLabel,
   getProgressionLevelDisplay,
   getProgressionTier,
+  getVisualStage,
+  getVisualStageDisplay,
   resolveProgressionLevelFromXp,
 } from "./progression";
 
@@ -40,6 +45,10 @@ describe("progression helpers", () => {
     expect(getNextTierBoundary(1)).toBe(5);
     expect(getNextTierBoundary(80)).toBe(81);
     expect(getNextTierBoundary(100)).toBeNull();
+    expect(getNextVisualStageBoundaryLevel(0)).toBe(1);
+    expect(getNextVisualStageBoundaryLevel(1)).toBe(5);
+    expect(getNextVisualStageBoundaryLevel(80)).toBe(81);
+    expect(getNextVisualStageBoundaryLevel(81)).toBeNull();
   });
 
   it("calculates progress percent to the next level", () => {
@@ -53,5 +62,26 @@ describe("progression helpers", () => {
     expect(didTierChange(4, 5)).toBe(true);
     expect(didTierChange(5, 12)).toBe(false);
     expect(getProgressionLevelDisplay(56)).toBe("Stage 56 • Mythic");
+  });
+
+  it("maps progression levels to visual stages", () => {
+    expect(getVisualStage(0)).toBe(0);
+    expect(getVisualStageDisplay(0)).toBe("Stage 0 • Egg");
+    expect(getVisualStage(1)).toBe(1);
+    expect(getVisualStage(4)).toBe(1);
+    expect(getVisualStageDisplay(4)).toBe("Stage 1 • Hatchling");
+    expect(getVisualStage(5)).toBe(2);
+    expect(getVisualStageDisplay(5)).toBe("Stage 2 • Initiate");
+    expect(getVisualStage(13)).toBe(3);
+    expect(getVisualStage(21)).toBe(4);
+    expect(getVisualStage(36)).toBe(5);
+    expect(getVisualStage(56)).toBe(6);
+    expect(getVisualStage(81)).toBe(7);
+    expect(getVisualStage(100)).toBe(7);
+  });
+
+  it("formats progression levels separately from visual stages", () => {
+    expect(getProgressionLevelLabel(4)).toBe("Level 4");
+    expect(getProgressionLevelAndTierDisplay(100)).toBe("Level 100 • Ascended");
   });
 });

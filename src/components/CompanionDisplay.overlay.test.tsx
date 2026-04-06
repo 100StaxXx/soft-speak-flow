@@ -292,6 +292,9 @@ describe("CompanionDisplay overlay stack", () => {
 
     const surface = screen.getByTestId("companion-motion-surface");
     expect(await screen.findByText("Nova")).toBeInTheDocument();
+    expect(screen.getByTestId("companion-visual-stage")).toHaveTextContent("Stage 2 • Initiate");
+    expect(screen.getByTestId("companion-level-chip")).toHaveTextContent("Level 8");
+    expect(screen.getByText("Bond")).toBeInTheDocument();
     expect(within(surface).getByTestId("companion-motion-surface-content")).toBeInTheDocument();
     expect(surface.querySelector('[data-motion-plane="backdrop"]')).not.toBeNull();
     expect(surface.querySelector('[data-motion-plane="foreground"]')).not.toBeNull();
@@ -310,7 +313,7 @@ describe("CompanionDisplay overlay stack", () => {
     render(<CompanionDisplay />);
 
     const shell = screen.getByTestId("companion-image-shell");
-    const image = screen.getByAltText(/companion at stage 8/i);
+    const image = screen.getByAltText(/companion at level 8/i);
 
     expect(shell).toHaveAttribute("data-companion-idle-motion", "inactive");
 
@@ -389,10 +392,12 @@ describe("CompanionDisplay overlay stack", () => {
 
     expect(screen.getByText("Fire Egg")).toBeInTheDocument();
     expect(screen.queryByText("Nova")).not.toBeInTheDocument();
-    expect(screen.getAllByText("Ready to evolve to Stage 1").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Ready to evolve to Level 1").length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: "HATCH" })).toBeInTheDocument();
+    expect(screen.getByTestId("companion-visual-stage")).toHaveTextContent("Stage 0 • Egg");
+    expect(screen.getByTestId("companion-level-chip")).toHaveTextContent("Level 0");
 
-    const image = screen.getByAltText(/egg companion at stage 0/i);
+    const image = screen.getByAltText(/egg companion at level 0/i);
     expect(image).toHaveAttribute(
       "src",
       expect.stringContaining("/companion-eggs/egg__t0_egg__normal__fire.png"),
@@ -437,8 +442,26 @@ describe("CompanionDisplay overlay stack", () => {
 
     expect(await screen.findByText("Nova")).toBeInTheDocument();
     expect(screen.queryByText("Fire Egg")).not.toBeInTheDocument();
-    const image = screen.getByAltText(/hatchling companion at stage 1/i);
+    expect(screen.getByTestId("companion-visual-stage")).toHaveTextContent("Stage 1 • Hatchling");
+    expect(screen.getByTestId("companion-level-chip")).toHaveTextContent("Level 1");
+    expect(screen.getByText(/XP to Level 2/)).toBeInTheDocument();
+    const image = screen.getByAltText(/hatchling companion at level 1/i);
     expect(image).toBeInTheDocument();
     expect(image).toHaveAttribute("data-companion-image-fit", "portrait");
+  });
+
+  it("shows max-level progression and final visual stage consistently", async () => {
+    mocks.companion = {
+      ...mocks.companion,
+      current_stage: 100,
+      current_xp: 38000,
+    };
+
+    render(<CompanionDisplay />);
+
+    expect(await screen.findByText("Nova")).toBeInTheDocument();
+    expect(screen.getByTestId("companion-visual-stage")).toHaveTextContent("Stage 7 • Ascended");
+    expect(screen.getByTestId("companion-level-chip")).toHaveTextContent("Level 100");
+    expect(screen.getByText("Level 100 maxed")).toBeInTheDocument();
   });
 });

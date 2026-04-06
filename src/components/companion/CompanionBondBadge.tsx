@@ -34,7 +34,7 @@ export const CompanionBondBadge = memo(({ className }: CompanionBondBadgeProps) 
           <span className="text-lg" aria-hidden>{currentBond.icon}</span>
           <div className="flex flex-col leading-tight">
             <span className="text-xs font-medium">{currentBond.name}</span>
-            <span className="text-[10px] text-muted-foreground">Lvl {currentBond.level}</span>
+            <span className="text-[10px] text-muted-foreground">Bond Lvl {currentBond.level}</span>
           </div>
         </motion.div>
       </TooltipTrigger>

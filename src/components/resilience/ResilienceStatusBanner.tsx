@@ -17,12 +17,23 @@ export function ResilienceStatusBanner() {
   const {
     state,
     queueCount,
+    receipts,
+    syncStatus,
+    lastSyncError,
     retryNow,
     dismissDegraded,
   } = useResilience();
   const [showQueueSheet, setShowQueueSheet] = useState(false);
 
   const visible = state !== "healthy";
+  const queuedForSyncCount = useMemo(
+    () => receipts.filter((receipt) => receipt.status === "queued" || receipt.status === "syncing").length,
+    [receipts],
+  );
+  const failedCount = useMemo(
+    () => receipts.filter((receipt) => receipt.status === "failed").length,
+    [receipts],
+  );
 
   const message = useMemo(() => {
     switch (state) {
@@ -33,13 +44,23 @@ export function ResilienceStatusBanner() {
       case "outage":
         return "Server outage. Your actions are being queued locally.";
       case "recovering":
-        return `Back online. Syncing ${queueCount} action${queueCount === 1 ? "" : "s"}...`;
+        if (syncStatus === "syncing" && queuedForSyncCount > 0) {
+          return `Back online. Syncing ${queuedForSyncCount} action${queuedForSyncCount === 1 ? "" : "s"}...`;
+        }
+        if (failedCount > 0 && queuedForSyncCount === 0) {
+          const retryMessage = lastSyncError ?? `${failedCount} action${failedCount === 1 ? "" : "s"} need${failedCount === 1 ? "s" : ""} retry.`;
+          return retryMessage.startsWith("Back online.") ? retryMessage : `Back online. ${retryMessage}`;
+        }
+        if (queuedForSyncCount > 0) {
+          return `Back online. ${queuedForSyncCount} action${queuedForSyncCount === 1 ? "" : "s"} queued for sync.`;
+        }
+        return `Back online. ${queueCount} action${queueCount === 1 ? "" : "s"} queued.`;
       case "recovered":
         return "All queued actions synced.";
       default:
         return "";
     }
-  }, [queueCount, state]);
+  }, [failedCount, lastSyncError, queueCount, queuedForSyncCount, state, syncStatus]);
 
   if (!visible) return null;
 

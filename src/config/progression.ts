@@ -15,6 +15,14 @@ export interface ProgressionThreshold {
   evolvesAtBoundary: boolean;
 }
 
+export interface ProgressionVisualStage {
+  stage: number;
+  tier: ProgressionTier;
+  label: string;
+  levelStart: number;
+  levelEnd: number;
+}
+
 export const PROGRESSION_LEVEL_CAP = 100;
 export const HATCH_READY_LEVEL = 1;
 export const REFERRAL_REWARD_LEVEL = 5;
@@ -46,6 +54,14 @@ export const PROGRESSION_TIER_BANDS = [
   levelStart: number;
   levelEnd: number;
 }>;
+
+export const PROGRESSION_VISUAL_STAGES = PROGRESSION_TIER_BANDS.map((band, stage) => ({
+  stage,
+  tier: band.tier,
+  label: PROGRESSION_TIER_LABELS[band.tier],
+  levelStart: band.levelStart,
+  levelEnd: band.levelEnd,
+})) satisfies ReadonlyArray<ProgressionVisualStage>;
 
 export const PROGRESSION_XP_THRESHOLDS = {
   0: 0,
@@ -169,11 +185,32 @@ export const getProgressionTierLabel = (tier: ProgressionTier): string =>
 export const getProgressionTierLabelForLevel = (level: number): string =>
   getProgressionTierLabel(getProgressionTier(level));
 
+export const getProgressionLevelLabel = (level: number): string =>
+  `Level ${clampProgressionLevel(level)}`;
+
+export const getProgressionLevelAndTierDisplay = (level: number): string =>
+  `${getProgressionLevelLabel(level)} • ${getProgressionTierLabelForLevel(level)}`;
+
 export const getProgressionThreshold = (level: number): number | null =>
   PROGRESSION_XP_THRESHOLDS[clampProgressionLevel(level)] ?? null;
 
 export const getProgressionLevelDisplay = (level: number): string =>
   `Stage ${clampProgressionLevel(level)} • ${getProgressionTierLabelForLevel(level)}`;
+
+export const getVisualStage = (level: number): number => {
+  const safeLevel = clampProgressionLevel(level);
+  return (
+    PROGRESSION_VISUAL_STAGES.find(
+      (visualStage) => safeLevel >= visualStage.levelStart && safeLevel <= visualStage.levelEnd,
+    )?.stage ?? 0
+  );
+};
+
+export const getVisualStageLabelForLevel = (level: number): string =>
+  getProgressionTierLabelForLevel(level);
+
+export const getVisualStageDisplay = (level: number): string =>
+  `Stage ${getVisualStage(level)} • ${getVisualStageLabelForLevel(level)}`;
 
 export const getNextProgressionLevel = (level: number): number | null => {
   const safeLevel = clampProgressionLevel(level);
@@ -189,6 +226,11 @@ export const getNextProgressionLevelXp = (level: number): number | null => {
 export const getNextTierBoundary = (level: number): number | null => {
   const safeLevel = clampProgressionLevel(level);
   return PROGRESSION_TIER_BANDS.find((band) => band.levelStart > safeLevel)?.levelStart ?? null;
+};
+
+export const getNextVisualStageBoundaryLevel = (level: number): number | null => {
+  const safeLevel = clampProgressionLevel(level);
+  return PROGRESSION_VISUAL_STAGES.find((visualStage) => visualStage.levelStart > safeLevel)?.levelStart ?? null;
 };
 
 export const isTierBoundaryLevel = (level: number): boolean => {
