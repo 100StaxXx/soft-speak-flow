@@ -17,6 +17,7 @@ Add the following secrets to your Supabase project (Project Settings → Secrets
 - `APPLE_YEARLY_PRICE_CENTS` – (Optional) Override the stored amount for yearly receipts; defaults to `5999` ($59.99).
 
 The functions will log which environment (Production/Sandbox) Apple reports so you can confirm the correct secret is in place.
+`APPLE_TEAM_ID` is not used for App Store Server API auth in this flow; use the App Store Connect issuer UUID in `APPLE_ISSUER_ID`.
 
 ## How it works
 

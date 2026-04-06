@@ -31,19 +31,27 @@ export class PromoCodeRedeemError extends Error {
   }
 }
 
-const FUNCTION_TRANSPORT_ERROR_MESSAGES = new Set([
-  "failed to send a request to the edge function",
-  "edge function returned a non-2xx status code",
+const SAFE_PROMO_FAILURE_REASONS = new Set<PromoCodeFailureReason>([
+  "invalid",
+  "used",
+  "expired",
+  "already_active",
+  "rate_limited",
 ]);
 
-const isFunctionTransportErrorMessage = (message: string | null | undefined): boolean => {
+const isTechnicalPromoMessage = (message: string | null | undefined): boolean => {
   if (typeof message !== "string") return false;
 
   const normalized = message.trim().toLowerCase();
   return (
-    FUNCTION_TRANSPORT_ERROR_MESSAGES.has(normalized) ||
+    normalized === "failed to send a request to the edge function" ||
+    normalized === "edge function returned a non-2xx status code" ||
     normalized.includes("functionsfetcherror") ||
-    normalized.includes("relay error invoking the edge function")
+    normalized.includes("relay error invoking the edge function") ||
+    normalized.includes("missing authorization header") ||
+    normalized.includes("auth configuration missing") ||
+    normalized.includes("unauthorized") ||
+    normalized.includes("internal server error")
   );
 };
 
@@ -59,6 +67,28 @@ const getErrorMessage = (error: unknown): string | undefined => {
   }
 
   return undefined;
+};
+
+const getPromoCodeFallbackMessage = (reason: PromoCodeFailureReason): string => {
+  switch (reason) {
+    case "unauthorized":
+      return "Your session has expired. Please sign in again and try to redeem your promo code.";
+    case "rate_limited":
+      return "You're making requests too quickly. Please wait a moment and try again.";
+    default:
+      return "Unable to redeem your promo code. Please try again.";
+  }
+};
+
+const getSafePromoBusinessMessage = (
+  message: string | null | undefined,
+  reason: PromoCodeFailureReason,
+): string | null => {
+  if (!message || !SAFE_PROMO_FAILURE_REASONS.has(reason) || isTechnicalPromoMessage(message)) {
+    return null;
+  }
+
+  return message;
 };
 
 const getPromoCodeRedeemErrorDetails = async (error: unknown): Promise<{
@@ -80,16 +110,36 @@ const getPromoCodeRedeemErrorDetails = async (error: unknown): Promise<{
     }
   }
 
-  if (backendMessage && !isFunctionTransportErrorMessage(backendMessage)) {
-    return { message: backendMessage, reason };
+  const safeBackendMessage = getSafePromoBusinessMessage(backendMessage, reason);
+  if (safeBackendMessage) {
+    return { message: safeBackendMessage, reason };
   }
 
-  if (directMessage && !isFunctionTransportErrorMessage(directMessage)) {
-    return { message: directMessage, reason };
+  const safeDirectMessage = getSafePromoBusinessMessage(directMessage, reason);
+  if (safeDirectMessage) {
+    return { message: safeDirectMessage, reason };
+  }
+
+  const shouldForceFriendlyMessage =
+    parsed.category === "network" ||
+    parsed.category === "relay" ||
+    parsed.category === "auth" ||
+    (typeof parsed.status === "number" && parsed.status >= 500);
+
+  if (shouldForceFriendlyMessage) {
+    return {
+      message: toUserFacingFunctionError(
+        isTechnicalPromoMessage(parsed.backendMessage)
+          ? { ...parsed, backendMessage: undefined }
+          : parsed,
+        { action: "redeem your promo code" },
+      ),
+      reason,
+    };
   }
 
   return {
-    message: toUserFacingFunctionError(parsed, { action: "redeem your promo code" }),
+    message: getPromoCodeFallbackMessage(reason),
     reason,
   };
 };
@@ -139,9 +189,10 @@ export const usePromoCode = () => {
 
       const result = data as PromoCodeRpcResult | undefined;
       if (!result?.success) {
+        const failureReason = toFailureReason(result?.status);
         throw new PromoCodeRedeemError(
-          result?.message || "Unable to redeem this promo code.",
-          toFailureReason(result?.status),
+          getSafePromoBusinessMessage(result?.message, failureReason) ?? getPromoCodeFallbackMessage(failureReason),
+          failureReason,
         );
       }
 

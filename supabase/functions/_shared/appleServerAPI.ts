@@ -36,6 +36,38 @@ export interface SubscriptionStatusResponse {
   data: AppleSubscriptionStatus[];
 }
 
+export const APPLE_API_CONFIG_ERROR_CODE = "APPLE_API_CONFIG_MISSING";
+export const APPLE_API_AUTH_ERROR_CODE = "APPLE_API_AUTH_FAILED";
+export const APPLE_API_REQUEST_FAILED_CODE = "APPLE_API_REQUEST_FAILED";
+export const APPLE_TRANSACTION_NOT_FOUND_ERROR_CODE = "APPLE_TRANSACTION_NOT_FOUND";
+
+type AppleApiErrorOptions = {
+  code: string;
+  statusCode?: number;
+  upstreamStatus?: number;
+  upstreamError?: string;
+};
+
+export class AppleApiError extends Error {
+  code: string;
+  statusCode: number;
+  upstreamStatus?: number;
+  upstreamError?: string;
+
+  constructor(message: string, options: AppleApiErrorOptions) {
+    super(message);
+    this.name = "AppleApiError";
+    this.code = options.code;
+    this.statusCode = options.statusCode ?? 502;
+    this.upstreamStatus = options.upstreamStatus;
+    this.upstreamError = options.upstreamError;
+  }
+}
+
+export function isAppleApiError(error: unknown): error is AppleApiError {
+  return error instanceof AppleApiError;
+}
+
 function base64UrlEncode(data: Uint8Array): string {
   const binString = Array.from(data, (byte) => String.fromCharCode(byte)).join("");
   const base64 = btoa(binString);
@@ -69,14 +101,17 @@ export function normalizeAppAccountToken(value: string | null | undefined): stri
  */
 async function createAppleJWT(): Promise<string> {
   const keyId = Deno.env.get("APPLE_KEY_ID");
-  // App Store Server API requires the App Store Connect Issuer ID (UUID).
-  // Keep APPLE_TEAM_ID as a legacy fallback for older environments.
-  const issuerId = Deno.env.get("APPLE_ISSUER_ID") ?? Deno.env.get("APPLE_TEAM_ID");
+  const issuerId = Deno.env.get("APPLE_ISSUER_ID");
   const privateKeyPem = Deno.env.get("APPLE_PRIVATE_KEY");
   const bundleId = Deno.env.get("APPLE_IOS_BUNDLE_ID");
 
   if (!keyId || !issuerId || !privateKeyPem || !bundleId) {
-    throw new Error("Missing Apple API configuration: APPLE_KEY_ID, APPLE_ISSUER_ID (or APPLE_TEAM_ID), APPLE_PRIVATE_KEY, or APPLE_IOS_BUNDLE_ID");
+    throw new AppleApiError("Subscription verification is temporarily unavailable. Please try again later.", {
+      code: APPLE_API_CONFIG_ERROR_CODE,
+      statusCode: 500,
+      upstreamError:
+        "Missing Apple API configuration: APPLE_KEY_ID, APPLE_ISSUER_ID, APPLE_PRIVATE_KEY, or APPLE_IOS_BUNDLE_ID",
+    });
   }
 
   const now = Math.floor(Date.now() / 1000);
@@ -152,6 +187,35 @@ export function decodeAppleJWS<T>(jws: string): T {
   return JSON.parse(payloadJson) as T;
 }
 
+function buildAppleApiRequestError(status: number, errorText: string): AppleApiError {
+  const upstreamError = errorText.trim() || `Apple API error: ${status}`;
+
+  if (status === 404) {
+    return new AppleApiError("No subscription transaction was found for this purchase.", {
+      code: APPLE_TRANSACTION_NOT_FOUND_ERROR_CODE,
+      statusCode: 404,
+      upstreamStatus: status,
+      upstreamError,
+    });
+  }
+
+  if (status === 401 || status === 403) {
+    return new AppleApiError("Subscription verification is temporarily unavailable. Please try again later.", {
+      code: APPLE_API_AUTH_ERROR_CODE,
+      statusCode: 502,
+      upstreamStatus: status,
+      upstreamError,
+    });
+  }
+
+  return new AppleApiError("Subscription verification is temporarily unavailable. Please try again later.", {
+    code: APPLE_API_REQUEST_FAILED_CODE,
+    statusCode: 502,
+    upstreamStatus: status,
+    upstreamError,
+  });
+}
+
 /**
  * Get transaction info from App Store Server API
  */
@@ -186,7 +250,7 @@ export async function getTransactionInfo(
       return getTransactionInfo(transactionId, true);
     }
     
-    throw new Error(`Apple API error: ${response.status} - ${errorText}`);
+    throw buildAppleApiRequestError(response.status, errorText);
   }
 
   const data = await response.json();
@@ -231,7 +295,7 @@ export async function getSubscriptionStatus(
       return getSubscriptionStatus(transactionId, true);
     }
     
-    throw new Error(`Apple API error: ${response.status} - ${errorText}`);
+    throw buildAppleApiRequestError(response.status, errorText);
   }
 
   const data: SubscriptionStatusResponse = await response.json();

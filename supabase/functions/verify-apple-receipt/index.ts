@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { handleCors, jsonResponse, errorResponse } from "../_shared/cors.ts";
+import { handleCors, jsonResponse } from "../_shared/cors.ts";
 import {
   APPLE_BINDING_CONFLICT_ERROR,
   APPLE_BINDING_MISSING_ERROR,
@@ -10,22 +10,119 @@ import {
   upsertSubscription,
   buildSubscriptionResponse,
 } from "../_shared/appleSubscriptions.ts";
-import { verifyTransaction } from "../_shared/appleServerAPI.ts";
+import {
+  isAppleApiError,
+  verifyTransaction,
+} from "../_shared/appleServerAPI.ts";
 
-/**
- * Verify Apple Receipt / Transaction
- * 
- * Supports two verification methods:
- * 1. StoreKit 2 (preferred): Pass { transactionId: "..." }
- * 2. Legacy receipts (fallback): Pass { receipt: "base64..." }
- */
-serve(async (req) => {
+const APPLE_BINDING_CONFLICT_CODE = "APPLE_BINDING_CONFLICT";
+const APPLE_BINDING_MISSING_CODE = "APPLE_BINDING_MISSING";
+
+type VerifyAppleReceiptDeps = {
+  createSupabaseClient?: typeof createClient;
+  verifyTransactionImpl?: typeof verifyTransaction;
+  verifyReceiptWithAppleImpl?: typeof verifyReceiptWithApple;
+  extractLatestTransactionImpl?: typeof extractLatestTransaction;
+  resolvePlanFromProductImpl?: typeof resolvePlanFromProduct;
+  upsertSubscriptionImpl?: typeof upsertSubscription;
+  buildSubscriptionResponseImpl?: typeof buildSubscriptionResponse;
+};
+
+const defaultDeps: Required<VerifyAppleReceiptDeps> = {
+  createSupabaseClient: createClient,
+  verifyTransactionImpl: verifyTransaction,
+  verifyReceiptWithAppleImpl: verifyReceiptWithApple,
+  extractLatestTransactionImpl: extractLatestTransaction,
+  resolvePlanFromProductImpl: resolvePlanFromProduct,
+  upsertSubscriptionImpl: upsertSubscription,
+  buildSubscriptionResponseImpl: buildSubscriptionResponse,
+};
+
+function buildErrorPayload(error: unknown): {
+  statusCode: number;
+  message: string;
+  code?: string;
+  upstreamStatus?: number;
+  upstreamError?: string;
+} {
+  const errorMessage = error instanceof Error ? error.message : "Unknown error";
+
+  if (errorMessage === "Unauthorized") {
+    return {
+      statusCode: 401,
+      message: "Unauthorized",
+    };
+  }
+
+  if (errorMessage === APPLE_BINDING_CONFLICT_ERROR) {
+    return {
+      statusCode: 403,
+      message: APPLE_BINDING_CONFLICT_ERROR,
+      code: APPLE_BINDING_CONFLICT_CODE,
+    };
+  }
+
+  if (errorMessage === APPLE_BINDING_MISSING_ERROR) {
+    return {
+      statusCode: 400,
+      message: APPLE_BINDING_MISSING_ERROR,
+      code: APPLE_BINDING_MISSING_CODE,
+    };
+  }
+
+  if (isAppleApiError(error)) {
+    return {
+      statusCode: error.statusCode,
+      message: error.message,
+      code: error.code,
+      upstreamStatus: error.upstreamStatus,
+      upstreamError: error.upstreamError,
+    };
+  }
+
+  if (errorMessage.includes("not found")) {
+    return {
+      statusCode: 404,
+      message: errorMessage,
+    };
+  }
+
+  if (
+    errorMessage.includes("invalid") ||
+    errorMessage.includes("required") ||
+    errorMessage.includes("already register")
+  ) {
+    return {
+      statusCode: 400,
+      message: errorMessage,
+    };
+  }
+
+  return {
+    statusCode: 500,
+    message: errorMessage,
+  };
+}
+
+export async function handleVerifyAppleReceipt(
+  req: Request,
+  deps: VerifyAppleReceiptDeps = defaultDeps,
+): Promise<Response> {
+  const {
+    createSupabaseClient,
+    verifyTransactionImpl,
+    verifyReceiptWithAppleImpl,
+    extractLatestTransactionImpl,
+    resolvePlanFromProductImpl,
+    upsertSubscriptionImpl,
+    buildSubscriptionResponseImpl,
+  } = { ...defaultDeps, ...deps };
   if (req.method === "OPTIONS") {
     return handleCors(req);
   }
 
   try {
-    const serviceClient = createClient(
+    const serviceClient = createSupabaseClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
@@ -35,7 +132,7 @@ serve(async (req) => {
       throw new Error("Unauthorized");
     }
 
-    const anonClient = createClient(
+    const anonClient = createSupabaseClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_ANON_KEY") ?? "",
       {
@@ -63,9 +160,9 @@ serve(async (req) => {
       try {
         console.log(`[verify-apple-receipt] Using App Store Server API v2 for transaction: ${transactionId}`);
 
-        const { transactionInfo, environment } = await verifyTransaction(transactionId);
+        const { transactionInfo, environment } = await verifyTransactionImpl(transactionId);
 
-        const plan = resolvePlanFromProduct(transactionInfo.productId);
+        const plan = resolvePlanFromProductImpl(transactionInfo.productId);
         const expiresAt = transactionInfo.expiresDate
           ? new Date(transactionInfo.expiresDate)
           : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // Default 30 days if no expiry
@@ -74,7 +171,7 @@ serve(async (req) => {
           ? new Date(transactionInfo.revocationDate)
           : undefined;
 
-        const subscription = await upsertSubscription(serviceClient, {
+        const subscription = await upsertSubscriptionImpl(serviceClient, {
           userId: user.id,
           transactionId: transactionInfo.transactionId,
           originalTransactionId: transactionInfo.originalTransactionId || transactionInfo.transactionId,
@@ -94,7 +191,7 @@ serve(async (req) => {
           success: true,
           environment,
           verificationMethod: "app_store_server_api_v2",
-          subscription: buildSubscriptionResponse(subscription),
+          subscription: buildSubscriptionResponseImpl(subscription),
         });
       } catch (txError) {
         const txErrorMessage = txError instanceof Error ? txError.message : String(txError ?? "");
@@ -115,8 +212,8 @@ serve(async (req) => {
     if (receipt) {
       console.log("[verify-apple-receipt] Using legacy verifyReceipt API");
       
-      const { result, environment } = await verifyReceiptWithApple(receipt);
-      const latestTransaction = extractLatestTransaction(result);
+      const { result, environment } = await verifyReceiptWithAppleImpl(receipt);
+      const latestTransaction = extractLatestTransactionImpl(result);
 
       if (!latestTransaction) {
         throw new Error("No subscription transaction found in receipt");
@@ -126,9 +223,9 @@ serve(async (req) => {
         throw new Error("Missing transaction identifier");
       }
 
-      const plan = resolvePlanFromProduct(latestTransaction.productId);
+      const plan = resolvePlanFromProductImpl(latestTransaction.productId);
 
-      const subscription = await upsertSubscription(serviceClient, {
+      const subscription = await upsertSubscriptionImpl(serviceClient, {
         userId: user.id,
         transactionId: latestTransaction.transactionId,
         originalTransactionId: latestTransaction.originalTransactionId,
@@ -147,7 +244,7 @@ serve(async (req) => {
         success: true,
         environment,
         verificationMethod: "legacy_verify_receipt",
-        subscription: buildSubscriptionResponse(subscription),
+        subscription: buildSubscriptionResponseImpl(subscription),
       });
     }
 
@@ -155,25 +252,24 @@ serve(async (req) => {
   } catch (error) {
     console.error("Error verifying receipt:", error);
 
-    let errorMessage = error instanceof Error ? error.message : "Unknown error";
-    let statusCode = 500;
-
-    if (errorMessage.includes("Apple API error: 401")) {
-      errorMessage = "Apple API authentication failed (401). Verify APPLE_ISSUER_ID, APPLE_KEY_ID, APPLE_PRIVATE_KEY, and APPLE_IOS_BUNDLE_ID.";
-    }
-
-    if (errorMessage === "Unauthorized") {
-      statusCode = 401;
-    } else if (errorMessage === APPLE_BINDING_CONFLICT_ERROR) {
-      statusCode = 403;
-    } else if (errorMessage === APPLE_BINDING_MISSING_ERROR) {
-      statusCode = 400;
-    } else if (errorMessage.includes("not found")) {
-      statusCode = 404;
-    } else if (errorMessage.includes("invalid") || errorMessage.includes("required") || errorMessage.includes("already register")) {
-      statusCode = 400;
-    }
-
-    return errorResponse(req, errorMessage, statusCode);
+    const errorPayload = buildErrorPayload(error);
+    return jsonResponse(
+      req,
+      {
+        error: errorPayload.message,
+        ...(errorPayload.code ? { code: errorPayload.code } : {}),
+        ...(typeof errorPayload.upstreamStatus === "number"
+          ? { upstream_status: errorPayload.upstreamStatus }
+          : {}),
+        ...(typeof errorPayload.upstreamError === "string" && errorPayload.upstreamError.length > 0
+          ? { upstream_error: errorPayload.upstreamError }
+          : {}),
+      },
+      errorPayload.statusCode,
+    );
   }
-});
+}
+
+if (Deno.env.get("SUPABASE_FUNCTIONS_TEST") !== "1") {
+  serve((req) => handleVerifyAppleReceipt(req));
+}

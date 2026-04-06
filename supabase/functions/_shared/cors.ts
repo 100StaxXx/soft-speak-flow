@@ -22,33 +22,36 @@
  *   });
  */
 
-// Allowed origins - loaded from environment or defaults
-// In production, set ALLOWED_ORIGINS env var to comma-separated list
-const getAllowedOrigins = (): string[] => {
-  const envOrigins = Deno.env.get("ALLOWED_ORIGINS");
-  
-  if (envOrigins) {
-    return envOrigins.split(",").map(o => o.trim());
-  }
-  
-  // Default allowed origins
-  // Add your production domains here
-  return [
-    // Production domains
-    "https://cosmiq.app",
-    "https://www.cosmiq.app",
-    "https://app.cosmiq.app",
-    "https://cosmiq.quest",
-    "https://www.cosmiq.quest",
-    "https://app.cosmiq.quest", // Native app redirect base
-    // Capacitor apps (iOS/Android)
-    "capacitor://localhost",
-    "http://localhost",
-    // Development
-    "http://localhost:5173",
-    "http://localhost:3000",
-    "http://127.0.0.1:5173",
-  ];
+const DEFAULT_ALLOWED_ORIGINS = [
+  // Production domains
+  "https://cosmiq.app",
+  "https://www.cosmiq.app",
+  "https://app.cosmiq.app",
+  "https://cosmiq.quest",
+  "https://www.cosmiq.quest",
+  "https://app.cosmiq.quest", // Native app redirect base
+  // Capacitor apps (iOS/Android)
+  "capacitor://localhost",
+  "http://localhost",
+  // Development
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "http://127.0.0.1:5173",
+] as const;
+
+function normalizeOrigins(origins: readonly string[]): string[] {
+  return Array.from(new Set(origins.map((origin) => origin.trim()).filter(Boolean)));
+}
+
+// Allowed origins - merge env overrides with built-in defaults.
+// In production, set ALLOWED_ORIGINS env var to add custom domains without dropping native/web defaults.
+export const getAllowedOrigins = (): string[] => {
+  const envOrigins = (Deno.env.get("ALLOWED_ORIGINS") ?? "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  return normalizeOrigins([...DEFAULT_ALLOWED_ORIGINS, ...envOrigins]);
 };
 
 /**

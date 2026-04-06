@@ -140,4 +140,82 @@ describe("usePromoCode", () => {
     expect((thrown as PromoCodeRedeemError).message).toBe("This promo code has expired.");
     expect((thrown as PromoCodeRedeemError).reason).toBe("expired");
   });
+
+  it("maps auth failures to a friendly sign-in message", async () => {
+    mocks.invoke.mockResolvedValue({
+      data: null,
+      error: {
+        name: "FunctionsHttpError",
+        message: "Edge Function returned a non-2xx status code",
+        context: new Response(
+          JSON.stringify({
+            error: "Unauthorized",
+          }),
+          {
+            status: 401,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      },
+    });
+
+    const { result } = renderHook(() => usePromoCode(), {
+      wrapper: createWrapper(),
+    });
+
+    let thrown: unknown;
+
+    await act(async () => {
+      try {
+        await result.current.redeemPromoCode.mutateAsync("bigfella2026");
+      } catch (error) {
+        thrown = error;
+      }
+    });
+
+    expect(thrown).toBeInstanceOf(PromoCodeRedeemError);
+    expect((thrown as PromoCodeRedeemError).message).toBe(
+      "Your session has expired. Please sign in again and try to redeem your promo code.",
+    );
+    expect((thrown as PromoCodeRedeemError).reason).toBe("unauthorized");
+  });
+
+  it("hides technical 5xx backend details behind friendly retry copy", async () => {
+    mocks.invoke.mockResolvedValue({
+      data: null,
+      error: {
+        name: "FunctionsHttpError",
+        message: "Edge Function returned a non-2xx status code",
+        context: new Response(
+          JSON.stringify({
+            error: "Auth configuration missing",
+          }),
+          {
+            status: 500,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      },
+    });
+
+    const { result } = renderHook(() => usePromoCode(), {
+      wrapper: createWrapper(),
+    });
+
+    let thrown: unknown;
+
+    await act(async () => {
+      try {
+        await result.current.redeemPromoCode.mutateAsync("bigfella2026");
+      } catch (error) {
+        thrown = error;
+      }
+    });
+
+    expect(thrown).toBeInstanceOf(PromoCodeRedeemError);
+    expect((thrown as PromoCodeRedeemError).message).toBe(
+      "Our servers are temporarily unavailable. Please try again in a moment.",
+    );
+    expect((thrown as PromoCodeRedeemError).reason).toBe("unknown");
+  });
 });

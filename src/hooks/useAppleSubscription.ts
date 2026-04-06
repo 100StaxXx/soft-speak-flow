@@ -13,12 +13,28 @@ import {
   getProductIdsForPlan,
   resolvePlanFromProductId,
 } from '@/utils/appleIAP';
-import { parseFunctionInvokeError } from '@/utils/supabaseFunctionErrors';
+import {
+  parseFunctionInvokeError,
+  toUserFacingFunctionError,
+  type ParsedFunctionInvokeError,
+} from '@/utils/supabaseFunctionErrors';
 import { useToast } from './use-toast';
 import { useAuth } from './useAuth';
 
 const PRODUCT_FETCH_ERROR_MESSAGE = "Premium subscriptions are temporarily unavailable. Please try again later.";
 const PRODUCT_IDS = getAllIAPProductIds();
+const APPLE_PROVIDER_ERROR_CODES = new Set([
+  "APPLE_API_AUTH_FAILED",
+  "APPLE_API_CONFIG_MISSING",
+  "APPLE_API_REQUEST_FAILED",
+]);
+const SAFE_APPLE_ERROR_MESSAGES = new Set([
+  "This purchase is already linked to another account.",
+  "This purchase is missing its app-account binding. Update the app and restore the purchase again.",
+  "No transaction ID or receipt data available",
+  "No transaction ID or receipt data available for subscription",
+  "No subscription transaction was found for this purchase.",
+]);
 
 const toProductFetchErrorMessage = (error: unknown): string => {
   const message = error instanceof Error ? error.message : String(error ?? '');
@@ -29,6 +45,49 @@ const toProductFetchErrorMessage = (error: unknown): string => {
     return message;
   }
   return `${PRODUCT_FETCH_ERROR_MESSAGE} (${message})`;
+};
+
+const isAppleProviderFailure = (parsed: ParsedFunctionInvokeError): boolean => {
+  const errorCode = parsed.code ?? parsed.responsePayload?.code;
+  const upstreamError = parsed.upstreamError?.toLowerCase() ?? "";
+  const backendMessage = parsed.backendMessage?.toLowerCase() ?? "";
+
+  return (
+    APPLE_PROVIDER_ERROR_CODES.has(errorCode ?? "") ||
+    parsed.upstreamStatus === 401 ||
+    parsed.upstreamStatus === 403 ||
+    upstreamError.includes("apple api") ||
+    backendMessage.includes("apple api")
+  );
+};
+
+const getSafeAppleErrorMessage = (parsed: ParsedFunctionInvokeError): string | null => {
+  const messages = [parsed.backendMessage?.trim(), parsed.message?.trim()];
+
+  for (const message of messages) {
+    if (!message) continue;
+    if (SAFE_APPLE_ERROR_MESSAGES.has(message)) {
+      return message;
+    }
+  }
+
+  return null;
+};
+
+const toSubscriptionErrorMessage = (
+  parsed: ParsedFunctionInvokeError,
+  action: string,
+): string => {
+  const safeMessage = getSafeAppleErrorMessage(parsed);
+  if (safeMessage) {
+    return safeMessage;
+  }
+
+  if (isAppleProviderFailure(parsed)) {
+    return PRODUCT_FETCH_ERROR_MESSAGE;
+  }
+
+  return toUserFacingFunctionError(parsed, { action });
 };
 
 export function useAppleSubscription() {
@@ -208,7 +267,7 @@ export function useAppleSubscription() {
     } catch (error) {
       console.error('Purchase error:', error);
       const parsed = await parseFunctionInvokeError(error);
-      const errorMessage = parsed.backendMessage || parsed.message || "Please try again";
+      const errorMessage = toSubscriptionErrorMessage(parsed, "activate premium");
       toast({
         title: "Purchase Failed",
         description: errorMessage,
@@ -321,7 +380,7 @@ export function useAppleSubscription() {
     } catch (error) {
       console.error('Restore error:', error);
       const parsed = await parseFunctionInvokeError(error);
-      const errorMessage = parsed.backendMessage || parsed.message || "Please try again";
+      const errorMessage = toSubscriptionErrorMessage(parsed, "restore your purchase");
       toast({
         title: "Restore Failed",
         description: errorMessage,
