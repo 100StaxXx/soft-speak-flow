@@ -9,7 +9,7 @@ import {
   type PropsWithChildren,
 } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
@@ -37,7 +37,7 @@ const EVOLVE_AUTOSCROLL_SELECTOR = '[data-tour="evolve-companion-button"]';
 const EVOLVE_AUTOSCROLL_VIEWPORT_MARGIN_PX = 72;
 
 const STEP_XP_REWARDS: Partial<Record<GuidedTutorialStepId, number>> = {
-  create_quest: 4,
+  create_quest: 3,
   morning_checkin: 3,
 };
 
@@ -738,6 +738,8 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
   const lastRouteRestoreSignatureRef = useRef<string | null>(null);
   const lastEvolveAutoscrollEntryRef = useRef<string | null>(null);
   const migrationPersistSignatureRef = useRef<string | null>(null);
+  const evolveCompanionBaselineUpdatedAtRef = useRef<number | null>(null);
+  const evolutionStartRecordedRef = useRef(false);
 
   const [sessionCompleted, setSessionCompleted] = useState<GuidedTutorialStepId[]>([]);
   const [sessionAwarded, setSessionAwarded] = useState<GuidedTutorialStepId[]>([]);
@@ -770,6 +772,8 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     stepPersistThrottleRef.current.clear();
     missingTargetSinceRef.current = null;
     migrationPersistSignatureRef.current = null;
+    evolveCompanionBaselineUpdatedAtRef.current = null;
+    evolutionStartRecordedRef.current = false;
   }, [user?.id]);
 
   const persistedCompletedBeforeMigration = useMemo(() => {
@@ -901,6 +905,13 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     return migratedProgress.evolutionInFlight;
   }, [migratedProgress.evolutionInFlight]);
   const evolutionInFlight = sessionEvolutionInFlight ?? persistedEvolutionInFlight;
+  const companionQueryKey = useMemo(() => getCompanionQueryKey(user?.id), [user?.id]);
+  const { data: cachedCompanionData, dataUpdatedAt: companionDataUpdatedAt } = useQuery<Companion | null>({
+    queryKey: companionQueryKey,
+    queryFn: async () => queryClient.getQueryData<Companion | null>(companionQueryKey) ?? null,
+    enabled: false,
+  });
+  const cachedCompanion = cachedCompanionData ?? null;
 
   const tutorialReady =
     Boolean(user?.id) && !profileLoading && walkthroughCompleted && tutorialEligible;
@@ -910,6 +921,10 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
   const tutorialComplete = tutorialReady && (tutorialMarkedComplete || !currentStep);
   const tutorialSuppressed = tutorialComplete || tutorialDismissed;
   const hasPendingIntroDialogue = Boolean(currentStep) && !milestoneSet.has("mentor_intro_hello");
+  const hasRecordedEvolutionStart =
+    milestoneSet.has("tap_evolve_companion") ||
+    evolutionInFlight ||
+    Boolean(migratedProgress.evolutionStartedAt);
   const stepRoute = currentStep?.route ?? null;
   const shouldRestoreRoute = shouldRestoreTutorialRoute({
     pathname: location.pathname,
@@ -999,6 +1014,20 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
 
     void persistProgress(migrationPayload);
   }, [migratedProgress, persistProgress, tutorialReady]);
+
+  useEffect(() => {
+    evolutionStartRecordedRef.current = hasRecordedEvolutionStart;
+  }, [hasRecordedEvolutionStart]);
+
+  useEffect(() => {
+    if (currentStepId !== "evolve_companion") {
+      evolveCompanionBaselineUpdatedAtRef.current = null;
+      return;
+    }
+
+    if (evolveCompanionBaselineUpdatedAtRef.current !== null) return;
+    evolveCompanionBaselineUpdatedAtRef.current = companionDataUpdatedAt;
+  }, [companionDataUpdatedAt, currentStepId]);
 
   const markMilestoneComplete = useCallback(
     (milestoneId: GuidedMilestoneId) => {
@@ -1171,20 +1200,13 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     }
 
     if (currentStep.id === "evolve_companion") {
-      const cachedCompanion = user?.id
-        ? queryClient.getQueryData<Companion | null>(getCompanionQueryKey(user.id))
-        : null;
-      const hasRecordedEvolutionStart =
-        milestoneSet.has("tap_evolve_companion") ||
-        evolutionInFlight ||
-        Boolean(migratedProgress.evolutionStartedAt) ||
-        Boolean(migratedProgress.evolutionCompletedAt);
-
-      if (
-        cachedCompanion &&
+      const hasFreshClaimedStageIncrease =
+        hasRecordedEvolutionStart &&
+        Boolean(cachedCompanion) &&
         cachedCompanion.current_stage > 0 &&
-        hasRecordedEvolutionStart
-      ) {
+        companionDataUpdatedAt > (evolveCompanionBaselineUpdatedAtRef.current ?? 0);
+
+      if (hasFreshClaimedStageIncrease) {
         if (evolutionInFlight) {
           setSessionEvolutionInFlight(false);
         }
@@ -1226,21 +1248,21 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     }
   }, [
     createQuestProgress.current,
+    companionDataUpdatedAt,
+    cachedCompanion,
     currentStep,
+    hasRecordedEvolutionStart,
     location.pathname,
     markCreateQuestSubstepComplete,
     markMilestoneComplete,
     markStepComplete,
     persistProgress,
-    queryClient,
     milestoneSet,
     evolutionInFlight,
     hasPendingIntroDialogue,
     migratedProgress.evolutionCompletedAt,
-    migratedProgress.evolutionStartedAt,
     tutorialSuppressed,
     tutorialReady,
-    user?.id,
   ]);
 
   useEffect(() => {
@@ -1307,6 +1329,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
       listeners.push({
         eventName: "evolution-loading-start",
         handler: () => {
+          evolutionStartRecordedRef.current = true;
           if (!milestoneSet.has("tap_evolve_companion")) {
             markMilestoneComplete("tap_evolve_companion");
           }
@@ -1321,6 +1344,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
       listeners.push({
         eventName: "companion-evolved",
         handler: () => {
+          if (!evolutionStartRecordedRef.current) return;
           setSessionEvolutionInFlight(false);
           void persistProgress({
             evolutionInFlight: false,
@@ -1352,7 +1376,9 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     markStepComplete,
     milestoneSet,
     persistProgress,
+    evolutionInFlight,
     hasPendingIntroDialogue,
+    migratedProgress.evolutionStartedAt,
     tutorialSuppressed,
     tutorialReady,
   ]);

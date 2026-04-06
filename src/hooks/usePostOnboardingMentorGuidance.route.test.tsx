@@ -202,17 +202,20 @@ describe("guided tutorial route restoration", () => {
       queryClient.setQueryData(["companion", "user-1"], options.seedCompanion);
     }
 
-    return render(
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={[initialPath]}>
-          <PostOnboardingMentorGuidanceProvider>
-            <Routes>
-              <Route path="*" element={<RouteProbe />} />
-            </Routes>
-          </PostOnboardingMentorGuidanceProvider>
-        </MemoryRouter>
-      </QueryClientProvider>
-    );
+    return {
+      queryClient,
+      ...render(
+        <QueryClientProvider client={queryClient}>
+          <MemoryRouter initialEntries={[initialPath]}>
+            <PostOnboardingMentorGuidanceProvider>
+              <Routes>
+                <Route path="*" element={<RouteProbe />} />
+              </Routes>
+            </PostOnboardingMentorGuidanceProvider>
+          </MemoryRouter>
+        </QueryClientProvider>
+      ),
+    };
   };
 
   it("redirects to the active tutorial route using replace semantics", async () => {
@@ -460,7 +463,34 @@ describe("guided tutorial route restoration", () => {
     });
   });
 
-  it("recovers to the post-evolution step when hatch had already started", async () => {
+  it("requires an explicit evolution start before the completion event advances the step", async () => {
+    mocks.guidedTutorial = createEvolveStepTutorial();
+    renderWithProviders("/companion");
+
+    await waitFor(() => {
+      expect(screen.getByTestId("path")).toHaveTextContent("/companion");
+      expect(screen.getByTestId("step")).toHaveTextContent("evolve_companion");
+    });
+
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent("companion-evolved"));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("step")).toHaveTextContent("evolve_companion");
+    });
+
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent("evolution-loading-start"));
+      window.dispatchEvent(new CustomEvent("companion-evolved"));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("step")).toHaveTextContent("post_evolution_companion_intro");
+    });
+  });
+
+  it("recovers to the post-evolution step when hatch had already started and companion state updates after mount", async () => {
     mocks.guidedTutorial = {
       ...createEvolveStepTutorial(),
       milestonesCompleted: [
@@ -471,15 +501,21 @@ describe("guided tutorial route restoration", () => {
       evolutionInFlight: true,
     };
 
-    renderWithProviders("/companion", {
-      seedCompanion: {
-        id: "companion-1",
-        current_stage: 1,
-      },
-    });
+    const { queryClient } = renderWithProviders("/companion");
 
     await waitFor(() => {
       expect(screen.getByTestId("path")).toHaveTextContent("/companion");
+      expect(screen.getByTestId("step")).toHaveTextContent("evolve_companion");
+    });
+
+    await act(async () => {
+      queryClient.setQueryData(["companion", "user-1"], {
+        id: "companion-1",
+        current_stage: 1,
+      });
+    });
+
+    await waitFor(() => {
       expect(screen.getByTestId("step")).toHaveTextContent("post_evolution_companion_intro");
     });
   });

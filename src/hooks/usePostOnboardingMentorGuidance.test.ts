@@ -92,6 +92,10 @@ vi.mock("@tanstack/react-query", async () => {
   return {
     ...actual,
     useQueryClient: () => mocks.state.queryClient,
+    useQuery: () => ({
+      data: null,
+      dataUpdatedAt: 0,
+    }),
   };
 });
 
@@ -533,6 +537,97 @@ describe("guided tutorial intro dialogue sequence", () => {
       expect(result.current.currentStep).toBe("morning_checkin");
       expect(result.current.currentSubstep).toBeNull();
     });
+  });
+
+  it("awards only the hatch-only tutorial XP budget across create quest and morning check-in", async () => {
+    mocks.state.awardCustomXP.mockClear();
+
+    mocks.state.guidedTutorial = {
+      version: 2,
+      eligible: true,
+      completed: false,
+      completedSteps: ["quests_campaigns_intro"],
+      xpAwardedSteps: [],
+      milestonesCompleted: ["mentor_intro_hello", "quests_campaigns_intro"],
+      substeps: {
+        create_quest: {
+          current: "submit_create_quest",
+          completed: ["open_add_quest", "enter_title", "select_time"],
+        },
+      },
+    };
+
+    const createQuestRender = renderHook(() => usePostOnboardingMentorGuidance(), {
+      wrapper: createWrapper("/journeys"),
+    });
+
+    await waitFor(() => {
+      expect(createQuestRender.result.current.currentStep).toBe("create_quest");
+      expect(createQuestRender.result.current.currentSubstep).toBe("submit_create_quest");
+    });
+
+    await act(async () => {
+      window.dispatchEvent(
+        new CustomEvent("task-added", {
+          detail: {
+            taskDate: "2026-04-04",
+            scheduledTime: "10:30",
+          },
+        })
+      );
+    });
+
+    await waitFor(() => {
+      expect(mocks.state.awardCustomXP).toHaveBeenCalledWith(
+        3,
+        "guided_tutorial_step_complete",
+        undefined,
+        expect.objectContaining({
+          guided_step: "create_quest",
+          source: "guided_tutorial",
+        }),
+      );
+    });
+
+    createQuestRender.unmount();
+
+    mocks.state.guidedTutorial = {
+      version: 2,
+      eligible: true,
+      completed: false,
+      completedSteps: ["quests_campaigns_intro", "create_quest"],
+      xpAwardedSteps: ["create_quest"],
+      milestonesCompleted: ["mentor_intro_hello"],
+    };
+
+    const morningCheckInRender = renderHook(() => usePostOnboardingMentorGuidance(), {
+      wrapper: createWrapper("/mentor"),
+    });
+
+    await waitFor(() => {
+      expect(morningCheckInRender.result.current.currentStep).toBe("morning_checkin");
+    });
+
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent("morning-checkin-completed"));
+    });
+
+    await waitFor(() => {
+      expect(mocks.state.awardCustomXP).toHaveBeenNthCalledWith(
+        2,
+        3,
+        "guided_tutorial_step_complete",
+        undefined,
+        expect.objectContaining({
+          guided_step: "morning_checkin",
+          source: "guided_tutorial",
+        }),
+      );
+    });
+
+    expect(
+      mocks.state.awardCustomXP.mock.calls.map(([xpAmount]) => xpAmount)
+    ).toEqual([3, 3]);
   });
 
   it("falls back to an add-quest launcher when submit_create_quest loses the sheet target, then reselects the create button when it returns", async () => {

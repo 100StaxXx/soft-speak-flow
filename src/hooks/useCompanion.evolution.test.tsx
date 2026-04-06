@@ -553,6 +553,51 @@ describe("useCompanion evolveCompanion", () => {
     expect(result.current.canEvolve).toBe(true);
   });
 
+  it("treats the tutorial's 10 XP hatch budget as enough for stage 1 but not stage 2", async () => {
+    mocks.userCompanionResponses.length = 0;
+    mocks.userCompanionResponses.push({
+      data: {
+        ...companionFixture,
+        current_stage: 0,
+        current_xp: 10,
+        preset_id: "dragon",
+        spirit_animal: "Dragon",
+        core_element: "fire",
+        current_image_url: "/companion-eggs/egg__t0_egg__normal__fire.png",
+        initial_image_url: "/companion-eggs/egg__t0_egg__normal__fire.png",
+      },
+      error: null,
+    });
+
+    const eggState = await renderUseCompanion();
+
+    expect(eggState.result.current.canEvolve).toBe(true);
+    expect(eggState.result.current.nextEvolutionXP).toBe(10);
+
+    eggState.unmount();
+
+    mocks.userCompanionResponses.length = 0;
+    mocks.userCompanionResponses.push({
+      data: {
+        ...companionFixture,
+        current_stage: 1,
+        current_xp: 10,
+        preset_id: "dragon",
+        spirit_animal: "Dragon",
+        core_element: "fire",
+        current_image_url: "/companion-presets/dragon/t1_youth/normal/dragon__t1_youth__normal__fire.png",
+        initial_image_url: "/companion-eggs/egg__t0_egg__normal__fire.png",
+      },
+      error: null,
+    });
+
+    const hatchlingState = await renderUseCompanion();
+
+    expect(hatchlingState.result.current.companion?.current_stage).toBe(1);
+    expect(hatchlingState.result.current.nextEvolutionXP).toBe(30);
+    expect(hatchlingState.result.current.canEvolve).toBe(false);
+  });
+
   it("uses onboarding fast retry defaults for companion creation", async () => {
     mocks.rpcMock.mockResolvedValueOnce({
       data: [
