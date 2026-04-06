@@ -4,6 +4,14 @@ export type BackendHealthState = "unknown" | "healthy" | "degraded" | "outage";
 
 export type QueuedActionStatus = "queued" | "syncing" | "synced" | "failed" | "dropped";
 
+export type SupportReportCategory =
+  | "bug"
+  | "billing"
+  | "sync"
+  | "performance"
+  | "feedback"
+  | "other";
+
 export interface QueuedActionReceipt {
   id: string;
   actionKind: string;
@@ -34,7 +42,7 @@ export interface SupportReportDiagnostics {
 
 export interface SupportReportPayload {
   correlationId: string;
-  category: "bug" | "billing" | "sync" | "performance" | "other";
+  category: SupportReportCategory;
   summary: string;
   reproductionSteps: string;
   expectedBehavior: string;

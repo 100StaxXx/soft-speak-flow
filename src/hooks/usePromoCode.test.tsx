@@ -6,11 +6,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   invoke: vi.fn(),
   rpc: vi.fn(),
+  user: { id: "user-1" },
+  session: { access_token: "access-token" },
 }));
 
 vi.mock("@/hooks/useAuth", () => ({
   useAuth: () => ({
-    user: { id: "user-1" },
+    user: mocks.user,
+    session: mocks.session,
   }),
 }));
 
@@ -23,7 +26,7 @@ vi.mock("@/integrations/supabase/client", () => ({
   },
 }));
 
-import { usePromoCode } from "./usePromoCode";
+import { PromoCodeRedeemError, usePromoCode } from "./usePromoCode";
 
 const createWrapper = () => {
   const queryClient = new QueryClient({
@@ -41,6 +44,8 @@ const createWrapper = () => {
 describe("usePromoCode", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.user = { id: "user-1" };
+    mocks.session = { access_token: "access-token" };
     mocks.invoke.mockResolvedValue({
       data: {
         success: true,
@@ -65,7 +70,74 @@ describe("usePromoCode", () => {
       body: {
         promoCode: "BIGFELLA2026",
       },
+      headers: {
+        Authorization: "Bearer access-token",
+      },
     });
     expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+
+  it("maps Edge Function transport failures to a friendly retry message", async () => {
+    mocks.invoke.mockResolvedValue({
+      data: null,
+      error: {
+        name: "FunctionsFetchError",
+        message: "Failed to send a request to the Edge Function",
+      },
+    });
+
+    const { result } = renderHook(() => usePromoCode(), {
+      wrapper: createWrapper(),
+    });
+
+    let thrown: unknown;
+
+    await act(async () => {
+      try {
+        await result.current.redeemPromoCode.mutateAsync("bigfella2026");
+      } catch (error) {
+        thrown = error;
+      }
+    });
+
+    expect(thrown).toBeInstanceOf(PromoCodeRedeemError);
+    expect((thrown as PromoCodeRedeemError).message).toBe(
+      "We couldn't reach the server to redeem your promo code. Check your connection and try again.",
+    );
+    expect((thrown as PromoCodeRedeemError).reason).toBe("unknown");
+  });
+
+  it("preserves backend promo failure reasons from function payloads", async () => {
+    mocks.invoke.mockResolvedValue({
+      data: null,
+      error: {
+        name: "FunctionsHttpError",
+        message: "Edge Function returned a non-2xx status code",
+        context: {
+          json: async () => ({
+            message: "This promo code has expired.",
+            status: "expired",
+          }),
+        },
+      },
+    });
+
+    const { result } = renderHook(() => usePromoCode(), {
+      wrapper: createWrapper(),
+    });
+
+    let thrown: unknown;
+
+    await act(async () => {
+      try {
+        await result.current.redeemPromoCode.mutateAsync("bigfella2026");
+      } catch (error) {
+        thrown = error;
+      }
+    });
+
+    expect(thrown).toBeInstanceOf(PromoCodeRedeemError);
+    expect((thrown as PromoCodeRedeemError).message).toBe("This promo code has expired.");
+    expect((thrown as PromoCodeRedeemError).reason).toBe("expired");
   });
 });

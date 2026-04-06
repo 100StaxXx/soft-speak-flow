@@ -1,6 +1,10 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
+import {
+  parseFunctionInvokeError,
+  toUserFacingFunctionError,
+} from "@/utils/supabaseFunctionErrors";
 
 export type PromoCodeFailureReason =
   | "invalid"
@@ -27,6 +31,69 @@ export class PromoCodeRedeemError extends Error {
   }
 }
 
+const FUNCTION_TRANSPORT_ERROR_MESSAGES = new Set([
+  "failed to send a request to the edge function",
+  "edge function returned a non-2xx status code",
+]);
+
+const isFunctionTransportErrorMessage = (message: string | null | undefined): boolean => {
+  if (typeof message !== "string") return false;
+
+  const normalized = message.trim().toLowerCase();
+  return (
+    FUNCTION_TRANSPORT_ERROR_MESSAGES.has(normalized) ||
+    normalized.includes("functionsfetcherror") ||
+    normalized.includes("relay error invoking the edge function")
+  );
+};
+
+const getErrorMessage = (error: unknown): string | undefined => {
+  if (error instanceof Error) return error.message;
+  if (
+    error &&
+    typeof error === "object" &&
+    "message" in error &&
+    typeof (error as { message?: unknown }).message === "string"
+  ) {
+    return (error as { message: string }).message;
+  }
+
+  return undefined;
+};
+
+const getPromoCodeRedeemErrorDetails = async (error: unknown): Promise<{
+  message: string;
+  reason: PromoCodeFailureReason;
+}> => {
+  const parsed = await parseFunctionInvokeError(error);
+  const directMessage = getErrorMessage(error)?.trim();
+  const backendMessage = parsed.backendMessage?.trim();
+
+  const reasonFromPayload = toFailureReason(parsed.responsePayload?.status);
+  let reason = reasonFromPayload;
+
+  if (reason === "unknown") {
+    if (parsed.category === "auth") {
+      reason = "unauthorized";
+    } else if (parsed.category === "rate_limit") {
+      reason = "rate_limited";
+    }
+  }
+
+  if (backendMessage && !isFunctionTransportErrorMessage(backendMessage)) {
+    return { message: backendMessage, reason };
+  }
+
+  if (directMessage && !isFunctionTransportErrorMessage(directMessage)) {
+    return { message: directMessage, reason };
+  }
+
+  return {
+    message: toUserFacingFunctionError(parsed, { action: "redeem your promo code" }),
+    reason,
+  };
+};
+
 const toFailureReason = (status: string | null | undefined): PromoCodeFailureReason => {
   switch (status) {
     case "invalid":
@@ -42,12 +109,12 @@ const toFailureReason = (status: string | null | undefined): PromoCodeFailureRea
 };
 
 export const usePromoCode = () => {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const queryClient = useQueryClient();
 
   const redeemPromoCode = useMutation({
     mutationFn: async (rawCode: string) => {
-      if (!user) {
+      if (!user || !session?.access_token) {
         throw new PromoCodeRedeemError("You must be signed in to redeem a promo code.", "unauthorized");
       }
 
@@ -60,29 +127,14 @@ export const usePromoCode = () => {
         body: {
           promoCode: normalizedCode,
         },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
       });
 
       if (error) {
-        let backendMessage =
-          (error as { message?: string }).message ||
-          "Unable to redeem promo code right now. Please try again.";
-        let failureReason: PromoCodeFailureReason = "unknown";
-
-        const errorWithContext = error as { context?: Response };
-        if (errorWithContext.context instanceof Response) {
-          try {
-            const errorPayload = await errorWithContext.context.json() as Partial<PromoCodeRpcResult> | null;
-            backendMessage = errorPayload?.message || backendMessage;
-            failureReason = toFailureReason(errorPayload?.status);
-          } catch {
-            if (errorWithContext.context.status === 429) {
-              backendMessage = "Too many promo redemption attempts. Please try again later.";
-              failureReason = "rate_limited";
-            }
-          }
-        }
-
-        throw new PromoCodeRedeemError(backendMessage, failureReason);
+        const promoError = await getPromoCodeRedeemErrorDetails(error);
+        throw new PromoCodeRedeemError(promoError.message, promoError.reason);
       }
 
       const result = data as PromoCodeRpcResult | undefined;

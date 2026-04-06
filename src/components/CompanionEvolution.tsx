@@ -3,9 +3,6 @@ import { AnimatePresence, motion } from "framer-motion";
 import confetti from "canvas-confetti";
 import { Sparkles } from "lucide-react";
 import { haptics } from "@/utils/haptics";
-import { supabase } from "@/integrations/supabase/client";
-import { playEvolutionStart, playEvolutionSuccess } from "@/utils/soundEffects";
-import { globalAudio } from "@/utils/globalAudio";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { EvolutionErrorFallback } from "@/components/ErrorFallback";
 import { getEvolutionTheme, type EvoTheme, type ParticleStyle } from "@/config/evolutionThemes";
@@ -22,8 +19,6 @@ interface CompanionEvolutionProps {
   newStage: number;
   previousImageUrl: string;
   newImageUrl: string;
-  mentorSlug?: string;
-  userId?: string;
   element?: string;
   onComplete: () => void;
 }
@@ -276,14 +271,10 @@ const CompanionEvolutionContent = ({
   newStage,
   previousImageUrl,
   newImageUrl,
-  mentorSlug,
-  userId,
   element,
   onComplete,
 }: CompanionEvolutionProps) => {
   const [phase, setPhase] = useState<EvolutionPhase>("hold");
-  const [voiceLine, setVoiceLine] = useState("");
-  const [isLoadingVoice, setIsLoadingVoice] = useState(false);
   const [canDismiss, setCanDismiss] = useState(false);
   const [showEmergencyExit, setShowEmergencyExit] = useState(false);
   const [strobeBeatIndex, setStrobeBeatIndex] = useState<number | null>(null);
@@ -292,13 +283,10 @@ const CompanionEvolutionContent = ({
     next: "idle",
     ready: false,
   });
-  const audioRef = useRef<HTMLAudioElement | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const emergencyTimeoutRef = useRef<number | null>(null);
   const timersRef = useRef<number[]>([]);
   const animationKeyRef = useRef<string | null>(null);
-  const voiceRequestKeyRef = useRef<string | null>(null);
-  const voicePlayedRef = useRef(false);
   const dismissHandledRef = useRef(false);
 
   const isFirstEvolution = newStage === 1;
@@ -367,24 +355,9 @@ const CompanionEvolutionContent = ({
     ? "Your companion has emerged."
     : `Your companion reached ${levelDisplay}.`;
 
-  const cleanupAudio = useCallback(() => {
-    if (!audioRef.current) return;
-
-    try {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-      audioRef.current.src = "";
-    } catch (error) {
-      log.error("Error cleaning up audio", { error });
-    } finally {
-      audioRef.current = null;
-    }
-  }, []);
-
   useEffect(() => {
     if (!isEvolving) {
       animationKeyRef.current = null;
-      voiceRequestKeyRef.current = null;
       setStrobeBeatIndex(null);
       return;
     }
@@ -461,86 +434,6 @@ const CompanionEvolutionContent = ({
   useEffect(() => {
     if (!isEvolving || !artReadiness.ready) return;
 
-    const requestKey = [
-      previousStage,
-      newStage,
-      previousImageUrl,
-      newImageUrl,
-      mentorSlug ?? "none",
-      userId ?? "none",
-    ].join("::");
-
-    if (voiceRequestKeyRef.current === requestKey) return;
-    voiceRequestKeyRef.current = requestKey;
-
-    setVoiceLine("");
-    cleanupAudio();
-    voicePlayedRef.current = false;
-
-    if (!mentorSlug || !userId) {
-      setIsLoadingVoice(false);
-      return;
-    }
-
-    let cancelled = false;
-    setIsLoadingVoice(true);
-
-    supabase.functions
-      .invoke("generate-evolution-voice", {
-        body: { mentorSlug, newStage, userId, isFirstEvolution },
-      })
-      .then(({ data, error }) => {
-        if (cancelled) return;
-        if (error) throw error;
-
-        if (data?.voiceLine) {
-          setVoiceLine(data.voiceLine);
-        } else {
-          setVoiceLine(
-            isFirstEvolution
-              ? "A new companion stands beside you."
-              : "A new form answers your companion's growth.",
-          );
-        }
-
-        if (data?.audioContent) {
-          audioRef.current = new Audio(`data:audio/mp3;base64,${data.audioContent}`);
-        }
-      })
-      .catch((error) => {
-        if (cancelled) return;
-        log.error("Failed to generate evolution voice", { error });
-        setVoiceLine(
-          isFirstEvolution
-            ? "A new companion stands beside you."
-            : "A new form answers your companion's growth.",
-        );
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setIsLoadingVoice(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    artReadiness.ready,
-    cleanupAudio,
-    isEvolving,
-    isFirstEvolution,
-    mentorSlug,
-    newImageUrl,
-    newStage,
-    previousImageUrl,
-    previousStage,
-    userId,
-  ]);
-
-  useEffect(() => {
-    if (!isEvolving || !artReadiness.ready) return;
-
     const animationKey = [
       previousStage,
       newStage,
@@ -571,7 +464,6 @@ const CompanionEvolutionContent = ({
 
     queueTimeout(() => {
       setPhase("charge");
-      playEvolutionStart();
       haptics.light();
     }, sequence.hold);
 
@@ -622,7 +514,6 @@ const CompanionEvolutionContent = ({
         element: element ?? null,
         stage: newStage,
       });
-      playEvolutionSuccess();
 
       if (!prefersReducedMotion) {
         confetti({
@@ -675,31 +566,17 @@ const CompanionEvolutionContent = ({
     triggerEvent,
   ]);
 
-  useEffect(() => {
-    if (phase !== "settle" || isLoadingVoice || !audioRef.current || voicePlayedRef.current || globalAudio.getMuted()) {
-      return;
-    }
-
-    voicePlayedRef.current = true;
-    audioRef.current.play().catch((error) => {
-      log.error("Audio play failed", { error });
-      voicePlayedRef.current = false;
-    });
-  }, [isLoadingVoice, phase]);
-
   useEffect(() => () => {
     timersRef.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
     if (emergencyTimeoutRef.current) {
       window.clearTimeout(emergencyTimeoutRef.current);
     }
-    cleanupAudio();
-  }, [cleanupAudio]);
+  }, []);
 
   const finishEvolution = useCallback(() => {
     if (dismissHandledRef.current) return;
     dismissHandledRef.current = true;
 
-    cleanupAudio();
     if (emergencyTimeoutRef.current) {
       window.clearTimeout(emergencyTimeoutRef.current);
       emergencyTimeoutRef.current = null;
@@ -710,7 +587,7 @@ const CompanionEvolutionContent = ({
     window.dispatchEvent(new CustomEvent("evolution-modal-closed"));
 
     onComplete();
-  }, [cleanupAudio, onComplete]);
+  }, [onComplete]);
 
   const handleDismiss = (event: React.MouseEvent) => {
     if (!canDismiss) {
@@ -1218,26 +1095,6 @@ const CompanionEvolutionContent = ({
                   <p className="mt-2 text-sm font-medium uppercase tracking-[0.28em] text-white/60 sm:text-base">
                     {levelDisplay}
                   </p>
-
-                  {phase === "settle" && voiceLine && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 12, scale: 0.97 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      transition={{ delay: 0.14, duration: 0.32 }}
-                      className="mx-auto mt-5 max-w-xl"
-                    >
-                      <div
-                        className="rounded-2xl border border-white/15 bg-white/8 px-5 py-4 text-left backdrop-blur-md"
-                        style={{
-                          boxShadow: `0 12px 34px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255,255,255,0.08)`,
-                        }}
-                      >
-                        <p className="text-base font-medium italic leading-relaxed text-white/94 sm:text-lg">
-                          "{voiceLine}"
-                        </p>
-                      </div>
-                    </motion.div>
-                  )}
                 </motion.div>
               )}
             </AnimatePresence>

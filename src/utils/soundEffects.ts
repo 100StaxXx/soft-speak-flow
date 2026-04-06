@@ -100,56 +100,6 @@ class SoundManager {
     return null;
   }
 
-  // Evolution sounds
-  async playEvolutionStart() {
-    if (this.shouldMute()) return;
-    await this.ensureAudioContext();
-    if (!this.audioContext) return;
-
-    // Create powerful ascending magical tones with harmonics
-    const frequencies = [220, 277, 330, 440, 554, 659, 880, 1108];
-    frequencies.forEach((freq, i) => {
-      setTimeout(() => {
-        this.createOscillator(freq, 0.2, 'sawtooth');
-        // Add harmonic
-        this.createOscillator(freq * 1.5, 0.1, 'sine');
-      }, i * 80);
-    });
-  }
-
-  async playEvolutionSuccess() {
-    if (this.shouldMute()) return;
-    await this.ensureAudioContext();
-    if (!this.audioContext) return;
-
-    // Create an epic triumphant fanfare with bass and harmonics
-    const bassTones = [130.81, 164.81, 196.00]; // C3, E3, G3
-    const chords = [
-      [523.25, 659.25, 783.99], // C5 major
-      [659.25, 830.61, 987.77], // E5 major
-      [783.99, 987.77, 1174.66], // G5 major
-      [1046.50, 1318.51, 1567.98], // C6 major - final high chord
-    ];
-    
-    // Play bass foundation
-    bassTones.forEach((freq, i) => {
-      setTimeout(() => {
-        this.createOscillator(freq, 0.4, 'sawtooth');
-      }, i * 150);
-    });
-    
-    // Play bright chords on top
-    chords.forEach((chord, i) => {
-      setTimeout(() => {
-        chord.forEach(freq => {
-          this.createOscillator(freq, 0.35, 'triangle');
-          // Add sparkle harmonics
-          this.createOscillator(freq * 2, 0.15, 'sine');
-        });
-      }, i * 180);
-    });
-  }
-
   async playSparkle() {
     if (this.shouldMute()) return;
     await this.ensureAudioContext();
@@ -466,8 +416,6 @@ class SoundManager {
 export const soundManager = new SoundManager();
 
 // Export individual sound functions for convenience
-export const playEvolutionStart = () => soundManager.playEvolutionStart();
-export const playEvolutionSuccess = () => soundManager.playEvolutionSuccess();
 export const playSparkle = () => soundManager.playSparkle();
 export const playHabitComplete = () => soundManager.playHabitComplete();
 export const playXPGain = () => soundManager.playXPGain();

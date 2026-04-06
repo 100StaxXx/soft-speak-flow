@@ -439,9 +439,7 @@ export const GlobalEvolutionListener = () => {
       newStage={evolutionData.level}
       previousImageUrl={evolutionData.previousImageUrl}
       newImageUrl={evolutionData.imageUrl}
-      mentorSlug={evolutionData.mentorSlug}
       element={evolutionData.element}
-      userId={user?.id}
       onComplete={() => {
         setIsEvolving(false);
         setEvolutionData(null);

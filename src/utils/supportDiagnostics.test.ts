@@ -53,4 +53,13 @@ describe("sanitizeSupportReportPayload", () => {
     expect(sanitized.diagnostics.recentErrorFingerprints).toHaveLength(20);
     expect(sanitized.diagnostics.recentErrorFingerprints[0]).toBe("error 10");
   });
+
+  it("preserves the feedback category while sanitizing the payload", () => {
+    const sanitized = sanitizeSupportReportPayload({
+      ...basePayload,
+      category: "feedback",
+    });
+
+    expect(sanitized.category).toBe("feedback");
+  });
 });

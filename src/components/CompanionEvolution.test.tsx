@@ -7,18 +7,9 @@ const mocks = vi.hoisted(() => ({
   prefersReducedMotion: false,
   triggerEventMock: vi.fn(),
   confettiMock: vi.fn(),
-  playEvolutionStartMock: vi.fn(),
-  playEvolutionSuccessMock: vi.fn(),
   hapticsLightMock: vi.fn(),
   hapticsMediumMock: vi.fn(),
   hapticsHeavyMock: vi.fn(),
-  invokeMock: vi.fn().mockResolvedValue({
-    data: { voiceLine: "A brighter form answers your journey." },
-    error: null,
-  }),
-  getMutedMock: vi.fn(() => false),
-  audioPlayMock: vi.fn().mockResolvedValue(undefined),
-  audioPauseMock: vi.fn(),
 }));
 
 vi.mock("canvas-confetti", () => ({
@@ -74,17 +65,6 @@ vi.mock("@/utils/haptics", () => ({
   },
 }));
 
-vi.mock("@/utils/soundEffects", () => ({
-  playEvolutionStart: mocks.playEvolutionStartMock,
-  playEvolutionSuccess: mocks.playEvolutionSuccessMock,
-}));
-
-vi.mock("@/utils/globalAudio", () => ({
-  globalAudio: {
-    getMuted: mocks.getMutedMock,
-  },
-}));
-
 vi.mock("@/hooks/useMotionProfile", () => ({
   useMotionProfile: () => ({
     profile: mocks.profile,
@@ -111,14 +91,6 @@ vi.mock("@/contexts/CompanionMotionContext", () => ({
 
 vi.mock("@/components/companion/motion/CompanionMotionLayer", () => ({
   CompanionMotionLayer: () => <div data-testid="companion-motion-layer" />,
-}));
-
-vi.mock("@/integrations/supabase/client", () => ({
-  supabase: {
-    functions: {
-      invoke: mocks.invokeMock,
-    },
-  },
 }));
 
 vi.mock("@/utils/logger", () => ({
@@ -167,6 +139,14 @@ const STROBE_BEAT_OFFSETS_MS = [
   2660,
   2800,
 ] as const;
+const FULL_DISMISSABLE_SEQUENCE_MS =
+  FULL_SEQUENCE_MS.hold
+  + FULL_SEQUENCE_MS.charge
+  + FULL_SEQUENCE_MS.conceal
+  + FULL_SEQUENCE_MS.strobe
+  + FULL_SEQUENCE_MS.apex
+  + FULL_SEQUENCE_MS.reveal
+  + FULL_SEQUENCE_MS.dismissBuffer;
 
 class MockPreloadImage {
   onload: ((event: Event) => void) | null = null;
@@ -189,22 +169,71 @@ class MockPreloadImage {
   }
 }
 
-class MockAudio {
-  currentTime = 0;
-  src = "";
-
-  pause = mocks.audioPauseMock;
-  play = mocks.audioPlayMock;
-
-  constructor(src?: string) {
-    if (src) {
-      this.src = src;
-    }
-  }
-}
-
 const originalImage = globalThis.Image;
-const originalAudio = globalThis.Audio;
+
+const installSilentEvolutionAudioGuards = () => {
+  const originalAudio = globalThis.Audio;
+  const originalAudioContext = window.AudioContext;
+  const originalWebkitAudioContext = (
+    window as typeof window & { webkitAudioContext?: typeof AudioContext }
+  ).webkitAudioContext;
+
+  const audioConstructorMock = vi.fn(() => ({
+    pause: vi.fn(),
+    play: vi.fn(),
+  }));
+  const audioContextConstructorMock = vi.fn(() => ({
+    createGain: vi.fn(),
+    createOscillator: vi.fn(),
+    currentTime: 0,
+    destination: {},
+    resume: vi.fn(),
+    state: "running",
+  }));
+
+  Object.defineProperty(globalThis, "Audio", {
+    configurable: true,
+    value: audioConstructorMock as unknown as typeof Audio,
+    writable: true,
+  });
+  Object.defineProperty(window, "AudioContext", {
+    configurable: true,
+    value: audioContextConstructorMock as unknown as typeof AudioContext,
+    writable: true,
+  });
+  Object.defineProperty(window, "webkitAudioContext", {
+    configurable: true,
+    value: audioContextConstructorMock as unknown as typeof AudioContext,
+    writable: true,
+  });
+
+  const restoreProperty = <K extends "Audio" | "AudioContext">(
+    target: typeof globalThis | typeof window,
+    key: K | "webkitAudioContext",
+    value: unknown,
+  ) => {
+    if (typeof value === "undefined") {
+      delete (target as Record<string, unknown>)[key];
+      return;
+    }
+
+    Object.defineProperty(target, key, {
+      configurable: true,
+      value,
+      writable: true,
+    });
+  };
+
+  return {
+    audioConstructorMock,
+    audioContextConstructorMock,
+    restore: () => {
+      restoreProperty(globalThis, "Audio", originalAudio);
+      restoreProperty(window, "AudioContext", originalAudioContext);
+      restoreProperty(window, "webkitAudioContext", originalWebkitAudioContext);
+    },
+  };
+};
 
 const flushTimers = async (ms = 0) => {
   await act(async () => {
@@ -225,8 +254,6 @@ const buildProps = () => ({
   newStage: 5,
   previousImageUrl: "https://example.com/stage-4.png",
   newImageUrl: "https://example.com/stage-5.png",
-  mentorSlug: "sage",
-  userId: "user-1",
   element: "fire",
   onComplete: vi.fn(),
 });
@@ -236,10 +263,8 @@ describe("CompanionEvolution", () => {
     vi.useFakeTimers();
     mocks.profile = "balanced";
     mocks.prefersReducedMotion = false;
-    mocks.getMutedMock.mockReturnValue(false);
 
     globalThis.Image = MockPreloadImage as unknown as typeof Image;
-    globalThis.Audio = MockAudio as unknown as typeof Audio;
   });
 
   afterEach(() => {
@@ -247,7 +272,6 @@ describe("CompanionEvolution", () => {
     vi.clearAllTimers();
     vi.useRealTimers();
     globalThis.Image = originalImage;
-    globalThis.Audio = originalAudio;
   });
 
   it("locks dismissal until the settle beat and dispatches completion events once", async () => {
@@ -373,6 +397,60 @@ describe("CompanionEvolution", () => {
     expect(mocks.hapticsMediumMock).not.toHaveBeenCalled();
   });
 
+  it("stays silent during the first hatch evolution while keeping haptics", async () => {
+    const props = buildProps();
+    const { audioConstructorMock, audioContextConstructorMock, restore } = installSilentEvolutionAudioGuards();
+
+    try {
+      render(
+        <CompanionEvolution
+          {...props}
+          previousStage={0}
+          newStage={1}
+          previousImageUrl="https://example.com/egg.png"
+          newImageUrl="https://example.com/hatchling.png"
+        />,
+      );
+      await prepareEvolution();
+
+      const dialog = screen.getByRole("alertdialog");
+      await flushTimers(FULL_DISMISSABLE_SEQUENCE_MS);
+      expect(screen.getByText("Tap anywhere to continue")).toBeInTheDocument();
+
+      fireEvent.click(dialog);
+
+      expect(props.onComplete).toHaveBeenCalledTimes(1);
+      expect(audioConstructorMock).not.toHaveBeenCalled();
+      expect(audioContextConstructorMock).not.toHaveBeenCalled();
+      expect(mocks.hapticsLightMock).toHaveBeenCalled();
+    } finally {
+      restore();
+    }
+  });
+
+  it("stays silent during later evolution cinematics while keeping haptics", async () => {
+    const props = buildProps();
+    const { audioConstructorMock, audioContextConstructorMock, restore } = installSilentEvolutionAudioGuards();
+
+    try {
+      render(<CompanionEvolution {...props} />);
+      await prepareEvolution();
+
+      const dialog = screen.getByRole("alertdialog");
+      await flushTimers(FULL_DISMISSABLE_SEQUENCE_MS);
+      expect(screen.getByText("Tap anywhere to continue")).toBeInTheDocument();
+
+      fireEvent.click(dialog);
+
+      expect(props.onComplete).toHaveBeenCalledTimes(1);
+      expect(audioConstructorMock).not.toHaveBeenCalled();
+      expect(audioContextConstructorMock).not.toHaveBeenCalled();
+      expect(mocks.hapticsLightMock).toHaveBeenCalled();
+    } finally {
+      restore();
+    }
+  });
+
   it("shows hatch visuals during first evolution", async () => {
     render(
       <CompanionEvolution
@@ -488,8 +566,6 @@ describe("CompanionEvolution", () => {
     await flushTimers(FULL_SEQUENCE_MS.apex);
     expect(dialog).toHaveAttribute("data-phase", "reveal");
     expect(mocks.hapticsMediumMock).toHaveBeenCalledTimes(4);
-    expect(mocks.playEvolutionStartMock).toHaveBeenCalledTimes(1);
-    expect(mocks.playEvolutionSuccessMock).toHaveBeenCalledTimes(1);
   });
 
   it("still allows emergency exit during the longer cinematic sequence", async () => {
@@ -510,8 +586,7 @@ describe("CompanionEvolution", () => {
     await prepareEvolution();
     await flushTimers(FULL_SEQUENCE_MS.hold);
 
-    expect(mocks.playEvolutionStartMock).toHaveBeenCalledTimes(1);
-    expect(mocks.invokeMock).toHaveBeenCalledTimes(1);
+    expect(mocks.hapticsLightMock).toHaveBeenCalledTimes(1);
 
     rerender(<CompanionEvolution {...props} />);
 
@@ -523,9 +598,8 @@ describe("CompanionEvolution", () => {
       FULL_SEQUENCE_MS.reveal,
     );
 
-    expect(mocks.playEvolutionStartMock).toHaveBeenCalledTimes(1);
-    expect(mocks.playEvolutionSuccessMock).toHaveBeenCalledTimes(1);
+    expect(mocks.hapticsLightMock).toHaveBeenCalledTimes(1);
     expect(mocks.triggerEventMock).toHaveBeenCalledTimes(1);
-    expect(mocks.invokeMock).toHaveBeenCalledTimes(1);
+    expect(mocks.confettiMock).toHaveBeenCalledTimes(1);
   });
 });

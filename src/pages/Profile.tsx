@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { User, Users, Repeat, LogOut, BookHeart, FileText, Shield, Gift, Trash2, Sparkles, HelpCircle, ChevronRight, ExternalLink, type LucideIcon } from "lucide-react";
+import { User, Users, Repeat, LogOut, BookHeart, FileText, Shield, Gift, Trash2, Sparkles, HelpCircle, ChevronRight, ExternalLink, MessageSquare, type LucideIcon } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -506,6 +506,28 @@ const Profile = () => {
                 </CardHeader>
                 <CardContent>
                   <ResetCompanionButton />
+                </CardContent>
+              </Card>
+
+              {/* Feedback */}
+              <Card className="border-border/50">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <MessageSquare className="h-4 w-4 text-primary" />
+                    Feedback
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    Share ideas, feature requests, or anything that needs attention.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Button
+                    onClick={() => navigate("/support/report", { state: { defaultCategory: "feedback" } })}
+                    variant="outline"
+                    className="w-full"
+                  >
+                    Send Feedback
+                  </Button>
                 </CardContent>
               </Card>
 

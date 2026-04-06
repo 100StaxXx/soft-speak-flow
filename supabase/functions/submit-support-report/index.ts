@@ -1,7 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { errorResponse, handleCors, jsonResponse } from "../_shared/cors.ts";
 
-const ALLOWED_CATEGORIES = new Set(["bug", "billing", "sync", "performance", "other"]);
+export const ALLOWED_CATEGORIES = new Set(["bug", "billing", "sync", "performance", "feedback", "other"]);
 const MAX_SUMMARY_LENGTH = 500;
 const MAX_TEXT_LENGTH = 8000;
 const MAX_CORRELATION_ID_LENGTH = 128;
@@ -24,7 +24,7 @@ const normalizeText = (value: unknown, maxLength: number): string => {
   return value.trim().slice(0, maxLength);
 };
 
-const parsePayload = (raw: unknown): { payload: NormalizedPayload | null; error: string | null } => {
+export const parsePayload = (raw: unknown): { payload: NormalizedPayload | null; error: string | null } => {
   if (!raw || typeof raw !== "object") {
     return { payload: null, error: "Invalid payload" };
   }
@@ -81,87 +81,89 @@ const parsePayload = (raw: unknown): { payload: NormalizedPayload | null; error:
   };
 };
 
-Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return handleCors(req);
-  }
-
-  if (req.method !== "POST") {
-    return errorResponse(req, "Method not allowed", 405);
-  }
-
-  const supabaseUrl = Deno.env.get("SUPABASE_URL");
-  const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
-  const authHeader = req.headers.get("Authorization");
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    console.error("[submit-support-report] Missing Supabase environment variables");
-    return errorResponse(req, "Server misconfigured", 500);
-  }
-
-  if (!authHeader) {
-    return errorResponse(req, "Unauthorized", 401);
-  }
-
-  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-    global: {
-      headers: {
-        Authorization: authHeader,
-      },
-    },
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-    },
-  });
-
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    console.warn("[submit-support-report] Failed auth check", userError);
-    return errorResponse(req, "Unauthorized", 401);
-  }
-
-  let rawPayload: unknown;
-  try {
-    rawPayload = await req.json();
-  } catch (_error) {
-    return errorResponse(req, "Invalid JSON payload", 400);
-  }
-
-  const { payload, error } = parsePayload(rawPayload);
-  if (error || !payload) {
-    return errorResponse(req, error ?? "Invalid payload", 400);
-  }
-
-  const { error: insertError } = await supabase.from("support_reports").insert({
-    user_id: user.id,
-    correlation_id: payload.correlationId,
-    category: payload.category,
-    summary: payload.summary,
-    reproduction_steps: payload.reproductionSteps,
-    expected_behavior: payload.expectedBehavior,
-    actual_behavior: payload.actualBehavior,
-    screenshot_data_url: payload.screenshotDataUrl,
-    consent_diagnostics: payload.consentDiagnostics,
-    diagnostics: payload.diagnostics,
-  });
-
-  if (insertError) {
-    if (insertError.code === "23505") {
-      return jsonResponse(req, { success: true, duplicate: true });
+if (Deno.env.get("SUPABASE_FUNCTIONS_TEST") !== "1") {
+  Deno.serve(async (req) => {
+    if (req.method === "OPTIONS") {
+      return handleCors(req);
     }
 
-    console.error("[submit-support-report] Insert failed", {
-      code: insertError.code,
-      message: insertError.message,
-      details: insertError.details,
-    });
-    return errorResponse(req, "Unable to submit support report", 500);
-  }
+    if (req.method !== "POST") {
+      return errorResponse(req, "Method not allowed", 405);
+    }
 
-  return jsonResponse(req, { success: true });
-});
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
+    const authHeader = req.headers.get("Authorization");
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      console.error("[submit-support-report] Missing Supabase environment variables");
+      return errorResponse(req, "Server misconfigured", 500);
+    }
+
+    if (!authHeader) {
+      return errorResponse(req, "Unauthorized", 401);
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: {
+          Authorization: authHeader,
+        },
+      },
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+    });
+
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      console.warn("[submit-support-report] Failed auth check", userError);
+      return errorResponse(req, "Unauthorized", 401);
+    }
+
+    let rawPayload: unknown;
+    try {
+      rawPayload = await req.json();
+    } catch (_error) {
+      return errorResponse(req, "Invalid JSON payload", 400);
+    }
+
+    const { payload, error } = parsePayload(rawPayload);
+    if (error || !payload) {
+      return errorResponse(req, error ?? "Invalid payload", 400);
+    }
+
+    const { error: insertError } = await supabase.from("support_reports").insert({
+      user_id: user.id,
+      correlation_id: payload.correlationId,
+      category: payload.category,
+      summary: payload.summary,
+      reproduction_steps: payload.reproductionSteps,
+      expected_behavior: payload.expectedBehavior,
+      actual_behavior: payload.actualBehavior,
+      screenshot_data_url: payload.screenshotDataUrl,
+      consent_diagnostics: payload.consentDiagnostics,
+      diagnostics: payload.diagnostics,
+    });
+
+    if (insertError) {
+      if (insertError.code === "23505") {
+        return jsonResponse(req, { success: true, duplicate: true });
+      }
+
+      console.error("[submit-support-report] Insert failed", {
+        code: insertError.code,
+        message: insertError.message,
+        details: insertError.details,
+      });
+      return errorResponse(req, "Unable to submit support report", 500);
+    }
+
+    return jsonResponse(req, { success: true });
+  });
+}
