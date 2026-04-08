@@ -7875,6 +7875,7 @@ export type Database = {
       }
       wallpaper_assets: {
         Row: {
+          batch_label: string | null
           created_at: string
           desktop_focus_x: number
           desktop_focus_y: number
@@ -7896,8 +7897,10 @@ export type Database = {
           storage_path: string
           updated_at: string
           validation_result: Json
+          variant_key: string | null
         }
         Insert: {
+          batch_label?: string | null
           created_at?: string
           desktop_focus_x?: number
           desktop_focus_y?: number
@@ -7919,8 +7922,10 @@ export type Database = {
           storage_path: string
           updated_at?: string
           validation_result?: Json
+          variant_key?: string | null
         }
         Update: {
+          batch_label?: string | null
           created_at?: string
           desktop_focus_x?: number
           desktop_focus_y?: number
@@ -7942,6 +7947,7 @@ export type Database = {
           storage_path?: string
           updated_at?: string
           validation_result?: Json
+          variant_key?: string | null
         }
         Relationships: []
       }

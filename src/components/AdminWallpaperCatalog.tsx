@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { toast } from "@/components/ui/sonner";
 import {
+  formatWallpaperVariantLabel,
   getWallpaperDateKey,
   wallpaperGenerationSpecs,
   type WallpaperPageKey,
@@ -42,8 +43,13 @@ export const AdminWallpaperCatalog = () => {
   const [assets, setAssets] = useState<WallpaperAssetRow[]>([]);
   const [liveAssignments, setLiveAssignments] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
+  const [isGeneratingBacklog, setIsGeneratingBacklog] = useState(false);
   const [mutatingId, setMutatingId] = useState<string | null>(null);
   const todayKey = useMemo(() => getWallpaperDateKey(), []);
+  const latestBatchLabel = useMemo(
+    () => assets.find((asset) => typeof asset.batch_label === "string" && asset.batch_label.length > 0)?.batch_label ?? null,
+    [assets],
+  );
 
   const fetchCatalog = useCallback(async () => {
     setLoading(true);
@@ -86,6 +92,30 @@ export const AdminWallpaperCatalog = () => {
 
   useEffect(() => {
     void fetchCatalog();
+  }, [fetchCatalog]);
+
+  const generateLandscapeBacklog = useCallback(async () => {
+    setIsGeneratingBacklog(true);
+
+    const { data, error } = await supabase.functions.invoke("generate-wallpaper-backlog", {
+      body: {
+        batchPreset: "landscape-diverse-v1",
+        promoteNow: true,
+      },
+    });
+
+    if (error) {
+      console.error("Failed to generate wallpaper backlog:", error);
+      toast.error("Failed to generate the wallpaper backlog");
+      setIsGeneratingBacklog(false);
+      return;
+    }
+
+    const acceptedCount = typeof data?.acceptedCount === "number" ? data.acceptedCount : 0;
+    const promotedCount = Array.isArray(data?.promoted) ? data.promoted.length : 0;
+    toast.success(`Generated ${acceptedCount} ready wallpapers. Promoted ${promotedCount} live today.`);
+    setIsGeneratingBacklog(false);
+    await fetchCatalog();
   }, [fetchCatalog]);
 
   const setAssetState = useCallback(async (asset: WallpaperAssetRow, publishState: WallpaperPublishState) => {
@@ -152,10 +182,20 @@ export const AdminWallpaperCatalog = () => {
             Auto-live daily scenic wallpapers for the core tabs. Current catalog day: {todayKey}.
           </p>
         </div>
-        <Button variant="outline" className="rounded-full" onClick={() => void fetchCatalog()} disabled={loading}>
-          {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
-          Refresh
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            className="rounded-full"
+            onClick={() => void generateLandscapeBacklog()}
+            disabled={loading || isGeneratingBacklog}
+          >
+            {isGeneratingBacklog ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Sparkles className="h-4 w-4 mr-2" />}
+            Generate 10 Landscapes
+          </Button>
+          <Button variant="outline" className="rounded-full" onClick={() => void fetchCatalog()} disabled={loading || isGeneratingBacklog}>
+            {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {loading ? (
@@ -176,7 +216,14 @@ export const AdminWallpaperCatalog = () => {
           const rejectionReasons = Array.isArray(validation.rejectionReasons) ? validation.rejectionReasons : [];
           const notes = Array.isArray(validation.notes) ? validation.notes : [];
           const isLiveToday = liveAssignments[asset.page_key] === asset.id;
+          const isPromotedFromLatestBatch = Boolean(
+            latestBatchLabel
+            && asset.batch_label
+            && asset.batch_label === latestBatchLabel
+            && isLiveToday,
+          );
           const isBusy = mutatingId === asset.id;
+          const variantLabel = formatWallpaperVariantLabel(asset.variant_key);
 
           return (
             <div
@@ -205,6 +252,11 @@ export const AdminWallpaperCatalog = () => {
                       Live today
                     </span>
                   ) : null}
+                  {isPromotedFromLatestBatch ? (
+                    <span className="rounded-full bg-emerald-500/15 text-emerald-300 px-3 py-1 text-xs font-medium border border-emerald-400/20">
+                      Promoted live
+                    </span>
+                  ) : null}
                 </div>
 
                 <div className="grid gap-2 text-sm text-muted-foreground md:grid-cols-2">
@@ -212,6 +264,8 @@ export const AdminWallpaperCatalog = () => {
                   <div>Generated for: <span className="text-foreground">{asset.generation_date}</span></div>
                   <div>Prompt version: <span className="text-foreground">{asset.prompt_version}</span></div>
                   <div>Model: <span className="text-foreground">{asset.render_model}</span></div>
+                  {asset.batch_label ? <div>Batch: <span className="text-foreground">{asset.batch_label}</span></div> : null}
+                  {variantLabel ? <div>Variant: <span className="text-foreground">{variantLabel}</span></div> : null}
                 </div>
 
                 <div className="grid gap-2 rounded-2xl bg-muted/20 p-3 text-sm md:grid-cols-2">

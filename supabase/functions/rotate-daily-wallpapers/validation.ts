@@ -7,7 +7,9 @@ const DEFAULT_VALIDATION_RESULT: WallpaperValidationResult = {
   approved: false,
   hasReadableText: false,
   hasUiOverlay: false,
+  hasPurpleDominance: false,
   safeZonesClear: false,
+  safeZoneConfidenceScore: 0,
   scenicQualityScore: 0,
   detailScore: 0,
   contrastScore: 0,
@@ -33,19 +35,23 @@ ${spec.pageDescription}
 Review the image for:
 1. Readable text, letters, logos, or watermark-like marks
 2. UI-like overlays, mockup chrome, browser bars, forms, buttons, or fake app screens
-3. Scenic quality and overall beauty
-4. Detail level and image fidelity
-5. Contrast/readability suitability for dark translucent cards
-6. Whether the page mood matches the target mood above
-7. Whether the top header zone, middle content zone, and bottom nav zone stay visually usable
-8. Recommend a strong focal point for mobile and desktop object-position percentages
+3. Whether purple or pink dominates the sky, fog, water, or terrain
+4. Scenic quality and overall beauty
+5. Detail level and image fidelity
+6. Contrast/readability suitability for dark translucent cards
+7. Whether the page mood matches the target mood above
+8. Whether the top header zone, middle content zone, and bottom nav zone stay visually usable
+9. How confident you are that the safe zones remain visually usable
+10. Recommend a strong focal point for mobile and desktop object-position percentages
 
 Respond with ONLY valid JSON using this exact schema:
 {
   "approved": true,
   "hasReadableText": false,
   "hasUiOverlay": false,
+  "hasPurpleDominance": false,
   "safeZonesClear": true,
+  "safeZoneConfidenceScore": 0,
   "scenicQualityScore": 0,
   "detailScore": 0,
   "contrastScore": 0,
@@ -60,7 +66,7 @@ Respond with ONLY valid JSON using this exact schema:
 
 Rules:
 - Scores are 0 to 100.
-- Set approved to false if there is any readable text, any UI overlay, unsafe composition, scenicQualityScore below 72, detailScore below 68, contrastScore below 60, or moodMatchScore below 72.
+- Set approved to false if there is any readable text, any UI overlay, purple/pink dominance, unsafe composition, scenicQualityScore below 72, detailScore below 68, contrastScore below 60, or moodMatchScore below 72.
 - Keep notes concise.
 - If approved is true, rejectionReasons must be an empty array.
 `;
@@ -103,7 +109,9 @@ export const normalizeWallpaperValidationResult = (
     approved: Boolean(base.approved),
     hasReadableText: Boolean(base.hasReadableText),
     hasUiOverlay: Boolean(base.hasUiOverlay),
+    hasPurpleDominance: Boolean(base.hasPurpleDominance),
     safeZonesClear: Boolean(base.safeZonesClear),
+    safeZoneConfidenceScore: clampScore(base.safeZoneConfidenceScore),
     scenicQualityScore: clampScore(base.scenicQualityScore),
     detailScore: clampScore(base.detailScore),
     contrastScore: clampScore(base.contrastScore),
@@ -118,7 +126,7 @@ export const normalizeWallpaperValidationResult = (
 };
 
 export const isWallpaperValidationAcceptable = (result: WallpaperValidationResult) => {
-  if (result.hasReadableText || result.hasUiOverlay || !result.safeZonesClear) {
+  if (result.hasReadableText || result.hasUiOverlay || result.hasPurpleDominance || !result.safeZonesClear) {
     return false;
   }
 

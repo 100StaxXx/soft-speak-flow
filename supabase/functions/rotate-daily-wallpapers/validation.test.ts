@@ -24,7 +24,9 @@ Deno.test("parseWallpaperValidationResult normalizes fenced JSON payloads", () =
   "approved": true,
   "hasReadableText": false,
   "hasUiOverlay": false,
+  "hasPurpleDominance": false,
   "safeZonesClear": true,
+  "safeZoneConfidenceScore": 89,
   "scenicQualityScore": 91,
   "detailScore": 84,
   "contrastScore": 72,
@@ -42,7 +44,7 @@ Deno.test("parseWallpaperValidationResult normalizes fenced JSON payloads", () =
     throw new Error("Expected parsed validation to remain approved");
   }
 
-  if (parsed.mobileFocusX !== 44.7 || parsed.desktopFocusY !== 30.4) {
+  if (parsed.mobileFocusX !== 44.7 || parsed.desktopFocusY !== 30.4 || parsed.safeZoneConfidenceScore !== 89) {
     throw new Error(`Unexpected normalized focus values: ${JSON.stringify(parsed)}`);
   }
 });
@@ -50,7 +52,9 @@ Deno.test("parseWallpaperValidationResult normalizes fenced JSON payloads", () =
 Deno.test("isWallpaperValidationAcceptable rejects text, UI, and weak scenic quality", () => {
   const valid = normalizeWallpaperValidationResult({
     approved: true,
+    hasPurpleDominance: false,
     safeZonesClear: true,
+    safeZoneConfidenceScore: 88,
     scenicQualityScore: 85,
     detailScore: 80,
     contrastScore: 70,
@@ -64,7 +68,9 @@ Deno.test("isWallpaperValidationAcceptable rejects text, UI, and weak scenic qua
   const rejected = normalizeWallpaperValidationResult({
     approved: true,
     hasReadableText: true,
+    hasPurpleDominance: false,
     safeZonesClear: true,
+    safeZoneConfidenceScore: 88,
     scenicQualityScore: 85,
     detailScore: 80,
     contrastScore: 70,
@@ -73,5 +79,20 @@ Deno.test("isWallpaperValidationAcceptable rejects text, UI, and weak scenic qua
 
   if (isWallpaperValidationAcceptable(rejected)) {
     throw new Error("Expected readable text to force rejection");
+  }
+
+  const purpleDominant = normalizeWallpaperValidationResult({
+    approved: true,
+    hasPurpleDominance: true,
+    safeZonesClear: true,
+    safeZoneConfidenceScore: 88,
+    scenicQualityScore: 85,
+    detailScore: 80,
+    contrastScore: 70,
+    moodMatchScore: 90,
+  });
+
+  if (isWallpaperValidationAcceptable(purpleDominant)) {
+    throw new Error("Expected purple dominance to force rejection");
   }
 });
