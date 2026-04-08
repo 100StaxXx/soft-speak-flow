@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   cinematicPageBackgrounds,
@@ -12,6 +12,11 @@ const mocks = vi.hoisted(() => ({
   maxParticles: 24,
   isBackgrounded: false,
   prefersReducedMotion: false,
+  wallpaper: null as null | {
+    imageUrl: string;
+    mobileObjectPosition: string;
+    desktopObjectPosition: string;
+  },
 }));
 
 vi.mock("@/contexts/MainTabVisibilityContext", () => ({
@@ -54,6 +59,15 @@ vi.mock("@/hooks/useTimeColors", () => ({
   }),
 }));
 
+vi.mock("@/hooks/useLiveWallpaper", () => ({
+  useLiveWallpaper: () => ({
+    dateKey: "2026-04-08",
+    wallpaper: mocks.wallpaper,
+    isLoading: false,
+    error: null,
+  }),
+}));
+
 import { CinematicPageBackground } from "@/components/CinematicPageBackground";
 
 describe("CinematicPageBackground", () => {
@@ -64,6 +78,7 @@ describe("CinematicPageBackground", () => {
     mocks.maxParticles = 24;
     mocks.isBackgrounded = false;
     mocks.prefersReducedMotion = false;
+    mocks.wallpaper = null;
   });
 
   afterEach(() => {
@@ -106,5 +121,45 @@ describe("CinematicPageBackground", () => {
     render(<CinematicPageBackground preset="quests" />);
 
     expect(screen.getByTestId("cinematic-background")).toHaveAttribute("data-cinematic-motion", "static");
+  });
+
+  it("uses a remote live wallpaper when one is available", () => {
+    mocks.wallpaper = {
+      imageUrl: "https://example.com/wallpaper.png",
+      mobileObjectPosition: "41% 27%",
+      desktopObjectPosition: "45% 31%",
+    };
+
+    render(<CinematicPageBackground preset="campaigns" />);
+
+    expect(screen.getByTestId("cinematic-background")).toHaveAttribute("data-cinematic-source", "remote");
+    expect(screen.getByTestId("cinematic-background-image-mobile")).toHaveAttribute(
+      "src",
+      "https://example.com/wallpaper.png",
+    );
+    expect(screen.getByTestId("cinematic-background-image-mobile")).toHaveStyle({
+      objectPosition: "41% 27%",
+    });
+  });
+
+  it("falls back to the bundled seed wallpaper if the live image fails to load", () => {
+    mocks.wallpaper = {
+      imageUrl: "https://example.com/broken-wallpaper.png",
+      mobileObjectPosition: "41% 27%",
+      desktopObjectPosition: "45% 31%",
+    };
+
+    render(<CinematicPageBackground preset="campaigns" />);
+
+    fireEvent.error(screen.getByTestId("cinematic-background-image-mobile"));
+
+    expect(screen.getByTestId("cinematic-background")).toHaveAttribute("data-cinematic-source", "seed");
+    expect(screen.getByTestId("cinematic-background-image-mobile")).toHaveAttribute(
+      "src",
+      cinematicPageBackgrounds.campaigns.background.src,
+    );
+    expect(screen.getByTestId("cinematic-background-image-mobile")).toHaveStyle({
+      objectPosition: cinematicPageBackgrounds.campaigns.mobileObjectPosition,
+    });
   });
 });

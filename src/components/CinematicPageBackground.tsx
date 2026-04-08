@@ -1,10 +1,12 @@
-import { memo, useCallback, useEffect, useMemo, useRef, type CSSProperties } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import {
   cinematicPageBackgrounds,
+  createRemoteBackgroundAsset,
   type CinematicPageBackgroundKey,
 } from "@/assets/backgrounds";
 import { StaticBackgroundImage } from "@/components/StaticBackgroundImage";
 import { useMainTabVisibility } from "@/contexts/MainTabVisibilityContext";
+import { useLiveWallpaper } from "@/hooks/useLiveWallpaper";
 import { useMotionProfile } from "@/hooks/useMotionProfile";
 import { useDeviceOrientation } from "@/hooks/useDeviceOrientation";
 import { useTimeColors } from "@/hooks/useTimeColors";
@@ -42,11 +44,13 @@ const generateAmbientStars = (count: number): AmbientStar[] => (
 export const CinematicPageBackground = memo(({ preset }: CinematicPageBackgroundProps) => {
   const presetConfig = cinematicPageBackgrounds[preset];
   const { isTabActive } = useMainTabVisibility();
+  const { wallpaper } = useLiveWallpaper(preset, isTabActive);
   const { capabilities, signals } = useMotionProfile();
   const { colors } = useTimeColors();
   const rootRef = useRef<HTMLDivElement>(null);
   const parallaxRafRef = useRef<number | null>(null);
   const parallaxTargetRef = useRef({ x: 0, y: 0 });
+  const [hasRemoteLoadError, setHasRemoteLoadError] = useState(false);
   const isNativeIOS = useMemo(() => {
     if (typeof window === "undefined") return false;
     const capacitor = (window as Window & {
@@ -118,6 +122,10 @@ export const CinematicPageBackground = memo(({ preset }: CinematicPageBackground
     };
   }, []);
 
+  useEffect(() => {
+    setHasRemoteLoadError(false);
+  }, [wallpaper?.imageUrl]);
+
   const imageStyle = useMemo<CSSProperties>(() => ({
     transform: shouldRunParallax
       ? "translate3d(calc(var(--cinematic-parallax-x, 0) * -14px), calc(var(--cinematic-parallax-y, 0) * -12px), 0) scale(1.05)"
@@ -125,6 +133,21 @@ export const CinematicPageBackground = memo(({ preset }: CinematicPageBackground
     transition: "transform 220ms ease-out",
     willChange: shouldRunParallax ? "transform" : undefined,
   }), [shouldRunParallax]);
+
+  const backgroundAsset = useMemo(() => {
+    if (!wallpaper?.imageUrl || hasRemoteLoadError) {
+      return presetConfig.background;
+    }
+    return createRemoteBackgroundAsset(wallpaper.imageUrl);
+  }, [hasRemoteLoadError, presetConfig.background, wallpaper?.imageUrl]);
+
+  const mobileObjectPosition = hasRemoteLoadError || !wallpaper
+    ? presetConfig.mobileObjectPosition
+    : wallpaper.mobileObjectPosition;
+  const desktopObjectPosition = hasRemoteLoadError || !wallpaper
+    ? presetConfig.desktopObjectPosition
+    : wallpaper.desktopObjectPosition;
+  const backgroundSource = !wallpaper?.imageUrl || hasRemoteLoadError ? "seed" : "remote";
 
   const overlayStrength = presetConfig.overlayStrength;
   const topScrimAlpha = Math.min(0.82, 0.26 + overlayStrength * 0.42);
@@ -139,23 +162,26 @@ export const CinematicPageBackground = memo(({ preset }: CinematicPageBackground
       className="fixed inset-0 -z-10 overflow-hidden pointer-events-none"
       data-testid="cinematic-background"
       data-cinematic-background={preset}
+      data-cinematic-source={backgroundSource}
       data-cinematic-motion={motionMode}
       data-cinematic-parallax={shouldRunParallax ? "enabled" : "disabled"}
     >
       <div className="absolute inset-0 bg-background" />
 
       <StaticBackgroundImage
-        background={presetConfig.background}
+        background={backgroundAsset}
         className="absolute inset-0 h-full w-full object-cover select-none md:hidden"
-        objectPosition={presetConfig.mobileObjectPosition}
+        objectPosition={mobileObjectPosition}
         style={imageStyle}
+        onError={() => setHasRemoteLoadError(true)}
         testId="cinematic-background-image-mobile"
       />
       <StaticBackgroundImage
-        background={presetConfig.background}
+        background={backgroundAsset}
         className="absolute inset-0 hidden h-full w-full object-cover select-none md:block"
-        objectPosition={presetConfig.desktopObjectPosition}
+        objectPosition={desktopObjectPosition}
         style={imageStyle}
+        onError={() => setHasRemoteLoadError(true)}
         testId="cinematic-background-image-desktop"
       />
 

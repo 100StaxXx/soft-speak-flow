@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactEventHandler } from "react";
 import { getStaticBackgroundSrcSet, type StaticBackgroundAsset } from "@/assets/backgrounds";
 
 interface StaticBackgroundImageProps {
@@ -6,6 +6,7 @@ interface StaticBackgroundImageProps {
   className?: string;
   style?: CSSProperties;
   objectPosition?: CSSProperties["objectPosition"];
+  onError?: ReactEventHandler<HTMLImageElement>;
   testId?: string;
 }
 
@@ -17,6 +18,7 @@ export const StaticBackgroundImage = ({
   className,
   style,
   objectPosition,
+  onError,
   testId,
 }: StaticBackgroundImageProps) => (
   <img
@@ -30,6 +32,7 @@ export const StaticBackgroundImage = ({
     decoding="async"
     loading="eager"
     style={{ objectPosition, ...style }}
+    onError={onError}
     data-testid={testId}
   />
 );

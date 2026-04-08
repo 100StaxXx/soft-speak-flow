@@ -2,7 +2,7 @@ const OPENAI_CHAT_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions"
 const OPENAI_IMAGE_GENERATIONS_URL = "https://api.openai.com/v1/images/generations";
 
 const DEFAULT_IMAGE_SIZE = "1536x1024";
-export const ALLOWED_IMAGE_SIZES = ["1024x1024", "1536x1024"] as const;
+export const ALLOWED_IMAGE_SIZES = ["1024x1024", "1536x1024", "1024x1536"] as const;
 export type SupportedImageSize = (typeof ALLOWED_IMAGE_SIZES)[number];
 
 function getEnv(name: string): string | undefined {

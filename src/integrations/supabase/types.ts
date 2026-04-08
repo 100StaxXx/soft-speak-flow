@@ -2612,6 +2612,44 @@ export type Database = {
           },
         ]
       }
+      daily_wallpaper_assignments: {
+        Row: {
+          assignment_source: string
+          created_at: string
+          for_date: string
+          id: string
+          page_key: string
+          updated_at: string
+          wallpaper_asset_id: string
+        }
+        Insert: {
+          assignment_source?: string
+          created_at?: string
+          for_date: string
+          id?: string
+          page_key: string
+          updated_at?: string
+          wallpaper_asset_id: string
+        }
+        Update: {
+          assignment_source?: string
+          created_at?: string
+          for_date?: string
+          id?: string
+          page_key?: string
+          updated_at?: string
+          wallpaper_asset_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_wallpaper_assignments_wallpaper_asset_id_fkey"
+            columns: ["wallpaper_asset_id"]
+            isOneToOne: false
+            referencedRelation: "wallpaper_assets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       downloads: {
         Row: {
           content_id: string
@@ -7834,6 +7872,78 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      wallpaper_assets: {
+        Row: {
+          created_at: string
+          desktop_focus_x: number
+          desktop_focus_y: number
+          generated_at: string
+          generation_date: string
+          generation_error: string | null
+          id: string
+          image_height: number
+          image_url: string
+          image_width: number
+          mobile_focus_x: number
+          mobile_focus_y: number
+          page_key: string
+          prompt_text: string
+          prompt_version: number
+          publish_state: string
+          render_model: string
+          source_kind: string
+          storage_path: string
+          updated_at: string
+          validation_result: Json
+        }
+        Insert: {
+          created_at?: string
+          desktop_focus_x?: number
+          desktop_focus_y?: number
+          generated_at?: string
+          generation_date: string
+          generation_error?: string | null
+          id?: string
+          image_height: number
+          image_url: string
+          image_width: number
+          mobile_focus_x?: number
+          mobile_focus_y?: number
+          page_key: string
+          prompt_text: string
+          prompt_version?: number
+          publish_state?: string
+          render_model: string
+          source_kind?: string
+          storage_path: string
+          updated_at?: string
+          validation_result?: Json
+        }
+        Update: {
+          created_at?: string
+          desktop_focus_x?: number
+          desktop_focus_y?: number
+          generated_at?: string
+          generation_date?: string
+          generation_error?: string | null
+          id?: string
+          image_height?: number
+          image_url?: string
+          image_width?: number
+          mobile_focus_x?: number
+          mobile_focus_y?: number
+          page_key?: string
+          prompt_text?: string
+          prompt_version?: number
+          publish_state?: string
+          render_model?: string
+          source_kind?: string
+          storage_path?: string
+          updated_at?: string
+          validation_result?: Json
+        }
+        Relationships: []
       }
       weekly_recaps: {
         Row: {

@@ -1,24 +1,22 @@
-import cosmicPath1 from './cosmic-path-1.png';
-import cosmicPath1_2x from './cosmic-path-1@2x.png';
-import cosmicPath2 from './cosmic-path-2.png';
-import cosmicPath2_2x from './cosmic-path-2@2x.png';
-import cosmicGalaxyPortal from './cosmic-galaxy-portal.png';
-import cosmicGalaxyPortal_2x from './cosmic-galaxy-portal@2x.png';
-import cosmicWelcome from './cosmic-welcome.png';
-import cosmicWelcome_2x from './cosmic-welcome@2x.png';
-import cosmicSignin from './cosmic-signin.png';
-import cosmicSignin_2x from './cosmic-signin@2x.png';
+import cosmicWelcome from "./cosmic-welcome.png";
+import cosmicWelcome_2x from "./cosmic-welcome@2x.png";
+import cosmicSignin from "./cosmic-signin.png";
+import cosmicSignin_2x from "./cosmic-signin@2x.png";
+import wallpaperQuestsSeed from "./wallpaper-quests-seed.webp";
+import wallpaperQuestsSeed_2x from "./wallpaper-quests-seed@2x.webp";
+import wallpaperCampaignsSeed from "./wallpaper-campaigns-seed.jpg";
+import wallpaperCampaignsSeed_2x from "./wallpaper-campaigns-seed@2x.jpg";
+import {
+  wallpaperGenerationSpecs,
+  type WallpaperPageKey,
+} from "@/shared/wallpaperCatalog";
 
 export interface StaticBackgroundAsset {
   src: string;
   src2x: string;
 }
 
-export type CinematicPageBackgroundKey =
-  | "quests"
-  | "campaigns"
-  | "companion"
-  | "profile";
+export type CinematicPageBackgroundKey = WallpaperPageKey;
 
 export interface CinematicPageBackgroundPreset {
   background: StaticBackgroundAsset;
@@ -28,55 +26,55 @@ export interface CinematicPageBackgroundPreset {
   showCosmicOverlay: boolean;
 }
 
-const createBackgroundAsset = (src: string, src2x: string): StaticBackgroundAsset => ({
+export const createBackgroundAsset = (src: string, src2x = src): StaticBackgroundAsset => ({
   src,
   src2x,
 });
 
-const cosmicPath1Asset = createBackgroundAsset(cosmicPath1, cosmicPath1_2x);
-const cosmicPath2Asset = createBackgroundAsset(cosmicPath2, cosmicPath2_2x);
-const cosmicGalaxyPortalAsset = createBackgroundAsset(cosmicGalaxyPortal, cosmicGalaxyPortal_2x);
+export const createRemoteBackgroundAsset = (src: string): StaticBackgroundAsset => createBackgroundAsset(src, src);
 
-// Specific backgrounds for key screens
 export const welcomeBackground = createBackgroundAsset(cosmicWelcome, cosmicWelcome_2x);
 export const signinBackground = createBackgroundAsset(cosmicSignin, cosmicSignin_2x);
+export const questsSeedBackground = createBackgroundAsset(wallpaperQuestsSeed, wallpaperQuestsSeed_2x);
+export const campaignsSeedBackground = createBackgroundAsset(wallpaperCampaignsSeed, wallpaperCampaignsSeed_2x);
 
 export const cinematicPageBackgrounds: Record<CinematicPageBackgroundKey, CinematicPageBackgroundPreset> = {
   quests: {
-    background: cosmicPath1Asset,
-    mobileObjectPosition: "52% 34%",
-    desktopObjectPosition: "50% 42%",
-    overlayStrength: 0.62,
-    showCosmicOverlay: true,
+    background: questsSeedBackground,
+    mobileObjectPosition: `${wallpaperGenerationSpecs.quests.mobileFocus.x}% ${wallpaperGenerationSpecs.quests.mobileFocus.y}%`,
+    desktopObjectPosition: `${wallpaperGenerationSpecs.quests.desktopFocus.x}% ${wallpaperGenerationSpecs.quests.desktopFocus.y}%`,
+    overlayStrength: wallpaperGenerationSpecs.quests.overlayStrength,
+    showCosmicOverlay: wallpaperGenerationSpecs.quests.showCosmicOverlay,
   },
   campaigns: {
-    background: cosmicGalaxyPortalAsset,
-    mobileObjectPosition: "50% 38%",
-    desktopObjectPosition: "50% 46%",
-    overlayStrength: 0.68,
-    showCosmicOverlay: true,
+    background: campaignsSeedBackground,
+    mobileObjectPosition: `${wallpaperGenerationSpecs.campaigns.mobileFocus.x}% ${wallpaperGenerationSpecs.campaigns.mobileFocus.y}%`,
+    desktopObjectPosition: `${wallpaperGenerationSpecs.campaigns.desktopFocus.x}% ${wallpaperGenerationSpecs.campaigns.desktopFocus.y}%`,
+    overlayStrength: wallpaperGenerationSpecs.campaigns.overlayStrength,
+    showCosmicOverlay: wallpaperGenerationSpecs.campaigns.showCosmicOverlay,
   },
   companion: {
-    background: welcomeBackground,
-    mobileObjectPosition: "52% 24%",
-    desktopObjectPosition: "50% 30%",
-    overlayStrength: 0.72,
-    showCosmicOverlay: true,
+    background: signinBackground,
+    mobileObjectPosition: `${wallpaperGenerationSpecs.companion.mobileFocus.x}% ${wallpaperGenerationSpecs.companion.mobileFocus.y}%`,
+    desktopObjectPosition: `${wallpaperGenerationSpecs.companion.desktopFocus.x}% ${wallpaperGenerationSpecs.companion.desktopFocus.y}%`,
+    overlayStrength: wallpaperGenerationSpecs.companion.overlayStrength,
+    showCosmicOverlay: wallpaperGenerationSpecs.companion.showCosmicOverlay,
   },
   profile: {
-    background: cosmicPath2Asset,
-    mobileObjectPosition: "50% 42%",
-    desktopObjectPosition: "50% 46%",
-    overlayStrength: 0.7,
-    showCosmicOverlay: false,
+    background: welcomeBackground,
+    mobileObjectPosition: `${wallpaperGenerationSpecs.profile.mobileFocus.x}% ${wallpaperGenerationSpecs.profile.mobileFocus.y}%`,
+    desktopObjectPosition: `${wallpaperGenerationSpecs.profile.desktopFocus.x}% ${wallpaperGenerationSpecs.profile.desktopFocus.y}%`,
+    overlayStrength: wallpaperGenerationSpecs.profile.overlayStrength,
+    showCosmicOverlay: wallpaperGenerationSpecs.profile.showCosmicOverlay,
   },
 };
 
-// Legacy backgrounds for other uses
+// Legacy scenic fallbacks for other surfaces that still want bundled atmosphere.
 export const cosmicPathBackgrounds = [
-  cosmicGalaxyPortalAsset,
-  cosmicPath1Asset,
-  cosmicPath2Asset,
+  questsSeedBackground,
+  campaignsSeedBackground,
+  welcomeBackground,
+  signinBackground,
 ];
 
 export const getRandomBackground = () => {

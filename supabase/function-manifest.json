@@ -84,6 +84,7 @@
     "generate-neglected-companion-image",
     "google-native-auth",
     "init-quest-attachment-upload",
+    "rotate-daily-wallpapers",
     "send-apns-notification",
     "sync-daily-pep-talk-transcript",
     "transcribe-audio"
@@ -93,7 +94,8 @@
     "generate-daily-mentor-pep-talks",
     "generate-tomorrow-pep-talks",
     "notifications-dispatch-v2",
-    "notifications-enqueue-v2"
+    "notifications-enqueue-v2",
+    "rotate-daily-wallpapers"
   ],
   "allowList": [
     "adjust-epic-plan",
@@ -178,6 +180,7 @@
     "resolve-streak-freeze",
     "retry-failed-payouts",
     "retry-missing-pep-talk-transcripts",
+    "rotate-daily-wallpapers",
     "schedule-daily-mentor-pushes",
     "send-apns-notification",
     "send-shout-notification",

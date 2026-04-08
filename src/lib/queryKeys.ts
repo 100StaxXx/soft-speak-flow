@@ -126,6 +126,12 @@ export const queryKeys = {
     byUser: (userId: string) => ['activity-feed', userId] as const,
   },
 
+  wallpapers: {
+    all: ['wallpapers'] as const,
+    live: (pageKey: string, dateKey: string) => ['wallpapers', 'live', pageKey, dateKey] as const,
+    catalog: () => ['wallpapers', 'catalog'] as const,
+  },
+
   analytics: {
     habits: (userId: string) => ['analytics-habits', userId] as const,
     moods: (userId: string) => ['analytics-moods', userId] as const,

@@ -16,6 +16,7 @@ import { AdminReferralConfig } from "@/components/AdminReferralConfig";
 import { AdminReferralAnalytics } from "@/components/AdminReferralAnalytics";
 import { EvolutionCardFlip } from "@/components/EvolutionCardFlip";
 import { AdminCompanionImageTester } from "@/components/AdminCompanionImageTester";
+import { AdminWallpaperCatalog } from "@/components/AdminWallpaperCatalog";
 import { globalAudio } from "@/utils/globalAudio";
 import { downloadImage } from "@/utils/imageDownload";
 
@@ -542,6 +543,9 @@ const Admin = () => {
 
         {/* Companion Image Tester */}
         <AdminCompanionImageTester />
+
+        {/* Wallpaper Catalog */}
+        <AdminWallpaperCatalog />
 
         {/* Sample Card Generator */}
         <Card className="p-6 mb-8 rounded-3xl shadow-soft">
