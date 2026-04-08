@@ -231,6 +231,164 @@ const setOnline = (online: boolean) => {
   });
 };
 
+type MockToggleTaskRemoteState = {
+  completed_at: string | null;
+  task_text: string;
+  habit_source_id: string | null;
+  task_date: string;
+  difficulty: string | null;
+  scheduled_time: string | null;
+  category: string | null;
+  is_main_quest: boolean | null;
+  xp_reward: number;
+  contact_id: string | null;
+  auto_log_interaction: boolean | null;
+  contact: null | {
+    id: string;
+    name: string;
+    avatar_url: string | null;
+  };
+};
+
+const buildToggleTaskRemoteState = (
+  overrides: Partial<MockToggleTaskRemoteState> = {},
+): MockToggleTaskRemoteState => ({
+  completed_at: null,
+  task_text: "Ship feature",
+  habit_source_id: null,
+  task_date: "2026-02-20",
+  difficulty: "medium",
+  scheduled_time: "09:00",
+  category: "mind",
+  is_main_quest: false,
+  xp_reward: 16,
+  contact_id: null,
+  auto_log_interaction: true,
+  contact: null,
+  ...overrides,
+});
+
+const mockToggleTaskCompletionFlow = ({
+  completionReads,
+  updateResult = { data: [{ id: "task-1", completed: true }], error: null },
+}: {
+  completionReads: Array<MockToggleTaskRemoteState | null>;
+  updateResult?: { data: Array<{ id: string; completed: boolean }> | null; error: null };
+}) => {
+  let completionReadCount = 0;
+  const completionSelectMaybeSingleMock = vi.fn().mockImplementation(() => {
+    const nextRead = completionReads[Math.min(completionReadCount, completionReads.length - 1)] ?? null;
+    completionReadCount += 1;
+    return Promise.resolve({
+      data: nextRead,
+      error: null,
+    });
+  });
+  const completionUpdateSelectMock = vi.fn().mockResolvedValue(updateResult);
+
+  mocks.fromMock.mockImplementation((table: string) => {
+    if (table === "daily_tasks") {
+      return {
+        select: vi.fn((selection?: string) => {
+          if (selection?.includes("completed_at")) {
+            return {
+              eq: vi.fn(() => ({
+                eq: vi.fn(() => ({
+                  maybeSingle: completionSelectMaybeSingleMock,
+                })),
+              })),
+            };
+          }
+
+          if (selection?.includes("task_date, scheduled_time, habit_source_id, source")) {
+            return {
+              eq: vi.fn(() => ({
+                eq: vi.fn(() => ({
+                  maybeSingle: mocks.dailyTasksFetchSchedulingSingleMock,
+                })),
+              })),
+            };
+          }
+
+          if (selection === "*") {
+            return {
+              eq: vi.fn(() => ({
+                eq: vi.fn(() => ({
+                  maybeSingle: mocks.dailyTasksFetchByIdMaybeSingleMock,
+                })),
+              })),
+            };
+          }
+
+          return {
+            eq: vi.fn(() => ({
+              eq: mocks.dailyTasksCountExecuteMock,
+              is: mocks.dailyTasksCountExecuteMock,
+            })),
+          };
+        }),
+        insert: mocks.dailyTasksInsertMock,
+        delete: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            eq: mocks.dailyTasksDeleteExecuteMock,
+          })),
+        })),
+        update: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                select: completionUpdateSelectMock,
+              })),
+            })),
+          })),
+        })),
+      };
+    }
+
+    if (table === "task_attachments") {
+      return {
+        delete: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            eq: mocks.taskAttachmentsDeleteExecuteMock,
+          })),
+        })),
+        insert: mocks.taskAttachmentsInsertExecuteMock,
+      };
+    }
+
+    if (table === "subtasks") {
+      return {
+        insert: vi.fn().mockResolvedValue({ error: null }),
+      };
+    }
+
+    return {
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          eq: vi.fn(),
+          is: vi.fn(),
+        })),
+      })),
+      insert: vi.fn(),
+      delete: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          eq: vi.fn(),
+        })),
+      })),
+      update: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          eq: vi.fn(),
+        })),
+      })),
+    };
+  });
+
+  return {
+    completionSelectMaybeSingleMock,
+    completionUpdateSelectMock,
+  };
+};
+
 describe("isTaskAttachmentsTableMissingError", () => {
   it("returns true for missing task_attachments schema-cache errors", () => {
     expect(isTaskAttachmentsTableMissingError(taskAttachmentsMissingTableError)).toBe(true);
@@ -1017,123 +1175,8 @@ describe("useTaskMutations attachment handling", () => {
     setOnline(true);
     mocks.awardCustomXPMock.mockResolvedValueOnce({ xpAwarded: 16 });
 
-    const completionSelectMaybeSingleMock = vi.fn().mockResolvedValue({
-      data: {
-        completed_at: null,
-        task_text: "Ship feature",
-        habit_source_id: null,
-        task_date: "2026-02-20",
-        difficulty: "medium",
-        scheduled_time: "09:00",
-        category: "mind",
-        is_main_quest: false,
-        xp_reward: 16,
-        contact_id: null,
-        auto_log_interaction: true,
-        contact: null,
-      },
-      error: null,
-    });
-    const completionUpdateSelectMock = vi.fn().mockResolvedValue({
-      data: [{ id: "task-1", completed: true }],
-      error: null,
-    });
-
-    mocks.fromMock.mockImplementation((table: string) => {
-      if (table === "daily_tasks") {
-        return {
-          select: vi.fn((selection?: string) => {
-            if (selection?.includes("completed_at")) {
-              return {
-                eq: vi.fn(() => ({
-                  eq: vi.fn(() => ({
-                    maybeSingle: completionSelectMaybeSingleMock,
-                  })),
-                })),
-              };
-            }
-
-            if (selection?.includes("task_date, scheduled_time, habit_source_id, source")) {
-              return {
-                eq: vi.fn(() => ({
-                  eq: vi.fn(() => ({
-                    maybeSingle: mocks.dailyTasksFetchSchedulingSingleMock,
-                  })),
-                })),
-              };
-            }
-
-            if (selection === "*") {
-              return {
-                eq: vi.fn(() => ({
-                  eq: vi.fn(() => ({
-                    maybeSingle: mocks.dailyTasksFetchByIdMaybeSingleMock,
-                  })),
-                })),
-              };
-            }
-
-            return {
-              eq: vi.fn(() => ({
-                eq: mocks.dailyTasksCountExecuteMock,
-                is: mocks.dailyTasksCountExecuteMock,
-              })),
-            };
-          }),
-          insert: mocks.dailyTasksInsertMock,
-          delete: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              eq: mocks.dailyTasksDeleteExecuteMock,
-            })),
-          })),
-          update: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              eq: vi.fn(() => ({
-                eq: vi.fn(() => ({
-                  select: completionUpdateSelectMock,
-                })),
-              })),
-            })),
-          })),
-        };
-      }
-
-      if (table === "task_attachments") {
-        return {
-          delete: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              eq: mocks.taskAttachmentsDeleteExecuteMock,
-            })),
-          })),
-          insert: mocks.taskAttachmentsInsertExecuteMock,
-        };
-      }
-
-      if (table === "subtasks") {
-        return {
-          insert: vi.fn().mockResolvedValue({ error: null }),
-        };
-      }
-
-      return {
-        select: vi.fn(() => ({
-          eq: vi.fn(() => ({
-            eq: vi.fn(),
-            is: vi.fn(),
-          })),
-        })),
-        insert: vi.fn(),
-        delete: vi.fn(() => ({
-          eq: vi.fn(() => ({
-            eq: vi.fn(),
-          })),
-        })),
-        update: vi.fn(() => ({
-          eq: vi.fn(() => ({
-            eq: vi.fn(),
-          })),
-        })),
-      };
+    const { completionUpdateSelectMock } = mockToggleTaskCompletionFlow({
+      completionReads: [buildToggleTaskRemoteState()],
     });
 
     const { result } = renderHook(() => useTaskMutations("2026-02-20"), {
@@ -1165,6 +1208,122 @@ describe("useTaskMutations attachment handling", () => {
     }));
     expect(completionToastCall?.[0].action.props.altText).toBe("Undo completion");
     expect(completionToastCall?.[0].action.props.children).toBe("Undo");
+    expect(completionUpdateSelectMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("silently reconciles when the quest is already completed before the mutation starts", async () => {
+    setOnline(true);
+    const alreadyCompletedAt = "2026-02-20T09:45:00.000Z";
+    const { completionUpdateSelectMock } = mockToggleTaskCompletionFlow({
+      completionReads: [
+        buildToggleTaskRemoteState({
+          completed_at: alreadyCompletedAt,
+        }),
+      ],
+    });
+
+    const { result } = renderHook(() => useTaskMutations("2026-02-20"), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      result.current.toggleTask({
+        taskId: "task-1",
+        completed: true,
+        xpReward: 16,
+      });
+    });
+
+    await waitFor(() => {
+      expect(mocks.upsertPlannerRecordMock).toHaveBeenCalledWith(
+        "daily_tasks",
+        expect.objectContaining({
+          id: "task-1",
+          completed: true,
+          completed_at: alreadyCompletedAt,
+        }),
+      );
+    });
+
+    expect(completionUpdateSelectMock).not.toHaveBeenCalled();
+    expect(mocks.awardCustomXPMock).not.toHaveBeenCalled();
+    expect(mocks.toastMock.mock.calls.find(([toastArg]) => toastArg?.title === "Failed to toggle quest")).toBeUndefined();
+    expect(mocks.toastMock.mock.calls.find(([toastArg]) => toastArg?.title === "Quest completed! ✨")).toBeUndefined();
+  });
+
+  it("reconciles when the guarded completion update returns zero rows but a refetch shows completion", async () => {
+    setOnline(true);
+    const reconciledCompletedAt = "2026-02-20T10:05:00.000Z";
+    const { completionSelectMaybeSingleMock, completionUpdateSelectMock } = mockToggleTaskCompletionFlow({
+      completionReads: [
+        buildToggleTaskRemoteState(),
+        buildToggleTaskRemoteState({
+          completed_at: reconciledCompletedAt,
+        }),
+      ],
+      updateResult: { data: [], error: null },
+    });
+
+    const { result } = renderHook(() => useTaskMutations("2026-02-20"), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      result.current.toggleTask({
+        taskId: "task-1",
+        completed: true,
+        xpReward: 16,
+      });
+    });
+
+    await waitFor(() => {
+      expect(mocks.upsertPlannerRecordMock).toHaveBeenCalledWith(
+        "daily_tasks",
+        expect.objectContaining({
+          id: "task-1",
+          completed: true,
+          completed_at: reconciledCompletedAt,
+        }),
+      );
+    });
+
+    expect(completionSelectMaybeSingleMock).toHaveBeenCalledTimes(2);
+    expect(completionUpdateSelectMock).toHaveBeenCalledTimes(1);
+    expect(mocks.awardCustomXPMock).not.toHaveBeenCalled();
+    expect(mocks.toastMock.mock.calls.find(([toastArg]) => toastArg?.title === "Failed to toggle quest")).toBeUndefined();
+    expect(mocks.toastMock.mock.calls.find(([toastArg]) => toastArg?.title === "Quest completed! ✨")).toBeUndefined();
+  });
+
+  it("still shows a destructive toast when completion cannot be confirmed after a zero-row update", async () => {
+    setOnline(true);
+    mockToggleTaskCompletionFlow({
+      completionReads: [
+        buildToggleTaskRemoteState(),
+        buildToggleTaskRemoteState(),
+      ],
+      updateResult: { data: [], error: null },
+    });
+
+    const { result } = renderHook(() => useTaskMutations("2026-02-20"), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      result.current.toggleTask({
+        taskId: "task-1",
+        completed: true,
+        xpReward: 16,
+      });
+    });
+
+    await waitFor(() => {
+      expect(mocks.toastMock).toHaveBeenCalledWith(expect.objectContaining({
+        title: "Failed to toggle quest",
+        variant: "destructive",
+      }));
+    }, { timeout: 4000 });
+
+    expect(mocks.awardCustomXPMock).not.toHaveBeenCalled();
   });
 
   it("normalizes legacy prefixed task IDs before remote quest updates", async () => {

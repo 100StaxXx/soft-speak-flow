@@ -142,4 +142,44 @@ describe("ProtectedRoute post-tutorial gating", () => {
 
     expect(screen.getByText("Paywall:trial_expired")).toBeInTheDocument();
   });
+
+  it("drops the paywall as soon as refreshed promo access is present", async () => {
+    profileState.profile = {
+      ...profileState.profile,
+      onboarding_data: {
+        guided_tutorial: { completed: true },
+      },
+    };
+
+    const { rerender } = renderRoute();
+
+    expect(screen.getByText("Paywall:pre_trial_signup")).toBeInTheDocument();
+
+    accessState.accessState = {
+      has_access: true,
+      access_source: "promo_code",
+      trial_ends_at: null,
+      subscribed: true,
+    };
+
+    rerender(
+      <MemoryRouter initialEntries={["/companion"]}>
+        <Routes>
+          <Route
+            path="/companion"
+            element={
+              <ProtectedRoute>
+                <div>Tutorial Complete Screen</div>
+              </ProtectedRoute>
+            }
+          />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Tutorial Complete Screen")).toBeInTheDocument();
+    });
+    expect(screen.queryByText("Paywall:pre_trial_signup")).not.toBeInTheDocument();
+  });
 });

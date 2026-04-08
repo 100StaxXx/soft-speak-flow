@@ -3,6 +3,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   navigate: vi.fn(),
+  location: {
+    pathname: "/companion",
+    search: "?view=full",
+    hash: "#today",
+  },
   toast: vi.fn(),
   signOut: vi.fn(),
   handlePurchase: vi.fn(),
@@ -21,6 +26,7 @@ vi.mock("react-router-dom", async () => {
   return {
     ...actual,
     useNavigate: () => mocks.navigate,
+    useLocation: () => mocks.location,
   };
 });
 
@@ -73,6 +79,11 @@ const openDeleteDialog = () => {
 describe("TrialExpiredPaywall layout", () => {
   beforeEach(() => {
     mocks.navigate.mockReset();
+    mocks.location = {
+      pathname: "/companion",
+      search: "?view=full",
+      hash: "#today",
+    };
     mocks.toast.mockReset();
     mocks.signOut.mockReset();
     mocks.handlePurchase.mockReset();
@@ -101,6 +112,16 @@ describe("TrialExpiredPaywall layout", () => {
     expect(root.className).toContain("pb-[var(--bottom-nav-runtime-offset,var(--bottom-nav-safe-offset))]");
     expect(screen.getByRole("button", { name: "Sign out" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Delete account" })).toBeInTheDocument();
+  });
+
+  it("passes the blocked route through to promo redemption", () => {
+    render(<TrialExpiredPaywall variant="pre_trial_signup" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Redeem Promo Code" }));
+
+    expect(mocks.navigate).toHaveBeenCalledWith("/promo-code", {
+      state: { returnTo: "/companion?view=full#today" },
+    });
   });
 
   it("submits account deletion on the first focused-input activation", async () => {

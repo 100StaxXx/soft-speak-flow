@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { queryKeys } from '@/lib/queryKeys';
 import {
   purchaseProduct,
   restorePurchases,
@@ -255,8 +256,7 @@ export function useAppleSubscription() {
 
       if (error) throw error;
 
-      // Invalidate subscription cache to unlock app immediately
-      await queryClient.invalidateQueries({ queryKey: ['subscription'] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.access.detail(user.id) });
 
       toast({
         title: "Success!",
@@ -370,8 +370,7 @@ export function useAppleSubscription() {
         throw error;
       }
 
-      // Invalidate subscription cache to unlock app immediately
-      await queryClient.invalidateQueries({ queryKey: ['subscription'] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.access.detail(user.id) });
 
       toast({
         title: "Restored!",

@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, lazy, Suspense, useRef } from 'react';
+import { useState, useCallback, useEffect, lazy, Suspense, useRef, useMemo } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import {
   AlertDialog,
@@ -31,6 +31,8 @@ import { MiniGameSkeleton } from '@/components/skeletons';
 import type { BossBattleContext } from '@/types/narrativeTypes';
 import { X } from 'lucide-react';
 import { isFullscreenEncounterGame } from './fullscreenGames';
+import { resolveCompanionVisualAssetUrl } from '@/lib/companionAssetResolver';
+import { getBundledCompanionImageFocalPoint } from '@/lib/companionImageFocal';
 
 // Lazy load mini-games for bundle optimization
 const EnergyBeamGame = lazy(() => import('./EnergyBeamGame').then(m => ({ default: m.EnergyBeamGame })));
@@ -127,6 +129,21 @@ export const AstralEncounterModal = ({
       ? normalizeCompanionName(companion?.cached_creature_name)
       : null)
     ?? 'Companion';
+
+  const encounterCompanionVisual = useMemo(() => {
+    const resolvedImageUrl = resolveCompanionVisualAssetUrl(companion, 'normal')
+      ?? companion?.current_image_url
+      ?? undefined;
+    const bundledFocal = getBundledCompanionImageFocalPoint(resolvedImageUrl);
+
+    return {
+      imageUrl: resolvedImageUrl,
+      focalX: bundledFocal?.x ?? companion?.current_image_focal_x ?? null,
+      focalY: bundledFocal?.y ?? companion?.current_image_focal_y ?? null,
+    };
+  }, [
+    companion,
+  ]);
 
   // Initialize battle state
   const {
@@ -570,9 +587,9 @@ export const AstralEncounterModal = ({
                     <BattleVSScreen 
                       adversary={adversary}
                       adversaryImageUrl={adversaryImageUrl || undefined}
-                      companionImageUrl={companion?.current_image_url || undefined}
-                      companionImageFocalX={companion?.current_image_focal_x ?? null}
-                      companionImageFocalY={companion?.current_image_focal_y ?? null}
+                      companionImageUrl={encounterCompanionVisual.imageUrl}
+                      companionImageFocalX={encounterCompanionVisual.focalX}
+                      companionImageFocalY={encounterCompanionVisual.focalY}
                       companionName={resolvedCompanionName}
                       companionStage={companion?.current_stage || 0}
                       onReady={handleBeginBattle}
@@ -671,9 +688,9 @@ export const AstralEncounterModal = ({
                           : undefined
                       }
                       tiltBonus={finalResult.tiltBonus}
-                      companionImageUrl={companion?.current_image_url || undefined}
-                      companionImageFocalX={companion?.current_image_focal_x ?? null}
-                      companionImageFocalY={companion?.current_image_focal_y ?? null}
+                      companionImageUrl={encounterCompanionVisual.imageUrl}
+                      companionImageFocalX={encounterCompanionVisual.focalX}
+                      companionImageFocalY={encounterCompanionVisual.focalY}
                       companionName={resolvedCompanionName}
                     />
                   </motion.div>

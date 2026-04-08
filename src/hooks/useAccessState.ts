@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { queryKeys } from "@/lib/queryKeys";
 import { useAuth } from "./useAuth";
 
 export type AccessSource = "subscription" | "promo_code" | "trial" | "manual" | "none";
@@ -26,7 +27,7 @@ export function useAccessState() {
   const { user, loading: authLoading } = useAuth();
 
   const query = useQuery({
-    queryKey: ["access-state", user?.id],
+    queryKey: user ? queryKeys.access.detail(user.id) : queryKeys.access.all,
     queryFn: async (): Promise<AccessState> => {
       if (!user) return DEFAULT_ACCESS_STATE;
 

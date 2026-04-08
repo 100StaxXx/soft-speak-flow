@@ -48,6 +48,11 @@ export const queryKeys = {
     all: ['profile'] as const,
     detail: (userId: string) => ['profile', userId] as const,
   },
+
+  access: {
+    all: ['access-state'] as const,
+    detail: (userId: string) => ['access-state', userId] as const,
+  },
   
   subscription: {
     all: ['subscription'] as const,

@@ -2,6 +2,7 @@ import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { queryKeys } from "@/lib/queryKeys";
 
 const mocks = vi.hoisted(() => ({
   toast: vi.fn(),
@@ -148,6 +149,23 @@ describe("useAppleSubscription", () => {
     });
   });
 
+  it("refreshes the access-state query after a successful purchase", async () => {
+    const { result } = renderHook(() => useAppleSubscription(), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await result.current.handlePurchase("cosmiq_premium_monthly");
+    });
+
+    expect(mocks.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: queryKeys.access.detail("11111111-1111-4111-8111-111111111111"),
+    });
+    expect(mocks.invalidateQueries).not.toHaveBeenCalledWith({
+      queryKey: queryKeys.subscription.all,
+    });
+  });
+
   it("preserves actionable Apple binding errors during purchase", async () => {
     mocks.invoke.mockResolvedValue({
       data: null,
@@ -215,6 +233,23 @@ describe("useAppleSubscription", () => {
       title: "Restore Failed",
       description: "Premium subscriptions are temporarily unavailable. Please try again later.",
       variant: "destructive",
+    });
+  });
+
+  it("refreshes the access-state query after a successful restore", async () => {
+    const { result } = renderHook(() => useAppleSubscription(), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await result.current.handleRestore();
+    });
+
+    expect(mocks.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: queryKeys.access.detail("11111111-1111-4111-8111-111111111111"),
+    });
+    expect(mocks.invalidateQueries).not.toHaveBeenCalledWith({
+      queryKey: queryKeys.subscription.all,
     });
   });
 });

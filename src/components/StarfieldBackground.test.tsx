@@ -101,6 +101,7 @@ describe("StarfieldBackground", () => {
 
     expect(mousemoveRegistrations).toHaveLength(0);
     expect(container.firstElementChild).toHaveAttribute("data-starfield-mode", "inactive");
+    expect(container.firstElementChild).toHaveAttribute("data-starfield-scene", "default");
   });
 
   it("attaches mousemove listeners in active enhanced mode", () => {
@@ -113,5 +114,24 @@ describe("StarfieldBackground", () => {
 
     expect(mousemoveRegistrations.length).toBeGreaterThan(0);
     expect(container.firstElementChild).toHaveAttribute("data-starfield-mode", "full");
+  });
+
+  it("renders scene-aware overlays when a scenic variant is selected", () => {
+    const { container } = render(<StarfieldBackground scene="quests-tempest" />);
+
+    expect(container.firstElementChild).toHaveAttribute("data-starfield-scene", "quests-tempest");
+    expect(
+      container.querySelector('[data-starfield-scene-layer="quests-tempest"]'),
+    ).toHaveAttribute("data-starfield-scene-motion", "animated");
+  });
+
+  it("keeps scenic layers static in lite mode", () => {
+    mocks.allowBackgroundAnimation = false;
+
+    const { container } = render(<StarfieldBackground scene="campaigns-summit" />);
+    expect(container.firstElementChild).toHaveAttribute("data-starfield-mode", "lite");
+    expect(
+      container.querySelector('[data-starfield-scene-layer="campaigns-summit"]'),
+    ).toHaveAttribute("data-starfield-scene-motion", "static");
   });
 });

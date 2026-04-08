@@ -8,7 +8,6 @@ import { getProductForPlan, getPurchaseProductIdForPlan } from "@/utils/appleIAP
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { useNavigate } from "react-router-dom";
 import { deleteCurrentAccount, isAccountDeletionAuthError } from "@/services/accountDeletion";
 import {
   AlertDialog,
@@ -20,6 +19,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
+import { useLocation, useNavigate } from "react-router-dom";
 
 type PlanType = "monthly" | "yearly";
 export type TrialGateVariant = "pre_trial_signup" | "trial_expired";
@@ -59,7 +59,9 @@ export const TrialExpiredPaywall = ({ variant = "pre_trial_signup" }: TrialExpir
   const { toast } = useToast();
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
+  const returnTo = `${location.pathname}${location.search}${location.hash}`;
 
   const monthlyProduct = useMemo(() => getProductForPlan("monthly", products), [products]);
   const yearlyProduct = useMemo(() => getProductForPlan("yearly", products), [products]);
@@ -360,7 +362,7 @@ export const TrialExpiredPaywall = ({ variant = "pre_trial_signup" }: TrialExpir
 
         <Button
           variant="outline"
-          onClick={() => navigate("/promo-code")}
+          onClick={() => navigate("/promo-code", { state: { returnTo } })}
           className="w-full"
         >
           Redeem Promo Code

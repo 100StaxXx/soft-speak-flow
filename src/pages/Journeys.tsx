@@ -987,7 +987,7 @@ const Journeys = () => {
 
   return (
     <PageTransition mode="instant">
-      <StarfieldBackground />
+      <StarfieldBackground scene="quests-tempest" />
       <div
         className={cn(
           "min-h-screen pb-nav-safe pt-safe px-4 relative z-10",

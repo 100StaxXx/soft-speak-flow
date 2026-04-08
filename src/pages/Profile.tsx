@@ -349,9 +349,9 @@ const Profile = () => {
 
   return (
     <PageTransition>
-      <StarfieldBackground />
-      
-      <div className="min-h-screen pb-nav-safe relative">
+      <StarfieldBackground scene="profile-observatory" />
+
+      <div className="min-h-screen pb-nav-safe relative z-10">
         {/* Header with hidden dev trigger */}
         <div className="sticky top-0 z-40 cosmiq-glass-header safe-area-top">
           <div className="max-w-2xl mx-auto px-4 py-4">

@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { queryKeys } from "@/lib/queryKeys";
 import { useAuth } from "./useAuth";
 import {
   parseFunctionInvokeError,
@@ -199,9 +200,11 @@ export const usePromoCode = () => {
       return result;
     },
     onSuccess: async () => {
+      if (!user?.id) return;
+
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["subscription"] }),
-        queryClient.invalidateQueries({ queryKey: ["profile"] }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.access.detail(user.id) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.profile.all }),
       ]);
     },
   });

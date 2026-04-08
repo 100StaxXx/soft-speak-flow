@@ -1,5 +1,5 @@
 import { FormEvent, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Gift } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,11 +7,30 @@ import { Input } from "@/components/ui/input";
 import { usePromoCode, PromoCodeRedeemError } from "@/hooks/usePromoCode";
 import { toast } from "@/components/ui/sonner";
 
+interface PromoCodeRedeemLocationState {
+  returnTo?: string;
+}
+
+const getPromoCodeSuccessPath = (state: PromoCodeRedeemLocationState | null): string => {
+  const returnTo = state?.returnTo;
+  if (
+    typeof returnTo === "string" &&
+    returnTo.startsWith("/") &&
+    !returnTo.startsWith("/promo-code")
+  ) {
+    return returnTo;
+  }
+
+  return "/profile";
+};
+
 const PromoCodeRedeem = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { redeemPromoCode } = usePromoCode();
   const [code, setCode] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const successPath = getPromoCodeSuccessPath(location.state as PromoCodeRedeemLocationState | null);
 
   const isSubmitting = redeemPromoCode.isPending;
   const sanitizedCode = useMemo(() => code.trim().toUpperCase(), [code]);
@@ -27,7 +46,7 @@ const PromoCodeRedeem = () => {
     try {
       await redeemPromoCode.mutateAsync(sanitizedCode);
       toast.success("Promo code applied. Access unlocked.");
-      navigate("/profile", { replace: true });
+      navigate(successPath, { replace: true });
     } catch (error) {
       if (error instanceof PromoCodeRedeemError) {
         setErrorMessage(error.message);
@@ -85,3 +104,4 @@ const PromoCodeRedeem = () => {
 };
 
 export default PromoCodeRedeem;
+export { getPromoCodeSuccessPath };

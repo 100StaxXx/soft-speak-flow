@@ -65,7 +65,7 @@ const Campaigns = () => {
 
   return (
     <PageTransition mode="instant">
-      <StarfieldBackground />
+      <StarfieldBackground scene="campaigns-summit" />
       <div className="min-h-screen pb-nav-safe pt-safe px-4 relative z-10">
         <div className="mx-auto w-full max-w-[1120px]">
           <motion.div

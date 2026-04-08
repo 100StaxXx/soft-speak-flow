@@ -575,7 +575,7 @@ const Companion = () => {
   return (
     <PageTransition mode="instant">
       <CompanionErrorBoundary>
-        <StarfieldBackground />
+        <StarfieldBackground scene="companion-sanctuary" />
         <div className="min-h-screen pb-nav-safe relative z-10" data-tour="companion-page">
           {/* Fixed header - won't move on iOS overscroll */}
           <header className="fixed top-0 left-0 right-0 z-40 w-full cosmiq-glass-header safe-area-top">

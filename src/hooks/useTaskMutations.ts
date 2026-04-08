@@ -149,6 +149,32 @@ type TaskCompletionDisciplineAward =
   | { kind: "planned_task_on_time"; taskId: string }
   | null;
 
+type ToggleTaskRemoteState = {
+  completed_at: string | null;
+  task_text: string;
+  habit_source_id: string | null;
+  task_date: string | null;
+  difficulty: string | null;
+  scheduled_time: string | null;
+  category: string | null;
+  is_main_quest: boolean | null;
+  xp_reward: number | null;
+  contact_id: string | null;
+  auto_log_interaction: boolean | null;
+  contact?: {
+    id: string;
+    name: string;
+    avatar_url: string | null;
+  } | null;
+};
+
+const TOGGLE_TASK_REMOTE_STATE_SELECT = `
+  completed_at, task_text, habit_source_id, task_date, difficulty, scheduled_time, category,
+  is_main_quest, xp_reward,
+  contact_id, auto_log_interaction,
+  contact:contacts!contact_id(id, name, avatar_url)
+`;
+
 export const isTaskCompletionOnTime = (scheduledTime: string | null, completedAt: Date): boolean | null => {
   if (!scheduledTime) return null;
   const scheduledHour = Number.parseInt(scheduledTime.split(":")[0] ?? "", 10);
@@ -645,6 +671,63 @@ export const useTaskMutations = (taskDate: string) => {
     }
 
     return data as Partial<DailyTask> | null;
+  };
+
+  const fetchToggleTaskRemoteState = async (taskId: string): Promise<ToggleTaskRemoteState | null> => {
+    if (!user?.id) throw new Error("User not authenticated");
+    const remoteTaskId = getRemoteTaskId(taskId);
+
+    const { data, error } = await supabase
+      .from("daily_tasks")
+      .select(TOGGLE_TASK_REMOTE_STATE_SELECT)
+      .eq("id", remoteTaskId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (error) throw error;
+
+    return (data as ToggleTaskRemoteState | null) ?? null;
+  };
+
+  const syncHabitCompletionState = async (
+    habitId: string | null,
+    date: string,
+    completed: boolean,
+  ): Promise<void> => {
+    if (!habitId) return;
+
+    await persistLocalHabitCompletion(habitId, date, completed);
+
+    if (!user?.id) return;
+
+    if (completed) {
+      const { error } = await supabase
+        .from("habit_completions")
+        .upsert({
+          user_id: user.id,
+          habit_id: habitId,
+          date,
+        }, { onConflict: "user_id,habit_id,date" });
+
+      if (error) {
+        console.error("[Task Toggle] Failed to sync habit completion:", error);
+      } else {
+        console.log("[Task Toggle] Synced habit completion for habit:", habitId);
+      }
+
+      return;
+    }
+
+    const { error } = await supabase
+      .from("habit_completions")
+      .delete()
+      .eq("user_id", user.id)
+      .eq("habit_id", habitId)
+      .eq("date", date);
+
+    if (error) {
+      console.error("[Task Toggle] Failed to remove habit completion:", error);
+    }
   };
 
   const persistRemoteSubtasks = async (
@@ -1222,19 +1305,7 @@ export const useTaskMutations = (taskDate: string) => {
         };
       }
 
-      const { data: existingTask, error: existingError } = await supabase
-        .from('daily_tasks')
-        .select(`
-          completed_at, task_text, habit_source_id, task_date, difficulty, scheduled_time, category,
-          is_main_quest, xp_reward,
-          contact_id, auto_log_interaction,
-          contact:contacts!contact_id(id, name, avatar_url)
-        `)
-        .eq('id', remoteTaskId)
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (existingError) throw existingError;
+      const existingTask = await fetchToggleTaskRemoteState(remoteTaskId);
 
       const wasAlreadyCompleted = (existingTask?.completed_at ?? localTask?.completed_at ?? null) !== null;
       const taskText = existingTask?.task_text || localTask?.task_text || 'Task';
@@ -1246,6 +1317,61 @@ export const useTaskMutations = (taskDate: string) => {
       const normalizedTaskXP = isMainQuest && xpReward <= storedTaskXP
         ? mainQuestXP
         : xpReward;
+      const taskDifficulty = existingTask?.difficulty || localTask?.difficulty || 'medium';
+      const taskScheduledTime = existingTask?.scheduled_time || localTask?.scheduled_time || null;
+      const taskCategory = existingTask?.category || localTask?.category || null;
+      const contactId = existingTask?.contact_id ?? localTask?.contact_id ?? null;
+      const autoLogInteraction = existingTask?.auto_log_interaction ?? localTask?.auto_log_interaction ?? true;
+      const contact = (existingTask?.contact as { id: string; name: string; avatar_url: string | null } | null)
+        ?? localTask?.contact
+        ?? null;
+      const reconcileCompletedTask = async (taskState: ToggleTaskRemoteState | null, completedAt?: string | null) => {
+        const resolvedTaskText = taskState?.task_text || existingTask?.task_text || localTask?.task_text || 'Task';
+        const resolvedHabitSourceId = taskState?.habit_source_id ?? existingTask?.habit_source_id ?? localTask?.habit_source_id ?? null;
+        const resolvedTaskDate = taskState?.task_date || existingTask?.task_date || localTask?.task_date || format(new Date(), 'yyyy-MM-dd');
+        const resolvedTaskDifficulty = taskState?.difficulty || existingTask?.difficulty || localTask?.difficulty || 'medium';
+        const resolvedTaskScheduledTime = taskState?.scheduled_time || existingTask?.scheduled_time || localTask?.scheduled_time || null;
+        const resolvedTaskCategory = taskState?.category || existingTask?.category || localTask?.category || null;
+        const resolvedContactId = taskState?.contact_id ?? existingTask?.contact_id ?? localTask?.contact_id ?? null;
+        const resolvedAutoLogInteraction = taskState?.auto_log_interaction
+          ?? existingTask?.auto_log_interaction
+          ?? localTask?.auto_log_interaction
+          ?? true;
+        const resolvedContact = (taskState?.contact as { id: string; name: string; avatar_url: string | null } | null)
+          ?? (existingTask?.contact as { id: string; name: string; avatar_url: string | null } | null)
+          ?? localTask?.contact
+          ?? null;
+        const resolvedCompletedAt = completedAt ?? taskState?.completed_at ?? existingTask?.completed_at ?? localTask?.completed_at ?? new Date().toISOString();
+
+        if (localTask) {
+          await persistLocalTaskRow({
+            ...localTask,
+            completed: true,
+            completed_at: resolvedCompletedAt,
+          });
+        }
+
+        await syncHabitCompletionState(resolvedHabitSourceId, resolvedTaskDate, true);
+
+        return {
+          taskId,
+          completed: true,
+          xpAwarded: 0,
+          bonusXP: 0,
+          toastReason: null,
+          wasAlreadyCompleted: true,
+          isUndo: false,
+          taskText: resolvedTaskText,
+          habitSourceId: resolvedHabitSourceId,
+          taskDate: resolvedTaskDate,
+          taskDifficulty: resolvedTaskDifficulty,
+          taskScheduledTime: resolvedTaskScheduledTime,
+          taskCategory: resolvedTaskCategory,
+          contactId: resolvedContactId,
+          autoLogInteraction: resolvedAutoLogInteraction,
+          contact: resolvedContact,
+        };
+      };
 
       // Allow undo if forceUndo is true, otherwise block unchecking
       if (wasAlreadyCompleted && !completed && !forceUndo) {
@@ -1275,15 +1401,7 @@ export const useTaskMutations = (taskDate: string) => {
         }
 
         // If this was a habit-sourced task, remove the habit completion
-        if (habitSourceId) {
-          await persistLocalHabitCompletion(habitSourceId, taskDateValue, false);
-          await supabase
-            .from('habit_completions')
-            .delete()
-            .eq('user_id', user.id)
-            .eq('habit_id', habitSourceId)
-            .eq('date', taskDateValue);
-        }
+        await syncHabitCompletionState(habitSourceId, taskDateValue, false);
 
         return { taskId, completed: false, xpAwarded: 0, wasAlreadyCompleted: true, isUndo: true, taskText, habitSourceId };
       }
@@ -1305,25 +1423,22 @@ export const useTaskMutations = (taskDate: string) => {
         }
 
         // If this was a habit-sourced task, remove the habit completion
-        if (habitSourceId) {
-          await persistLocalHabitCompletion(habitSourceId, taskDateValue, false);
-          await supabase
-            .from('habit_completions')
-            .delete()
-            .eq('user_id', user.id)
-            .eq('habit_id', habitSourceId)
-            .eq('date', taskDateValue);
-        }
+        await syncHabitCompletionState(habitSourceId, taskDateValue, false);
 
         return { taskId, completed: false, xpAwarded: 0, wasAlreadyCompleted, isUndo: false, taskText, habitSourceId };
       }
 
+      if (wasAlreadyCompleted) {
+        return reconcileCompletedTask(existingTask, existingTask?.completed_at ?? localTask?.completed_at ?? null);
+      }
+
       const { bonusXP, toastReason } = await calculateGuildBonus(user.id, normalizedTaskXP);
       const totalXP = normalizedTaskXP + bonusXP;
+      const completedAt = new Date().toISOString();
 
       const { data: updateResult, error: updateError } = await supabase
         .from('daily_tasks')
-        .update({ completed: true, completed_at: new Date().toISOString() })
+        .update({ completed: true, completed_at: completedAt })
         .eq('id', remoteTaskId)
         .eq('user_id', user.id)
         .eq('completed', false)
@@ -1331,13 +1446,19 @@ export const useTaskMutations = (taskDate: string) => {
 
       if (updateError) throw updateError;
       if (!updateResult || updateResult.length === 0) {
-        throw new Error('Task was already completed');
+        const refetchedTask = await fetchToggleTaskRemoteState(remoteTaskId);
+
+        if (refetchedTask?.completed_at) {
+          return reconcileCompletedTask(refetchedTask, refetchedTask.completed_at);
+        }
+
+        throw new Error(refetchedTask ? 'Failed to confirm quest completion' : 'Task not found');
       }
       if (localTask) {
         await persistLocalTaskRow({
           ...localTask,
           completed: true,
-          completed_at: new Date().toISOString(),
+          completed_at: completedAt,
         });
       }
 
@@ -1345,29 +1466,7 @@ export const useTaskMutations = (taskDate: string) => {
       const awardedXP = awardResult?.xpAwarded ?? 0;
 
       // If this is a habit-sourced task, sync with habit_completions
-      if (habitSourceId) {
-        await persistLocalHabitCompletion(habitSourceId, taskDateValue, true);
-        const { error: habitError } = await supabase
-          .from('habit_completions')
-          .upsert({
-            user_id: user.id,
-            habit_id: habitSourceId,
-            date: taskDateValue,
-          }, { onConflict: 'user_id,habit_id,date' });
-
-        if (habitError) {
-          console.error('[Task Toggle] Failed to sync habit completion:', habitError);
-        } else {
-          console.log('[Task Toggle] Synced habit completion for habit:', habitSourceId);
-        }
-      }
-
-      const taskDifficulty = existingTask?.difficulty || 'medium';
-      const taskScheduledTime = existingTask?.scheduled_time || null;
-      const taskCategory = existingTask?.category || null;
-      const contactId = existingTask?.contact_id || null;
-      const autoLogInteraction = existingTask?.auto_log_interaction ?? true;
-      const contact = existingTask?.contact as { id: string; name: string; avatar_url: string | null } | null;
+      await syncHabitCompletionState(habitSourceId, taskDateValue, true);
 
       return { 
         taskId, 

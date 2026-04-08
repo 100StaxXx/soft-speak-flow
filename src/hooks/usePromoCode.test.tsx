@@ -2,6 +2,7 @@ import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { queryKeys } from "@/lib/queryKeys";
 
 const mocks = vi.hoisted(() => ({
   invoke: vi.fn(),
@@ -36,9 +37,11 @@ const createWrapper = () => {
     },
   });
 
-  return ({ children }: { children: React.ReactNode }) => (
+  const wrapper = ({ children }: { children: React.ReactNode }) => (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   );
+
+  return { queryClient, wrapper };
 };
 
 describe("usePromoCode", () => {
@@ -58,8 +61,9 @@ describe("usePromoCode", () => {
   });
 
   it("redeems promo codes through the edge function instead of direct RPC", async () => {
+    const { wrapper } = createWrapper();
     const { result } = renderHook(() => usePromoCode(), {
-      wrapper: createWrapper(),
+      wrapper,
     });
 
     await act(async () => {
@@ -86,8 +90,9 @@ describe("usePromoCode", () => {
       },
     });
 
+    const { wrapper } = createWrapper();
     const { result } = renderHook(() => usePromoCode(), {
-      wrapper: createWrapper(),
+      wrapper,
     });
 
     let thrown: unknown;
@@ -122,8 +127,9 @@ describe("usePromoCode", () => {
       },
     });
 
+    const { wrapper } = createWrapper();
     const { result } = renderHook(() => usePromoCode(), {
-      wrapper: createWrapper(),
+      wrapper,
     });
 
     let thrown: unknown;
@@ -159,8 +165,9 @@ describe("usePromoCode", () => {
       },
     });
 
+    const { wrapper } = createWrapper();
     const { result } = renderHook(() => usePromoCode(), {
-      wrapper: createWrapper(),
+      wrapper,
     });
 
     let thrown: unknown;
@@ -198,8 +205,9 @@ describe("usePromoCode", () => {
       },
     });
 
+    const { wrapper } = createWrapper();
     const { result } = renderHook(() => usePromoCode(), {
-      wrapper: createWrapper(),
+      wrapper,
     });
 
     let thrown: unknown;
@@ -217,5 +225,28 @@ describe("usePromoCode", () => {
       "Our servers are temporarily unavailable. Please try again in a moment.",
     );
     expect((thrown as PromoCodeRedeemError).reason).toBe("unknown");
+  });
+
+  it("refreshes the access-state query after a successful redemption", async () => {
+    const { queryClient, wrapper } = createWrapper();
+    const invalidateQueriesSpy = vi.spyOn(queryClient, "invalidateQueries");
+
+    const { result } = renderHook(() => usePromoCode(), {
+      wrapper,
+    });
+
+    await act(async () => {
+      await result.current.redeemPromoCode.mutateAsync("bigfella2026");
+    });
+
+    expect(invalidateQueriesSpy).toHaveBeenCalledWith({
+      queryKey: queryKeys.access.detail("user-1"),
+    });
+    expect(invalidateQueriesSpy).toHaveBeenCalledWith({
+      queryKey: queryKeys.profile.all,
+    });
+    expect(invalidateQueriesSpy).not.toHaveBeenCalledWith({
+      queryKey: queryKeys.subscription.all,
+    });
   });
 });
