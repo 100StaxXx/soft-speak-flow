@@ -7,7 +7,7 @@ import { Capacitor } from "@capacitor/core";
 import { App as CapacitorApp } from "@capacitor/app";
 import { useLocation, useNavigate } from "react-router-dom";
 import { PageTransition } from "@/components/PageTransition";
-import { StarfieldBackground } from "@/components/StarfieldBackground";
+import { CinematicPageBackground } from "@/components/CinematicPageBackground";
 import { TodaysAgenda } from "@/components/TodaysAgenda";
 import { DesktopWeekPlanner } from "@/components/DesktopWeekPlanner";
 import { cn } from "@/lib/utils";
@@ -987,7 +987,7 @@ const Journeys = () => {
 
   return (
     <PageTransition mode="instant">
-      <StarfieldBackground scene="quests-tempest" />
+      <CinematicPageBackground preset="quests" />
       <div
         className={cn(
           "min-h-screen pb-nav-safe pt-safe px-4 relative z-10",

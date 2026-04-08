@@ -99,8 +99,10 @@ vi.mock("@/components/PageTransition", () => ({
   PageTransition: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
 
-vi.mock("@/components/StarfieldBackground", () => ({
-  StarfieldBackground: () => null,
+vi.mock("@/components/CinematicPageBackground", () => ({
+  CinematicPageBackground: ({ preset }: { preset: string }) => (
+    <div data-testid="cinematic-background" data-preset={preset} />
+  ),
 }));
 
 vi.mock("@/components/DatePillsScroller", () => ({
@@ -486,6 +488,12 @@ describe("Journeys inbox integration", () => {
       writable: true,
       value: mocks.scrollIntoView,
     });
+  });
+
+  it("uses the quests cinematic wallpaper preset", () => {
+    renderJourneys();
+
+    expect(screen.getByTestId("cinematic-background")).toHaveAttribute("data-preset", "quests");
   });
 
   it("renders the inbox section above the agenda when unscheduled quests exist", async () => {

@@ -28,7 +28,7 @@ import { LegalDocumentViewer } from "@/components/LegalDocumentViewer";
 import { QuestBehaviorSettings } from "@/components/QuestBehaviorSettings";
 import { DisplayNameSetting } from "@/components/DisplayNameSetting";
 import { CalendarIntegrationsSettings } from "@/components/CalendarIntegrationsSettings";
-import { StarfieldBackground } from "@/components/StarfieldBackground";
+import { CinematicPageBackground } from "@/components/CinematicPageBackground";
 import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
 import { applyMentorChange } from "@/pages/profileMentorChange";
@@ -336,7 +336,7 @@ const Profile = () => {
   if (!user) {
     return (
       <PageTransition>
-        <StarfieldBackground />
+        <CinematicPageBackground preset="profile" />
         <div className="min-h-screen pb-nav-safe flex items-center justify-center relative z-10">
           <div className="text-center">
             <h2 className="text-3xl font-bold mb-4">Sign in to view your profile</h2>
@@ -349,7 +349,7 @@ const Profile = () => {
 
   return (
     <PageTransition>
-      <StarfieldBackground scene="profile-observatory" />
+      <CinematicPageBackground preset="profile" />
 
       <div className="min-h-screen pb-nav-safe relative z-10">
         {/* Header with hidden dev trigger */}

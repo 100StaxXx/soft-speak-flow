@@ -75,8 +75,10 @@ vi.mock("@/components/PageTransition", () => ({
   PageTransition: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
-vi.mock("@/components/StarfieldBackground", () => ({
-  StarfieldBackground: () => null,
+vi.mock("@/components/CinematicPageBackground", () => ({
+  CinematicPageBackground: ({ preset }: { preset: string }) => (
+    <div data-testid="cinematic-background" data-preset={preset} />
+  ),
 }));
 
 vi.mock("@/components/PageInfoButton", () => ({
@@ -160,6 +162,12 @@ const renderProfile = () =>
 describe("Profile feedback entry", () => {
   beforeEach(() => {
     mocks.navigate.mockReset();
+  });
+
+  it("uses the profile cinematic wallpaper preset", () => {
+    renderProfile();
+
+    expect(screen.getByTestId("cinematic-background")).toHaveAttribute("data-preset", "profile");
   });
 
   it("renders a feedback card that opens the support form in feedback mode", () => {

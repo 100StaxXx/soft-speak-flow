@@ -14,6 +14,20 @@ export interface StaticBackgroundAsset {
   src2x: string;
 }
 
+export type CinematicPageBackgroundKey =
+  | "quests"
+  | "campaigns"
+  | "companion"
+  | "profile";
+
+export interface CinematicPageBackgroundPreset {
+  background: StaticBackgroundAsset;
+  mobileObjectPosition: string;
+  desktopObjectPosition: string;
+  overlayStrength: number;
+  showCosmicOverlay: boolean;
+}
+
 const createBackgroundAsset = (src: string, src2x: string): StaticBackgroundAsset => ({
   src,
   src2x,
@@ -26,6 +40,37 @@ const cosmicGalaxyPortalAsset = createBackgroundAsset(cosmicGalaxyPortal, cosmic
 // Specific backgrounds for key screens
 export const welcomeBackground = createBackgroundAsset(cosmicWelcome, cosmicWelcome_2x);
 export const signinBackground = createBackgroundAsset(cosmicSignin, cosmicSignin_2x);
+
+export const cinematicPageBackgrounds: Record<CinematicPageBackgroundKey, CinematicPageBackgroundPreset> = {
+  quests: {
+    background: cosmicPath1Asset,
+    mobileObjectPosition: "52% 34%",
+    desktopObjectPosition: "50% 42%",
+    overlayStrength: 0.62,
+    showCosmicOverlay: true,
+  },
+  campaigns: {
+    background: cosmicGalaxyPortalAsset,
+    mobileObjectPosition: "50% 38%",
+    desktopObjectPosition: "50% 46%",
+    overlayStrength: 0.68,
+    showCosmicOverlay: true,
+  },
+  companion: {
+    background: welcomeBackground,
+    mobileObjectPosition: "52% 24%",
+    desktopObjectPosition: "50% 30%",
+    overlayStrength: 0.72,
+    showCosmicOverlay: true,
+  },
+  profile: {
+    background: cosmicPath2Asset,
+    mobileObjectPosition: "50% 42%",
+    desktopObjectPosition: "50% 46%",
+    overlayStrength: 0.7,
+    showCosmicOverlay: false,
+  },
+};
 
 // Legacy backgrounds for other uses
 export const cosmicPathBackgrounds = [

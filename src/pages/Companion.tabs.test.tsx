@@ -199,8 +199,10 @@ vi.mock("@/components/CompanionErrorBoundary", () => ({
   CompanionErrorBoundary: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
-vi.mock("@/components/StarfieldBackground", () => ({
-  StarfieldBackground: () => null,
+vi.mock("@/components/CinematicPageBackground", () => ({
+  CinematicPageBackground: ({ preset }: { preset: string }) => (
+    <div data-testid="cinematic-background" data-preset={preset} />
+  ),
 }));
 
 vi.mock("@/components/MentorGuidanceCard", () => ({
@@ -328,6 +330,12 @@ describe("Companion tabs performance behavior", () => {
     mocks.nextEvolutionXP = 200;
     mocks.progressToNext = 60;
     mocks.canEvolve = false;
+  });
+
+  it("uses the companion cinematic wallpaper preset", () => {
+    renderCompanion();
+
+    expect(screen.getByTestId("cinematic-background")).toHaveAttribute("data-preset", "companion");
   });
 
   afterEach(() => {

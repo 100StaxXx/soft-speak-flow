@@ -1,8 +1,12 @@
+import type { CSSProperties } from "react";
 import { getStaticBackgroundSrcSet, type StaticBackgroundAsset } from "@/assets/backgrounds";
 
 interface StaticBackgroundImageProps {
   background: StaticBackgroundAsset;
   className?: string;
+  style?: CSSProperties;
+  objectPosition?: CSSProperties["objectPosition"];
+  testId?: string;
 }
 
 const DEFAULT_CLASSNAME =
@@ -11,6 +15,9 @@ const DEFAULT_CLASSNAME =
 export const StaticBackgroundImage = ({
   background,
   className,
+  style,
+  objectPosition,
+  testId,
 }: StaticBackgroundImageProps) => (
   <img
     src={background.src}
@@ -22,5 +29,7 @@ export const StaticBackgroundImage = ({
     draggable={false}
     decoding="async"
     loading="eager"
+    style={{ objectPosition, ...style }}
+    data-testid={testId}
   />
 );

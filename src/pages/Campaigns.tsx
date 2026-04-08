@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Plus, Sparkles, Target, Trophy } from "lucide-react";
 import { PageTransition } from "@/components/PageTransition";
-import { StarfieldBackground } from "@/components/StarfieldBackground";
+import { CinematicPageBackground } from "@/components/CinematicPageBackground";
 import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
 import { JourneyCard } from "@/components/JourneyCard";
@@ -65,7 +65,7 @@ const Campaigns = () => {
 
   return (
     <PageTransition mode="instant">
-      <StarfieldBackground scene="campaigns-summit" />
+      <CinematicPageBackground preset="campaigns" />
       <div className="min-h-screen pb-nav-safe pt-safe px-4 relative z-10">
         <div className="mx-auto w-full max-w-[1120px]">
           <motion.div

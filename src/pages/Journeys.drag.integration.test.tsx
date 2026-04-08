@@ -79,8 +79,10 @@ vi.mock("@/components/PageTransition", () => ({
   PageTransition: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
 
-vi.mock("@/components/StarfieldBackground", () => ({
-  StarfieldBackground: () => null,
+vi.mock("@/components/CinematicPageBackground", () => ({
+  CinematicPageBackground: ({ preset }: { preset: string }) => (
+    <div data-testid="cinematic-background" data-preset={preset} />
+  ),
 }));
 
 vi.mock("@/components/BottomNav", () => ({
