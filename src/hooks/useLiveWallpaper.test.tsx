@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { act, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -75,8 +76,10 @@ const TestConsumer = () => {
   return (
     <div>
       <div data-testid="current-date">{manifest.currentDateKey}</div>
+      <div data-testid="current-ready">{String(manifest.currentDateReady)}</div>
       <div data-testid="wallpaper-source">{wallpaper?.source ?? "loading"}</div>
       <div data-testid="wallpaper-url">{wallpaper?.imageUrl ?? "none"}</div>
+      <div data-testid="error-message">{manifest.error?.message ?? "none"}</div>
       <button
         type="button"
         onClick={() => {
@@ -90,12 +93,32 @@ const TestConsumer = () => {
   );
 };
 
-const renderProvider = async () => {
+const AllPagesConsumer = () => {
+  const manifest = useWallpaperManifest();
+  const guide = useResolvedWallpaper("guide");
+  const quests = useResolvedWallpaper("quests");
+  const campaigns = useResolvedWallpaper("campaigns");
+  const companion = useResolvedWallpaper("companion");
+  const profile = useResolvedWallpaper("profile");
+
+  return (
+    <div>
+      <div data-testid="current-ready">{String(manifest.currentDateReady)}</div>
+      <div data-testid="guide-source">{guide?.source ?? "loading"}</div>
+      <div data-testid="quests-source">{quests?.source ?? "loading"}</div>
+      <div data-testid="campaigns-source">{campaigns?.source ?? "loading"}</div>
+      <div data-testid="companion-source">{companion?.source ?? "loading"}</div>
+      <div data-testid="profile-source">{profile?.source ?? "loading"}</div>
+    </div>
+  );
+};
+
+const renderProvider = async (children: ReactNode = <TestConsumer />, enabled = true) => {
   await act(async () => {
     render(
       <QueryClientProvider client={makeQueryClient()}>
-        <WallpaperManifestProvider enabled userTimezone="America/Los_Angeles">
-          <TestConsumer />
+        <WallpaperManifestProvider enabled={enabled} userTimezone="America/Los_Angeles">
+          {children}
         </WallpaperManifestProvider>
       </QueryClientProvider>,
     );
@@ -103,6 +126,16 @@ const renderProvider = async () => {
     await Promise.resolve();
     await Promise.resolve();
   });
+};
+
+const settleProvider = async (cycles = 3) => {
+  for (let cycle = 0; cycle < cycles; cycle += 1) {
+    await act(async () => {
+      vi.advanceTimersByTime(1);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+  }
 };
 
 describe("WallpaperManifestProvider", () => {
@@ -126,10 +159,69 @@ describe("WallpaperManifestProvider", () => {
     localStorageState.store.clear();
   });
 
+  it("uses a remote wallpaper after a successful manifest fetch", async () => {
+    mocks.from.mockImplementation(() => ({
+      select: () => ({
+        in: async () => ({
+          data: [
+            {
+              for_date: "2026-04-08",
+              page_key: "guide",
+              assignment_source: "auto",
+              image_url: "https://example.com/today.png",
+              mobile_focus_x: 51,
+              mobile_focus_y: 31,
+              desktop_focus_x: 53,
+              desktop_focus_y: 35,
+              updated_at: "2026-04-08T10:00:00.000Z",
+            },
+          ],
+          error: null,
+        }),
+      }),
+    }));
+
+    await renderProvider();
+    await settleProvider();
+
+    expect(screen.getByTestId("current-ready")).toHaveTextContent("true");
+    expect(screen.getByTestId("wallpaper-source")).toHaveTextContent("remote");
+    expect(screen.getByTestId("wallpaper-url")).toHaveTextContent("https://example.com/today.png");
+    expect(screen.getByTestId("error-message")).toHaveTextContent("none");
+  });
+
+  it("falls back to scenic seed art for all five pages when the manifest resolves with zero rows", async () => {
+    await renderProvider(<AllPagesConsumer />);
+    await settleProvider();
+
+    expect(screen.getByTestId("current-ready")).toHaveTextContent("true");
+    expect(screen.getByTestId("guide-source")).toHaveTextContent("seed");
+    expect(screen.getByTestId("quests-source")).toHaveTextContent("seed");
+    expect(screen.getByTestId("campaigns-source")).toHaveTextContent("seed");
+    expect(screen.getByTestId("companion-source")).toHaveTextContent("seed");
+    expect(screen.getByTestId("profile-source")).toHaveTextContent("seed");
+  });
+
+  it("falls back to the seed wallpaper and exposes the error when the manifest fetch fails", async () => {
+    mocks.from.mockImplementation(() => ({
+      select: () => ({
+        in: async () => ({ data: null, error: new Error("manifest failed") }),
+      }),
+    }));
+
+    await renderProvider();
+    await settleProvider();
+
+    expect(screen.getByTestId("current-ready")).toHaveTextContent("true");
+    expect(screen.getByTestId("wallpaper-source")).toHaveTextContent("seed");
+    expect(screen.getByTestId("error-message")).toHaveTextContent("manifest failed");
+  });
+
   it("hydrates the current effective day from cache without painting yesterday first", async () => {
     localStorage.setItem(CACHE_KEY, JSON.stringify({
-      version: 2,
+      version: 3,
       savedAt: "2026-04-08T10:20:00.000Z",
+      resolvedDateKeys: ["2026-04-08", "2026-04-09"],
       manifestByDate: {
         "2026-04-07": {
           guide: {
@@ -173,7 +265,7 @@ describe("WallpaperManifestProvider", () => {
       },
     }));
 
-    await renderProvider();
+    await renderProvider(<TestConsumer />, false);
 
     expect(screen.getByTestId("current-date")).toHaveTextContent("2026-04-08");
     expect(screen.getByTestId("wallpaper-source")).toHaveTextContent("remote");
@@ -183,9 +275,49 @@ describe("WallpaperManifestProvider", () => {
   it("switches to the preloaded next-day wallpaper at the 2 AM boundary without showing the old date again", async () => {
     vi.setSystemTime(new Date("2026-04-08T08:50:00.000Z"));
 
+    mocks.from.mockImplementation(() => ({
+      select: () => ({
+        in: async (_column: string, dateKeys: string[]) => ({
+          data: dateKeys.flatMap((dateKey) => {
+            if (dateKey === "2026-04-07") {
+              return [{
+                for_date: "2026-04-07",
+                page_key: "guide",
+                assignment_source: "auto",
+                image_url: "https://example.com/day-7.png",
+                mobile_focus_x: 50,
+                mobile_focus_y: 30,
+                desktop_focus_x: 52,
+                desktop_focus_y: 34,
+                updated_at: "2026-04-07T10:00:00.000Z",
+              }];
+            }
+
+            if (dateKey === "2026-04-08") {
+              return [{
+                for_date: "2026-04-08",
+                page_key: "guide",
+                assignment_source: "auto",
+                image_url: "https://example.com/day-8.png",
+                mobile_focus_x: 50,
+                mobile_focus_y: 30,
+                desktop_focus_x: 52,
+                desktop_focus_y: 34,
+                updated_at: "2026-04-08T10:00:00.000Z",
+              }];
+            }
+
+            return [];
+          }),
+          error: null,
+        }),
+      }),
+    }));
+
     localStorage.setItem(CACHE_KEY, JSON.stringify({
-      version: 2,
+      version: 3,
       savedAt: "2026-04-08T08:45:00.000Z",
+      resolvedDateKeys: ["2026-04-07", "2026-04-08"],
       manifestByDate: {
         "2026-04-07": {
           guide: {
@@ -232,8 +364,9 @@ describe("WallpaperManifestProvider", () => {
 
   it("falls back to the seed wallpaper after a render failure for the active remote wallpaper", async () => {
     localStorage.setItem(CACHE_KEY, JSON.stringify({
-      version: 2,
+      version: 3,
       savedAt: "2026-04-08T10:20:00.000Z",
+      resolvedDateKeys: ["2026-04-08", "2026-04-09"],
       manifestByDate: {
         "2026-04-08": {
           guide: {
@@ -252,7 +385,7 @@ describe("WallpaperManifestProvider", () => {
       },
     }));
 
-    await renderProvider();
+    await renderProvider(<TestConsumer />, false);
 
     expect(screen.getByTestId("wallpaper-source")).toHaveTextContent("remote");
 

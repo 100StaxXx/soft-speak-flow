@@ -453,7 +453,7 @@ export const getExistingAssignment = async (
 export const getLatestReadyAsset = async (
   supabase: SupabaseClient,
   pageKey: WallpaperPageKey,
-) => {
+): Promise<ReadyWallpaperAssetRow | null> => {
   const candidates = await listWallpaperAssetCandidates(supabase, pageKey);
   return pickLatestEligibleWallpaperCandidate(pageKey, candidates);
 };

@@ -58,10 +58,17 @@ interface WallpaperManifestContextValue {
 const WallpaperManifestContext = createContext<WallpaperManifestContextValue | null>(null);
 
 const CACHE_KEY = "wallpaper-manifest-cache-v2";
-const CACHE_VERSION = 2;
+const CACHE_VERSION = 3;
 
 interface WallpaperManifestCachePayload {
   version: number;
+  savedAt: string;
+  manifestByDate: Record<string, Partial<Record<WallpaperPageKey, LiveWallpaperManifestEntry>>>;
+  resolvedDateKeys: string[];
+}
+
+interface LegacyWallpaperManifestCachePayload {
+  version: 2;
   savedAt: string;
   manifestByDate: Record<string, Partial<Record<WallpaperPageKey, LiveWallpaperManifestEntry>>>;
 }
@@ -74,6 +81,10 @@ const isWallpaperPageKey = (value: string | null | undefined): value is Wallpape
   || value === "profile"
 );
 
+const mergeDateKeys = (current: string[], next: string[]) => (
+  [...new Set([...current, ...next.filter(Boolean)])]
+);
+
 const readWallpaperManifestCache = (
   targetDates: string[],
 ): WallpaperManifestCachePayload | null => {
@@ -81,8 +92,12 @@ const readWallpaperManifestCache = (
   if (!raw) return null;
 
   try {
-    const parsed = JSON.parse(raw) as WallpaperManifestCachePayload;
-    if (parsed.version !== CACHE_VERSION || !parsed.manifestByDate) {
+    const parsed = JSON.parse(raw) as WallpaperManifestCachePayload | LegacyWallpaperManifestCachePayload;
+    if (
+      (parsed.version !== 2 && parsed.version !== CACHE_VERSION)
+      || !parsed.manifestByDate
+      || typeof parsed.manifestByDate !== "object"
+    ) {
       return null;
     }
 
@@ -92,9 +107,16 @@ const readWallpaperManifestCache = (
         .map((dateKey) => [dateKey, parsed.manifestByDate[dateKey]]),
     ) as WallpaperManifestCachePayload["manifestByDate"];
 
+    const resolvedDateKeys = Array.isArray((parsed as WallpaperManifestCachePayload).resolvedDateKeys)
+      ? (parsed as WallpaperManifestCachePayload).resolvedDateKeys
+        .filter((dateKey): dateKey is string => typeof dateKey === "string" && targetDates.includes(dateKey))
+      : Object.keys(manifestByDate);
+
     return {
-      ...parsed,
+      version: CACHE_VERSION,
+      savedAt: parsed.savedAt,
       manifestByDate,
+      resolvedDateKeys,
     };
   } catch (_error) {
     return null;
@@ -102,14 +124,15 @@ const readWallpaperManifestCache = (
 };
 
 const writeWallpaperManifestCache = (
-  manifestByDate: Record<string, Partial<Record<WallpaperPageKey, LiveWallpaperManifestEntry>>>,
+  payload: Pick<WallpaperManifestCachePayload, "manifestByDate" | "resolvedDateKeys">,
 ) => {
   safeLocalStorage.setItem(
     CACHE_KEY,
     JSON.stringify({
       version: CACHE_VERSION,
       savedAt: new Date().toISOString(),
-      manifestByDate,
+      manifestByDate: payload.manifestByDate,
+      resolvedDateKeys: payload.resolvedDateKeys,
     } satisfies WallpaperManifestCachePayload),
   );
 };
@@ -255,7 +278,9 @@ export const WallpaperManifestProvider = ({
       ) as Record<string, Partial<Record<WallpaperPageKey, ResolvedWallpaper>>>;
     },
   );
-  const [knownDateKeys, setKnownDateKeys] = useState<string[]>(() => Object.keys(initialCache?.manifestByDate ?? {}));
+  const [resolvedDateKeys, setResolvedDateKeys] = useState<string[]>(
+    () => initialCache?.resolvedDateKeys ?? Object.keys(initialCache?.manifestByDate ?? {}),
+  );
   const failedRemoteKeysRef = useRef<Set<string>>(new Set());
   const [failedRemoteVersion, setFailedRemoteVersion] = useState(0);
   const preloadTicketRef = useRef(0);
@@ -277,7 +302,7 @@ export const WallpaperManifestProvider = ({
         ),
         ...current,
       }));
-      setKnownDateKeys((current) => [...new Set([...current, ...Object.keys(cached.manifestByDate)])]);
+      setResolvedDateKeys((current) => mergeDateKeys(current, cached.resolvedDateKeys));
     });
   }, [currentDateKey, nextDateKey, targetDates]);
 
@@ -295,28 +320,33 @@ export const WallpaperManifestProvider = ({
 
     const nextManifestByDate = targetDates.reduce<Record<string, Partial<Record<WallpaperPageKey, LiveWallpaperManifestEntry>>>>(
       (acc, dateKey) => {
-        const nextEntries = manifestQuery.data[dateKey] ?? {};
-        if (Object.keys(nextEntries).length > 0) {
-          acc[dateKey] = nextEntries;
-        }
+        acc[dateKey] = manifestQuery.data[dateKey] ?? {};
         return acc;
       },
       {},
     );
 
-    if (Object.keys(nextManifestByDate).length === 0) {
-      return;
-    }
-
     startTransition(() => {
       setManifestByDate((current) => ({ ...current, ...nextManifestByDate }));
-      setKnownDateKeys((current) => [...new Set([...current, ...targetDates])]);
+      setResolvedDateKeys((current) => mergeDateKeys(current, targetDates));
     });
+    const cached = readWallpaperManifestCache(targetDates);
     writeWallpaperManifestCache({
-      ...(readWallpaperManifestCache(targetDates)?.manifestByDate ?? {}),
-      ...nextManifestByDate,
+      manifestByDate: {
+        ...(cached?.manifestByDate ?? {}),
+        ...nextManifestByDate,
+      },
+      resolvedDateKeys: mergeDateKeys(cached?.resolvedDateKeys ?? [], targetDates),
     });
   }, [manifestQuery.data, targetDates]);
+
+  useEffect(() => {
+    if (!enabled || !manifestQuery.error) return;
+
+    startTransition(() => {
+      setResolvedDateKeys((current) => mergeDateKeys(current, targetDates));
+    });
+  }, [enabled, manifestQuery.error, targetDates]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -354,6 +384,9 @@ export const WallpaperManifestProvider = ({
         });
       } catch (_error) {
         failedRemoteKeysRef.current.add(failedKey);
+        startTransition(() => {
+          setFailedRemoteVersion((current) => current + 1);
+        });
       }
     })).catch(() => undefined);
   }, [enabled, manifestByDate, targetDates]);
@@ -449,12 +482,12 @@ export const WallpaperManifestProvider = ({
       return null;
     }
 
-    if (knownDateKeys.includes(currentDateKey)) {
+    if (resolvedDateKeys.includes(currentDateKey)) {
       return toSeedFallbackWallpaper(pageKey, currentDateKey);
     }
 
     return null;
-  }, [currentDateKey, failedRemoteVersion, knownDateKeys, manifestByDate, resolvedByDate]);
+  }, [currentDateKey, failedRemoteVersion, manifestByDate, resolvedByDate, resolvedDateKeys]);
 
   const value = useMemo<WallpaperManifestContextValue>(() => ({
     currentDateKey,
@@ -462,7 +495,7 @@ export const WallpaperManifestProvider = ({
     isRefreshing: manifestQuery.isFetching,
     error: manifestQuery.error instanceof Error ? manifestQuery.error : null,
     manifestByDate,
-    currentDateReady: knownDateKeys.includes(currentDateKey),
+    currentDateReady: resolvedDateKeys.includes(currentDateKey),
     refresh: async () => {
       setClockMs(Date.now());
       await manifestQuery.refetch();
@@ -474,7 +507,7 @@ export const WallpaperManifestProvider = ({
     nextDateKey,
     manifestQuery,
     manifestByDate,
-    knownDateKeys,
+    resolvedDateKeys,
     useResolvedWallpaperForPage,
     reportWallpaperRenderError,
   ]);

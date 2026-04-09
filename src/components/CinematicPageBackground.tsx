@@ -129,7 +129,11 @@ export const CinematicPageBackground = memo(({ preset }: CinematicPageBackground
     willChange: shouldRunParallax ? "transform" : undefined,
   }), [shouldRunParallax]);
 
-  const backgroundSource = resolvedWallpaper?.source ?? "loading";
+  const backgroundSource = resolvedWallpaper?.source ?? "seed";
+  const activeBackground = resolvedWallpaper?.background ?? presetConfig.background;
+  const mobileObjectPosition = resolvedWallpaper?.mobileObjectPosition ?? presetConfig.mobileObjectPosition;
+  const desktopObjectPosition = resolvedWallpaper?.desktopObjectPosition ?? presetConfig.desktopObjectPosition;
+  const backgroundImageUrl = resolvedWallpaper?.imageUrl ?? presetConfig.background.src;
 
   const scrim = presetConfig.scrim;
   const motionMode = shouldAnimateOverlay ? "animated" : "static";
@@ -151,30 +155,26 @@ export const CinematicPageBackground = memo(({ preset }: CinematicPageBackground
         style={{ background: presetConfig.loadingGradient }}
       />
 
-      {resolvedWallpaper ? (
-        <>
-          <StaticBackgroundImage
-            background={resolvedWallpaper.background}
-            className="absolute inset-0 h-full w-full object-cover select-none md:hidden"
-            objectPosition={resolvedWallpaper.mobileObjectPosition}
-            style={imageStyle}
-            onError={resolvedWallpaper.source === "remote"
-              ? () => reportWallpaperRenderError(preset, resolvedWallpaper.imageUrl)
-              : undefined}
-            testId="cinematic-background-image-mobile"
-          />
-          <StaticBackgroundImage
-            background={resolvedWallpaper.background}
-            className="absolute inset-0 hidden h-full w-full object-cover select-none md:block"
-            objectPosition={resolvedWallpaper.desktopObjectPosition}
-            style={imageStyle}
-            onError={resolvedWallpaper.source === "remote"
-              ? () => reportWallpaperRenderError(preset, resolvedWallpaper.imageUrl)
-              : undefined}
-            testId="cinematic-background-image-desktop"
-          />
-        </>
-      ) : null}
+      <StaticBackgroundImage
+        background={activeBackground}
+        className="absolute inset-0 h-full w-full object-cover select-none md:hidden"
+        objectPosition={mobileObjectPosition}
+        style={imageStyle}
+        onError={backgroundSource === "remote"
+          ? () => reportWallpaperRenderError(preset, backgroundImageUrl)
+          : undefined}
+        testId="cinematic-background-image-mobile"
+      />
+      <StaticBackgroundImage
+        background={activeBackground}
+        className="absolute inset-0 hidden h-full w-full object-cover select-none md:block"
+        objectPosition={desktopObjectPosition}
+        style={imageStyle}
+        onError={backgroundSource === "remote"
+          ? () => reportWallpaperRenderError(preset, backgroundImageUrl)
+          : undefined}
+        testId="cinematic-background-image-desktop"
+      />
 
       <div
         className="absolute inset-0"

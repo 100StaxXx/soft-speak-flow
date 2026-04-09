@@ -628,8 +628,8 @@ export const addDaysToWallpaperDate = (
 
 export const getWallpaperHorizonDates = (
   startDate: string,
-  daysAhead = WALLPAPER_HORIZON_DAYS,
-) => Array.from(
+  daysAhead: number = WALLPAPER_HORIZON_DAYS,
+): string[] => Array.from(
   { length: Math.max(1, daysAhead) },
   (_, index) => addDaysToWallpaperDate(startDate, index),
 );
@@ -646,8 +646,8 @@ const stableHash = (value: string) => (
 export const getDeterministicWallpaperRecipes = (
   pageKey: WallpaperPageKey,
   dateKey: string,
-  candidateCount = WALLPAPER_DEFAULT_CANDIDATE_COUNT,
-) => {
+  candidateCount: number = WALLPAPER_DEFAULT_CANDIDATE_COUNT,
+): WallpaperPromptRecipe[] => {
   const family = wallpaperRecipeFamilies[pageKey];
   const cappedCount = Math.max(1, Math.min(candidateCount, family.length));
   const recipeStart = (
@@ -663,7 +663,7 @@ export const getDeterministicWallpaperRecipe = (
   pageKey: WallpaperPageKey,
   dateKey: string,
   candidateIndex: number,
-  candidateCount = WALLPAPER_DEFAULT_CANDIDATE_COUNT,
+  candidateCount: number = WALLPAPER_DEFAULT_CANDIDATE_COUNT,
 ) => {
   const recipes = getDeterministicWallpaperRecipes(pageKey, dateKey, candidateCount);
   const normalizedIndex = Math.max(0, Math.min(candidateIndex, recipes.length - 1));

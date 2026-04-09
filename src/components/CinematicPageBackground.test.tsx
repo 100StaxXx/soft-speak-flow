@@ -106,6 +106,19 @@ describe("CinematicPageBackground", () => {
     expect(screen.getByTestId("cinematic-background")).toHaveAttribute("data-cinematic-background", preset);
   });
 
+  it("renders the bundled scenic seed art immediately when no live wallpaper has resolved yet", () => {
+    render(<CinematicPageBackground preset="campaigns" />);
+
+    expect(screen.getByTestId("cinematic-background")).toHaveAttribute("data-cinematic-source", "seed");
+    expect(screen.getByTestId("cinematic-background-image-mobile")).toHaveAttribute(
+      "src",
+      cinematicPageBackgrounds.campaigns.background.src,
+    );
+    expect(screen.getByTestId("cinematic-background-image-mobile")).toHaveStyle({
+      objectPosition: cinematicPageBackgrounds.campaigns.mobileObjectPosition,
+    });
+  });
+
   it("uses the configured mobile and desktop focal points", () => {
     mocks.wallpaper = {
       source: "seed",
