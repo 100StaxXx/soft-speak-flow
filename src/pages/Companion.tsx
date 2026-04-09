@@ -182,13 +182,13 @@ const CompanionTabBar = ({
   const isDesktop = layoutMode === "desktop";
 
   return (
-    <TabsList
-      data-testid="companion-tab-list"
-      className={cn(
-        "border-stardust-gold/20 bg-[linear-gradient(180deg,rgba(36,28,12,0.72),rgba(20,16,8,0.78))] text-stardust-gold/78 backdrop-blur-md shadow-[0_18px_40px_rgba(0,0,0,0.2)]",
-        isDesktop
-          ? "inline-grid h-auto w-auto min-w-[460px] grid-cols-4 justify-start p-1.5"
-          : "grid w-full grid-cols-4",
+      <TabsList
+        data-testid="companion-tab-list"
+        className={cn(
+          "border-stardust-gold/16 bg-[linear-gradient(180deg,rgba(34,28,15,0.56),rgba(20,16,8,0.6))] text-stardust-gold/78 backdrop-blur-md shadow-[0_16px_34px_rgba(0,0,0,0.16)]",
+          isDesktop
+            ? "inline-grid h-auto w-auto min-w-[460px] grid-cols-4 justify-start p-1.5"
+            : "grid w-full grid-cols-4",
       )}
     >
       <TabsTrigger
@@ -600,7 +600,7 @@ const Companion = () => {
           style={COMPANION_GOLD_THEME_VARS}
         >
           {/* Fixed header - won't move on iOS overscroll */}
-          <header className="fixed top-0 left-0 right-0 z-40 w-full cosmiq-glass-header safe-area-top">
+          <header className="fixed top-0 left-0 right-0 z-40 w-full cosmiq-glass-header cosmiq-glass-header--companion safe-area-top">
             <div
               className={cn(
                 "flex items-center justify-between py-4",

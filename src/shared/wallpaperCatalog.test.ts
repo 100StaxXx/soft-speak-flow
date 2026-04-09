@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  CORE_TABS_V1_VARIANT_KEYS,
   LANDSCAPE_DIVERSE_V1_VARIANT_KEYS,
   calculateWallpaperPromotionScore,
   countWallpaperVariantsByPage,
@@ -13,16 +14,31 @@ import {
 } from "@/shared/wallpaperCatalog";
 
 describe("wallpaperGenerationBatchPresets", () => {
+  it("keeps the core-tabs-v1 preset locked to one generated backdrop per core tab", () => {
+    const preset = wallpaperGenerationBatchPresets["core-tabs-v1"];
+
+    expect(preset.variantKeys).toEqual([...CORE_TABS_V1_VARIANT_KEYS]);
+    expect(preset.variantKeys).toHaveLength(4);
+    expect(countWallpaperVariantsByPage(preset.variantKeys)).toEqual({
+      guide: 1,
+      quests: 1,
+      campaigns: 1,
+      companion: 1,
+      profile: 0,
+    });
+  });
+
   it("keeps the landscape-diverse-v1 preset locked to the curated 10-image backlog", () => {
     const preset = wallpaperGenerationBatchPresets["landscape-diverse-v1"];
 
     expect(preset.variantKeys).toEqual([...LANDSCAPE_DIVERSE_V1_VARIANT_KEYS]);
     expect(preset.variantKeys).toHaveLength(10);
     expect(countWallpaperVariantsByPage(preset.variantKeys)).toEqual({
+      guide: 1,
       quests: 3,
       campaigns: 3,
       companion: 2,
-      profile: 2,
+      profile: 1,
     });
   });
 });
@@ -88,7 +104,7 @@ describe("wallpaper promotion scoring", () => {
 
   it("only keeps post-cutoff generated assets eligible for the recent live wallpaper pages", () => {
     expect(
-      isWallpaperAssetEligibleForLiveRotation("campaigns", {
+      isWallpaperAssetEligibleForLiveRotation("guide", {
         publishState: "ready",
         sourceKind: "generated",
         generationDate: RECENT_LIVE_WALLPAPER_CUTOFF_DATE,
@@ -97,6 +113,14 @@ describe("wallpaper promotion scoring", () => {
 
     expect(
       isWallpaperAssetEligibleForLiveRotation("campaigns", {
+        publishState: "ready",
+        sourceKind: "generated",
+        generationDate: RECENT_LIVE_WALLPAPER_CUTOFF_DATE,
+      }),
+    ).toBe(true);
+
+    expect(
+      isWallpaperAssetEligibleForLiveRotation("guide", {
         publishState: "ready",
         sourceKind: "seed",
         generationDate: "2026-04-08",

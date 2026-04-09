@@ -62,7 +62,7 @@ export const NextEvolutionPreview = memo(({
 
   if (isMaxStage) {
     return (
-      <Card className="p-5 bg-card/25 backdrop-blur-2xl border-accent/20">
+      <Card className="p-5 bg-card/18 backdrop-blur-xl border-accent/16">
         <div className="flex items-center gap-3 mb-3">
           <div className="h-10 w-10 rounded-full bg-accent/20 flex items-center justify-center">
             <Sparkles className="h-5 w-5 text-accent" />
@@ -79,7 +79,7 @@ export const NextEvolutionPreview = memo(({
   }
 
   return (
-    <Card className="p-5 bg-card/25 backdrop-blur-2xl border-primary/20 hover:border-primary/40 transition-all duration-300">
+    <Card className="p-5 bg-card/18 backdrop-blur-xl border-primary/16 hover:border-primary/32 transition-all duration-300">
       <div className="space-y-4">
         {/* Header */}
         <div className="flex items-center gap-3">

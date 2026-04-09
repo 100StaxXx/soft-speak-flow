@@ -57,7 +57,7 @@ export const XPBreakdown = memo(() => {
   };
 
   return (
-    <Card className="p-5 md:p-6 bg-card/25 backdrop-blur-2xl border-primary/20 select-none">
+    <Card className="p-5 md:p-6 bg-card/18 backdrop-blur-xl border-primary/16 select-none">
       <div className="space-y-4" onContextMenu={(e) => e.preventDefault()}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">

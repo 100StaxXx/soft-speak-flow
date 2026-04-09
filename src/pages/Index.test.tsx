@@ -103,8 +103,10 @@ vi.mock("@/components/ui/parallax-card", () => ({
   ParallaxCard: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
-vi.mock("@/components/StarfieldBackground", () => ({
-  StarfieldBackground: () => null,
+vi.mock("@/components/CinematicPageBackground", () => ({
+  CinematicPageBackground: ({ preset }: { preset: string }) => (
+    <div data-testid="cinematic-background" data-preset={preset} />
+  ),
 }));
 
 vi.mock("@/components/skeletons", () => ({
@@ -196,6 +198,7 @@ describe("Index mentor connection state", () => {
     renderIndex();
 
     expect(screen.getByTestId("mentor-mobile-layout")).toBeInTheDocument();
+    expect(screen.getByTestId("cinematic-background")).toHaveAttribute("data-preset", "guide");
     expect(screen.getByTestId("guide-theme-shell")).toHaveStyle("--primary: 181 57% 56%; --accent: 176 46% 64%");
     expect(screen.queryByAltText("Guide background")).not.toBeInTheDocument();
     expect(screen.queryByTestId("mentor-desktop-layout")).not.toBeInTheDocument();

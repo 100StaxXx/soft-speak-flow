@@ -149,11 +149,7 @@ export const CinematicPageBackground = memo(({ preset }: CinematicPageBackground
     : wallpaper.desktopObjectPosition;
   const backgroundSource = !wallpaper?.imageUrl || hasRemoteLoadError ? "seed" : "remote";
 
-  const overlayStrength = presetConfig.overlayStrength;
-  const topScrimAlpha = Math.min(0.82, 0.26 + overlayStrength * 0.42);
-  const middleScrimAlpha = Math.min(0.46, 0.06 + overlayStrength * 0.16);
-  const bottomScrimAlpha = Math.min(0.92, 0.34 + overlayStrength * 0.5);
-  const glowOpacity = presetConfig.showCosmicOverlay ? 0.12 + overlayStrength * 0.1 : 0.06;
+  const scrim = presetConfig.scrim;
   const motionMode = shouldAnimateOverlay ? "animated" : "static";
 
   return (
@@ -187,20 +183,23 @@ export const CinematicPageBackground = memo(({ preset }: CinematicPageBackground
 
       <div
         className="absolute inset-0"
+        data-cinematic-scrim="top"
         style={{
-          background: `linear-gradient(180deg, hsl(var(--background) / ${topScrimAlpha}) 0%, hsl(var(--background) / ${middleScrimAlpha}) 28%, hsl(var(--background) / ${bottomScrimAlpha}) 100%)`,
+          background: `linear-gradient(180deg, hsl(var(--background) / ${scrim.topGradientTopAlpha}) 0%, hsl(var(--background) / ${scrim.topGradientMiddleAlpha}) 28%, hsl(var(--background) / ${scrim.topGradientBottomAlpha}) 100%)`,
         }}
       />
       <div
         className="absolute inset-0"
+        data-cinematic-scrim="center"
         style={{
-          background: `radial-gradient(circle at 50% 34%, transparent 0%, transparent 32%, hsl(var(--background) / ${0.18 + overlayStrength * 0.12}) 76%, hsl(var(--background) / ${0.48 + overlayStrength * 0.18}) 100%)`,
+          background: `radial-gradient(circle at ${scrim.centerAnchor}, transparent 0%, transparent ${scrim.centerClearStop}%, hsl(var(--background) / ${scrim.centerMidAlpha}) ${scrim.centerMidStop}%, hsl(var(--background) / ${scrim.centerEdgeAlpha}) 100%)`,
         }}
       />
       <div
         className="absolute inset-0"
+        data-cinematic-scrim="bottom"
         style={{
-          background: `linear-gradient(180deg, transparent 0%, transparent 72%, hsl(var(--background) / ${0.56 + overlayStrength * 0.18}) 100%)`,
+          background: `linear-gradient(180deg, transparent 0%, transparent ${scrim.bottomFadeStart}%, hsl(var(--background) / ${scrim.bottomFadeEndAlpha}) 100%)`,
         }}
       />
 
@@ -222,7 +221,7 @@ export const CinematicPageBackground = memo(({ preset }: CinematicPageBackground
               left: "8%",
               width: "34%",
               height: "18%",
-              background: `radial-gradient(circle at center, ${withAlpha(colors.primary, glowOpacity)}, transparent 72%)`,
+              background: `radial-gradient(circle at center, ${withAlpha(colors.primary, scrim.cosmicGlowOpacity)}, transparent 72%)`,
               opacity: 0.8,
             }}
           />
@@ -233,7 +232,7 @@ export const CinematicPageBackground = memo(({ preset }: CinematicPageBackground
               top: "14%",
               width: "28%",
               height: "18%",
-              background: `radial-gradient(circle at center, ${withAlpha(colors.accent, glowOpacity * 0.88)}, transparent 72%)`,
+              background: `radial-gradient(circle at center, ${withAlpha(colors.accent, scrim.cosmicGlowOpacity * 0.88)}, transparent 72%)`,
               opacity: 0.72,
             }}
           />

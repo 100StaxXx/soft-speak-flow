@@ -126,8 +126,8 @@ vi.mock("@/components/ui/parallax-card", () => ({
   ParallaxCard: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
-vi.mock("@/components/StarfieldBackground", () => ({
-  StarfieldBackground: () => null,
+vi.mock("@/components/CinematicPageBackground", () => ({
+  CinematicPageBackground: () => null,
 }));
 
 vi.mock("@/components/skeletons", () => ({

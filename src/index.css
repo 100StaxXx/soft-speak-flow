@@ -2374,6 +2374,16 @@ All colors MUST be HSL.
     box-shadow: 0 6px 18px rgba(0, 0, 0, 0.14);
   }
 
+  .cosmiq-glass-header--companion {
+    background: linear-gradient(
+      180deg,
+      hsl(var(--background) / 0.56),
+      hsl(var(--background) / 0.36)
+    );
+    border-bottom-color: hsl(var(--stardust-gold) / 0.18);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+  }
+
   html.platform-mac-hosted-ios .cosmiq-glass-nav,
   body.platform-mac-hosted-ios .cosmiq-glass-nav {
     background: linear-gradient(
@@ -2398,6 +2408,16 @@ All colors MUST be HSL.
     backdrop-filter: blur(10px) saturate(112%);
     -webkit-backdrop-filter: blur(10px) saturate(112%);
     box-shadow: 0 5px 14px rgba(0, 0, 0, 0.12);
+  }
+
+  html.platform-mac-hosted-ios .cosmiq-glass-header--companion,
+  body.platform-mac-hosted-ios .cosmiq-glass-header--companion {
+    background: linear-gradient(
+      180deg,
+      hsl(var(--background) / 0.72),
+      hsl(var(--background) / 0.52)
+    );
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   }
   
   /* Base cosmiq glass effect (updated for more transparency) */
@@ -2788,16 +2808,16 @@ All colors MUST be HSL.
   @keyframes tutorial-checkin-glow {
     0%, 100% {
       box-shadow:
-        0 0 0 1px rgba(216, 132, 255, 0.26),
-        0 0 18px rgba(168, 85, 247, 0.28),
-        0 12px 26px rgba(126, 34, 206, 0.24);
+        0 0 0 1px hsl(var(--primary) / 0.26),
+        0 0 18px rgba(var(--primary-rgb), 0.28),
+        0 12px 26px hsl(var(--primary) / 0.24);
       filter: brightness(1);
     }
     50% {
       box-shadow:
-        0 0 0 1px rgba(244, 161, 255, 0.45),
-        0 0 30px rgba(217, 70, 239, 0.34),
-        0 18px 36px rgba(168, 85, 247, 0.3);
+        0 0 0 1px hsl(var(--primary) / 0.45),
+        0 0 30px rgba(var(--primary-rgb), 0.34),
+        0 18px 36px hsl(var(--primary) / 0.3);
       filter: brightness(1.08);
     }
   }
@@ -2846,9 +2866,9 @@ All colors MUST be HSL.
   .tutorial-checkin-cta:disabled {
     opacity: 1;
     box-shadow:
-      0 0 0 1px rgba(216, 132, 255, 0.26),
-      0 0 18px rgba(168, 85, 247, 0.28),
-      0 12px 26px rgba(126, 34, 206, 0.24);
+      0 0 0 1px hsl(var(--primary) / 0.26),
+      0 0 18px rgba(var(--primary-rgb), 0.28),
+      0 12px 26px hsl(var(--primary) / 0.24);
     filter: saturate(1.05);
   }
 

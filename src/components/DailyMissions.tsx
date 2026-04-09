@@ -166,8 +166,8 @@ const DailyMissionsContent = memo(() => {
   };
 
   return (
-    <Card className="p-4 sm:p-5 md:p-6 bg-card/25 backdrop-blur-2xl border-accent/20 hover:border-accent/40 transition-all duration-500 hover:shadow-[0_0_40px_hsl(var(--accent)/0.15)] relative overflow-hidden group">
-      <div className="absolute inset-0 bg-gradient-to-br from-accent/10 to-primary/10 pointer-events-none" />
+    <Card className="p-4 sm:p-5 md:p-6 bg-card/18 backdrop-blur-xl border-accent/16 hover:border-accent/28 transition-all duration-500 hover:shadow-[0_0_32px_hsl(var(--accent)/0.12)] relative overflow-hidden group">
+      <div className="absolute inset-0 bg-gradient-to-br from-accent/8 to-primary/8 pointer-events-none" />
       <div className="relative space-y-3 sm:space-y-4 z-10">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 sm:gap-3">

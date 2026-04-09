@@ -1,10 +1,11 @@
 export const WALLPAPER_CATALOG_TIMEZONE = "America/Los_Angeles" as const;
-export const WALLPAPER_PROMPT_VERSION = 2 as const;
+export const WALLPAPER_PROMPT_VERSION = 3 as const;
 export const WALLPAPER_IMAGE_SIZE = "1024x1536" as const;
 export const WALLPAPER_IMAGE_WIDTH = 1024 as const;
 export const WALLPAPER_IMAGE_HEIGHT = 1536 as const;
 
 export const WALLPAPER_PAGE_KEYS = [
+  "guide",
   "quests",
   "campaigns",
   "companion",
@@ -14,6 +15,7 @@ export const WALLPAPER_PAGE_KEYS = [
 export type WallpaperPageKey = (typeof WALLPAPER_PAGE_KEYS)[number];
 
 export const RECENT_LIVE_WALLPAPER_PAGE_KEYS = [
+  "guide",
   "quests",
   "campaigns",
   "companion",
@@ -63,8 +65,6 @@ export interface WallpaperGenerationSpec {
     x: number;
     y: number;
   };
-  overlayStrength: number;
-  showCosmicOverlay: boolean;
 }
 
 export interface WallpaperPromptVariant {
@@ -104,6 +104,7 @@ export interface WallpaperAssetCandidate<TId extends string = string>
 }
 
 const wallpaperPageLabels: Record<WallpaperPageKey, string> = {
+  guide: "Guide",
   quests: "Quests",
   campaigns: "Campaigns",
   companion: "Companion",
@@ -111,9 +112,10 @@ const wallpaperPageLabels: Record<WallpaperPageKey, string> = {
 };
 
 const wallpaperPageDescriptions: Record<WallpaperPageKey, string> = {
-  quests: "Awe-inspiring open-path landscape for personal planning and weekly questing.",
-  campaigns: "Grand expedition-scale vista for long-range momentum and ritual building.",
-  companion: "Calm luminous sanctuary that supports the companion card instead of competing with it.",
+  guide: "Calm cinematic observatory backdrop for daily guidance, briefings, and reflective support.",
+  quests: "Forward-motion planning landscape with a clear route and a sense of possibility.",
+  campaigns: "Large-scale strategic vista for long-range momentum, ambition, and ritual building.",
+  companion: "Peaceful sanctuary backdrop that stays supportive while leaving the companion card as the hero.",
   profile: "Quiet premium observatory or twilight landscape for settings and account surfaces.",
 };
 
@@ -156,44 +158,49 @@ const buildWallpaperPrompt = (
 ].join(" ");
 
 export const wallpaperGenerationSpecs: Record<WallpaperPageKey, WallpaperGenerationSpec> = {
+  guide: {
+    label: wallpaperPageLabels.guide,
+    pageDescription: wallpaperPageDescriptions.guide,
+    prompt: buildWallpaperPrompt(
+      "guide",
+      "Show a calm observatory, contemplative overlook, moonlit terrace, or serene horizon with subtle celestial detail and elegant atmospheric depth.",
+      "Prioritize wisdom, steadiness, and readability for guidance cards. The image should feel premium and supportive, never loud or distracting.",
+    ),
+    mobileFocus: { x: 50, y: 30 },
+    desktopFocus: { x: 52, y: 34 },
+  },
   quests: {
     label: wallpaperPageLabels.quests,
     pageDescription: wallpaperPageDescriptions.quests,
     prompt: buildWallpaperPrompt(
       "quests",
-      "Show a gorgeous path, trail, pass, shoreline, canyon route, or other inviting route through a vast landscape. The image should spark forward motion and possibility.",
-      "Prioritize beauty, depth, horizon scale, and a strong sense of journey over overt fantasy effects.",
+      "Show a gorgeous path, trail, pass, shoreline route, canyon switchback, or other clearly readable way forward through a vast landscape. The image should spark planning energy and motion.",
+      "Prioritize route clarity, beauty, depth, and a sense of personal momentum over spectacle or fantasy noise.",
     ),
-    mobileFocus: { x: 56, y: 54 },
+    mobileFocus: { x: 56, y: 56 },
     desktopFocus: { x: 58, y: 50 },
-    overlayStrength: 0.64,
-    showCosmicOverlay: true,
   },
   campaigns: {
     label: wallpaperPageLabels.campaigns,
     pageDescription: wallpaperPageDescriptions.campaigns,
     prompt: buildWallpaperPrompt(
       "campaigns",
-      "Show a majestic large-scale landscape with cliffs, ranges, coastlines, canyons, glaciers, or alien horizons that feel built for long-term ambition and expedition.",
-      "The image should feel enormous, dramatic, and strategic, with clear scenic depth and a premium high-definition finish.",
+      "Show a majestic large-scale landscape with cliffs, ranges, coastlines, canyons, glaciers, or alien horizons that feel built for long-range ambition and expedition planning.",
+      "The image should feel enormous, strategic, and high-definition, with commanding scenic depth rather than dreamy haze.",
     ),
-    mobileFocus: { x: 46, y: 44 },
-    desktopFocus: { x: 50, y: 48 },
-    overlayStrength: 0.7,
-    showCosmicOverlay: true,
+    mobileFocus: { x: 46, y: 42 },
+    desktopFocus: { x: 50, y: 46 },
   },
   companion: {
     label: wallpaperPageLabels.companion,
     pageDescription: wallpaperPageDescriptions.companion,
     prompt: buildWallpaperPrompt(
       "companion",
-      "Show a serene celestial sanctuary or nature-meets-space refuge with a peaceful center and gentle atmospheric beauty.",
-      "Keep the center calm and uncluttered so the companion card remains the visual hero.",
+      "Show a serene celestial sanctuary or nature-meets-space refuge with a peaceful center, soft atmosphere, and gentle luminous beauty.",
+      "Keep the center especially calm and uncluttered so the companion card remains the visual hero. Avoid bright competing subjects behind the card area.",
     ),
-    mobileFocus: { x: 52, y: 28 },
-    desktopFocus: { x: 50, y: 32 },
-    overlayStrength: 0.72,
-    showCosmicOverlay: true,
+    mobileFocus: { x: 50, y: 26 },
+    desktopFocus: { x: 50, y: 30 },
   },
   profile: {
     label: wallpaperPageLabels.profile,
@@ -205,12 +212,19 @@ export const wallpaperGenerationSpecs: Record<WallpaperPageKey, WallpaperGenerat
     ),
     mobileFocus: { x: 50, y: 34 },
     desktopFocus: { x: 50, y: 36 },
-    overlayStrength: 0.66,
-    showCosmicOverlay: false,
   },
 };
 
 export const wallpaperPromptVariants = {
+  "guide-aurora-observatory": {
+    pageKey: "guide",
+    title: "Aurora Observatory",
+    prompt: buildWallpaperPrompt(
+      "guide",
+      "Show a refined hilltop observatory, moonlit study terrace, or contemplative cliffside refuge with subtle aurora color and a tranquil celestial sky. Favor teal, silver, deep blue, slate, and restrained warm light accents.",
+      "Keep the center readable and emotionally steady, with calm atmosphere that supports daily guidance rather than stealing focus.",
+    ),
+  },
   "quests-desert-trail-dawn": {
     pageKey: "quests",
     title: "Desert Trail Dawn",
@@ -305,7 +319,15 @@ export const wallpaperPromptVariants = {
 
 export type WallpaperPromptVariantKey = keyof typeof wallpaperPromptVariants;
 
+export const CORE_TABS_V1_VARIANT_KEYS = [
+  "guide-aurora-observatory",
+  "quests-redwood-mist-path",
+  "campaigns-ocean-cliffs-ringworld",
+  "companion-moonlit-alpine-sanctuary",
+] as const satisfies readonly WallpaperPromptVariantKey[];
+
 export const LANDSCAPE_DIVERSE_V1_VARIANT_KEYS = [
+  "guide-aurora-observatory",
   "quests-desert-trail-dawn",
   "quests-redwood-mist-path",
   "quests-ringed-tundra-pass",
@@ -315,10 +337,13 @@ export const LANDSCAPE_DIVERSE_V1_VARIANT_KEYS = [
   "companion-moonlit-alpine-sanctuary",
   "companion-bioluminescent-lagoon",
   "profile-twilight-coastal-observatory",
-  "profile-snow-plateau-horizon",
 ] as const satisfies readonly WallpaperPromptVariantKey[];
 
 export const wallpaperGenerationBatchPresets = {
+  "core-tabs-v1": {
+    label: "Core Tabs v1",
+    variantKeys: [...CORE_TABS_V1_VARIANT_KEYS],
+  },
   "landscape-diverse-v1": {
     label: "Landscape Diverse v1",
     variantKeys: [...LANDSCAPE_DIVERSE_V1_VARIANT_KEYS],
@@ -356,6 +381,12 @@ const wallpaperDateFormatter = new Intl.DateTimeFormat("en-CA", {
   day: "2-digit",
 });
 
+const createWallpaperPageRecord = <T>(factory: (pageKey: WallpaperPageKey) => T) => (
+  Object.fromEntries(
+    WALLPAPER_PAGE_KEYS.map((pageKey) => [pageKey, factory(pageKey)]),
+  ) as Record<WallpaperPageKey, T>
+);
+
 export const countWallpaperVariantsByPage = (
   variantKeys: readonly WallpaperPromptVariantKey[],
 ) => variantKeys.reduce<Record<WallpaperPageKey, number>>(
@@ -363,12 +394,7 @@ export const countWallpaperVariantsByPage = (
     counts[wallpaperPromptVariants[variantKey].pageKey] += 1;
     return counts;
   },
-  {
-    quests: 0,
-    campaigns: 0,
-    companion: 0,
-    profile: 0,
-  },
+  createWallpaperPageRecord(() => 0),
 );
 
 export const formatWallpaperVariantLabel = (variantKey: string | null | undefined) => {

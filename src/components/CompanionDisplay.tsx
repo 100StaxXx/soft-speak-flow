@@ -545,19 +545,19 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
   return (
     <>
       <Card
-        className="relative overflow-hidden bg-card/25 backdrop-blur-2xl border transition-all duration-500 animate-scale-in"
+        className="relative overflow-hidden bg-card/18 backdrop-blur-xl border transition-all duration-500 animate-scale-in"
         style={{ borderColor: companionPalette.chipBorder }}
       >
         {/* Equipped background or default nebula gradients */}
         {equippedBackgroundStyle ? (
           <div 
-            className="absolute inset-0 opacity-70 transition-opacity duration-500" 
+            className="absolute inset-0 opacity-58 transition-opacity duration-500" 
             style={{ background: equippedBackgroundStyle }}
           />
         ) : (
           <>
             <div
-              className={`absolute inset-0 opacity-60 ${!prefersReducedMotion ? "animate-nebula-shift" : ""}`}
+              className={`absolute inset-0 opacity-42 ${!prefersReducedMotion ? "animate-nebula-shift" : ""}`}
               style={{
                 background: `linear-gradient(135deg, ${companionPalette.cardGradientA}, ${companionPalette.cardGradientB})`,
               }}

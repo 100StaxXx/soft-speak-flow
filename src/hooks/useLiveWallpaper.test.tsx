@@ -127,6 +127,47 @@ describe("fetchLiveWallpaperRecord", () => {
     });
   });
 
+  it("resolves guide wallpaper assignments through the same live wallpaper path", async () => {
+    mocks.from
+      .mockReturnValueOnce({
+        select: () => ({
+          eq: () => ({
+            eq: () => ({
+              maybeSingle: async () => ({
+                data: { wallpaper_asset_id: "guide-asset-1" },
+                error: null,
+              }),
+            }),
+          }),
+        }),
+      })
+      .mockReturnValueOnce({
+        select: () => ({
+          eq: () => ({
+            maybeSingle: async () => ({
+              data: {
+                publish_state: "ready",
+                source_kind: "generated",
+                generation_date: "2026-04-08",
+                image_url: "https://example.com/guide-wallpaper.png",
+                mobile_focus_x: 50,
+                mobile_focus_y: 30,
+                desktop_focus_x: 52,
+                desktop_focus_y: 34,
+              },
+              error: null,
+            }),
+          }),
+        }),
+      });
+
+    await expect(fetchLiveWallpaperRecord("guide", "2026-04-08")).resolves.toEqual({
+      imageUrl: "https://example.com/guide-wallpaper.png",
+      mobileObjectPosition: "50% 30%",
+      desktopObjectPosition: "52% 34%",
+    });
+  });
+
   it("returns null when the assigned wallpaper asset is not ready", async () => {
     mocks.from
       .mockReturnValueOnce({

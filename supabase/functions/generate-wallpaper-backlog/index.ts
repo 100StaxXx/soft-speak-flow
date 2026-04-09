@@ -10,6 +10,7 @@ import {
 } from "../_shared/wallpaperPipeline.ts";
 import {
   getWallpaperDateKey,
+  WALLPAPER_PAGE_KEYS,
   pickBestWallpaperPromotionCandidate,
   wallpaperGenerationBatchPresets,
   wallpaperPromptVariants,
@@ -61,7 +62,7 @@ serve(async (req) => {
     batchPreset?: WallpaperGenerationBatchPresetKey;
     promoteNow?: boolean;
   };
-  const batchPresetKey = body.batchPreset ?? "landscape-diverse-v1";
+  const batchPresetKey = body.batchPreset ?? "core-tabs-v1";
   const promoteNow = body.promoteNow !== false;
   const preset = wallpaperGenerationBatchPresets[batchPresetKey];
 
@@ -75,7 +76,20 @@ serve(async (req) => {
   const dateKey = getWallpaperDateKey();
   const batchLabel = buildBatchLabel(batchPresetKey);
   const outcomes: BatchOutcome[] = [];
-  const acceptedByPage: Record<
+  const acceptedByPage = Object.fromEntries(
+    WALLPAPER_PAGE_KEYS.map((pageKey) => [pageKey, [] as Array<{
+      id: string;
+      createdAt: string;
+      variantKey: WallpaperPromptVariantKey;
+      validation: {
+        scenicQualityScore: number;
+        moodMatchScore: number;
+        detailScore: number;
+        contrastScore: number;
+        safeZoneConfidenceScore: number;
+      };
+    }>]),
+  ) as Record<
     WallpaperPageKey,
     Array<{
       id: string;
@@ -89,12 +103,7 @@ serve(async (req) => {
         safeZoneConfidenceScore: number;
       };
     }>
-  > = {
-    quests: [],
-    campaigns: [],
-    companion: [],
-    profile: [],
-  };
+  >;
 
   for (const variantKey of preset.variantKeys) {
     const variant = wallpaperPromptVariants[variantKey];

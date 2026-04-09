@@ -293,12 +293,12 @@ const MorningCheckInContent = () => {
   return (
     <div data-tour="morning-checkin" className="rounded-2xl bg-card/25 backdrop-blur-2xl border border-white/[0.08] overflow-hidden animate-scale-in shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
       {/* Header */}
-      <div className="px-5 py-4 border-b border-white/[0.06] bg-gradient-to-r from-orange-500/5 to-amber-500/[0.02]">
+      <div className="px-5 py-4 border-b border-white/[0.06] bg-gradient-to-r from-primary/10 to-accent/[0.04]">
         <div className="flex items-center gap-3">
-          <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-orange-500/20 to-amber-500/20 flex items-center justify-center border border-orange-500/30">
-            <Sunrise className="h-5 w-5 text-orange-500" />
+          <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center border border-primary/30">
+            <Sunrise className="h-5 w-5 text-primary" />
           </div>
-          <h3 className="font-heading font-black text-2xl tracking-wide text-orange-500">CHECK-IN</h3>
+          <h3 className="font-heading font-black text-2xl tracking-wide text-primary">CHECK-IN</h3>
         </div>
       </div>
 
@@ -330,7 +330,7 @@ const MorningCheckInContent = () => {
           data-tour="checkin-submit"
           data-tutorial-highlight={isTutorialMorningCheckinStep ? "true" : undefined}
           disabled={isSubmitting || !mood || !intention.trim() || !!existingCheckIn}
-          variant="cta"
+          variant="gradient"
           className={cn(
             "w-full h-13 text-base",
             isTutorialMorningCheckinStep && "tutorial-checkin-cta"

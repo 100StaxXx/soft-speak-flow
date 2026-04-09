@@ -20,14 +20,14 @@ export const FocusTab = memo(({ layoutMode = 'mobile' }: FocusTabProps) => {
   if (isDesktop) {
     return (
       <div className="space-y-6 pt-1">
-        <div className="flex flex-col gap-4 rounded-2xl border border-border/60 bg-card/35 p-4 backdrop-blur-md md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col gap-4 rounded-2xl border border-border/50 bg-card/24 p-4 backdrop-blur-md md:flex-row md:items-center md:justify-between">
           <div className="space-y-1">
             <p className="text-sm font-medium text-muted-foreground">Focus studio</p>
             <p className="text-2xl font-semibold tracking-tight">
               Run focus sessions or resist an urge without leaving your companion.
             </p>
           </div>
-          <div className="flex gap-2 rounded-2xl bg-background/40 p-1">
+          <div className="flex gap-2 rounded-2xl bg-background/28 p-1">
             <Button
               variant={mode === 'focus' ? 'default' : 'ghost'}
               size="sm"

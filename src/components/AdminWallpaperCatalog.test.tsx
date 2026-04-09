@@ -112,20 +112,20 @@ describe("AdminWallpaperCatalog", () => {
     expect(screen.getByText("Desert Trail Dawn")).toBeInTheDocument();
   });
 
-  it("triggers the fixed backlog generation flow from the admin action", async () => {
+  it("triggers the core tab starter generation flow from the admin action", async () => {
     render(<AdminWallpaperCatalog />);
 
-    fireEvent.click(await screen.findByRole("button", { name: /generate 10 landscapes/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /generate 4 core backdrops/i }));
 
     await waitFor(() => {
       expect(mocks.invoke).toHaveBeenCalledWith("generate-wallpaper-backlog", {
         body: {
-          batchPreset: "landscape-diverse-v1",
+          batchPreset: "core-tabs-v1",
           promoteNow: true,
         },
       });
     });
 
-    expect(mocks.toastSuccess).toHaveBeenCalledWith("Generated 7 ready wallpapers. Promoted 1 live today.");
+    expect(mocks.toastSuccess).toHaveBeenCalledWith("Generated 7 ready core tab backdrops. Promoted 1 live today.");
   });
 });

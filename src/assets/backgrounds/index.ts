@@ -18,12 +18,26 @@ export interface StaticBackgroundAsset {
 
 export type CinematicPageBackgroundKey = WallpaperPageKey;
 
+export interface CinematicBackgroundScrim {
+  topGradientTopAlpha: number;
+  topGradientMiddleAlpha: number;
+  topGradientBottomAlpha: number;
+  centerAnchor: string;
+  centerClearStop: number;
+  centerMidStop: number;
+  centerMidAlpha: number;
+  centerEdgeAlpha: number;
+  bottomFadeStart: number;
+  bottomFadeEndAlpha: number;
+  cosmicGlowOpacity: number;
+}
+
 export interface CinematicPageBackgroundPreset {
   background: StaticBackgroundAsset;
   mobileObjectPosition: string;
   desktopObjectPosition: string;
-  overlayStrength: number;
   showCosmicOverlay: boolean;
+  scrim: CinematicBackgroundScrim;
 }
 
 export const createBackgroundAsset = (src: string, src2x = src): StaticBackgroundAsset => ({
@@ -39,33 +53,100 @@ export const questsSeedBackground = createBackgroundAsset(wallpaperQuestsSeed, w
 export const campaignsSeedBackground = createBackgroundAsset(wallpaperCampaignsSeed, wallpaperCampaignsSeed_2x);
 
 export const cinematicPageBackgrounds: Record<CinematicPageBackgroundKey, CinematicPageBackgroundPreset> = {
+  guide: {
+    background: welcomeBackground,
+    mobileObjectPosition: `${wallpaperGenerationSpecs.guide.mobileFocus.x}% ${wallpaperGenerationSpecs.guide.mobileFocus.y}%`,
+    desktopObjectPosition: `${wallpaperGenerationSpecs.guide.desktopFocus.x}% ${wallpaperGenerationSpecs.guide.desktopFocus.y}%`,
+    showCosmicOverlay: true,
+    scrim: {
+      topGradientTopAlpha: 0.5,
+      topGradientMiddleAlpha: 0.16,
+      topGradientBottomAlpha: 0.62,
+      centerAnchor: "50% 30%",
+      centerClearStop: 38,
+      centerMidStop: 74,
+      centerMidAlpha: 0.12,
+      centerEdgeAlpha: 0.34,
+      bottomFadeStart: 78,
+      bottomFadeEndAlpha: 0.52,
+      cosmicGlowOpacity: 0.11,
+    },
+  },
   quests: {
     background: questsSeedBackground,
     mobileObjectPosition: `${wallpaperGenerationSpecs.quests.mobileFocus.x}% ${wallpaperGenerationSpecs.quests.mobileFocus.y}%`,
     desktopObjectPosition: `${wallpaperGenerationSpecs.quests.desktopFocus.x}% ${wallpaperGenerationSpecs.quests.desktopFocus.y}%`,
-    overlayStrength: wallpaperGenerationSpecs.quests.overlayStrength,
-    showCosmicOverlay: wallpaperGenerationSpecs.quests.showCosmicOverlay,
+    showCosmicOverlay: true,
+    scrim: {
+      topGradientTopAlpha: 0.58,
+      topGradientMiddleAlpha: 0.2,
+      topGradientBottomAlpha: 0.76,
+      centerAnchor: "50% 36%",
+      centerClearStop: 30,
+      centerMidStop: 74,
+      centerMidAlpha: 0.24,
+      centerEdgeAlpha: 0.46,
+      bottomFadeStart: 72,
+      bottomFadeEndAlpha: 0.68,
+      cosmicGlowOpacity: 0.16,
+    },
   },
   campaigns: {
     background: campaignsSeedBackground,
     mobileObjectPosition: `${wallpaperGenerationSpecs.campaigns.mobileFocus.x}% ${wallpaperGenerationSpecs.campaigns.mobileFocus.y}%`,
     desktopObjectPosition: `${wallpaperGenerationSpecs.campaigns.desktopFocus.x}% ${wallpaperGenerationSpecs.campaigns.desktopFocus.y}%`,
-    overlayStrength: wallpaperGenerationSpecs.campaigns.overlayStrength,
-    showCosmicOverlay: wallpaperGenerationSpecs.campaigns.showCosmicOverlay,
+    showCosmicOverlay: true,
+    scrim: {
+      topGradientTopAlpha: 0.64,
+      topGradientMiddleAlpha: 0.24,
+      topGradientBottomAlpha: 0.82,
+      centerAnchor: "50% 34%",
+      centerClearStop: 28,
+      centerMidStop: 74,
+      centerMidAlpha: 0.28,
+      centerEdgeAlpha: 0.52,
+      bottomFadeStart: 68,
+      bottomFadeEndAlpha: 0.76,
+      cosmicGlowOpacity: 0.15,
+    },
   },
   companion: {
     background: signinBackground,
     mobileObjectPosition: `${wallpaperGenerationSpecs.companion.mobileFocus.x}% ${wallpaperGenerationSpecs.companion.mobileFocus.y}%`,
     desktopObjectPosition: `${wallpaperGenerationSpecs.companion.desktopFocus.x}% ${wallpaperGenerationSpecs.companion.desktopFocus.y}%`,
-    overlayStrength: wallpaperGenerationSpecs.companion.overlayStrength,
-    showCosmicOverlay: wallpaperGenerationSpecs.companion.showCosmicOverlay,
+    showCosmicOverlay: true,
+    scrim: {
+      topGradientTopAlpha: 0.42,
+      topGradientMiddleAlpha: 0.12,
+      topGradientBottomAlpha: 0.56,
+      centerAnchor: "50% 26%",
+      centerClearStop: 44,
+      centerMidStop: 80,
+      centerMidAlpha: 0.1,
+      centerEdgeAlpha: 0.24,
+      bottomFadeStart: 82,
+      bottomFadeEndAlpha: 0.42,
+      cosmicGlowOpacity: 0.08,
+    },
   },
   profile: {
     background: welcomeBackground,
     mobileObjectPosition: `${wallpaperGenerationSpecs.profile.mobileFocus.x}% ${wallpaperGenerationSpecs.profile.mobileFocus.y}%`,
     desktopObjectPosition: `${wallpaperGenerationSpecs.profile.desktopFocus.x}% ${wallpaperGenerationSpecs.profile.desktopFocus.y}%`,
-    overlayStrength: wallpaperGenerationSpecs.profile.overlayStrength,
-    showCosmicOverlay: wallpaperGenerationSpecs.profile.showCosmicOverlay,
+    showCosmicOverlay: false,
+    scrim: {
+      topGradientTopAlpha: 0.54,
+      topGradientMiddleAlpha: 0.16,
+      topGradientBottomAlpha: 0.68,
+      centerAnchor: "50% 34%",
+      centerClearStop: 36,
+      centerMidStop: 76,
+      centerMidAlpha: 0.18,
+      centerEdgeAlpha: 0.4,
+      bottomFadeStart: 76,
+      bottomFadeEndAlpha: 0.56,
+      cosmicGlowOpacity: 0.06,
+    },
   },
 };
 

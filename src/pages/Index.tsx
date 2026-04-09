@@ -23,7 +23,6 @@ import {
   buildEstablishedProfileSelfHealPatch,
   getOnboardingGateState,
 } from "@/utils/profileOnboarding";
-import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMainTabVisibility } from "@/contexts/MainTabVisibilityContext";
 import { useMentorLayoutMode } from "@/hooks/useMentorLayoutMode";
@@ -33,6 +32,7 @@ import { useMentorConnection } from "@/contexts/MentorConnectionContext";
 import { getEffectiveDailyDate } from "@/utils/timezone";
 import { safeSessionStorage } from "@/utils/storage";
 import { usePostOnboardingMentorGuidance } from "@/hooks/usePostOnboardingMentorGuidance";
+import { CinematicPageBackground } from "@/components/CinematicPageBackground";
 
 type IndexProps = {
   enableOnboardingGuard?: boolean;
@@ -646,7 +646,7 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
 
   return (
     <PageTransition mode={enableOnboardingGuard ? "animated" : "instant"}>
-      <StarfieldBackground scene={shouldUseGuideTiffanyTheme ? "guide-tiffany" : "default"} />
+      <CinematicPageBackground preset="guide" />
 
       {/* Scrollable Content */}
       <div

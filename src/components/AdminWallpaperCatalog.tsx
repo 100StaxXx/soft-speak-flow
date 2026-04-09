@@ -94,12 +94,12 @@ export const AdminWallpaperCatalog = () => {
     void fetchCatalog();
   }, [fetchCatalog]);
 
-  const generateLandscapeBacklog = useCallback(async () => {
+  const generateCoreTabBackdrops = useCallback(async () => {
     setIsGeneratingBacklog(true);
 
     const { data, error } = await supabase.functions.invoke("generate-wallpaper-backlog", {
       body: {
-        batchPreset: "landscape-diverse-v1",
+        batchPreset: "core-tabs-v1",
         promoteNow: true,
       },
     });
@@ -113,7 +113,7 @@ export const AdminWallpaperCatalog = () => {
 
     const acceptedCount = typeof data?.acceptedCount === "number" ? data.acceptedCount : 0;
     const promotedCount = Array.isArray(data?.promoted) ? data.promoted.length : 0;
-    toast.success(`Generated ${acceptedCount} ready wallpapers. Promoted ${promotedCount} live today.`);
+    toast.success(`Generated ${acceptedCount} ready core tab backdrops. Promoted ${promotedCount} live today.`);
     setIsGeneratingBacklog(false);
     await fetchCatalog();
   }, [fetchCatalog]);
@@ -179,17 +179,17 @@ export const AdminWallpaperCatalog = () => {
         <div>
           <h2 className="font-heading text-2xl font-semibold">Wallpaper Catalog</h2>
           <p className="text-muted-foreground">
-            Auto-live daily scenic wallpapers for the core tabs. Current catalog day: {todayKey}.
+            Auto-live daily scenic wallpapers for Guide, Quests, Campaigns, and Companion. Current catalog day: {todayKey}.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button
             className="rounded-full"
-            onClick={() => void generateLandscapeBacklog()}
+            onClick={() => void generateCoreTabBackdrops()}
             disabled={loading || isGeneratingBacklog}
           >
             {isGeneratingBacklog ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Sparkles className="h-4 w-4 mr-2" />}
-            Generate 10 Landscapes
+            Generate 4 Core Backdrops
           </Button>
           <Button variant="outline" className="rounded-full" onClick={() => void fetchCatalog()} disabled={loading || isGeneratingBacklog}>
             {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}

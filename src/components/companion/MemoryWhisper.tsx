@@ -73,7 +73,7 @@ export const MemoryWhisper = memo(({ className, chance = 0.15 }: MemoryWhisperPr
         transition={{ duration: 0.3 }}
         className={cn(
           "mt-2 p-2 rounded-lg",
-          "bg-primary/5 border border-primary/10",
+          "bg-primary/4 border border-primary/8",
           className
         )}
         style={{

@@ -191,7 +191,7 @@ export const MorningBriefing = memo(({ onAskMore, className }: MorningBriefingPr
               <Button
                 onClick={handleGenerate}
                 disabled={isGenerating}
-                variant="cta"
+                variant="gradient"
                 className="w-full h-10 sm:h-12"
                 size="lg"
               >

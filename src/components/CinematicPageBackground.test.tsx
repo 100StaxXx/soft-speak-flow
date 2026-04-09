@@ -86,6 +86,7 @@ describe("CinematicPageBackground", () => {
   });
 
   it.each([
+    "guide",
     "quests",
     "campaigns",
     "companion",
@@ -104,6 +105,25 @@ describe("CinematicPageBackground", () => {
     });
     expect(screen.getByTestId("cinematic-background-image-desktop")).toHaveStyle({
       objectPosition: cinematicPageBackgrounds.campaigns.desktopObjectPosition,
+    });
+  });
+
+  it("uses the preset scrim recipe instead of a shared derived overlay", () => {
+    render(<CinematicPageBackground preset="guide" />);
+
+    const scrim = cinematicPageBackgrounds.guide.scrim;
+    const background = screen.getByTestId("cinematic-background");
+    const topScrim = background.querySelector('[data-cinematic-scrim="top"]') as HTMLElement | null;
+    const centerScrim = background.querySelector('[data-cinematic-scrim="center"]') as HTMLElement | null;
+
+    expect(topScrim).not.toBeNull();
+    expect(centerScrim).not.toBeNull();
+
+    expect(topScrim).toHaveStyle({
+      background: `linear-gradient(180deg, hsl(var(--background) / ${scrim.topGradientTopAlpha}) 0%, hsl(var(--background) / ${scrim.topGradientMiddleAlpha}) 28%, hsl(var(--background) / ${scrim.topGradientBottomAlpha}) 100%)`,
+    });
+    expect(centerScrim).toHaveStyle({
+      background: `radial-gradient(circle at ${scrim.centerAnchor}, transparent 0%, transparent ${scrim.centerClearStop}%, hsl(var(--background) / ${scrim.centerMidAlpha}) ${scrim.centerMidStop}%, hsl(var(--background) / ${scrim.centerEdgeAlpha}) 100%)`,
     });
   });
 

@@ -337,7 +337,7 @@ describe("Companion tabs performance behavior", () => {
 
     expect(screen.getByTestId("cinematic-background")).toHaveAttribute("data-preset", "companion");
     expect(screen.getByTestId("companion-theme-shell")).toHaveStyle("--primary: 45 100% 65%; --accent: 40 96% 57%");
-    expect(screen.getByTestId("companion-tab-list")).toHaveClass("border-stardust-gold/20");
+    expect(screen.getByTestId("companion-tab-list")).toHaveClass("border-stardust-gold/16");
   });
 
   afterEach(() => {
