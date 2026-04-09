@@ -26,6 +26,8 @@ const resolvePrefillTitle = (parsed: ParsedTask, transcript: string) => {
       /\snext\s+\w+/i,
       /\sat\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)?\b/i,
       /\s(?:for|with)\s+\d+\s*(?:h(?:ours?)?|m(?:in(?:ute)?s?)?)\b/i,
+      /\s(?:it(?:'s| is)\s+)?(?:gonna|going\s+to|will|should|can|could)?\s*(?:last|take|run|be)\b/i,
+      /\s(?:lasting|taking|running)\b/i,
       /\s(?:daily|weekly|monthly|weekdays?|weekends?)\b/i,
       /\severy\s+\w+/i,
       /\sremind(?:er| me)?\b/i,

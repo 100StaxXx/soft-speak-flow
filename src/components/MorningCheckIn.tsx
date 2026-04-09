@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, memo } from "react";
-import { Card } from "@/components/ui/card";
+import { Card, clearShellCardClassName } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useXPRewards } from "@/hooks/useXPRewards";
 import { useAchievements } from "@/hooks/useAchievements";
@@ -232,7 +232,11 @@ const MorningCheckInContent = () => {
 
   if (existingCheckIn?.completed_at) {
     return (
-      <Card data-tour="morning-checkin" className="p-5 sm:p-6 bg-card/25 backdrop-blur-2xl border-celestial-blue/20">
+      <Card
+        data-tour="morning-checkin"
+        data-testid="morning-checkin-shell"
+        className={cn("p-5 sm:p-6 border-celestial-blue/20", clearShellCardClassName)}
+      >
         <div className="space-y-4">
           <div className="flex items-start gap-3">
             <div className="h-10 w-10 rounded-xl bg-stardust-gold/20 flex items-center justify-center flex-shrink-0 ring-1 ring-stardust-gold/30">
@@ -246,7 +250,10 @@ const MorningCheckInContent = () => {
 
           {/* Mentor Response Section */}
           {personality && (
-            <div className="relative overflow-hidden bg-white/[0.03] backdrop-blur-xl rounded-2xl p-4 sm:p-5 border border-white/[0.08]">
+            <div
+              data-testid="mentor-response-panel"
+              className="relative overflow-hidden bg-white/[0.03] backdrop-blur-xl rounded-2xl p-4 sm:p-5 border border-white/[0.08]"
+            >
               <span
                 aria-hidden="true"
                 className="absolute -left-1 -top-7 text-7xl leading-none font-serif text-white/[0.08] select-none"
@@ -293,9 +300,16 @@ const MorningCheckInContent = () => {
   }
 
   return (
-    <div data-tour="morning-checkin" className="rounded-2xl bg-card/25 backdrop-blur-2xl border border-white/[0.08] overflow-hidden animate-scale-in shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+    <div
+      data-tour="morning-checkin"
+      data-testid="morning-checkin-shell"
+      className={cn(
+        "rounded-2xl border border-white/[0.08] overflow-hidden animate-scale-in",
+        clearShellCardClassName,
+      )}
+    >
       {/* Header */}
-      <div className="px-5 py-4 border-b border-white/[0.06] bg-gradient-to-r from-primary/10 to-accent/[0.04]">
+      <div data-testid="morning-checkin-header" className="px-5 py-4 border-b border-white/[0.06]">
         <div className="flex items-center gap-3">
           <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center border border-primary/30">
             <Sunrise className="h-5 w-5 text-primary" />

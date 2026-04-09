@@ -119,6 +119,12 @@ describe("MorningCheckIn completion portrait", () => {
     render(<MorningCheckIn />);
 
     const portrait = await screen.findByTestId("mentor-portrait-tile");
+    expect(screen.getByTestId("morning-checkin-shell").className).toContain("bg-transparent");
+    expect(screen.getByTestId("morning-checkin-shell").className).toContain("backdrop-blur-none");
+    expect(screen.getByTestId("morning-checkin-shell").className).toContain("shadow-none");
+    expect(screen.getByTestId("morning-checkin-shell")).toHaveClass("border-celestial-blue/20");
+    expect(screen.getByTestId("mentor-response-panel")).toHaveClass("bg-white/[0.03]");
+    expect(screen.getByTestId("mentor-response-panel")).toHaveClass("backdrop-blur-xl");
     expect(portrait).toHaveClass("float-right");
     expect((portrait as HTMLImageElement).src).toContain("https://cdn.example.com/atlas.png");
     expect(screen.getByText(/Consistency beats intensity/i)).toBeInTheDocument();
@@ -178,6 +184,10 @@ describe("MorningCheckIn completion portrait", () => {
 
     render(<MorningCheckIn />);
 
+    expect(screen.getByTestId("morning-checkin-shell").className).toContain("bg-transparent");
+    expect(screen.getByTestId("morning-checkin-shell").className).toContain("backdrop-blur-none");
+    expect(screen.getByTestId("morning-checkin-shell").className).toContain("shadow-none");
+    expect(screen.getByTestId("morning-checkin-header")).not.toHaveClass("bg-gradient-to-r");
     const submitButton = screen.getByRole("button", { name: /check in/i });
     expect(submitButton).toBeDisabled();
     expect(submitButton).toHaveAttribute("data-tutorial-highlight", "true");

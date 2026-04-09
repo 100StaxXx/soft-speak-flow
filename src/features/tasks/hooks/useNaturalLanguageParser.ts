@@ -84,6 +84,79 @@ const MONTH_MAP: Record<string, number> = {
   dec: 11, december: 11,
 };
 
+const NUMBER_WORD_MAP: Record<string, number> = {
+  a: 1,
+  an: 1,
+  zero: 0,
+  one: 1,
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6,
+  seven: 7,
+  eight: 8,
+  nine: 9,
+  ten: 10,
+  eleven: 11,
+  twelve: 12,
+  thirteen: 13,
+  fourteen: 14,
+  fifteen: 15,
+  sixteen: 16,
+  seventeen: 17,
+  eighteen: 18,
+  nineteen: 19,
+  twenty: 20,
+  thirty: 30,
+  forty: 40,
+  fifty: 50,
+  sixty: 60,
+  seventy: 70,
+  eighty: 80,
+  ninety: 90,
+  couple: 2,
+  few: 3,
+};
+
+const NUMBER_WORD_PATTERN = String.raw`(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety(?:[-\s](?:one|two|three|four|five|six|seven|eight|nine))?)`;
+const DURATION_AMOUNT_PATTERN = String.raw`(?:\d+(?:\.\d+)?|a|an|couple|few|${NUMBER_WORD_PATTERN})`;
+const DURATION_PREFIX_PATTERN = String.raw`(?:for\s+|(?:it(?:'s| is)\s+)?(?:gonna|going\s+to|will|should|can|could)?\s*(?:last|take|run|be)\s+|(?:lasting|taking|running)\s+)?`;
+const DURATION_SUFFIX_GUARD = String.raw`(?!\s*(?:before|early|prior|remind(?:er)?))`;
+
+function parseSpokenNumberToken(value: string): number | null {
+  const normalized = value.trim().toLowerCase().replace(/-/g, ' ').replace(/\s+/g, ' ');
+
+  if (!normalized) return null;
+
+  if (/^\d+(?:\.\d+)?$/.test(normalized)) {
+    return Number.parseFloat(normalized);
+  }
+
+  if (normalized in NUMBER_WORD_MAP) {
+    return NUMBER_WORD_MAP[normalized];
+  }
+
+  const parts = normalized.split(' ').filter(Boolean);
+  if (parts.length === 2) {
+    const [tens, ones] = parts;
+    const tensValue = NUMBER_WORD_MAP[tens];
+    const onesValue = NUMBER_WORD_MAP[ones];
+
+    if (typeof tensValue === 'number' && typeof onesValue === 'number' && tensValue >= 20 && onesValue < 10) {
+      return tensValue + onesValue;
+    }
+  }
+
+  return null;
+}
+
+function parseDurationAmount(value: string, multiplier: number): number | null {
+  const parsedNumber = parseSpokenNumberToken(value);
+  if (parsedNumber === null) return null;
+  return Math.round(parsedNumber * multiplier);
+}
+
 // Smart time inference
 function inferAmPm(hour: number): 'am' | 'pm' {
   if (hour >= 1 && hour <= 6) return 'pm';
@@ -226,15 +299,100 @@ const DATE_PATTERNS = [
 
 // Duration patterns - enhanced
 const DURATION_PATTERNS = [
-  { regex: /\bfor\s+(\d+)\s*h(?:ours?)?\b/i, handler: (m: RegExpMatchArray) => parseInt(m[1]) * 60 },
-  { regex: /\bfor\s+(\d+)\s*m(?:in(?:utes?)?)?\b/i, handler: (m: RegExpMatchArray) => parseInt(m[1]) },
-  { regex: /\b(\d+)\s*h(?:ours?)?\s*(?:(\d+)\s*m(?:in)?s?)?\b/i, handler: (m: RegExpMatchArray) => parseInt(m[1]) * 60 + (m[2] ? parseInt(m[2]) : 0) },
-  { regex: /\b(\d+)\s*m(?:in(?:utes?)?)?\b/i, handler: (m: RegExpMatchArray) => parseInt(m[1]) },
-  { regex: /\bhalf\s*(?:an?\s*)?hour\b/i, handler: () => 30 },
-  { regex: /\bquarter\s*(?:of\s*an?\s*)?hour\b/i, handler: () => 15 },
-  { regex: /\b(?:a\s*)?couple\s*(?:of\s*)?hours?\b/i, handler: () => 120 },
-  { regex: /\b(?:a\s*)?few\s*(?:of\s*)?hours?\b/i, handler: () => 180 },
-  { regex: /\b(?:a\s*)?few\s*(?:of\s*)?min(?:ute)?s?\b/i, handler: () => 10 },
+  {
+    regex: new RegExp(
+      String.raw`\b${DURATION_PREFIX_PATTERN}(${DURATION_AMOUNT_PATTERN})\s*h(?:ours?|rs?)\s*(?:and\s+)?(${DURATION_AMOUNT_PATTERN})\s*m(?:in(?:ute)?s?)?\b${DURATION_SUFFIX_GUARD}`,
+      'i',
+    ),
+    handler: (m: RegExpMatchArray) => {
+      const hours = parseDurationAmount(m[1], 60);
+      const minutes = parseDurationAmount(m[2], 1);
+      return hours !== null && minutes !== null ? hours + minutes : null;
+    },
+  },
+  {
+    regex: new RegExp(
+      String.raw`\b${DURATION_PREFIX_PATTERN}(?:an?|one)\s+hour\s*(?:and\s+)?(${DURATION_AMOUNT_PATTERN})\s*m(?:in(?:ute)?s?)?\b${DURATION_SUFFIX_GUARD}`,
+      'i',
+    ),
+    handler: (m: RegExpMatchArray) => {
+      const minutes = parseDurationAmount(m[1], 1);
+      return minutes !== null ? 60 + minutes : null;
+    },
+  },
+  {
+    regex: new RegExp(
+      String.raw`\b${DURATION_PREFIX_PATTERN}(?:an?|one)\s+hour\s+and\s+a\s+half\b${DURATION_SUFFIX_GUARD}`,
+      'i',
+    ),
+    handler: () => 90,
+  },
+  {
+    regex: new RegExp(
+      String.raw`\b${DURATION_PREFIX_PATTERN}(${DURATION_AMOUNT_PATTERN})\s*h(?:ours?|rs?)\s+and\s+a\s+half\b${DURATION_SUFFIX_GUARD}`,
+      'i',
+    ),
+    handler: (m: RegExpMatchArray) => {
+      const hours = parseDurationAmount(m[1], 60);
+      return hours !== null ? hours + 30 : null;
+    },
+  },
+  {
+    regex: new RegExp(
+      String.raw`\b${DURATION_PREFIX_PATTERN}(${DURATION_AMOUNT_PATTERN})\s*h(?:ours?|rs?)\b${DURATION_SUFFIX_GUARD}`,
+      'i',
+    ),
+    handler: (m: RegExpMatchArray) => parseDurationAmount(m[1], 60),
+  },
+  {
+    regex: new RegExp(
+      String.raw`\b${DURATION_PREFIX_PATTERN}(?:an?|one)\s+hour\b${DURATION_SUFFIX_GUARD}`,
+      'i',
+    ),
+    handler: () => 60,
+  },
+  {
+    regex: new RegExp(
+      String.raw`\b${DURATION_PREFIX_PATTERN}(${DURATION_AMOUNT_PATTERN})\s*m(?:in(?:ute)?s?)?\b${DURATION_SUFFIX_GUARD}`,
+      'i',
+    ),
+    handler: (m: RegExpMatchArray) => parseDurationAmount(m[1], 1),
+  },
+  {
+    regex: new RegExp(
+      String.raw`\b${DURATION_PREFIX_PATTERN}half\s*(?:an?\s*)?hour\b${DURATION_SUFFIX_GUARD}`,
+      'i',
+    ),
+    handler: () => 30,
+  },
+  {
+    regex: new RegExp(
+      String.raw`\b${DURATION_PREFIX_PATTERN}quarter\s*(?:of\s*an?\s*)?hour\b${DURATION_SUFFIX_GUARD}`,
+      'i',
+    ),
+    handler: () => 15,
+  },
+  {
+    regex: new RegExp(
+      String.raw`\b${DURATION_PREFIX_PATTERN}(?:a\s*)?couple\s*(?:of\s*)?hours?\b${DURATION_SUFFIX_GUARD}`,
+      'i',
+    ),
+    handler: () => 120,
+  },
+  {
+    regex: new RegExp(
+      String.raw`\b${DURATION_PREFIX_PATTERN}(?:a\s*)?few\s*(?:of\s*)?hours?\b${DURATION_SUFFIX_GUARD}`,
+      'i',
+    ),
+    handler: () => 180,
+  },
+  {
+    regex: new RegExp(
+      String.raw`\b${DURATION_PREFIX_PATTERN}(?:a\s*)?few\s*(?:of\s*)?min(?:ute)?s?\b${DURATION_SUFFIX_GUARD}`,
+      'i',
+    ),
+    handler: () => 10,
+  },
   { regex: /\b(?:all|full)\s*day\b/i, handler: () => 480 },
   { regex: /\bhalf\s*day\b/i, handler: () => 240 },
   { regex: /\bquick\b/i, handler: () => 15 },

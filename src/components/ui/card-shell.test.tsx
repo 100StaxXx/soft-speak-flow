@@ -1,13 +1,19 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { Card, outerShellCardClassName } from "./card";
+import { Card, clearShellCardClassName, outerShellCardClassName } from "./card";
 import { GlassCard } from "./glass-card";
 
 const expectOuterShellClasses = (className: string) => {
   expect(className).toContain("bg-white/[0.03]");
   expect(className).toContain("backdrop-blur-none");
   expect(className).toContain("border-white/10");
+  expect(className).toContain("shadow-none");
+};
+
+const expectClearShellClasses = (className: string) => {
+  expect(className).toContain("bg-transparent");
+  expect(className).toContain("backdrop-blur-none");
   expect(className).toContain("shadow-none");
 };
 
@@ -30,5 +36,15 @@ describe("outer shell card treatment", () => {
     );
 
     expectOuterShellClasses(screen.getByTestId("glass-shell").className);
+  });
+
+  it("exposes a dedicated fully clear shell token for transparent cards", () => {
+    render(
+      <Card data-testid="clear-shell" className={clearShellCardClassName}>
+        Clear shell
+      </Card>,
+    );
+
+    expectClearShellClasses(screen.getByTestId("clear-shell").className);
   });
 });

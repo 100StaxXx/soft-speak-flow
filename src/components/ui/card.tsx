@@ -5,6 +5,9 @@ import { cn } from "@/lib/utils";
 export const outerShellCardClassName =
   "bg-white/[0.03] backdrop-blur-none border-white/10 shadow-none";
 
+export const clearShellCardClassName =
+  "!bg-transparent !backdrop-blur-none !shadow-none";
+
 const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(({ className, ...props }, ref) => (
   <div 
     ref={ref} 

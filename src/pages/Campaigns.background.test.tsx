@@ -66,6 +66,14 @@ describe("Campaigns background", () => {
     expect(screen.queryByText("Campaign command center")).not.toBeInTheDocument();
     expect(screen.getByTestId("campaigns-create-button")).toHaveClass("bg-celestial-blue/14");
     expect(screen.getByTestId("campaigns-empty-state-button")).toHaveClass("bg-celestial-blue/14");
-    expect(screen.getByTestId("campaigns-stat-active")).toHaveClass("border-celestial-blue/24");
+    expect(screen.getByTestId("campaigns-stat-active")).toHaveClass("border-celestial-blue/18");
+    expect(screen.getByTestId("campaigns-stat-active").className).toContain("bg-transparent");
+    expect(screen.getByTestId("campaigns-stat-active").className).toContain("backdrop-blur-none");
+    expect(screen.getByTestId("campaigns-stat-active").className).toContain("shadow-none");
+    expect(screen.getByTestId("campaigns-empty-state-panel")).toHaveClass("border-celestial-blue/18");
+    expect(screen.getByTestId("campaigns-empty-state-panel")).toHaveClass("border-dashed");
+    expect(screen.getByTestId("campaigns-empty-state-panel").className).toContain("bg-transparent");
+    expect(screen.getByTestId("campaigns-empty-state-panel").className).toContain("backdrop-blur-none");
+    expect(screen.getByTestId("campaigns-empty-state-panel").className).toContain("shadow-none");
   });
 });

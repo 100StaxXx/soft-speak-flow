@@ -51,4 +51,14 @@ describe("buildVoiceQuestPrefillFromTranscript", () => {
       recurrenceMonthDays: [30],
     }));
   });
+
+  it("strips spoken duration phrasing from the quest title while keeping the parsed minutes", () => {
+    const prefill = buildVoiceQuestPrefillFromTranscript("Deep work it's gonna last 60 minutes tomorrow");
+
+    expect(prefill).toEqual(expect.objectContaining({
+      text: "Deep work",
+      taskDate: "2026-04-10",
+      estimatedDuration: 60,
+    }));
+  });
 });

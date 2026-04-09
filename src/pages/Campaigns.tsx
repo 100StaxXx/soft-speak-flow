@@ -9,6 +9,7 @@ import { JourneyCard } from "@/components/JourneyCard";
 import { Pathfinder } from "@/components/Pathfinder";
 import { CampaignCreatedAnimation } from "@/components/CampaignCreatedAnimation";
 import { Button } from "@/components/ui/button";
+import { clearShellCardClassName } from "@/components/ui/card";
 import { useEpics } from "@/hooks/useEpics";
 import { useMainTabVisibility } from "@/contexts/MainTabVisibilityContext";
 import { cn } from "@/lib/utils";
@@ -19,9 +20,15 @@ interface CreatedCampaignData {
 }
 
 const CAMPAIGN_LIMIT = 3;
-const CAMPAIGN_STAT_CARD_CLASS = "rounded-[24px] border border-celestial-blue/18 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] p-4 backdrop-blur-2xl shadow-[0_20px_40px_rgba(0,0,0,0.14)]";
+const CAMPAIGN_STAT_CARD_CLASS = cn(
+  "rounded-[24px] border border-celestial-blue/18 p-4",
+  clearShellCardClassName,
+);
 const CAMPAIGN_CTA_CLASS = "gap-2 border-celestial-blue/32 bg-celestial-blue/14 text-cyan-50 shadow-[0_14px_32px_rgba(16,75,130,0.2)] backdrop-blur-xl hover:bg-celestial-blue/20 hover:border-celestial-blue/42 hover:text-white";
-const CAMPAIGN_PANEL_CLASS = "rounded-[32px] border border-celestial-blue/18 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.015))] shadow-[0_20px_40px_rgba(0,0,0,0.14)] backdrop-blur-2xl";
+const CAMPAIGN_PANEL_CLASS = cn(
+  "rounded-[32px] border border-celestial-blue/18",
+  clearShellCardClassName,
+);
 
 const Campaigns = () => {
   const prefersReducedMotion = useReducedMotion();
@@ -155,7 +162,10 @@ const Campaigns = () => {
                 ))}
               </div>
             ) : !hasCampaigns ? (
-              <div className={cn(CAMPAIGN_PANEL_CLASS, "border-dashed px-6 py-12 text-center")}>
+              <div
+                data-testid="campaigns-empty-state-panel"
+                className={cn(CAMPAIGN_PANEL_CLASS, "border-dashed px-6 py-12 text-center")}
+              >
                 <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-celestial-blue/15 text-celestial-blue">
                   <Target className="h-8 w-8" />
                 </div>
