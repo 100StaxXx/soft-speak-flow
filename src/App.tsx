@@ -196,7 +196,7 @@ const MentorConnectedThemeProvider = memo(({ children }: { children: ReactNode }
 MentorConnectedThemeProvider.displayName = "MentorConnectedThemeProvider";
 
 const AppContent = memo(() => {
-  const { loading: profileLoading } = useProfile();
+  const { profile, loading: profileLoading } = useProfile();
   const { session, status } = useAuth();
   const [splashHidden, setSplashHidden] = useState(false);
   const [recoveryChecked, setRecoveryChecked] = useState(false);

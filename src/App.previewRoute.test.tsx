@@ -185,10 +185,17 @@ vi.mock("@/utils/profileOnboarding", () => ({
 }));
 
 vi.mock("@/utils/storage", () => ({
+  safeLocalStorage: {
+    getItem: vi.fn(() => null),
+    setItem: vi.fn(),
+    removeItem: vi.fn(),
+    clear: vi.fn(),
+  },
   safeSessionStorage: {
     getItem: vi.fn(() => null),
     setItem: vi.fn(),
     removeItem: vi.fn(),
+    clear: vi.fn(),
   },
 }));
 
