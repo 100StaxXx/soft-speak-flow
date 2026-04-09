@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { toast } from "@/components/ui/sonner";
 import {
   formatWallpaperVariantLabel,
-  getWallpaperDateKey,
+  getEffectiveWallpaperDate,
   wallpaperGenerationSpecs,
   type WallpaperPageKey,
   type WallpaperPublishState,
@@ -15,6 +15,7 @@ import {
 
 type WallpaperAssetRow = Database["public"]["Tables"]["wallpaper_assets"]["Row"];
 type DailyWallpaperAssignmentInsert = Database["public"]["Tables"]["daily_wallpaper_assignments"]["Insert"];
+type DailyWallpaperAssignmentRow = Database["public"]["Tables"]["daily_wallpaper_assignments"]["Row"];
 
 const stateBadgeClasses: Record<WallpaperPublishState, string> = {
   ready: "bg-emerald-500/15 text-emerald-300 border border-emerald-400/20",
@@ -41,11 +42,11 @@ const asValidationSnapshot = (value: Json | null): ValidationSnapshot => {
 
 export const AdminWallpaperCatalog = () => {
   const [assets, setAssets] = useState<WallpaperAssetRow[]>([]);
-  const [liveAssignments, setLiveAssignments] = useState<Record<string, string>>({});
+  const [liveAssignments, setLiveAssignments] = useState<Record<string, DailyWallpaperAssignmentRow>>({});
   const [loading, setLoading] = useState(true);
   const [isGeneratingBacklog, setIsGeneratingBacklog] = useState(false);
   const [mutatingId, setMutatingId] = useState<string | null>(null);
-  const todayKey = useMemo(() => getWallpaperDateKey(), []);
+  const todayKey = useMemo(() => getEffectiveWallpaperDate(), []);
   const latestBatchLabel = useMemo(
     () => assets.find((asset) => typeof asset.batch_label === "string" && asset.batch_label.length > 0)?.batch_label ?? null,
     [assets],
@@ -62,8 +63,8 @@ export const AdminWallpaperCatalog = () => {
         .limit(24),
       supabase
         .from("daily_wallpaper_assignments")
-        .select("page_key, wallpaper_asset_id")
-        .eq("for_date", getWallpaperDateKey()),
+        .select("id, page_key, for_date, wallpaper_asset_id, assignment_source, created_at, updated_at")
+        .eq("for_date", todayKey),
     ]);
 
     if (assetsResult.error) {
@@ -80,43 +81,49 @@ export const AdminWallpaperCatalog = () => {
       return;
     }
 
-    const nextAssignments = (assignmentsResult.data ?? []).reduce<Record<string, string>>((acc, row) => {
-      acc[row.page_key] = row.wallpaper_asset_id;
+    const nextAssignments = (assignmentsResult.data ?? []).reduce<Record<string, DailyWallpaperAssignmentRow>>((acc, row) => {
+      acc[row.page_key] = row;
       return acc;
     }, {});
 
     setAssets(assetsResult.data ?? []);
     setLiveAssignments(nextAssignments);
     setLoading(false);
-  }, []);
+  }, [todayKey]);
 
   useEffect(() => {
     void fetchCatalog();
   }, [fetchCatalog]);
 
-  const generateCoreTabBackdrops = useCallback(async () => {
+  const regenerateDailySet = useCallback(async () => {
     setIsGeneratingBacklog(true);
 
-    const { data, error } = await supabase.functions.invoke("generate-wallpaper-backlog", {
+    const { data, error } = await supabase.functions.invoke("rotate-daily-wallpapers", {
       body: {
-        batchPreset: "core-tabs-v1",
-        promoteNow: true,
+        startDate: todayKey,
+        daysAhead: 4,
+        candidateCount: 3,
+        force: true,
       },
     });
 
     if (error) {
-      console.error("Failed to generate wallpaper backlog:", error);
-      toast.error("Failed to generate the wallpaper backlog");
+      console.error("Failed to regenerate wallpaper daily set:", error);
+      toast.error("Failed to regenerate the daily wallpaper set");
       setIsGeneratingBacklog(false);
       return;
     }
 
-    const acceptedCount = typeof data?.acceptedCount === "number" ? data.acceptedCount : 0;
-    const promotedCount = Array.isArray(data?.promoted) ? data.promoted.length : 0;
-    toast.success(`Generated ${acceptedCount} ready core tab backdrops. Promoted ${promotedCount} live today.`);
+    const generatedCount = Array.isArray(data?.outcomes)
+      ? data.outcomes.filter((outcome: { status?: string }) => outcome.status === "generated").length
+      : 0;
+    const carryForwardCount = Array.isArray(data?.outcomes)
+      ? data.outcomes.filter((outcome: { status?: string }) => outcome.status === "carry_forward").length
+      : 0;
+    toast.success(`Regenerated the daily wallpaper set. ${generatedCount} pages got new art and ${carryForwardCount} pages carried forward.`);
     setIsGeneratingBacklog(false);
     await fetchCatalog();
-  }, [fetchCatalog]);
+  }, [fetchCatalog, todayKey]);
 
   const setAssetState = useCallback(async (asset: WallpaperAssetRow, publishState: WallpaperPublishState) => {
     setMutatingId(asset.id);
@@ -133,7 +140,7 @@ export const AdminWallpaperCatalog = () => {
       return;
     }
 
-    if (liveAssignments[asset.page_key] === asset.id) {
+    if (liveAssignments[asset.page_key]?.wallpaper_asset_id === asset.id) {
       await supabase
         .from("daily_wallpaper_assignments")
         .delete()
@@ -179,17 +186,17 @@ export const AdminWallpaperCatalog = () => {
         <div>
           <h2 className="font-heading text-2xl font-semibold">Wallpaper Catalog</h2>
           <p className="text-muted-foreground">
-            Auto-live daily scenic wallpapers for Guide, Quests, Campaigns, and Companion. Current catalog day: {todayKey}.
+            Auto-live daily scenic wallpapers for Guide, Quests, Campaigns, Companion, and Profile. Current wallpaper day: {todayKey}.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button
             className="rounded-full"
-            onClick={() => void generateCoreTabBackdrops()}
+            onClick={() => void regenerateDailySet()}
             disabled={loading || isGeneratingBacklog}
           >
             {isGeneratingBacklog ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Sparkles className="h-4 w-4 mr-2" />}
-            Generate 4 Core Backdrops
+            Regenerate Daily Set
           </Button>
           <Button variant="outline" className="rounded-full" onClick={() => void fetchCatalog()} disabled={loading || isGeneratingBacklog}>
             {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
@@ -215,7 +222,8 @@ export const AdminWallpaperCatalog = () => {
           const validation = asValidationSnapshot(asset.validation_result);
           const rejectionReasons = Array.isArray(validation.rejectionReasons) ? validation.rejectionReasons : [];
           const notes = Array.isArray(validation.notes) ? validation.notes : [];
-          const isLiveToday = liveAssignments[asset.page_key] === asset.id;
+          const liveAssignment = liveAssignments[asset.page_key] ?? null;
+          const isLiveToday = liveAssignment?.wallpaper_asset_id === asset.id;
           const isPromotedFromLatestBatch = Boolean(
             latestBatchLabel
             && asset.batch_label
@@ -249,7 +257,7 @@ export const AdminWallpaperCatalog = () => {
                   </span>
                   {isLiveToday ? (
                     <span className="rounded-full bg-primary/15 text-primary px-3 py-1 text-xs font-medium border border-primary/20">
-                      Live today
+                      Live {liveAssignment?.for_date}
                     </span>
                   ) : null}
                   {isPromotedFromLatestBatch ? (
@@ -264,6 +272,9 @@ export const AdminWallpaperCatalog = () => {
                   <div>Generated for: <span className="text-foreground">{asset.generation_date}</span></div>
                   <div>Prompt version: <span className="text-foreground">{asset.prompt_version}</span></div>
                   <div>Model: <span className="text-foreground">{asset.render_model}</span></div>
+                  {isLiveToday ? (
+                    <div>Assignment source: <span className="text-foreground">{liveAssignment?.assignment_source.replaceAll("_", " ")}</span></div>
+                  ) : null}
                   {asset.batch_label ? <div>Batch: <span className="text-foreground">{asset.batch_label}</span></div> : null}
                   {variantLabel ? <div>Variant: <span className="text-foreground">{variantLabel}</span></div> : null}
                 </div>

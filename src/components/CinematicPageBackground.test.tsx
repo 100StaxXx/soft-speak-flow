@@ -12,8 +12,11 @@ const mocks = vi.hoisted(() => ({
   maxParticles: 24,
   isBackgrounded: false,
   prefersReducedMotion: false,
+  reportWallpaperRenderError: vi.fn(),
   wallpaper: null as null | {
+    source: "remote" | "seed";
     imageUrl: string;
+    background: { src: string; src2x: string };
     mobileObjectPosition: string;
     desktopObjectPosition: string;
   },
@@ -59,12 +62,17 @@ vi.mock("@/hooks/useTimeColors", () => ({
   }),
 }));
 
-vi.mock("@/hooks/useLiveWallpaper", () => ({
-  useLiveWallpaper: () => ({
-    dateKey: "2026-04-08",
-    wallpaper: mocks.wallpaper,
-    isLoading: false,
+vi.mock("@/contexts/WallpaperManifestContext", () => ({
+  useResolvedWallpaper: () => mocks.wallpaper,
+  useWallpaperManifest: () => ({
+    currentDateKey: "2026-04-08",
+    currentDateReady: true,
+    reportWallpaperRenderError: mocks.reportWallpaperRenderError,
     error: null,
+    manifestByDate: {},
+    isRefreshing: false,
+    nextDateKey: "2026-04-09",
+    refresh: vi.fn(),
   }),
 }));
 
@@ -79,6 +87,7 @@ describe("CinematicPageBackground", () => {
     mocks.isBackgrounded = false;
     mocks.prefersReducedMotion = false;
     mocks.wallpaper = null;
+    mocks.reportWallpaperRenderError.mockReset();
   });
 
   afterEach(() => {
@@ -98,6 +107,14 @@ describe("CinematicPageBackground", () => {
   });
 
   it("uses the configured mobile and desktop focal points", () => {
+    mocks.wallpaper = {
+      source: "seed",
+      imageUrl: cinematicPageBackgrounds.campaigns.background.src,
+      background: cinematicPageBackgrounds.campaigns.background,
+      mobileObjectPosition: cinematicPageBackgrounds.campaigns.mobileObjectPosition,
+      desktopObjectPosition: cinematicPageBackgrounds.campaigns.desktopObjectPosition,
+    };
+
     render(<CinematicPageBackground preset="campaigns" />);
 
     expect(screen.getByTestId("cinematic-background-image-mobile")).toHaveStyle({
@@ -145,7 +162,12 @@ describe("CinematicPageBackground", () => {
 
   it("uses a remote live wallpaper when one is available", () => {
     mocks.wallpaper = {
+      source: "remote",
       imageUrl: "https://example.com/wallpaper.png",
+      background: {
+        src: "https://example.com/wallpaper.png",
+        src2x: "https://example.com/wallpaper.png",
+      },
       mobileObjectPosition: "41% 27%",
       desktopObjectPosition: "45% 31%",
     };
@@ -162,9 +184,14 @@ describe("CinematicPageBackground", () => {
     });
   });
 
-  it("falls back to the bundled seed wallpaper if the live image fails to load", () => {
+  it("reports remote render failures back to the wallpaper provider", () => {
     mocks.wallpaper = {
+      source: "remote",
       imageUrl: "https://example.com/broken-wallpaper.png",
+      background: {
+        src: "https://example.com/broken-wallpaper.png",
+        src2x: "https://example.com/broken-wallpaper.png",
+      },
       mobileObjectPosition: "41% 27%",
       desktopObjectPosition: "45% 31%",
     };
@@ -173,13 +200,9 @@ describe("CinematicPageBackground", () => {
 
     fireEvent.error(screen.getByTestId("cinematic-background-image-mobile"));
 
-    expect(screen.getByTestId("cinematic-background")).toHaveAttribute("data-cinematic-source", "seed");
-    expect(screen.getByTestId("cinematic-background-image-mobile")).toHaveAttribute(
-      "src",
-      cinematicPageBackgrounds.campaigns.background.src,
+    expect(mocks.reportWallpaperRenderError).toHaveBeenCalledWith(
+      "campaigns",
+      "https://example.com/broken-wallpaper.png",
     );
-    expect(screen.getByTestId("cinematic-background-image-mobile")).toHaveStyle({
-      objectPosition: cinematicPageBackgrounds.campaigns.mobileObjectPosition,
-    });
   });
 });

@@ -1,5 +1,5 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AdminWallpaperCatalog } from "@/components/AdminWallpaperCatalog";
 
 const mocks = vi.hoisted(() => ({
@@ -55,20 +55,27 @@ const wallpaperAssets = [
     generated_at: "2026-04-08T10:00:00.000Z",
     created_at: "2026-04-08T10:00:00.000Z",
     updated_at: "2026-04-08T10:00:00.000Z",
-    variant_key: "quests-desert-trail-dawn",
-    batch_label: "landscape-diverse-v1-2026-04-08T10-00-00-000Z",
+    variant_key: "quests-desert-trail-first-light",
+    batch_label: "rotate-2026-04-08-2026-04-08T10-00-00-000Z",
   },
 ];
 
 const liveAssignments = [
   {
+    id: "assignment-1",
     page_key: "quests",
+    for_date: "2026-04-08",
     wallpaper_asset_id: "asset-1",
+    assignment_source: "auto",
+    created_at: "2026-04-08T10:01:00.000Z",
+    updated_at: "2026-04-08T10:01:00.000Z",
   },
 ];
 
 describe("AdminWallpaperCatalog", () => {
   beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-08T18:00:00.000Z"));
     vi.clearAllMocks();
 
     mocks.from.mockImplementation((table: string) => {
@@ -95,37 +102,71 @@ describe("AdminWallpaperCatalog", () => {
 
     mocks.invoke.mockResolvedValue({
       data: {
-        acceptedCount: 7,
-        promoted: [{ pageKey: "quests", assetId: "asset-1" }],
+        outcomes: [
+          { pageKey: "quests", dateKey: "2026-04-08", status: "generated", assetId: "asset-1" },
+          { pageKey: "campaigns", dateKey: "2026-04-08", status: "carry_forward", assetId: "asset-2" },
+        ],
       },
       error: null,
     });
   });
 
-  it("shows batch metadata and marks the latest live asset as promoted", async () => {
-    render(<AdminWallpaperCatalog />);
-
-    await screen.findByText("Quests");
-
-    expect(screen.getByText("Promoted live")).toBeInTheDocument();
-    expect(screen.getByText(/landscape-diverse-v1-2026-04-08/i)).toBeInTheDocument();
-    expect(screen.getByText("Desert Trail Dawn")).toBeInTheDocument();
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
-  it("triggers the core tab starter generation flow from the admin action", async () => {
+  const renderCatalog = async () => {
     render(<AdminWallpaperCatalog />);
 
-    fireEvent.click(await screen.findByRole("button", { name: /generate 4 core backdrops/i }));
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+  };
 
-    await waitFor(() => {
-      expect(mocks.invoke).toHaveBeenCalledWith("generate-wallpaper-backlog", {
-        body: {
-          batchPreset: "core-tabs-v1",
-          promoteNow: true,
-        },
-      });
+  it("shows batch metadata and marks the latest live asset as promoted", async () => {
+    await renderCatalog();
+
+    expect(screen.getByText("Promoted live")).toBeInTheDocument();
+    expect(screen.getByText(/rotate-2026-04-08-2026-04-08/i)).toBeInTheDocument();
+    expect(screen.getByText("Desert Trail / First Light")).toBeInTheDocument();
+    expect(screen.getByText(/Assignment source:/i)).toHaveTextContent("auto");
+  });
+
+  it("triggers the daily wallpaper regeneration flow from the admin action", async () => {
+    await renderCatalog();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /regenerate daily set/i }));
+      await Promise.resolve();
+      await Promise.resolve();
     });
 
-    expect(mocks.toastSuccess).toHaveBeenCalledWith("Generated 7 ready core tab backdrops. Promoted 1 live today.");
+    expect(mocks.invoke).toHaveBeenCalledWith("rotate-daily-wallpapers", {
+      body: {
+        startDate: "2026-04-08",
+        daysAhead: 4,
+        candidateCount: 3,
+        force: true,
+      },
+    });
+
+    expect(mocks.toastSuccess).toHaveBeenCalledWith(
+      "Regenerated the daily wallpaper set. 1 pages got new art and 1 pages carried forward.",
+    );
+  });
+
+  it("refreshes the catalog after the regeneration call settles", async () => {
+    await renderCatalog();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /regenerate daily set/i }));
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mocks.from).toHaveBeenCalledWith("wallpaper_assets");
+    expect(mocks.from).toHaveBeenCalledWith("daily_wallpaper_assignments");
   });
 });

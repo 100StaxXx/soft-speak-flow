@@ -129,6 +129,7 @@ export const queryKeys = {
   wallpapers: {
     all: ['wallpapers'] as const,
     live: (pageKey: string, dateKey: string) => ['wallpapers', 'live', pageKey, dateKey] as const,
+    manifest: (dateKeys: readonly string[]) => ['wallpapers', 'manifest', ...dateKeys] as const,
     catalog: () => ['wallpapers', 'catalog'] as const,
   },
 

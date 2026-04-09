@@ -1,5 +1,8 @@
 export const WALLPAPER_CATALOG_TIMEZONE = "America/Los_Angeles" as const;
-export const WALLPAPER_PROMPT_VERSION = 3 as const;
+export const WALLPAPER_RESET_HOUR = 2 as const;
+export const WALLPAPER_HORIZON_DAYS = 4 as const;
+export const WALLPAPER_DEFAULT_CANDIDATE_COUNT = 3 as const;
+export const WALLPAPER_PROMPT_VERSION = 4 as const;
 export const WALLPAPER_IMAGE_SIZE = "1024x1536" as const;
 export const WALLPAPER_IMAGE_WIDTH = 1024 as const;
 export const WALLPAPER_IMAGE_HEIGHT = 1536 as const;
@@ -13,15 +16,6 @@ export const WALLPAPER_PAGE_KEYS = [
 ] as const;
 
 export type WallpaperPageKey = (typeof WALLPAPER_PAGE_KEYS)[number];
-
-export const RECENT_LIVE_WALLPAPER_PAGE_KEYS = [
-  "guide",
-  "quests",
-  "campaigns",
-  "companion",
-] as const satisfies readonly WallpaperPageKey[];
-
-export const RECENT_LIVE_WALLPAPER_CUTOFF_DATE = "2026-04-08" as const;
 
 export type WallpaperPublishState =
   | "ready"
@@ -67,15 +61,11 @@ export interface WallpaperGenerationSpec {
   };
 }
 
-export interface WallpaperPromptVariant {
+export interface WallpaperPromptRecipe {
+  key: string;
   pageKey: WallpaperPageKey;
   title: string;
   prompt: string;
-}
-
-export interface WallpaperGenerationBatchPreset {
-  label: string;
-  variantKeys: WallpaperPromptVariantKey[];
 }
 
 export interface WallpaperPromotionCandidate<TId extends string = string> {
@@ -93,14 +83,26 @@ export interface WallpaperPromotionCandidate<TId extends string = string> {
 
 export interface WallpaperLiveEligibilityInput {
   publishState?: string | null;
-  sourceKind?: string | null;
-  generationDate?: string | null;
 }
 
 export interface WallpaperAssetCandidate<TId extends string = string>
   extends WallpaperPromotionCandidate<TId>,
     WallpaperLiveEligibilityInput {
   pageKey?: WallpaperPageKey | null;
+  sourceKind?: string | null;
+  generationDate?: string | null;
+}
+
+export interface LiveWallpaperManifestEntry {
+  forDate: string;
+  pageKey: WallpaperPageKey;
+  assignmentSource: WallpaperAssignmentSource;
+  imageUrl: string;
+  mobileFocusX: number | null;
+  mobileFocusY: number | null;
+  desktopFocusX: number | null;
+  desktopFocusY: number | null;
+  updatedAt: string;
 }
 
 const wallpaperPageLabels: Record<WallpaperPageKey, string> = {
@@ -146,16 +148,18 @@ const buildWallpaperPrompt = (
   pageKey: WallpaperPageKey,
   scenePrompt: string,
   emphasisPrompt: string,
+  atmospherePrompt?: string,
 ) => [
   `Create a breathtaking cinematic mobile wallpaper for the ${wallpaperPageLabels[pageKey]} page in the Cosmiq app.`,
   `Target mood: ${wallpaperPageDescriptions[pageKey]}`,
   scenePrompt,
   emphasisPrompt,
+  atmospherePrompt,
   WALLPAPER_SHARED_FIDELITY_CLAUSE,
   WALLPAPER_SHARED_PALETTE_CLAUSE,
   WALLPAPER_SHARED_SAFE_ZONE_CLAUSE,
   WALLPAPER_SHARED_NEGATIVE_CLAUSE,
-].join(" ");
+].filter(Boolean).join(" ");
 
 export const wallpaperGenerationSpecs: Record<WallpaperPageKey, WallpaperGenerationSpec> = {
   guide: {
@@ -215,202 +219,461 @@ export const wallpaperGenerationSpecs: Record<WallpaperPageKey, WallpaperGenerat
   },
 };
 
-export const wallpaperPromptVariants = {
-  "guide-aurora-observatory": {
-    pageKey: "guide",
-    title: "Aurora Observatory",
-    prompt: buildWallpaperPrompt(
-      "guide",
-      "Show a refined hilltop observatory, moonlit study terrace, or contemplative cliffside refuge with subtle aurora color and a tranquil celestial sky. Favor teal, silver, deep blue, slate, and restrained warm light accents.",
-      "Keep the center readable and emotionally steady, with calm atmosphere that supports daily guidance rather than stealing focus.",
-    ),
-  },
-  "quests-desert-trail-dawn": {
-    pageKey: "quests",
-    title: "Desert Trail Dawn",
-    prompt: buildWallpaperPrompt(
-      "quests",
-      "Show a winding desert trail at first light through sandstone mesas and sweeping dunes, with warm sand, rust, and slate tones. A subtle distant moon or ringed planet is allowed, but the landscape must stay primary.",
-      "Make the path legible and inviting without looking artificial or glowing purple.",
-    ),
-  },
-  "quests-redwood-mist-path": {
-    pageKey: "quests",
-    title: "Redwood Mist Path",
-    prompt: buildWallpaperPrompt(
-      "quests",
-      "Show a towering redwood or old-growth forest path with mist, moss, and filtered dawn light. The palette should lean emerald, deep blue, silver, and natural bark tones.",
-      "Keep the scene majestic and immersive, with clear forward movement and no fantasy clutter.",
-    ),
-  },
-  "quests-ringed-tundra-pass": {
-    pageKey: "quests",
-    title: "Ringed Tundra Pass",
-    prompt: buildWallpaperPrompt(
-      "quests",
-      "Show a windswept tundra trail threading through an icy mountain pass with a distant ringed planet above a cold blue horizon. Use slate, cyan, silver, and muted earth tones.",
-      "Blend natural-world realism with subtle alien wonder, keeping the route visible and the scenery sharp.",
-    ),
-  },
-  "campaigns-ocean-cliffs-ringworld": {
-    pageKey: "campaigns",
-    title: "Ocean Cliffs Ringworld",
-    prompt: buildWallpaperPrompt(
-      "campaigns",
-      "Show colossal ocean cliffs above a storm-polished sea with an enormous ringworld or planetary arc spanning the far sky. Favor deep blue, teal, slate, and silver.",
-      "The composition should feel vast and strategic, with a powerful horizon and expedition scale.",
-    ),
-  },
-  "campaigns-golden-canyon-expanse": {
-    pageKey: "campaigns",
-    title: "Golden Canyon Expanse",
-    prompt: buildWallpaperPrompt(
-      "campaigns",
-      "Show a sunlit canyon expanse with giant layered rock walls, open desert air, and a dramatic overlook. Favor sand, rust, amber, slate, and deep blue shadows.",
-      "Make it heroic and high-definition, with a commanding long-range feeling rather than dreamlike haze.",
-    ),
-  },
-  "campaigns-glacial-alien-range": {
-    pageKey: "campaigns",
-    title: "Glacial Alien Range",
-    prompt: buildWallpaperPrompt(
-      "campaigns",
-      "Show a glacial mountain range on an alien world with teal ice, dark stone, reflective water, and a cold clean sky. A distant moon is welcome, but keep the terrain dominant.",
-      "Aim for expedition-scale grandeur with crisp texture, deep perspective, and restrained cosmic drama.",
-    ),
-  },
-  "companion-moonlit-alpine-sanctuary": {
-    pageKey: "companion",
-    title: "Moonlit Alpine Sanctuary",
-    prompt: buildWallpaperPrompt(
-      "companion",
-      "Show a moonlit alpine lake sanctuary surrounded by mountains, gentle clouds, and soft starlight. Favor moonlit neutrals, deep blue, silver, teal, and evergreen tones.",
-      "Keep the center visually calm, luminous, and supportive rather than crowded or flashy.",
-    ),
-  },
-  "companion-bioluminescent-lagoon": {
-    pageKey: "companion",
-    title: "Bioluminescent Lagoon",
-    prompt: buildWallpaperPrompt(
-      "companion",
-      "Show a serene bioluminescent lagoon with emerald and cyan water glow, dark rock, soft vegetation, and a quiet celestial sky. The effect should feel natural and premium, not neon fantasy art.",
-      "Preserve a calm central field for the companion card and avoid bright subjects competing for attention.",
-    ),
-  },
-  "profile-twilight-coastal-observatory": {
-    pageKey: "profile",
-    title: "Twilight Coastal Observatory",
-    prompt: buildWallpaperPrompt(
-      "profile",
-      "Show a quiet coastal observatory or cliffside lookout at twilight with a clean horizon, refined architecture silhouette, and restrained celestial detail. Favor deep blue, slate, silver, and seafoam tones.",
-      "The image should feel premium, calm, and uncluttered, with excellent readability for settings content.",
-    ),
-  },
-  "profile-snow-plateau-horizon": {
-    pageKey: "profile",
-    title: "Snow Plateau Horizon",
-    prompt: buildWallpaperPrompt(
-      "profile",
-      "Show a minimalist snow plateau or tundra horizon under a crisp cold sky with subtle cosmic scale. Favor silver, blue-gray, slate, and moonlit neutrals with very restrained color accents.",
-      "Keep the composition elegant, spacious, and quiet, with no dominant fantasy effects.",
-    ),
-  },
-} as const satisfies Record<string, WallpaperPromptVariant>;
+interface RecipeSceneDescriptor {
+  key: string;
+  title: string;
+  scenePrompt: string;
+}
 
-export type WallpaperPromptVariantKey = keyof typeof wallpaperPromptVariants;
+interface RecipeAtmosphereDescriptor {
+  key: string;
+  title: string;
+  atmospherePrompt: string;
+}
 
-export const CORE_TABS_V1_VARIANT_KEYS = [
-  "guide-aurora-observatory",
-  "quests-redwood-mist-path",
-  "campaigns-ocean-cliffs-ringworld",
-  "companion-moonlit-alpine-sanctuary",
-] as const satisfies readonly WallpaperPromptVariantKey[];
+const createPromptRecipeFamily = (
+  pageKey: WallpaperPageKey,
+  scenes: readonly RecipeSceneDescriptor[],
+  atmospheres: readonly RecipeAtmosphereDescriptor[],
+  emphasisPrompt: string,
+) => scenes.flatMap((scene) => atmospheres.map((atmosphere) => ({
+  key: `${pageKey}-${scene.key}-${atmosphere.key}`,
+  pageKey,
+  title: `${scene.title} / ${atmosphere.title}`,
+  prompt: buildWallpaperPrompt(
+    pageKey,
+    scene.scenePrompt,
+    emphasisPrompt,
+    atmosphere.atmospherePrompt,
+  ),
+})));
 
-export const LANDSCAPE_DIVERSE_V1_VARIANT_KEYS = [
-  "guide-aurora-observatory",
-  "quests-desert-trail-dawn",
-  "quests-redwood-mist-path",
-  "quests-ringed-tundra-pass",
-  "campaigns-ocean-cliffs-ringworld",
-  "campaigns-golden-canyon-expanse",
-  "campaigns-glacial-alien-range",
-  "companion-moonlit-alpine-sanctuary",
-  "companion-bioluminescent-lagoon",
-  "profile-twilight-coastal-observatory",
-] as const satisfies readonly WallpaperPromptVariantKey[];
+const wallpaperRecipeFamilies = {
+  guide: createPromptRecipeFamily(
+    "guide",
+    [
+      {
+        key: "aurora-observatory",
+        title: "Aurora Observatory",
+        scenePrompt: "Show a refined hilltop observatory or moonlit study terrace with subtle aurora color and a tranquil celestial sky.",
+      },
+      {
+        key: "stone-library-overlook",
+        title: "Stone Library Overlook",
+        scenePrompt: "Show an elevated stone library overlook above a quiet valley, with lantern architecture, distant stars, and a serene horizon.",
+      },
+      {
+        key: "moon-tide-balcony",
+        title: "Moon Tide Balcony",
+        scenePrompt: "Show a contemplative balcony above a moonlit sea with calm surf, elegant rails, and a clear horizon that feels reflective and wise.",
+      },
+      {
+        key: "high-desert-telescope",
+        title: "High Desert Telescope",
+        scenePrompt: "Show a high-desert telescope ridge with clean night air, sculpted rock, and a steady celestial canopy that feels grounding rather than flashy.",
+      },
+    ],
+    [
+      {
+        key: "silver-quiet",
+        title: "Silver Quiet",
+        atmospherePrompt: "Favor silver, deep blue, slate, and restrained teal glow with calm contrast and elegant darkness.",
+      },
+      {
+        key: "teal-dawn",
+        title: "Teal Dawn",
+        atmospherePrompt: "Favor teal dawn light, cool cyan haze, and gentle warm lantern accents without overpowering the scene.",
+      },
+      {
+        key: "amber-lantern",
+        title: "Amber Lantern",
+        atmospherePrompt: "Use moonlit neutrals with subtle amber lantern pools that imply guidance and warmth while keeping the image quiet.",
+      },
+      {
+        key: "crisp-midnight",
+        title: "Crisp Midnight",
+        atmospherePrompt: "Keep the air crisp and dark with sharp stars, restrained cloud detail, and premium night-sky clarity.",
+      },
+    ],
+    "Keep the center readable and emotionally steady, with calm atmosphere that supports daily guidance rather than stealing focus.",
+  ),
+  quests: createPromptRecipeFamily(
+    "quests",
+    [
+      {
+        key: "desert-trail",
+        title: "Desert Trail",
+        scenePrompt: "Show a winding desert trail through sandstone mesas and sweeping dunes with a clearly readable route and wide-open motion.",
+      },
+      {
+        key: "redwood-path",
+        title: "Redwood Path",
+        scenePrompt: "Show a towering redwood or old-growth forest path with clear forward direction through mist, moss, and filtered light.",
+      },
+      {
+        key: "ringed-pass",
+        title: "Ringed Pass",
+        scenePrompt: "Show an icy or tundra route threading through a mountain pass with subtle alien wonder and a visible trail line.",
+      },
+      {
+        key: "coastal-switchbacks",
+        title: "Coastal Switchbacks",
+        scenePrompt: "Show dramatic coastal switchbacks above a deep blue sea with a long route drawing the eye upward and forward.",
+      },
+    ],
+    [
+      {
+        key: "first-light",
+        title: "First Light",
+        atmospherePrompt: "Favor warm dawn edges, clean air, and crisp depth without losing terrain detail or route visibility.",
+      },
+      {
+        key: "cool-mist",
+        title: "Cool Mist",
+        atmospherePrompt: "Use cool mist, silver light, and deep blue shadow separation while keeping the path unmistakably clear.",
+      },
+      {
+        key: "storm-clearing",
+        title: "Storm Clearing",
+        atmospherePrompt: "Let the sky feel freshly clearing after weather with strong contrast, dramatic cloud shape, and bright route readability.",
+      },
+      {
+        key: "moon-route",
+        title: "Moon Route",
+        atmospherePrompt: "Blend moonlit cool tones with subtle alien scale, keeping the route luminous by composition rather than artificial glow.",
+      },
+    ],
+    "Make the route legible and inviting. Prioritize motion, depth, and planning energy over spectacle or fantasy clutter.",
+  ),
+  campaigns: createPromptRecipeFamily(
+    "campaigns",
+    [
+      {
+        key: "ocean-cliffs",
+        title: "Ocean Cliffs",
+        scenePrompt: "Show colossal ocean cliffs above a storm-polished sea with huge scenic scale and a commanding horizon.",
+      },
+      {
+        key: "golden-canyon",
+        title: "Golden Canyon",
+        scenePrompt: "Show a sunlit canyon expanse with giant layered rock walls, open desert air, and a dramatic overlook built for long-range planning.",
+      },
+      {
+        key: "glacial-range",
+        title: "Glacial Range",
+        scenePrompt: "Show a glacial mountain range with teal ice, dark stone, reflective water, and a cold clean sky with expedition-scale grandeur.",
+      },
+      {
+        key: "volcanic-archipelago",
+        title: "Volcanic Archipelago",
+        scenePrompt: "Show a volcanic archipelago or basalt highlands with sweeping landforms, enormous scale, and clear strategic depth.",
+      },
+    ],
+    [
+      {
+        key: "ringworld-sky",
+        title: "Ringworld Sky",
+        atmospherePrompt: "A distant ringworld or planetary arc may appear, but keep the terrain and scale primary rather than turning the image into poster art.",
+      },
+      {
+        key: "sun-struck",
+        title: "Sun-Struck",
+        atmospherePrompt: "Favor crisp sun-struck terrain, deep shadows, and commanding visibility with minimal haze.",
+      },
+      {
+        key: "storm-polished",
+        title: "Storm-Polished",
+        atmospherePrompt: "Let the environment feel weathered, strategic, and immense with strong contrast and premium scenic texture.",
+      },
+      {
+        key: "cold-clarity",
+        title: "Cold Clarity",
+        atmospherePrompt: "Use cold clarity, deep blue, slate, silver, and restrained teal highlights to emphasize expedition-scale ambition.",
+      },
+    ],
+    "The image should feel enormous, strategic, and high-definition, with commanding scenic depth rather than dreamy haze.",
+  ),
+  companion: createPromptRecipeFamily(
+    "companion",
+    [
+      {
+        key: "alpine-sanctuary",
+        title: "Alpine Sanctuary",
+        scenePrompt: "Show a moonlit alpine lake sanctuary surrounded by mountains, gentle clouds, and soft starlight with a calm center.",
+      },
+      {
+        key: "bioluminescent-lagoon",
+        title: "Bioluminescent Lagoon",
+        scenePrompt: "Show a serene bioluminescent lagoon with natural emerald and cyan glow, dark rock, soft vegetation, and a quiet celestial sky.",
+      },
+      {
+        key: "garden-temple",
+        title: "Garden Temple",
+        scenePrompt: "Show a hidden celestial garden temple or quiet ruin wrapped in nature, stillness, and soft open space through the center.",
+      },
+      {
+        key: "snow-meadow",
+        title: "Snow Meadow",
+        scenePrompt: "Show a snow meadow refuge under a luminous night sky with calm terrain, subtle shelter cues, and a peaceful central field.",
+      },
+    ],
+    [
+      {
+        key: "moonlit",
+        title: "Moonlit",
+        atmospherePrompt: "Favor moonlit neutrals, deep blue, silver, teal, and evergreen tones with restrained glow and gentle depth.",
+      },
+      {
+        key: "emerald-breath",
+        title: "Emerald Breath",
+        atmospherePrompt: "Use natural emerald and cyan luminous accents that feel premium and alive, never neon or synthetic.",
+      },
+      {
+        key: "soft-clouds",
+        title: "Soft Clouds",
+        atmospherePrompt: "Let soft clouds, atmospheric depth, and clean tonal separation keep the center comforting and readable.",
+      },
+      {
+        key: "dawn-peace",
+        title: "Dawn Peace",
+        atmospherePrompt: "Introduce faint dawn warmth at the edges while preserving a cool, peaceful center for the companion card.",
+      },
+    ],
+    "Keep the center especially calm and uncluttered so the companion card remains the visual hero. Avoid bright competing subjects behind the card area.",
+  ),
+  profile: createPromptRecipeFamily(
+    "profile",
+    [
+      {
+        key: "coastal-observatory",
+        title: "Coastal Observatory",
+        scenePrompt: "Show a quiet coastal observatory or cliffside lookout at twilight with a clean horizon and refined architecture silhouette.",
+      },
+      {
+        key: "snow-plateau",
+        title: "Snow Plateau",
+        scenePrompt: "Show a minimalist snow plateau or tundra horizon under a crisp cold sky with subtle cosmic scale and lots of breathing room.",
+      },
+      {
+        key: "desert-courtyard",
+        title: "Desert Courtyard",
+        scenePrompt: "Show a restrained desert courtyard or ridge overlook with elegant stone forms, open sky, and premium stillness.",
+      },
+      {
+        key: "lake-horizon",
+        title: "Lake Horizon",
+        scenePrompt: "Show a polished mountain-lake horizon with quiet premium atmosphere, spacious composition, and subtle celestial detail.",
+      },
+    ],
+    [
+      {
+        key: "slate-evening",
+        title: "Slate Evening",
+        atmospherePrompt: "Favor deep blue, slate, silver, and seafoam tones with cool evening contrast and minimal clutter.",
+      },
+      {
+        key: "moon-glass",
+        title: "Moon Glass",
+        atmospherePrompt: "Keep reflections, surfaces, and air clean and elegant with moonlit neutrals and refined tonal separation.",
+      },
+      {
+        key: "cold-air",
+        title: "Cold Air",
+        atmospherePrompt: "Use crisp cold air, blue-gray shadow, and restrained light accents to preserve a premium settings backdrop.",
+      },
+      {
+        key: "soft-amber",
+        title: "Soft Amber",
+        atmospherePrompt: "Allow only very restrained amber architectural warmth against otherwise cool neutrals for a polished premium feel.",
+      },
+    ],
+    "Keep the image elegant, subtle, and uncluttered rather than dramatic or loud.",
+  ),
+} as const satisfies Record<WallpaperPageKey, WallpaperPromptRecipe[]>;
 
-export const wallpaperGenerationBatchPresets = {
-  "core-tabs-v1": {
-    label: "Core Tabs v1",
-    variantKeys: [...CORE_TABS_V1_VARIANT_KEYS],
-  },
-  "landscape-diverse-v1": {
-    label: "Landscape Diverse v1",
-    variantKeys: [...LANDSCAPE_DIVERSE_V1_VARIANT_KEYS],
-  },
-} as const satisfies Record<string, WallpaperGenerationBatchPreset>;
+export const wallpaperPromptRecipes = Object.freeze(
+  Object.fromEntries(
+    Object.values(wallpaperRecipeFamilies)
+      .flat()
+      .map((recipe) => [recipe.key, recipe]),
+  ) as Record<string, WallpaperPromptRecipe>,
+);
 
-export type WallpaperGenerationBatchPresetKey = keyof typeof wallpaperGenerationBatchPresets;
+export type WallpaperPromptVariantKey = keyof typeof wallpaperPromptRecipes;
 
-export const pageUsesRecentLiveWallpaperPool = (pageKey: WallpaperPageKey) =>
-  RECENT_LIVE_WALLPAPER_PAGE_KEYS.includes(
-    pageKey as (typeof RECENT_LIVE_WALLPAPER_PAGE_KEYS)[number],
+function resolveWallpaperTimezone(timezone?: string | null): string {
+  const fallback = Intl.DateTimeFormat().resolvedOptions().timeZone || WALLPAPER_CATALOG_TIMEZONE;
+
+  if (!timezone) {
+    return fallback;
+  }
+
+  try {
+    Intl.DateTimeFormat("en-US", { timeZone: timezone });
+    return timezone;
+  } catch (_error) {
+    return fallback;
+  }
+}
+
+function getDatePartsInTimezone(date: Date, timeZone: string) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+    timeZone,
+  }).formatToParts(date);
+
+  const read = (type: Intl.DateTimeFormatPartTypes, fallback: string) =>
+    Number(parts.find((part) => part.type === type)?.value ?? fallback);
+
+  return {
+    year: read("year", "1970"),
+    month: read("month", "1"),
+    day: read("day", "1"),
+    hour: read("hour", "0"),
+    minute: read("minute", "0"),
+    second: read("second", "0"),
+  };
+}
+
+function formatDateKeyInTimezone(date: Date, timeZone: string) {
+  const { year, month, day } = getDatePartsInTimezone(date, timeZone);
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function getUtcDateForZonedWallClock(
+  timeZone: string,
+  year: number,
+  month: number,
+  day: number,
+  hour: number,
+  minute: number,
+  second: number,
+) {
+  const initialGuess = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
+  const zonedParts = getDatePartsInTimezone(initialGuess, timeZone);
+  const desiredUtcStamp = Date.UTC(year, month - 1, day, hour, minute, second);
+  const zonedUtcStamp = Date.UTC(
+    zonedParts.year,
+    zonedParts.month - 1,
+    zonedParts.day,
+    zonedParts.hour,
+    zonedParts.minute,
+    zonedParts.second,
   );
 
-export const isWallpaperAssetEligibleForLiveRotation = (
-  pageKey: WallpaperPageKey,
-  asset: WallpaperLiveEligibilityInput,
+  return new Date(initialGuess.getTime() + (desiredUtcStamp - zonedUtcStamp));
+}
+
+export const getEffectiveWallpaperDate = (
+  userTimezone?: string | null,
+  date = new Date(),
 ) => {
-  if (asset.publishState !== "ready") {
-    return false;
+  const timeZone = resolveWallpaperTimezone(userTimezone);
+  const parts = getDatePartsInTimezone(date, timeZone);
+
+  if (parts.hour < WALLPAPER_RESET_HOUR) {
+    const previousDate = new Date(date.getTime() - 24 * 60 * 60 * 1000);
+    return formatDateKeyInTimezone(previousDate, timeZone);
   }
 
-  if (!pageUsesRecentLiveWallpaperPool(pageKey)) {
-    return true;
-  }
-
-  return asset.sourceKind === "generated"
-    && typeof asset.generationDate === "string"
-    && asset.generationDate >= RECENT_LIVE_WALLPAPER_CUTOFF_DATE;
+  return formatDateKeyInTimezone(date, timeZone);
 };
 
-const wallpaperDateFormatter = new Intl.DateTimeFormat("en-CA", {
-  timeZone: WALLPAPER_CATALOG_TIMEZONE,
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-});
+export const getWallpaperSchedulerStartDate = (date = new Date()) =>
+  getEffectiveWallpaperDate(WALLPAPER_CATALOG_TIMEZONE, date);
 
-const createWallpaperPageRecord = <T>(factory: (pageKey: WallpaperPageKey) => T) => (
-  Object.fromEntries(
-    WALLPAPER_PAGE_KEYS.map((pageKey) => [pageKey, factory(pageKey)]),
-  ) as Record<WallpaperPageKey, T>
-);
+export const getNextWallpaperBoundary = (
+  userTimezone?: string | null,
+  date = new Date(),
+) => {
+  const timeZone = resolveWallpaperTimezone(userTimezone);
+  const parts = getDatePartsInTimezone(date, timeZone);
+  const targetDate = new Date(Date.UTC(parts.year, parts.month - 1, parts.day));
 
-export const countWallpaperVariantsByPage = (
-  variantKeys: readonly WallpaperPromptVariantKey[],
-) => variantKeys.reduce<Record<WallpaperPageKey, number>>(
-  (counts, variantKey) => {
-    counts[wallpaperPromptVariants[variantKey].pageKey] += 1;
-    return counts;
-  },
-  createWallpaperPageRecord(() => 0),
-);
-
-export const formatWallpaperVariantLabel = (variantKey: string | null | undefined) => {
-  if (!variantKey) return null;
-
-  const knownVariant = wallpaperPromptVariants[variantKey as WallpaperPromptVariantKey];
-  if (knownVariant) {
-    return knownVariant.title;
+  if (parts.hour >= WALLPAPER_RESET_HOUR) {
+    targetDate.setUTCDate(targetDate.getUTCDate() + 1);
   }
 
-  return variantKey
-    .split("-")
-    .filter(Boolean)
-    .map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1)}`)
-    .join(" ");
+  let boundary = getUtcDateForZonedWallClock(
+    timeZone,
+    targetDate.getUTCFullYear(),
+    targetDate.getUTCMonth() + 1,
+    targetDate.getUTCDate(),
+    WALLPAPER_RESET_HOUR,
+    0,
+    0,
+  );
+
+  if (boundary.getTime() <= date.getTime()) {
+    boundary = new Date(boundary.getTime() + 24 * 60 * 60 * 1000);
+  }
+
+  return boundary;
 };
+
+export const addDaysToWallpaperDate = (
+  dateKey: string,
+  days: number,
+) => {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  const nextDate = new Date(Date.UTC(year, month - 1, day + days));
+  return `${nextDate.getUTCFullYear()}-${String(nextDate.getUTCMonth() + 1).padStart(2, "0")}-${String(nextDate.getUTCDate()).padStart(2, "0")}`;
+};
+
+export const getWallpaperHorizonDates = (
+  startDate: string,
+  daysAhead = WALLPAPER_HORIZON_DAYS,
+) => Array.from(
+  { length: Math.max(1, daysAhead) },
+  (_, index) => addDaysToWallpaperDate(startDate, index),
+);
+
+const getWallpaperDateSerial = (dateKey: string) => {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  return Math.floor(Date.UTC(year, month - 1, day) / 86400000);
+};
+
+const stableHash = (value: string) => (
+  value.split("").reduce((hash, char) => (hash * 31 + char.charCodeAt(0)) >>> 0, 7)
+);
+
+export const getDeterministicWallpaperRecipes = (
+  pageKey: WallpaperPageKey,
+  dateKey: string,
+  candidateCount = WALLPAPER_DEFAULT_CANDIDATE_COUNT,
+) => {
+  const family = wallpaperRecipeFamilies[pageKey];
+  const cappedCount = Math.max(1, Math.min(candidateCount, family.length));
+  const recipeStart = (
+    stableHash(pageKey) + getWallpaperDateSerial(dateKey) * cappedCount
+  ) % family.length;
+
+  return Array.from({ length: cappedCount }, (_, index) => (
+    family[(recipeStart + index) % family.length]
+  ));
+};
+
+export const getDeterministicWallpaperRecipe = (
+  pageKey: WallpaperPageKey,
+  dateKey: string,
+  candidateIndex: number,
+  candidateCount = WALLPAPER_DEFAULT_CANDIDATE_COUNT,
+) => {
+  const recipes = getDeterministicWallpaperRecipes(pageKey, dateKey, candidateCount);
+  const normalizedIndex = Math.max(0, Math.min(candidateIndex, recipes.length - 1));
+  return recipes[normalizedIndex];
+};
+
+export const isWallpaperAssetEligibleForLiveRotation = (
+  _pageKey: WallpaperPageKey,
+  asset: WallpaperLiveEligibilityInput,
+) => asset.publishState === "ready";
 
 export const calculateWallpaperPromotionScore = (
   validation: Pick<
@@ -483,14 +746,6 @@ export const pickLatestEligibleWallpaperCandidate = <
     })[0] ?? null
 );
 
-export const pickOldestUnusedWallpaperAssetId = (
-  orderedReadyAssetIds: readonly string[],
-  usedAssetIds: Iterable<string>,
-) => {
-  const used = new Set(usedAssetIds);
-  return orderedReadyAssetIds.find((assetId) => !used.has(assetId)) ?? null;
-};
-
 export const clampPercent = (value: number | null | undefined, fallback = 50) => {
   if (typeof value !== "number" || Number.isNaN(value)) {
     return fallback;
@@ -505,11 +760,17 @@ export const toObjectPosition = (
   fallbackY = 50,
 ) => `${clampPercent(x, fallbackX)}% ${clampPercent(y, fallbackY)}%`;
 
-export const getWallpaperDateKey = (date = new Date()) => {
-  const parts = wallpaperDateFormatter.formatToParts(date);
-  const year = parts.find((part) => part.type === "year")?.value ?? "1970";
-  const month = parts.find((part) => part.type === "month")?.value ?? "01";
-  const day = parts.find((part) => part.type === "day")?.value ?? "01";
+export const formatWallpaperVariantLabel = (variantKey: string | null | undefined) => {
+  if (!variantKey) return null;
 
-  return `${year}-${month}-${day}`;
+  const recipe = wallpaperPromptRecipes[variantKey];
+  if (recipe) {
+    return recipe.title;
+  }
+
+  return variantKey
+    .split("-")
+    .filter(Boolean)
+    .map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1)}`)
+    .join(" ");
 };

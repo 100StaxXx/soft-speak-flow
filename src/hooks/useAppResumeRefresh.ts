@@ -62,6 +62,7 @@ export const useAppResumeRefresh = ({ enabled = true }: UseAppResumeRefreshOptio
       queryClient.invalidateQueries({ queryKey: ['companion-evolution-image'] }),
       queryClient.invalidateQueries({ queryKey: ['current-evolution-card'] }),
       queryClient.invalidateQueries({ queryKey: ['evolution-cards'] }),
+      queryClient.invalidateQueries({ queryKey: ['wallpapers'] }),
     ]);
 
     if (user?.id) {

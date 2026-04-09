@@ -1,45 +1,43 @@
 import { describe, expect, it } from "vitest";
 import {
-  CORE_TABS_V1_VARIANT_KEYS,
-  LANDSCAPE_DIVERSE_V1_VARIANT_KEYS,
+  WALLPAPER_PAGE_KEYS,
   calculateWallpaperPromotionScore,
-  countWallpaperVariantsByPage,
+  getDeterministicWallpaperRecipes,
+  getEffectiveWallpaperDate,
+  getWallpaperHorizonDates,
   isWallpaperAssetEligibleForLiveRotation,
   pickBestEligibleWallpaperCandidateForDate,
-  pickLatestEligibleWallpaperCandidate,
-  pickOldestUnusedWallpaperAssetId,
   pickBestWallpaperPromotionCandidate,
-  RECENT_LIVE_WALLPAPER_CUTOFF_DATE,
-  wallpaperGenerationBatchPresets,
+  pickLatestEligibleWallpaperCandidate,
 } from "@/shared/wallpaperCatalog";
 
-describe("wallpaperGenerationBatchPresets", () => {
-  it("keeps the core-tabs-v1 preset locked to one generated backdrop per core tab", () => {
-    const preset = wallpaperGenerationBatchPresets["core-tabs-v1"];
+describe("wallpaper date resolution", () => {
+  it("uses the 2 AM effective-day reset in the requested timezone", () => {
+    expect(
+      getEffectiveWallpaperDate("America/Los_Angeles", new Date("2026-04-08T08:30:00.000Z")),
+    ).toBe("2026-04-07");
 
-    expect(preset.variantKeys).toEqual([...CORE_TABS_V1_VARIANT_KEYS]);
-    expect(preset.variantKeys).toHaveLength(4);
-    expect(countWallpaperVariantsByPage(preset.variantKeys)).toEqual({
-      guide: 1,
-      quests: 1,
-      campaigns: 1,
-      companion: 1,
-      profile: 0,
-    });
+    expect(
+      getEffectiveWallpaperDate("America/Los_Angeles", new Date("2026-04-08T10:30:00.000Z")),
+    ).toBe("2026-04-08");
+
+    expect(
+      getEffectiveWallpaperDate("Asia/Tokyo", new Date("2026-04-08T17:30:00.000Z")),
+    ).toBe("2026-04-09");
   });
+});
 
-  it("keeps the landscape-diverse-v1 preset locked to the curated 10-image backlog", () => {
-    const preset = wallpaperGenerationBatchPresets["landscape-diverse-v1"];
+describe("deterministic wallpaper recipes", () => {
+  it("does not reuse a recipe key for the same page inside the 4-day rolling window", () => {
+    const horizonDates = getWallpaperHorizonDates("2026-04-08");
 
-    expect(preset.variantKeys).toEqual([...LANDSCAPE_DIVERSE_V1_VARIANT_KEYS]);
-    expect(preset.variantKeys).toHaveLength(10);
-    expect(countWallpaperVariantsByPage(preset.variantKeys)).toEqual({
-      guide: 1,
-      quests: 3,
-      campaigns: 3,
-      companion: 2,
-      profile: 1,
-    });
+    for (const pageKey of WALLPAPER_PAGE_KEYS) {
+      const recipeKeys = horizonDates.flatMap((dateKey) =>
+        getDeterministicWallpaperRecipes(pageKey, dateKey, 3).map((recipe) => recipe.key),
+      );
+
+      expect(new Set(recipeKeys).size).toBe(recipeKeys.length);
+    }
   });
 });
 
@@ -93,73 +91,22 @@ describe("wallpaper promotion scoring", () => {
     expect(best?.id).toBe("newest-equal-safe-zone");
   });
 
-  it("selects the oldest ready asset that has never been assigned", () => {
-    expect(
-      pickOldestUnusedWallpaperAssetId(
-        ["asset-1", "asset-2", "asset-3"],
-        ["asset-1", "asset-3"],
-      ),
-    ).toBe("asset-2");
-  });
-
-  it("only keeps post-cutoff generated assets eligible for the recent live wallpaper pages", () => {
+  it("treats only ready assets as live-rotation eligible", () => {
     expect(
       isWallpaperAssetEligibleForLiveRotation("guide", {
         publishState: "ready",
-        sourceKind: "generated",
-        generationDate: RECENT_LIVE_WALLPAPER_CUTOFF_DATE,
-      }),
-    ).toBe(true);
-
-    expect(
-      isWallpaperAssetEligibleForLiveRotation("campaigns", {
-        publishState: "ready",
-        sourceKind: "generated",
-        generationDate: RECENT_LIVE_WALLPAPER_CUTOFF_DATE,
       }),
     ).toBe(true);
 
     expect(
       isWallpaperAssetEligibleForLiveRotation("guide", {
-        publishState: "ready",
-        sourceKind: "seed",
-        generationDate: "2026-04-08",
+        publishState: "suppressed",
       }),
     ).toBe(false);
-
-    expect(
-      isWallpaperAssetEligibleForLiveRotation("quests", {
-        publishState: "ready",
-        sourceKind: "generated",
-        generationDate: "2026-04-07",
-      }),
-    ).toBe(false);
-
-    expect(
-      isWallpaperAssetEligibleForLiveRotation("profile", {
-        publishState: "ready",
-        sourceKind: "seed",
-        generationDate: "2026-04-01",
-      }),
-    ).toBe(true);
   });
 
-  it("prefers the best eligible current-day candidate before other ready assets", () => {
+  it("prefers the best approved same-date candidate before other ready assets", () => {
     const candidates = [
-      {
-        id: "newest-seed-but-ineligible",
-        createdAt: "2026-04-09T12:00:00.000Z",
-        publishState: "ready",
-        sourceKind: "seed",
-        generationDate: "2026-04-09",
-        validation: {
-          scenicQualityScore: 99,
-          moodMatchScore: 99,
-          detailScore: 99,
-          contrastScore: 99,
-          safeZoneConfidenceScore: 99,
-        },
-      },
       {
         id: "latest-older",
         createdAt: "2026-04-09T11:00:00.000Z",

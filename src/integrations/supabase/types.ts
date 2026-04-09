@@ -8163,6 +8163,20 @@ export type Database = {
       }
     }
     Views: {
+      live_wallpaper_manifest_v: {
+        Row: {
+          assignment_source: string | null
+          desktop_focus_x: number | null
+          desktop_focus_y: number | null
+          for_date: string | null
+          image_url: string | null
+          mobile_focus_x: number | null
+          mobile_focus_y: number | null
+          page_key: string | null
+          updated_at: string | null
+        }
+        Relationships: []
+      }
       rhythm_tracks_with_scores: {
         Row: {
           audio_url: string | null

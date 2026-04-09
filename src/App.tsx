@@ -46,6 +46,7 @@ import { usePostOnboardingMentorGuidance } from "@/hooks/usePostOnboardingMentor
 import { ResilienceProvider } from "@/contexts/ResilienceContext";
 import { ResilienceStatusBanner } from "@/components/resilience/ResilienceStatusBanner";
 import { MentorConnectionProvider, useMentorConnection } from "@/contexts/MentorConnectionContext";
+import { WallpaperManifestProvider } from "@/contexts/WallpaperManifestContext";
 
 // Lazy load pages for code splitting
 const Home = lazy(() => import("./pages/Home"));
@@ -309,25 +310,29 @@ const AppContent = memo(() => {
     <ResilienceProvider>
       <MentorConnectionProvider>
         <MentorConnectedThemeProvider>
-          <ResilienceStatusBanner />
-          <ViewModeProvider>
-            <CompanionMotionProvider>
-              <XPProvider>
-                <PostOnboardingMentorGuidanceProvider>
-                  <WeeklyRecapProvider>
-                    <CompanionPresenceProvider>
-                      <TalkPopupProvider>
-                        <RealtimeSyncProvider>
-                        <AstralEncounterProvider>
-                        <Suspense fallback={<LoadingFallback />}>
-                        <EvolutionAwareContent />
-                        {activeMainTabPath ? (
-                          <ProtectedRoute>
-                            <MainTabsKeepAlive activePath={activeMainTabPath} />
-                          </ProtectedRoute>
-                        ) : (
-                        <AnimatePresence mode="sync" initial={false}>
-                          <Routes location={location} key={location.pathname}>
+          <WallpaperManifestProvider
+            enabled={Boolean(session?.user)}
+            userTimezone={profile?.timezone ?? null}
+          >
+            <ResilienceStatusBanner />
+            <ViewModeProvider>
+              <CompanionMotionProvider>
+                <XPProvider>
+                  <PostOnboardingMentorGuidanceProvider>
+                    <WeeklyRecapProvider>
+                      <CompanionPresenceProvider>
+                        <TalkPopupProvider>
+                          <RealtimeSyncProvider>
+                          <AstralEncounterProvider>
+                          <Suspense fallback={<LoadingFallback />}>
+                          <EvolutionAwareContent />
+                          {activeMainTabPath ? (
+                            <ProtectedRoute>
+                              <MainTabsKeepAlive activePath={activeMainTabPath} />
+                            </ProtectedRoute>
+                          ) : (
+                          <AnimatePresence mode="sync" initial={false}>
+                            <Routes location={location} key={location.pathname}>
                   <Route path="/welcome" element={<Welcome />} />
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/calendar/oauth/callback" element={<CalendarOAuthCallback />} />
@@ -371,21 +376,22 @@ const AppContent = memo(() => {
                   <Route path="/test-scroll" element={<TestScroll />} />
                   <Route path="/test-day-planner" element={<TestDayPlanner />} />
                   <Route path="*" element={<NotFound />} />
-                          </Routes>
-                          </AnimatePresence>
-                        )}
-                        {showBottomNav && <BottomNav />}
-                        <MentorTutorialLayer />
-                        </Suspense>
-                        </AstralEncounterProvider>
-                        </RealtimeSyncProvider>
-                      </TalkPopupProvider>
-                    </CompanionPresenceProvider>
-                  </WeeklyRecapProvider>
-                </PostOnboardingMentorGuidanceProvider>
-              </XPProvider>
-            </CompanionMotionProvider>
-          </ViewModeProvider>
+                            </Routes>
+                            </AnimatePresence>
+                          )}
+                          {showBottomNav && <BottomNav />}
+                          <MentorTutorialLayer />
+                          </Suspense>
+                          </AstralEncounterProvider>
+                          </RealtimeSyncProvider>
+                        </TalkPopupProvider>
+                      </CompanionPresenceProvider>
+                    </WeeklyRecapProvider>
+                  </PostOnboardingMentorGuidanceProvider>
+                </XPProvider>
+              </CompanionMotionProvider>
+            </ViewModeProvider>
+          </WallpaperManifestProvider>
         </MentorConnectedThemeProvider>
       </MentorConnectionProvider>
     </ResilienceProvider>
