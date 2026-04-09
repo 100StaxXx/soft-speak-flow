@@ -29,8 +29,6 @@ jobs:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
       SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-      SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
-      INTERNAL_FUNCTION_SECRET: ${{ secrets.INTERNAL_FUNCTION_SECRET }}
 
     steps:
       - uses: actions/checkout@v4
@@ -95,47 +93,94 @@ jobs:
             where jobname = 'rotate-daily-wallpapers';
           "
 
-      - name: Force-generate guide wallpaper for active day
+      - name: Queue guide wallpaper generation for active day
         run: |
           set -euo pipefail
 
-          body="$(jq -nc --arg startDate "${{ inputs.wallpaper_start_date }}" '{
-            startDate: $startDate,
-            daysAhead: 1,
-            candidateCount: 3,
-            force: true,
-            pageKeys: ["guide"]
-          }')"
+          supabase db query --linked "
+            select public.invoke_edge_function_with_internal_secret(
+              'rotate-daily-wallpapers',
+              jsonb_build_object(
+                'startDate', '${{ inputs.wallpaper_start_date }}',
+                'daysAhead', 1,
+                'candidateCount', 3,
+                'force', true,
+                'pageKeys', jsonb_build_array('guide')
+              )
+            );
+          "
 
-          curl --fail-with-body -sS \
-            -X POST "https://${PROJECT_REF}.supabase.co/functions/v1/rotate-daily-wallpapers" \
-            -H "Content-Type: application/json" \
-            -H "apikey: ${SUPABASE_PUBLISHABLE_KEY}" \
-            -H "x-internal-key: ${INTERNAL_FUNCTION_SECRET}" \
-            --data "$body" | tee /tmp/guide-force.json
-
-          jq -e '.success == true' /tmp/guide-force.json > /dev/null
-
-      - name: Refill 4-day horizon for all cinematic pages
+      - name: Wait for guide wallpaper generation
         run: |
           set -euo pipefail
 
-          body="$(jq -nc --arg startDate "${{ inputs.wallpaper_start_date }}" '{
-            startDate: $startDate,
-            daysAhead: 4,
-            candidateCount: 3,
-            force: false,
-            pageKeys: ["guide", "quests", "campaigns", "companion", "profile"]
-          }')"
+          for attempt in $(seq 1 30); do
+            ready_count="$(supabase db query --linked -o csv "
+              select count(*)
+              from public.wallpaper_assets
+              where page_key = 'guide'
+                and publish_state = 'ready';
+            " | tail -n 1 | tr -d '\r')"
 
-          curl --fail-with-body -sS \
-            -X POST "https://${PROJECT_REF}.supabase.co/functions/v1/rotate-daily-wallpapers" \
-            -H "Content-Type: application/json" \
-            -H "apikey: ${SUPABASE_PUBLISHABLE_KEY}" \
-            -H "x-internal-key: ${INTERNAL_FUNCTION_SECRET}" \
-            --data "$body" | tee /tmp/horizon-refill.json
+            assignment_count="$(supabase db query --linked -o csv "
+              select count(*)
+              from public.daily_wallpaper_assignments
+              where for_date = date '${{ inputs.wallpaper_start_date }}'
+                and page_key = 'guide';
+            " | tail -n 1 | tr -d '\r')"
 
-          jq -e '.success == true' /tmp/horizon-refill.json > /dev/null
+            if [ "${ready_count}" -ge 1 ] && [ "${assignment_count}" -ge 1 ]; then
+              echo "Guide wallpaper generation completed on attempt ${attempt}"
+              exit 0
+            fi
+
+            echo "Guide wallpaper not ready yet (attempt ${attempt}/30)"
+            sleep 10
+          done
+
+          echo "Guide wallpaper generation did not finish within 5 minutes" >&2
+          exit 1
+
+      - name: Queue 4-day horizon refill for all cinematic pages
+        run: |
+          set -euo pipefail
+
+          supabase db query --linked "
+            select public.invoke_edge_function_with_internal_secret(
+              'rotate-daily-wallpapers',
+              jsonb_build_object(
+                'startDate', '${{ inputs.wallpaper_start_date }}',
+                'daysAhead', 4,
+                'candidateCount', 3,
+                'force', false,
+                'pageKeys', jsonb_build_array('guide', 'quests', 'campaigns', 'companion', 'profile')
+              )
+            );
+          "
+
+      - name: Wait for 4-day horizon refill
+        run: |
+          set -euo pipefail
+
+          for attempt in $(seq 1 18); do
+            horizon_count="$(supabase db query --linked -o csv "
+              select count(*)
+              from public.daily_wallpaper_assignments
+              where for_date between date '${{ inputs.wallpaper_start_date }}' and date '${{ inputs.wallpaper_start_date }}' + 3
+                and page_key in ('guide', 'quests', 'campaigns', 'companion', 'profile');
+            " | tail -n 1 | tr -d '\r')"
+
+            if [ "${horizon_count}" -ge 20 ]; then
+              echo "Wallpaper horizon filled on attempt ${attempt}"
+              exit 0
+            fi
+
+            echo "Wallpaper horizon still incomplete (attempt ${attempt}/18, count=${horizon_count})"
+            sleep 10
+          done
+
+          echo "Wallpaper horizon refill did not finish within 3 minutes" >&2
+          exit 1
 
       - name: Verify guide assets and 4-day assignment coverage
         run: |
