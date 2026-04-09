@@ -7,6 +7,7 @@ import { useCompanionHealth, CompanionMoodState } from "@/hooks/useCompanionHeal
 import { useCompanion } from "@/hooks/useCompanion";
 import { useXPRewards } from "@/hooks/useXPRewards";
 import { useLivingCompanionSafe } from "@/hooks/useLivingCompanion";
+import { useAchievements } from "@/hooks/useAchievements";
 import { CompanionImage, CompanionPortraitShell } from "@/components/CompanionImage";
 import { isCompanionPresetImageSource } from "@/lib/companionImageFocal";
 
@@ -19,6 +20,7 @@ export const WelcomeBackModal = ({ isOpen, onClose }: WelcomeBackModalProps) => 
   const { health, markUserActive } = useCompanionHealth();
   const { companion } = useCompanion();
   const { awardCustomXP, XP_REWARDS } = useXPRewards();
+  const { checkComebackAchievement } = useAchievements();
   const { triggerComeback } = useLivingCompanionSafe();
   const [showReunion, setShowReunion] = useState(false);
   const [hasAwarded, setHasAwarded] = useState(false);
@@ -66,6 +68,8 @@ export const WelcomeBackModal = ({ isOpen, onClose }: WelcomeBackModalProps) => 
         console.log('[LivingCompanion] Comeback reaction failed:', err)
       );
     }
+
+    await checkComebackAchievement(health.daysInactive);
     
     // Close after animation
     setTimeout(() => {

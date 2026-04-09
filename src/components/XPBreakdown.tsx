@@ -1,11 +1,11 @@
 import { memo } from "react";
-import { Card } from "@/components/ui/card";
+import { Card, outerShellCardClassName } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Sparkles, TrendingUp, Flame } from "lucide-react";
 import { useStreakMultiplier } from "@/hooks/useStreakMultiplier";
-import { formatDisplayLabel } from "@/lib/utils";
+import { cn, formatDisplayLabel } from "@/lib/utils";
 
 export const XPBreakdown = memo(() => {
   const { user } = useAuth();
@@ -57,7 +57,7 @@ export const XPBreakdown = memo(() => {
   };
 
   return (
-    <Card className="p-5 md:p-6 bg-card/18 backdrop-blur-xl border-primary/16 select-none">
+    <Card className={cn("p-5 md:p-6 border-primary/16 select-none", outerShellCardClassName)}>
       <div className="space-y-4" onContextMenu={(e) => e.preventDefault()}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">

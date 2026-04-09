@@ -5,6 +5,7 @@ import { GlassCard } from '@/components/ui/glass-card';
 import { Button } from '@/components/ui/button';
 import { ResistModePanel } from './ResistModePanel';
 import { cn } from '@/lib/utils';
+import { outerShellCardClassName } from '@/components/ui/card';
 import type { CompanionLayoutMode } from '@/hooks/useCompanionLayoutMode';
 
 type FocusMode = 'focus' | 'resist';
@@ -20,7 +21,12 @@ export const FocusTab = memo(({ layoutMode = 'mobile' }: FocusTabProps) => {
   if (isDesktop) {
     return (
       <div className="space-y-6 pt-1">
-        <div className="flex flex-col gap-4 rounded-2xl border border-border/50 bg-card/24 p-4 backdrop-blur-md md:flex-row md:items-center md:justify-between">
+        <div
+          className={cn(
+            'flex flex-col gap-4 rounded-2xl border p-4 md:flex-row md:items-center md:justify-between',
+            outerShellCardClassName,
+          )}
+        >
           <div className="space-y-1">
             <p className="text-sm font-medium text-muted-foreground">Focus studio</p>
             <p className="text-2xl font-semibold tracking-tight">
@@ -51,7 +57,7 @@ export const FocusTab = memo(({ layoutMode = 'mobile' }: FocusTabProps) => {
 
         {mode === 'focus' ? (
           <div className="space-y-6">
-            <GlassCard variant="subtle" className="p-5 text-left space-y-2">
+            <GlassCard variant="pageShell" className="p-5 text-left space-y-2">
               <div className="flex items-center gap-2 text-primary">
                 <Sparkles className="h-5 w-5" />
                 <span className="text-sm font-medium">Focus to grow your companion</span>
@@ -96,7 +102,7 @@ export const FocusTab = memo(({ layoutMode = 'mobile' }: FocusTabProps) => {
 
       {mode === 'focus' ? (
         <>
-          <GlassCard variant="subtle" className="p-4 text-center space-y-2">
+          <GlassCard variant="pageShell" className="p-4 text-center space-y-2">
             <div className="flex items-center justify-center gap-2 text-primary">
               <Sparkles className="h-5 w-5" />
               <span className="text-sm font-medium">Focus to grow your companion</span>

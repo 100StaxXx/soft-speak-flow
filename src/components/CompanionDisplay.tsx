@@ -1,4 +1,4 @@
-import { Card } from "@/components/ui/card";
+import { Card, outerShellCardClassName } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { PawPrint, Sparkles } from "lucide-react";
@@ -545,31 +545,38 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
   return (
     <>
       <Card
-        className="relative overflow-hidden bg-card/14 backdrop-blur-xl border transition-all duration-500 animate-scale-in"
+        data-testid="companion-outer-shell"
+        className={cn(
+          "relative overflow-hidden border transition-all duration-500 animate-scale-in",
+          outerShellCardClassName,
+        )}
         style={{ borderColor: companionPalette.chipBorder }}
       >
         {/* Equipped background or default nebula gradients */}
         {equippedBackgroundStyle ? (
           <div 
-            className="absolute inset-0 opacity-58 transition-opacity duration-500" 
+            className="absolute inset-0 opacity-[0.16] transition-opacity duration-500" 
             style={{ background: equippedBackgroundStyle }}
           />
         ) : (
           <>
             <div
-              className={`absolute inset-0 opacity-42 ${!prefersReducedMotion ? "animate-nebula-shift" : ""}`}
+              data-testid="companion-shell-gradient-overlay"
+              className={`absolute inset-0 opacity-[0.16] ${!prefersReducedMotion ? "animate-nebula-shift" : ""}`}
               style={{
                 background: `linear-gradient(135deg, ${companionPalette.cardGradientA}, ${companionPalette.cardGradientB})`,
               }}
             />
             <div
-              className="absolute inset-0"
+              data-testid="companion-shell-radial-top"
+              className="absolute inset-0 opacity-[0.10]"
               style={{
                 background: `radial-gradient(circle at top right, ${companionPalette.glow}, transparent 52%)`,
               }}
             />
             <div
-              className="absolute inset-0"
+              data-testid="companion-shell-radial-bottom"
+              className="absolute inset-0 opacity-[0.10]"
               style={{
                 background: `radial-gradient(circle at bottom left, ${companionPalette.badgeBorder}, transparent 56%)`,
               }}

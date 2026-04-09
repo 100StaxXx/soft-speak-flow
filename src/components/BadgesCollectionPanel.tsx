@@ -14,6 +14,7 @@ import {
   DialogTitle,
 } from "./ui/dialog";
 import type { CompanionLayoutMode } from "@/hooks/useCompanionLayoutMode";
+import { normalizeAchievementType } from "@/lib/achievementTypes";
 
 type FilterCategory = 'all' | BadgeCategory;
 
@@ -55,7 +56,11 @@ export const BadgesCollectionPanel = ({ layoutMode = "mobile" }: BadgesCollectio
   });
 
   const earnedTypes = useMemo(() => {
-    return new Set(earnedAchievements?.map(a => a.achievement_type) || []);
+    return new Set(
+      (earnedAchievements ?? [])
+        .map((achievement) => normalizeAchievementType(achievement.achievement_type))
+        .filter(Boolean),
+    );
   }, [earnedAchievements]);
 
   const filteredBadges = useMemo(() => {
@@ -74,7 +79,16 @@ export const BadgesCollectionPanel = ({ layoutMode = "mobile" }: BadgesCollectio
   const totalEarned = BADGE_CATALOG.filter(b => earnedTypes.has(b.achievementType)).length;
   const totalAvailable = BADGE_CATALOG.length;
 
-  const filterCategories: FilterCategory[] = ['all', 'streaks', 'companion', 'starpaths', 'firsts', 'special'];
+  const filterCategories: FilterCategory[] = [
+    'all',
+    'streaks',
+    'companion',
+    'starpaths',
+    'challenges',
+    'firsts',
+    'special',
+    'astral',
+  ];
 
   if (isLoading) {
     return (

@@ -70,6 +70,8 @@ const mocks = vi.hoisted(() => {
   };
 
   const awardPepTalkListenedAsync = vi.fn();
+  const checkFirstTimeAchievements = vi.fn();
+  const checkPepTalkListeningAchievements = vi.fn();
   const toastError = vi.fn();
   const toastSuccess = vi.fn();
   const safePlayMock = vi.fn(async () => true);
@@ -125,6 +127,8 @@ const mocks = vi.hoisted(() => {
   return {
     state,
     awardPepTalkListenedAsync,
+    checkFirstTimeAchievements,
+    checkPepTalkListeningAchievements,
     toastError,
     toastSuccess,
     safePlayMock,
@@ -182,6 +186,13 @@ vi.mock("@/contexts/MentorConnectionContext", () => ({
 vi.mock("@/hooks/useXPRewards", () => ({
   useXPRewards: () => ({
     awardPepTalkListenedAsync: mocks.awardPepTalkListenedAsync,
+  }),
+}));
+
+vi.mock("@/hooks/useAchievements", () => ({
+  useAchievements: () => ({
+    checkFirstTimeAchievements: mocks.checkFirstTimeAchievements,
+    checkPepTalkListeningAchievements: mocks.checkPepTalkListeningAchievements,
   }),
 }));
 
@@ -296,6 +307,8 @@ describe("TodaysPepTalk transcript expand behavior", () => {
     vi.useRealTimers();
     mocks.safeLocalStorage.clear();
     mocks.awardPepTalkListenedAsync.mockReset();
+    mocks.checkFirstTimeAchievements.mockReset();
+    mocks.checkPepTalkListeningAchievements.mockReset();
     mocks.awardPepTalkListenedAsync.mockResolvedValue({
       xpAwarded: 8,
       duplicate: false,
@@ -592,7 +605,8 @@ describe("TodaysPepTalk transcript expand behavior", () => {
     });
 
     await waitFor(() => {
-      expect(mocks.toastError).toHaveBeenCalledWith("No themes configured for mentor: solace");
+      expect(mocks.toastError).toHaveBeenCalled();
+      expect(mocks.toastError.mock.calls.at(-1)?.[0]).toBe("No themes configured for mentor: solace");
     });
   });
 

@@ -20,6 +20,7 @@ import { globalAudio } from "@/utils/globalAudio";
 import { createIOSOptimizedAudio, isIOS, iosAudioManager, safePlay } from "@/utils/iosAudio";
 import { logger } from "@/utils/logger";
 import { toast } from "@/components/ui/sonner";
+import { useAchievements } from "@/hooks/useAchievements";
 
 interface CaptionWord {
   word: string;
@@ -178,6 +179,7 @@ export const TodaysPepTalk = memo(() => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { awardPepTalkListenedAsync } = useXPRewards();
+  const { checkFirstTimeAchievements, checkPepTalkListeningAchievements } = useAchievements();
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -518,6 +520,21 @@ export const TodaysPepTalk = memo(() => {
       if (awardResult) {
         hasAwardedXPRef.current = true;
         setHasAwardedXP(true);
+
+        if (!awardResult.duplicate) {
+          const { count } = await supabase
+            .from("xp_events")
+            .select("*", { count: "exact", head: true })
+            .eq("user_id", profile.id)
+            .eq("event_type", "pep_talk_listen");
+
+          const totalListens = count ?? 0;
+          if (totalListens === 1) {
+            await checkFirstTimeAchievements("peptalk");
+          }
+
+          await checkPepTalkListeningAchievements(totalListens);
+        }
       }
     } catch (awardError) {
       log.warn("Pep talk XP award failed", {
@@ -527,7 +544,13 @@ export const TodaysPepTalk = memo(() => {
     } finally {
       isAwardingXPRef.current = false;
     }
-  }, [awardPepTalkListenedAsync, pepTalk?.id, profile?.id]);
+  }, [
+    awardPepTalkListenedAsync,
+    checkFirstTimeAchievements,
+    checkPepTalkListeningAchievements,
+    pepTalk?.id,
+    profile?.id,
+  ]);
 
   useEffect(() => {
     const audio = audioRef.current;

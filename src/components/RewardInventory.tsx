@@ -6,7 +6,7 @@
 import { useState, memo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card } from "@/components/ui/card";
+import { Card, outerShellCardClassName } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Check, Sparkles, Image, Frame, Wand2, Gem, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -78,7 +78,7 @@ export const RewardInventory = memo(({ className, layoutMode = "mobile" }: Rewar
 
   if (isLoading) {
     return (
-      <Card className={cn("p-6 cosmiq-glass", className)}>
+      <Card className={cn("p-6", outerShellCardClassName, className)}>
         <div className="flex items-center justify-center h-40">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
         </div>
@@ -87,7 +87,7 @@ export const RewardInventory = memo(({ className, layoutMode = "mobile" }: Rewar
   }
 
   return (
-    <Card className={cn("cosmiq-glass overflow-hidden", className)}>
+    <Card className={cn("overflow-hidden", outerShellCardClassName, className)}>
       <div className="p-4 border-b border-border/50">
         <div className="flex items-center gap-2">
           <Sparkles className="w-5 h-5 text-primary" />

@@ -291,10 +291,18 @@ describe("CompanionDisplay overlay stack", () => {
     render(<CompanionDisplay />);
 
     const surface = screen.getByTestId("companion-motion-surface");
+    const outerShell = screen.getByTestId("companion-outer-shell");
     expect(await screen.findByText("Nova")).toBeInTheDocument();
     expect(screen.getByTestId("companion-visual-stage")).toHaveTextContent("Stage 2 • Initiate");
     expect(screen.getByTestId("companion-level-chip")).toHaveTextContent("Level 8");
     expect(screen.getByText("Bond")).toBeInTheDocument();
+    expect(outerShell.className).toContain("bg-card/[0.05]");
+    expect(outerShell.className).toContain("backdrop-blur-md");
+    expect(outerShell.className).toContain("border-border/25");
+    expect(outerShell.className).toContain("shadow-[0_10px_24px_rgba(0,0,0,0.14)]");
+    expect(screen.getByTestId("companion-shell-gradient-overlay").className).toContain("opacity-[0.16]");
+    expect(screen.getByTestId("companion-shell-radial-top").className).toContain("opacity-[0.10]");
+    expect(screen.getByTestId("companion-shell-radial-bottom").className).toContain("opacity-[0.10]");
     expect(within(surface).getByTestId("companion-motion-surface-content")).toBeInTheDocument();
     expect(surface.querySelector('[data-motion-plane="backdrop"]')).not.toBeNull();
     expect(surface.querySelector('[data-motion-plane="foreground"]')).not.toBeNull();

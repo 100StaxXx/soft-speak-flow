@@ -27,7 +27,7 @@ const MorningCheckInContent = () => {
   const { isActive: isTutorialActive, currentStep: tutorialStep } = usePostOnboardingMentorGuidance();
   const queryClient = useQueryClient();
   const { awardCheckInComplete, XP_REWARDS } = useXPRewards();
-  const { checkFirstTimeAchievements } = useAchievements();
+  const { checkDailyCompletionAchievement, checkFirstTimeAchievements } = useAchievements();
   const { triggerReaction } = useLivingCompanionSafe();
   const [mood, setMood] = useState<string>("");
   const [intention, setIntention] = useState("");
@@ -191,6 +191,8 @@ const MorningCheckInContent = () => {
       if (count === 1) {
         await checkFirstTimeAchievements('checkin');
       }
+
+      await checkDailyCompletionAchievement(today);
 
       // Trigger astral encounter check
       window.dispatchEvent(new CustomEvent('quest-completed'));

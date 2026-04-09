@@ -1,9 +1,16 @@
+import { useCallback, useRef } from "react";
+
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "./useAuth";
 import { toast } from "@/components/ui/sonner";
 import { playAchievementUnlock } from "@/utils/soundEffects";
-import { useCallback, useRef } from "react";
 import { AdversaryTheme } from "@/types/astralEncounters";
+import { STORY_TYPE_BADGES } from "@/types/epicRewards";
+import {
+  getAchievementTypeVariants,
+  normalizeAchievementType,
+} from "@/lib/achievementTypes";
+
+import { useAuth } from "./useAuth";
 
 interface AchievementData {
   type: string;
@@ -21,38 +28,69 @@ interface AchievementData {
 
 export const useAchievements = () => {
   const { user } = useAuth();
-  
-  // Track achievements already notified this session to prevent duplicate toasts
+
+  // Track achievements already handled this session to prevent duplicate toasts and writes.
   const notifiedAchievements = useRef<Set<string>>(new Set());
 
   const awardAchievement = useCallback(async (achievement: AchievementData) => {
     if (!user) return;
 
-    // Skip if already notified this session
-    if (notifiedAchievements.current.has(achievement.type)) return;
-    notifiedAchievements.current.add(achievement.type);
+    const canonicalType = normalizeAchievementType(achievement.type);
+    if (!canonicalType) return;
+    if (notifiedAchievements.current.has(canonicalType)) return;
 
     try {
-      // Use upsert with ignoreDuplicates to handle race conditions
+      let existingAchievements: Array<{ id: string }> | null = null;
+
+      if (canonicalType === "story_chapter") {
+        const { data, error } = await supabase
+          .from("achievements")
+          .select("id")
+          .eq("user_id", user.id)
+          .or("achievement_type.eq.story_chapter,achievement_type.like.story_chapter_%")
+          .limit(1);
+
+        if (error) throw error;
+        existingAchievements = data;
+      } else {
+        const { data, error } = await supabase
+          .from("achievements")
+          .select("id")
+          .eq("user_id", user.id)
+          .in("achievement_type", getAchievementTypeVariants(canonicalType))
+          .limit(1);
+
+        if (error) throw error;
+        existingAchievements = data;
+      }
+
+      if (existingAchievements && existingAchievements.length > 0) {
+        notifiedAchievements.current.add(canonicalType);
+        return;
+      }
+
       const { data, error } = await supabase
         .from("achievements")
         .upsert({
           user_id: user.id,
-          achievement_type: achievement.type,
+          achievement_type: canonicalType,
           title: achievement.title,
           description: achievement.description,
           icon: achievement.icon,
           tier: achievement.tier,
           metadata: achievement.metadata || {},
         }, {
-          onConflict: 'user_id,achievement_type',
-          ignoreDuplicates: true
+          onConflict: "user_id,achievement_type",
+          ignoreDuplicates: true,
         })
-        .select('id')
+        .select("id")
         .maybeSingle();
 
-      // Only show toast if this was a new insert (data returned means it was inserted)
-      if (data && !error) {
+      if (error) throw error;
+
+      notifiedAchievements.current.add(canonicalType);
+
+      if (data) {
         toast.success("🏆 Achievement Unlocked!", {
           description: achievement.title,
         });
@@ -64,149 +102,156 @@ export const useAchievements = () => {
   }, [user]);
 
   const checkStreakAchievements = async (streak: number) => {
-    // Silver: 3-day streak (early effort)
-    if (streak === 3) {
+    if (streak >= 3) {
       await awardAchievement({
-        type: "three_day_streak",
+        type: "streak_3_day",
         title: "Getting Started",
         description: "3 days of consistency",
         icon: "flame",
-        tier: "silver",
-        metadata: { 
+        tier: "bronze",
+        metadata: {
           streak,
           pepTalkDuration: "2-3 min",
           pepTalkMessage: "You're showing effort today. Keep that energy.",
-          pepTalkCategory: "encouragement"
-        },
-      });
-    } 
-    // Gold: 7-day streak (discipline)
-    else if (streak === 7) {
-      await awardAchievement({
-        type: "week_streak",
-        title: "Week of Discipline",
-        description: "7 days of unwavering commitment",
-        icon: "trophy",
-        tier: "gold",
-        metadata: { 
-          streak,
-          pepTalkDuration: "4-5 min",
-          pepTalkMessage: "You're not who you were last week. You're growing.",
-          pepTalkCategory: "discipline"
-        },
-      });
-    } 
-    // Gold: 14-day streak (sustained discipline)
-    else if (streak === 14) {
-      await awardAchievement({
-        type: "two_week_streak",
-        title: "Fortnight Fighter",
-        description: "14 days of unwavering discipline",
-        icon: "trophy",
-        tier: "gold",
-        metadata: { 
-          streak,
-          pepTalkDuration: "4-5 min",
-          pepTalkMessage: "Two weeks of showing up. That's the discipline talking.",
-          pepTalkCategory: "discipline"
+          pepTalkCategory: "encouragement",
         },
       });
     }
-    // Platinum: 30-day streak (transformation)
-    else if (streak === 30) {
+
+    if (streak >= 7) {
       await awardAchievement({
-        type: "month_streak",
-        title: "Transformed",
-        description: "30 days - You're not the same person anymore",
+        type: "streak_7_day",
+        title: "Week of Discipline",
+        description: "7 days of unwavering commitment",
+        icon: "trophy",
+        tier: "silver",
+        metadata: {
+          streak,
+          pepTalkDuration: "4-5 min",
+          pepTalkMessage: "You're not who you were last week. You're growing.",
+          pepTalkCategory: "discipline",
+        },
+      });
+    }
+
+    if (streak >= 14) {
+      await awardAchievement({
+        type: "streak_14_day",
+        title: "Fortnight Force",
+        description: "14 days of unwavering discipline",
+        icon: "trophy",
+        tier: "gold",
+        metadata: {
+          streak,
+          pepTalkDuration: "4-5 min",
+          pepTalkMessage: "Two weeks of showing up. That's the discipline talking.",
+          pepTalkCategory: "discipline",
+        },
+      });
+    }
+
+    if (streak >= 30) {
+      await awardAchievement({
+        type: "streak_30_day",
+        title: "Monthly Master",
+        description: "Maintained a 30-day streak",
         icon: "crown",
         tier: "platinum",
-        metadata: { 
+        metadata: {
           streak,
           pepTalkDuration: "7-10 min",
           pepTalkMessage: "A month ago, you started. Today, you're different. This is transformation.",
-          pepTalkCategory: "breakthrough"
+          pepTalkCategory: "breakthrough",
         },
       });
     }
   };
 
   const checkChallengeAchievements = async (completedCount: number) => {
-    if (completedCount === 1) {
+    if (completedCount >= 1) {
       await awardAchievement({
-        type: "first_challenge",
+        type: "challenge_complete",
         title: "Challenge Accepted",
         description: "Completed your first challenge",
         icon: "target",
-        tier: "bronze",
-      });
-    } else if (completedCount === 5) {
-      await awardAchievement({
-        type: "challenge_veteran",
-        title: "Challenge Veteran",
-        description: "Completed 5 challenges",
-        icon: "target",
         tier: "silver",
       });
-    } else if (completedCount === 10) {
+    }
+
+    if (completedCount >= 5) {
       await awardAchievement({
-        type: "challenge_master",
-        title: "Challenge Master",
-        description: "Completed 10 challenges",
+        type: "challenge_5_complete",
+        title: "Challenge Seeker",
+        description: "Completed 5 challenges",
         icon: "target",
         tier: "gold",
       });
     }
   };
 
-  const checkFirstTimeAchievements = async (type: 'habit' | 'checkin' | 'peptalk' | 'mission') => {
+  const checkFirstTimeAchievements = async (
+    type: "habit" | "checkin" | "peptalk" | "mission" | "epic",
+  ) => {
     const achievementMap = {
       habit: {
         type: "first_habit",
-        title: "First Step",
-        description: "Created your first habit",
+        title: "Habit Starter",
+        description: "Completed your first habit",
         icon: "check",
         tier: "bronze" as const,
         metadata: {
           pepTalkDuration: "1 min",
           pepTalkMessage: "Welcome. Every journey starts with one step.",
-          pepTalkCategory: "welcome"
-        }
+          pepTalkCategory: "welcome",
+        },
       },
       checkin: {
-        type: "first_checkin",
-        title: "Good Morning",
+        type: "first_check_in",
+        title: "Self Aware",
         description: "Completed your first check-in",
         icon: "sunrise",
         tier: "bronze" as const,
         metadata: {
           pepTalkDuration: "1 min",
           pepTalkMessage: "You showed up today. That matters.",
-          pepTalkCategory: "welcome"
-        }
+          pepTalkCategory: "welcome",
+        },
       },
       peptalk: {
-        type: "first_peptalk",
-        title: "Listening",
+        type: "first_pep_talk",
+        title: "First Listen",
         description: "Listened to your first pep talk",
         icon: "headphones",
         tier: "bronze" as const,
         metadata: {
           pepTalkDuration: "1 min",
           pepTalkMessage: "You're here. You're listening. Keep going.",
-          pepTalkCategory: "welcome"
-        }
+          pepTalkCategory: "welcome",
+        },
       },
       mission: {
-        type: "first_mission",
-        title: "Mission Accepted",
-        description: "Completed your first mission",
+        type: "first_quest",
+        title: "Quest Beginner",
+        description: "Completed your first quest",
         icon: "target",
         tier: "bronze" as const,
         metadata: {
           pepTalkDuration: "1 min",
-          pepTalkMessage: "One mission down. This is how change happens.",
-          pepTalkCategory: "welcome"
-        }
+          pepTalkMessage: "One quest down. This is how change happens.",
+          pepTalkCategory: "welcome",
+        },
+      },
+      epic: {
+        type: "first_epic",
+        title: "Epic Starter",
+        description: "Created your first epic",
+        icon: "rocket",
+        tier: "bronze" as const,
+        metadata: {
+          pepTalkDuration: "1 min",
+          pepTalkMessage: "A new campaign begins. This is the first page of something bigger.",
+          pepTalkCategory: "welcome",
+        },
       },
     };
 
@@ -214,40 +259,42 @@ export const useAchievements = () => {
   };
 
   const checkCompanionAchievements = async (stage: number) => {
-    if (stage === 5) {
+    if (stage >= 5) {
       await awardAchievement({
         type: "companion_level_5",
         title: "Growing Together",
         description: "Your companion reached Stage 5 • Initiate",
         icon: "sparkles",
-        tier: "silver",
+        tier: "bronze",
         metadata: {
           stage,
           pepTalkDuration: "2-3 min",
           pepTalkMessage: "Watch how your companion changes as you do.",
-          pepTalkCategory: "growth"
-        }
+          pepTalkCategory: "growth",
+        },
       });
     }
-    else if (stage === 21) {
+
+    if (stage >= 21) {
       await awardAchievement({
         type: "companion_level_21",
         title: "Deep Bond",
         description: "Your companion reached Stage 21 • Guardian",
         icon: "sparkles",
-        tier: "gold",
+        tier: "silver",
         metadata: {
           stage,
           pepTalkDuration: "4-5 min",
           pepTalkMessage: "Guardian tier. The bond is undeniable now.",
-          pepTalkCategory: "discipline"
-        }
+          pepTalkCategory: "discipline",
+        },
       });
-    } 
-    else if (stage === 56) {
+    }
+
+    if (stage >= 56) {
       await awardAchievement({
         type: "companion_level_56",
-        title: "Evolution Master",
+        title: "Champion Bond",
         description: "Your companion reached Stage 56 • Mythic",
         icon: "star",
         tier: "gold",
@@ -255,11 +302,12 @@ export const useAchievements = () => {
           stage,
           pepTalkDuration: "4-5 min",
           pepTalkMessage: "Mythic tier. This is discipline and consistency made visible.",
-          pepTalkCategory: "discipline"
-        }
+          pepTalkCategory: "discipline",
+        },
       });
-    } 
-    else if (stage === 100) {
+    }
+
+    if (stage >= 100) {
       await awardAchievement({
         type: "companion_level_100",
         title: "Ultimate Bond",
@@ -270,190 +318,202 @@ export const useAchievements = () => {
           stage,
           pepTalkDuration: "7-10 min",
           pepTalkMessage: "Stage 100. This bond has become legend.",
-          pepTalkCategory: "breakthrough"
-        }
+          pepTalkCategory: "breakthrough",
+        },
       });
     }
   };
 
-  // New: Attribute-based achievements
-  const checkAttributeAchievements = async (attribute: 'mind' | 'body' | 'soul', value: number) => {
+  const checkAttributeAchievements = async (attribute: "mind" | "body" | "soul", value: number) => {
+    if (value < 100) return;
+
     const attrName = attribute.charAt(0).toUpperCase() + attribute.slice(1);
-    
-    // Silver: Attribute reaches 5
-    if (value === 5) {
-      await awardAchievement({
-        type: `${attribute}_5`,
-        title: `${attrName} Awakening`,
-        description: `${attrName} attribute reached 5`,
-        icon: "zap",
-        tier: "silver",
-        metadata: {
-          attribute,
-          value,
-          pepTalkDuration: "2-3 min",
-          pepTalkMessage: `Your ${attribute} is growing. You're feeling it, aren't you?`,
-          pepTalkCategory: "growth"
-        }
-      });
-    }
-    // Gold: Attribute reaches 10
-    else if (value === 10) {
-      await awardAchievement({
-        type: `${attribute}_10`,
-        title: `${attrName} Mastery`,
-        description: `${attrName} attribute reached 10`,
-        icon: "zap",
-        tier: "gold",
-        metadata: {
-          attribute,
-          value,
-          pepTalkDuration: "4-5 min",
-          pepTalkMessage: `${attrName} at 10. This is what discipline looks like.`,
-          pepTalkCategory: "discipline"
-        }
-      });
-    }
-    // Platinum: Attribute reaches 15
-    else if (value === 15) {
-      await awardAchievement({
-        type: `${attribute}_15`,
-        title: `${attrName} Transcendence`,
-        description: `${attrName} attribute reached 15`,
-        icon: "crown",
-        tier: "platinum",
-        metadata: {
-          attribute,
-          value,
-          pepTalkDuration: "7-10 min",
-          pepTalkMessage: `${attrName} at 15. You're operating at a different level now.`,
-          pepTalkCategory: "breakthrough"
-        }
-      });
-    }
+    const icon = attribute === "mind" ? "brain" : attribute === "body" ? "dumbbell" : "sparkles";
+
+    await awardAchievement({
+      type: `attribute_master_${attribute}`,
+      title: `${attrName} Master`,
+      description: `Reached 100 ${attrName} attribute`,
+      icon,
+      tier: "gold",
+      metadata: {
+        attribute,
+        value,
+        pepTalkDuration: "7-10 min",
+        pepTalkMessage: `${attrName} is fully lit up now. You earned this.`,
+        pepTalkCategory: "breakthrough",
+      },
+    });
   };
 
-  // New: Total attributes achievement (Platinum)
   const checkTotalAttributesAchievement = async (total: number) => {
-    if (total >= 50) {
-      await awardAchievement({
-        type: "total_attributes_50",
-        title: "Balanced Transformation",
-        description: "Total attributes reached 50",
-        icon: "crown",
-        tier: "platinum",
-        metadata: {
-          total,
-          pepTalkDuration: "7-10 min",
-          pepTalkMessage: "Mind, Body, Soul - all growing together. This is true transformation.",
-          pepTalkCategory: "breakthrough"
-        }
-      });
-    }
+    if (total < 250) return;
+
+    await awardAchievement({
+      type: "total_attributes_250",
+      title: "Well Rounded",
+      description: "Reached 250 total attributes",
+      icon: "crown",
+      tier: "platinum",
+      metadata: {
+        total,
+        pepTalkDuration: "7-10 min",
+        pepTalkMessage: "Mind, Body, Soul - all growing together. This is true transformation.",
+        pepTalkCategory: "breakthrough",
+      },
+    });
   };
 
-  // New: Pep talk listening achievements
   const checkPepTalkListeningAchievements = async (count: number) => {
-    // Silver: 3 pep talks in a week
-    if (count === 3) {
+    if (count >= 10) {
       await awardAchievement({
-        type: "peptalk_listener_3",
-        title: "Active Listener",
-        description: "Listened to 3 pep talks this week",
-        icon: "headphones",
-        tier: "silver",
-        metadata: {
-          count,
-          pepTalkDuration: "2-3 min",
-          pepTalkMessage: "You're not just listening. You're absorbing.",
-          pepTalkCategory: "encouragement"
-        }
-      });
-    }
-    // Gold: Complete a themed set (tracked separately)
-    else if (count === 10) {
-      await awardAchievement({
-        type: "peptalk_listener_10",
-        title: "Devoted Student",
+        type: "pep_talk_listener_10",
+        title: "Avid Listener",
         description: "Listened to 10 pep talks",
         icon: "headphones",
-        tier: "gold",
+        tier: "silver",
         metadata: {
           count,
           pepTalkDuration: "4-5 min",
           pepTalkMessage: "Ten talks. You're committed to this growth.",
-          pepTalkCategory: "discipline"
-        }
+          pepTalkCategory: "discipline",
+        },
+      });
+    }
+
+    if (count >= 50) {
+      await awardAchievement({
+        type: "pep_talk_listener_50",
+        title: "Wisdom Seeker",
+        description: "Listened to 50 pep talks",
+        icon: "headphones",
+        tier: "gold",
+        metadata: {
+          count,
+          pepTalkDuration: "7-10 min",
+          pepTalkMessage: "You've built a real library of encouragement inside yourself now.",
+          pepTalkCategory: "breakthrough",
+        },
       });
     }
   };
 
-  // New: Daily completion achievement (Silver)
-  const checkDailyCompletionAchievement = async () => {
+  const checkDailyCompletionAchievement = useCallback(async (date?: string) => {
+    if (!user?.id) return;
+
+    const effectiveDate = date ?? new Date().toISOString().split("T")[0];
+    const [
+      { count: habitCount },
+      { count: habitCompletionCount },
+      { count: checkInCount },
+      { count: missionCount },
+      { count: completedMissionCount },
+    ] = await Promise.all([
+      supabase
+        .from("habits")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .eq("is_active", true),
+      supabase
+        .from("habit_completions")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .eq("date", effectiveDate),
+      supabase
+        .from("daily_check_ins")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .eq("check_in_date", effectiveDate),
+      supabase
+        .from("daily_missions")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .eq("mission_date", effectiveDate),
+      supabase
+        .from("daily_missions")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .eq("mission_date", effectiveDate)
+        .eq("completed", true),
+    ]);
+
+    const activeHabits = habitCount ?? 0;
+    const completedHabits = habitCompletionCount ?? 0;
+    const completedCheckIns = checkInCount ?? 0;
+    const missionsForDay = missionCount ?? 0;
+    const completedMissions = completedMissionCount ?? 0;
+
+    if (activeHabits === 0 || completedHabits < activeHabits || completedCheckIns === 0) {
+      return;
+    }
+
+    if (missionsForDay > 0 && completedMissions < missionsForDay) {
+      return;
+    }
+
     await awardAchievement({
-      type: "all_tasks_complete",
+      type: "perfect_day",
       title: "Perfect Day",
-      description: "Completed every task today",
+      description: "Completed all daily activities",
       icon: "check-circle",
-      tier: "silver",
+      tier: "gold",
       metadata: {
         pepTalkDuration: "2-3 min",
         pepTalkMessage: "You did it all today. Every. Single. Thing.",
-        pepTalkCategory: "encouragement"
-      }
+        pepTalkCategory: "encouragement",
+      },
     });
-  };
+  }, [awardAchievement, user?.id]);
 
-  // New: Story chapter completion (Gold)
-  const checkStoryChapterAchievement = async (chapter: number) => {
+  const checkStoryChapterAchievement = async () => {
     await awardAchievement({
-      type: `story_chapter_${chapter}`,
-      title: `Chapter ${chapter} Complete`,
-      description: `Finished story chapter ${chapter}`,
+      type: "story_chapter",
+      title: "Story Lover",
+      description: "Read a companion story chapter",
       icon: "book",
-      tier: "gold",
+      tier: "bronze",
       metadata: {
-        chapter,
+        chapterUnlocked: true,
         pepTalkDuration: "4-5 min",
         pepTalkMessage: "Another chapter. Your story is unfolding.",
-        pepTalkCategory: "discipline"
-      }
+        pepTalkCategory: "discipline",
+      },
     });
   };
 
-  // New: Full storyline completion (Platinum)
   const checkFullStorylineAchievement = async () => {
     await awardAchievement({
       type: "full_storyline",
-      title: "Story Complete",
-      description: "Completed the entire companion storyline",
+      title: "Lore Master",
+      description: "Read all available story chapters",
       icon: "crown",
       tier: "platinum",
       metadata: {
         pepTalkDuration: "7-10 min",
         pepTalkMessage: "The full story. From beginning to now. Look at how far you've come.",
-        pepTalkCategory: "breakthrough"
-      }
+        pepTalkCategory: "breakthrough",
+      },
     });
   };
 
-  // New: Comeback achievement (Platinum) - simplified version
-  const checkComebackAchievement = async () => {
+  const checkComebackAchievement = async (daysInactive: number = 0) => {
+    if (daysInactive < 7) return;
+
     await awardAchievement({
-      type: "comeback_arc",
-      title: "The Comeback",
-      description: "Returned stronger after a break",
+      type: "comeback",
+      title: "Comeback King",
+      description: "Returned after a break",
       icon: "crown",
-      tier: "platinum",
+      tier: "silver",
       metadata: {
+        daysInactive,
         pepTalkDuration: "7-10 min",
         pepTalkMessage: "You came back. That's what matters. Welcome home.",
-        pepTalkCategory: "breakthrough"
-      }
+        pepTalkCategory: "breakthrough",
+      },
     });
   };
 
-  // New: Arcade discovery achievement
   const checkArcadeDiscovery = useCallback(async () => {
     await awardAchievement({
       type: "arcade_explorer",
@@ -463,86 +523,96 @@ export const useAchievements = () => {
       tier: "silver",
       metadata: {
         pepTalkMessage: "You found the secret arcade. Nice work, explorer.",
-        pepTalkCategory: "discovery"
-      }
+        pepTalkCategory: "discovery",
+      },
     });
   }, [awardAchievement]);
 
-  // Astral Hunter achievements - theme-based creature defeat progression
   const checkAdversaryDefeatAchievements = useCallback(async (
-    theme: AdversaryTheme, 
-    timesDefeated: number
-  ): Promise<{ shouldRollLoot: boolean; lootTier: 'rare' | 'epic' | 'legendary' | null }> => {
+    theme: AdversaryTheme,
+    timesDefeated: number,
+  ): Promise<{ shouldRollLoot: boolean; lootTier: "rare" | "epic" | "legendary" | null }> => {
     const themeNames: Record<AdversaryTheme, { prefix: string; icon: string }> = {
-      distraction: { prefix: 'Focus', icon: 'target' },
-      stagnation: { prefix: 'Momentum', icon: 'waves' },
-      anxiety: { prefix: 'Serenity', icon: 'heart' },
-      doubt: { prefix: 'Confidence', icon: 'shield' },
-      chaos: { prefix: 'Order', icon: 'zap' },
-      laziness: { prefix: 'Drive', icon: 'flame' },
-      overthinking: { prefix: 'Clarity', icon: 'brain' },
-      fear: { prefix: 'Courage', icon: 'shield' },
-      confusion: { prefix: 'Wisdom', icon: 'sparkles' },
-      vulnerability: { prefix: 'Resilience', icon: 'gem' },
-      imbalance: { prefix: 'Harmony', icon: 'scale' },
+      distraction: { prefix: "Focus", icon: "target" },
+      stagnation: { prefix: "Momentum", icon: "waves" },
+      anxiety: { prefix: "Serenity", icon: "heart" },
+      doubt: { prefix: "Confidence", icon: "shield" },
+      chaos: { prefix: "Order", icon: "zap" },
+      laziness: { prefix: "Drive", icon: "flame" },
+      overthinking: { prefix: "Clarity", icon: "brain" },
+      fear: { prefix: "Courage", icon: "shield" },
+      confusion: { prefix: "Wisdom", icon: "sparkles" },
+      vulnerability: { prefix: "Resilience", icon: "gem" },
+      imbalance: { prefix: "Harmony", icon: "scale" },
     };
 
     const { prefix, icon } = themeNames[theme];
     let shouldRollLoot = false;
-    let lootTier: 'rare' | 'epic' | 'legendary' | null = null;
+    let lootTier: "rare" | "epic" | "legendary" | null = null;
 
-    // Bronze: 3 defeats
     if (timesDefeated === 3) {
       await awardAchievement({
         type: `astral_${theme}_3`,
         title: `${prefix} Initiate`,
         description: `Defeated 3 ${theme} adversaries`,
         icon,
-        tier: 'bronze',
-        metadata: { theme, count: 3 }
+        tier: "bronze",
+        metadata: { theme, count: 3 },
       });
-    }
-    // Silver: 10 defeats + roll for rare loot
-    else if (timesDefeated === 10) {
+    } else if (timesDefeated === 10) {
       await awardAchievement({
         type: `astral_${theme}_10`,
         title: `${prefix} Warrior`,
         description: `Defeated 10 ${theme} adversaries`,
         icon,
-        tier: 'silver',
-        metadata: { theme, count: 10 }
+        tier: "silver",
+        metadata: { theme, count: 10 },
       });
       shouldRollLoot = true;
-      lootTier = 'rare';
-    }
-    // Gold: 25 defeats + roll for epic/legendary loot
-    else if (timesDefeated === 25) {
+      lootTier = "rare";
+    } else if (timesDefeated === 25) {
       await awardAchievement({
         type: `astral_${theme}_25`,
         title: `${prefix} Champion`,
         description: `Defeated 25 ${theme} adversaries`,
         icon,
-        tier: 'gold',
-        metadata: { theme, count: 25 }
+        tier: "gold",
+        metadata: { theme, count: 25 },
       });
       shouldRollLoot = true;
-      lootTier = 'epic';
-    }
-    // Platinum: 50 defeats
-    else if (timesDefeated === 50) {
+      lootTier = "epic";
+    } else if (timesDefeated === 50) {
       await awardAchievement({
         type: `astral_${theme}_50`,
         title: `${prefix} Transcendent`,
         description: `Defeated 50 ${theme} adversaries`,
         icon,
-        tier: 'platinum',
-        metadata: { theme, count: 50 }
+        tier: "platinum",
+        metadata: { theme, count: 50 },
       });
       shouldRollLoot = true;
-      lootTier = 'legendary';
+      lootTier = "legendary";
     }
 
     return { shouldRollLoot, lootTier };
+  }, [awardAchievement]);
+
+  const checkStoryCompletionAchievement = useCallback(async (storyTypeSlug: string | null | undefined) => {
+    if (!storyTypeSlug) return;
+
+    const badgeInfo = STORY_TYPE_BADGES[storyTypeSlug];
+    if (!badgeInfo) return;
+
+    await awardAchievement({
+      type: badgeInfo.achievementType,
+      title: badgeInfo.title,
+      description: badgeInfo.description,
+      icon: badgeInfo.icon,
+      tier: badgeInfo.tier,
+      metadata: {
+        storyTypeSlug,
+      },
+    });
   }, [awardAchievement]);
 
   return {
@@ -560,5 +630,6 @@ export const useAchievements = () => {
     checkComebackAchievement,
     checkArcadeDiscovery,
     checkAdversaryDefeatAchievements,
+    checkStoryCompletionAchievement,
   };
 };

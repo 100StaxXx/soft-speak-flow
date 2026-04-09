@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionStory } from "@/hooks/useCompanionStory";
-import { Card } from "./ui/card";
+import { Card, outerShellCardClassName } from "./ui/card";
 import { Button } from "./ui/button";
 import {
   BookOpen,
@@ -140,7 +140,7 @@ export const CompanionStoryJournal = ({ layoutMode = "mobile" }: CompanionStoryJ
 
   if (companionLoading) {
     return (
-      <Card className="p-8 text-center">
+      <Card className={cn(outerShellCardClassName, "p-8 text-center")}>
         <div className="flex flex-col items-center gap-4">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
           <p className="text-muted-foreground">Loading your companion's story...</p>
@@ -151,7 +151,7 @@ export const CompanionStoryJournal = ({ layoutMode = "mobile" }: CompanionStoryJ
 
   if (!companion) {
     return (
-      <Card className="p-8 text-center">
+      <Card className={cn(outerShellCardClassName, "p-8 text-center")}>
         <BookOpen className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
         <p className="text-muted-foreground">
           Create your companion first to unlock the Story Journal
@@ -163,7 +163,7 @@ export const CompanionStoryJournal = ({ layoutMode = "mobile" }: CompanionStoryJ
   return (
     <div className={cn("space-y-6", isDesktop ? "max-w-none p-0" : "max-w-4xl mx-auto p-4")}>
       {showGallery && (
-        <Card className="p-6">
+        <Card className={cn(outerShellCardClassName, "p-6")}>
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold">Chapter Gallery</h3>
             <Button variant="ghost" size="sm" onClick={() => setShowGallery(false)}>
@@ -238,7 +238,7 @@ export const CompanionStoryJournal = ({ layoutMode = "mobile" }: CompanionStoryJ
         </Button>
       </div>
 
-      <Card className={cn(isDesktop ? "p-8" : "p-6")}>
+      <Card className={cn(outerShellCardClassName, isDesktop ? "p-8" : "p-6")}>
         {chapterImage && isLevelUnlocked && (
           <div className="flex justify-center mb-6">
             <div className="relative w-48 h-48 rounded-2xl overflow-hidden border-2 border-primary/20 shadow-glow">

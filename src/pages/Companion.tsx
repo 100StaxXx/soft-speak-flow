@@ -40,6 +40,7 @@ import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Companion as CompanionData } from "@/hooks/useCompanion";
 import { useMainTabVisibility } from "@/contexts/MainTabVisibilityContext";
+import { outerShellCardClassName } from "@/components/ui/card";
 import {
   useCompanionLayoutMode,
   type CompanionLayoutMode,
@@ -92,7 +93,7 @@ const OverviewTab = memo(({
   if (isDesktop) {
     return (
       <div className="space-y-6 pt-1">
-        <div className="rounded-2xl border border-border/60 bg-card/35 p-4 backdrop-blur-md">
+        <div className={cn("rounded-2xl border p-4", outerShellCardClassName)}>
           <MemoryWhisper chance={0.2} className="px-0" />
         </div>
 

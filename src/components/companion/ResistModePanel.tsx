@@ -46,9 +46,9 @@ export const ResistModePanel = memo(() => {
   }, [removeHabit]);
 
   return (
-    <div className="space-y-4">
+      <div className="space-y-4">
       {/* Header */}
-      <GlassCard variant="subtle" className="p-4 text-center space-y-2">
+      <GlassCard variant="pageShell" className="p-4 text-center space-y-2">
         <div className="flex items-center justify-center gap-2 text-primary">
           <Shield className="h-5 w-5" />
           <span className="text-sm font-medium">Resist urges to grow stronger</span>

@@ -1,5 +1,6 @@
 import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
+import { outerShellCardClassName } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 const glassCardVariants = cva(
@@ -27,6 +28,7 @@ const glassCardVariants = cva(
           "border-border/60",
           "shadow-[0_16px_38px_rgba(0,0,0,0.24)]",
         ],
+        pageShell: [outerShellCardClassName],
         subtle: [
           "bg-card/62 backdrop-blur-md",
           "border-border/45",

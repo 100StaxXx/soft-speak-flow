@@ -5,6 +5,7 @@ import { useAuth } from "./useAuth";
 import { toast } from "@/components/ui/sonner";
 import { useXPRewards } from "@/hooks/useXPRewards";
 import { useAIInteractionTracker } from "@/hooks/useAIInteractionTracker";
+import { useAchievements } from "@/hooks/useAchievements";
 import { format } from "date-fns";
 import type { StoryTypeSlug } from "@/types/narrativeTypes";
 import type { EpicRecord } from "@/hooks/epicsQuery";
@@ -322,6 +323,7 @@ export const useEpics = (options: EpicsOptions = {}) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { awardCustomXP } = useXPRewards();
+  const { checkFirstTimeAchievements, checkStoryCompletionAchievement } = useAchievements();
   const { trackEpicOutcome } = useAIInteractionTracker();
   const { queueAction, shouldQueueWrites, retryNow } = useResilience();
   const { enabled = true } = options;
@@ -563,12 +565,23 @@ export const useEpics = (options: EpicsOptions = {}) => {
         return { queued: true, epic };
       }
     },
-    onSuccess: ({ queued, epic }) => {
+    onSuccess: async ({ queued, epic }) => {
       queryClient.invalidateQueries({ queryKey: ["epics"] });
       queryClient.invalidateQueries({ queryKey: ["habits"] });
       queryClient.invalidateQueries({ queryKey: ["habit-surfacing"] });
       queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
       queryClient.invalidateQueries({ queryKey: ["user-ai-context"] });
+
+      if (!queued && user?.id) {
+        const { count } = await supabase
+          .from("epics")
+          .select("*", { count: "exact", head: true })
+          .eq("user_id", user.id);
+
+        if ((count ?? 0) === 1) {
+          await checkFirstTimeAchievements("epic");
+        }
+      }
 
       if (!queued && user?.id) {
         void requestJourneyPathGeneration({
@@ -676,6 +689,7 @@ export const useEpics = (options: EpicsOptions = {}) => {
         } catch (error) {
           console.error("Failed to award epic completion XP:", error);
         }
+        await checkStoryCompletionAchievement(epic.story_type_slug);
         toast.success("Epic Completed! 🏆", {
           description: `You've conquered the ${epic.title} epic! Your companion grows stronger!`,
         });

@@ -67,7 +67,7 @@ export const useDailyMissions = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { awardCustomXP } = useXPRewards();
-  const { checkFirstTimeAchievements } = useAchievements();
+  const { checkDailyCompletionAchievement, checkFirstTimeAchievements } = useAchievements();
   const today = getEffectiveMissionDate(); // Uses 2 AM reset in user's timezone
   const [generationErrorMessage, setGenerationErrorMessage] = useState<string | null>(null);
 
@@ -297,6 +297,8 @@ export const useDailyMissions = () => {
       if (count === 1) {
         await checkFirstTimeAchievements('mission');
       }
+
+      await checkDailyCompletionAchievement(today);
       
       return data;
     },

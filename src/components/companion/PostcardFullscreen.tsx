@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+
 import { motion } from "framer-motion";
 import { X, MapPin, Calendar, Share2, Sparkles, BookOpen, Search, Quote, Users, Crown, Trophy, Star } from "lucide-react";
 import { CompanionPostcard } from "@/hooks/useCompanionPostcards";
@@ -10,6 +12,7 @@ import { toast } from "@/components/ui/sonner";
 import { Capacitor } from "@capacitor/core";
 import { Share } from "@capacitor/share";
 import { useNarrativeEpic } from "@/hooks/useCosmicLibrary";
+import { useAchievements } from "@/hooks/useAchievements";
 
 interface PostcardFullscreenProps {
   postcard: CompanionPostcard;
@@ -19,10 +22,27 @@ interface PostcardFullscreenProps {
 export const PostcardFullscreen = ({ postcard, onClose }: PostcardFullscreenProps) => {
   const hasNarrativeContent = !!(postcard.chapter_title || postcard.story_content || postcard.clue_text || postcard.prophecy_line);
   const isFinale = postcard.is_finale;
+  const { checkFullStorylineAchievement, checkStoryChapterAchievement } = useAchievements();
   
   // Fetch epic data for finale info
   const { epic } = useNarrativeEpic(isFinale ? postcard.epic_id || undefined : undefined);
   const storySeed = epic?.story_seed;
+
+  useEffect(() => {
+    if (!hasNarrativeContent) return;
+
+    void checkStoryChapterAchievement();
+
+    if (isFinale) {
+      void checkFullStorylineAchievement();
+    }
+  }, [
+    checkFullStorylineAchievement,
+    checkStoryChapterAchievement,
+    hasNarrativeContent,
+    isFinale,
+    postcard.id,
+  ]);
 
   const handleShare = async () => {
     const shareText = postcard.chapter_title 

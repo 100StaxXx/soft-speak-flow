@@ -1,5 +1,6 @@
 import { memo, useMemo } from "react";
-import { Card } from "@/components/ui/card";
+import { Card, outerShellCardClassName } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
 import { Sparkles, TrendingUp } from "lucide-react";
 import { MAX_COMPANION_STAGE } from "@/config/companionCatalog";
@@ -62,7 +63,7 @@ export const NextEvolutionPreview = memo(({
 
   if (isMaxStage) {
     return (
-      <Card className="p-5 bg-card/18 backdrop-blur-xl border-accent/16">
+      <Card className={cn("p-5 border-accent/16", outerShellCardClassName)}>
         <div className="flex items-center gap-3 mb-3">
           <div className="h-10 w-10 rounded-full bg-accent/20 flex items-center justify-center">
             <Sparkles className="h-5 w-5 text-accent" />
@@ -79,7 +80,12 @@ export const NextEvolutionPreview = memo(({
   }
 
   return (
-    <Card className="p-5 bg-card/18 backdrop-blur-xl border-primary/16 hover:border-primary/32 transition-all duration-300">
+    <Card
+      className={cn(
+        "p-5 border-primary/16 hover:border-primary/32 transition-all duration-300",
+        outerShellCardClassName,
+      )}
+    >
       <div className="space-y-4">
         {/* Header */}
         <div className="flex items-center gap-3">

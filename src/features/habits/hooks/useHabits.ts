@@ -33,7 +33,7 @@ export function useHabits() {
   const { companion } = useCompanion();
   const { updateWisdomFromLearning, awardDisciplineForHabitCompletion } = useCompanionAttributes();
   const { awardCustomXP, awardAllHabitsComplete } = useXPRewards();
-  const { checkStreakAchievements } = useAchievements();
+  const { checkDailyCompletionAchievement, checkFirstTimeAchievements, checkStreakAchievements } = useAchievements();
   const { queueAction, shouldQueueWrites, retryNow } = useResilience();
 
   const habitsQuery = useQuery({
@@ -114,6 +114,7 @@ export function useHabits() {
       }
 
       awardAllHabitsComplete();
+      await checkDailyCompletionAchievement(today);
     } catch (error) {
       console.error("Failed to award all habits complete bonus:", error);
     }
@@ -338,6 +339,15 @@ export function useHabits() {
 
           if (profile?.current_habit_streak) {
             await checkStreakAchievements(profile.current_habit_streak);
+          }
+
+          const { count: completionCount } = await supabase
+            .from("habit_completions")
+            .select("*", { count: "exact", head: true })
+            .eq("user_id", user.id);
+
+          if ((completionCount ?? 0) === 1) {
+            await checkFirstTimeAchievements("habit");
           }
 
           confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
