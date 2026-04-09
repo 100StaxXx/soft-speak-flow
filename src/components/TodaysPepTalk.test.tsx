@@ -354,6 +354,46 @@ describe("TodaysPepTalk transcript expand behavior", () => {
     expect(screen.getByText("Execute Your Vision")).toBeInTheDocument();
   });
 
+  it("uses a transparent shell while loading", () => {
+    renderComponent();
+
+    const shell = screen.getByTestId("pep-talk-shell");
+
+    expect(shell).toHaveClass("bg-transparent");
+    expect(shell).toHaveClass("backdrop-blur-none");
+    expect(shell).toHaveClass("shadow-none");
+  });
+
+  it("uses a transparent shell for the empty state", async () => {
+    mocks.state.todayPepTalk = null;
+    mocks.state.fallbackPepTalk = null;
+
+    renderComponent();
+
+    await screen.findByText("No pep talk available today");
+
+    const shell = screen.getByTestId("pep-talk-shell");
+
+    expect(shell).toHaveClass("bg-transparent");
+    expect(shell).toHaveClass("backdrop-blur-none");
+    expect(shell).toHaveClass("shadow-none");
+    expect(shell.querySelector(".from-primary\\/10")).toBeNull();
+  });
+
+  it("uses a transparent shell for the loaded state while keeping the inner content panel", async () => {
+    renderComponent();
+
+    await screen.findByText("Execute Your Vision");
+
+    const shell = screen.getByTestId("pep-talk-shell");
+
+    expect(shell).toHaveClass("bg-transparent");
+    expect(shell).toHaveClass("backdrop-blur-none");
+    expect(shell).toHaveClass("shadow-none");
+    expect(shell.querySelector(".animate-gradient-shift")).toBeNull();
+    expect(shell.querySelector(".from-card\\/90")).not.toBeNull();
+  });
+
   it("shows full raw script when transcript array is empty", async () => {
     mocks.state.todayPepTalk = makePepTalk({
       id: "pep-talk-empty",

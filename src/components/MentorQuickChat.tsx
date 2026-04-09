@@ -22,6 +22,7 @@ const ROTATING_QUESTIONS = [
 ];
 
 const TOUCH_TAP_MAX_MOVEMENT_PX = 12;
+const transparentShellClassName = "bg-transparent backdrop-blur-none shadow-none border-white/[0.08]";
 
 export const MentorQuickChat = memo(() => {
   const navigate = useNavigate();
@@ -68,10 +69,10 @@ export const MentorQuickChat = memo(() => {
   };
 
   return (
-    <Card className="p-6 space-y-5 rounded-2xl bg-card/25 backdrop-blur-2xl border-white/[0.08] relative overflow-hidden">
-      {/* Animated background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5" />
-      
+    <Card
+      data-testid="mentor-quick-chat-shell"
+      className={`p-6 space-y-5 rounded-2xl relative overflow-hidden ${transparentShellClassName}`}
+    >
       <div className="relative z-10 space-y-5">
         <div className="flex items-center justify-center gap-2">
           <div className="relative">

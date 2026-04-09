@@ -139,6 +139,8 @@ describe("DesktopWeekPlanner", () => {
 
     const timedCard = screen.getByTestId("desktop-week-task-timed-task");
     expect(timedCard).toBeInTheDocument();
+    expect(timedCard).toHaveAttribute("data-quest-card-shell", "true");
+    expect(timedCard).toHaveClass("journeys-quest-card-shell");
     expect(within(screen.getByTestId("desktop-week-anytime-2026-03-31")).getByText("Loose planning")).toBeInTheDocument();
     expect(screen.getByText("Wednesday review")).toBeInTheDocument();
     expect(within(timedCard).queryByText("8:00 AM")).not.toBeInTheDocument();
@@ -225,6 +227,11 @@ describe("DesktopWeekPlanner", () => {
     await waitFor(() => {
       expect(screen.getByTestId("desktop-quest-popover-editable-task")).toBeInTheDocument();
     });
+
+    expect(screen.getByTestId("desktop-week-task-editable-task")).toHaveClass(
+      "journeys-quest-card-shell",
+      "journeys-quest-card-shell--active",
+    );
 
     expect(screen.getByText("Discuss roadmap")).toBeInTheDocument();
     fireEvent.click(screen.getByText("Edit"));

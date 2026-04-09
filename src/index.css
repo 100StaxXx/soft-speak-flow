@@ -1103,6 +1103,27 @@ All colors MUST be HSL.
     display: none;
   }
 
+  .journeys-quest-card-shell {
+    position: relative;
+    isolation: isolate;
+  }
+
+  .journeys-quest-card-shell::after {
+    content: "";
+    position: absolute;
+    inset: 2px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: inherit;
+    opacity: 0.92;
+    pointer-events: none;
+    transition: border-color 0.2s ease, opacity 0.2s ease;
+  }
+
+  .journeys-quest-card-shell--active::after {
+    border-color: hsl(var(--primary) / 0.3);
+    opacity: 1;
+  }
+
   /* iOS Touch Optimizations */
   .ios-scroll-container {
     -webkit-overflow-scrolling: touch;

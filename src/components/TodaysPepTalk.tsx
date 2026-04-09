@@ -57,6 +57,7 @@ type InlineAudioElement = HTMLAudioElement & {
 const log = logger.scope("TodaysPepTalk");
 const AUDIO_READY_TIMEOUT_MS = 5000;
 const TODAY_PEP_TALK_QUERY_ROOT = ["today-pep-talk"] as const;
+const transparentShellClassName = "bg-transparent backdrop-blur-none shadow-none border-white/[0.08]";
 
 function buildTodayPepTalkQueryKey(mentorId: string | null | undefined, effectiveDate: string) {
   return [...TODAY_PEP_TALK_QUERY_ROOT, mentorId ?? null, effectiveDate] as const;
@@ -768,7 +769,10 @@ export const TodaysPepTalk = memo(() => {
 
   if (loading) {
     return (
-      <Card className="p-6 animate-pulse">
+      <Card
+        data-testid="pep-talk-shell"
+        className={cn("rounded-3xl border p-6 animate-pulse", transparentShellClassName)}
+      >
         <div className="space-y-4">
           <div className="h-4 bg-muted rounded w-1/3" />
           <div className="h-20 bg-muted rounded" />
@@ -779,8 +783,10 @@ export const TodaysPepTalk = memo(() => {
 
   if (error || !pepTalk) {
     return (
-      <Card className="relative overflow-hidden rounded-3xl border-2 p-6">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-accent/5 to-primary/5" />
+      <Card
+        data-testid="pep-talk-shell"
+        className={cn("relative overflow-hidden rounded-3xl border p-6", transparentShellClassName)}
+      >
         <div className="relative space-y-4 text-center">
           <div className="flex items-center justify-center gap-2">
             <Sparkles className="h-5 w-5 text-muted-foreground" />
@@ -827,26 +833,14 @@ export const TodaysPepTalk = memo(() => {
 
   return (
     <Card
+      data-testid="pep-talk-shell"
       className={cn(
-        "relative overflow-hidden group rounded-3xl border-2",
+        "relative overflow-hidden group rounded-3xl border",
+        transparentShellClassName,
         !isNativeIOS && "animate-fade-in",
         isNativeIOS && "gpu-layer",
       )}
     >
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/25 via-accent/15 to-primary/10 animate-gradient-shift" />
-
-      {isPlaying && (
-        <>
-          <div className="absolute top-1/4 left-1/4 w-1 h-1 bg-primary rounded-full animate-sparkle" />
-          <div className="absolute top-1/3 right-1/4 w-1.5 h-1.5 bg-accent rounded-full animate-sparkle" style={{ animationDelay: "0.3s" }} />
-          <div className="absolute bottom-1/3 left-1/3 w-1 h-1 bg-primary rounded-full animate-sparkle" style={{ animationDelay: "0.6s" }} />
-          <div className="absolute top-1/2 right-1/3 w-1.5 h-1.5 bg-accent rounded-full animate-sparkle" style={{ animationDelay: "0.9s" }} />
-        </>
-      )}
-
-      <div className="absolute -top-20 -right-20 w-40 h-40 bg-primary/20 blur-3xl rounded-full animate-pulse-slow" />
-      <div className="absolute -bottom-20 -left-20 w-40 h-40 bg-accent/20 blur-3xl rounded-full animate-pulse-slow" style={{ animationDelay: "1.5s" }} />
-
       <div className="relative p-6 md:p-8 space-y-6">
         <div className="flex items-center justify-center gap-2">
           <div className="relative">

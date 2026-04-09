@@ -92,6 +92,9 @@ const safeFormat = (date: Date, fmt: string, fallback = "") => {
 };
 
 const TOUCH_CLICK_SUPPRESSION_RESET_MS = 750;
+const JOURNEYS_QUEST_CARD_SHELL_CLASS_NAME =
+  "journeys-quest-card-shell overflow-hidden border bg-white/[0.04] shadow-[0_12px_22px_rgba(0,0,0,0.14)] transition-colors";
+const JOURNEYS_QUEST_CARD_SHELL_ACTIVE_CLASS_NAME = "journeys-quest-card-shell--active";
 
 interface Task {
   id: string;
@@ -1922,8 +1925,11 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
       return (
         <div
+          data-quest-card-shell="true"
           className={cn(
-            "group flex items-center gap-2 rounded-[18px] border border-white/10 bg-white/[0.04] p-2 shadow-[0_12px_22px_rgba(0,0,0,0.14)] transition-colors",
+            JOURNEYS_QUEST_CARD_SHELL_CLASS_NAME,
+            "group flex items-center gap-2 rounded-[18px] border-white/10 p-2",
+            isDesktopDetailOpen && JOURNEYS_QUEST_CARD_SHELL_ACTIVE_CLASS_NAME,
             isDesktopDetailOpen && "border-primary/40 bg-primary/[0.08]",
             isComplete && "opacity-70",
           )}
@@ -1996,391 +2002,400 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       );
     }
 
+    const isMobileQuestShellActive = isExpanded || (isActivated && !isDragging);
     const taskContent = (
       <Collapsible open={isExpanded} onOpenChange={() => {}}>
         <div
+          data-quest-card-shell="true"
           className={cn(
-            "flex items-center gap-3 transition-all relative group",
-            "no-text-select select-none min-h-[46px]",
-            isRitual ? "py-3" : "py-2",
-            isComplete && "opacity-60",
-            isDragging && "cursor-grabbing",
-            isActivated && !isDragging && "bg-muted/30 rounded-lg"
+            JOURNEYS_QUEST_CARD_SHELL_CLASS_NAME,
+            "rounded-[22px] border-white/10 px-2",
+            isMobileQuestShellActive && JOURNEYS_QUEST_CARD_SHELL_ACTIVE_CLASS_NAME,
+            isMobileQuestShellActive && "border-primary/35 bg-primary/[0.06]",
+            isComplete && "opacity-70",
           )}
-          onContextMenu={suppressNativeContextMenu}
         >
-          {/* Checkbox - only this toggles completion */}
-          <div className="relative ml-1 flex flex-col items-center self-start pt-0.5 gap-0">
-            <button
-              data-interactive="true"
-              data-tap-control="true"
-              onClick={(e) => {
-                if (suppressNextCheckboxClickRef.current) {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  clearTouchCheckboxClickSuppression();
-                  return;
-                }
-
-                handleCheckboxClick(e);
-              }}
-              onTouchStart={(e) => {
-                touchStartRef.current = { 
-                  x: e.touches[0].clientX, 
-                  y: e.touches[0].clientY 
-                };
-              }}
-              onTouchEnd={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                armTouchCheckboxClickSuppression();
-                // Only trigger if finger moved less than 5px (not scrolling)
-                if (touchStartRef.current) {
-                  const dx = Math.abs(e.changedTouches[0].clientX - touchStartRef.current.x);
-                  const dy = Math.abs(e.changedTouches[0].clientY - touchStartRef.current.y);
-                  if (dx < 5 && dy < 5) {
-                    handleCheckboxClick(e as unknown as React.MouseEvent);
-                  }
-                }
-                touchStartRef.current = null;
-              }}
-              className={cn(
-                "relative flex items-center justify-center w-11 h-11 touch-manipulation transition-transform select-none",
-                "active:scale-95"
-              )}
-              style={{
-                WebkitTapHighlightColor: 'transparent',
-                touchAction: 'manipulation',
-              }}
-              aria-label={
-                isComplete
-                  ? "Mark task as incomplete"
-                  : "Mark task as complete"
-              }
-              role="checkbox"
-              aria-checked={isComplete}
-            >
-              {useLiteAnimations ? (
-                <div
-                  className={cn(
-                    "flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all",
-                    isComplete 
-                      ? "bg-primary border-primary" 
-                      : "border-muted-foreground/40 hover:border-primary"
-                  )}
-                >
-                  {isComplete && (
-                    <Check className="w-4 h-4 text-primary-foreground" />
-                  )}
-                </div>
-              ) : (
-                <motion.div 
-                  className={cn(
-                    "flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all",
-                    isComplete 
-                      ? "bg-primary border-primary" 
-                      : "border-muted-foreground/40 hover:border-primary"
-                  )}
-                  whileTap={!isDragging && !isPressed ? { scale: 0.85 } : {}}
-                >
-                  {isComplete && (
-                    <motion.div
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      transition={{ type: "spring", stiffness: 500, damping: 25 }}
-                    >
-                      <Check className="w-4 h-4 text-primary-foreground" />
-                    </motion.div>
-                  )}
-                </motion.div>
-              )}
-            </button>
-          </div>
-          
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              {isRitual && (
-                <Repeat className="w-4 h-4 text-accent flex-shrink-0" />
-              )}
-              <MarqueeText
-                text={task.task_text}
-                className="flex-1"
-                textClassName={cn(
-                  "text-sm",
-                  isComplete && "text-muted-foreground",
-                  isComplete && (justCompletedTasks.has(task.id) ? "animate-strikethrough" : "line-through")
-                )}
-              />
-            </div>
-            {task.scheduled_time && (
-              <span className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                <Clock className="w-3 h-3" />
-                {formatTime(task.scheduled_time)}
-              </span>
+          <div
+            className={cn(
+              "flex items-center gap-3 transition-all relative group",
+              "no-text-select select-none min-h-[46px]",
+              isRitual ? "py-3" : "py-2",
+              isDragging && "cursor-grabbing",
             )}
-            {overlapCount > 0 && (
-              <span className="mt-1 inline-flex items-center rounded-full border border-primary/35 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
-                Overlaps: {overlapCount}
-              </span>
-            )}
-          </div>
-          
-          <div className="flex items-center gap-2">
-            {/* Quest action menu */}
-            {!isComplete && !isDragging && !isActivated && (onEditQuest || onSendToCalendar || onDeleteQuest || onMoveQuestToNextDay) && (
-              <DropdownMenu
-                open={isActionMenuOpen}
-                onOpenChange={(open) => {
-                  setOpenActionMenuTaskId((current) => {
-                    if (open) return task.id;
-                    return current === task.id ? null : current;
-                  });
-                }}
-              >
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    data-interactive="true"
-                    data-tap-control="true"
-                    aria-label="Quest actions"
-                    variant="ghost"
-                    size="icon"
-                    className="h-9 w-9 -m-1.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 md:focus-visible:opacity-100 transition-opacity touch-manipulation"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <MoreHorizontal className="w-4 h-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-44">
-                  {onEditQuest && (
-                    <DropdownMenuItem
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setOpenActionMenuTaskId(null);
-                        onEditQuest(task);
-                      }}
-                    >
-                      <Pencil className="w-4 h-4 mr-2" />
-                      Edit quest
-                    </DropdownMenuItem>
-                  )}
-                  {onSendToCalendar && (
-                    <DropdownMenuItem
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setOpenActionMenuTaskId(null);
-                        onSendToCalendar(task.id);
-                      }}
-                    >
-                      <CalendarPlus className="w-4 h-4 mr-2" />
-                      {hasCalendarLink?.(task.id) ? "Re-send to calendar" : "Send to calendar"}
-                    </DropdownMenuItem>
-                  )}
-                  {onMoveQuestToNextDay && !isRitual && (
-                    <DropdownMenuItem
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setOpenActionMenuTaskId(null);
-                        onMoveQuestToNextDay(task.id);
-                      }}
-                    >
-                      <CalendarArrowUp className="w-4 h-4 mr-2" />
-                      Move to tomorrow
-                    </DropdownMenuItem>
-                  )}
-                  {onDeleteQuest && (
-                    <DropdownMenuItem
-                      className="text-destructive focus:text-destructive"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setOpenActionMenuTaskId(null);
-                        onDeleteQuest(task.id);
-                      }}
-                    >
-                      <Trash2 className="w-4 h-4 mr-2" />
-                      Delete quest
-                    </DropdownMenuItem>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-            {task.is_main_quest && (
-              <Badge variant="outline" className="text-xs px-1.5 py-0.5 h-5 bg-primary/10 border-primary/30">
-                Main
-              </Badge>
-            )}
-            <span className="text-sm font-bold text-stardust-gold/80">+{effectiveTaskXP}</span>
-            
-            {/* Chevron for expandable details - only shown if task has details */}
-            {hasDetails && (
-              <Button
+            onContextMenu={suppressNativeContextMenu}
+          >
+            {/* Checkbox - only this toggles completion */}
+            <div className="relative ml-1 flex flex-col items-center self-start pt-0.5 gap-0">
+              <button
                 data-interactive="true"
                 data-tap-control="true"
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 -m-1 flex-shrink-0"
-                onClick={(e) => toggleTaskExpanded(task.id, e)}
+                onClick={(e) => {
+                  if (suppressNextCheckboxClickRef.current) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    clearTouchCheckboxClickSuppression();
+                    return;
+                  }
+                  handleCheckboxClick(e);
+                }}
+                onTouchStart={(e) => {
+                  touchStartRef.current = {
+                    x: e.touches[0].clientX,
+                    y: e.touches[0].clientY
+                  };
+                }}
+                onTouchEnd={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  armTouchCheckboxClickSuppression();
+                  // Only trigger if finger moved less than 5px (not scrolling)
+                  if (touchStartRef.current) {
+                    const dx = Math.abs(e.changedTouches[0].clientX - touchStartRef.current.x);
+                    const dy = Math.abs(e.changedTouches[0].clientY - touchStartRef.current.y);
+                    if (dx < 5 && dy < 5) {
+                      handleCheckboxClick(e as unknown as React.MouseEvent);
+                    }
+                  }
+                  touchStartRef.current = null;
+                }}
+                className={cn(
+                  "relative flex items-center justify-center w-11 h-11 touch-manipulation transition-transform select-none",
+                  "active:scale-95"
+                )}
+                style={{
+                  WebkitTapHighlightColor: 'transparent',
+                  touchAction: 'manipulation',
+                }}
+                aria-label={
+                  isComplete
+                    ? "Mark task as incomplete"
+                    : "Mark task as complete"
+                }
+                role="checkbox"
+                aria-checked={isComplete}
               >
-                <ChevronDown className={cn(
-                  "w-4 h-4 text-muted-foreground transition-transform duration-200",
-                  isExpanded && "rotate-180"
-                )} />
-              </Button>
-            )}
-          </div>
-        </div>
-
-        {/* Expandable details section */}
-        <CollapsibleContent>
-          <div className="pl-8 pr-2 pb-2 space-y-2">
-            {/* Subtasks */}
-            {subtasks.length > 0 && (
-              <div className="space-y-1.5 rounded-md border border-border/40 bg-muted/20 p-2">
-                <div className="flex items-center justify-between">
-                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                    Subtasks
-                  </p>
-                  <p className="text-[11px] text-muted-foreground">
-                    {completedSubtaskCount}/{subtasks.length}
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  {subtasks.map((subtask) => (
-                    <label
-                      key={subtask.id}
-                      className="flex items-center gap-2 rounded-sm px-1 py-1 text-xs"
-                    >
-                      <Checkbox
-                        checked={!!subtask.completed}
-                        onCheckedChange={(checked) => {
-                          toggleSubtask.mutate({
-                            taskId: task.id,
-                            subtaskId: subtask.id,
-                            completed: !!checked,
-                          });
-                        }}
-                        onClick={(event) => event.stopPropagation()}
-                        className="h-3.5 w-3.5"
-                      />
-                      <span
-                        className={cn(
-                          "text-xs",
-                          subtask.completed && "text-muted-foreground line-through"
-                        )}
+                {useLiteAnimations ? (
+                  <div
+                    className={cn(
+                      "flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all",
+                      isComplete
+                        ? "bg-primary border-primary"
+                        : "border-muted-foreground/40 hover:border-primary"
+                    )}
+                  >
+                    {isComplete && (
+                      <Check className="w-4 h-4 text-primary-foreground" />
+                    )}
+                  </div>
+                ) : (
+                  <motion.div
+                    className={cn(
+                      "flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all",
+                      isComplete
+                        ? "bg-primary border-primary"
+                        : "border-muted-foreground/40 hover:border-primary"
+                    )}
+                    whileTap={!isDragging && !isPressed ? { scale: 0.85 } : {}}
+                  >
+                    {isComplete && (
+                      <motion.div
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={{ type: "spring", stiffness: 500, damping: 25 }}
                       >
-                        {subtask.title}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            )}
+                        <Check className="w-4 h-4 text-primary-foreground" />
+                      </motion.div>
+                    )}
+                  </motion.div>
+                )}
+              </button>
+            </div>
 
-            {displayAttachments.length > 0 && (
-              <div className="space-y-1.5 rounded-md border border-border/40 bg-muted/20 p-2">
-                <div className="flex items-center justify-between">
-                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                    Attachments
-                  </p>
-                  <p className="text-[11px] text-muted-foreground">
-                    {displayAttachments.length}
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  {displayAttachments.map((attachment, index) => (
-                    <a
-                      key={`${attachment.fileUrl}-${index}`}
-                      href={attachment.fileUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex items-center gap-2 rounded-sm px-1 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                {isRitual && (
+                  <Repeat className="w-4 h-4 text-accent flex-shrink-0" />
+                )}
+                <MarqueeText
+                  text={task.task_text}
+                  className="flex-1"
+                  textClassName={cn(
+                    "text-sm",
+                    isComplete && "text-muted-foreground",
+                    isComplete && (justCompletedTasks.has(task.id) ? "animate-strikethrough" : "line-through")
+                  )}
+                />
+              </div>
+              {task.scheduled_time && (
+                <span className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                  <Clock className="w-3 h-3" />
+                  {formatTime(task.scheduled_time)}
+                </span>
+              )}
+              {overlapCount > 0 && (
+                <span className="mt-1 inline-flex items-center rounded-full border border-primary/35 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                  Overlaps: {overlapCount}
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              {/* Quest action menu */}
+              {!isComplete && !isDragging && !isActivated && (onEditQuest || onSendToCalendar || onDeleteQuest || onMoveQuestToNextDay) && (
+                <DropdownMenu
+                  open={isActionMenuOpen}
+                  onOpenChange={(open) => {
+                    setOpenActionMenuTaskId((current) => {
+                      if (open) return task.id;
+                      return current === task.id ? null : current;
+                    });
+                  }}
+                >
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      data-interactive="true"
+                      data-tap-control="true"
+                      aria-label="Quest actions"
+                      variant="ghost"
+                      size="icon"
+                      className="h-9 w-9 -m-1.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 md:focus-visible:opacity-100 transition-opacity touch-manipulation"
+                      onClick={(e) => e.stopPropagation()}
                     >
-                      {attachment.isImage ? (
-                        <FileImage className="h-3.5 w-3.5 flex-shrink-0" />
-                      ) : (
-                        <Paperclip className="h-3.5 w-3.5 flex-shrink-0" />
-                      )}
-                      <span className="truncate">{attachment.fileName}</span>
-                    </a>
-                  ))}
-                </div>
-              </div>
-            )}
+                      <MoreHorizontal className="w-4 h-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-44">
+                    {onEditQuest && (
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenActionMenuTaskId(null);
+                          onEditQuest(task);
+                        }}
+                      >
+                        <Pencil className="w-4 h-4 mr-2" />
+                        Edit quest
+                      </DropdownMenuItem>
+                    )}
+                    {onSendToCalendar && (
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenActionMenuTaskId(null);
+                          onSendToCalendar(task.id);
+                        }}
+                      >
+                        <CalendarPlus className="w-4 h-4 mr-2" />
+                        {hasCalendarLink?.(task.id) ? "Re-send to calendar" : "Send to calendar"}
+                      </DropdownMenuItem>
+                    )}
+                    {onMoveQuestToNextDay && !isRitual && (
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenActionMenuTaskId(null);
+                          onMoveQuestToNextDay(task.id);
+                        }}
+                      >
+                        <CalendarArrowUp className="w-4 h-4 mr-2" />
+                        Move to tomorrow
+                      </DropdownMenuItem>
+                    )}
+                    {onDeleteQuest && (
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenActionMenuTaskId(null);
+                          onDeleteQuest(task.id);
+                        }}
+                      >
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Delete quest
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+              {task.is_main_quest && (
+                <Badge variant="outline" className="text-xs px-1.5 py-0.5 h-5 bg-primary/10 border-primary/30">
+                  Main
+                </Badge>
+              )}
+              <span className="text-sm font-bold text-stardust-gold/80">+{effectiveTaskXP}</span>
 
-            {/* Notes */}
-            {task.notes && (
-              useLiteAnimations ? (
-                <div className="flex items-start gap-2 text-sm text-muted-foreground">
-                  <FileText className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                  <p className="text-xs leading-relaxed whitespace-pre-line">{stripMarkdown(task.notes)}</p>
-                </div>
-              ) : (
-                <motion.div className="flex items-start gap-2 text-sm text-muted-foreground">
-                  <FileText className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                  <p className="text-xs leading-relaxed whitespace-pre-line">{stripMarkdown(task.notes)}</p>
-                </motion.div>
-              )
-            )}
-            
-            {/* Badges row */}
-            {hasDetailBadges && (
-              <div className="flex flex-wrap gap-1.5">
-              {/* Category */}
-              {CategoryIcon && task.category && (
-                <Badge variant="outline" className="text-xs px-1.5 py-0.5 h-5 gap-1 border-muted-foreground/30">
-                  <CategoryIcon className="w-3 h-3" />
-                  {task.category}
-                </Badge>
-              )}
-              
-              {/* Difficulty */}
-              {task.difficulty && (
-                <Badge 
-                  variant="outline" 
-                  className={cn(
-                    "text-xs px-1.5 py-0.5 h-5",
-                    task.difficulty === 'easy' && "bg-green-500/10 text-green-500 border-green-500/30",
-                    task.difficulty === 'medium' && "bg-yellow-500/10 text-yellow-500 border-yellow-500/30",
-                    task.difficulty === 'hard' && "bg-red-500/10 text-red-500 border-red-500/30"
-                  )}
+              {/* Chevron for expandable details - only shown if task has details */}
+              {hasDetails && (
+                <Button
+                  data-interactive="true"
+                  data-tap-control="true"
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 -m-1 flex-shrink-0"
+                  onClick={(e) => toggleTaskExpanded(task.id, e)}
                 >
-                  {task.difficulty}
-                </Badge>
+                  <ChevronDown className={cn(
+                    "w-4 h-4 text-muted-foreground transition-transform duration-200",
+                    isExpanded && "rotate-180"
+                  )} />
+                </Button>
               )}
-              
-              {/* Priority */}
-              {task.priority && (
-                <Badge 
-                  variant="outline" 
-                  className={cn(
-                    "text-xs px-1.5 py-0.5 h-5",
-                    task.priority === 'high' && "bg-red-500/10 text-red-500 border-red-500/30",
-                    task.priority === 'medium' && "bg-yellow-500/10 text-yellow-500 border-yellow-500/30",
-                    task.priority === 'low' && "bg-blue-500/10 text-blue-500 border-blue-500/30"
-                  )}
-                >
-                  {task.priority} priority
-                </Badge>
-              )}
-              
-              {/* Duration */}
-              {task.estimated_duration && (
-                <Badge variant="outline" className="text-xs px-1.5 py-0.5 h-5 gap-1 border-muted-foreground/30">
-                  <Timer className="w-3 h-3" />
-                  {task.estimated_duration}m
-                </Badge>
-              )}
-              
-              {/* Recurrence */}
-              {task.is_recurring && task.recurrence_pattern && (
-                <Badge variant="outline" className="text-xs px-1.5 py-0.5 h-5 gap-1 bg-accent/10 text-accent border-accent/30">
-                  <Repeat className="w-3 h-3" />
-                  {formatDisplayLabel(task.recurrence_pattern)}
-                </Badge>
-              )}
-              </div>
-            )}
+            </div>
           </div>
-        </CollapsibleContent>
+
+          {/* Expandable details section */}
+          <CollapsibleContent>
+            <div className="pl-8 pr-2 pb-2 space-y-2">
+              {/* Subtasks */}
+              {subtasks.length > 0 && (
+                <div className="space-y-1.5 rounded-md border border-border/40 bg-muted/20 p-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                      Subtasks
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {completedSubtaskCount}/{subtasks.length}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    {subtasks.map((subtask) => (
+                      <label
+                        key={subtask.id}
+                        className="flex items-center gap-2 rounded-sm px-1 py-1 text-xs"
+                      >
+                        <Checkbox
+                          checked={!!subtask.completed}
+                          onCheckedChange={(checked) => {
+                            toggleSubtask.mutate({
+                              taskId: task.id,
+                              subtaskId: subtask.id,
+                              completed: !!checked,
+                            });
+                          }}
+                          onClick={(event) => event.stopPropagation()}
+                          className="h-3.5 w-3.5"
+                        />
+                        <span
+                          className={cn(
+                            "text-xs",
+                            subtask.completed && "text-muted-foreground line-through"
+                          )}
+                        >
+                          {subtask.title}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {displayAttachments.length > 0 && (
+                <div className="space-y-1.5 rounded-md border border-border/40 bg-muted/20 p-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                      Attachments
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {displayAttachments.length}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    {displayAttachments.map((attachment, index) => (
+                      <a
+                        key={`${attachment.fileUrl}-${index}`}
+                        href={attachment.fileUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center gap-2 rounded-sm px-1 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
+                      >
+                        {attachment.isImage ? (
+                          <FileImage className="h-3.5 w-3.5 flex-shrink-0" />
+                        ) : (
+                          <Paperclip className="h-3.5 w-3.5 flex-shrink-0" />
+                        )}
+                        <span className="truncate">{attachment.fileName}</span>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Notes */}
+              {task.notes && (
+                useLiteAnimations ? (
+                  <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                    <FileText className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                    <p className="text-xs leading-relaxed whitespace-pre-line">{stripMarkdown(task.notes)}</p>
+                  </div>
+                ) : (
+                  <motion.div className="flex items-start gap-2 text-sm text-muted-foreground">
+                    <FileText className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                    <p className="text-xs leading-relaxed whitespace-pre-line">{stripMarkdown(task.notes)}</p>
+                  </motion.div>
+                )
+              )}
+
+              {/* Badges row */}
+              {hasDetailBadges && (
+                <div className="flex flex-wrap gap-1.5">
+                {/* Category */}
+                {CategoryIcon && task.category && (
+                  <Badge variant="outline" className="text-xs px-1.5 py-0.5 h-5 gap-1 border-muted-foreground/30">
+                    <CategoryIcon className="w-3 h-3" />
+                    {task.category}
+                  </Badge>
+                )}
+
+                {/* Difficulty */}
+                {task.difficulty && (
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      "text-xs px-1.5 py-0.5 h-5",
+                      task.difficulty === 'easy' && "bg-green-500/10 text-green-500 border-green-500/30",
+                      task.difficulty === 'medium' && "bg-yellow-500/10 text-yellow-500 border-yellow-500/30",
+                      task.difficulty === 'hard' && "bg-red-500/10 text-red-500 border-red-500/30"
+                    )}
+                  >
+                    {task.difficulty}
+                  </Badge>
+                )}
+
+                {/* Priority */}
+                {task.priority && (
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      "text-xs px-1.5 py-0.5 h-5",
+                      task.priority === 'high' && "bg-red-500/10 text-red-500 border-red-500/30",
+                      task.priority === 'medium' && "bg-yellow-500/10 text-yellow-500 border-yellow-500/30",
+                      task.priority === 'low' && "bg-blue-500/10 text-blue-500 border-blue-500/30"
+                    )}
+                  >
+                    {task.priority} priority
+                  </Badge>
+                )}
+
+                {/* Duration */}
+                {task.estimated_duration && (
+                  <Badge variant="outline" className="text-xs px-1.5 py-0.5 h-5 gap-1 border-muted-foreground/30">
+                    <Timer className="w-3 h-3" />
+                    {task.estimated_duration}m
+                  </Badge>
+                )}
+
+                {/* Recurrence */}
+                {task.is_recurring && task.recurrence_pattern && (
+                  <Badge variant="outline" className="text-xs px-1.5 py-0.5 h-5 gap-1 bg-accent/10 text-accent border-accent/30">
+                    <Repeat className="w-3 h-3" />
+                    {formatDisplayLabel(task.recurrence_pattern)}
+                  </Badge>
+                )}
+                </div>
+              )}
+            </div>
+          </CollapsibleContent>
+        </div>
       </Collapsible>
     );
 

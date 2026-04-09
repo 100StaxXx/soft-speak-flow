@@ -96,6 +96,9 @@ interface WeekPlannerTaskCardProps {
 
 const DEFAULT_TIMELINE_START_HOUR = 6;
 const DEFAULT_TIMELINE_END_HOUR = 21;
+const JOURNEYS_QUEST_CARD_SHELL_CLASS_NAME =
+  "journeys-quest-card-shell overflow-hidden border bg-white/[0.04] shadow-[0_12px_22px_rgba(0,0,0,0.14)] transition-colors";
+const JOURNEYS_QUEST_CARD_SHELL_ACTIVE_CLASS_NAME = "journeys-quest-card-shell--active";
 
 const formatHourLabel = (hour: number) => format(new Date(2000, 0, 1, hour, 0), "h a");
 
@@ -170,9 +173,12 @@ function WeekPlannerTaskCard({
   return (
     <div
       data-testid={`desktop-week-task-${task.id}`}
+      data-quest-card-shell="true"
       className={cn(
-        "rounded-[18px] border border-white/10 bg-white/[0.04] p-2 shadow-[0_12px_22px_rgba(0,0,0,0.14)] transition-colors",
+        JOURNEYS_QUEST_CARD_SHELL_CLASS_NAME,
+        "rounded-[18px] border-white/10 p-2",
         compact && "rounded-[16px]",
+        isOpen && JOURNEYS_QUEST_CARD_SHELL_ACTIVE_CLASS_NAME,
         isOpen && "border-primary/40 bg-primary/[0.08]",
         isComplete && "opacity-70",
       )}

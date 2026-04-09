@@ -251,6 +251,12 @@ const openDropdownMenu = (trigger: HTMLElement) => {
   });
 };
 
+const getQuestCardShell = (container: HTMLElement) => {
+  const shell = container.querySelector('[data-quest-card-shell="true"]');
+  expect(shell).toBeInstanceOf(HTMLElement);
+  return shell as HTMLElement;
+};
+
 const createDomRect = (overrides: Partial<DOMRect> = {}): DOMRect => ({
   x: 0,
   y: 0,
@@ -1543,7 +1549,9 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     );
 
     const pane = screen.getByTestId("scheduled-timeline-pane");
-    expect(within(pane).getByTestId("timeline-row-task-scheduled-1")).toBeInTheDocument();
+    const mobileRow = within(pane).getByTestId("timeline-row-task-scheduled-1");
+    expect(mobileRow).toBeInTheDocument();
+    expect(getQuestCardShell(mobileRow)).toHaveClass("journeys-quest-card-shell");
     expect(screen.queryByTestId("timeline-row-task-unscheduled-1")).not.toBeInTheDocument();
     expect(screen.queryByText("Anytime focus")).not.toBeInTheDocument();
     expect(screen.queryByText("Anytime")).not.toBeInTheDocument();
@@ -2959,6 +2967,10 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     await waitFor(() => {
       expect(screen.getByTestId("desktop-quest-popover-task-scheduled-1")).toBeInTheDocument();
     });
+
+    expect(
+      getQuestCardShell(screen.getByTestId("timeline-row-task-scheduled-1")),
+    ).toHaveClass("journeys-quest-card-shell", "journeys-quest-card-shell--active");
 
     fireEvent.doubleClick(screen.getByTestId("desktop-timeline-task-button-task-scheduled-1"));
 
