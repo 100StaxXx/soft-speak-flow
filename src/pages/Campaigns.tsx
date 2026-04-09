@@ -19,6 +19,9 @@ interface CreatedCampaignData {
 }
 
 const CAMPAIGN_LIMIT = 3;
+const CAMPAIGN_STAT_CARD_CLASS = "rounded-[24px] border border-celestial-blue/24 bg-[linear-gradient(180deg,rgba(10,34,60,0.72),rgba(4,16,32,0.54))] p-4 backdrop-blur-2xl shadow-[0_20px_40px_rgba(0,0,0,0.2)]";
+const CAMPAIGN_CTA_CLASS = "gap-2 border-celestial-blue/32 bg-celestial-blue/14 text-cyan-50 shadow-[0_14px_32px_rgba(16,75,130,0.2)] backdrop-blur-xl hover:bg-celestial-blue/20 hover:border-celestial-blue/42 hover:text-white";
+const CAMPAIGN_PANEL_CLASS = "rounded-[32px] border border-celestial-blue/28 bg-[linear-gradient(180deg,rgba(10,34,60,0.56),rgba(4,16,32,0.36))] shadow-[0_20px_40px_rgba(0,0,0,0.18)] backdrop-blur-2xl";
 
 const Campaigns = () => {
   const prefersReducedMotion = useReducedMotion();
@@ -77,11 +80,7 @@ const Campaigns = () => {
             <div className="absolute right-0 top-0">
               <PageInfoButton onClick={() => setShowPageInfo(true)} />
             </div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-celestial-blue/30 bg-celestial-blue/10 px-4 py-2 text-sm text-celestial-blue">
-              <Sparkles className="h-4 w-4" />
-              Campaign command center
-            </div>
-            <h1 className="mt-4 bg-gradient-to-r from-celestial-blue via-primary to-accent bg-clip-text text-3xl font-semibold tracking-tight text-transparent">
+            <h1 className="mt-1 bg-gradient-to-r from-celestial-blue via-sky-300 to-cyan-100 bg-clip-text text-3xl font-semibold tracking-tight text-transparent">
               Campaigns
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">
@@ -97,12 +96,13 @@ const Campaigns = () => {
           >
             {[
               { label: "Active", value: activeEpics.length, accent: "text-celestial-blue" },
-              { label: "Completed", value: completedEpics.length, accent: "text-primary" },
+              { label: "Completed", value: completedEpics.length, accent: "text-sky-200" },
               { label: "Completion", value: `${completionRate}%`, accent: "text-stardust-gold" },
             ].map((stat) => (
               <div
                 key={stat.label}
-                className="rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(23,20,38,0.94),rgba(16,13,27,0.9))] p-4 shadow-[0_20px_40px_rgba(0,0,0,0.2)]"
+                data-testid={`campaigns-stat-${stat.label.toLowerCase()}`}
+                className={CAMPAIGN_STAT_CARD_CLASS}
               >
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/75">{stat.label}</p>
                 <p className={cn("mt-2 text-2xl font-semibold", stat.accent)}>{stat.value}</p>
@@ -119,7 +119,9 @@ const Campaigns = () => {
             <Button
               type="button"
               size="lg"
-              className="gap-2"
+              variant="outline"
+              data-testid="campaigns-create-button"
+              className={CAMPAIGN_CTA_CLASS}
               disabled={hasReachedLimit}
               onClick={() => setShowPathfinder(true)}
             >
@@ -153,7 +155,7 @@ const Campaigns = () => {
                 ))}
               </div>
             ) : !hasCampaigns ? (
-              <div className="rounded-[32px] border border-dashed border-celestial-blue/35 bg-[linear-gradient(180deg,rgba(23,20,38,0.94),rgba(16,13,27,0.9))] px-6 py-12 text-center shadow-[0_20px_40px_rgba(0,0,0,0.2)]">
+              <div className={cn(CAMPAIGN_PANEL_CLASS, "border-dashed px-6 py-12 text-center")}>
                 <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-celestial-blue/15 text-celestial-blue">
                   <Target className="h-8 w-8" />
                 </div>
@@ -163,8 +165,10 @@ const Campaigns = () => {
                 </p>
                 <Button
                   type="button"
+                  variant="outline"
                   size="lg"
-                  className="mt-6 gap-2"
+                  data-testid="campaigns-empty-state-button"
+                  className={cn("mt-6", CAMPAIGN_CTA_CLASS)}
                   onClick={() => setShowPathfinder(true)}
                 >
                   <Sparkles className="h-4 w-4" />
@@ -189,7 +193,7 @@ const Campaigns = () => {
                         />
                       ))
                     ) : (
-                      <div className="rounded-[24px] border border-white/10 bg-white/[0.03] px-4 py-6 text-sm text-muted-foreground">
+                      <div className="rounded-[24px] border border-celestial-blue/18 bg-celestial-blue/[0.08] px-4 py-6 text-sm text-muted-foreground backdrop-blur-xl">
                         No active campaigns right now. Start one when you want a bigger container than a single quest.
                       </div>
                     )}
@@ -207,7 +211,7 @@ const Campaigns = () => {
                         <JourneyCard key={epic.id} journey={epic} />
                       ))
                     ) : (
-                      <div className="rounded-[24px] border border-white/10 bg-white/[0.03] px-4 py-6 text-sm text-muted-foreground">
+                      <div className="rounded-[24px] border border-celestial-blue/18 bg-celestial-blue/[0.08] px-4 py-6 text-sm text-muted-foreground backdrop-blur-xl">
                         Completed campaigns will collect here as your long-form wins stack up.
                       </div>
                     )}

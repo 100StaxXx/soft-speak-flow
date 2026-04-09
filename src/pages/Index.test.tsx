@@ -196,6 +196,8 @@ describe("Index mentor connection state", () => {
     renderIndex();
 
     expect(screen.getByTestId("mentor-mobile-layout")).toBeInTheDocument();
+    expect(screen.getByTestId("guide-theme-shell")).toHaveStyle("--primary: 181 57% 56%; --accent: 176 46% 64%");
+    expect(screen.queryByAltText("Guide background")).not.toBeInTheDocument();
     expect(screen.queryByTestId("mentor-desktop-layout")).not.toBeInTheDocument();
     expect(screen.getByText("MorningCheckIn")).toBeInTheDocument();
     expect(screen.queryByText("MentorSwitcher")).not.toBeInTheDocument();

@@ -31,6 +31,7 @@ import {
   useEffect,
   useMemo,
   useRef,
+  type CSSProperties,
 } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ParallaxCard } from "@/components/ui/parallax-card";
@@ -61,6 +62,15 @@ const INITIAL_MOUNTED_TABS: Record<CompanionTab, boolean> = {
   stories: false,
   collection: false,
 };
+
+const COMPANION_GOLD_THEME_VARS: CSSProperties = {
+  "--primary": "45 100% 65%",
+  "--accent": "40 96% 57%",
+  "--ring": "45 100% 65%",
+  "--border": "43 78% 30%",
+  "--primary-rgb": "255, 214, 102",
+  "--shadow-glow": "0 0 24px hsl(45 100% 65% / 0.35)",
+} as CSSProperties;
 
 const isCompanionTab = (tab: string): tab is CompanionTab =>
   COMPANION_TAB_KEYS.includes(tab as CompanionTab);
@@ -173,24 +183,31 @@ const CompanionTabBar = ({
 
   return (
     <TabsList
+      data-testid="companion-tab-list"
       className={cn(
-        "bg-card/80 backdrop-blur-md border border-border/60",
+        "border-stardust-gold/20 bg-[linear-gradient(180deg,rgba(36,28,12,0.72),rgba(20,16,8,0.78))] text-stardust-gold/78 backdrop-blur-md shadow-[0_18px_40px_rgba(0,0,0,0.2)]",
         isDesktop
           ? "inline-grid h-auto w-auto min-w-[460px] grid-cols-4 justify-start p-1.5"
           : "grid w-full grid-cols-4",
       )}
     >
-      <TabsTrigger value="overview" className="flex items-center gap-2">
+      <TabsTrigger
+        value="overview"
+        className="flex items-center gap-2 data-[state=active]:border-stardust-gold/35 data-[state=active]:bg-stardust-gold/12 data-[state=active]:text-stardust-gold"
+      >
         <TrendingUp className="h-4 w-4" />
         <span className={cn(isDesktop ? "inline" : "hidden sm:inline")}>Overview</span>
       </TabsTrigger>
-      <TabsTrigger value="focus" className="flex items-center gap-2">
+      <TabsTrigger
+        value="focus"
+        className="flex items-center gap-2 data-[state=active]:border-stardust-gold/35 data-[state=active]:bg-stardust-gold/12 data-[state=active]:text-stardust-gold"
+      >
         <Timer className="h-4 w-4" />
         <span className={cn(isDesktop ? "inline" : "hidden sm:inline")}>Focus</span>
       </TabsTrigger>
       <TabsTrigger
         value="stories"
-        className="flex items-center gap-2"
+        className="flex items-center gap-2 data-[state=active]:border-stardust-gold/35 data-[state=active]:bg-stardust-gold/12 data-[state=active]:text-stardust-gold"
         onPointerDown={onStoriesPrefetch}
         onFocus={onStoriesPrefetch}
       >
@@ -199,7 +216,7 @@ const CompanionTabBar = ({
       </TabsTrigger>
       <TabsTrigger
         value="collection"
-        className="flex items-center gap-2"
+        className="flex items-center gap-2 data-[state=active]:border-stardust-gold/35 data-[state=active]:bg-stardust-gold/12 data-[state=active]:text-stardust-gold"
         onPointerDown={onCollectionPrefetch}
         onFocus={onCollectionPrefetch}
       >
@@ -576,7 +593,12 @@ const Companion = () => {
     <PageTransition mode="instant">
       <CompanionErrorBoundary>
         <CinematicPageBackground preset="companion" />
-        <div className="min-h-screen pb-nav-safe relative z-10" data-tour="companion-page">
+        <div
+          className="min-h-screen pb-nav-safe relative z-10"
+          data-testid="companion-theme-shell"
+          data-tour="companion-page"
+          style={COMPANION_GOLD_THEME_VARS}
+        >
           {/* Fixed header - won't move on iOS overscroll */}
           <header className="fixed top-0 left-0 right-0 z-40 w-full cosmiq-glass-header safe-area-top">
             <div

@@ -38,6 +38,7 @@ interface ShootingStar {
 
 export type StarfieldScene =
   | "default"
+  | "guide-tiffany"
   | "quests-tempest"
   | "campaigns-summit"
   | "companion-sanctuary"
@@ -64,6 +65,14 @@ const SCENE_PRESETS: Record<StarfieldScene, ScenePreset> = {
     silhouette: "hsl(238, 22%, 10%)",
     detail: "hsl(232, 26%, 14%)",
     glow: "hsl(45, 90%, 70%)",
+  },
+  "guide-tiffany": {
+    skyTint: "hsl(205, 36%, 18%)",
+    accent: "hsl(181, 60%, 58%)",
+    secondaryAccent: "hsl(189, 52%, 67%)",
+    silhouette: "hsl(210, 24%, 9%)",
+    detail: "hsl(202, 30%, 14%)",
+    glow: "hsl(185, 74%, 73%)",
   },
   "quests-tempest": {
     skyTint: "hsl(208, 46%, 24%)",

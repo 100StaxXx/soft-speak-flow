@@ -13,6 +13,14 @@ export const WALLPAPER_PAGE_KEYS = [
 
 export type WallpaperPageKey = (typeof WALLPAPER_PAGE_KEYS)[number];
 
+export const RECENT_LIVE_WALLPAPER_PAGE_KEYS = [
+  "quests",
+  "campaigns",
+  "companion",
+] as const satisfies readonly WallpaperPageKey[];
+
+export const RECENT_LIVE_WALLPAPER_CUTOFF_DATE = "2026-04-08" as const;
+
 export type WallpaperPublishState =
   | "ready"
   | "validation_failed"
@@ -81,6 +89,18 @@ export interface WallpaperPromotionCandidate<TId extends string = string> {
     | "contrastScore"
     | "safeZoneConfidenceScore"
   >;
+}
+
+export interface WallpaperLiveEligibilityInput {
+  publishState?: string | null;
+  sourceKind?: string | null;
+  generationDate?: string | null;
+}
+
+export interface WallpaperAssetCandidate<TId extends string = string>
+  extends WallpaperPromotionCandidate<TId>,
+    WallpaperLiveEligibilityInput {
+  pageKey?: WallpaperPageKey | null;
 }
 
 const wallpaperPageLabels: Record<WallpaperPageKey, string> = {
@@ -307,6 +327,28 @@ export const wallpaperGenerationBatchPresets = {
 
 export type WallpaperGenerationBatchPresetKey = keyof typeof wallpaperGenerationBatchPresets;
 
+export const pageUsesRecentLiveWallpaperPool = (pageKey: WallpaperPageKey) =>
+  RECENT_LIVE_WALLPAPER_PAGE_KEYS.includes(
+    pageKey as (typeof RECENT_LIVE_WALLPAPER_PAGE_KEYS)[number],
+  );
+
+export const isWallpaperAssetEligibleForLiveRotation = (
+  pageKey: WallpaperPageKey,
+  asset: WallpaperLiveEligibilityInput,
+) => {
+  if (asset.publishState !== "ready") {
+    return false;
+  }
+
+  if (!pageUsesRecentLiveWallpaperPool(pageKey)) {
+    return true;
+  }
+
+  return asset.sourceKind === "generated"
+    && typeof asset.generationDate === "string"
+    && asset.generationDate >= RECENT_LIVE_WALLPAPER_CUTOFF_DATE;
+};
+
 const wallpaperDateFormatter = new Intl.DateTimeFormat("en-CA", {
   timeZone: WALLPAPER_CATALOG_TIMEZONE,
   year: "numeric",
@@ -386,6 +428,34 @@ export const pickBestWallpaperPromotionCandidate = <
   if (candidates.length === 0) return null;
   return [...candidates].sort(compareWallpaperPromotionCandidates)[0];
 };
+
+export const pickBestEligibleWallpaperCandidateForDate = <
+  T extends WallpaperAssetCandidate,
+>(
+  pageKey: WallpaperPageKey,
+  dateKey: string,
+  candidates: readonly T[],
+) => pickBestWallpaperPromotionCandidate(
+  candidates.filter((candidate) =>
+    candidate.generationDate === dateKey
+    && isWallpaperAssetEligibleForLiveRotation(pageKey, candidate),
+  ),
+);
+
+export const pickLatestEligibleWallpaperCandidate = <
+  T extends WallpaperAssetCandidate,
+>(
+  pageKey: WallpaperPageKey,
+  candidates: readonly T[],
+) => (
+  candidates
+    .filter((candidate) => isWallpaperAssetEligibleForLiveRotation(pageKey, candidate))
+    .sort((left, right) => {
+      const rightCreatedAt = right.createdAt ? Date.parse(right.createdAt) : 0;
+      const leftCreatedAt = left.createdAt ? Date.parse(left.createdAt) : 0;
+      return rightCreatedAt - leftCreatedAt;
+    })[0] ?? null
+);
 
 export const pickOldestUnusedWallpaperAssetId = (
   orderedReadyAssetIds: readonly string[],

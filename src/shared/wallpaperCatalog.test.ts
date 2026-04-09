@@ -3,8 +3,12 @@ import {
   LANDSCAPE_DIVERSE_V1_VARIANT_KEYS,
   calculateWallpaperPromotionScore,
   countWallpaperVariantsByPage,
+  isWallpaperAssetEligibleForLiveRotation,
+  pickBestEligibleWallpaperCandidateForDate,
+  pickLatestEligibleWallpaperCandidate,
   pickOldestUnusedWallpaperAssetId,
   pickBestWallpaperPromotionCandidate,
+  RECENT_LIVE_WALLPAPER_CUTOFF_DATE,
   wallpaperGenerationBatchPresets,
 } from "@/shared/wallpaperCatalog";
 
@@ -80,5 +84,107 @@ describe("wallpaper promotion scoring", () => {
         ["asset-1", "asset-3"],
       ),
     ).toBe("asset-2");
+  });
+
+  it("only keeps post-cutoff generated assets eligible for the recent live wallpaper pages", () => {
+    expect(
+      isWallpaperAssetEligibleForLiveRotation("campaigns", {
+        publishState: "ready",
+        sourceKind: "generated",
+        generationDate: RECENT_LIVE_WALLPAPER_CUTOFF_DATE,
+      }),
+    ).toBe(true);
+
+    expect(
+      isWallpaperAssetEligibleForLiveRotation("campaigns", {
+        publishState: "ready",
+        sourceKind: "seed",
+        generationDate: "2026-04-08",
+      }),
+    ).toBe(false);
+
+    expect(
+      isWallpaperAssetEligibleForLiveRotation("quests", {
+        publishState: "ready",
+        sourceKind: "generated",
+        generationDate: "2026-04-07",
+      }),
+    ).toBe(false);
+
+    expect(
+      isWallpaperAssetEligibleForLiveRotation("profile", {
+        publishState: "ready",
+        sourceKind: "seed",
+        generationDate: "2026-04-01",
+      }),
+    ).toBe(true);
+  });
+
+  it("prefers the best eligible current-day candidate before other ready assets", () => {
+    const candidates = [
+      {
+        id: "newest-seed-but-ineligible",
+        createdAt: "2026-04-09T12:00:00.000Z",
+        publishState: "ready",
+        sourceKind: "seed",
+        generationDate: "2026-04-09",
+        validation: {
+          scenicQualityScore: 99,
+          moodMatchScore: 99,
+          detailScore: 99,
+          contrastScore: 99,
+          safeZoneConfidenceScore: 99,
+        },
+      },
+      {
+        id: "latest-older",
+        createdAt: "2026-04-09T11:00:00.000Z",
+        publishState: "ready",
+        sourceKind: "generated",
+        generationDate: "2026-04-08",
+        validation: {
+          scenicQualityScore: 82,
+          moodMatchScore: 80,
+          detailScore: 78,
+          contrastScore: 76,
+          safeZoneConfidenceScore: 80,
+        },
+      },
+      {
+        id: "today-best",
+        createdAt: "2026-04-09T10:00:00.000Z",
+        publishState: "ready",
+        sourceKind: "generated",
+        generationDate: "2026-04-09",
+        validation: {
+          scenicQualityScore: 95,
+          moodMatchScore: 92,
+          detailScore: 88,
+          contrastScore: 84,
+          safeZoneConfidenceScore: 90,
+        },
+      },
+      {
+        id: "today-weaker",
+        createdAt: "2026-04-09T11:30:00.000Z",
+        publishState: "ready",
+        sourceKind: "generated",
+        generationDate: "2026-04-09",
+        validation: {
+          scenicQualityScore: 80,
+          moodMatchScore: 81,
+          detailScore: 79,
+          contrastScore: 78,
+          safeZoneConfidenceScore: 82,
+        },
+      },
+    ];
+
+    expect(
+      pickBestEligibleWallpaperCandidateForDate("campaigns", "2026-04-09", candidates)?.id,
+    ).toBe("today-best");
+    expect(
+      pickLatestEligibleWallpaperCandidate("campaigns", candidates)?.id,
+    ).toBe("today-weaker");
   });
 });

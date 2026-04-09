@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useCallback, useRef } from "react";
+import { useEffect, useMemo, useCallback, useRef, type CSSProperties } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -46,6 +46,15 @@ type MentorPageData = {
     author?: string;
   } | null;
 };
+
+const GUIDE_TIFFANY_THEME_VARS: CSSProperties = {
+  "--primary": "181 57% 56%",
+  "--accent": "176 46% 64%",
+  "--ring": "181 57% 56%",
+  "--border": "184 34% 28%",
+  "--primary-rgb": "88, 211, 205",
+  "--shadow-glow": "0 0 24px hsl(181 57% 56% / 0.35)",
+} as CSSProperties;
 
 const DesktopMentorStateCard = ({
   title,
@@ -132,6 +141,7 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
     [profile?.timezone],
   );
   const isTutorialMorningCheckinStep = !isDesktop && isTutorialActive && tutorialStep === "morning_checkin";
+  const shouldUseGuideTiffanyTheme = location.pathname === "/mentor";
 
   // Scroll to top on mount
   useEffect(() => {
@@ -636,25 +646,14 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
 
   return (
     <PageTransition mode={enableOnboardingGuard ? "animated" : "instant"}>
-      {/* Cosmiq Starfield Background */}
-      <StarfieldBackground />
-      
-      {/* Fixed Background Image */}
-      {mentorImage && (
-        <div className="fixed inset-0 z-0 pointer-events-none">
-          <img
-            src={mentorImage}
-            alt="Guide background"
-            className="w-full h-full object-cover object-center"
-            loading="eager"
-            decoding="async"
-          />
-          <div className="absolute inset-0 bg-background/85" />
-        </div>
-      )}
+      <StarfieldBackground scene={shouldUseGuideTiffanyTheme ? "guide-tiffany" : "default"} />
 
       {/* Scrollable Content */}
-      <div className="relative z-10 min-h-screen pb-nav-safe pt-safe">
+      <div
+        className="relative z-10 min-h-screen pb-nav-safe pt-safe"
+        data-testid="guide-theme-shell"
+        style={shouldUseGuideTiffanyTheme ? GUIDE_TIFFANY_THEME_VARS : undefined}
+      >
         {isDesktop ? desktopContent : mobileContent}
       </div>
       

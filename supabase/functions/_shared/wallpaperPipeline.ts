@@ -4,9 +4,13 @@ import {
   WALLPAPER_IMAGE_SIZE,
   WALLPAPER_IMAGE_WIDTH,
   WALLPAPER_PROMPT_VERSION,
+  isWallpaperAssetEligibleForLiveRotation,
   pickOldestUnusedWallpaperAssetId,
+  pickBestEligibleWallpaperCandidateForDate,
+  pickLatestEligibleWallpaperCandidate,
   wallpaperGenerationSpecs,
   type WallpaperAssignmentSource,
+  type WallpaperAssetCandidate,
   type WallpaperPageKey,
   type WallpaperPromptVariantKey,
   type WallpaperValidationResult,
@@ -26,8 +30,35 @@ export interface GeneratedWallpaperAssetRecord {
   validationResult: WallpaperValidationResult;
 }
 
-interface ReadyWallpaperAssetRow {
+interface ReadyWallpaperAssetRow extends WallpaperAssetCandidate {
   id: string;
+  publishState: string;
+  sourceKind: string;
+  generationDate: string;
+  validation_result?: Pick<
+    WallpaperValidationResult,
+    "scenicQualityScore"
+    | "moodMatchScore"
+    | "detailScore"
+    | "contrastScore"
+    | "safeZoneConfidenceScore"
+  > | null;
+}
+
+interface WallpaperAssetLookupRow {
+  id: string;
+  publish_state: string;
+  source_kind: string;
+  generation_date: string;
+  created_at: string;
+  validation_result?: Pick<
+    WallpaperValidationResult,
+    "scenicQualityScore"
+    | "moodMatchScore"
+    | "detailScore"
+    | "contrastScore"
+    | "safeZoneConfidenceScore"
+  > | null;
 }
 
 interface UsedWallpaperAssignmentRow {
@@ -326,6 +357,63 @@ export const assignWallpaperAsset = async (
   }
 };
 
+const mapWallpaperAssetCandidate = (
+  row: WallpaperAssetLookupRow,
+): ReadyWallpaperAssetRow => ({
+  id: row.id,
+  createdAt: row.created_at,
+  publishState: row.publish_state,
+  sourceKind: row.source_kind,
+  generationDate: row.generation_date,
+  validation_result: row.validation_result,
+  validation: {
+    scenicQualityScore: Number(row.validation_result?.scenicQualityScore ?? 0),
+    moodMatchScore: Number(row.validation_result?.moodMatchScore ?? 0),
+    detailScore: Number(row.validation_result?.detailScore ?? 0),
+    contrastScore: Number(row.validation_result?.contrastScore ?? 0),
+    safeZoneConfidenceScore: Number(row.validation_result?.safeZoneConfidenceScore ?? 0),
+  },
+});
+
+const loadWallpaperAssetCandidates = async (
+  supabase: SupabaseClient,
+  pageKey: WallpaperPageKey,
+  ascending = false,
+) => {
+  const { data, error } = await supabase
+    .from("wallpaper_assets")
+    .select("id, publish_state, source_kind, generation_date, created_at, validation_result")
+    .eq("page_key", pageKey)
+    .order("created_at", { ascending });
+
+  if (error) {
+    throw new Error(`Failed to load wallpaper assets for ${pageKey}: ${error.message}`);
+  }
+
+  return ((data ?? []) as WallpaperAssetLookupRow[]).map(mapWallpaperAssetCandidate);
+};
+
+export const getWallpaperAssetEligibilitySnapshot = async (
+  supabase: SupabaseClient,
+  wallpaperAssetId: string,
+) => {
+  const { data, error } = await supabase
+    .from("wallpaper_assets")
+    .select("publish_state, source_kind, generation_date")
+    .eq("id", wallpaperAssetId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to load wallpaper asset eligibility: ${error.message}`);
+  }
+
+  return data as {
+    publish_state: string;
+    source_kind: string;
+    generation_date: string;
+  } | null;
+};
+
 export const getExistingAssignment = async (
   supabase: SupabaseClient,
   pageKey: WallpaperPageKey,
@@ -349,38 +437,18 @@ export const getLatestReadyAssetId = async (
   supabase: SupabaseClient,
   pageKey: WallpaperPageKey,
 ) => {
-  const { data, error } = await supabase
-    .from("wallpaper_assets")
-    .select("id")
-    .eq("page_key", pageKey)
-    .eq("publish_state", "ready")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (error) {
-    throw new Error(`Failed to load latest ready wallpaper asset: ${error.message}`);
-  }
-
-  return data?.id ?? null;
+  const candidates = await loadWallpaperAssetCandidates(supabase, pageKey);
+  return pickLatestEligibleWallpaperCandidate(pageKey, candidates)?.id ?? null;
 };
 
 export const getOldestUnusedReadyAssetId = async (
   supabase: SupabaseClient,
   pageKey: WallpaperPageKey,
 ) => {
-  const { data: readyAssets, error: readyAssetsError } = await supabase
-    .from("wallpaper_assets")
-    .select("id")
-    .eq("page_key", pageKey)
-    .eq("publish_state", "ready")
-    .order("created_at", { ascending: true });
-
-  if (readyAssetsError) {
-    throw new Error(`Failed to load ready wallpaper backlog: ${readyAssetsError.message}`);
-  }
-
-  const orderedAssetIds = ((readyAssets ?? []) as ReadyWallpaperAssetRow[]).map((asset) => asset.id);
+  const readyAssets = await loadWallpaperAssetCandidates(supabase, pageKey, true);
+  const orderedAssetIds = readyAssets
+    .filter((asset) => isWallpaperAssetEligibleForLiveRotation(pageKey, asset))
+    .map((asset) => asset.id);
   if (orderedAssetIds.length === 0) {
     return null;
   }
@@ -398,4 +466,13 @@ export const getOldestUnusedReadyAssetId = async (
     orderedAssetIds,
     ((usedAssignments ?? []) as UsedWallpaperAssignmentRow[]).map((assignment) => assignment.wallpaper_asset_id),
   );
+};
+
+export const getBestEligibleAssetIdForDate = async (
+  supabase: SupabaseClient,
+  pageKey: WallpaperPageKey,
+  dateKey: string,
+) => {
+  const candidates = await loadWallpaperAssetCandidates(supabase, pageKey);
+  return pickBestEligibleWallpaperCandidateForDate(pageKey, dateKey, candidates)?.id ?? null;
 };

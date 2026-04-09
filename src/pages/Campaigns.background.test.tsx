@@ -63,5 +63,9 @@ describe("Campaigns background", () => {
     render(<Campaigns />);
 
     expect(screen.getByTestId("cinematic-background")).toHaveAttribute("data-preset", "campaigns");
+    expect(screen.queryByText("Campaign command center")).not.toBeInTheDocument();
+    expect(screen.getByTestId("campaigns-create-button")).toHaveClass("bg-celestial-blue/14");
+    expect(screen.getByTestId("campaigns-empty-state-button")).toHaveClass("bg-celestial-blue/14");
+    expect(screen.getByTestId("campaigns-stat-active")).toHaveClass("border-celestial-blue/24");
   });
 });

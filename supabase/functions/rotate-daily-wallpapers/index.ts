@@ -4,6 +4,7 @@ installOpenAICompatibilityShim();
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import {
   getWallpaperDateKey,
+  isWallpaperAssetEligibleForLiveRotation,
   wallpaperGenerationSpecs,
   type WallpaperPageKey,
 } from "../../../src/shared/wallpaperCatalog.ts";
@@ -12,7 +13,9 @@ import {
   assignWallpaperAsset,
   createWallpaperServiceClient,
   generateAndStoreWallpaperAsset,
+  getBestEligibleAssetIdForDate,
   getExistingAssignment,
+  getWallpaperAssetEligibilitySnapshot,
   getLatestReadyAssetId,
   getOldestUnusedReadyAssetId,
 } from "../_shared/wallpaperPipeline.ts";
@@ -46,11 +49,36 @@ const rotatePageWallpaper = async (
 ): Promise<RotationOutcome> => {
   const existingAssignment = await getExistingAssignment(supabase, pageKey, dateKey);
   if (existingAssignment && !force) {
+    const eligibilitySnapshot = await getWallpaperAssetEligibilitySnapshot(
+      supabase,
+      existingAssignment.wallpaper_asset_id,
+    );
+
+    if (
+      eligibilitySnapshot
+      && isWallpaperAssetEligibleForLiveRotation(pageKey, {
+        publishState: eligibilitySnapshot.publish_state,
+        sourceKind: eligibilitySnapshot.source_kind,
+        generationDate: eligibilitySnapshot.generation_date,
+      })
+    ) {
+      return {
+        pageKey,
+        status: "skipped",
+        assetId: existingAssignment.wallpaper_asset_id,
+        reason: "already assigned for date",
+      };
+    }
+  }
+
+  const bestEligibleAssetForDate = await getBestEligibleAssetIdForDate(supabase, pageKey, dateKey);
+  if (bestEligibleAssetForDate) {
+    await assignWallpaperAsset(supabase, pageKey, dateKey, bestEligibleAssetForDate, "auto");
     return {
       pageKey,
-      status: "skipped",
-      assetId: existingAssignment.wallpaper_asset_id,
-      reason: "already assigned for date",
+      status: "backlog",
+      assetId: bestEligibleAssetForDate,
+      reason: "assigned best eligible asset for current catalog day",
     };
   }
 

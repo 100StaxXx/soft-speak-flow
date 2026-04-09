@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { queryKeys } from "@/lib/queryKeys";
 import {
   getWallpaperDateKey,
+  isWallpaperAssetEligibleForLiveRotation,
   toObjectPosition,
   type WallpaperPageKey,
 } from "@/shared/wallpaperCatalog";
@@ -18,6 +19,8 @@ export interface LiveWallpaperRecord {
 
 interface WallpaperAssetLookupRow {
   publish_state: string;
+  source_kind: string;
+  generation_date: string;
   image_url: string;
   mobile_focus_x: number | null;
   mobile_focus_y: number | null;
@@ -46,7 +49,7 @@ export const fetchLiveWallpaperRecord = async (
 
   const { data, error: assetError } = await supabase
     .from("wallpaper_assets")
-    .select("publish_state, image_url, mobile_focus_x, mobile_focus_y, desktop_focus_x, desktop_focus_y")
+    .select("publish_state, source_kind, generation_date, image_url, mobile_focus_x, mobile_focus_y, desktop_focus_x, desktop_focus_y")
     .eq("id", assignment.wallpaper_asset_id)
     .maybeSingle();
 
@@ -56,7 +59,14 @@ export const fetchLiveWallpaperRecord = async (
 
   const asset = data as WallpaperAssetLookupRow | null;
 
-  if (!asset || asset.publish_state !== "ready") {
+  if (
+    !asset
+    || !isWallpaperAssetEligibleForLiveRotation(pageKey, {
+      publishState: asset.publish_state,
+      sourceKind: asset.source_kind,
+      generationDate: asset.generation_date,
+    })
+  ) {
     return null;
   }
 
