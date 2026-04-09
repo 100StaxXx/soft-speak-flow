@@ -335,6 +335,10 @@ const CONTEXT_PATTERNS = [
 const REMINDER_PATTERNS: Array<{ regex: RegExp; handler: (m: RegExpMatchArray) => number }> = [
   { regex: /remind\s*(?:me\s+)?(\d+)\s*(?:min(?:ute)?s?)\s*(?:before|early|prior)/i, handler: (m) => parseInt(m[1]) },
   { regex: /remind\s*(?:me\s+)?(?:at\s+least\s+)?(\d+)\s*(?:h(?:ou)?rs?)\s*(?:before|early|prior)/i, handler: (m) => parseInt(m[1]) * 60 },
+  { regex: /(?:with\s+)?(?:a\s+)?(\d+)\s*(?:min(?:ute)?s?)\s*remind(?:er)?/i, handler: (m) => parseInt(m[1]) },
+  { regex: /(?:with\s+)?(?:a\s+)?(\d+)\s*(?:h(?:ou)?rs?)\s*remind(?:er)?/i, handler: (m) => parseInt(m[1]) * 60 },
+  { regex: /remind(?:er)?\s*(?:me\s+)?(?:for\s+)?(\d+)\s*(?:min(?:ute)?s?)\s*(?:before|early|prior)?/i, handler: (m) => parseInt(m[1]) },
+  { regex: /remind(?:er)?\s*(?:me\s+)?(?:for\s+)?(\d+)\s*(?:h(?:ou)?rs?)\s*(?:before|early|prior)?/i, handler: (m) => parseInt(m[1]) * 60 },
   { regex: /remind\s*(?:me\s+)?(?:a\s+)?half\s*(?:an?\s+)?(?:h(?:ou)?r)\s*(?:before|early|prior)/i, handler: () => 30 },
   { regex: /remind\s*(?:me\s+)?(?:an?\s+|one\s+)(?:h(?:ou)?r)\s*(?:before|early|prior)/i, handler: () => 60 },
   { regex: /remind\s*me\b/i, handler: () => 15 },

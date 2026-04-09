@@ -195,6 +195,7 @@ const InboxPage = memo(function InboxPage() {
     const createdTask = await addTask({
       taskText: data.text,
       difficulty: data.difficulty,
+      source: data.creationSource,
       taskDate: taskDate,
       isMainQuest: false,
       scheduledTime: data.scheduledTime,

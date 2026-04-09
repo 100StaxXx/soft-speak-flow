@@ -3,6 +3,7 @@
  */
 
 export type QuestDifficulty = "easy" | "medium" | "hard";
+export type QuestCreationSource = "manual" | "inbox" | "voice" | "nlp";
 export type QuestTemplateCategory = "work" | "health" | "home" | "admin" | "personal";
 export type QuestTemplateBrowserTab = "common" | "yours";
 export type QuestTemplateOrigin = "common" | "personal_explicit" | "personal_derived";
@@ -44,6 +45,23 @@ export interface PendingTaskData {
   reminderEnabled: boolean;
   reminderMinutesBefore: number;
   moreInformation: string | null;
+}
+
+export interface QuestComposerPrefillDraft {
+  text?: string;
+  taskDate?: string | null;
+  difficulty?: QuestDifficulty;
+  scheduledTime?: string | null;
+  estimatedDuration?: number | null;
+  recurrencePattern?: string | null;
+  recurrenceDays?: number[];
+  recurrenceMonthDays?: number[];
+  recurrenceCustomPeriod?: "week" | "month" | null;
+  reminderEnabled?: boolean;
+  reminderMinutesBefore?: number;
+  moreInformation?: string | null;
+  location?: string | null;
+  creationSource?: QuestCreationSource;
 }
 
 export interface QuestFormState {

@@ -19,9 +19,9 @@ interface CreatedCampaignData {
 }
 
 const CAMPAIGN_LIMIT = 3;
-const CAMPAIGN_STAT_CARD_CLASS = "rounded-[24px] border border-celestial-blue/24 bg-[linear-gradient(180deg,rgba(10,34,60,0.72),rgba(4,16,32,0.54))] p-4 backdrop-blur-2xl shadow-[0_20px_40px_rgba(0,0,0,0.2)]";
+const CAMPAIGN_STAT_CARD_CLASS = "rounded-[24px] border border-celestial-blue/18 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] p-4 backdrop-blur-2xl shadow-[0_20px_40px_rgba(0,0,0,0.14)]";
 const CAMPAIGN_CTA_CLASS = "gap-2 border-celestial-blue/32 bg-celestial-blue/14 text-cyan-50 shadow-[0_14px_32px_rgba(16,75,130,0.2)] backdrop-blur-xl hover:bg-celestial-blue/20 hover:border-celestial-blue/42 hover:text-white";
-const CAMPAIGN_PANEL_CLASS = "rounded-[32px] border border-celestial-blue/28 bg-[linear-gradient(180deg,rgba(10,34,60,0.56),rgba(4,16,32,0.36))] shadow-[0_20px_40px_rgba(0,0,0,0.18)] backdrop-blur-2xl";
+const CAMPAIGN_PANEL_CLASS = "rounded-[32px] border border-celestial-blue/18 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.015))] shadow-[0_20px_40px_rgba(0,0,0,0.14)] backdrop-blur-2xl";
 
 const Campaigns = () => {
   const prefersReducedMotion = useReducedMotion();

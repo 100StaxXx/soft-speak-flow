@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SHARED_TIMELINE_DRAG_INTERACTION_PROFILE } from "@/components/calendar/dragSnap";
+import { QUEST_LAUNCHER_SCROLL_CLEARANCE_PX } from "@/components/quest-launchers/metrics";
 
 const windowScrollToSpy = vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
 if (!HTMLElement.prototype.scrollTo) {
@@ -294,7 +295,7 @@ const mockViewport = ({ height, offsetTop = 0 }: { height: number; offsetTop?: n
   };
 };
 
-const EXPECTED_MOBILE_FAB_SCROLL_CLEARANCE = "76px";
+const EXPECTED_MOBILE_FAB_SCROLL_CLEARANCE = `${QUEST_LAUNCHER_SCROLL_CLEARANCE_PX}px`;
 
 const getRenderedPlaceholderMinutes = (): number[] => {
   return Array.from(document.querySelectorAll<HTMLElement>('[data-testid^="timeline-marker-placeholder-"]'))
@@ -1213,6 +1214,65 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(scheduledPane).toBeInTheDocument();
     expect(scheduledPane).toHaveClass("overflow-y-auto", "overflow-x-hidden");
     expect(screen.queryByRole("button", { name: /drag to reschedule/i })).not.toBeInTheDocument();
+  });
+
+  it("renders a voice launcher next to the visible add quest CTA when provided", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+    const onVoiceAddQuest = vi.fn();
+
+    render(
+      <TodaysAgenda
+        tasks={[]}
+        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        onVoiceAddQuest={onVoiceAddQuest}
+        completedCount={0}
+        totalCount={0}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Add quest with voice" })[0]);
+    expect(onVoiceAddQuest).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: /^Add Quest$/i })).toHaveAttribute("data-tour", "add-quest-launcher");
+  });
+
+  it("adds mobile timeline clearance for the stacked quest launchers", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-scheduled-clearance",
+            task_text: "Protected focus block",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "08:00",
+          },
+        ]}
+        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    expect(screen.getByTestId("scheduled-timeline-pane").style.scrollPaddingBottom).toBe(`${QUEST_LAUNCHER_SCROLL_CLEARANCE_PX}px`);
+    expect(screen.getByTestId("scheduled-timeline-content").style.paddingBottom).toBe(`${QUEST_LAUNCHER_SCROLL_CLEARANCE_PX}px`);
   });
 
   it("uses a fixed desktop pane height above the runtime bottom-nav offset instead of a max-height clamp", async () => {

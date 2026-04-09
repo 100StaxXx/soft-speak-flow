@@ -14,6 +14,7 @@ import { calculateGuildBonus } from "@/utils/guildBonus";
 import { format } from "date-fns";
 import { TimeoutError, pollWithDeadline, withTimeout } from "@/utils/asyncTimeout";
 import {
+  type NormalizedTaskSchedulingState,
   normalizeTaskSchedulingState,
   normalizeTaskSchedulingUpdate,
 } from "@/utils/taskSchedulingRules";
@@ -27,6 +28,7 @@ import type { QuestAttachmentInput } from "@/types/questAttachments";
 import { useResilience } from "@/contexts/ResilienceContext";
 import { isQueueableWriteError } from "@/utils/networkErrors";
 import type { DailyTask } from "@/services/dailyTasksRemote";
+import type { QuestCreationSource } from "@/features/quests/types";
 import { trackResilienceEvent } from "@/utils/resilienceTelemetry";
 import type { ResilienceState } from "@/types/resilience";
 import { QUEST_ACTION_TOAST_DURATION_MS } from "@/constants/questToast";
@@ -70,6 +72,7 @@ function detectCategory(taskText: string, providedCategory?: string): TaskCatego
 export interface AddTaskParams {
   taskText: string;
   difficulty: 'easy' | 'medium' | 'hard';
+  source?: QuestCreationSource | string | null;
   taskDate?: string | null;
   isMainQuest?: boolean;
   scheduledTime?: string | null;
@@ -246,6 +249,13 @@ interface RecurrenceWriteResult {
   hasRecurrence: boolean;
   isMonthBased: boolean;
 }
+
+const resolveQuestSource = (
+  requestedSource: AddTaskParams["source"] | string | null | undefined,
+  normalizedScheduling: Pick<NormalizedTaskSchedulingState, "source" | "task_date">,
+) => requestedSource
+  ?? normalizedScheduling.source
+  ?? (normalizedScheduling.task_date === null ? "inbox" : "manual");
 
 const MONTHLY_RECURRENCE_SCHEMA_MESSAGE = "Monthly recurrence is temporarily unavailable until backend update completes.";
 const CREATE_TASK_REMOTE_TIMEOUT_MS = 3_000;
@@ -813,7 +823,7 @@ export const useTaskMutations = (taskDate: string) => {
         task_date: params.taskDate !== undefined ? params.taskDate : taskDate,
         scheduled_time: params.scheduledTime || null,
         habit_source_id: null,
-        source: params.taskDate === null ? 'inbox' : 'manual',
+        source: params.source ?? (params.taskDate === null ? 'inbox' : 'manual'),
       });
       const normalizedAttachments = (params.attachments ?? []).slice(0, 10);
       const primaryImageUrl = firstImageFromAttachments(normalizedAttachments) ?? params.imageUrl ?? null;
@@ -873,7 +883,7 @@ export const useTaskMutations = (taskDate: string) => {
         actual_time_spent: null,
         ai_generated: null,
         context_id: null,
-        source: normalizedScheduling.source ?? (normalizedScheduling.task_date === null ? "inbox" : "manual"),
+        source: resolveQuestSource(params.source, normalizedScheduling),
         habit_source_id: null,
         epic_id: null,
         sort_order: 0,
@@ -918,7 +928,7 @@ export const useTaskMutations = (taskDate: string) => {
         auto_log_interaction: params.autoLogInteraction ?? true,
         image_url: primaryImageUrl,
         location: params.location || null,
-        source: normalizedScheduling.source ?? (normalizedScheduling.task_date === null ? "inbox" : "manual"),
+        source: resolveQuestSource(params.source, normalizedScheduling),
         subtasks: localTaskRow.subtasks?.map((subtask) => ({
           id: subtask.id,
           title: subtask.title,
@@ -1002,7 +1012,7 @@ export const useTaskMutations = (taskDate: string) => {
           auto_log_interaction: params.autoLogInteraction ?? true,
           image_url: primaryImageUrl,
           location: params.location || null,
-          source: normalizedScheduling.source ?? (normalizedScheduling.task_date === null ? 'inbox' : 'manual'),
+          source: resolveQuestSource(params.source, normalizedScheduling),
         };
 
         let persistedRemoteTask: Partial<DailyTask> | null = null;
@@ -1141,7 +1151,7 @@ export const useTaskMutations = (taskDate: string) => {
         task_date: params.taskDate !== undefined ? params.taskDate : taskDate,
         scheduled_time: params.scheduledTime || null,
         habit_source_id: null,
-        source: params.taskDate === null ? 'inbox' : 'manual',
+        source: params.source ?? (params.taskDate === null ? 'inbox' : 'manual'),
       });
       const recurrenceWrite = buildRecurrenceWriteFields({
         recurrencePattern: params.recurrencePattern,
@@ -1181,7 +1191,7 @@ export const useTaskMutations = (taskDate: string) => {
         notes: params.notes || null,
         image_url: primaryImageUrl,
         location: params.location || null,
-        source: normalizedScheduling.source ?? (normalizedScheduling.task_date === null ? 'inbox' : 'manual'),
+        source: resolveQuestSource(params.source, normalizedScheduling),
       };
 
       // Only update the specific day query to avoid cross-day cache pollution

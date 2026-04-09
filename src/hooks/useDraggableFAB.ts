@@ -3,39 +3,41 @@ import { PanInfo } from 'framer-motion';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { Capacitor } from '@capacitor/core';
 import { safeLocalStorage } from '@/utils/storage';
+import {
+  QUEST_LAUNCHER_BOTTOM_GAP_PX,
+  QUEST_LAUNCHER_SIDE_INSET_PX,
+  QUEST_LAUNCHER_TOP_OFFSET_PX,
+} from '@/components/quest-launchers/metrics';
 
 export type FABPosition = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
 
 const STORAGE_KEY = 'add-quest-fab-position';
 const LONG_PRESS_DURATION = 500;
-const FAB_SIDE_INSET_PX = 16;
-const FAB_TOP_OFFSET_PX = 80;
-const FAB_BOTTOM_GAP_PX = 24;
-const FAB_BOTTOM_OFFSET_CSS = `calc(var(--bottom-nav-runtime-offset, var(--bottom-nav-safe-offset)) + ${FAB_BOTTOM_GAP_PX}px)`;
+const FAB_BOTTOM_OFFSET_CSS = `calc(var(--bottom-nav-runtime-offset, var(--bottom-nav-safe-offset)) + ${QUEST_LAUNCHER_BOTTOM_GAP_PX}px)`;
 
 // Position styles for each corner
 const POSITION_STYLES: Record<FABPosition, React.CSSProperties> = {
   'top-left': { 
-    top: `calc(env(safe-area-inset-top, 0px) + ${FAB_TOP_OFFSET_PX}px)`, 
-    left: `${FAB_SIDE_INSET_PX}px`,
+    top: `calc(env(safe-area-inset-top, 0px) + ${QUEST_LAUNCHER_TOP_OFFSET_PX}px)`, 
+    left: `${QUEST_LAUNCHER_SIDE_INSET_PX}px`,
     bottom: 'auto',
     right: 'auto'
   },
   'top-right': { 
-    top: `calc(env(safe-area-inset-top, 0px) + ${FAB_TOP_OFFSET_PX}px)`, 
-    right: `${FAB_SIDE_INSET_PX}px`,
+    top: `calc(env(safe-area-inset-top, 0px) + ${QUEST_LAUNCHER_TOP_OFFSET_PX}px)`, 
+    right: `${QUEST_LAUNCHER_SIDE_INSET_PX}px`,
     bottom: 'auto',
     left: 'auto'
   },
   'bottom-left': { 
     bottom: FAB_BOTTOM_OFFSET_CSS, 
-    left: `${FAB_SIDE_INSET_PX}px`,
+    left: `${QUEST_LAUNCHER_SIDE_INSET_PX}px`,
     top: 'auto',
     right: 'auto'
   },
   'bottom-right': { 
     bottom: FAB_BOTTOM_OFFSET_CSS, 
-    right: `${FAB_SIDE_INSET_PX}px`,
+    right: `${QUEST_LAUNCHER_SIDE_INSET_PX}px`,
     top: 'auto',
     left: 'auto'
   },

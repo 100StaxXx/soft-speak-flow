@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AddQuestSheet, type AddQuestData } from "./AddQuestSheet";
 import type { QuestAttachmentInput } from "@/types/questAttachments";
-import type { PersonalQuestTemplate } from "@/features/quests/types";
+import type { PersonalQuestTemplate, QuestComposerPrefillDraft } from "@/features/quests/types";
 
 const mocks = vi.hoisted(() => ({
   integrationVisible: false,
@@ -44,6 +44,19 @@ const buildPersonalTemplate = (overrides: Partial<PersonalQuestTemplate> = {}): 
   subtasks: ["Choose one priority", "Silence notifications"],
   templateOrigin: "personal_derived",
   sourceCommonTemplateId: null,
+  ...overrides,
+});
+
+const buildVoicePrefill = (overrides: Partial<QuestComposerPrefillDraft> = {}): QuestComposerPrefillDraft => ({
+  text: "Voice planned quest",
+  taskDate: "2026-01-16",
+  scheduledTime: "15:00",
+  estimatedDuration: 60,
+  reminderEnabled: true,
+  reminderMinutesBefore: 30,
+  moreInformation: "Bring roadmap",
+  location: "Library",
+  creationSource: "voice",
   ...overrides,
 });
 
@@ -987,6 +1000,7 @@ describe("AddQuestSheet", () => {
       scheduledTime: null,
       sendToInbox: true,
       sendToCalendar: false,
+      creationSource: "inbox",
     });
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
@@ -1065,12 +1079,127 @@ describe("AddQuestSheet", () => {
       taskDate: "2026-01-15",
       scheduledTime: "09:00",
       sendToInbox: false,
+      creationSource: "manual",
       contactId: null,
       autoLogInteraction: true,
       recurrenceMonthDays: [],
       recurrenceCustomPeriod: null,
     });
     expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it("applies voice prefills once per key, preserves edits, and resets after close", async () => {
+    const onAdd = vi.fn().mockResolvedValue(undefined);
+    const onOpenChange = vi.fn();
+    const initialPrefill = buildVoicePrefill();
+    const { rerender } = render(
+      <AddQuestSheet
+        open
+        onOpenChange={onOpenChange}
+        selectedDate={selectedDate}
+        onAdd={onAdd}
+        prefillDraft={initialPrefill}
+        prefillKey="voice-1"
+      />,
+    );
+
+    const titleInput = screen.getByPlaceholderText("Quest Title");
+    expect(titleInput).toHaveValue("Voice planned quest");
+    expect(screen.getByRole("button", { name: "Jan 16" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "3:00 PM" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "1h" })).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Bring roadmap")).toBeInTheDocument();
+    expect(screen.getByText("30 minutes before")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Advanced Settings/i }));
+    expect(screen.getByPlaceholderText("Where will this happen? (optional)")).toHaveValue("Library");
+
+    fireEvent.change(titleInput, {
+      target: { value: "Edited voice quest" },
+    });
+
+    rerender(
+      <AddQuestSheet
+        open
+        onOpenChange={onOpenChange}
+        selectedDate={selectedDate}
+        onAdd={onAdd}
+        prefillDraft={buildVoicePrefill({ text: "Overwritten while open", scheduledTime: "16:00" })}
+        prefillKey="voice-1"
+      />,
+    );
+
+    expect(screen.getByPlaceholderText("Quest Title")).toHaveValue("Edited voice quest");
+    expect(screen.getByRole("button", { name: "3:00 PM" })).toBeInTheDocument();
+
+    rerender(
+      <AddQuestSheet
+        open={false}
+        onOpenChange={onOpenChange}
+        selectedDate={selectedDate}
+        onAdd={onAdd}
+        prefillDraft={buildVoicePrefill({ text: "Reopened voice quest" })}
+        prefillKey="voice-1"
+      />,
+    );
+
+    rerender(
+      <AddQuestSheet
+        open
+        onOpenChange={onOpenChange}
+        selectedDate={selectedDate}
+        onAdd={onAdd}
+        prefillDraft={buildVoicePrefill({ text: "Reopened voice quest" })}
+        prefillKey="voice-1"
+      />,
+    );
+
+    expect(screen.getByPlaceholderText("Quest Title")).toHaveValue("Reopened voice quest");
+
+    rerender(
+      <AddQuestSheet
+        open
+        onOpenChange={onOpenChange}
+        selectedDate={selectedDate}
+        onAdd={onAdd}
+        prefillDraft={buildVoicePrefill({ text: "Fresh voice quest", scheduledTime: "16:30" })}
+        prefillKey="voice-2"
+      />,
+    );
+
+    expect(screen.getByPlaceholderText("Quest Title")).toHaveValue("Fresh voice quest");
+    expect(screen.getByRole("button", { name: "4:30 PM" })).toBeInTheDocument();
+  });
+
+  it("submits a voice-prefilled quest with the voice creation source preserved", async () => {
+    const onAdd = vi.fn<Parameters<(data: AddQuestData) => Promise<void>>, ReturnType<(data: AddQuestData) => Promise<void>>>()
+      .mockResolvedValue(undefined);
+
+    render(
+      <AddQuestSheet
+        open
+        onOpenChange={vi.fn()}
+        selectedDate={selectedDate}
+        onAdd={onAdd}
+        prefillDraft={buildVoicePrefill()}
+        prefillKey="voice-submit"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Add Quest" }));
+
+    await waitFor(() => {
+      expect(onAdd).toHaveBeenCalledTimes(1);
+    });
+
+    expect(onAdd.mock.calls[0]?.[0]).toEqual(expect.objectContaining({
+      text: "Voice planned quest",
+      taskDate: "2026-01-16",
+      scheduledTime: "15:00",
+      creationSource: "voice",
+      reminderEnabled: true,
+      reminderMinutesBefore: 30,
+    }));
   });
 
   it("hides send-to-calendar option when default provider is stale and no providers are connected", () => {

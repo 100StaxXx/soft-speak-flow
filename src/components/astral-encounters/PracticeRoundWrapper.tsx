@@ -4,6 +4,7 @@ import { MiniGameResult, MiniGameType } from '@/types/astralEncounters';
 import { Button } from '@/components/ui/button';
 import { Play, SkipForward } from 'lucide-react';
 import { isFullscreenEncounterGame, usesFlowLayoutFullscreenShell } from './fullscreenGames';
+import { useAchievements } from '@/hooks/useAchievements';
 
 const EnergyBeamGame = lazy(() => import('./EnergyBeamGame').then(m => ({ default: m.EnergyBeamGame })));
 const TapSequenceGame = lazy(() => import('./TapSequenceGame').then(m => ({ default: m.TapSequenceGame })));
@@ -219,7 +220,12 @@ export const PracticeRoundWrapper = ({
   onSkipPractice,
   isFullscreen = false,
 }: PracticeRoundWrapperProps) => {
+  const { checkArcadeDiscovery } = useAchievements();
   const [practicePhase, setPracticePhase] = useState<'intro' | 'playing' | 'complete'>('intro');
+
+  useEffect(() => {
+    void checkArcadeDiscovery();
+  }, [checkArcadeDiscovery]);
   
   // Check if this game needs fullscreen rendering
   const isFullscreenGame = isFullscreen || isFullscreenEncounterGame(gameType);

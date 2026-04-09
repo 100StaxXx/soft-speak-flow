@@ -703,6 +703,34 @@ describe("useTaskMutations attachment handling", () => {
     );
   });
 
+  it("preserves an explicit voice source through local and remote quest creation", async () => {
+    setOnline(true);
+
+    const { result } = renderHook(() => useTaskMutations("2026-02-20"), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await result.current.addTask({
+        taskText: "Voice captured quest",
+        difficulty: "medium",
+        taskDate: "2026-02-20",
+        scheduledTime: "09:00",
+        source: "voice",
+      });
+    });
+
+    expect(mocks.upsertPlannerRecordMock).toHaveBeenCalledWith(
+      "daily_tasks",
+      expect.objectContaining({
+        source: "voice",
+      }),
+    );
+    expect(mocks.dailyTasksInsertMock).toHaveBeenCalledWith(expect.objectContaining({
+      source: "voice",
+    }));
+  });
+
   it("normalizes legacy prefixed UUID-like fields before live quest creation", async () => {
     setOnline(true);
     const legacyTaskId = "task-e47e5651-7522-4888-a04d-6eff518fa4ba";

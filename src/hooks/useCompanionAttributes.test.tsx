@@ -5,12 +5,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   rpcMock: vi.fn(),
+  fromMock: vi.fn(),
+  checkAttributeAchievementsMock: vi.fn(),
+  checkTotalAttributesAchievementMock: vi.fn(),
 }));
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     rpc: mocks.rpcMock,
-    from: vi.fn(),
+    from: mocks.fromMock,
   },
 }));
 
@@ -20,7 +23,18 @@ vi.mock("./useAuth", () => ({
   }),
 }));
 
-import { getStreakDisciplineGain, useCompanionAttributes } from "./useCompanionAttributes";
+vi.mock("./useAchievements", () => ({
+  useAchievements: () => ({
+    checkAttributeAchievements: mocks.checkAttributeAchievementsMock,
+    checkTotalAttributesAchievement: mocks.checkTotalAttributesAchievementMock,
+  }),
+}));
+
+import {
+  deriveBadgeAttributes,
+  getStreakDisciplineGain,
+  useCompanionAttributes,
+} from "./useCompanionAttributes";
 
 const createWrapper = () => {
   const queryClient = new QueryClient({
@@ -48,7 +62,27 @@ const rpcSuccess = {
 
 describe("useCompanionAttributes discipline awards", () => {
   beforeEach(() => {
+    const builder = {
+      select: vi.fn(() => builder),
+      eq: vi.fn(() => builder),
+      maybeSingle: vi.fn(async () => ({
+        data: {
+          vitality: 600,
+          wisdom: 600,
+          discipline: 600,
+          resolve: 600,
+          creativity: 600,
+          alignment: 600,
+        },
+        error: null,
+      })),
+    };
+
     mocks.rpcMock.mockReset();
+    mocks.fromMock.mockReset();
+    mocks.fromMock.mockReturnValue(builder);
+    mocks.checkAttributeAchievementsMock.mockReset();
+    mocks.checkTotalAttributesAchievementMock.mockReset();
     mocks.rpcMock.mockResolvedValue(rpcSuccess);
   });
 
@@ -125,5 +159,25 @@ describe("getStreakDisciplineGain", () => {
     expect(getStreakDisciplineGain(14)).toBe(25);
     expect(getStreakDisciplineGain(21)).toBe(5);
     expect(getStreakDisciplineGain(30)).toBe(40);
+  });
+});
+
+describe("deriveBadgeAttributes", () => {
+  it("derives aggregate badge stats from the six-stat companion model", () => {
+    expect(
+      deriveBadgeAttributes({
+        vitality: 600,
+        wisdom: 720,
+        discipline: 600,
+        resolve: 480,
+        creativity: 480,
+        alignment: 720,
+      }),
+    ).toEqual({
+      mind: 100,
+      body: 100,
+      soul: 100,
+      total: 300,
+    });
   });
 });

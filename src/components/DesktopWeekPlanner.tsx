@@ -6,6 +6,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Flame,
+  Mic,
   Plus,
   Target,
   Trophy,
@@ -58,6 +59,7 @@ interface DesktopWeekPlannerProps {
   onPlannerModeChange?: (mode: "week" | "day") => void;
   onToggle: (taskId: string, completed: boolean, xpReward: number) => void;
   onAddQuest: () => void;
+  onVoiceAddQuest?: () => void;
   onOpenMonthView?: () => void;
   onUndoToggle?: (taskId: string, xpReward: number) => void;
   onEditQuest?: (task: DailyTask) => void;
@@ -247,6 +249,7 @@ export function DesktopWeekPlanner({
   onPlannerModeChange,
   onToggle,
   onAddQuest,
+  onVoiceAddQuest,
   onOpenMonthView,
   onUndoToggle,
   onEditQuest,
@@ -534,15 +537,29 @@ export function DesktopWeekPlanner({
                 Month
               </Button>
             ) : null}
-            <Button
-              size="sm"
-              data-tour="add-quest-launcher"
-              className="h-9 rounded-[18px] px-4 shadow-[0_14px_28px_rgba(122,61,255,0.2)]"
-              onClick={onAddQuest}
-            >
-              <Plus className="h-4 w-4" />
-              Add Quest
-            </Button>
+            <div className="flex items-center gap-2">
+              {onVoiceAddQuest ? (
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  aria-label="Add quest with voice"
+                  className="h-9 w-9 rounded-[18px] border-primary/20 bg-primary/10 text-primary hover:bg-primary/15"
+                  onClick={onVoiceAddQuest}
+                >
+                  <Mic className="h-4 w-4" />
+                </Button>
+              ) : null}
+              <Button
+                size="sm"
+                data-tour="add-quest-launcher"
+                className="h-9 rounded-[18px] px-4 shadow-[0_14px_28px_rgba(122,61,255,0.2)]"
+                onClick={onAddQuest}
+              >
+                <Plus className="h-4 w-4" />
+                Add Quest
+              </Button>
+            </div>
           </div>
         </div>
 

@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useAchievements } from "@/hooks/useAchievements";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -19,8 +20,10 @@ type ChallengeTab = "active" | "available";
 
 export default function Challenges() {
   const { user } = useAuth();
+  const { checkChallengeAchievements } = useAchievements();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<ChallengeTab>("active");
+  const syncedCompletedChallengeIdsRef = useRef<Set<string>>(new Set());
 
   // Fetch available challenges
   const { data: availableChallenges } = useQuery({
@@ -60,7 +63,7 @@ export default function Challenges() {
   });
 
   // Fetch challenge progress
-  const { data: challengeProgress } = useQuery({
+  const { data: challengeProgress, refetch: refetchChallengeProgress } = useQuery({
     queryKey: ["challenge-progress", user?.id],
     enabled: !!user && !!userChallenges,
     queryFn: async () => {
@@ -76,6 +79,84 @@ export default function Challenges() {
       return data || [];
     },
   });
+
+  const completedDaysByChallengeId = useMemo(() => {
+    const next = new Map<string, number>();
+
+    for (const progressEntry of challengeProgress ?? []) {
+      if (!progressEntry.user_challenge_id || !progressEntry.completed) continue;
+      next.set(
+        progressEntry.user_challenge_id,
+        (next.get(progressEntry.user_challenge_id) ?? 0) + 1,
+      );
+    }
+
+    return next;
+  }, [challengeProgress]);
+
+  const completedChallenges = useMemo(() => {
+    return (userChallenges ?? []).filter((userChallenge) => {
+      const challenge = userChallenge.challenges;
+      if (!challenge) return false;
+
+      if (userChallenge.status === "completed") return true;
+
+      return (completedDaysByChallengeId.get(userChallenge.id) ?? 0) >= challenge.total_days;
+    });
+  }, [completedDaysByChallengeId, userChallenges]);
+
+  useEffect(() => {
+    if (completedChallenges.length === 0) return;
+
+    void checkChallengeAchievements(completedChallenges.length);
+  }, [checkChallengeAchievements, completedChallenges.length]);
+
+  useEffect(() => {
+    const pendingCompletions = completedChallenges.filter((userChallenge) => {
+      return (
+        userChallenge.status !== "completed" &&
+        !syncedCompletedChallengeIdsRef.current.has(userChallenge.id) &&
+        Boolean(userChallenge.challenges)
+      );
+    });
+
+    if (pendingCompletions.length === 0) return;
+
+    pendingCompletions.forEach((userChallenge) => {
+      syncedCompletedChallengeIdsRef.current.add(userChallenge.id);
+    });
+
+    void (async () => {
+      const results = await Promise.all(
+        pendingCompletions.map(async (userChallenge) => {
+          const challenge = userChallenge.challenges;
+          const { error } = await supabase
+            .from("user_challenges")
+            .update({
+              status: "completed",
+              current_day: challenge?.total_days ?? userChallenge.current_day,
+            })
+            .eq("id", userChallenge.id);
+
+          return { id: userChallenge.id, error };
+        }),
+      );
+
+      const failedIds = results
+        .filter((result) => result.error)
+        .map((result) => result.id);
+
+      if (failedIds.length > 0) {
+        failedIds.forEach((id) => {
+          syncedCompletedChallengeIdsRef.current.delete(id);
+        });
+        console.error("Failed to sync completed challenges:", results);
+        return;
+      }
+
+      await Promise.all([refetchUserChallenges(), refetchChallengeProgress()]);
+    })();
+  }, [completedChallenges, refetchChallengeProgress, refetchUserChallenges]);
 
   const handleStartChallenge = async (challengeId: string, totalDays: number) => {
     if (!user) return;

@@ -79,10 +79,32 @@ describe("DesktopWeekPlanner", () => {
     expect(screen.getByTestId("desktop-week-hour-6")).toBeInTheDocument();
     expect(screen.getByRole("group", { name: /desktop planner mode/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Today" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /add quest/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Add Quest$/i })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Day" }));
     expect(onPlannerModeChange).toHaveBeenCalledWith("day");
+  });
+
+  it("renders a companion voice launcher while preserving the manual add quest target", () => {
+    const onVoiceAddQuest = vi.fn();
+
+    render(
+      <DesktopWeekPlanner
+        selectedDate={selectedDate}
+        tasks={[]}
+        plannerMode="week"
+        onDateSelect={vi.fn()}
+        onPlannerModeChange={vi.fn()}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        onVoiceAddQuest={onVoiceAddQuest}
+        onOpenMonthView={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Add quest with voice" }));
+    expect(onVoiceAddQuest).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: /^Add Quest$/i })).toHaveAttribute("data-tour", "add-quest-launcher");
   });
 
   it("places timed tasks into hour rows and keeps cards title-only until clicked", () => {

@@ -1,8 +1,10 @@
+import { useCallback } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { toast } from "@/components/ui/sonner";
 import { ECHO_MAP, AttributeType } from "@/config/attributeDescriptions";
+import { useAchievements } from "./useAchievements";
 
 const STAT_MIN = 100;
 const STAT_MAX = 1000;
@@ -63,7 +65,46 @@ interface PlannedTaskDisciplineAwardParams {
   taskId: string;
 }
 
+interface CompanionBadgeStatSnapshot {
+  vitality: number | null;
+  wisdom: number | null;
+  discipline: number | null;
+  resolve: number | null;
+  creativity: number | null;
+  alignment: number | null;
+}
+
 const getLocalDateStamp = () => new Date().toLocaleDateString("en-CA");
+
+const normalizeDetailedStat = (value: number | null | undefined) => {
+  return Math.max(STAT_MIN, value ?? STAT_DEFAULT);
+};
+
+export const deriveBadgeAttributes = ({
+  vitality,
+  wisdom,
+  discipline,
+  resolve,
+  creativity,
+  alignment,
+}: CompanionBadgeStatSnapshot) => {
+  const mind = Math.floor(
+    (normalizeDetailedStat(wisdom) + normalizeDetailedStat(creativity)) / 12,
+  );
+  const body = Math.floor(
+    (normalizeDetailedStat(vitality) + normalizeDetailedStat(discipline)) / 12,
+  );
+  const soul = Math.floor(
+    (normalizeDetailedStat(resolve) + normalizeDetailedStat(alignment)) / 12,
+  );
+
+  return {
+    mind,
+    body,
+    soul,
+    total: mind + body + soul,
+  };
+};
 
 export const getStreakDisciplineGain = (streakDays: number): number => {
   if (streakDays === 7) return 15;
@@ -76,6 +117,34 @@ export const getStreakDisciplineGain = (streakDays: number): number => {
 export const useCompanionAttributes = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { checkAttributeAchievements, checkTotalAttributesAchievement } = useAchievements();
+
+  const syncDerivedAttributeAchievements = useCallback(async (companionId: string) => {
+    if (!user?.id) return;
+
+    const { data, error } = await supabase
+      .from("user_companion")
+      .select("vitality, wisdom, discipline, resolve, creativity, alignment")
+      .eq("id", companionId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (error) {
+      throw error;
+    }
+
+    if (!data) return;
+
+    const badgeStats = deriveBadgeAttributes(data);
+
+    await Promise.all([
+      checkAttributeAchievements("mind", badgeStats.mind),
+      checkAttributeAchievements("body", badgeStats.body),
+      checkAttributeAchievements("soul", badgeStats.soul),
+    ]);
+
+    await checkTotalAttributesAchievement(badgeStats.total);
+  }, [checkAttributeAchievements, checkTotalAttributesAchievement, user?.id]);
 
   const updateAttribute = useMutation({
     mutationFn: async ({ companionId, attribute, amount, applyEchoGains = true }: UpdateAttributeParams) => {
@@ -119,7 +188,7 @@ export const useCompanionAttributes = () => {
 
       if (updateError) throw updateError;
 
-      return { attribute, newValue, change: amount };
+      return { attribute, newValue, change: amount, companionId };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["companion"] });
@@ -132,6 +201,10 @@ export const useCompanionAttributes = () => {
           duration: 2000,
         });
       }
+
+      void syncDerivedAttributeAchievements(data.companionId).catch((error) => {
+        console.error("Attribute badge sync failed:", error);
+      });
     },
     onError: (error) => {
       console.error("Attribute update failed:", error);
@@ -170,9 +243,12 @@ export const useCompanionAttributes = () => {
         echoAmount: result.echo_amount ?? 0,
       };
     },
-    onSuccess: (data) => {
+    onSuccess: (data, variables) => {
       if (data.awardedAmount > 0) {
         queryClient.invalidateQueries({ queryKey: ["companion"] });
+        void syncDerivedAttributeAchievements(variables.companionId).catch((error) => {
+          console.error("Attribute badge sync failed:", error);
+        });
       }
     },
     onError: (error) => {

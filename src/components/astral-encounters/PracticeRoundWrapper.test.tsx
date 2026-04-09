@@ -3,6 +3,16 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { PracticeRoundWrapper } from './PracticeRoundWrapper';
 
+const mocks = vi.hoisted(() => ({
+  checkArcadeDiscoveryMock: vi.fn(),
+}));
+
+vi.mock('@/hooks/useAchievements', () => ({
+  useAchievements: () => ({
+    checkArcadeDiscovery: mocks.checkArcadeDiscoveryMock,
+  }),
+}));
+
 vi.mock('framer-motion', () => {
   const passthrough = ({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) => {
     const {

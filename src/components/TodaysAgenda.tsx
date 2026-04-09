@@ -9,6 +9,7 @@ import { toast } from "@/components/ui/sonner";
 import { 
   Flame, 
   Trophy, 
+  Mic,
   Plus,
   Check,
   Circle,
@@ -71,6 +72,7 @@ import { getEpicDaysRemaining, resolveEpicEndDate } from "@/utils/epicDates";
 import {
   DesktopQuestDetailsPopover,
 } from "@/components/DesktopQuestDetailsPopover";
+import { QUEST_LAUNCHER_SCROLL_CLEARANCE_PX } from "@/components/quest-launchers/metrics";
 
 // Helper to calculate days remaining
 const getDaysLeft = (epic: { start_date: string; target_days: number; end_date?: string | null }) =>
@@ -188,6 +190,7 @@ interface TodaysAgendaProps {
   desktopInteractionResetKey?: string | number;
   onToggle: (taskId: string, completed: boolean, xpReward: number) => void;
   onAddQuest: () => void;
+  onVoiceAddQuest?: () => void;
   completedCount: number;
   totalCount: number;
   currentStreak?: number;
@@ -248,11 +251,7 @@ const MAX_PLACEHOLDER_EMPHASIS = 1;
 const LANE_OFFSET_STEP_PX = 10;
 const NOW_MARKER_VIEWPORT_TARGET = 0.45;
 const DEFAULT_BOTTOM_NAV_SAFE_OFFSET_PX = 104;
-const MOBILE_FAB_SIZE_PX = 44;
-const MOBILE_FAB_BOTTOM_GAP_PX = 24;
-const MOBILE_FAB_CLEARANCE_BUFFER_PX = 8;
-const MOBILE_FAB_SCROLL_CLEARANCE_PX =
-  MOBILE_FAB_SIZE_PX + MOBILE_FAB_BOTTOM_GAP_PX + MOBILE_FAB_CLEARANCE_BUFFER_PX;
+const MOBILE_FAB_SCROLL_CLEARANCE_PX = QUEST_LAUNCHER_SCROLL_CLEARANCE_PX;
 const DRAG_OVERLAY_TOP_PADDING_PX = 8;
 const DRAG_OVERLAY_BOTTOM_PADDING_PX = 10;
 const DRAG_OVERLAY_NAV_GAP_PX = 4;
@@ -623,6 +622,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   desktopInteractionResetKey,
   onToggle,
   onAddQuest,
+  onVoiceAddQuest,
   completedCount,
   totalCount,
   currentStreak = 0,
@@ -2487,16 +2487,30 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             </p>
           )}
           {!hideDesktopRailAddButton && !isDesktopLayout ? (
-            <Button
-              variant="outline"
-              size="sm"
-              data-tour="add-quest-launcher"
-              className="mt-4 w-full rounded-2xl border-white/10 bg-white/[0.04] hover:bg-white/[0.08]"
-              onClick={onAddQuest}
-            >
-              <Plus className="h-4 w-4" />
-              Add Quest
-            </Button>
+            <div className="mt-4 flex items-center gap-2">
+              {onVoiceAddQuest ? (
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  aria-label="Add quest with voice"
+                  className="h-9 w-9 rounded-2xl border-primary/20 bg-primary/10 text-primary hover:bg-primary/15"
+                  onClick={onVoiceAddQuest}
+                >
+                  <Mic className="h-4 w-4" />
+                </Button>
+              ) : null}
+              <Button
+                variant="outline"
+                size="sm"
+                data-tour="add-quest-launcher"
+                className="w-full rounded-2xl border-white/10 bg-white/[0.04] hover:bg-white/[0.08]"
+                onClick={onAddQuest}
+              >
+                <Plus className="h-4 w-4" />
+                Add Quest
+              </Button>
+            </div>
           ) : null}
         </div>
       </section>
@@ -2741,16 +2755,30 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                   Month
                 </Button>
               ) : null}
-              <Button
-                type="button"
-                size="sm"
-                data-tour="add-quest-launcher"
-                className="h-9 rounded-[18px] px-4 shadow-[0_14px_28px_rgba(122,61,255,0.2)]"
-                onClick={onAddQuest}
-              >
-                <Plus className="h-4 w-4" />
-                Add Quest
-              </Button>
+              <div className="flex items-center gap-2">
+                {onVoiceAddQuest ? (
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="outline"
+                    aria-label="Add quest with voice"
+                    className="h-9 w-9 rounded-[18px] border-primary/20 bg-primary/10 text-primary hover:bg-primary/15"
+                    onClick={onVoiceAddQuest}
+                  >
+                    <Mic className="h-4 w-4" />
+                  </Button>
+                ) : null}
+                <Button
+                  type="button"
+                  size="sm"
+                  data-tour="add-quest-launcher"
+                  className="h-9 rounded-[18px] px-4 shadow-[0_14px_28px_rgba(122,61,255,0.2)]"
+                  onClick={onAddQuest}
+                >
+                  <Plus className="h-4 w-4" />
+                  Add Quest
+                </Button>
+              </div>
             </div>
           </div>
         ) : null}
@@ -2814,16 +2842,30 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                   ? "Your day is still open. Add a quest to give the planner some shape."
                   : `Nothing is planned for ${selectedDateHeading} yet. Add a quest to anchor the day.`}
               </p>
-              <Button
-                variant="outline"
-                size="sm"
-                data-tour="add-quest-launcher"
-                className="mt-4 rounded-2xl border-white/10 bg-white/[0.04] hover:bg-white/[0.08]"
-                onClick={onAddQuest}
-              >
-                <Plus className="w-3 h-3 mr-1.5" />
-                Add Quest
-              </Button>
+              <div className="mt-4 flex items-center justify-center gap-2">
+                {onVoiceAddQuest ? (
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="outline"
+                    aria-label="Add quest with voice"
+                    className="h-9 w-9 rounded-2xl border-primary/20 bg-primary/10 text-primary hover:bg-primary/15"
+                    onClick={onVoiceAddQuest}
+                  >
+                    <Mic className="h-4 w-4" />
+                  </Button>
+                ) : null}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  data-tour="add-quest-launcher"
+                  className="rounded-2xl border-white/10 bg-white/[0.04] hover:bg-white/[0.08]"
+                  onClick={onAddQuest}
+                >
+                  <Plus className="mr-1.5 h-3 w-3" />
+                  Add Quest
+                </Button>
+              </div>
             </div>
           ) : (
             <div className={cn(isDesktopLayout && "flex min-h-0 flex-1 flex-col")}>

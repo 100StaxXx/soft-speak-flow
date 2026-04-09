@@ -36,6 +36,8 @@ import { hasRecurrencePattern } from "@/utils/recurrenceValidation";
 import { QuestTemplateBrowser } from "@/features/quests/components/QuestTemplateBrowser";
 import { usePersonalQuestTemplates } from "@/features/quests/hooks/usePersonalQuestTemplates";
 import type {
+  QuestComposerPrefillDraft,
+  QuestCreationSource,
   QuestTemplateBrowserTab,
   QuestTemplatePrefill,
 } from "@/features/quests/types";
@@ -62,6 +64,7 @@ export interface AddQuestData {
   subtasks: string[];
   imageUrl: string | null;
   attachments: QuestAttachmentInput[];
+  creationSource: QuestCreationSource;
 }
 
 interface AddQuestSheetProps {
@@ -71,6 +74,8 @@ interface AddQuestSheetProps {
   prefilledTime?: string | null;
   autoFillTimeOnFirstTap?: boolean;
   presentation?: QuestComposerPresentation;
+  prefillDraft?: QuestComposerPrefillDraft | null;
+  prefillKey?: string | null;
   onAdd: (data: AddQuestData) => Promise<void>;
   isAdding?: boolean;
   onCreateCampaign?: () => void;
@@ -96,6 +101,8 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   selectedDate,
   prefilledTime,
   presentation = "mobile-sheet",
+  prefillDraft = null,
+  prefillKey = null,
   onAdd,
   isAdding = false,
   onCreateCampaign,
@@ -122,6 +129,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   const [subtasks, setSubtasks] = useState<string[]>([]);
   const [sendToCalendar, setSendToCalendar] = useState(false);
   const [attachments, setAttachments] = useState<QuestAttachmentInput[]>([]);
+  const [creationSource, setCreationSource] = useState<QuestCreationSource>("manual");
   const [selectedTemplate, setSelectedTemplate] = useState<QuestTemplatePrefill | null>(null);
   const [showTemplateUpdatePrompt, setShowTemplateUpdatePrompt] = useState(false);
   const [pendingSubmitIntent, setPendingSubmitIntent] = useState<SubmitIntent | null>(null);
@@ -149,6 +157,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
 
   const subtaskInputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const hasEmittedTitleEnteredRef = useRef(false);
+  const lastPrefillKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (prefilledTime) setScheduledTime(prefilledTime);
@@ -176,15 +185,42 @@ export const AddQuestSheet = memo(function AddQuestSheet({
       setSubtasks([]);
       setSendToCalendar(false);
       setAttachments([]);
+      setCreationSource("manual");
       setSelectedTemplate(null);
       setShowTemplateUpdatePrompt(false);
       setPendingSubmitIntent(null);
       setIsHandlingTemplatePrompt(false);
+      lastPrefillKeyRef.current = null;
       hasEmittedTitleEnteredRef.current = false;
     } else {
       setTaskDate(format(selectedDate, "yyyy-MM-dd"));
     }
   }, [open, selectedDate]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (!prefillDraft || !prefillKey) return;
+    if (lastPrefillKeyRef.current === prefillKey) return;
+
+    lastPrefillKeyRef.current = prefillKey;
+    setTaskText(prefillDraft.text ?? "");
+    setDifficulty(prefillDraft.difficulty ?? "medium");
+    setScheduledTime(prefillDraft.scheduledTime ?? null);
+    setEstimatedDuration(prefillDraft.estimatedDuration ?? 30);
+    setRecurrencePattern(prefillDraft.recurrencePattern ?? null);
+    setRecurrenceDays(prefillDraft.recurrenceDays ?? []);
+    setRecurrenceMonthDays(prefillDraft.recurrenceMonthDays ?? []);
+    setRecurrenceCustomPeriod(prefillDraft.recurrenceCustomPeriod ?? null);
+    setReminderEnabled(prefillDraft.reminderEnabled ?? false);
+    setReminderMinutesBefore(prefillDraft.reminderMinutesBefore ?? 15);
+    setMoreInformation(prefillDraft.moreInformation ?? null);
+    setLocation(prefillDraft.location ?? null);
+    setTaskDate(prefillDraft.taskDate ?? format(selectedDate, "yyyy-MM-dd"));
+    setCreationSource(prefillDraft.creationSource ?? "manual");
+    setSelectedTemplate(null);
+    setShowTemplateUpdatePrompt(false);
+    setPendingSubmitIntent(null);
+  }, [open, prefillDraft, prefillKey, selectedDate]);
 
   const endTime = useMemo(() => {
     if (!scheduledTime || !estimatedDuration) return null;
@@ -345,6 +381,13 @@ export const AddQuestSheet = memo(function AddQuestSheet({
     if (!taskText.trim()) return;
     if (intent === "inbox" && hasRecurrencePattern(recurrencePattern)) return;
 
+    const resolvedCreationSource: QuestCreationSource =
+      creationSource === "voice" || creationSource === "nlp"
+        ? creationSource
+        : intent === "inbox"
+          ? "inbox"
+          : "manual";
+
     if (intent === "scheduled") {
       window.dispatchEvent(new CustomEvent("add-quest-create-attempted"));
     }
@@ -370,9 +413,10 @@ export const AddQuestSheet = memo(function AddQuestSheet({
       subtasks: subtasks.filter(s => s.trim()),
       imageUrl: attachments.find((attachment) => attachment.isImage)?.fileUrl ?? null,
       attachments,
+      creationSource: resolvedCreationSource,
     });
     onOpenChange(false);
-  }, [taskText, recurrencePattern, scheduledTime, onAdd, taskDate, difficulty, estimatedDuration, recurrenceDays, recurrenceMonthDays, recurrenceCustomPeriod, reminderEnabled, reminderMinutesBefore, moreInformation, location, sendToCalendar, canShowCalendarSendOption, subtasks, attachments, onOpenChange]);
+  }, [taskText, recurrencePattern, creationSource, scheduledTime, onAdd, taskDate, difficulty, estimatedDuration, recurrenceDays, recurrenceMonthDays, recurrenceCustomPeriod, reminderEnabled, reminderMinutesBefore, moreInformation, location, sendToCalendar, canShowCalendarSendOption, subtasks, attachments, onOpenChange]);
 
   const submitWithTemplateHandling = useCallback(async (intent: SubmitIntent) => {
     if (selectedTemplate && hasTemplateCustomizations) {

@@ -172,7 +172,7 @@ export const useAchievements = () => {
       await awardAchievement({
         type: "challenge_complete",
         title: "Challenge Accepted",
-        description: "Completed your first challenge",
+        description: "Completed a challenge",
         icon: "target",
         tier: "silver",
       });

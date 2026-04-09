@@ -191,6 +191,14 @@ class IOSAudioStateManager {
   private isMuted = false;
   private listeners: Set<(muted: boolean) => void> = new Set();
   private audioElements: Set<HTMLAudioElement> = new Set();
+  private resumeCandidates: Set<HTMLAudioElement> = new Set();
+  private audioElementListeners = new Map<
+    HTMLAudioElement,
+    {
+      pause: () => void;
+      ended: () => void;
+    }
+  >();
   
   constructor() {
     if (typeof window !== 'undefined') {
@@ -226,26 +234,55 @@ class IOSAudioStateManager {
     if (document.hidden) {
       // App backgrounded - audio will be suspended by iOS
       log.info('App backgrounded');
+      this.captureResumeCandidates();
     } else {
       // App foregrounded - resume audio if not muted
       log.info('App foregrounded');
-      if (!this.isMuted) {
+      if (!this.isMuted && this.resumeCandidates.size > 0) {
         // Small delay to let iOS settle
         setTimeout(() => this.resumeAllAudio(), 100);
       }
     }
   };
+
+  private captureResumeCandidates() {
+    for (const audio of this.audioElements) {
+      if (!audio.paused && !audio.ended) {
+        this.resumeCandidates.add(audio);
+      } else {
+        this.resumeCandidates.delete(audio);
+      }
+    }
+  }
   
   /**
    * Register an audio element for coordinated control
    */
   registerAudio(audio: HTMLAudioElement) {
     this.audioElements.add(audio);
+    this.resumeCandidates.delete(audio);
     
     // Apply current mute state using muted property (proper iOS support)
     if (this.isMuted) {
       audio.muted = true;
     }
+
+    const handlePause = () => {
+      if (!document.hidden) {
+        this.resumeCandidates.delete(audio);
+      }
+    };
+
+    const handleEnded = () => {
+      this.resumeCandidates.delete(audio);
+    };
+
+    audio.addEventListener('pause', handlePause);
+    audio.addEventListener('ended', handleEnded);
+    this.audioElementListeners.set(audio, {
+      pause: handlePause,
+      ended: handleEnded,
+    });
   }
   
   /**
@@ -253,6 +290,14 @@ class IOSAudioStateManager {
    */
   unregisterAudio(audio: HTMLAudioElement) {
     this.audioElements.delete(audio);
+    this.resumeCandidates.delete(audio);
+
+    const listeners = this.audioElementListeners.get(audio);
+    if (listeners) {
+      audio.removeEventListener('pause', listeners.pause);
+      audio.removeEventListener('ended', listeners.ended);
+      this.audioElementListeners.delete(audio);
+    }
   }
   
   /**
@@ -263,11 +308,18 @@ class IOSAudioStateManager {
     await resumeAudioContext();
     
     // Then check each audio element
-    for (const audio of this.audioElements) {
+    for (const audio of Array.from(this.resumeCandidates)) {
+      if (!this.audioElements.has(audio)) {
+        this.resumeCandidates.delete(audio);
+        continue;
+      }
+
       if (audio.paused && !this.isMuted) {
-        // Audio was paused (possibly by iOS background), try to resume
+        // Only resume audio that was playing when the app was backgrounded.
         safePlay(audio);
       }
+
+      this.resumeCandidates.delete(audio);
     }
   }
   

@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { isSameDay } from "date-fns";
 import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -47,7 +47,27 @@ const mocks = vi.hoisted(() => ({
     task_date: string | null;
   }>,
   lastDatePillSelectedDate: null as Date | null,
-  lastAddQuestSheetProps: null as null | { autoFillTimeOnFirstTap?: boolean; open?: boolean; presentation?: string },
+  lastAddQuestSheetProps: null as null | {
+    autoFillTimeOnFirstTap?: boolean;
+    open?: boolean;
+    presentation?: string;
+    prefillKey?: string | null;
+    prefillDraft?: {
+      text?: string;
+      taskDate?: string | null;
+      scheduledTime?: string | null;
+      estimatedDuration?: number | null;
+      reminderEnabled?: boolean;
+      reminderMinutesBefore?: number;
+      moreInformation?: string | null;
+      creationSource?: string;
+    } | null;
+  },
+  lastVoiceQuestCaptureProps: null as null | {
+    open?: boolean;
+    onOpenChange?: (open: boolean) => void;
+    onCapture?: (transcript: string) => void;
+  },
   tutorialGuidance: {
     isActive: false,
     currentStep: null as string | null,
@@ -140,9 +160,52 @@ vi.mock("@/components/DatePillsScroller", () => ({
 }));
 
 vi.mock("@/components/AddQuestSheet", () => ({
-  AddQuestSheet: (props: { autoFillTimeOnFirstTap?: boolean; open?: boolean; presentation?: string }) => {
+  AddQuestSheet: (props: {
+    autoFillTimeOnFirstTap?: boolean;
+    open?: boolean;
+    presentation?: string;
+    prefillKey?: string | null;
+    prefillDraft?: {
+      text?: string;
+      taskDate?: string | null;
+      scheduledTime?: string | null;
+      estimatedDuration?: number | null;
+      reminderEnabled?: boolean;
+      reminderMinutesBefore?: number;
+      moreInformation?: string | null;
+      creationSource?: string;
+    } | null;
+  }) => {
     mocks.lastAddQuestSheetProps = props;
     return null;
+  },
+}));
+
+vi.mock("@/components/VoiceQuestCaptureDrawer", () => ({
+  VoiceQuestCaptureDrawer: (props: {
+    open?: boolean;
+    onOpenChange?: (open: boolean) => void;
+    onCapture?: (transcript: string) => void;
+  }) => {
+    mocks.lastVoiceQuestCaptureProps = props;
+
+    if (!props.open) {
+      return null;
+    }
+
+    return (
+      <div data-testid="voice-quest-capture-drawer">
+        <button
+          type="button"
+          onClick={() => props.onCapture?.("Deep work tomorrow at 3pm for 2 hours with a 30 minute reminder notes: bring roadmap")}
+        >
+          emit-voice-capture
+        </button>
+        <button type="button" onClick={() => props.onOpenChange?.(false)}>
+          close-voice-drawer
+        </button>
+      </div>
+    );
   },
 }));
 
@@ -193,9 +256,26 @@ vi.mock("@/components/CampaignCreatedAnimation", () => ({
 }));
 
 vi.mock("@/components/DraggableFAB", () => ({
-  DraggableFAB: () => {
+  DraggableFAB: ({
+    onTap,
+    onVoiceTap,
+  }: {
+    onTap?: () => void;
+    onVoiceTap?: () => void;
+  }) => {
     mocks.draggableFabRenderCount += 1;
-    return <button type="button" data-testid="draggable-fab" data-tour="add-quest-fab">fab</button>;
+    return (
+      <div data-testid="draggable-fab">
+        <button type="button" data-testid="manual-quest-fab" data-tour="add-quest-fab" onClick={() => onTap?.()}>
+          fab
+        </button>
+        {onVoiceTap ? (
+          <button type="button" data-testid="voice-quest-fab" aria-label="Add quest with voice" onClick={() => onVoiceTap()}>
+            voice
+          </button>
+        ) : null}
+      </div>
+    );
   },
 }));
 
@@ -489,6 +569,7 @@ describe("Journeys row drag integration", () => {
     mocks.draggableFabRenderCount = 0;
     mocks.lastDatePillSelectedDate = null;
     mocks.lastAddQuestSheetProps = null;
+    mocks.lastVoiceQuestCaptureProps = null;
     mocks.tutorialGuidance = {
       isActive: false,
       currentStep: null,
@@ -591,9 +672,10 @@ describe("Journeys row drag integration", () => {
       </QueryClientProvider>,
     );
 
-    const addQuestButton = await screen.findByRole("button", { name: /add quest/i });
+    const addQuestButton = await screen.findByRole("button", { name: /^Add Quest$/i });
     expect(addQuestButton).toBeInTheDocument();
     expect(addQuestButton).toHaveAttribute("data-tour", "add-quest-launcher");
+    expect(screen.getAllByRole("button", { name: "Add quest with voice" }).length).toBeGreaterThan(0);
     expect(screen.queryByTestId("draggable-fab")).not.toBeInTheDocument();
     expect(mocks.draggableFabRenderCount).toBe(0);
     expect(mocks.lastAddQuestSheetProps?.presentation).toBe("desktop-panel");
@@ -615,8 +697,59 @@ describe("Journeys row drag integration", () => {
       </QueryClientProvider>,
     );
 
-    expect(await screen.findByTestId("draggable-fab")).toHaveAttribute("data-tour", "add-quest-fab");
+    const fab = await screen.findByTestId("draggable-fab");
+    expect(within(fab).getByTestId("manual-quest-fab")).toHaveAttribute("data-tour", "add-quest-fab");
+    expect(within(fab).getByTestId("voice-quest-fab")).toBeInTheDocument();
     expect(mocks.draggableFabRenderCount).toBe(1);
+  });
+
+  it("captures voice on Mac-hosted iOS and reopens the existing sheet with parsed prefills", async () => {
+    mocks.isMacHostedIOSApp = true;
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      writable: true,
+      value: 1100,
+    });
+
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/journeys"]}>
+          <Journeys />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    const voiceButtons = await screen.findAllByRole("button", { name: "Add quest with voice" });
+    fireEvent.click(voiceButtons[0]);
+
+    await waitFor(() => {
+      expect(mocks.lastVoiceQuestCaptureProps?.open).toBe(true);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "emit-voice-capture" }));
+
+    await waitFor(() => {
+      expect(mocks.lastAddQuestSheetProps?.open).toBe(true);
+    });
+
+    expect(mocks.lastAddQuestSheetProps?.presentation).toBe("desktop-panel");
+    expect(mocks.lastAddQuestSheetProps?.prefillKey).toBeTruthy();
+    expect(mocks.lastAddQuestSheetProps?.prefillDraft).toEqual(expect.objectContaining({
+      creationSource: "voice",
+      text: "Deep work",
+      scheduledTime: "15:00",
+      estimatedDuration: 120,
+      reminderEnabled: true,
+      reminderMinutesBefore: 30,
+      moreInformation: "bring roadmap",
+    }));
   });
 
   it("opens the add flow with meta+n on Mac-hosted iOS", async () => {
