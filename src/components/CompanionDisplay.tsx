@@ -545,7 +545,7 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
   return (
     <>
       <Card
-        className="relative overflow-hidden bg-card/18 backdrop-blur-xl border transition-all duration-500 animate-scale-in"
+        className="relative overflow-hidden bg-card/14 backdrop-blur-xl border transition-all duration-500 animate-scale-in"
         style={{ borderColor: companionPalette.chipBorder }}
       >
         {/* Equipped background or default nebula gradients */}

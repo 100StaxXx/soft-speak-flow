@@ -72,12 +72,13 @@ const installLocalStorageMock = () => {
 const TestConsumer = () => {
   const wallpaper = useResolvedWallpaper("guide");
   const manifest = useWallpaperManifest();
+  const wallpaperState = wallpaper?.source ?? (manifest.currentDateReady ? "none" : "loading");
 
   return (
     <div>
       <div data-testid="current-date">{manifest.currentDateKey}</div>
       <div data-testid="current-ready">{String(manifest.currentDateReady)}</div>
-      <div data-testid="wallpaper-source">{wallpaper?.source ?? "loading"}</div>
+      <div data-testid="wallpaper-source">{wallpaperState}</div>
       <div data-testid="wallpaper-url">{wallpaper?.imageUrl ?? "none"}</div>
       <div data-testid="error-message">{manifest.error?.message ?? "none"}</div>
       <button
@@ -100,15 +101,18 @@ const AllPagesConsumer = () => {
   const campaigns = useResolvedWallpaper("campaigns");
   const companion = useResolvedWallpaper("companion");
   const profile = useResolvedWallpaper("profile");
+  const resolveState = (wallpaper: ReturnType<typeof useResolvedWallpaper>) => (
+    wallpaper?.source ?? (manifest.currentDateReady ? "none" : "loading")
+  );
 
   return (
     <div>
       <div data-testid="current-ready">{String(manifest.currentDateReady)}</div>
-      <div data-testid="guide-source">{guide?.source ?? "loading"}</div>
-      <div data-testid="quests-source">{quests?.source ?? "loading"}</div>
-      <div data-testid="campaigns-source">{campaigns?.source ?? "loading"}</div>
-      <div data-testid="companion-source">{companion?.source ?? "loading"}</div>
-      <div data-testid="profile-source">{profile?.source ?? "loading"}</div>
+      <div data-testid="guide-source">{resolveState(guide)}</div>
+      <div data-testid="quests-source">{resolveState(quests)}</div>
+      <div data-testid="campaigns-source">{resolveState(campaigns)}</div>
+      <div data-testid="companion-source">{resolveState(companion)}</div>
+      <div data-testid="profile-source">{resolveState(profile)}</div>
     </div>
   );
 };
@@ -190,19 +194,19 @@ describe("WallpaperManifestProvider", () => {
     expect(screen.getByTestId("error-message")).toHaveTextContent("none");
   });
 
-  it("falls back to scenic seed art for all five pages when the manifest resolves with zero rows", async () => {
+  it("returns no wallpaper for all five pages when the manifest resolves with zero rows", async () => {
     await renderProvider(<AllPagesConsumer />);
     await settleProvider();
 
     expect(screen.getByTestId("current-ready")).toHaveTextContent("true");
-    expect(screen.getByTestId("guide-source")).toHaveTextContent("seed");
-    expect(screen.getByTestId("quests-source")).toHaveTextContent("seed");
-    expect(screen.getByTestId("campaigns-source")).toHaveTextContent("seed");
-    expect(screen.getByTestId("companion-source")).toHaveTextContent("seed");
-    expect(screen.getByTestId("profile-source")).toHaveTextContent("seed");
+    expect(screen.getByTestId("guide-source")).toHaveTextContent("none");
+    expect(screen.getByTestId("quests-source")).toHaveTextContent("none");
+    expect(screen.getByTestId("campaigns-source")).toHaveTextContent("none");
+    expect(screen.getByTestId("companion-source")).toHaveTextContent("none");
+    expect(screen.getByTestId("profile-source")).toHaveTextContent("none");
   });
 
-  it("falls back to the seed wallpaper and exposes the error when the manifest fetch fails", async () => {
+  it("returns no wallpaper and exposes the error when the manifest fetch fails", async () => {
     mocks.from.mockImplementation(() => ({
       select: () => ({
         in: async () => ({ data: null, error: new Error("manifest failed") }),
@@ -213,7 +217,7 @@ describe("WallpaperManifestProvider", () => {
     await settleProvider();
 
     expect(screen.getByTestId("current-ready")).toHaveTextContent("true");
-    expect(screen.getByTestId("wallpaper-source")).toHaveTextContent("seed");
+    expect(screen.getByTestId("wallpaper-source")).toHaveTextContent("none");
     expect(screen.getByTestId("error-message")).toHaveTextContent("manifest failed");
   });
 
@@ -362,7 +366,7 @@ describe("WallpaperManifestProvider", () => {
     expect(screen.getByTestId("wallpaper-url")).toHaveTextContent("https://example.com/day-8.png");
   });
 
-  it("falls back to the seed wallpaper after a render failure for the active remote wallpaper", async () => {
+  it("clears the wallpaper after a render failure for the active remote wallpaper", async () => {
     localStorage.setItem(CACHE_KEY, JSON.stringify({
       version: 3,
       savedAt: "2026-04-08T10:20:00.000Z",
@@ -393,7 +397,7 @@ describe("WallpaperManifestProvider", () => {
       screen.getByRole("button", { name: "fail" }).click();
     });
 
-    expect(screen.getByTestId("wallpaper-source")).toHaveTextContent("seed");
-    expect(screen.getByTestId("wallpaper-url")).not.toHaveTextContent("https://example.com/today.png");
+    expect(screen.getByTestId("wallpaper-source")).toHaveTextContent("none");
+    expect(screen.getByTestId("wallpaper-url")).toHaveTextContent("none");
   });
 });

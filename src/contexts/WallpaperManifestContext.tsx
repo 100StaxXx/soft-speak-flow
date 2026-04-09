@@ -13,7 +13,6 @@ import { App as CapacitorApp } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
 import { useQuery } from "@tanstack/react-query";
 import {
-  cinematicPageBackgrounds,
   createRemoteBackgroundAsset,
   type StaticBackgroundAsset,
 } from "@/assets/backgrounds";
@@ -39,7 +38,7 @@ export interface ResolvedWallpaper {
   background: StaticBackgroundAsset;
   mobileObjectPosition: string;
   desktopObjectPosition: string;
-  source: "remote" | "seed";
+  source: "remote";
   assignmentSource: WallpaperAssignmentSource | null;
 }
 
@@ -202,19 +201,6 @@ const toResolvedWallpaper = (
   desktopObjectPosition: toObjectPosition(entry.desktopFocusX, entry.desktopFocusY),
   source: "remote",
   assignmentSource: entry.assignmentSource,
-});
-
-const toSeedFallbackWallpaper = (
-  pageKey: WallpaperPageKey,
-  dateKey: string,
-): ResolvedWallpaper => ({
-  dateKey,
-  imageUrl: cinematicPageBackgrounds[pageKey].background.src,
-  background: cinematicPageBackgrounds[pageKey].background,
-  mobileObjectPosition: cinematicPageBackgrounds[pageKey].mobileObjectPosition,
-  desktopObjectPosition: cinematicPageBackgrounds[pageKey].desktopObjectPosition,
-  source: "seed",
-  assignmentSource: null,
 });
 
 export const fetchWallpaperManifest = async (
@@ -472,7 +458,7 @@ export const WallpaperManifestProvider = ({
     if (manifestEntry) {
       const failedKey = `${currentDateKey}:${pageKey}:${manifestEntry.imageUrl}`;
       if (failedRemoteKeysRef.current.has(failedKey)) {
-        return toSeedFallbackWallpaper(pageKey, currentDateKey);
+        return null;
       }
 
       if (resolvedEntry?.imageUrl === manifestEntry.imageUrl) {
@@ -483,7 +469,7 @@ export const WallpaperManifestProvider = ({
     }
 
     if (resolvedDateKeys.includes(currentDateKey)) {
-      return toSeedFallbackWallpaper(pageKey, currentDateKey);
+      return null;
     }
 
     return null;

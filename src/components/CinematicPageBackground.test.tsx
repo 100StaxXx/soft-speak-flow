@@ -12,9 +12,10 @@ const mocks = vi.hoisted(() => ({
   maxParticles: 24,
   isBackgrounded: false,
   prefersReducedMotion: false,
+  currentDateReady: true,
   reportWallpaperRenderError: vi.fn(),
   wallpaper: null as null | {
-    source: "remote" | "seed";
+    source: "remote";
     imageUrl: string;
     background: { src: string; src2x: string };
     mobileObjectPosition: string;
@@ -66,7 +67,7 @@ vi.mock("@/contexts/WallpaperManifestContext", () => ({
   useResolvedWallpaper: () => mocks.wallpaper,
   useWallpaperManifest: () => ({
     currentDateKey: "2026-04-08",
-    currentDateReady: true,
+    currentDateReady: mocks.currentDateReady,
     reportWallpaperRenderError: mocks.reportWallpaperRenderError,
     error: null,
     manifestByDate: {},
@@ -86,6 +87,7 @@ describe("CinematicPageBackground", () => {
     mocks.maxParticles = 24;
     mocks.isBackgrounded = false;
     mocks.prefersReducedMotion = false;
+    mocks.currentDateReady = true;
     mocks.wallpaper = null;
     mocks.reportWallpaperRenderError.mockReset();
   });
@@ -106,24 +108,22 @@ describe("CinematicPageBackground", () => {
     expect(screen.getByTestId("cinematic-background")).toHaveAttribute("data-cinematic-background", preset);
   });
 
-  it("renders the bundled scenic seed art immediately when no live wallpaper has resolved yet", () => {
+  it("renders the cinematic gradient state when no live wallpaper is available", () => {
     render(<CinematicPageBackground preset="campaigns" />);
 
-    expect(screen.getByTestId("cinematic-background")).toHaveAttribute("data-cinematic-source", "seed");
-    expect(screen.getByTestId("cinematic-background-image-mobile")).toHaveAttribute(
-      "src",
-      cinematicPageBackgrounds.campaigns.background.src,
-    );
-    expect(screen.getByTestId("cinematic-background-image-mobile")).toHaveStyle({
-      objectPosition: cinematicPageBackgrounds.campaigns.mobileObjectPosition,
-    });
+    expect(screen.getByTestId("cinematic-background")).toHaveAttribute("data-cinematic-source", "none");
+    expect(screen.queryByTestId("cinematic-background-image-mobile")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("cinematic-background-image-desktop")).not.toBeInTheDocument();
   });
 
   it("uses the configured mobile and desktop focal points", () => {
     mocks.wallpaper = {
-      source: "seed",
-      imageUrl: cinematicPageBackgrounds.campaigns.background.src,
-      background: cinematicPageBackgrounds.campaigns.background,
+      source: "remote",
+      imageUrl: "https://example.com/focal-wallpaper.png",
+      background: {
+        src: "https://example.com/focal-wallpaper.png",
+        src2x: "https://example.com/focal-wallpaper.png",
+      },
       mobileObjectPosition: cinematicPageBackgrounds.campaigns.mobileObjectPosition,
       desktopObjectPosition: cinematicPageBackgrounds.campaigns.desktopObjectPosition,
     };
