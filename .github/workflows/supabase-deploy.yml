@@ -48,7 +48,8 @@ jobs:
           for file in \
             supabase/migrations/20260408200000_add_guide_to_wallpaper_catalog.sql \
             supabase/migrations/20260408210000_create_live_wallpaper_manifest_view.sql \
-            supabase/migrations/20260408211000_rework_daily_wallpaper_rotation_schedule.sql
+            supabase/migrations/20260408211000_rework_daily_wallpaper_rotation_schedule.sql \
+            supabase/migrations/20260409171000_extend_wallpaper_rotation_internal_timeout.sql
           do
             echo "Applying ${file}"
             supabase db query --linked -f "$file"
@@ -61,7 +62,8 @@ jobs:
           for version in \
             20260408200000 \
             20260408210000 \
-            20260408211000
+            20260408211000 \
+            20260409171000
           do
             echo "Marking ${version} as applied"
             supabase migration repair --linked --password "$SUPABASE_DB_PASSWORD" --status applied "$version" --yes
@@ -98,8 +100,7 @@ jobs:
           set -euo pipefail
 
           supabase db query --linked "
-            select public.invoke_edge_function_with_internal_secret(
-              'rotate-daily-wallpapers',
+            select public.invoke_rotate_daily_wallpapers_with_internal_secret(
               jsonb_build_object(
                 'startDate', '${{ inputs.wallpaper_start_date }}',
                 'daysAhead', 1,
@@ -146,8 +147,7 @@ jobs:
           set -euo pipefail
 
           supabase db query --linked "
-            select public.invoke_edge_function_with_internal_secret(
-              'rotate-daily-wallpapers',
+            select public.invoke_rotate_daily_wallpapers_with_internal_secret(
               jsonb_build_object(
                 'startDate', '${{ inputs.wallpaper_start_date }}',
                 'daysAhead', 4,
