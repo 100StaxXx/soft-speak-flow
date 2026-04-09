@@ -10,9 +10,200 @@ on:
       - "scripts/generate-function-manifest.sh"
       - "supabase/function-manifest.json"
   workflow_dispatch:
+    inputs:
+      repair_wallpapers:
+        description: Run the wallpaper-only production repair flow instead of the full deploy
+        required: false
+        type: boolean
+        default: false
+      wallpaper_start_date:
+        description: Active wallpaper date for the repair flow (YYYY-MM-DD)
+        required: false
+        default: "2026-04-09"
 
 jobs:
+  repair-wallpapers:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.repair_wallpapers }}
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+      INTERNAL_FUNCTION_SECRET: ${{ secrets.INTERNAL_FUNCTION_SECRET }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Link Supabase project
+        run: supabase link --project-ref "$PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
+
+      - name: Apply wallpaper catalog migrations
+        run: |
+          set -euo pipefail
+
+          for file in \
+            supabase/migrations/20260408200000_add_guide_to_wallpaper_catalog.sql \
+            supabase/migrations/20260408210000_create_live_wallpaper_manifest_view.sql \
+            supabase/migrations/20260408211000_rework_daily_wallpaper_rotation_schedule.sql
+          do
+            echo "Applying ${file}"
+            supabase db query --linked -f "$file"
+          done
+
+      - name: Repair migration history for wallpaper fixes
+        run: |
+          set -euo pipefail
+
+          for version in \
+            20260408200000 \
+            20260408210000 \
+            20260408211000
+          do
+            echo "Marking ${version} as applied"
+            supabase migration repair --linked --password "$SUPABASE_DB_PASSWORD" --status applied "$version" --yes
+          done
+
+      - name: Verify catalog schema and scheduler
+        run: |
+          set -euo pipefail
+
+          supabase db query --linked "
+            select conrelid::regclass::text as table_name,
+                   conname,
+                   pg_get_constraintdef(oid) as definition
+            from pg_constraint
+            where conname in (
+              'wallpaper_assets_page_key_check',
+              'daily_wallpaper_assignments_page_key_check'
+            )
+            order by table_name;
+          "
+
+          supabase db query --linked "
+            select to_regclass('public.live_wallpaper_manifest_v') as live_wallpaper_manifest_v;
+          "
+
+          supabase db query --linked "
+            select jobname, schedule, command
+            from cron.job
+            where jobname = 'rotate-daily-wallpapers';
+          "
+
+      - name: Force-generate guide wallpaper for active day
+        run: |
+          set -euo pipefail
+
+          body="$(jq -nc --arg startDate "${{ inputs.wallpaper_start_date }}" '{
+            startDate: $startDate,
+            daysAhead: 1,
+            candidateCount: 3,
+            force: true,
+            pageKeys: ["guide"]
+          }')"
+
+          curl --fail-with-body -sS \
+            -X POST "https://${PROJECT_REF}.supabase.co/functions/v1/rotate-daily-wallpapers" \
+            -H "Content-Type: application/json" \
+            -H "apikey: ${SUPABASE_PUBLISHABLE_KEY}" \
+            -H "x-internal-key: ${INTERNAL_FUNCTION_SECRET}" \
+            --data "$body" | tee /tmp/guide-force.json
+
+          jq -e '.success == true' /tmp/guide-force.json > /dev/null
+
+      - name: Refill 4-day horizon for all cinematic pages
+        run: |
+          set -euo pipefail
+
+          body="$(jq -nc --arg startDate "${{ inputs.wallpaper_start_date }}" '{
+            startDate: $startDate,
+            daysAhead: 4,
+            candidateCount: 3,
+            force: false,
+            pageKeys: ["guide", "quests", "campaigns", "companion", "profile"]
+          }')"
+
+          curl --fail-with-body -sS \
+            -X POST "https://${PROJECT_REF}.supabase.co/functions/v1/rotate-daily-wallpapers" \
+            -H "Content-Type: application/json" \
+            -H "apikey: ${SUPABASE_PUBLISHABLE_KEY}" \
+            -H "x-internal-key: ${INTERNAL_FUNCTION_SECRET}" \
+            --data "$body" | tee /tmp/horizon-refill.json
+
+          jq -e '.success == true' /tmp/horizon-refill.json > /dev/null
+
+      - name: Verify guide assets and 4-day assignment coverage
+        run: |
+          set -euo pipefail
+
+          cat > /tmp/verify_wallpaper_repair.sql <<SQL
+          DO \$\$
+          DECLARE
+            start_date date := DATE '${{ inputs.wallpaper_start_date }}';
+            missing_count integer;
+          BEGIN
+            IF NOT EXISTS (
+              SELECT 1
+              FROM public.wallpaper_assets
+              WHERE page_key = 'guide'
+                AND publish_state = 'ready'
+            ) THEN
+              RAISE EXCEPTION 'Guide still has no ready wallpaper assets';
+            END IF;
+
+            SELECT count(*)
+              INTO missing_count
+            FROM (
+              SELECT expected.for_date, expected.page_key
+              FROM (
+                SELECT gs::date AS for_date, pages.page_key
+                FROM generate_series(start_date, start_date + 3, interval '1 day') AS gs
+                CROSS JOIN (
+                  VALUES
+                    ('guide'),
+                    ('quests'),
+                    ('campaigns'),
+                    ('companion'),
+                    ('profile')
+                ) AS pages(page_key)
+              ) AS expected
+              LEFT JOIN public.daily_wallpaper_assignments AS actual
+                ON actual.for_date = expected.for_date
+               AND actual.page_key = expected.page_key
+              WHERE actual.id IS NULL
+            ) AS missing;
+
+            IF missing_count > 0 THEN
+              RAISE EXCEPTION 'Missing % wallpaper assignments in the active horizon', missing_count;
+            END IF;
+          END
+          \$\$;
+          SQL
+
+          supabase db query --linked -f /tmp/verify_wallpaper_repair.sql
+
+          supabase db query --linked "
+            select for_date, page_key, assignment_source, wallpaper_asset_id
+            from public.daily_wallpaper_assignments
+            where for_date between date '${{ inputs.wallpaper_start_date }}' and date '${{ inputs.wallpaper_start_date }}' + 3
+            order by for_date, page_key;
+          "
+
+          supabase db query --linked "
+            select page_key, count(*) as ready_assets
+            from public.wallpaper_assets
+            where publish_state = 'ready'
+            group by page_key
+            order by page_key;
+          "
+
   deploy:
+    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.repair_wallpapers }}
     runs-on: ubuntu-latest
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
