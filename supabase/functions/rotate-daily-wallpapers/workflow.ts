@@ -56,6 +56,11 @@ export interface RotationDeps {
   getLatestReadyAsset: typeof getLatestReadyAsset;
 }
 
+interface RotatePageWallpaperControls {
+  allowGeneration?: boolean;
+  generationCandidateCount?: number;
+}
+
 const defaultDeps: RotationDeps = {
   getExistingAssignment,
   getWallpaperAssetEligibilitySnapshot,
@@ -139,6 +144,7 @@ export const rotatePageWallpaper = async (
   force: boolean,
   batchLabel: string,
   deps: RotationDeps = defaultDeps,
+  controls: RotatePageWallpaperControls = {},
 ): Promise<RotationOutcome> => {
   const existingAssignment = await deps.getExistingAssignment(supabase, pageKey, dateKey);
   if (existingAssignment && !force) {
@@ -180,12 +186,36 @@ export const rotatePageWallpaper = async (
     };
   }
 
+  if (controls.allowGeneration === false) {
+    const latestReadyAsset = await deps.getLatestReadyAsset(supabase, pageKey);
+    if (latestReadyAsset) {
+      await deps.assignWallpaperAsset(supabase, pageKey, dateKey, latestReadyAsset.id, "carry_forward");
+      return {
+        pageKey,
+        dateKey,
+        status: "carry_forward",
+        assetId: latestReadyAsset.id,
+        assignmentSource: "carry_forward",
+        reason: "fast rotation reused latest ready asset",
+      };
+    }
+
+    return {
+      pageKey,
+      dateKey,
+      status: "skipped",
+      assetId: null,
+      reason: "fast rotation skipped generation with no carry-forward asset",
+    };
+  }
+
   const existingVariantKeys = new Set(
     sameDateCandidates
       .map((candidate) => candidate.variantKey)
       .filter((variantKey): variantKey is string => Boolean(variantKey)),
   );
-  const recipesToGenerate = getDeterministicWallpaperRecipes(pageKey, dateKey, candidateCount)
+  const effectiveCandidateCount = Math.max(1, controls.generationCandidateCount ?? candidateCount);
+  const recipesToGenerate = getDeterministicWallpaperRecipes(pageKey, dateKey, effectiveCandidateCount)
     .filter((recipe) => force || !existingVariantKeys.has(recipe.key));
 
   const generatedCandidates: ReadyWallpaperAssetRow[] = [];
@@ -260,6 +290,104 @@ export const rotateWallpaperAssignments = async (
   const dates = getWallpaperHorizonDates(options.startDate, options.daysAhead);
   const outcomes: RotationOutcome[] = [];
 
+  if (!options.force) {
+    const outcomeBySlot = new Map<string, RotationOutcome>();
+
+    // First cover the whole horizon with same-date reuse or carry-forward so one slow
+    // generation job cannot block every future assignment in the current run.
+    for (const dateKey of dates) {
+      for (const pageKey of options.pageKeys) {
+        const outcome = await rotatePageWallpaper(
+          supabase,
+          pageKey,
+          dateKey,
+          options.candidateCount,
+          false,
+          batchLabel,
+          deps,
+          {
+            allowGeneration: false,
+            generationCandidateCount: 0,
+          },
+        );
+        outcomeBySlot.set(`${dateKey}:${pageKey}`, outcome);
+      }
+    }
+
+    // Then try to freshen the active wallpaper day only, promoting future carry-forward
+    // assignments afterward if a new current-day asset becomes available.
+    for (const pageKey of options.pageKeys) {
+      const currentKey = `${options.startDate}:${pageKey}`;
+      const currentOutcome = outcomeBySlot.get(currentKey);
+      if (
+        !currentOutcome
+        || (
+          currentOutcome.status !== "carry_forward"
+          && currentOutcome.assignmentSource !== "carry_forward"
+          && currentOutcome.assetId !== null
+        )
+      ) {
+        continue;
+      }
+
+      const generatedOutcome = await rotatePageWallpaper(
+        supabase,
+        pageKey,
+        options.startDate,
+        options.candidateCount,
+        false,
+        batchLabel,
+        deps,
+        {
+          allowGeneration: true,
+          generationCandidateCount: 1,
+        },
+      );
+      outcomeBySlot.set(currentKey, generatedOutcome);
+
+      if (generatedOutcome.assetId === null) {
+        continue;
+      }
+
+      for (const dateKey of dates.slice(1)) {
+        const slotKey = `${dateKey}:${pageKey}`;
+        const existingOutcome = outcomeBySlot.get(slotKey);
+        if (existingOutcome?.assetId !== null) {
+          continue;
+        }
+
+        const futureOutcome = await rotatePageWallpaper(
+          supabase,
+          pageKey,
+          dateKey,
+          options.candidateCount,
+          false,
+          batchLabel,
+          deps,
+          {
+            allowGeneration: false,
+            generationCandidateCount: 0,
+          },
+        );
+        outcomeBySlot.set(slotKey, futureOutcome);
+      }
+    }
+
+    for (const dateKey of dates) {
+      for (const pageKey of options.pageKeys) {
+        const outcome = outcomeBySlot.get(`${dateKey}:${pageKey}`);
+        if (outcome) {
+          outcomes.push(outcome);
+        }
+      }
+    }
+
+    return {
+      batchLabel,
+      outcomes,
+    };
+  }
+
   for (const dateKey of dates) {
     for (const pageKey of options.pageKeys) {
       const outcome = await rotatePageWallpaper(
@@ -267,9 +395,13 @@ export const rotateWallpaperAssignments = async (
         pageKey,
         dateKey,
         options.candidateCount,
-        options.force,
+        true,
         batchLabel,
         deps,
+        {
+          allowGeneration: true,
+          generationCandidateCount: options.candidateCount,
+        },
       );
       outcomes.push(outcome);
     }

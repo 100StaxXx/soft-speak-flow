@@ -41,7 +41,42 @@ const createDeps = (overrides: Partial<RotationDeps> = {}): RotationDeps => ({
 
 Deno.test("rotateWallpaperAssignments fills the 4-day horizon for all five pages", async () => {
   const assigned: Array<{ pageKey: string; dateKey: string; assetId: string; assignmentSource: string }> = [];
+  const latestReadyByPage = new Map<string, Awaited<ReturnType<RotationDeps["getLatestReadyAsset"]>>>();
+  const generated: Array<{ pageKey: string; dateKey: string; variantKey: string | null }> = [];
   const deps = createDeps({
+    generateAndStoreWallpaperAsset: async (_supabase, args) => {
+      generated.push({
+        pageKey: args.pageKey,
+        dateKey: args.dateKey,
+        variantKey: args.variantKey ?? null,
+      });
+      const asset = await createDeps().generateAndStoreWallpaperAsset(_supabase, args);
+      latestReadyByPage.set(args.pageKey, {
+        id: asset.assetId,
+        createdAt: asset.createdAt,
+        publishState: asset.publishState,
+        sourceKind: "generated",
+        generationDate: args.dateKey,
+        variantKey: asset.variantKey,
+        batchLabel: null,
+        validation_result: {
+          scenicQualityScore: asset.validationResult.scenicQualityScore,
+          moodMatchScore: asset.validationResult.moodMatchScore,
+          detailScore: asset.validationResult.detailScore,
+          contrastScore: asset.validationResult.contrastScore,
+          safeZoneConfidenceScore: asset.validationResult.safeZoneConfidenceScore,
+        },
+        validation: {
+          scenicQualityScore: asset.validationResult.scenicQualityScore,
+          moodMatchScore: asset.validationResult.moodMatchScore,
+          detailScore: asset.validationResult.detailScore,
+          contrastScore: asset.validationResult.contrastScore,
+          safeZoneConfidenceScore: asset.validationResult.safeZoneConfidenceScore,
+        },
+      });
+      return asset;
+    },
+    getLatestReadyAsset: async (_supabase, pageKey) => latestReadyByPage.get(pageKey) ?? null,
     assignWallpaperAsset: async (_supabase, pageKey, dateKey, assetId, assignmentSource) => {
       assigned.push({ pageKey, dateKey, assetId, assignmentSource });
     },
@@ -59,12 +94,76 @@ Deno.test("rotateWallpaperAssignments fills the 4-day horizon for all five pages
     throw new Error(`Expected 20 outcomes, got ${outcomes.length}`);
   }
 
-  if (outcomes.some((outcome) => outcome.status !== "generated")) {
-    throw new Error(`Expected all outcomes to generate, got ${JSON.stringify(outcomes)}`);
+  const generatedOutcomes = outcomes.filter((outcome) => outcome.status === "generated");
+  const carryForwardOutcomes = outcomes.filter((outcome) => outcome.status === "carry_forward");
+
+  if (generatedOutcomes.length !== WALLPAPER_PAGE_KEYS.length) {
+    throw new Error(`Expected only the active date to generate, got ${JSON.stringify(generatedOutcomes)}`);
+  }
+
+  if (carryForwardOutcomes.length !== WALLPAPER_PAGE_KEYS.length * 3) {
+    throw new Error(`Expected future dates to carry forward, got ${JSON.stringify(carryForwardOutcomes)}`);
+  }
+
+  if (generated.some((entry) => entry.dateKey !== "2026-04-08")) {
+    throw new Error(`Expected fast rotation to generate only the start date, got ${JSON.stringify(generated)}`);
   }
 
   if (assigned.length !== WALLPAPER_PAGE_KEYS.length * 4) {
     throw new Error(`Expected every page/date to be assigned, got ${assigned.length}`);
+  }
+});
+
+Deno.test("rotatePageWallpaper skips generation during fast rotation when carry-forward art exists", async () => {
+  let generatedCount = 0;
+  const outcome = await rotatePageWallpaper(
+    {},
+    "companion",
+    "2026-04-10",
+    3,
+    false,
+    "rotate-2026-04-09",
+    createDeps({
+      generateAndStoreWallpaperAsset: async (...args) => {
+        generatedCount += 1;
+        return createDeps().generateAndStoreWallpaperAsset(...args);
+      },
+      getLatestReadyAsset: async () => ({
+        id: "companion-carry-forward",
+        createdAt: "2026-04-09T10:00:00.000Z",
+        publishState: "ready",
+        sourceKind: "generated",
+        generationDate: "2026-04-09",
+        variantKey: "companion-alpine-sanctuary-moonlit",
+        batchLabel: "rotate-2026-04-09",
+        validation_result: {
+          scenicQualityScore: 92,
+          moodMatchScore: 89,
+          detailScore: 84,
+          contrastScore: 80,
+          safeZoneConfidenceScore: 88,
+        },
+        validation: {
+          scenicQualityScore: 92,
+          moodMatchScore: 89,
+          detailScore: 84,
+          contrastScore: 80,
+          safeZoneConfidenceScore: 88,
+        },
+      }),
+    }),
+    {
+      allowGeneration: false,
+      generationCandidateCount: 0,
+    },
+  );
+
+  if (outcome.status !== "carry_forward" || outcome.assetId !== "companion-carry-forward") {
+    throw new Error(`Expected fast rotation to carry forward, got ${JSON.stringify(outcome)}`);
+  }
+
+  if (generatedCount !== 0) {
+    throw new Error("Expected fast rotation to skip generation entirely when carry-forward art exists");
   }
 });
 
