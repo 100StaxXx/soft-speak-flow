@@ -19,8 +19,8 @@ struct CosmicGradientBackground: View {
     var body: some View {
         LinearGradient(
             colors: [
-                Color.cosmicBackground.opacity(0.08),
-                Color.cosmicBackgroundEnd.opacity(0.14)
+                Color.clear,
+                Color.white.opacity(0.04)
             ],
             startPoint: .topLeading,
             endPoint: .bottomTrailing

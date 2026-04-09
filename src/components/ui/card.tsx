@@ -3,7 +3,7 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 
 export const outerShellCardClassName =
-  "bg-card/[0.05] backdrop-blur-md border-border/25 shadow-[0_10px_24px_rgba(0,0,0,0.14)]";
+  "bg-white/[0.03] backdrop-blur-none border-white/10 shadow-none";
 
 const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(({ className, ...props }, ref) => (
   <div 

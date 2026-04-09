@@ -5,10 +5,10 @@ import { Card, outerShellCardClassName } from "./card";
 import { GlassCard } from "./glass-card";
 
 const expectOuterShellClasses = (className: string) => {
-  expect(className).toContain("bg-card/[0.05]");
-  expect(className).toContain("backdrop-blur-md");
-  expect(className).toContain("border-border/25");
-  expect(className).toContain("shadow-[0_10px_24px_rgba(0,0,0,0.14)]");
+  expect(className).toContain("bg-white/[0.03]");
+  expect(className).toContain("backdrop-blur-none");
+  expect(className).toContain("border-white/10");
+  expect(className).toContain("shadow-none");
 };
 
 describe("outer shell card treatment", () => {

@@ -555,28 +555,28 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
         {/* Equipped background or default nebula gradients */}
         {equippedBackgroundStyle ? (
           <div 
-            className="absolute inset-0 opacity-[0.16] transition-opacity duration-500" 
+            className="absolute inset-0 opacity-[0.08] transition-opacity duration-500" 
             style={{ background: equippedBackgroundStyle }}
           />
         ) : (
           <>
             <div
               data-testid="companion-shell-gradient-overlay"
-              className={`absolute inset-0 opacity-[0.16] ${!prefersReducedMotion ? "animate-nebula-shift" : ""}`}
+              className={`absolute inset-0 opacity-[0.08] ${!prefersReducedMotion ? "animate-nebula-shift" : ""}`}
               style={{
                 background: `linear-gradient(135deg, ${companionPalette.cardGradientA}, ${companionPalette.cardGradientB})`,
               }}
             />
             <div
               data-testid="companion-shell-radial-top"
-              className="absolute inset-0 opacity-[0.10]"
+              className="absolute inset-0 opacity-[0.04]"
               style={{
                 background: `radial-gradient(circle at top right, ${companionPalette.glow}, transparent 52%)`,
               }}
             />
             <div
               data-testid="companion-shell-radial-bottom"
-              className="absolute inset-0 opacity-[0.10]"
+              className="absolute inset-0 opacity-[0.04]"
               style={{
                 background: `radial-gradient(circle at bottom left, ${companionPalette.badgeBorder}, transparent 56%)`,
               }}
