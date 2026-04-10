@@ -1265,7 +1265,12 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
     onError: (error) => {
       setIsEvolvingLoading(false);
       console.error("Hatch failed:", error);
-      toast.error(error instanceof Error ? error.message : "Unable to hatch your companion right now.");
+      const message =
+        error instanceof Error && error.message
+          ? error.message
+          : (error as { message?: string } | null)?.message
+            ?? "Unable to hatch your companion right now.";
+      toast.error(message);
     },
   });
 
