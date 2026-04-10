@@ -1,9 +1,5 @@
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  getGuidedTutorialGateDeferralSessionKey,
-  getGuidedTutorialLocalProgressKey,
-} from "@/utils/guidedTutorial";
 
 const mocks = vi.hoisted(() => ({
   profile: null as Record<string, unknown> | null,
@@ -18,10 +14,6 @@ const mocks = vi.hoisted(() => ({
 }));
 
 const localStorageState = vi.hoisted(() => ({
-  store: new Map<string, string>(),
-}));
-
-const sessionStorageState = vi.hoisted(() => ({
   store: new Map<string, string>(),
 }));
 
@@ -70,34 +62,10 @@ const installLocalStorageMock = () => {
   });
 };
 
-const installSessionStorageMock = () => {
-  Object.defineProperty(globalThis, "sessionStorage", {
-    configurable: true,
-    value: {
-      getItem: (key: string) => sessionStorageState.store.get(key) ?? null,
-      setItem: (key: string, value: string) => {
-        sessionStorageState.store.set(key, value);
-      },
-      removeItem: (key: string) => {
-        sessionStorageState.store.delete(key);
-      },
-      clear: () => {
-        sessionStorageState.store.clear();
-      },
-      key: (index: number) => Array.from(sessionStorageState.store.keys())[index] ?? null,
-      get length() {
-        return sessionStorageState.store.size;
-      },
-    } as Storage,
-  });
-};
-
 describe("useAccessStatus", () => {
   beforeEach(() => {
     installLocalStorageMock();
-    installSessionStorageMock();
     localStorageState.store.clear();
-    sessionStorageState.store.clear();
     mocks.profileLoading = false;
     mocks.accessLoading = false;
     mocks.accessState = {
@@ -198,7 +166,7 @@ describe("useAccessStatus", () => {
       },
     });
     globalThis.localStorage?.setItem?.(
-      getGuidedTutorialLocalProgressKey("user-1"),
+      "guided_tutorial_progress_user-1",
       JSON.stringify({ completed: true })
     );
 
@@ -206,23 +174,6 @@ describe("useAccessStatus", () => {
 
     expect(result.current.hasAccess).toBe(false);
     expect(result.current.gateReason).toBe("pre_trial_signup");
-  });
-
-  it("defers the pre-trial gate until the next session after tutorial completion", () => {
-    mocks.profile = createProfile({
-      onboarding_data: {
-        guided_tutorial: { completed: true },
-      },
-    });
-    globalThis.sessionStorage?.setItem?.(
-      getGuidedTutorialGateDeferralSessionKey("user-1"),
-      "true"
-    );
-
-    const { result } = renderHook(() => useAccessStatus());
-
-    expect(result.current.hasAccess).toBe(true);
-    expect(result.current.gateReason).toBe("none");
   });
 
   it("does not trigger the pre-trial gate when the tutorial was dismissed instead of completed", () => {

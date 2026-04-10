@@ -100,8 +100,6 @@ const RouteProbe = () => {
     currentStep,
     secondaryActionLabel,
     onSecondaryAction,
-    resumeActionLabel,
-    onResumeAction,
   } = usePostOnboardingMentorGuidance();
 
   return (
@@ -111,15 +109,11 @@ const RouteProbe = () => {
       <div data-testid="intro-active">{String(isIntroDialogueActive)}</div>
       <div data-testid="intro-action">{dialogueActionLabel || ""}</div>
       <div data-testid="secondary-action">{secondaryActionLabel || ""}</div>
-      <div data-testid="resume-action">{resumeActionLabel || ""}</div>
       <button type="button" onClick={() => onDialogueAction?.()}>
         intro-action
       </button>
       <button type="button" onClick={() => onSecondaryAction?.()}>
         secondary
-      </button>
-      <button type="button" onClick={() => onResumeAction?.()}>
-        resume
       </button>
       <button type="button" onClick={() => navigate(-1)}>
         back
@@ -180,7 +174,6 @@ describe("guided tutorial route restoration", () => {
   });
 
   afterEach(() => {
-    vi.useRealTimers();
     vi.restoreAllMocks();
     window.matchMedia = originalMatchMedia;
     document
@@ -277,25 +270,21 @@ describe("guided tutorial route restoration", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "intro-action" }));
 
-    vi.useFakeTimers();
-    try {
-      await act(async () => {
-        window.dispatchEvent(new CustomEvent("morning-checkin-completed"));
-        await vi.advanceTimersByTimeAsync(0);
-      });
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent("morning-checkin-completed"));
+    });
 
+    await waitFor(() => {
       expect(screen.getByTestId("path")).toHaveTextContent("/companion");
       expect(screen.getByTestId("step")).toHaveTextContent("companion_tab_intro");
-      expect(screen.getByTestId("intro-action")).toHaveTextContent("");
+      expect(screen.getByTestId("intro-action")).toHaveTextContent("Continue");
+    });
 
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(1300);
-      });
+    fireEvent.click(screen.getByRole("button", { name: "intro-action" }));
 
+    await waitFor(() => {
       expect(screen.getByTestId("step")).toHaveTextContent("evolve_companion");
-    } finally {
-      vi.useRealTimers();
-    }
+    });
 
     await act(async () => {
       window.dispatchEvent(new CustomEvent("evolution-loading-start"));
@@ -305,7 +294,7 @@ describe("guided tutorial route restoration", () => {
     await waitFor(() => {
       expect(screen.getByTestId("path")).toHaveTextContent("/companion");
       expect(screen.getByTestId("step")).toHaveTextContent("post_evolution_companion_intro");
-      expect(screen.getByTestId("intro-action")).toHaveTextContent("");
+      expect(screen.getByTestId("intro-action")).toHaveTextContent("Continue");
     });
   });
 
@@ -338,7 +327,7 @@ describe("guided tutorial route restoration", () => {
     });
   });
 
-  it("stops restoring tutorial routes after setup is deferred and can resume later", async () => {
+  it("stops restoring tutorial routes after the tutorial is skipped", async () => {
     renderWithProviders();
 
     await waitFor(() => {
@@ -351,7 +340,7 @@ describe("guided tutorial route restoration", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("intro-action")).toHaveTextContent("");
-      expect(screen.getByTestId("secondary-action")).toHaveTextContent("Continue later");
+      expect(screen.getByTestId("secondary-action")).toHaveTextContent("Skip tutorial");
     });
 
     fireEvent.click(screen.getByRole("button", { name: "secondary" }));
@@ -359,20 +348,12 @@ describe("guided tutorial route restoration", () => {
     await waitFor(() => {
       expect(screen.getByTestId("step")).toHaveTextContent("");
       expect(screen.getByTestId("secondary-action")).toHaveTextContent("");
-      expect(screen.getByTestId("resume-action")).toHaveTextContent("Continue setup");
     });
 
     fireEvent.click(screen.getByRole("button", { name: "go-journeys" }));
 
     await waitFor(() => {
       expect(screen.getByTestId("path")).toHaveTextContent("/journeys");
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "resume" }));
-
-    await waitFor(() => {
-      expect(screen.getByTestId("path")).toHaveTextContent("/mentor");
-      expect(screen.getByTestId("resume-action")).toHaveTextContent("");
     });
   });
 

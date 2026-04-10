@@ -15,30 +15,133 @@ interface JourneyPathRequestBody {
   milestoneIndex: number | null;
 }
 
-function parseJourneyPathBody(payload: unknown): JourneyPathRequestBody {
+interface ValidJourneyPathRequestBody {
+  epicId: string;
+  milestoneIndex: number;
+}
+
+interface JourneyPathBodyReadResult {
+  parseErrorName: string | null;
+  parsedBody: JourneyPathRequestBody;
+  rawBody: unknown;
+}
+
+interface GenerateJourneyPathDependencies {
+  getOpenAIApiKey?: () => string | undefined;
+  requireProtectedRequestImpl?: typeof requireProtectedRequest;
+}
+
+const INVALID_JOURNEY_PATH_INPUT_ERROR = "Missing or invalid journey path parameters.";
+
+const normalizeJourneyPathEpicId = (value: unknown): string | null => {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+};
+
+const normalizeJourneyPathMilestoneIndex = (value: unknown): number | null => {
+  if (typeof value === "number") {
+    return Number.isInteger(value) ? value : null;
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed.length === 0) {
+      return null;
+    }
+
+    const parsed = Number(trimmed);
+    return Number.isInteger(parsed) ? parsed : null;
+  }
+
+  return null;
+};
+
+export function parseJourneyPathBody(payload: unknown): JourneyPathRequestBody {
   if (!payload || typeof payload !== "object") {
     return { epicId: null, milestoneIndex: null };
   }
 
   const requestPayload = payload as Record<string, unknown>;
   return {
-    epicId: typeof requestPayload.epicId === "string" ? requestPayload.epicId : null,
-    milestoneIndex: typeof requestPayload.milestoneIndex === "number"
-      ? requestPayload.milestoneIndex
-      : null,
+    epicId: normalizeJourneyPathEpicId(requestPayload.epicId),
+    milestoneIndex: normalizeJourneyPathMilestoneIndex(requestPayload.milestoneIndex),
   };
 }
 
-export async function handleGenerateJourneyPath(req: Request): Promise<Response> {
+export async function readJourneyPathBody(req: Request): Promise<JourneyPathBodyReadResult> {
+  try {
+    const rawBody = await req.clone().json();
+    return {
+      parseErrorName: null,
+      parsedBody: parseJourneyPathBody(rawBody),
+      rawBody,
+    };
+  } catch (error) {
+    return {
+      parseErrorName: error instanceof Error ? error.name : "UnknownError",
+      parsedBody: { epicId: null, milestoneIndex: null },
+      rawBody: null,
+    };
+  }
+}
+
+export function getJourneyPathValidationError(body: JourneyPathRequestBody): string | null {
+  if (!body.epicId || body.milestoneIndex === null || body.milestoneIndex < 0) {
+    return INVALID_JOURNEY_PATH_INPUT_ERROR;
+  }
+
+  return null;
+}
+
+function isValidJourneyPathBody(body: JourneyPathRequestBody): body is ValidJourneyPathRequestBody {
+  return getJourneyPathValidationError(body) === null;
+}
+
+function logJourneyPathValidationFailure(
+  req: Request,
+  requestId: string,
+  bodyReadResult: JourneyPathBodyReadResult,
+) {
+  const rawPayload = bodyReadResult.rawBody && typeof bodyReadResult.rawBody === "object"
+    ? bodyReadResult.rawBody as Record<string, unknown>
+    : null;
+
+  const rawEpicId = rawPayload?.epicId;
+  const rawMilestoneIndex = rawPayload?.milestoneIndex;
+
+  console.warn("[generate-journey-path] Invalid input", {
+    requestId,
+    bodyUsed: req.bodyUsed,
+    contentType: req.headers.get("content-type"),
+    hasJsonBody: bodyReadResult.rawBody !== null,
+    parseErrorName: bodyReadResult.parseErrorName,
+    epicIdType: rawEpicId === undefined ? "missing" : typeof rawEpicId,
+    epicIdLength: typeof rawEpicId === "string" ? rawEpicId.trim().length : null,
+    milestoneIndexType: rawMilestoneIndex === undefined ? "missing" : typeof rawMilestoneIndex,
+    normalizedMilestoneIndex: bodyReadResult.parsedBody.milestoneIndex,
+  });
+}
+
+export async function handleGenerateJourneyPath(
+  req: Request,
+  deps: GenerateJourneyPathDependencies = {},
+): Promise<Response> {
   if (req.method === "OPTIONS") {
     return handleCors(req);
   }
 
   const corsHeaders = getCorsHeaders(req);
+  const bodyReadResult = await readJourneyPathBody(req);
+  const requireProtectedRequestImpl = deps.requireProtectedRequestImpl ?? requireProtectedRequest;
+  const getOpenAIApiKey = deps.getOpenAIApiKey ?? (() => Deno.env.get("OPENAI_API_KEY"));
   let requestId: string = crypto.randomUUID();
 
   try {
-    const protectedRequest = await requireProtectedRequest(req, {
+    const protectedRequest = await requireProtectedRequestImpl(req, {
       profileKey: "ai.expensive_export",
       endpointName: "generate-journey-path",
       allowServiceRole: false,
@@ -49,18 +152,18 @@ export async function handleGenerateJourneyPath(req: Request): Promise<Response>
     const { auth, supabase, requestId: protectedRequestId } = protectedRequest;
     requestId = protectedRequestId;
 
-    const body = await req.json().catch(() => ({}));
-    const { epicId, milestoneIndex } = parseJourneyPathBody(body);
-    if (!epicId || milestoneIndex === null || milestoneIndex < 0) {
+    if (!isValidJourneyPathBody(bodyReadResult.parsedBody)) {
+      logJourneyPathValidationFailure(req, requestId, bodyReadResult);
       return createSafeErrorResponse(req, {
         status: 400,
         code: "INVALID_INPUT",
-        error: "Missing required parameters: epicId, milestoneIndex",
+        error: INVALID_JOURNEY_PATH_INPUT_ERROR,
         requestId,
       });
     }
+    const { epicId, milestoneIndex } = bodyReadResult.parsedBody;
 
-    const openAIApiKey = Deno.env.get("OPENAI_API_KEY");
+    const openAIApiKey = getOpenAIApiKey();
     if (!openAIApiKey) {
       return createSafeErrorResponse(req, {
         status: 500,
@@ -309,5 +412,5 @@ Ultra high resolution.`;
 }
 
 if (Deno.env.get("SUPABASE_FUNCTIONS_TEST") !== "1") {
-  serve(handleGenerateJourneyPath);
+  serve((req) => handleGenerateJourneyPath(req));
 }

@@ -19,7 +19,7 @@ const narrativeLines = [
 
 const LINE_DISPLAY_MS = 3400;
 const FINAL_LINE_HOLD_MS = LINE_DISPLAY_MS;
-const FINAL_BUTTON_DELAY_MS = 1600;
+const FINAL_BUTTON_DELAY_MS = 3200;
 
 export const JourneyBegins = ({ userName, companionAnimal, onComplete }: JourneyBeginsProps) => {
   const [currentLine, setCurrentLine] = useState(0);

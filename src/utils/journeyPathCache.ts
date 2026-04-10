@@ -53,6 +53,7 @@ type EpicWithJourneyPath = EpicRecord & {
 
 const pendingJourneyPathGenerations = new Map<string, Promise<JourneyPathSnapshot | null>>();
 const generationStatusCounts = new Map<string, Map<number, number>>();
+const INVALID_JOURNEY_PATH_INPUT_MESSAGE = "Missing or invalid journey path parameters.";
 
 export const getJourneyPathQueryKey = (epicId: string | undefined, userId: string | undefined) =>
   ["journey-path", epicId, userId] as const;
@@ -153,6 +154,35 @@ const toJourneyPathPayloadFailure = (
       status: typeof responsePayload.status === "number" ? responsePayload.status : null,
     }),
   );
+};
+
+const createJourneyPathInputFailure = (
+  message = INVALID_JOURNEY_PATH_INPUT_MESSAGE,
+) => new JourneyPathGenerationFailure(
+  toJourneyPathGenerationError({
+    code: "INVALID_INPUT",
+    message,
+    requestId: null,
+    retryAfterSeconds: null,
+    retryable: false,
+    status: 400,
+  }),
+);
+
+const normalizeJourneyPathGenerationInput = (epicId: string, milestoneIndex: number) => {
+  const normalizedEpicId = epicId.trim();
+  if (normalizedEpicId.length === 0) {
+    return createJourneyPathInputFailure();
+  }
+
+  if (!Number.isInteger(milestoneIndex) || milestoneIndex < 0) {
+    return createJourneyPathInputFailure();
+  }
+
+  return {
+    epicId: normalizedEpicId,
+    milestoneIndex,
+  };
 };
 
 const getHighestPendingMilestoneIndex = (countsByMilestone: Map<number, number>) => {
@@ -375,13 +405,34 @@ export async function requestJourneyPathGeneration({
   queryClient,
   userId,
 }: JourneyPathGenerationOptions): Promise<JourneyPathSnapshot | null> {
-  const generationRequestKey = getGenerationRequestKey(userId, epicId, milestoneIndex);
+  const normalizedInput = normalizeJourneyPathGenerationInput(epicId, milestoneIndex);
+  if (normalizedInput instanceof JourneyPathGenerationFailure) {
+    patchJourneyPathGenerationState(
+      queryClient,
+      epicId,
+      userId,
+      false,
+      null,
+      toJourneyPathGenerationError({
+        code: normalizedInput.code,
+        message: normalizedInput.message,
+        requestId: normalizedInput.requestId,
+        retryAfterSeconds: normalizedInput.retryAfterSeconds,
+        retryable: normalizedInput.retryable,
+        status: normalizedInput.status,
+      }),
+    );
+    throw normalizedInput;
+  }
+
+  const { epicId: normalizedEpicId, milestoneIndex: normalizedMilestoneIndex } = normalizedInput;
+  const generationRequestKey = getGenerationRequestKey(userId, normalizedEpicId, normalizedMilestoneIndex);
   const existingRequest = pendingJourneyPathGenerations.get(generationRequestKey);
   if (existingRequest) {
     return existingRequest;
   }
 
-  markJourneyPathGenerationStart(queryClient, epicId, userId, milestoneIndex);
+  markJourneyPathGenerationStart(queryClient, normalizedEpicId, userId, normalizedMilestoneIndex);
 
   const request = (async () => {
     let failure: JourneyPathGenerationFailure | null = null;
@@ -389,8 +440,8 @@ export async function requestJourneyPathGeneration({
     try {
       const { data, error } = await supabase.functions.invoke("generate-journey-path", {
         body: {
-          epicId,
-          milestoneIndex,
+          epicId: normalizedEpicId,
+          milestoneIndex: normalizedMilestoneIndex,
         },
       });
 
@@ -401,7 +452,7 @@ export async function requestJourneyPathGeneration({
         throw toJourneyPathPayloadFailure(data);
       }
 
-      const remoteSnapshot = await fetchRemoteLatestJourneyPath(userId, epicId);
+      const remoteSnapshot = await fetchRemoteLatestJourneyPath(userId, normalizedEpicId);
       if (remoteSnapshot) {
         return persistAndPatchJourneyPathSnapshot(queryClient, remoteSnapshot);
       }
@@ -414,10 +465,10 @@ export async function requestJourneyPathGeneration({
       }
 
       return persistAndPatchJourneyPathSnapshot(queryClient, {
-        id: getLocalJourneyPathSnapshotId(userId, epicId),
+        id: getLocalJourneyPathSnapshotId(userId, normalizedEpicId),
         user_id: userId,
-        epic_id: epicId,
-        milestone_index: typeof data?.milestoneIndex === "number" ? data.milestoneIndex : milestoneIndex,
+        epic_id: normalizedEpicId,
+        milestone_index: typeof data?.milestoneIndex === "number" ? data.milestoneIndex : normalizedMilestoneIndex,
         image_url: data.imageUrl,
         generated_at: new Date().toISOString(),
         prompt_context: null,
@@ -431,9 +482,9 @@ export async function requestJourneyPathGeneration({
       pendingJourneyPathGenerations.delete(generationRequestKey);
       markJourneyPathGenerationEnd(
         queryClient,
-        epicId,
+        normalizedEpicId,
         userId,
-        milestoneIndex,
+        normalizedMilestoneIndex,
         failure
           ? toJourneyPathGenerationError({
             code: failure.code,

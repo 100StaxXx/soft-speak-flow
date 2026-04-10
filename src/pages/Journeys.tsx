@@ -86,26 +86,6 @@ interface CreatedCampaignData {
 
 type DesktopPlannerMode = "week" | "day";
 
-export const shouldAutoLaunchTutorialCreateQuest = ({
-  tutorialActive,
-  tutorialStep,
-  tutorialSubstep,
-  showAddSheet,
-  showVoiceQuestCapture,
-}: {
-  tutorialActive: boolean;
-  tutorialStep: string | null;
-  tutorialSubstep: string | null;
-  showAddSheet: boolean;
-  showVoiceQuestCapture: boolean;
-}): boolean => (
-  tutorialActive &&
-  tutorialStep === "create_quest" &&
-  tutorialSubstep === "open_add_quest" &&
-  !showAddSheet &&
-  !showVoiceQuestCapture
-);
-
 const Journeys = () => {
   const prefersReducedMotion = useReducedMotion();
   const location = useLocation();
@@ -133,7 +113,6 @@ const Journeys = () => {
   const [createdCampaignData, setCreatedCampaignData] = useState<CreatedCampaignData | null>(null);
   const [isInboxExpanded, setIsInboxExpanded] = useState(false);
   const previousIsTabActiveRef = useRef(isTabActive);
-  const tutorialQuestComposerLaunchRef = useRef<string | null>(null);
   const scheduledTimeUpdateQueueRef = useRef<Map<string, Promise<void>>>(new Map());
   const inboxSectionRef = useRef<HTMLDivElement | null>(null);
   const hasInitializedInboxVisibilityRef = useRef(false);
@@ -141,13 +120,6 @@ const Journeys = () => {
     usePostOnboardingMentorGuidance();
   const shouldAutoFillTutorialTime =
     tutorialActive && tutorialStep === "create_quest" && tutorialSubstep === "select_time";
-  const shouldAutoLaunchTutorialQuestComposer = shouldAutoLaunchTutorialCreateQuest({
-    tutorialActive,
-    tutorialStep,
-    tutorialSubstep,
-    showAddSheet,
-    showVoiceQuestCapture,
-  });
   const isInboxRequested = useMemo(
     () => new URLSearchParams(location.search).get("section") === "inbox",
     [location.search],
@@ -194,33 +166,6 @@ const Journeys = () => {
   const openVoiceQuestCapture = useCallback(() => {
     setShowVoiceQuestCapture(true);
   }, []);
-
-  useEffect(() => {
-    if (!shouldAutoLaunchTutorialQuestComposer) {
-      tutorialQuestComposerLaunchRef.current = null;
-      return;
-    }
-
-    const signature = `${tutorialStep}:${tutorialSubstep}`;
-    if (tutorialQuestComposerLaunchRef.current === signature) {
-      return;
-    }
-
-    tutorialQuestComposerLaunchRef.current = signature;
-
-    const timeout = window.setTimeout(() => {
-      openAddQuestSheet();
-    }, 250);
-
-    return () => {
-      window.clearTimeout(timeout);
-    };
-  }, [
-    openAddQuestSheet,
-    shouldAutoLaunchTutorialQuestComposer,
-    tutorialStep,
-    tutorialSubstep,
-  ]);
 
   const handleVoiceQuestCapture = useCallback((transcript: string) => {
     setShowVoiceQuestCapture(false);

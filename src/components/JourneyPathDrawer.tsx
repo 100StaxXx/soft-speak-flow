@@ -147,6 +147,7 @@ export const JourneyPathDrawer = memo(function JourneyPathDrawer({
                   companionMood={companion?.current_mood}
                   showCompanion={true}
                   milestones={trailMilestones}
+                  epicId={epic.id}
                   transparentBackground={!!drawerImageUrl}
                   className="absolute inset-0"
                 />

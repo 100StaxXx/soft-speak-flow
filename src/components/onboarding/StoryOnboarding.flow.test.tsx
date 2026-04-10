@@ -638,16 +638,13 @@ describe("StoryOnboarding questionnaire submission flow", () => {
       const guidedTutorial = JSON.parse(rawProgress ?? "{}");
       expect(guidedTutorial).toMatchObject({
         version: 2,
-        flowVersion: 4,
+        flowVersion: 3,
         eligible: true,
         completed: false,
         dismissed: false,
-        softDismissed: false,
         completedSteps: [],
         xpAwardedSteps: [],
         milestonesCompleted: [],
-        lastActiveAt: expect.any(String),
-        lastUpdatedAt: expect.any(String),
       });
     } finally {
       vi.useRealTimers();

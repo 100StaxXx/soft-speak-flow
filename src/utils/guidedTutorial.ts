@@ -1,13 +1,10 @@
 import type { GuidedTutorialProgress } from "@/types/profile";
 
 export const GUIDED_TUTORIAL_VERSION = 2;
-export const GUIDED_TUTORIAL_FLOW_VERSION = 4;
+export const GUIDED_TUTORIAL_FLOW_VERSION = 3;
 
 export const getGuidedTutorialLocalProgressKey = (userId: string) =>
   `guided_tutorial_progress_${userId}`;
-
-export const getGuidedTutorialGateDeferralSessionKey = (userId: string) =>
-  `guided_tutorial_gate_deferred_${userId}`;
 
 export const createInitialGuidedTutorialProgress = (
   nowIso: string = new Date().toISOString(),
@@ -19,8 +16,6 @@ export const createInitialGuidedTutorialProgress = (
   xpAwardedSteps: [],
   milestonesCompleted: [],
   dismissed: false,
-  softDismissed: false,
   completed: false,
-  lastActiveAt: nowIso,
   lastUpdatedAt: nowIso,
 });

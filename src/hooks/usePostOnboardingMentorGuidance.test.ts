@@ -14,7 +14,7 @@ const createGuidedTutorial = () => ({
 
 const createCloseoutTutorial = () => ({
   version: 2,
-  flowVersion: 4,
+  flowVersion: 3,
   eligible: true,
   dismissed: false,
   completed: false,
@@ -62,43 +62,26 @@ const mocks = vi.hoisted(() => ({
 }));
 
 const storageMocks = vi.hoisted(() => {
-  const localStore = new Map<string, string>();
-  const sessionStore = new Map<string, string>();
+  const store = new Map<string, string>();
 
   return {
     safeLocalStorage: {
-      getItem: vi.fn((key: string) => localStore.get(key) ?? null),
+      getItem: vi.fn((key: string) => store.get(key) ?? null),
       setItem: vi.fn((key: string, value: string) => {
-        localStore.set(key, value);
+        store.set(key, value);
         return true;
       }),
       removeItem: vi.fn((key: string) => {
-        localStore.delete(key);
+        store.delete(key);
         return true;
       }),
       clear: vi.fn(() => {
-        localStore.clear();
-        return true;
-      }),
-    },
-    safeSessionStorage: {
-      getItem: vi.fn((key: string) => sessionStore.get(key) ?? null),
-      setItem: vi.fn((key: string, value: string) => {
-        sessionStore.set(key, value);
-        return true;
-      }),
-      removeItem: vi.fn((key: string) => {
-        sessionStore.delete(key);
-        return true;
-      }),
-      clear: vi.fn(() => {
-        sessionStore.clear();
+        store.clear();
         return true;
       }),
     },
     reset: () => {
-      localStore.clear();
-      sessionStore.clear();
+      store.clear();
     },
   };
 });
@@ -146,7 +129,6 @@ vi.mock("@/hooks/useMentorPersonality", () => ({
 
 vi.mock("@/utils/storage", () => ({
   safeLocalStorage: storageMocks.safeLocalStorage,
-  safeSessionStorage: storageMocks.safeSessionStorage,
 }));
 
 vi.mock("@/integrations/supabase/client", () => ({
@@ -428,8 +410,8 @@ describe("guided tutorial intro dialogue sequence", () => {
       expect(result.current.isIntroDialogueActive).toBe(false);
       expect(result.current.isActive).toBe(true);
       expect(result.current.currentStep).toBe("quests_campaigns_intro");
-      expect(result.current.dialogueActionLabel).toBeUndefined();
-      expect(result.current.onDialogueAction).toBeUndefined();
+      expect(result.current.dialogueActionLabel).toBe("Continue");
+      expect(result.current.onDialogueAction).toBeDefined();
     });
   });
 
@@ -492,7 +474,7 @@ describe("guided tutorial intro dialogue sequence", () => {
       "guided_tutorial_progress_user-1",
       JSON.stringify({
         version: 2,
-        flowVersion: 4,
+        flowVersion: 3,
         eligible: true,
         dismissed: false,
         completed: false,
@@ -803,9 +785,9 @@ describe("guided tutorial intro dialogue sequence", () => {
 
       await waitFor(() => {
         expect(result.current.currentStep).toBe("quests_campaigns_intro");
-        expect(result.current.dialogueText).toContain("Quests tab");
-        expect(result.current.dialogueText).toContain("real momentum");
-        expect(result.current.dialogueSupportText).toContain("first quest flow");
+        expect(result.current.dialogueText).toContain("daily to-do list");
+        expect(result.current.dialogueText.toLowerCase()).toContain("schedule");
+        expect(result.current.dialogueSupportText?.toLowerCase()).toContain("routines");
       });
     }
   );
@@ -897,8 +879,7 @@ describe("guided tutorial intro dialogue sequence", () => {
     let atlasQuestsText = "";
     await waitFor(() => {
       atlasQuestsText = atlasQuestsResult.current.dialogueText;
-      expect(atlasQuestsText).toContain("Quests tab");
-      expect(atlasQuestsText).toContain("real momentum");
+      expect(atlasQuestsText).toContain("daily to-do list");
     });
     unmountAtlasQuests();
 
@@ -927,8 +908,7 @@ describe("guided tutorial intro dialogue sequence", () => {
     let strykerQuestsText = "";
     await waitFor(() => {
       strykerQuestsText = strykerQuestsResult.current.dialogueText;
-      expect(strykerQuestsText).toContain("Quests tab");
-      expect(strykerQuestsText).toContain("real momentum");
+      expect(strykerQuestsText).toContain("daily to-do list");
     });
 
     expect(atlasQuestsText).toEqual(strykerQuestsText);
@@ -1019,10 +999,10 @@ describe("guided tutorial intro dialogue sequence", () => {
     });
   });
 
-  it("lets the user continue later and exposes a resumable setup action", async () => {
+  it("dismisses an in-progress tutorial and persists the dismissed state", async () => {
     mocks.state.guidedTutorial = {
       version: 2,
-      flowVersion: 4,
+      flowVersion: 3,
       eligible: true,
       dismissed: false,
       completed: false,
@@ -1038,7 +1018,7 @@ describe("guided tutorial intro dialogue sequence", () => {
     await waitFor(() => {
       expect(result.current.isActive).toBe(true);
       expect(result.current.currentStep).toBe("quests_campaigns_intro");
-      expect(result.current.secondaryActionLabel).toBe("Continue later");
+      expect(result.current.secondaryActionLabel).toBe("Skip tutorial");
       expect(result.current.onSecondaryAction).toBeDefined();
     });
 
@@ -1051,24 +1031,12 @@ describe("guided tutorial intro dialogue sequence", () => {
       expect(result.current.currentStep).toBe(null);
       expect(result.current.secondaryActionLabel).toBeUndefined();
       expect(result.current.dialogueText).toBe("");
-      expect(result.current.resumeActionLabel).toBe("Continue setup");
     });
 
     const latestPayload = mocks.state.profileUpdatePayloads.at(-1) as
-      | {
-          onboarding_data?: {
-            guided_tutorial?: {
-              dismissed?: boolean;
-              softDismissed?: boolean;
-              completed?: boolean;
-              resumeStepId?: string | null;
-            };
-          };
-        }
+      | { onboarding_data?: { guided_tutorial?: { dismissed?: boolean; completed?: boolean } } }
       | undefined;
-    expect(latestPayload?.onboarding_data?.guided_tutorial?.dismissed).toBe(false);
-    expect(latestPayload?.onboarding_data?.guided_tutorial?.softDismissed).toBe(true);
-    expect(latestPayload?.onboarding_data?.guided_tutorial?.resumeStepId).toBe("quests_campaigns_intro");
+    expect(latestPayload?.onboarding_data?.guided_tutorial?.dismissed).toBe(true);
     expect(latestPayload?.onboarding_data?.guided_tutorial?.completed).toBe(false);
   });
 

@@ -15,11 +15,6 @@ const narrativeLines = [
   "The universe has been waiting for you.",
 ];
 
-const LINE_DISPLAY_MS = 1800;
-const FINAL_MESSAGE_HOLD_MS = 600;
-const CONTINUE_BUTTON_DELAY_MS = 800;
-const AUTO_ADVANCE_AFTER_FINAL_MS = 1800;
-
 export const DestinyReveal = ({ userName, onComplete }: DestinyRevealProps) => {
   const [currentLine, setCurrentLine] = useState(0);
   const [showFinalMessage, setShowFinalMessage] = useState(false);
@@ -39,12 +34,12 @@ export const DestinyReveal = ({ userName, onComplete }: DestinyRevealProps) => {
     if (currentLine < narrativeLines.length) {
       const timer = setTimeout(() => {
         setCurrentLine(prev => prev + 1);
-      }, LINE_DISPLAY_MS);
+      }, 2500);
       return () => clearTimeout(timer);
     } else {
       const finalTimer = setTimeout(() => {
         setShowFinalMessage(true);
-      }, FINAL_MESSAGE_HOLD_MS);
+      }, 800);
       return () => clearTimeout(finalTimer);
     }
   }, [currentLine]);
@@ -53,20 +48,10 @@ export const DestinyReveal = ({ userName, onComplete }: DestinyRevealProps) => {
     if (showFinalMessage) {
       const buttonTimer = setTimeout(() => {
         setShowButton(true);
-      }, CONTINUE_BUTTON_DELAY_MS);
+      }, 2000);
       return () => clearTimeout(buttonTimer);
     }
   }, [showFinalMessage]);
-
-  useEffect(() => {
-    if (!showFinalMessage) return;
-
-    const autoAdvanceTimer = setTimeout(() => {
-      onComplete();
-    }, AUTO_ADVANCE_AFTER_FINAL_MS);
-
-    return () => clearTimeout(autoAdvanceTimer);
-  }, [onComplete, showFinalMessage]);
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-6 pt-safe-top safe-area-bottom relative">
@@ -152,7 +137,7 @@ export const DestinyReveal = ({ userName, onComplete }: DestinyRevealProps) => {
                 size="lg"
                 className="px-8 py-6 text-lg bg-primary hover:bg-primary/90"
               >
-                Continue Now
+                Choose My Faction
               </Button>
             </motion.div>
           )}

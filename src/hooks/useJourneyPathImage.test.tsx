@@ -445,6 +445,17 @@ describe("useJourneyPathImage", () => {
       expect(mocks.requestJourneyPathGenerationMock).toHaveBeenCalledTimes(2);
     });
 
+    expect(mocks.requestJourneyPathGenerationMock.mock.calls[0][0]).toMatchObject({
+      epicId: "epic-1",
+      milestoneIndex: 0,
+      userId: "user-1",
+    });
+    expect(mocks.requestJourneyPathGenerationMock.mock.calls[1][0]).toMatchObject({
+      epicId: "epic-1",
+      milestoneIndex: 0,
+      userId: "user-1",
+    });
+
     await waitFor(() => {
       expect(result.current.generationError).toBeNull();
     });
