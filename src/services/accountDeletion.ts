@@ -193,18 +193,31 @@ export const getAccountDeletionFailureMessage = (error: unknown): string => {
 };
 
 export const deleteCurrentAccount = async ({ queryClient, userId, signOut }: DeleteAccountOptions) => {
-  const {
-    data: { session },
-    error: sessionError,
-  } = await supabase.auth.getSession();
+  // Attempt to refresh the session first to avoid sending a stale/expired token
+  // to the edge function. If refreshSession fails (e.g. no refresh token), fall
+  // back to the cached session — the edge function will reject it with 401 if
+  // truly expired, and the caller already handles auth errors.
+  let accessToken: string | undefined;
 
-  if (sessionError || !session?.access_token) {
-    throw new Error("Session expired. Please sign in again.");
+  try {
+    const { data: refreshedData } = await supabase.auth.refreshSession();
+    accessToken = refreshedData?.session?.access_token;
+  } catch {
+    // refresh failed — will try cached session below
+  }
+
+  if (!accessToken) {
+    const { data: cachedData, error: sessionError } = await supabase.auth.getSession();
+    accessToken = cachedData?.session?.access_token;
+
+    if (sessionError || !accessToken) {
+      throw new Error("Session expired. Please sign in again.");
+    }
   }
 
   const { data, error } = await supabase.functions.invoke<DeleteUserFunctionResponse>("delete-user", {
     headers: {
-      Authorization: `Bearer ${session.access_token}`,
+      Authorization: `Bearer ${accessToken}`,
     },
   });
 

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -24,13 +24,20 @@ const mocks = vi.hoisted(() => ({
     avatar_url?: string;
   } | null,
   loadMentorImage: vi.fn(),
+  parseFunctionInvokeError: vi.fn(),
+  toUserFacingFunctionError: vi.fn(),
   queryClient: {
     invalidateQueries: vi.fn().mockResolvedValue(undefined),
   },
   toast: vi.fn(),
   awardCheckInComplete: vi.fn(),
+  checkDailyCompletionAchievement: vi.fn().mockResolvedValue(undefined),
   checkFirstTimeAchievements: vi.fn().mockResolvedValue(undefined),
   triggerReaction: vi.fn().mockResolvedValue(undefined),
+  setPendingMentorMood: vi.fn(),
+  insertCheckIn: vi.fn(),
+  countCheckIns: vi.fn(),
+  invokeFunction: vi.fn(),
   guidance: {
     isActive: false,
     currentStep: null as string | null,
@@ -65,6 +72,7 @@ vi.mock("@/hooks/useXPRewards", () => ({
 
 vi.mock("@/hooks/useAchievements", () => ({
   useAchievements: () => ({
+    checkDailyCompletionAchievement: mocks.checkDailyCompletionAchievement,
     checkFirstTimeAchievements: mocks.checkFirstTimeAchievements,
   }),
 }));
@@ -77,6 +85,50 @@ vi.mock("@/hooks/useLivingCompanion", () => ({
 
 vi.mock("@/utils/mentorImageLoader", () => ({
   loadMentorImage: mocks.loadMentorImage,
+}));
+
+vi.mock("@/utils/mentorMoodSignal", () => ({
+  setPendingMentorMood: mocks.setPendingMentorMood,
+}));
+
+vi.mock("@/utils/supabaseFunctionErrors", () => ({
+  parseFunctionInvokeError: mocks.parseFunctionInvokeError,
+  toUserFacingFunctionError: mocks.toUserFacingFunctionError,
+}));
+
+vi.mock("@/integrations/supabase/client", () => ({
+  supabase: {
+    from: (table: string) => {
+      if (table === "daily_check_ins") {
+        const selectChain = {
+          eq: vi.fn(() => selectChain),
+          maybeSingle: mocks.insertCheckIn,
+          then: undefined,
+        };
+        return {
+          select: () => selectChain,
+          insert: () => ({
+            select: () => ({
+              maybeSingle: mocks.insertCheckIn,
+            }),
+          }),
+        };
+      }
+
+      return {
+        select: () => {
+          const selectChain = {
+            eq: vi.fn(() => selectChain),
+            maybeSingle: mocks.countCheckIns,
+          };
+          return selectChain;
+        },
+      };
+    },
+    functions: {
+      invoke: mocks.invokeFunction,
+    },
+  },
 }));
 
 vi.mock("@/hooks/usePostOnboardingMentorGuidance", () => ({
@@ -104,11 +156,18 @@ describe("MorningCheckIn completion portrait", () => {
       avatar_url: "https://cdn.example.com/atlas.png",
     };
     mocks.loadMentorImage.mockReset();
+    mocks.parseFunctionInvokeError.mockReset();
+    mocks.toUserFacingFunctionError.mockReset();
     mocks.queryClient.invalidateQueries.mockClear();
     mocks.toast.mockClear();
     mocks.awardCheckInComplete.mockClear();
+    mocks.checkDailyCompletionAchievement.mockClear();
     mocks.checkFirstTimeAchievements.mockClear();
     mocks.triggerReaction.mockClear();
+    mocks.setPendingMentorMood.mockClear();
+    mocks.insertCheckIn.mockReset();
+    mocks.countCheckIns.mockReset();
+    mocks.invokeFunction.mockReset();
     mocks.guidance = {
       isActive: false,
       currentStep: null,
@@ -206,5 +265,48 @@ describe("MorningCheckIn completion portrait", () => {
     const submitButton = screen.getByRole("button", { name: /check in/i });
     expect(submitButton).not.toHaveAttribute("data-tutorial-highlight");
     expect(submitButton.className).not.toContain("tutorial-checkin-cta");
+  });
+
+  it("shows the parsed backend error when the mentor reply request fails", async () => {
+    mocks.existingCheckIn = null;
+    mocks.insertCheckIn
+      .mockResolvedValueOnce({ data: null })
+      .mockImplementationOnce(async () => {
+        mocks.existingCheckIn = {
+          completed_at: "2026-02-21T12:00:00.000Z",
+          intention: "Ship the thing",
+          mentor_response: null,
+        };
+
+        return {
+          data: {
+            id: "check-in-1",
+            user_id: "user-1",
+            completed_at: "2026-02-21T12:00:00.000Z",
+          },
+          error: null,
+        };
+      });
+    mocks.countCheckIns.mockResolvedValue({ count: 2 });
+    const invokeError = new Error("Edge Function returned a non-2xx status code");
+    mocks.invokeFunction.mockResolvedValue({ error: invokeError });
+    mocks.parseFunctionInvokeError.mockResolvedValue({
+      category: "rate_limit",
+      isOffline: false,
+      backendMessage: "Too many AI requests. Please try again later.",
+    });
+    mocks.toUserFacingFunctionError.mockReturnValue("Too many AI requests. Please try again later.");
+
+    render(<MorningCheckIn />);
+
+    fireEvent.click(screen.getByRole("button", { name: /motivated/i }));
+    fireEvent.change(screen.getByPlaceholderText("I will..."), {
+      target: { value: "Ship the thing" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /check in/i }));
+
+    expect(await screen.findByTestId("mentor-response-status")).toHaveTextContent(
+      "Too many AI requests. Please try again later.",
+    );
   });
 });

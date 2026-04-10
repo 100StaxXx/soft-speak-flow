@@ -45,7 +45,8 @@ const RETRYABLE_ERROR_PATTERNS = [
   "too many requests",
 ];
 const STORAGE_LIST_PAGE_SIZE = 100;
-const STORAGE_REMOVE_BATCH_SIZE = 100;
+const STORAGE_REMOVE_BATCH_SIZE = 500;
+const STORAGE_CLEANUP_DEADLINE_MS = 8_000; // Leave headroom before edge function timeout
 const LEGACY_USER_STORAGE_PREFIX_TARGETS = [
   { bucket: "quest-attachments", prefix: (userId: string) => userId },
   { bucket: "mentors-avatars", prefix: (userId: string) => userId },
@@ -654,13 +655,53 @@ const summarizeOwnedStorageObjects = (
     return summary;
   }, {});
 
+const checkStorageDeadline = (startTime: number, phase: string): void => {
+  const elapsed = Date.now() - startTime;
+  if (elapsed > STORAGE_CLEANUP_DEADLINE_MS) {
+    throw createStageFailureError(
+      "storage_cleanup",
+      ACCOUNT_DELETION_ERROR_CODES.STORAGE_CLEANUP_FAILED,
+      { message: `Storage cleanup timed out during ${phase} after ${elapsed}ms` },
+    );
+  }
+};
+
 const deleteUserStorageAssets = async (
   supabase: SupabaseAdminClient,
   userId: string,
   waitForRetry: (ms: number) => Promise<void>,
 ): Promise<void> => {
+  const storageStartTime = Date.now();
   const legacyStoragePathsByBucket = await collectLegacyUserStoragePaths(supabase, userId, waitForRetry);
   await removeStoragePathsByBucket(supabase, legacyStoragePathsByBucket, waitForRetry);
+
+  // Validate legacy storage was actually removed by re-collecting and checking
+  if (legacyStoragePathsByBucket.size > 0) {
+    const remainingLegacyPaths = await collectLegacyUserStoragePaths(supabase, userId, waitForRetry);
+    const remainingLegacyCount = Array.from(remainingLegacyPaths.values()).reduce(
+      (sum, paths) => sum + paths.length,
+      0,
+    );
+
+    if (remainingLegacyCount > 0) {
+      const remainingSummary: Record<string, number> = {};
+      for (const [bucket, paths] of remainingLegacyPaths.entries()) {
+        remainingSummary[bucket] = paths.length;
+      }
+      console.error("[delete-user] legacy storage paths remain after cleanup", {
+        userId,
+        buckets: remainingSummary,
+      });
+      throw createStageFailureError(
+        "storage_cleanup",
+        ACCOUNT_DELETION_ERROR_CODES.STORAGE_CLEANUP_FAILED,
+        {
+          message: "Legacy storage paths remain after cleanup",
+          remainingBuckets: remainingSummary,
+        },
+      );
+    }
+  }
 
   const ownedStorageObjects = await listOwnedStorageObjects(supabase, userId, waitForRetry);
   const ownedStoragePathsByBucket = groupStoragePathsByBucket(ownedStorageObjects);
@@ -788,6 +829,13 @@ export const handleDeleteUser = async (
       );
     }
 
+    // Auth deletion happens after the profile and relational data are already gone.
+    // If this step fails, the user's data is removed but their auth record lingers.
+    // Rather than throwing (which tells the client nothing was deleted), we treat
+    // auth deletion failure as a degraded success with a warning so the client can
+    // navigate the user away and the orphaned auth record can be cleaned up later.
+    const warnings: Array<{ code: string; message: string; details?: unknown }> = [];
+
     try {
       await runDeleteStepWithRetry(
         "auth.admin.deleteUser",
@@ -801,16 +849,20 @@ export const handleDeleteUser = async (
         waitForRetry,
       );
     } catch (error) {
-      console.error("[delete-user] auth deletion failed", {
+      console.error("[delete-user] auth deletion failed after profile removal — returning degraded success", {
         requestId,
         userId: user.id,
         stage: "auth_delete",
         ...describeError(error),
       });
-      throw createStageFailureError("auth_delete", ACCOUNT_DELETION_ERROR_CODES.AUTH_DELETE_FAILED, error);
+      warnings.push({
+        code: "AUTH_DELETE_DEFERRED",
+        message: "Your data was deleted but sign-in record removal was delayed. It will be cleaned up automatically.",
+        details: describeError(error),
+      });
     }
 
-    return new Response(JSON.stringify({ success: true, requestId }), {
+    return new Response(JSON.stringify({ success: true, requestId, warnings }), {
       status: 200,
       headers: buildRequestHeaders(corsHeaders, requestId),
     });

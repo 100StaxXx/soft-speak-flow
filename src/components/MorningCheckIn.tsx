@@ -19,6 +19,24 @@ import { loadMentorImage } from "@/utils/mentorImageLoader";
 import { setPendingMentorMood } from "@/utils/mentorMoodSignal";
 import { usePostOnboardingMentorGuidance } from "@/hooks/usePostOnboardingMentorGuidance";
 import { cn } from "@/lib/utils";
+import {
+  parseFunctionInvokeError,
+  toUserFacingFunctionError,
+} from "@/utils/supabaseFunctionErrors";
+
+type MentorResponseIssue =
+  | {
+      kind: "error";
+      message: string;
+    }
+  | {
+      kind: "timeout";
+      message: string;
+    }
+  | null;
+
+const CHECK_IN_TIMEOUT_MESSAGE =
+  "Your check-in was saved, but your guide's personalized reply is taking longer than expected.";
 
 const MorningCheckInContent = () => {
   const { user } = useAuth();
@@ -33,6 +51,7 @@ const MorningCheckInContent = () => {
   const [intention, setIntention] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [mentorPortraitUrl, setMentorPortraitUrl] = useState("");
+  const [mentorResponseIssue, setMentorResponseIssue] = useState<MentorResponseIssue>(null);
   // Use ref for pollStartTime to avoid stale closure in refetchInterval callback
   const pollStartTimeRef = useRef<number | null>(null);
   const isTutorialMorningCheckinStep = isTutorialActive && tutorialStep === "morning_checkin";
@@ -117,6 +136,26 @@ const MorningCheckInContent = () => {
     setPendingMentorMood(mood || null);
   }, [existingCheckIn?.completed_at, mood]);
 
+  useEffect(() => {
+    if (existingCheckIn?.mentor_response) {
+      setMentorResponseIssue(null);
+      pollStartTimeRef.current = null;
+      return;
+    }
+
+    if (
+      existingCheckIn?.completed_at &&
+      pollStartTimeRef.current &&
+      Date.now() - pollStartTimeRef.current > MAX_POLL_DURATION &&
+      !mentorResponseIssue
+    ) {
+      setMentorResponseIssue({
+        kind: "timeout",
+        message: CHECK_IN_TIMEOUT_MESSAGE,
+      });
+    }
+  }, [existingCheckIn?.completed_at, existingCheckIn?.mentor_response, mentorResponseIssue, MAX_POLL_DURATION]);
+
   const submitCheckIn = async () => {
     if (!user || !mood || !intention.trim()) {
       toast({ title: "Please complete all fields", variant: "destructive" });
@@ -134,6 +173,7 @@ const MorningCheckInContent = () => {
     }
 
     setIsSubmitting(true);
+    setMentorResponseIssue(null);
 
     try {
       // Double-check right before insert (cache could be stale)
@@ -210,11 +250,23 @@ const MorningCheckInContent = () => {
         
         if (invocationError) {
           logger.error('Edge function invocation error:', invocationError);
-          // Don't block the UI - mentor response is optional
+          const parsedError = await parseFunctionInvokeError(invocationError);
+          setMentorResponseIssue({
+            kind: "error",
+            message: toUserFacingFunctionError(parsedError, {
+              action: "load your guide's personalized check-in reply",
+            }),
+          });
         }
       } catch (error) {
         logger.error('Edge function invocation failed:', error);
-        // Don't block the UI - mentor response is optional
+        const parsedError = await parseFunctionInvokeError(error);
+        setMentorResponseIssue({
+          kind: "error",
+          message: toUserFacingFunctionError(parsedError, {
+            action: "load your guide's personalized check-in reply",
+          }),
+        });
       }
 
       queryClient.invalidateQueries({ queryKey: ['morning-check-in'] });
@@ -281,9 +333,12 @@ const MorningCheckInContent = () => {
                     <p className="text-base italic text-foreground/90 leading-relaxed">
                       "{existingCheckIn.mentor_response}"
                     </p>
-                  ) : pollStartTimeRef.current && Date.now() - pollStartTimeRef.current > MAX_POLL_DURATION ? (
-                    <p className="text-base text-foreground/80 italic leading-relaxed">
-                      "Great work on setting your intention today. Stay focused and crush it."
+                  ) : mentorResponseIssue ? (
+                    <p
+                      data-testid="mentor-response-status"
+                      className="text-sm text-muted-foreground leading-relaxed"
+                    >
+                      {mentorResponseIssue.message}
                     </p>
                   ) : (
                     <p className="text-sm text-muted-foreground italic">
