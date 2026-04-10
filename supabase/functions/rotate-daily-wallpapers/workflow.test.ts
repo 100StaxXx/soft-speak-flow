@@ -3,7 +3,28 @@ import {
   rotateWallpaperAssignments,
   type RotationDeps,
 } from "./workflow.ts";
-import { WALLPAPER_PAGE_KEYS } from "../../../src/shared/wallpaperCatalog.ts";
+import {
+  WALLPAPER_PAGE_KEYS,
+  getDeterministicWallpaperRecipes,
+} from "../../../src/shared/wallpaperCatalog.ts";
+
+const withGenerationSlotBudget = async (
+  slotCount: number,
+  callback: () => Promise<void>,
+) => {
+  const previousValue = Deno.env.get("WALLPAPER_MAX_GENERATION_SLOTS_PER_RUN");
+  Deno.env.set("WALLPAPER_MAX_GENERATION_SLOTS_PER_RUN", String(slotCount));
+
+  try {
+    await callback();
+  } finally {
+    if (typeof previousValue === "string") {
+      Deno.env.set("WALLPAPER_MAX_GENERATION_SLOTS_PER_RUN", previousValue);
+    } else {
+      Deno.env.delete("WALLPAPER_MAX_GENERATION_SLOTS_PER_RUN");
+    }
+  }
+};
 
 const createDeps = (overrides: Partial<RotationDeps> = {}): RotationDeps => ({
   getExistingAssignment: async () => null,
@@ -40,82 +61,53 @@ const createDeps = (overrides: Partial<RotationDeps> = {}): RotationDeps => ({
 });
 
 Deno.test("rotateWallpaperAssignments fills the 4-day horizon for all five pages", async () => {
-  const assigned: Array<{ pageKey: string; dateKey: string; assetId: string; assignmentSource: string }> = [];
-  const latestReadyByPage = new Map<string, Awaited<ReturnType<RotationDeps["getLatestReadyAsset"]>>>();
-  const generated: Array<{ pageKey: string; dateKey: string; variantKey: string | null }> = [];
-  const deps = createDeps({
-    generateAndStoreWallpaperAsset: async (_supabase, args) => {
-      generated.push({
-        pageKey: args.pageKey,
-        dateKey: args.dateKey,
-        variantKey: args.variantKey ?? null,
-      });
-      const asset = await createDeps().generateAndStoreWallpaperAsset(_supabase, args);
-      latestReadyByPage.set(args.pageKey, {
-        id: asset.assetId,
-        createdAt: asset.createdAt,
-        publishState: asset.publishState,
-        sourceKind: "generated",
-        generationDate: args.dateKey,
-        variantKey: asset.variantKey,
-        batchLabel: null,
-        validation_result: {
-          scenicQualityScore: asset.validationResult.scenicQualityScore,
-          moodMatchScore: asset.validationResult.moodMatchScore,
-          detailScore: asset.validationResult.detailScore,
-          contrastScore: asset.validationResult.contrastScore,
-          safeZoneConfidenceScore: asset.validationResult.safeZoneConfidenceScore,
-        },
-        validation: {
-          scenicQualityScore: asset.validationResult.scenicQualityScore,
-          moodMatchScore: asset.validationResult.moodMatchScore,
-          detailScore: asset.validationResult.detailScore,
-          contrastScore: asset.validationResult.contrastScore,
-          safeZoneConfidenceScore: asset.validationResult.safeZoneConfidenceScore,
-        },
-      });
-      return asset;
-    },
-    getLatestReadyAsset: async (_supabase, pageKey) => latestReadyByPage.get(pageKey) ?? null,
-    assignWallpaperAsset: async (_supabase, pageKey, dateKey, assetId, assignmentSource) => {
-      assigned.push({ pageKey, dateKey, assetId, assignmentSource });
-    },
+  await withGenerationSlotBudget(20, async () => {
+    const assigned: Array<{ pageKey: string; dateKey: string; assetId: string; assignmentSource: string }> = [];
+    const generated: Array<{ pageKey: string; dateKey: string; variantKey: string | null }> = [];
+    const deps = createDeps({
+      generateAndStoreWallpaperAsset: async (_supabase, args) => {
+        generated.push({
+          pageKey: args.pageKey,
+          dateKey: args.dateKey,
+          variantKey: args.variantKey ?? null,
+        });
+        return createDeps().generateAndStoreWallpaperAsset(_supabase, args);
+      },
+      assignWallpaperAsset: async (_supabase, pageKey, dateKey, assetId, assignmentSource) => {
+        assigned.push({ pageKey, dateKey, assetId, assignmentSource });
+      },
+    });
+
+    const { outcomes } = await rotateWallpaperAssignments({}, {
+      startDate: "2026-04-08",
+      daysAhead: 4,
+      pageKeys: [...WALLPAPER_PAGE_KEYS],
+      candidateCount: 3,
+      force: false,
+    }, deps);
+
+    if (outcomes.length !== WALLPAPER_PAGE_KEYS.length * 4) {
+      throw new Error(`Expected 20 outcomes, got ${outcomes.length}`);
+    }
+
+    if (outcomes.some((outcome) => outcome.status !== "generated")) {
+      throw new Error(`Expected every slot to generate when empty, got ${JSON.stringify(outcomes)}`);
+    }
+
+    const generatedDates = new Set(generated.map((entry) => entry.dateKey));
+    if (generatedDates.size !== 4) {
+      throw new Error(`Expected generation across the full horizon, got ${JSON.stringify(generated)}`);
+    }
+
+    if (assigned.length !== WALLPAPER_PAGE_KEYS.length * 4) {
+      throw new Error(`Expected every page/date to be assigned, got ${assigned.length}`);
+    }
   });
-
-  const { outcomes } = await rotateWallpaperAssignments({}, {
-    startDate: "2026-04-08",
-    daysAhead: 4,
-    pageKeys: [...WALLPAPER_PAGE_KEYS],
-    candidateCount: 3,
-    force: false,
-  }, deps);
-
-  if (outcomes.length !== WALLPAPER_PAGE_KEYS.length * 4) {
-    throw new Error(`Expected 20 outcomes, got ${outcomes.length}`);
-  }
-
-  const generatedOutcomes = outcomes.filter((outcome) => outcome.status === "generated");
-  const carryForwardOutcomes = outcomes.filter((outcome) => outcome.status === "carry_forward");
-
-  if (generatedOutcomes.length !== WALLPAPER_PAGE_KEYS.length) {
-    throw new Error(`Expected only the active date to generate, got ${JSON.stringify(generatedOutcomes)}`);
-  }
-
-  if (carryForwardOutcomes.length !== WALLPAPER_PAGE_KEYS.length * 3) {
-    throw new Error(`Expected future dates to carry forward, got ${JSON.stringify(carryForwardOutcomes)}`);
-  }
-
-  if (generated.some((entry) => entry.dateKey !== "2026-04-08")) {
-    throw new Error(`Expected fast rotation to generate only the start date, got ${JSON.stringify(generated)}`);
-  }
-
-  if (assigned.length !== WALLPAPER_PAGE_KEYS.length * 4) {
-    throw new Error(`Expected every page/date to be assigned, got ${assigned.length}`);
-  }
 });
 
-Deno.test("rotatePageWallpaper skips generation during fast rotation when carry-forward art exists", async () => {
+Deno.test("rotatePageWallpaper retries a carry-forward assignment instead of treating it as final", async () => {
   let generatedCount = 0;
+  const assigned: Array<{ assetId: string; assignmentSource: string }> = [];
   const outcome = await rotatePageWallpaper(
     {},
     "companion",
@@ -124,46 +116,67 @@ Deno.test("rotatePageWallpaper skips generation during fast rotation when carry-
     false,
     "rotate-2026-04-09",
     createDeps({
+      getExistingAssignment: async () => ({
+        id: "assign-carry-forward",
+        wallpaper_asset_id: "old-asset",
+        assignment_source: "carry_forward",
+      }),
+      getWallpaperAssetEligibilitySnapshot: async () => ({
+        publish_state: "ready",
+        source_kind: "generated",
+        generation_date: "2026-04-09",
+      }),
       generateAndStoreWallpaperAsset: async (...args) => {
         generatedCount += 1;
         return createDeps().generateAndStoreWallpaperAsset(...args);
       },
-      getLatestReadyAsset: async () => ({
-        id: "companion-carry-forward",
-        createdAt: "2026-04-09T10:00:00.000Z",
-        publishState: "ready",
-        sourceKind: "generated",
-        generationDate: "2026-04-09",
-        variantKey: "companion-alpine-sanctuary-moonlit",
-        batchLabel: "rotate-2026-04-09",
-        validation_result: {
-          scenicQualityScore: 92,
-          moodMatchScore: 89,
-          detailScore: 84,
-          contrastScore: 80,
-          safeZoneConfidenceScore: 88,
-        },
-        validation: {
-          scenicQualityScore: 92,
-          moodMatchScore: 89,
-          detailScore: 84,
-          contrastScore: 80,
-          safeZoneConfidenceScore: 88,
-        },
-      }),
+      assignWallpaperAsset: async (_supabase, _pageKey, _dateKey, assetId, assignmentSource) => {
+        assigned.push({ assetId, assignmentSource });
+      },
     }),
-    {
-      allowGeneration: false,
-      generationCandidateCount: 0,
-    },
   );
 
-  if (outcome.status !== "carry_forward" || outcome.assetId !== "companion-carry-forward") {
-    throw new Error(`Expected fast rotation to carry forward, got ${JSON.stringify(outcome)}`);
+  if (outcome.status !== "generated") {
+    throw new Error(`Expected carry-forward slot to be regenerated, got ${JSON.stringify(outcome)}`);
+  }
+
+  if (generatedCount === 0) {
+    throw new Error("Expected carry-forward slots to retry generation");
+  }
+
+  if (assigned[0]?.assignmentSource !== "auto") {
+    throw new Error(`Expected regenerated asset to replace carry-forward with auto, got ${JSON.stringify(assigned)}`);
+  }
+});
+
+Deno.test("rotatePageWallpaper keeps admin overrides sticky", async () => {
+  let generatedCount = 0;
+  const outcome = await rotatePageWallpaper(
+    {},
+    "profile",
+    "2026-04-10",
+    3,
+    false,
+    "rotate-2026-04-10",
+    createDeps({
+      getExistingAssignment: async () => ({
+        id: "assign-admin",
+        wallpaper_asset_id: "admin-asset",
+        assignment_source: "admin_override",
+      }),
+      generateAndStoreWallpaperAsset: async (...args) => {
+        generatedCount += 1;
+        return createDeps().generateAndStoreWallpaperAsset(...args);
+      },
+    }),
+  );
+
+  if (outcome.status !== "skipped" || outcome.assetId !== "admin-asset") {
+    throw new Error(`Expected admin override to remain in place, got ${JSON.stringify(outcome)}`);
   }
 
   if (generatedCount !== 0) {
-    throw new Error("Expected fast rotation to skip generation entirely when carry-forward art exists");
+    throw new Error("Expected admin override to skip generation");
   }
 });
 
@@ -346,5 +359,58 @@ Deno.test("rotatePageWallpaper uses carry-forward only when there are no approve
 
   if (assigned[0]?.assignmentSource !== "carry_forward") {
     throw new Error(`Expected carry_forward assignment, got ${JSON.stringify(assigned)}`);
+  }
+});
+
+Deno.test("rotatePageWallpaper retries deterministic recipes after earlier validation failures", async () => {
+  const recipe = getDeterministicWallpaperRecipes("guide", "2026-04-10", 1)[0];
+  let generatedCount = 0;
+
+  const outcome = await rotatePageWallpaper(
+    {},
+    "guide",
+    "2026-04-10",
+    1,
+    false,
+    "rotate-2026-04-10",
+    createDeps({
+      listWallpaperAssetCandidates: async () => [
+        {
+          id: "failed-guide-candidate",
+          createdAt: "2026-04-10T10:00:00.000Z",
+          publishState: "validation_failed",
+          sourceKind: "generated",
+          generationDate: "2026-04-10",
+          variantKey: recipe.key,
+          batchLabel: "rotate-2026-04-10",
+          validation_result: {
+            scenicQualityScore: 40,
+            moodMatchScore: 42,
+            detailScore: 39,
+            contrastScore: 45,
+            safeZoneConfidenceScore: 25,
+          },
+          validation: {
+            scenicQualityScore: 40,
+            moodMatchScore: 42,
+            detailScore: 39,
+            contrastScore: 45,
+            safeZoneConfidenceScore: 25,
+          },
+        },
+      ],
+      generateAndStoreWallpaperAsset: async (...args) => {
+        generatedCount += 1;
+        return createDeps().generateAndStoreWallpaperAsset(...args);
+      },
+    }),
+  );
+
+  if (generatedCount !== 1) {
+    throw new Error(`Expected the failed deterministic recipe to be retried, got ${generatedCount}`);
+  }
+
+  if (outcome.status !== "generated") {
+    throw new Error(`Expected retry to replace carry-forward path with a generated asset, got ${JSON.stringify(outcome)}`);
   }
 });

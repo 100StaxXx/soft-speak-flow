@@ -8,7 +8,13 @@ import { useAuth } from "@/hooks/useAuth";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useProfile } from "@/hooks/useProfile";
 import { supabase } from "@/integrations/supabase/client";
-import { deleteCurrentAccount, isAccountDeletionAuthError } from "@/services/accountDeletion";
+import {
+  deleteCurrentAccount,
+  getAccountDeletionErrorMetadata,
+  getAccountDeletionFailureMessage,
+  isAccountDeletionAuthError,
+} from "@/services/accountDeletion";
+import { logger } from "@/utils/logger";
 import {
   buildEstablishedProfileSelfHealPatch,
   getOnboardingGateState,
@@ -129,11 +135,18 @@ export default function Onboarding() {
           return;
         }
 
-        toast.error(
-          error instanceof Error
-            ? error.message
-            : "We couldn't reset your legacy account automatically. Please try again.",
-        );
+        const errorMetadata = getAccountDeletionErrorMetadata(error);
+        logger.error("[Account Deletion] Legacy onboarding reset failed", {
+          surface: "onboarding_legacy_reset",
+          userId: user.id,
+          code: errorMetadata.code,
+          status: errorMetadata.status,
+          requestId: errorMetadata.requestId,
+          stage: errorMetadata.stage,
+          message: error instanceof Error ? error.message : String(error),
+        });
+
+        toast.error(getAccountDeletionFailureMessage(error));
       }
     })();
   }, [user, onboardingGateReady, onboardingGate.needsCompanionMigration, navigate, queryClient, signOut]);

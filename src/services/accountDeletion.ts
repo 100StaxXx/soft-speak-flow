@@ -13,6 +13,15 @@ export interface AccountDeletionWarning {
   details?: unknown;
 }
 
+export type AccountDeletionStage = "storage_cleanup" | "relational_cleanup" | "auth_delete";
+
+export interface AccountDeletionErrorMetadata {
+  code?: string;
+  status?: number;
+  requestId?: string;
+  stage?: AccountDeletionStage;
+}
+
 interface DeleteAccountOptions {
   queryClient: QueryClient;
   userId: string;
@@ -24,6 +33,8 @@ interface DeleteUserFunctionResponse {
   error?: string;
   code?: string;
   status?: number;
+  requestId?: string;
+  stage?: AccountDeletionStage;
   warnings?: AccountDeletionWarning[];
 }
 
@@ -39,7 +50,31 @@ const ACCOUNT_DELETION_TEMPORARY_CODES = new Set([
   "ACCOUNT_DELETION_BACKEND_UNAVAILABLE",
   "ACCOUNT_DELETION_CONFIG_ERROR",
   "ACCOUNT_DELETION_UNKNOWN",
+  "ACCOUNT_DELETION_RELATIONAL_CLEANUP_FAILED",
+  "ACCOUNT_DELETION_STORAGE_CLEANUP_FAILED",
 ]);
+const ACCOUNT_DELETION_STAGE_MESSAGES: Record<AccountDeletionStage, string> = {
+  storage_cleanup: "We couldn't finish deleting your uploaded files, so your account wasn't removed. Please try again.",
+  relational_cleanup: "We couldn't finish removing your account data, so your account wasn't removed. Please try again.",
+  auth_delete: "We couldn't finish removing your sign-in record, so your account wasn't removed. Please try again.",
+};
+
+type AccountDeletionErrorWithMetadata = Error & AccountDeletionErrorMetadata & { cause?: unknown };
+
+const isAccountDeletionStage = (value: unknown): value is AccountDeletionStage =>
+  value === "storage_cleanup" || value === "relational_cleanup" || value === "auth_delete";
+
+const getAccountDeletionStage = (value: unknown): AccountDeletionStage | undefined =>
+  isAccountDeletionStage(value) ? value : undefined;
+
+const getParsedFunctionCode = (parsed: ParsedFunctionInvokeError): string | undefined =>
+  parsed.code ?? parsed.responsePayload?.code;
+
+const getParsedFunctionRequestId = (parsed: ParsedFunctionInvokeError): string | undefined =>
+  parsed.requestId ?? parsed.responsePayload?.requestId;
+
+const getParsedFunctionStage = (parsed: ParsedFunctionInvokeError): AccountDeletionStage | undefined =>
+  getAccountDeletionStage(parsed.responsePayload?.stage);
 
 const normalizeWarnings = (raw: unknown): AccountDeletionWarning[] => {
   if (!Array.isArray(raw)) return [];
@@ -69,6 +104,14 @@ const normalizeWarnings = (raw: unknown): AccountDeletionWarning[] => {
 
 export const isAccountDeletionAuthError = (error: unknown): boolean => {
   if (!(error instanceof Error)) return false;
+  const code =
+    error && typeof error === "object" && typeof (error as { code?: unknown }).code === "string"
+      ? (error as { code: string }).code
+      : undefined;
+  if (code && ACCOUNT_DELETION_AUTH_CODES.has(code)) {
+    return true;
+  }
+
   const message = error.message.toLowerCase();
   return (
     message.includes("unauthorized") ||
@@ -78,10 +121,19 @@ export const isAccountDeletionAuthError = (error: unknown): boolean => {
   );
 };
 
-const createAccountDeletionError = (message: string, cause?: unknown): Error => {
-  const error = new Error(message);
+const createAccountDeletionError = (
+  message: string,
+  metadata: AccountDeletionErrorMetadata = {},
+  cause?: unknown,
+): AccountDeletionErrorWithMetadata => {
+  const error = new Error(message) as AccountDeletionErrorWithMetadata;
+  error.name = "AccountDeletionError";
+  error.code = metadata.code;
+  error.status = metadata.status;
+  error.requestId = metadata.requestId;
+  error.stage = metadata.stage;
   if (cause !== undefined) {
-    (error as Error & { cause?: unknown }).cause = cause;
+    error.cause = cause;
   }
   return error;
 };
@@ -101,7 +153,7 @@ const mapAccountDeletionCodeToMessage = (code?: string): string | null => {
 };
 
 const toAccountDeletionErrorMessage = (parsed: ParsedFunctionInvokeError): string => {
-  const mappedFromCode = mapAccountDeletionCodeToMessage(parsed.code ?? parsed.responsePayload?.code);
+  const mappedFromCode = mapAccountDeletionCodeToMessage(getParsedFunctionCode(parsed));
   if (mappedFromCode) {
     return mappedFromCode;
   }
@@ -111,6 +163,33 @@ const toAccountDeletionErrorMessage = (parsed: ParsedFunctionInvokeError): strin
   }
 
   return toUserFacingFunctionError(parsed, { action: "delete your account" });
+};
+
+export const getAccountDeletionErrorMetadata = (error: unknown): AccountDeletionErrorMetadata => {
+  if (!error || typeof error !== "object") {
+    return {};
+  }
+
+  const candidate = error as AccountDeletionErrorMetadata;
+  return {
+    ...(typeof candidate.code === "string" ? { code: candidate.code } : {}),
+    ...(typeof candidate.status === "number" ? { status: candidate.status } : {}),
+    ...(typeof candidate.requestId === "string" ? { requestId: candidate.requestId } : {}),
+    ...(isAccountDeletionStage(candidate.stage) ? { stage: candidate.stage } : {}),
+  };
+};
+
+export const getAccountDeletionFailureMessage = (error: unknown): string => {
+  const { stage } = getAccountDeletionErrorMetadata(error);
+  if (stage) {
+    return ACCOUNT_DELETION_STAGE_MESSAGES[stage];
+  }
+
+  if (error instanceof Error && error.message.trim().length > 0) {
+    return error.message;
+  }
+
+  return "Failed to delete account. Please try again.";
 };
 
 export const deleteCurrentAccount = async ({ queryClient, userId, signOut }: DeleteAccountOptions) => {
@@ -131,12 +210,30 @@ export const deleteCurrentAccount = async ({ queryClient, userId, signOut }: Del
 
   if (error) {
     const parsedError = await parseFunctionInvokeError(error);
-    throw createAccountDeletionError(toAccountDeletionErrorMessage(parsedError), error);
+    throw createAccountDeletionError(
+      toAccountDeletionErrorMessage(parsedError),
+      {
+        code: getParsedFunctionCode(parsedError),
+        status: parsedError.status,
+        requestId: getParsedFunctionRequestId(parsedError),
+        stage: getParsedFunctionStage(parsedError),
+      },
+      error,
+    );
   }
 
   if (!data?.success) {
     const mappedMessage = mapAccountDeletionCodeToMessage(data?.code);
-    throw createAccountDeletionError(mappedMessage ?? data?.error ?? "Unable to delete account", data);
+    throw createAccountDeletionError(
+      mappedMessage ?? data?.error ?? "Unable to delete account",
+      {
+        code: data?.code,
+        status: data?.status,
+        requestId: data?.requestId,
+        stage: getAccountDeletionStage(data?.stage),
+      },
+      data,
+    );
   }
 
   await clearAuthScopedClientState(queryClient, { previousUserId: userId, clearLegacyLocalState: true });
@@ -149,5 +246,6 @@ export const deleteCurrentAccount = async ({ queryClient, userId, signOut }: Del
 
   return {
     warnings: normalizeWarnings(data.warnings),
+    requestId: data.requestId,
   };
 };

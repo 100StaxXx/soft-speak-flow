@@ -4,7 +4,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { storePendingSocialAuthAttempt } from "@/utils/socialAuth";
 
 const mocks = vi.hoisted(() => {
-  const ensureProfileMock = vi.fn();
   const getAuthRedirectPathMock = vi.fn();
   const getProfileAwareAuthFallbackPathMock = vi.fn();
   const safeNavigateMock = vi.fn();
@@ -19,7 +18,6 @@ const mocks = vi.hoisted(() => {
   const appleAuthorizeMock = vi.fn();
 
   return {
-    ensureProfileMock,
     getAuthRedirectPathMock,
     getProfileAwareAuthFallbackPathMock,
     safeNavigateMock,
@@ -39,7 +37,6 @@ const mocks = vi.hoisted(() => {
 });
 
 vi.mock("@/utils/authRedirect", () => ({
-  ensureProfile: mocks.ensureProfileMock,
   getAuthRedirectPath: mocks.getAuthRedirectPathMock,
   getProfileAwareAuthFallbackPath: mocks.getProfileAwareAuthFallbackPathMock,
 }));
@@ -167,7 +164,6 @@ describe("Auth social auth intent guard", () => {
       },
       error: null,
     });
-    mocks.ensureProfileMock.mockResolvedValue(undefined);
     mocks.getAuthRedirectPathMock.mockResolvedValue("/tasks");
     mocks.getProfileAwareAuthFallbackPathMock.mockResolvedValue("/tasks");
     mocks.invokeMock.mockResolvedValue({

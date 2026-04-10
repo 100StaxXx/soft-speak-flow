@@ -32,7 +32,13 @@ import { CinematicPageBackground } from "@/components/CinematicPageBackground";
 import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
 import { applyMentorChange } from "@/pages/profileMentorChange";
-import { deleteCurrentAccount, isAccountDeletionAuthError } from "@/services/accountDeletion";
+import {
+  deleteCurrentAccount,
+  getAccountDeletionErrorMetadata,
+  getAccountDeletionFailureMessage,
+  isAccountDeletionAuthError,
+} from "@/services/accountDeletion";
+import { logger } from "@/utils/logger";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -276,7 +282,6 @@ const Profile = () => {
         state: { message: "Your account has been deleted." },
       });
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Something went wrong deleting your account.";
       if (isAccountDeletionAuthError(error)) {
         toast({
           title: "Session expired",
@@ -290,9 +295,19 @@ const Profile = () => {
         }
         navigate("/auth", { replace: true });
       } else {
+        const errorMetadata = getAccountDeletionErrorMetadata(error);
+        logger.error("[Account Deletion] Profile deletion failed", {
+          surface: "profile",
+          userId: user.id,
+          code: errorMetadata.code,
+          status: errorMetadata.status,
+          requestId: errorMetadata.requestId,
+          stage: errorMetadata.stage,
+          message: error instanceof Error ? error.message : String(error),
+        });
         toast({
           title: "Account deletion failed",
-          description: errorMessage,
+          description: getAccountDeletionFailureMessage(error),
           variant: "destructive",
         });
       }

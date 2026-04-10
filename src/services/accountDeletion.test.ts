@@ -28,7 +28,12 @@ vi.mock("@/utils/supabaseFunctionErrors", () => ({
   toUserFacingFunctionError: mocks.toUserFacingFunctionError,
 }));
 
-import { deleteCurrentAccount, isAccountDeletionAuthError } from "./accountDeletion";
+import {
+  deleteCurrentAccount,
+  getAccountDeletionErrorMetadata,
+  getAccountDeletionFailureMessage,
+  isAccountDeletionAuthError,
+} from "./accountDeletion";
 
 describe("accountDeletion", () => {
   const queryClient = {} as never;
@@ -149,17 +154,66 @@ describe("accountDeletion", () => {
 
     expect(error).toBeInstanceOf(Error);
     expect((error as Error).message).toBe("Account deletion is temporarily unavailable. Please try again later.");
+    expect(getAccountDeletionErrorMetadata(error)).toEqual({
+      code: "ACCOUNT_DELETION_BACKEND_UNAVAILABLE",
+      status: 500,
+    });
 
     expect(mocks.clearAuthScopedClientState).not.toHaveBeenCalled();
     expect(signOut).not.toHaveBeenCalled();
+  });
+
+  it("preserves requestId and stage from edge function transport failures", async () => {
+    const rawError = new Error("Edge function returned a non-2xx status code");
+    mocks.invoke.mockResolvedValue({
+      data: null,
+      error: rawError,
+    });
+    mocks.parseFunctionInvokeError.mockResolvedValue({
+      category: "http",
+      status: 500,
+      message: "Edge function returned a non-2xx status code",
+      backendMessage: "Account deletion is temporarily unavailable. Please try again later.",
+      code: "ACCOUNT_DELETION_STORAGE_CLEANUP_FAILED",
+      responsePayload: {
+        error: "Account deletion is temporarily unavailable. Please try again later.",
+        code: "ACCOUNT_DELETION_STORAGE_CLEANUP_FAILED",
+        requestId: "req-delete-1",
+        stage: "storage_cleanup",
+      },
+      requestId: "req-delete-1",
+      retryAfterSeconds: undefined,
+      upstreamStatus: undefined,
+      upstreamError: undefined,
+      isOffline: false,
+      name: "FunctionsHttpError",
+    });
+
+    const error = await deleteCurrentAccount({
+      queryClient,
+      userId: "user-1",
+      signOut,
+    }).catch((caughtError) => caughtError);
+
+    expect(getAccountDeletionErrorMetadata(error)).toEqual({
+      code: "ACCOUNT_DELETION_STORAGE_CLEANUP_FAILED",
+      status: 500,
+      requestId: "req-delete-1",
+      stage: "storage_cleanup",
+    });
+    expect(getAccountDeletionFailureMessage(error)).toBe(
+      "We couldn't finish deleting your uploaded files, so your account wasn't removed. Please try again.",
+    );
   });
 
   it("maps non-success function payloads without clearing local state", async () => {
     mocks.invoke.mockResolvedValue({
       data: {
         success: false,
-        code: "ACCOUNT_DELETION_BACKEND_UNAVAILABLE",
+        code: "ACCOUNT_DELETION_STORAGE_CLEANUP_FAILED",
         error: "Account deletion is temporarily unavailable. Please try again later.",
+        requestId: "req-delete-2",
+        stage: "storage_cleanup",
       },
       error: null,
     });
@@ -172,6 +226,14 @@ describe("accountDeletion", () => {
 
     expect(error).toBeInstanceOf(Error);
     expect((error as Error).message).toBe("Account deletion is temporarily unavailable. Please try again later.");
+    expect(getAccountDeletionErrorMetadata(error)).toEqual({
+      code: "ACCOUNT_DELETION_STORAGE_CLEANUP_FAILED",
+      requestId: "req-delete-2",
+      stage: "storage_cleanup",
+    });
+    expect(getAccountDeletionFailureMessage(error)).toBe(
+      "We couldn't finish deleting your uploaded files, so your account wasn't removed. Please try again.",
+    );
     expect(mocks.clearAuthScopedClientState).not.toHaveBeenCalled();
     expect(signOut).not.toHaveBeenCalled();
   });
@@ -181,6 +243,7 @@ describe("accountDeletion", () => {
     mocks.invoke.mockResolvedValue({
       data: {
         success: true,
+        requestId: "req-delete-success-1",
         warnings,
       },
       error: null,
@@ -193,6 +256,7 @@ describe("accountDeletion", () => {
         signOut,
       }),
     ).resolves.toEqual({
+      requestId: "req-delete-success-1",
       warnings,
     });
 

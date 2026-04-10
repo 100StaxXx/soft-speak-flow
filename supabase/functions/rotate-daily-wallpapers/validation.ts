@@ -66,7 +66,7 @@ Respond with ONLY valid JSON using this exact schema:
 
 Rules:
 - Scores are 0 to 100.
-- Set approved to false if there is any readable text, any UI overlay, purple/pink dominance, unsafe composition, scenicQualityScore below 72, detailScore below 68, contrastScore below 60, or moodMatchScore below 72.
+- Set approved to false if there is any readable text, any UI overlay, purple/pink dominance, unsafe composition, scenicQualityScore below 68, detailScore below 65, contrastScore below 60, or moodMatchScore below 70.
 - Keep notes concise.
 - If approved is true, rejectionReasons must be an empty array.
 `;
@@ -130,10 +130,10 @@ export const isWallpaperValidationAcceptable = (result: WallpaperValidationResul
     return false;
   }
 
-  if (result.scenicQualityScore < 72) return false;
-  if (result.detailScore < 68) return false;
+  if (result.scenicQualityScore < 68) return false;
+  if (result.detailScore < 65) return false;
   if (result.contrastScore < 60) return false;
-  if (result.moodMatchScore < 72) return false;
+  if (result.moodMatchScore < 70) return false;
 
   return result.approved;
 };

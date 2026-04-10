@@ -17,7 +17,9 @@ const Welcome = () => {
   // If user is already logged in, redirect them appropriately
   useEffect(() => {
     if (!loading && user) {
-      getAuthRedirectPath(user.id).then((path) => {
+      getAuthRedirectPath(user.id, {
+        email: user.email ?? null,
+      }).then((path) => {
         navigate(path, { replace: true });
       });
     }

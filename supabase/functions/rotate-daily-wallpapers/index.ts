@@ -2,7 +2,14 @@ import { installOpenAICompatibilityShim } from "../_shared/aiClient.ts";
 installOpenAICompatibilityShim();
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { errorResponse, hasUserRole, jsonResponse, requireUserOrInternalRequest } from "../_shared/auth.ts";
+import {
+  errorResponse,
+  hasInternalKey,
+  hasUserRole,
+  jsonResponse,
+  requireAdminOrServiceRoleAuth,
+  requireInternalRequest,
+} from "../_shared/auth.ts";
 import { createWallpaperServiceClient } from "../_shared/wallpaperPipeline.ts";
 import {
   resolveRotateDailyWallpapersOptions,
@@ -22,21 +29,41 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const requestAuth = await requireUserOrInternalRequest(req, corsHeaders);
-  if (requestAuth instanceof Response) {
-    return requestAuth;
-  }
+  if (hasInternalKey(req)) {
+    const internalAuth = await requireInternalRequest(req, corsHeaders);
+    if (internalAuth instanceof Response) {
+      return internalAuth;
+    }
+  } else {
+    const requestAuth = await requireAdminOrServiceRoleAuth(req, corsHeaders);
+    if (requestAuth instanceof Response) {
+      return requestAuth;
+    }
 
-  if (!requestAuth.isInternal) {
-    const isAdmin = await hasUserRole(requestAuth.userId, "admin");
-    if (!isAdmin) {
-      return errorResponse(403, "Admin access required", corsHeaders);
+    if (!requestAuth.isServiceRole) {
+      const isAdmin = await hasUserRole(requestAuth.userId, "admin");
+      if (!isAdmin) {
+        return errorResponse(403, "Admin access required", corsHeaders);
+      }
     }
   }
 
   const body = await req.json().catch(() => ({})) as RotateDailyWallpapersRequestBody;
   const options = resolveRotateDailyWallpapersOptions(body);
   const { batchLabel, outcomes } = await rotateWallpaperAssignments(supabase, options);
+
+  console.info(JSON.stringify({
+    event: "wallpaper_rotation_batch",
+    batchLabel,
+    startDate: options.startDate,
+    daysAhead: options.daysAhead,
+    candidateCount: options.candidateCount,
+    force: options.force,
+    generatedCount: outcomes.filter((outcome) => outcome.status === "generated").length,
+    assignedExistingCount: outcomes.filter((outcome) => outcome.status === "assigned_existing").length,
+    carryForwardCount: outcomes.filter((outcome) => outcome.status === "carry_forward").length,
+    skippedCount: outcomes.filter((outcome) => outcome.status === "skipped").length,
+  }));
 
   return jsonResponse(200, {
     success: true,

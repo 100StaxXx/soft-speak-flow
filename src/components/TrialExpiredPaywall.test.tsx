@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   reloadProducts: vi.fn(),
   deleteCurrentAccount: vi.fn(),
   isAccountDeletionAuthError: vi.fn(() => false),
+  loggerError: vi.fn(),
 }));
 
 vi.mock("@tanstack/react-query", () => ({
@@ -60,6 +61,32 @@ vi.mock("@/hooks/useAppleSubscription", () => ({
 vi.mock("@/services/accountDeletion", () => ({
   deleteCurrentAccount: mocks.deleteCurrentAccount,
   isAccountDeletionAuthError: mocks.isAccountDeletionAuthError,
+  getAccountDeletionErrorMetadata: (error: unknown) => {
+    if (!error || typeof error !== "object") return {};
+    const candidate = error as Record<string, unknown>;
+    return {
+      ...(typeof candidate.code === "string" ? { code: candidate.code } : {}),
+      ...(typeof candidate.status === "number" ? { status: candidate.status } : {}),
+      ...(typeof candidate.requestId === "string" ? { requestId: candidate.requestId } : {}),
+      ...(typeof candidate.stage === "string" ? { stage: candidate.stage } : {}),
+    };
+  },
+  getAccountDeletionFailureMessage: (error: unknown) => {
+    const stage =
+      error && typeof error === "object" && typeof (error as { stage?: unknown }).stage === "string"
+        ? (error as { stage: string }).stage
+        : undefined;
+    if (stage === "storage_cleanup") {
+      return "We couldn't finish deleting your uploaded files, so your account wasn't removed. Please try again.";
+    }
+    return error instanceof Error ? error.message : "Failed to delete account. Please try again.";
+  },
+}));
+
+vi.mock("@/utils/logger", () => ({
+  logger: {
+    error: mocks.loggerError,
+  },
 }));
 
 import { TrialExpiredPaywall } from "./TrialExpiredPaywall";
@@ -93,6 +120,7 @@ describe("TrialExpiredPaywall layout", () => {
     mocks.deleteCurrentAccount.mockResolvedValue({ warnings: [] });
     mocks.isAccountDeletionAuthError.mockReset();
     mocks.isAccountDeletionAuthError.mockReturnValue(false);
+    mocks.loggerError.mockReset();
   });
 
   it("uses top-aligned scroll layout instead of centered overflow layout", () => {
@@ -168,7 +196,14 @@ describe("TrialExpiredPaywall layout", () => {
   });
 
   it("keeps the dialog open and preserves confirmation text after a deletion failure", async () => {
-    mocks.deleteCurrentAccount.mockRejectedValueOnce(new Error("Delete failed"));
+    mocks.deleteCurrentAccount.mockRejectedValueOnce(
+      Object.assign(new Error("Account deletion is temporarily unavailable. Please try again later."), {
+        code: "ACCOUNT_DELETION_STORAGE_CLEANUP_FAILED",
+        status: 500,
+        requestId: "req-delete-paywall-1",
+        stage: "storage_cleanup",
+      }),
+    );
 
     render(<TrialExpiredPaywall variant="trial_expired" />);
 
@@ -179,9 +214,18 @@ describe("TrialExpiredPaywall layout", () => {
     await waitFor(() => {
       expect(mocks.toast).toHaveBeenCalledWith({
         title: "Error",
-        description: "Delete failed",
+        description: "We couldn't finish deleting your uploaded files, so your account wasn't removed. Please try again.",
         variant: "destructive",
       });
+    });
+    expect(mocks.loggerError).toHaveBeenCalledWith("[Account Deletion] Trial paywall deletion failed", {
+      surface: "trial_expired",
+      userId: "user-1",
+      code: "ACCOUNT_DELETION_STORAGE_CLEANUP_FAILED",
+      status: 500,
+      requestId: "req-delete-paywall-1",
+      stage: "storage_cleanup",
+      message: "Account deletion is temporarily unavailable. Please try again later.",
     });
 
     expect(screen.getByText("Delete your account?")).toBeInTheDocument();

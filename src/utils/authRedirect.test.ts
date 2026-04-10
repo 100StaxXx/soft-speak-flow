@@ -62,7 +62,7 @@ vi.mock("./logger", () => ({
   },
 }));
 
-import { ensureProfile, getAuthRedirectPath, getProfileAwareAuthFallbackPath } from "./authRedirect";
+import { getAuthRedirectPath, getProfileAwareAuthFallbackPath } from "./authRedirect";
 
 const noCompanion = { data: null, error: null };
 const existingCompanion = {
@@ -268,13 +268,52 @@ describe("getAuthRedirectPath", () => {
     await expect(getAuthRedirectPath("12345678-user")).resolves.toBe("/tasks");
   });
 
-  it("routes to /onboarding when profile is missing", async () => {
+  it("routes to /onboarding when profile is missing and bootstraps a minimal profile in the background", async () => {
     mocks.profilesMaybeSingleMock.mockResolvedValueOnce({
       data: null,
       error: null,
     });
 
-    await expect(getAuthRedirectPath("12345678-user")).resolves.toBe("/onboarding");
+    await expect(
+      getAuthRedirectPath("12345678-user", {
+        email: "new@example.com",
+      }),
+    ).resolves.toBe("/onboarding");
+
+    expect(mocks.profilesUpsertMock).toHaveBeenCalledTimes(1);
+    const upsertCalls = mocks.profilesUpsertMock.mock.calls as Array<
+      [Record<string, unknown>, { onConflict?: string; ignoreDuplicates?: boolean }?]
+    >;
+    const [payload, options] = upsertCalls[0] ?? [{}];
+
+    expect(payload).toEqual(
+      expect.objectContaining({
+        id: "12345678-user",
+        email: "new@example.com",
+        timezone: expect.any(String),
+      }),
+    );
+    expect(payload).not.toHaveProperty("selected_mentor_id");
+    expect(payload).not.toHaveProperty("onboarding_completed");
+    expect(payload).not.toHaveProperty("onboarding_step");
+    expect(payload).not.toHaveProperty("onboarding_data");
+    expect(options).toEqual({ onConflict: "id" });
+  });
+
+  it("does not wait for profile bootstrap writes when the profile is missing", async () => {
+    mocks.profilesMaybeSingleMock.mockResolvedValueOnce({
+      data: null,
+      error: null,
+    });
+    mocks.profilesUpsertMock.mockImplementationOnce(() => new Promise(() => {}));
+
+    await expect(
+      getAuthRedirectPath("slow-bootstrap-user", {
+        email: "slow@example.com",
+      }),
+    ).resolves.toBe("/onboarding");
+
+    expect(mocks.profilesUpsertMock).toHaveBeenCalledTimes(1);
   });
 
   it("falls back safely on timeout and checks returning-user status", async () => {
@@ -480,41 +519,5 @@ describe("getProfileAwareAuthFallbackPath", () => {
     mocks.profilesMaybeSingleMock.mockRejectedValueOnce(new Error("profile unavailable"));
 
     await expect(getProfileAwareAuthFallbackPath("error-user")).resolves.toBe("/onboarding");
-  });
-});
-
-describe("ensureProfile", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mocks.profilesMaybeSingleMock.mockResolvedValue({ data: null, error: null });
-    mocks.companionMaybeSingleMock.mockResolvedValue(noCompanion);
-  });
-
-  it("creates only a minimal bootstrap payload when the profile is missing", async () => {
-    mocks.profilesMaybeSingleMock.mockResolvedValueOnce({
-      data: null,
-      error: null,
-    });
-
-    await ensureProfile("profile-missing-user", "new@example.com");
-
-    expect(mocks.profilesUpsertMock).toHaveBeenCalledTimes(1);
-    const upsertCalls = mocks.profilesUpsertMock.mock.calls as Array<
-      [Record<string, unknown>, { onConflict?: string; ignoreDuplicates?: boolean }?]
-    >;
-    const [payload, options] = upsertCalls[0] ?? [{}];
-
-    expect(payload).toEqual(
-      expect.objectContaining({
-        id: "profile-missing-user",
-        email: "new@example.com",
-        timezone: expect.any(String),
-      }),
-    );
-    expect(payload).not.toHaveProperty("selected_mentor_id");
-    expect(payload).not.toHaveProperty("onboarding_completed");
-    expect(payload).not.toHaveProperty("onboarding_step");
-    expect(payload).not.toHaveProperty("onboarding_data");
-    expect(options).toEqual({ onConflict: "id" });
   });
 });

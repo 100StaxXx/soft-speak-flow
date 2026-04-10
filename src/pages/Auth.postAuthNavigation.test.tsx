@@ -3,7 +3,6 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => {
-  const ensureProfileMock = vi.fn();
   const getAuthRedirectPathMock = vi.fn();
   const getProfileAwareAuthFallbackPathMock = vi.fn();
   const safeNavigateMock = vi.fn();
@@ -25,7 +24,6 @@ const mocks = vi.hoisted(() => {
   const fromMock = vi.fn(() => ({ select: selectMock }));
 
   return {
-    ensureProfileMock,
     getAuthRedirectPathMock,
     getProfileAwareAuthFallbackPathMock,
     safeNavigateMock,
@@ -51,7 +49,6 @@ const mocks = vi.hoisted(() => {
 });
 
 vi.mock("@/utils/authRedirect", () => ({
-  ensureProfile: mocks.ensureProfileMock,
   getAuthRedirectPath: mocks.getAuthRedirectPathMock,
   getProfileAwareAuthFallbackPath: mocks.getProfileAwareAuthFallbackPathMock,
 }));
@@ -197,7 +194,6 @@ describe("Auth post-auth navigation", () => {
       },
     });
 
-    mocks.ensureProfileMock.mockResolvedValue(undefined);
     mocks.getAuthRedirectPathMock.mockResolvedValue("/tasks");
     mocks.getProfileAwareAuthFallbackPathMock.mockResolvedValue("/tasks");
     mocks.setSessionMock.mockResolvedValue({
@@ -241,7 +237,7 @@ describe("Auth post-auth navigation", () => {
 
     expect(mocks.safeNavigateMock).toHaveBeenCalledWith(expect.any(Function), "/tasks");
     expect(mocks.safeNavigateMock).toHaveBeenCalledTimes(1);
-    expect(mocks.toastMock).toHaveBeenCalledTimes(1);
+    expect(mocks.toastMock).not.toHaveBeenCalled();
   });
 
   it("does not render a guest-mode CTA", async () => {

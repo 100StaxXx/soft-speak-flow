@@ -622,6 +622,136 @@ describe("useCompanion evolveCompanion", () => {
     );
   });
 
+  it("keeps repaired legacy preset-backed level 5 companions out of the egg state on fetch", async () => {
+    mocks.userCompanionResponses.length = 0;
+    const repairedImageUrl =
+      "https://example.com/storage/v1/object/public/companion-presets/fox/t2_guardian/normal/fox__t2_guardian__normal__nature.png";
+    mocks.userCompanionResponses.push(
+      {
+        data: {
+          ...companionFixture,
+          current_stage: 5,
+          current_xp: 100,
+          preset_id: "fox",
+          spirit_animal: "Fox",
+          core_element: "nature",
+          current_image_url: "/companion-eggs/egg__t0_egg__normal__nature.png",
+          initial_image_url: "/companion-eggs/egg__t0_egg__normal__nature.png",
+        },
+        error: null,
+      },
+      {
+        data: {
+          ...companionFixture,
+          current_stage: 5,
+          current_xp: 100,
+          preset_id: "fox",
+          spirit_animal: "Fox",
+          core_element: "nature",
+          current_image_url: repairedImageUrl,
+          current_image_focal_x: null,
+          current_image_focal_y: null,
+          initial_image_url: "/companion-eggs/egg__t0_egg__normal__nature.png",
+        },
+        error: null,
+      },
+    );
+    mocks.rpcMock.mockImplementation(async (fnName: string) => {
+      if (fnName === "repair_auto_advanced_companion_state") {
+        return {
+          data: [
+            {
+              repaired: true,
+              current_stage: 5,
+              last_real_stage: 5,
+              current_image_url: repairedImageUrl,
+              current_image_focal_x: null,
+              current_image_focal_y: null,
+            },
+          ],
+          error: null,
+        };
+      }
+
+      return { data: null, error: null };
+    });
+
+    const { result } = await renderUseCompanion();
+
+    expect(result.current.companion?.current_stage).toBe(5);
+    expect(result.current.companion?.current_image_url).toBe(repairedImageUrl);
+    expect(mocks.userCompanionUpdatePayloads).toHaveLength(0);
+    expect(mocks.rpcMock).toHaveBeenCalledWith(
+      "repair_auto_advanced_companion_state",
+      { p_companion_id: companionFixture.id },
+    );
+  });
+
+  it("clamps impossible non-legacy fetch results when the repair RPC leaves them unresolved", async () => {
+    mocks.userCompanionResponses.length = 0;
+    mocks.userCompanionResponses.push({
+      data: {
+        ...companionFixture,
+        current_stage: 3,
+        current_xp: 60,
+        preset_id: null,
+        spirit_animal: "Wolf",
+        core_element: "fire",
+        current_image_url: "https://example.com/stage-3.png",
+      },
+      error: null,
+    });
+    mocks.rpcMock.mockImplementation(async (fnName: string) => {
+      if (fnName === "repair_auto_advanced_companion_state") {
+        return {
+          data: [
+            {
+              repaired: false,
+              current_stage: 3,
+              last_real_stage: 1,
+              current_image_url: "https://example.com/stage-3.png",
+              current_image_focal_x: 0.5,
+              current_image_focal_y: 0.5,
+            },
+          ],
+          error: null,
+        };
+      }
+
+      return { data: null, error: null };
+    });
+    mocks.companionEvolutionListResponses.push({
+      data: [
+        {
+          stage: 0,
+          image_url: "https://example.com/egg.png",
+          xp_at_evolution: 0,
+          evolved_at: "2026-04-09T10:00:00.000Z",
+        },
+        {
+          stage: 1,
+          image_url: "https://example.com/stage-1.png",
+          xp_at_evolution: 10,
+          evolved_at: "2026-04-09T10:05:00.000Z",
+        },
+      ],
+      error: null,
+    });
+
+    const { result } = await renderUseCompanion();
+
+    expect(result.current.companion?.current_stage).toBe(1);
+    expect(result.current.companion?.current_image_url).toBe("https://example.com/stage-1.png");
+    expect(mocks.loggerWarnMock).toHaveBeenCalledWith(
+      "Applied local companion claim fallback",
+      expect.objectContaining({
+        companionId: companionFixture.id,
+        restoredStage: 1,
+        reason: "repair_rpc_unresolved",
+      }),
+    );
+  });
+
   it("repairs stale preset-backed positive-stage egg images during fetch", async () => {
     mocks.userCompanionResponses.length = 0;
     mocks.userCompanionResponses.push({

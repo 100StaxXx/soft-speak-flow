@@ -8,7 +8,13 @@ import { getProductForPlan, getPurchaseProductIdForPlan } from "@/utils/appleIAP
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { deleteCurrentAccount, isAccountDeletionAuthError } from "@/services/accountDeletion";
+import {
+  deleteCurrentAccount,
+  getAccountDeletionErrorMetadata,
+  getAccountDeletionFailureMessage,
+  isAccountDeletionAuthError,
+} from "@/services/accountDeletion";
+import { logger } from "@/utils/logger";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -151,9 +157,19 @@ export const TrialExpiredPaywall = ({ variant = "pre_trial_signup" }: TrialExpir
         }
         navigate("/auth", { replace: true });
       } else {
+        const errorMetadata = getAccountDeletionErrorMetadata(error);
+        logger.error("[Account Deletion] Trial paywall deletion failed", {
+          surface: variant,
+          userId: user?.id ?? null,
+          code: errorMetadata.code,
+          status: errorMetadata.status,
+          requestId: errorMetadata.requestId,
+          stage: errorMetadata.stage,
+          message: error instanceof Error ? error.message : String(error),
+        });
         toast({
           title: "Error",
-          description: error instanceof Error ? error.message : "Failed to delete account. Please try again.",
+          description: getAccountDeletionFailureMessage(error),
           variant: "destructive",
         });
       }

@@ -20,9 +20,12 @@ const ACCOUNT_DELETION_TEMPORARILY_UNAVAILABLE_MESSAGE =
 
 const ACCOUNT_DELETION_ERROR_CODES = {
   AUTH_REQUIRED: "ACCOUNT_DELETION_AUTH_REQUIRED",
+  AUTH_DELETE_FAILED: "ACCOUNT_DELETION_AUTH_DELETE_FAILED",
   BACKEND_UNAVAILABLE: "ACCOUNT_DELETION_BACKEND_UNAVAILABLE",
   CONFIG_ERROR: "ACCOUNT_DELETION_CONFIG_ERROR",
   NOT_FOUND: "ACCOUNT_DELETION_NOT_FOUND",
+  RELATIONAL_CLEANUP_FAILED: "ACCOUNT_DELETION_RELATIONAL_CLEANUP_FAILED",
+  STORAGE_CLEANUP_FAILED: "ACCOUNT_DELETION_STORAGE_CLEANUP_FAILED",
   UNKNOWN: "ACCOUNT_DELETION_UNKNOWN",
 } as const;
 
@@ -59,22 +62,31 @@ const LEGACY_USER_STORAGE_FILTER_TARGETS = [
 
 type AccountDeletionErrorCode =
   (typeof ACCOUNT_DELETION_ERROR_CODES)[keyof typeof ACCOUNT_DELETION_ERROR_CODES];
+type AccountDeletionStage = "storage_cleanup" | "relational_cleanup" | "auth_delete";
 
 interface SanitizedDeleteUserError {
   code: AccountDeletionErrorCode;
   message: string;
   status: number;
+  stage?: AccountDeletionStage;
 }
 
 class AccountDeletionError extends Error {
   status: number;
   code: AccountDeletionErrorCode;
+  stage?: AccountDeletionStage;
 
-  constructor(message: string, options: { status: number; code: AccountDeletionErrorCode; cause?: unknown }) {
+  constructor(message: string, options: {
+    status: number;
+    code: AccountDeletionErrorCode;
+    cause?: unknown;
+    stage?: AccountDeletionStage;
+  }) {
     super(message);
     this.name = "AccountDeletionError";
     this.status = options.status;
     this.code = options.code;
+    this.stage = options.stage;
     if (options.cause !== undefined) {
       (this as Error & { cause?: unknown }).cause = options.cause;
     }
@@ -87,6 +99,11 @@ interface HandleDeleteUserDependencies {
   env?: Pick<typeof Deno.env, "get">;
   createAdminClient?: (supabaseUrl: string, serviceRoleKey: string) => SupabaseAdminClient;
   sleep?: (ms: number) => Promise<void>;
+}
+
+interface StorageObjectOwnershipEntry {
+  bucket_id?: unknown;
+  name?: unknown;
 }
 
 const createUnauthorizedError = (cause?: unknown) =>
@@ -107,6 +124,21 @@ const createTemporaryUnavailableError = (
     status: 500,
     code,
     cause,
+  });
+
+const createStageFailureError = (
+  stage: AccountDeletionStage,
+  code:
+    | typeof ACCOUNT_DELETION_ERROR_CODES.STORAGE_CLEANUP_FAILED
+    | typeof ACCOUNT_DELETION_ERROR_CODES.RELATIONAL_CLEANUP_FAILED
+    | typeof ACCOUNT_DELETION_ERROR_CODES.AUTH_DELETE_FAILED,
+  cause?: unknown,
+) =>
+  new AccountDeletionError(ACCOUNT_DELETION_TEMPORARILY_UNAVAILABLE_MESSAGE, {
+    status: 500,
+    code,
+    cause,
+    stage,
   });
 
 const createAdminClient = (supabaseUrl: string, serviceRoleKey: string): SupabaseAdminClient =>
@@ -176,6 +208,12 @@ const describeError = (error: unknown): Record<string, unknown> => ({
   message: getErrorMessage(error) ?? String(error),
 });
 
+const buildRequestHeaders = (corsHeaders: HeadersInit, requestId: string): HeadersInit => ({
+  ...corsHeaders,
+  "Content-Type": "application/json",
+  "X-Request-Id": requestId,
+});
+
 const buildStoragePath = (prefix: string, name: string): string =>
   prefix ? `${prefix}/${name}` : name;
 
@@ -235,6 +273,7 @@ function sanitizeError(error: unknown): SanitizedDeleteUserError {
       message: error.message,
       status: error.status,
       code: error.code,
+      ...(error.stage ? { stage: error.stage } : {}),
     };
   }
 
@@ -276,6 +315,7 @@ function sanitizeError(error: unknown): SanitizedDeleteUserError {
 
 const createErrorResponse = (
   corsHeaders: HeadersInit,
+  requestId: string,
   details: SanitizedDeleteUserError,
 ): Response =>
   new Response(
@@ -284,10 +324,12 @@ const createErrorResponse = (
       error: details.message,
       code: details.code,
       status: details.status,
+      ...(details.stage ? { stage: details.stage } : {}),
+      requestId,
     }),
     {
       status: details.status,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: buildRequestHeaders(corsHeaders, requestId),
     },
   );
 
@@ -460,11 +502,97 @@ const removeStoragePaths = async (
   }
 };
 
-const deleteUserStorageAssets = async (
+const getStorageObjectBucketId = (entry: StorageObjectOwnershipEntry): string | undefined =>
+  asString(entry?.bucket_id);
+
+const listOwnedStorageObjectsForColumn = async (
+  supabase: SupabaseAdminClient,
+  userId: string,
+  ownershipColumn: "owner" | "owner_id",
+  waitForRetry: (ms: number) => Promise<void>,
+): Promise<Array<{ bucket: string; path: string }>> => {
+  const entries: Array<{ bucket: string; path: string }> = [];
+
+  for (let offset = 0; ; offset += STORAGE_LIST_PAGE_SIZE) {
+    let pageEntries: StorageObjectOwnershipEntry[] = [];
+
+    await runDeleteStepWithRetry(
+      `storage ownership query ${ownershipColumn}`,
+      async () => {
+        const { data, error } = await supabase
+          .schema("storage")
+          .from("objects")
+          .select("bucket_id,name")
+          .eq(ownershipColumn, userId)
+          .order("bucket_id", { ascending: true })
+          .order("name", { ascending: true })
+          .range(offset, offset + STORAGE_LIST_PAGE_SIZE - 1);
+
+        if (error) {
+          throw error;
+        }
+
+        pageEntries = Array.isArray(data) ? data as StorageObjectOwnershipEntry[] : [];
+      },
+      ACCOUNT_DELETION_ERROR_CODES.BACKEND_UNAVAILABLE,
+      waitForRetry,
+    );
+
+    for (const entry of pageEntries) {
+      const bucket = getStorageObjectBucketId(entry);
+      const path = getStorageEntryName(entry);
+
+      if (!bucket || !path) {
+        continue;
+      }
+
+      entries.push({ bucket, path });
+    }
+
+    if (pageEntries.length < STORAGE_LIST_PAGE_SIZE) {
+      break;
+    }
+  }
+
+  return entries;
+};
+
+const listOwnedStorageObjects = async (
   supabase: SupabaseAdminClient,
   userId: string,
   waitForRetry: (ms: number) => Promise<void>,
-): Promise<void> => {
+): Promise<Array<{ bucket: string; path: string }>> => {
+  const dedupedEntries = new Map<string, { bucket: string; path: string }>();
+
+  for (const ownershipColumn of ["owner", "owner_id"] as const) {
+    const entries = await listOwnedStorageObjectsForColumn(supabase, userId, ownershipColumn, waitForRetry);
+
+    for (const entry of entries) {
+      dedupedEntries.set(`${entry.bucket}:${entry.path}`, entry);
+    }
+  }
+
+  return Array.from(dedupedEntries.values());
+};
+
+const groupStoragePathsByBucket = (
+  entries: Array<{ bucket: string; path: string }>,
+): Map<string, string[]> => {
+  const storagePathsByBucket = new Map<string, string[]>();
+
+  for (const entry of entries) {
+    const existingPaths = storagePathsByBucket.get(entry.bucket) ?? [];
+    storagePathsByBucket.set(entry.bucket, [...existingPaths, entry.path]);
+  }
+
+  return storagePathsByBucket;
+};
+
+const collectLegacyUserStoragePaths = async (
+  supabase: SupabaseAdminClient,
+  userId: string,
+  waitForRetry: (ms: number) => Promise<void>,
+): Promise<Map<string, string[]>> => {
   const storagePathsByBucket = new Map<string, string[]>();
 
   for (const target of LEGACY_USER_STORAGE_PREFIX_TARGETS) {
@@ -501,12 +629,66 @@ const deleteUserStorageAssets = async (
     storagePathsByBucket.set(target.bucket, [...existing, ...paths]);
   }
 
+  return storagePathsByBucket;
+};
+
+const removeStoragePathsByBucket = async (
+  supabase: SupabaseAdminClient,
+  storagePathsByBucket: Map<string, string[]>,
+  waitForRetry: (ms: number) => Promise<void>,
+): Promise<void> => {
   for (const [bucket, paths] of storagePathsByBucket.entries()) {
     console.log("[delete-user] removing storage assets", {
       bucket,
       count: paths.length,
     });
     await removeStoragePaths(supabase, bucket, paths, waitForRetry);
+  }
+};
+
+const summarizeOwnedStorageObjects = (
+  entries: Array<{ bucket: string; path: string }>,
+): Record<string, number> =>
+  entries.reduce<Record<string, number>>((summary, entry) => {
+    summary[entry.bucket] = (summary[entry.bucket] ?? 0) + 1;
+    return summary;
+  }, {});
+
+const deleteUserStorageAssets = async (
+  supabase: SupabaseAdminClient,
+  userId: string,
+  waitForRetry: (ms: number) => Promise<void>,
+): Promise<void> => {
+  const legacyStoragePathsByBucket = await collectLegacyUserStoragePaths(supabase, userId, waitForRetry);
+  await removeStoragePathsByBucket(supabase, legacyStoragePathsByBucket, waitForRetry);
+
+  const ownedStorageObjects = await listOwnedStorageObjects(supabase, userId, waitForRetry);
+  const ownedStoragePathsByBucket = groupStoragePathsByBucket(ownedStorageObjects);
+
+  if (ownedStorageObjects.length > 0) {
+    console.log("[delete-user] removing owned storage objects", {
+      userId,
+      buckets: summarizeOwnedStorageObjects(ownedStorageObjects),
+    });
+  }
+
+  await removeStoragePathsByBucket(supabase, ownedStoragePathsByBucket, waitForRetry);
+
+  const remainingOwnedObjects = await listOwnedStorageObjects(supabase, userId, waitForRetry);
+  if (remainingOwnedObjects.length > 0) {
+    console.error("[delete-user] owned storage objects remain after cleanup", {
+      userId,
+      buckets: summarizeOwnedStorageObjects(remainingOwnedObjects),
+      samplePaths: remainingOwnedObjects.slice(0, 10),
+    });
+    throw createStageFailureError(
+      "storage_cleanup",
+      ACCOUNT_DELETION_ERROR_CODES.STORAGE_CLEANUP_FAILED,
+      {
+        message: "Owned storage objects remain after cleanup",
+        remainingBuckets: summarizeOwnedStorageObjects(remainingOwnedObjects),
+      },
+    );
   }
 };
 
@@ -518,12 +700,13 @@ export const handleDeleteUser = async (
     return handleCors(req);
   }
 
+  const requestId = crypto.randomUUID();
   const corsHeaders = getCorsHeaders(req);
 
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: buildRequestHeaders(corsHeaders, requestId),
     });
   }
 
@@ -537,6 +720,7 @@ export const handleDeleteUser = async (
 
     if (!supabaseUrl || !serviceRoleKey) {
       console.error("[delete-user] missing required env", {
+        requestId,
         hasSupabaseUrl: Boolean(supabaseUrl),
         hasServiceRoleKey: Boolean(serviceRoleKey),
       });
@@ -547,58 +731,96 @@ export const handleDeleteUser = async (
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
-      return createErrorResponse(corsHeaders, sanitizeError(createUnauthorizedError()));
+      return createErrorResponse(corsHeaders, requestId, sanitizeError(createUnauthorizedError()));
     }
 
     const token = authHeader.replace("Bearer", "").trim();
     if (!token) {
-      return createErrorResponse(corsHeaders, sanitizeError(createUnauthorizedError()));
+      return createErrorResponse(corsHeaders, requestId, sanitizeError(createUnauthorizedError()));
     }
 
     const { data: userResult, error: userError } = await supabase.auth.getUser(token);
     if (userError) {
-      console.error("[delete-user] auth.getUser failed", userError);
+      console.error("[delete-user] auth.getUser failed", { requestId, ...describeError(userError) });
       throw createUnauthorizedError(userError);
     }
 
     const user = userResult?.user;
     if (!user) {
-      return createErrorResponse(corsHeaders, sanitizeError(createUnauthorizedError()));
+      return createErrorResponse(corsHeaders, requestId, sanitizeError(createUnauthorizedError()));
     }
 
-    await deleteUserStorageAssets(supabase, user.id, waitForRetry);
+    try {
+      await deleteUserStorageAssets(supabase, user.id, waitForRetry);
+    } catch (error) {
+      console.error("[delete-user] storage cleanup failed", {
+        requestId,
+        userId: user.id,
+        stage: "storage_cleanup",
+        ...describeError(error),
+      });
+      throw createStageFailureError("storage_cleanup", ACCOUNT_DELETION_ERROR_CODES.STORAGE_CLEANUP_FAILED, error);
+    }
 
-    await runDeleteStepWithRetry(
-      "delete_user_account rpc",
-      async () => {
-        const { error } = await supabase.rpc("delete_user_account", { p_user_id: user.id });
-        if (error) {
-          throw error;
-        }
-      },
-      ACCOUNT_DELETION_ERROR_CODES.BACKEND_UNAVAILABLE,
-      waitForRetry,
-    );
+    try {
+      await runDeleteStepWithRetry(
+        "delete_user_account rpc",
+        async () => {
+          const { error } = await supabase.rpc("delete_user_account", { p_user_id: user.id });
+          if (error) {
+            throw error;
+          }
+        },
+        ACCOUNT_DELETION_ERROR_CODES.BACKEND_UNAVAILABLE,
+        waitForRetry,
+      );
+    } catch (error) {
+      console.error("[delete-user] relational cleanup failed", {
+        requestId,
+        userId: user.id,
+        stage: "relational_cleanup",
+        ...describeError(error),
+      });
+      throw createStageFailureError(
+        "relational_cleanup",
+        ACCOUNT_DELETION_ERROR_CODES.RELATIONAL_CLEANUP_FAILED,
+        error,
+      );
+    }
 
-    await runDeleteStepWithRetry(
-      "auth.admin.deleteUser",
-      async () => {
-        const { error } = await supabase.auth.admin.deleteUser(user.id);
-        if (error && !isAlreadyDeletedAuthUserError(error)) {
-          throw error;
-        }
-      },
-      ACCOUNT_DELETION_ERROR_CODES.BACKEND_UNAVAILABLE,
-      waitForRetry,
-    );
+    try {
+      await runDeleteStepWithRetry(
+        "auth.admin.deleteUser",
+        async () => {
+          const { error } = await supabase.auth.admin.deleteUser(user.id);
+          if (error && !isAlreadyDeletedAuthUserError(error)) {
+            throw error;
+          }
+        },
+        ACCOUNT_DELETION_ERROR_CODES.BACKEND_UNAVAILABLE,
+        waitForRetry,
+      );
+    } catch (error) {
+      console.error("[delete-user] auth deletion failed", {
+        requestId,
+        userId: user.id,
+        stage: "auth_delete",
+        ...describeError(error),
+      });
+      throw createStageFailureError("auth_delete", ACCOUNT_DELETION_ERROR_CODES.AUTH_DELETE_FAILED, error);
+    }
 
-    return new Response(JSON.stringify({ success: true }), {
+    return new Response(JSON.stringify({ success: true, requestId }), {
       status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: buildRequestHeaders(corsHeaders, requestId),
     });
   } catch (error) {
-    console.error("[delete-user] request failed", error);
-    return createErrorResponse(corsHeaders, sanitizeError(error));
+    console.error("[delete-user] request failed", {
+      requestId,
+      ...describeError(error),
+      rawError: error,
+    });
+    return createErrorResponse(corsHeaders, requestId, sanitizeError(error));
   }
 };
 

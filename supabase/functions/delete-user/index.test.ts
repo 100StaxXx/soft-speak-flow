@@ -44,6 +44,12 @@ type AuthDeleteResult = { error: unknown | null };
 type StorageListEntry = { name: string; id: string | null };
 type StorageListResult = { data: StorageListEntry[]; error: unknown | null };
 type StorageRemoveResult = { error: unknown | null };
+type OwnedStorageObject = {
+  bucket: string;
+  path: string;
+  owner?: string | null;
+  owner_id?: string | null;
+};
 
 const createRpcResult = (error: unknown | null = null): RpcResult => ({ error });
 const createAuthDeleteResult = (error: unknown | null = null): AuthDeleteResult => ({ error });
@@ -59,12 +65,16 @@ const createHandleDeleteUserHarness = ({
   getUserResult,
   listResultsByKey = {},
   removeResults = [createStorageRemoveResult()],
+  ownedStorageObjects = [],
+  persistOwnedStorageObjectsAfterRemove = false,
 }: {
   rpcResults?: RpcResult[];
   authDeleteResults?: AuthDeleteResult[];
   getUserResult?: { data: { user: { id: string } | null } | null; error: unknown | null };
   listResultsByKey?: Record<string, StorageListResult[]>;
   removeResults?: StorageRemoveResult[];
+  ownedStorageObjects?: OwnedStorageObject[];
+  persistOwnedStorageObjectsAfterRemove?: boolean;
 } = {}) => {
   let rpcCallCount = 0;
   let authDeleteCallCount = 0;
@@ -73,6 +83,7 @@ const createHandleDeleteUserHarness = ({
   const sleepCalls: number[] = [];
   const operations: string[] = [];
   const removeCalls: Array<{ bucket: string; paths: string[] }> = [];
+  let remainingOwnedStorageObjects = [...ownedStorageObjects];
 
   const getListResult = (bucket: string, prefix: string, offset: number): StorageListResult => {
     const key = `${bucket}:${prefix}:${offset}`;
@@ -80,6 +91,45 @@ const createHandleDeleteUserHarness = ({
     const currentCallCount = listCallCountByKey.get(key) ?? 0;
     listCallCountByKey.set(key, currentCallCount + 1);
     return results[Math.min(currentCallCount, results.length - 1)];
+  };
+
+  const createStorageObjectsQueryBuilder = () => {
+    let ownershipColumn: "owner" | "owner_id" | null = null;
+    let ownershipValue: string | null = null;
+
+    const builder = {
+      select: (_columns: string) => builder,
+      eq: (column: "owner" | "owner_id", value: string) => {
+        ownershipColumn = column;
+        ownershipValue = value;
+        return builder;
+      },
+      order: (_column: string, _options?: { ascending?: boolean }) => builder,
+      range: async (from: number, to: number) => {
+        operations.push(`storage.objects.select:${ownershipColumn ?? "none"}:${ownershipValue ?? "none"}:${from}-${to}`);
+
+        const matchingObjects = remainingOwnedStorageObjects
+          .filter((entry) => {
+            if (!ownershipColumn || !ownershipValue) return false;
+            return entry[ownershipColumn] === ownershipValue;
+          })
+          .sort((left, right) => {
+            if (left.bucket === right.bucket) {
+              return left.path.localeCompare(right.path);
+            }
+            return left.bucket.localeCompare(right.bucket);
+          })
+          .slice(from, to + 1)
+          .map((entry) => ({
+            bucket_id: entry.bucket,
+            name: entry.path,
+          }));
+
+        return { data: matchingObjects, error: null };
+      },
+    };
+
+    return builder;
   };
 
   const client = {
@@ -108,10 +158,25 @@ const createHandleDeleteUserHarness = ({
         remove: async (paths: string[]) => {
           operations.push(`storage.remove:${bucket}:${paths.join(",")}`);
           removeCalls.push({ bucket, paths });
-          return removeResults[Math.min(removeCallCount++, removeResults.length - 1)];
+          const result = removeResults[Math.min(removeCallCount++, removeResults.length - 1)];
+          if (!result.error && !persistOwnedStorageObjectsAfterRemove) {
+            remainingOwnedStorageObjects = remainingOwnedStorageObjects.filter((entry) =>
+              !(entry.bucket === bucket && paths.includes(entry.path))
+            );
+          }
+          return result;
         },
       }),
     },
+    schema: (schemaName: string) => ({
+      from: (tableName: string) => {
+        if (schemaName !== "storage" || tableName !== "objects") {
+          throw new Error(`Unexpected schema/table query: ${schemaName}.${tableName}`);
+        }
+
+        return createStorageObjectsQueryBuilder();
+      },
+    }),
     rpc: async () => {
       operations.push("rpc.delete_user_account");
       return rpcResults[Math.min(rpcCallCount++, rpcResults.length - 1)];
@@ -134,6 +199,7 @@ const createHandleDeleteUserHarness = ({
     sleepCalls,
     operations,
     removeCalls,
+    getRemainingOwnedStorageObjects: () => remainingOwnedStorageObjects,
   };
 };
 
@@ -158,6 +224,7 @@ Deno.test("delete-user removes legacy storage assets before rpc and auth delete"
 
   assertEquals(response.status, 200, "Expected delete-user to succeed");
   assertEquals(body.success, true, "Expected success response body");
+  assert(typeof body.requestId === "string" && body.requestId.length > 0, "Expected a requestId on success");
   assertEquals(harness.getRpcCallCount(), 1, "Expected rpc deletion to run once");
   assertEquals(harness.getAuthDeleteCallCount(), 1, "Expected auth deletion to run once");
   assertArrayEquals(
@@ -186,6 +253,39 @@ Deno.test("delete-user removes legacy storage assets before rpc and auth delete"
   assert(rpcIndex < authDeleteIndex, "Expected rpc deletion before auth deletion");
 });
 
+Deno.test("delete-user removes owned storage objects across multiple buckets even when prefix discovery misses them", async () => {
+  const harness = createHandleDeleteUserHarness({
+    ownedStorageObjects: [
+      { bucket: "quest-attachments", path: "user-1/owned-upload.png", owner: USER_ID },
+      { bucket: "quest-attachments", path: "user-1/owned-upload-2.png", owner_id: USER_ID },
+      { bucket: "evolution-cards", path: "postcards/user-1/fallback-card.png", owner_id: USER_ID },
+    ],
+  });
+
+  const response = await module.handleDeleteUser(createRequest(), harness.dependencies);
+  const body = await response.json();
+
+  assertEquals(response.status, 200, "Expected delete-user to succeed after ownership sweep cleanup");
+  assertEquals(body.success, true, "Expected success response body");
+  assertEquals(harness.getRpcCallCount(), 1, "Expected rpc deletion to run once");
+  assertEquals(harness.getAuthDeleteCallCount(), 1, "Expected auth deletion to run once");
+  assertEquals(harness.getRemainingOwnedStorageObjects().length, 0, "Expected ownership sweep to clear all owned objects");
+  assert(
+    harness.removeCalls.some((call) =>
+      call.bucket === "quest-attachments"
+      && call.paths.includes("user-1/owned-upload.png")
+      && call.paths.includes("user-1/owned-upload-2.png")
+    ),
+    "Expected quest-attachments owned objects to be removed from the ownership sweep",
+  );
+  assert(
+    harness.removeCalls.some((call) =>
+      call.bucket === "evolution-cards" && call.paths.includes("postcards/user-1/fallback-card.png")
+    ),
+    "Expected multi-bucket owned objects to be removed from the ownership sweep",
+  );
+});
+
 Deno.test("delete-user retries transient storage removal failures and succeeds", async () => {
   const harness = createHandleDeleteUserHarness({
     listResultsByKey: {
@@ -204,6 +304,26 @@ Deno.test("delete-user retries transient storage removal failures and succeeds",
   assertEquals(body.success, true, "Expected success response body");
   assertEquals(harness.getRemoveCallCount(), 2, "Expected storage removal to retry once");
   assertArrayEquals(harness.sleepCalls, [500], "Expected retry backoff after transient storage failure");
+});
+
+Deno.test("delete-user returns a storage_cleanup stage failure when owned objects remain after cleanup", async () => {
+  const harness = createHandleDeleteUserHarness({
+    ownedStorageObjects: [
+      { bucket: "quest-attachments", path: "user-1/stuck-upload.png", owner: USER_ID },
+    ],
+    persistOwnedStorageObjectsAfterRemove: true,
+  });
+
+  const response = await module.handleDeleteUser(createRequest(), harness.dependencies);
+  const body = await response.json();
+
+  assertEquals(response.status, 500, "Expected lingering owned objects to fail account deletion");
+  assertEquals(body.success, false, "Expected failure response body");
+  assertEquals(body.code, "ACCOUNT_DELETION_STORAGE_CLEANUP_FAILED", "Expected storage cleanup error code");
+  assertEquals(body.stage, "storage_cleanup", "Expected storage cleanup stage");
+  assert(typeof body.requestId === "string" && body.requestId.length > 0, "Expected a requestId on failure");
+  assertEquals(harness.getRpcCallCount(), 0, "Expected rpc deletion not to run when storage cleanup fails");
+  assertEquals(harness.getAuthDeleteCallCount(), 0, "Expected auth deletion not to run when storage cleanup fails");
 });
 
 Deno.test("delete-user retries transient rpc failures and succeeds", async () => {
@@ -255,19 +375,36 @@ Deno.test("delete-user treats an already deleted auth user as a success", async 
   assertArrayEquals(harness.sleepCalls, [], "Expected no retry delay for already-deleted auth users");
 });
 
-Deno.test("delete-user does not retry non-transient rpc authorization failures", async () => {
+Deno.test("delete-user returns a relational_cleanup stage failure for rpc errors", async () => {
   const harness = createHandleDeleteUserHarness({
-    rpcResults: [createRpcResult({ status: 401, message: "Unauthorized" })],
+    rpcResults: [createRpcResult({ status: 400, message: "violates foreign key constraint" })],
   });
 
   const response = await module.handleDeleteUser(createRequest(), harness.dependencies);
   const body = await response.json();
 
-  assertEquals(response.status, 401, "Expected unauthorized rpc failures to stay terminal");
+  assertEquals(response.status, 500, "Expected rpc failures to become relational cleanup errors");
   assertEquals(body.success, false, "Expected failure response body");
-  assertEquals(body.code, "ACCOUNT_DELETION_AUTH_REQUIRED", "Expected auth-required error code");
-  assertEquals(harness.getRpcCallCount(), 1, "Expected no retry for non-transient rpc auth failures");
-  assertArrayEquals(harness.sleepCalls, [], "Expected no retry delay for terminal auth failures");
+  assertEquals(body.code, "ACCOUNT_DELETION_RELATIONAL_CLEANUP_FAILED", "Expected relational cleanup error code");
+  assertEquals(body.stage, "relational_cleanup", "Expected relational cleanup stage");
+  assertEquals(harness.getRpcCallCount(), 1, "Expected no retry for terminal rpc failures");
+  assertArrayEquals(harness.sleepCalls, [], "Expected no retry delay for terminal rpc failures");
+});
+
+Deno.test("delete-user returns an auth_delete stage failure for auth admin errors", async () => {
+  const harness = createHandleDeleteUserHarness({
+    authDeleteResults: [createAuthDeleteResult({ status: 400, message: "delete blocked" })],
+  });
+
+  const response = await module.handleDeleteUser(createRequest(), harness.dependencies);
+  const body = await response.json();
+
+  assertEquals(response.status, 500, "Expected auth delete failures to be surfaced as auth delete errors");
+  assertEquals(body.success, false, "Expected failure response body");
+  assertEquals(body.code, "ACCOUNT_DELETION_AUTH_DELETE_FAILED", "Expected auth delete error code");
+  assertEquals(body.stage, "auth_delete", "Expected auth delete stage");
+  assertEquals(harness.getRpcCallCount(), 1, "Expected relational cleanup to run before auth deletion");
+  assertEquals(harness.getAuthDeleteCallCount(), 1, "Expected auth deletion to be attempted once");
 });
 
 Deno.test("delete-user returns unauthorized when auth lookup fails", async () => {

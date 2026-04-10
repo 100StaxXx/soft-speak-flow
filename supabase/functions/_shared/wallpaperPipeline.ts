@@ -65,13 +65,15 @@ interface WallpaperAssetLookupRow {
   > | null;
 }
 
-const openAIApiKey = Deno.env.get("OPENAI_API_KEY");
-const supabaseUrl = Deno.env.get("SUPABASE_URL");
-const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-const renderModel = Deno.env.get("OPENAI_IMAGE_MODEL") ?? "gpt-image-1";
-const validationModel = Deno.env.get("OPENAI_TEXT_MODEL") ?? "gpt-4o-mini";
+const getOpenAIApiKey = () => Deno.env.get("OPENAI_API_KEY");
+const getSupabaseUrl = () => Deno.env.get("SUPABASE_URL");
+const getSupabaseServiceRoleKey = () => Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+const getRenderModel = () => Deno.env.get("OPENAI_IMAGE_MODEL") ?? "gpt-image-1";
+const getValidationModel = () => Deno.env.get("OPENAI_TEXT_MODEL") ?? "gpt-4o-mini";
 
 export const createWallpaperServiceClient = () => {
+  const supabaseUrl = getSupabaseUrl();
+  const supabaseServiceRoleKey = getSupabaseServiceRoleKey();
   if (!supabaseUrl || !supabaseServiceRoleKey) {
     throw new Error("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be configured");
   }
@@ -120,7 +122,51 @@ const sanitizeStorageSegment = (value: string) =>
     .replace(/-+/g, "-")
     .replace(/^-|-$/g, "");
 
+type WallpaperFailureStage = "generate" | "validate" | "upload" | "insert";
+
+const toErrorMessage = (error: unknown) => (
+  error instanceof Error ? error.message : String(error)
+).slice(0, 320);
+
+const logWallpaperRecipeFailure = (args: {
+  pageKey: WallpaperPageKey;
+  dateKey: string;
+  variantKey?: WallpaperPromptVariantKey | null;
+  batchLabel?: string | null;
+  stage: WallpaperFailureStage;
+  error: string;
+}) => {
+  console.error(JSON.stringify({
+    event: "wallpaper_recipe_failure",
+    pageKey: args.pageKey,
+    dateKey: args.dateKey,
+    variantKey: args.variantKey ?? null,
+    batchLabel: args.batchLabel ?? null,
+    stage: args.stage,
+    error: args.error,
+  }));
+};
+
+const logWallpaperRecipeValidationFailure = (args: {
+  pageKey: WallpaperPageKey;
+  dateKey: string;
+  variantKey?: WallpaperPromptVariantKey | null;
+  batchLabel?: string | null;
+  rejectionReasons: string[];
+}) => {
+  console.warn(JSON.stringify({
+    event: "wallpaper_recipe_failure",
+    pageKey: args.pageKey,
+    dateKey: args.dateKey,
+    variantKey: args.variantKey ?? null,
+    batchLabel: args.batchLabel ?? null,
+    stage: "validate",
+    error: args.rejectionReasons.join(" | ").slice(0, 320),
+  }));
+};
+
 export const generateWallpaperImage = async (promptText: string) => {
+  const openAIApiKey = getOpenAIApiKey();
   if (!openAIApiKey) {
     throw new Error("OPENAI_API_KEY is not configured");
   }
@@ -132,7 +178,7 @@ export const generateWallpaperImage = async (promptText: string) => {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: renderModel,
+      model: getRenderModel(),
       image_size: WALLPAPER_IMAGE_SIZE,
       messages: [{ role: "user", content: promptText }],
       modalities: ["image", "text"],
@@ -157,6 +203,7 @@ export const validateWallpaperImage = async (
   pageKey: WallpaperPageKey,
   imageUrl: string,
 ) => {
+  const openAIApiKey = getOpenAIApiKey();
   if (!openAIApiKey) {
     throw new Error("OPENAI_API_KEY is not configured");
   }
@@ -169,7 +216,7 @@ export const validateWallpaperImage = async (
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: validationModel,
+      model: getValidationModel(),
       messages: [
         {
           role: "user",
@@ -263,7 +310,7 @@ export const insertWallpaperAsset = async (
     source_kind: "generated",
     prompt_text: args.promptText,
     prompt_version: WALLPAPER_PROMPT_VERSION,
-    render_model: renderModel,
+    render_model: getRenderModel(),
     storage_path: args.storagePath,
     image_url: args.imageUrl,
     image_width: WALLPAPER_IMAGE_WIDTH,
@@ -302,30 +349,97 @@ export const generateAndStoreWallpaperAsset = async (
     batchLabel?: string | null;
   },
 ): Promise<GeneratedWallpaperAssetRecord> => {
-  const generatedImageUrl = await generateWallpaperImage(args.promptText);
-  const validation = await validateWallpaperImage(args.pageKey, generatedImageUrl);
-  const uploaded = await uploadWallpaperImage(
-    supabase,
-    args.pageKey,
-    args.dateKey,
-    generatedImageUrl,
-    {
-      batchLabel: args.batchLabel,
+  let generatedImageUrl: string;
+  try {
+    generatedImageUrl = await generateWallpaperImage(args.promptText);
+  } catch (error) {
+    logWallpaperRecipeFailure({
+      pageKey: args.pageKey,
+      dateKey: args.dateKey,
       variantKey: args.variantKey,
-    },
-  );
+      batchLabel: args.batchLabel,
+      stage: "generate",
+      error: toErrorMessage(error),
+    });
+    throw error;
+  }
+
+  let validation: WallpaperValidationResult;
+  try {
+    validation = await validateWallpaperImage(args.pageKey, generatedImageUrl);
+  } catch (error) {
+    logWallpaperRecipeFailure({
+      pageKey: args.pageKey,
+      dateKey: args.dateKey,
+      variantKey: args.variantKey,
+      batchLabel: args.batchLabel,
+      stage: "validate",
+      error: toErrorMessage(error),
+    });
+    throw error;
+  }
+
+  let uploaded: { filePath: string; imageUrl: string };
+  try {
+    uploaded = await uploadWallpaperImage(
+      supabase,
+      args.pageKey,
+      args.dateKey,
+      generatedImageUrl,
+      {
+        batchLabel: args.batchLabel,
+        variantKey: args.variantKey,
+      },
+    );
+  } catch (error) {
+    logWallpaperRecipeFailure({
+      pageKey: args.pageKey,
+      dateKey: args.dateKey,
+      variantKey: args.variantKey,
+      batchLabel: args.batchLabel,
+      stage: "upload",
+      error: toErrorMessage(error),
+    });
+    throw error;
+  }
+
   const publishState = validation.approved ? "ready" : "validation_failed";
-  const asset = await insertWallpaperAsset(supabase, {
-    pageKey: args.pageKey,
-    dateKey: args.dateKey,
-    promptText: args.promptText,
-    imageUrl: uploaded.imageUrl,
-    storagePath: uploaded.filePath,
-    validationResult: validation,
-    publishState,
-    variantKey: args.variantKey,
-    batchLabel: args.batchLabel,
-  });
+  let asset: { id: string; created_at: string };
+  try {
+    asset = await insertWallpaperAsset(supabase, {
+      pageKey: args.pageKey,
+      dateKey: args.dateKey,
+      promptText: args.promptText,
+      imageUrl: uploaded.imageUrl,
+      storagePath: uploaded.filePath,
+      validationResult: validation,
+      publishState,
+      variantKey: args.variantKey,
+      batchLabel: args.batchLabel,
+    });
+  } catch (error) {
+    logWallpaperRecipeFailure({
+      pageKey: args.pageKey,
+      dateKey: args.dateKey,
+      variantKey: args.variantKey,
+      batchLabel: args.batchLabel,
+      stage: "insert",
+      error: toErrorMessage(error),
+    });
+    throw error;
+  }
+
+  if (publishState === "validation_failed") {
+    logWallpaperRecipeValidationFailure({
+      pageKey: args.pageKey,
+      dateKey: args.dateKey,
+      variantKey: args.variantKey,
+      batchLabel: args.batchLabel,
+      rejectionReasons: validation.rejectionReasons.length > 0
+        ? validation.rejectionReasons
+        : ["validator rejected wallpaper"],
+    });
+  }
 
   return {
     assetId: asset.id,

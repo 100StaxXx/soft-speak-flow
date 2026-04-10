@@ -56,11 +56,6 @@ export interface RotationDeps {
   getLatestReadyAsset: typeof getLatestReadyAsset;
 }
 
-interface RotatePageWallpaperControls {
-  allowGeneration?: boolean;
-  generationCandidateCount?: number;
-}
-
 const defaultDeps: RotationDeps = {
   getExistingAssignment,
   getWallpaperAssetEligibilitySnapshot,
@@ -71,6 +66,49 @@ const defaultDeps: RotationDeps = {
 };
 
 const DATE_KEY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+const DEFAULT_MAX_GENERATION_SLOTS_PER_RUN = 1;
+const GENERATION_DEFERRED_REASON = "generation deferred due to run budget";
+
+interface RotatePageWallpaperControls {
+  allowGeneration: boolean;
+}
+
+interface RotatePageWallpaperExecutionResult {
+  outcome: RotationOutcome;
+  consumedGenerationSlot: boolean;
+}
+
+const getMaxGenerationSlotsPerRun = () => {
+  const rawValue = Deno.env.get("WALLPAPER_MAX_GENERATION_SLOTS_PER_RUN");
+  if (!rawValue) {
+    return DEFAULT_MAX_GENERATION_SLOTS_PER_RUN;
+  }
+
+  const parsed = Number.parseInt(rawValue, 10);
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    return DEFAULT_MAX_GENERATION_SLOTS_PER_RUN;
+  }
+
+  return parsed;
+};
+
+const logRotationOutcome = (
+  batchLabel: string,
+  outcome: RotationOutcome,
+  force: boolean,
+) => {
+  console.info(JSON.stringify({
+    event: "wallpaper_rotation_slot",
+    batchLabel,
+    force,
+    pageKey: outcome.pageKey,
+    dateKey: outcome.dateKey,
+    status: outcome.status,
+    assetId: outcome.assetId,
+    assignmentSource: outcome.assignmentSource ?? null,
+    reason: outcome.reason ?? null,
+  }));
+};
 
 const clampInteger = (value: unknown, fallback: number, minimum: number, maximum: number) => {
   if (typeof value !== "number" || Number.isNaN(value)) {
@@ -136,31 +174,52 @@ const toCandidateFromGeneratedAsset = (
   pageKey,
 });
 
-export const rotatePageWallpaper = async (
+const rotatePageWallpaperInternal = async (
   supabase: SupabaseClient,
   pageKey: WallpaperPageKey,
   dateKey: string,
   candidateCount: number,
   force: boolean,
   batchLabel: string,
+  controls: RotatePageWallpaperControls,
   deps: RotationDeps = defaultDeps,
-  controls: RotatePageWallpaperControls = {},
-): Promise<RotationOutcome> => {
+): Promise<RotatePageWallpaperExecutionResult> => {
   const existingAssignment = await deps.getExistingAssignment(supabase, pageKey, dateKey);
   if (existingAssignment && !force) {
+    if (existingAssignment.assignment_source === "admin_override") {
+      return {
+        outcome: {
+          pageKey,
+          dateKey,
+          status: "skipped",
+          assetId: existingAssignment.wallpaper_asset_id,
+          assignmentSource: existingAssignment.assignment_source,
+          reason: "admin override kept",
+        },
+        consumedGenerationSlot: false,
+      };
+    }
+
     const eligibilitySnapshot = await deps.getWallpaperAssetEligibilitySnapshot(
       supabase,
       existingAssignment.wallpaper_asset_id,
     );
 
-    if (eligibilitySnapshot?.publish_state === "ready") {
+    if (
+      existingAssignment.assignment_source === "auto"
+      && eligibilitySnapshot?.publish_state === "ready"
+      && eligibilitySnapshot.generation_date === dateKey
+    ) {
       return {
-        pageKey,
-        dateKey,
-        status: "skipped",
-        assetId: existingAssignment.wallpaper_asset_id,
-        assignmentSource: existingAssignment.assignment_source,
-        reason: "already assigned",
+        outcome: {
+          pageKey,
+          dateKey,
+          status: "skipped",
+          assetId: existingAssignment.wallpaper_asset_id,
+          assignmentSource: existingAssignment.assignment_source,
+          reason: "same-date auto assignment kept",
+        },
+        consumedGenerationSlot: false,
       };
     }
   }
@@ -177,46 +236,69 @@ export const rotatePageWallpaper = async (
   if (bestExistingSameDate && !force) {
     await deps.assignWallpaperAsset(supabase, pageKey, dateKey, bestExistingSameDate.id, "auto");
     return {
-      pageKey,
-      dateKey,
-      status: "assigned_existing",
-      assetId: bestExistingSameDate.id,
-      assignmentSource: "auto",
-      reason: "reused approved same-date asset",
+      outcome: {
+        pageKey,
+        dateKey,
+        status: "assigned_existing",
+        assetId: bestExistingSameDate.id,
+        assignmentSource: "auto",
+        reason: "reused approved same-date asset",
+      },
+      consumedGenerationSlot: false,
     };
   }
 
-  if (controls.allowGeneration === false) {
+  if (!controls.allowGeneration) {
+    if (existingAssignment) {
+      return {
+        outcome: {
+          pageKey,
+          dateKey,
+          status: "skipped",
+          assetId: existingAssignment.wallpaper_asset_id,
+          assignmentSource: existingAssignment.assignment_source,
+          reason: GENERATION_DEFERRED_REASON,
+        },
+        consumedGenerationSlot: false,
+      };
+    }
+
     const latestReadyAsset = await deps.getLatestReadyAsset(supabase, pageKey);
     if (latestReadyAsset) {
       await deps.assignWallpaperAsset(supabase, pageKey, dateKey, latestReadyAsset.id, "carry_forward");
       return {
-        pageKey,
-        dateKey,
-        status: "carry_forward",
-        assetId: latestReadyAsset.id,
-        assignmentSource: "carry_forward",
-        reason: "fast rotation reused latest ready asset",
+        outcome: {
+          pageKey,
+          dateKey,
+          status: "carry_forward",
+          assetId: latestReadyAsset.id,
+          assignmentSource: "carry_forward",
+          reason: GENERATION_DEFERRED_REASON,
+        },
+        consumedGenerationSlot: false,
       };
     }
 
     return {
-      pageKey,
-      dateKey,
-      status: "skipped",
-      assetId: null,
-      reason: "fast rotation skipped generation with no carry-forward asset",
+      outcome: {
+        pageKey,
+        dateKey,
+        status: "skipped",
+        assetId: null,
+        reason: `${GENERATION_DEFERRED_REASON} and no carry-forward asset`,
+      },
+      consumedGenerationSlot: false,
     };
   }
 
-  const existingVariantKeys = new Set(
+  const existingReadyVariantKeys = new Set(
     sameDateCandidates
+      .filter((candidate) => candidate.publishState === "ready")
       .map((candidate) => candidate.variantKey)
       .filter((variantKey): variantKey is string => Boolean(variantKey)),
   );
-  const effectiveCandidateCount = Math.max(1, controls.generationCandidateCount ?? candidateCount);
-  const recipesToGenerate = getDeterministicWallpaperRecipes(pageKey, dateKey, effectiveCandidateCount)
-    .filter((recipe) => force || !existingVariantKeys.has(recipe.key));
+  const recipesToGenerate = getDeterministicWallpaperRecipes(pageKey, dateKey, Math.max(1, candidateCount))
+    .filter((recipe) => force || !existingReadyVariantKeys.has(recipe.key));
 
   const generatedCandidates: ReadyWallpaperAssetRow[] = [];
   const generationErrors: string[] = [];
@@ -234,6 +316,31 @@ export const rotatePageWallpaper = async (
       generatedCandidates.push(
         toCandidateFromGeneratedAsset(generatedAsset, pageKey, dateKey, batchLabel),
       );
+
+      const bestCandidateAfterGeneration = pickBestEligibleWallpaperCandidateForDate(
+        pageKey,
+        dateKey,
+        [...sameDateCandidates, ...generatedCandidates],
+      );
+
+      if (bestCandidateAfterGeneration) {
+        await deps.assignWallpaperAsset(supabase, pageKey, dateKey, bestCandidateAfterGeneration.id, "auto");
+        return {
+          outcome: {
+            pageKey,
+            dateKey,
+            status: generatedCandidates.some((candidate) => candidate.id === bestCandidateAfterGeneration.id)
+              ? "generated"
+              : "assigned_existing",
+            assetId: bestCandidateAfterGeneration.id,
+            assignmentSource: "auto",
+            reason: generatedCandidates.some((candidate) => candidate.id === bestCandidateAfterGeneration.id)
+              ? "generated approved same-date candidate"
+              : "reused approved same-date asset",
+          },
+          consumedGenerationSlot: true,
+        };
+      }
     } catch (error) {
       generationErrors.push(error instanceof Error ? error.message : String(error));
     }
@@ -248,14 +355,19 @@ export const rotatePageWallpaper = async (
   if (bestSameDateCandidate) {
     await deps.assignWallpaperAsset(supabase, pageKey, dateKey, bestSameDateCandidate.id, "auto");
     return {
-      pageKey,
-      dateKey,
-      status: recipesToGenerate.length > 0 ? "generated" : "assigned_existing",
-      assetId: bestSameDateCandidate.id,
-      assignmentSource: "auto",
-      reason: recipesToGenerate.length > 0
-        ? "generated approved same-date candidate"
-        : "reused approved same-date asset",
+      outcome: {
+        pageKey,
+        dateKey,
+        status: generatedCandidates.some((candidate) => candidate.id === bestSameDateCandidate.id)
+          ? "generated"
+          : "assigned_existing",
+        assetId: bestSameDateCandidate.id,
+        assignmentSource: "auto",
+        reason: generatedCandidates.some((candidate) => candidate.id === bestSameDateCandidate.id)
+          ? "generated approved same-date candidate"
+          : "reused approved same-date asset",
+      },
+      consumedGenerationSlot: true,
     };
   }
 
@@ -263,22 +375,51 @@ export const rotatePageWallpaper = async (
   if (latestReadyAsset) {
     await deps.assignWallpaperAsset(supabase, pageKey, dateKey, latestReadyAsset.id, "carry_forward");
     return {
-      pageKey,
-      dateKey,
-      status: "carry_forward",
-      assetId: latestReadyAsset.id,
-      assignmentSource: "carry_forward",
-      reason: generationErrors[0] ?? "no approved same-date candidates",
+      outcome: {
+        pageKey,
+        dateKey,
+        status: "carry_forward",
+        assetId: latestReadyAsset.id,
+        assignmentSource: "carry_forward",
+        reason: generationErrors[0] ?? "no approved same-date candidates",
+      },
+      consumedGenerationSlot: true,
     };
   }
 
   return {
+    outcome: {
+      pageKey,
+      dateKey,
+      status: "skipped",
+      assetId: null,
+      reason: generationErrors[0] ?? "no approved candidates and no carry-forward asset",
+    },
+    consumedGenerationSlot: true,
+  };
+};
+
+export const rotatePageWallpaper = async (
+  supabase: SupabaseClient,
+  pageKey: WallpaperPageKey,
+  dateKey: string,
+  candidateCount: number,
+  force: boolean,
+  batchLabel: string,
+  deps: RotationDeps = defaultDeps,
+): Promise<RotationOutcome> => {
+  const { outcome } = await rotatePageWallpaperInternal(
+    supabase,
     pageKey,
     dateKey,
-    status: "skipped",
-    assetId: null,
-    reason: generationErrors[0] ?? "no approved candidates and no carry-forward asset",
-  };
+    candidateCount,
+    force,
+    batchLabel,
+    { allowGeneration: true },
+    deps,
+  );
+
+  return outcome;
 };
 
 export const rotateWallpaperAssignments = async (
@@ -289,121 +430,25 @@ export const rotateWallpaperAssignments = async (
   const batchLabel = buildWallpaperBatchLabel(options.startDate);
   const dates = getWallpaperHorizonDates(options.startDate, options.daysAhead);
   const outcomes: RotationOutcome[] = [];
-
-  if (!options.force) {
-    const outcomeBySlot = new Map<string, RotationOutcome>();
-
-    // First cover the whole horizon with same-date reuse or carry-forward so one slow
-    // generation job cannot block every future assignment in the current run.
-    for (const dateKey of dates) {
-      for (const pageKey of options.pageKeys) {
-        const outcome = await rotatePageWallpaper(
-          supabase,
-          pageKey,
-          dateKey,
-          options.candidateCount,
-          false,
-          batchLabel,
-          deps,
-          {
-            allowGeneration: false,
-            generationCandidateCount: 0,
-          },
-        );
-        outcomeBySlot.set(`${dateKey}:${pageKey}`, outcome);
-      }
-    }
-
-    // Then try to freshen the active wallpaper day only, promoting future carry-forward
-    // assignments afterward if a new current-day asset becomes available.
-    for (const pageKey of options.pageKeys) {
-      const currentKey = `${options.startDate}:${pageKey}`;
-      const currentOutcome = outcomeBySlot.get(currentKey);
-      if (
-        !currentOutcome
-        || (
-          currentOutcome.status !== "carry_forward"
-          && currentOutcome.assignmentSource !== "carry_forward"
-          && currentOutcome.assetId !== null
-        )
-      ) {
-        continue;
-      }
-
-      const generatedOutcome = await rotatePageWallpaper(
-        supabase,
-        pageKey,
-        options.startDate,
-        options.candidateCount,
-        false,
-        batchLabel,
-        deps,
-        {
-          allowGeneration: true,
-          generationCandidateCount: 1,
-        },
-      );
-      outcomeBySlot.set(currentKey, generatedOutcome);
-
-      if (generatedOutcome.assetId === null) {
-        continue;
-      }
-
-      for (const dateKey of dates.slice(1)) {
-        const slotKey = `${dateKey}:${pageKey}`;
-        const existingOutcome = outcomeBySlot.get(slotKey);
-        if (existingOutcome?.assetId !== null) {
-          continue;
-        }
-
-        const futureOutcome = await rotatePageWallpaper(
-          supabase,
-          pageKey,
-          dateKey,
-          options.candidateCount,
-          false,
-          batchLabel,
-          deps,
-          {
-            allowGeneration: false,
-            generationCandidateCount: 0,
-          },
-        );
-        outcomeBySlot.set(slotKey, futureOutcome);
-      }
-    }
-
-    for (const dateKey of dates) {
-      for (const pageKey of options.pageKeys) {
-        const outcome = outcomeBySlot.get(`${dateKey}:${pageKey}`);
-        if (outcome) {
-          outcomes.push(outcome);
-        }
-      }
-    }
-
-    return {
-      batchLabel,
-      outcomes,
-    };
-  }
+  let remainingGenerationSlots = getMaxGenerationSlotsPerRun();
 
   for (const dateKey of dates) {
     for (const pageKey of options.pageKeys) {
-      const outcome = await rotatePageWallpaper(
+      const { outcome, consumedGenerationSlot } = await rotatePageWallpaperInternal(
         supabase,
         pageKey,
         dateKey,
         options.candidateCount,
-        true,
+        options.force,
         batchLabel,
+        { allowGeneration: remainingGenerationSlots > 0 },
         deps,
-        {
-          allowGeneration: true,
-          generationCandidateCount: options.candidateCount,
-        },
       );
       outcomes.push(outcome);
+      logRotationOutcome(batchLabel, outcome, options.force);
+      if (consumedGenerationSlot) {
+        remainingGenerationSlots -= 1;
+      }
     }
   }
 

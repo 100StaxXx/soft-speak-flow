@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
-import { getAuthRedirectPath, getProfileAwareAuthFallbackPath, ensureProfile } from "@/utils/authRedirect";
+import { getAuthRedirectPath, getProfileAwareAuthFallbackPath } from "@/utils/authRedirect";
 import { logger } from "@/utils/logger";
 import { hasWalkthroughCompleted } from "@/utils/profileOnboarding";
 import { getRedirectUrlWithPath, getRedirectUrl } from '@/utils/redirectUrl';
@@ -449,17 +449,15 @@ const Auth = () => {
     const deadlineTask = new Promise<"deadline">((resolve) => {
       timeoutId = setTimeout(() => {
         logger.warn(`[Auth ${source}] TIMEOUT after ${POST_AUTH_NAVIGATION_TIMEOUT_MS}ms - resolving profile-aware fallback path`);
-        toast({
-          title: "Taking longer than expected",
-          description: "Redirecting you now...",
-        });
 
         void Promise.resolve((async () => {
           let fallbackPath = POST_AUTH_DEFAULT_PATH;
 
           try {
             const fallbackStartTime = Date.now();
-            fallbackPath = await getProfileAwareAuthFallbackPath(session.user.id);
+            fallbackPath = await getProfileAwareAuthFallbackPath(session.user.id, {
+              email: session.user.email ?? null,
+            });
             logger.info(`[Auth ${source}] Profile-aware timeout fallback resolved to "${fallbackPath}" in ${Date.now() - fallbackStartTime}ms`);
           } catch (error) {
             logger.warn(`[Auth ${source}] Profile-aware timeout fallback failed, defaulting to ${POST_AUTH_DEFAULT_PATH}`, { error });
@@ -474,14 +472,11 @@ const Auth = () => {
 
     const coreTask = (async (): Promise<"core"> => {
       try {
-        logger.info(`[Auth ${source}] Calling ensureProfile...`);
-        const profileStartTime = Date.now();
-        await ensureProfile(session.user.id, session.user.email);
-        logger.info(`[Auth ${source}] ensureProfile completed in ${Date.now() - profileStartTime}ms`);
-
         logger.info(`[Auth ${source}] Calling getAuthRedirectPath...`);
         const redirectStartTime = Date.now();
-        const path = await getAuthRedirectPath(session.user.id);
+        const path = await getAuthRedirectPath(session.user.id, {
+          email: session.user.email ?? null,
+        });
         logger.info(`[Auth ${source}] getAuthRedirectPath returned "${path}" in ${Date.now() - redirectStartTime}ms`);
 
         finalizeNavigation(path, "resolved-path");
