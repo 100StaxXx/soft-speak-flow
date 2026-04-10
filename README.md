@@ -144,7 +144,9 @@ If `npx cap sync ios` reports that the iOS platform has not been added, add it o
 npx cap add ios
 ```
 
-After the platform is created, you can rerun `npx cap sync ios` to copy the latest web assets and update native dependencies.
+After the platform is created, you can rerun `npm run ios:sync` to rebuild the web app, copy the latest assets into the Capacitor project, and verify the synced bundle contents.
+
+Treat everything under `ios/App/App/public` and `ios/App/build-cli` as generated output. Those folders are useful for inspection, but they are not the source of truth for app code and should always be refreshed from the current web build before device or TestFlight packaging.
 
 The Capacitor iOS project includes a custom CocoaPods `post_install` hook (see `ios/App/Podfile`) that scans every downloaded `.xcframework`. If a framework ships without the plain `ios-arm64` slice that the `[CP] Copy XCFrameworks` script expects, the hook clones the closest non-simulator `ios-arm64_*` variant into place. This prevents `rsync` errors like the ones seen for `IONFilesystemLib` or `FBSDKCoreKit_Basics`.
 
@@ -162,5 +164,13 @@ If you still hit `[CP] Copy XCFrameworks` failures:
    npm run ios:sync
    ```
 3. In Xcode, delete Derived Data for the app target, then rebuild.
+
+For release-style validation, prefer:
+
+```sh
+npm run ios:preflight
+```
+
+That flow rebuilds the web assets, syncs iOS, verifies the copied bundles, and then checks widget signing so stale WebView bundles are less likely to slip into a device build.
 
 After a fresh `pod install`, the hook repopulates missing `ios-arm64` slices automatically, so the build completes even when upstream vendors omit that directory.

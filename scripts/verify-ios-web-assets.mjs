@@ -13,6 +13,11 @@ const projectRoot = path.resolve(__dirname, "..");
 const distAssetsDir = path.join(projectRoot, "dist", "assets");
 const iosAssetsDir = path.join(projectRoot, "ios", "App", "App", "public", "assets");
 const INDEX_BUNDLE_PATTERN = /^index-[A-Za-z0-9_-]+\.js$/;
+const JAVASCRIPT_BUNDLE_PATTERN = /\.js$/;
+const LEGACY_JOURNEY_PATH_CONTRACT_PATTERN =
+  /generate-journey-path["']?\s*,\s*\{[\s\S]{0,250}?body:\{[\s\S]{0,250}?userId:/;
+const LEGACY_JOURNEY_PATH_ERROR =
+  "Missing required parameters: epicId, milestoneIndex, userId";
 
 const prefix = "[ios:verify-assets]";
 
@@ -40,14 +45,51 @@ const listIndexBundles = async (directory) => {
     .sort();
 };
 
+const listJavaScriptBundles = async (directory) => {
+  let entries;
+  try {
+    entries = await fs.readdir(directory, { withFileTypes: true });
+  } catch (error) {
+    throw new Error(`Missing assets directory: ${directory}`);
+  }
+
+  return entries
+    .filter((entry) => entry.isFile() && JAVASCRIPT_BUNDLE_PATTERN.test(entry.name))
+    .map((entry) => entry.name)
+    .sort();
+};
+
 const hashFile = async (filePath) => {
   const fileBuffer = await fs.readFile(filePath);
   return createHash("sha256").update(fileBuffer).digest("hex");
 };
 
+const verifyNoLegacyJourneyPathContract = async (directory, bundles) => {
+  const offenders = [];
+
+  for (const bundle of bundles) {
+    const bundleContents = await fs.readFile(path.join(directory, bundle), "utf8");
+    if (
+      LEGACY_JOURNEY_PATH_CONTRACT_PATTERN.test(bundleContents)
+      || bundleContents.includes(LEGACY_JOURNEY_PATH_ERROR)
+    ) {
+      offenders.push(bundle);
+    }
+  }
+
+  if (offenders.length > 0) {
+    fail(
+      `Found legacy journey-path request contract in ${directory}: ${offenders.join(", ")}. ` +
+      "Rebuild from current source before shipping iOS assets.",
+    );
+  }
+};
+
 const verifyAssets = async () => {
   const distBundles = await listIndexBundles(distAssetsDir);
   const iosBundles = await listIndexBundles(iosAssetsDir);
+  const distJavaScriptBundles = await listJavaScriptBundles(distAssetsDir);
+  const iosJavaScriptBundles = await listJavaScriptBundles(iosAssetsDir);
 
   if (distBundles.length === 0) {
     fail(`No Vite index bundle found in ${distAssetsDir}`);
@@ -76,6 +118,9 @@ const verifyAssets = async () => {
   if (hashMismatches.length > 0) {
     fail(`Bundle content mismatch for: ${hashMismatches.join(", ")}`);
   }
+
+  await verifyNoLegacyJourneyPathContract(distAssetsDir, distJavaScriptBundles);
+  await verifyNoLegacyJourneyPathContract(iosAssetsDir, iosJavaScriptBundles);
 
   info(`Verified ${distBundles.length} index bundle(s) are synced between dist and iOS public assets.`);
 };
