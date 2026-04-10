@@ -391,7 +391,7 @@ Deno.test("delete-user returns a relational_cleanup stage failure for rpc errors
   assertArrayEquals(harness.sleepCalls, [], "Expected no retry delay for terminal rpc failures");
 });
 
-Deno.test("delete-user returns an auth_delete stage failure for auth admin errors", async () => {
+Deno.test("delete-user returns degraded success with warning when auth admin deletion fails after profile removal", async () => {
   const harness = createHandleDeleteUserHarness({
     authDeleteResults: [createAuthDeleteResult({ status: 400, message: "delete blocked" })],
   });
@@ -399,10 +399,11 @@ Deno.test("delete-user returns an auth_delete stage failure for auth admin error
   const response = await module.handleDeleteUser(createRequest(), harness.dependencies);
   const body = await response.json();
 
-  assertEquals(response.status, 500, "Expected auth delete failures to be surfaced as auth delete errors");
-  assertEquals(body.success, false, "Expected failure response body");
-  assertEquals(body.code, "ACCOUNT_DELETION_AUTH_DELETE_FAILED", "Expected auth delete error code");
-  assertEquals(body.stage, "auth_delete", "Expected auth delete stage");
+  assertEquals(response.status, 200, "Expected degraded success when auth delete fails after profile is gone");
+  assertEquals(body.success, true, "Expected success response since profile data was deleted");
+  assert(Array.isArray(body.warnings), "Expected warnings array in response");
+  assert(body.warnings.length > 0, "Expected at least one warning about deferred auth deletion");
+  assertEquals(body.warnings[0].code, "AUTH_DELETE_DEFERRED", "Expected AUTH_DELETE_DEFERRED warning code");
   assertEquals(harness.getRpcCallCount(), 1, "Expected relational cleanup to run before auth deletion");
   assertEquals(harness.getAuthDeleteCallCount(), 1, "Expected auth deletion to be attempted once");
 });

@@ -530,6 +530,25 @@ const listOwnedStorageObjectsForColumn = async (
           .range(offset, offset + STORAGE_LIST_PAGE_SIZE - 1);
 
         if (error) {
+          // Classify RLS / permission errors as terminal so they aren't
+          // uselessly retried — these require a config fix, not a retry.
+          const errorText = getNormalizedErrorText(error);
+          if (
+            getErrorStatus(error) === 403
+            || errorText.includes("permission denied")
+            || errorText.includes("rls")
+            || errorText.includes("policy")
+          ) {
+            console.error(`[delete-user] storage ownership query (${ownershipColumn}) blocked by permissions`, {
+              ...describeError(error),
+            });
+            throw createStageFailureError(
+              "storage_cleanup",
+              ACCOUNT_DELETION_ERROR_CODES.STORAGE_CLEANUP_FAILED,
+              error,
+            );
+          }
+
           throw error;
         }
 
@@ -673,7 +692,10 @@ const deleteUserStorageAssets = async (
 ): Promise<void> => {
   const storageStartTime = Date.now();
   const legacyStoragePathsByBucket = await collectLegacyUserStoragePaths(supabase, userId, waitForRetry);
+  checkStorageDeadline(storageStartTime, "legacy collection");
+
   await removeStoragePathsByBucket(supabase, legacyStoragePathsByBucket, waitForRetry);
+  checkStorageDeadline(storageStartTime, "legacy removal");
 
   // Validate legacy storage was actually removed by re-collecting and checking
   if (legacyStoragePathsByBucket.size > 0) {
@@ -703,17 +725,23 @@ const deleteUserStorageAssets = async (
     }
   }
 
+  checkStorageDeadline(storageStartTime, "legacy validation");
+
   const ownedStorageObjects = await listOwnedStorageObjects(supabase, userId, waitForRetry);
+  checkStorageDeadline(storageStartTime, "ownership query");
+
   const ownedStoragePathsByBucket = groupStoragePathsByBucket(ownedStorageObjects);
 
   if (ownedStorageObjects.length > 0) {
     console.log("[delete-user] removing owned storage objects", {
       userId,
+      count: ownedStorageObjects.length,
       buckets: summarizeOwnedStorageObjects(ownedStorageObjects),
     });
   }
 
   await removeStoragePathsByBucket(supabase, ownedStoragePathsByBucket, waitForRetry);
+  checkStorageDeadline(storageStartTime, "ownership removal");
 
   const remainingOwnedObjects = await listOwnedStorageObjects(supabase, userId, waitForRetry);
   if (remainingOwnedObjects.length > 0) {

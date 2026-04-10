@@ -336,14 +336,18 @@ const Profile = () => {
       return;
     }
 
-    window.setTimeout(() => {
+    // Use requestAnimationFrame to wait for the current event cycle and any
+    // pending React re-renders to flush before checking focus state. This avoids
+    // the race condition where setTimeout(0) could fire before or after other
+    // queued input/keyboard handlers, causing the blur/focus swap to be skipped.
+    requestAnimationFrame(() => {
       if (document.activeElement !== deleteConfirmationInputRef.current) {
         return;
       }
 
       deleteConfirmationInputRef.current?.blur();
       deleteSubmitButtonRef.current?.focus();
-    }, 0);
+    });
   }, []);
 
 
