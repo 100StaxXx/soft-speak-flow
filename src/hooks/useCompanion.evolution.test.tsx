@@ -34,7 +34,10 @@ const mocks = vi.hoisted(() => {
   const loggerErrorMock = vi.fn();
   const loggerInfoMock = vi.fn();
   const userCompanionResponses: Array<{ data: unknown; error: unknown }> = [];
+  const userCompanionUpdateResponses: Array<{ data: unknown; error: unknown }> = [];
+  const userCompanionUpdatePayloads: Array<Record<string, unknown>> = [];
   const companionEvolutionResponses: Array<{ data: unknown; error: unknown }> = [];
+  const companionEvolutionListResponses: Array<{ data: unknown; error: unknown }> = [];
 
   return {
     rpcMock,
@@ -50,7 +53,10 @@ const mocks = vi.hoisted(() => {
     loggerErrorMock,
     loggerInfoMock,
     userCompanionResponses,
+    userCompanionUpdateResponses,
+    userCompanionUpdatePayloads,
     companionEvolutionResponses,
+    companionEvolutionListResponses,
   };
 });
 
@@ -63,8 +69,8 @@ vi.mock("@/integrations/supabase/client", () => ({
     from: mocks.fromMock,
     storage: {
       from: () => ({
-        getPublicUrl: () => ({
-          data: { publicUrl: "https://example.com/preset-stage0.png" },
+        getPublicUrl: (assetPath: string) => ({
+          data: { publicUrl: `https://example.com/storage/v1/object/public/companion-presets/${assetPath}` },
         }),
       }),
     },
@@ -157,8 +163,32 @@ const createRelayInvokeError = () => ({
 });
 
 const createQueryBuilder = (table: string) => {
+  let isUpdateOperation = false;
+
+  const resolveAwaitResponse = async () => {
+    if (table === "companion_evolutions") {
+      return mocks.companionEvolutionListResponses.shift() ?? { data: [], error: null };
+    }
+
+    if (table === "user_companion") {
+      if (isUpdateOperation) {
+        return mocks.userCompanionUpdateResponses.shift() ?? { data: null, error: null };
+      }
+      return mocks.userCompanionResponses.shift() ?? { data: companionFixture, error: null };
+    }
+
+    return { data: null, error: null };
+  };
+
   const builder = {
     select: vi.fn(() => builder),
+    update: vi.fn((payload: Record<string, unknown>) => {
+      isUpdateOperation = true;
+      if (table === "user_companion") {
+        mocks.userCompanionUpdatePayloads.push(payload);
+      }
+      return builder;
+    }),
     eq: vi.fn(() => builder),
     in: vi.fn(() => builder),
     order: vi.fn(() => builder),
@@ -180,6 +210,8 @@ const createQueryBuilder = (table: string) => {
 
       return { data: null, error: null };
     }),
+    then: (onFulfilled: (value: unknown) => unknown, onRejected?: (reason: unknown) => unknown) =>
+      resolveAwaitResponse().then(onFulfilled, onRejected),
   };
 
   return builder;
@@ -216,7 +248,10 @@ describe("useCompanion evolveCompanion", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.userCompanionResponses.length = 0;
+    mocks.userCompanionUpdateResponses.length = 0;
+    mocks.userCompanionUpdatePayloads.length = 0;
     mocks.companionEvolutionResponses.length = 0;
+    mocks.companionEvolutionListResponses.length = 0;
     mocks.userCompanionResponses.push({ data: companionFixture, error: null });
 
     mocks.fromMock.mockImplementation((table: string) => createQueryBuilder(table));
@@ -454,6 +489,82 @@ describe("useCompanion evolveCompanion", () => {
     expect(mocks.checkCompanionAchievementsMock).not.toHaveBeenCalled();
   });
 
+  it("falls back to local evolution history when the repair RPC is unavailable", async () => {
+    mocks.userCompanionResponses.length = 0;
+    const staleAutoAdvancedCompanion = {
+      ...companionFixture,
+      current_stage: 5,
+      current_xp: 103,
+      preset_id: "dragon",
+      spirit_animal: "Dragon",
+      core_element: "fire",
+      current_image_url: "https://example.com/stage-5.png",
+      initial_image_url: "https://example.com/egg.png",
+    };
+    mocks.userCompanionResponses.push(
+      { data: staleAutoAdvancedCompanion, error: null },
+      { data: staleAutoAdvancedCompanion, error: null },
+    );
+    mocks.rpcMock.mockResolvedValue({
+      data: null,
+      error: {
+        code: "42883",
+        message: "function public.repair_auto_advanced_companion_state(uuid) does not exist",
+        details: null,
+        hint: null,
+      },
+    });
+    mocks.companionEvolutionListResponses.push({
+      data: [
+        {
+          stage: 0,
+          image_url: "https://example.com/egg.png",
+          xp_at_evolution: 0,
+          evolved_at: "2026-04-09T10:00:00.000Z",
+        },
+        {
+          stage: 1,
+          image_url: "https://example.com/stage-1.png",
+          xp_at_evolution: 10,
+          evolved_at: "2026-04-09T10:05:00.000Z",
+        },
+      ],
+      error: null,
+    });
+    mocks.companionEvolutionListResponses.push({
+      data: [
+        {
+          stage: 0,
+          image_url: "https://example.com/egg.png",
+          xp_at_evolution: 0,
+          evolved_at: "2026-04-09T10:00:00.000Z",
+        },
+        {
+          stage: 1,
+          image_url: "https://example.com/stage-1.png",
+          xp_at_evolution: 10,
+          evolved_at: "2026-04-09T10:05:00.000Z",
+        },
+      ],
+      error: null,
+    });
+
+    const { result } = await renderUseCompanion();
+
+    expect(result.current.companion?.current_stage).toBe(1);
+    expect(result.current.companion?.current_image_url).toBe("https://example.com/stage-1.png");
+    expect(result.current.nextEvolutionXP).toBe(30);
+    expect(result.current.canEvolve).toBe(true);
+    expect(mocks.loggerWarnMock).toHaveBeenCalledWith(
+      "Applied local companion claim fallback",
+      expect.objectContaining({
+        companionId: companionFixture.id,
+        restoredStage: 1,
+        reason: "repair_rpc_failed",
+      }),
+    );
+  });
+
   it("repairs companions that loaded ahead of their actual evolution history", async () => {
     mocks.userCompanionResponses.length = 0;
     mocks.userCompanionResponses.push(
@@ -509,6 +620,120 @@ describe("useCompanion evolveCompanion", () => {
       "repair_auto_advanced_companion_state",
       { p_companion_id: companionFixture.id },
     );
+  });
+
+  it("repairs stale preset-backed positive-stage egg images during fetch", async () => {
+    mocks.userCompanionResponses.length = 0;
+    mocks.userCompanionResponses.push({
+      data: {
+        ...companionFixture,
+        current_stage: 6,
+        current_xp: 2200,
+        preset_id: "griffin",
+        spirit_animal: "Griffin",
+        core_element: "fire",
+        current_image_url: "/companion-eggs/egg__t0_egg__normal__fire.png",
+      },
+      error: null,
+    });
+    mocks.userCompanionUpdateResponses.push({ data: null, error: null });
+    mocks.rpcMock.mockImplementation(async (fnName: string) => {
+      if (fnName === "repair_auto_advanced_companion_state") {
+        return {
+          data: [
+            {
+              repaired: false,
+              current_stage: 6,
+              last_real_stage: 6,
+              current_image_url: "/companion-eggs/egg__t0_egg__normal__fire.png",
+              current_image_focal_x: 0.5,
+              current_image_focal_y: 0.5,
+            },
+          ],
+          error: null,
+        };
+      }
+
+      return { data: null, error: null };
+    });
+
+    const { result } = await renderUseCompanion();
+
+    expect(mocks.userCompanionUpdatePayloads).toEqual([
+      expect.objectContaining({
+        current_image_url:
+          "https://example.com/storage/v1/object/public/companion-presets/griffin/t2_guardian/normal/griffin__t2_guardian__normal__fire.png",
+      }),
+    ]);
+    expect(result.current.companion?.current_image_url).toBe(
+      "https://example.com/storage/v1/object/public/companion-presets/griffin/t2_guardian/normal/griffin__t2_guardian__normal__fire.png",
+    );
+  });
+
+  it("does not repair stage 0 egg companions forward", async () => {
+    mocks.userCompanionResponses.length = 0;
+    mocks.userCompanionResponses.push({
+      data: {
+        ...companionFixture,
+        current_stage: 0,
+        current_xp: 0,
+        preset_id: "griffin",
+        spirit_animal: "Griffin",
+        core_element: "fire",
+        current_image_url: "/companion-eggs/egg__t0_egg__normal__fire.png",
+        initial_image_url: "/companion-eggs/egg__t0_egg__normal__fire.png",
+      },
+      error: null,
+    });
+
+    const { result } = await renderUseCompanion();
+
+    expect(result.current.companion?.current_stage).toBe(0);
+    expect(mocks.userCompanionUpdatePayloads).toHaveLength(0);
+    expect(mocks.rpcMock).not.toHaveBeenCalledWith(
+      "repair_auto_advanced_companion_state",
+      expect.anything(),
+    );
+  });
+
+  it("does not rewrite valid non-egg preset image URLs during fetch repair", async () => {
+    mocks.userCompanionResponses.length = 0;
+    mocks.userCompanionResponses.push({
+      data: {
+        ...companionFixture,
+        current_stage: 6,
+        current_xp: 2200,
+        preset_id: "griffin",
+        spirit_animal: "Griffin",
+        core_element: "fire",
+        current_image_url: "https://example.com/existing-stage6.png",
+      },
+      error: null,
+    });
+    mocks.rpcMock.mockImplementation(async (fnName: string) => {
+      if (fnName === "repair_auto_advanced_companion_state") {
+        return {
+          data: [
+            {
+              repaired: false,
+              current_stage: 6,
+              last_real_stage: 6,
+              current_image_url: "https://example.com/existing-stage6.png",
+              current_image_focal_x: 0.5,
+              current_image_focal_y: 0.5,
+            },
+          ],
+          error: null,
+        };
+      }
+
+      return { data: null, error: null };
+    });
+
+    const { result } = await renderUseCompanion();
+
+    expect(result.current.companion?.current_image_url).toBe("https://example.com/existing-stage6.png");
+    expect(mocks.userCompanionUpdatePayloads).toHaveLength(0);
   });
 
   it("keeps later claimed stages ready without auto-advancing them", async () => {

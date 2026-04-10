@@ -7,6 +7,12 @@ import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { logger } from "@/utils/logger";
+import {
+  dispatchPlannerSyncFinished,
+  syncLocalHabitsFromRemote,
+  warmEpicsQueryFromRemote,
+} from "@/utils/plannerSync";
+import { getEffectiveMissionDate } from "@/utils/timezone";
 
 export const useHabitsRealtime = () => {
   const { user } = useAuth();
@@ -25,7 +31,12 @@ export const useHabitsRealtime = () => {
           table: 'habits',
           filter: `user_id=eq.${user.id}`,
         },
-        () => {
+        async () => {
+          await Promise.allSettled([
+            syncLocalHabitsFromRemote(user.id, getEffectiveMissionDate()),
+            warmEpicsQueryFromRemote(queryClient, user.id),
+          ]);
+          dispatchPlannerSyncFinished();
           queryClient.invalidateQueries({ queryKey: ['habits', user.id] });
           queryClient.invalidateQueries({ queryKey: ['habits'] });
           queryClient.invalidateQueries({ queryKey: ['habit-surfacing'] });

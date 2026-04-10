@@ -1,10 +1,11 @@
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { EditRitualSheet } from "./EditRitualSheet";
 
 const mocks = vi.hoisted(() => ({
   invalidateQueries: vi.fn(),
+  saveRitualMock: vi.fn(),
 }));
 
 vi.mock("@/hooks/useAuth", () => ({
@@ -25,6 +26,12 @@ vi.mock("@/integrations/supabase/client", () => ({
   },
 }));
 
+vi.mock("@/hooks/useRitualUpdate", () => ({
+  useRitualUpdate: () => ({
+    saveRitual: mocks.saveRitualMock,
+  }),
+}));
+
 vi.mock("sonner", () => ({
   toast: {
     success: vi.fn(),
@@ -38,7 +45,30 @@ vi.mock("@/features/quests/components/NaturalLanguageEditor", () => ({
 }));
 
 vi.mock("@/components/Pathfinder/FrequencyPresets", () => ({
-  FrequencyPresets: () => <div>Frequency Presets</div>,
+  FrequencyPresets: ({
+    onFrequencyChange,
+  }: {
+    onFrequencyChange: (selection: {
+      frequency: string;
+      customDays: number[];
+      customMonthDays: number[];
+      customPeriod: "week" | "month";
+    }) => void;
+  }) => (
+    <button
+      type="button"
+      onClick={() =>
+        onFrequencyChange({
+          frequency: "5x_week",
+          customDays: [0, 1, 2, 3, 4],
+          customMonthDays: [],
+          customPeriod: "week",
+        })
+      }
+    >
+      Frequency Presets
+    </button>
+  ),
 }));
 
 vi.mock("@/components/HabitDifficultySelector", () => ({
@@ -71,6 +101,18 @@ vi.mock("@/components/ui/scroll-area", () => ({
 describe("EditRitualSheet", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.saveRitualMock.mockResolvedValue({
+      queued: false,
+      createdCount: 4,
+      updatedCount: 1,
+      deletedCount: 0,
+      normalizedSchedule: {
+        frequency: "5x_week",
+        custom_days: [0, 1, 2, 3, 4],
+        custom_month_days: null,
+        customPeriod: "week",
+      },
+    });
   });
 
   it("uses the shared time and duration controls", () => {
@@ -138,5 +180,46 @@ describe("EditRitualSheet", () => {
     fireEvent.click(advancedTrigger);
 
     expect(screen.getAllByText("Early Reminder")).toHaveLength(1);
+  });
+
+  it("passes a normalized weekday schedule into the ritual save workflow", async () => {
+    const onOpenChange = vi.fn();
+
+    render(
+      <EditRitualSheet
+        ritual={{
+          habitId: "habit-1",
+          title: "Strength Training Sessions",
+          description: "Lift heavy",
+          difficulty: "hard",
+          frequency: "weekly",
+          custom_days: [0],
+          preferred_time: "07:00",
+          estimated_minutes: 180,
+          reminder_enabled: false,
+          reminder_minutes_before: 15,
+          category: "body",
+        }}
+        open
+        onOpenChange={onOpenChange}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Frequency Presets" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
+
+    await waitFor(() => {
+      expect(mocks.saveRitualMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          habitId: "habit-1",
+          frequency: "5x_week",
+          customDays: [0, 1, 2, 3, 4],
+          customMonthDays: [],
+          customPeriod: "week",
+        }),
+      );
+    });
+
+    expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 });

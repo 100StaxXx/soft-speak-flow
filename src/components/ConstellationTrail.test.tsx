@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -17,10 +17,12 @@ describe("ConstellationTrail", () => {
     mocks.useJourneyPathImageMock.mockReturnValue({
       pathImageUrl: null,
       currentMilestoneIndex: -1,
+      generationError: null,
       isGenerating: false,
       isLoading: false,
       error: null,
       generateInitialPath: vi.fn(),
+      retryInitialPath: vi.fn(),
       regeneratePathForMilestone: vi.fn(),
     });
   });
@@ -29,10 +31,12 @@ describe("ConstellationTrail", () => {
     mocks.useJourneyPathImageMock.mockReturnValue({
       pathImageUrl: "https://example.supabase.co/storage/v1/object/public/journey-paths/user-1/epic-1/path.png",
       currentMilestoneIndex: 1,
+      generationError: null,
       isGenerating: false,
       isLoading: false,
       error: null,
       generateInitialPath: vi.fn(),
+      retryInitialPath: vi.fn(),
       regeneratePathForMilestone: vi.fn(),
     });
 
@@ -51,10 +55,12 @@ describe("ConstellationTrail", () => {
     mocks.useJourneyPathImageMock.mockReturnValue({
       pathImageUrl: null,
       currentMilestoneIndex: -1,
+      generationError: null,
       isGenerating: true,
       isLoading: false,
       error: null,
       generateInitialPath: vi.fn(),
+      retryInitialPath: vi.fn(),
       regeneratePathForMilestone: vi.fn(),
     });
 
@@ -71,10 +77,12 @@ describe("ConstellationTrail", () => {
     mocks.useJourneyPathImageMock.mockReturnValue({
       pathImageUrl: null,
       currentMilestoneIndex: -1,
+      generationError: null,
       isGenerating: true,
       isLoading: false,
       error: null,
       generateInitialPath: vi.fn(),
+      retryInitialPath: vi.fn(),
       regeneratePathForMilestone: vi.fn(),
     });
 
@@ -86,10 +94,12 @@ describe("ConstellationTrail", () => {
     mocks.useJourneyPathImageMock.mockReturnValue({
       pathImageUrl: "https://example.supabase.co/storage/v1/object/public/journey-paths/user-1/epic-9/path.png",
       currentMilestoneIndex: 0,
+      generationError: null,
       isGenerating: false,
       isLoading: false,
       error: null,
       generateInitialPath: vi.fn(),
+      retryInitialPath: vi.fn(),
       regeneratePathForMilestone: vi.fn(),
     });
 
@@ -101,5 +111,39 @@ describe("ConstellationTrail", () => {
       "https://example.supabase.co/storage/v1/object/public/journey-paths/user-1/epic-9/path.png",
     );
     expect(screen.getByTestId("journey-path-overlay")).toHaveAttribute("data-overlay-mode", "generated");
+  });
+
+  it("shows a retryable error state over the fallback background when generation fails", () => {
+    const retryInitialPath = vi.fn();
+
+    mocks.useJourneyPathImageMock.mockReturnValue({
+      pathImageUrl: null,
+      currentMilestoneIndex: -1,
+      generationError: {
+        code: "RATE_LIMITED",
+        message: "You're making requests too quickly. Please wait about 45 seconds and try again.",
+        requestId: "req-journey-429",
+        retryAfterSeconds: 45,
+        retryable: true,
+        status: 429,
+      },
+      isGenerating: false,
+      isLoading: false,
+      error: null,
+      generateInitialPath: vi.fn(),
+      retryInitialPath,
+      regeneratePathForMilestone: vi.fn(),
+    });
+
+    render(<ConstellationTrail progress={7} targetDays={30} epicId="epic-2" />);
+
+    expect(screen.getByTestId("journey-path-fallback")).toBeInTheDocument();
+    expect(screen.getByTestId("journey-path-error")).toBeInTheDocument();
+    expect(screen.getByText("Path image unavailable")).toBeInTheDocument();
+    expect(screen.getByText(/wait about 45 seconds/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /retry image/i }));
+
+    expect(retryInitialPath).toHaveBeenCalledTimes(1);
   });
 });

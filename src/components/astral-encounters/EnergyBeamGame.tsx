@@ -80,6 +80,14 @@ const DIFFICULTY_CONFIG = {
   },
 };
 
+const SESSION_WAVE_TARGET: Record<ArcadeDifficulty, number> = {
+  beginner: 3,
+  easy: 3,
+  medium: 3,
+  hard: 4,
+  master: 4,
+};
+
 // Enemy types
 type EnemyType = 'scout' | 'fighter' | 'cruiser' | 'boss';
 
@@ -620,6 +628,7 @@ export function EnergyBeamGame({
   const [score, setScore] = useState(0);
   const [wave, setWave] = useState(1);
   const [lives, setLives] = useState(config.startLives);
+  const [secondWinds, setSecondWinds] = useState(0);
   
   // Player state
   const [playerX, setPlayerX] = useState(50);
@@ -650,11 +659,13 @@ export function EnergyBeamGame({
   const isWaveTransitioning = useRef(false);
   const gameStateRef = useRef(gameState);
   const playerXRef = useRef(playerX);
+  const livesRef = useRef(lives);
   const rapidFireRef = useRef(rapidFire);
   const spreadShotRef = useRef(spreadShot);
   const hasShieldRef = useRef(hasShield);
   const isSlowMoRef = useRef(isSlowMo);
   const isInvulnerableRef = useRef(isInvulnerable);
+  const secondWindingRef = useRef(false);
   const currentConfigRef = useRef({
     enemySpeed: config.enemySpeed,
     diveChance: config.diveChance,
@@ -688,6 +699,10 @@ export function EnergyBeamGame({
   }, [playerX]);
 
   useEffect(() => {
+    livesRef.current = lives;
+  }, [lives]);
+
+  useEffect(() => {
     rapidFireRef.current = rapidFire;
   }, [rapidFire]);
 
@@ -710,6 +725,36 @@ export function EnergyBeamGame({
   useEffect(() => {
     currentConfigRef.current = currentConfig;
   }, [currentConfig]);
+
+  const sessionWaveTarget = isPractice ? 2 : SESSION_WAVE_TARGET[difficulty];
+
+  const triggerSecondWind = useCallback(() => {
+    if (secondWindingRef.current) return;
+
+    secondWindingRef.current = true;
+    livesRef.current = 0;
+    setSecondWinds(prev => prev + 1);
+    setLives(0);
+    setProjectiles(prev => prev.filter(projectile => !projectile.isEnemy));
+    setScreenFlash('rgba(168,85,247,0.45)');
+    setIsInvulnerable(true);
+    isInvulnerableRef.current = true;
+    triggerHaptic('heavy');
+
+    registerTimeout(() => {
+      if (!mountedRef.current) return;
+      livesRef.current = config.startLives;
+      setLives(config.startLives);
+      setScreenFlash(null);
+    }, 250);
+
+    registerTimeout(() => {
+      if (!mountedRef.current) return;
+      setIsInvulnerable(false);
+      isInvulnerableRef.current = false;
+      secondWindingRef.current = false;
+    }, 1400);
+  }, [config.startLives, mountedRef, registerTimeout]);
   
   // Initialize first wave - only run if not in wave transition
   useEffect(() => {
@@ -1022,21 +1067,21 @@ export function EnergyBeamGame({
                   setScreenFlash(null);
                 }, 200);
                 
-                setLives(l => {
-                  const newLives = l - 1;
-                  if (newLives <= 0) {
-                    setGameState('complete');
-                  }
-                  return newLives;
-                });
-                setIsInvulnerable(true);
-                isInvulnerableRef.current = true;
-                registerTimeout(() => {
-                  if (!mountedRef.current) return;
-                  setIsInvulnerable(false);
-                  isInvulnerableRef.current = false;
-                }, 2000);
-                triggerHaptic('heavy');
+                const hitLastLife = livesRef.current <= 1;
+                if (hitLastLife) {
+                  triggerSecondWind();
+                } else {
+                  livesRef.current -= 1;
+                  setLives(l => l - 1);
+                  triggerHaptic('heavy');
+                  setIsInvulnerable(true);
+                  isInvulnerableRef.current = true;
+                  registerTimeout(() => {
+                    if (!mountedRef.current) return;
+                    setIsInvulnerable(false);
+                    isInvulnerableRef.current = false;
+                  }, 2000);
+                }
               }
               return;
             }
@@ -1106,7 +1151,11 @@ export function EnergyBeamGame({
                 break;
               case 'repair':
                 // Restore 1 life up to the difficulty cap.
-                setLives(l => Math.min(l + 1, config.startLives));
+                setLives(l => {
+                  const repairedLives = Math.min(l + 1, config.startLives);
+                  livesRef.current = repairedLives;
+                  return repairedLives;
+                });
                 setScorePopups(p => [...p, {
                   id: `sp-repair-${Date.now()}`,
                   x: pu.x,
@@ -1195,20 +1244,20 @@ export function EnergyBeamGame({
                   setScreenFlash(null);
                 }, 200);
                 
-                setLives(l => {
-                  const newLives = l - 1;
-                  if (newLives <= 0) {
-                    setGameState('complete');
-                  }
-                  return newLives;
-                });
-                setIsInvulnerable(true);
-                isInvulnerableRef.current = true;
-                registerTimeout(() => {
-                  if (!mountedRef.current) return;
-                  setIsInvulnerable(false);
-                  isInvulnerableRef.current = false;
-                }, 2000);
+                const hitLastLife = livesRef.current <= 1;
+                if (hitLastLife) {
+                  triggerSecondWind();
+                } else {
+                  livesRef.current -= 1;
+                  setLives(l => l - 1);
+                  setIsInvulnerable(true);
+                  isInvulnerableRef.current = true;
+                  registerTimeout(() => {
+                    if (!mountedRef.current) return;
+                    setIsInvulnerable(false);
+                    isInvulnerableRef.current = false;
+                  }, 2000);
+                }
               }
               triggerHaptic('heavy');
             }
@@ -1233,7 +1282,7 @@ export function EnergyBeamGame({
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [gameState, fireProjectile, onDamage, tierAttackDamage, registerTimeout, mountedRef]);
+  }, [gameState, fireProjectile, onDamage, tierAttackDamage, registerTimeout, mountedRef, triggerSecondWind]);
   
   // Check wave completion - ENDLESS, always spawn next wave
   useEffect(() => {
@@ -1246,8 +1295,7 @@ export function EnergyBeamGame({
     const stats = statsRef.current;
     stats.wavesCompleted++;
     
-    // Practice mode: end after completing 2 waves
-    if (isPractice && stats.wavesCompleted >= 2) {
+    if (stats.wavesCompleted >= sessionWaveTarget) {
       isWaveTransitioning.current = false;
       setGameState('complete');
       return;
@@ -1271,7 +1319,7 @@ export function EnergyBeamGame({
       setGameState('playing');
       isWaveTransitioning.current = false; // Unlock after complete
     }, 2000);
-  }, [enemies.length, wave, config, gameState, isPractice, onDamage, registerTimeout, mountedRef]);
+  }, [config, enemies.length, gameState, mountedRef, onDamage, registerTimeout, sessionWaveTarget, wave]);
   
   // Determine result based on accuracy
   const getResult = useCallback((accuracy: number): 'perfect' | 'good' | 'fail' => {
@@ -1296,7 +1344,7 @@ export function EnergyBeamGame({
       master: 2 
     };
     const threshold = waveThresholds[difficulty];
-    const accuracy = Math.min(100, Math.round((wavesCleared / threshold) * 100));
+    const accuracy = Math.max(0, Math.min(100, Math.round((wavesCleared / threshold) * 100) - secondWinds * 12));
     
     // Determine result based on accuracy for consistency
     const result = getResult(accuracy);
@@ -1315,7 +1363,7 @@ export function EnergyBeamGame({
     }, 1500);
     
     return () => clearTimer(timer);
-  }, [gameState, lives, difficulty, getResult, score, registerTimeout, clearTimer, completeOnce]);
+  }, [gameState, difficulty, getResult, score, secondWinds, registerTimeout, clearTimer, completeOnce]);
   
   return (
     <div className="relative w-full h-full flex-1 min-h-0 flex flex-col items-center overflow-hidden select-none">

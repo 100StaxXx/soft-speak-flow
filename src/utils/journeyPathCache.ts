@@ -3,6 +3,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { getEpicsQueryKey, type EpicRecord } from "@/hooks/epicsQuery";
 import { normalizeJourneyPathPromptContext, type JourneyPathPromptContext } from "@/shared/journeyPathConfig";
 import {
+  isRetriableFunctionInvokeError,
+  parseFunctionInvokeError,
+  toUserFacingFunctionError,
+} from "@/utils/supabaseFunctionErrors";
+import {
   getLocalJourneyPathForEpic,
   upsertPlannerRecord,
 } from "@/utils/plannerLocalStore";
@@ -18,8 +23,18 @@ export interface JourneyPathSnapshot {
 }
 
 interface JourneyPathGenerationState {
+  error: JourneyPathGenerationError | null;
   milestoneIndex: number | null;
   pending: boolean;
+}
+
+export interface JourneyPathGenerationError {
+  code: string | null;
+  message: string;
+  requestId: string | null;
+  retryAfterSeconds: number | null;
+  retryable: boolean;
+  status: number | null;
 }
 
 interface JourneyPathGenerationOptions {
@@ -52,10 +67,93 @@ const getGenerationRequestKey = (userId: string, epicId: string, milestoneIndex:
 
 const getGenerationStateKey = (userId: string, epicId: string) => `${userId}:${epicId}`;
 
-const toGenerationState = (pending: boolean, milestoneIndex: number | null): JourneyPathGenerationState => ({
+const toGenerationState = (
+  pending: boolean,
+  milestoneIndex: number | null,
+  error: JourneyPathGenerationError | null = null,
+): JourneyPathGenerationState => ({
+  error,
   pending,
   milestoneIndex,
 });
+
+export class JourneyPathGenerationFailure extends Error {
+  readonly code: string | null;
+  readonly requestId: string | null;
+  readonly retryAfterSeconds: number | null;
+  readonly retryable: boolean;
+  readonly status: number | null;
+
+  constructor(details: JourneyPathGenerationError) {
+    super(details.message);
+    this.name = "JourneyPathGenerationFailure";
+    this.code = details.code;
+    this.requestId = details.requestId;
+    this.retryAfterSeconds = details.retryAfterSeconds;
+    this.retryable = details.retryable;
+    this.status = details.status;
+    Object.setPrototypeOf(this, JourneyPathGenerationFailure.prototype);
+  }
+}
+
+const toJourneyPathGenerationError = (
+  details: Partial<JourneyPathGenerationError> & { message?: string | null },
+): JourneyPathGenerationError => ({
+  code: typeof details.code === "string" ? details.code : null,
+  message: typeof details.message === "string" && details.message.trim().length > 0
+    ? details.message
+    : "Unable to generate your Star Path image. Please try again.",
+  requestId: typeof details.requestId === "string" ? details.requestId : null,
+  retryAfterSeconds: typeof details.retryAfterSeconds === "number" ? details.retryAfterSeconds : null,
+  retryable: details.retryable === true,
+  status: typeof details.status === "number" ? details.status : null,
+});
+
+const toJourneyPathGenerationFailure = async (error: unknown) => {
+  const parsed = await parseFunctionInvokeError(error);
+  const userFacingMessage = toUserFacingFunctionError(parsed, {
+    action: "generate your Star Path image",
+  });
+  const message = userFacingMessage === "Request could not be processed right now"
+    ? "Our servers are temporarily unavailable. Please try again in a moment."
+    : userFacingMessage;
+
+  return new JourneyPathGenerationFailure(
+    toJourneyPathGenerationError({
+      code: parsed.responsePayload?.code ?? parsed.code ?? null,
+      message,
+      requestId: parsed.requestId ?? null,
+      retryAfterSeconds: parsed.retryAfterSeconds ?? null,
+      retryable: parsed.category === "rate_limit" || isRetriableFunctionInvokeError(error),
+      status: parsed.status ?? null,
+    }),
+  );
+};
+
+const toJourneyPathPayloadFailure = (
+  payload: unknown,
+  fallbackMessage = "Unable to generate your Star Path image. Please try again.",
+) => {
+  const responsePayload = payload && typeof payload === "object"
+    ? payload as Record<string, unknown>
+    : {};
+
+  return new JourneyPathGenerationFailure(
+    toJourneyPathGenerationError({
+      code: typeof responsePayload.code === "string" ? responsePayload.code : null,
+      message: typeof responsePayload.error === "string" ? responsePayload.error : fallbackMessage,
+      requestId: typeof responsePayload.requestId === "string" ? responsePayload.requestId : null,
+      retryAfterSeconds: typeof responsePayload.retryAfterSeconds === "number"
+        ? responsePayload.retryAfterSeconds
+        : null,
+      retryable:
+        typeof responsePayload.retryAfterSeconds === "number"
+        || responsePayload.code === "RATE_LIMITED"
+        || responsePayload.code === "COOLDOWN_ACTIVE",
+      status: typeof responsePayload.status === "number" ? responsePayload.status : null,
+    }),
+  );
+};
 
 const getHighestPendingMilestoneIndex = (countsByMilestone: Map<number, number>) => {
   const pendingMilestones = [...countsByMilestone.entries()]
@@ -144,10 +242,11 @@ const patchJourneyPathGenerationState = (
   userId: string,
   pending: boolean,
   milestoneIndex: number | null,
+  error: JourneyPathGenerationError | null = null,
 ) => {
   queryClient.setQueryData<JourneyPathGenerationState>(
     getJourneyPathGenerationKey(epicId, userId),
-    toGenerationState(pending, milestoneIndex),
+    toGenerationState(pending, milestoneIndex, error),
   );
 };
 
@@ -161,7 +260,7 @@ const markJourneyPathGenerationStart = (
   const current = generationStatusCounts.get(generationStateKey) ?? new Map<number, number>();
   current.set(milestoneIndex, (current.get(milestoneIndex) ?? 0) + 1);
   generationStatusCounts.set(generationStateKey, current);
-  patchJourneyPathGenerationState(queryClient, epicId, userId, true, getHighestPendingMilestoneIndex(current));
+  patchJourneyPathGenerationState(queryClient, epicId, userId, true, getHighestPendingMilestoneIndex(current), null);
 };
 
 const markJourneyPathGenerationEnd = (
@@ -169,11 +268,12 @@ const markJourneyPathGenerationEnd = (
   epicId: string,
   userId: string,
   milestoneIndex: number,
+  error: JourneyPathGenerationError | null = null,
 ) => {
   const generationStateKey = getGenerationStateKey(userId, epicId);
   const current = generationStatusCounts.get(generationStateKey);
   if (!current) {
-    patchJourneyPathGenerationState(queryClient, epicId, userId, false, null);
+    patchJourneyPathGenerationState(queryClient, epicId, userId, false, null, error);
     return;
   }
 
@@ -186,12 +286,12 @@ const markJourneyPathGenerationEnd = (
 
   if (current.size === 0) {
     generationStatusCounts.delete(generationStateKey);
-    patchJourneyPathGenerationState(queryClient, epicId, userId, false, null);
+    patchJourneyPathGenerationState(queryClient, epicId, userId, false, null, error);
     return;
   }
 
   generationStatusCounts.set(generationStateKey, current);
-  patchJourneyPathGenerationState(queryClient, epicId, userId, true, getHighestPendingMilestoneIndex(current));
+  patchJourneyPathGenerationState(queryClient, epicId, userId, true, getHighestPendingMilestoneIndex(current), null);
 };
 
 export async function getPersistedJourneyPathSnapshot(
@@ -284,43 +384,69 @@ export async function requestJourneyPathGeneration({
   markJourneyPathGenerationStart(queryClient, epicId, userId, milestoneIndex);
 
   const request = (async () => {
-    const { data, error } = await supabase.functions.invoke("generate-journey-path", {
-      body: {
-        epicId,
-        milestoneIndex,
-      },
-    });
+    let failure: JourneyPathGenerationFailure | null = null;
 
-    if (error) {
-      throw error;
-    }
-    if (data?.error) {
-      throw new Error(data.error);
-    }
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-journey-path", {
+        body: {
+          epicId,
+          milestoneIndex,
+        },
+      });
 
-    const remoteSnapshot = await fetchRemoteLatestJourneyPath(userId, epicId);
-    if (remoteSnapshot) {
-      return persistAndPatchJourneyPathSnapshot(queryClient, remoteSnapshot);
-    }
+      if (error) {
+        throw await toJourneyPathGenerationFailure(error);
+      }
+      if (data?.error) {
+        throw toJourneyPathPayloadFailure(data);
+      }
 
-    if (typeof data?.imageUrl !== "string" || data.imageUrl.length === 0) {
-      return null;
-    }
+      const remoteSnapshot = await fetchRemoteLatestJourneyPath(userId, epicId);
+      if (remoteSnapshot) {
+        return persistAndPatchJourneyPathSnapshot(queryClient, remoteSnapshot);
+      }
 
-    return persistAndPatchJourneyPathSnapshot(queryClient, {
-      id: getLocalJourneyPathSnapshotId(userId, epicId),
-      user_id: userId,
-      epic_id: epicId,
-      milestone_index: typeof data?.milestoneIndex === "number" ? data.milestoneIndex : milestoneIndex,
-      image_url: data.imageUrl,
-      generated_at: new Date().toISOString(),
-      prompt_context: null,
-    });
-  })()
-    .finally(() => {
+      if (typeof data?.imageUrl !== "string" || data.imageUrl.length === 0) {
+        throw toJourneyPathPayloadFailure(
+          data,
+          "We couldn't generate your Star Path image. Please try again.",
+        );
+      }
+
+      return persistAndPatchJourneyPathSnapshot(queryClient, {
+        id: getLocalJourneyPathSnapshotId(userId, epicId),
+        user_id: userId,
+        epic_id: epicId,
+        milestone_index: typeof data?.milestoneIndex === "number" ? data.milestoneIndex : milestoneIndex,
+        image_url: data.imageUrl,
+        generated_at: new Date().toISOString(),
+        prompt_context: null,
+      });
+    } catch (error) {
+      failure = error instanceof JourneyPathGenerationFailure
+        ? error
+        : await toJourneyPathGenerationFailure(error);
+      throw failure;
+    } finally {
       pendingJourneyPathGenerations.delete(generationRequestKey);
-      markJourneyPathGenerationEnd(queryClient, epicId, userId, milestoneIndex);
-    });
+      markJourneyPathGenerationEnd(
+        queryClient,
+        epicId,
+        userId,
+        milestoneIndex,
+        failure
+          ? toJourneyPathGenerationError({
+            code: failure.code,
+            message: failure.message,
+            requestId: failure.requestId,
+            retryAfterSeconds: failure.retryAfterSeconds,
+            retryable: failure.retryable,
+            status: failure.status,
+          })
+          : null,
+      );
+    }
+  })();
 
   pendingJourneyPathGenerations.set(generationRequestKey, request);
   return request;

@@ -1,6 +1,7 @@
 import { memo, useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -11,7 +12,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Trophy, Flame, Target, Calendar, Zap, Share2, Check, X, Flag, Star } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Trophy, Flame, Target, Calendar, Zap, Share2, Check, X, Flag, Star, Pencil, Loader2 } from "lucide-react";
 import type { StorySeed } from "@/types/narrativeTypes";
 import { motion } from "framer-motion";
 import { toast } from "@/components/ui/sonner";
@@ -61,14 +70,18 @@ interface Journey {
 
 interface JourneyCardProps {
   journey: Journey;
+  onRename?: (nextTitle: string) => Promise<void> | void;
   onComplete?: () => void;
   onAbandon?: () => void;
 }
 
-export const JourneyCard = memo(function JourneyCard({ journey, onComplete, onAbandon }: JourneyCardProps) {
+export const JourneyCard = memo(function JourneyCard({ journey, onRename, onComplete, onAbandon }: JourneyCardProps) {
   const [copied, setCopied] = useState(false);
   const [showAbandonDialog, setShowAbandonDialog] = useState(false);
   const [showAdjustDialog, setShowAdjustDialog] = useState(false);
+  const [showRenameDialog, setShowRenameDialog] = useState(false);
+  const [renameTitle, setRenameTitle] = useState(journey.title);
+  const [isRenaming, setIsRenaming] = useState(false);
   
   const { companion } = useCompanion();
   const { health } = useCompanionHealth();
@@ -155,80 +168,117 @@ export const JourneyCard = memo(function JourneyCard({ journey, onComplete, onAb
     }
   }, [journey.invite_code]);
 
+  const openRenameDialog = useCallback(() => {
+    setRenameTitle(journey.title);
+    setShowRenameDialog(true);
+  }, [journey.title]);
+
+  const handleRenameSubmit = useCallback(async () => {
+    if (!onRename) return;
+
+    const trimmedTitle = renameTitle.trim();
+    if (!trimmedTitle || trimmedTitle === journey.title) return;
+
+    setIsRenaming(true);
+    try {
+      await onRename(trimmedTitle);
+      setShowRenameDialog(false);
+    } catch {
+      // The mutation hook surfaces the error toast.
+    } finally {
+      setIsRenaming(false);
+    }
+  }, [journey.title, onRename, renameTitle]);
+
   // Count valid rituals (habits linked to journey)
   const ritualCount = journey.epic_habits?.filter(eh => eh.habits)?.length || 0;
+  const trimmedRenameTitle = renameTitle.trim();
+  const isRenameSaveDisabled = isRenaming || trimmedRenameTitle.length === 0 || trimmedRenameTitle === journey.title;
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
-      className="bg-card/30 backdrop-blur-sm border border-border/30 rounded-2xl p-4"
-    >
-      <div className="space-y-4">
-        <div className="flex items-start justify-between mb-3">
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-1">
-              {isCompleted ? (
-                <Trophy className="w-5 h-5 text-yellow-400" />
-              ) : (
-                <Target className="w-5 h-5 text-primary" />
-              )}
-              <h3 className="text-lg font-bold">{journey.title}</h3>
-              {journey.invite_code && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 px-2 text-primary hover:text-primary hover:bg-primary/10"
-                  onClick={handleShareJourney}
-                >
-                  {copied ? (
-                    <Check className="w-3.5 h-3.5" />
-                  ) : (
-                    <Share2 className="w-3.5 h-3.5" />
-                  )}
-                </Button>
+    <>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+        className="bg-card/30 backdrop-blur-sm border border-border/30 rounded-2xl p-4"
+      >
+        <div className="space-y-4">
+          <div className="flex items-start justify-between mb-3">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                {isCompleted ? (
+                  <Trophy className="w-5 h-5 text-yellow-400" />
+                ) : (
+                  <Target className="w-5 h-5 text-primary" />
+                )}
+                <h3 className="text-lg font-bold">{journey.title}</h3>
+                {journey.invite_code && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-primary hover:text-primary hover:bg-primary/10"
+                    onClick={handleShareJourney}
+                  >
+                    {copied ? (
+                      <Check className="w-3.5 h-3.5" />
+                    ) : (
+                      <Share2 className="w-3.5 h-3.5" />
+                    )}
+                  </Button>
+                )}
+              </div>
+              {journey.description && (
+                <p className="text-xs text-muted-foreground line-clamp-2">
+                  {journey.description}
+                </p>
               )}
             </div>
-            {journey.description && (
-              <p className="text-xs text-muted-foreground line-clamp-2">
-                {journey.description}
-              </p>
-            )}
+            <div className="flex items-center gap-2 ml-2">
+              <Badge variant={isCompleted ? "default" : "secondary"} className="text-xs">
+                {isCompleted ? "Legendary" : isActive ? "Active" : "Abandoned"}
+              </Badge>
+              {isActive && onRename && (
+                <button
+                  type="button"
+                  onClick={openRenameDialog}
+                  className="h-5 w-5 rounded-full hover:bg-primary/10 flex items-center justify-center text-muted-foreground/50 hover:text-primary transition-colors"
+                  title="Rename campaign"
+                  aria-label="Rename campaign"
+                >
+                  <Pencil className="h-3 w-3" />
+                </button>
+              )}
+              {isActive && onAbandon && (
+                <button
+                  type="button"
+                  onClick={() => setShowAbandonDialog(true)}
+                  className="h-5 w-5 rounded-full hover:bg-destructive/10 flex items-center justify-center text-muted-foreground/40 hover:text-destructive transition-colors"
+                  title="Abandon journey"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </div>
           </div>
-          <div className="flex items-center gap-2 ml-2">
-            <Badge variant={isCompleted ? "default" : "secondary"} className="text-xs">
-              {isCompleted ? "Legendary" : isActive ? "Active" : "Abandoned"}
-            </Badge>
-            {isActive && onAbandon && (
-              <button
-                onClick={() => setShowAbandonDialog(true)}
-                className="h-5 w-5 rounded-full hover:bg-destructive/10 flex items-center justify-center text-muted-foreground/40 hover:text-destructive transition-colors"
-                title="Abandon journey"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            )}
-          </div>
-        </div>
 
-        {/* Constellation Trail Progress */}
-        <ConstellationTrail 
-          progress={journey.progress_percentage} 
-          targetDays={journey.target_days}
-          className="mb-3"
-          companionImageUrl={health?.imageUrl || companion?.current_image_url}
-          companionImageFocalX={health?.imageFocalX ?? companion?.current_image_focal_x ?? null}
-          companionImageFocalY={health?.imageFocalY ?? companion?.current_image_focal_y ?? null}
-          companionMood={health?.moodState}
-          showCompanion={true}
-          milestones={trailMilestones}
-          epicId={journey.id}
-        />
+          {/* Constellation Trail Progress */}
+          <ConstellationTrail 
+            progress={journey.progress_percentage} 
+            targetDays={journey.target_days}
+            className="mb-3"
+            companionImageUrl={health?.imageUrl || companion?.current_image_url}
+            companionImageFocalX={health?.imageFocalX ?? companion?.current_image_focal_x ?? null}
+            companionImageFocalY={health?.imageFocalY ?? companion?.current_image_focal_y ?? null}
+            companionMood={health?.moodState}
+            showCompanion={true}
+            milestones={trailMilestones}
+            epicId={journey.id}
+          />
 
 
-        {/* Compact Stats Bar */}
-        <div className="flex items-center gap-3 text-xs text-muted-foreground mb-3 px-1">
+          {/* Compact Stats Bar */}
+          <div className="flex items-center gap-3 text-xs text-muted-foreground mb-3 px-1">
           <span className="flex items-center gap-1">
             <Calendar className="w-3 h-3" />
             {journey.target_days}d total
@@ -259,10 +309,10 @@ export const JourneyCard = memo(function JourneyCard({ journey, onComplete, onAb
               <span className="text-stardust-gold font-medium">{journey.xp_reward} XP</span>
             </span>
           )}
-        </div>
+          </div>
 
-        {/* Action Buttons Grid - 2 column layout with fun kid-friendly styling */}
-        <div className="grid grid-cols-2 gap-3 mb-3">
+          {/* Action Buttons Grid - 2 column layout with fun kid-friendly styling */}
+          <div className="grid grid-cols-2 gap-3 mb-3">
           {/* Chapter/Postcard Tile - Expandable */}
           {postcardProgress && isActive && (
             <motion.div
@@ -353,60 +403,115 @@ export const JourneyCard = memo(function JourneyCard({ journey, onComplete, onAb
               )}
             />
           )}
+          </div>
+
+          {/* Complete Button (only at 100%) */}
+          {isActive && journey.progress_percentage >= 100 && onComplete && (
+            <Button
+              onClick={onComplete}
+              className="w-full bg-gradient-to-r from-stardust-gold to-amber-500 hover:from-stardust-gold/90 hover:to-amber-500/90 text-black font-bold"
+            >
+              <Trophy className="w-4 h-4 mr-2" />
+              Complete Journey
+            </Button>
+          )}
+
+          {/* Abandon Dialog */}
+          <AlertDialog open={showAbandonDialog} onOpenChange={setShowAbandonDialog}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Abandon this journey?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  You'll lose progress on "{journey.title}". This cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Keep Going</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => {
+                    setShowAbandonDialog(false);
+                    onAbandon?.();
+                  }}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Abandon
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
+          {/* Smart Adjust Plan Drawer */}
+          <SmartAdjustPlanDrawer
+            open={showAdjustDialog}
+            onOpenChange={setShowAdjustDialog}
+            epicId={journey.id}
+            epicTitle={journey.title}
+            habits={journey.epic_habits
+              ?.filter(eh => eh.habits)
+              .map(eh => ({
+                id: eh.habit_id,
+                title: eh.habits?.title || 'Untitled',
+                difficulty: eh.habits?.difficulty,
+                frequency: eh.habits?.frequency,
+                estimated_minutes: eh.habits?.estimated_minutes,
+              })) || []}
+          />
         </div>
+      </motion.div>
 
-        {/* Complete Button (only at 100%) */}
-        {isActive && journey.progress_percentage >= 100 && onComplete && (
-          <Button
-            onClick={onComplete}
-            className="w-full bg-gradient-to-r from-stardust-gold to-amber-500 hover:from-stardust-gold/90 hover:to-amber-500/90 text-black font-bold"
-          >
-            <Trophy className="w-4 h-4 mr-2" />
-            Complete Journey
-          </Button>
-        )}
-
-        {/* Abandon Dialog */}
-        <AlertDialog open={showAbandonDialog} onOpenChange={setShowAbandonDialog}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Abandon this journey?</AlertDialogTitle>
-              <AlertDialogDescription>
-                You'll lose progress on "{journey.title}". This cannot be undone.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Keep Going</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={() => {
-                  setShowAbandonDialog(false);
-                  onAbandon?.();
-                }}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              >
-                Abandon
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-
-        {/* Smart Adjust Plan Drawer */}
-        <SmartAdjustPlanDrawer
-          open={showAdjustDialog}
-          onOpenChange={setShowAdjustDialog}
-          epicId={journey.id}
-          epicTitle={journey.title}
-          habits={journey.epic_habits
-            ?.filter(eh => eh.habits)
-            .map(eh => ({
-              id: eh.habit_id,
-              title: eh.habits?.title || 'Untitled',
-              difficulty: eh.habits?.difficulty,
-              frequency: eh.habits?.frequency,
-              estimated_minutes: eh.habits?.estimated_minutes,
-            })) || []}
-        />
-      </div>
-    </motion.div>
+      <Dialog
+        open={showRenameDialog}
+        onOpenChange={(open) => {
+          if (!isRenaming) {
+            setShowRenameDialog(open);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md" hideCloseButton={isRenaming}>
+          <DialogHeader>
+            <DialogTitle>Rename campaign</DialogTitle>
+            <DialogDescription>
+              Give this campaign a clearer title. Your progress and rituals will stay the same.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <label htmlFor={`rename-campaign-${journey.id}`} className="text-sm font-medium">
+              Campaign name
+            </label>
+            <Input
+              id={`rename-campaign-${journey.id}`}
+              value={renameTitle}
+              onChange={(event) => setRenameTitle(event.target.value)}
+              disabled={isRenaming}
+              placeholder="Name your campaign"
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowRenameDialog(false)}
+              disabled={isRenaming}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={() => void handleRenameSubmit()}
+              disabled={isRenameSaveDisabled}
+            >
+              {isRenaming ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Save"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 });

@@ -20,6 +20,7 @@ import {
   resolveCompanionVisualAssetUrl,
 } from "@/lib/companionAssetResolver";
 import {
+  getBundledCompanionImageAssetKey,
   getBundledCompanionImageFocalPoint,
   shouldBackfillCompanionImageFocal,
 } from "@/lib/companionImageFocal";
@@ -32,6 +33,7 @@ import {
   toUserFacingFunctionError,
 } from "@/utils/supabaseFunctionErrors";
 import {
+  getProgressionThreshold,
   resolveProgressionLevelFromXp,
 } from "@/config/progression";
 
@@ -82,6 +84,123 @@ export const XP_REWARDS = SYSTEM_XP_REWARDS;
 export const getCompanionQueryKey = (userId: string | undefined) =>
   ["companion", userId] as const;
 
+type CompanionEvolutionHistoryRow = {
+  stage: number | null;
+  image_url: string | null;
+  xp_at_evolution?: number | null;
+  evolved_at?: string | null;
+};
+
+const resolveHighestValidClaimedStageFromHistory = (
+  historyRows: CompanionEvolutionHistoryRow[],
+): {
+  lastRealStage: number;
+  imageUrlByStage: Map<number, string | null>;
+} => {
+  const validStages = new Set<number>();
+  const latestEvolutionByStage = new Map<number, CompanionEvolutionHistoryRow>();
+
+  historyRows.forEach((row) => {
+    const stage = typeof row.stage === "number" ? Math.max(0, Math.floor(row.stage)) : null;
+    if (stage === null) return;
+
+    const stageThreshold = stage === 0 ? 0 : getProgressionThreshold(stage);
+    const xpAtEvolution = typeof row.xp_at_evolution === "number" ? row.xp_at_evolution : -1;
+    const isValidStageRow =
+      stage === 0 || (stageThreshold !== null && xpAtEvolution >= stageThreshold);
+
+    if (!isValidStageRow) return;
+
+    validStages.add(stage);
+
+    const previousRow = latestEvolutionByStage.get(stage);
+    if (!previousRow || (row.evolved_at ?? "") >= (previousRow.evolved_at ?? "")) {
+      latestEvolutionByStage.set(stage, row);
+    }
+  });
+
+  let lastRealStage = 0;
+  while (validStages.has(lastRealStage + 1)) {
+    lastRealStage += 1;
+  }
+
+  const imageUrlByStage = new Map<number, string | null>();
+  latestEvolutionByStage.forEach((row, stage) => {
+    imageUrlByStage.set(stage, row.image_url ?? null);
+  });
+
+  return { lastRealStage, imageUrlByStage };
+};
+
+const reconcileCompanionClaimedStageLocally = async ({
+  companion,
+  userId,
+  reason,
+}: {
+  companion: Companion;
+  userId: string;
+  reason: string;
+}): Promise<Companion> => {
+  const { data, error } = await supabase
+    .from("companion_evolutions")
+    .select("stage, image_url, xp_at_evolution, evolved_at")
+    .eq("companion_id", companion.id)
+    .order("stage", { ascending: true })
+    .order("evolved_at", { ascending: true });
+
+  if (error) {
+    logger.warn("Companion local claim validation failed", {
+      companionId: companion.id,
+      userId,
+      reason,
+      error: error.message,
+    });
+    return companion;
+  }
+
+  const historyRows = Array.isArray(data) ? (data as CompanionEvolutionHistoryRow[]) : [];
+  if (historyRows.length === 0) {
+    logger.warn("Companion local claim validation skipped due to empty history", {
+      companionId: companion.id,
+      userId,
+      reason,
+    });
+    return companion;
+  }
+
+  const { lastRealStage, imageUrlByStage } = resolveHighestValidClaimedStageFromHistory(historyRows);
+
+  if (companion.current_stage <= lastRealStage) {
+    return companion;
+  }
+
+  const restoredImageUrl = lastRealStage <= 0
+    ? companion.initial_image_url ?? getUniversalEggAssetUrl(companion.core_element || "fire")
+    : imageUrlByStage.get(lastRealStage) ?? companion.current_image_url;
+  const restoredImageFocalX = lastRealStage <= 0
+    ? companion.initial_image_focal_x ?? companion.current_image_focal_x ?? null
+    : companion.current_image_focal_x ?? null;
+  const restoredImageFocalY = lastRealStage <= 0
+    ? companion.initial_image_focal_y ?? companion.current_image_focal_y ?? null
+    : companion.current_image_focal_y ?? null;
+
+  logger.warn("Applied local companion claim fallback", {
+    companionId: companion.id,
+    userId,
+    reason,
+    currentStage: companion.current_stage,
+    restoredStage: lastRealStage,
+  });
+
+  return {
+    ...companion,
+    current_stage: lastRealStage,
+    current_image_url: restoredImageUrl,
+    current_image_focal_x: restoredImageFocalX,
+    current_image_focal_y: restoredImageFocalY,
+  };
+};
+
 const fetchCompanionById = async (companionId: string): Promise<Companion | null> => {
   const { data, error } = await supabase
     .from("user_companion")
@@ -91,6 +210,73 @@ const fetchCompanionById = async (companionId: string): Promise<Companion | null
 
   if (error) throw error;
   return data as Companion | null;
+};
+
+const hasObviousStalePositiveStageNormalImage = (imageUrl: string | null | undefined): boolean => {
+  if (typeof imageUrl !== "string" || imageUrl.trim().length === 0) {
+    return true;
+  }
+
+  const assetKey = getBundledCompanionImageAssetKey(imageUrl);
+  if (!assetKey) return false;
+
+  return assetKey.startsWith("companion-eggs/") || assetKey.includes("/t0_egg/");
+};
+
+const repairStalePresetCompanionNormalImage = async ({
+  companion,
+  userId,
+}: {
+  companion: Companion;
+  userId: string;
+}): Promise<Companion> => {
+  if (companion.current_stage <= 0 || !companion.preset_id) {
+    return companion;
+  }
+
+  if (!hasObviousStalePositiveStageNormalImage(companion.current_image_url)) {
+    return companion;
+  }
+
+  const repairedImageUrl = resolveCompanionVisualAssetUrl(companion, "normal");
+  if (!repairedImageUrl || repairedImageUrl === companion.current_image_url) {
+    return companion;
+  }
+
+  const { error } = await supabase
+    .from("user_companion")
+    .update({
+      current_image_url: repairedImageUrl,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", companion.id);
+
+  if (error) {
+    logger.warn("Failed to repair stale preset companion image", {
+      companionId: companion.id,
+      userId,
+      currentStage: companion.current_stage,
+      presetId: companion.preset_id,
+      previousImageUrl: companion.current_image_url,
+      repairedImageUrl,
+      error: error.message,
+    });
+    return companion;
+  }
+
+  logger.info("Repaired stale preset companion image", {
+    companionId: companion.id,
+    userId,
+    currentStage: companion.current_stage,
+    presetId: companion.preset_id,
+    previousImageUrl: companion.current_image_url,
+    repairedImageUrl,
+  });
+
+  return {
+    ...companion,
+    current_image_url: repairedImageUrl,
+  };
 };
 
 export const fetchCompanion = async (userId: string): Promise<Companion | null> => {
@@ -122,7 +308,15 @@ export const fetchCompanion = async (userId: string): Promise<Companion | null> 
       userId,
       error: repairError.message,
     });
-    return companion;
+    const resolvedCompanion = await reconcileCompanionClaimedStageLocally({
+      companion,
+      userId,
+      reason: "repair_rpc_failed",
+    });
+    return repairStalePresetCompanionNormalImage({
+      companion: resolvedCompanion,
+      userId,
+    });
   }
 
   const repairResult = (Array.isArray(repairData) ? repairData[0] : repairData) as
@@ -135,7 +329,15 @@ export const fetchCompanion = async (userId: string): Promise<Companion | null> 
       userId,
       currentStage: companion.current_stage,
     });
-    return companion;
+    const resolvedCompanion = await reconcileCompanionClaimedStageLocally({
+      companion,
+      userId,
+      reason: "repair_rpc_empty",
+    });
+    return repairStalePresetCompanionNormalImage({
+      companion: resolvedCompanion,
+      userId,
+    });
   }
 
   if (!repairResult.repaired) {
@@ -147,7 +349,15 @@ export const fetchCompanion = async (userId: string): Promise<Companion | null> 
         lastRealStage: repairResult.last_real_stage,
       });
     }
-    return companion;
+    const resolvedCompanion = await reconcileCompanionClaimedStageLocally({
+      companion,
+      userId,
+      reason: "repair_rpc_unresolved",
+    });
+    return repairStalePresetCompanionNormalImage({
+      companion: resolvedCompanion,
+      userId,
+    });
   }
 
   logger.warn("Repaired auto-advanced companion state", {
@@ -159,13 +369,27 @@ export const fetchCompanion = async (userId: string): Promise<Companion | null> 
   });
 
   const repairedCompanion = await fetchCompanionById(companion.id);
-  return repairedCompanion ?? {
+  const resolvedCompanion = repairedCompanion ?? {
     ...companion,
     current_stage: repairResult.current_stage,
     current_image_url: repairResult.current_image_url,
     current_image_focal_x: repairResult.current_image_focal_x,
     current_image_focal_y: repairResult.current_image_focal_y,
   };
+
+  if (resolvedCompanion.current_stage <= 0) {
+    return resolvedCompanion;
+  }
+
+  const verifiedCompanion = await reconcileCompanionClaimedStageLocally({
+    companion: resolvedCompanion,
+    userId,
+    reason: "post_repair_verification",
+  });
+  return repairStalePresetCompanionNormalImage({
+    companion: verifiedCompanion,
+    userId,
+  });
 };
 
 interface DirectEvolutionResponse {

@@ -30,6 +30,14 @@ const DIFFICULTY_CONFIG: Record<ArcadeDifficulty, { baseSpeed: number }> = {
   master: { baseSpeed: 160 },
 };
 
+const SESSION_SCORE_TARGET: Record<ArcadeDifficulty, number> = {
+  beginner: 4,
+  easy: 5,
+  medium: 6,
+  hard: 7,
+  master: 8,
+};
+
 interface Position {
   x: number;
   y: number;
@@ -475,6 +483,7 @@ export const SoulSerpentGame = ({
   const [swipeIndicator, setSwipeIndicator] = useState<Direction | null>(null);
   const [showSwipeHint, setShowSwipeHint] = useState(true);
   const [interpolation, setInterpolation] = useState(0); // 0 to 1 for smooth movement
+  const [secondWinds, setSecondWinds] = useState(0);
   
   const snakeRef = useRef<Position[]>(snake);
   const trailCleanupRef = useRef<NodeJS.Timeout | null>(null);
@@ -505,6 +514,7 @@ export const SoulSerpentGame = ({
   const diffConfig = DIFFICULTY_CONFIG[difficulty];
   const adjustedSpeed = diffConfig.baseSpeed * (1 - questIntervalScale * 0.1);
   const gameSpeed = Math.max(120, adjustedSpeed);
+  const sessionScoreTarget = isPractice ? 5 : SESSION_SCORE_TARGET[difficulty];
 
   // Add trail particle when snake moves
   const addTrailParticle = useCallback((position: Position, snakeLength: number) => {
@@ -554,28 +564,13 @@ export const SoulSerpentGame = ({
   }, []);
 
   // Calculate accuracy based on score achieved (endless mode) - binary win/lose
-  const calculateAccuracy = useCallback((finalScore: number): { accuracy: number; result: 'perfect' | 'good' | 'fail' } => {
-    // Score thresholds based on difficulty
-    const thresholds: Record<ArcadeDifficulty, { fail: number; good: number; perfect: number }> = {
-      beginner: { fail: 2, good: 4, perfect: 7 },
-      easy: { fail: 3, good: 6, perfect: 10 },
-      medium: { fail: 4, good: 8, perfect: 12 },
-      hard: { fail: 5, good: 10, perfect: 15 },
-      master: { fail: 6, good: 12, perfect: 18 },
-    };
-    
-    const t = thresholds[difficulty];
-    
-    if (finalScore < t.fail) {
-      return { accuracy: Math.round((finalScore / t.fail) * 40), result: 'fail' };
-    } else if (finalScore < t.good) {
-      return { accuracy: 50 + Math.round(((finalScore - t.fail) / (t.good - t.fail)) * 30), result: 'good' };
-    } else if (finalScore < t.perfect) {
-      return { accuracy: 80 + Math.round(((finalScore - t.good) / (t.perfect - t.good)) * 10), result: 'good' };
-    } else {
-      return { accuracy: Math.min(100, 90 + Math.round((finalScore - t.perfect) * 0.5)), result: 'perfect' };
-    }
-  }, [difficulty]);
+  const calculateAccuracy = useCallback((finalScore: number, windCount: number): { accuracy: number; result: 'perfect' | 'good' | 'fail' } => {
+    const accuracy = Math.max(0, Math.min(100, Math.round(55 + finalScore * 6 - windCount * 15)));
+    const result: 'perfect' | 'good' | 'fail' =
+      accuracy >= 90 ? 'perfect' : accuracy >= 50 ? 'good' : 'fail';
+
+    return { accuracy, result };
+  }, []);
 
   const moveSnake = useCallback(() => {
     if (gameState !== 'playing') return;
@@ -622,26 +617,23 @@ export const SoulSerpentGame = ({
     // Self collision = game over (check against body, not including tail that will be removed)
     const bodyToCheck = prevSnake.slice(0, -1); // Exclude tail since it moves
     if (bodyToCheck.some(seg => seg.x === newHead.x && seg.y === newHead.y)) {
-      setGameState('complete');
       triggerHaptic('error');
       setShake(true);
       setTimeout(() => setShake(false), 300);
 
-      // Player takes tier-based collision damage (game ends)
+      // Player takes tier-based collision damage, but the run recovers with a second wind.
       onDamage?.({ target: 'player', amount: tierAttackDamage, source: 'collision' });
+      setSecondWinds(prev => prev + 1);
 
-      // Calculate result based on score achieved
-      const { accuracy, result } = calculateAccuracy(score);
-
-      completeGame({
-        success: result !== 'fail',
-        accuracy,
-        result,
-        highScoreValue: score,
-        gameStats: {
-          score,
-        },
-      });
+      const resetSnake = [{ x: 5, y: 5 }];
+      setSnake(resetSnake);
+      snakeRef.current = resetSnake;
+      setDirection('right');
+      directionRef.current = 'right';
+      lastDirectionRef.current = 'right';
+      directionQueueRef.current = [];
+      setStardust(spawnStardust(resetSnake));
+      setInterpolation(0);
       return;
     }
 
@@ -656,11 +648,17 @@ export const SoulSerpentGame = ({
         onDamage?.({ target: 'adversary', amount: GAME_DAMAGE_VALUES.soul_serpent.scoreMilestone, source: 'score_milestone' });
       }
 
-      // Practice mode: end after collecting 5 stardust
-      if (isPractice && newScore >= 5) {
+      if (newScore >= sessionScoreTarget) {
         setScore(newScore);
+        const { accuracy, result } = calculateAccuracy(newScore, secondWinds);
         setGameState('complete');
-        completeGame({ success: true, accuracy: 80, result: 'good', highScoreValue: newScore, gameStats: { score: newScore } });
+        completeGame({
+          success: result !== 'fail',
+          accuracy,
+          result,
+          highScoreValue: newScore,
+          gameStats: { score: newScore },
+        });
         setSnake(newSnake);
         snakeRef.current = newSnake;
         return;
@@ -686,7 +684,7 @@ export const SoulSerpentGame = ({
     
     // Reset interpolation for smooth animation
     setInterpolation(0);
-  }, [gameState, stardust, score, highScore, spawnStardust, completeGame, addTrailParticle, calculateAccuracy, onDamage, isPractice]);
+  }, [addTrailParticle, calculateAccuracy, completeGame, gameState, highScore, onDamage, score, secondWinds, sessionScoreTarget, spawnStardust, stardust, tierAttackDamage]);
 
   // Game loop with smooth interpolation
   useEffect(() => {

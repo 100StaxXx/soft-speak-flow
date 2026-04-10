@@ -1,5 +1,10 @@
 import { useProfile } from "./useProfile";
 import { useAccessState } from "./useAccessState";
+import {
+  getGuidedTutorialGateDeferralSessionKey,
+  getGuidedTutorialLocalProgressKey,
+} from "@/utils/guidedTutorial";
+import { safeSessionStorage } from "@/utils/storage";
 
 export type AccessSource = 'subscription' | 'promo_code' | 'trial' | 'none';
 export type AccessGateReason = 'none' | 'pre_trial_signup' | 'trial_expired';
@@ -21,7 +26,7 @@ const hasLocalGuidedTutorialCompleted = (profileId: unknown): boolean => {
   try {
     const storage = window.localStorage;
     if (!storage || typeof storage.getItem !== "function") return false;
-    const raw = storage.getItem(`guided_tutorial_progress_${profileId}`);
+    const raw = storage.getItem(getGuidedTutorialLocalProgressKey(profileId));
     if (!raw) return false;
     const parsed: unknown = JSON.parse(raw);
     if (!isRecord(parsed)) return false;
@@ -29,6 +34,11 @@ const hasLocalGuidedTutorialCompleted = (profileId: unknown): boolean => {
   } catch {
     return false;
   }
+};
+
+const shouldDeferPreTrialGateForCurrentSession = (profileId: unknown): boolean => {
+  if (typeof profileId !== "string" || profileId.length === 0) return false;
+  return safeSessionStorage.getItem(getGuidedTutorialGateDeferralSessionKey(profileId)) === "true";
 };
 
 interface AccessStatus {
@@ -92,6 +102,7 @@ export function useAccessStatus(): AccessStatus {
   const tutorialCompleted =
     hasGuidedTutorialCompleted(profile.onboarding_data) ||
     hasLocalGuidedTutorialCompleted(profile.id);
+  const deferPreTrialGateForCurrentSession = shouldDeferPreTrialGateForCurrentSession(profile.id);
 
   const trialEndsAt = accessState.trial_ends_at ? new Date(accessState.trial_ends_at) : null;
 
@@ -105,9 +116,12 @@ export function useAccessStatus(): AccessStatus {
     trialDaysRemaining = Math.max(0, Math.ceil(msRemaining / (1000 * 60 * 60 * 24)));
   }
 
-  // Product rule: once guided tutorial concludes, unsubscribed users should land on the trial CTA gate.
-  // This intentionally takes precedence over legacy trial timestamp fields.
-  const needsPreTrialSignup = !isSubscribed && tutorialCompleted;
+  // Product rule: tutorial completion should not be interrupted by the gate in the same session.
+  // We defer the CTA until the next return session for a smoother onboarding closeout.
+  const needsPreTrialSignup =
+    !isSubscribed &&
+    tutorialCompleted &&
+    !deferPreTrialGateForCurrentSession;
 
   let hasAccess = true;
   let accessSource: AccessSource = 'none';

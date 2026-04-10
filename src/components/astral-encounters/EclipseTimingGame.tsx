@@ -525,22 +525,6 @@ export const EclipseTimingGame = ({
         const newMissCount = stats.notesMissed + missCount;
         gameStatsRef.current = { ...stats, notesMissed: newMissCount, combo: 0 };
         
-        if (newMissCount >= maxMisses) {
-          audioRef.current?.pause();
-          onDamage?.({ target: 'player', amount: GAME_DAMAGE_VALUES.eclipse_timing.tooManyMisses, source: 'too_many_misses' });
-          
-          const totalNotes = notes.length;
-          const finalStats = gameStatsRef.current;
-          const accuracy = totalNotes > 0 ? Math.round((finalStats.notesHit / totalNotes) * 100) : 0;
-          
-          setGameResult({
-            success: false, accuracy, result: 'fail', highScoreValue: finalStats.score,
-            gameStats: { score: finalStats.score, maxCombo: finalStats.maxCombo, notesHit: finalStats.notesHit, misses: finalStats.notesMissed },
-          });
-          setGameStats({ ...finalStats });
-          setGameState('complete');
-          return;
-        }
       }
       
       // Throttled render sync
@@ -560,7 +544,7 @@ export const EclipseTimingGame = ({
         
         // Update warning/multiplier visibility
         const stats = gameStatsRef.current;
-        setShowMissWarning(stats.notesMissed >= maxMisses - 2 && stats.notesMissed < maxMisses);
+        setShowMissWarning(stats.notesMissed >= maxMisses - 2);
         setShowComboMultiplier(stats.combo >= 10);
       }
       
@@ -581,8 +565,14 @@ export const EclipseTimingGame = ({
         const finalStats = gameStatsRef.current;
         const accuracy = totalNotes > 0 ? Math.round((finalStats.notesHit / totalNotes) * 100) : 0;
         
+        const result: 'perfect' | 'good' | 'fail' =
+          accuracy >= 90 ? 'perfect' : accuracy >= 50 ? 'good' : 'fail';
+
         setGameResult({
-          success: true, accuracy, result: accuracy >= 90 ? 'perfect' : 'good', highScoreValue: finalStats.score,
+          success: result !== 'fail',
+          accuracy,
+          result,
+          highScoreValue: finalStats.score,
           gameStats: { score: finalStats.score, maxCombo: finalStats.maxCombo, notesHit: finalStats.notesHit, misses: finalStats.notesMissed },
         });
         setGameStats({ ...finalStats });
@@ -829,7 +819,9 @@ export const EclipseTimingGame = ({
           className="absolute top-20 right-4 z-30 px-3 py-1 rounded-full text-sm font-bold animate-pulse"
           style={{ background: 'linear-gradient(135deg, hsl(0, 70%, 50%), hsl(0, 84%, 40%))', color: 'white' }}
         >
-          ⚠️ {maxMisses - notesMissed} MISS{maxMisses - notesMissed > 1 ? 'ES' : ''} LEFT!
+          {notesMissed >= maxMisses
+            ? '⚠️ Second wind active - keep the rhythm alive!'
+            : `⚠️ ${maxMisses - notesMissed} MISS${maxMisses - notesMissed > 1 ? 'ES' : ''} LEFT!`}
         </div>
       )}
       

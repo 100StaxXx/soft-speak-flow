@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import { AstralFrequencyGame } from './AstralFrequencyGame';
 import { EclipseTimingGame } from './EclipseTimingGame';
 import { EnergyBeamGame } from './EnergyBeamGame';
@@ -7,6 +7,13 @@ import { GalacticMatchGame } from './GalacticMatchGame';
 import { SoulSerpentGame } from './SoulSerpentGame';
 import { StarfallDodgeGame } from './StarfallDodgeGame';
 import { TapSequenceGame } from './TapSequenceGame';
+import { afterEach, beforeEach } from 'vitest';
+
+const mocks = vi.hoisted(() => ({
+  fetchRandomTrack: vi.fn(),
+  rateTrack: vi.fn(),
+  incrementPlayCount: vi.fn(),
+}));
 
 vi.mock('framer-motion', () => {
   const passthrough = ({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) => {
@@ -62,9 +69,9 @@ vi.mock('@/hooks/useRhythmTrack', () => ({
     isGenerating: false,
     error: null,
     userRating: null,
-    fetchRandomTrack: vi.fn().mockResolvedValue(null),
-    rateTrack: vi.fn().mockResolvedValue(true),
-    incrementPlayCount: vi.fn().mockResolvedValue(undefined),
+    fetchRandomTrack: mocks.fetchRandomTrack,
+    rateTrack: mocks.rateTrack,
+    incrementPlayCount: mocks.incrementPlayCount,
   }),
 }));
 
@@ -79,6 +86,20 @@ const baseProps = {
   difficulty: 'easy' as const,
   isPractice: true,
 };
+
+beforeEach(() => {
+  mocks.fetchRandomTrack.mockReset();
+  mocks.fetchRandomTrack.mockResolvedValue(null);
+  mocks.rateTrack.mockReset();
+  mocks.rateTrack.mockResolvedValue(true);
+  mocks.incrementPlayCount.mockReset();
+  mocks.incrementPlayCount.mockResolvedValue(undefined);
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
 
 describe('active encounter games smoke', () => {
   it('renders Energy Beam without crashing', () => {
@@ -113,6 +134,47 @@ describe('active encounter games smoke', () => {
     render(<EclipseTimingGame {...baseProps} />);
 
     expect(screen.getByText('Loading music...')).toBeInTheDocument();
+  });
+
+  it('loads a rhythm track in compact encounter mode so battle music still plays', async () => {
+    class FakeAudio extends EventTarget {
+      preload = '';
+      currentTime = 0;
+      src: string;
+      load = vi.fn(() => {
+        this.dispatchEvent(new Event('canplaythrough'));
+      });
+      play = vi.fn().mockResolvedValue(undefined);
+      pause = vi.fn();
+
+      constructor(src?: string) {
+        super();
+        this.src = src ?? '';
+      }
+    }
+
+    const track = {
+      id: 'track-1',
+      audio_url: '/sounds/encounter-music.mp3',
+      bpm: 128,
+      duration_seconds: 30,
+      genre: 'Synthwave',
+    };
+
+    mocks.fetchRandomTrack.mockResolvedValueOnce(track);
+    const audioConstructor = vi.fn((src?: string) => new FakeAudio(src));
+    vi.stubGlobal('Audio', audioConstructor);
+
+    render(
+      <EclipseTimingGame
+        {...baseProps}
+        compact
+        isPractice={false}
+      />,
+    );
+
+    await waitFor(() => expect(mocks.fetchRandomTrack).toHaveBeenCalledWith('easy'));
+    await waitFor(() => expect(audioConstructor).toHaveBeenCalledWith('/sounds/encounter-music.mp3'));
   });
 
   it('renders Starfall Dodge without crashing', () => {

@@ -17,11 +17,17 @@ import { useXPRewards } from "@/hooks/useXPRewards";
 import { getCompanionQueryKey, type Companion } from "@/hooks/useCompanion";
 import { useMentorPersonality } from "@/hooks/useMentorPersonality";
 import {
+  COMPANION_STORY_TONES,
+  getCompanionElement,
+  type CompanionStoryTone,
+} from "@/config/companionCatalog";
+import {
   GUIDED_TUTORIAL_FLOW_VERSION,
   GUIDED_TUTORIAL_VERSION,
+  getGuidedTutorialGateDeferralSessionKey,
   getGuidedTutorialLocalProgressKey,
 } from "@/utils/guidedTutorial";
-import { safeLocalStorage } from "@/utils/storage";
+import { safeLocalStorage, safeSessionStorage } from "@/utils/storage";
 import type {
   CreateQuestSubstepId,
   GuidedMilestoneId,
@@ -33,6 +39,7 @@ import type {
 const TARGET_RESOLVE_POLL_MS = 250;
 const TARGET_MISSING_FALLBACK_MS = 1400;
 const CLOSEOUT_AUTO_COMPLETE_MS = 2600;
+const EXPLAINER_AUTO_ADVANCE_MS = 1200;
 const EVOLVE_AUTOSCROLL_SELECTOR = '[data-tour="evolve-companion-button"]';
 const EVOLVE_AUTOSCROLL_VIEWPORT_MARGIN_PX = 72;
 
@@ -187,6 +194,21 @@ interface MentorDialogueLine {
   support: string;
 }
 
+interface GuidanceNarrativeContext {
+  storyTone: CompanionStoryTone | null;
+  storyToneLabel: string | null;
+  companionLabel: string | null;
+  companionElementLabel: string | null;
+}
+
+const STORY_TONE_SUPPORT_BY_TONE: Record<CompanionStoryTone, string> = {
+  epic_adventure: "We'll move quickly and make your first win feel like the opening scene of something bigger.",
+  soft_gentle: "We'll keep the pace calm and make your first win feel easy to hold onto.",
+  emotional_heartfelt: "We'll make the first steps feel personal, steady, and full of bond-building momentum.",
+  dark_intense: "We'll keep the pressure useful and turn the first steps into something sharp and deliberate.",
+  whimsical_playful: "We'll keep it light, a little strange, and surprisingly effective from the start.",
+};
+
 const INTRO_DIALOGUE_BY_MENTOR_SLUG: Record<string, MentorDialogueLine> = {
   atlas: {
     text: "Greetings, I'm Atlas. Let's begin your path to productivity.",
@@ -218,29 +240,83 @@ const INTRO_DIALOGUE_BY_MENTOR_SLUG: Record<string, MentorDialogueLine> = {
   },
 };
 
-const getMentorIntroDialogue = (mentorSlug: string | undefined, speakerName: string) => {
+const coerceStoryTone = (value: unknown): CompanionStoryTone | null => {
+  if (typeof value !== "string") return null;
+  return COMPANION_STORY_TONES.some((tone) => tone.value === value)
+    ? (value as CompanionStoryTone)
+    : null;
+};
+
+const resolveStoryToneLabel = (storyTone: CompanionStoryTone | null): string | null => {
+  if (!storyTone) return null;
+  return COMPANION_STORY_TONES.find((tone) => tone.value === storyTone)?.label ?? null;
+};
+
+const buildToneAwareSupport = (
+  baseSupport: string,
+  storyTone: CompanionStoryTone | null,
+): string => {
+  if (!storyTone) return baseSupport;
+  return `${baseSupport} ${STORY_TONE_SUPPORT_BY_TONE[storyTone]}`;
+};
+
+const buildCompanionBondNudge = ({
+  companionLabel,
+  companionElementLabel,
+}: GuidanceNarrativeContext): string | null => {
+  if (companionLabel && companionElementLabel) {
+    return `Every real-world win feeds the ${companionElementLabel.toLowerCase()} bond carrying your ${companionLabel}.`;
+  }
+
+  if (companionElementLabel) {
+    return `Every real-world win feeds the ${companionElementLabel.toLowerCase()} bond you just chose.`;
+  }
+
+  if (companionLabel) {
+    return `Every real-world win feeds the bond forming around your ${companionLabel}.`;
+  }
+
+  return null;
+};
+
+const getMentorIntroDialogue = (
+  mentorSlug: string | undefined,
+  speakerName: string,
+  context: GuidanceNarrativeContext,
+) => {
   const slug = mentorSlug?.toLowerCase();
+  const toneAwareSupport = (support: string) => buildToneAwareSupport(support, context.storyTone);
+
   if (slug && INTRO_DIALOGUE_BY_MENTOR_SLUG[slug]) {
-    return INTRO_DIALOGUE_BY_MENTOR_SLUG[slug];
+    return {
+      ...INTRO_DIALOGUE_BY_MENTOR_SLUG[slug],
+      support: toneAwareSupport(INTRO_DIALOGUE_BY_MENTOR_SLUG[slug].support),
+    };
   }
 
   if (speakerName && speakerName !== "Your guide") {
     return {
       text: `Hey, I'm ${speakerName}. I'm glad you're here.`,
-      support: "I'll guide your first few taps so you can settle in quickly.",
+      support: toneAwareSupport("I'll guide your first few taps so you can settle in quickly."),
     };
   }
 
   return {
     text: "Hey, I'm your guide. I'm glad you're here.",
-    support: "I'll guide your first few taps so you can settle in quickly.",
+    support: toneAwareSupport("I'll guide your first few taps so you can settle in quickly."),
   };
 };
 
-const getQuestsCampaignsIntroDialogue = (): MentorDialogueLine => ({
-  text: "This is your Quests tab. Think of Quests as your daily to-do list. Tasks you can schedule on your calendar, or save to your inbox to plan later.",
-  support: "Campaigns are goals that build routines and rituals to help you succeed.",
-});
+const getQuestsCampaignsIntroDialogue = (context: GuidanceNarrativeContext): MentorDialogueLine => {
+  const bondNudge = buildCompanionBondNudge(context);
+
+  return {
+    text: "This is your Quests tab. It holds the concrete actions that turn your new story into real momentum.",
+    support: bondNudge
+      ? `${bondNudge} I'll open your first quest flow next so we can make this real immediately.`
+      : "I'll open your first quest flow next so we can make this real immediately.",
+  };
+};
 
 const resolveSelectorFromCandidates = (selectors: string[]): string | null => {
   for (const selector of selectors) {
@@ -257,6 +333,32 @@ const isElementComfortablyInView = (element: HTMLElement, viewportHeight: number
   );
 };
 
+const getGuidedStepRoute = (stepId: GuidedTutorialStepId | null): string | null =>
+  GUIDED_STEPS.find((step) => step.id === stepId)?.route ?? null;
+
+const getResumePromptText = (
+  stepId: GuidedTutorialStepId | null,
+  context: GuidanceNarrativeContext,
+): string => {
+  if (stepId === "create_quest") {
+    return context.companionLabel
+      ? `Continue setup and finish the first quest for your ${context.companionLabel}.`
+      : "Continue setup and finish your first quest.";
+  }
+
+  if (stepId === "morning_checkin") {
+    return "Continue setup and lock in your first morning check-in.";
+  }
+
+  if (stepId === "evolve_companion") {
+    return context.companionLabel
+      ? `Continue setup and awaken your ${context.companionLabel}.`
+      : "Continue setup and awaken your companion.";
+  }
+
+  return "Continue setup where you left off.";
+};
+
 export interface CreateQuestProgressState {
   current: CreateQuestSubstepId;
   completed: CreateQuestSubstepId[];
@@ -266,6 +368,12 @@ export interface CreateQuestProgressState {
 
 type GuidedTutorialProgressSnapshot = Partial<GuidedTutorialProgress> & {
   milestonesCompleted?: GuidedMilestoneId[];
+  completedAt?: string | null;
+  resumeStepId?: GuidedTutorialStepId | null;
+  resumeRoute?: string | null;
+  softDismissedAt?: string | null;
+  lastActiveAt?: string | null;
+  dismissed?: boolean | null;
 };
 
 interface MigratedGuidedProgress {
@@ -472,6 +580,46 @@ export const safeAwardedSteps = (value: unknown): GuidedTutorialStepId[] => {
   return value.filter(isGuidedStepId);
 };
 
+const getSoftDismissedState = (
+  progress: GuidedTutorialProgressSnapshot | null | undefined,
+): boolean => Boolean(progress?.softDismissed ?? progress?.dismissed);
+
+const getResumeStepId = (
+  progress: GuidedTutorialProgressSnapshot | null | undefined,
+): GuidedTutorialStepId | null => (
+  progress?.resumeStepId && isGuidedStepId(progress.resumeStepId)
+    ? progress.resumeStepId
+    : null
+);
+
+const getResumeRoute = (
+  progress: GuidedTutorialProgressSnapshot | null | undefined,
+): string | null => (
+  typeof progress?.resumeRoute === "string" && progress.resumeRoute.trim().length > 0
+    ? progress.resumeRoute
+    : null
+);
+
+const applyGuidedTutorialPatch = (
+  base: GuidedTutorialProgressSnapshot,
+  patch: GuidedTutorialProgressSnapshot,
+): GuidedTutorialProgressSnapshot => {
+  const next: GuidedTutorialProgressSnapshot = { ...base };
+
+  (Object.entries(patch) as Array<[keyof GuidedTutorialProgressSnapshot, unknown]>).forEach(
+    ([key, value]) => {
+      if (value === null) {
+        delete next[key];
+        return;
+      }
+
+      next[key] = value as never;
+    },
+  );
+
+  return next;
+};
+
 const readLocalProgress = (userId: string | undefined): GuidedTutorialProgressSnapshot | null => {
   if (!userId) return null;
   const raw = safeLocalStorage.getItem(getGuidedTutorialLocalProgressKey(userId));
@@ -545,6 +693,10 @@ export interface PostOnboardingMentorGuidanceState {
   onSecondaryAction?: () => void;
   dialogueActionLabel?: string;
   onDialogueAction?: () => void;
+  resumeActionLabel?: string;
+  onResumeAction?: () => void;
+  resumePromptText?: string;
+  resumeProgressText?: string;
 }
 
 const DEFAULT_GUIDANCE_STATE: PostOnboardingMentorGuidanceState = {
@@ -570,6 +722,10 @@ const DEFAULT_GUIDANCE_STATE: PostOnboardingMentorGuidanceState = {
   onSecondaryAction: undefined,
   dialogueActionLabel: undefined,
   onDialogueAction: undefined,
+  resumeActionLabel: undefined,
+  onResumeAction: undefined,
+  resumePromptText: undefined,
+  resumeProgressText: undefined,
 };
 
 const PostOnboardingMentorGuidanceContext = createContext<PostOnboardingMentorGuidanceState>(
@@ -627,11 +783,14 @@ export const getMentorInstructionLines = (
 
 const getMilestoneDialogue = (
   milestoneId: GuidedMilestoneId,
-  _mentorSlug: string | undefined
+  _mentorSlug: string | undefined,
+  context: GuidanceNarrativeContext,
 ): { text: string; support?: string } => {
+  const bondNudge = buildCompanionBondNudge(context);
+
   switch (milestoneId) {
     case "quests_campaigns_intro":
-      return getQuestsCampaignsIntroDialogue();
+      return getQuestsCampaignsIntroDialogue(context);
     case "stay_on_quests":
       return {
         text: "Start on Quests. We'll build your first quest together.",
@@ -639,8 +798,10 @@ const getMilestoneDialogue = (
       };
     case "open_add_quest":
       return {
-        text: "Tap the + in the bottom right.",
-        support: "This opens your Create a Quest Menu.",
+        text: "I'm opening your first quest form now.",
+        support: bondNudge
+          ? `${bondNudge} If it doesn't appear, tap the + in the bottom right.`
+          : "If it doesn't appear, tap the + in the bottom right.",
       };
     case "enter_title":
       return {
@@ -655,7 +816,9 @@ const getMilestoneDialogue = (
     case "submit_create_quest":
       return {
         text: "Tap Add Quest.",
-        support: "Your first mission is now live.",
+        support: context.storyToneLabel
+          ? `Your first move in this ${context.storyToneLabel.toLowerCase()} arc goes live the moment you submit it.`
+          : "Your first mission is now live.",
       };
     case "open_companion_tab":
       return {
@@ -674,17 +837,23 @@ const getMilestoneDialogue = (
     case "submit_morning_checkin":
       return {
         text: "Welcome to your Guide tab. Receive a Pep Talk or talk to your Guide to stay on track. Complete your check-in.",
-        support: "Keep it honest. Keep it simple.",
+        support: context.storyTone === "emotional_heartfelt"
+          ? "Keep it honest. The bond gets stronger when you tell the truth about where you are."
+          : "Keep it honest. Keep it simple.",
       };
     case "companion_tab_intro":
       return {
-        text: "This is your Companion Tab. See your progress reflected in your Companion's growth.",
-        support: "Stay locked in with the Pomodoro Timer and Resist mini games to break bad habits",
+        text: context.companionLabel
+          ? `This is your Companion Tab. This is where ${context.companionLabel}'s growth starts showing up.`
+          : "This is your Companion Tab. See your progress reflected in your companion's growth.",
+        support: "Stay locked in with the Pomodoro Timer and Resist mini games whenever you need help holding the line.",
       };
     case "tap_evolve_companion":
       return {
         text: "Your companion has gathered enough strength. Tap Hatch to awaken it.",
-        support: "The form you chose during onboarding is ready to emerge.",
+        support: context.companionLabel && context.companionElementLabel
+          ? `Your ${context.companionLabel} is ready to emerge from the ${context.companionElementLabel.toLowerCase()} bond you chose in onboarding.`
+          : "The form you chose during onboarding is ready to emerge.",
       };
     case "complete_companion_evolution":
       return {
@@ -694,12 +863,16 @@ const getMilestoneDialogue = (
     case "post_evolution_companion_intro":
       return {
         text: "AMAZING! You've taken your first step to greatness.",
-        support: "Here you track your bond and growth.",
+        support: context.storyToneLabel
+          ? `Here you track the bond and growth that carry your ${context.storyToneLabel.toLowerCase()} path forward.`
+          : "Here you track your bond and growth.",
       };
     case "mentor_closeout_message":
       return {
         text: "You're ready. This concludes the tutorial.",
-        support: "Keep momentum through daily quests and check-ins.",
+        support: context.companionLabel
+          ? `Keep momentum through daily quests and check-ins. ${context.companionLabel} grows when you do.`
+          : "Keep momentum through daily quests and check-ins.",
       };
     default:
       return {
@@ -746,7 +919,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
   const [sessionCreateQuestCompleted, setSessionCreateQuestCompleted] = useState<CreateQuestSubstepId[]>([]);
   const [sessionMilestonesCompleted, setSessionMilestonesCompleted] = useState<GuidedMilestoneId[]>([]);
   const [sessionEvolutionInFlight, setSessionEvolutionInFlight] = useState<boolean | null>(null);
-  const [sessionDismissed, setSessionDismissed] = useState<boolean | null>(null);
+  const [sessionSoftDismissed, setSessionSoftDismissed] = useState<boolean | null>(null);
   const [activeTargetSelector, setActiveTargetSelector] = useState<string | null>(null);
 
   const onboardingData = (profile?.onboarding_data as Record<string, unknown> | null) ?? null;
@@ -758,7 +931,8 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
   const tutorialEligible =
     (remoteProgress?.version === GUIDED_TUTORIAL_VERSION && remoteProgress?.eligible === true) ||
     (localProgress?.version === GUIDED_TUTORIAL_VERSION && localProgress?.eligible === true);
-  const persistedDismissed = Boolean(remoteProgress?.dismissed || localProgress?.dismissed);
+  const persistedSoftDismissed =
+    getSoftDismissedState(remoteProgress) || getSoftDismissedState(localProgress);
 
   useEffect(() => {
     setSessionCompleted([]);
@@ -766,7 +940,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     setSessionCreateQuestCompleted([]);
     setSessionMilestonesCompleted([]);
     setSessionEvolutionInFlight(null);
-    setSessionDismissed(null);
+    setSessionSoftDismissed(null);
     setActiveTargetSelector(null);
     completionPersistRef.current = false;
     stepPersistThrottleRef.current.clear();
@@ -912,12 +1086,27 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     enabled: false,
   });
   const cachedCompanion = cachedCompanionData ?? null;
+  const onboardingStoryTone = useMemo(
+    () => coerceStoryTone(onboardingData?.story_tone ?? cachedCompanion?.story_tone),
+    [cachedCompanion?.story_tone, onboardingData?.story_tone]
+  );
+  const narrativeContext = useMemo<GuidanceNarrativeContext>(() => ({
+    storyTone: onboardingStoryTone,
+    storyToneLabel: resolveStoryToneLabel(onboardingStoryTone),
+    companionLabel:
+      typeof cachedCompanion?.spirit_animal === "string" && cachedCompanion.spirit_animal.trim().length > 0
+        ? cachedCompanion.spirit_animal.trim()
+        : null,
+    companionElementLabel: cachedCompanion?.core_element
+      ? getCompanionElement(cachedCompanion.core_element).label
+      : null,
+  }), [cachedCompanion?.core_element, cachedCompanion?.spirit_animal, onboardingStoryTone]);
 
   const tutorialReady =
     Boolean(user?.id) && !profileLoading && walkthroughCompleted && tutorialEligible;
 
   const tutorialMarkedComplete = migratedProgress.completed;
-  const tutorialDismissed = sessionDismissed ?? persistedDismissed;
+  const tutorialDismissed = sessionSoftDismissed ?? persistedSoftDismissed;
   const tutorialComplete = tutorialReady && (tutorialMarkedComplete || !currentStep);
   const tutorialSuppressed = tutorialComplete || tutorialDismissed;
   const hasPendingIntroDialogue = Boolean(currentStep) && !milestoneSet.has("mentor_intro_hello");
@@ -941,14 +1130,17 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
 
       const nowIso = new Date().toISOString();
       const localCurrent = readLocalProgress(user.id) ?? {};
-      const localNext: GuidedTutorialProgressSnapshot = {
-        ...localCurrent,
+      const normalizedProgress = {
         ...progress,
+        lastActiveAt: progress.lastActiveAt === null ? null : progress.lastActiveAt ?? nowIso,
+      } satisfies GuidedTutorialProgressSnapshot;
+      const localNext = applyGuidedTutorialPatch(localCurrent, {
+        ...normalizedProgress,
         version: GUIDED_TUTORIAL_VERSION,
         flowVersion: GUIDED_TUTORIAL_FLOW_VERSION,
         eligible: true,
         lastUpdatedAt: nowIso,
-      };
+      });
       safeLocalStorage.setItem(
         getGuidedTutorialLocalProgressKey(user.id),
         JSON.stringify(localNext),
@@ -957,14 +1149,13 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
       const baseData = (profile?.onboarding_data as Record<string, unknown> | null) ?? {};
       const currentGuided =
         (readRemoteProgress(baseData) as GuidedTutorialProgressSnapshot | null) ?? {};
-      const remoteNext: GuidedTutorialProgressSnapshot = {
-        ...currentGuided,
-        ...progress,
+      const remoteNext = applyGuidedTutorialPatch(currentGuided, {
+        ...normalizedProgress,
         version: GUIDED_TUTORIAL_VERSION,
         flowVersion: GUIDED_TUTORIAL_FLOW_VERSION,
         eligible: true,
         lastUpdatedAt: nowIso,
-      };
+      });
 
       const { error } = await supabase
         .from("profiles")
@@ -1003,6 +1194,23 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
       completedAt:
         migratedProgress.completedAt ??
         (migratedProgress.completed ? new Date().toISOString() : undefined),
+      softDismissed: persistedSoftDismissed,
+      softDismissedAt:
+        remoteProgress?.softDismissedAt ??
+        localProgress?.softDismissedAt ??
+        (getSoftDismissedState(remoteProgress) || getSoftDismissedState(localProgress)
+          ? new Date().toISOString()
+          : undefined),
+      resumeStepId:
+        getResumeStepId(remoteProgress) ??
+        getResumeStepId(localProgress) ??
+        currentStepId ??
+        undefined,
+      resumeRoute:
+        getResumeRoute(remoteProgress) ??
+        getResumeRoute(localProgress) ??
+        stepRoute ??
+        undefined,
       evolutionInFlight: migratedProgress.evolutionInFlight,
       evolutionStartedAt: migratedProgress.evolutionStartedAt,
       evolutionCompletedAt: migratedProgress.evolutionCompletedAt,
@@ -1013,7 +1221,16 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     migrationPersistSignatureRef.current = signature;
 
     void persistProgress(migrationPayload);
-  }, [migratedProgress, persistProgress, tutorialReady]);
+  }, [
+    currentStepId,
+    localProgress?.softDismissedAt,
+    migratedProgress,
+    persistProgress,
+    persistedSoftDismissed,
+    remoteProgress?.softDismissedAt,
+    stepRoute,
+    tutorialReady,
+  ]);
 
   useEffect(() => {
     evolutionStartRecordedRef.current = hasRecordedEvolutionStart;
@@ -1124,6 +1341,11 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
         xpAwardedSteps: toActiveStepOrder(nextAwardedSet),
         completed: complete,
         completedAt: complete ? new Date().toISOString() : undefined,
+        softDismissed: complete ? false : undefined,
+        softDismissedAt: complete ? null : undefined,
+        resumeStepId: complete ? null : undefined,
+        resumeRoute: complete ? null : undefined,
+        dismissed: false,
       });
     },
     [awardCustomXP, awardedSet, completedSet, hasPendingIntroDialogue, persistProgress, tutorialReady]
@@ -1133,13 +1355,21 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     if (!tutorialComplete || completionPersistRef.current) return;
 
     completionPersistRef.current = true;
+    if (user?.id) {
+      safeSessionStorage.setItem(getGuidedTutorialGateDeferralSessionKey(user.id), "true");
+    }
     void persistProgress({
       completedSteps: GUIDED_STEPS.map((step) => step.id),
       xpAwardedSteps: Array.from(awardedSet),
       completed: true,
       completedAt: new Date().toISOString(),
+      softDismissed: false,
+      softDismissedAt: null,
+      resumeStepId: null,
+      resumeRoute: null,
+      dismissed: false,
     });
-  }, [awardedSet, persistProgress, tutorialComplete]);
+  }, [awardedSet, persistProgress, tutorialComplete, user?.id]);
 
   useEffect(() => {
     if (!tutorialReady || tutorialSuppressed || hasPendingIntroDialogue || !currentStep) return;
@@ -1148,8 +1378,16 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
       if (location.pathname !== "/journeys") return;
       if (milestoneSet.has("quests_campaigns_intro")) {
         markStepComplete("quests_campaigns_intro");
+        return;
       }
-      return;
+
+      const timeout = window.setTimeout(() => {
+        markMilestoneComplete("quests_campaigns_intro");
+      }, EXPLAINER_AUTO_ADVANCE_MS);
+
+      return () => {
+        window.clearTimeout(timeout);
+      };
     }
 
     if (currentStep.id === "create_quest") {
@@ -1195,8 +1433,16 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
       if (location.pathname !== "/companion") return;
       if (milestoneSet.has("companion_tab_intro")) {
         markStepComplete("companion_tab_intro");
+        return;
       }
-      return;
+
+      const timeout = window.setTimeout(() => {
+        markMilestoneComplete("companion_tab_intro");
+      }, EXPLAINER_AUTO_ADVANCE_MS);
+
+      return () => {
+        window.clearTimeout(timeout);
+      };
     }
 
     if (currentStep.id === "evolve_companion") {
@@ -1227,8 +1473,16 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
       if (location.pathname !== "/companion") return;
       if (milestoneSet.has("post_evolution_companion_intro")) {
         markStepComplete("post_evolution_companion_intro");
+        return;
       }
-      return;
+
+      const timeout = window.setTimeout(() => {
+        markMilestoneComplete("post_evolution_companion_intro");
+      }, EXPLAINER_AUTO_ADVANCE_MS);
+
+      return () => {
+        window.clearTimeout(timeout);
+      };
     }
 
     if (currentStep.id === "mentor_closeout") {
@@ -1421,11 +1675,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
   }, [createQuestProgress.current, currentStep, evolutionInFlight, milestoneSet]);
 
   const isIntroDialogueActive = currentMilestone === "mentor_intro_hello";
-  const supportsDialogueAction =
-    currentMilestone === "mentor_intro_hello" ||
-    currentMilestone === "quests_campaigns_intro" ||
-    currentMilestone === "companion_tab_intro" ||
-    currentMilestone === "post_evolution_companion_intro";
+  const supportsDialogueAction = currentMilestone === "mentor_intro_hello";
   const dialogueActionLabel = supportsDialogueAction
     ? currentMilestone === "mentor_intro_hello"
       ? "Start Tutorial"
@@ -1436,7 +1686,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     markMilestoneComplete(currentMilestone);
   }, [currentMilestone, markMilestoneComplete, supportsDialogueAction]);
 
-  const dismissTutorial = useCallback(() => {
+  const continueTutorialLater = useCallback(() => {
     if (!tutorialReady || tutorialMarkedComplete || tutorialDismissed) return;
 
     emitTutorialEvent("tutorial_skipped", {
@@ -1446,20 +1696,25 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
       route: location.pathname,
     });
 
-    setSessionDismissed(true);
+    setSessionSoftDismissed(true);
     setActiveTargetSelector(null);
     missingTargetSinceRef.current = null;
 
     void persistProgress({
-      dismissed: true,
+      dismissed: false,
+      softDismissed: true,
+      softDismissedAt: new Date().toISOString(),
+      resumeStepId: currentStepId ?? null,
+      resumeRoute: stepRoute ?? getGuidedStepRoute(currentStepId),
       completed: false,
-      completedAt: undefined,
+      completedAt: null,
     });
   }, [
     currentMilestone,
     currentStepId,
     location.pathname,
     persistProgress,
+    stepRoute,
     tutorialDismissed,
     tutorialMarkedComplete,
     tutorialReady,
@@ -1491,6 +1746,45 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     markStepComplete,
     milestoneSet,
     tutorialDismissed,
+    tutorialMarkedComplete,
+    tutorialReady,
+  ]);
+
+  const resumeStepId =
+    currentStepId ??
+    getResumeStepId(remoteProgress) ??
+    getResumeStepId(localProgress);
+  const resumeRoute =
+    stepRoute ??
+    getResumeRoute(remoteProgress) ??
+    getResumeRoute(localProgress) ??
+    getGuidedStepRoute(resumeStepId);
+
+  const resumeTutorial = useCallback(() => {
+    if (!tutorialReady || tutorialMarkedComplete || !resumeStepId) return;
+
+    setSessionSoftDismissed(false);
+    setActiveTargetSelector(null);
+    missingTargetSinceRef.current = null;
+
+    void persistProgress({
+      dismissed: false,
+      softDismissed: false,
+      softDismissedAt: null,
+      resumeStepId: null,
+      resumeRoute: null,
+    });
+
+    const nextRoute = resumeRoute ?? getGuidedStepRoute(resumeStepId);
+    if (nextRoute && location.pathname !== nextRoute) {
+      navigate(nextRoute, { replace: false });
+    }
+  }, [
+    location.pathname,
+    navigate,
+    persistProgress,
+    resumeRoute,
+    resumeStepId,
     tutorialMarkedComplete,
     tutorialReady,
   ]);
@@ -1698,8 +1992,8 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
 
   const dialogue = currentMilestone
     ? currentMilestone === "mentor_intro_hello"
-      ? getMentorIntroDialogue(personality?.slug, personality?.name ?? "Your guide")
-      : getMilestoneDialogue(currentMilestone, personality?.slug)
+      ? getMentorIntroDialogue(personality?.slug, personality?.name ?? "Your guide", narrativeContext)
+      : getMilestoneDialogue(currentMilestone, personality?.slug, narrativeContext)
     : { text: "", support: undefined };
   const mentorInstructionLines = dialogue.support ? [dialogue.text, dialogue.support] : [dialogue.text];
 
@@ -1744,13 +2038,17 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     !tutorialSuppressed && !isIntroDialogueActive
       ? currentStepId === "mentor_closeout"
         ? "Complete tutorial"
-        : "Skip tutorial"
+        : "Continue later"
       : undefined;
   const onSecondaryAction = secondaryActionLabel
     ? currentStepId === "mentor_closeout"
       ? completeTutorial
-      : dismissTutorial
+      : continueTutorialLater
     : undefined;
+  const resumeActionLabel =
+    tutorialDismissed && !tutorialComplete && resumeStepId ? "Continue setup" : undefined;
+  const resumePromptText =
+    resumeActionLabel ? getResumePromptText(resumeStepId, narrativeContext) : undefined;
   const isPreHatchCompanionStep =
     !tutorialSuppressed &&
     (currentStepId === "companion_tab_intro" ||
@@ -1780,6 +2078,10 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     dialogueActionLabel: tutorialSuppressed ? undefined : dialogueActionLabel,
     onDialogueAction:
       tutorialSuppressed ? undefined : (supportsDialogueAction ? onDialogueAction : undefined),
+    resumeActionLabel,
+    onResumeAction: resumeActionLabel ? resumeTutorial : undefined,
+    resumePromptText,
+    resumeProgressText: resumeActionLabel ? progressText : undefined,
   };
 };
 

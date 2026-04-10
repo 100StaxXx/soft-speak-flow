@@ -12,6 +12,7 @@ interface UseBattleStateOptions {
   onPlayerDefeated?: () => void;
   onAdversaryDefeated?: () => void;
   onDamageDealt?: (event: DamageEvent) => void;
+  playerFloorHP?: number;
 }
 
 interface UseBattleStateReturn {
@@ -28,6 +29,7 @@ export function useBattleState({
   onPlayerDefeated,
   onAdversaryDefeated,
   onDamageDealt,
+  playerFloorHP = 0,
 }: UseBattleStateOptions): UseBattleStateReturn {
   const config = TIER_BATTLE_CONFIG[tier];
   const callbacksRef = useRef({ onPlayerDefeated, onAdversaryDefeated, onDamageDealt });
@@ -62,6 +64,9 @@ export function useBattleState({
       setPlayerHP(prev => {
         const newHP = prev - event.amount;
         if (newHP <= 0) {
+          if (playerFloorHP > 0) {
+            return playerFloorHP;
+          }
           // Use setTimeout to avoid state update during render
           setTimeout(() => callbacksRef.current.onPlayerDefeated?.(), 0);
         }
@@ -76,7 +81,7 @@ export function useBattleState({
         return Math.max(0, newHP);
       });
     }
-  }, [isPlayerDefeated, isAdversaryDefeated]);
+  }, [isPlayerDefeated, isAdversaryDefeated, playerFloorHP]);
   
   const resetBattle = useCallback(() => {
     setPlayerHP(config.playerHP);

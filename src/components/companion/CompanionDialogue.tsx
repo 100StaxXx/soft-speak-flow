@@ -15,7 +15,11 @@ import { useTalkPopupContextSafe } from "@/contexts/TalkPopupContext";
 import { cn } from "@/lib/utils";
 import type { CompanionShimmerType } from "@/config/companionDialoguePacks";
 import { isNearEvolution } from "@/lib/companionEvolutionSignals";
-import { isCompanionPresetImageSource } from "@/lib/companionImageFocal";
+import {
+  getBundledCompanionImageFocalPoint,
+  isCompanionPresetImageSource,
+} from "@/lib/companionImageFocal";
+import { resolveCompanionVisualAssetUrl } from "@/lib/companionAssetResolver";
 
 interface MoodConfig {
   color: string;
@@ -134,7 +138,12 @@ export const CompanionDialogue = memo(({
   const progressToNext = progressToNextOverride ?? rawProgressToNext;
   const canEvolve = canEvolveOverride ?? rawCanEvolve;
   const { dismiss: dismissTalkPopup } = useTalkPopupContextSafe();
-  const companionImageUrl = companion?.current_image_url;
+  const companionImageUrl = resolveCompanionVisualAssetUrl(companion, "normal")
+    ?? companion?.current_image_url
+    ?? null;
+  const bundledCompanionImageFocal = getBundledCompanionImageFocalPoint(companionImageUrl);
+  const companionImageFocalX = bundledCompanionImageFocal?.x ?? companion?.current_image_focal_x ?? null;
+  const companionImageFocalY = bundledCompanionImageFocal?.y ?? companion?.current_image_focal_y ?? null;
   const usesPortraitAvatar = isCompanionPresetImageSource(companionImageUrl);
   const cachedCompanionName =
     companion && companion.current_stage > 0
@@ -256,8 +265,8 @@ export const CompanionDialogue = memo(({
                         alt={resolvedCompanionName}
                         fit="portrait"
                         element={companion?.core_element}
-                        focalX={companion?.current_image_focal_x ?? null}
-                        focalY={companion?.current_image_focal_y ?? null}
+                        focalX={companionImageFocalX}
+                        focalY={companionImageFocalY}
                         className="rounded-lg"
                       />
                     </CompanionPortraitShell>
@@ -266,8 +275,8 @@ export const CompanionDialogue = memo(({
                       variant="avatar"
                       src={companionImageUrl}
                       alt={resolvedCompanionName}
-                      focalX={companion?.current_image_focal_x ?? null}
-                      focalY={companion?.current_image_focal_y ?? null}
+                      focalX={companionImageFocalX}
+                      focalY={companionImageFocalY}
                       className="object-cover"
                     />
                   )
@@ -338,8 +347,8 @@ export const CompanionDialogue = memo(({
                         alt={resolvedCompanionName}
                         fit="portrait"
                         element={companion?.core_element}
-                        focalX={companion?.current_image_focal_x ?? null}
-                        focalY={companion?.current_image_focal_y ?? null}
+                        focalX={companionImageFocalX}
+                        focalY={companionImageFocalY}
                         className="rounded-lg"
                       />
                     </CompanionPortraitShell>
@@ -348,8 +357,8 @@ export const CompanionDialogue = memo(({
                       variant="avatar"
                       src={companionImageUrl}
                       alt={resolvedCompanionName}
-                      focalX={companion?.current_image_focal_x ?? null}
-                      focalY={companion?.current_image_focal_y ?? null}
+                      focalX={companionImageFocalX}
+                      focalY={companionImageFocalY}
                       className="object-cover"
                     />
                   )

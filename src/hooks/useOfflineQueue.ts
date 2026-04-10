@@ -441,6 +441,26 @@ async function executeQueuedAction(userId: string, action: QueuedAction): Promis
       return;
     }
 
+    case "EPIC_UPDATE": {
+      const { epicId, updates } = action.payload as {
+        epicId: string;
+        updates: Record<string, unknown>;
+      };
+
+      if (!updates || Object.keys(updates).length === 0) {
+        return;
+      }
+
+      const { error } = await supabase
+        .from("epics")
+        .update(updates)
+        .eq("id", epicId)
+        .eq("user_id", userId);
+
+      if (error) throw error;
+      return;
+    }
+
     case "EPIC_STATUS_UPDATE": {
       const { epicId, status } = action.payload as {
         epicId: string;

@@ -1,11 +1,12 @@
 import { useState, useEffect, memo } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Bell, AlertCircle, MapPin, Bug, CheckCircle, XCircle, Loader2, ChevronDown, ChevronUp } from "lucide-react";
-import { useProfile } from "@/hooks/useProfile";
+import { useProfile, type Profile } from "@/hooks/useProfile";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
@@ -38,6 +39,19 @@ type QueueDebugRow = Pick<
   Database["public"]["Tables"]["push_notification_queue"]["Row"],
   "id" | "notification_type" | "status" | "scheduled_for" | "delivered_at" | "last_error"
 >;
+
+type NotificationProfileUpdates = Partial<Pick<
+  Profile,
+  | "daily_push_enabled"
+  | "daily_push_time"
+  | "daily_quote_push_enabled"
+  | "daily_quote_push_time"
+  | "habit_reminders_enabled"
+  | "task_reminders_enabled"
+  | "checkin_reminders_enabled"
+>>;
+
+type NotificationTimeField = "daily_push_time" | "daily_quote_push_time";
 
 const RECENT_QUEUE_LIMIT = 12;
 
@@ -74,6 +88,7 @@ export const PushNotificationSettings = memo(() => {
   const { profile } = useProfile();
   const { user } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [pushEnabled, setPushEnabled] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
 
@@ -87,6 +102,27 @@ export const PushNotificationSettings = memo(() => {
       hasActiveNativePushSubscription(user.id).then(setPushEnabled);
     }
   }, [user]);
+
+  const persistProfileUpdates = async (updates: NotificationProfileUpdates) => {
+    if (!user) return;
+
+    const { error } = await supabase
+      .from("profiles")
+      .update(updates)
+      .eq("id", user.id);
+
+    if (error) throw error;
+
+    queryClient.setQueryData<Profile | null | undefined>(["profile", user.id], (currentProfile) => {
+      if (currentProfile == null) {
+        return profile ? { ...profile, ...updates } : currentProfile;
+      }
+
+      return { ...currentProfile, ...updates };
+    });
+
+    void queryClient.invalidateQueries({ queryKey: ["profile"] });
+  };
 
   const handleTogglePushPermission = async (enabled: boolean) => {
     if (!user) return;
@@ -122,14 +158,8 @@ export const PushNotificationSettings = memo(() => {
     }
     
     try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({ daily_push_enabled: enabled })
-        .eq("id", user.id);
-      
-      if (error) throw error;
+      await persistProfileUpdates({ daily_push_enabled: enabled });
       toast({ title: enabled ? "Daily Push Enabled" : "Daily Push Disabled", description: "Settings updated successfully" });
-      setTimeout(() => window.location.reload(), 1000);
     } catch (error) {
       console.error("Error toggling pep talk:", error);
       toast({ title: "Error", description: error instanceof Error ? error.message : "Failed to toggle pep talk", variant: "destructive" });
@@ -149,14 +179,8 @@ export const PushNotificationSettings = memo(() => {
     }
     
     try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({ daily_quote_push_enabled: enabled })
-        .eq("id", user.id);
-      
-      if (error) throw error;
+      await persistProfileUpdates({ daily_quote_push_enabled: enabled });
       toast({ title: enabled ? "Quote Push Enabled" : "Quote Push Disabled", description: "Settings updated successfully" });
-      setTimeout(() => window.location.reload(), 1000);
     } catch (error) {
       console.error("Error toggling quote push:", error);
       toast({ title: "Error", description: error instanceof Error ? error.message : "Failed to toggle quote push", variant: "destructive" });
@@ -176,14 +200,8 @@ export const PushNotificationSettings = memo(() => {
     }
     
     try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({ habit_reminders_enabled: enabled })
-        .eq("id", user.id);
-      
-      if (error) throw error;
+      await persistProfileUpdates({ habit_reminders_enabled: enabled });
       toast({ title: enabled ? "Habit Reminders Enabled" : "Habit Reminders Disabled", description: "Settings updated successfully" });
-      setTimeout(() => window.location.reload(), 1000);
     } catch (error) {
       console.error("Error toggling habit reminders:", error);
       toast({ title: "Error", description: error instanceof Error ? error.message : "Failed to toggle habit reminders", variant: "destructive" });
@@ -203,14 +221,8 @@ export const PushNotificationSettings = memo(() => {
     }
     
     try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({ task_reminders_enabled: enabled })
-        .eq("id", user.id);
-      
-      if (error) throw error;
+      await persistProfileUpdates({ task_reminders_enabled: enabled });
       toast({ title: enabled ? "Quest Reminders Enabled" : "Quest Reminders Disabled", description: "Settings updated successfully" });
-      setTimeout(() => window.location.reload(), 1000);
     } catch (error) {
       console.error("Error toggling task reminders:", error);
       toast({ title: "Error", description: error instanceof Error ? error.message : "Failed to toggle task reminders", variant: "destructive" });
@@ -230,32 +242,23 @@ export const PushNotificationSettings = memo(() => {
     }
 
     try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({ checkin_reminders_enabled: enabled })
-        .eq("id", user.id);
-
-      if (error) throw error;
+      await persistProfileUpdates({ checkin_reminders_enabled: enabled });
       toast({ title: enabled ? "Check-In Reminders Enabled" : "Check-In Reminders Disabled", description: "Settings updated successfully" });
-      setTimeout(() => window.location.reload(), 1000);
     } catch (error) {
       console.error("Error toggling check-in reminders:", error);
       toast({ title: "Error", description: error instanceof Error ? error.message : "Failed to toggle check-in reminders", variant: "destructive" });
     }
   };
 
-  const handleUpdateTime = async (field: string, value: string) => {
+  const handleUpdateTime = async (field: NotificationTimeField, value: string) => {
     if (!user) return;
     try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({ [field]: value })
-        .eq("id", user.id);
-      
-      if (error) throw error;
+      await persistProfileUpdates(
+        field === "daily_push_time"
+          ? { daily_push_time: value }
+          : { daily_quote_push_time: value },
+      );
       toast({ title: "Time Updated", description: "Your push notification time has been updated" });
-      // Reload to sync state
-      setTimeout(() => window.location.reload(), 1000);
     } catch (error) {
       console.error("Error updating time:", error);
       toast({ title: "Error", description: error instanceof Error ? error.message : "Failed to update time", variant: "destructive" });

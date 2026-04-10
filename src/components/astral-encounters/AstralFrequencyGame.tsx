@@ -56,6 +56,14 @@ const DIFFICULTY_CONFIG = {
   },
 };
 
+const SESSION_DISTANCE_TARGET: Record<ArcadeDifficulty, number> = {
+  beginner: 600,
+  easy: 500,
+  medium: 400,
+  hard: 300,
+  master: 250,
+};
+
 const LANE_POSITIONS = [-2.5, 0, 2.5];
 
 // 3D Tunnel component
@@ -468,6 +476,7 @@ export const AstralFrequencyGame = ({
   const [hasShield, setHasShield] = useState(false);
   const [lives, setLives] = useState(3);
   const [showDamageFlash, setShowDamageFlash] = useState(false);
+  const [secondWinds, setSecondWinds] = useState(0);
   
   // Game objects
   const [obstacles, setObstacles] = useState<Array<{ id: string; lane: number; z: number; type: 'asteroid' | 'crystal' | 'shield' }>>([]);
@@ -477,16 +486,20 @@ export const AstralFrequencyGame = ({
   const gameStateRef = useRef(gameState);
   const playerLaneRef = useRef(playerLane);
   const hasShieldRef = useRef(hasShield);
+  const livesRef = useRef(lives);
   const lastSpawnRef = useRef(0);
   const touchStartRef = useRef<{ x: number } | null>(null);
   const speedRef = useRef(speed);
   const damageFlashTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const secondWindingRef = useRef(false);
   
   // Sync refs
   useEffect(() => { gameStateRef.current = gameState; }, [gameState]);
   useEffect(() => { playerLaneRef.current = playerLane; }, [playerLane]);
   useEffect(() => { hasShieldRef.current = hasShield; }, [hasShield]);
+  useEffect(() => { livesRef.current = lives; }, [lives]);
   useEffect(() => { speedRef.current = speed; }, [speed]);
+  const sessionDistanceTarget = isPractice ? 500 : SESSION_DISTANCE_TARGET[difficulty];
 
   useEffect(() => {
     return () => {
@@ -506,6 +519,24 @@ export const AstralFrequencyGame = ({
       damageFlashTimeoutRef.current = null;
     }, 200);
   }, []);
+
+  const triggerSecondWind = useCallback(() => {
+    if (secondWindingRef.current) return;
+
+    secondWindingRef.current = true;
+    setSecondWinds(prev => prev + 1);
+    livesRef.current = 0;
+    setLives(0);
+    setHasShield(false);
+    triggerDamageFlash();
+    triggerHaptic('heavy');
+
+    setTimeout(() => {
+      livesRef.current = 3;
+      setLives(3);
+      secondWindingRef.current = false;
+    }, 300);
+  }, [triggerDamageFlash]);
   
   const handleCountdownComplete = useCallback(() => {
     setGameState('playing');
@@ -562,13 +593,12 @@ export const AstralFrequencyGame = ({
         // Player takes damage from collision
         onDamage?.({ target: 'player', amount: tierAttackDamage, source: 'collision' });
         
-        setLives(prev => {
-          const newLives = prev - 1;
-          if (newLives <= 0) {
-            setGameState('complete');
-          }
-          return newLives;
-        });
+        if (livesRef.current <= 1) {
+          triggerSecondWind();
+        } else {
+          livesRef.current -= 1;
+          setLives(prev => prev - 1);
+        }
         setCombo(0);
         triggerHaptic('heavy');
       }
@@ -605,8 +635,7 @@ export const AstralFrequencyGame = ({
           onDamage?.({ target: 'adversary', amount: GAME_DAMAGE_VALUES.astral_frequency.distanceMilestone, source: 'distance_milestone' });
         }
         
-        // Practice mode: end after reaching 500 distance
-        if (isPractice && newDistance >= 500) {
+        if (newDistance >= sessionDistanceTarget) {
           setGameState('complete');
         }
         
@@ -649,7 +678,7 @@ export const AstralFrequencyGame = ({
     }, 100);
     
     return () => clearInterval(interval);
-  }, [gameState, config, isPractice, onDamage]);
+  }, [config, gameState, onDamage, sessionDistanceTarget]);
   
   // Complete game - calculate result based on distance and score
   useEffect(() => {
@@ -667,7 +696,7 @@ export const AstralFrequencyGame = ({
       master: 250 
     };
     const threshold = distanceThresholds[difficulty];
-    const accuracy = Math.min(100, Math.round((distance / threshold) * 100));
+    const accuracy = Math.max(0, Math.min(100, Math.round((distance / threshold) * 100) - secondWinds * 10));
     
     const result: 'perfect' | 'good' | 'fail' = 
       accuracy >= 90 ? 'perfect' : accuracy >= 50 ? 'good' : 'fail';
@@ -684,7 +713,7 @@ export const AstralFrequencyGame = ({
         livesRemaining: lives,
       },
     });
-  }, [gameState, score, distance, difficulty, onComplete, maxCombo, lives]);
+  }, [gameState, score, distance, difficulty, onComplete, maxCombo, lives, secondWinds]);
   
   return (
     <div 

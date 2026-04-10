@@ -35,12 +35,12 @@ const GAME_INSTRUCTIONS: Record<MiniGameType, GameInstruction> = {
   energy_beam: {
     icon: Zap,
     title: "Star Defender",
-    goal: "Survive endless alien waves!",
+    goal: "Rack up points through relentless alien waves!",
     howToPlay: [
       "Move left/right to dodge attacks",
       "Auto-fire destroys enemies",
-      "3 lives - survive as long as possible",
-      "Waves get harder - how far can you go?"
+      "Empty hearts trigger a second wind instead of ending the run",
+      "Clear waves fast for stronger grades"
     ],
     statBonus: 'body',
     statIcon: Heart,
@@ -52,8 +52,8 @@ const GAME_INSTRUCTIONS: Record<MiniGameType, GameInstruction> = {
     howToPlay: [
       "Watch orbs light up in sequence",
       "Numbers hide - tap from memory!",
-      "Wrong tap = lose a life, sequence replays",
-      "3 lives total - survive endless levels!"
+      "Wrong tap replays the sequence and drains a heart",
+      "If hearts empty, you get a second wind and keep going"
     ],
     statBonus: 'mind',
     statIcon: Brain,
@@ -64,10 +64,10 @@ const GAME_INSTRUCTIONS: Record<MiniGameType, GameInstruction> = {
     goal: "Survive the endless cosmic tunnel!",
     howToPlay: [
       "Swipe or tap ◀ ▶ to switch lanes",
-      "🔴 RED ASTEROIDS = DANGER! Lose a life",
+      "🔴 RED ASTEROIDS = DANGER! They trigger damage and reset pressure",
       "🟡 GOLD CRYSTALS = Points! Collect them",
       "🔵 CYAN SHIELDS = Protection for 1 hit",
-      "Speed increases - survive as long as you can!"
+      "The tunnel keeps escalating - distance and score drive your grade"
     ],
     statBonus: 'soul',
     statIcon: Sparkles,
@@ -90,9 +90,9 @@ const GAME_INSTRUCTIONS: Record<MiniGameType, GameInstruction> = {
     goal: "Survive the endless starfall!",
     howToPlay: [
       "📱 Tilt or swipe to dodge debris",
-      "3 lives - debris hits cost one!",
+      "Debris hits cost hearts, but empty hearts trigger a second wind",
       "Collect 💎 crystals for bonus points",
-      "Speed increases - how long can you last?"
+      "Longer survival and better crystal runs score higher"
     ],
     statBonus: 'body',
     statIcon: Heart,
@@ -104,7 +104,7 @@ const GAME_INSTRUCTIONS: Record<MiniGameType, GameInstruction> = {
     howToPlay: [
       "Swipe or use D-Pad to change direction",
       "Collect glowing stardust to grow longer",
-      "Game ends when you hit yourself!"
+      "Self-collisions reset the serpent, but your score keeps going"
     ],
     statBonus: 'body',
     statIcon: Heart,
@@ -129,8 +129,8 @@ const GAME_INSTRUCTIONS: Record<MiniGameType, GameInstruction> = {
     howToPlay: [
       "All cards revealed at start - MEMORIZE!",
       "Cards hide - match pairs from memory",
-      "Wrong match = lose a life (3 total)",
-      "Clear level → more cards next level!"
+      "Wrong matches drain hearts and can trigger a second wind reset",
+      "Clear levels cleanly for better grades"
     ],
     statBonus: 'mind',
     statIcon: Brain,

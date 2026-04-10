@@ -1,7 +1,7 @@
 import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const buildJourneyPathSnapshot = (overrides: Partial<{
   epic_id: string;
@@ -23,6 +23,22 @@ const buildJourneyPathSnapshot = (overrides: Partial<{
     prompt_context: null,
   };
 };
+
+const buildJourneyPathGenerationError = (overrides: Partial<{
+  code: string | null;
+  message: string;
+  requestId: string | null;
+  retryAfterSeconds: number | null;
+  retryable: boolean;
+  status: number | null;
+}> = {}) => ({
+  code: overrides.code ?? "UPSTREAM_FAILED",
+  message: overrides.message ?? "Our servers are temporarily unavailable. Please try again in a moment.",
+  requestId: overrides.requestId ?? "req-journey-1",
+  retryAfterSeconds: overrides.retryAfterSeconds ?? null,
+  retryable: overrides.retryable ?? true,
+  status: overrides.status ?? 503,
+});
 
 const createDeferred = <T,>() => {
   let resolve!: (value: T) => void;
@@ -155,6 +171,8 @@ vi.mock("@/utils/journeyPathCache", () => {
 
 import { useJourneyPathImage } from "./useJourneyPathImage";
 
+const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
 const createWrapper = () => {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -176,6 +194,10 @@ describe("useJourneyPathImage", () => {
     mocks.fetchRemoteLatestJourneyPathMock.mockResolvedValue(null);
     mocks.getPersistedJourneyPathSnapshotMock.mockResolvedValue(null);
     mocks.requestJourneyPathGenerationMock.mockResolvedValue(null);
+  });
+
+  afterAll(() => {
+    consoleErrorSpy.mockRestore();
   });
 
   it("returns the persisted local image before remote revalidation completes", async () => {
@@ -213,12 +235,14 @@ describe("useJourneyPathImage", () => {
 
     mocks.requestJourneyPathGenerationMock.mockImplementation(({ epicId, milestoneIndex, queryClient, userId }) => {
       queryClient.setQueryData(["journey-path-generation", epicId, userId], {
+        error: null,
         pending: true,
         milestoneIndex,
       });
 
       return generationDeferred.promise.finally(() => {
         queryClient.setQueryData(["journey-path-generation", epicId, userId], {
+          error: null,
           pending: false,
           milestoneIndex: null,
         });
@@ -280,12 +304,14 @@ describe("useJourneyPathImage", () => {
     mocks.getPersistedJourneyPathSnapshotMock.mockResolvedValue(localSnapshot);
     mocks.requestJourneyPathGenerationMock.mockImplementation(({ epicId, milestoneIndex, queryClient, userId }) => {
       queryClient.setQueryData(["journey-path-generation", epicId, userId], {
+        error: null,
         pending: true,
         milestoneIndex,
       });
 
       return generationDeferred.promise.finally(() => {
         queryClient.setQueryData(["journey-path-generation", epicId, userId], {
+          error: null,
           pending: false,
           milestoneIndex: null,
         });
@@ -328,12 +354,14 @@ describe("useJourneyPathImage", () => {
 
     mocks.requestJourneyPathGenerationMock.mockImplementation(({ epicId, milestoneIndex, queryClient, userId }) => {
       queryClient.setQueryData(["journey-path-generation", epicId, userId], {
+        error: null,
         pending: true,
         milestoneIndex,
       });
 
       return Promise.resolve(generatedSnapshot).finally(() => {
         queryClient.setQueryData(["journey-path-generation", epicId, userId], {
+          error: null,
           pending: false,
           milestoneIndex: null,
         });
@@ -351,6 +379,74 @@ describe("useJourneyPathImage", () => {
         queryClient: expect.any(QueryClient),
         userId: "user-1",
       });
+    });
+
+    await waitFor(() => {
+      expect(result.current.pathImageUrl).toBe(generatedSnapshot.image_url);
+    });
+  });
+
+  it("surfaces a failed initial generation and allows a manual retry to recover", async () => {
+    const generatedSnapshot = buildJourneyPathSnapshot({
+      generated_at: "2026-03-28T04:00:00.000Z",
+      image_url: "https://example.com/retried-generated.png",
+    });
+    const generationError = buildJourneyPathGenerationError();
+
+    mocks.requestJourneyPathGenerationMock
+      .mockImplementationOnce(({ epicId, milestoneIndex, queryClient, userId }) => {
+        queryClient.setQueryData(["journey-path-generation", epicId, userId], {
+          error: null,
+          pending: true,
+          milestoneIndex,
+        });
+
+        return Promise.reject(new Error(generationError.message)).finally(() => {
+          queryClient.setQueryData(["journey-path-generation", epicId, userId], {
+            error: generationError,
+            pending: false,
+            milestoneIndex: null,
+          });
+        });
+      })
+      .mockImplementationOnce(({ epicId, milestoneIndex, queryClient, userId }) => {
+        queryClient.setQueryData(["journey-path-generation", epicId, userId], {
+          error: null,
+          pending: true,
+          milestoneIndex,
+        });
+
+        return Promise.resolve(generatedSnapshot).finally(() => {
+          queryClient.setQueryData(["journey-path-generation", epicId, userId], {
+            error: null,
+            pending: false,
+            milestoneIndex: null,
+          });
+        });
+      });
+
+    const { result } = renderHook(() => useJourneyPathImage("epic-1"), {
+      wrapper: createWrapper().wrapper,
+    });
+
+    await waitFor(() => {
+      expect(mocks.requestJourneyPathGenerationMock).toHaveBeenCalledTimes(1);
+    });
+
+    await waitFor(() => {
+      expect(result.current.generationError).toEqual(generationError);
+    });
+
+    act(() => {
+      result.current.retryInitialPath();
+    });
+
+    await waitFor(() => {
+      expect(mocks.requestJourneyPathGenerationMock).toHaveBeenCalledTimes(2);
+    });
+
+    await waitFor(() => {
+      expect(result.current.generationError).toBeNull();
     });
 
     await waitFor(() => {

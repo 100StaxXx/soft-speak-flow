@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, memo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MiniGameResult } from '@/types/astralEncounters';
 import { triggerHaptic } from './gameUtils';
-import { playHabitComplete, playXPGain, playMissionComplete } from '@/utils/soundEffects';
+import { playHabitComplete, playMissionComplete } from '@/utils/soundEffects';
 import { Heart } from 'lucide-react';
 import { useMountedRef, useSingleCompletion, useTimerRegistry } from './gameLifecycle';
 import { useMaxAspectRect } from './useMaxAspectRect';
@@ -44,6 +44,14 @@ const MAX_LIVES_BY_DIFFICULTY: Record<ArcadeDifficulty, number> = {
   medium: 3,
   hard: 2,
   master: 1,
+};
+
+const SESSION_LEVEL_TARGET: Record<ArcadeDifficulty, number> = {
+  beginner: 2,
+  easy: 2,
+  medium: 3,
+  hard: 3,
+  master: 4,
 };
 
 // Cosmic symbols with colors
@@ -192,7 +200,7 @@ const MatchEffect = memo(({ color }: { color: string }) => (
 ));
 MatchEffect.displayName = 'MatchEffect';
 
-type GamePhase = 'countdown' | 'revealing' | 'hiding' | 'playing' | 'levelComplete' | 'gameOver';
+type GamePhase = 'countdown' | 'revealing' | 'hiding' | 'playing' | 'levelComplete' | 'secondWind';
 
 interface LevelCompleteSnapshot {
   token: number;
@@ -233,9 +241,13 @@ export const GalacticMatchGame = ({
   const [countdown, setCountdown] = useState(3);
   const [revealCountdown, setRevealCountdown] = useState(0);
   const [mistakesThisLevel, setMistakesThisLevel] = useState(0);
+  const [wrongMatchesTotal, setWrongMatchesTotal] = useState(0);
+  const [secondWinds, setSecondWinds] = useState(0);
+  const [bestCombo, setBestCombo] = useState(0);
   const phaseRef = useRef<GamePhase>('countdown');
   const levelCompleteTokenRef = useRef(0);
   const pendingLevelCompleteRef = useRef<LevelCompleteSnapshot | null>(null);
+  const sessionLevelTarget = isPractice ? 2 : SESSION_LEVEL_TARGET[difficulty];
   
   const config = useMemo(() => getLevelConfig(level, round, diffConfig.startPairs, diffConfig.revealTimeMultiplier), [level, round, diffConfig]);
   const { hostRef: boardHostRef, rect: boardRect } = useMaxAspectRect(config.cols, config.rows);
@@ -293,16 +305,32 @@ export const GalacticMatchGame = ({
     resetTransientBoardState();
 
     // In practice mode, end after completing 2 levels
-    if (isPractice && snapshot.level >= 2) {
+    if (snapshot.level >= sessionLevelTarget) {
+      const accuracy = Math.max(
+        0,
+        Math.min(
+          100,
+          Math.round(
+            100
+            - wrongMatchesTotal * 8
+            - secondWinds * 12
+            + Math.min(snapshot.scoreWithBonus / 25, 10)
+            + Math.min(bestCombo * 2, 10),
+          ),
+        ),
+      );
+      const result: 'perfect' | 'good' | 'fail' =
+        accuracy >= 90 ? 'perfect' : accuracy >= 50 ? 'good' : 'fail';
+
       completeOnce({
-        success: true,
-        accuracy: 100,
-        result: 'good',
+        success: result !== 'fail',
+        accuracy,
+        result,
         highScoreValue: snapshot.level,
         gameStats: {
           level: snapshot.level,
           score: snapshot.scoreWithBonus,
-          maxCombo: snapshot.combo,
+          maxCombo: bestCombo,
         },
       });
       return;
@@ -342,7 +370,17 @@ export const GalacticMatchGame = ({
     setRound(nextRound);
     setPhase('revealing');
     setRevealCountdown(Math.ceil(nextConfig.revealTime));
-  }, [completeOnce, diffConfig.revealTimeMultiplier, diffConfig.startPairs, isPractice, mountedRef, resetTransientBoardState]);
+  }, [
+    bestCombo,
+    completeOnce,
+    diffConfig.revealTimeMultiplier,
+    diffConfig.startPairs,
+    mountedRef,
+    resetTransientBoardState,
+    secondWinds,
+    sessionLevelTarget,
+    wrongMatchesTotal,
+  ]);
 
   const handleContinueFromLevelComplete = useCallback(() => {
     const pending = pendingLevelCompleteRef.current;
@@ -441,36 +479,25 @@ export const GalacticMatchGame = ({
     }
   }, [matchedPairs, config.pairs, phase, level, round, mistakesThisLevel, onDamage, score, combo, registerTimeout, advanceFromLevelComplete]);
 
-  // Handle game over
+  // Recover from a faux game-over with a fresh set of lives.
   useEffect(() => {
-    if (phase !== 'gameOver') return;
+    if (phase !== 'secondWind') return;
 
-    const maxPossibleScore = 500; // Reasonable estimate for accuracy calc
-    const accuracy = Math.min(100, Math.round((score / maxPossibleScore) * 100));
+    const timer = registerTimeout(() => {
+      if (!mountedRef.current || phaseRef.current !== 'secondWind') return;
 
-    const result: 'perfect' | 'good' | 'fail' = level >= 3 
-      ? (level >= 6 ? 'perfect' : 'good')
-      : 'fail';
+      resetTransientBoardState();
+      setLives(maxLives);
+      setCards(prev => prev.map(c => ({ ...c, isFlipped: true })));
 
-    if (result !== 'fail') {
-      playXPGain();
-      triggerHaptic('success');
-    }
+      const unmatchedCount = cards.filter(c => !c.isMatched).length;
+      const revealTime = Math.min(1.5 + (unmatchedCount / 4) * 0.5, 3);
+      setRevealCountdown(Math.ceil(revealTime));
+      setPhase('revealing');
+    }, 1200);
 
-    registerTimeout(() => {
-      completeOnce({ 
-        success: result !== 'fail', 
-        accuracy: Math.min(accuracy, 100), 
-        result,
-        highScoreValue: level,
-        gameStats: {
-          level,
-          score,
-          maxCombo: combo,
-        },
-      });
-    }, 1500);
-  }, [phase, score, level, combo, registerTimeout, completeOnce]);
+    return () => clearTimer(timer);
+  }, [cards, clearTimer, maxLives, mountedRef, phase, registerTimeout, resetTransientBoardState]);
 
   // Handle card click
   const handleCardClick = useCallback((cardId: string) => {
@@ -508,6 +535,7 @@ export const GalacticMatchGame = ({
         triggerHaptic('success');
 
         setCombo(newCombo);
+        setBestCombo(prev => Math.max(prev, newCombo));
         setScore(prev => prev + points);
         setMatchedPairs(prev => prev + 1);
 
@@ -532,6 +560,7 @@ export const GalacticMatchGame = ({
         setLives(newLives);
         setCombo(0);
         setMistakesThisLevel(prev => prev + 1);
+        setWrongMatchesTotal(prev => prev + 1);
         triggerHaptic('error');
         
         // Player takes damage from adversary attack
@@ -539,16 +568,12 @@ export const GalacticMatchGame = ({
 
         // Check for game over first
         if (newLives <= 0) {
+          setSecondWinds(prev => prev + 1);
           registerTimeout(() => {
             if (!mountedRef.current || phaseRef.current !== 'playing') return;
-            setCards(prev => prev.map(c => 
-              c.id === firstId || c.id === secondId 
-                ? { ...c, isFlipped: false } 
-                : c
-            ));
             setFlippedCards([]);
             setIsLocked(false);
-            setPhase('gameOver');
+            setPhase('secondWind');
           }, 800);
         } else {
           // Show all unmatched cards again for re-memorization
@@ -768,9 +793,9 @@ export const GalacticMatchGame = ({
           )}
         </AnimatePresence>
 
-        {/* Game over overlay - Enhanced defeat screen */}
+        {/* Second wind overlay */}
         <AnimatePresence>
-          {phase === 'gameOver' && (
+          {phase === 'secondWind' && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -827,7 +852,7 @@ export const GalacticMatchGame = ({
                   animate={{ y: 0, opacity: 1 }}
                   transition={{ delay: 0.2 }}
                 >
-                  {level >= 5 ? 'Amazing Run!' : level >= 3 ? 'Good Effort!' : 'The Void Prevails'}
+                  Second Wind
                 </motion.h3>
                 
                 {/* Encouraging message */}
@@ -837,9 +862,7 @@ export const GalacticMatchGame = ({
                   animate={{ opacity: 1 }}
                   transition={{ delay: 0.4 }}
                 >
-                  {level >= 3 
-                    ? 'Your memory grows stronger each time' 
-                    : 'Every attempt brings you closer to mastery'}
+                  The cards reset, but your run keeps going
                 </motion.p>
                 
                 {/* Stats */}
@@ -850,10 +873,10 @@ export const GalacticMatchGame = ({
                   transition={{ delay: 0.3 }}
                 >
                   <div className="text-lg font-bold text-purple-400">
-                    Reached Level {level}
+                    Hearts restored
                   </div>
                   <div className="text-sm text-slate-400">
-                    Final Score: {Math.min(score, MAX_XP)} XP
+                    Score holds at {Math.min(score, MAX_XP)}
                   </div>
                 </motion.div>
               </motion.div>

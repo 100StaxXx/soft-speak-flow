@@ -235,6 +235,7 @@ export const useDailyMissions = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['daily-missions'] });
+      queryClient.invalidateQueries({ queryKey: ['daily-mission-pulse'] });
       toast({
         title: "Daily missions refreshed",
         description: "Fresh challenges are ready for you!",
@@ -304,6 +305,7 @@ export const useDailyMissions = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['daily-missions'] });
+      queryClient.invalidateQueries({ queryKey: ['daily-mission-pulse'] });
       toast({ title: "Mission Complete!", description: "XP awarded!" });
       playMissionComplete();
       
@@ -323,6 +325,7 @@ export const useDailyMissions = () => {
   const totalCount = missions?.length || 0;
 
   return {
+    missionDate: today,
     missions: missions || [],
     isLoading,
     completeMission: completeMission.mutateAsync,

@@ -1,41 +1,138 @@
 import { memo } from "react";
+import type { LucideIcon } from "lucide-react";
+import {
+  CheckCircle2,
+  Globe2,
+  Radar,
+  Target,
+  TrendingUp,
+  Zap,
+  Sparkles,
+} from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, Target, Zap, TrendingUp, Sparkles } from "lucide-react";
-import { useDailyMissions } from "@/hooks/useDailyMissions";
-import { useMissionAutoComplete } from "@/hooks/useMissionAutoComplete";
 import { Progress } from "@/components/ui/progress";
-import { EmptyMissions } from "@/components/EmptyMissions";
-import { haptics } from "@/utils/haptics";
-import confetti from "canvas-confetti";
 import { Badge } from "@/components/ui/badge";
+import { EmptyMissions } from "@/components/EmptyMissions";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { MissionErrorFallback } from "@/components/ErrorFallback";
 import { MissionCardSkeleton } from "@/components/SkeletonLoader";
+import { useDailyMissions } from "@/hooks/useDailyMissions";
+import { useDailyMissionPulse } from "@/hooks/useDailyMissionPulse";
+import { useMissionAutoComplete } from "@/hooks/useMissionAutoComplete";
+import { useProfile } from "@/hooks/useProfile";
 import { getTodaysTheme } from "@/config/missionTemplates";
+import { getFactionById } from "@/config/factions";
+import { haptics } from "@/utils/haptics";
+import confetti from "canvas-confetti";
 import { cn } from "@/lib/utils";
 import { outerShellCardClassName } from "@/components/ui/card";
 
+interface MissionPulsePanelProps {
+  title: string;
+  accentColor: string;
+  percentage: number;
+  completedUsers: number;
+  participantCount: number;
+  completedMissions: number;
+  totalMissions: number;
+  icon: LucideIcon;
+}
+
+const MissionPulsePanel = ({
+  title,
+  accentColor,
+  percentage,
+  completedUsers,
+  participantCount,
+  completedMissions,
+  totalMissions,
+  icon: Icon,
+}: MissionPulsePanelProps) => {
+  const hasParticipants = participantCount > 0;
+
+  return (
+    <div
+      className="rounded-2xl border p-3 sm:p-3.5 backdrop-blur-sm"
+      style={{
+        borderColor: `${accentColor}40`,
+        background: `linear-gradient(135deg, ${accentColor}18 0%, transparent 100%)`,
+      }}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-muted-foreground">
+            {title}
+          </p>
+          <div className="mt-2 flex items-end gap-2">
+            <span className="text-2xl font-black leading-none" style={{ color: accentColor }}>
+              {percentage}%
+            </span>
+            <span className="pb-0.5 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+              engaged
+            </span>
+          </div>
+        </div>
+        <div
+          className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border"
+          style={{
+            borderColor: `${accentColor}4d`,
+            backgroundColor: `${accentColor}20`,
+          }}
+        >
+          <Icon className="h-4 w-4" style={{ color: accentColor }} />
+        </div>
+      </div>
+
+      <div className="mt-3 space-y-1.5">
+        <div className="h-1.5 overflow-hidden rounded-full bg-white/8">
+          <div
+            className="h-full rounded-full transition-all duration-500"
+            style={{
+              width: `${Math.max(0, Math.min(percentage, 100))}%`,
+              background: `linear-gradient(90deg, ${accentColor}, ${accentColor}cc)`,
+            }}
+          />
+        </div>
+        <p className="text-xs text-foreground/88">
+          {hasParticipants
+            ? `${completedUsers.toLocaleString()} / ${participantCount.toLocaleString()} adventurers have cleared at least one mission`
+            : "Awaiting the first reports for today's dispatch."}
+        </p>
+        <p className="text-[11px] text-muted-foreground">
+          {completedMissions.toLocaleString()} / {totalMissions.toLocaleString()} missions marked complete
+        </p>
+      </div>
+    </div>
+  );
+};
+
 const DailyMissionsContent = memo(() => {
-  const { 
-    missions, 
+  const {
+    missionDate,
+    missions,
     isLoading,
-    completeMission, 
-    isCompleting, 
-    completedCount, 
-    totalCount, 
+    completeMission,
+    isCompleting,
+    completedCount,
+    totalCount,
     allComplete,
     regenerateMissions,
     isRegenerating,
     generationErrorMessage,
     missionTheme,
   } = useDailyMissions();
-  
-  // Enable auto-completion detection
+  const { profile } = useProfile();
+  const { pulse, isLoading: isPulseLoading } = useDailyMissionPulse({
+    missionDate,
+    enabled: !isLoading && missions.length > 0,
+  });
+
   useMissionAutoComplete();
-  
-  // Use theme from backend if available, fallback to client-side calculation for cached missions
+
   const todaysTheme = missionTheme || getTodaysTheme();
+  const factionData = getFactionById(profile?.faction || pulse?.caller_faction);
+  const DispatchIcon = factionData?.icon || Target;
 
   if (isLoading) {
     return <MissionCardSkeleton />;
@@ -52,31 +149,27 @@ const DailyMissionsContent = memo(() => {
   }
 
   const progress = (completedCount / totalCount) * 100;
-  
-  // Separate base missions and bonus missions
-  const baseMissions = missions.filter(m => !m.is_bonus);
-  const bonusMissions = missions.filter(m => m.is_bonus);
-  
+  const baseMissions = missions.filter((mission) => !mission.is_bonus);
+  const bonusMissions = missions.filter((mission) => mission.is_bonus);
+
   const handleComplete = async (id: string) => {
     haptics.medium();
-    
+
     try {
       await completeMission(id);
-      
-      // Check if this completion makes all missions complete
-      const updatedMissions = missions.map(m => 
-        m.id === id ? { ...m, completed: true } : m
+
+      const updatedMissions = missions.map((mission) =>
+        mission.id === id ? { ...mission, completed: true } : mission,
       );
-      const allWillBeComplete = updatedMissions.every(m => m.completed);
-      
+      const allWillBeComplete = updatedMissions.every((mission) => mission.completed);
+
       if (allWillBeComplete) {
-        // Big celebration for completing all missions
         setTimeout(() => {
           confetti({
             particleCount: 150,
             spread: 120,
             origin: { y: 0.6 },
-            colors: ['#A76CFF', '#C084FC', '#E879F9', '#FFD700', '#FFA500'],
+            colors: ["#A76CFF", "#C084FC", "#E879F9", "#FFD700", "#FFA500"],
             ticks: 400,
             gravity: 0.6,
             scalar: 1.5,
@@ -84,52 +177,54 @@ const DailyMissionsContent = memo(() => {
         }, 500);
       }
     } catch (error) {
-      console.error('Failed to complete mission:', error);
+      console.error("Failed to complete mission:", error);
       haptics.light();
     }
   };
 
   const renderMission = (mission: typeof missions[0]) => {
     const hasProgress = mission.progress_target > 1;
-    const progressPercent = hasProgress 
-      ? (mission.progress_current / mission.progress_target) * 100 
+    const progressPercent = hasProgress
+      ? (mission.progress_current / mission.progress_target) * 100
       : 0;
     const isAutoComplete = mission.auto_complete;
-    
+
     return (
       <div
         key={mission.id}
-        onContextMenu={(e) => e.preventDefault()}
-        className={`flex items-center justify-between p-2.5 sm:p-3 rounded-lg border transition-all select-none ${
+        onContextMenu={(event) => event.preventDefault()}
+        className={cn(
+          "flex items-center justify-between rounded-lg border p-2.5 transition-all select-none sm:p-3",
           mission.completed
-            ? "bg-accent/5 border-accent/20 opacity-60"
-            : "bg-background border-border hover:border-accent/40"
-        } ${mission.is_bonus ? "border-yellow-500/30 bg-gradient-to-r from-yellow-500/5 to-orange-500/5" : ""}`}
+            ? "border-accent/20 bg-accent/5 opacity-60"
+            : "border-border bg-background hover:border-accent/40",
+          mission.is_bonus && "border-yellow-500/30 bg-gradient-to-r from-yellow-500/5 to-orange-500/5",
+        )}
       >
-        <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+        <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
           {mission.completed && (
-            <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-accent flex-shrink-0" />
+            <CheckCircle2 className="h-4 w-4 flex-shrink-0 text-accent sm:h-5 sm:w-5" />
           )}
           <div className="flex-1">
-            <div className="flex items-center gap-2 mb-1 flex-wrap">
-              <p className={`text-sm font-medium ${mission.completed ? "line-through" : ""}`}>
+            <div className="mb-1 flex flex-wrap items-center gap-2">
+              <p className={cn("text-sm font-medium", mission.completed && "line-through")}>
                 {mission.mission_text}
               </p>
               {isAutoComplete && !mission.completed && (
-                <Badge variant="outline" className="text-xs px-1.5 py-0">
-                  <Zap className="h-2.5 w-2.5 mr-1" />
+                <Badge variant="outline" className="px-1.5 py-0 text-xs">
+                  <Zap className="mr-1 h-2.5 w-2.5" />
                   Auto
                 </Badge>
               )}
               {mission.is_bonus && (
-                <Badge variant="gold" className="text-xs px-1.5 py-0">
-                  <Sparkles className="h-2.5 w-2.5 mr-1" />
+                <Badge variant="gold" className="px-1.5 py-0 text-xs">
+                  <Sparkles className="mr-1 h-2.5 w-2.5" />
                   Bonus
                 </Badge>
               )}
-              {mission.difficulty === 'hard' && !mission.completed && (
-                <Badge variant="outline" className="text-xs px-1.5 py-0 border-red-500/50 text-red-600">
-                  <TrendingUp className="h-2.5 w-2.5 mr-1" />
+              {mission.difficulty === "hard" && !mission.completed && (
+                <Badge variant="outline" className="border-red-500/50 px-1.5 py-0 text-xs text-red-600">
+                  <TrendingUp className="mr-1 h-2.5 w-2.5" />
                   Hard
                 </Badge>
               )}
@@ -143,18 +238,18 @@ const DailyMissionsContent = memo(() => {
               )}
             </div>
             {hasProgress && !mission.completed && (
-              <Progress value={progressPercent} className="h-1 mt-1.5" />
+              <Progress value={progressPercent} className="mt-1.5 h-1" />
             )}
           </div>
         </div>
-        
+
         {!mission.completed && !isAutoComplete && (
           <Button
             size="sm"
             variant="outline"
             onClick={() => handleComplete(mission.id)}
             disabled={isCompleting}
-            className="transition-transform hover:scale-105 active:scale-95 hover:bg-accent/10 hover:border-accent/60 min-w-[90px]"
+            className="min-w-[90px] transition-transform hover:scale-105 hover:border-accent/60 hover:bg-accent/10 active:scale-95"
           >
             {isCompleting ? (
               <div className="h-3 w-3 animate-spin rounded-full border-2 border-accent border-t-transparent" />
@@ -170,46 +265,108 @@ const DailyMissionsContent = memo(() => {
   return (
     <Card
       className={cn(
-        "p-4 sm:p-5 md:p-6 border-accent/16 hover:border-accent/28 transition-all duration-500 hover:shadow-[0_0_32px_hsl(var(--accent)/0.12)] relative overflow-hidden group",
+        "group relative overflow-hidden border-accent/16 p-4 transition-all duration-500 hover:border-accent/28 hover:shadow-[0_0_32px_hsl(var(--accent)/0.12)] sm:p-5 md:p-6",
         outerShellCardClassName,
       )}
     >
-      <div className="absolute inset-0 bg-gradient-to-br from-accent/8 to-primary/8 pointer-events-none" />
-      <div className="relative space-y-3 sm:space-y-4 z-10">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-full bg-accent/20 flex items-center justify-center flex-shrink-0">
-              <Target className="h-4 w-4 sm:h-5 sm:w-5 text-accent" />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-accent/8 to-primary/8" />
+      {factionData && (
+        <div
+          className="pointer-events-none absolute -right-12 top-[-56px] h-44 w-44 rounded-full blur-3xl"
+          style={{ backgroundColor: `${factionData.color}33` }}
+        />
+      )}
+
+      <div className="relative z-10 space-y-3 sm:space-y-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+            <div
+              className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border sm:h-10 sm:w-10"
+              style={
+                factionData
+                  ? {
+                      borderColor: `${factionData.color}4d`,
+                      backgroundColor: `${factionData.color}1f`,
+                    }
+                  : undefined
+              }
+            >
+              <DispatchIcon
+                className="h-4 w-4 text-accent sm:h-5 sm:w-5"
+                style={factionData ? { color: factionData.color } : undefined}
+              />
             </div>
-            <div>
+            <div className="min-w-0">
+              {factionData && (
+                <p
+                  className="truncate text-[10px] font-semibold uppercase tracking-[0.26em]"
+                  style={{ color: factionData.color }}
+                >
+                  {factionData.name} Dispatch
+                </p>
+              )}
               <div className="flex items-center gap-1">
-                <h3 className="font-heading font-black text-base sm:text-lg">Daily Missions</h3>
+                <h3 className="font-heading text-base font-black sm:text-lg">
+                  {factionData ? "Guild Missions" : "Daily Missions"}
+                </h3>
               </div>
-              {/* Theme Day Badge */}
-              <div className="flex items-center gap-1.5 mt-0.5">
+              <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
                 <span className="text-sm">{todaysTheme.emoji}</span>
-                <span className="text-xs text-muted-foreground font-medium">{todaysTheme.name}</span>
+                <span className="text-xs font-medium text-muted-foreground">{todaysTheme.name}</span>
+                {factionData && (
+                  <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                    • {factionData.subtitle}
+                  </span>
+                )}
               </div>
             </div>
-            <p className="text-[10px] sm:text-xs text-muted-foreground ml-auto">
+          </div>
+
+          <div className="text-right">
+            <p className="text-[10px] text-muted-foreground sm:text-xs">
               {completedCount}/{totalCount} complete
             </p>
+            {allComplete && (
+              <div className="text-[10px] font-bold text-stardust-gold animate-pulse sm:text-xs">
+                Dispatch complete
+              </div>
+            )}
           </div>
-          {allComplete && (
-            <div className="text-[10px] sm:text-xs font-bold text-stardust-gold animate-pulse">
-              All Done! 🎉
-            </div>
-          )}
         </div>
 
         <Progress value={progress} className="h-2" />
 
-        {/* Base Missions */}
+        {!isPulseLoading && pulse && (
+          <div className={cn("grid gap-2.5", factionData ? "md:grid-cols-2" : "grid-cols-1")}>
+            {factionData && (
+              <MissionPulsePanel
+                title={factionData.name}
+                accentColor={factionData.color}
+                percentage={pulse.faction_completion_percentage}
+                completedUsers={pulse.faction_completed_users}
+                participantCount={pulse.faction_participants}
+                completedMissions={pulse.faction_missions_completed}
+                totalMissions={pulse.faction_missions_total}
+                icon={Radar}
+              />
+            )}
+            <MissionPulsePanel
+              title="Global Network"
+              accentColor={factionData?.color || "#A76CFF"}
+              percentage={pulse.global_completion_percentage}
+              completedUsers={pulse.global_completed_users}
+              participantCount={pulse.global_participants}
+              completedMissions={pulse.global_missions_completed}
+              totalMissions={pulse.global_missions_total}
+              icon={Globe2}
+            />
+          </div>
+        )}
+
         <div className="space-y-2">
           {baseMissions.map(renderMission)}
         </div>
-        
-        {/* Bonus Missions Section */}
+
         {bonusMissions.length > 0 && (
           <div className="space-y-2">
             <div className="flex items-center gap-2 pt-2">
@@ -224,7 +381,7 @@ const DailyMissionsContent = memo(() => {
   );
 });
 
-DailyMissionsContent.displayName = 'DailyMissionsContent';
+DailyMissionsContent.displayName = "DailyMissionsContent";
 
 export const DailyMissions = memo(() => (
   <ErrorBoundary fallback={<MissionErrorFallback />}>
@@ -232,4 +389,4 @@ export const DailyMissions = memo(() => (
   </ErrorBoundary>
 ));
 
-DailyMissions.displayName = 'DailyMissions';
+DailyMissions.displayName = "DailyMissions";

@@ -26,14 +26,12 @@ import { HabitDifficultySelector } from "@/components/HabitDifficultySelector";
 import { AdvancedQuestOptions } from "@/components/AdvancedQuestOptions";
 import { NaturalLanguageEditor } from "@/features/quests/components/NaturalLanguageEditor";
 import { FrequencyPresets } from "@/components/Pathfinder/FrequencyPresets";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
-import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils";
 import { DurationPickerField, TimePickerField, getNextTimeForStep } from "@/components/scheduling";
 import type { ParsedTask } from "@/features/tasks/hooks";
 import { inferCustomPeriod } from "@/utils/habitSchedule";
+import { useRitualUpdate } from "@/hooks/useRitualUpdate";
 
 type HabitCategory = 'mind' | 'body' | 'soul';
 type Difficulty = 'easy' | 'medium' | 'hard';
@@ -61,6 +59,8 @@ export interface RitualData {
   // Task-specific fields (for instance)
   recurrence_pattern?: string | null;
   recurrence_days?: number[] | null;
+  recurrence_month_days?: number[] | null;
+  recurrence_custom_period?: "week" | "month" | null;
   reminder_enabled?: boolean | null;
   reminder_minutes_before?: number | null;
 }
@@ -88,8 +88,7 @@ export const EditRitualSheet = memo(function EditRitualSheet({
   onDelete,
   isDeleting,
 }: EditRitualSheetProps) {
-  const { user } = useAuth();
-  const queryClient = useQueryClient();
+  const { saveRitual } = useRitualUpdate();
   
   // Form state
   const [title, setTitle] = useState("");
@@ -121,12 +120,15 @@ export const EditRitualSheet = memo(function EditRitualSheet({
       setCategory((ritual.category as HabitCategory) || "soul");
       setRecurrencePattern(ritual.recurrence_pattern || null);
       setRecurrenceDays(ritual.recurrence_days || ritual.custom_days || []);
-      setRecurrenceMonthDays(ritual.custom_month_days || []);
-      setCustomPeriod(inferCustomPeriod({
-        frequency: ritual.frequency,
-        custom_days: ritual.custom_days,
-        custom_month_days: ritual.custom_month_days,
-      }));
+      setRecurrenceMonthDays(ritual.recurrence_month_days || ritual.custom_month_days || []);
+      setCustomPeriod(
+        ritual.recurrence_custom_period
+          || inferCustomPeriod({
+            frequency: ritual.frequency,
+            custom_days: ritual.custom_days,
+            custom_month_days: ritual.custom_month_days,
+          }),
+      );
       setReminderEnabled(ritual.reminder_enabled || false);
       setReminderMinutesBefore(ritual.reminder_minutes_before || 15);
       // Auto-expand advanced if any advanced fields are set
@@ -179,70 +181,34 @@ export const EditRitualSheet = memo(function EditRitualSheet({
   };
 
   const handleSave = async () => {
-    if (!ritual || !user?.id || !title.trim()) return;
+    if (!ritual || !title.trim()) return;
     
     setSaving(true);
     try {
-      // Prepare updates for both tables
-      const habitUpdates = {
-        title: title.trim(),
-        description: description.trim() || null,
+      const result = await saveRitual({
+        habitId: ritual.habitId,
+        title,
+        description,
         frequency,
-        estimated_minutes: estimatedMinutes,
+        estimatedMinutes,
         difficulty,
-        preferred_time: preferredTime || null,
+        preferredTime: preferredTime || null,
         category,
-        custom_days: recurrenceDays.length > 0 ? recurrenceDays : null,
-        custom_month_days: recurrenceMonthDays.length > 0 ? recurrenceMonthDays : null,
-      };
+        customDays: recurrenceDays,
+        customMonthDays: recurrenceMonthDays,
+        customPeriod,
+        reminderEnabled,
+        reminderMinutesBefore,
+      });
 
-      const taskUpdates = {
-        task_text: title.trim(),
-        difficulty,
-        scheduled_time: preferredTime || null,
-        estimated_duration: estimatedMinutes,
-        category,
-        recurrence_pattern: recurrencePattern,
-        recurrence_days: recurrenceDays,
-        reminder_enabled: reminderEnabled,
-        reminder_minutes_before: reminderMinutesBefore,
-      };
-
-      // 1. Update the habit template (source of truth)
-      const { error: habitError } = await supabase
-        .from('habits')
-        .update(habitUpdates)
-        .eq('id', ritual.habitId)
-        .eq('user_id', user.id);
-
-      if (habitError) {
-        console.error('Error updating habit:', habitError);
-        toast.error('Failed to update ritual template');
-        return;
-      }
-
-      // 2. Update ALL daily_tasks that are linked to this habit
-      const { error: tasksError } = await supabase
-        .from('daily_tasks')
-        .update(taskUpdates)
-        .eq('habit_source_id', ritual.habitId)
-        .eq('user_id', user.id)
-        .eq('completed', false); // Only update non-completed tasks
-
-      if (tasksError) {
-        console.error('Error updating linked tasks:', tasksError);
-        // Don't fail completely - habit was updated
-        toast.warning('Ritual updated, but some task instances may not have synced');
-      } else {
-        toast.success('Ritual updated everywhere!');
-      }
-
-      // Invalidate queries to refresh data across all views
-      queryClient.invalidateQueries({ queryKey: ['habits'] });
-      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
-      queryClient.invalidateQueries({ queryKey: ['epics'] });
-      queryClient.invalidateQueries({ queryKey: ['habit-surfacing'] });
-      queryClient.invalidateQueries({ queryKey: ['epic-progress'] });
+      const scheduleChangeCount = result.createdCount + result.updatedCount + result.deletedCount;
+      toast.success(result.queued ? "Ritual saved offline" : "Ritual updated", {
+        description: result.queued
+          ? "Your schedule changes will sync when you're back online."
+          : scheduleChangeCount > 0
+            ? `Updated ${scheduleChangeCount} upcoming ritual ${scheduleChangeCount === 1 ? "instance" : "instances"}.`
+            : "Your ritual details are up to date.",
+      });
 
       onSaveComplete?.();
       onOpenChange(false);

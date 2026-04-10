@@ -9,6 +9,8 @@ import {
   pickBestEligibleWallpaperCandidateForDate,
   pickBestWallpaperPromotionCandidate,
   pickLatestEligibleWallpaperCandidate,
+  wallpaperGenerationSpecs,
+  wallpaperPromptRecipes,
 } from "@/shared/wallpaperCatalog";
 
 describe("wallpaper date resolution", () => {
@@ -38,6 +40,44 @@ describe("deterministic wallpaper recipes", () => {
 
       expect(new Set(recipeKeys).size).toBe(recipeKeys.length);
     }
+  });
+
+  it("samples multiple scene families in a 3-candidate batch for every page", () => {
+    const horizonDates = getWallpaperHorizonDates("2026-04-08");
+
+    for (const pageKey of WALLPAPER_PAGE_KEYS) {
+      for (const dateKey of horizonDates) {
+        const sceneTitles = getDeterministicWallpaperRecipes(pageKey, dateKey, 3)
+          .map((recipe) => recipe.title.split(" / ")[0]);
+
+        expect(new Set(sceneTitles).size).toBe(3);
+      }
+    }
+  });
+
+  it("bakes the scenic diversity guidance into every page-level prompt", () => {
+    for (const pageKey of WALLPAPER_PAGE_KEYS) {
+      const prompt = wallpaperGenerationSpecs[pageKey].prompt;
+
+      expect(prompt).toContain("Favor broad scenic variety");
+      expect(prompt).toContain("Do not default to mountain ridges");
+      expect(prompt).toContain("occasional elegant city-night environments");
+    }
+  });
+
+  it("covers both broad ecosystems and occasional built-environment scenes", () => {
+    const recipes = Object.values(wallpaperPromptRecipes);
+    const titles = recipes.map((recipe) => recipe.title.toLowerCase());
+
+    expect(titles.some((title) => title.includes("forest"))).toBe(true);
+    expect(titles.some((title) => title.includes("desert"))).toBe(true);
+    expect(titles.some((title) => title.includes("tundra") || title.includes("snow"))).toBe(true);
+    expect(titles.some((title) => title.includes("wetland") || title.includes("lagoon"))).toBe(true);
+    expect(titles.some((title) => title.includes("grassland") || title.includes("steppe"))).toBe(true);
+    expect(titles.some((title) => title.includes("volcanic"))).toBe(true);
+    expect(titles.some((title) => title.includes("coastal") || title.includes("ocean"))).toBe(true);
+    expect(titles.some((title) => title.includes("rooftop") || title.includes("skyline"))).toBe(true);
+    expect(titles.some((title) => title.includes("courtyard") || title.includes("observatory"))).toBe(true);
   });
 });
 

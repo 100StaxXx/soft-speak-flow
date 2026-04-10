@@ -192,6 +192,13 @@ type LocalEpicPayload = {
   milestones: Array<{ id: string; epic_id: string; user_id: string; title: string; description: string | null; target_date: string; milestone_percent: number; is_postcard_milestone: boolean; phase_order: number; phase_name: string | null }>;
 };
 
+type LocalTaskEpicTitleRow = {
+  id: string;
+  user_id: string;
+  epic_id: string | null;
+  epic_title?: string | null;
+};
+
 async function applyLocalEpicPayload(payload: LocalEpicPayload) {
   await upsertPlannerRecords("habits", payload.habits);
   await upsertPlannerRecord("epics", payload.epic);
@@ -259,6 +266,35 @@ async function applyLocalEpicStatusChange(userId: string, epicId: string, status
   }
 }
 
+async function applyLocalEpicRename(userId: string, epicId: string, title: string) {
+  const localEpics = await loadLocalEpics(userId);
+  const epic = localEpics.find((candidate) => candidate.id === epicId);
+  if (!epic) {
+    throw new Error("Epic not found");
+  }
+
+  const nextEpic: LocalEpicRow = {
+    ...epic,
+    title,
+  };
+
+  await upsertPlannerRecord("epics", nextEpic);
+
+  const localTasks = await getAllLocalTasksForUser<LocalTaskEpicTitleRow>(userId);
+  const tasksToUpdate = localTasks
+    .filter((task) => task.epic_id === epicId && task.epic_title !== title)
+    .map((task) => ({
+      ...task,
+      epic_title: title,
+    }));
+
+  if (tasksToUpdate.length > 0) {
+    await upsertPlannerRecords("daily_tasks", tasksToUpdate);
+  }
+
+  return nextEpic;
+}
+
 async function applyRemoteEpicStatusChange(userId: string, epicId: string, status: "completed" | "abandoned") {
   const { error } = await supabase
     .from("epics")
@@ -317,6 +353,16 @@ async function applyRemoteEpicStatusChange(userId: string, epicId: string, statu
     .eq("epic_id", epicId)
     .eq("user_id", userId);
   if (milestonesError) throw milestonesError;
+}
+
+async function applyRemoteEpicRename(userId: string, epicId: string, title: string) {
+  const { error } = await supabase
+    .from("epics")
+    .update({ title })
+    .eq("id", epicId)
+    .eq("user_id", userId);
+
+  if (error) throw error;
 }
 
 export const useEpics = (options: EpicsOptions = {}) => {
@@ -705,6 +751,102 @@ export const useEpics = (options: EpicsOptions = {}) => {
     },
   });
 
+  const renameEpic = useMutation({
+    mutationFn: async ({
+      epicId,
+      title,
+    }: {
+      epicId: string;
+      title: string;
+    }) => {
+      if (!user?.id) {
+        throw new Error("User not authenticated");
+      }
+
+      const trimmedTitle = title.trim();
+      if (!trimmedTitle) {
+        throw new Error("Campaign title cannot be empty");
+      }
+
+      const epic = epics.find((candidate) => candidate.id === epicId);
+      if (!epic) {
+        throw new Error("Epic not found or you don't have permission");
+      }
+
+      if (epic.status !== "active") {
+        throw new Error("Only active campaigns can be renamed");
+      }
+
+      if (epic.title === trimmedTitle) {
+        return { epic, title: trimmedTitle, queued: false };
+      }
+
+      const nextEpic = await applyLocalEpicRename(user.id, epicId, trimmedTitle);
+
+      queryClient.setQueryData<EpicRecord[] | undefined>(["epics", user.id], (previous) =>
+        previous?.map((candidate) =>
+          candidate.id === epicId
+            ? {
+                ...candidate,
+                title: trimmedTitle,
+              }
+            : candidate,
+        ) ?? previous,
+      );
+
+      if (shouldQueueWrites) {
+        await queueAction({
+          actionKind: "EPIC_UPDATE",
+          entityType: "epic",
+          entityId: epicId,
+          payload: {
+            epicId,
+            updates: {
+              title: trimmedTitle,
+            },
+          },
+        });
+        return { epic: nextEpic, title: trimmedTitle, queued: true };
+      }
+
+      try {
+        await applyRemoteEpicRename(user.id, epicId, trimmedTitle);
+      } catch (error) {
+        await queueAction({
+          actionKind: "EPIC_UPDATE",
+          entityType: "epic",
+          entityId: epicId,
+          payload: {
+            epicId,
+            updates: {
+              title: trimmedTitle,
+            },
+          },
+        });
+        void retryNow();
+        return { epic: nextEpic, title: trimmedTitle, queued: true };
+      }
+
+      return { epic: nextEpic, title: trimmedTitle, queued: false };
+    },
+    onSuccess: ({ queued, title }) => {
+      queryClient.invalidateQueries({ queryKey: ["epics"] });
+      queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["habit-surfacing"] });
+      queryClient.invalidateQueries({ queryKey: ["user-ai-context"] });
+
+      toast.success(queued ? "Campaign rename saved offline" : "Campaign renamed", {
+        description: queued
+          ? "Your new campaign title will sync when you're back online."
+          : `Now titled "${title}".`,
+      });
+    },
+    onError: (error) => {
+      console.error("Failed to rename epic:", error);
+      toast.error("Failed to rename campaign");
+    },
+  });
+
   const addHabitToEpic = useMutation({
     mutationFn: async ({
       epicId,
@@ -800,6 +942,7 @@ export const useEpics = (options: EpicsOptions = {}) => {
     createEpic: createEpic.mutateAsync,
     isCreating: createEpic.isPending,
     isCreateSuccess: createEpic.isSuccess,
+    renameEpic: renameEpic.mutateAsync,
     updateEpicStatus: updateEpicStatus.mutate,
     addHabitToEpic: addHabitToEpic.mutate,
     removeHabitFromEpic: removeHabitFromEpic.mutate,

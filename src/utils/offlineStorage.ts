@@ -26,6 +26,7 @@ export type QueueActionKind =
   | "HABIT_DELETE"
   | "HABIT_COMPLETION_SET"
   | "EPIC_CREATE"
+  | "EPIC_UPDATE"
   | "EPIC_STATUS_UPDATE"
   | "MENTOR_FEEDBACK"
   | "SUPPORT_REPORT";
@@ -105,6 +106,7 @@ const toQueueActionKind = (value: unknown): QueueActionKind | null => {
     || value === "HABIT_DELETE"
     || value === "HABIT_COMPLETION_SET"
     || value === "EPIC_CREATE"
+    || value === "EPIC_UPDATE"
     || value === "EPIC_STATUS_UPDATE"
     || value === "MENTOR_FEEDBACK"
     || value === "SUPPORT_REPORT"
@@ -171,6 +173,7 @@ const defaultEntityTypeForAction = (actionKind: QueueActionKind): QueueEntityTyp
     case "HABIT_COMPLETION_SET":
       return "habit_completion";
     case "EPIC_CREATE":
+    case "EPIC_UPDATE":
     case "EPIC_STATUS_UPDATE":
       return "epic";
     case "MENTOR_FEEDBACK":

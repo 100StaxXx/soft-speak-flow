@@ -8339,6 +8339,23 @@ export type Database = {
       cleanup_old_audit_logs: { Args: never; Returns: undefined }
       cleanup_old_influencer_logs: { Args: never; Returns: undefined }
       count_user_epics: { Args: { p_user_id: string }; Returns: number }
+      get_daily_mission_pulse: {
+        Args: { p_mission_date: string }
+        Returns: {
+          caller_faction: string | null
+          faction_completed_users: number
+          faction_completion_percentage: number
+          faction_missions_completed: number
+          faction_missions_total: number
+          faction_participants: number
+          global_completed_users: number
+          global_completion_percentage: number
+          global_missions_completed: number
+          global_missions_total: number
+          global_participants: number
+          mission_date: string
+        }[]
+      }
       create_companion_if_not_exists: {
         Args: {
           p_core_element: string

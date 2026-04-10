@@ -2,7 +2,7 @@ export const WALLPAPER_CATALOG_TIMEZONE = "America/Los_Angeles" as const;
 export const WALLPAPER_RESET_HOUR = 2 as const;
 export const WALLPAPER_HORIZON_DAYS = 4 as const;
 export const WALLPAPER_DEFAULT_CANDIDATE_COUNT = 3 as const;
-export const WALLPAPER_PROMPT_VERSION = 4 as const;
+export const WALLPAPER_PROMPT_VERSION = 5 as const;
 export const WALLPAPER_IMAGE_SIZE = "1024x1536" as const;
 export const WALLPAPER_IMAGE_WIDTH = 1024 as const;
 export const WALLPAPER_IMAGE_HEIGHT = 1536 as const;
@@ -114,11 +114,11 @@ const wallpaperPageLabels: Record<WallpaperPageKey, string> = {
 };
 
 const wallpaperPageDescriptions: Record<WallpaperPageKey, string> = {
-  guide: "Calm cinematic observatory backdrop for daily guidance, briefings, and reflective support.",
-  quests: "Forward-motion planning landscape with a clear route and a sense of possibility.",
-  campaigns: "Large-scale strategic vista for long-range momentum, ambition, and ritual building.",
-  companion: "Peaceful sanctuary backdrop that stays supportive while leaving the companion card as the hero.",
-  profile: "Quiet premium observatory or twilight landscape for settings and account surfaces.",
+  guide: "Calm cinematic observatory, rooftop, terrace, or reflective scenic backdrop for daily guidance and briefings.",
+  quests: "Forward-motion scenery with a clear route and a sense of possibility across natural or quiet urban environments.",
+  campaigns: "Large-scale strategic vista or monumental overlook for long-range momentum, ambition, and ritual building.",
+  companion: "Peaceful sanctuary backdrop across natural or refined built environments that leaves the companion card as the hero.",
+  profile: "Quiet premium observatory, skyline terrace, courtyard, or restrained scenic backdrop for settings and account surfaces.",
 };
 
 const WALLPAPER_SHARED_FIDELITY_CLAUSE = [
@@ -133,10 +133,16 @@ const WALLPAPER_SHARED_PALETTE_CLAUSE = [
   "Do not let purple or pink dominate the sky, fog, water, terrain, or the overall image mood.",
 ].join(" ");
 
+const WALLPAPER_SHARED_DIVERSITY_CLAUSE = [
+  "Favor broad scenic variety across forests, deserts, tundras, wetlands, grasslands, volcanic terrain, coastlines, courtyards, rooftops, observatories, and occasional elegant city-night environments.",
+  "Do not default to mountain ridges, river valleys, cliff walls, or alpine scenes unless the selected scene prompt specifically calls for them.",
+  "Urban or architectural scenery is allowed only when it remains calm, premium, spacious, and free of crowds, traffic, signage, or ad-like neon noise.",
+].join(" ");
+
 const WALLPAPER_SHARED_NEGATIVE_CLAUSE = [
   "No text, no letters, no numbers, no logos, no readable symbols, no watermarks.",
   "No app UI, no browser chrome, no forms, no buttons, no device frames, no mockup overlays.",
-  "Avoid abstract nebula mush, soft purple haze, tunnel effects, portal gimmicks, or promo-art composition.",
+  "Avoid abstract nebula mush, soft purple haze, tunnel effects, portal gimmicks, promo-art composition, or crowded city chaos.",
 ].join(" ");
 
 const WALLPAPER_SHARED_SAFE_ZONE_CLAUSE = [
@@ -156,6 +162,7 @@ const buildWallpaperPrompt = (
   emphasisPrompt,
   atmospherePrompt,
   WALLPAPER_SHARED_FIDELITY_CLAUSE,
+  WALLPAPER_SHARED_DIVERSITY_CLAUSE,
   WALLPAPER_SHARED_PALETTE_CLAUSE,
   WALLPAPER_SHARED_SAFE_ZONE_CLAUSE,
   WALLPAPER_SHARED_NEGATIVE_CLAUSE,
@@ -167,7 +174,7 @@ export const wallpaperGenerationSpecs: Record<WallpaperPageKey, WallpaperGenerat
     pageDescription: wallpaperPageDescriptions.guide,
     prompt: buildWallpaperPrompt(
       "guide",
-      "Show a calm observatory, contemplative overlook, moonlit terrace, or serene horizon with subtle celestial detail and elegant atmospheric depth.",
+      "Show a calm observatory, moonlit terrace, rooftop study, forest lookout, coastal platform, desert telescope site, or serene city-night retreat with subtle celestial detail and elegant atmospheric depth.",
       "Prioritize wisdom, steadiness, and readability for guidance cards. The image should feel premium and supportive, never loud or distracting.",
     ),
     mobileFocus: { x: 50, y: 30 },
@@ -178,7 +185,7 @@ export const wallpaperGenerationSpecs: Record<WallpaperPageKey, WallpaperGenerat
     pageDescription: wallpaperPageDescriptions.quests,
     prompt: buildWallpaperPrompt(
       "quests",
-      "Show a gorgeous path, trail, pass, shoreline route, canyon switchback, or other clearly readable way forward through a vast landscape. The image should spark planning energy and motion.",
+      "Show a gorgeous path, trail, boardwalk, stairway, elevated walkway, shoreline road, dune route, or other clearly readable way forward through varied scenery. The image should spark planning energy and motion.",
       "Prioritize route clarity, beauty, depth, and a sense of personal momentum over spectacle or fantasy noise.",
     ),
     mobileFocus: { x: 56, y: 56 },
@@ -189,7 +196,7 @@ export const wallpaperGenerationSpecs: Record<WallpaperPageKey, WallpaperGenerat
     pageDescription: wallpaperPageDescriptions.campaigns,
     prompt: buildWallpaperPrompt(
       "campaigns",
-      "Show a majestic large-scale landscape with cliffs, ranges, coastlines, canyons, glaciers, or alien horizons that feel built for long-range ambition and expedition planning.",
+      "Show a majestic large-scale vista such as a desert basin, tundra shelf, forest canopy overlook, delta coast, volcanic plateau, port city horizon, or monumental civic terrace built for long-range ambition and strategic planning.",
       "The image should feel enormous, strategic, and high-definition, with commanding scenic depth rather than dreamy haze.",
     ),
     mobileFocus: { x: 46, y: 42 },
@@ -200,7 +207,7 @@ export const wallpaperGenerationSpecs: Record<WallpaperPageKey, WallpaperGenerat
     pageDescription: wallpaperPageDescriptions.companion,
     prompt: buildWallpaperPrompt(
       "companion",
-      "Show a serene celestial sanctuary or nature-meets-space refuge with a peaceful center, soft atmosphere, and gentle luminous beauty.",
+      "Show a serene sanctuary such as a glade, lagoon, meadow, courtyard, rooftop garden, oasis, wetland refuge, or snow field with a peaceful center, soft atmosphere, and gentle luminous beauty.",
       "Keep the center especially calm and uncluttered so the companion card remains the visual hero. Avoid bright competing subjects behind the card area.",
     ),
     mobileFocus: { x: 50, y: 26 },
@@ -211,7 +218,7 @@ export const wallpaperGenerationSpecs: Record<WallpaperPageKey, WallpaperGenerat
     pageDescription: wallpaperPageDescriptions.profile,
     prompt: buildWallpaperPrompt(
       "profile",
-      "Show a refined twilight observatory, coastal overlook, snowy horizon, or restrained cosmic landscape with quiet premium atmosphere.",
+      "Show a refined coastal observatory, rooftop skyline terrace, forest retreat, elegant courtyard, snowy horizon, or restrained waterside overlook with quiet premium atmosphere.",
       "Keep the image elegant, subtle, and uncluttered rather than dramatic or loud.",
     ),
     mobileFocus: { x: 50, y: 34 },
@@ -236,7 +243,7 @@ const createPromptRecipeFamily = (
   scenes: readonly RecipeSceneDescriptor[],
   atmospheres: readonly RecipeAtmosphereDescriptor[],
   emphasisPrompt: string,
-) => scenes.flatMap((scene) => atmospheres.map((atmosphere) => ({
+) => atmospheres.flatMap((atmosphere) => scenes.map((scene) => ({
   key: `${pageKey}-${scene.key}-${atmosphere.key}`,
   pageKey,
   title: `${scene.title} / ${atmosphere.title}`,
@@ -255,12 +262,12 @@ const wallpaperRecipeFamilies = {
       {
         key: "aurora-observatory",
         title: "Aurora Observatory",
-        scenePrompt: "Show a refined hilltop observatory or moonlit study terrace with subtle aurora color and a tranquil celestial sky.",
+        scenePrompt: "Show a refined observatory or moonlit study terrace with subtle aurora color, elegant architecture, and a tranquil celestial sky.",
       },
       {
         key: "stone-library-overlook",
         title: "Stone Library Overlook",
-        scenePrompt: "Show an elevated stone library overlook above a quiet valley, with lantern architecture, distant stars, and a serene horizon.",
+        scenePrompt: "Show an elevated stone library overlook or lantern-lit terrace above a quiet valley or marsh with distant stars and a serene horizon.",
       },
       {
         key: "moon-tide-balcony",
@@ -270,7 +277,17 @@ const wallpaperRecipeFamilies = {
       {
         key: "high-desert-telescope",
         title: "High Desert Telescope",
-        scenePrompt: "Show a high-desert telescope ridge with clean night air, sculpted rock, and a steady celestial canopy that feels grounding rather than flashy.",
+        scenePrompt: "Show a high-desert telescope terrace with clean night air, sculpted rock, and a steady celestial canopy that feels grounding rather than flashy.",
+      },
+      {
+        key: "forest-observatory",
+        title: "Forest Observatory",
+        scenePrompt: "Show a quiet forest observatory or cedar lookout deck nestled among tall trees, cool mist, and precise starlight with a thoughtful premium mood.",
+      },
+      {
+        key: "rooftop-study",
+        title: "Rooftop Study",
+        scenePrompt: "Show a serene rooftop study or skyline terrace above a calm city at night with clean lines, sparse lantern warmth, and generous open sky.",
       },
     ],
     [
@@ -311,14 +328,29 @@ const wallpaperRecipeFamilies = {
         scenePrompt: "Show a towering redwood or old-growth forest path with clear forward direction through mist, moss, and filtered light.",
       },
       {
-        key: "ringed-pass",
-        title: "Ringed Pass",
-        scenePrompt: "Show an icy or tundra route threading through a mountain pass with subtle alien wonder and a visible trail line.",
+        key: "tundra-route",
+        title: "Tundra Route",
+        scenePrompt: "Show an icy or tundra route crossing open cold terrain with subtle alien wonder, crisp footing, and a clearly visible trail line.",
+      },
+      {
+        key: "grassland-track",
+        title: "Grassland Track",
+        scenePrompt: "Show a long grassland or steppe track through wind-shaped fields and rolling open country with unmistakable forward direction.",
+      },
+      {
+        key: "wetland-boardwalk",
+        title: "Wetland Boardwalk",
+        scenePrompt: "Show a premium wetland boardwalk or marsh path through reeds, still water, and soft morning haze with a clean readable route.",
       },
       {
         key: "coastal-switchbacks",
         title: "Coastal Switchbacks",
         scenePrompt: "Show dramatic coastal switchbacks above a deep blue sea with a long route drawing the eye upward and forward.",
+      },
+      {
+        key: "city-ascent",
+        title: "City Ascent",
+        scenePrompt: "Show an elegant urban stairway, elevated walkway, or rooftop path rising through a calm cityscape with strong route clarity and zero crowd noise.",
       },
     ],
     [
@@ -359,14 +391,34 @@ const wallpaperRecipeFamilies = {
         scenePrompt: "Show a sunlit canyon expanse with giant layered rock walls, open desert air, and a dramatic overlook built for long-range planning.",
       },
       {
-        key: "glacial-range",
-        title: "Glacial Range",
-        scenePrompt: "Show a glacial mountain range with teal ice, dark stone, reflective water, and a cold clean sky with expedition-scale grandeur.",
+        key: "glacial-shelf",
+        title: "Glacial Shelf",
+        scenePrompt: "Show a glacial shelf or tundra ice field with teal ice, dark stone, reflective water, and a cold clean sky with expedition-scale grandeur.",
       },
       {
         key: "volcanic-archipelago",
         title: "Volcanic Archipelago",
         scenePrompt: "Show a volcanic archipelago or basalt highlands with sweeping landforms, enormous scale, and clear strategic depth.",
+      },
+      {
+        key: "forest-basin",
+        title: "Forest Basin",
+        scenePrompt: "Show a giant forest basin or canopy overlook with layered green depth, distant ridgeless horizons, and immense strategic scale.",
+      },
+      {
+        key: "steppe-frontier",
+        title: "Steppe Frontier",
+        scenePrompt: "Show a vast steppe frontier with open land, huge sky, subtle fortification cues, and commanding long-range visibility.",
+      },
+      {
+        key: "delta-coast",
+        title: "Delta Coast",
+        scenePrompt: "Show a monumental delta coast or estuary vista with braided waterways, marsh islands, port-like scale, and immense strategic depth.",
+      },
+      {
+        key: "skyline-overlook",
+        title: "Skyline Overlook",
+        scenePrompt: "Show a strategic skyline overlook or monumental civic terrace above a calm city with premium architecture, enormous scale, and disciplined visual order.",
       },
     ],
     [
@@ -409,12 +461,32 @@ const wallpaperRecipeFamilies = {
       {
         key: "garden-temple",
         title: "Garden Temple",
-        scenePrompt: "Show a hidden celestial garden temple or quiet ruin wrapped in nature, stillness, and soft open space through the center.",
+        scenePrompt: "Show a hidden celestial garden temple or quiet ruin garden wrapped in nature, stillness, and soft open space through the center.",
+      },
+      {
+        key: "meadow-refuge",
+        title: "Meadow Refuge",
+        scenePrompt: "Show a moonlit meadow refuge with soft grasses, calm shelter cues, and a peaceful central field that feels safe and luminous.",
+      },
+      {
+        key: "desert-oasis",
+        title: "Desert Oasis",
+        scenePrompt: "Show a serene desert oasis with still water, elegant palms, warm stone, and quiet celestial air while keeping the center uncluttered.",
+      },
+      {
+        key: "rooftop-garden",
+        title: "Rooftop Garden",
+        scenePrompt: "Show a rooftop garden sanctuary above a calm twilight skyline with restrained lights, soft greenery, and a gentle open center.",
       },
       {
         key: "snow-meadow",
         title: "Snow Meadow",
         scenePrompt: "Show a snow meadow refuge under a luminous night sky with calm terrain, subtle shelter cues, and a peaceful central field.",
+      },
+      {
+        key: "wetland-sanctuary",
+        title: "Wetland Sanctuary",
+        scenePrompt: "Show a quiet wetland sanctuary with reeds, reflective water, subtle boardwalk hints, and a calm open center under a soft celestial sky.",
       },
     ],
     [
@@ -447,7 +519,7 @@ const wallpaperRecipeFamilies = {
       {
         key: "coastal-observatory",
         title: "Coastal Observatory",
-        scenePrompt: "Show a quiet coastal observatory or cliffside lookout at twilight with a clean horizon and refined architecture silhouette.",
+        scenePrompt: "Show a quiet coastal observatory or seaside lookout at twilight with a clean horizon and refined architecture silhouette.",
       },
       {
         key: "snow-plateau",
@@ -457,12 +529,22 @@ const wallpaperRecipeFamilies = {
       {
         key: "desert-courtyard",
         title: "Desert Courtyard",
-        scenePrompt: "Show a restrained desert courtyard or ridge overlook with elegant stone forms, open sky, and premium stillness.",
+        scenePrompt: "Show a restrained desert courtyard with elegant stone forms, open sky, and premium stillness.",
+      },
+      {
+        key: "forest-retreat",
+        title: "Forest Retreat",
+        scenePrompt: "Show a polished forest retreat with quiet architecture, tall trees, cool air, and lots of breathing room for a premium settings backdrop.",
       },
       {
         key: "lake-horizon",
         title: "Lake Horizon",
-        scenePrompt: "Show a polished mountain-lake horizon with quiet premium atmosphere, spacious composition, and subtle celestial detail.",
+        scenePrompt: "Show a polished lake or marsh horizon with quiet premium atmosphere, spacious composition, and subtle celestial detail.",
+      },
+      {
+        key: "skyline-terrace",
+        title: "Skyline Terrace",
+        scenePrompt: "Show a refined skyline terrace or rooftop overlook at blue hour with disciplined architecture, quiet lights, and an uncluttered premium mood.",
       },
     ],
     [

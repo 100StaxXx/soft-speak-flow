@@ -39,6 +39,7 @@ const Campaigns = () => {
     isLoading,
     createEpic,
     isCreating,
+    renameEpic,
     updateEpicStatus,
   } = useEpics({ enabled: isTabActive });
   const [showPathfinder, setShowPathfinder] = useState(false);
@@ -198,6 +199,7 @@ const Campaigns = () => {
                         <JourneyCard
                           key={epic.id}
                           journey={epic}
+                          onRename={(title) => renameEpic({ epicId: epic.id, title })}
                           onComplete={() => updateEpicStatus({ epicId: epic.id, status: "completed" })}
                           onAbandon={() => updateEpicStatus({ epicId: epic.id, status: "abandoned" })}
                         />

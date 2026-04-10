@@ -9,6 +9,7 @@ import {
 const mocks = vi.hoisted(() => ({
   onDialogueAction: vi.fn(),
   onSecondaryAction: vi.fn(),
+  onResumeAction: vi.fn(),
   guidance: {
     isActive: true,
     isIntroDialogueActive: false,
@@ -23,10 +24,14 @@ const mocks = vi.hoisted(() => ({
     canTemporarilyHide: false,
     dialogueText: "Tap the + in the bottom right.",
     dialogueSupportText: "I'll highlight it for you.",
-    secondaryActionLabel: "Skip tutorial",
+    secondaryActionLabel: "Continue later",
     onSecondaryAction: vi.fn(),
     dialogueActionLabel: undefined,
     onDialogueAction: undefined,
+    resumeActionLabel: undefined,
+    onResumeAction: undefined,
+    resumePromptText: undefined,
+    resumeProgressText: undefined,
     speakerName: "Atlas",
     speakerSlug: "atlas",
     speakerAvatarUrl: "",
@@ -42,7 +47,7 @@ vi.mock("@/hooks/usePostOnboardingMentorGuidance", () => ({
 }));
 
 describe("MentorGuidanceCard", () => {
-  it("renders VN-style dialogue with a skip control once the tutorial is in progress", () => {
+  it("renders VN-style dialogue with a continue-later control once the tutorial is in progress", () => {
     render(<MentorGuidanceCard />);
 
     expect(screen.getByText("Atlas portrait")).toBeInTheDocument();
@@ -50,7 +55,7 @@ describe("MentorGuidanceCard", () => {
     expect(screen.getByText("Step 1 of 3 - Create Quest 2/5")).toBeInTheDocument();
     expect(screen.getByText("Tap the + in the bottom right.")).toBeInTheDocument();
     expect(screen.getByText("I'll highlight it for you.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Skip tutorial" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Continue later" })).toBeInTheDocument();
   });
 
   it("does not render when guidance is inactive", () => {
@@ -73,19 +78,19 @@ describe("MentorGuidanceCard", () => {
     expect(mocks.onDialogueAction).toHaveBeenCalledTimes(1);
 
     mocks.guidance.isIntroDialogueActive = false;
-    mocks.guidance.secondaryActionLabel = "Skip tutorial";
+    mocks.guidance.secondaryActionLabel = "Continue later";
     mocks.guidance.onSecondaryAction = mocks.onSecondaryAction;
     mocks.guidance.dialogueActionLabel = undefined;
     mocks.guidance.onDialogueAction = undefined;
     mocks.onDialogueAction.mockClear();
   });
 
-  it("renders skip action for in-progress tutorial milestones", () => {
-    mocks.guidance.secondaryActionLabel = "Skip tutorial";
+  it("renders continue-later action for in-progress tutorial milestones", () => {
+    mocks.guidance.secondaryActionLabel = "Continue later";
     mocks.guidance.onSecondaryAction = mocks.onSecondaryAction;
 
     render(<MentorGuidanceCard />);
-    fireEvent.click(screen.getByRole("button", { name: "Skip tutorial" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue later" }));
 
     expect(mocks.onSecondaryAction).toHaveBeenCalledTimes(1);
 
@@ -100,22 +105,29 @@ describe("MentorGuidanceCard", () => {
 
     expect(screen.getByRole("button", { name: "Complete tutorial" })).toBeInTheDocument();
 
-    mocks.guidance.secondaryActionLabel = "Skip tutorial";
+    mocks.guidance.secondaryActionLabel = "Continue later";
   });
 
-  it("renders continue action for non-intro explainer milestones", () => {
-    mocks.guidance.isIntroDialogueActive = false;
-    mocks.guidance.dialogueActionLabel = "Continue";
-    mocks.guidance.onDialogueAction = mocks.onDialogueAction;
+  it("renders a resume card when setup was deferred", () => {
+    mocks.guidance.isActive = false;
+    mocks.guidance.resumeActionLabel = "Continue setup";
+    mocks.guidance.onResumeAction = mocks.onResumeAction;
+    mocks.guidance.resumePromptText = "Continue setup where you left off.";
+    mocks.guidance.resumeProgressText = "Step 2 of 7";
 
     render(<MentorGuidanceCard />);
-    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    expect(screen.getByText("Step 2 of 7")).toBeInTheDocument();
+    expect(screen.getByText("Continue setup where you left off.")).toBeInTheDocument();
 
-    expect(mocks.onDialogueAction).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "Continue setup" }));
+    expect(mocks.onResumeAction).toHaveBeenCalledTimes(1);
 
-    mocks.guidance.dialogueActionLabel = undefined;
-    mocks.guidance.onDialogueAction = undefined;
-    mocks.onDialogueAction.mockClear();
+    mocks.guidance.isActive = true;
+    mocks.guidance.resumeActionLabel = undefined;
+    mocks.guidance.onResumeAction = undefined;
+    mocks.guidance.resumePromptText = undefined;
+    mocks.guidance.resumeProgressText = undefined;
+    mocks.onResumeAction.mockClear();
   });
 
   it("renders hide tutorial control only when temporary hiding is allowed", () => {

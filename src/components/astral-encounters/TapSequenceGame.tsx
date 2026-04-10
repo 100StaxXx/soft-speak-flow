@@ -31,6 +31,14 @@ const DIFFICULTY_CONFIG: Record<ArcadeDifficulty, { orbModifier: number; showTim
   master: { orbModifier: 2, showTimeBonus: -100, startLives: 2 },
 };
 
+const SESSION_LEVEL_TARGET: Record<ArcadeDifficulty, number> = {
+  beginner: 2,
+  easy: 2,
+  medium: 3,
+  hard: 3,
+  master: 4,
+};
+
 interface Orb {
   id: number;
   x: number;
@@ -276,7 +284,9 @@ export const TapSequenceGame = ({
   const [totalTaps, setTotalTaps] = useState(0);
   const [levelMessage, setLevelMessage] = useState<string | null>(null);
   const [mistakesThisLevel, setMistakesThisLevel] = useState(0);
+  const [secondWinds, setSecondWinds] = useState(0);
   const gameStateRef = useRef(gameState);
+  const sessionLevelTarget = isPractice ? 2 : SESSION_LEVEL_TARGET[difficulty];
 
   useEffect(() => {
     gameStateRef.current = gameState;
@@ -352,26 +362,27 @@ export const TapSequenceGame = ({
   }, [gameState, highlightIndex, orbs, showTimePerOrb, registerTimeout, clearTimer, mountedRef]);
 
   // Complete game with XP cap
-  const finishGame = useCallback((won: boolean) => {
+  const finishGame = useCallback(() => {
     if (gameStateRef.current === 'complete') return;
     setGameState('complete');
     
     const accuracy = totalTaps > 0 ? Math.round((totalCorrectTaps / totalTaps) * 100) : 0;
-    const levelBonus = Math.min(level * 5, 50);
-    // Cap accuracy to prevent XP exploit from endless levels
-    const finalAccuracy = Math.min(100, accuracy + levelBonus);
+    const levelBonus = Math.min(Math.max(0, level - 1) * 6, 18);
+    const secondWindPenalty = secondWinds * 12;
+    const finalAccuracy = Math.max(0, Math.min(100, accuracy + levelBonus - secondWindPenalty));
+    const result = finalAccuracy >= 90 ? 'perfect' : finalAccuracy >= 50 ? 'good' : 'fail';
     
     completeOnce({
-      success: won,
-      accuracy: Math.min(finalAccuracy, 100),
-      result: won ? (finalAccuracy >= 90 ? 'perfect' : 'good') : 'fail',
+      success: result !== 'fail',
+      accuracy: finalAccuracy,
+      result,
       highScoreValue: level,
       gameStats: {
         level,
         score,
       },
     });
-  }, [level, totalCorrectTaps, totalTaps, score, completeOnce]);
+  }, [level, totalCorrectTaps, totalTaps, score, secondWinds, completeOnce]);
 
   // Handle orb tap
   const handleOrbTap = useCallback((orb: Orb) => {
@@ -415,8 +426,8 @@ export const TapSequenceGame = ({
           setLevelMessage(null);
           
           // In practice mode, end after completing 2 levels
-          if (isPractice && level >= 2) {
-            finishGame(true);
+          if (level >= sessionLevelTarget) {
+            finishGame();
             return;
           }
           
@@ -436,31 +447,26 @@ export const TapSequenceGame = ({
       
       // Player takes damage from adversary attack
       onDamage?.({ target: 'player', amount: tierAttackDamage, source: 'wrong_tap' });
-      
-      setLives(prev => {
-        const newLives = prev - 1;
-        if (newLives <= 0) {
-          // Game over
-          registerTimeout(() => {
-            if (!mountedRef.current) return;
-            finishGame(false);
-          }, 500);
-        } else {
-          // Re-show sequence
-          setAttemptsThisLevel(prev => prev + 1);
-          setCurrentOrder(1);
-          setOrbs(prev => prev.map(o => ({ ...o, tapped: false })));
-          setLevelMessage('❌ Wrong! Watch again...');
-          
-          registerTimeout(() => {
-            if (!mountedRef.current || gameStateRef.current !== 'playing') return;
-            setLevelMessage(null);
-            setGameState('reshowing');
-            setHighlightIndex(0);
-          }, 1000);
-        }
-        return newLives;
-      });
+
+      const hitSecondWind = lives <= 1;
+      setLives(hitSecondWind ? diffConfig.startLives : lives - 1);
+      setAttemptsThisLevel(prev => prev + 1);
+      setCurrentOrder(1);
+      setOrbs(prev => prev.map(o => ({ ...o, tapped: false })));
+
+      if (hitSecondWind) {
+        setSecondWinds(prev => prev + 1);
+        setLevelMessage('💫 Second wind! Keep going...');
+      } else {
+        setLevelMessage('❌ Wrong! Watch again...');
+      }
+
+      registerTimeout(() => {
+        if (!mountedRef.current || gameStateRef.current !== 'playing') return;
+        setLevelMessage(null);
+        setGameState('reshowing');
+        setHighlightIndex(0);
+      }, 1000);
       
       setShake(true);
       setLastTapResult({ id: orb.id, success: false });
@@ -470,7 +476,7 @@ export const TapSequenceGame = ({
         setLastTapResult(null);
       }, 400);
     }
-  }, [gameState, currentOrder, orbCount, level, attemptsThisLevel, mistakesThisLevel, generateOrbs, finishGame, onDamage, tierAttackDamage, isPractice, registerTimeout, mountedRef]);
+  }, [gameState, currentOrder, orbCount, level, attemptsThisLevel, mistakesThisLevel, generateOrbs, finishGame, onDamage, tierAttackDamage, lives, diffConfig.startLives, sessionLevelTarget, registerTimeout, mountedRef]);
 
   const getHighlightedOrbOrder = useCallback(() => {
     const sortedOrbs = [...orbs].sort((a, b) => a.order - b.order);
@@ -628,27 +634,6 @@ export const TapSequenceGame = ({
           )}
         </AnimatePresence>
 
-        {/* Game over overlay */}
-        <AnimatePresence>
-          {lives <= 0 && gameState !== 'complete' && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="absolute inset-0 flex items-center justify-center z-30"
-              style={{ background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(8px)' }}
-            >
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                className="text-center"
-              >
-                <span className="text-5xl">💔</span>
-                <p className="text-xl font-bold text-white mt-3">Game Over!</p>
-                <p className="text-lg text-primary mt-1">Reached Level {level}</p>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
         </div>
       </div>
 
@@ -670,7 +655,7 @@ export const TapSequenceGame = ({
       {/* Game info - hidden in compact mode */}
       {!compact && (
         <div className="mt-1 flex items-center gap-3 text-[10px] text-muted-foreground">
-          <span>{diffConfig.startLives} lives • Endless</span>
+          <span>Second winds active • Endless</span>
           <span className="text-primary">No time limit</span>
         </div>
       )}

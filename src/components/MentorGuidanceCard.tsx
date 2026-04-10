@@ -172,6 +172,10 @@ export const MentorGuidanceCard = () => {
     onSecondaryAction,
     dialogueActionLabel,
     onDialogueAction,
+    resumeActionLabel,
+    onResumeAction,
+    resumePromptText,
+    resumeProgressText,
   } = usePostOnboardingMentorGuidance();
 
   const wrapperRef = useRef<HTMLElement | null>(null);
@@ -249,6 +253,38 @@ export const MentorGuidanceCard = () => {
     [placement]
   );
 
+  if (!isActive && resumeActionLabel && onResumeAction) {
+    return (
+      <section
+        data-tutorial="mentor-dialogue-panel"
+        className="pointer-events-none fixed bottom-0 left-0 right-0 z-[105] px-3 pb-[calc(env(safe-area-inset-bottom,0px)+10px)]"
+        aria-live="polite"
+      >
+        <div className="mx-auto max-w-md rounded-2xl border border-white/15 bg-black/60 shadow-[0_18px_40px_rgba(0,0,0,0.35)] backdrop-blur-md">
+          <div className="flex items-center gap-3 p-3">
+            <div className="min-w-0 flex-1">
+              {resumeProgressText ? (
+                <p className="text-[10px] uppercase tracking-[0.16em] text-amber-200/90">
+                  {resumeProgressText}
+                </p>
+              ) : null}
+              <p className="mt-1 text-sm leading-relaxed text-white/90">
+                {resumePromptText || "Continue setup where you left off."}
+              </p>
+            </div>
+            <Button
+              type="button"
+              onClick={onResumeAction}
+              className="pointer-events-auto h-10 shrink-0 rounded-xl bg-amber-500 px-4 text-black hover:bg-amber-400"
+            >
+              {resumeActionLabel}
+            </Button>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   if (!isActive || !dialogueText || (canTemporarilyHide && isTemporarilyHidden)) {
     return null;
   }
@@ -302,11 +338,11 @@ export const MentorGuidanceCard = () => {
                   <Button
                     type="button"
                     variant="ghost"
-                    aria-label={secondaryActionLabel || "Skip tutorial"}
+                    aria-label={secondaryActionLabel || "Continue later"}
                     onClick={onSecondaryAction}
                     className="pointer-events-auto h-9 rounded-xl border border-white/25 bg-black/45 text-white hover:bg-black/60"
                   >
-                    {secondaryActionLabel || "Skip tutorial"}
+                    {secondaryActionLabel || "Continue later"}
                   </Button>
                 ) : null}
                 {onDialogueAction ? (

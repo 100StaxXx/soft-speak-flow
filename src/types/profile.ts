@@ -60,7 +60,12 @@ export interface GuidedTutorialProgress {
   introSeen?: boolean;
   introSeenAt?: string;
   substeps?: GuidedSubstepProgress;
-  dismissed: boolean;
+  dismissed?: boolean; // legacy permanent dismissal flag retained for migration
+  softDismissed?: boolean;
+  softDismissedAt?: string;
+  resumeStepId?: GuidedTutorialStepId;
+  resumeRoute?: string;
+  lastActiveAt?: string;
   completed: boolean;
   completedAt?: string;
   lastUpdatedAt?: string;

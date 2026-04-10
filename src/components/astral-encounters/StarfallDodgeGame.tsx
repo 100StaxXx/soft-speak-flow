@@ -93,6 +93,14 @@ const DIFFICULTY_CONFIG = {
   },
 };
 
+const SESSION_SURVIVAL_TARGET: Record<ArcadeDifficulty, number> = {
+  beginner: 25,
+  easy: 25,
+  medium: 20,
+  hard: 20,
+  master: 18,
+};
+
 // Power-up durations in milliseconds
 const POWERUP_DURATIONS = {
   magnet: 5000,
@@ -354,6 +362,7 @@ export const StarfallDodgeGame = ({
   const [slowMoEndTime, setSlowMoEndTime] = useState(0);
   const [survivalTime, setSurvivalTime] = useState(0);
   const [shake, setShake] = useState(false);
+  const [secondWinds, setSecondWinds] = useState(0);
   
   // Progressive difficulty state
   const [currentSpeed, setCurrentSpeed] = useState(0);
@@ -367,6 +376,7 @@ export const StarfallDodgeGame = ({
   const gameStateRef = useRef(gameState);
   const touchStartRef = useRef<{ x: number; playerX: number } | null>(null);
   const livesRef = useRef(lives);
+  const secondWindingRef = useRef(false);
   const hasShieldRef = useRef(hasShield);
   const hasMagnetRef = useRef(hasMagnet);
   const hasSlowMoRef = useRef(hasSlowMo);
@@ -424,6 +434,7 @@ export const StarfallDodgeGame = ({
       baseSpeed: s.baseSpeed + questIntervalScale * 0.1,
     };
   }, [difficulty, questIntervalScale]);
+  const sessionSurvivalTarget = isPractice ? 15 : SESSION_SURVIVAL_TARGET[difficulty];
 
   // Initialize progressive difficulty
   useEffect(() => {
@@ -502,6 +513,26 @@ export const StarfallDodgeGame = ({
       shakeTimerRef.current = null;
     }, durationMs);
   }, []);
+
+  const triggerSecondWind = useCallback(() => {
+    if (secondWindingRef.current) return;
+
+    secondWindingRef.current = true;
+    setSecondWinds(prev => prev + 1);
+    livesRef.current = 0;
+    setLives(0);
+    setHasShield(false);
+    setHasMagnet(false);
+    setHasSlowMo(false);
+    triggerShake(400);
+
+    setTimeout(() => {
+      if (!gameAreaRef.current) return;
+      livesRef.current = 3;
+      setLives(3);
+      secondWindingRef.current = false;
+    }, 350);
+  }, [triggerShake]);
 
   // Spawn object helper
   const spawnObject = useCallback((playerX: number, speed: number) => {
@@ -589,9 +620,9 @@ export const StarfallDodgeGame = ({
     if (newMilestones > prevMilestones) {
       onDamage?.({ target: 'adversary', amount: GAME_DAMAGE_VALUES.starfall_dodge.survivalMilestone, source: 'survival_milestone' });
     }
-    if (isPractice && nextSurvival >= 15) {
-      setGameState('complete');
-    }
+        if (nextSurvival >= sessionSurvivalTarget) {
+          setGameState('complete');
+        }
 
     // Progressive difficulty - increase speed and spawn rate over time.
     // deltaTime is seconds, so no additional scaling is needed.
@@ -668,19 +699,20 @@ export const StarfallDodgeGame = ({
               return false;
               
             case 'powerup_life':
-              setLives(prev => Math.min(prev + 1, 3)); // Keep life cap aligned with displayed HUD hearts
+              setLives(prev => {
+                const nextLives = Math.min(prev + 1, 3);
+                livesRef.current = nextLives;
+                return nextLives;
+              }); // Keep life cap aligned with displayed HUD hearts
               emitParticles(obj.x, obj.y, '#ec4899', 12);
               triggerHaptic('heavy');
               return false;
               
             case 'bomb':
-              // Bomb = instant game over (lose all lives)
               emitParticles(obj.x, obj.y, '#ef4444', 15);
               emitParticles(obj.x, obj.y, '#f97316', 15);
               triggerHaptic('heavy');
-              setLives(0);
-              triggerShake(400);
-              setGameState('complete');
+              triggerSecondWind();
               return false;
               
             case 'debris':
@@ -691,14 +723,13 @@ export const StarfallDodgeGame = ({
                 triggerHaptic('medium');
               } else {
                 onDamage?.({ target: 'player', amount: tierAttackDamage, source: 'hit_by_projectile' });
-                setLives(prev => {
-                  const newLives = prev - 1;
-                  if (newLives <= 0) {
-                    setGameState('complete');
-                  }
-                  return newLives;
-                });
-                triggerShake(200);
+                if (livesRef.current <= 1) {
+                  triggerSecondWind();
+                } else {
+                  livesRef.current -= 1;
+                  setLives(prev => prev - 1);
+                  triggerShake(200);
+                }
                 emitParticles(obj.x, obj.y, '#ef4444', 8);
                 triggerHaptic('heavy');
               }
@@ -737,7 +768,7 @@ export const StarfallDodgeGame = ({
     const finalSurvivalTime = survivalTimeRef.current;
     const timeThresholds = { beginner: 90, easy: 60, medium: 45, hard: 30, master: 20 };
     const threshold = timeThresholds[difficulty];
-    const accuracy = Math.min(100, Math.round((finalSurvivalTime / threshold) * 100));
+    const accuracy = Math.max(0, Math.min(100, Math.round((finalSurvivalTime / threshold) * 100) - secondWinds * 10));
     
     const result: 'perfect' | 'good' | 'fail' = 
       accuracy >= 90 ? 'perfect' : accuracy >= 50 ? 'good' : 'fail';
@@ -754,7 +785,7 @@ export const StarfallDodgeGame = ({
         livesRemaining: lives,
       },
     });
-  }, [gameState, crystalsCollected, difficulty, onComplete, useTilt, lives]);
+  }, [gameState, crystalsCollected, difficulty, onComplete, secondWinds, useTilt, lives]);
 
   return (
     <div

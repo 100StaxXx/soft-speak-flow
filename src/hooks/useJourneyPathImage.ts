@@ -5,6 +5,7 @@ import { getEpicsQueryKey, type EpicRecord } from "@/hooks/epicsQuery";
 import { needsJourneyPathLandscapeRefresh } from "@/shared/journeyPathConfig";
 import {
   fetchRemoteLatestJourneyPath,
+  type JourneyPathGenerationError,
   getJourneyPathGenerationKey,
   getJourneyPathQueryKey,
   getJourneyPathSnapshotFromEpic,
@@ -53,14 +54,15 @@ export const useJourneyPathImage = (epicId: string | undefined) => {
       ?? null,
   });
 
-  const { data: generationState = { pending: false, milestoneIndex: null } } = useQuery<{
+  const { data: generationState = { pending: false, milestoneIndex: null, error: null } } = useQuery<{
+    error: JourneyPathGenerationError | null;
     pending: boolean;
     milestoneIndex: number | null;
   }>({
     queryKey: getJourneyPathGenerationKey(epicId, user?.id),
-    queryFn: async () => ({ pending: false, milestoneIndex: null }),
+    queryFn: async () => ({ pending: false, milestoneIndex: null, error: null }),
     enabled: false,
-    initialData: { pending: false, milestoneIndex: null },
+    initialData: { pending: false, milestoneIndex: null, error: null },
     staleTime: Infinity,
     gcTime: Infinity,
   });
@@ -168,6 +170,15 @@ export const useJourneyPathImage = (epicId: string | undefined) => {
     });
   }, [epicId, journeyPath, triggerJourneyPathGeneration, user?.id]);
 
+  const retryInitialPath = useCallback(() => {
+    if (!epicId || !user?.id || journeyPath) return;
+
+    initialGenerationRequestedRef.current = false;
+    void triggerJourneyPathGeneration(0).catch((error) => {
+      console.error("Failed to retry initial journey path generation:", error);
+    });
+  }, [epicId, journeyPath, triggerJourneyPathGeneration, user?.id]);
+
   const regeneratePathForMilestone = useCallback((milestoneIndex: number) => {
     if (!epicId || !user?.id) return;
 
@@ -182,6 +193,8 @@ export const useJourneyPathImage = (epicId: string | undefined) => {
       || !user?.id
       || !hasResolvedLocalSnapshot
       || journeyPath
+      || generationState.error
+      || generationState.pending
       || initialGenerationRequestedRef.current
     ) {
       return;
@@ -190,9 +203,12 @@ export const useJourneyPathImage = (epicId: string | undefined) => {
     initialGenerationRequestedRef.current = true;
     void triggerJourneyPathGeneration(0).catch((error) => {
       console.error("Failed to auto-generate initial journey path:", error);
+      initialGenerationRequestedRef.current = false;
     });
   }, [
     epicId,
+    generationState.error,
+    generationState.pending,
     hasResolvedLocalSnapshot,
     journeyPath,
     triggerJourneyPathGeneration,
@@ -236,7 +252,9 @@ export const useJourneyPathImage = (epicId: string | undefined) => {
     isGenerating: generationState.pending,
     needsLandscapeRefresh,
     error: remoteJourneyPathQuery.error,
+    generationError: generationState.error,
     generateInitialPath,
+    retryInitialPath,
     regeneratePathForMilestone,
   };
 };

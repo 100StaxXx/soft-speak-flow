@@ -13,6 +13,16 @@ const mocks = vi.hoisted(() => {
   const requestJourneyPathGenerationMock = vi.fn();
   const retryNowMock = vi.fn();
   const rpcMock = vi.fn();
+  const getAllLocalTasksForUserMock = vi.fn();
+  const getLocalEpicHabitsMock = vi.fn();
+  const getLocalHabitCompletionsMock = vi.fn();
+  const getLocalHabitsMock = vi.fn();
+  const getLocalJourneyPhasesMock = vi.fn();
+  const getLocalEpicMilestonesMock = vi.fn();
+  const removePlannerRecordMock = vi.fn();
+  const removePlannerRecordsMock = vi.fn();
+  const upsertPlannerRecordMock = vi.fn();
+  const upsertPlannerRecordsMock = vi.fn();
   let shouldQueueWrites = false;
   const warmEpicsQueryFromRemoteMock = vi.fn();
 
@@ -26,6 +36,16 @@ const mocks = vi.hoisted(() => {
     requestJourneyPathGenerationMock,
     retryNowMock,
     rpcMock,
+    getAllLocalTasksForUserMock,
+    getLocalEpicHabitsMock,
+    getLocalHabitCompletionsMock,
+    getLocalHabitsMock,
+    getLocalJourneyPhasesMock,
+    getLocalEpicMilestonesMock,
+    removePlannerRecordMock,
+    removePlannerRecordsMock,
+    upsertPlannerRecordMock,
+    upsertPlannerRecordsMock,
     get shouldQueueWrites() {
       return shouldQueueWrites;
     },
@@ -82,6 +102,24 @@ vi.mock("@/utils/plannerSync", () => ({
   warmEpicsQueryFromRemote: (...args: unknown[]) => mocks.warmEpicsQueryFromRemoteMock(...args),
 }));
 
+vi.mock("@/utils/plannerLocalStore", async () => {
+  const actual = await vi.importActual<typeof import("@/utils/plannerLocalStore")>("@/utils/plannerLocalStore");
+
+  return {
+    ...actual,
+    getAllLocalTasksForUser: (...args: unknown[]) => mocks.getAllLocalTasksForUserMock(...args),
+    getLocalEpicHabits: (...args: unknown[]) => mocks.getLocalEpicHabitsMock(...args),
+    getLocalHabitCompletions: (...args: unknown[]) => mocks.getLocalHabitCompletionsMock(...args),
+    getLocalHabits: (...args: unknown[]) => mocks.getLocalHabitsMock(...args),
+    getLocalJourneyPhases: (...args: unknown[]) => mocks.getLocalJourneyPhasesMock(...args),
+    getLocalEpicMilestones: (...args: unknown[]) => mocks.getLocalEpicMilestonesMock(...args),
+    removePlannerRecord: (...args: unknown[]) => mocks.removePlannerRecordMock(...args),
+    removePlannerRecords: (...args: unknown[]) => mocks.removePlannerRecordsMock(...args),
+    upsertPlannerRecord: (...args: unknown[]) => mocks.upsertPlannerRecordMock(...args),
+    upsertPlannerRecords: (...args: unknown[]) => mocks.upsertPlannerRecordsMock(...args),
+  };
+});
+
 import { normalizeCreateCampaignError, useEpics } from "./useEpics";
 import { resolveEpicEndDate } from "@/utils/epicDates";
 
@@ -108,6 +146,16 @@ describe("useEpics", () => {
     mocks.retryNowMock.mockResolvedValue(undefined);
     mocks.rpcMock.mockResolvedValue({ data: 0, error: null });
     mocks.warmEpicsQueryFromRemoteMock.mockResolvedValue([]);
+    mocks.getAllLocalTasksForUserMock.mockResolvedValue([]);
+    mocks.getLocalEpicHabitsMock.mockResolvedValue([]);
+    mocks.getLocalHabitCompletionsMock.mockResolvedValue([]);
+    mocks.getLocalHabitsMock.mockResolvedValue([]);
+    mocks.getLocalJourneyPhasesMock.mockResolvedValue([]);
+    mocks.getLocalEpicMilestonesMock.mockResolvedValue([]);
+    mocks.removePlannerRecordMock.mockResolvedValue(undefined);
+    mocks.removePlannerRecordsMock.mockResolvedValue(undefined);
+    mocks.upsertPlannerRecordMock.mockResolvedValue(undefined);
+    mocks.upsertPlannerRecordsMock.mockResolvedValue(undefined);
 
     mocks.fromMock.mockReturnValue({
       select: mocks.selectMock,
@@ -481,6 +529,177 @@ describe("useEpics", () => {
 
     expect(mocks.queueActionMock).toHaveBeenCalled();
     expect(mocks.requestJourneyPathGenerationMock).not.toHaveBeenCalled();
+  });
+
+  it("renames an active campaign locally, syncs the new title remotely, and invalidates dependent queries", async () => {
+    let localEpics = [
+      {
+        id: "epic-1",
+        user_id: "user-1",
+        title: "Campaign Alpha",
+        description: null,
+        status: "active",
+        progress_percentage: 40,
+        target_days: 14,
+        start_date: "2026-02-10",
+        end_date: null,
+        created_at: "2026-02-10T00:00:00.000Z",
+        epic_habits: [],
+      },
+    ];
+    let localTasks = [
+      {
+        id: "task-1",
+        user_id: "user-1",
+        epic_id: "epic-1",
+        epic_title: "Campaign Alpha",
+      },
+    ];
+
+    mocks.loadLocalEpicsMock.mockImplementation(async () => localEpics);
+    mocks.getAllLocalTasksForUserMock.mockImplementation(async () => localTasks);
+    mocks.upsertPlannerRecordMock.mockImplementation(async (storeName: string, record: typeof localEpics[number]) => {
+      if (storeName === "epics") {
+        localEpics = localEpics.map((epic) => (epic.id === record.id ? record : epic));
+      }
+    });
+    mocks.upsertPlannerRecordsMock.mockImplementation(async (storeName: string, records: typeof localTasks) => {
+      if (storeName === "daily_tasks") {
+        const updatesById = new Map(records.map((record) => [record.id, record]));
+        localTasks = localTasks.map((task) => updatesById.get(task.id) ?? task);
+      }
+    });
+    mocks.warmEpicsQueryFromRemoteMock.mockImplementationOnce(async (queryClient: QueryClient, userId: string) => {
+      queryClient.setQueryData(["epics", userId], localEpics);
+      return localEpics;
+    });
+
+    const eqUserIdUpdateMock = vi.fn().mockResolvedValue({ error: null });
+    const eqIdUpdateMock = vi.fn().mockReturnValue({ eq: eqUserIdUpdateMock });
+    const updateMock = vi.fn().mockReturnValue({ eq: eqIdUpdateMock });
+
+    mocks.fromMock.mockImplementation((table: string) => {
+      if (table === "epics") {
+        return {
+          update: updateMock,
+          select: mocks.selectMock,
+        };
+      }
+
+      return {
+        select: mocks.selectMock,
+      };
+    });
+
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+
+    const { result } = renderHook(() => useEpics(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.activeEpics[0]?.title).toBe("Campaign Alpha");
+    });
+
+    await act(async () => {
+      await result.current.renameEpic({ epicId: "epic-1", title: "  Campaign Aurora  " });
+    });
+
+    await waitFor(() => {
+      expect(result.current.activeEpics[0]?.title).toBe("Campaign Aurora");
+    });
+
+    expect(updateMock).toHaveBeenCalledWith({ title: "Campaign Aurora" });
+    expect(eqIdUpdateMock).toHaveBeenCalledWith("id", "epic-1");
+    expect(eqUserIdUpdateMock).toHaveBeenCalledWith("user_id", "user-1");
+    expect(localTasks[0]?.epic_title).toBe("Campaign Aurora");
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["epics"] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["daily-tasks"] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["habit-surfacing"] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["user-ai-context"] });
+  });
+
+  it("queues EPIC_UPDATE when a remote rename falls back offline", async () => {
+    let localEpics = [
+      {
+        id: "epic-1",
+        user_id: "user-1",
+        title: "Campaign Alpha",
+        description: null,
+        status: "active",
+        progress_percentage: 40,
+        target_days: 14,
+        start_date: "2026-02-10",
+        end_date: null,
+        created_at: "2026-02-10T00:00:00.000Z",
+        epic_habits: [],
+      },
+    ];
+
+    mocks.loadLocalEpicsMock.mockImplementation(async () => localEpics);
+    mocks.upsertPlannerRecordMock.mockImplementation(async (storeName: string, record: typeof localEpics[number]) => {
+      if (storeName === "epics") {
+        localEpics = localEpics.map((epic) => (epic.id === record.id ? record : epic));
+      }
+    });
+    mocks.warmEpicsQueryFromRemoteMock.mockImplementationOnce(async (queryClient: QueryClient, userId: string) => {
+      queryClient.setQueryData(["epics", userId], localEpics);
+      return localEpics;
+    });
+
+    const remoteError = new Error("temporary outage");
+    const eqUserIdUpdateMock = vi.fn().mockResolvedValue({ error: remoteError });
+    const eqIdUpdateMock = vi.fn().mockReturnValue({ eq: eqUserIdUpdateMock });
+    const updateMock = vi.fn().mockReturnValue({ eq: eqIdUpdateMock });
+
+    mocks.fromMock.mockImplementation((table: string) => {
+      if (table === "epics") {
+        return {
+          update: updateMock,
+          select: mocks.selectMock,
+        };
+      }
+
+      return {
+        select: mocks.selectMock,
+      };
+    });
+
+    const { result } = renderHook(() => useEpics(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.activeEpics[0]?.title).toBe("Campaign Alpha");
+    });
+
+    await act(async () => {
+      await result.current.renameEpic({ epicId: "epic-1", title: "Campaign Nova" });
+    });
+
+    await waitFor(() => {
+      expect(result.current.activeEpics[0]?.title).toBe("Campaign Nova");
+    });
+
+    expect(mocks.queueActionMock).toHaveBeenCalledWith({
+      actionKind: "EPIC_UPDATE",
+      entityType: "epic",
+      entityId: "epic-1",
+      payload: {
+        epicId: "epic-1",
+        updates: {
+          title: "Campaign Nova",
+        },
+      },
+    });
+    expect(mocks.retryNowMock).toHaveBeenCalled();
   });
 
   it("surfaces hydrated latest journey-path data after a reopen-style load", async () => {

@@ -48,6 +48,12 @@ const GalacticMatchGame = lazy(() => import('./GalacticMatchGame').then(m => ({ 
 // Track which games user has practiced (persists in session)
 const practicedGames = new Set<MiniGameType>();
 
+const getEncounterResultFromAccuracy = (accuracy: number): 'perfect' | 'good' | 'fail' => {
+  if (accuracy >= 90) return 'perfect';
+  if (accuracy >= 50) return 'good';
+  return 'fail';
+};
+
 interface AstralEncounterModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -150,16 +156,10 @@ export const AstralEncounterModal = ({
     battleState,
     dealDamage,
     resetBattle,
-    getResult,
     tierAttackDamage,
     damageEvents,
   } = useBattleState({
     tier: (adversary?.tier as AdversaryTier) || 'common',
-    onPlayerDefeated: () => {
-      if (battleEndedRef.current) return;
-      battleEndedRef.current = true;
-      handleBattleEnd('fail');
-    },
     onAdversaryDefeated: () => {
       if (battleEndedRef.current) return;
       battleEndedRef.current = true;
@@ -171,15 +171,33 @@ export const AstralEncounterModal = ({
         setTimeout(() => setShowScreenShake(false), 300);
       }
     },
+    playerFloorHP: 1,
   });
 
-  // Handle battle end (victory or defeat)
-  const handleBattleEnd = useCallback(async (outcome: 'victory' | 'fail') => {
+  const getBattleAccuracy = useCallback((outcome: 'victory' | 'timeout') => {
+    const pressureAccuracy = 100 - battleState.adversaryHPPercent;
+    const resilienceAccuracy = battleState.playerHPPercent;
+    const phaseAccuracy = phaseResults.length > 0
+      ? phaseResults.reduce((total, item) => total + item.accuracy, 0) / phaseResults.length
+      : pressureAccuracy;
+
+    const rawAccuracy = Math.round(
+      phaseAccuracy * 0.5
+      + pressureAccuracy * 0.3
+      + resilienceAccuracy * 0.2,
+    );
+
+    const floorAccuracy = outcome === 'victory' ? 50 : 0;
+    return Math.max(floorAccuracy, Math.min(100, rawAccuracy));
+  }, [battleState.adversaryHPPercent, battleState.playerHPPercent, phaseResults]);
+
+  // Handle battle end (victory or timeout)
+  const handleBattleEnd = useCallback(async (outcome: 'victory' | 'timeout') => {
     if (!adversary || !encounter) return;
-    
-    const result = outcome === 'fail' ? 'fail' : getResult();
-    const accuracy = outcome === 'fail' ? 0 : Math.round(battleState.playerHPPercent);
-    const xpEarned = outcome === 'fail' ? 0 : calculateXPReward(
+
+    const accuracy = getBattleAccuracy(outcome);
+    const result = getEncounterResultFromAccuracy(accuracy);
+    const xpEarned = calculateXPReward(
       adversary.tier as AdversaryTier, 
       accuracy,
       usedTiltControls
@@ -188,7 +206,9 @@ export const AstralEncounterModal = ({
     const didPersist = await onComplete({
       encounterId: encounter.id,
       accuracy,
-      phasesCompleted: outcome === 'fail' ? currentPhaseIndex : adversary.phases,
+      phasesCompleted: outcome === 'victory'
+        ? adversary.phases
+        : Math.max(currentPhaseIndex + 1, phaseResults.length, 1),
     });
 
     if (!didPersist) {
@@ -204,7 +224,7 @@ export const AstralEncounterModal = ({
     });
 
     setPhase('result');
-  }, [adversary, encounter, getResult, battleState.playerHPPercent, onComplete, currentPhaseIndex, usedTiltControls, onOpenChange]);
+  }, [adversary, encounter, getBattleAccuracy, onComplete, currentPhaseIndex, usedTiltControls, onOpenChange, phaseResults]);
 
   // Reset phase when modal opens - set to boss_intro for boss battles
   useEffect(() => {
@@ -232,11 +252,7 @@ export const AstralEncounterModal = ({
       // Time expired - auto-resolve based on HP comparison
       if (!battleEndedRef.current) {
         battleEndedRef.current = true;
-        const adversaryDamagePercent = 100 - battleState.adversaryHPPercent;
-        const playerDamagePercent = 100 - battleState.playerHPPercent;
-        // Player wins if they dealt more % damage to adversary
-        const outcome = adversaryDamagePercent > playerDamagePercent ? 'victory' : 'fail';
-        handleBattleEnd(outcome);
+        handleBattleEnd('timeout');
       }
       return;
     }
@@ -246,7 +262,7 @@ export const AstralEncounterModal = ({
     }, 1000);
     
     return () => clearInterval(timer);
-  }, [phase, battleTimeLeft, battleState.adversaryHPPercent, battleState.playerHPPercent, handleBattleEnd]);
+  }, [phase, battleTimeLeft, handleBattleEnd]);
 
   // Fetch cached adversary image immediately; top up variants asynchronously in background.
   const { imageUrl: adversaryImageUrl } = useAdversaryImage({

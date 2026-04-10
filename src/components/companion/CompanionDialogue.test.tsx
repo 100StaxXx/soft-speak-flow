@@ -1,6 +1,14 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const getPublicUrlMock = vi.hoisted(() =>
+  vi.fn((assetPath: string) => ({
+    data: {
+      publicUrl: `https://example.supabase.co/storage/v1/object/public/companion-presets/${assetPath}`,
+    },
+  })),
+);
+
 const mocks = vi.hoisted(() => ({
   dialogue: {
     greeting: "Primary greeting",
@@ -18,6 +26,10 @@ const mocks = vi.hoisted(() => ({
     id: "companion-1",
     current_stage: 4,
     current_image_url: null as string | null,
+    current_image_focal_x: 0.5 as number | null,
+    current_image_focal_y: 0.5 as number | null,
+    preset_id: null as string | null,
+    core_element: "fire",
     cached_creature_name: "Wolf" as string | null,
     spirit_animal: "Wolf",
     progressToNext: 50,
@@ -50,12 +62,26 @@ vi.mock("@/hooks/useCompanion", () => ({
       id: mocks.companion.id,
       current_stage: mocks.companion.current_stage,
       current_image_url: mocks.companion.current_image_url,
+      current_image_focal_x: mocks.companion.current_image_focal_x,
+      current_image_focal_y: mocks.companion.current_image_focal_y,
+      preset_id: mocks.companion.preset_id,
+      core_element: mocks.companion.core_element,
       cached_creature_name: mocks.companion.cached_creature_name,
       spirit_animal: mocks.companion.spirit_animal,
     },
     progressToNext: mocks.companion.progressToNext,
     canEvolve: mocks.companion.canEvolve,
   }),
+}));
+
+vi.mock("@/integrations/supabase/client", () => ({
+  supabase: {
+    storage: {
+      from: () => ({
+        getPublicUrl: getPublicUrlMock,
+      }),
+    },
+  },
 }));
 
 vi.mock("@/contexts/TalkPopupContext", () => ({
@@ -99,12 +125,17 @@ describe("CompanionDialogue", () => {
     mocks.companion.id = "companion-1";
     mocks.companion.current_stage = 4;
     mocks.companion.current_image_url = null;
+    mocks.companion.current_image_focal_x = 0.5;
+    mocks.companion.current_image_focal_y = 0.5;
+    mocks.companion.preset_id = null;
+    mocks.companion.core_element = "fire";
     mocks.companion.cached_creature_name = "Wolf";
     mocks.companion.spirit_animal = "Wolf";
     mocks.companion.progressToNext = 50;
     mocks.companion.canEvolve = false;
     mocks.talkPopup.dismiss.mockClear();
     mocks.talkPopup.show.mockClear();
+    getPublicUrlMock.mockClear();
     setReducedMotion(false);
   });
 
@@ -180,6 +211,28 @@ describe("CompanionDialogue", () => {
 
     expect(within(dialog).queryByRole("img", { name: "Wolf" })).not.toBeInTheDocument();
     expect(within(dialog).getByText("W")).toBeInTheDocument();
+  });
+
+  it("uses resolved preset art when a positive-stage companion still stores the egg image", () => {
+    mocks.companion.current_stage = 6;
+    mocks.companion.current_image_url = "/companion-eggs/egg__t0_egg__normal__fire.png";
+    mocks.companion.preset_id = "griffin";
+    mocks.companion.core_element = "fire";
+    mocks.companion.cached_creature_name = "Griffin";
+    mocks.companion.spirit_animal = "Griffin";
+
+    const { container } = render(<CompanionDialogue />);
+
+    expect(container.innerHTML).toContain(
+      "griffin/t2_guardian/normal/griffin__t2_guardian__normal__fire.png",
+    );
+    expect(container.innerHTML).not.toContain("/companion-eggs/egg__t0_egg__normal__fire.png");
+
+    fireEvent.click(screen.getByRole("button", { name: /open griffin dialogue/i }));
+    const dialog = screen.getByRole("dialog", { name: "Griffin" });
+    expect(dialog.innerHTML).toContain(
+      "griffin/t2_guardian/normal/griffin__t2_guardian__normal__fire.png",
+    );
   });
 
   it("renders loading skeleton and prevents opening while loading", () => {

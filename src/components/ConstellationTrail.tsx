@@ -1,7 +1,7 @@
 import { memo, useMemo, useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { HelpCircle, MapPin, Sparkles, Lock, Star, Zap } from "lucide-react";
+import { AlertCircle, HelpCircle, MapPin, Sparkles, Lock, Star, Zap } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
 import { Haptics, ImpactStyle, NotificationType } from "@capacitor/haptics";
@@ -9,6 +9,7 @@ import { cosmicPathBackgrounds, getStaticBackgroundSrcSet } from "@/assets/backg
 import { useJourneyPathImage } from "@/hooks/useJourneyPathImage";
 import { getJourneyPathCardImageUrl } from "@/utils/journeyPathUrls";
 import { CompanionImage } from "@/components/CompanionImage";
+import { Button } from "@/components/ui/button";
 
 // Milestone from epic_milestones table
 interface TrailMilestone {
@@ -866,6 +867,8 @@ export const ConstellationTrail = memo(function ConstellationTrail({
   const { 
     pathImageUrl, 
     isGenerating, 
+    generationError,
+    retryInitialPath,
   } = useJourneyPathImage(epicId);
   
   // Path generation is handled by useEpics when epic is created
@@ -928,6 +931,7 @@ export const ConstellationTrail = memo(function ConstellationTrail({
     [pathImageUrl],
   );
   const hasGeneratedBackground = Boolean(optimizedPathImageUrl);
+  const showGenerationError = Boolean(!hasGeneratedBackground && generationError && !isGenerating);
   const fallbackBackgroundUrl = !transparentBackground ? fallbackBackground.src : null;
   const fallbackBackgroundSrcSet = !hasGeneratedBackground && !transparentBackground
     ? getStaticBackgroundSrcSet(fallbackBackground)
@@ -1000,6 +1004,34 @@ export const ConstellationTrail = memo(function ConstellationTrail({
           <Sparkles className="h-3 w-3 animate-pulse" />
           <span>Updating</span>
         </motion.div>
+      )}
+
+      {showGenerationError && (
+        <div
+          className="absolute inset-x-3 bottom-3 z-20 rounded-2xl border border-amber-300/25 bg-slate-950/82 p-3 text-white shadow-[0_16px_40px_rgba(15,23,42,0.38)] backdrop-blur-md"
+          data-testid="journey-path-error"
+        >
+          <div className="flex items-start gap-2.5">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-200" />
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-100/85">
+                Path image unavailable
+              </p>
+              <p className="mt-1 text-xs leading-5 text-white/78">
+                {generationError.message}
+              </p>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="mt-3 h-8 border-white/15 bg-white/5 px-3 text-white hover:bg-white/10"
+                onClick={retryInitialPath}
+              >
+                Retry image
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Background twinkling stars */}
