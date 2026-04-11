@@ -150,6 +150,8 @@ Treat everything under `ios/App/App/public`, `ios/App/build-cli`, and `ios/App/b
 
 The App target now runs a bundled web-asset verification phase during Xcode builds. If a repo-local `App.app/public/assets` bundle drifts from `dist/assets` or still contains a legacy journey-path retry contract, the native build fails before packaging the app.
 
+When Xcode launches that verification step outside your interactive shell, it now falls back to the Node version declared in `.nvmrc` or `.node-version` in addition to `NODE_BINARY` and common system install paths.
+
 The Capacitor iOS project includes a custom CocoaPods `post_install` hook (see `ios/App/Podfile`) that scans every downloaded `.xcframework`. If a framework ships without the plain `ios-arm64` slice that the `[CP] Copy XCFrameworks` script expects, the hook clones the closest non-simulator `ios-arm64_*` variant into place. This prevents `rsync` errors like the ones seen for `IONFilesystemLib` or `FBSDKCoreKit_Basics`.
 
 If you still hit `[CP] Copy XCFrameworks` failures:

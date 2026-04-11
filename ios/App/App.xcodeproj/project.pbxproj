@@ -295,7 +295,7 @@
 			name = "Verify Bundled Web Assets";
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "PROJECT_ROOT=\"${SRCROOT}/../..\"\nif [ -n \"${NODE_BINARY:-}\" ] && [ -x \"${NODE_BINARY}\" ]; then\n  NODE_EXECUTABLE=\"${NODE_BINARY}\"\nelif command -v node >/dev/null 2>&1; then\n  NODE_EXECUTABLE=\"$(command -v node)\"\nelif [ -x /opt/homebrew/bin/node ]; then\n  NODE_EXECUTABLE=/opt/homebrew/bin/node\nelif [ -x /usr/local/bin/node ]; then\n  NODE_EXECUTABLE=/usr/local/bin/node\nelse\n  echo \"error: Node.js is required to verify bundled web assets.\" >&2\n  exit 1\nfi\n\"${NODE_EXECUTABLE}\" \"${PROJECT_ROOT}/scripts/verify-ios-web-assets.mjs\" --target-built-assets \"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/public/assets\" --skip-generated-build-scan\n";
+			shellScript = "PROJECT_ROOT=\"${SRCROOT}/../..\"\nNODE_EXECUTABLE=\"$(${PROJECT_ROOT}/scripts/find-node-for-xcode.sh \"${PROJECT_ROOT}\")\"\n\"${NODE_EXECUTABLE}\" \"${PROJECT_ROOT}/scripts/verify-ios-web-assets.mjs\" --target-built-assets \"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/public/assets\" --skip-generated-build-scan\n";
 			showEnvVarsInLog = 0;
 		};
 		9592DBEFFC6D2A0C8D5DEB22 /* [CP] Embed Pods Frameworks */ = {
@@ -600,7 +600,7 @@
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_ENTITLEMENTS = ../CosmiqWidget/CosmiqWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 243;
+				CURRENT_PROJECT_VERSION = 244;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = ../CosmiqWidget/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = CosmiqWidget;
@@ -628,7 +628,7 @@
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_ENTITLEMENTS = ../CosmiqWidget/CosmiqWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 243;
+				CURRENT_PROJECT_VERSION = 244;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = ../CosmiqWidget/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = CosmiqWidget;
