@@ -12,6 +12,11 @@ const projectRoot = path.resolve(__dirname, "..");
 
 const distAssetsDir = path.join(projectRoot, "dist", "assets");
 const iosAssetsDir = path.join(projectRoot, "ios", "App", "App", "public", "assets");
+const generatedBuildRoots = [
+  path.join(projectRoot, "ios", "App", "build-cli"),
+  path.join(projectRoot, "ios", "App", "build-cli-device-smoke"),
+  path.join(projectRoot, "ios", "App", "build-xc"),
+];
 const INDEX_BUNDLE_PATTERN = /^index-[A-Za-z0-9_-]+\.js$/;
 const JAVASCRIPT_BUNDLE_PATTERN = /\.js$/;
 const LEGACY_JOURNEY_PATH_CONTRACT_PATTERN =
@@ -29,6 +34,87 @@ const fail = (message) => {
   console.error(`${prefix} ${message}`);
   console.error(`${prefix} Run \`npm run build && npm run ios:sync\` and retry.`);
   process.exit(1);
+};
+
+const parseArgs = (argv) => {
+  let targetBuiltAssetsDir = null;
+  let skipGeneratedBuildScan = false;
+
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+
+    if (arg === "--skip-generated-build-scan") {
+      skipGeneratedBuildScan = true;
+      continue;
+    }
+
+    if (arg === "--target-built-assets") {
+      const nextArg = argv[index + 1];
+      if (!nextArg) {
+        fail("Missing value for --target-built-assets");
+      }
+      targetBuiltAssetsDir = path.resolve(nextArg);
+      index += 1;
+      continue;
+    }
+
+    if (arg.startsWith("--target-built-assets=")) {
+      targetBuiltAssetsDir = path.resolve(arg.slice("--target-built-assets=".length));
+      continue;
+    }
+
+    fail(`Unsupported argument: ${arg}`);
+  }
+
+  return { targetBuiltAssetsDir, skipGeneratedBuildScan };
+};
+
+const directoryExists = async (directory) => {
+  try {
+    const stats = await fs.stat(directory);
+    return stats.isDirectory();
+  } catch (error) {
+    return false;
+  }
+};
+
+const walkDirectories = async (directory, visit) => {
+  const entries = await fs.readdir(directory, { withFileTypes: true });
+  for (const entry of entries) {
+    if (!entry.isDirectory()) {
+      continue;
+    }
+
+    const entryPath = path.join(directory, entry.name);
+    await visit(entryPath, entry.name);
+    await walkDirectories(entryPath, visit);
+  }
+};
+
+const findGeneratedBuildAssetDirs = async () => {
+  const matches = new Set();
+
+  for (const buildRoot of generatedBuildRoots) {
+    if (!await directoryExists(buildRoot)) {
+      continue;
+    }
+
+    await walkDirectories(buildRoot, async (directory, name) => {
+      if (name !== "assets") {
+        return;
+      }
+
+      const normalizedDirectory = path.normalize(directory);
+      const expectedSuffix = path.normalize(path.join("App.app", "public", "assets"));
+      if (!normalizedDirectory.endsWith(expectedSuffix)) {
+        return;
+      }
+
+      matches.add(directory);
+    });
+  }
+
+  return [...matches].sort();
 };
 
 const listIndexBundles = async (directory) => {
@@ -85,42 +171,70 @@ const verifyNoLegacyJourneyPathContract = async (directory, bundles) => {
   }
 };
 
-const verifyAssets = async () => {
-  const distBundles = await listIndexBundles(distAssetsDir);
-  const iosBundles = await listIndexBundles(iosAssetsDir);
-  const distJavaScriptBundles = await listJavaScriptBundles(distAssetsDir);
-  const iosJavaScriptBundles = await listJavaScriptBundles(iosAssetsDir);
+const verifyDirectoryMatchesDist = async (directory, distBundles, distJavaScriptBundles, label) => {
+  const directoryBundles = await listIndexBundles(directory);
+  const directoryJavaScriptBundles = await listJavaScriptBundles(directory);
 
-  if (distBundles.length === 0) {
-    fail(`No Vite index bundle found in ${distAssetsDir}`);
+  if (directoryBundles.length === 0) {
+    fail(`No index bundle found in ${label} (${directory})`);
   }
 
-  if (iosBundles.length === 0) {
-    fail(`No Capacitor index bundle found in ${iosAssetsDir}`);
-  }
-
-  const missingInIos = distBundles.filter((bundle) => !iosBundles.includes(bundle));
-  if (missingInIos.length > 0) {
+  const missingBundles = distBundles.filter((bundle) => !directoryBundles.includes(bundle));
+  if (missingBundles.length > 0) {
     fail(
-      `iOS assets are stale. Missing bundle(s): ${missingInIos.join(", ")}. Found in iOS: ${iosBundles.join(", ")}`,
+      `${label} is stale at ${directory}. Missing bundle(s): ${missingBundles.join(", ")}. ` +
+      `Found: ${directoryBundles.join(", ")}`,
     );
   }
 
   const hashMismatches = [];
   for (const bundle of distBundles) {
     const distHash = await hashFile(path.join(distAssetsDir, bundle));
-    const iosHash = await hashFile(path.join(iosAssetsDir, bundle));
-    if (distHash !== iosHash) {
+    const directoryHash = await hashFile(path.join(directory, bundle));
+    if (distHash !== directoryHash) {
       hashMismatches.push(bundle);
     }
   }
 
   if (hashMismatches.length > 0) {
-    fail(`Bundle content mismatch for: ${hashMismatches.join(", ")}`);
+    fail(`${label} at ${directory} has bundle content mismatch for: ${hashMismatches.join(", ")}`);
   }
 
   await verifyNoLegacyJourneyPathContract(distAssetsDir, distJavaScriptBundles);
-  await verifyNoLegacyJourneyPathContract(iosAssetsDir, iosJavaScriptBundles);
+  await verifyNoLegacyJourneyPathContract(directory, directoryJavaScriptBundles);
+};
+
+const verifyAssets = async () => {
+  const { targetBuiltAssetsDir, skipGeneratedBuildScan } = parseArgs(process.argv.slice(2));
+  const distBundles = await listIndexBundles(distAssetsDir);
+  const distJavaScriptBundles = await listJavaScriptBundles(distAssetsDir);
+
+  if (distBundles.length === 0) {
+    fail(`No Vite index bundle found in ${distAssetsDir}`);
+  }
+
+  await verifyNoLegacyJourneyPathContract(distAssetsDir, distJavaScriptBundles);
+  await verifyDirectoryMatchesDist(iosAssetsDir, distBundles, distJavaScriptBundles, "Capacitor iOS public assets");
+
+  const buildAssetDirs = new Set();
+  if (!skipGeneratedBuildScan) {
+    for (const directory of await findGeneratedBuildAssetDirs()) {
+      buildAssetDirs.add(directory);
+    }
+  }
+
+  if (targetBuiltAssetsDir) {
+    buildAssetDirs.add(targetBuiltAssetsDir);
+  }
+
+  for (const directory of [...buildAssetDirs].sort()) {
+    await verifyDirectoryMatchesDist(
+      directory,
+      distBundles,
+      distJavaScriptBundles,
+      `generated iOS app bundle assets`,
+    );
+  }
 
   info(`Verified ${distBundles.length} index bundle(s) are synced between dist and iOS public assets.`);
 };

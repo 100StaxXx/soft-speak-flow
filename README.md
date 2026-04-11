@@ -146,7 +146,9 @@ npx cap add ios
 
 After the platform is created, you can rerun `npm run ios:sync` to rebuild the web app, copy the latest assets into the Capacitor project, and verify the synced bundle contents.
 
-Treat everything under `ios/App/App/public` and `ios/App/build-cli` as generated output. Those folders are useful for inspection, but they are not the source of truth for app code and should always be refreshed from the current web build before device or TestFlight packaging.
+Treat everything under `ios/App/App/public`, `ios/App/build-cli`, and `ios/App/build-xc` as generated output. Those folders are useful for inspection, but they are not the source of truth for app code and should always be refreshed from the current web build before device or TestFlight packaging.
+
+The App target now runs a bundled web-asset verification phase during Xcode builds. If a repo-local `App.app/public/assets` bundle drifts from `dist/assets` or still contains a legacy journey-path retry contract, the native build fails before packaging the app.
 
 The Capacitor iOS project includes a custom CocoaPods `post_install` hook (see `ios/App/Podfile`) that scans every downloaded `.xcframework`. If a framework ships without the plain `ios-arm64` slice that the `[CP] Copy XCFrameworks` script expects, the hook clones the closest non-simulator `ios-arm64_*` variant into place. This prevents `rsync` errors like the ones seen for `IONFilesystemLib` or `FBSDKCoreKit_Basics`.
 
