@@ -8,7 +8,13 @@ const battleVsPropsSpy = vi.hoisted(() => vi.fn());
 const resultPropsSpy = vi.hoisted(() => vi.fn());
 const useCompanionMock = vi.hoisted(() => vi.fn());
 const refetchCompanionMock = vi.hoisted(() => vi.fn());
-const onCompleteMock = vi.hoisted(() => vi.fn(async () => true));
+const onCompleteMock = vi.hoisted(() =>
+  vi.fn(async () => ({
+    persisted: true,
+    xpAwarded: 42,
+    xpCapApplied: false,
+  })),
+);
 const battleStateHookValue = vi.hoisted(() => ({
   battleState: {
     playerHP: 100,
@@ -284,7 +290,11 @@ describe('AstralEncounterModal companion portrait resolution', () => {
     useCompanionMock.mockReset();
     refetchCompanionMock.mockReset();
     onCompleteMock.mockClear();
-    onCompleteMock.mockResolvedValue(true);
+    onCompleteMock.mockResolvedValue({
+      persisted: true,
+      xpAwarded: 42,
+      xpCapApplied: false,
+    });
     battleStateHookValue.dealDamage.mockReset();
     battleStateHookValue.resetBattle.mockReset();
     battleStateHookValue.getResult.mockClear();

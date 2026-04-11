@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { format, addDays, addWeeks, addMonths, nextMonday, nextTuesday, nextWednesday, nextThursday, nextFriday, nextSaturday, nextSunday, setMonth, setDate, getYear, endOfMonth, startOfMonth } from 'date-fns';
+import { format, addDays, addWeeks, addMonths, addMinutes, nextMonday, nextTuesday, nextWednesday, nextThursday, nextFriday, nextSaturday, nextSunday, setMonth, setDate, getYear, endOfMonth, startOfMonth } from 'date-fns';
 import type { QuestAttachmentInput } from '@/types/questAttachments';
 
 export interface ParsedTask {
@@ -157,6 +157,21 @@ function parseDurationAmount(value: string, multiplier: number): number | null {
   return Math.round(parsedNumber * multiplier);
 }
 
+function resolveRelativeScheduledDateTime(minutesFromNow: number): { scheduledDate: string; scheduledTime: string } {
+  const targetDate = addMinutes(new Date(), minutesFromNow);
+  return {
+    scheduledDate: format(targetDate, 'yyyy-MM-dd'),
+    scheduledTime: format(targetDate, 'HH:mm'),
+  };
+}
+
+function stripRelativeTimePhrases(text: string): string {
+  return RELATIVE_TIME_PATTERNS.reduce(
+    (cleaned, pattern) => cleaned.replace(pattern.regex, ' '),
+    text,
+  );
+}
+
 // Smart time inference
 function inferAmPm(hour: number): 'am' | 'pm' {
   if (hour >= 1 && hour <= 6) return 'pm';
@@ -261,6 +276,36 @@ const TIME_PATTERNS = [
   { regex: /\b(?:before\s*bed|bedtime|end\s*of\s*day)\b/i, handler: () => '22:00' },
   { regex: /\blate\s*night\b/i, handler: () => '23:00' },
   { regex: /\bmidnight\b/i, handler: () => '00:00' },
+];
+
+const RELATIVE_TIME_PATTERNS: Array<{
+  regex: RegExp;
+  handler: (match: RegExpMatchArray) => { scheduledDate: string; scheduledTime: string } | null;
+}> = [
+  {
+    regex: /\bin\s+half\s*(?:an?\s*)?hour\b/i,
+    handler: () => resolveRelativeScheduledDateTime(30),
+  },
+  {
+    regex: new RegExp(
+      String.raw`\bin\s+(${DURATION_AMOUNT_PATTERN})\s*h(?:ours?|rs?)\b`,
+      'i',
+    ),
+    handler: (match) => {
+      const minutes = parseDurationAmount(match[1], 60);
+      return minutes === null ? null : resolveRelativeScheduledDateTime(minutes);
+    },
+  },
+  {
+    regex: new RegExp(
+      String.raw`\bin\s+(${DURATION_AMOUNT_PATTERN})\s*m(?:in(?:ute)?s?)?\b`,
+      'i',
+    ),
+    handler: (match) => {
+      const minutes = parseDurationAmount(match[1], 1);
+      return minutes === null ? null : resolveRelativeScheduledDateTime(minutes);
+    },
+  },
 ];
 
 // Date patterns - enhanced with more relative dates
@@ -595,6 +640,7 @@ function cleanTaskText(text: string): string {
 
   const patternsToRemove = [
     ...TIME_PATTERNS.map(p => p.regex),
+    ...RELATIVE_TIME_PATTERNS.map(p => p.regex),
     ...DATE_PATTERNS.map(p => p.regex),
     ...DURATION_PATTERNS.map(p => p.regex),
     ...DIFFICULTY_PATTERNS.map(p => p.regex),
@@ -675,6 +721,7 @@ export function parseNaturalLanguage(input: string): ParsedTask {
     imageUrl: null,
     attachments: [],
   };
+  const inputWithoutRelativeTime = stripRelativeTimePhrases(input);
 
   // Parse clear patterns first
   for (const pattern of CLEAR_PATTERNS) {
@@ -709,9 +756,26 @@ export function parseNaturalLanguage(input: string): ParsedTask {
     }
   }
 
+  // Parse relative time after explicit times so absolute clock values win.
+  if (!result.scheduledTime) {
+    for (const pattern of RELATIVE_TIME_PATTERNS) {
+      const match = input.match(pattern.regex);
+      if (!match) continue;
+
+      const relativeSchedule = pattern.handler(match);
+      if (!relativeSchedule) continue;
+
+      result.scheduledTime = relativeSchedule.scheduledTime;
+      if (!result.scheduledDate) {
+        result.scheduledDate = relativeSchedule.scheduledDate;
+      }
+      break;
+    }
+  }
+
   // Parse duration
   for (const pattern of DURATION_PATTERNS) {
-    const match = input.match(pattern.regex);
+    const match = inputWithoutRelativeTime.match(pattern.regex);
     if (match) {
       result.estimatedDuration = pattern.handler(match);
       break;

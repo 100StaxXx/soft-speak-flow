@@ -25,7 +25,6 @@ import { useAdversaryImage } from '@/hooks/useAdversaryImage';
 import { useBattleState } from '@/hooks/useBattleState';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { calculateXPReward } from '@/utils/adversaryGenerator';
 import { AdversaryTier } from '@/types/astralEncounters';
 import { MiniGameSkeleton } from '@/components/skeletons';
 import type { BossBattleContext } from '@/types/narrativeTypes';
@@ -60,7 +59,16 @@ interface AstralEncounterModalProps {
   encounter: AstralEncounter | null;
   adversary: Adversary | null;
   questInterval?: number;
-  onComplete: (params: { encounterId: string; accuracy: number; phasesCompleted: number }) => Promise<boolean>;
+  onComplete: (params: {
+    encounterId: string;
+    accuracy: number;
+    phasesCompleted: number;
+    usedTiltControls: boolean;
+  }) => Promise<{
+    persisted: boolean;
+    xpAwarded: number;
+    xpCapApplied: boolean;
+  }>;
   onPass?: () => void | Promise<void>;
   // Boss battle props
   isBossBattle?: boolean;
@@ -96,6 +104,7 @@ export const AstralEncounterModal = ({
     result: 'perfect' | 'good' | 'fail';
     accuracy: number;
     xpEarned: number;
+    xpCapApplied: boolean;
     tiltBonus?: boolean;
   } | null>(null);
   const [showScreenShake, setShowScreenShake] = useState(false);
@@ -197,21 +206,16 @@ export const AstralEncounterModal = ({
 
     const accuracy = getBattleAccuracy(outcome);
     const result = getEncounterResultFromAccuracy(accuracy);
-    const xpEarned = calculateXPReward(
-      adversary.tier as AdversaryTier, 
-      accuracy,
-      usedTiltControls
-    );
-
-    const didPersist = await onComplete({
+    const completion = await onComplete({
       encounterId: encounter.id,
       accuracy,
       phasesCompleted: outcome === 'victory'
         ? adversary.phases
         : Math.max(currentPhaseIndex + 1, phaseResults.length, 1),
+      usedTiltControls,
     });
 
-    if (!didPersist) {
+    if (!completion.persisted) {
       onOpenChange(false);
       return;
     }
@@ -219,7 +223,8 @@ export const AstralEncounterModal = ({
     setFinalResult({
       result,
       accuracy,
-      xpEarned,
+      xpEarned: completion.xpAwarded,
+      xpCapApplied: completion.xpCapApplied,
       tiltBonus: usedTiltControls,
     });
 
@@ -697,6 +702,7 @@ export const AstralEncounterModal = ({
                       result={finalResult.result}
                       accuracy={finalResult.accuracy}
                       xpEarned={finalResult.xpEarned}
+                      xpCapApplied={finalResult.xpCapApplied}
                       onClose={handleClose}
                       retryAvailableAt={
                         finalResult.result === 'fail' 

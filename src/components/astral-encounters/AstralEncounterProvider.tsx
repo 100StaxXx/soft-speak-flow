@@ -105,12 +105,21 @@ const AstralEncounterProviderInner = ({ children }: AstralEncounterProviderProps
     encounterId: string;
     accuracy: number;
     phasesCompleted: number;
+    usedTiltControls: boolean;
   }) => {
     try {
-      await completeEncounterAsync(params);
-      return true;
+      const completion = await completeEncounterAsync(params);
+      return {
+        persisted: true,
+        xpAwarded: completion.xpAwarded,
+        xpCapApplied: completion.xpCapApplied,
+      };
     } catch {
-      return false;
+      return {
+        persisted: false,
+        xpAwarded: 0,
+        xpCapApplied: false,
+      };
     }
   }, [completeEncounterAsync]);
 

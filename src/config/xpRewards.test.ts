@@ -1,4 +1,5 @@
 import {
+  ASTRAL_ENCOUNTER_DAILY_XP_CAP,
   HABIT_XP_REWARDS,
   SYSTEM_XP_REWARDS,
   DAILY_XP_CAP,
@@ -18,6 +19,10 @@ describe("xpRewards rebalance constants", () => {
   it("uses updated repeatable cap values", () => {
     expect(DAILY_XP_CAP).toBe(260);
     expect(POST_CAP_REPEATABLE_MULTIPLIER).toBe(0.35);
+  });
+
+  it("limits astral encounter XP to about three full runs per day", () => {
+    expect(ASTRAL_ENCOUNTER_DAILY_XP_CAP).toBe(150);
   });
 });
 

@@ -61,4 +61,16 @@ describe("buildVoiceQuestPrefillFromTranscript", () => {
       estimatedDuration: 60,
     }));
   });
+
+  it("prefills relative-time voice scheduling with a clean title", () => {
+    const prefill = buildVoiceQuestPrefillFromTranscript("Walk the dog in one hour");
+
+    expect(prefill).toEqual(expect.objectContaining({
+      text: "Walk the dog",
+      taskDate: "2026-04-09",
+      scheduledTime: "13:00",
+      estimatedDuration: null,
+      creationSource: "voice",
+    }));
+  });
 });

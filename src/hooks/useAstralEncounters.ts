@@ -41,6 +41,12 @@ export interface EncounterTriggerResult {
   reason?: EncounterTriggerReason;
 }
 
+export interface EncounterCompletionResult {
+  result: ReturnType<typeof getResultFromAccuracy>;
+  xpAwarded: number;
+  xpCapApplied: boolean;
+}
+
 const RECENT_ADVERSARY_HISTORY_LIMIT = 10;
 const RECENT_MINIGAME_HISTORY_LIMIT = 2;
 const UNSUPPORTED_PLATFORM_ERROR_CODE = 'unsupported_platform';
@@ -255,16 +261,20 @@ export const useAstralEncounters = () => {
       encounterId: string;
       accuracy: number;
       phasesCompleted: number;
+      usedTiltControls: boolean;
     }) => {
       if (!user?.id || !companion?.id || !activeEncounter) {
         throw new Error('Missing required data');
       }
 
       const result = getResultFromAccuracy(params.accuracy);
-      const xpEarned = calculateXPReward(
+      const rawXpEarned = calculateXPReward(
         activeEncounter.adversary.tier,
-        params.accuracy
+        params.accuracy,
+        params.usedTiltControls,
       );
+      let xpAwarded = 0;
+      let xpCapApplied = false;
 
       // Update encounter
       const { error: updateError } = await supabase
@@ -272,7 +282,7 @@ export const useAstralEncounters = () => {
         .update({
           result,
           accuracy_score: params.accuracy,
-          xp_earned: xpEarned,
+          xp_earned: 0,
           essence_earned: result !== 'fail' ? activeEncounter.adversary.essenceName : null,
           stat_boost_type: result !== 'fail' ? activeEncounter.adversary.statType : null,
           stat_boost_amount: result !== 'fail' ? activeEncounter.adversary.statBoost : 0,
@@ -402,7 +412,7 @@ export const useAstralEncounters = () => {
         const newStatField = statTypeMapping[oldStatField];
         if (!newStatField) {
           console.error('Invalid stat type:', oldStatField);
-          return { result, xpEarned };
+          return { result, xpAwarded, xpCapApplied };
         }
         // Type-safe stat access using new 6-stat system
         const companionStatsNew = {
@@ -423,8 +433,26 @@ export const useAstralEncounters = () => {
         throwIfSupabaseError(companionUpdateError, 'Failed to update companion stats');
 
         // Award XP
-        if (xpEarned > 0) {
-          await awardCustomXP(xpEarned, 'astral_encounter', `Defeated ${activeEncounter.adversary.name}`);
+        if (rawXpEarned > 0) {
+          const awardResult = await awardCustomXP(rawXpEarned, 'astral_encounter');
+          xpAwarded = awardResult?.xpAwarded ?? 0;
+          xpCapApplied = Boolean(awardResult?.capApplied) || Boolean(awardResult && xpAwarded < rawXpEarned);
+        }
+
+        const { error: encounterXpUpdateError } = await supabase
+          .from('astral_encounters')
+          .update({ xp_earned: xpAwarded })
+          .eq('id', params.encounterId);
+        throwIfSupabaseError(encounterXpUpdateError, 'Failed to sync encounter XP');
+
+        if (activeEncounter.encounter.trigger_type !== 'urge_resist') {
+          if (xpAwarded > 0) {
+            toast.success(`Victory! +${xpAwarded} XP`);
+          } else if (xpCapApplied) {
+            toast.success('Victory! Daily Astral XP cap reached.', {
+              description: 'You can keep playing, but Astral encounters will not award more XP until tomorrow.',
+            });
+          }
         }
       }
 
@@ -450,7 +478,7 @@ export const useAstralEncounters = () => {
               habit_id: habitId,
               encounter_id: params.encounterId,
               result,
-              xp_earned: xpEarned,
+              xp_earned: xpAwarded,
               care_boost: careBoost,
             });
             throwIfSupabaseError(resistLogInsertError, 'Failed to write resist log');
@@ -493,18 +521,29 @@ export const useAstralEncounters = () => {
             }
 
             if (isSuccess) {
-              toast.success('You resisted! Your companion grows stronger.', {
-                description: `+${xpEarned} XP • Streak: ${newStreak}`,
-              });
+              if (xpAwarded > 0) {
+                toast.success('You resisted! Your companion grows stronger.', {
+                  description: `+${xpAwarded} XP • Streak: ${newStreak}`,
+                });
+              } else if (xpCapApplied) {
+                toast.success('You resisted! Your streak still counts.', {
+                  description: `Daily Astral XP cap reached • Streak: ${newStreak}`,
+                });
+              } else {
+                toast.success('You resisted! Your companion grows stronger.', {
+                  description: `Streak: ${newStreak}`,
+                });
+              }
             }
           }
         }
       }
 
-      return { result, xpEarned };
+      return { result, xpAwarded, xpCapApplied };
     },
-    onSuccess: ({ result, xpEarned }) => {
+    onSuccess: ({ result }) => {
       queryClient.invalidateQueries({ queryKey: ['astral-encounters'] });
+      queryClient.invalidateQueries({ queryKey: ['astral-encounter-xp-today'] });
       queryClient.invalidateQueries({ queryKey: ['adversary-essences'] });
       queryClient.invalidateQueries({ queryKey: ['cosmic-codex'] });
       queryClient.invalidateQueries({ queryKey: ['user-epic-rewards'] });
@@ -512,15 +551,10 @@ export const useAstralEncounters = () => {
       queryClient.invalidateQueries({ queryKey: ['bad-habits'] });
       queryClient.invalidateQueries({ queryKey: ['resist-log'] });
 
-      // Only show generic victory toast if not urge_resist (resist has its own toast)
-      if (result !== 'fail' && activeEncounter?.encounter.trigger_type !== 'urge_resist') {
-        toast.success(`Victory! +${xpEarned} XP`);
+      // Trigger companion reaction on resist victory
+      if (result !== 'fail' && activeEncounter?.encounter.trigger_type === 'urge_resist') {
+        triggerResistVictory().catch(err => console.log('[LivingCompanion] Resist trigger failed:', err));
       }
-       
-       // Trigger companion reaction on resist victory
-       if (result !== 'fail' && activeEncounter?.encounter.trigger_type === 'urge_resist') {
-         triggerResistVictory().catch(err => console.log('[LivingCompanion] Resist trigger failed:', err));
-       }
     },
     onError: (error) => {
       console.error('Failed to complete encounter:', error);

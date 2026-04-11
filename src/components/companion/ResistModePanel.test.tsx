@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   addHabit: vi.fn(),
   removeHabit: vi.fn(),
   isMacSession: vi.fn(),
+  useResistMode: vi.fn(),
 }));
 
 vi.mock("framer-motion", async () => {
@@ -33,35 +34,7 @@ vi.mock("framer-motion", async () => {
 });
 
 vi.mock("@/hooks/useResistMode", () => ({
-  useResistMode: () => ({
-    habits: [
-      {
-        id: "habit-1",
-        user_id: "user-1",
-        name: "Late-night scrolling",
-        icon: "📵",
-        habit_theme: "distraction",
-        times_resisted: 4,
-        current_streak: 2,
-        longest_streak: 5,
-        last_resisted_at: null,
-        is_active: true,
-        created_at: new Date().toISOString(),
-      },
-    ],
-    stats: {
-      totalResisted: 4,
-      successfulResists: 4,
-      todayResists: 1,
-      bestStreak: 5,
-    },
-    isLoading: false,
-    isAddingHabit: false,
-    isRemovingHabit: false,
-    addHabit: mocks.addHabit,
-    removeHabit: mocks.removeHabit,
-    getHabit: vi.fn(),
-  }),
+  useResistMode: mocks.useResistMode,
 }));
 
 vi.mock("@/contexts/AstralEncounterContext", () => ({
@@ -85,6 +58,38 @@ describe("ResistModePanel", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.isMacSession.mockReturnValue(false);
+    mocks.useResistMode.mockReturnValue({
+      habits: [
+        {
+          id: "habit-1",
+          user_id: "user-1",
+          name: "Late-night scrolling",
+          icon: "📵",
+          habit_theme: "distraction",
+          times_resisted: 4,
+          current_streak: 2,
+          longest_streak: 5,
+          last_resisted_at: null,
+          is_active: true,
+          created_at: new Date().toISOString(),
+        },
+      ],
+      stats: {
+        totalResisted: 4,
+        successfulResists: 4,
+        todayResists: 1,
+        bestStreak: 5,
+        astralXpToday: 45,
+        astralXpRemaining: 105,
+        astralXpCapReached: false,
+      },
+      isLoading: false,
+      isAddingHabit: false,
+      isRemovingHabit: false,
+      addHabit: mocks.addHabit,
+      removeHabit: mocks.removeHabit,
+      getHabit: vi.fn(),
+    });
   });
 
   it("shows the Mac notice and disables Astral encounter CTAs on macOS", () => {
@@ -118,5 +123,48 @@ describe("ResistModePanel", () => {
         "distraction",
       );
     });
+  });
+
+  it("shows the daily cap banner and relabels resist actions after astral XP is capped", () => {
+    mocks.useResistMode.mockReturnValue({
+      habits: [
+        {
+          id: "habit-1",
+          user_id: "user-1",
+          name: "Late-night scrolling",
+          icon: "📵",
+          habit_theme: "distraction",
+          times_resisted: 4,
+          current_streak: 2,
+          longest_streak: 5,
+          last_resisted_at: null,
+          is_active: true,
+          created_at: new Date().toISOString(),
+        },
+      ],
+      stats: {
+        totalResisted: 4,
+        successfulResists: 4,
+        todayResists: 1,
+        bestStreak: 5,
+        astralXpToday: 150,
+        astralXpRemaining: 0,
+        astralXpCapReached: true,
+      },
+      isLoading: false,
+      isAddingHabit: false,
+      isRemovingHabit: false,
+      addHabit: mocks.addHabit,
+      removeHabit: mocks.removeHabit,
+      getHabit: vi.fn(),
+    });
+
+    render(<ResistModePanel />);
+
+    expect(screen.getByText("Daily Astral XP cap reached")).toBeInTheDocument();
+    expect(
+      screen.getByText(/will not award more XP until tomorrow/i),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Resist (no XP)" })).toBeInTheDocument();
   });
 });

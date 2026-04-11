@@ -5,16 +5,21 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   submitReflection: vi.fn(),
   toast: vi.fn(),
+  drawerRootProps: [] as Array<Record<string, unknown>>,
 }));
 
 vi.mock("@/components/ui/drawer", () => ({
   Drawer: ({
     open,
     children,
+    ...props
   }: {
     open: boolean;
     children: ReactNode;
-  }) => (open ? <div>{children}</div> : null),
+  } & Record<string, unknown>) => {
+    mocks.drawerRootProps.push(props);
+    return open ? <div>{children}</div> : null;
+  },
   DrawerContent: ({
     children,
     ...props
@@ -46,6 +51,7 @@ describe("EveningReflectionDrawer", () => {
     mocks.submitReflection.mockReset();
     mocks.submitReflection.mockResolvedValue(undefined);
     mocks.toast.mockReset();
+    mocks.drawerRootProps.length = 0;
   });
 
   it("keeps deeper prompts collapsed until requested", () => {
@@ -98,6 +104,144 @@ describe("EveningReflectionDrawer", () => {
       } else {
         delete (HTMLElement.prototype as HTMLElement & { scrollIntoView?: unknown }).scrollIntoView;
       }
+    }
+  });
+
+  it("disables Vaul input repositioning for the reflection drawer", () => {
+    render(<EveningReflectionDrawer open={true} onOpenChange={vi.fn()} />);
+
+    expect(mocks.drawerRootProps).toHaveLength(1);
+    expect(mocks.drawerRootProps[0]?.repositionInputs).toBe(false);
+  });
+
+  it("does not call window.scrollTo when focusing between textareas", async () => {
+    const windowScrollToSpy = vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
+
+    try {
+      render(<EveningReflectionDrawer open={true} onOpenChange={vi.fn()} />);
+
+      fireEvent.focus(screen.getByPlaceholderText(
+        "A small win, a moment of joy, something you appreciated about today...",
+      ));
+
+      fireEvent.click(screen.getByRole("button", { name: /go a little deeper/i }));
+
+      fireEvent.focus(screen.getByPlaceholderText("Anything else that feels worth naming tonight..."));
+      fireEvent.focus(screen.getByPlaceholderText(
+        "One small shift, boundary, or choice you'd like to try tomorrow...",
+      ));
+      fireEvent.focus(screen.getByPlaceholderText("Something or someone you appreciate today..."));
+
+      await waitFor(() => {
+        expect(windowScrollToSpy).not.toHaveBeenCalled();
+      });
+    } finally {
+      windowScrollToSpy.mockRestore();
+    }
+  });
+
+  it("keeps focus correction local to the drawer scroller only when a textarea is clipped", async () => {
+    const originalScrollTo = HTMLElement.prototype.scrollTo;
+    const elementScrollToSpy = vi.fn();
+    const windowScrollToSpy = vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
+
+    Object.defineProperty(HTMLElement.prototype, "scrollTo", {
+      configurable: true,
+      writable: true,
+      value: elementScrollToSpy,
+    });
+
+    try {
+      const { container } = render(<EveningReflectionDrawer open={true} onOpenChange={vi.fn()} />);
+
+      const scrollContainer = container.querySelector(
+        "div.mx-auto[data-vaul-no-drag]",
+      ) as HTMLDivElement | null;
+      const winsInput = screen.getByPlaceholderText(
+        "A small win, a moment of joy, something you appreciated about today...",
+      ) as HTMLTextAreaElement;
+      const gratitudeInput = screen.getByPlaceholderText(
+        "Something or someone you appreciate today...",
+      ) as HTMLTextAreaElement;
+
+      expect(scrollContainer).not.toBeNull();
+
+      Object.defineProperty(scrollContainer!, "scrollTop", {
+        configurable: true,
+        writable: true,
+        value: 100,
+      });
+
+      Object.defineProperty(scrollContainer!, "getBoundingClientRect", {
+        configurable: true,
+        value: () => ({
+          top: 100,
+          bottom: 400,
+          left: 0,
+          right: 320,
+          width: 320,
+          height: 300,
+          x: 0,
+          y: 100,
+          toJSON: () => ({}),
+        }),
+      });
+
+      Object.defineProperty(winsInput, "getBoundingClientRect", {
+        configurable: true,
+        value: () => ({
+          top: 120,
+          bottom: 200,
+          left: 0,
+          right: 320,
+          width: 320,
+          height: 80,
+          x: 0,
+          y: 120,
+          toJSON: () => ({}),
+        }),
+      });
+
+      Object.defineProperty(gratitudeInput, "getBoundingClientRect", {
+        configurable: true,
+        value: () => ({
+          top: 360,
+          bottom: 460,
+          left: 0,
+          right: 320,
+          width: 320,
+          height: 100,
+          x: 0,
+          y: 360,
+          toJSON: () => ({}),
+        }),
+      });
+
+      fireEvent.focus(winsInput);
+
+      await waitFor(() => {
+        expect(elementScrollToSpy).not.toHaveBeenCalled();
+      });
+
+      fireEvent.focus(gratitudeInput);
+
+      await waitFor(() => {
+        expect(elementScrollToSpy).toHaveBeenCalledTimes(1);
+      });
+
+      expect(elementScrollToSpy).toHaveBeenLastCalledWith({ top: 176, behavior: "auto" });
+      expect(windowScrollToSpy).not.toHaveBeenCalled();
+    } finally {
+      if (originalScrollTo) {
+        Object.defineProperty(HTMLElement.prototype, "scrollTo", {
+          configurable: true,
+          writable: true,
+          value: originalScrollTo,
+        });
+      } else {
+        delete (HTMLElement.prototype as HTMLElement & { scrollTo?: unknown }).scrollTo;
+      }
+      windowScrollToSpy.mockRestore();
     }
   });
 

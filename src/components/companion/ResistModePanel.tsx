@@ -1,7 +1,7 @@
 import { memo, useCallback, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GlassCard } from '@/components/ui/glass-card';
-import { Shield, Flame, Target, Zap, Smartphone } from 'lucide-react';
+import { Shield, Flame, Target, Zap, Smartphone, Sparkles } from 'lucide-react';
 import { HabitResistCard } from './HabitResistCard';
 import { AddBadHabitDialog } from './AddBadHabitDialog';
 import { useResistMode, BadHabit } from '@/hooks/useResistMode';
@@ -79,6 +79,24 @@ export const ResistModePanel = memo(() => {
         </GlassCard>
       )}
 
+      {!isMacBlockedSession && stats.astralXpCapReached && (
+        <GlassCard variant="inset" className="p-4">
+          <div className="flex items-start gap-3">
+            <div className="rounded-full bg-primary/10 p-2 text-primary">
+              <Sparkles className="h-5 w-5" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-semibold text-foreground">
+                Daily Astral XP cap reached
+              </p>
+              <p className="text-xs text-muted-foreground">
+                You can still resist urges to protect your streak and support your companion, but Resist games will not award more XP until tomorrow.
+              </p>
+            </div>
+          </div>
+        </GlassCard>
+      )}
+
       {/* Stats Row */}
       {(stats.totalResisted > 0 || stats.bestStreak > 0) && (
         <div className="grid grid-cols-3 gap-2">
@@ -117,7 +135,13 @@ export const ResistModePanel = memo(() => {
               onRemove={() => handleRemoveHabit(habit.id)}
               isLoading={isStartingEncounter || isTriggeringEncounter || resistingHabitId === habit.id}
               resistDisabled={isMacBlockedSession}
-              resistLabel={isMacBlockedSession ? 'iPhone/iPad only' : 'Resist'}
+              resistLabel={
+                isMacBlockedSession
+                  ? 'iPhone/iPad only'
+                  : stats.astralXpCapReached
+                    ? 'Resist (no XP)'
+                    : 'Resist'
+              }
             />
           ))}
         </AnimatePresence>

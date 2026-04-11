@@ -77,6 +77,14 @@ export const ENCOUNTER_XP_REWARDS = {
 } as const;
 
 /**
+ * Astral Encounter Daily XP Cap
+ *
+ * Resist encounters tend to land in the 35-45 XP range before bonuses,
+ * so 150 XP feels like roughly three full-XP games per day.
+ */
+export const ASTRAL_ENCOUNTER_DAILY_XP_CAP = 150;
+
+/**
  * Astral Encounter Result Multipliers
  * 
  * Applied to base XP based on performance accuracy.

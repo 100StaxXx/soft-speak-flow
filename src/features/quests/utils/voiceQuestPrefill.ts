@@ -20,6 +20,8 @@ const resolvePrefillTitle = (parsed: ParsedTask, transcript: string) => {
   const stripVoiceMetadata = (value: string) => {
     const breakPatterns = [
       /\snotes?:/i,
+      /\sin\s+half\s*(?:an?\s*)?hour\b/i,
+      /\sin\s+(?:\d+|a|an|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety(?:[-\s](?:one|two|three|four|five|six|seven|eight|nine))?)\s*(?:h(?:ours?|rs?)|m(?:in(?:ute)?s?)?)\b/i,
       /\stomorrow\b/i,
       /\stoday\b/i,
       /\sday\s*after\s*tomorrow\b/i,

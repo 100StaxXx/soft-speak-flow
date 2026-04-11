@@ -13,6 +13,7 @@ interface EncounterResultProps {
   result: ResultType;
   accuracy: number;
   xpEarned: number;
+  xpCapApplied?: boolean;
   onClose: () => void;
   retryAvailableAt?: string;
   tiltBonus?: boolean;
@@ -115,6 +116,7 @@ export const EncounterResultScreen = ({
   result, 
   accuracy, 
   xpEarned, 
+  xpCapApplied = false,
   onClose,
   retryAvailableAt,
   tiltBonus,
@@ -423,6 +425,16 @@ export const EncounterResultScreen = ({
               <span>📱</span>
               <span>+25% Tilt Bonus!</span>
             </motion.div>
+          )}
+          {xpCapApplied && xpEarned === 0 && (
+            <motion.p
+              className="max-w-xs text-center text-xs text-muted-foreground"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 1.1 }}
+            >
+              Daily Astral XP cap reached. This win still counted for your resist progress and companion growth.
+            </motion.p>
           )}
         </motion.div>
       )}

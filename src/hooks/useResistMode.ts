@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { AdversaryTheme } from '@/types/astralEncounters';
+import { ASTRAL_ENCOUNTER_DAILY_XP_CAP } from '@/config/xpRewards';
 import { toast } from "@/components/ui/sonner";
 
 export interface BadHabit {
@@ -33,6 +34,8 @@ export interface ResistLog {
 export const useResistMode = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const now = new Date();
+  const startOfTodayIso = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
 
   // Fetch user's bad habits
   const { data: habits, isLoading: habitsLoading } = useQuery({
@@ -69,6 +72,24 @@ export const useResistMode = () => {
 
       if (error) throw error;
       return data as ResistLog[];
+    },
+    enabled: !!user?.id,
+  });
+
+  const { data: todayAstralXpEvents, isLoading: astralXpLoading } = useQuery({
+    queryKey: ['astral-encounter-xp-today', user?.id, startOfTodayIso],
+    queryFn: async () => {
+      if (!user?.id) return [];
+
+      const { data, error } = await supabase
+        .from('xp_events')
+        .select('xp_earned')
+        .eq('user_id', user.id)
+        .eq('event_type', 'astral_encounter')
+        .gte('created_at', startOfTodayIso);
+
+      if (error) throw error;
+      return data ?? [];
     },
     enabled: !!user?.id,
   });
@@ -153,14 +174,23 @@ export const useResistMode = () => {
           r.result !== 'fail'
       ).length ?? 0;
     const bestStreak = Math.max(...(habits?.map((h) => h.longest_streak) ?? [0]));
+    const astralXpToday = todayAstralXpEvents?.reduce(
+      (sum, event) => sum + Math.max(0, event.xp_earned ?? 0),
+      0,
+    ) ?? 0;
+    const astralXpRemaining = Math.max(0, ASTRAL_ENCOUNTER_DAILY_XP_CAP - astralXpToday);
+    const astralXpCapReached = astralXpRemaining <= 0;
 
     return {
       totalResisted,
       successfulResists,
       todayResists,
       bestStreak,
+      astralXpToday,
+      astralXpRemaining,
+      astralXpCapReached,
     };
-  }, [habits, resistHistory]);
+  }, [habits, resistHistory, todayAstralXpEvents]);
 
   return {
     // Data
@@ -169,7 +199,7 @@ export const useResistMode = () => {
     stats,
 
     // Loading
-    isLoading: habitsLoading || historyLoading,
+    isLoading: habitsLoading || historyLoading || astralXpLoading,
     isAddingHabit: addHabitMutation.isPending,
     isRemovingHabit: removeHabitMutation.isPending,
 

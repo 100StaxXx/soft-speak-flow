@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ChevronDown, Moon, Sparkles } from "lucide-react";
 import {
   Drawer,
@@ -31,12 +31,14 @@ const MAX_REFLECTION_LENGTH = 800;
 export const EveningReflectionDrawer = ({ open, onOpenChange }: EveningReflectionDrawerProps) => {
   const { submitReflection, isSubmitting } = useEveningReflection();
   const { toast } = useToast();
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const [mood, setMood] = useState<string>("");
   const [wins, setWins] = useState("");
   const [additionalReflection, setAdditionalReflection] = useState("");
   const [tomorrowAdjustment, setTomorrowAdjustment] = useState("");
   const [gratitude, setGratitude] = useState("");
   const [isDeeperOpen, setIsDeeperOpen] = useState(false);
+  const focusScrollPadding = 16;
 
   const resetForm = () => {
     setMood("");
@@ -79,10 +81,53 @@ export const EveningReflectionDrawer = ({ open, onOpenChange }: EveningReflectio
 
   const isValid = mood.length > 0;
 
+  const keepFocusedFieldVisible = (target: HTMLTextAreaElement) => {
+    requestAnimationFrame(() => {
+      const container = scrollContainerRef.current;
+      if (!container || !target.isConnected) return;
+
+      const containerRect = container.getBoundingClientRect();
+      const targetRect = target.getBoundingClientRect();
+
+      const clippedTop = targetRect.top < containerRect.top + focusScrollPadding;
+      const clippedBottom = targetRect.bottom > containerRect.bottom - focusScrollPadding;
+
+      if (!clippedTop && !clippedBottom) {
+        return;
+      }
+
+      let nextTop = container.scrollTop;
+
+      if (clippedTop) {
+        nextTop -= containerRect.top + focusScrollPadding - targetRect.top;
+      } else if (clippedBottom) {
+        nextTop += targetRect.bottom - (containerRect.bottom - focusScrollPadding);
+      }
+
+      const clampedTop = Math.max(0, nextTop);
+      if (Math.abs(clampedTop - container.scrollTop) < 1) {
+        return;
+      }
+
+      container.scrollTo({ top: clampedTop, behavior: "auto" });
+    });
+  };
+
+  const handleTextareaFocus = (event: React.FocusEvent<HTMLTextAreaElement>) => {
+    keepFocusedFieldVisible(event.currentTarget);
+  };
+
   return (
-    <Drawer open={open} onOpenChange={handleOpenChange} shouldScaleBackground={false} handleOnly={true}>
+    <Drawer
+      open={open}
+      onOpenChange={handleOpenChange}
+      shouldScaleBackground={false}
+      handleOnly={true}
+      repositionInputs={false}
+    >
       <DrawerContent className="max-h-[85dvh]">
         <div 
+          ref={scrollContainerRef}
           className="mx-auto w-full max-w-lg px-4 pb-8 overflow-y-auto overscroll-contain"
           style={{ 
             WebkitOverflowScrolling: 'touch',
@@ -134,6 +179,7 @@ export const EveningReflectionDrawer = ({ open, onOpenChange }: EveningReflectio
                 value={wins}
                 maxLength={MAX_REFLECTION_LENGTH}
                 onChange={(e) => setWins(e.target.value.slice(0, MAX_REFLECTION_LENGTH))}
+                onFocus={handleTextareaFocus}
                 className="resize-none min-h-24 bg-muted/30 border-border/50"
               />
               <p className="text-xs text-muted-foreground text-right">{wins.length}/{MAX_REFLECTION_LENGTH}</p>
@@ -170,6 +216,7 @@ export const EveningReflectionDrawer = ({ open, onOpenChange }: EveningReflectio
                       value={additionalReflection}
                       maxLength={MAX_REFLECTION_LENGTH}
                       onChange={(e) => setAdditionalReflection(e.target.value.slice(0, MAX_REFLECTION_LENGTH))}
+                      onFocus={handleTextareaFocus}
                       className="resize-none min-h-24 bg-muted/30 border-border/50"
                     />
                     <p className="text-xs text-muted-foreground text-right">
@@ -186,6 +233,7 @@ export const EveningReflectionDrawer = ({ open, onOpenChange }: EveningReflectio
                       value={tomorrowAdjustment}
                       maxLength={MAX_REFLECTION_LENGTH}
                       onChange={(e) => setTomorrowAdjustment(e.target.value.slice(0, MAX_REFLECTION_LENGTH))}
+                      onFocus={handleTextareaFocus}
                       className="resize-none min-h-24 bg-muted/30 border-border/50"
                     />
                     <p className="text-xs text-muted-foreground text-right">
@@ -206,6 +254,7 @@ export const EveningReflectionDrawer = ({ open, onOpenChange }: EveningReflectio
                 value={gratitude}
                 maxLength={MAX_REFLECTION_LENGTH}
                 onChange={(e) => setGratitude(e.target.value.slice(0, MAX_REFLECTION_LENGTH))}
+                onFocus={handleTextareaFocus}
                 className="resize-none min-h-24 bg-muted/30 border-border/50"
               />
               <p className="text-xs text-muted-foreground text-right">{gratitude.length}/{MAX_REFLECTION_LENGTH}</p>
