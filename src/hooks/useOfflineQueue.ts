@@ -20,6 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { extractErrorMessage } from "@/utils/networkErrors";
 import { trackResilienceEvent } from "@/utils/resilienceTelemetry";
 import { dispatchPlannerSyncFinished } from "@/utils/plannerSync";
+import { toRemoteEpicInsertPayload } from "@/utils/epicRemotePayload";
 
 export type SyncStatus = "idle" | "syncing" | "success" | "error";
 
@@ -416,7 +417,7 @@ async function executeQueuedAction(userId: string, action: QueuedAction): Promis
 
       const { error: epicError } = await supabase
         .from("epics")
-        .upsert(payload.epic);
+        .upsert(toRemoteEpicInsertPayload(payload.epic));
       if (epicError) throw epicError;
 
       if (payload.epicHabits.length > 0) {

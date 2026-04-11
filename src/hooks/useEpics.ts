@@ -31,6 +31,7 @@ import {
   upsertPlannerRecord,
   upsertPlannerRecords,
 } from "@/utils/plannerLocalStore";
+import { toRemoteEpicInsertPayload } from "@/utils/epicRemotePayload";
 
 const normalizeDifficulty = (value: string): "easy" | "medium" | "hard" => {
   const lower = value?.toLowerCase()?.trim() || "medium";
@@ -647,7 +648,9 @@ export const useEpics = (options: EpicsOptions = {}) => {
         const { error: habitsError } = await supabase.from("habits").insert(habits);
         if (habitsError) throw habitsError;
 
-        const { error: epicError } = await supabase.from("epics").insert(epic);
+        const { error: epicError } = await supabase
+          .from("epics")
+          .insert(toRemoteEpicInsertPayload(epic));
         if (epicError) throw epicError;
 
         if (epicHabits.length > 0) {

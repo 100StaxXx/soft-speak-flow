@@ -433,6 +433,7 @@ describe("useEpics", () => {
       target_days: 14,
     }));
     expect(insertedEpic.end_date).toBe(resolveEpicEndDate(insertedEpic));
+    expect(insertedEpic).not.toHaveProperty("epic_habits");
   });
 
   it("preserves monthly ritual cadence and month days during campaign creation", async () => {

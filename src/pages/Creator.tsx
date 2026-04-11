@@ -346,7 +346,7 @@ export default function Creator() {
             <h3 className="font-semibold mb-2 text-sm">Rewards Structure</h3>
             <ul className="text-xs text-muted-foreground space-y-1">
               <li>• 50% of first month subscription ($5)</li>
-              <li>• 20% of first year subscription ($20)</li>
+              <li>• 20% of first year subscription ($12)</li>
               <li>• $50 minimum payout threshold</li>
               <li>• Payments via PayPal after admin approval</li>
             </ul>

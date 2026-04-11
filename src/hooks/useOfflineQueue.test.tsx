@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   isNativePlatform: vi.fn(() => false),
   toast: vi.fn(),
   invoke: vi.fn(),
+  from: vi.fn(),
   trackResilienceEvent: vi.fn(),
   dispatchPlannerSyncFinished: vi.fn(),
 }));
@@ -43,6 +44,7 @@ vi.mock("@capacitor/app", () => ({
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
+    from: (...args: unknown[]) => mocks.from(...args),
     functions: {
       invoke: (...args: unknown[]) => mocks.invoke(...args),
     },
@@ -110,6 +112,7 @@ describe("useOfflineQueue", () => {
     vi.clearAllMocks();
     mocks.isNativePlatform.mockReturnValue(false);
     mocks.addListener.mockResolvedValue({ remove: vi.fn().mockResolvedValue(undefined) });
+    mocks.from.mockReset();
     setOnline(true);
     await clearAllPendingActions();
   });
@@ -237,6 +240,70 @@ describe("useOfflineQueue", () => {
 
     await waitFor(() => {
       expect(result.current.pendingCount).toBe(0);
+    });
+  });
+
+  it("sanitizes queued EPIC_CREATE payloads before upserting epics remotely", async () => {
+    await initOfflineDB();
+    await enqueueAction({
+      userId: "user-1",
+      actionKind: "EPIC_CREATE",
+      entityType: "epic",
+      entityId: "epic-1",
+      payload: {
+        epic: {
+          id: "epic-1",
+          user_id: "user-1",
+          title: "Queued Campaign",
+          description: null,
+          status: "active",
+          progress_percentage: 0,
+          target_days: 30,
+          start_date: "2026-04-11",
+          end_date: "2026-05-11",
+          xp_reward: 300,
+          invite_code: "EPIC-TEST",
+          theme_color: "heroic",
+          created_at: "2026-04-11T00:00:00.000Z",
+          epic_habits: [],
+        },
+        habits: [],
+        epicHabits: [],
+        phases: [],
+        milestones: [],
+      },
+    });
+
+    const epicsUpsertMock = vi.fn().mockResolvedValue({ error: null });
+
+    mocks.from.mockImplementation((table: string) => {
+      if (table === "epics") {
+        return {
+          upsert: epicsUpsertMock,
+        };
+      }
+
+      return {
+        upsert: vi.fn().mockResolvedValue({ error: null }),
+      };
+    });
+
+    const { result } = renderHook(() => useOfflineQueue());
+
+    await waitFor(() => {
+      expect(epicsUpsertMock).toHaveBeenCalledTimes(1);
+    });
+
+    expect(epicsUpsertMock).toHaveBeenCalledWith(expect.objectContaining({
+      id: "epic-1",
+      user_id: "user-1",
+      title: "Queued Campaign",
+    }));
+    expect(epicsUpsertMock.mock.calls[0]?.[0]).not.toHaveProperty("epic_habits");
+
+    await waitFor(() => {
+      expect(result.current.pendingCount).toBe(0);
+      expect(result.current.syncStatus).toBe("success");
     });
   });
 });
