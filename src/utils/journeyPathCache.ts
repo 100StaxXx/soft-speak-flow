@@ -54,6 +54,9 @@ type EpicWithJourneyPath = EpicRecord & {
 const pendingJourneyPathGenerations = new Map<string, Promise<JourneyPathSnapshot | null>>();
 const generationStatusCounts = new Map<string, Map<number, number>>();
 const INVALID_JOURNEY_PATH_INPUT_MESSAGE = "Missing or invalid journey path parameters.";
+const JOURNEY_PATH_EPIC_SYNC_MESSAGE =
+  "We couldn't load this campaign yet. If you just created it, wait a moment and try again.";
+const JOURNEY_PATH_NOT_FOUND_RETRY_DELAYS_MS = [400, 1200, 2500] as const;
 
 export const getJourneyPathQueryKey = (epicId: string | undefined, userId: string | undefined) =>
   ["journey-path", epicId, userId] as const;
@@ -110,12 +113,39 @@ const toJourneyPathGenerationError = (
   status: typeof details.status === "number" ? details.status : null,
 });
 
+const isJourneyPathEpicNotFound = (details: {
+  code?: string | null;
+  message?: string | null;
+  status?: number | null;
+}) => {
+  if (details.code === "NOT_FOUND") {
+    return true;
+  }
+
+  if (details.status !== 404) {
+    return false;
+  }
+
+  return (details.message ?? "").toLowerCase().includes("epic not found");
+};
+
+const sleep = (ms: number) =>
+  new Promise<void>((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+
 const toJourneyPathGenerationFailure = async (error: unknown) => {
   const parsed = await parseFunctionInvokeError(error);
   const userFacingMessage = toUserFacingFunctionError(parsed, {
     action: "generate your Star Path image",
   });
-  const message = userFacingMessage === "Request could not be processed right now"
+  const message = isJourneyPathEpicNotFound({
+    code: parsed.responsePayload?.code ?? parsed.code ?? null,
+    message: parsed.backendMessage ?? parsed.message ?? null,
+    status: parsed.status ?? null,
+  })
+    ? JOURNEY_PATH_EPIC_SYNC_MESSAGE
+    : userFacingMessage === "Request could not be processed right now"
     ? "Our servers are temporarily unavailable. Please try again in a moment."
     : userFacingMessage;
 
@@ -142,7 +172,15 @@ const toJourneyPathPayloadFailure = (
   return new JourneyPathGenerationFailure(
     toJourneyPathGenerationError({
       code: typeof responsePayload.code === "string" ? responsePayload.code : null,
-      message: typeof responsePayload.error === "string" ? responsePayload.error : fallbackMessage,
+      message: isJourneyPathEpicNotFound({
+        code: typeof responsePayload.code === "string" ? responsePayload.code : null,
+        message: typeof responsePayload.error === "string" ? responsePayload.error : null,
+        status: typeof responsePayload.status === "number" ? responsePayload.status : null,
+      })
+        ? JOURNEY_PATH_EPIC_SYNC_MESSAGE
+        : typeof responsePayload.error === "string"
+          ? responsePayload.error
+          : fallbackMessage,
       requestId: typeof responsePayload.requestId === "string" ? responsePayload.requestId : null,
       retryAfterSeconds: typeof responsePayload.retryAfterSeconds === "number"
         ? responsePayload.retryAfterSeconds
@@ -438,41 +476,66 @@ export async function requestJourneyPathGeneration({
     let failure: JourneyPathGenerationFailure | null = null;
 
     try {
-      const { data, error } = await supabase.functions.invoke("generate-journey-path", {
-        body: {
-          epicId: normalizedEpicId,
-          milestoneIndex: normalizedMilestoneIndex,
-        },
-      });
+      for (let attemptIndex = 0; ; attemptIndex += 1) {
+        const { data, error } = await supabase.functions.invoke("generate-journey-path", {
+          body: {
+            epicId: normalizedEpicId,
+            milestoneIndex: normalizedMilestoneIndex,
+          },
+        });
 
-      if (error) {
-        throw await toJourneyPathGenerationFailure(error);
-      }
-      if (data?.error) {
-        throw toJourneyPathPayloadFailure(data);
-      }
+        if (error) {
+          const parsed = await parseFunctionInvokeError(error);
+          if (
+            isJourneyPathEpicNotFound({
+              code: parsed.responsePayload?.code ?? parsed.code ?? null,
+              message: parsed.backendMessage ?? parsed.message ?? null,
+              status: parsed.status ?? null,
+            })
+            && attemptIndex < JOURNEY_PATH_NOT_FOUND_RETRY_DELAYS_MS.length
+          ) {
+            await sleep(JOURNEY_PATH_NOT_FOUND_RETRY_DELAYS_MS[attemptIndex]);
+            continue;
+          }
+          throw await toJourneyPathGenerationFailure(error);
+        }
+        if (data?.error) {
+          if (
+            isJourneyPathEpicNotFound({
+              code: typeof data.code === "string" ? data.code : null,
+              message: typeof data.error === "string" ? data.error : null,
+              status: typeof data.status === "number" ? data.status : null,
+            })
+            && attemptIndex < JOURNEY_PATH_NOT_FOUND_RETRY_DELAYS_MS.length
+          ) {
+            await sleep(JOURNEY_PATH_NOT_FOUND_RETRY_DELAYS_MS[attemptIndex]);
+            continue;
+          }
+          throw toJourneyPathPayloadFailure(data);
+        }
 
-      const remoteSnapshot = await fetchRemoteLatestJourneyPath(userId, normalizedEpicId);
-      if (remoteSnapshot) {
-        return persistAndPatchJourneyPathSnapshot(queryClient, remoteSnapshot);
-      }
+        const remoteSnapshot = await fetchRemoteLatestJourneyPath(userId, normalizedEpicId);
+        if (remoteSnapshot) {
+          return persistAndPatchJourneyPathSnapshot(queryClient, remoteSnapshot);
+        }
 
-      if (typeof data?.imageUrl !== "string" || data.imageUrl.length === 0) {
-        throw toJourneyPathPayloadFailure(
-          data,
-          "We couldn't generate your Star Path image. Please try again.",
-        );
-      }
+        if (typeof data?.imageUrl !== "string" || data.imageUrl.length === 0) {
+          throw toJourneyPathPayloadFailure(
+            data,
+            "We couldn't generate your Star Path image. Please try again.",
+          );
+        }
 
-      return persistAndPatchJourneyPathSnapshot(queryClient, {
-        id: getLocalJourneyPathSnapshotId(userId, normalizedEpicId),
-        user_id: userId,
-        epic_id: normalizedEpicId,
-        milestone_index: typeof data?.milestoneIndex === "number" ? data.milestoneIndex : normalizedMilestoneIndex,
-        image_url: data.imageUrl,
-        generated_at: new Date().toISOString(),
-        prompt_context: null,
-      });
+        return persistAndPatchJourneyPathSnapshot(queryClient, {
+          id: getLocalJourneyPathSnapshotId(userId, normalizedEpicId),
+          user_id: userId,
+          epic_id: normalizedEpicId,
+          milestone_index: typeof data?.milestoneIndex === "number" ? data.milestoneIndex : normalizedMilestoneIndex,
+          image_url: data.imageUrl,
+          generated_at: new Date().toISOString(),
+          prompt_context: null,
+        });
+      }
     } catch (error) {
       failure = error instanceof JourneyPathGenerationFailure
         ? error

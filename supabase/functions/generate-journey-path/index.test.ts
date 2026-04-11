@@ -37,6 +37,18 @@ Deno.test("generate-journey-path stores user-scoped cache rows and storage keys"
     !source.includes("requestPayload.userId"),
     "Expected the function to stop trusting caller-supplied userId values",
   );
+  assert(
+    source.includes('profileKey: "ai.standard"'),
+    "Expected journey path generation to use the standard AI abuse-protection profile",
+  );
+  assert(
+    source.includes("EPIC_FETCH_RETRY_DELAYS_MS = [400, 1200, 2500]"),
+    "Expected journey path generation to retry epic lookups before failing",
+  );
+  assert(
+    source.includes('error: EPIC_SYNC_PENDING_ERROR'),
+    "Expected journey path generation to surface a sync-friendly epic lookup message",
+  );
 });
 
 const createProtectedContext = () => ({

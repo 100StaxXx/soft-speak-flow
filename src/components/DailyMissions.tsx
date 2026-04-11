@@ -32,10 +32,8 @@ interface MissionPulsePanelProps {
   title: string;
   accentColor: string;
   percentage: number;
-  completedUsers: number;
-  participantCount: number;
-  completedMissions: number;
-  totalMissions: number;
+  primaryText: string;
+  secondaryText?: string;
   icon: LucideIcon;
 }
 
@@ -43,14 +41,10 @@ const MissionPulsePanel = ({
   title,
   accentColor,
   percentage,
-  completedUsers,
-  participantCount,
-  completedMissions,
-  totalMissions,
+  primaryText,
+  secondaryText,
   icon: Icon,
 }: MissionPulsePanelProps) => {
-  const hasParticipants = participantCount > 0;
-
   return (
     <div
       className="rounded-2xl border p-3 sm:p-3.5 backdrop-blur-sm"
@@ -69,7 +63,7 @@ const MissionPulsePanel = ({
               {percentage}%
             </span>
             <span className="pb-0.5 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-              engaged
+              completed
             </span>
           </div>
         </div>
@@ -94,17 +88,19 @@ const MissionPulsePanel = ({
             }}
           />
         </div>
-        <p className="text-xs text-foreground/88">
-          {hasParticipants
-            ? `${completedUsers.toLocaleString()} / ${participantCount.toLocaleString()} adventurers have cleared at least one mission`
-            : "Awaiting the first reports for today's dispatch."}
-        </p>
-        <p className="text-[11px] text-muted-foreground">
-          {completedMissions.toLocaleString()} / {totalMissions.toLocaleString()} missions marked complete
-        </p>
+        <p className="text-xs text-foreground/88">{primaryText}</p>
+        {secondaryText && (
+          <p className="text-[11px] text-muted-foreground">{secondaryText}</p>
+        )}
       </div>
     </div>
   );
+};
+
+const formatAverageDelta = (delta: number) => {
+  if (delta > 0) return `${delta} pts above average`;
+  if (delta < 0) return `${Math.abs(delta)} pts below average`;
+  return "At guild average";
 };
 
 const DailyMissionsContent = memo(() => {
@@ -131,7 +127,9 @@ const DailyMissionsContent = memo(() => {
   useMissionAutoComplete();
 
   const todaysTheme = missionTheme || getTodaysTheme();
-  const factionData = getFactionById(profile?.faction || pulse?.caller_faction);
+  const callerFaction = profile?.faction || pulse?.caller_faction;
+  const factionData = getFactionById(callerFaction);
+  const hasFactionContext = Boolean(callerFaction);
   const DispatchIcon = factionData?.icon || Target;
 
   if (isLoading) {
@@ -307,7 +305,7 @@ const DailyMissionsContent = memo(() => {
               )}
               <div className="flex items-center gap-1">
                 <h3 className="font-heading text-base font-black sm:text-lg">
-                  {factionData ? "Guild Missions" : "Daily Missions"}
+                  {hasFactionContext ? "Guild Missions" : "Daily Missions"}
                 </h3>
               </div>
               <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
@@ -337,27 +335,22 @@ const DailyMissionsContent = memo(() => {
         <Progress value={progress} className="h-2" />
 
         {!isPulseLoading && pulse && (
-          <div className={cn("grid gap-2.5", factionData ? "md:grid-cols-2" : "grid-cols-1")}>
-            {factionData && (
+          <div className={cn("grid gap-2.5", hasFactionContext ? "md:grid-cols-2" : "grid-cols-1")}>
+            {hasFactionContext && (
               <MissionPulsePanel
-                title={factionData.name}
-                accentColor={factionData.color}
+                title={factionData?.name || "Your Guild"}
+                accentColor={factionData?.color || "#A76CFF"}
                 percentage={pulse.faction_completion_percentage}
-                completedUsers={pulse.faction_completed_users}
-                participantCount={pulse.faction_participants}
-                completedMissions={pulse.faction_missions_completed}
-                totalMissions={pulse.faction_missions_total}
+                primaryText={formatAverageDelta(pulse.faction_vs_network_average_pp)}
+                secondaryText="Daily mission completion rate compared with other guilds"
                 icon={Radar}
               />
             )}
             <MissionPulsePanel
-              title="Global Network"
+              title="Network Average"
               accentColor={factionData?.color || "#A76CFF"}
-              percentage={pulse.global_completion_percentage}
-              completedUsers={pulse.global_completed_users}
-              participantCount={pulse.global_participants}
-              completedMissions={pulse.global_missions_completed}
-              totalMissions={pulse.global_missions_total}
+              percentage={pulse.network_average_completion_percentage}
+              primaryText="Average mission completion across guilds today"
               icon={Globe2}
             />
           </div>

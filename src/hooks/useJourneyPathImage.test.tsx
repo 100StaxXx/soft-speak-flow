@@ -54,6 +54,7 @@ const createDeferred = <T,>() => {
 
 const mocks = vi.hoisted(() => ({
   fetchRemoteLatestJourneyPathMock: vi.fn(),
+  getActiveQueuedActionsMock: vi.fn(),
   getPersistedJourneyPathSnapshotMock: vi.fn(),
   requestJourneyPathGenerationMock: vi.fn(),
 }));
@@ -66,6 +67,14 @@ vi.mock("@/hooks/useAuth", () => ({
 
 vi.mock("@/hooks/epicsQuery", () => ({
   getEpicsQueryKey: (userId: string | undefined) => ["epics", userId] as const,
+}));
+
+vi.mock("@/utils/offlineStorage", () => ({
+  getActiveQueuedActions: (...args: unknown[]) => mocks.getActiveQueuedActionsMock(...args),
+}));
+
+vi.mock("@/utils/plannerSync", () => ({
+  PLANNER_SYNC_EVENT: "planner-sync-finished",
 }));
 
 vi.mock("@/utils/journeyPathCache", () => {
@@ -188,10 +197,37 @@ const createWrapper = () => {
   return { queryClient, wrapper };
 };
 
+const buildQueuedAction = (overrides: Partial<{
+  action_kind: string;
+  created_at: number;
+  entity_id: string | null;
+  entity_type: string;
+  id: string;
+  last_error: string | null;
+  payload: Record<string, unknown>;
+  retry_count: number;
+  status: "queued" | "syncing" | "synced" | "failed" | "dropped";
+  updated_at: number;
+  user_id: string;
+}> = {}) => ({
+  id: overrides.id ?? "queued-1",
+  user_id: overrides.user_id ?? "user-1",
+  action_kind: overrides.action_kind ?? "EPIC_CREATE",
+  entity_type: overrides.entity_type ?? "epic",
+  entity_id: overrides.entity_id ?? "epic-1",
+  payload: overrides.payload ?? {},
+  retry_count: overrides.retry_count ?? 0,
+  last_error: overrides.last_error ?? null,
+  status: overrides.status ?? "queued",
+  created_at: overrides.created_at ?? Date.now(),
+  updated_at: overrides.updated_at ?? Date.now(),
+});
+
 describe("useJourneyPathImage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.fetchRemoteLatestJourneyPathMock.mockResolvedValue(null);
+    mocks.getActiveQueuedActionsMock.mockResolvedValue([]);
     mocks.getPersistedJourneyPathSnapshotMock.mockResolvedValue(null);
     mocks.requestJourneyPathGenerationMock.mockResolvedValue(null);
   });
@@ -294,6 +330,45 @@ describe("useJourneyPathImage", () => {
     await act(async () => {
       remoteDeferred.resolve(null);
       await remoteDeferred.promise;
+    });
+  });
+
+  it("waits for a queued epic create to finish syncing before generating a path", async () => {
+    mocks.getActiveQueuedActionsMock.mockResolvedValue([buildQueuedAction()]);
+
+    const { result } = renderHook(() => useJourneyPathImage("epic-1"), {
+      wrapper: createWrapper().wrapper,
+    });
+
+    await waitFor(() => {
+      expect(result.current.isWaitingForEpicSync).toBe(true);
+    });
+
+    expect(mocks.requestJourneyPathGenerationMock).not.toHaveBeenCalled();
+    expect(result.current.generationError).toBeNull();
+  });
+
+  it("starts generation after the queued epic create clears", async () => {
+    mocks.getActiveQueuedActionsMock
+      .mockResolvedValueOnce([buildQueuedAction()])
+      .mockResolvedValueOnce([]);
+
+    renderHook(() => useJourneyPathImage("epic-1"), {
+      wrapper: createWrapper().wrapper,
+    });
+
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent("planner-sync-finished"));
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(mocks.requestJourneyPathGenerationMock).toHaveBeenCalledWith({
+        epicId: "epic-1",
+        milestoneIndex: 0,
+        queryClient: expect.any(QueryClient),
+        userId: "user-1",
+      });
     });
   });
 

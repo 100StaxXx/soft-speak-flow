@@ -8343,17 +8343,10 @@ export type Database = {
         Args: { p_mission_date: string }
         Returns: {
           caller_faction: string | null
-          faction_completed_users: number
           faction_completion_percentage: number
-          faction_missions_completed: number
-          faction_missions_total: number
-          faction_participants: number
-          global_completed_users: number
-          global_completion_percentage: number
-          global_missions_completed: number
-          global_missions_total: number
-          global_participants: number
+          faction_vs_network_average_pp: number
           mission_date: string
+          network_average_completion_percentage: number
         }[]
       }
       create_companion_if_not_exists: {

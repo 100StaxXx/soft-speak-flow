@@ -34,6 +34,23 @@ vi.mock("@/hooks/useProfile", () => ({
 
 import { DailyMissions } from "./DailyMissions";
 
+interface TestPulse {
+  mission_date: string;
+  caller_faction: string | null;
+  faction_completion_percentage: number;
+  network_average_completion_percentage: number;
+  faction_vs_network_average_pp: number;
+}
+
+const buildPulse = (overrides: Partial<TestPulse> = {}): TestPulse => ({
+  mission_date: "2026-04-09",
+  caller_faction: "starfall",
+  faction_completion_percentage: 72,
+  network_average_completion_percentage: 61,
+  faction_vs_network_average_pp: 11,
+  ...overrides,
+});
+
 describe("DailyMissions", () => {
   beforeEach(() => {
     mockUseDailyMissions.mockReturnValue({
@@ -67,20 +84,7 @@ describe("DailyMissions", () => {
     });
 
     mockUseDailyMissionPulse.mockReturnValue({
-      pulse: {
-        mission_date: "2026-04-09",
-        caller_faction: "starfall",
-        faction_participants: 25,
-        faction_completed_users: 18,
-        faction_completion_percentage: 72,
-        faction_missions_total: 75,
-        faction_missions_completed: 46,
-        global_participants: 140,
-        global_completed_users: 85,
-        global_completion_percentage: 61,
-        global_missions_total: 420,
-        global_missions_completed: 237,
-      },
+      pulse: buildPulse(),
       isLoading: false,
       error: null,
     });
@@ -92,16 +96,78 @@ describe("DailyMissions", () => {
     });
   });
 
-  it("renders faction-themed telemetry with faction and global completion totals", () => {
+  it("renders faction-themed percentage comparisons without exposing raw counts", () => {
     render(<DailyMissions />);
 
     expect(screen.getByText("Guild Missions")).toBeInTheDocument();
     expect(screen.getByText(/STARFALL FLEET Dispatch/i)).toBeInTheDocument();
-    expect(screen.getByText("Global Network")).toBeInTheDocument();
+    expect(screen.getByText("Network Average")).toBeInTheDocument();
     expect(screen.getByText("72%")).toBeInTheDocument();
     expect(screen.getByText("61%")).toBeInTheDocument();
-    expect(screen.getByText(/18 \/ 25 adventurers have cleared at least one mission/i)).toBeInTheDocument();
-    expect(screen.getByText(/237 \/ 420 missions marked complete/i)).toBeInTheDocument();
+    expect(screen.getByText("11 pts above average")).toBeInTheDocument();
+    expect(screen.getByText("Average mission completion across guilds today")).toBeInTheDocument();
+    expect(screen.getByText("Daily mission completion rate compared with other guilds")).toBeInTheDocument();
+    expect(screen.queryByText(/adventurers have cleared at least one mission/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/missions marked complete/i)).not.toBeInTheDocument();
     expect(screen.getByText("Send a quick encouragement text")).toBeInTheDocument();
+  });
+
+  it("renders below-average comparison copy", () => {
+    mockUseDailyMissionPulse.mockReturnValue({
+      pulse: buildPulse({
+        faction_completion_percentage: 43,
+        network_average_completion_percentage: 58,
+        faction_vs_network_average_pp: -15,
+      }),
+      isLoading: false,
+      error: null,
+    });
+
+    render(<DailyMissions />);
+
+    expect(screen.getByText("15 pts below average")).toBeInTheDocument();
+  });
+
+  it("renders at-average comparison copy", () => {
+    mockUseDailyMissionPulse.mockReturnValue({
+      pulse: buildPulse({
+        faction_completion_percentage: 58,
+        network_average_completion_percentage: 58,
+        faction_vs_network_average_pp: 0,
+      }),
+      isLoading: false,
+      error: null,
+    });
+
+    render(<DailyMissions />);
+
+    expect(screen.getByText("At guild average")).toBeInTheDocument();
+  });
+
+  it("shows only the network benchmark when the user has no faction", () => {
+    mockUseDailyMissionPulse.mockReturnValue({
+      pulse: buildPulse({
+        caller_faction: null,
+        faction_completion_percentage: 0,
+        network_average_completion_percentage: 64,
+        faction_vs_network_average_pp: 0,
+      }),
+      isLoading: false,
+      error: null,
+    });
+
+    mockUseProfile.mockReturnValue({
+      profile: {
+        faction: null,
+      },
+    });
+
+    render(<DailyMissions />);
+
+    expect(screen.getByText("Daily Missions")).toBeInTheDocument();
+    expect(screen.getByText("Network Average")).toBeInTheDocument();
+    expect(screen.queryByText("Guild Missions")).not.toBeInTheDocument();
+    expect(screen.queryByText(/STARFALL FLEET Dispatch/i)).not.toBeInTheDocument();
+    expect(screen.queryByText("Your Guild")).not.toBeInTheDocument();
   });
 });

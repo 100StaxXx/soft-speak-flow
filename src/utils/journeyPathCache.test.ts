@@ -55,6 +55,7 @@ const buildRemoteFetchChain = () => {
 describe("journeyPathCache", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useRealTimers();
     buildRemoteFetchChain();
     mocks.getLocalJourneyPathForEpicMock.mockResolvedValue(null);
     mocks.upsertPlannerRecordMock.mockResolvedValue(undefined);
@@ -177,6 +178,109 @@ describe("journeyPathCache", () => {
       },
       milestoneIndex: null,
       pending: false,
+    });
+  });
+
+  it("retries epic-not-found responses before succeeding", async () => {
+    vi.useFakeTimers();
+
+    mocks.invokeMock
+      .mockResolvedValueOnce({
+        data: null,
+        error: {
+          name: "FunctionsHttpError",
+          message: "Edge Function returned a non-2xx status code",
+          context: new Response(
+            JSON.stringify({
+              error: "Epic not found",
+              code: "NOT_FOUND",
+              requestId: "req-journey-404-1",
+            }),
+            {
+              status: 404,
+              headers: { "Content-Type": "application/json" },
+            },
+          ),
+        },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          imageUrl: "https://example.com/generated-path.png",
+          milestoneIndex: 0,
+        },
+        error: null,
+      });
+
+    const queryClient = createQueryClient();
+    const promise = requestJourneyPathGeneration({
+      epicId: "epic-1",
+      milestoneIndex: 0,
+      queryClient,
+      userId: "user-1",
+    });
+
+    await Promise.resolve();
+    expect(mocks.invokeMock).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(400);
+
+    const snapshot = await promise;
+    expect(mocks.invokeMock).toHaveBeenCalledTimes(2);
+    expect(snapshot).toMatchObject({
+      epic_id: "epic-1",
+      image_url: "https://example.com/generated-path.png",
+      milestone_index: 0,
+      user_id: "user-1",
+    });
+  });
+
+  it("surfaces a sync message after repeated epic-not-found responses", async () => {
+    vi.useFakeTimers();
+
+    const notFoundError = {
+      name: "FunctionsHttpError",
+      message: "Edge Function returned a non-2xx status code",
+      context: new Response(
+        JSON.stringify({
+          error: "Epic not found",
+          code: "NOT_FOUND",
+          requestId: "req-journey-404-final",
+        }),
+        {
+          status: 404,
+          headers: { "Content-Type": "application/json" },
+        },
+      ),
+    };
+
+    mocks.invokeMock.mockResolvedValue({
+      data: null,
+      error: notFoundError,
+    });
+
+    const queryClient = createQueryClient();
+    const promise = requestJourneyPathGeneration({
+      epicId: "epic-404",
+      milestoneIndex: 0,
+      queryClient,
+      userId: "user-1",
+    }).catch((error) => error);
+
+    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(400);
+    await vi.advanceTimersByTimeAsync(1200);
+    await vi.advanceTimersByTimeAsync(2500);
+
+    const caughtError = await promise;
+    expect(mocks.invokeMock).toHaveBeenCalledTimes(4);
+    expect(caughtError).toBeInstanceOf(JourneyPathGenerationFailure);
+    expect(caughtError).toMatchObject({
+      code: "NOT_FOUND",
+      message: "We couldn't load this campaign yet. If you just created it, wait a moment and try again.",
+      requestId: "req-journey-404-final",
+      retryAfterSeconds: null,
+      retryable: false,
+      status: 404,
     });
   });
 

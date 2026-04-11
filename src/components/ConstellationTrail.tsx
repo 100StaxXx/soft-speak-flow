@@ -867,6 +867,7 @@ export const ConstellationTrail = memo(function ConstellationTrail({
   const { 
     pathImageUrl, 
     isGenerating, 
+    isWaitingForEpicSync,
     generationError,
     retryInitialPath,
   } = useJourneyPathImage(epicId);
@@ -931,6 +932,7 @@ export const ConstellationTrail = memo(function ConstellationTrail({
     [pathImageUrl],
   );
   const hasGeneratedBackground = Boolean(optimizedPathImageUrl);
+  const showEpicSyncPending = Boolean(!hasGeneratedBackground && isWaitingForEpicSync && !isGenerating);
   const showGenerationError = Boolean(!hasGeneratedBackground && generationError && !isGenerating);
   const fallbackBackgroundUrl = !transparentBackground ? fallbackBackground.src : null;
   const fallbackBackgroundSrcSet = !hasGeneratedBackground && !transparentBackground
@@ -1004,6 +1006,25 @@ export const ConstellationTrail = memo(function ConstellationTrail({
           <Sparkles className="h-3 w-3 animate-pulse" />
           <span>Updating</span>
         </motion.div>
+      )}
+
+      {showEpicSyncPending && (
+        <div
+          className="absolute inset-x-3 bottom-3 z-20 rounded-2xl border border-sky-300/25 bg-slate-950/82 p-3 text-white shadow-[0_16px_40px_rgba(15,23,42,0.38)] backdrop-blur-md"
+          data-testid="journey-path-sync-pending"
+        >
+          <div className="flex items-start gap-2.5">
+            <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-sky-200" />
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-100/85">
+                Campaign syncing
+              </p>
+              <p className="mt-1 text-xs leading-5 text-white/78">
+                We&apos;re still saving this campaign. Your Star Path will appear as soon as sync finishes.
+              </p>
+            </div>
+          </div>
+        </div>
       )}
 
       {showGenerationError && (

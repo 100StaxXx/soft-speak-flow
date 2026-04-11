@@ -5,16 +5,9 @@ import { useAuth } from "./useAuth";
 export interface DailyMissionPulse {
   mission_date: string;
   caller_faction: string | null;
-  faction_participants: number;
-  faction_completed_users: number;
   faction_completion_percentage: number;
-  faction_missions_total: number;
-  faction_missions_completed: number;
-  global_participants: number;
-  global_completed_users: number;
-  global_completion_percentage: number;
-  global_missions_total: number;
-  global_missions_completed: number;
+  network_average_completion_percentage: number;
+  faction_vs_network_average_pp: number;
 }
 
 interface UseDailyMissionPulseOptions {

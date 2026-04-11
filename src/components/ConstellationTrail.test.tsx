@@ -19,6 +19,7 @@ describe("ConstellationTrail", () => {
       currentMilestoneIndex: -1,
       generationError: null,
       isGenerating: false,
+      isWaitingForEpicSync: false,
       isLoading: false,
       error: null,
       generateInitialPath: vi.fn(),
@@ -33,6 +34,7 @@ describe("ConstellationTrail", () => {
       currentMilestoneIndex: 1,
       generationError: null,
       isGenerating: false,
+      isWaitingForEpicSync: false,
       isLoading: false,
       error: null,
       generateInitialPath: vi.fn(),
@@ -57,6 +59,7 @@ describe("ConstellationTrail", () => {
       currentMilestoneIndex: -1,
       generationError: null,
       isGenerating: true,
+      isWaitingForEpicSync: false,
       isLoading: false,
       error: null,
       generateInitialPath: vi.fn(),
@@ -79,6 +82,7 @@ describe("ConstellationTrail", () => {
       currentMilestoneIndex: -1,
       generationError: null,
       isGenerating: true,
+      isWaitingForEpicSync: false,
       isLoading: false,
       error: null,
       generateInitialPath: vi.fn(),
@@ -96,6 +100,7 @@ describe("ConstellationTrail", () => {
       currentMilestoneIndex: 0,
       generationError: null,
       isGenerating: false,
+      isWaitingForEpicSync: false,
       isLoading: false,
       error: null,
       generateInitialPath: vi.fn(),
@@ -128,6 +133,7 @@ describe("ConstellationTrail", () => {
         status: 429,
       },
       isGenerating: false,
+      isWaitingForEpicSync: false,
       isLoading: false,
       error: null,
       generateInitialPath: vi.fn(),
@@ -145,5 +151,28 @@ describe("ConstellationTrail", () => {
     fireEvent.click(screen.getByRole("button", { name: /retry image/i }));
 
     expect(retryInitialPath).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows a sync banner instead of an error while the campaign is still syncing", () => {
+    mocks.useJourneyPathImageMock.mockReturnValue({
+      pathImageUrl: null,
+      currentMilestoneIndex: -1,
+      generationError: null,
+      isGenerating: false,
+      isWaitingForEpicSync: true,
+      isLoading: false,
+      error: null,
+      generateInitialPath: vi.fn(),
+      retryInitialPath: vi.fn(),
+      regeneratePathForMilestone: vi.fn(),
+    });
+
+    render(<ConstellationTrail progress={7} targetDays={30} epicId="epic-queued" />);
+
+    expect(screen.getByTestId("journey-path-fallback")).toBeInTheDocument();
+    expect(screen.getByTestId("journey-path-sync-pending")).toBeInTheDocument();
+    expect(screen.getByText("Campaign syncing")).toBeInTheDocument();
+    expect(screen.queryByTestId("journey-path-error")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /retry image/i })).not.toBeInTheDocument();
   });
 });

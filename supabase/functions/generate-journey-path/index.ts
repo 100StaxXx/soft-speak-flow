@@ -32,6 +32,8 @@ interface GenerateJourneyPathDependencies {
 }
 
 const INVALID_JOURNEY_PATH_INPUT_ERROR = "Missing or invalid journey path parameters.";
+const EPIC_SYNC_PENDING_ERROR = "We couldn't load this campaign yet. If you just created it, wait a moment and try again.";
+const EPIC_FETCH_RETRY_DELAYS_MS = [400, 1200, 2500] as const;
 
 const normalizeJourneyPathEpicId = (value: unknown): string | null => {
   if (typeof value !== "string") {
@@ -97,6 +99,10 @@ export function getJourneyPathValidationError(body: JourneyPathRequestBody): str
   return null;
 }
 
+async function sleep(ms: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function isValidJourneyPathBody(body: JourneyPathRequestBody): body is ValidJourneyPathRequestBody {
   return getJourneyPathValidationError(body) === null;
 }
@@ -142,7 +148,7 @@ export async function handleGenerateJourneyPath(
 
   try {
     const protectedRequest = await requireProtectedRequestImpl(req, {
-      profileKey: "ai.expensive_export",
+      profileKey: "ai.standard",
       endpointName: "generate-journey-path",
       allowServiceRole: false,
     });
@@ -194,18 +200,41 @@ export async function handleGenerateJourneyPath(
       });
     }
 
-    const { data: epic, error: epicError } = await supabase
-      .from("epics")
-      .select("id, user_id, title, story_type_slug, theme_color, story_seed")
-      .eq("id", epicId)
-      .single();
+    let epic: {
+      id: string;
+      user_id: string;
+      title: string;
+      story_type_slug: string | null;
+      theme_color: string | null;
+      story_seed: unknown;
+    } | null = null;
+    let epicError: unknown = null;
+
+    for (let attemptIndex = 0; attemptIndex <= EPIC_FETCH_RETRY_DELAYS_MS.length; attemptIndex += 1) {
+      const epicResult = await supabase
+        .from("epics")
+        .select("id, user_id, title, story_type_slug, theme_color, story_seed")
+        .eq("id", epicId)
+        .single();
+
+      epic = epicResult.data;
+      epicError = epicResult.error;
+
+      if (!epicError && epic) {
+        break;
+      }
+
+      if (attemptIndex < EPIC_FETCH_RETRY_DELAYS_MS.length) {
+        await sleep(EPIC_FETCH_RETRY_DELAYS_MS[attemptIndex]);
+      }
+    }
 
     if (epicError || !epic) {
       console.error("[generate-journey-path] Epic fetch error:", epicError);
       return createSafeErrorResponse(req, {
         status: 404,
         code: "NOT_FOUND",
-        error: "Epic not found",
+        error: EPIC_SYNC_PENDING_ERROR,
         requestId,
       });
     }

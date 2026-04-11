@@ -3,6 +3,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getEpicsQueryKey, type EpicRecord } from "@/hooks/epicsQuery";
 import { needsJourneyPathLandscapeRefresh } from "@/shared/journeyPathConfig";
+import { getActiveQueuedActions } from "@/utils/offlineStorage";
+import { PLANNER_SYNC_EVENT } from "@/utils/plannerSync";
 import {
   fetchRemoteLatestJourneyPath,
   type JourneyPathGenerationError,
@@ -17,6 +19,8 @@ import {
   type JourneyPathSnapshot,
 } from "@/utils/journeyPathCache";
 
+const EPIC_CREATE_QUEUE_POLL_INTERVAL_MS = 2_000;
+
 export const useJourneyPathImage = (epicId: string | undefined) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -24,6 +28,7 @@ export const useJourneyPathImage = (epicId: string | undefined) => {
   const legacyLandscapeRefreshRequestedRef = useRef(false);
   const [persistedJourneyPath, setPersistedJourneyPath] = useState<JourneyPathSnapshot | null>(null);
   const [hasResolvedLocalSnapshot, setHasResolvedLocalSnapshot] = useState(false);
+  const [isWaitingForEpicSync, setIsWaitingForEpicSync] = useState(false);
 
   const epics = queryClient.getQueryData<EpicRecord[]>(getEpicsQueryKey(user?.id)) ?? [];
 
@@ -66,6 +71,27 @@ export const useJourneyPathImage = (epicId: string | undefined) => {
     staleTime: Infinity,
     gcTime: Infinity,
   });
+
+  const refreshEpicSyncPendingState = useCallback(async () => {
+    if (!epicId || !user?.id) {
+      setIsWaitingForEpicSync(false);
+      return false;
+    }
+
+    try {
+      const activeQueuedActions = await getActiveQueuedActions(user.id);
+      const hasPendingEpicCreate = activeQueuedActions.some((action) =>
+        action.action_kind === "EPIC_CREATE" && action.entity_id === epicId
+      );
+
+      setIsWaitingForEpicSync(hasPendingEpicCreate);
+      return hasPendingEpicCreate;
+    } catch (error) {
+      console.error("Failed to inspect pending epic sync state:", error);
+      setIsWaitingForEpicSync(false);
+      return false;
+    }
+  }, [epicId, user?.id]);
 
   useEffect(() => {
     if (!journeyPathFromEpics || !user?.id) return;
@@ -125,6 +151,59 @@ export const useJourneyPathImage = (epicId: string | undefined) => {
     legacyLandscapeRefreshRequestedRef.current = false;
   }, [epicId, user?.id]);
 
+  useEffect(() => {
+    let disposed = false;
+
+    const refreshPendingState = async () => {
+      const hasPendingEpicCreate = await refreshEpicSyncPendingState();
+      if (disposed) return;
+      if (hasPendingEpicCreate) {
+        initialGenerationRequestedRef.current = false;
+      }
+    };
+
+    void refreshPendingState();
+
+    const handlePlannerSync = () => {
+      void refreshPendingState();
+    };
+
+    const handleOnline = () => {
+      void refreshPendingState();
+    };
+
+    window.addEventListener(PLANNER_SYNC_EVENT, handlePlannerSync);
+    window.addEventListener("online", handleOnline);
+
+    return () => {
+      disposed = true;
+      window.removeEventListener(PLANNER_SYNC_EVENT, handlePlannerSync);
+      window.removeEventListener("online", handleOnline);
+    };
+  }, [refreshEpicSyncPendingState]);
+
+  useEffect(() => {
+    if (!isWaitingForEpicSync) {
+      return;
+    }
+
+    if (epicId && user?.id) {
+      queryClient.setQueryData(getJourneyPathGenerationKey(epicId, user.id), {
+        error: null,
+        pending: false,
+        milestoneIndex: null,
+      });
+    }
+
+    const intervalId = globalThis.setInterval(() => {
+      void refreshEpicSyncPendingState();
+    }, EPIC_CREATE_QUEUE_POLL_INTERVAL_MS);
+
+    return () => {
+      globalThis.clearInterval(intervalId);
+    };
+  }, [epicId, isWaitingForEpicSync, queryClient, refreshEpicSyncPendingState, user?.id]);
+
   const journeyPath = useMemo(
     () =>
       preferNewerJourneyPathSnapshot(
@@ -144,6 +223,10 @@ export const useJourneyPathImage = (epicId: string | undefined) => {
         throw new Error("Missing epic or user");
       }
 
+      if (isWaitingForEpicSync) {
+        return null;
+      }
+
       const generatedJourneyPath = await requestJourneyPathGeneration({
         epicId,
         milestoneIndex,
@@ -159,7 +242,7 @@ export const useJourneyPathImage = (epicId: string | undefined) => {
 
       return generatedJourneyPath;
     },
-    [epicId, queryClient, user?.id],
+    [epicId, isWaitingForEpicSync, queryClient, user?.id],
   );
 
   const generateInitialPath = useCallback(() => {
@@ -193,6 +276,7 @@ export const useJourneyPathImage = (epicId: string | undefined) => {
       || !user?.id
       || !hasResolvedLocalSnapshot
       || journeyPath
+      || isWaitingForEpicSync
       || generationState.error
       || generationState.pending
       || initialGenerationRequestedRef.current
@@ -210,6 +294,7 @@ export const useJourneyPathImage = (epicId: string | undefined) => {
     generationState.error,
     generationState.pending,
     hasResolvedLocalSnapshot,
+    isWaitingForEpicSync,
     journeyPath,
     triggerJourneyPathGeneration,
     user?.id,
@@ -250,9 +335,10 @@ export const useJourneyPathImage = (epicId: string | undefined) => {
     journeyPathPromptContext: journeyPath?.prompt_context ?? null,
     isLoading: !journeyPath && (!hasResolvedLocalSnapshot || remoteJourneyPathQuery.isLoading),
     isGenerating: generationState.pending,
+    isWaitingForEpicSync,
     needsLandscapeRefresh,
     error: remoteJourneyPathQuery.error,
-    generationError: generationState.error,
+    generationError: isWaitingForEpicSync ? null : generationState.error,
     generateInitialPath,
     retryInitialPath,
     regeneratePathForMilestone,
