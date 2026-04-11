@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useResilience } from "@/contexts/ResilienceContext";
 import { getEpicsQueryKey, type EpicRecord } from "@/hooks/epicsQuery";
 import { needsJourneyPathLandscapeRefresh } from "@/shared/journeyPathConfig";
 import { getActiveQueuedActions } from "@/utils/offlineStorage";
@@ -20,15 +21,23 @@ import {
 } from "@/utils/journeyPathCache";
 
 const EPIC_CREATE_QUEUE_POLL_INTERVAL_MS = 2_000;
+const EPIC_SYNC_FAILURE_MESSAGE =
+  "We couldn't finish saving this campaign yet. Retry sync to finish setting up your Star Path.";
+
+type EpicCreateSyncState =
+  | { status: "idle" }
+  | { status: "pending" }
+  | { status: "failed"; actionId: string | null; message: string };
 
 export const useJourneyPathImage = (epicId: string | undefined) => {
   const { user } = useAuth();
+  const { retryAction, retryNow } = useResilience();
   const queryClient = useQueryClient();
   const initialGenerationRequestedRef = useRef(false);
   const legacyLandscapeRefreshRequestedRef = useRef(false);
   const [persistedJourneyPath, setPersistedJourneyPath] = useState<JourneyPathSnapshot | null>(null);
   const [hasResolvedLocalSnapshot, setHasResolvedLocalSnapshot] = useState(false);
-  const [isWaitingForEpicSync, setIsWaitingForEpicSync] = useState(false);
+  const [epicCreateSyncState, setEpicCreateSyncState] = useState<EpicCreateSyncState>({ status: "idle" });
 
   const epics = queryClient.getQueryData<EpicRecord[]>(getEpicsQueryKey(user?.id)) ?? [];
 
@@ -72,24 +81,50 @@ export const useJourneyPathImage = (epicId: string | undefined) => {
     gcTime: Infinity,
   });
 
-  const refreshEpicSyncPendingState = useCallback(async () => {
+  const refreshEpicCreateSyncState = useCallback(async () => {
     if (!epicId || !user?.id) {
-      setIsWaitingForEpicSync(false);
-      return false;
+      setEpicCreateSyncState({ status: "idle" });
+      return { status: "idle" } as const;
     }
 
     try {
       const activeQueuedActions = await getActiveQueuedActions(user.id);
-      const hasPendingEpicCreate = activeQueuedActions.some((action) =>
-        action.action_kind === "EPIC_CREATE" && action.entity_id === epicId
-      );
+      const matchingEpicCreates = activeQueuedActions
+        .filter((action) => action.action_kind === "EPIC_CREATE" && action.entity_id === epicId)
+        .sort((left, right) => right.updated_at - left.updated_at);
 
-      setIsWaitingForEpicSync(hasPendingEpicCreate);
-      return hasPendingEpicCreate;
+      const hasPendingEpicCreate = matchingEpicCreates.some((action) =>
+        action.status === "queued" || action.status === "syncing"
+      );
+      if (hasPendingEpicCreate) {
+        const nextState = { status: "pending" } as const;
+        setEpicCreateSyncState(nextState);
+        return nextState;
+      }
+
+      const failedEpicCreate = matchingEpicCreates.find((action) => action.status === "failed");
+      if (failedEpicCreate) {
+        const nextState = {
+          status: "failed",
+          actionId: failedEpicCreate.id,
+          message: failedEpicCreate.last_error || EPIC_SYNC_FAILURE_MESSAGE,
+        } as const;
+        setEpicCreateSyncState(nextState);
+        return nextState;
+      }
+
+      const nextState = { status: "idle" } as const;
+      setEpicCreateSyncState(nextState);
+      return nextState;
     } catch (error) {
       console.error("Failed to inspect pending epic sync state:", error);
-      setIsWaitingForEpicSync(false);
-      return false;
+      const nextState = {
+        status: "failed",
+        actionId: null,
+        message: EPIC_SYNC_FAILURE_MESSAGE,
+      } as const;
+      setEpicCreateSyncState(nextState);
+      return nextState;
     }
   }, [epicId, user?.id]);
 
@@ -155,9 +190,9 @@ export const useJourneyPathImage = (epicId: string | undefined) => {
     let disposed = false;
 
     const refreshPendingState = async () => {
-      const hasPendingEpicCreate = await refreshEpicSyncPendingState();
+      const nextState = await refreshEpicCreateSyncState();
       if (disposed) return;
-      if (hasPendingEpicCreate) {
+      if (nextState.status === "pending") {
         initialGenerationRequestedRef.current = false;
       }
     };
@@ -180,10 +215,10 @@ export const useJourneyPathImage = (epicId: string | undefined) => {
       window.removeEventListener(PLANNER_SYNC_EVENT, handlePlannerSync);
       window.removeEventListener("online", handleOnline);
     };
-  }, [refreshEpicSyncPendingState]);
+  }, [refreshEpicCreateSyncState]);
 
   useEffect(() => {
-    if (!isWaitingForEpicSync) {
+    if (epicCreateSyncState.status !== "pending") {
       return;
     }
 
@@ -196,13 +231,13 @@ export const useJourneyPathImage = (epicId: string | undefined) => {
     }
 
     const intervalId = globalThis.setInterval(() => {
-      void refreshEpicSyncPendingState();
+      void refreshEpicCreateSyncState();
     }, EPIC_CREATE_QUEUE_POLL_INTERVAL_MS);
 
     return () => {
       globalThis.clearInterval(intervalId);
     };
-  }, [epicId, isWaitingForEpicSync, queryClient, refreshEpicSyncPendingState, user?.id]);
+  }, [epicCreateSyncState.status, epicId, queryClient, refreshEpicCreateSyncState, user?.id]);
 
   const journeyPath = useMemo(
     () =>
@@ -223,7 +258,7 @@ export const useJourneyPathImage = (epicId: string | undefined) => {
         throw new Error("Missing epic or user");
       }
 
-      if (isWaitingForEpicSync) {
+      if (epicCreateSyncState.status !== "idle") {
         return null;
       }
 
@@ -242,7 +277,7 @@ export const useJourneyPathImage = (epicId: string | undefined) => {
 
       return generatedJourneyPath;
     },
-    [epicId, isWaitingForEpicSync, queryClient, user?.id],
+    [epicCreateSyncState.status, epicId, queryClient, user?.id],
   );
 
   const generateInitialPath = useCallback(() => {
@@ -270,13 +305,25 @@ export const useJourneyPathImage = (epicId: string | undefined) => {
     });
   }, [epicId, triggerJourneyPathGeneration, user?.id]);
 
+  const retryEpicSync = useCallback(async () => {
+    try {
+      if (epicCreateSyncState.status === "failed" && epicCreateSyncState.actionId) {
+        await retryAction(epicCreateSyncState.actionId);
+      } else {
+        await retryNow();
+      }
+    } finally {
+      await refreshEpicCreateSyncState();
+    }
+  }, [epicCreateSyncState, refreshEpicCreateSyncState, retryAction, retryNow]);
+
   useEffect(() => {
     if (
       !epicId
       || !user?.id
       || !hasResolvedLocalSnapshot
       || journeyPath
-      || isWaitingForEpicSync
+      || epicCreateSyncState.status !== "idle"
       || generationState.error
       || generationState.pending
       || initialGenerationRequestedRef.current
@@ -291,10 +338,10 @@ export const useJourneyPathImage = (epicId: string | undefined) => {
     });
   }, [
     epicId,
+    epicCreateSyncState.status,
     generationState.error,
     generationState.pending,
     hasResolvedLocalSnapshot,
-    isWaitingForEpicSync,
     journeyPath,
     triggerJourneyPathGeneration,
     user?.id,
@@ -335,12 +382,15 @@ export const useJourneyPathImage = (epicId: string | undefined) => {
     journeyPathPromptContext: journeyPath?.prompt_context ?? null,
     isLoading: !journeyPath && (!hasResolvedLocalSnapshot || remoteJourneyPathQuery.isLoading),
     isGenerating: generationState.pending,
-    isWaitingForEpicSync,
+    isWaitingForEpicSync: epicCreateSyncState.status === "pending",
+    epicSyncStatus: epicCreateSyncState.status,
+    epicSyncErrorMessage: epicCreateSyncState.status === "failed" ? epicCreateSyncState.message : null,
     needsLandscapeRefresh,
     error: remoteJourneyPathQuery.error,
-    generationError: isWaitingForEpicSync ? null : generationState.error,
+    generationError: epicCreateSyncState.status === "pending" ? null : generationState.error,
     generateInitialPath,
     retryInitialPath,
+    retryEpicSync,
     regeneratePathForMilestone,
   };
 };

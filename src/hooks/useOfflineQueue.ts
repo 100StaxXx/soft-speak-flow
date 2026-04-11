@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { App } from "@capacitor/app";
+import { Capacitor } from "@capacitor/core";
 import {
   discardQueuedAction,
   enqueueAction,
@@ -616,27 +618,6 @@ export function useOfflineQueue() {
     [refreshQueueState, user?.id],
   );
 
-  useEffect(() => {
-    let disposed = false;
-
-    const init = async () => {
-      try {
-        await initOfflineDB();
-        if (!disposed) {
-          await refreshQueueState();
-        }
-      } catch (error) {
-        console.error("Failed to initialize offline queue:", error);
-      }
-    };
-
-    void init();
-
-    return () => {
-      disposed = true;
-    };
-  }, [refreshQueueState]);
-
   const queueAction = useCallback(
     async ({ actionKind, entityType, entityId, payload }: QueueActionInput): Promise<string> => {
       if (!user?.id) throw new Error("User not authenticated");
@@ -789,12 +770,76 @@ export function useOfflineQueue() {
   }, [refreshQueueState, toast, user?.id]);
 
   useEffect(() => {
+    let disposed = false;
+
+    const init = async () => {
+      try {
+        await initOfflineDB();
+        if (!disposed) {
+          const queueState = await refreshQueueState();
+          if (queueState.pendingCount > 0 && navigator.onLine) {
+            await syncPendingActions();
+          }
+        }
+      } catch (error) {
+        console.error("Failed to initialize offline queue:", error);
+      }
+    };
+
+    void init();
+
+    return () => {
+      disposed = true;
+    };
+  }, [refreshQueueState, syncPendingActions]);
+
+  useEffect(() => {
     const handleOnline = () => {
       void syncPendingActions();
     };
 
     window.addEventListener("online", handleOnline);
     return () => window.removeEventListener("online", handleOnline);
+  }, [syncPendingActions]);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== "visible") return;
+      void syncPendingActions();
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [syncPendingActions]);
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+
+    let disposed = false;
+    let listenerHandle: { remove: () => Promise<void> } | null = null;
+
+    const setupListener = async () => {
+      const handle = await App.addListener("appStateChange", ({ isActive }) => {
+        if (!isActive) return;
+        void syncPendingActions();
+      });
+
+      if (disposed) {
+        await handle.remove();
+        return;
+      }
+
+      listenerHandle = handle;
+    };
+
+    void setupListener();
+
+    return () => {
+      disposed = true;
+      if (listenerHandle) {
+        void listenerHandle.remove();
+      }
+    };
   }, [syncPendingActions]);
 
   const retryAction = useCallback(

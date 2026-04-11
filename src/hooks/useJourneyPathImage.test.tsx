@@ -57,6 +57,8 @@ const mocks = vi.hoisted(() => ({
   getActiveQueuedActionsMock: vi.fn(),
   getPersistedJourneyPathSnapshotMock: vi.fn(),
   requestJourneyPathGenerationMock: vi.fn(),
+  retryActionMock: vi.fn(),
+  retryNowMock: vi.fn(),
 }));
 
 vi.mock("@/hooks/useAuth", () => ({
@@ -67,6 +69,13 @@ vi.mock("@/hooks/useAuth", () => ({
 
 vi.mock("@/hooks/epicsQuery", () => ({
   getEpicsQueryKey: (userId: string | undefined) => ["epics", userId] as const,
+}));
+
+vi.mock("@/contexts/ResilienceContext", () => ({
+  useResilience: () => ({
+    retryAction: (...args: unknown[]) => mocks.retryActionMock(...args),
+    retryNow: (...args: unknown[]) => mocks.retryNowMock(...args),
+  }),
 }));
 
 vi.mock("@/utils/offlineStorage", () => ({
@@ -230,6 +239,8 @@ describe("useJourneyPathImage", () => {
     mocks.getActiveQueuedActionsMock.mockResolvedValue([]);
     mocks.getPersistedJourneyPathSnapshotMock.mockResolvedValue(null);
     mocks.requestJourneyPathGenerationMock.mockResolvedValue(null);
+    mocks.retryActionMock.mockResolvedValue(undefined);
+    mocks.retryNowMock.mockResolvedValue(undefined);
   });
 
   afterAll(() => {
@@ -346,6 +357,34 @@ describe("useJourneyPathImage", () => {
 
     expect(mocks.requestJourneyPathGenerationMock).not.toHaveBeenCalled();
     expect(result.current.generationError).toBeNull();
+  });
+
+  it("surfaces a failed epic create as a retryable sync error instead of a syncing state", async () => {
+    mocks.getActiveQueuedActionsMock.mockResolvedValue([
+      buildQueuedAction({
+        id: "epic-create-failed",
+        last_error: "duplicate key value violates unique constraint",
+        status: "failed",
+      }),
+    ]);
+
+    const { result } = renderHook(() => useJourneyPathImage("epic-1"), {
+      wrapper: createWrapper().wrapper,
+    });
+
+    await waitFor(() => {
+      expect(result.current.epicSyncStatus).toBe("failed");
+    });
+
+    expect(result.current.isWaitingForEpicSync).toBe(false);
+    expect(result.current.epicSyncErrorMessage).toBe("duplicate key value violates unique constraint");
+    expect(mocks.requestJourneyPathGenerationMock).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await result.current.retryEpicSync();
+    });
+
+    expect(mocks.retryActionMock).toHaveBeenCalledWith("epic-create-failed");
   });
 
   it("starts generation after the queued epic create clears", async () => {

@@ -531,6 +531,92 @@ describe("useEpics", () => {
     expect(mocks.requestJourneyPathGenerationMock).not.toHaveBeenCalled();
   });
 
+  it("rolls back and rejects when campaign creation fails with a non-queueable server error", async () => {
+    const habitsInsertMock = vi.fn().mockResolvedValue({ error: null });
+    const epicsInsertMock = vi.fn().mockResolvedValue({
+      error: { message: "violates check constraint", status: 400 },
+    });
+    const deleteEpicHabitsInMock = vi.fn().mockResolvedValue({ error: null });
+    const deleteHabitsEqMock = vi.fn().mockResolvedValue({ error: null });
+    const deleteHabitsInMock = vi.fn().mockReturnValue({ eq: deleteHabitsEqMock });
+    const deleteEpicsEqUserMock = vi.fn().mockResolvedValue({ error: null });
+    const deleteEpicsEqIdMock = vi.fn().mockReturnValue({ eq: deleteEpicsEqUserMock });
+
+    mocks.fromMock.mockImplementation((table: string) => {
+      if (table === "habits") {
+        return {
+          insert: habitsInsertMock,
+          delete: vi.fn().mockReturnValue({ in: deleteHabitsInMock }),
+          select: mocks.selectMock,
+        };
+      }
+
+      if (table === "epics") {
+        return {
+          insert: epicsInsertMock,
+          delete: vi.fn().mockReturnValue({ eq: deleteEpicsEqIdMock }),
+          select: mocks.selectMock,
+        };
+      }
+
+      if (table === "epic_habits") {
+        return {
+          delete: vi.fn().mockReturnValue({ in: deleteEpicHabitsInMock }),
+          select: mocks.selectMock,
+        };
+      }
+
+      if (table === "journey_phases" || table === "epic_milestones") {
+        return {
+          delete: vi.fn().mockReturnValue({
+            in: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ error: null }),
+            }),
+          }),
+          select: mocks.selectMock,
+        };
+      }
+
+      return {
+        select: mocks.selectMock,
+      };
+    });
+
+    const { result } = renderHook(() => useEpics(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    await act(async () => {
+      await expect(result.current.createEpic({
+        title: "Broken Campaign",
+        target_days: 14,
+        habits: [
+          {
+            title: "Morning focus",
+            difficulty: "easy",
+            frequency: "daily",
+            custom_days: [1, 2, 3, 4, 5],
+          },
+        ],
+      })).rejects.toMatchObject({
+        status: 400,
+      });
+    });
+
+    expect(mocks.queueActionMock).not.toHaveBeenCalled();
+    expect(mocks.retryNowMock).not.toHaveBeenCalled();
+    expect(mocks.removePlannerRecordMock).toHaveBeenCalledWith("epics", expect.any(String));
+    expect(mocks.removePlannerRecordsMock).toHaveBeenCalledWith("habits", expect.any(Array));
+    expect(deleteEpicHabitsInMock).toHaveBeenCalled();
+    expect(deleteHabitsInMock).toHaveBeenCalled();
+    expect(deleteEpicsEqIdMock).toHaveBeenCalledWith("id", expect.any(String));
+    expect(deleteEpicsEqUserMock).toHaveBeenCalledWith("user_id", "user-1");
+  });
+
   it("renames an active campaign locally, syncs the new title remotely, and invalidates dependent queries", async () => {
     let localEpics = [
       {

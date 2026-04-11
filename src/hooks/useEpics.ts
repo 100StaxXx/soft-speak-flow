@@ -17,6 +17,7 @@ import {
   warmEpicsQueryFromRemote,
 } from "@/utils/plannerSync";
 import { resolveEpicEndDate } from "@/utils/epicDates";
+import { isQueueableWriteError } from "@/utils/networkErrors";
 import {
   createOfflinePlannerId,
   getAllLocalTasksForUser,
@@ -205,6 +206,70 @@ async function applyLocalEpicPayload(payload: LocalEpicPayload) {
   await upsertPlannerRecords("epic_habits", payload.epicHabits);
   await upsertPlannerRecords("journey_phases", payload.phases);
   await upsertPlannerRecords("epic_milestones", payload.milestones);
+}
+
+async function rollbackLocalEpicPayload(payload: LocalEpicPayload) {
+  if (payload.epicHabits.length > 0) {
+    await removePlannerRecords("epic_habits", payload.epicHabits.map((link) => link.id));
+  }
+
+  if (payload.phases.length > 0) {
+    await removePlannerRecords("journey_phases", payload.phases.map((phase) => phase.id));
+  }
+
+  if (payload.milestones.length > 0) {
+    await removePlannerRecords("epic_milestones", payload.milestones.map((milestone) => milestone.id));
+  }
+
+  await removePlannerRecord("epics", payload.epic.id);
+
+  if (payload.habits.length > 0) {
+    await removePlannerRecords("habits", payload.habits.map((habit) => habit.id));
+  }
+}
+
+async function rollbackRemoteEpicPayload(userId: string, payload: LocalEpicPayload) {
+  if (payload.epicHabits.length > 0) {
+    const { error } = await supabase
+      .from("epic_habits")
+      .delete()
+      .in("id", payload.epicHabits.map((link) => link.id));
+    if (error) throw error;
+  }
+
+  if (payload.phases.length > 0) {
+    const { error } = await supabase
+      .from("journey_phases")
+      .delete()
+      .in("id", payload.phases.map((phase) => phase.id))
+      .eq("user_id", userId);
+    if (error) throw error;
+  }
+
+  if (payload.milestones.length > 0) {
+    const { error } = await supabase
+      .from("epic_milestones")
+      .delete()
+      .in("id", payload.milestones.map((milestone) => milestone.id))
+      .eq("user_id", userId);
+    if (error) throw error;
+  }
+
+  const { error: epicError } = await supabase
+    .from("epics")
+    .delete()
+    .eq("id", payload.epic.id)
+    .eq("user_id", userId);
+  if (epicError) throw epicError;
+
+  if (payload.habits.length > 0) {
+    const { error } = await supabase
+      .from("habits")
+      .delete()
+      .in("id", payload.habits.map((habit) => habit.id))
+      .eq("user_id", userId);
+    if (error) throw error;
+  }
 }
 
 async function applyLocalEpicStatusChange(userId: string, epicId: string, status: "completed" | "abandoned") {
@@ -556,9 +621,8 @@ export const useEpics = (options: EpicsOptions = {}) => {
         milestones,
       };
 
-      await applyLocalEpicPayload(payload);
-
       if (shouldQueueWrites) {
+        await applyLocalEpicPayload(payload);
         await queueAction({
           actionKind: "EPIC_CREATE",
           entityType: "epic",
@@ -576,6 +640,8 @@ export const useEpics = (options: EpicsOptions = {}) => {
       } else if ((activeCampaignCount ?? 0) >= ACTIVE_CAMPAIGN_LIMIT) {
         throw new Error(CAMPAIGN_LIMIT_REACHED_MESSAGE);
       }
+
+      await applyLocalEpicPayload(payload);
 
       try {
         const { error: habitsError } = await supabase.from("habits").insert(habits);
@@ -601,6 +667,22 @@ export const useEpics = (options: EpicsOptions = {}) => {
 
         return { queued: false, epic };
       } catch (error) {
+        if (!isQueueableWriteError(error)) {
+          try {
+            await rollbackLocalEpicPayload(payload);
+          } catch (rollbackError) {
+            console.warn("Failed to roll back local campaign after create error:", rollbackError);
+          }
+
+          try {
+            await rollbackRemoteEpicPayload(user.id, payload);
+          } catch (rollbackError) {
+            console.warn("Failed to roll back remote campaign after create error:", rollbackError);
+          }
+
+          throw error;
+        }
+
         await queueAction({
           actionKind: "EPIC_CREATE",
           entityType: "epic",

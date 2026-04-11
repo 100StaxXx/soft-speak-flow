@@ -18,12 +18,15 @@ describe("ConstellationTrail", () => {
       pathImageUrl: null,
       currentMilestoneIndex: -1,
       generationError: null,
+      epicSyncErrorMessage: null,
+      epicSyncStatus: "idle",
       isGenerating: false,
       isWaitingForEpicSync: false,
       isLoading: false,
       error: null,
       generateInitialPath: vi.fn(),
       retryInitialPath: vi.fn(),
+      retryEpicSync: vi.fn(),
       regeneratePathForMilestone: vi.fn(),
     });
   });
@@ -33,12 +36,15 @@ describe("ConstellationTrail", () => {
       pathImageUrl: "https://example.supabase.co/storage/v1/object/public/journey-paths/user-1/epic-1/path.png",
       currentMilestoneIndex: 1,
       generationError: null,
+      epicSyncErrorMessage: null,
+      epicSyncStatus: "idle",
       isGenerating: false,
       isWaitingForEpicSync: false,
       isLoading: false,
       error: null,
       generateInitialPath: vi.fn(),
       retryInitialPath: vi.fn(),
+      retryEpicSync: vi.fn(),
       regeneratePathForMilestone: vi.fn(),
     });
 
@@ -58,12 +64,15 @@ describe("ConstellationTrail", () => {
       pathImageUrl: null,
       currentMilestoneIndex: -1,
       generationError: null,
+      epicSyncErrorMessage: null,
+      epicSyncStatus: "idle",
       isGenerating: true,
       isWaitingForEpicSync: false,
       isLoading: false,
       error: null,
       generateInitialPath: vi.fn(),
       retryInitialPath: vi.fn(),
+      retryEpicSync: vi.fn(),
       regeneratePathForMilestone: vi.fn(),
     });
 
@@ -81,12 +90,15 @@ describe("ConstellationTrail", () => {
       pathImageUrl: null,
       currentMilestoneIndex: -1,
       generationError: null,
+      epicSyncErrorMessage: null,
+      epicSyncStatus: "idle",
       isGenerating: true,
       isWaitingForEpicSync: false,
       isLoading: false,
       error: null,
       generateInitialPath: vi.fn(),
       retryInitialPath: vi.fn(),
+      retryEpicSync: vi.fn(),
       regeneratePathForMilestone: vi.fn(),
     });
 
@@ -99,12 +111,15 @@ describe("ConstellationTrail", () => {
       pathImageUrl: "https://example.supabase.co/storage/v1/object/public/journey-paths/user-1/epic-9/path.png",
       currentMilestoneIndex: 0,
       generationError: null,
+      epicSyncErrorMessage: null,
+      epicSyncStatus: "idle",
       isGenerating: false,
       isWaitingForEpicSync: false,
       isLoading: false,
       error: null,
       generateInitialPath: vi.fn(),
       retryInitialPath: vi.fn(),
+      retryEpicSync: vi.fn(),
       regeneratePathForMilestone: vi.fn(),
     });
 
@@ -132,12 +147,15 @@ describe("ConstellationTrail", () => {
         retryable: true,
         status: 429,
       },
+      epicSyncErrorMessage: null,
+      epicSyncStatus: "idle",
       isGenerating: false,
       isWaitingForEpicSync: false,
       isLoading: false,
       error: null,
       generateInitialPath: vi.fn(),
       retryInitialPath,
+      retryEpicSync: vi.fn(),
       regeneratePathForMilestone: vi.fn(),
     });
 
@@ -158,12 +176,15 @@ describe("ConstellationTrail", () => {
       pathImageUrl: null,
       currentMilestoneIndex: -1,
       generationError: null,
+      epicSyncErrorMessage: null,
+      epicSyncStatus: "pending",
       isGenerating: false,
       isWaitingForEpicSync: true,
       isLoading: false,
       error: null,
       generateInitialPath: vi.fn(),
       retryInitialPath: vi.fn(),
+      retryEpicSync: vi.fn(),
       regeneratePathForMilestone: vi.fn(),
     });
 
@@ -174,5 +195,36 @@ describe("ConstellationTrail", () => {
     expect(screen.getByText("Campaign syncing")).toBeInTheDocument();
     expect(screen.queryByTestId("journey-path-error")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /retry image/i })).not.toBeInTheDocument();
+  });
+
+  it("shows a retryable sync error when the campaign create failed", () => {
+    const retryEpicSync = vi.fn();
+
+    mocks.useJourneyPathImageMock.mockReturnValue({
+      pathImageUrl: null,
+      currentMilestoneIndex: -1,
+      generationError: null,
+      epicSyncErrorMessage: "duplicate key value violates unique constraint",
+      epicSyncStatus: "failed",
+      isGenerating: false,
+      isWaitingForEpicSync: false,
+      isLoading: false,
+      error: null,
+      generateInitialPath: vi.fn(),
+      retryInitialPath: vi.fn(),
+      retryEpicSync,
+      regeneratePathForMilestone: vi.fn(),
+    });
+
+    render(<ConstellationTrail progress={7} targetDays={30} epicId="epic-failed" />);
+
+    expect(screen.getByTestId("journey-path-sync-error")).toBeInTheDocument();
+    expect(screen.getByText("Campaign sync failed")).toBeInTheDocument();
+    expect(screen.getByText(/duplicate key value/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /retry sync/i }));
+
+    expect(retryEpicSync).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId("journey-path-sync-pending")).not.toBeInTheDocument();
   });
 });

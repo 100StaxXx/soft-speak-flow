@@ -868,8 +868,11 @@ export const ConstellationTrail = memo(function ConstellationTrail({
     pathImageUrl, 
     isGenerating, 
     isWaitingForEpicSync,
+    epicSyncStatus,
+    epicSyncErrorMessage,
     generationError,
     retryInitialPath,
+    retryEpicSync,
   } = useJourneyPathImage(epicId);
   
   // Path generation is handled by useEpics when epic is created
@@ -933,7 +936,8 @@ export const ConstellationTrail = memo(function ConstellationTrail({
   );
   const hasGeneratedBackground = Boolean(optimizedPathImageUrl);
   const showEpicSyncPending = Boolean(!hasGeneratedBackground && isWaitingForEpicSync && !isGenerating);
-  const showGenerationError = Boolean(!hasGeneratedBackground && generationError && !isGenerating);
+  const showEpicSyncError = Boolean(!hasGeneratedBackground && epicSyncStatus === "failed" && !isGenerating);
+  const showGenerationError = Boolean(!hasGeneratedBackground && generationError && !isGenerating && epicSyncStatus !== "failed");
   const fallbackBackgroundUrl = !transparentBackground ? fallbackBackground.src : null;
   const fallbackBackgroundSrcSet = !hasGeneratedBackground && !transparentBackground
     ? getStaticBackgroundSrcSet(fallbackBackground)
@@ -1022,6 +1026,36 @@ export const ConstellationTrail = memo(function ConstellationTrail({
               <p className="mt-1 text-xs leading-5 text-white/78">
                 We&apos;re still saving this campaign. Your Star Path will appear as soon as sync finishes.
               </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showEpicSyncError && (
+        <div
+          className="absolute inset-x-3 bottom-3 z-20 rounded-2xl border border-amber-300/25 bg-slate-950/82 p-3 text-white shadow-[0_16px_40px_rgba(15,23,42,0.38)] backdrop-blur-md"
+          data-testid="journey-path-sync-error"
+        >
+          <div className="flex items-start gap-2.5">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-200" />
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-100/85">
+                Campaign sync failed
+              </p>
+              <p className="mt-1 text-xs leading-5 text-white/78">
+                {epicSyncErrorMessage}
+              </p>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="mt-3 h-8 border-white/15 bg-white/5 px-3 text-white hover:bg-white/10"
+                onClick={() => {
+                  void retryEpicSync();
+                }}
+              >
+                Retry sync
+              </Button>
             </div>
           </div>
         </div>

@@ -7,6 +7,8 @@ import { ProfilePreferences } from "@/types/profile";
 export interface Profile {
   id: string;
   email: string | null;
+  referral_code: string | null;
+  referred_by_code: string | null;
   preferences: ProfilePreferences | null;
   selected_mentor_id: string | null;
   created_at: string;
@@ -57,6 +59,8 @@ export const useProfile = () => {
         .select(`
           id,
           email,
+          referral_code,
+          referred_by_code,
           preferences,
           selected_mentor_id,
           created_at,
@@ -111,6 +115,8 @@ export const useProfile = () => {
           .select(`
             id,
             email,
+            referral_code,
+            referred_by_code,
             preferences,
             selected_mentor_id,
             created_at,

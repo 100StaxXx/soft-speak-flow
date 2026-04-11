@@ -9,6 +9,8 @@ import {
 } from "@/utils/offlineStorage";
 
 const mocks = vi.hoisted(() => ({
+  addListener: vi.fn(),
+  isNativePlatform: vi.fn(() => false),
   toast: vi.fn(),
   invoke: vi.fn(),
   trackResilienceEvent: vi.fn(),
@@ -25,6 +27,18 @@ vi.mock("@/hooks/use-toast", () => ({
   useToast: () => ({
     toast: mocks.toast,
   }),
+}));
+
+vi.mock("@capacitor/core", () => ({
+  Capacitor: {
+    isNativePlatform: () => mocks.isNativePlatform(),
+  },
+}));
+
+vi.mock("@capacitor/app", () => ({
+  App: {
+    addListener: (...args: unknown[]) => mocks.addListener(...args),
+  },
 }));
 
 vi.mock("@/integrations/supabase/client", () => ({
@@ -46,6 +60,7 @@ vi.mock("@/utils/plannerSync", () => ({
 import { useOfflineQueue } from "./useOfflineQueue";
 
 const originalOnlineDescriptor = Object.getOwnPropertyDescriptor(Navigator.prototype, "onLine");
+const originalVisibilityStateDescriptor = Object.getOwnPropertyDescriptor(document, "visibilityState");
 
 const setOnline = (online: boolean) => {
   Object.defineProperty(window.navigator, "onLine", {
@@ -76,9 +91,25 @@ const enqueueFailedSupportReport = async (retryCount: number) => {
   return id;
 };
 
+const enqueueQueuedSupportReport = async () => {
+  await initOfflineDB();
+  return enqueueAction({
+    userId: "user-1",
+    actionKind: "SUPPORT_REPORT",
+    entityType: "support_report",
+    entityId: "corr-queued",
+    payload: {
+      correlationId: "corr-queued",
+      summary: "Queued support report",
+    },
+  });
+};
+
 describe("useOfflineQueue", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
+    mocks.isNativePlatform.mockReturnValue(false);
+    mocks.addListener.mockResolvedValue({ remove: vi.fn().mockResolvedValue(undefined) });
     setOnline(true);
     await clearAllPendingActions();
   });
@@ -86,6 +117,9 @@ describe("useOfflineQueue", () => {
   afterEach(async () => {
     if (originalOnlineDescriptor) {
       Object.defineProperty(window.navigator, "onLine", originalOnlineDescriptor);
+    }
+    if (originalVisibilityStateDescriptor) {
+      Object.defineProperty(document, "visibilityState", originalVisibilityStateDescriptor);
     }
     await clearAllPendingActions();
     __resetOfflineDBForTests();
@@ -143,5 +177,66 @@ describe("useOfflineQueue", () => {
 
     expect(result.current.pendingCount).toBe(1);
     expect(result.current.receipts.find((receipt) => receipt.id === id)?.status).toBe("failed");
+  });
+
+  it("auto-syncs queued actions during initialization when already online", async () => {
+    await enqueueQueuedSupportReport();
+    mocks.invoke.mockResolvedValue({ data: null, error: null });
+
+    const { result } = renderHook(() => useOfflineQueue());
+
+    await waitFor(() => {
+      expect(mocks.invoke).toHaveBeenCalledWith("submit-support-report", {
+        body: expect.objectContaining({
+          correlationId: "corr-queued",
+        }),
+      });
+    });
+
+    await waitFor(() => {
+      expect(result.current.pendingCount).toBe(0);
+      expect(result.current.syncStatus).toBe("success");
+    });
+  });
+
+  it("retries queued actions when the tab becomes visible again", async () => {
+    await enqueueQueuedSupportReport();
+    mocks.invoke.mockResolvedValue({ data: null, error: null });
+    setOnline(false);
+
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      value: "hidden",
+    });
+
+    const { result } = renderHook(() => useOfflineQueue());
+
+    await waitFor(() => {
+      expect(result.current.pendingCount).toBe(1);
+    });
+
+    expect(mocks.invoke).not.toHaveBeenCalled();
+
+    setOnline(true);
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      value: "visible",
+    });
+
+    await act(async () => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+
+    await waitFor(() => {
+      expect(mocks.invoke).toHaveBeenCalledWith("submit-support-report", {
+        body: expect.objectContaining({
+          correlationId: "corr-queued",
+        }),
+      });
+    });
+
+    await waitFor(() => {
+      expect(result.current.pendingCount).toBe(0);
+    });
   });
 });
