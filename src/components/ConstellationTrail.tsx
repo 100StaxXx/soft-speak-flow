@@ -42,6 +42,29 @@ interface ConstellationTrailProps {
 // Fixed constellation pattern - wave with more vertical variation for taller container
 const CONSTELLATION_Y_PATTERN = [70, 40, 60, 25, 75, 35, 55, 45];
 
+interface TrailPoint {
+  x: number;
+  y: number;
+  size: number;
+}
+
+interface TrailControlPoint {
+  x: number;
+  y: number;
+}
+
+interface TrailBranchSegment {
+  id: string;
+  path: string;
+  startIndex: number;
+  endIndex: number;
+}
+
+interface TrailRouteModel {
+  mainPath: string;
+  decorativeBranches: TrailBranchSegment[];
+}
+
 const hashString = (value: string) => {
   let hash = 0;
   for (let index = 0; index < value.length; index += 1) {
@@ -51,9 +74,11 @@ const hashString = (value: string) => {
   return Math.abs(hash);
 };
 
+const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+
 // Generate star positions along a constellation-like path with wave pattern
 const generateStarPositions = (count: number) => {
-  const positions: { x: number; y: number; size: number }[] = [];
+  const positions: TrailPoint[] = [];
   
   for (let i = 0; i < count; i++) {
     const t = count === 1 ? 0.5 : i / (count - 1);
@@ -69,8 +94,96 @@ const generateStarPositions = (count: number) => {
   return positions;
 };
 
-// Calculate position along the smooth curved path
-const getPositionOnPath = (progress: number, starPositions: { x: number; y: number }[]) => {
+const getMainRouteControlPoint = (start: Pick<TrailPoint, "x" | "y">, end: Pick<TrailPoint, "x" | "y">, segmentIndex: number): TrailControlPoint => ({
+  x: (start.x + end.x) / 2,
+  y: (start.y + end.y) / 2 + (segmentIndex % 2 === 0 ? -12 : 12),
+});
+
+const appendQuadraticSegment = (
+  path: string,
+  start: Pick<TrailPoint, "x" | "y">,
+  end: Pick<TrailPoint, "x" | "y">,
+  segmentIndex: number,
+) => {
+  const control = getMainRouteControlPoint(start, end, segmentIndex);
+  return `${path} Q ${control.x} ${control.y} ${end.x} ${end.y}`;
+};
+
+const buildMainRoutePath = (starPositions: Array<Pick<TrailPoint, "x" | "y">>) => {
+  if (starPositions.length < 2) return "";
+
+  let path = `M ${starPositions[0].x} ${starPositions[0].y}`;
+  for (let index = 1; index < starPositions.length; index += 1) {
+    path = appendQuadraticSegment(path, starPositions[index - 1], starPositions[index], index);
+  }
+  return path;
+};
+
+const buildBranchPath = (
+  start: Pick<TrailPoint, "x" | "y">,
+  end: Pick<TrailPoint, "x" | "y">,
+  branchIndex: number,
+) => {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const length = Math.hypot(dx, dy) || 1;
+  const normalX = -dy / length;
+  const normalY = dx / length;
+  const side = branchIndex % 2 === 0 ? 1 : -1;
+  const spread = clamp(dx * 0.18, 7, 14) * side;
+  const lift = clamp(length * 0.16, 5, 12) * side;
+
+  const control1X = start.x + dx * 0.28 + normalX * spread;
+  const control1Y = start.y + dy * 0.18 + normalY * (lift * 0.8);
+  const control2X = start.x + dx * 0.72 + normalX * (spread * 1.15);
+  const control2Y = start.y + dy * 0.82 + normalY * lift;
+
+  return `M ${start.x} ${start.y} C ${control1X} ${control1Y} ${control2X} ${control2Y} ${end.x} ${end.y}`;
+};
+
+const buildDecorativeBranches = (starPositions: TrailPoint[]): TrailBranchSegment[] => {
+  if (starPositions.length < 5) return [];
+
+  const branchPairs: Array<{ startIndex: number; endIndex: number }> = [];
+  const firstStartIndex = 1;
+  const firstEndIndex = Math.min(starPositions.length - 2, 3);
+
+  if (firstEndIndex - firstStartIndex >= 2) {
+    branchPairs.push({ startIndex: firstStartIndex, endIndex: firstEndIndex });
+  }
+
+  if (starPositions.length >= 8) {
+    const secondStartIndex = Math.max(firstEndIndex + 1, Math.floor((starPositions.length - 1) * 0.58));
+    const secondEndIndex = Math.min(starPositions.length - 2, secondStartIndex + 2);
+
+    if (secondEndIndex - secondStartIndex >= 2) {
+      branchPairs.push({ startIndex: secondStartIndex, endIndex: secondEndIndex });
+    }
+  }
+
+  return branchPairs.flatMap((branch, branchIndex) => {
+    const start = starPositions[branch.startIndex];
+    const end = starPositions[branch.endIndex];
+    if (!start || !end || end.x - start.x < 18) {
+      return [];
+    }
+
+    return [{
+      id: `branch-${branch.startIndex}-${branch.endIndex}`,
+      path: buildBranchPath(start, end, branchIndex),
+      startIndex: branch.startIndex,
+      endIndex: branch.endIndex,
+    }];
+  });
+};
+
+const buildTrailRouteModel = (starPositions: TrailPoint[]): TrailRouteModel => ({
+  mainPath: buildMainRoutePath(starPositions),
+  decorativeBranches: buildDecorativeBranches(starPositions),
+});
+
+// Calculate position along the smooth curved main route
+const getPositionOnPath = (progress: number, starPositions: Array<Pick<TrailPoint, "x" | "y">>) => {
   if (starPositions.length < 2) return { x: 10, y: 50 };
   
   const t = Math.max(0, Math.min(100, progress)) / 100;
@@ -82,51 +195,18 @@ const getPositionOnPath = (progress: number, starPositions: { x: number; y: numb
   const start = starPositions[currentSegment];
   const end = starPositions[currentSegment + 1];
   
-  // Use smooth interpolation with control point
-  const midX = (start.x + end.x) / 2;
-  const controlY = (start.y + end.y) / 2 + (currentSegment % 2 === 0 ? -10 : 10);
+  const control = getMainRouteControlPoint(start, end, currentSegment + 1);
   
   // Quadratic bezier interpolation
   const oneMinusT = 1 - segmentT;
-  const x = oneMinusT * oneMinusT * start.x + 2 * oneMinusT * segmentT * midX + segmentT * segmentT * end.x;
-  const y = oneMinusT * oneMinusT * start.y + 2 * oneMinusT * segmentT * controlY + segmentT * segmentT * end.y;
+  const x = oneMinusT * oneMinusT * start.x + 2 * oneMinusT * segmentT * control.x + segmentT * segmentT * end.x;
+  const y = oneMinusT * oneMinusT * start.y + 2 * oneMinusT * segmentT * control.y + segmentT * segmentT * end.y;
   
   return { x, y };
 };
 
-// Generate smooth curved SVG path with Bezier curves and a decorative loop
-const generateFullPathString = (starPositions: { x: number; y: number }[]) => {
-  if (starPositions.length < 2) return "";
-  
-  let path = `M ${starPositions[0].x} ${starPositions[0].y}`;
-  
-  for (let i = 1; i < starPositions.length; i++) {
-    const prev = starPositions[i - 1];
-    const curr = starPositions[i];
-    const midX = (prev.x + curr.x) / 2;
-    const controlY = (prev.y + curr.y) / 2 + (i % 2 === 0 ? -12 : 12);
-    
-    // Add a small decorative loop at ~40% of the journey
-    if (i === Math.max(1, Math.floor(starPositions.length * 0.4))) {
-      const loopX = midX;
-      const loopY = (prev.y + curr.y) / 2;
-      // Curve to loop start
-      path += ` Q ${midX - 5} ${controlY} ${loopX - 4} ${loopY}`;
-      // The loop - a small arc
-      path += ` C ${loopX - 8} ${loopY - 12} ${loopX + 8} ${loopY - 12} ${loopX + 4} ${loopY}`;
-      // Continue to current point
-      path += ` Q ${midX + 5} ${controlY} ${curr.x} ${curr.y}`;
-    } else {
-      // Smooth quadratic curve
-      path += ` Q ${midX} ${controlY} ${curr.x} ${curr.y}`;
-    }
-  }
-  
-  return path;
-};
-
 // Generate partial smooth curved path up to a certain progress percentage
-const generatePartialPathString = (starPositions: { x: number; y: number }[], progress: number) => {
+const generatePartialPathString = (starPositions: Array<Pick<TrailPoint, "x" | "y">>, progress: number) => {
   if (starPositions.length < 2 || progress <= 0) return "";
   
   const endPos = getPositionOnPath(progress, starPositions);
@@ -137,26 +217,10 @@ const generatePartialPathString = (starPositions: { x: number; y: number }[], pr
   
   let path = `M ${starPositions[0].x} ${starPositions[0].y}`;
   
-  // Draw curved segments up to completed segments
   for (let i = 1; i <= completedSegments && i < starPositions.length; i++) {
-    const prev = starPositions[i - 1];
-    const curr = starPositions[i];
-    const midX = (prev.x + curr.x) / 2;
-    const controlY = (prev.y + curr.y) / 2 + (i % 2 === 0 ? -12 : 12);
-    
-    // Handle the loop segment
-    if (i === Math.max(1, Math.floor(starPositions.length * 0.4))) {
-      const loopX = midX;
-      const loopY = (prev.y + curr.y) / 2;
-      path += ` Q ${midX - 5} ${controlY} ${loopX - 4} ${loopY}`;
-      path += ` C ${loopX - 8} ${loopY - 12} ${loopX + 8} ${loopY - 12} ${loopX + 4} ${loopY}`;
-      path += ` Q ${midX + 5} ${controlY} ${curr.x} ${curr.y}`;
-    } else {
-      path += ` Q ${midX} ${controlY} ${curr.x} ${curr.y}`;
-    }
+    path = appendQuadraticSegment(path, starPositions[i - 1], starPositions[i], i);
   }
   
-  // Draw partial segment to current progress position
   if (completedSegments < totalSegments) {
     path += ` L ${endPos.x} ${endPos.y}`;
   }
@@ -896,6 +960,7 @@ export const ConstellationTrail = memo(function ConstellationTrail({
   }, [propMilestones]);
   
   const starPositions = useMemo(() => generateStarPositions(sortedMilestones.length), [sortedMilestones.length]);
+  const routeModel = useMemo(() => buildTrailRouteModel(starPositions), [starPositions]);
   
   const bgStars = useMemo(() => {
     const seededRandom = (seed: number) => {
@@ -1136,23 +1201,53 @@ export const ConstellationTrail = memo(function ConstellationTrail({
         </defs>
 
         <path
-          d={generateFullPathString(starPositions)}
+          d={routeModel.mainPath}
           fill="none"
           stroke="hsl(var(--muted) / 0.15)"
           strokeWidth="1.5"
           strokeLinecap="round"
           strokeLinejoin="round"
+          data-testid="trail-main-base-path"
         />
 
         <path
-          d={generateFullPathString(starPositions)}
+          d={routeModel.mainPath}
           fill="none"
           stroke="url(#pulseGradient)"
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
           opacity="0.7"
+          data-testid="trail-main-pulse-path"
         />
+
+        {routeModel.decorativeBranches.map((branch) => (
+          <path
+            key={`${branch.id}-base`}
+            d={branch.path}
+            fill="none"
+            stroke="hsl(var(--muted) / 0.12)"
+            strokeWidth="1.15"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeDasharray="2 2.5"
+            data-testid="trail-branch-base-path"
+          />
+        ))}
+
+        {routeModel.decorativeBranches.map((branch) => (
+          <path
+            key={`${branch.id}-pulse`}
+            d={branch.path}
+            fill="none"
+            stroke="url(#pulseGradient)"
+            strokeWidth="1.45"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            opacity="0.35"
+            data-testid="trail-branch-pulse-path"
+          />
+        ))}
 
         {progress > 0 && (
           <motion.path
@@ -1166,6 +1261,7 @@ export const ConstellationTrail = memo(function ConstellationTrail({
             initial={{ pathLength: 0, opacity: 0 }}
             animate={{ pathLength: 1, opacity: 1 }}
             transition={{ duration: 1.5, ease: "easeOut" }}
+            data-testid="trail-progress-path"
           />
         )}
       </svg>

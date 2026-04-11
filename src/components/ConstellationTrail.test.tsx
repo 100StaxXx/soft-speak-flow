@@ -59,6 +59,69 @@ describe("ConstellationTrail", () => {
     expect(screen.queryByText(/loading journey path/i)).not.toBeInTheDocument();
   });
 
+  it("keeps very short journeys clean without decorative branch paths", () => {
+    render(
+      <ConstellationTrail
+        progress={18}
+        targetDays={14}
+        epicId="epic-short"
+        milestones={[
+          { id: "milestone-1", title: "Checkpoint", milestone_percent: 100, is_postcard_milestone: true },
+        ]}
+      />,
+    );
+
+    expect(screen.getByTestId("trail-main-base-path")).toBeInTheDocument();
+    expect(screen.getByTestId("trail-main-pulse-path")).toBeInTheDocument();
+    expect(screen.queryAllByTestId("trail-branch-base-path")).toHaveLength(0);
+    expect(screen.queryAllByTestId("trail-branch-pulse-path")).toHaveLength(0);
+  });
+
+  it("adds subtle split-and-rejoin branch paths for longer journeys while keeping progress on the main route", () => {
+    render(
+      <ConstellationTrail
+        progress={52}
+        targetDays={60}
+        epicId="epic-branching"
+        milestones={[
+          { id: "milestone-1", title: "Ember", milestone_percent: 12, is_postcard_milestone: false },
+          { id: "milestone-2", title: "Harbor", milestone_percent: 24, is_postcard_milestone: true },
+          { id: "milestone-3", title: "Grove", milestone_percent: 38, is_postcard_milestone: false },
+          { id: "milestone-4", title: "Crown", milestone_percent: 56, is_postcard_milestone: false },
+          { id: "milestone-5", title: "Summit", milestone_percent: 74, is_postcard_milestone: true },
+          { id: "milestone-6", title: "Nova", milestone_percent: 100, is_postcard_milestone: true },
+        ]}
+      />,
+    );
+
+    expect(screen.getByTestId("trail-progress-path")).toBeInTheDocument();
+    expect(screen.getAllByTestId("trail-branch-base-path").length).toBeGreaterThan(0);
+    expect(screen.getAllByTestId("trail-branch-pulse-path").length).toBeGreaterThan(0);
+    expect(screen.queryAllByTestId("trail-branch-progress-path")).toHaveLength(0);
+  });
+
+  it("keeps companion and milestone interactions stable when branching is enabled", () => {
+    render(
+      <ConstellationTrail
+        progress={48}
+        targetDays={45}
+        epicId="epic-companion"
+        companionImageUrl="https://example.com/companion.png"
+        milestones={[
+          { id: "milestone-1", title: "Ember", milestone_percent: 20, is_postcard_milestone: false, completed_at: "2026-04-01T00:00:00.000Z" },
+          { id: "milestone-2", title: "Harbor", milestone_percent: 40, is_postcard_milestone: true, completed_at: "2026-04-05T00:00:00.000Z" },
+          { id: "milestone-3", title: "Grove", milestone_percent: 60, is_postcard_milestone: false },
+          { id: "milestone-4", title: "Summit", milestone_percent: 80, is_postcard_milestone: true },
+          { id: "milestone-5", title: "Nova", milestone_percent: 100, is_postcard_milestone: true },
+        ]}
+      />,
+    );
+
+    expect(screen.getByAltText("Companion")).toBeInTheDocument();
+    expect(screen.getAllByLabelText(/unlock milestone at/i)).toHaveLength(3);
+    expect(screen.getAllByTestId("trail-branch-base-path").length).toBeGreaterThan(0);
+  });
+
   it("shows a static fallback immediately and keeps it visible while the path updates", () => {
     mocks.useJourneyPathImageMock.mockReturnValue({
       pathImageUrl: null,
