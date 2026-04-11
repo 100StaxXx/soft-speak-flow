@@ -18,6 +18,7 @@
     "manifest:check": "./scripts/check-function-manifest.sh",
     "ios:sync": "npm run build && npx cap sync ios && node scripts/fix-widget-config.cjs && npm run ios:verify-assets",
     "ios:verify-assets": "node scripts/verify-ios-web-assets.mjs",
+    "ios:verify-assets:generated": "node scripts/verify-ios-web-assets.mjs --scan-generated-builds",
     "ios:verify-widget-signing": "node scripts/verify-widget-signing.mjs",
     "ios:smoke:device": "node scripts/ios-device-smoke.mjs",
     "ios:preflight": "npm run ios:sync && npm run ios:verify-widget-signing",

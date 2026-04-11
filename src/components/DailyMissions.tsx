@@ -3,7 +3,6 @@ import type { LucideIcon } from "lucide-react";
 import {
   CheckCircle2,
   Globe2,
-  Radar,
   Target,
   TrendingUp,
   Zap,
@@ -92,6 +91,212 @@ const MissionPulsePanel = ({
         {secondaryText && (
           <p className="text-[11px] text-muted-foreground">{secondaryText}</p>
         )}
+      </div>
+    </div>
+  );
+};
+
+interface MissionCompetitionSnapshotProps {
+  guildName: string;
+  accentColor: string;
+  guildPercentage: number;
+  networkPercentage: number;
+  deltaText: string;
+}
+
+const clampPercentage = (value: number) => Math.max(0, Math.min(value, 100));
+
+const hexToRgba = (hex: string, alpha: number) => {
+  const normalized = hex.replace("#", "");
+  const expanded =
+    normalized.length === 3
+      ? normalized
+          .split("")
+          .map((segment) => `${segment}${segment}`)
+          .join("")
+      : normalized;
+
+  const parsed = Number.parseInt(expanded, 16);
+  if (Number.isNaN(parsed)) {
+    return `rgba(255, 255, 255, ${alpha})`;
+  }
+
+  const red = (parsed >> 16) & 255;
+  const green = (parsed >> 8) & 255;
+  const blue = parsed & 255;
+
+  return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+};
+
+const MissionCompetitionSnapshot = ({
+  guildName,
+  accentColor,
+  guildPercentage,
+  networkPercentage,
+  deltaText,
+}: MissionCompetitionSnapshotProps) => {
+  const guildValue = clampPercentage(guildPercentage);
+  const networkValue = clampPercentage(networkPercentage);
+  const size = 156;
+  const center = size / 2;
+  const outerRadius = 58;
+  const innerRadius = 42;
+  const outerStroke = 12;
+  const innerStroke = 10;
+  const startAngleOffset = 0.25;
+  const guildCircumference = 2 * Math.PI * outerRadius;
+  const networkCircumference = 2 * Math.PI * innerRadius;
+  const guildDashOffset = guildCircumference * (1 - guildValue / 100);
+  const networkDashOffset = networkCircumference * (1 - networkValue / 100);
+  const networkColor = hexToRgba(accentColor, 0.62);
+  const outerTrackColor = hexToRgba(accentColor, 0.14);
+  const innerTrackColor = hexToRgba(accentColor, 0.1);
+  const glowColor = hexToRgba(accentColor, 0.2);
+  const chartLabel = `Today's competition. ${guildName} is at ${guildValue}% completed. Network average is ${networkValue}%. ${deltaText}.`;
+
+  return (
+    <div
+      className="rounded-[28px] border p-4 sm:p-5 backdrop-blur-sm"
+      style={{
+        borderColor: hexToRgba(accentColor, 0.24),
+        background: `linear-gradient(160deg, ${hexToRgba(accentColor, 0.18)} 0%, rgba(10, 15, 25, 0.18) 52%, rgba(10, 15, 25, 0.06) 100%)`,
+        boxShadow: `0 18px 44px ${glowColor}`,
+      }}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.26em] text-muted-foreground">
+            Today's Competition
+          </p>
+          <p className="mt-1 text-sm font-medium text-foreground/86">
+            See how your guild stacks up right now.
+          </p>
+        </div>
+        <div
+          className="rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em]"
+          style={{
+            borderColor: hexToRgba(accentColor, 0.34),
+            backgroundColor: hexToRgba(accentColor, 0.12),
+            color: accentColor,
+          }}
+        >
+          {deltaText}
+        </div>
+      </div>
+
+      <div className="mt-4 flex flex-col items-center gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div
+          className="relative h-40 w-40 flex-shrink-0"
+          role="img"
+          aria-label={chartLabel}
+        >
+          <svg
+            viewBox={`0 0 ${size} ${size}`}
+            className="h-full w-full -rotate-90 overflow-visible"
+            aria-hidden="true"
+          >
+            <defs>
+              <linearGradient id="guild-competition-ring" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor={hexToRgba(accentColor, 0.72)} />
+                <stop offset="100%" stopColor={accentColor} />
+              </linearGradient>
+              <linearGradient id="network-competition-ring" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor={hexToRgba(accentColor, 0.28)} />
+                <stop offset="100%" stopColor={networkColor} />
+              </linearGradient>
+            </defs>
+
+            <circle
+              cx={center}
+              cy={center}
+              r={outerRadius}
+              fill="none"
+              stroke={outerTrackColor}
+              strokeWidth={outerStroke}
+            />
+            <circle
+              cx={center}
+              cy={center}
+              r={outerRadius}
+              fill="none"
+              stroke="url(#guild-competition-ring)"
+              strokeWidth={outerStroke}
+              strokeLinecap="round"
+              strokeDasharray={guildCircumference}
+              strokeDashoffset={guildDashOffset}
+              transform={`rotate(${startAngleOffset * 360} ${center} ${center})`}
+            />
+
+            <circle
+              cx={center}
+              cy={center}
+              r={innerRadius}
+              fill="none"
+              stroke={innerTrackColor}
+              strokeWidth={innerStroke}
+            />
+            <circle
+              cx={center}
+              cy={center}
+              r={innerRadius}
+              fill="none"
+              stroke="url(#network-competition-ring)"
+              strokeWidth={innerStroke}
+              strokeLinecap="round"
+              strokeDasharray={networkCircumference}
+              strokeDashoffset={networkDashOffset}
+              transform={`rotate(${startAngleOffset * 360} ${center} ${center})`}
+            />
+          </svg>
+
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.24em] text-muted-foreground">
+              {guildName}
+            </span>
+            <span className="mt-1 text-3xl font-black leading-none" style={{ color: accentColor }}>
+              {guildValue}%
+            </span>
+            <span className="mt-1 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+              completed
+            </span>
+          </div>
+        </div>
+
+        <div className="grid w-full gap-2.5 sm:max-w-[220px]">
+          <div
+            className="rounded-2xl border px-3 py-2.5"
+            style={{
+              borderColor: hexToRgba(accentColor, 0.3),
+              backgroundColor: hexToRgba(accentColor, 0.08),
+            }}
+          >
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                {guildName}
+              </span>
+              <span className="text-lg font-black" style={{ color: accentColor }}>
+                {guildValue}%
+              </span>
+            </div>
+          </div>
+
+          <div
+            className="rounded-2xl border px-3 py-2.5"
+            style={{
+              borderColor: hexToRgba(accentColor, 0.18),
+              backgroundColor: "rgba(255, 255, 255, 0.03)",
+            }}
+          >
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                Network Average
+              </span>
+              <span className="text-lg font-black" style={{ color: networkColor }}>
+                {networkValue}%
+              </span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -335,24 +540,25 @@ const DailyMissionsContent = memo(() => {
         <Progress value={progress} className="h-2" />
 
         {!isPulseLoading && pulse && (
-          <div className={cn("grid gap-2.5", hasFactionContext ? "md:grid-cols-2" : "grid-cols-1")}>
+          <div className="grid gap-2.5">
             {hasFactionContext && (
-              <MissionPulsePanel
-                title={factionData?.name || "Your Guild"}
+              <MissionCompetitionSnapshot
+                guildName={factionData?.name || "Your Guild"}
                 accentColor={factionData?.color || "#A76CFF"}
-                percentage={pulse.faction_completion_percentage}
-                primaryText={formatAverageDelta(pulse.faction_vs_network_average_pp)}
-                secondaryText="Daily mission completion rate compared with other guilds"
-                icon={Radar}
+                guildPercentage={pulse.faction_completion_percentage}
+                networkPercentage={pulse.network_average_completion_percentage}
+                deltaText={formatAverageDelta(pulse.faction_vs_network_average_pp)}
               />
             )}
-            <MissionPulsePanel
-              title="Network Average"
-              accentColor={factionData?.color || "#A76CFF"}
-              percentage={pulse.network_average_completion_percentage}
-              primaryText="Average mission completion across guilds today"
-              icon={Globe2}
-            />
+            {!hasFactionContext && (
+              <MissionPulsePanel
+                title="Network Average"
+                accentColor={factionData?.color || "#A76CFF"}
+                percentage={pulse.network_average_completion_percentage}
+                primaryText="Average mission completion across guilds today"
+                icon={Globe2}
+              />
+            )}
           </div>
         )}
 

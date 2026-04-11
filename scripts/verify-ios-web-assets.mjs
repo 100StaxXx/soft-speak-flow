@@ -39,9 +39,15 @@ const fail = (message) => {
 const parseArgs = (argv) => {
   let targetBuiltAssetsDir = null;
   let skipGeneratedBuildScan = false;
+  let scanGeneratedBuilds = false;
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
+
+    if (arg === "--scan-generated-builds") {
+      scanGeneratedBuilds = true;
+      continue;
+    }
 
     if (arg === "--skip-generated-build-scan") {
       skipGeneratedBuildScan = true;
@@ -66,7 +72,7 @@ const parseArgs = (argv) => {
     fail(`Unsupported argument: ${arg}`);
   }
 
-  return { targetBuiltAssetsDir, skipGeneratedBuildScan };
+  return { targetBuiltAssetsDir, skipGeneratedBuildScan, scanGeneratedBuilds };
 };
 
 const directoryExists = async (directory) => {
@@ -205,7 +211,11 @@ const verifyDirectoryMatchesDist = async (directory, distBundles, distJavaScript
 };
 
 const verifyAssets = async () => {
-  const { targetBuiltAssetsDir, skipGeneratedBuildScan } = parseArgs(process.argv.slice(2));
+  const {
+    targetBuiltAssetsDir,
+    skipGeneratedBuildScan,
+    scanGeneratedBuilds,
+  } = parseArgs(process.argv.slice(2));
   const distBundles = await listIndexBundles(distAssetsDir);
   const distJavaScriptBundles = await listJavaScriptBundles(distAssetsDir);
 
@@ -217,7 +227,7 @@ const verifyAssets = async () => {
   await verifyDirectoryMatchesDist(iosAssetsDir, distBundles, distJavaScriptBundles, "Capacitor iOS public assets");
 
   const buildAssetDirs = new Set();
-  if (!skipGeneratedBuildScan) {
+  if (scanGeneratedBuilds && !skipGeneratedBuildScan) {
     for (const directory of await findGeneratedBuildAssetDirs()) {
       buildAssetDirs.add(directory);
     }

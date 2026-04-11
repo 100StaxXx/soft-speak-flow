@@ -101,12 +101,17 @@ describe("DailyMissions", () => {
 
     expect(screen.getByText("Guild Missions")).toBeInTheDocument();
     expect(screen.getByText(/STARFALL FLEET Dispatch/i)).toBeInTheDocument();
-    expect(screen.getByText("Network Average")).toBeInTheDocument();
-    expect(screen.getByText("72%")).toBeInTheDocument();
+    expect(screen.getByText("Today's Competition")).toBeInTheDocument();
+    expect(screen.getAllByText("72%")).toHaveLength(2);
     expect(screen.getByText("61%")).toBeInTheDocument();
     expect(screen.getByText("11 pts above average")).toBeInTheDocument();
-    expect(screen.getByText("Average mission completion across guilds today")).toBeInTheDocument();
-    expect(screen.getByText("Daily mission completion rate compared with other guilds")).toBeInTheDocument();
+    expect(
+      screen.getByRole("img", {
+        name: /Today's competition\. STARFALL FLEET is at 72% completed\. Network average is 61%\./i,
+      }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Average mission completion across guilds today")).not.toBeInTheDocument();
+    expect(screen.queryByText("Daily mission completion rate compared with other guilds")).not.toBeInTheDocument();
     expect(screen.queryByText(/adventurers have cleared at least one mission/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/missions marked complete/i)).not.toBeInTheDocument();
     expect(screen.getByText("Send a quick encouragement text")).toBeInTheDocument();
@@ -142,6 +147,11 @@ describe("DailyMissions", () => {
     render(<DailyMissions />);
 
     expect(screen.getByText("At guild average")).toBeInTheDocument();
+    expect(
+      screen.getByRole("img", {
+        name: /Today's competition\. STARFALL FLEET is at 58% completed\. Network average is 58%\. At guild average\./i,
+      }),
+    ).toBeInTheDocument();
   });
 
   it("shows only the network benchmark when the user has no faction", () => {

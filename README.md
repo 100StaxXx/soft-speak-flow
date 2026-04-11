@@ -146,9 +146,11 @@ npx cap add ios
 
 After the platform is created, you can rerun `npm run ios:sync` to rebuild the web app, copy the latest assets into the Capacitor project, and verify the synced bundle contents.
 
-Treat everything under `ios/App/App/public`, `ios/App/build-cli`, and `ios/App/build-xc` as generated output. Those folders are useful for inspection, but they are not the source of truth for app code and should always be refreshed from the current web build before device or TestFlight packaging.
+Treat everything under `ios/App/App/public`, `ios/App/build-cli`, `ios/App/build-cli-device-smoke`, and `ios/App/build-xc` as generated output. Those folders are useful for inspection, but they are not the source of truth for app code and should always be refreshed from the current web build before device or TestFlight packaging.
 
-The App target now runs a bundled web-asset verification phase during Xcode builds. If a repo-local `App.app/public/assets` bundle drifts from `dist/assets` or still contains a legacy journey-path retry contract, the native build fails before packaging the app.
+`npm run ios:verify-assets` checks the source-of-truth sync between `dist/assets` and `ios/App/App/public/assets`. To also scan already-built app bundles under the generated Xcode output folders, run `npm run ios:verify-assets:generated`.
+
+The App target now runs a bundled web-asset verification phase during Xcode builds. If the built `App.app/public/assets` bundle drifts from `dist/assets` or still contains a legacy journey-path retry contract, the native build fails before packaging the app.
 
 When Xcode launches that verification step outside your interactive shell, it now falls back to the Node version declared in `.nvmrc` or `.node-version` in addition to `NODE_BINARY` and common system install paths.
 
