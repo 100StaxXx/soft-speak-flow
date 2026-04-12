@@ -16,6 +16,11 @@ import {
   shouldApplyEngagementBudget,
   type NotificationType,
 } from "../_shared/notificationsV2.ts";
+import {
+  buildNoDeviceTokenFailureUpdate,
+  resolveSourceAcknowledgement,
+  TERMINAL_NO_DEVICE_ERROR,
+} from "./queueDelivery.ts";
 
 interface QueueRow {
   id: string;
@@ -36,8 +41,6 @@ interface DeviceTokenRow {
   device_token: string;
   updated_at: string | null;
 }
-
-const TERMINAL_NO_DEVICE_ERROR = "no_device_tokens";
 
 function toDateOrNull(value: string | null | undefined): Date | null {
   if (!value) return null;
@@ -92,55 +95,13 @@ async function acknowledgeSourceDelivery(
   row: QueueRow,
   deliveredAtIso: string,
 ): Promise<void> {
-  const sourceTable = row.source_table;
-  const sourceId = row.source_id;
+  const acknowledgement = resolveSourceAcknowledgement(row, deliveredAtIso);
+  if (!acknowledgement) return;
 
-  if (!sourceTable || !sourceId) return;
-
-  if (sourceTable === "user_daily_pushes") {
-    await supabase.from("user_daily_pushes").update({ delivered_at: deliveredAtIso }).eq("id", sourceId);
-    return;
-  }
-
-  if (sourceTable === "user_daily_quote_pushes") {
-    await supabase.from("user_daily_quote_pushes").update({ delivered_at: deliveredAtIso }).eq("id", sourceId);
-    return;
-  }
-
-  if (sourceTable === "daily_tasks") {
-    if (row.notification_type === "task_start") {
-      await supabase.from("daily_tasks").update({ start_notification_sent: true }).eq("id", sourceId);
-    } else if (row.notification_type === "task_reminder") {
-      await supabase.from("daily_tasks").update({ reminder_sent: true }).eq("id", sourceId);
-    }
-    return;
-  }
-
-  if (sourceTable === "habits") {
-    const payloadLocalDate = row.payload?.local_date;
-    const reminderLocalDate = typeof payloadLocalDate === "string" ? payloadLocalDate : null;
-
-    await supabase
-      .from("habits")
-      .update({ reminder_last_sent_for_date: reminderLocalDate })
-      .eq("id", sourceId);
-    return;
-  }
-
-  if (sourceTable === "contact_reminders") {
-    await supabase
-      .from("contact_reminders")
-      .update({ sent: true, sent_at: deliveredAtIso })
-      .eq("id", sourceId);
-    return;
-  }
-
-  if (sourceTable === "mentor_nudges") {
-    await supabase
-      .from("mentor_nudges")
-      .update({ push_sent_at: deliveredAtIso })
-      .eq("id", sourceId);
-  }
+  await supabase
+    .from(acknowledgement.table)
+    .update(acknowledgement.updates)
+    .eq("id", acknowledgement.id);
 }
 
 async function loadBudgetState(
@@ -339,15 +300,16 @@ serve(async (req) => {
       }
 
       if (!deviceTokens || deviceTokens.length === 0) {
+        if (row.notification_type === "task_start" || row.notification_type === "task_reminder") {
+          console.warn("[notifications-dispatch-v2] quest notification missing device token", {
+            queue_id: row.id,
+            user_id: row.user_id,
+            notification_type: row.notification_type,
+            source_id: row.source_id,
+          });
+        }
         failedTerminal += 1;
-        await updateQueueStatus(supabase, row.id, {
-          status: "failed_terminal",
-          delivered: true,
-          delivered_at: nowIso,
-          attempt_count: attemptCount,
-          next_retry_at: null,
-          last_error: TERMINAL_NO_DEVICE_ERROR,
-        });
+        await updateQueueStatus(supabase, row.id, buildNoDeviceTokenFailureUpdate(attemptCount, nowIso));
         continue;
       }
 
@@ -401,6 +363,15 @@ serve(async (req) => {
       }
 
       if (successCount > 0) {
+        if (row.notification_type === "task_start" || row.notification_type === "task_reminder") {
+          console.log("[notifications-dispatch-v2] quest notification sent", {
+            queue_id: row.id,
+            user_id: row.user_id,
+            notification_type: row.notification_type,
+            source_id: row.source_id,
+            token_attempts: tokensToAttempt.length,
+          });
+        }
         sent += 1;
         await updateQueueStatus(supabase, row.id, {
           status: "sent",

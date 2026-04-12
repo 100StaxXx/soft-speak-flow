@@ -20,7 +20,8 @@ import {
   unregisterNativePush,
   hasActiveNativePushSubscription,
   debugTestRegistration,
-  getNativePushTokenDebugSnapshot
+  getNativePushTokenDebugSnapshot,
+  waitForNativePushToken,
 } from "@/utils/nativePushNotifications";
 
 const timeOptions = [
@@ -54,6 +55,7 @@ type NotificationProfileUpdates = Partial<Pick<
 type NotificationTimeField = "daily_push_time" | "daily_quote_push_time";
 
 const RECENT_QUEUE_LIMIT = 12;
+const QUEST_NOTIFICATION_TYPES = new Set(["task_start", "task_reminder"]);
 
 const formatRelativeTokenAge = (value: string | null): string => {
   if (!value) {
@@ -90,6 +92,7 @@ export const PushNotificationSettings = memo(() => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [pushEnabled, setPushEnabled] = useState(false);
+  const [pushStatusLoaded, setPushStatusLoaded] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
 
   // Check platform support after mount
@@ -99,7 +102,12 @@ export const PushNotificationSettings = memo(() => {
 
   useEffect(() => {
     if (user) {
-      hasActiveNativePushSubscription(user.id).then(setPushEnabled);
+      hasActiveNativePushSubscription(user.id).then((value) => {
+        setPushEnabled(value);
+        setPushStatusLoaded(true);
+      });
+    } else {
+      setPushStatusLoaded(true);
     }
   }, [user]);
 
@@ -131,13 +139,19 @@ export const PushNotificationSettings = memo(() => {
       if (enabled) {
         // Subscribe to native push notifications
         await initializeNativePush(user.id);
-        setPushEnabled(true);
-        toast({ title: "Notifications Enabled", description: "You'll receive daily notifications" });
+        const hasToken = await waitForNativePushToken(user.id);
+        setPushEnabled(hasToken);
+        toast({
+          title: hasToken ? "Notifications Enabled" : "Registration Started",
+          description: hasToken
+            ? "This device can now receive mobile push notifications."
+            : "Permission is enabled, but we're still waiting for this device token to finish registering.",
+        });
       } else {
         // Unsubscribe from push notifications
         await unregisterNativePush(user.id);
         setPushEnabled(false);
-        toast({ title: "Notifications Disabled", description: "You won't receive push notifications" });
+        toast({ title: "Notifications Disabled", description: "This device will no longer receive mobile push notifications." });
       }
     } catch (error) {
       console.error("Error toggling push notifications:", error);
@@ -151,7 +165,7 @@ export const PushNotificationSettings = memo(() => {
     if (enabled && !pushEnabled) {
       toast({ 
         title: "Enable push notifications first", 
-        description: "Please enable browser notifications before activating daily pep talks",
+        description: "Please enable mobile push notifications before activating daily pep talks",
         variant: "destructive" 
       });
       return;
@@ -172,7 +186,7 @@ export const PushNotificationSettings = memo(() => {
     if (enabled && !pushEnabled) {
       toast({ 
         title: "Enable push notifications first", 
-        description: "Please enable browser notifications before activating daily quotes",
+        description: "Please enable mobile push notifications before activating daily quotes",
         variant: "destructive" 
       });
       return;
@@ -193,7 +207,7 @@ export const PushNotificationSettings = memo(() => {
     if (enabled && !pushEnabled) {
       toast({ 
         title: "Enable push notifications first", 
-        description: "Please enable browser notifications before activating habit reminders",
+        description: "Please enable mobile push notifications before activating habit reminders",
         variant: "destructive" 
       });
       return;
@@ -214,7 +228,7 @@ export const PushNotificationSettings = memo(() => {
     if (enabled && !pushEnabled) {
       toast({ 
         title: "Enable push notifications first", 
-        description: "Please enable browser notifications before activating quest reminders",
+        description: "Please enable mobile push notifications before activating quest reminders",
         variant: "destructive" 
       });
       return;
@@ -235,7 +249,7 @@ export const PushNotificationSettings = memo(() => {
     if (enabled && !pushEnabled) {
       toast({
         title: "Enable push notifications first",
-        description: "Please enable browser notifications before activating check-in reminders",
+        description: "Please enable mobile push notifications before activating check-in reminders",
         variant: "destructive",
       });
       return;
@@ -271,10 +285,10 @@ export const PushNotificationSettings = memo(() => {
         <div className="bg-accent/20 p-2 rounded-xl">
           <Bell className="h-5 w-5 text-foreground" />
         </div>
-        <h2 className="font-display text-2xl text-foreground">Daily Notifications</h2>
+        <h2 className="font-display text-2xl text-foreground">Mobile Push Notifications</h2>
       </div>
       <p className="text-muted-foreground text-sm mb-6">
-        Get personalized pep talks and quotes delivered daily.
+        Get quest reminders, pep talks, and quotes delivered to your iPhone or iPad.
       </p>
 
       {!isSupported && (
@@ -287,14 +301,14 @@ export const PushNotificationSettings = memo(() => {
       )}
 
       <div className="space-y-6">
-        {/* Browser Push Permission */}
+          {/* Native Push Permission */}
         {isSupported && (
           <div className="space-y-3 pb-4 border-b border-border">
             <div className="flex items-center justify-between">
               <div>
-                <Label className="text-foreground font-medium">Browser Notifications</Label>
+                <Label className="text-foreground font-medium">Mobile Push Access</Label>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Allow this app to send you notifications
+                  Allow this iPhone or iPad to receive push notifications
                 </p>
               </div>
               <Switch
@@ -419,7 +433,7 @@ export const PushNotificationSettings = memo(() => {
             <div>
               <Label className="text-foreground font-medium">Quest Reminders</Label>
               <p className="text-xs text-muted-foreground mt-1">
-                Get notified before scheduled quests
+                Get notified before scheduled quests and again when they start
               </p>
             </div>
             <Switch
@@ -428,6 +442,14 @@ export const PushNotificationSettings = memo(() => {
               disabled={!pushEnabled}
             />
           </div>
+          {pushStatusLoaded && (profile?.task_reminders_enabled ?? true) && !pushEnabled && (
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                Quest reminders are enabled, but this device is not registered for mobile push yet. Turn on Mobile Push Access above, then use Test Registration below if a token still does not appear.
+              </AlertDescription>
+            </Alert>
+          )}
         </div>
 
         {/* Morning + Evening Check-In Reminders */}
@@ -479,6 +501,10 @@ const PushDebugPanel = memo(({ userId }: { userId?: string }) => {
     recentSkippedBudget: boolean;
     recentFailedTerminal: boolean;
     recentNoDeviceTokens: boolean;
+    recentShadowMode: boolean;
+    recentRollbackEnabled: boolean;
+    recentRolloutBlocked: boolean;
+    recentQuestRows: QueueDebugRow[];
     error?: string;
   } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -501,6 +527,10 @@ const PushDebugPanel = memo(({ userId }: { userId?: string }) => {
           recentSkippedBudget: false,
           recentFailedTerminal: false,
           recentNoDeviceTokens: false,
+          recentShadowMode: false,
+          recentRollbackEnabled: false,
+          recentRolloutBlocked: false,
+          recentQuestRows: [],
         });
         return;
       }
@@ -529,6 +559,7 @@ const PushDebugPanel = memo(({ userId }: { userId?: string }) => {
       }
 
       const recentQueueRows = (queueResult.data ?? []) as QueueDebugRow[];
+      const recentQuestRows = recentQueueRows.filter((row) => QUEST_NOTIFICATION_TYPES.has(row.notification_type));
 
       setDebugInfo({
         ...info,
@@ -538,9 +569,13 @@ const PushDebugPanel = memo(({ userId }: { userId?: string }) => {
         latestTokenUpdatedAt: tokenSnapshot.latestUpdatedAt,
         latestTokenPreview: tokenSnapshot.latestTokenPreview,
         recentQueueRows,
+        recentQuestRows,
         recentSkippedBudget: recentQueueRows.some((row) => row.status === "skipped_budget"),
         recentFailedTerminal: recentQueueRows.some((row) => row.status === "failed_terminal"),
         recentNoDeviceTokens: recentQueueRows.some((row) => row.last_error === "no_device_tokens"),
+        recentShadowMode: recentQueueRows.some((row) => row.last_error === "shadow_mode"),
+        recentRollbackEnabled: recentQueueRows.some((row) => row.last_error === "rollback_enabled"),
+        recentRolloutBlocked: recentQueueRows.some((row) => String(row.last_error ?? "").startsWith("rollout_")),
       });
     } catch (error) {
       console.error('Debug info error:', error);
@@ -558,9 +593,9 @@ const PushDebugPanel = memo(({ userId }: { userId?: string }) => {
     setIsRegistering(true);
     try {
       await initializeNativePush(userId);
-      toast({ title: "Registration Initiated", description: "Check Xcode console for detailed logs" });
-      // Reload debug info after a short delay
-      setTimeout(loadDebugInfo, 2000);
+      await waitForNativePushToken(userId, { timeoutMs: 5000, pollMs: 250 });
+      await loadDebugInfo();
+      toast({ title: "Registration Checked", description: "Refreshed this device's push token and queue diagnostics." });
     } catch (error) {
       toast({ 
         title: "Registration Failed", 
@@ -687,6 +722,21 @@ const PushDebugPanel = memo(({ userId }: { userId?: string }) => {
                     Recent no_device_tokens
                   </span>
                 )}
+                {debugInfo.recentShadowMode && (
+                  <span className="rounded-full border border-sky-500/40 bg-sky-500/10 px-2 py-1 text-xs text-sky-700 dark:text-sky-300">
+                    Recent shadow_mode
+                  </span>
+                )}
+                {debugInfo.recentRollbackEnabled && (
+                  <span className="rounded-full border border-slate-500/40 bg-slate-500/10 px-2 py-1 text-xs text-slate-700 dark:text-slate-300">
+                    Recent rollback_enabled
+                  </span>
+                )}
+                {debugInfo.recentRolloutBlocked && (
+                  <span className="rounded-full border border-slate-500/40 bg-slate-500/10 px-2 py-1 text-xs text-slate-700 dark:text-slate-300">
+                    Recent rollout block
+                  </span>
+                )}
                 {!debugInfo.recentSkippedBudget && !debugInfo.recentFailedTerminal && !debugInfo.recentNoDeviceTokens && (
                   <span className="rounded-full border border-border bg-background px-2 py-1 text-xs text-muted-foreground">
                     No recent queue failures
@@ -702,6 +752,15 @@ const PushDebugPanel = memo(({ userId }: { userId?: string }) => {
               </Alert>
             )}
             
+            {debugInfo.permissionStatus === "granted" && !debugInfo.hasToken && (
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription className="text-xs">
+                  Push permission is granted, but this device does not have a saved iOS token yet. Use Test Registration, then verify a quest queue row no longer fails with <code>no_device_tokens</code>.
+                </AlertDescription>
+              </Alert>
+            )}
+
             <div className="flex gap-2 pt-2">
               <Button 
                 variant="outline" 
@@ -726,6 +785,39 @@ const PushDebugPanel = memo(({ userId }: { userId?: string }) => {
                   'Test Registration'
                 )}
               </Button>
+            </div>
+
+            <div className="space-y-2 pt-3 border-t border-border">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Recent Quest Queue Rows</span>
+                <span className="text-foreground">{debugInfo.recentQuestRows.length}</span>
+              </div>
+
+              {debugInfo.recentQuestRows.length > 0 ? (
+                <div className="space-y-2">
+                  {debugInfo.recentQuestRows.map((row) => (
+                    <div key={row.id} className="rounded-lg border border-border p-3 space-y-1">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-foreground font-medium">{row.notification_type}</span>
+                        <span className="text-muted-foreground font-mono text-xs">{row.status}</span>
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Scheduled: {new Date(row.scheduled_for).toLocaleString()}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Delivered: {row.delivered_at ? new Date(row.delivered_at).toLocaleString() : "Not yet"}
+                      </div>
+                      {row.last_error && (
+                        <div className="text-xs text-destructive break-all">
+                          Reason: {row.last_error}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">No recent quest reminder or quest start queue activity</p>
+              )}
             </div>
 
             <div className="space-y-2 pt-3 border-t border-border">

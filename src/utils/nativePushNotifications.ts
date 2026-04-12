@@ -21,6 +21,12 @@ export interface NativePushTokenDebugSnapshot {
   latestTokenPreview: string | null;
 }
 
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
 /**
  * Check if native push notifications are supported
  */
@@ -221,6 +227,25 @@ export async function getNativePushTokenDebugSnapshot(userId: string): Promise<N
       latestTokenPreview: null,
     };
   }
+}
+
+export async function waitForNativePushToken(
+  userId: string,
+  options?: { timeoutMs?: number; pollMs?: number },
+): Promise<boolean> {
+  const timeoutMs = Math.max(250, options?.timeoutMs ?? 5000);
+  const pollMs = Math.max(100, options?.pollMs ?? 250);
+  const startedAt = Date.now();
+
+  while (Date.now() - startedAt <= timeoutMs) {
+    if (await hasActiveNativePushSubscription(userId)) {
+      return true;
+    }
+
+    await delay(pollMs);
+  }
+
+  return false;
 }
 
 /**

@@ -16,6 +16,11 @@ import {
 } from "../_shared/notificationsV2.ts";
 import { composeNotificationCopy, type CompanionNotificationContext } from "../_shared/notificationComposer.ts";
 import { scanPaginatedRows } from "./pagination.ts";
+import {
+  buildTaskNotificationCandidates,
+  type TaskCandidateRow,
+  type TaskProfileRow,
+} from "./taskNotifications.ts";
 
 interface QueueInsertRow {
   user_id: string;
@@ -201,6 +206,8 @@ serve(async (req) => {
       daily_quote: 0,
     };
     let generatedDailyQuotes = 0;
+    let queuedTaskStarts = 0;
+    let queuedTaskReminders = 0;
 
     let dailyProfilesScanned = 0;
 
@@ -569,58 +576,30 @@ serve(async (req) => {
       ? (await supabase
         .from("profiles")
         .select("id, timezone, task_reminders_enabled")
-        .in("id", taskUserIds)).data as Pick<ProfileRow, "id" | "timezone" | "task_reminders_enabled">[] | null
+        .in("id", taskUserIds)).data as TaskProfileRow[] | null
       : [];
     const taskProfileByUser = new Map((taskProfiles ?? []).map((row) => [row.id, row]));
 
-    for (const task of taskCandidates ?? []) {
-      const profile = taskProfileByUser.get(task.user_id);
-      const timezone = normalizeTimezone(profile?.timezone);
-      const scheduledAt = toScheduledDateTime(task.task_date, task.scheduled_time, timezone);
-      if (!scheduledAt) continue;
-
-      const remindersEnabled = profile?.task_reminders_enabled !== false;
-
-      if (scheduledAt <= now && !task.start_notification_sent && remindersEnabled) {
-        inserts.push(rowForQueue({
-          userId: task.user_id,
-          type: "task_start",
-          sourceTable: "daily_tasks",
-          sourceId: task.id,
-          dedupeKey: `task_start:${task.id}`,
-          scheduledFor: scheduledAt.toISOString(),
-          payload: {
-            task_id: task.id,
-            task_text: task.task_text,
-            xp_reward: task.xp_reward,
-            type: "task_start",
-            url: "/tasks",
-          },
-        }));
+    for (const taskNotification of buildTaskNotificationCandidates({
+      tasks: (taskCandidates ?? []) as TaskCandidateRow[],
+      profilesByUser: taskProfileByUser,
+      now,
+    })) {
+      if (taskNotification.type === "task_start") {
+        queuedTaskStarts += 1;
+      } else if (taskNotification.type === "task_reminder") {
+        queuedTaskReminders += 1;
       }
 
-      if (task.reminder_enabled && !task.reminder_sent && remindersEnabled) {
-        const minutesBefore = typeof task.reminder_minutes_before === "number" ? task.reminder_minutes_before : 15;
-        const reminderAt = new Date(scheduledAt.getTime() - minutesBefore * 60_000);
-        if (reminderAt <= now) {
-          inserts.push(rowForQueue({
-            userId: task.user_id,
-            type: "task_reminder",
-            sourceTable: "daily_tasks",
-            sourceId: task.id,
-            dedupeKey: `task_reminder:${task.id}:${minutesBefore}`,
-            scheduledFor: reminderAt.toISOString(),
-            payload: {
-              task_id: task.id,
-              task_text: task.task_text,
-              xp_reward: task.xp_reward,
-              reminder_minutes_before: minutesBefore,
-              type: "task_reminder",
-              url: "/tasks",
-            },
-          }));
-        }
-      }
+      inserts.push(rowForQueue({
+        userId: taskNotification.userId,
+        type: taskNotification.type,
+        sourceTable: "daily_tasks",
+        sourceId: taskNotification.sourceId,
+        dedupeKey: taskNotification.dedupeKey,
+        scheduledFor: taskNotification.scheduledFor,
+        payload: taskNotification.payload,
+      }));
     }
 
     // 4) Habit reminders
@@ -898,6 +877,8 @@ serve(async (req) => {
           daily_pep: duePepPushes?.length ?? 0,
           daily_quote: dueQuotePushes?.length ?? 0,
           tasks: taskCandidates?.length ?? 0,
+          task_start_candidates: queuedTaskStarts,
+          task_reminder_candidates: queuedTaskReminders,
           habits: habitCandidates?.length ?? 0,
           contact_reminders: dueContacts?.length ?? 0,
           mentor_nudges: nudges.length,

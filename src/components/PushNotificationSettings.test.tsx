@@ -60,6 +60,7 @@ const mocks = vi.hoisted(() => {
       latestUpdatedAt: "2026-03-31T18:00:00.000Z",
       latestTokenPreview: "abcd1234...wxyz",
     })),
+    waitForNativePushToken: vi.fn(() => Promise.resolve(true)),
     initializeNativePush: vi.fn(() => Promise.resolve()),
     unregisterNativePush: vi.fn(() => Promise.resolve()),
     fromMock,
@@ -120,6 +121,7 @@ vi.mock("@/utils/nativePushNotifications", () => ({
   hasActiveNativePushSubscription: mocks.hasActiveNativePushSubscription,
   debugTestRegistration: mocks.debugTestRegistration,
   getNativePushTokenDebugSnapshot: mocks.getNativePushTokenDebugSnapshot,
+  waitForNativePushToken: mocks.waitForNativePushToken,
   initializeNativePush: mocks.initializeNativePush,
   unregisterNativePush: mocks.unregisterNativePush,
 }));
@@ -194,6 +196,9 @@ describe("PushNotificationSettings debug panel", () => {
   it("shows timezone, token freshness, and recent queue diagnostics", async () => {
     renderWithClient();
 
+    expect(screen.getByText("Mobile Push Notifications")).toBeInTheDocument();
+    expect(screen.getByText("Mobile Push Access")).toBeInTheDocument();
+
     fireEvent.click(screen.getByRole("button", { name: /Debug Push Notifications/i }));
 
     await waitFor(() => {
@@ -205,9 +210,48 @@ describe("PushNotificationSettings debug panel", () => {
     expect(screen.getByText("Recent skipped_budget")).toBeInTheDocument();
     expect(screen.getByText("Recent failed_terminal")).toBeInTheDocument();
     expect(screen.getByText("Recent no_device_tokens")).toBeInTheDocument();
+    expect(screen.getByText("Recent Quest Queue Rows")).toBeInTheDocument();
     expect(screen.getByText("Reason: no_device_tokens")).toBeInTheDocument();
-    expect(screen.getByText("task_reminder")).toBeInTheDocument();
+    expect(screen.getAllByText("task_reminder").length).toBeGreaterThan(0);
     expect(screen.getByText("habit_reminder")).toBeInTheDocument();
+  });
+
+  it("shows a recovery clue when quest reminders are enabled but no device token is registered", async () => {
+    mocks.hasActiveNativePushSubscription.mockResolvedValue(false);
+
+    renderWithClient();
+
+    await waitFor(() => {
+      expect(screen.getByText(/Quest reminders are enabled, but this device is not registered for mobile push yet/i)).toBeInTheDocument();
+    });
+  });
+
+  it("refreshes diagnostics immediately after test registration succeeds", async () => {
+    renderWithClient();
+
+    fireEvent.click(screen.getByRole("button", { name: /Debug Push Notifications/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Profile Timezone:")).toBeInTheDocument();
+    });
+
+    mocks.debugTestRegistration.mockClear();
+    mocks.getNativePushTokenDebugSnapshot.mockClear();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Test Registration" }));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mocks.initializeNativePush).toHaveBeenCalledWith(mocks.user.id);
+    expect(mocks.waitForNativePushToken).toHaveBeenCalledWith(mocks.user.id, { timeoutMs: 5000, pollMs: 250 });
+    expect(mocks.debugTestRegistration).toHaveBeenCalled();
+    expect(mocks.getNativePushTokenDebugSnapshot).toHaveBeenCalled();
+    expect(mocks.toast).toHaveBeenCalledWith({
+      title: "Registration Checked",
+      description: "Refreshed this device's push token and queue diagnostics.",
+    });
   });
 
   it("updates daily pep talk delivery time without reloading the app", async () => {

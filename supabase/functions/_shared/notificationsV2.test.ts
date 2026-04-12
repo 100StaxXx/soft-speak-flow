@@ -53,15 +53,25 @@ Deno.test("scheduled reminders bypass engagement budget while daily content stay
 
   const blockedDailyPep = decideEngagementBudget({
     notificationType: "daily_pep",
-    state: {
-      sentTodayCount: 1,
-      lastSentAt: new Date("2026-03-27T15:00:00.000Z"),
-    },
+    state: { sentTodayCount: 2, lastSentAt: new Date("2026-03-27T10:00:00.000Z") },
     now: new Date("2026-03-27T16:00:00.000Z"),
   });
 
-  if (blockedDailyPep.allow || blockedDailyPep.reason !== "soft_target_enforced") {
-    throw new Error(`Expected daily_pep to be blocked by soft target, got ${JSON.stringify(blockedDailyPep)}`);
+  if (blockedDailyPep.allow || blockedDailyPep.reason !== "daily_cap_reached") {
+    throw new Error(`Expected daily_pep to be blocked by daily cap, got ${JSON.stringify(blockedDailyPep)}`);
+  }
+
+  const spacedDailyPep = decideEngagementBudget({
+    notificationType: "daily_pep",
+    state: {
+      sentTodayCount: 1,
+      lastSentAt: new Date("2026-03-27T10:00:00.000Z"),
+    },
+    now: new Date("2026-03-27T14:01:00.000Z"),
+  });
+
+  if (!spacedDailyPep.allow) {
+    throw new Error(`Expected daily_pep to be allowed after spacing guard clears, got ${JSON.stringify(spacedDailyPep)}`);
   }
 
   const allowedTaskReminder = decideEngagementBudget({
