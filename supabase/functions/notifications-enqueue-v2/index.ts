@@ -559,11 +559,10 @@ serve(async (req) => {
       const timezone = normalizeTimezone(profile?.timezone);
       const scheduledAt = toScheduledDateTime(task.task_date, task.scheduled_time, timezone);
       if (!scheduledAt) continue;
-      if (scheduledAt > now) continue;
 
       const remindersEnabled = profile?.task_reminders_enabled !== false;
 
-      if (!task.start_notification_sent && remindersEnabled) {
+      if (scheduledAt <= now && !task.start_notification_sent && remindersEnabled) {
         inserts.push(rowForQueue({
           userId: task.user_id,
           type: "task_start",

@@ -434,10 +434,6 @@ export function decideEngagementBudget(input: {
     return { allow: false, reason: "daily_cap_reached" };
   }
 
-  if (state.sentTodayCount === 1) {
-    return { allow: false, reason: "soft_target_enforced" };
-  }
-
   if (state.lastSentAt && minutesBetween(now, state.lastSentAt) < 240) {
     return { allow: false, reason: "spacing_guard" };
   }

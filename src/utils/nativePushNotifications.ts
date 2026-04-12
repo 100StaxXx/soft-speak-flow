@@ -238,7 +238,8 @@ async function saveDeviceToken(userId: string, deviceToken: string): Promise<voi
         user_id: userId,
         device_token: deviceToken,
         platform: 'ios',
-        user_agent: navigator.userAgent
+        user_agent: navigator.userAgent,
+        updated_at: new Date().toISOString(),
       }, {
         onConflict: 'user_id,device_token'
       });
@@ -308,6 +309,24 @@ export async function unregisterNativePush(userId: string): Promise<void> {
     console.log('[NativePush] Unregister error:', error);
     logger.error('Error unregistering from push:', error);
     throw error;
+  }
+}
+
+/**
+ * Lightweight APNs re-registration for app resume.
+ * Skips permission prompts and listener setup — just pokes APNs so iOS
+ * returns the current device token, which the existing listener saves.
+ */
+export async function refreshPushRegistration(): Promise<void> {
+  if (!isNativePushSupported() || !currentPushUserId || !listenersBound) {
+    return;
+  }
+
+  try {
+    console.log('[NativePush] Refreshing APNs registration on resume');
+    await PushNotifications.register();
+  } catch (error) {
+    console.log('[NativePush] Resume re-registration failed:', error);
   }
 }
 

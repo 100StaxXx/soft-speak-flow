@@ -5,6 +5,7 @@ import { App } from '@capacitor/app';
 import { format } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
 import { logger } from '@/utils/logger';
+import { refreshPushRegistration } from '@/utils/nativePushNotifications';
 import {
   dispatchPlannerSyncFinished,
   warmDailyTasksQueryFromRemote,
@@ -80,6 +81,10 @@ export const useAppResumeRefresh = ({ enabled = true }: UseAppResumeRefreshOptio
     ]);
 
     dispatchPlannerSyncFinished();
+
+    // Re-register with APNs so iOS returns the current device token.
+    // This keeps the token fresh even when iOS rotates it in the background.
+    void refreshPushRegistration();
   }, [enabled, queryClient, user?.id]);
 
   // Native iOS/Android: Listen for app state changes
