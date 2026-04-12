@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
 import { requireInternalRequest } from "../_shared/auth.ts";
 import { sendAPNSNotification } from "../_shared/apns.ts";
+import { resolveNotificationCompanionContextMap } from "../_shared/companionName.ts";
 import {
   addMinutes,
   decideEngagementBudget,
@@ -18,6 +19,7 @@ import {
 } from "../_shared/notificationsV2.ts";
 import {
   buildNoDeviceTokenFailureUpdate,
+  resolveDeliveryCopy,
   resolveSourceAcknowledgement,
   TERMINAL_NO_DEVICE_ERROR,
 } from "./queueDelivery.ts";
@@ -42,10 +44,49 @@ interface DeviceTokenRow {
   updated_at: string | null;
 }
 
+interface CompanionRow {
+  id: string;
+  user_id: string;
+  current_stage: number | null;
+  cached_creature_name: string | null;
+  spirit_animal: string | null;
+  current_mood: string | null;
+  inactive_days: number | null;
+  created_at: string | null;
+}
+
 function toDateOrNull(value: string | null | undefined): Date | null {
   if (!value) return null;
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+async function loadCompanionContextMap(
+  supabase: any,
+  userIds: string[],
+): Promise<Map<string, { displayName?: string | null; cachedCreatureName?: string | null; spiritAnimal?: string | null; currentMood?: string | null; inactiveDays?: number | null }>> {
+  if (userIds.length === 0) {
+    return new Map();
+  }
+
+  const { data, error } = await supabase
+    .from("user_companion")
+    .select("id, user_id, current_stage, cached_creature_name, spirit_animal, current_mood, inactive_days, created_at")
+    .in("user_id", userIds);
+
+  if (error) {
+    throw error;
+  }
+
+  return resolveNotificationCompanionContextMap({
+    supabase,
+    companions: (data as CompanionRow[] | null) ?? [],
+    logPrefix: "[notifications-dispatch-v2]",
+  });
+}
+
+function shouldLoadCompanionContext(notificationType: NotificationType): boolean {
+  return notificationType === "daily_pep" || notificationType === "mentor_nudge";
 }
 
 async function claimQueueRow(supabase: any, rowId: string, workerId: string): Promise<QueueRow | null> {
@@ -74,7 +115,7 @@ async function claimQueueRow(supabase: any, rowId: string, workerId: string): Pr
 async function updateQueueStatus(
   supabase: any,
   id: string,
-  updates: Record<string, unknown>,
+  updates: object,
 ): Promise<void> {
   const { error } = await supabase
     .from("push_notification_queue")
@@ -197,6 +238,16 @@ serve(async (req) => {
 
     if (fetchError) throw fetchError;
 
+    const queuedRows = (dueRows as QueueRow[] | null) ?? [];
+    const companionContextMap = await loadCompanionContextMap(
+      supabase,
+      [...new Set(
+        queuedRows
+          .filter((row) => shouldLoadCompanionContext(row.notification_type))
+          .map((row) => row.user_id),
+      )],
+    );
+
     const budgetCache = new Map<string, DeliveryBudgetState>();
 
     let processed = 0;
@@ -207,7 +258,7 @@ serve(async (req) => {
     let skippedRollout = 0;
     let shadowed = 0;
 
-    for (const candidate of (dueRows as QueueRow[] | null) ?? []) {
+    for (const candidate of queuedRows) {
       const row = await claimQueueRow(supabase, candidate.id, workerId);
       if (!row) continue;
 
@@ -321,12 +372,16 @@ serve(async (req) => {
       const tokensToAttempt = tokenFanoutMode === "all"
         ? orderedTokens
         : orderedTokens.slice(0, 1);
+      const deliveryCopy = resolveDeliveryCopy(
+        row,
+        companionContextMap.get(row.user_id) ?? null,
+      );
 
       for (const token of tokensToAttempt) {
         try {
           const sendResult = await sendAPNSNotification(token.device_token, {
-            title: row.title,
-            body: row.body,
+            title: deliveryCopy.title,
+            body: deliveryCopy.body,
             data: {
               ...(row.payload ?? {}),
               queue_id: row.id,

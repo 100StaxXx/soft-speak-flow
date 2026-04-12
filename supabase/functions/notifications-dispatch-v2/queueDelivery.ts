@@ -1,4 +1,8 @@
 import type { NotificationType } from "../_shared/notificationsV2.ts";
+import {
+  composeNotificationCopy,
+  type CompanionNotificationContext,
+} from "../_shared/notificationComposer.ts";
 
 export interface QueueDeliverySourceRow {
   source_table: string;
@@ -22,7 +26,41 @@ export interface QueueSourceAcknowledgement {
   updates: Record<string, unknown>;
 }
 
+export interface QueueDeliveryCopyRow {
+  notification_type: NotificationType;
+  title: string;
+  body: string;
+  payload: Record<string, unknown> | null;
+}
+
 export const TERMINAL_NO_DEVICE_ERROR = "no_device_tokens";
+
+function shouldRefreshCompanionLedCopy(notificationType: NotificationType): boolean {
+  return notificationType === "daily_pep" || notificationType === "mentor_nudge";
+}
+
+export function resolveDeliveryCopy(
+  row: QueueDeliveryCopyRow,
+  companion?: CompanionNotificationContext | null,
+): { title: string; body: string } {
+  if (!shouldRefreshCompanionLedCopy(row.notification_type)) {
+    return {
+      title: row.title,
+      body: row.body,
+    };
+  }
+
+  const copy = composeNotificationCopy({
+    type: row.notification_type,
+    payload: row.payload ?? {},
+    companion,
+  });
+
+  return {
+    title: copy.title,
+    body: typeof row.body === "string" && row.body.trim().length > 0 ? row.body : copy.body,
+  };
+}
 
 export function buildNoDeviceTokenFailureUpdate(
   attemptCount: number,
