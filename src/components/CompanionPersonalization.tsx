@@ -6,7 +6,7 @@ import { CompanionCreationLoader } from "./CompanionCreationLoader";
 import { CompanionImage, CompanionPortraitShell } from "./CompanionImage";
 import {
   COMPANION_ELEMENTS,
-  COMPANION_PRESETS,
+  COMPANION_PICKER_PRESETS,
   COMPANION_STORY_TONES,
   getCompanionElementAnchorColor,
   type CompanionElementId,
@@ -75,7 +75,7 @@ export const CompanionPersonalization = ({
   const isMigrationMode = mode === "migration";
 
   const selectedPreset = useMemo(
-    () => COMPANION_PRESETS.find((preset) => preset.id === selectedPresetId) ?? COMPANION_PRESETS[0],
+    () => COMPANION_PICKER_PRESETS.find((preset) => preset.id === selectedPresetId) ?? COMPANION_PICKER_PRESETS[0],
     [selectedPresetId],
   );
   const selectedElementMeta = useMemo(
@@ -213,7 +213,7 @@ export const CompanionPersonalization = ({
               </div>
             ) : (
               <div className="flex gap-4 overflow-x-auto pb-3 snap-x snap-mandatory">
-                {COMPANION_PRESETS.map((preset) => {
+                {COMPANION_PICKER_PRESETS.map((preset) => {
                   const previewUrl = getPresetPreviewUrl(preset.id, selectedElement);
                   const previewKey = `${preset.id}:${selectedElement}`;
                   const isSupported = isPilotCompanionPreset(preset.id);

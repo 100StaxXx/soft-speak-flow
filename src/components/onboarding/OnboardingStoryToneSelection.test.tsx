@@ -1,7 +1,17 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { COMPANION_PRESETS } from "@/config/companionCatalog";
+import { COMPANION_PICKER_PRESETS } from "@/config/companionCatalog";
 import { OnboardingStoryToneSelection } from "./OnboardingStoryToneSelection";
+
+const getVisibleSpeciesOrder = () => {
+  const speciesNames = COMPANION_PICKER_PRESETS.map((preset) => preset.displayName);
+
+  return screen
+    .getAllByRole("button")
+    .map((button) => button.textContent ?? "")
+    .flatMap((text) => speciesNames.filter((name) => text.includes(name)))
+    .filter((name, index, values) => values.indexOf(name) === index);
+};
 
 vi.mock("framer-motion", async () => {
   const React = await import("react");
@@ -27,7 +37,11 @@ describe("OnboardingStoryToneSelection", () => {
 
     expect(screen.getByRole("button", { name: /Epic Adventure/i })).toHaveAttribute("data-selected", "true");
     expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
-    for (const preset of COMPANION_PRESETS) {
+    expect(getVisibleSpeciesOrder().slice(0, 3)).toEqual(["Leviathan", "Phoenix", "Kitsune"]);
+    for (const removedSpecies of ["Wolf", "Owl", "Lion", "Griffin", "Sphinx"]) {
+      expect(screen.queryByText(removedSpecies)).not.toBeInTheDocument();
+    }
+    for (const preset of COMPANION_PICKER_PRESETS) {
       expect(screen.getByTestId(`species-silhouette-${preset.id}`)).toHaveAttribute(
         "src",
         expect.stringContaining(`/onboarding/locked-species-silhouettes/`),
@@ -82,5 +96,20 @@ describe("OnboardingStoryToneSelection", () => {
       storyTone: "whimsical_playful",
       presetId: "phoenix",
     });
+  });
+
+  it("keeps the onboarding picker roster aligned with the curated species order", () => {
+    render(<OnboardingStoryToneSelection onComplete={vi.fn()} initialTone="epic_adventure" />);
+
+    expect(getVisibleSpeciesOrder()).toEqual([
+      "Leviathan",
+      "Phoenix",
+      "Kitsune",
+      "Dragon",
+      "Pegasus",
+      "Mechanical Dragon",
+      "Tanuki",
+      "Buttercat",
+    ]);
   });
 });

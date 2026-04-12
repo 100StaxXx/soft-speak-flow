@@ -140,6 +140,7 @@ const REDUCED_SEQUENCE_MS = {
   reveal: 500,
   dismissBuffer: 120,
 } as const;
+const HATCH_INTRO_MIN_MS = 800;
 
 const STROBE_BEAT_OFFSETS_MS = [
   0,
@@ -383,17 +384,36 @@ describe("CompanionEvolution", () => {
     expect(mocks.hapticsMediumMock).not.toHaveBeenCalled();
   });
 
+  it("shows a short hatchery intro before the first hatch cinematic begins", async () => {
+    render(<CompanionEvolution {...buildFirstHatchProps()} />);
+    await prepareEvolution();
+
+    expect(screen.getByTestId("evolution-hatch-intro")).toBeInTheDocument();
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(HTMLMediaElement.prototype.play).not.toHaveBeenCalled();
+
+    await flushTimers(HATCH_INTRO_MIN_MS);
+
+    expect(screen.queryByTestId("evolution-hatch-intro")).not.toBeInTheDocument();
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+    expect(HTMLMediaElement.prototype.play).toHaveBeenCalled();
+  });
+
   it("plays the mapped first hatch video with embedded audio when global audio is enabled", async () => {
     const props = buildFirstHatchProps();
 
     render(<CompanionEvolution {...props} />);
     await prepareEvolution();
+    await flushTimers(HATCH_INTRO_MIN_MS);
 
     const dialog = screen.getByRole("alertdialog");
     const video = screen.getByTestId("evolution-hatch-video") as HTMLVideoElement;
+    const videoStage = screen.getByTestId("evolution-hatch-video-stage");
 
     expect(video.getAttribute("src")).toContain("/companion-hatch-videos/hatch__fox__fire__center-crop.mp4");
     expect(video.muted).toBe(false);
+    expect(videoStage).toBeInTheDocument();
+    expect(screen.getByTestId("evolution-hatch-video-backdrop")).toBeInTheDocument();
     expect(HTMLMediaElement.prototype.play).toHaveBeenCalled();
     expect(screen.queryByTestId("evolution-hatching-overlay")).not.toBeInTheDocument();
 
@@ -412,6 +432,7 @@ describe("CompanionEvolution", () => {
 
     render(<CompanionEvolution {...props} />);
     await prepareEvolution();
+    await flushTimers(HATCH_INTRO_MIN_MS);
 
     const video = screen.getByTestId("evolution-hatch-video") as HTMLVideoElement;
     expect(video.muted).toBe(true);
@@ -436,6 +457,14 @@ describe("CompanionEvolution", () => {
     expect(mocks.hapticsLightMock).toHaveBeenCalled();
   });
 
+  it("does not show the hatchery intro for later evolutions", async () => {
+    render(<CompanionEvolution {...buildProps()} />);
+    await prepareEvolution();
+
+    expect(screen.queryByTestId("evolution-hatch-intro")).not.toBeInTheDocument();
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+  });
+
   it("shows hatch visuals during first evolution", async () => {
     render(
       <CompanionEvolution
@@ -445,6 +474,7 @@ describe("CompanionEvolution", () => {
       />,
     );
     await prepareEvolution();
+    await flushTimers(HATCH_INTRO_MIN_MS);
     await flushTimers(FULL_SEQUENCE_MS.hold);
 
     expect(screen.getByTestId("evolution-hatching-overlay")).toBeInTheDocument();
@@ -472,10 +502,13 @@ describe("CompanionEvolution", () => {
       />,
     );
     await prepareEvolution();
+    await flushTimers(HATCH_INTRO_MIN_MS);
 
     const dialog = screen.getByRole("alertdialog");
     expect(screen.queryByTestId("evolution-hatch-video")).not.toBeInTheDocument();
     expect(screen.getByTestId("evolution-art-stage")).toHaveAttribute("data-strobe-enabled", "true");
+    const revealArtImage = screen.getByTestId("evolution-reveal-art").querySelector("img");
+    expect(revealArtImage).toHaveAttribute("data-companion-image-fit", "portrait");
 
     await flushTimers(FULL_SEQUENCE_MS.hold + FULL_SEQUENCE_MS.charge);
     expect(dialog).toHaveAttribute("data-phase", "conceal");

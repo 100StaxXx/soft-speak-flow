@@ -211,6 +211,28 @@ export const COMPANION_PRESETS: readonly CompanionPresetDefinition[] = [
   },
 ] as const;
 
+export const COMPANION_PICKER_PRESET_IDS = [
+  "leviathan",
+  "phoenix",
+  "fox",
+  "dragon",
+  "pegasus",
+  "mechanicaldragon",
+  "tanuki",
+  "buttercat",
+] as const satisfies readonly CompanionPresetId[];
+
+export const COMPANION_PICKER_PRESETS: readonly CompanionPresetDefinition[] =
+  COMPANION_PICKER_PRESET_IDS.map((presetId) => {
+    const preset = COMPANION_PRESETS.find((entry) => entry.id === presetId);
+
+    if (!preset) {
+      throw new Error(`Missing companion picker preset: ${presetId}`);
+    }
+
+    return preset;
+  });
+
 export const LEGACY_COMPANION_PRESETS: readonly CompanionPresetDefinition[] = [
   {
     id: "raven",

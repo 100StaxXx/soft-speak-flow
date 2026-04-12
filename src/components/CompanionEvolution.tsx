@@ -14,6 +14,7 @@ import { getProgressionLevelDisplay } from "@/config/progression";
 import type { CompanionMotionEvent } from "@/config/companionMotion";
 import { getCompanionHatchVideoUrl } from "@/config/companionHatchVideos";
 import { globalAudio } from "@/utils/globalAudio";
+import { CompanionImage } from "@/components/CompanionImage";
 
 interface CompanionEvolutionProps {
   isEvolving: boolean;
@@ -59,6 +60,9 @@ const REDUCED_SEQUENCE_MS = {
 
 const EMERGENCY_EXIT_DELAY_MS = 15_000;
 const IMAGE_PRELOAD_TIMEOUT_MS = 2_000;
+const HATCH_INTRO_MIN_MS = 800;
+const HATCH_FOREGROUND_STAGE_MAX_WIDTH_PX = 560;
+const HATCH_FOREGROUND_STAGE_MAX_HEIGHT_PX = 700;
 const STROBE_BEAT_OFFSETS_MS = [
   0,
   350,
@@ -77,6 +81,52 @@ const STROBE_PULSE_INTERVAL = 4;
 const LAST_STROBE_BEAT_INDEX = STROBE_BEAT_OFFSETS_MS.length - 1;
 
 const log = logger.scope("CompanionEvolution");
+
+const HatchIntroSplash = () => (
+  <div
+    className="fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden bg-black"
+    data-testid="evolution-hatch-intro"
+    style={{
+      paddingTop: "env(safe-area-inset-top)",
+      paddingBottom: "env(safe-area-inset-bottom)",
+      paddingLeft: "env(safe-area-inset-left)",
+      paddingRight: "env(safe-area-inset-right)",
+      background:
+        "radial-gradient(circle at center, rgba(58, 44, 6, 0.68) 0%, rgba(0, 0, 0, 0.94) 58%, black 100%)",
+    }}
+  >
+    <motion.div
+      className="absolute inset-[-15%] pointer-events-none"
+      animate={{ opacity: [0.32, 0.58, 0.32], scale: [0.96, 1.04, 0.96] }}
+      transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+      style={{
+        background:
+          "radial-gradient(circle at 50% 40%, rgba(255, 196, 94, 0.28) 0%, rgba(255, 214, 143, 0.12) 28%, transparent 64%)",
+      }}
+    />
+
+    <div className="relative z-10 flex max-w-md flex-col items-center gap-5 px-6 text-center">
+      <motion.div
+        className="h-28 w-28 rounded-full border border-amber-200/30"
+        animate={{ scale: [0.94, 1.04, 0.94], opacity: [0.46, 0.86, 0.46] }}
+        transition={{ duration: 1.9, repeat: Infinity, ease: "easeInOut" }}
+        style={{
+          background:
+            "radial-gradient(circle at 50% 35%, rgba(255, 229, 169, 0.72) 0%, rgba(245, 158, 11, 0.22) 48%, rgba(0, 0, 0, 0) 75%)",
+          boxShadow: "0 0 48px rgba(251, 191, 36, 0.18)",
+        }}
+      />
+      <div className="space-y-3">
+        <h2 className="text-3xl font-black uppercase tracking-[0.18em] text-amber-300 sm:text-4xl">
+          Opening the hatchery...
+        </h2>
+        <p className="text-base font-medium text-white/82 sm:text-lg">
+          Your companion is getting ready to emerge.
+        </p>
+      </div>
+    </div>
+  </div>
+);
 
 const ConvergenceParticles = ({
   phase,
@@ -293,8 +343,10 @@ const CompanionEvolutionContent = ({
   const animationKeyRef = useRef<string | null>(null);
   const dismissHandledRef = useRef(false);
   const hatchVideoRef = useRef<HTMLVideoElement | null>(null);
+  const hatchVideoBackdropRef = useRef<HTMLVideoElement | null>(null);
   const [isHatchVideoMuted, setIsHatchVideoMuted] = useState(() => globalAudio.getMuted());
   const [disableHatchVideo, setDisableHatchVideo] = useState(false);
+  const [hatchIntroComplete, setHatchIntroComplete] = useState(false);
 
   const isFirstEvolution = newStage === 1;
   const hatchVideoUrl = useMemo(
@@ -367,9 +419,35 @@ const CompanionEvolutionContent = ({
     ? "Your companion has emerged."
     : `Your companion reached ${levelDisplay}.`;
 
+  const showHatchIntro = isFirstEvolution && !hatchIntroComplete;
+  const shouldStartCinematic = artReadiness.ready && (!isFirstEvolution || hatchIntroComplete);
+  const firstHatchImageFit = isFirstEvolution ? "portrait" : "cover";
+
   useEffect(() => {
     setDisableHatchVideo(false);
   }, [element, isEvolving, newImageUrl, presetId, previousImageUrl]);
+
+  useEffect(() => {
+    if (!isEvolving) {
+      setHatchIntroComplete(false);
+      return;
+    }
+
+    if (!isFirstEvolution) {
+      setHatchIntroComplete(true);
+      return;
+    }
+
+    setHatchIntroComplete(false);
+
+    const timeoutId = window.setTimeout(() => {
+      setHatchIntroComplete(true);
+    }, HATCH_INTRO_MIN_MS);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [isEvolving, isFirstEvolution, previousImageUrl, newImageUrl, presetId, element]);
 
   useEffect(() => {
     return globalAudio.subscribe((muted) => {
@@ -381,6 +459,11 @@ const CompanionEvolutionContent = ({
     if (!hatchVideoRef.current) return;
     hatchVideoRef.current.muted = isHatchVideoMuted;
   }, [isHatchVideoMuted, useHatchVideo]);
+
+  useEffect(() => {
+    if (!hatchVideoBackdropRef.current) return;
+    hatchVideoBackdropRef.current.muted = true;
+  }, [useHatchVideo]);
 
   useEffect(() => {
     if (!isEvolving) {
@@ -459,7 +542,7 @@ const CompanionEvolutionContent = ({
   }, [isEvolving, newImageUrl, previousImageUrl]);
 
   useEffect(() => {
-    if (!isEvolving || !artReadiness.ready) return;
+    if (!isEvolving || !shouldStartCinematic) return;
 
     const animationKey = [
       previousStage,
@@ -493,6 +576,7 @@ const CompanionEvolutionContent = ({
 
     if (useHatchVideo) {
       const videoElement = hatchVideoRef.current;
+      const videoBackdropElement = hatchVideoBackdropRef.current;
       if (!videoElement || !hatchVideoUrl) {
         setDisableHatchVideo(true);
         animationKeyRef.current = null;
@@ -516,11 +600,19 @@ const CompanionEvolutionContent = ({
       videoElement.addEventListener("ended", handleVideoEnded);
       videoElement.addEventListener("error", handleVideoError);
 
+      const playBackdropVideo = () => {
+        if (!videoBackdropElement) return;
+        videoBackdropElement.currentTime = 0;
+        videoBackdropElement.muted = true;
+        void videoBackdropElement.play().catch(() => undefined);
+      };
+
       void (async () => {
         try {
           await globalAudio.ensureReady();
           videoElement.currentTime = 0;
           videoElement.muted = isHatchVideoMuted;
+          playBackdropVideo();
           await videoElement.play();
           haptics.light();
         } catch (error) {
@@ -530,7 +622,9 @@ const CompanionEvolutionContent = ({
           });
 
           try {
+            videoElement.currentTime = 0;
             videoElement.muted = true;
+            playBackdropVideo();
             await videoElement.play();
             haptics.light();
           } catch (retryError) {
@@ -546,6 +640,7 @@ const CompanionEvolutionContent = ({
 
       return () => {
         videoElement.pause();
+        videoBackdropElement?.pause();
         videoElement.removeEventListener("ended", handleVideoEnded);
         videoElement.removeEventListener("error", handleVideoError);
         if (emergencyTimeoutRef.current) {
@@ -641,7 +736,7 @@ const CompanionEvolutionContent = ({
       containerRef.current?.classList.remove("animate-evolution-pulse-hit");
     };
   }, [
-    artReadiness.ready,
+    shouldStartCinematic,
     confettiParticleCount,
     element,
     isEvolving,
@@ -655,7 +750,6 @@ const CompanionEvolutionContent = ({
     revealDelayMs,
     sequence,
     silhouetteStrobeEnabled,
-    strobeDelayMs,
     theme,
     triggerEvent,
     useHatchVideo,
@@ -702,6 +796,10 @@ const CompanionEvolutionContent = ({
   };
 
   if (!isEvolving) return null;
+
+  if (showHatchIntro) {
+    return <HatchIntroSplash />;
+  }
 
   if (!artReadiness.ready) {
     return (
@@ -849,14 +947,41 @@ const CompanionEvolutionContent = ({
           {useHatchVideo && hatchVideoUrl && (
             <div className="absolute inset-0 z-[3] overflow-hidden" data-testid="evolution-hatch-video-layer">
               <video
-                ref={hatchVideoRef}
+                ref={hatchVideoBackdropRef}
                 src={hatchVideoUrl}
-                className="h-full w-full object-cover"
+                className="absolute inset-0 h-full w-full scale-110 object-cover opacity-30 blur-2xl"
                 playsInline
                 preload="auto"
-                muted={isHatchVideoMuted}
-                data-testid="evolution-hatch-video"
+                muted
+                aria-hidden="true"
+                data-testid="evolution-hatch-video-backdrop"
               />
+              <div
+                className="absolute inset-0 pointer-events-none"
+                style={{
+                  background: "radial-gradient(circle at center, rgba(8, 10, 22, 0.12) 0%, rgba(0, 0, 0, 0.48) 68%, rgba(0, 0, 0, 0.78) 100%)",
+                }}
+              />
+              <div className="relative flex h-full w-full items-center justify-center px-4 py-10 sm:px-6">
+                <div
+                  className="relative w-full overflow-hidden rounded-[2rem] border border-white/12 bg-black/20 shadow-[0_0_48px_rgba(0,0,0,0.45)] backdrop-blur-[2px]"
+                  data-testid="evolution-hatch-video-stage"
+                  style={{
+                    width: `min(92vw, ${HATCH_FOREGROUND_STAGE_MAX_WIDTH_PX}px)`,
+                    height: `min(78vh, ${HATCH_FOREGROUND_STAGE_MAX_HEIGHT_PX}px)`,
+                  }}
+                >
+                  <video
+                    ref={hatchVideoRef}
+                    src={hatchVideoUrl}
+                    className="h-full w-full object-contain"
+                    playsInline
+                    preload="auto"
+                    muted={isHatchVideoMuted}
+                    data-testid="evolution-hatch-video"
+                  />
+                </div>
+              </div>
               <div
                 className="absolute inset-0 pointer-events-none"
                 style={{
@@ -1012,12 +1137,10 @@ const CompanionEvolutionContent = ({
                 )}
 
                 {hasDualArt && previousDisplayImageUrl && (
-                  <motion.img
+                  <motion.div
                     key={`previous-art-${previousDisplayImageUrl}`}
-                    src={previousDisplayImageUrl}
-                    alt={`Companion before evolving at stage ${previousStage}`}
                     data-testid="evolution-previous-art"
-                    className="absolute inset-0 h-full w-full rounded-[2rem] object-cover shadow-2xl"
+                    className="absolute inset-0"
                     initial={false}
                     animate={{
                       opacity: phase === "reveal" || phase === "settle"
@@ -1062,16 +1185,22 @@ const CompanionEvolutionContent = ({
                       border: `2px solid hsl(${theme.glowA} / 0.34)`,
                       boxShadow: `0 0 28px hsl(${theme.glowA} / 0.24)`,
                     }}
-                  />
+                  >
+                    <CompanionImage
+                      src={previousDisplayImageUrl}
+                      alt={`Companion before evolving at stage ${previousStage}`}
+                      fit={firstHatchImageFit}
+                      containerAspectRatio={580 / 470}
+                      className="rounded-[2rem] shadow-2xl"
+                    />
+                  </motion.div>
                 )}
 
                 {revealDisplayImageUrl ? (
-                  <motion.img
+                  <motion.div
                     key={`reveal-art-${revealDisplayImageUrl}`}
-                    src={revealDisplayImageUrl}
-                    alt={`Companion after evolving at stage ${newStage}`}
                     data-testid="evolution-reveal-art"
-                    className="absolute inset-0 h-full w-full rounded-[2rem] object-cover shadow-2xl"
+                    className="absolute inset-0"
                     initial={false}
                     animate={hasDualArt
                       ? {
@@ -1146,7 +1275,15 @@ const CompanionEvolutionContent = ({
                           ? `0 0 54px ${theme.revealBurstColor}, inset 0 0 26px hsl(${theme.glowB} / 0.18)`
                           : `0 0 24px hsl(${theme.glowA} / 0.18)`,
                     }}
-                  />
+                  >
+                    <CompanionImage
+                      src={revealDisplayImageUrl}
+                      alt={`Companion after evolving at stage ${newStage}`}
+                      fit={firstHatchImageFit}
+                      containerAspectRatio={580 / 470}
+                      className="rounded-[2rem] shadow-2xl"
+                    />
+                  </motion.div>
                 ) : (
                   <div
                     className="absolute inset-0 flex items-center justify-center rounded-[2rem] border border-white/10 bg-white/5 text-white/70"

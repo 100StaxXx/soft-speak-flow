@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  COMPANION_PICKER_PRESET_IDS,
+  COMPANION_PICKER_PRESETS,
   getCompanionElement,
   getCompanionElementProductLabel,
   hasRemoteCompanionPresetAssetCoverage,
@@ -97,5 +99,28 @@ describe("companion preset asset coverage", () => {
     expect(getCompanionElementProductLabel("fire")).toBe("Ember");
     expect(getCompanionElementProductLabel("ice")).toBe("Frost");
     expect(getCompanionElementProductLabel("nature")).toBe("Terra");
+  });
+
+  it("exposes the curated onboarding and personalization picker roster", () => {
+    expect(COMPANION_PICKER_PRESET_IDS).toEqual([
+      "leviathan",
+      "phoenix",
+      "fox",
+      "dragon",
+      "pegasus",
+      "mechanicaldragon",
+      "tanuki",
+      "buttercat",
+    ]);
+    expect(COMPANION_PICKER_PRESETS.map((preset) => preset.displayName)).toEqual([
+      "Leviathan",
+      "Phoenix",
+      "Kitsune",
+      "Dragon",
+      "Pegasus",
+      "Mechanical Dragon",
+      "Tanuki",
+      "Buttercat",
+    ]);
   });
 });

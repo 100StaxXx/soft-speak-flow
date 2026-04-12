@@ -2,8 +2,8 @@ import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import {
+  COMPANION_PICKER_PRESETS,
   COMPANION_ONBOARDING_SILHOUETTE_SOURCES,
-  COMPANION_PRESETS,
   COMPANION_STORY_TONES,
   type CompanionPresetId,
   type CompanionStoryTone,
@@ -52,7 +52,7 @@ export const OnboardingStoryToneSelection = ({
     [selectedTone],
   );
   const selectedPresetMeta = useMemo(
-    () => COMPANION_PRESETS.find((preset) => preset.id === selectedPresetId) ?? null,
+    () => COMPANION_PICKER_PRESETS.find((preset) => preset.id === selectedPresetId) ?? null,
     [selectedPresetId],
   );
 
@@ -132,7 +132,7 @@ export const OnboardingStoryToneSelection = ({
               </div>
 
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                {COMPANION_PRESETS.map((preset, index) => {
+                {COMPANION_PICKER_PRESETS.map((preset, index) => {
                   const isSupported = isPilotCompanionPreset(preset.id);
                   const isSelected = isSupported && preset.id === selectedPresetId;
                   const silhouetteSrc = COMPANION_ONBOARDING_SILHOUETTE_SOURCES[preset.id] ?? null;
