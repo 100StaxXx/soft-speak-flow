@@ -1,5 +1,11 @@
 import cosmicWelcome from "./cosmic-welcome.png";
 import cosmicWelcome_2x from "./cosmic-welcome@2x.png";
+import cosmicGalaxyPortal from "./cosmic-galaxy-portal.png";
+import cosmicGalaxyPortal_2x from "./cosmic-galaxy-portal@2x.png";
+import cosmicPath1 from "./cosmic-path-1.png";
+import cosmicPath1_2x from "./cosmic-path-1@2x.png";
+import cosmicPath2 from "./cosmic-path-2.png";
+import cosmicPath2_2x from "./cosmic-path-2@2x.png";
 import cosmicSignin from "./cosmic-signin.png";
 import cosmicSignin_2x from "./cosmic-signin@2x.png";
 import wallpaperQuestsSeed from "./wallpaper-quests-seed.webp";
@@ -48,6 +54,9 @@ export const createBackgroundAsset = (src: string, src2x = src): StaticBackgroun
 export const createRemoteBackgroundAsset = (src: string): StaticBackgroundAsset => createBackgroundAsset(src, src);
 
 export const welcomeBackground = createBackgroundAsset(cosmicWelcome, cosmicWelcome_2x);
+export const galaxyPortalBackground = createBackgroundAsset(cosmicGalaxyPortal, cosmicGalaxyPortal_2x);
+export const cosmicPath1Background = createBackgroundAsset(cosmicPath1, cosmicPath1_2x);
+export const cosmicPath2Background = createBackgroundAsset(cosmicPath2, cosmicPath2_2x);
 export const signinBackground = createBackgroundAsset(cosmicSignin, cosmicSignin_2x);
 export const questsSeedBackground = createBackgroundAsset(wallpaperQuestsSeed, wallpaperQuestsSeed_2x);
 export const campaignsSeedBackground = createBackgroundAsset(wallpaperCampaignsSeed, wallpaperCampaignsSeed_2x);
@@ -152,6 +161,9 @@ export const cinematicPageBackgrounds: Record<CinematicPageBackgroundKey, Cinema
 
 // Legacy scenic fallbacks for other surfaces that still want bundled atmosphere.
 export const cosmicPathBackgrounds = [
+  galaxyPortalBackground,
+  cosmicPath1Background,
+  cosmicPath2Background,
   questsSeedBackground,
   campaignsSeedBackground,
   welcomeBackground,

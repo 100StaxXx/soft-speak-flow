@@ -38,22 +38,24 @@ describe("OnboardingStoryToneSelection", () => {
 
     const dragonCard = screen.getByText("Dragon").closest("button");
     expect(dragonCard).not.toBeNull();
-    fireEvent.click(dragonCard!);
+    expect(dragonCard).toBeDisabled();
+    expect(screen.getAllByText("Awaiting Awakening").length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("button", { name: /Kitsune/i }));
     expect(screen.getByRole("button", { name: "Continue" })).toBeEnabled();
-    expect(screen.getByTestId("species-silhouette-dragon")).toHaveAttribute(
+    expect(screen.getByTestId("species-silhouette-fox")).toHaveAttribute(
       "src",
-      "/onboarding/locked-species-silhouettes/dragon.png",
+      "/onboarding/locked-species-silhouettes/fox.png",
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
     expect(onComplete).toHaveBeenCalledWith({
       storyTone: "epic_adventure",
-      presetId: "dragon",
+      presetId: "fox",
     });
   });
 
-  it("lets the user change the tone and species and use the back action", () => {
+  it("lets the user change the tone and select phoenix as a supported species while keeping unsupported species blocked", () => {
     const onComplete = vi.fn();
     const onBack = vi.fn();
 
@@ -72,10 +74,6 @@ describe("OnboardingStoryToneSelection", () => {
       "/onboarding/locked-species-silhouettes/fox.png",
     );
     fireEvent.click(screen.getByRole("button", { name: /Phoenix/i }));
-    expect(screen.getByTestId("species-silhouette-phoenix")).toHaveAttribute(
-      "src",
-      "/onboarding/locked-species-silhouettes/phoenix.png",
-    );
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 

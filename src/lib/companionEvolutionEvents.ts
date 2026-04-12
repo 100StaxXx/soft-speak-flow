@@ -6,6 +6,7 @@ export interface CompanionHatchStartedDetail {
   newStage: 1;
   previousImageUrl: string;
   newImageUrl: string;
+  presetId?: string | null;
   element: string | null;
 }
 
@@ -23,6 +24,11 @@ export const isCompanionHatchStartedDetail = (
     && value.newStage === 1
     && typeof value.previousImageUrl === "string"
     && typeof value.newImageUrl === "string"
+    && (
+      typeof value.presetId === "string"
+      || value.presetId === null
+      || typeof value.presetId === "undefined"
+    )
     && (typeof value.element === "string" || value.element === null)
   );
 };

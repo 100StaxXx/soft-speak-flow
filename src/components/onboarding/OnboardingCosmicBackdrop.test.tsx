@@ -4,6 +4,12 @@ import {
   OnboardingCosmicBackdrop,
   resolveOnboardingBackdropPreset,
 } from "./OnboardingCosmicBackdrop";
+import {
+  galaxyPortalBackground,
+  welcomeBackground,
+  cosmicPath1Background,
+  cosmicPath2Background,
+} from "@/assets/backgrounds";
 import { useMotionProfile } from "@/hooks/useMotionProfile";
 
 vi.mock("@/hooks/useMotionProfile", () => ({
@@ -33,13 +39,12 @@ describe("OnboardingCosmicBackdrop", () => {
     mockedUseMotionProfile.mockReturnValue(defaultMotionProfile);
   });
 
-  it("resolves stage presets with stronger calculating rings than destiny", () => {
-    const destiny = resolveOnboardingBackdropPreset("destiny");
-    const calculating = resolveOnboardingBackdropPreset("calculating");
-
-    expect(calculating.ringOpacity).toBeGreaterThan(destiny.ringOpacity);
-    expect(calculating.ringScale).toBeGreaterThan(destiny.ringScale);
-    expect(calculating.particleDensity).toBeGreaterThan(destiny.particleDensity);
+  it("resolves stage presets to the curated onboarding photo set", () => {
+    expect(resolveOnboardingBackdropPreset("prologue").background).toEqual(welcomeBackground);
+    expect(resolveOnboardingBackdropPreset("destiny").background).toEqual(galaxyPortalBackground);
+    expect(resolveOnboardingBackdropPreset("questionnaire").background).toEqual(cosmicPath1Background);
+    expect(resolveOnboardingBackdropPreset("calculating").background).toEqual(cosmicPath1Background);
+    expect(resolveOnboardingBackdropPreset("journey-begins").background).toEqual(cosmicPath2Background);
   });
 
   it("renders faction tint only when a faction is provided", () => {
@@ -65,7 +70,14 @@ describe("OnboardingCosmicBackdrop", () => {
     });
 
     const { container } = render(<OnboardingCosmicBackdrop stage="calculating" />);
-    expect(container.querySelectorAll(".onb-cosmic-ring").length).toBeGreaterThan(0);
+    expect(screen.getByTestId("onb-photo-backdrop")).toBeInTheDocument();
     expect(container.querySelectorAll(".onb-animated")).toHaveLength(0);
+  });
+
+  it("renders the stage photo backdrop with the mapped image source", () => {
+    render(<OnboardingCosmicBackdrop stage="journey-begins" />);
+
+    const backdrop = screen.getByTestId("onb-photo-backdrop") as HTMLImageElement;
+    expect(backdrop.src).toContain(cosmicPath2Background.src);
   });
 });

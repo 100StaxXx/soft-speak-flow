@@ -71,7 +71,7 @@ describe("OnboardingEggSelection", () => {
     expect(screen.queryByRole("button", { name: "Back" })).not.toBeInTheDocument();
   });
 
-  it("uses the tuned light egg slot variables aligned to the painted pedestal art", () => {
+  it("uses tuned bottom-row egg variables aligned to the painted pedestal art", () => {
     render(
       <OnboardingEggSelection
         onComplete={vi.fn()}
@@ -81,11 +81,18 @@ describe("OnboardingEggSelection", () => {
       />,
     );
 
+    const voidSlot = screen.getByTestId("egg-slot-void");
+    const stormSlot = screen.getByTestId("egg-slot-storm");
     const lightSlot = screen.getByTestId("egg-slot-light");
 
+    expect(voidSlot.style.getPropertyValue("--egg-bottom")).toBe("21%");
+    expect(voidSlot.style.getPropertyValue("--egg-offset-x")).toBe("3%");
+    expect(stormSlot.style.getPropertyValue("--egg-bottom")).toBe("21%");
+    expect(stormSlot.style.getPropertyValue("--egg-offset-x")).toBe("0%");
     expect(lightSlot.style.getPropertyValue("--egg-slot-y")).toBe("54.2%");
     expect(lightSlot.style.getPropertyValue("--egg-width")).toBe("61%");
-    expect(lightSlot.style.getPropertyValue("--egg-bottom")).toBe("26%");
+    expect(lightSlot.style.getPropertyValue("--egg-bottom")).toBe("28%");
+    expect(lightSlot.style.getPropertyValue("--egg-offset-x")).toBe("-3%");
   });
 
   it("keeps the chamber visible and freezes controls while setup is saving", () => {
@@ -107,6 +114,35 @@ describe("OnboardingEggSelection", () => {
     expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
   });
 
+  it("renders unsupported elements as awaiting awakening and blocks selection", () => {
+    const onComplete = vi.fn();
+
+    render(
+      <OnboardingEggSelection
+        onComplete={onComplete}
+        storyTone="epic_adventure"
+        presetId="fox"
+        spiritAnimal="Kitsune"
+      />,
+    );
+
+    const stormSlot = screen.getByTestId("egg-slot-storm");
+    expect(stormSlot).toBeDisabled();
+    expect(stormSlot).toHaveAttribute("data-supported", "false");
+    expect(screen.getAllByText("Awaiting Awakening").length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole("button", { name: "Select Terra element" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    expect(onComplete).toHaveBeenCalledWith({
+      presetId: "fox",
+      favoriteColor: "#34D399",
+      spiritAnimal: "Kitsune",
+      coreElement: "nature",
+      storyTone: "epic_adventure",
+    });
+  });
+
   it("marks only the selected element and submits the provided story tone unchanged", () => {
     const onComplete = vi.fn();
 
@@ -114,8 +150,8 @@ describe("OnboardingEggSelection", () => {
       <OnboardingEggSelection
         onComplete={onComplete}
         storyTone="dark_intense"
-        presetId="wolf"
-        spiritAnimal="Wolf"
+        presetId="phoenix"
+        spiritAnimal="Phoenix"
       />,
     );
 
@@ -128,9 +164,9 @@ describe("OnboardingEggSelection", () => {
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
     expect(onComplete).toHaveBeenCalledWith({
-      presetId: "wolf",
+      presetId: "phoenix",
       favoriteColor: "#60A5FA",
-      spiritAnimal: "Wolf",
+      spiritAnimal: "Phoenix",
       coreElement: "ice",
       storyTone: "dark_intense",
     });

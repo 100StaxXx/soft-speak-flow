@@ -430,6 +430,88 @@ describe("Auth post-auth navigation", () => {
     );
   });
 
+  it("shows an accurate toast when sign-up validation fails before submit", async () => {
+    mocks.getSessionMock.mockResolvedValue({
+      data: {
+        session: null,
+      },
+    });
+
+    renderAuth();
+    await flushMicrotasks();
+
+    fireEvent.click(screen.getByRole("button", { name: /need an account\? sign up/i }));
+    fireEvent.change(screen.getByLabelText(/email/i), {
+      target: { value: "new@example.c" },
+    });
+    fireEvent.change(screen.getByLabelText(/^password$/i), {
+      target: { value: "Password123" },
+    });
+    fireEvent.change(screen.getByLabelText(/confirm password/i), {
+      target: { value: "Password123" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /^get started$/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Invalid email address");
+    expect(mocks.invokeMock).not.toHaveBeenCalled();
+    expect(mocks.toastMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Couldn't create account",
+        description: "Invalid email address",
+        variant: "destructive",
+      }),
+    );
+  });
+
+  it("shows an accurate toast when email sign-up fails because the email already exists", async () => {
+    mocks.getSessionMock.mockResolvedValue({
+      data: {
+        session: null,
+      },
+    });
+
+    mocks.invokeMock.mockResolvedValue({
+      data: null,
+      error: {
+        name: "FunctionsHttpError",
+        message: "Edge Function returned a non-2xx status code",
+        context: {
+          json: async () => ({
+            error: "An account with this email already exists. Try signing in instead.",
+            code: "EMAIL_ALREADY_REGISTERED",
+            requestId: "req-auth-duplicate-1",
+          }),
+        },
+      },
+    });
+
+    renderAuth();
+    await flushMicrotasks();
+
+    fireEvent.click(screen.getByRole("button", { name: /need an account\? sign up/i }));
+    fireEvent.change(screen.getByLabelText(/email/i), {
+      target: { value: "existing@example.com" },
+    });
+    fireEvent.change(screen.getByLabelText(/^password$/i), {
+      target: { value: "Password123" },
+    });
+    fireEvent.change(screen.getByLabelText(/confirm password/i), {
+      target: { value: "Password123" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /^get started$/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "An account with this email already exists. Try signing in instead.",
+    );
+    expect(mocks.toastMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Couldn't create account",
+        description: "An account with this email already exists. Try signing in instead.",
+        variant: "destructive",
+      }),
+    );
+  });
+
   it("maps auth outage codes to a temporary auth message and logs requestId", async () => {
     mocks.getSessionMock.mockResolvedValue({
       data: {

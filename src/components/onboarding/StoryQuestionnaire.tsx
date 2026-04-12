@@ -55,11 +55,11 @@ const questions: StoryQuestion[] = [
   {
     id: "mentor_energy",
     narrative: "",
-    question: "What kind of guide energy resonates with you?",
+    question: "Would you prefer your guide to be a man or a woman?",
     options: [
-      { optionId: "feminine_presence", text: "Feminine presence", tags: ["feminine_preference"] },
-      { optionId: "masculine_presence", text: "Masculine presence", tags: ["masculine_preference"] },
-      { optionId: "either_works", text: "Either works for me", tags: [] },
+      { optionId: "man", text: "Man", tags: ["masculine_preference"] },
+      { optionId: "woman", text: "Woman", tags: ["feminine_preference"] },
+      { optionId: "no_preference", text: "No preference", tags: [] },
     ],
   },
   {

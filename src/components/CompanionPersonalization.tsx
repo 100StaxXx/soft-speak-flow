@@ -14,6 +14,13 @@ import {
   type CompanionStoryTone,
 } from "@/config/companionCatalog";
 import {
+  COMPANION_FUTURE_STATE_LABEL,
+  getDefaultPilotCompanionElementId,
+  getDefaultPilotCompanionPresetId,
+  isPilotCompanionElement,
+  isPilotCompanionPreset,
+} from "@/config/companionPilotAvailability";
+import {
   getPresetCompanionAssetUrl,
   getUniversalEggAssetUrl,
 } from "@/lib/companionAssetResolver";
@@ -56,8 +63,10 @@ export const CompanionPersonalization = ({
   initialElement = "fire",
   initialStoryTone = "epic_adventure",
 }: CompanionPersonalizationProps) => {
-  const [selectedPresetId, setSelectedPresetId] = useState<CompanionPresetId>("dragon");
-  const [selectedElement, setSelectedElement] = useState<CompanionElementId>(initialElement);
+  const [selectedPresetId, setSelectedPresetId] = useState<CompanionPresetId>(getDefaultPilotCompanionPresetId());
+  const [selectedElement, setSelectedElement] = useState<CompanionElementId>(
+    isPilotCompanionElement(initialElement) ? initialElement : getDefaultPilotCompanionElementId(),
+  );
   const [selectedTone, setSelectedTone] = useState<CompanionStoryTone>(initialStoryTone);
   const [brokenPreviewKeys, setBrokenPreviewKeys] = useState<Record<string, boolean>>({});
   const isFullscreen = layout === "fullscreen";
@@ -137,18 +146,27 @@ export const CompanionPersonalization = ({
             {isEggSelectionMode ? (
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 {COMPANION_ELEMENTS.map((element) => {
-                  const isSelected = element.id === selectedElement;
+                  const isSupported = isPilotCompanionElement(element.id);
+                  const isSelected = isSupported && element.id === selectedElement;
                   return (
                     <button
                       key={element.id}
                       type="button"
-                      onClick={() => setSelectedElement(element.id)}
+                      onClick={() => {
+                        if (!isSupported) return;
+                        setSelectedElement(element.id);
+                      }}
+                      disabled={!isSupported}
+                      aria-disabled={!isSupported}
                       className={[
-                        "rounded-3xl border text-left transition-all duration-300 overflow-hidden",
+                        "rounded-3xl border text-left transition-all duration-300 overflow-hidden disabled:cursor-not-allowed",
                         isSelected
                           ? "border-primary/70 bg-primary/10 shadow-[0_0_40px_rgba(168,85,247,0.20)] scale-[1.01]"
-                          : "border-white/10 bg-white/5 hover:border-white/25 hover:bg-white/10",
+                          : isSupported
+                            ? "border-white/10 bg-white/5 hover:border-white/25 hover:bg-white/10"
+                            : "border-white/10 bg-white/[0.03] opacity-70 saturate-50",
                       ].join(" ")}
+                      data-supported={isSupported ? "true" : "false"}
                     >
                       <div className="relative h-[220px] bg-gradient-to-br from-slate-950/80 via-slate-900/80 to-slate-950/95">
                         <CompanionImage
@@ -173,6 +191,11 @@ export const CompanionPersonalization = ({
                                 Selected
                               </span>
                             )}
+                            {!isSelected && !isSupported && (
+                              <span className="rounded-full border border-white/10 bg-black/35 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/70">
+                                {COMPANION_FUTURE_STATE_LABEL}
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -193,19 +216,28 @@ export const CompanionPersonalization = ({
                 {COMPANION_PRESETS.map((preset) => {
                   const previewUrl = getPresetPreviewUrl(preset.id, selectedElement);
                   const previewKey = `${preset.id}:${selectedElement}`;
-                  const isSelected = preset.id === selectedPreset.id;
+                  const isSupported = isPilotCompanionPreset(preset.id);
+                  const isSelected = isSupported && preset.id === selectedPreset.id;
 
                   return (
                     <button
                       key={preset.id}
                       type="button"
-                      onClick={() => setSelectedPresetId(preset.id)}
+                      onClick={() => {
+                        if (!isSupported) return;
+                        setSelectedPresetId(preset.id);
+                      }}
+                      disabled={!isSupported}
+                      aria-disabled={!isSupported}
                       className={[
-                        "snap-center shrink-0 w-[250px] rounded-3xl border text-left transition-all duration-300 overflow-hidden",
+                        "snap-center shrink-0 w-[250px] rounded-3xl border text-left transition-all duration-300 overflow-hidden disabled:cursor-not-allowed",
                         isSelected
                           ? "border-primary/70 bg-primary/10 shadow-[0_0_40px_rgba(168,85,247,0.20)] scale-[1.01]"
-                          : "border-white/10 bg-white/5 hover:border-white/25 hover:bg-white/10",
+                          : isSupported
+                            ? "border-white/10 bg-white/5 hover:border-white/25 hover:bg-white/10"
+                            : "border-white/10 bg-white/[0.03] opacity-70 saturate-50",
                       ].join(" ")}
+                      data-supported={isSupported ? "true" : "false"}
                     >
                       <div className="relative h-[260px] bg-gradient-to-br from-slate-950/80 via-slate-900/80 to-slate-950/95">
                         {!brokenPreviewKeys[previewKey] ? (
@@ -220,7 +252,7 @@ export const CompanionPersonalization = ({
                               alt={preset.displayName}
                               fit="portrait"
                               element={selectedElement}
-                              className="h-full w-full"
+                              className={isSupported ? "h-full w-full" : "h-full w-full opacity-70"}
                               loading="lazy"
                               onError={() =>
                                 setBrokenPreviewKeys((current) => ({
@@ -259,6 +291,11 @@ export const CompanionPersonalization = ({
                             {isSelected && (
                               <span className="rounded-full border border-primary/60 bg-primary/20 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-primary-foreground">
                                 Selected
+                              </span>
+                            )}
+                            {!isSelected && !isSupported && (
+                              <span className="rounded-full border border-white/10 bg-black/35 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/70">
+                                {COMPANION_FUTURE_STATE_LABEL}
                               </span>
                             )}
                           </div>
@@ -343,25 +380,41 @@ export const CompanionPersonalization = ({
                 <Label className="text-lg font-semibold text-foreground">Element Skin</Label>
                 <div className="grid grid-cols-2 gap-3">
                   {COMPANION_ELEMENTS.map((element) => {
-                    const isSelected = selectedElement === element.id;
+                    const isSupported = isPilotCompanionElement(element.id);
+                    const isSelected = isSupported && selectedElement === element.id;
                     return (
                       <button
                         key={element.id}
                         type="button"
-                        onClick={() => setSelectedElement(element.id)}
+                        onClick={() => {
+                          if (!isSupported) return;
+                          setSelectedElement(element.id);
+                        }}
+                        disabled={!isSupported}
+                        aria-disabled={!isSupported}
                         className={[
-                          "rounded-2xl border-2 p-4 text-left transition-all duration-200",
+                          "rounded-2xl border-2 p-4 text-left transition-all duration-200 disabled:cursor-not-allowed",
                           isSelected
                             ? "border-primary bg-primary/15 shadow-lg shadow-primary/15"
-                            : "border-white/15 bg-white/5 hover:border-white/30 hover:bg-white/10",
+                            : isSupported
+                              ? "border-white/15 bg-white/5 hover:border-white/30 hover:bg-white/10"
+                              : "border-white/10 bg-white/[0.03] opacity-70 saturate-50",
                         ].join(" ")}
+                        data-supported={isSupported ? "true" : "false"}
                       >
-                        <div className="flex items-center gap-3">
-                          <div
-                            className="h-4 w-4 rounded-full shadow-[0_0_16px_currentColor]"
-                            style={{ backgroundColor: element.anchorColor, color: element.anchorColor }}
-                          />
-                          <div className="font-semibold text-foreground">{element.label}</div>
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-3">
+                            <div
+                              className="h-4 w-4 rounded-full shadow-[0_0_16px_currentColor]"
+                              style={{ backgroundColor: element.anchorColor, color: element.anchorColor }}
+                            />
+                            <div className="font-semibold text-foreground">{element.label}</div>
+                          </div>
+                          {!isSelected && !isSupported ? (
+                            <span className="rounded-full border border-white/10 bg-black/25 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/70">
+                              {COMPANION_FUTURE_STATE_LABEL}
+                            </span>
+                          ) : null}
                         </div>
                         <p className="mt-2 text-xs text-muted-foreground">{element.summary}</p>
                       </button>
@@ -424,7 +477,11 @@ export const CompanionPersonalization = ({
                 coreElement: selectedElement,
                 storyTone: selectedTone,
               })}
-              disabled={isLoading}
+              disabled={
+                isLoading
+                || !isPilotCompanionElement(selectedElement)
+                || (!isEggSelectionMode && !isPilotCompanionPreset(selectedPreset.id))
+              }
               className="min-w-[220px]"
               size="lg"
             >

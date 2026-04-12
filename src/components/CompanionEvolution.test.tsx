@@ -10,6 +10,9 @@ const mocks = vi.hoisted(() => ({
   hapticsLightMock: vi.fn(),
   hapticsMediumMock: vi.fn(),
   hapticsHeavyMock: vi.fn(),
+  globalAudioMuted: false,
+  ensureReadyMock: vi.fn(() => Promise.resolve()),
+  globalAudioListeners: new Set<(muted: boolean) => void>(),
 }));
 
 vi.mock("canvas-confetti", () => ({
@@ -104,6 +107,19 @@ vi.mock("@/utils/logger", () => ({
   },
 }));
 
+vi.mock("@/utils/globalAudio", () => ({
+  globalAudio: {
+    getMuted: () => mocks.globalAudioMuted,
+    ensureReady: () => mocks.ensureReadyMock(),
+    subscribe: (listener: (muted: boolean) => void) => {
+      mocks.globalAudioListeners.add(listener);
+      return () => {
+        mocks.globalAudioListeners.delete(listener);
+      };
+    },
+  },
+}));
+
 import { CompanionEvolution } from "./CompanionEvolution";
 
 const FULL_SEQUENCE_MS = {
@@ -170,70 +186,8 @@ class MockPreloadImage {
 }
 
 const originalImage = globalThis.Image;
-
-const installSilentEvolutionAudioGuards = () => {
-  const originalAudio = globalThis.Audio;
-  const originalAudioContext = window.AudioContext;
-  const originalWebkitAudioContext = (
-    window as typeof window & { webkitAudioContext?: typeof AudioContext }
-  ).webkitAudioContext;
-
-  const audioConstructorMock = vi.fn(() => ({
-    pause: vi.fn(),
-    play: vi.fn(),
-  }));
-  const audioContextConstructorMock = vi.fn(() => ({
-    createGain: vi.fn(),
-    createOscillator: vi.fn(),
-    currentTime: 0,
-    destination: {},
-    resume: vi.fn(),
-    state: "running",
-  }));
-
-  Object.defineProperty(globalThis, "Audio", {
-    configurable: true,
-    value: audioConstructorMock as unknown as typeof Audio,
-    writable: true,
-  });
-  Object.defineProperty(window, "AudioContext", {
-    configurable: true,
-    value: audioContextConstructorMock as unknown as typeof AudioContext,
-    writable: true,
-  });
-  Object.defineProperty(window, "webkitAudioContext", {
-    configurable: true,
-    value: audioContextConstructorMock as unknown as typeof AudioContext,
-    writable: true,
-  });
-
-  const restoreProperty = <K extends "Audio" | "AudioContext">(
-    target: typeof globalThis | typeof window,
-    key: K | "webkitAudioContext",
-    value: unknown,
-  ) => {
-    if (typeof value === "undefined") {
-      delete (target as Record<string, unknown>)[key];
-      return;
-    }
-
-    Object.defineProperty(target, key, {
-      configurable: true,
-      value,
-      writable: true,
-    });
-  };
-
-  return {
-    audioConstructorMock,
-    audioContextConstructorMock,
-    restore: () => {
-      restoreProperty(globalThis, "Audio", originalAudio);
-      restoreProperty(window, "AudioContext", originalAudioContext);
-      restoreProperty(window, "webkitAudioContext", originalWebkitAudioContext);
-    },
-  };
-};
+const originalMediaPlay = HTMLMediaElement.prototype.play;
+const originalMediaPause = HTMLMediaElement.prototype.pause;
 
 const flushTimers = async (ms = 0) => {
   await act(async () => {
@@ -254,8 +208,17 @@ const buildProps = () => ({
   newStage: 5,
   previousImageUrl: "https://example.com/stage-4.png",
   newImageUrl: "https://example.com/stage-5.png",
+  presetId: "fox",
   element: "fire",
   onComplete: vi.fn(),
+});
+
+const buildFirstHatchProps = () => ({
+  ...buildProps(),
+  previousStage: 0,
+  newStage: 1,
+  previousImageUrl: "https://example.com/egg.png",
+  newImageUrl: "https://example.com/hatchling.png",
 });
 
 describe("CompanionEvolution", () => {
@@ -263,8 +226,21 @@ describe("CompanionEvolution", () => {
     vi.useFakeTimers();
     mocks.profile = "balanced";
     mocks.prefersReducedMotion = false;
+    mocks.globalAudioMuted = false;
+    mocks.ensureReadyMock.mockResolvedValue(undefined);
+    mocks.globalAudioListeners.clear();
 
     globalThis.Image = MockPreloadImage as unknown as typeof Image;
+    Object.defineProperty(HTMLMediaElement.prototype, "play", {
+      configurable: true,
+      value: vi.fn().mockResolvedValue(undefined),
+      writable: true,
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, "pause", {
+      configurable: true,
+      value: vi.fn(),
+      writable: true,
+    });
   });
 
   afterEach(() => {
@@ -272,6 +248,16 @@ describe("CompanionEvolution", () => {
     vi.clearAllTimers();
     vi.useRealTimers();
     globalThis.Image = originalImage;
+    Object.defineProperty(HTMLMediaElement.prototype, "play", {
+      configurable: true,
+      value: originalMediaPlay,
+      writable: true,
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, "pause", {
+      configurable: true,
+      value: originalMediaPause,
+      writable: true,
+    });
   });
 
   it("locks dismissal until the settle beat and dispatches completion events once", async () => {
@@ -397,74 +383,72 @@ describe("CompanionEvolution", () => {
     expect(mocks.hapticsMediumMock).not.toHaveBeenCalled();
   });
 
-  it("stays silent during the first hatch evolution while keeping haptics", async () => {
-    const props = buildProps();
-    const { audioConstructorMock, audioContextConstructorMock, restore } = installSilentEvolutionAudioGuards();
+  it("plays the mapped first hatch video with embedded audio when global audio is enabled", async () => {
+    const props = buildFirstHatchProps();
 
-    try {
-      render(
-        <CompanionEvolution
-          {...props}
-          previousStage={0}
-          newStage={1}
-          previousImageUrl="https://example.com/egg.png"
-          newImageUrl="https://example.com/hatchling.png"
-        />,
-      );
-      await prepareEvolution();
+    render(<CompanionEvolution {...props} />);
+    await prepareEvolution();
 
-      const dialog = screen.getByRole("alertdialog");
-      await flushTimers(FULL_DISMISSABLE_SEQUENCE_MS);
-      expect(screen.getByText("Tap anywhere to continue")).toBeInTheDocument();
+    const dialog = screen.getByRole("alertdialog");
+    const video = screen.getByTestId("evolution-hatch-video") as HTMLVideoElement;
 
-      fireEvent.click(dialog);
+    expect(video.getAttribute("src")).toContain("/companion-hatch-videos/hatch__fox__fire__center-crop.mp4");
+    expect(video.muted).toBe(false);
+    expect(HTMLMediaElement.prototype.play).toHaveBeenCalled();
+    expect(screen.queryByTestId("evolution-hatching-overlay")).not.toBeInTheDocument();
 
-      expect(props.onComplete).toHaveBeenCalledTimes(1);
-      expect(audioConstructorMock).not.toHaveBeenCalled();
-      expect(audioContextConstructorMock).not.toHaveBeenCalled();
-      expect(mocks.hapticsLightMock).toHaveBeenCalled();
-    } finally {
-      restore();
-    }
+    fireEvent.ended(video);
+    expect(screen.getByText("Tap anywhere to continue")).toBeInTheDocument();
+
+    fireEvent.click(dialog);
+
+    expect(props.onComplete).toHaveBeenCalledTimes(1);
+    expect(mocks.hapticsLightMock).toHaveBeenCalled();
   });
 
-  it("stays silent during later evolution cinematics while keeping haptics", async () => {
+  it("mutes the hatch video when global audio is disabled", async () => {
+    mocks.globalAudioMuted = true;
+    const props = buildFirstHatchProps();
+
+    render(<CompanionEvolution {...props} />);
+    await prepareEvolution();
+
+    const video = screen.getByTestId("evolution-hatch-video") as HTMLVideoElement;
+    expect(video.muted).toBe(true);
+    expect(HTMLMediaElement.prototype.play).toHaveBeenCalled();
+  });
+
+  it("keeps later evolution cinematics on the legacy image-based path without hatch video playback", async () => {
     const props = buildProps();
-    const { audioConstructorMock, audioContextConstructorMock, restore } = installSilentEvolutionAudioGuards();
 
-    try {
-      render(<CompanionEvolution {...props} />);
-      await prepareEvolution();
+    render(<CompanionEvolution {...props} />);
+    await prepareEvolution();
 
-      const dialog = screen.getByRole("alertdialog");
-      await flushTimers(FULL_DISMISSABLE_SEQUENCE_MS);
-      expect(screen.getByText("Tap anywhere to continue")).toBeInTheDocument();
+    const dialog = screen.getByRole("alertdialog");
+    await flushTimers(FULL_DISMISSABLE_SEQUENCE_MS);
+    expect(screen.getByText("Tap anywhere to continue")).toBeInTheDocument();
 
-      fireEvent.click(dialog);
+    fireEvent.click(dialog);
 
-      expect(props.onComplete).toHaveBeenCalledTimes(1);
-      expect(audioConstructorMock).not.toHaveBeenCalled();
-      expect(audioContextConstructorMock).not.toHaveBeenCalled();
-      expect(mocks.hapticsLightMock).toHaveBeenCalled();
-    } finally {
-      restore();
-    }
+    expect(props.onComplete).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId("evolution-hatch-video")).not.toBeInTheDocument();
+    expect(HTMLMediaElement.prototype.play).not.toHaveBeenCalled();
+    expect(mocks.hapticsLightMock).toHaveBeenCalled();
   });
 
   it("shows hatch visuals during first evolution", async () => {
     render(
       <CompanionEvolution
-        {...buildProps()}
-        previousStage={0}
-        newStage={1}
-        previousImageUrl="https://example.com/egg.png"
-        newImageUrl="https://example.com/hatchling.png"
+        {...buildFirstHatchProps()}
+        presetId="fox"
+        element="storm"
       />,
     );
     await prepareEvolution();
     await flushTimers(FULL_SEQUENCE_MS.hold);
 
     expect(screen.getByTestId("evolution-hatching-overlay")).toBeInTheDocument();
+    expect(screen.queryByTestId("evolution-hatch-video")).not.toBeInTheDocument();
   });
 
   it("does not show hatch visuals for later evolutions", async () => {
@@ -475,7 +459,7 @@ describe("CompanionEvolution", () => {
     expect(screen.queryByTestId("evolution-hatching-overlay")).not.toBeInTheDocument();
   });
 
-  it("uses the cinematic barrage and apex during first evolution when both art states are available", async () => {
+  it("falls back to the legacy first-hatch barrage when no mapped hatch video exists", async () => {
     render(
       <CompanionEvolution
         {...buildProps()}
@@ -483,11 +467,14 @@ describe("CompanionEvolution", () => {
         newStage={1}
         previousImageUrl="https://example.com/egg.png"
         newImageUrl="https://example.com/hatchling.png"
+        presetId="fox"
+        element="storm"
       />,
     );
     await prepareEvolution();
 
     const dialog = screen.getByRole("alertdialog");
+    expect(screen.queryByTestId("evolution-hatch-video")).not.toBeInTheDocument();
     expect(screen.getByTestId("evolution-art-stage")).toHaveAttribute("data-strobe-enabled", "true");
 
     await flushTimers(FULL_SEQUENCE_MS.hold + FULL_SEQUENCE_MS.charge);

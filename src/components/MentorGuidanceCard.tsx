@@ -261,7 +261,7 @@ export const MentorGuidanceCard = () => {
       style={placementStyle}
       aria-live="polite"
     >
-      <div className="pointer-events-none mx-auto max-w-4xl rounded-2xl border border-white/20 bg-black/65 shadow-[0_18px_40px_rgba(0,0,0,0.45)] backdrop-blur-md">
+      <div className="pointer-events-none mx-auto w-full max-w-[22rem] rounded-2xl border border-white/20 bg-black/65 shadow-[0_18px_40px_rgba(0,0,0,0.45)] backdrop-blur-md sm:max-w-4xl">
         <div className="flex items-end gap-3 p-3 sm:p-4">
           <div className="shrink-0">
             <MentorAvatar

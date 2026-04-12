@@ -8,6 +8,10 @@ import {
   type CompanionPresetId,
   type CompanionStoryTone,
 } from "@/config/companionCatalog";
+import {
+  COMPANION_FUTURE_STATE_LABEL,
+  isPilotCompanionPreset,
+} from "@/config/companionPilotAvailability";
 import { cn } from "@/lib/utils";
 
 export interface OnboardingStoryToneSelectionValue {
@@ -37,7 +41,11 @@ export const OnboardingStoryToneSelection = ({
   onBack,
 }: OnboardingStoryToneSelectionProps) => {
   const [selectedTone, setSelectedTone] = useState<CompanionStoryTone>(initialTone);
-  const [selectedPresetId, setSelectedPresetId] = useState<CompanionPresetId | null>(initialPresetId);
+  const [selectedPresetId, setSelectedPresetId] = useState<CompanionPresetId | null>(
+    initialPresetId && isPilotCompanionPreset(initialPresetId)
+      ? initialPresetId
+      : null,
+  );
 
   const selectedToneMeta = useMemo(
     () => COMPANION_STORY_TONES.find((tone) => tone.value === selectedTone) ?? COMPANION_STORY_TONES[0],
@@ -125,7 +133,8 @@ export const OnboardingStoryToneSelection = ({
 
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                 {COMPANION_PRESETS.map((preset, index) => {
-                  const isSelected = preset.id === selectedPresetId;
+                  const isSupported = isPilotCompanionPreset(preset.id);
+                  const isSelected = isSupported && preset.id === selectedPresetId;
                   const silhouetteSrc = COMPANION_ONBOARDING_SILHOUETTE_SOURCES[preset.id] ?? null;
 
                   return (
@@ -135,15 +144,23 @@ export const OnboardingStoryToneSelection = ({
                       initial={{ opacity: 0, y: 18 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: index * 0.03 }}
-                      onClick={() => setSelectedPresetId(preset.id)}
+                      onClick={() => {
+                        if (!isSupported) return;
+                        setSelectedPresetId(preset.id);
+                      }}
+                      disabled={!isSupported}
                       className={cn(
-                        "rounded-[26px] border px-4 py-4 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60",
+                        "rounded-[26px] border px-4 py-4 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 disabled:cursor-not-allowed",
                         isSelected
                           ? "border-emerald-300/[0.45] bg-emerald-300/[0.14] text-white shadow-[0_20px_40px_rgba(52,211,153,0.14)]"
-                          : "border-white/[0.10] bg-white/[0.05] text-white/[0.86] hover:border-white/[0.2] hover:bg-white/[0.08]",
+                          : isSupported
+                            ? "border-white/[0.10] bg-white/[0.05] text-white/[0.86] hover:border-white/[0.2] hover:bg-white/[0.08]"
+                            : "border-white/[0.08] bg-white/[0.03] text-white/[0.52] saturate-50",
                       )}
                       data-selected={isSelected ? "true" : "false"}
+                      data-supported={isSupported ? "true" : "false"}
                       aria-pressed={isSelected}
+                      aria-disabled={!isSupported}
                     >
                       <div className="flex items-start gap-4">
                         <div className="min-w-0 flex-1 space-y-2">
@@ -157,6 +174,10 @@ export const OnboardingStoryToneSelection = ({
                             {isSelected ? (
                               <span className="rounded-full border border-white/15 bg-white/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/85">
                                 Selected
+                              </span>
+                            ) : !isSupported ? (
+                              <span className="rounded-full border border-white/10 bg-black/25 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/70">
+                                {COMPANION_FUTURE_STATE_LABEL}
                               </span>
                             ) : null}
                           </div>
@@ -174,7 +195,10 @@ export const OnboardingStoryToneSelection = ({
                               alt=""
                               aria-hidden="true"
                               data-testid={`species-silhouette-${preset.id}`}
-                              className="relative h-full w-full object-contain brightness-0 contrast-200"
+                              className={cn(
+                                "relative h-full w-full object-contain brightness-0 contrast-200",
+                                !isSupported && "opacity-50",
+                              )}
                             />
                           </div>
                         ) : null}
@@ -205,7 +229,7 @@ export const OnboardingStoryToneSelection = ({
                   <p className="text-sm leading-6 text-white/[0.72]">
                     {selectedPresetMeta
                       ? `${selectedPresetMeta.revealCopy} This choice stays sleeping inside the egg until the first hatch.`
-                      : "Choose the creature form first so the egg chamber can focus only on element."}
+                      : "Choose one of the currently awakened species so the egg chamber can focus only on element."}
                   </p>
                 </div>
               </div>

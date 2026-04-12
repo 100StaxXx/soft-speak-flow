@@ -53,6 +53,13 @@ describe("MentorGuidanceCard", () => {
     expect(screen.getByRole("button", { name: "Skip tutorial" })).toBeInTheDocument();
   });
 
+  it("uses a centered compact mobile width for the floating panel", () => {
+    const { container } = render(<MentorGuidanceCard />);
+
+    const panel = container.querySelector('[data-tutorial="mentor-dialogue-panel"] > div');
+    expect(panel).toHaveClass("mx-auto", "w-full", "max-w-[22rem]", "sm:max-w-4xl");
+  });
+
   it("does not render when guidance is inactive", () => {
     mocks.guidance.isActive = false;
     render(<MentorGuidanceCard />);

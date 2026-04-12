@@ -80,8 +80,8 @@ const TAG_TO_TEXT: Record<string, string> = {
   grounded: "grounded energy",
   spiritual: "spiritual guidance",
   intuition: "intuitive guidance",
-  feminine_preference: "feminine guide energy",
-  masculine_preference: "masculine guide energy",
+  feminine_preference: "a woman as your guide",
+  masculine_preference: "a man as your guide",
 };
 
 export function generateMentorExplanation(

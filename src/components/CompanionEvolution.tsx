@@ -12,6 +12,8 @@ import { CompanionMotionLayer } from "@/components/companion/motion/CompanionMot
 import { useCompanionMotionSafe } from "@/contexts/CompanionMotionContext";
 import { getProgressionLevelDisplay } from "@/config/progression";
 import type { CompanionMotionEvent } from "@/config/companionMotion";
+import { getCompanionHatchVideoUrl } from "@/config/companionHatchVideos";
+import { globalAudio } from "@/utils/globalAudio";
 
 interface CompanionEvolutionProps {
   isEvolving: boolean;
@@ -19,6 +21,7 @@ interface CompanionEvolutionProps {
   newStage: number;
   previousImageUrl: string;
   newImageUrl: string;
+  presetId?: string;
   element?: string;
   onComplete: () => void;
 }
@@ -271,6 +274,7 @@ const CompanionEvolutionContent = ({
   newStage,
   previousImageUrl,
   newImageUrl,
+  presetId,
   element,
   onComplete,
 }: CompanionEvolutionProps) => {
@@ -288,8 +292,16 @@ const CompanionEvolutionContent = ({
   const timersRef = useRef<number[]>([]);
   const animationKeyRef = useRef<string | null>(null);
   const dismissHandledRef = useRef(false);
+  const hatchVideoRef = useRef<HTMLVideoElement | null>(null);
+  const [isHatchVideoMuted, setIsHatchVideoMuted] = useState(() => globalAudio.getMuted());
+  const [disableHatchVideo, setDisableHatchVideo] = useState(false);
 
   const isFirstEvolution = newStage === 1;
+  const hatchVideoUrl = useMemo(
+    () => getCompanionHatchVideoUrl({ presetId, element }),
+    [element, presetId],
+  );
+  const useHatchVideo = isFirstEvolution && Boolean(hatchVideoUrl) && !disableHatchVideo;
   const theme: EvoTheme = useMemo(
     () => getEvolutionTheme(element, isFirstEvolution),
     [element, isFirstEvolution],
@@ -354,6 +366,21 @@ const CompanionEvolutionContent = ({
   const celebrationDescription = isFirstEvolution
     ? "Your companion has emerged."
     : `Your companion reached ${levelDisplay}.`;
+
+  useEffect(() => {
+    setDisableHatchVideo(false);
+  }, [element, isEvolving, newImageUrl, presetId, previousImageUrl]);
+
+  useEffect(() => {
+    return globalAudio.subscribe((muted) => {
+      setIsHatchVideoMuted(muted);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!hatchVideoRef.current) return;
+    hatchVideoRef.current.muted = isHatchVideoMuted;
+  }, [isHatchVideoMuted, useHatchVideo]);
 
   useEffect(() => {
     if (!isEvolving) {
@@ -439,6 +466,8 @@ const CompanionEvolutionContent = ({
       newStage,
       previousImageUrl,
       newImageUrl,
+      presetId ?? "none",
+      useHatchVideo ? "video" : "legacy",
       prefersReducedMotion ? "reduced" : "full",
     ].join("::");
 
@@ -461,6 +490,70 @@ const CompanionEvolutionContent = ({
       log.info("Evolution modal timeout reached, showing emergency exit");
       setShowEmergencyExit(true);
     }, EMERGENCY_EXIT_DELAY_MS);
+
+    if (useHatchVideo) {
+      const videoElement = hatchVideoRef.current;
+      if (!videoElement || !hatchVideoUrl) {
+        setDisableHatchVideo(true);
+        animationKeyRef.current = null;
+        return;
+      }
+
+      const handleVideoEnded = () => {
+        setPhase("settle");
+        setCanDismiss(true);
+        haptics.medium();
+      };
+
+      const handleVideoError = () => {
+        log.warn("Hatch video failed, falling back to legacy hatch visuals", {
+          hatchVideoUrl,
+        });
+        setDisableHatchVideo(true);
+        animationKeyRef.current = null;
+      };
+
+      videoElement.addEventListener("ended", handleVideoEnded);
+      videoElement.addEventListener("error", handleVideoError);
+
+      void (async () => {
+        try {
+          await globalAudio.ensureReady();
+          videoElement.currentTime = 0;
+          videoElement.muted = isHatchVideoMuted;
+          await videoElement.play();
+          haptics.light();
+        } catch (error) {
+          log.warn("Unmuted hatch video autoplay failed, retrying muted", {
+            hatchVideoUrl,
+            error: error instanceof Error ? error.message : String(error),
+          });
+
+          try {
+            videoElement.muted = true;
+            await videoElement.play();
+            haptics.light();
+          } catch (retryError) {
+            log.warn("Muted hatch video autoplay failed, falling back to legacy hatch visuals", {
+              hatchVideoUrl,
+              error: retryError instanceof Error ? retryError.message : String(retryError),
+            });
+            setDisableHatchVideo(true);
+            animationKeyRef.current = null;
+          }
+        }
+      })();
+
+      return () => {
+        videoElement.pause();
+        videoElement.removeEventListener("ended", handleVideoEnded);
+        videoElement.removeEventListener("error", handleVideoError);
+        if (emergencyTimeoutRef.current) {
+          window.clearTimeout(emergencyTimeoutRef.current);
+          emergencyTimeoutRef.current = null;
+        }
+      };
+    }
 
     queueTimeout(() => {
       setPhase("charge");
@@ -555,6 +648,7 @@ const CompanionEvolutionContent = ({
     isFirstEvolution,
     newImageUrl,
     newStage,
+    presetId,
     prefersReducedMotion,
     previousImageUrl,
     previousStage,
@@ -564,6 +658,9 @@ const CompanionEvolutionContent = ({
     strobeDelayMs,
     theme,
     triggerEvent,
+    useHatchVideo,
+    hatchVideoUrl,
+    isHatchVideoMuted,
   ]);
 
   useEffect(() => () => {
@@ -722,15 +819,17 @@ const CompanionEvolutionContent = ({
             />
           )}
 
-          <CompanionMotionLayer
-            variant="evolution"
-            stage={newStage}
-            element={element}
-            event={evolutionMotionEvent}
-            className="absolute inset-0 z-[1]"
-          />
+          {!useHatchVideo && (
+            <CompanionMotionLayer
+              variant="evolution"
+              stage={newStage}
+              element={element}
+              event={evolutionMotionEvent}
+              className="absolute inset-0 z-[1]"
+            />
+          )}
 
-          {!prefersReducedMotion && (
+          {!useHatchVideo && !prefersReducedMotion && (
             <ConvergenceParticles
               phase={phase}
               particleStyle={theme.particleStyle}
@@ -739,7 +838,7 @@ const CompanionEvolutionContent = ({
             />
           )}
 
-          {isFirstEvolution && (
+          {!useHatchVideo && isFirstEvolution && (
             <HatchingOverlay
               phase={phase}
               show={phase === "charge" || phase === "conceal"}
@@ -747,9 +846,29 @@ const CompanionEvolutionContent = ({
             />
           )}
 
+          {useHatchVideo && hatchVideoUrl && (
+            <div className="absolute inset-0 z-[3] overflow-hidden" data-testid="evolution-hatch-video-layer">
+              <video
+                ref={hatchVideoRef}
+                src={hatchVideoUrl}
+                className="h-full w-full object-cover"
+                playsInline
+                preload="auto"
+                muted={isHatchVideoMuted}
+                data-testid="evolution-hatch-video"
+              />
+              <div
+                className="absolute inset-0 pointer-events-none"
+                style={{
+                  background: "linear-gradient(180deg, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0) 28%, rgba(0,0,0,0.24) 100%)",
+                }}
+              />
+            </div>
+          )}
+
           <div className="relative z-10 flex w-full max-w-5xl flex-col items-center justify-center gap-8 px-6">
             <AnimatePresence mode="wait">
-              {(phase === "hold" || phase === "charge" || phase === "conceal") && (
+              {!useHatchVideo && (phase === "hold" || phase === "charge" || phase === "conceal") && (
                 <motion.div
                   key={`anticipation-${phase}`}
                   initial={{ opacity: 0, scale: 0.96, y: 8 }}
@@ -777,46 +896,47 @@ const CompanionEvolutionContent = ({
               )}
             </AnimatePresence>
 
-            <div
-              className="relative flex w-full items-center justify-center"
-              style={{
-                minHeight: "min(54vh, 470px)",
-              }}
-            >
-              <motion.div
-                className="relative flex w-full max-w-[580px] items-center justify-center"
-                data-testid="evolution-art-stage"
-                data-art-presentation={hasDualArt ? "swap" : "single"}
-                data-strobe-enabled={silhouetteStrobeEnabled ? "true" : "false"}
-                data-strobe-beat={strobeBeatIndex === null ? "-1" : String(strobeBeatIndex)}
-                data-strobe-target={strobeTarget}
+            {!useHatchVideo && (
+              <div
+                className="relative flex w-full items-center justify-center"
                 style={{
-                  height: "min(54vh, 470px)",
-                  ["--evo-strobe-duration" as string]: `${sequence.strobe / 1000}s`,
-                  ["--evo-strobe-progress" as string]: strobeProgress.toFixed(3),
-                }}
-                initial={false}
-                animate={{
-                  scale: phase === "hold"
-                    ? 1
-                    : phase === "charge"
-                      ? 1.03
-                      : phase === "conceal"
-                        ? 1.07
-                        : phase === "strobe"
-                          ? 1.07 + strobeProgress * 0.02
-                          : phase === "apex"
-                            ? 1.12
-                            : phase === "reveal"
-                              ? 1.03
-                              : 1,
-                  y: phase === "apex" ? -4 : 0,
-                }}
-                transition={{
-                  duration: phase === "strobe" ? 0.16 : phase === "apex" ? 0.22 : 0.32,
-                  ease: [0.22, 1, 0.36, 1],
+                  minHeight: "min(54vh, 470px)",
                 }}
               >
+                <motion.div
+                  className="relative flex w-full max-w-[580px] items-center justify-center"
+                  data-testid="evolution-art-stage"
+                  data-art-presentation={hasDualArt ? "swap" : "single"}
+                  data-strobe-enabled={silhouetteStrobeEnabled ? "true" : "false"}
+                  data-strobe-beat={strobeBeatIndex === null ? "-1" : String(strobeBeatIndex)}
+                  data-strobe-target={strobeTarget}
+                  style={{
+                    height: "min(54vh, 470px)",
+                    ["--evo-strobe-duration" as string]: `${sequence.strobe / 1000}s`,
+                    ["--evo-strobe-progress" as string]: strobeProgress.toFixed(3),
+                  }}
+                  initial={false}
+                  animate={{
+                    scale: phase === "hold"
+                      ? 1
+                      : phase === "charge"
+                        ? 1.03
+                        : phase === "conceal"
+                          ? 1.07
+                          : phase === "strobe"
+                            ? 1.07 + strobeProgress * 0.02
+                            : phase === "apex"
+                              ? 1.12
+                              : phase === "reveal"
+                                ? 1.03
+                                : 1,
+                    y: phase === "apex" ? -4 : 0,
+                  }}
+                  transition={{
+                    duration: phase === "strobe" ? 0.16 : phase === "apex" ? 0.22 : 0.32,
+                    ease: [0.22, 1, 0.36, 1],
+                  }}
+                >
                 <motion.div
                   className="absolute inset-[10%] rounded-full pointer-events-none"
                   initial={false}
@@ -1056,8 +1176,9 @@ const CompanionEvolutionContent = ({
                     />
                   </>
                 )}
-              </motion.div>
-            </div>
+                </motion.div>
+              </div>
+            )}
 
             <AnimatePresence mode="wait">
               {(phase === "reveal" || phase === "settle") && (

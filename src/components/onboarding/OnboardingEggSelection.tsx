@@ -8,6 +8,10 @@ import {
   type CompanionPresetId,
   type CompanionStoryTone,
 } from "@/config/companionCatalog";
+import {
+  COMPANION_FUTURE_STATE_LABEL,
+  isPilotCompanionElement,
+} from "@/config/companionPilotAvailability";
 import { cn } from "@/lib/utils";
 
 const CHAMBER_ASSET_BASE = "/onboarding/egg-chamber";
@@ -21,6 +25,7 @@ type ChamberSlotConfig = {
   height: string;
   eggWidth: string;
   eggBottom: string;
+  eggOffsetX: string;
   bounceDelay: string;
   bounceDuration: string;
   eggSrc: string;
@@ -57,6 +62,7 @@ const CHAMBER_SLOTS: Record<CompanionElementId, ChamberSlotConfig> = {
     height: "31%",
     eggWidth: "76%",
     eggBottom: "17%",
+    eggOffsetX: "0%",
     bounceDelay: "-0.1s",
     bounceDuration: "3.4s",
     eggSrc: `${CHAMBER_ASSET_BASE}/ember_eggclear.png`,
@@ -69,6 +75,7 @@ const CHAMBER_SLOTS: Record<CompanionElementId, ChamberSlotConfig> = {
     height: "31.5%",
     eggWidth: "81%",
     eggBottom: "16.5%",
+    eggOffsetX: "0%",
     bounceDelay: "-1.2s",
     bounceDuration: "3.9s",
     eggSrc: `${CHAMBER_ASSET_BASE}/frost_eggclear.png`,
@@ -81,6 +88,7 @@ const CHAMBER_SLOTS: Record<CompanionElementId, ChamberSlotConfig> = {
     height: "31%",
     eggWidth: "74%",
     eggBottom: "17%",
+    eggOffsetX: "0%",
     bounceDelay: "-0.8s",
     bounceDuration: "3.6s",
     eggSrc: `${CHAMBER_ASSET_BASE}/terra_eggclear.png`,
@@ -92,7 +100,8 @@ const CHAMBER_SLOTS: Record<CompanionElementId, ChamberSlotConfig> = {
     width: "27.5%",
     height: "30.5%",
     eggWidth: "71%",
-    eggBottom: "19%",
+    eggBottom: "21%",
+    eggOffsetX: "3%",
     bounceDelay: "-1.7s",
     bounceDuration: "4.1s",
     eggSrc: `${CHAMBER_ASSET_BASE}/void_eggclear.png`,
@@ -104,7 +113,8 @@ const CHAMBER_SLOTS: Record<CompanionElementId, ChamberSlotConfig> = {
     width: "28.5%",
     height: "31%",
     eggWidth: "72%",
-    eggBottom: "19%",
+    eggBottom: "21%",
+    eggOffsetX: "0%",
     bounceDelay: "-2.2s",
     bounceDuration: "3.7s",
     eggSrc: `${CHAMBER_ASSET_BASE}/storm_eggclear.png`,
@@ -116,7 +126,8 @@ const CHAMBER_SLOTS: Record<CompanionElementId, ChamberSlotConfig> = {
     width: "28.5%",
     height: "31%",
     eggWidth: "61%",
-    eggBottom: "26%",
+    eggBottom: "28%",
+    eggOffsetX: "-3%",
     bounceDelay: "-0.5s",
     bounceDuration: "3.5s",
     eggSrc: `${CHAMBER_ASSET_BASE}/light_eggclear.png`,
@@ -197,7 +208,8 @@ export const OnboardingEggSelection = ({
             {ELEMENT_ORDER.map((elementId) => {
               const slot = CHAMBER_SLOTS[elementId];
               const element = getCompanionElement(elementId);
-              const isSelected = selectedElement === element.id;
+              const isSupported = isPilotCompanionElement(element.id);
+              const isSelected = isSupported && selectedElement === element.id;
               const slotStyle: ChamberSlotStyle = {
                 "--egg-slot-x": slot.centerX,
                 "--egg-slot-y": slot.centerY,
@@ -205,6 +217,7 @@ export const OnboardingEggSelection = ({
                 "--egg-slot-height": slot.height,
                 "--egg-width": slot.eggWidth,
                 "--egg-bottom": slot.eggBottom,
+                "--egg-offset-x": slot.eggOffsetX,
                 "--egg-delay": slot.bounceDelay,
                 "--egg-duration": slot.bounceDuration,
                 "--egg-glow": slot.glowColor,
@@ -216,16 +229,28 @@ export const OnboardingEggSelection = ({
                   type="button"
                   className="onboarding-egg-slot"
                   data-selected={isSelected ? "true" : "false"}
+                  data-supported={isSupported ? "true" : "false"}
                   data-element={element.id}
                   data-testid={`egg-slot-${element.id}`}
                   style={slotStyle}
-                  aria-label={`Select ${element.productLabel} element`}
+                  aria-label={isSupported
+                    ? `Select ${element.productLabel} element`
+                    : `${element.productLabel} element, ${COMPANION_FUTURE_STATE_LABEL}`}
                   aria-pressed={isSelected}
-                  disabled={isLoading}
-                  onClick={() => setSelectedElement(element.id)}
+                  aria-disabled={!isSupported || isLoading}
+                  disabled={isLoading || !isSupported}
+                  onClick={() => {
+                    if (!isSupported) return;
+                    setSelectedElement(element.id);
+                  }}
                 >
                   <span className="onboarding-egg-slot__pedestal-flare" aria-hidden="true" />
                   <span className="onboarding-egg-slot__egg-aura" aria-hidden="true" />
+                  {!isSupported ? (
+                    <span className="onboarding-egg-slot__future-badge" aria-hidden="true">
+                      {COMPANION_FUTURE_STATE_LABEL}
+                    </span>
+                  ) : null}
                   <span
                     className={cn(
                       "onboarding-egg-slot__float",

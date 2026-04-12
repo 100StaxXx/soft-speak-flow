@@ -1245,6 +1245,7 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
         newStage: 1,
         previousImageUrl: hatchResult.previous_image_url,
         newImageUrl: hatchResult.current_image_url,
+        presetId: hatchResult.preset_id ?? null,
         element: hatchResult.core_element ?? null,
       };
 
@@ -1631,6 +1632,7 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
               newStage: 1,
               previousImageUrl: hatchAnimationSnapshot.previousImageUrl,
               newImageUrl,
+              presetId: latestCompanion.preset_id ?? null,
               element: latestCompanion.core_element ?? hatchAnimationSnapshot.element ?? null,
             },
           }),

@@ -13,6 +13,7 @@ function assertEquals<T>(actual: T, expected: T, message: string): void {
 Deno.env.set("SUPABASE_FUNCTIONS_TEST", "1");
 Deno.env.set("SUPABASE_URL", "https://example.supabase.co");
 Deno.env.set("SUPABASE_ANON_KEY", "anon-key");
+Deno.env.set("SUPABASE_SERVICE_ROLE_KEY", "service-role-key");
 
 const authGatewayModule = await import("./auth-gateway/index.ts");
 const initUploadModule = await import("./init-quest-attachment-upload/index.ts");
@@ -119,6 +120,123 @@ Deno.test("auth-gateway allows normal password sign-up under limit", async () =>
   assertEquals(body.user.id, "new-user-1", "Expected auth gateway to return the created user");
   assertEquals(body.user.email, "newuser@example.com", "Expected auth gateway to normalize the email");
   assertEquals(body.requiresEmailConfirmation, true, "Expected sign-up without a session to require email confirmation");
+});
+
+Deno.test("auth-gateway returns a duplicate-email message for password sign-up", async () => {
+  const response = await authGatewayModule.handleAuthGateway(
+    new Request("https://example.com/functions/v1/auth-gateway", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "sign_up_password",
+        email: "existing@example.com",
+        password: "supersecret123",
+      }),
+    }),
+    {
+      createAdminClient: () => ({}),
+      createAnonClient: () => ({
+        auth: {
+          signUp: async () => ({
+            data: { session: null, user: null },
+            error: {
+              code: "email_exists",
+              message: "User already registered",
+              status: 422,
+            },
+          }),
+        },
+      }),
+      applyAbuseProtectionFn: async () => ({
+        requestId: "req-auth-signup-duplicate-1",
+        ipAddress: "203.0.113.15",
+        protection: null,
+      }) as any,
+    },
+  );
+
+  const body = await response.json();
+  assertEquals(response.status, 409, "Expected duplicate email sign-up to map to conflict");
+  assertEquals(body.code, "EMAIL_ALREADY_REGISTERED", "Expected duplicate email code");
+  assertEquals(body.error, "An account with this email already exists. Try signing in instead.", "Expected duplicate email message");
+});
+
+Deno.test("auth-gateway returns a validation message for invalid sign-up email from provider", async () => {
+  const response = await authGatewayModule.handleAuthGateway(
+    new Request("https://example.com/functions/v1/auth-gateway", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "sign_up_password",
+        email: "newuser@example.com",
+        password: "supersecret123",
+      }),
+    }),
+    {
+      createAdminClient: () => ({}),
+      createAnonClient: () => ({
+        auth: {
+          signUp: async () => ({
+            data: { session: null, user: null },
+            error: {
+              code: "email_address_invalid",
+              message: "Email address is invalid",
+              status: 400,
+            },
+          }),
+        },
+      }),
+      applyAbuseProtectionFn: async () => ({
+        requestId: "req-auth-signup-invalid-email-1",
+        ipAddress: "203.0.113.16",
+        protection: null,
+      }) as any,
+    },
+  );
+
+  const body = await response.json();
+  assertEquals(response.status, 400, "Expected invalid provider email to stay a bad request");
+  assertEquals(body.code, "INVALID_EMAIL", "Expected invalid email code");
+  assertEquals(body.error, "Enter a valid email address.", "Expected invalid email message");
+});
+
+Deno.test("auth-gateway returns a rate-limit message for throttled password sign-up", async () => {
+  const response = await authGatewayModule.handleAuthGateway(
+    new Request("https://example.com/functions/v1/auth-gateway", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "sign_up_password",
+        email: "newuser@example.com",
+        password: "supersecret123",
+      }),
+    }),
+    {
+      createAdminClient: () => ({}),
+      createAnonClient: () => ({
+        auth: {
+          signUp: async () => ({
+            data: { session: null, user: null },
+            error: {
+              code: "over_request_rate_limit",
+              message: "For security purposes, you can only request this after 30 seconds.",
+              status: 429,
+            },
+          }),
+        },
+      }),
+      applyAbuseProtectionFn: async () => ({
+        requestId: "req-auth-signup-rate-limit-1",
+        ipAddress: "203.0.113.17",
+        protection: null,
+      }) as any,
+    },
+  );
+
+  const body = await response.json();
+  assertEquals(response.status, 429, "Expected throttled sign-up to return 429");
+  assertEquals(body.code, "SIGN_UP_RATE_LIMITED", "Expected rate-limit code");
+  assertEquals(body.error, "Too many sign-up attempts. Please wait a moment and try again.", "Expected rate-limit message");
 });
 
 Deno.test("auth-gateway returns service misconfigured when admin client creation fails", async () => {

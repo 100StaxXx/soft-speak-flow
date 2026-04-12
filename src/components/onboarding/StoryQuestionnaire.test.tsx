@@ -49,7 +49,7 @@ describe("StoryQuestionnaire", () => {
     const { onComplete } = renderQuestionnaire(true);
 
     const backButton = screen.getByRole("button", { name: /back/i });
-    const firstOption = screen.getByRole("button", { name: /feminine presence/i });
+    const firstOption = screen.getByRole("button", { name: /woman/i });
     const continueButton = screen.getByRole("button", { name: /continue/i });
 
     expect(backButton).toBeDisabled();
@@ -63,7 +63,7 @@ describe("StoryQuestionnaire", () => {
   it("selects an answer first and advances only after continue", () => {
     renderQuestionnaire();
 
-    const firstOption = screen.getByRole("button", { name: /feminine presence/i });
+    const firstOption = screen.getByRole("button", { name: /woman/i });
     const continueButton = screen.getByRole("button", { name: /continue/i });
 
     expect(firstOption).toHaveAttribute("aria-pressed", "false");
@@ -71,9 +71,9 @@ describe("StoryQuestionnaire", () => {
 
     fireEvent.touchStart(firstOption);
 
-    expect(screen.getByRole("button", { name: /feminine presence/i })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: /woman/i })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("button", { name: /continue/i })).not.toBeDisabled();
-    expect(screen.getByText(/what kind of guide energy resonates with you/i)).toBeInTheDocument();
+    expect(screen.getByText(/would you prefer your guide to be a man or a woman/i)).toBeInTheDocument();
 
     fireEvent.touchStart(screen.getByRole("button", { name: /continue/i }));
 
@@ -83,7 +83,7 @@ describe("StoryQuestionnaire", () => {
   it("restores the previous selection when moving back", () => {
     renderQuestionnaire();
 
-    answerCurrentQuestion(/feminine presence/i);
+    answerCurrentQuestion(/woman/i);
     fireEvent.click(screen.getByRole("button", { name: /emotions & healing/i }));
     clickContinue();
 
@@ -97,7 +97,7 @@ describe("StoryQuestionnaire", () => {
   it("dedupes touchstart and click on the final continue action", () => {
     const { onComplete } = renderQuestionnaire();
 
-    answerCurrentQuestion(/feminine presence/i);
+    answerCurrentQuestion(/woman/i);
     answerCurrentQuestion(/clarity & mindset/i);
     answerCurrentQuestion(/gentle & compassionate/i);
     fireEvent.click(screen.getByRole("button", { name: /clear principles and logic/i }));
@@ -108,7 +108,7 @@ describe("StoryQuestionnaire", () => {
 
     expect(onComplete).toHaveBeenCalledTimes(1);
     expect(onComplete).toHaveBeenCalledWith([
-      expect.objectContaining({ questionId: "mentor_energy", optionId: "feminine_presence" }),
+      expect.objectContaining({ questionId: "mentor_energy", optionId: "woman" }),
       expect.objectContaining({ questionId: "focus_area", optionId: "clarity_mindset" }),
       expect.objectContaining({ questionId: "guidance_tone", optionId: "gentle_compassionate" }),
       expect.objectContaining({ questionId: "progress_style", optionId: "principles_logic" }),
@@ -118,7 +118,7 @@ describe("StoryQuestionnaire", () => {
   it("dedupes pointerdown and click on the final continue action", () => {
     const { onComplete } = renderQuestionnaire();
 
-    answerCurrentQuestion(/feminine presence/i);
+    answerCurrentQuestion(/woman/i);
     answerCurrentQuestion(/clarity & mindset/i);
     answerCurrentQuestion(/gentle & compassionate/i);
     fireEvent.click(screen.getByRole("button", { name: /clear principles and logic/i }));

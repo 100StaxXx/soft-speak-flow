@@ -61,6 +61,156 @@ function sanitizeAuthError(message: string | undefined, fallback: string): strin
   return fallback;
 }
 
+interface SupabaseProviderError {
+  code?: string;
+  message?: string;
+  status?: number;
+  weak_password?: {
+    message?: string;
+    reasons?: string[];
+  };
+}
+
+function isLikelyTechnicalSignUpMessage(message: string | undefined): boolean {
+  const normalized = message?.toLowerCase() ?? "";
+
+  return (
+    normalized.includes("database error") ||
+    normalized.includes("unexpected_failure") ||
+    normalized.includes("internal server error") ||
+    normalized.includes("smtp") ||
+    normalized.includes("hook") ||
+    normalized.includes("500")
+  );
+}
+
+function getWeakPasswordMessage(error: SupabaseProviderError): string {
+  const reasons = Array.isArray(error.weak_password?.reasons)
+    ? error.weak_password.reasons
+        .filter((reason): reason is string => typeof reason === "string" && reason.trim().length > 0)
+        .map((reason) => reason.trim().replace(/[.]+$/, ""))
+    : [];
+
+  if (reasons.length > 0) {
+    return `Choose a stronger password. ${reasons.join("; ")}.`;
+  }
+
+  const providerMessage = error.weak_password?.message?.trim();
+  if (providerMessage) {
+    return providerMessage;
+  }
+
+  return "Choose a stronger password. Use at least 8 characters with a mix of letters, numbers, or symbols.";
+}
+
+function sanitizeSignUpError(error: unknown): {
+  status: number;
+  code: string;
+  error: string;
+} {
+  const providerError = (error ?? {}) as SupabaseProviderError;
+  const providerCode = providerError.code?.toLowerCase() ?? "";
+  const providerMessage = toAuthErrorMessage(error).trim();
+  const normalized = providerMessage.toLowerCase();
+
+  if (
+    providerCode === "email_exists" ||
+    normalized.includes("already registered") ||
+    normalized.includes("already exists")
+  ) {
+    return {
+      status: 409,
+      code: "EMAIL_ALREADY_REGISTERED",
+      error: "An account with this email already exists. Try signing in instead.",
+    };
+  }
+
+  if (
+    providerCode === "email_address_invalid" ||
+    (providerCode === "validation_failed" && normalized.includes("email")) ||
+    normalized.includes("invalid email") ||
+    normalized.includes("email address") && normalized.includes("invalid") ||
+    normalized.includes("must be a valid email")
+  ) {
+    return {
+      status: providerError.status ?? 400,
+      code: "INVALID_EMAIL",
+      error: "Enter a valid email address.",
+    };
+  }
+
+  if (
+    providerCode === "weak_password" ||
+    (providerCode === "validation_failed" && normalized.includes("password")) ||
+    normalized.includes("weak password")
+  ) {
+    return {
+      status: providerError.status ?? 400,
+      code: "WEAK_PASSWORD",
+      error: getWeakPasswordMessage(providerError),
+    };
+  }
+
+  if (
+    providerCode === "over_request_rate_limit" ||
+    providerCode === "over_email_send_rate_limit" ||
+    normalized.includes("rate limit") ||
+    (normalized.includes("security purposes") && normalized.includes("request this"))
+  ) {
+    return {
+      status: providerError.status ?? 429,
+      code: "SIGN_UP_RATE_LIMITED",
+      error: "Too many sign-up attempts. Please wait a moment and try again.",
+    };
+  }
+
+  if (
+    providerCode === "email_provider_disabled" ||
+    providerCode === "signup_disabled" ||
+    normalized.includes("email signups are disabled") ||
+    normalized.includes("signups not allowed")
+  ) {
+    return {
+      status: providerError.status ?? 503,
+      code: "EMAIL_SIGNUPS_DISABLED",
+      error: "Email sign-up is currently unavailable. Please try again later.",
+    };
+  }
+
+  if (
+    providerCode === "email_address_not_authorized" ||
+    normalized.includes("email address is not authorized")
+  ) {
+    return {
+      status: providerError.status ?? 400,
+      code: "EMAIL_NOT_AUTHORIZED",
+      error: "We can't send sign-up emails to that address right now. Please use a different email or contact support.",
+    };
+  }
+
+  if (providerCode === "user_banned") {
+    return {
+      status: providerError.status ?? 403,
+      code: "USER_BANNED",
+      error: "This email can't create an account right now. Contact support if this seems wrong.",
+    };
+  }
+
+  if (providerMessage && !isLikelyTechnicalSignUpMessage(providerMessage)) {
+    return {
+      status: providerError.status ?? 400,
+      code: "SIGN_UP_FAILED",
+      error: providerMessage,
+    };
+  }
+
+  return {
+    status: providerError.status ?? 400,
+    code: "SIGN_UP_FAILED",
+    error: "Unable to create account right now. Please try again in a moment.",
+  };
+}
+
 function buildRequestContext(
   action: string | undefined,
   ipAddress: string,
@@ -302,16 +452,19 @@ export async function handleAuthGateway(
       });
 
       if (error) {
+        const safeSignUpError = sanitizeSignUpError(error);
         logAuthEvent("auth-gateway", "error", "Supabase password sign-up failed", {
           ...requestContext,
           requestId,
           phase: "provider_auth",
           providerErrorMessage: error.message,
+          providerErrorCode: error.code,
+          providerErrorStatus: error.status,
         });
         return createLoggedSafeErrorResponse({
-          status: 400,
-          code: "SIGN_UP_FAILED",
-          error: "Unable to create account.",
+          status: safeSignUpError.status,
+          code: safeSignUpError.code,
+          error: safeSignUpError.error,
         }, {
           ...requestContext,
           phase: "provider_auth",

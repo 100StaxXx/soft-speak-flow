@@ -209,6 +209,11 @@
   isolation: isolate;
 }
 
+.onboarding-egg-slot[data-supported="false"] {
+  opacity: 0.72;
+  filter: saturate(0.45) brightness(0.58);
+}
+
 .onboarding-egg-slot:focus-visible {
   outline: none;
 }
@@ -227,6 +232,28 @@
     opacity 220ms ease,
     transform 220ms ease,
     filter 220ms ease;
+}
+
+.onboarding-egg-slot__future-badge {
+  position: absolute;
+  left: 50%;
+  top: 12%;
+  z-index: 3;
+  transform: translateX(-50%);
+  max-width: calc(100% - 1.5rem);
+  padding: 0.22rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid hsl(var(--foreground) / 0.12);
+  background: hsl(260 22% 8% / 0.76);
+  color: hsl(var(--foreground) / 0.72);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  line-height: 1.1;
+  text-transform: uppercase;
+  text-align: center;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .onboarding-egg-slot__pedestal-flare {
@@ -270,7 +297,7 @@
   left: 50%;
   bottom: var(--egg-bottom);
   width: var(--egg-width);
-  transform: translateX(-50%);
+  transform: translateX(calc(-50% + var(--egg-offset-x, 0%)));
   transform-origin: center bottom;
   filter:
     drop-shadow(0 16px 24px rgba(0, 0, 0, 0.35))
@@ -300,7 +327,7 @@
 .onboarding-egg-slot:hover .onboarding-egg-slot__egg,
 .onboarding-egg-slot:focus-visible .onboarding-egg-slot__egg,
 .onboarding-egg-slot[data-selected="true"] .onboarding-egg-slot__egg {
-  transform: translateX(-50%) scale(1.045);
+  transform: translateX(calc(-50% + var(--egg-offset-x, 0%))) scale(1.045);
   filter:
     drop-shadow(0 22px 30px rgba(0, 0, 0, 0.42))
     drop-shadow(0 0 18px var(--egg-glow))
@@ -2063,6 +2090,23 @@ All colors MUST be HSL.
       linear-gradient(180deg, hsl(var(--onb-base-2)), hsl(var(--onb-base-3)));
   }
 
+  .onb-photo-backdrop {
+    object-position: var(--onb-photo-mobile-position, 50% 50%);
+    filter: saturate(0.96) brightness(0.78);
+    transform: scale(1.02);
+  }
+
+  .onb-photo-scrim {
+    background:
+      linear-gradient(
+        180deg,
+        hsl(var(--background) / var(--onb-top-scrim-opacity, 0.36)) 0%,
+        hsl(var(--background) / 0.08) 28%,
+        hsl(var(--background) / 0.18) 52%,
+        hsl(var(--background) / var(--onb-bottom-scrim-opacity, 0.54)) 100%
+      );
+  }
+
   .onb-nebula-haze {
     background:
       radial-gradient(46% 40% at 24% 32%, hsl(var(--onb-nebula-1) / 0.26), transparent 78%),
@@ -2074,17 +2118,7 @@ All colors MUST be HSL.
 
   .onb-faction-tint {
     background:
-      radial-gradient(52% 42% at 50% 54%, hsl(var(--onb-faction-accent, var(--onb-nebula-1)) / 0.42), transparent 76%);
-  }
-
-  .onb-cosmic-ring {
-    position: absolute;
-    border-radius: 9999px;
-    border: 1px solid hsl(var(--onb-ring) / 0.28);
-    box-shadow:
-      inset 0 0 44px hsl(var(--onb-ring) / 0.1),
-      0 0 36px hsl(var(--onb-nebula-1) / 0.18);
-    transform-origin: center;
+      radial-gradient(58% 48% at 50% 56%, hsl(var(--onb-faction-accent, var(--onb-nebula-1)) / 0.24), transparent 78%);
   }
 
   .onb-cosmic-particle {
@@ -2112,16 +2146,16 @@ All colors MUST be HSL.
     animation: onb-nebula-drift 30s ease-in-out infinite;
   }
 
-  .onb-animate-ring-breathe {
-    animation-name: onb-ring-breathe;
-    animation-timing-function: ease-in-out;
-    animation-iteration-count: infinite;
-  }
-
   .onb-animate-particle-float {
     animation-name: onb-particle-float;
     animation-timing-function: linear;
     animation-iteration-count: infinite;
+  }
+
+  @media (min-width: 768px) {
+    .onb-photo-backdrop {
+      object-position: var(--onb-photo-desktop-position, var(--onb-photo-mobile-position, 50% 50%));
+    }
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -2233,11 +2267,13 @@ All colors MUST be HSL.
   }
 
   .mentor-spotlight-ring--outline {
-    border: 1.5px solid hsl(var(--primary) / 0.72);
+    border: 3px solid hsl(var(--primary) / 0.95);
     border-radius: 20px;
     box-shadow:
-      0 0 0 4px hsl(var(--primary) / 0.09),
-      0 10px 24px rgba(0, 0, 0, 0.18);
+      0 0 0 2px hsl(var(--primary) / 0.32),
+      0 0 0 8px hsl(var(--primary) / 0.16),
+      0 0 28px hsl(var(--primary) / 0.42),
+      0 10px 24px rgba(0, 0, 0, 0.22);
   }
 
   .mentor-spotlight-target-elevated {

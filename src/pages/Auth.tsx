@@ -53,6 +53,7 @@ const AUTH_TEMPORARY_OUTAGE_MESSAGE =
   "Authentication is temporarily unavailable. Please try again in a moment.";
 const APPLE_AUTH_TEMPORARY_OUTAGE_MESSAGE =
   "Sign in with Apple is temporarily unavailable. Please try again in a moment.";
+const ACCOUNT_CREATION_ERROR_TOAST_TITLE = "Couldn't create account";
 
 type AuthGatewayAction = "sign_in_password" | "sign_up_password" | "reset_password";
 type PostAuthProvider = "apple" | null;
@@ -695,6 +696,14 @@ const Auth = () => {
   // Import the redirect URL helper at the top of the component
   // (moved to import statement)
 
+  const showAccountCreationError = useCallback((message: string) => {
+    toast({
+      title: ACCOUNT_CREATION_ERROR_TOAST_TITLE,
+      description: message,
+      variant: "destructive",
+    });
+  }, [toast]);
+
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setInlineError(null);
@@ -708,7 +717,11 @@ const Auth = () => {
       confirmPassword: isLogin ? undefined : confirmPassword 
     });
     if (!result.success) {
-      setInlineError(result.error.errors[0].message);
+      const message = result.error.errors[0].message;
+      setInlineError(message);
+      if (!isLogin) {
+        showAccountCreationError(message);
+      }
       return;
     }
 
@@ -766,7 +779,11 @@ const Auth = () => {
         }
       }
     } catch (error) {
-      setInlineError(getErrorMessage(error));
+      const message = getErrorMessage(error);
+      setInlineError(message);
+      if (!isLogin) {
+        showAccountCreationError(message);
+      }
     } finally {
       setLoading(false);
     }

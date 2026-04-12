@@ -72,6 +72,7 @@ export const GlobalEvolutionListener = () => {
     level: number;
     previousImageUrl: string;
     imageUrl: string;
+    presetId?: string;
     mentorSlug?: string;
     element?: string;
   } | null>(null);
@@ -146,6 +147,7 @@ export const GlobalEvolutionListener = () => {
     level,
     previousImageUrl,
     imageUrl,
+    presetId,
     element,
     dispatchLoadingStart = false,
     markAsLocalHatch = false,
@@ -155,6 +157,7 @@ export const GlobalEvolutionListener = () => {
     level: number;
     previousImageUrl: string;
     imageUrl: string;
+    presetId?: string;
     element?: string;
     dispatchLoadingStart?: boolean;
     markAsLocalHatch?: boolean;
@@ -178,6 +181,7 @@ export const GlobalEvolutionListener = () => {
         level,
         previousImageUrl,
         imageUrl,
+        presetId,
         element,
       });
       triggerEvent({
@@ -375,6 +379,11 @@ export const GlobalEvolutionListener = () => {
             level: newLevel,
             previousImageUrl,
             imageUrl,
+            presetId: typeof newData.preset_id === "string"
+              ? newData.preset_id
+              : typeof oldData.preset_id === "string"
+                ? oldData.preset_id
+                : undefined,
             element,
             dispatchLoadingStart: true,
           });
@@ -417,6 +426,7 @@ export const GlobalEvolutionListener = () => {
         level: detail.newStage,
         previousImageUrl: detail.previousImageUrl,
         imageUrl: detail.newImageUrl,
+        presetId: typeof detail.presetId === "string" ? detail.presetId : undefined,
         element: detail.element ?? undefined,
         markAsLocalHatch: true,
       });
@@ -439,6 +449,7 @@ export const GlobalEvolutionListener = () => {
       newStage={evolutionData.level}
       previousImageUrl={evolutionData.previousImageUrl}
       newImageUrl={evolutionData.imageUrl}
+      presetId={evolutionData.presetId}
       element={evolutionData.element}
       onComplete={() => {
         setIsEvolving(false);
