@@ -570,7 +570,10 @@ serve(async (req) => {
 
     const { error: deleteDataError } = await supabase.rpc("delete_user_account", { p_user_id: userId });
     if (deleteDataError) {
-      console.error("[delete-user] delete_user_account rpc failed", deleteDataError);
+      const rpcMessage = typeof deleteDataError === "object" && deleteDataError !== null
+        ? (deleteDataError as Record<string, unknown>).message ?? (deleteDataError as Record<string, unknown>).details ?? JSON.stringify(deleteDataError)
+        : String(deleteDataError);
+      console.error("[delete-user] delete_user_account rpc failed", { rpcMessage, deleteDataError });
       throw createTemporaryUnavailableError(ACCOUNT_DELETION_ERROR_CODES.BACKEND_UNAVAILABLE, deleteDataError);
     }
 
