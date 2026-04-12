@@ -141,7 +141,7 @@ describe("EditQuestDialog", () => {
     expect(screen.getByDisplayValue("Legacy quest")).toBeInTheDocument();
   });
 
-  it("renders duration below time controls and above subtasks", () => {
+  it("renders early reminder above subtasks after the time controls", () => {
     render(
       <EditQuestDialog
         task={legacyTask}
@@ -154,35 +154,41 @@ describe("EditQuestDialog", () => {
 
     const timeButton = screen.getByRole("button", { name: "9:30 AM" });
     const durationButton = screen.getByRole("button", { name: "30 min" });
+    const reminderButton = screen.getByRole("button", { name: "None" });
     const addSubtaskInput = screen.getByPlaceholderText("Add Subtask");
 
     expect(timeButton.compareDocumentPosition(durationButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(durationButton.compareDocumentPosition(addSubtaskInput) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(durationButton.compareDocumentPosition(reminderButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(reminderButton.compareDocumentPosition(addSubtaskInput) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it("shows Early Reminder above Advanced Settings without duplicating it", () => {
-    render(
-      <EditQuestDialog
-        task={legacyTask}
-        open
-        onOpenChange={vi.fn()}
-        onSave={vi.fn().mockResolvedValue(undefined)}
-        isSaving={false}
-      />,
-    );
+  it.each([undefined, "desktop-panel"] as const)(
+    "shows Early Reminder above Advanced Settings without duplicating it for %s presentation",
+    (presentation) => {
+      render(
+        <EditQuestDialog
+          task={legacyTask}
+          open
+          presentation={presentation}
+          onOpenChange={vi.fn()}
+          onSave={vi.fn().mockResolvedValue(undefined)}
+          isSaving={false}
+        />,
+      );
 
-    const reminderLabel = screen.getByText("Early Reminder");
-    const advancedTrigger = screen.getByRole("button", { name: /Advanced Settings/i });
-    const relation = advancedTrigger.compareDocumentPosition(reminderLabel);
+      const reminderLabel = screen.getByText("Early Reminder");
+      const advancedTrigger = screen.getByRole("button", { name: /Advanced Settings/i });
+      const relation = advancedTrigger.compareDocumentPosition(reminderLabel);
 
-    expect(relation & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
-    expect(screen.queryByText("Recurrence")).not.toBeInTheDocument();
+      expect(relation & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
+      expect(screen.queryByText("Recurrence")).not.toBeInTheDocument();
 
-    fireEvent.click(advancedTrigger);
+      fireEvent.click(advancedTrigger);
 
-    expect(screen.getAllByText("Early Reminder")).toHaveLength(1);
-    expect(screen.getByText("Recurrence")).toBeInTheDocument();
-  });
+      expect(screen.getAllByText("Early Reminder")).toHaveLength(1);
+      expect(screen.getByText("Recurrence")).toBeInTheDocument();
+    },
+  );
 
   it("normalizes legacy values before save", async () => {
     const onOpenChange = vi.fn();

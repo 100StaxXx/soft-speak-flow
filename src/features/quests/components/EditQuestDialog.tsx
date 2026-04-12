@@ -423,6 +423,39 @@ export function EditQuestDialog({
               />
             </div>
 
+            {scheduledTime && (
+              <AdvancedQuestOptions
+                scheduledTime={scheduledTime}
+                estimatedDuration={estimatedDuration}
+                recurrencePattern={recurrencePattern}
+                recurrenceDays={recurrenceDays}
+                recurrenceMonthDays={recurrenceMonthDays}
+                recurrenceCustomPeriod={recurrenceCustomPeriod}
+                reminderEnabled={reminderEnabled}
+                reminderMinutesBefore={reminderMinutesBefore}
+                onScheduledTimeChange={setScheduledTime}
+                onEstimatedDurationChange={setEstimatedDuration}
+                onRecurrencePatternChange={setRecurrencePattern}
+                onRecurrenceDaysChange={setRecurrenceDays}
+                onRecurrenceMonthDaysChange={setRecurrenceMonthDays}
+                onRecurrenceCustomPeriodChange={setRecurrenceCustomPeriod}
+                onReminderEnabledChange={setReminderEnabled}
+                onReminderMinutesBeforeChange={setReminderMinutesBefore}
+                moreInformation={moreInformation}
+                onMoreInformationChange={setMoreInformation}
+                location={location}
+                onLocationChange={setLocation}
+                selectedDate={parsedTaskDate ?? new Date()}
+                hideScheduledTime
+                hideDuration
+                hideMoreInformation
+                hideRecurrence
+                hideLocation
+                requireScheduledTimeForRecurrence
+                visualStyle="quest-soft"
+              />
+            )}
+
             {/* Subtasks + Notes Card */}
             <div className={cn(QUEST_FORM_STYLES.sectionCard, "overflow-hidden")}>
               {subtasks.map((st) => (
@@ -478,39 +511,6 @@ export function EditQuestDialog({
                 visualStyle="quest-soft"
               />
             </div>
-
-            {scheduledTime && (
-              <AdvancedQuestOptions
-                scheduledTime={scheduledTime}
-                estimatedDuration={estimatedDuration}
-                recurrencePattern={recurrencePattern}
-                recurrenceDays={recurrenceDays}
-                recurrenceMonthDays={recurrenceMonthDays}
-                recurrenceCustomPeriod={recurrenceCustomPeriod}
-                reminderEnabled={reminderEnabled}
-                reminderMinutesBefore={reminderMinutesBefore}
-                onScheduledTimeChange={setScheduledTime}
-                onEstimatedDurationChange={setEstimatedDuration}
-                onRecurrencePatternChange={setRecurrencePattern}
-                onRecurrenceDaysChange={setRecurrenceDays}
-                onRecurrenceMonthDaysChange={setRecurrenceMonthDays}
-                onRecurrenceCustomPeriodChange={setRecurrenceCustomPeriod}
-                onReminderEnabledChange={setReminderEnabled}
-                onReminderMinutesBeforeChange={setReminderMinutesBefore}
-                moreInformation={moreInformation}
-                onMoreInformationChange={setMoreInformation}
-                location={location}
-                onLocationChange={setLocation}
-                selectedDate={parsedTaskDate ?? new Date()}
-                hideScheduledTime
-                hideDuration
-                hideMoreInformation
-                hideRecurrence
-                hideLocation
-                requireScheduledTimeForRecurrence
-                visualStyle="quest-soft"
-              />
-            )}
 
             {/* Advanced Settings */}
             <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>

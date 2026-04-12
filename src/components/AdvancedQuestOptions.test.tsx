@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { useState } from "react";
 import { AdvancedQuestOptions } from "./AdvancedQuestOptions";
@@ -78,6 +78,7 @@ function RecurrenceDisabledHarness() {
 }
 
 function ReminderHarness() {
+  const [reminderEnabled, setReminderEnabled] = useState(false);
   const [reminderMinutesBefore, setReminderMinutesBefore] = useState(15);
 
   return (
@@ -95,8 +96,8 @@ function ReminderHarness() {
         onRecurrenceMonthDaysChange={vi.fn()}
         recurrenceCustomPeriod={null}
         onRecurrenceCustomPeriodChange={vi.fn()}
-        reminderEnabled
-        onReminderEnabledChange={vi.fn()}
+        reminderEnabled={reminderEnabled}
+        onReminderEnabledChange={setReminderEnabled}
         reminderMinutesBefore={reminderMinutesBefore}
         onReminderMinutesBeforeChange={setReminderMinutesBefore}
         moreInformation={null}
@@ -104,9 +105,18 @@ function ReminderHarness() {
         location={null}
         onLocationChange={vi.fn()}
       />
-      <div data-testid="reminder-state">{reminderMinutesBefore}</div>
+      <div data-testid="reminder-state">{String(reminderEnabled)}|{reminderMinutesBefore}</div>
     </div>
   );
+}
+
+function getReminderSection() {
+  const helperText = screen.getByText("You'll be notified when the quest starts. Add an early reminder for a little breathing room.");
+  const section = helperText.parentElement;
+  if (!section) {
+    throw new Error("Reminder section not found");
+  }
+  return within(section);
 }
 
 function DurationHarness() {
@@ -282,26 +292,95 @@ describe("AdvancedQuestOptions reminder picker", () => {
     });
   });
 
+  it("shows None by default when reminders are disabled", () => {
+    render(<ReminderHarness />);
+
+    expect(getReminderSection().getByRole("button", { name: "None" })).toBeInTheDocument();
+    expect(screen.getByTestId("reminder-state")).toHaveTextContent("false|15");
+  });
+
   it("shows 2 days and custom reminder options", () => {
     render(<ReminderHarness />);
 
-    fireEvent.click(screen.getByRole("button", { name: "15 minutes before" }));
+    fireEvent.click(getReminderSection().getByRole("button", { name: "None" }));
 
     expect(screen.getByRole("button", { name: "2 days before" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Custom" })).toBeInTheDocument();
   });
 
+  it("enables reminders when selecting a preset", async () => {
+    render(<ReminderHarness />);
+
+    fireEvent.click(getReminderSection().getByRole("button", { name: "None" }));
+    fireEvent.click(screen.getByRole("button", { name: "30 minutes before" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("reminder-state")).toHaveTextContent("true|30");
+    });
+
+    expect(screen.getByRole("button", { name: "30 minutes before" })).toBeInTheDocument();
+  });
+
+  it("disables reminders when selecting None", async () => {
+    render(<ReminderHarness />);
+
+    fireEvent.click(getReminderSection().getByRole("button", { name: "None" }));
+    fireEvent.click(screen.getByRole("button", { name: "10 minutes before" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("reminder-state")).toHaveTextContent("true|10");
+    });
+
+    fireEvent.click(getReminderSection().getByRole("button", { name: "10 minutes before" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "None" }).at(-1)!);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("reminder-state")).toHaveTextContent("false|10");
+    });
+
+    expect(getReminderSection().getByRole("button", { name: "None" })).toBeInTheDocument();
+  });
+
   it("applies a custom reminder value", async () => {
     render(<ReminderHarness />);
 
-    fireEvent.click(screen.getByRole("button", { name: "15 minutes before" }));
+    fireEvent.click(getReminderSection().getByRole("button", { name: "None" }));
     fireEvent.click(screen.getByRole("button", { name: "Custom" }));
     fireEvent.change(screen.getByLabelText("Minutes before"), { target: { value: "180" } });
     fireEvent.click(screen.getByRole("button", { name: "Apply" }));
 
     await waitFor(() => {
-      expect(screen.getByTestId("reminder-state")).toHaveTextContent("180");
+      expect(screen.getByTestId("reminder-state")).toHaveTextContent("true|180");
     });
+
+    expect(screen.getByRole("button", { name: /180 minutes before \(Custom\)/i })).toBeInTheDocument();
+  });
+
+  it("shows an existing custom reminder label when reminders are enabled", () => {
+    render(
+      <AdvancedQuestOptions
+        scheduledTime="09:00"
+        onScheduledTimeChange={vi.fn()}
+        estimatedDuration={30}
+        onEstimatedDurationChange={vi.fn()}
+        recurrencePattern={null}
+        onRecurrencePatternChange={vi.fn()}
+        recurrenceDays={[]}
+        onRecurrenceDaysChange={vi.fn()}
+        recurrenceMonthDays={[]}
+        onRecurrenceMonthDaysChange={vi.fn()}
+        recurrenceCustomPeriod={null}
+        onRecurrenceCustomPeriodChange={vi.fn()}
+        reminderEnabled
+        onReminderEnabledChange={vi.fn()}
+        reminderMinutesBefore={180}
+        onReminderMinutesBeforeChange={vi.fn()}
+        moreInformation={null}
+        onMoreInformationChange={vi.fn()}
+        location={null}
+        onLocationChange={vi.fn()}
+      />,
+    );
 
     expect(screen.getByRole("button", { name: /180 minutes before \(Custom\)/i })).toBeInTheDocument();
   });
