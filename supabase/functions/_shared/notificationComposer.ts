@@ -1,8 +1,10 @@
 import type { NotificationType } from "./notificationsV2.ts";
+import {
+  getNotificationSafeCompanionName,
+  type NotificationCompanionNameContext,
+} from "./companionName.ts";
 
-export interface CompanionNotificationContext {
-  cachedCreatureName?: string | null;
-  spiritAnimal?: string | null;
+export interface CompanionNotificationContext extends NotificationCompanionNameContext {
   currentMood?: string | null;
   inactiveDays?: number | null;
 }
@@ -19,13 +21,10 @@ export interface NotificationComposeInput {
 }
 
 function getCompanionName(companion?: CompanionNotificationContext | null): string {
-  const explicitName = companion?.cachedCreatureName?.trim();
-  if (explicitName) return explicitName;
-
-  const species = companion?.spiritAnimal?.trim();
-  if (species) return species;
-
-  return "Your companion";
+  return getNotificationSafeCompanionName(
+    companion?.displayName ?? companion?.cachedCreatureName,
+    companion?.spiritAnimal,
+  );
 }
 
 function asString(value: unknown, fallback = ""): string {

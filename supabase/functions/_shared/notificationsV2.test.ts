@@ -249,6 +249,25 @@ Deno.test("composer applies companion context only to companion-led types", () =
   }
 });
 
+Deno.test("composer never surfaces the species label as a companion push title", () => {
+  const dailyPep = composeNotificationCopy({
+    type: "daily_pep",
+    payload: { summary: "Your pep talk is ready." },
+    companion: {
+      cachedCreatureName: "Phoenix",
+      spiritAnimal: "Phoenix",
+    },
+  });
+
+  if (dailyPep.title.includes("Phoenix")) {
+    throw new Error(`Expected species label to be suppressed, got ${dailyPep.title}`);
+  }
+
+  if (!dailyPep.title.startsWith("Your companion")) {
+    throw new Error(`Expected generic fallback title, got ${dailyPep.title}`);
+  }
+});
+
 Deno.test("composer formats daily quote copy", () => {
   const dailyQuote = composeNotificationCopy({
     type: "daily_quote",

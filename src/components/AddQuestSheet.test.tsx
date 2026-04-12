@@ -60,6 +60,15 @@ const buildVoicePrefill = (overrides: Partial<QuestComposerPrefillDraft> = {}): 
   ...overrides,
 });
 
+const getRecurrenceSection = (): HTMLElement => {
+  const recurrenceLabel = screen.getByText("Recurrence");
+  const section = recurrenceLabel.parentElement?.parentElement;
+  if (!section) {
+    throw new Error("Recurrence section not found");
+  }
+  return section as HTMLElement;
+};
+
 vi.mock("@/components/QuestAttachmentPicker", () => ({
   QuestAttachmentPicker: ({ onAttachmentsChange }: { onAttachmentsChange: (attachments: QuestAttachmentInput[]) => void }) => (
     <div>
@@ -188,26 +197,35 @@ describe("AddQuestSheet", () => {
     expect(durationButton.compareDocumentPosition(addSubtaskButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it("shows Early Reminder above Advanced Settings after a time is selected", () => {
-    render(
-      <AddQuestSheet
-        open
-        onOpenChange={vi.fn()}
-        selectedDate={selectedDate}
-        onAdd={vi.fn().mockResolvedValue(undefined)}
-      />
-    );
+  it.each([undefined, "desktop-panel"] as const)(
+    "shows Early Reminder above Add Subtask and Advanced Settings after a time is selected for %s presentation",
+    (presentation) => {
+      render(
+        <AddQuestSheet
+          open
+          presentation={presentation}
+          onOpenChange={vi.fn()}
+          selectedDate={selectedDate}
+          onAdd={vi.fn().mockResolvedValue(undefined)}
+        />
+      );
 
-    expect(screen.queryByText("Early Reminder")).not.toBeInTheDocument();
+      expect(screen.queryByText("Early Reminder")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Time" }));
-    const reminderLabel = screen.getByText("Early Reminder");
-    const advancedTrigger = screen.getByRole("button", { name: /Advanced Settings/i });
-    const relation = advancedTrigger.compareDocumentPosition(reminderLabel);
+      fireEvent.click(screen.getByRole("button", { name: "Time" }));
 
-    expect(reminderLabel).toBeInTheDocument();
-    expect(relation & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
-  });
+      const reminderLabel = screen.getByText("Early Reminder");
+      const addSubtaskButton = screen.getByRole("button", { name: "Add Subtask" });
+      const advancedTrigger = screen.getByRole("button", { name: /Advanced Settings/i });
+
+      expect(reminderLabel.compareDocumentPosition(addSubtaskButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(reminderLabel.compareDocumentPosition(advancedTrigger) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+      fireEvent.click(advancedTrigger);
+
+      expect(screen.getAllByText("Early Reminder")).toHaveLength(1);
+    },
+  );
 
   it("does not auto-focus the title on open and still allows manual focus", () => {
     vi.useFakeTimers();
@@ -1015,7 +1033,7 @@ describe("AddQuestSheet", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: "None" })).toBeDisabled();
+    expect(within(getRecurrenceSection()).getByRole("button", { name: "None" })).toBeDisabled();
     expect(screen.getByText("Set a time to enable recurrence.")).toBeInTheDocument();
   });
 
@@ -1035,7 +1053,7 @@ describe("AddQuestSheet", () => {
     fireEvent.change(screen.getByPlaceholderText("Quest Title"), {
       target: { value: "Recurring inbox attempt" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "None" }));
+    fireEvent.click(within(getRecurrenceSection()).getByRole("button", { name: "None" }));
     fireEvent.click(screen.getByRole("button", { name: "Daily" }));
 
     const inboxButton = screen.getByRole("button", { name: "Add to Inbox instead" });
@@ -1334,7 +1352,7 @@ describe("AddQuestSheet", () => {
     fireEvent.change(screen.getByPlaceholderText("Quest Title"), {
       target: { value: "Weekday quest" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "None" }));
+    fireEvent.click(within(getRecurrenceSection()).getByRole("button", { name: "None" }));
     fireEvent.click(screen.getByRole("button", { name: "Weekdays" }));
     fireEvent.click(screen.getByRole("button", { name: "Add Quest" }));
 
@@ -1366,7 +1384,7 @@ describe("AddQuestSheet", () => {
     fireEvent.change(screen.getByPlaceholderText("Quest Title"), {
       target: { value: "Biweekly quest" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "None" }));
+    fireEvent.click(within(getRecurrenceSection()).getByRole("button", { name: "None" }));
     fireEvent.click(screen.getByRole("button", { name: "Every 2 Weeks" }));
     fireEvent.click(screen.getByRole("button", { name: "Add Quest" }));
 

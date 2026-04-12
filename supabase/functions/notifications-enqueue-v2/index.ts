@@ -15,6 +15,7 @@ import {
   type NotificationType,
 } from "../_shared/notificationsV2.ts";
 import { composeNotificationCopy, type CompanionNotificationContext } from "../_shared/notificationComposer.ts";
+import { resolveNotificationCompanionContextMap } from "../_shared/companionName.ts";
 import { scanPaginatedRows } from "./pagination.ts";
 import {
   buildTaskNotificationCandidates,
@@ -59,11 +60,14 @@ interface MentorRow {
 }
 
 interface CompanionRow {
+  id: string;
   user_id: string;
+  current_stage: number | null;
   cached_creature_name: string | null;
   spirit_animal: string | null;
   current_mood: string | null;
   inactive_days: number | null;
+  created_at: string | null;
 }
 
 interface DailyPepTalkRow {
@@ -112,17 +116,27 @@ function dailyContentKey(mentorSlug: string, localDate: string): string {
   return `${mentorSlug}:${localDate}`;
 }
 
-function toCompanionMap(rows: CompanionRow[] | null): Map<string, CompanionNotificationContext> {
-  const map = new Map<string, CompanionNotificationContext>();
-  for (const row of rows ?? []) {
-    map.set(row.user_id, {
-      cachedCreatureName: row.cached_creature_name,
-      spiritAnimal: row.spirit_animal,
-      currentMood: row.current_mood,
-      inactiveDays: row.inactive_days,
-    });
+async function loadCompanionContextMap(
+  supabase: any,
+  userIds: string[],
+  logPrefix: string,
+): Promise<Map<string, CompanionNotificationContext>> {
+  if (userIds.length === 0) {
+    return new Map<string, CompanionNotificationContext>();
   }
-  return map;
+
+  const { data, error } = await supabase
+    .from("user_companion")
+    .select("id, user_id, current_stage, cached_creature_name, spirit_animal, current_mood, inactive_days, created_at")
+    .in("user_id", userIds);
+
+  if (error) throw error;
+
+  return resolveNotificationCompanionContextMap({
+    supabase,
+    companions: (data as CompanionRow[] | null) ?? [],
+    logPrefix,
+  });
 }
 
 function rowForQueue(input: {
@@ -478,12 +492,11 @@ serve(async (req) => {
     if (pepError) throw pepError;
 
     const pepUserIds = [...new Set((duePepPushes ?? []).map((row) => row.user_id as string))];
-    const companionMap = pepUserIds.length > 0
-      ? toCompanionMap((await supabase
-        .from("user_companion")
-        .select("user_id, cached_creature_name, spirit_animal, current_mood, inactive_days")
-        .in("user_id", pepUserIds)).data as CompanionRow[] | null)
-      : new Map<string, CompanionNotificationContext>();
+    const companionMap = await loadCompanionContextMap(
+      supabase,
+      pepUserIds,
+      "[notifications-enqueue-v2] daily_pep",
+    );
 
     for (const push of duePepPushes ?? []) {
       const pepTalk = Array.isArray(push.daily_pep_talks) ? push.daily_pep_talks[0] : push.daily_pep_talks;
@@ -728,12 +741,11 @@ serve(async (req) => {
     });
 
     const nudgeUserIds = [...new Set(nudges.map((row) => row.user_id as string))];
-    const nudgeCompanionMap = nudgeUserIds.length > 0
-      ? toCompanionMap((await supabase
-        .from("user_companion")
-        .select("user_id, cached_creature_name, spirit_animal, current_mood, inactive_days")
-        .in("user_id", nudgeUserIds)).data as CompanionRow[] | null)
-      : new Map<string, CompanionNotificationContext>();
+    const nudgeCompanionMap = await loadCompanionContextMap(
+      supabase,
+      nudgeUserIds,
+      "[notifications-enqueue-v2] mentor_nudge",
+    );
 
     for (const nudge of nudges) {
       inserts.push(rowForQueue({

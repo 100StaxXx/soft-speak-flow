@@ -772,6 +772,40 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                 />
               </div>
 
+              {scheduledTime && (
+                <AdvancedQuestOptions
+                  scheduledTime={scheduledTime}
+                  estimatedDuration={estimatedDuration}
+                  recurrencePattern={recurrencePattern}
+                  recurrenceDays={recurrenceDays}
+                  recurrenceMonthDays={recurrenceMonthDays}
+                  recurrenceCustomPeriod={recurrenceCustomPeriod}
+                  reminderEnabled={reminderEnabled}
+                  reminderMinutesBefore={reminderMinutesBefore}
+                  onScheduledTimeChange={setScheduledTime}
+                  onEstimatedDurationChange={setEstimatedDuration}
+                  onRecurrencePatternChange={setRecurrencePattern}
+                  onRecurrenceDaysChange={setRecurrenceDays}
+                  onRecurrenceMonthDaysChange={setRecurrenceMonthDays}
+                  onRecurrenceCustomPeriodChange={setRecurrenceCustomPeriod}
+                  onReminderEnabledChange={setReminderEnabled}
+                  onReminderMinutesBeforeChange={setReminderMinutesBefore}
+                  moreInformation={moreInformation}
+                  onMoreInformationChange={setMoreInformation}
+                  location={location}
+                  onLocationChange={setLocation}
+                  selectedDate={dateObj}
+                  taskDifficulty={difficulty}
+                  hideScheduledTime
+                  hideDuration
+                  hideMoreInformation
+                  hideRecurrence
+                  hideLocation
+                  requireScheduledTimeForRecurrence
+                  visualStyle="quest-soft"
+                />
+              )}
+
               <div className={cn(QUEST_FORM_STYLES.sectionCard, "overflow-hidden")}>
                 {subtasks.map((st, idx) => (
                   <div key={idx} className={cn("group flex items-center gap-2 px-4 py-3", `border-b ${QUEST_FORM_STYLES.divider}`)}>
@@ -861,40 +895,6 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                   visualStyle="quest-soft"
                 />
               </div>
-
-              {scheduledTime && (
-                <AdvancedQuestOptions
-                  scheduledTime={scheduledTime}
-                  estimatedDuration={estimatedDuration}
-                  recurrencePattern={recurrencePattern}
-                  recurrenceDays={recurrenceDays}
-                  recurrenceMonthDays={recurrenceMonthDays}
-                  recurrenceCustomPeriod={recurrenceCustomPeriod}
-                  reminderEnabled={reminderEnabled}
-                  reminderMinutesBefore={reminderMinutesBefore}
-                  onScheduledTimeChange={setScheduledTime}
-                  onEstimatedDurationChange={setEstimatedDuration}
-                  onRecurrencePatternChange={setRecurrencePattern}
-                  onRecurrenceDaysChange={setRecurrenceDays}
-                  onRecurrenceMonthDaysChange={setRecurrenceMonthDays}
-                  onRecurrenceCustomPeriodChange={setRecurrenceCustomPeriod}
-                  onReminderEnabledChange={setReminderEnabled}
-                  onReminderMinutesBeforeChange={setReminderMinutesBefore}
-                  moreInformation={moreInformation}
-                  onMoreInformationChange={setMoreInformation}
-                  location={location}
-                  onLocationChange={setLocation}
-                  selectedDate={dateObj}
-                  taskDifficulty={difficulty}
-                  hideScheduledTime
-                  hideDuration
-                  hideMoreInformation
-                  hideRecurrence
-                  hideLocation
-                  requireScheduledTimeForRecurrence
-                  visualStyle="quest-soft"
-                />
-              )}
 
               <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
                 <CollapsibleTrigger asChild>

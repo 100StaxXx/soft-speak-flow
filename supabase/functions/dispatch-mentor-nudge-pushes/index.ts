@@ -2,10 +2,21 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
 import { requireRequestAuth } from "../_shared/auth.ts";
+import { resolveNotificationCompanionContextMap } from "../_shared/companionName.ts";
+import { buildMentorNudgeNotificationTitle } from "../_shared/mentorNudgeNotification.ts";
 
 interface PushError {
   nudgeId: string;
   error: string;
+}
+
+interface CompanionRow {
+  id: string;
+  user_id: string;
+  current_stage: number | null;
+  cached_creature_name: string | null;
+  spirit_animal: string | null;
+  created_at: string | null;
 }
 
 serve(async (req) => {
@@ -68,6 +79,28 @@ serve(async (req) => {
 
     console.log(`Found ${pushEligibleNudges.length} push-eligible nudges`)
 
+    const nudgeUserIds = [...new Set(pushEligibleNudges.map((nudge) => nudge.user_id as string))]
+    let companionRows: CompanionRow[] = []
+    if (nudgeUserIds.length > 0) {
+      const { data: companionData, error: companionError } = await supabase
+        .from("user_companion")
+        .select("id, user_id, current_stage, cached_creature_name, spirit_animal, created_at")
+        .in("user_id", nudgeUserIds)
+
+      if (companionError) {
+        console.error("Error fetching companions for mentor nudges:", companionError)
+        throw companionError
+      }
+
+      companionRows = (companionData as CompanionRow[] | null) ?? []
+    }
+
+    const companionContextMap = await resolveNotificationCompanionContextMap({
+      supabase,
+      companions: companionRows,
+      logPrefix: "[dispatch-mentor-nudge-pushes]",
+    })
+
     let dispatched = 0
     const errors: PushError[] = []
 
@@ -113,22 +146,18 @@ serve(async (req) => {
           if (mentor) mentorName = mentor.name
         }
 
-        // Get companion name from context
-        const context = nudge.context as { companion_name?: string | null; companion_animal?: string; concern_level?: string } | null
-        const companionName = context?.companion_name || context?.companion_animal || 'Your companion'
+        // Resolve the companion's proper name from canonical companion data.
+        const context = nudge.context as { concern_level?: string } | null
+        const companionContext = companionContextMap.get(nudge.user_id)
         const concernLevel = context?.concern_level
 
-        // Build notification title based on nudge type and concern level
-        let title = `${mentorName} says:`
-        if (nudge.nudge_type === 'companion_concern') {
-          if (concernLevel === 'dormancy_warning') {
-            title = `${companionName} is fading... 🌑`
-          } else if (concernLevel === 'dormancy_imminent') {
-            title = `${companionName} needs you now ⚠️`
-          } else {
-            title = `${companionName} misses you 💔`
-          }
-        }
+        const title = buildMentorNudgeNotificationTitle({
+          mentorName,
+          nudgeType: nudge.nudge_type,
+          concernLevel,
+          companionName: companionContext?.displayName ?? companionContext?.cachedCreatureName,
+          spiritAnimal: companionContext?.spiritAnimal,
+        })
 
         // Send to each device
         for (const token of deviceTokens) {
