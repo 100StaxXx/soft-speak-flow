@@ -10,6 +10,7 @@ import {
   createCostGuardrailSession,
   isCostGuardrailBlockedError,
 } from "../_shared/costGuardrails.ts";
+import { registerUserStorageAsset } from "../_shared/storageAssetLedger.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -35,10 +36,11 @@ serve(async (req) => {
       throw new Error("Missing memorialId or companionData");
     }
 
-    const rolloutKey =
+    const ownerUserId =
       typeof companionData?.user_id === "string" && companionData.user_id.length > 0
         ? companionData.user_id
-        : memorialId;
+        : null;
+    const rolloutKey = ownerUserId ?? memorialId;
     const imageSize = resolveCompanionImageSizeForUser(rolloutKey);
     console.log(`[MemorialImagePolicy] rollout_key=${rolloutKey} image_size=${imageSize}`);
 
@@ -93,6 +95,7 @@ serve(async (req) => {
 - Their departure: "${death_cause}" - the image should evoke peaceful rest`;
 
     let generatedImageUrl = final_image_url;
+    let uploadedStoragePath: string | null = null;
 
     try {
       const response = await guardedFetch("https://api.openai.com/v1/chat/completions", {
@@ -127,7 +130,11 @@ serve(async (req) => {
           const base64Data = generatedImage.replace(/^data:image\/\w+;base64,/, "");
           const imageBuffer = Uint8Array.from(atob(base64Data), (char) => char.charCodeAt(0));
 
-          const fileName = `memorials/${memorialId}-${Date.now()}.png`;
+          if (!ownerUserId) {
+            throw new Error("companionData.user_id is required to store memorial images");
+          }
+
+          const fileName = `${ownerUserId}/memorials/${memorialId}-${Date.now()}.png`;
 
           const { error: uploadError } = await supabase.storage
             .from("companion-images")
@@ -142,6 +149,7 @@ serve(async (req) => {
               .getPublicUrl(fileName);
 
             generatedImageUrl = publicUrl.publicUrl;
+            uploadedStoragePath = fileName;
             console.log("[Memorial Image] Successfully generated and uploaded memorial image");
           } else {
             console.error("[Memorial Image] Upload error:", uploadError);
@@ -162,6 +170,18 @@ serve(async (req) => {
     if (updateError) {
       console.error("[Memorial Image] Failed to update memorial:", updateError);
       throw updateError;
+    }
+
+    if (uploadedStoragePath && ownerUserId) {
+      await registerUserStorageAsset({
+        supabase,
+        userId: ownerUserId,
+        bucketId: "companion-images",
+        storagePath: uploadedStoragePath,
+        sourceKind: "companion_memorial",
+        sourceRecordTable: "companion_memorials",
+        sourceRecordId: memorialId,
+      });
     }
 
     console.log(`[Memorial Image] Memorial updated for ${companion_name}`);

@@ -16,6 +16,7 @@ import {
   coerceCompanionPresetId,
   resolveCompanionAssetPath,
 } from "../../../src/config/companionCatalog.ts";
+import { registerUserStorageAsset } from "../_shared/storageAssetLedger.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -196,7 +197,7 @@ export async function handleGenerateDormantCompanionImage(
     const base64Data = generatedImage.replace(/^data:image\/\w+;base64,/, "");
     const imageBuffer = Uint8Array.from(atob(base64Data), (char) => char.charCodeAt(0));
 
-    const fileName = `dormant/${companionId}-${Date.now()}.png`;
+    const fileName = `${companion.user_id}/dormant/${companionId}-${Date.now()}.png`;
 
     const { error: uploadError } = await supabase.storage
       .from("companion-images")
@@ -227,6 +228,16 @@ export async function handleGenerateDormantCompanionImage(
       console.error("[Dormant Image] Failed to save image:", updateError);
       throw updateError;
     }
+
+    await registerUserStorageAsset({
+      supabase,
+      userId: companion.user_id,
+      bucketId: "companion-images",
+      storagePath: fileName,
+      sourceKind: "companion_dormant_image",
+      sourceRecordTable: "user_companion",
+      sourceRecordId: companion.id,
+    });
 
     console.log(`[Dormant Image] Generated and saved for companion ${companionId}`);
 

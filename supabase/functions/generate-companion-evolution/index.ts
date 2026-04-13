@@ -28,6 +28,7 @@ import {
   coerceCompanionPresetId,
   resolveCompanionAssetPath,
 } from "../../../src/config/companionCatalog.ts";
+import { registerUserStorageAsset } from "../_shared/storageAssetLedger.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -1115,8 +1116,8 @@ Rules:
     const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, "");
     const buffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
     
-    const fileName = `${companion.id}_stage_${nextStage}_${Date.now()}.png`;
-    const { data: uploadData, error: uploadError } = await supabase.storage
+    const fileName = `${resolvedUserId}/evolutions/${companion.id}_stage_${nextStage}_${Date.now()}.png`;
+    const { error: uploadError } = await supabase.storage
       .from("evolution-cards")
       .upload(fileName, buffer, {
         contentType: "image/png",
@@ -1158,6 +1159,16 @@ Rules:
       console.error("Evolution record error:", evolutionError);
       throw new Error("Failed to save evolution record");
     }
+
+    await registerUserStorageAsset({
+      supabase: supabaseAdmin,
+      userId: resolvedUserId,
+      bucketId: "evolution-cards",
+      storagePath: fileName,
+      sourceKind: "companion_evolution",
+      sourceRecordTable: "companion_evolutions",
+      sourceRecordId: typeof evolutionRecord?.id === "string" ? evolutionRecord.id : undefined,
+    });
 
     // 9. Update companion current state
     const { error: updateError } = await supabase

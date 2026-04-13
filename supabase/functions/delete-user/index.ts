@@ -121,6 +121,11 @@ interface StorageObjectOwnershipEntry {
   name?: unknown;
 }
 
+interface RegisteredStorageAssetEntry {
+  bucket_id?: unknown;
+  storage_path?: unknown;
+}
+
 const createUnauthorizedError = (cause?: unknown) =>
   new AccountDeletionError("Unauthorized", {
     status: 401,
@@ -624,6 +629,76 @@ const getStorageObjectBucketId = (
   entry: StorageObjectOwnershipEntry,
 ): string | undefined => asString(entry?.bucket_id);
 
+const getRegisteredStorageAssetPath = (
+  entry: RegisteredStorageAssetEntry,
+): string | undefined => asString(entry?.storage_path);
+
+const getStorageEntryKey = (entry: { bucket: string; path: string }): string =>
+  `${entry.bucket}:${entry.path}`;
+
+const listRegisteredStorageAssets = async (
+  supabase: SupabaseAdminClient,
+  userId: string,
+  waitForRetry: (ms: number) => Promise<void>,
+): Promise<Array<{ bucket: string; path: string }>> => {
+  const entries: Array<{ bucket: string; path: string }> = [];
+
+  for (let offset = 0;; offset += STORAGE_LIST_PAGE_SIZE) {
+    let pageEntries: RegisteredStorageAssetEntry[] = [];
+
+    await runDeleteStepWithRetry(
+      "user_storage_assets query",
+      async () => {
+        const { data, error } = await supabase
+          .from("user_storage_assets")
+          .select("bucket_id,storage_path")
+          .eq("user_id", userId)
+          .order("bucket_id", { ascending: true })
+          .order("storage_path", { ascending: true })
+          .range(offset, offset + STORAGE_LIST_PAGE_SIZE - 1);
+
+        if (error) {
+          const errorText = getNormalizedErrorText(error);
+          if (
+            errorText.includes("user storage assets") &&
+            (
+              errorText.includes("does not exist") ||
+              errorText.includes("schema cache")
+            )
+          ) {
+            pageEntries = [];
+            return;
+          }
+          throw error;
+        }
+
+        pageEntries = Array.isArray(data)
+          ? data as RegisteredStorageAssetEntry[]
+          : [];
+      },
+      ACCOUNT_DELETION_ERROR_CODES.BACKEND_UNAVAILABLE,
+      waitForRetry,
+    );
+
+    for (const entry of pageEntries) {
+      const bucket = getStorageObjectBucketId(entry);
+      const path = getRegisteredStorageAssetPath(entry);
+
+      if (!bucket || !path) {
+        continue;
+      }
+
+      entries.push({ bucket, path });
+    }
+
+    if (pageEntries.length < STORAGE_LIST_PAGE_SIZE) {
+      break;
+    }
+  }
+
+  return entries;
+};
+
 const listOwnedStorageObjectsForColumn = async (
   supabase: SupabaseAdminClient,
   userId: string,
@@ -821,12 +896,55 @@ const deleteUserStorageAssets = async (
   waitForRetry: (ms: number) => Promise<void>,
 ): Promise<void> => {
   const storageStartTime = Date.now();
+  const registeredStorageAssets = await listRegisteredStorageAssets(
+    supabase,
+    userId,
+    waitForRetry,
+  );
+  checkStorageDeadline(storageStartTime, "registry query");
+
+  const registeredStoragePathsByBucket = groupStoragePathsByBucket(
+    registeredStorageAssets,
+  );
+  const registeredAssetKeys = new Set(
+    registeredStorageAssets.map(getStorageEntryKey),
+  );
+
+  if (registeredStorageAssets.length > 0) {
+    console.log("[delete-user] removing registered storage assets", {
+      userId,
+      count: registeredStorageAssets.length,
+      buckets: summarizeOwnedStorageObjects(registeredStorageAssets),
+    });
+  }
+
+  await removeStoragePathsByBucket(
+    supabase,
+    registeredStoragePathsByBucket,
+    waitForRetry,
+  );
+  checkStorageDeadline(storageStartTime, "registry removal");
+
   const legacyStoragePathsByBucket = await collectLegacyUserStoragePaths(
     supabase,
     userId,
     waitForRetry,
   );
   checkStorageDeadline(storageStartTime, "legacy collection");
+
+  const legacyEntries = Array.from(legacyStoragePathsByBucket.entries())
+    .flatMap(([bucket, paths]) => paths.map((path) => ({ bucket, path })));
+  const unregisteredLegacyEntries = legacyEntries.filter((entry) =>
+    !registeredAssetKeys.has(getStorageEntryKey(entry))
+  );
+
+  if (unregisteredLegacyEntries.length > 0) {
+    console.warn("[delete-user] legacy fallback discovered unregistered storage assets", {
+      userId,
+      count: unregisteredLegacyEntries.length,
+      buckets: summarizeOwnedStorageObjects(unregisteredLegacyEntries),
+    });
+  }
 
   await removeStoragePathsByBucket(
     supabase,
@@ -880,12 +998,24 @@ const deleteUserStorageAssets = async (
   const ownedStoragePathsByBucket = groupStoragePathsByBucket(
     ownedStorageObjects,
   );
+  const unregisteredOwnedObjects = ownedStorageObjects.filter((entry) =>
+    !registeredAssetKeys.has(getStorageEntryKey(entry))
+  );
 
   if (ownedStorageObjects.length > 0) {
     console.log("[delete-user] removing owned storage objects", {
       userId,
       count: ownedStorageObjects.length,
       buckets: summarizeOwnedStorageObjects(ownedStorageObjects),
+    });
+  }
+
+  if (unregisteredOwnedObjects.length > 0) {
+    console.warn("[delete-user] ownership fallback discovered unregistered storage assets", {
+      userId,
+      count: unregisteredOwnedObjects.length,
+      buckets: summarizeOwnedStorageObjects(unregisteredOwnedObjects),
+      samplePaths: unregisteredOwnedObjects.slice(0, 10),
     });
   }
 

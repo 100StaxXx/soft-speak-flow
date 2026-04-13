@@ -4,6 +4,7 @@ installOpenAICompatibilityShim();
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createSafeErrorResponse, requireProtectedRequest } from "../_shared/abuseProtection.ts";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
+import { registerUserStorageAsset } from "../_shared/storageAssetLedger.ts";
 import {
   JOURNEY_PATH_LANDSCAPE_IMAGE_SIZE,
   JOURNEY_PATH_RENDER_VERSION,
@@ -397,7 +398,7 @@ Ultra high resolution.`;
       .getPublicUrl(fileName);
 
     const imageUrl = urlData.publicUrl;
-    const { error: insertError } = await supabase
+    const { data: journeyPathRow, error: insertError } = await supabase
       .from("epic_journey_paths")
       .upsert({
         epic_id: epicId,
@@ -416,10 +417,22 @@ Ultra high resolution.`;
         generated_at: new Date().toISOString(),
       }, {
         onConflict: "epic_id,user_id,milestone_index",
-      });
+      })
+      .select("id")
+      .single();
 
     if (insertError) {
       console.error("[generate-journey-path] Database insert error:", insertError);
+    } else {
+      await registerUserStorageAsset({
+        supabase,
+        userId,
+        bucketId: "journey-paths",
+        storagePath: fileName,
+        sourceKind: "journey_path",
+        sourceRecordTable: "epic_journey_paths",
+        sourceRecordId: typeof journeyPathRow?.id === "string" ? journeyPathRow.id : undefined,
+      });
     }
 
     return new Response(JSON.stringify({

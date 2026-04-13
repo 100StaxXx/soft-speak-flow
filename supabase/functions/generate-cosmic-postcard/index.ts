@@ -10,6 +10,7 @@ import {
   createCostGuardrailSession,
   isCostGuardrailBlockedError,
 } from "../_shared/costGuardrails.ts";
+import { registerUserStorageAsset } from "../_shared/storageAssetLedger.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -417,6 +418,7 @@ OUTPUT: A beautiful cosmic postcard showing THIS EXACT companion visiting ${loca
 
     // Upload image to Supabase Storage for permanent storage
     let permanentImageUrl = rawImageUrl;
+    let uploadedStoragePath: string | null = null;
     if (rawImageUrl.startsWith('data:image')) {
       try {
         const base64Data = rawImageUrl.split(',')[1];
@@ -435,6 +437,7 @@ OUTPUT: A beautiful cosmic postcard showing THIS EXACT companion visiting ${loca
             .from('evolution-cards')
             .getPublicUrl(filePath);
           permanentImageUrl = publicUrl;
+          uploadedStoragePath = filePath;
           console.log('[Cosmic Postcard] Uploaded to storage');
         }
       } catch (uploadErr) {
@@ -594,6 +597,18 @@ Return ONLY the story content - no JSON, no formatting markers, just the narrati
     if (insertError) {
       console.error('[Cosmic Postcard] Error saving postcard:', insertError);
       throw new Error(`Failed to save postcard: ${insertError.message}`);
+    }
+
+    if (uploadedStoragePath) {
+      await registerUserStorageAsset({
+        supabase,
+        userId,
+        bucketId: 'evolution-cards',
+        storagePath: uploadedStoragePath,
+        sourceKind: 'companion_postcard',
+        sourceRecordTable: 'companion_postcards',
+        sourceRecordId: typeof postcard?.id === 'string' ? postcard.id : undefined,
+      });
     }
 
     console.log(`[Cosmic Postcard] Successfully created postcard ${postcard.id}`);

@@ -19,6 +19,7 @@ import {
   buildSpiritLockPromptBlock,
   resolveCompanionSpiritLockProfile,
 } from "../_shared/companionSpiritLock.ts";
+import { registerUserStorageAsset } from "../_shared/storageAssetLedger.ts";
 
 // ============================================================================
 // CATEGORY DEFAULTS - Shared anatomy for creature categories
@@ -1258,6 +1259,13 @@ Score each aspect from 0-100 and list any issues.`;
     }
 
     const { data: { publicUrl } } = supabase.storage.from("mentors-avatars").getPublicUrl(filePath);
+    await registerUserStorageAsset({
+      supabase,
+      userId: user.id,
+      bucketId: "mentors-avatars",
+      storagePath: filePath,
+      sourceKind: "companion_image",
+    });
     storageUploadDurationMs = Date.now() - storageStartedAt;
     console.log(`[CompanionImageTiming] storage_ms=${storageUploadDurationMs}`);
 

@@ -66,6 +66,10 @@ type OwnedStorageObject = {
   owner?: string | null;
   owner_id?: string | null;
 };
+type RegisteredStorageAsset = {
+  bucket: string;
+  path: string;
+};
 type ListedStorageObject = {
   bucket: string;
   path: string;
@@ -154,6 +158,7 @@ const createHandleDeleteUserHarness = ({
   listResultsByKey = {},
   removeResults = [createStorageRemoveResult()],
   ownedStorageObjects = [],
+  registeredStorageAssets = [],
   persistOwnedStorageObjectsAfterRemove = false,
 }: {
   rpcResults?: RpcResult[];
@@ -165,6 +170,7 @@ const createHandleDeleteUserHarness = ({
   listResultsByKey?: Record<string, StorageListResult[]>;
   removeResults?: StorageRemoveResult[];
   ownedStorageObjects?: OwnedStorageObject[];
+  registeredStorageAssets?: RegisteredStorageAsset[];
   persistOwnedStorageObjectsAfterRemove?: boolean;
 } = {}) => {
   let rpcCallCount = 0;
@@ -257,6 +263,45 @@ const createHandleDeleteUserHarness = ({
     return builder;
   };
 
+  const createUserStorageAssetsQueryBuilder = () => {
+    let userId: string | null = null;
+
+    const builder = {
+      select: (_columns: string) => builder,
+      eq: (column: "user_id", value: string) => {
+        if (column !== "user_id") {
+          throw new Error(`Unexpected user_storage_assets eq column: ${column}`);
+        }
+        userId = value;
+        return builder;
+      },
+      order: (_column: string, _options?: { ascending?: boolean }) => builder,
+      range: async (from: number, to: number) => {
+        operations.push(
+          `user_storage_assets.select:${userId ?? "none"}:${from}-${to}`,
+        );
+
+        const matchingAssets = registeredStorageAssets
+          .filter((_entry) => userId === USER_ID)
+          .sort((left, right) => {
+            if (left.bucket === right.bucket) {
+              return left.path.localeCompare(right.path);
+            }
+            return left.bucket.localeCompare(right.bucket);
+          })
+          .slice(from, to + 1)
+          .map((entry) => ({
+            bucket_id: entry.bucket,
+            storage_path: entry.path,
+          }));
+
+        return { data: matchingAssets, error: null };
+      },
+    };
+
+    return builder;
+  };
+
   const client = {
     auth: {
       getUser: async () => {
@@ -299,6 +344,13 @@ const createHandleDeleteUserHarness = ({
           return result;
         },
       }),
+    },
+    from: (tableName: string) => {
+      if (tableName !== "user_storage_assets") {
+        throw new Error(`Unexpected public table query: ${tableName}`);
+      }
+
+      return createUserStorageAssetsQueryBuilder();
     },
     schema: (schemaName: string) => ({
       from: (tableName: string) => {
@@ -417,6 +469,52 @@ Deno.test("delete-user removes legacy storage assets before rpc and auth delete"
   );
 });
 
+Deno.test("delete-user removes registered storage assets before relational cleanup", async () => {
+  const harness = createHandleDeleteUserHarness({
+    registeredStorageAssets: [
+      {
+        bucket: "quest-attachments",
+        path: "user-1/1744400000_receipt.png",
+      },
+      {
+        bucket: "companion-images",
+        path: "user-1/dormant/companion-1-1744400001.png",
+      },
+    ],
+  });
+
+  const response = await module.handleDeleteUser(
+    createRequest(),
+    harness.dependencies,
+  );
+  const body = await response.json();
+
+  assertEquals(response.status, 200, "Expected delete-user to succeed");
+  assertEquals(body.success, true, "Expected success response body");
+  assertArrayEquals(
+    harness.removeCalls,
+    [
+      {
+        bucket: "companion-images",
+        paths: ["user-1/dormant/companion-1-1744400001.png"],
+      },
+      { bucket: "quest-attachments", paths: ["user-1/1744400000_receipt.png"] },
+    ],
+    "Expected registered ledger assets to be removed by exact path",
+  );
+
+  const registryQueryIndex = harness.operations.indexOf(
+    "user_storage_assets.select:user-1:0-99",
+  );
+  const rpcIndex = harness.operations.indexOf("rpc.delete_user_account");
+  assert(registryQueryIndex !== -1, "Expected the storage ledger to be queried");
+  assert(rpcIndex !== -1, "Expected relational cleanup to run");
+  assert(
+    registryQueryIndex < rpcIndex,
+    "Expected registry cleanup before relational cleanup",
+  );
+});
+
 Deno.test("delete-user removes owned storage objects across multiple buckets even when prefix discovery misses them", async () => {
   const harness = createHandleDeleteUserHarness({
     ownedStorageObjects: [
@@ -479,6 +577,45 @@ Deno.test("delete-user removes owned storage objects across multiple buckets eve
       call.paths.includes("postcards/user-1/fallback-card.png")
     ),
     "Expected multi-bucket owned objects to be removed from the ownership sweep",
+  );
+});
+
+Deno.test("delete-user still falls back to ownership discovery for unregistered legacy assets", async () => {
+  const harness = createHandleDeleteUserHarness({
+    registeredStorageAssets: [
+      {
+        bucket: "quest-attachments",
+        path: "user-1/known.png",
+      },
+    ],
+    ownedStorageObjects: [
+      {
+        bucket: "quest-attachments",
+        path: "user-1/known.png",
+        owner: USER_ID,
+      },
+      {
+        bucket: "companion-images",
+        path: "legacy/dormant-companion.png",
+        owner_id: USER_ID,
+      },
+    ],
+  });
+
+  const response = await module.handleDeleteUser(
+    createRequest(),
+    harness.dependencies,
+  );
+  const body = await response.json();
+
+  assertEquals(response.status, 200, "Expected delete-user to succeed");
+  assertEquals(body.success, true, "Expected success response body");
+  assert(
+    harness.removeCalls.some((call) =>
+      call.bucket === "companion-images" &&
+      call.paths.includes("legacy/dormant-companion.png")
+    ),
+    "Expected ownership fallback to remove unregistered assets",
   );
 });
 
