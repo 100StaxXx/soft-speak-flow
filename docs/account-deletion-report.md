@@ -14,9 +14,9 @@
 - Remote migration history is behind local repo state. As of 2026-04-12, the linked project is missing these local migrations:
   - `20260411111500_cap_astral_encounter_daily_xp.sql`
   - `20260411143000_refine_daily_mission_pulse_percentages.sql`
-  - `20260412113000_fix_delete_user_account_companion_fk_cleanup.sql`
+  - `20260412113100_fix_delete_user_account_companion_fk_cleanup.sql`
   - `20260412134500_notification_install_dedupe.sql`
-- The account-deletion-specific drift is the missing `20260412113000_fix_delete_user_account_companion_fk_cleanup.sql` migration plus the older April 4 `delete-user` deploy. That is enough to explain why production can still return the old generic failure surface.
+- The account-deletion-specific drift is the missing `20260412113100_fix_delete_user_account_companion_fk_cleanup.sql` migration plus the older April 4 `delete-user` deploy. That is enough to explain why production can still return the old generic failure surface.
 
 ## Likely root causes of non-2xx responses
 1. **Missing service role secret in the Edge Function environment**

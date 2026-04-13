@@ -3,15 +3,18 @@ import { resolveProgressionLevelFromXp } from "@/config/progression";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 
+const MISSION_COMPLETION_UNAVAILABLE_MESSAGE =
+  "Mission completion is temporarily unavailable while the app updates. Please try again in a minute.";
+
 export type MissionCompletionSource = "manual" | "auto_complete";
 
 export type CompleteDailyMissionWithXpResult =
   Database["public"]["Functions"]["complete_daily_mission_with_xp"]["Returns"][number];
 
 export class MissionCompletionError extends Error {
-  kind: "already_completed" | "failed";
+  kind: "already_completed" | "failed" | "infrastructure";
 
-  constructor(message: string, kind: "already_completed" | "failed") {
+  constructor(message: string, kind: "already_completed" | "failed" | "infrastructure") {
     super(message);
     this.name = "MissionCompletionError";
     this.kind = kind;
@@ -22,6 +25,54 @@ type CompleteDailyMissionWithXpParams = {
   missionId: string;
   completionSource?: MissionCompletionSource;
   progressCurrent?: number | null;
+};
+
+type SupabaseRpcErrorLike = {
+  code?: string | null;
+  message?: string | null;
+  details?: string | null;
+  hint?: string | null;
+};
+
+const normalizeMissionCompletionErrorSource = (error: SupabaseRpcErrorLike | null | undefined) =>
+  [error?.message, error?.details, error?.hint]
+    .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+    .join(" ")
+    .toLowerCase();
+
+export const isMissionCompletionRpcUnavailableError = (
+  error: SupabaseRpcErrorLike | null | undefined,
+) => {
+  if (!error) return false;
+  if (error.code === "42883") return true;
+
+  const normalizedSource = normalizeMissionCompletionErrorSource(error);
+  return (
+    normalizedSource.includes("complete_daily_mission_with_xp")
+    && (
+      normalizedSource.includes("could not find function")
+      || normalizedSource.includes("schema cache")
+      || normalizedSource.includes("does not exist")
+      || normalizedSource.includes("undefined function")
+      || normalizedSource.includes("function not found")
+    )
+  );
+};
+
+const toMissionCompletionError = (error: unknown) => {
+  if (error instanceof MissionCompletionError) {
+    return error;
+  }
+
+  if (isMissionCompletionRpcUnavailableError(error as SupabaseRpcErrorLike | null | undefined)) {
+    return new MissionCompletionError(MISSION_COMPLETION_UNAVAILABLE_MESSAGE, "infrastructure");
+  }
+
+  if (error instanceof Error) {
+    return new MissionCompletionError(error.message, "failed");
+  }
+
+  return new MissionCompletionError("Unable to complete this mission right now.", "failed");
 };
 
 export const completeDailyMissionWithXp = async ({
@@ -35,7 +86,7 @@ export const completeDailyMissionWithXp = async ({
     p_progress_current: progressCurrent,
   });
 
-  if (error) throw error;
+  if (error) throw toMissionCompletionError(error);
 
   const result = Array.isArray(data) ? data[0] : data;
   if (!result) {

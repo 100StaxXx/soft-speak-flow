@@ -13,6 +13,8 @@
 - Set production project ref/keys in `.env` and GitHub secrets.
 - Run `Supabase Deploy` workflow.
 - Run `Backend Smoke` workflow.
+- Before shipping frontend/mobile clients that call new RPCs, verify the target project has the corresponding migration applied and that PostgREST can resolve the function signature from schema cache.
+- For mission completion specifically, confirm `public.complete_daily_mission_with_xp(uuid, text, integer)` exists and is executable by `authenticated` before releasing clients that depend on it.
 - Deploy frontend with production `VITE_SUPABASE_*` values.
 
 ## 3) Rollback window

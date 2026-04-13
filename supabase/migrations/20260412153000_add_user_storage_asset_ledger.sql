@@ -324,6 +324,11 @@ SELECT
   source_record_table,
   source_record_id
 FROM backfill_rows
+WHERE EXISTS (
+  SELECT 1
+  FROM public.profiles
+  WHERE profiles.id = backfill_rows.user_id
+)
 ON CONFLICT (bucket_id, storage_path) DO UPDATE
 SET
   user_id = EXCLUDED.user_id,

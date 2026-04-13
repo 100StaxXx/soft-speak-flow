@@ -9,9 +9,11 @@ import { useXPToast } from "@/contexts/XPContext";
 import {
   completeDailyMissionWithXp,
   getMissionCompletionError,
+  MissionCompletionError,
   showMissionRewardFeedback,
 } from "@/lib/dailyMissionCompletion";
 import { playMissionComplete } from "@/utils/soundEffects";
+import { logger } from "@/utils/logger";
 import confetti from "canvas-confetti";
 
 /**
@@ -19,6 +21,7 @@ import confetti from "canvas-confetti";
  * Listens to activity feed and matches against mission requirements
  */
 export const useMissionAutoComplete = () => {
+  const log = logger.scope("useMissionAutoComplete");
   const { user } = useAuth();
   const { activities } = useActivityFeed();
   const { toast } = useToast();
@@ -141,7 +144,20 @@ export const useMissionAutoComplete = () => {
           }
         }
       } catch (error) {
-        console.error("Error in mission auto-complete:", error);
+        if (error instanceof MissionCompletionError && error.kind === "infrastructure") {
+          log.warn("Mission auto-complete RPC unavailable", {
+            userId: user.id,
+            missionDate: today,
+            message: error.message,
+          });
+          return;
+        }
+
+        log.error("Error in mission auto-complete", {
+          userId: user.id,
+          missionDate: today,
+          error,
+        });
       }
     };
 

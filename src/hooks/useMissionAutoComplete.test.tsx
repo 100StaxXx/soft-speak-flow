@@ -17,7 +17,7 @@ const mocks = vi.hoisted(() => ({
       activity_data: {},
       mentor_comment: null,
       mentor_voice_url: null,
-      created_at: "2026-04-12T12:00:00.000Z",
+      created_at: "2099-01-01T12:00:00.000Z",
       is_read: false,
     },
   ],
@@ -257,6 +257,81 @@ describe("useMissionAutoComplete", () => {
         pending_evolution_count: 0,
       }],
       error: null,
+    });
+
+    renderHook(() => useMissionAutoComplete());
+
+    await waitFor(() => {
+      expect(mocks.rpcMock).toHaveBeenCalledTimes(1);
+    });
+
+    expect(mocks.showXPToastMock).not.toHaveBeenCalled();
+    expect(mocks.toastMock).not.toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Mission Auto-Completed! 🎯" }),
+    );
+    expect(mocks.playMissionCompleteMock).not.toHaveBeenCalled();
+  });
+
+  it("suppresses reward feedback when the mission completion RPC is unavailable", async () => {
+    const mission = {
+      id: "mission-3",
+      mission_text: "Explore the stacks",
+      mission_type: "library_explore",
+      category: "growth",
+      xp_reward: 8,
+      completed: false,
+      auto_complete: true,
+      progress_target: 1,
+      progress_current: 1,
+    };
+
+    let dailyMissionCallCount = 0;
+    mocks.fromMock.mockImplementation((table: string) => {
+      if (table !== "daily_missions") {
+        throw new Error(`Unexpected table access: ${table}`);
+      }
+
+      dailyMissionCallCount += 1;
+
+      if (dailyMissionCallCount === 1) {
+        let eqCount = 0;
+        const builder = {
+          select: () => builder,
+          eq: () => {
+            eqCount += 1;
+            if (eqCount >= 4) {
+              return Promise.resolve({ data: [mission], error: null });
+            }
+            return builder;
+          },
+        };
+        return builder;
+      }
+
+      if (dailyMissionCallCount === 2) {
+        let eqCount = 0;
+        const builder = {
+          update: () => builder,
+          eq: () => {
+            eqCount += 1;
+            if (eqCount >= 2) {
+              return Promise.resolve({ error: null });
+            }
+            return builder;
+          },
+        };
+        return builder;
+      }
+
+      throw new Error(`Unexpected daily_missions access #${dailyMissionCallCount}`);
+    });
+    mocks.rpcMock.mockResolvedValue({
+      data: null,
+      error: {
+        code: "42883",
+        message:
+          "Could not find the function public.complete_daily_mission_with_xp(p_mission_id, p_completion_source, p_progress_current) in the schema cache",
+      },
     });
 
     renderHook(() => useMissionAutoComplete());

@@ -508,4 +508,43 @@ describe("useDailyMissions", () => {
     });
     expect(mocks.showXPToast).not.toHaveBeenCalled();
   });
+
+  it("shows a friendly message when the mission completion RPC is unavailable", async () => {
+    const mission = makeMission("m4", "growth");
+    mocks.existingMissionResponses.push({ data: [mission], error: null });
+    mocks.rpc.mockResolvedValue({
+      data: null,
+      error: {
+        code: "42883",
+        message:
+          "Could not find the function public.complete_daily_mission_with_xp(p_mission_id, p_completion_source, p_progress_current) in the schema cache",
+      },
+    });
+
+    const { result } = renderHook(() => useDailyMissions(), {
+      wrapper: createHookWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.missions).toHaveLength(1);
+    });
+
+    await act(async () => {
+      await expect(result.current.completeMission(mission.id)).rejects.toThrow(
+        "Mission completion is temporarily unavailable while the app updates. Please try again in a minute.",
+      );
+    });
+
+    const successToasts = mocks.toast.mock.calls.filter(
+      (call) => call[0]?.title === "Mission Complete!" && call[0]?.description === "XP awarded!",
+    );
+    expect(successToasts).toHaveLength(0);
+    expect(mocks.toast).toHaveBeenCalledWith({
+      title: "Mission not completed",
+      description:
+        "Mission completion is temporarily unavailable while the app updates. Please try again in a minute.",
+      variant: "destructive",
+    });
+    expect(mocks.showXPToast).not.toHaveBeenCalled();
+  });
 });

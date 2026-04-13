@@ -1,3 +1,5 @@
+DROP FUNCTION IF EXISTS public.get_daily_mission_pulse(date);
+
 CREATE OR REPLACE FUNCTION public.get_daily_mission_pulse(p_mission_date date)
 RETURNS TABLE(
   mission_date date,
