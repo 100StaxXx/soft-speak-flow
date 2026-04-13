@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   deleteCurrentAccount: vi.fn(),
   isAccountDeletionAuthError: vi.fn(() => false),
   loggerError: vi.fn(),
+  applyReferralCodeMutateAsync: vi.fn(),
 }));
 
 vi.mock("@tanstack/react-query", () => ({
@@ -55,6 +56,17 @@ vi.mock("@/hooks/useAppleSubscription", () => ({
     productError: null,
     reloadProducts: mocks.reloadProducts,
     hasLoadedProducts: true,
+    hasReferralPricing: false,
+  }),
+}));
+
+vi.mock("@/hooks/useReferrals", () => ({
+  useReferrals: () => ({
+    referralStats: { referred_by: null },
+    applyReferralCode: {
+      mutateAsync: mocks.applyReferralCodeMutateAsync,
+      isPending: false,
+    },
   }),
 }));
 
@@ -92,7 +104,7 @@ vi.mock("@/utils/logger", () => ({
 import { TrialExpiredPaywall } from "./TrialExpiredPaywall";
 
 const getRootContainer = () => {
-  const heading = screen.getByRole("heading");
+  const heading = screen.getByRole("heading", { level: 1 });
   const root = heading.closest("div.fixed");
   expect(root).not.toBeNull();
   return root as HTMLDivElement;
@@ -121,6 +133,8 @@ describe("TrialExpiredPaywall layout", () => {
     mocks.isAccountDeletionAuthError.mockReset();
     mocks.isAccountDeletionAuthError.mockReturnValue(false);
     mocks.loggerError.mockReset();
+    mocks.applyReferralCodeMutateAsync.mockReset();
+    mocks.applyReferralCodeMutateAsync.mockResolvedValue({ success: true });
   });
 
   it("uses top-aligned scroll layout instead of centered overflow layout", () => {
@@ -150,6 +164,14 @@ describe("TrialExpiredPaywall layout", () => {
     expect(mocks.navigate).toHaveBeenCalledWith("/promo-code", {
       state: { returnTo: "/companion?view=full#today" },
     });
+  });
+
+  it("lets users skip referral entry and continue to the subscription paywall", () => {
+    render(<TrialExpiredPaywall variant="pre_trial_signup" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Skip and Continue" }));
+
+    expect(mocks.navigate).toHaveBeenCalledWith("/premium");
   });
 
   it("submits account deletion on the first focused-input activation", async () => {

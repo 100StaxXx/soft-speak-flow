@@ -3,12 +3,11 @@ import { useNavigate } from "react-router-dom";
 import { Capacitor } from "@capacitor/core";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ArrowLeft, RefreshCw, Smartphone, Check, X, Copy, Trash2, RotateCcw, Settings, Loader2, TestTube, Database } from "lucide-react";
 import { useAppleSubscription } from "@/hooks/useAppleSubscription";
-import { supabase } from "@/integrations/supabase/client";
+import { useRevenueCat } from "@/hooks/useRevenueCat";
 import { useToast } from "@/hooks/use-toast";
 import { IAP_PRODUCTS, purchaseProduct } from "@/utils/appleIAP";
 import {
@@ -55,8 +54,8 @@ StatusBadge.displayName = 'StatusBadge';
 const IAPTest = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { customerInfo, refreshCustomerInfo } = useRevenueCat();
   const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [manualTransactionId, setManualTransactionId] = useState("");
   const [verificationResult, setVerificationResult] = useState<any>(null);
   const [isVerifying, setIsVerifying] = useState(false);
   const [purchasingProductId, setPurchasingProductId] = useState<string | null>(null);
@@ -378,35 +377,17 @@ const IAPTest = () => {
 
   // Manual verification
   const verifyManualTransaction = async () => {
-    if (!manualTransactionId.trim()) {
-      toast({ title: "Error", description: "Please enter a transaction ID", variant: "destructive" });
-      return;
-    }
-
     setIsVerifying(true);
     setVerificationResult(null);
-    addLog(`Verifying transaction: ${manualTransactionId}`, 'info');
+    addLog("Refreshing RevenueCat customer info", 'info');
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      const { data, error } = await supabase.functions.invoke('verify-apple-receipt', {
-        body: { transactionId: manualTransactionId },
-        headers: session?.access_token ? {
-          Authorization: `Bearer ${session.access_token}`
-        } : undefined
-      });
-
-      if (error) {
-        addLog(`Verification error: ${error.message}`, 'error');
-        setVerificationResult({ error: error.message });
-      } else {
-        addLog('Verification successful', 'success');
-        setVerificationResult(data);
-      }
+      const refreshed = await refreshCustomerInfo();
+      addLog("RevenueCat customer info refreshed", "success");
+      setVerificationResult(refreshed ?? customerInfo);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      addLog(`Verification exception: ${message}`, 'error');
+      addLog(`RevenueCat refresh exception: ${message}`, 'error');
       setVerificationResult({ error: message });
     } finally {
       setIsVerifying(false);
@@ -708,28 +689,16 @@ const IAPTest = () => {
         {/* Manual Verification */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Manual Verification</CardTitle>
+            <CardTitle className="text-sm">RevenueCat Customer Info</CardTitle>
           </CardHeader>
           <CardContent className="pt-0 space-y-3">
-            <div className="space-y-2">
-              <Label htmlFor="transactionId" className="text-xs">Transaction ID</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="transactionId"
-                  placeholder="Enter transaction ID..."
-                  value={manualTransactionId}
-                  onChange={(e) => setManualTransactionId(e.target.value)}
-                  className="font-mono text-sm"
-                />
-                <Button 
-                  onClick={verifyManualTransaction} 
-                  disabled={isVerifying}
-                  size="sm"
-                >
-                  {isVerifying ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Verify'}
-                </Button>
-              </div>
-            </div>
+            <Button
+              onClick={verifyManualTransaction}
+              disabled={isVerifying}
+              size="sm"
+            >
+              {isVerifying ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Refresh Customer Info'}
+            </Button>
 
             {verificationResult && (
               <div className="mt-3">

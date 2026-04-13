@@ -1,6 +1,6 @@
-import { useCallback, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type PointerEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type PointerEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Crown, Sparkles, MessageCircle, Lock, RefreshCw } from "lucide-react";
+import { ArrowRight, CheckCircle2, Crown, Gift, Lock, MessageCircle, RefreshCw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAppleSubscription } from "@/hooks/useAppleSubscription";
@@ -15,6 +15,7 @@ import {
   isAccountDeletionAuthError,
 } from "@/services/accountDeletion";
 import { logger } from "@/utils/logger";
+import { useReferrals } from "@/hooks/useReferrals";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -26,6 +27,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { useLocation, useNavigate } from "react-router-dom";
+import paywallPrimaryBackground from "@/assets/backgrounds/paywall-primary.webp";
+import { trackPaywallEvent } from "@/utils/paywallTelemetry";
 
 type PlanType = "monthly" | "yearly";
 export type TrialGateVariant = "pre_trial_signup" | "trial_expired";
@@ -44,6 +47,7 @@ const blurActiveElement = () => {
 
 export const TrialExpiredPaywall = ({ variant = "pre_trial_signup" }: TrialExpiredPaywallProps) => {
   const [selectedPlan, setSelectedPlan] = useState<PlanType>("yearly");
+  const [referralCode, setReferralCode] = useState("");
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
@@ -61,21 +65,36 @@ export const TrialExpiredPaywall = ({ variant = "pre_trial_signup" }: TrialExpir
     productError,
     reloadProducts,
     hasLoadedProducts,
+    hasReferralPricing,
   } = useAppleSubscription();
   const { toast } = useToast();
   const { user, signOut } = useAuth();
+  const { referralStats, applyReferralCode } = useReferrals();
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
   const returnTo = `${location.pathname}${location.search}${location.hash}`;
 
   const monthlyProduct = useMemo(() => getProductForPlan("monthly", products), [products]);
-  const yearlyProduct = useMemo(() => getProductForPlan("yearly", products), [products]);
+  const yearlyProduct = useMemo(
+    () => getProductForPlan("yearly", products, { preferReferral: hasReferralPricing }),
+    [hasReferralPricing, products],
+  );
   const selectedProduct = selectedPlan === "yearly" ? yearlyProduct : monthlyProduct;
   const selectedProductId = useMemo(
-    () => getPurchaseProductIdForPlan(selectedPlan, products),
-    [selectedPlan, products],
+    () => getPurchaseProductIdForPlan(selectedPlan, products, { preferReferral: hasReferralPricing }),
+    [hasReferralPricing, selectedPlan, products],
   );
+  const hasAppliedReferralCode = Boolean(referralStats?.referred_by || hasReferralPricing);
+
+  useEffect(() => {
+    trackPaywallEvent("paywall_viewed", {
+      surface: "trial_gate",
+      variant,
+      hasReferralPricing,
+      hasAppliedReferralCode,
+    });
+  }, [hasAppliedReferralCode, hasReferralPricing, variant]);
 
   const handleSubscribe = async () => {
     if (!selectedProduct) {
@@ -87,8 +106,56 @@ export const TrialExpiredPaywall = ({ variant = "pre_trial_signup" }: TrialExpir
       return;
     }
 
-    await handlePurchase(selectedProductId);
+    trackPaywallEvent("package_selected", {
+      surface: "trial_gate",
+      plan: selectedPlan,
+      productId: selectedProductId,
+      hasReferralPricing,
+      hasAppliedReferralCode,
+    });
+    await handlePurchase(selectedProductId, "trial_gate");
   };
+
+  const handleContinueToSubscription = useCallback(() => {
+    trackPaywallEvent("continue_to_subscription", {
+      surface: "trial_gate",
+      hasReferralPricing,
+      hasAppliedReferralCode,
+    });
+    navigate("/premium");
+  }, [hasAppliedReferralCode, hasReferralPricing, navigate]);
+
+  const handleApplyReferralCode = useCallback(async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const sanitized = referralCode.trim().toUpperCase();
+    if (!sanitized || !user?.id) return;
+
+    try {
+      trackPaywallEvent("referral_apply_started", {
+        surface: "trial_gate",
+        referralCode: sanitized,
+      });
+      await applyReferralCode.mutateAsync(sanitized);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["profile", user.id] }),
+        queryClient.invalidateQueries({ queryKey: ["referral-stats", user.id] }),
+      ]);
+      trackPaywallEvent("referral_apply_succeeded", {
+        surface: "trial_gate",
+        referralCode: sanitized,
+      });
+      setReferralCode("");
+      navigate("/premium");
+    } catch (error) {
+      trackPaywallEvent("referral_apply_failed", {
+        surface: "trial_gate",
+        referralCode: sanitized,
+        message: error instanceof Error ? error.message : "unknown_error",
+      });
+      // errors are surfaced by the hook
+    }
+  }, [applyReferralCode, navigate, queryClient, referralCode, user?.id]);
 
   const handleSignOut = async () => {
     setIsSigningOut(true);
@@ -220,9 +287,9 @@ export const TrialExpiredPaywall = ({ variant = "pre_trial_signup" }: TrialExpir
       savings: null,
     },
     yearly: {
-      fallbackPrice: "$59.99",
+      fallbackPrice: hasReferralPricing ? "$69.99" : "$99.99",
       period: "/year",
-      savings: "Save 50%",
+      savings: hasReferralPricing ? "Referral price" : "Best value",
     },
   };
 
@@ -243,10 +310,18 @@ export const TrialExpiredPaywall = ({ variant = "pre_trial_signup" }: TrialExpir
 
   return (
     <div className="fixed inset-0 z-50 bg-background flex flex-col items-center justify-start px-6 pt-safe pb-[var(--bottom-nav-runtime-offset,var(--bottom-nav-safe-offset))] overflow-y-auto">
-      <div className="w-full max-w-md space-y-6">
+      <div
+        className="fixed inset-0 -z-10 bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: `url(${paywallPrimaryBackground})` }}
+        aria-hidden="true"
+      />
+      <div className="fixed inset-0 -z-10 bg-gradient-to-b from-background/30 via-background/55 to-background/95" aria-hidden="true" />
+      <div className="fixed inset-0 -z-10 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.12),transparent_38%)]" aria-hidden="true" />
+
+      <div className="w-full max-w-md space-y-6 relative z-10">
         {/* Header */}
         <div className="text-center space-y-4">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-br from-primary to-accent shadow-glow">
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-br from-primary/90 to-accent/90 shadow-glow backdrop-blur-sm">
             <Crown className="h-10 w-10 text-primary-foreground" />
           </div>
           <h1 className="font-display text-3xl text-foreground">
@@ -257,17 +332,92 @@ export const TrialExpiredPaywall = ({ variant = "pre_trial_signup" }: TrialExpir
           </p>
         </div>
 
-        {/* Plan Toggle */}
+        <Card className="border-white/15 bg-background/60 backdrop-blur-md shadow-2xl">
+          <CardContent className="p-5 space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 rounded-full bg-primary/15 p-2">
+                <Gift className="h-5 w-5 text-primary" />
+              </div>
+              <div className="space-y-1">
+                <h2 className="text-lg font-semibold text-foreground">Have a referral code?</h2>
+                <p className="text-sm text-muted-foreground">
+                  Enter it here to unlock the discounted annual offer before you continue to subscriptions.
+                </p>
+              </div>
+            </div>
+
+            {hasAppliedReferralCode ? (
+              <div className="rounded-2xl border border-primary/30 bg-primary/10 p-4">
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 className="mt-0.5 h-5 w-5 text-primary" />
+                  <div className="space-y-1">
+                    <p className="font-medium text-foreground">Referral pricing is unlocked</p>
+                    <p className="text-sm text-muted-foreground">
+                      Your annual plan will show the discounted referral price on the next screen.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <form className="space-y-3" onSubmit={handleApplyReferralCode}>
+                <Input
+                  placeholder="ENTER REFERRAL CODE"
+                  value={referralCode}
+                  onChange={(event) => setReferralCode(event.target.value.toUpperCase())}
+                  maxLength={24}
+                  className="h-12 border-white/15 bg-background/70 text-center text-base tracking-[0.2em] uppercase"
+                />
+                <Button
+                  type="submit"
+                  disabled={applyReferralCode.isPending || !referralCode.trim()}
+                  className="w-full"
+                >
+                  {applyReferralCode.isPending ? "Applying..." : "Apply Referral Code"}
+                </Button>
+                <p className="text-center text-xs text-muted-foreground">
+                  Entering a valid code unlocks discounted annual pricing. You can also skip this step.
+                </p>
+              </form>
+            )}
+
+            <Button
+              onClick={handleContinueToSubscription}
+              className="w-full py-6 text-base font-semibold bg-gradient-to-r from-primary to-accent hover:opacity-90 text-primary-foreground shadow-glow"
+            >
+              {hasAppliedReferralCode ? "Continue to Subscription" : "Skip and Continue"}
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Features */}
+        <Card className="border-white/10 bg-background/50 backdrop-blur-md">
+          <CardContent className="p-5 space-y-3">
+          {[
+            { icon: Sparkles, text: "All 15 evolution stages" },
+            { icon: MessageCircle, text: "Unlimited guide chat" },
+            { icon: Lock, text: "Unlimited Quests & Epics" },
+            { icon: Crown, text: "All premium features" },
+          ].map((feature, idx) => (
+            <div key={idx} className="flex items-center gap-3 text-sm">
+              <feature.icon className="h-5 w-5 text-primary flex-shrink-0" />
+              <span className="text-foreground">{feature.text}</span>
+            </div>
+          ))}
+          </CardContent>
+        </Card>
+
+        {/* Plan Preview */}
         <div className="flex gap-3">
           {(["monthly", "yearly"] as PlanType[]).map((plan) => (
             <Card
               key={plan}
               onClick={() => setSelectedPlan(plan)}
               className={cn(
-                "flex-1 cursor-pointer transition-all relative overflow-hidden",
+                "flex-1 cursor-pointer transition-all relative overflow-hidden border-white/10 bg-background/55 backdrop-blur-md",
                 selectedPlan === plan
-                  ? "border-2 border-primary bg-primary/5 shadow-glow"
-                  : "border border-border hover:border-primary/50"
+                  ? "border-2 border-primary bg-primary/10 shadow-glow"
+                  : "border hover:border-primary/50"
               )}
             >
               {plans[plan].savings && (
@@ -287,21 +437,6 @@ export const TrialExpiredPaywall = ({ variant = "pre_trial_signup" }: TrialExpir
                 </p>
               </CardContent>
             </Card>
-          ))}
-        </div>
-
-        {/* Features */}
-        <div className="space-y-3 py-2">
-          {[
-            { icon: Sparkles, text: "All 15 evolution stages" },
-            { icon: MessageCircle, text: "Unlimited guide chat" },
-            { icon: Lock, text: "Unlimited Quests & Epics" },
-            { icon: Crown, text: "All premium features" },
-          ].map((feature, idx) => (
-            <div key={idx} className="flex items-center gap-3 text-sm">
-              <feature.icon className="h-5 w-5 text-primary flex-shrink-0" />
-              <span className="text-foreground">{feature.text}</span>
-            </div>
           ))}
         </div>
 
@@ -342,57 +477,27 @@ export const TrialExpiredPaywall = ({ variant = "pre_trial_signup" }: TrialExpir
           </div>
         )}
 
-        {/* Subscribe Button */}
-        <Button
-          onClick={handleSubscribe}
-          disabled={
-            loading || 
-            !isAvailable || 
-            productsLoading || 
-            !hasLoadedProducts ||
-            !selectedProduct
-          }
-          className="w-full py-7 text-lg font-black uppercase tracking-wider bg-gradient-to-r from-primary to-accent hover:opacity-90 text-primary-foreground shadow-glow"
-          size="lg"
-        >
-          {loading ? (
-            <>
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary-foreground mr-2" />
-              Processing...
-            </>
-          ) : (
-            copy.cta
-          )}
-        </Button>
-
-        {/* Restore Purchases */}
-        <Button
-          variant="ghost"
-          onClick={handleRestore}
-          disabled={loading}
-          className="w-full text-muted-foreground hover:text-foreground"
-        >
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Restore Purchases
-        </Button>
-
-        <Button
-          variant="outline"
-          onClick={() => navigate("/promo-code", { state: { returnTo } })}
-          className="w-full"
-        >
-          Redeem Promo Code
-        </Button>
-
-        <p className="text-xs text-center text-muted-foreground -mt-2">
-          Have a promo code? Redeem it to unlock access.
-        </p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Button
+            variant="outline"
+            onClick={() => navigate("/promo-code", { state: { returnTo } })}
+            className="border-white/15 bg-background/45 backdrop-blur-md"
+          >
+            Redeem Promo Code
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={() => { void handleRestore("trial_gate"); }}
+            disabled={loading}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Restore Purchases
+          </Button>
+        </div>
 
         <p className="text-xs text-center text-muted-foreground leading-relaxed">
-          {copy.legalIntro}
-          Subscription automatically renews unless canceled at least 24 hours before the end of the current period.
-          Your account will be charged for renewal within 24 hours prior to the end of the current period.
-          You can manage and cancel your subscriptions by going to Settings {">"} [Your Name] {">"} Subscriptions after purchase.
+          You’ll review the full subscription details on the next screen. {copy.legalIntro}
         </p>
         <div className="flex justify-center gap-4 text-xs">
           <a href="/privacy" className="text-muted-foreground underline hover:text-foreground">Privacy Policy</a>

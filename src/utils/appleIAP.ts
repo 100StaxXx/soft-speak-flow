@@ -1,15 +1,28 @@
-import { Capacitor } from '@capacitor/core';
-import { NativePurchases, PURCHASE_TYPE } from '@capgo/native-purchases';
-import { isNativeIOSHandheld } from '@/utils/platformTargets';
+import type { CustomerInfo, PurchasesOfferings, PurchasesPackage } from "@revenuecat/purchases-capacitor";
+import {
+  COSMIQ_PRO_ENTITLEMENT,
+  PREMIUM_YEARLY_PRODUCT_ID,
+  REFERRAL_YEARLY_PRODUCT_ID,
+  getCosmiqProEntitlement,
+  getCurrentOfferingPackages,
+  getPackageForPlan,
+  getRevenueCatErrorMessage,
+  initializeRevenueCat,
+  isReferralProductIdentifier,
+  isRevenueCatAvailable,
+  isRevenueCatCancellationError,
+  purchasePackage,
+  resolvePackageTargetFromPackage,
+  resolveActivePlan,
+  resolvePlanFromProductIdentifier,
+  restorePurchases as restoreRevenueCatPurchases,
+  type RevenueCatPackageTarget,
+  type RevenueCatPlan,
+} from "@/services/revenueCat";
 
-// Type definitions for IAP plugin responses
 export interface IAPPurchase {
   productId?: string;
   transactionId?: string;
-  transactionDate?: number;
-  receipt?: string;
-  transactionReceipt?: string;
-  appAccountToken?: string;
 }
 
 export interface IAPProduct {
@@ -19,231 +32,165 @@ export interface IAPProduct {
   price: number;
   priceString: string;
   currencyCode: string;
+  packageIdentifier: string;
+  plan: RevenueCatPlan;
+  packageTarget: RevenueCatPackageTarget;
+  hasReferralDiscount: boolean;
 }
 
-export type IAPPlan = 'monthly' | 'yearly';
+export type IAPPlan = RevenueCatPlan;
 
-const IAP_PRODUCT_IDS_BY_PLAN: Record<IAPPlan, readonly string[]> = {
-  monthly: ['cosmiq_premium_monthly', 'com.darrylgraham.revolution.monthly'],
-  yearly: ['cosmiq_premium_yearly', 'com.darrylgraham.revolution.yearly'],
-};
-
-// Apple IAP Product IDs - configure these in App Store Connect
 export const IAP_PRODUCTS = {
-  MONTHLY: IAP_PRODUCT_IDS_BY_PLAN.monthly[0],
-  YEARLY: IAP_PRODUCT_IDS_BY_PLAN.yearly[0],
+  MONTHLY: "monthly",
+  YEARLY: PREMIUM_YEARLY_PRODUCT_ID,
 } as const;
 
-export const getProductIdsForPlan = (plan: IAPPlan): string[] => [...IAP_PRODUCT_IDS_BY_PLAN[plan]];
+const packageToProduct = (aPackage: PurchasesPackage): IAPProduct | null => {
+  const plan = resolvePlanFromProductIdentifier(aPackage.product.identifier) ??
+    resolvePlanFromProductIdentifier(aPackage.identifier);
 
-export const getAllIAPProductIds = (): string[] => {
-  const all = [...IAP_PRODUCT_IDS_BY_PLAN.monthly, ...IAP_PRODUCT_IDS_BY_PLAN.yearly];
-  return Array.from(new Set(all));
+  if (!plan) return null;
+
+  const identifier = aPackage.identifier.toLowerCase();
+  const productIdentifier = aPackage.product.identifier.toLowerCase();
+  const hasReferralDiscount =
+    plan === "yearly" &&
+    (isReferralProductIdentifier(identifier) || isReferralProductIdentifier(productIdentifier));
+
+  return {
+    identifier: aPackage.product.identifier,
+    title: aPackage.product.title,
+    description: aPackage.product.description,
+    price: aPackage.product.price,
+    priceString: aPackage.product.priceString,
+    currencyCode: aPackage.product.currencyCode,
+    packageIdentifier: aPackage.identifier,
+    plan,
+    packageTarget: hasReferralDiscount ? "referral_yearly" : plan,
+    hasReferralDiscount,
+  };
 };
+
+export const getProductIdsForPlan = (plan: IAPPlan): string[] => [plan];
+
+export const getAllIAPProductIds = (): string[] => ["monthly", PREMIUM_YEARLY_PRODUCT_ID, REFERRAL_YEARLY_PRODUCT_ID];
 
 export const resolvePlanFromProductId = (productId: string | null | undefined): IAPPlan | null => {
-  if (!productId) return null;
-  const normalized = productId.toLowerCase();
-
-  if (IAP_PRODUCT_IDS_BY_PLAN.yearly.some((id) => normalized === id.toLowerCase())) {
-    return 'yearly';
-  }
-
-  if (IAP_PRODUCT_IDS_BY_PLAN.monthly.some((id) => normalized === id.toLowerCase())) {
-    return 'monthly';
-  }
-
-  if (normalized.includes('year') || normalized.includes('annual')) {
-    return 'yearly';
-  }
-
-  if (normalized.includes('month')) {
-    return 'monthly';
-  }
-
-  return null;
+  return resolvePlanFromProductIdentifier(productId);
 };
 
-export const getProductForPlan = (plan: IAPPlan, products: IAPProduct[]): IAPProduct | undefined => {
-  const ids = new Set(getProductIdsForPlan(plan));
-  return products.find((product) => ids.has(product.identifier));
+export const getProductForPlan = (
+  plan: IAPPlan,
+  products: IAPProduct[],
+  options?: { preferReferral?: boolean },
+): IAPProduct | undefined => {
+  const matchingProducts = products.filter((product) => product.plan === plan);
+  if (plan !== "yearly") return matchingProducts[0];
+  if (options?.preferReferral) {
+    return matchingProducts.find((product) => product.hasReferralDiscount) ?? matchingProducts[0];
+  }
+  return matchingProducts.find((product) => !product.hasReferralDiscount) ?? matchingProducts[0];
 };
 
-export const getPurchaseProductIdForPlan = (plan: IAPPlan, products: IAPProduct[]): string => {
-  return getProductForPlan(plan, products)?.identifier ?? getProductIdsForPlan(plan)[0];
+export const getPurchaseProductIdForPlan = (
+  plan: IAPPlan,
+  products: IAPProduct[],
+  options?: { preferReferral?: boolean },
+): string => {
+  if (plan === "yearly" && options?.preferReferral) {
+    return getProductForPlan(plan, products, options)?.identifier ?? REFERRAL_YEARLY_PRODUCT_ID;
+  }
+  if (plan === "yearly") {
+    return getProductForPlan(plan, products, options)?.identifier ?? PREMIUM_YEARLY_PRODUCT_ID;
+  }
+  return getProductForPlan(plan, products, options)?.identifier ?? plan;
 };
 
-// Check if IAP is available (iOS native only)
-export const isIAPAvailable = (): boolean => {
-  return isNativeIOSHandheld();
+export const getPackageTargetForProductId = (
+  productId: string,
+  offerings: PurchasesOfferings | null | undefined,
+): RevenueCatPackageTarget | null => {
+  const matchingPackage = getCurrentOfferingPackages(offerings).find(
+    (aPackage) => aPackage.product.identifier === productId,
+  );
+  return resolvePackageTargetFromPackage(matchingPackage);
 };
 
-const extractErrorMessage = (error: unknown): string => {
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-  if (typeof error === 'string' && error) {
-    return error;
-  }
-  if (typeof error === 'object' && error !== null && 'message' in error) {
-    const message = String((error as { message?: unknown }).message ?? '');
-    if (message) return message;
-  }
-  return 'Unknown IAP error';
+export const isIAPAvailable = (): boolean => isRevenueCatAvailable();
+
+export const getProductsFromOfferings = (offerings: PurchasesOfferings | null | undefined): IAPProduct[] => {
+  return getCurrentOfferingPackages(offerings)
+    .map(packageToProduct)
+    .filter((product): product is IAPProduct => product !== null);
 };
 
-const ensureBillingSupported = async (): Promise<void> => {
-  if (!isIAPAvailable()) {
-    throw new Error('In-App Purchases are only available on iOS');
+const findPackageByProductIdentifier = (
+  productId: string,
+  offerings: PurchasesOfferings | null | undefined,
+): PurchasesPackage | undefined => {
+  const requestedPlan = resolvePlanFromProductId(productId);
+  if (requestedPlan) {
+    const normalizedProductId = productId.toLowerCase();
+    const packageTarget: RevenueCatPackageTarget =
+      normalizedProductId === REFERRAL_YEARLY_PRODUCT_ID || (requestedPlan === "yearly" && isReferralProductIdentifier(normalizedProductId))
+        ? "referral_yearly"
+        : requestedPlan;
+    return getPackageForPlan(packageTarget, offerings);
   }
 
-  const support = await NativePurchases.isBillingSupported();
-  if (!support?.isBillingSupported) {
-    throw new Error('In-App Purchases require iOS 15 or later.');
-  }
+  return getCurrentOfferingPackages(offerings).find((aPackage) => aPackage.product.identifier === productId);
 };
 
-// Purchase a product
 export const purchaseProduct = async (
   productId: string,
-  appAccountToken?: string,
+  offerings?: PurchasesOfferings | null,
 ): Promise<IAPPurchase> => {
-  if (!isIAPAvailable()) {
-    throw new Error('In-App Purchases are only available on iOS');
+  await initializeRevenueCat();
+
+  const aPackage = findPackageByProductIdentifier(productId, offerings);
+  if (!aPackage) {
+    throw new Error(`Unable to find a RevenueCat package for "${productId}".`);
   }
 
   try {
-    const result = await NativePurchases.purchaseProduct({
-      productIdentifier: productId,
-      productType: PURCHASE_TYPE.SUBS,
-      appAccountToken,
-    });
-
-    return result as IAPPurchase;
+    const result = await purchasePackage(aPackage);
+    return {
+      productId: result.productIdentifier,
+      transactionId: result.customerInfo.requestDate,
+    };
   } catch (error) {
-    console.error('Purchase failed:', error);
-    throw error;
+    if (isRevenueCatCancellationError(error)) {
+      throw error;
+    }
+    throw new Error(getRevenueCatErrorMessage(error));
   }
 };
 
-// Restore purchases
-export const restorePurchases = async (appAccountToken?: string): Promise<IAPPurchase[]> => {
-  if (!isIAPAvailable()) {
-    throw new Error('In-App Purchases are only available on iOS');
-  }
+export const restorePurchases = async (): Promise<IAPPurchase[]> => {
+  await initializeRevenueCat();
+  const customerInfo = await restoreRevenueCatPurchases();
 
-  try {
-    await NativePurchases.restorePurchases();
-
-    // The restore API resolves void, so query purchases after sync.
-    const result = await NativePurchases.getPurchases({
-      productType: PURCHASE_TYPE.SUBS,
-      appAccountToken,
-    }) as unknown;
-    const purchases = ((result as { purchases?: unknown[] })?.purchases) || [];
-
-    return purchases
-      .map((purchase) => {
-        if (typeof purchase !== 'object' || purchase === null) return {};
-        const source = purchase as Record<string, unknown>;
-        const transactionDateFromIso = typeof source.purchaseDate === 'string'
-          ? Date.parse(source.purchaseDate)
-          : NaN;
-        const transactionDate = Number.isFinite(transactionDateFromIso)
-          ? transactionDateFromIso
-          : (typeof source.transactionDate === 'number' ? source.transactionDate : undefined);
-
-        const productId = typeof source.productIdentifier === 'string'
-          ? source.productIdentifier
-          : (typeof source.productId === 'string' ? source.productId : undefined);
-
-        const receipt = typeof source.receipt === 'string' ? source.receipt : undefined;
-        const transactionReceipt = typeof source.transactionReceipt === 'string'
-          ? source.transactionReceipt
-          : receipt;
-
-        return {
-          productId,
-          transactionId: typeof source.transactionId === 'string' ? source.transactionId : undefined,
-          transactionDate,
-          receipt,
-          transactionReceipt,
-          appAccountToken: typeof source.appAccountToken === 'string' ? source.appAccountToken : undefined,
-        } satisfies IAPPurchase;
-      })
-      .filter((purchase) => Boolean(purchase.transactionId || purchase.productId));
-  } catch (error) {
-    console.error('Restore failed:', error);
-    throw error;
-  }
+  return customerInfo.allPurchasedProductIdentifiers.map((productId) => ({
+    productId,
+    transactionId: customerInfo.requestDate,
+  }));
 };
 
-// Get product info
-export const getProducts = async (productIds: string[]): Promise<IAPProduct[]> => {
-  console.log('[IAP DEBUG] getProducts called with:', productIds);
-  console.log('[IAP DEBUG] isIAPAvailable:', isIAPAvailable());
-  console.log('[IAP DEBUG] Platform:', Capacitor.getPlatform());
-  console.log('[IAP DEBUG] isNative:', Capacitor.isNativePlatform());
-  
-  if (!isIAPAvailable()) {
-    console.log('[IAP DEBUG] IAP not available, returning empty array');
-    return [];
-  }
-
-  try {
-    await ensureBillingSupported();
-    const uniqueProductIds = Array.from(new Set(productIds.filter(Boolean)));
-
-    console.log('[IAP DEBUG] Calling NativePurchases.getProducts...');
-    const result = await NativePurchases.getProducts({
-      productIdentifiers: uniqueProductIds,
-      productType: PURCHASE_TYPE.SUBS,
-    }) as unknown;
-
-    console.log('[IAP DEBUG] Raw result from NativePurchases:', JSON.stringify(result, null, 2));
-    
-    const products = ((result as { products?: IAPProduct[] })?.products) || [];
-    console.log('[IAP DEBUG] Parsed products count:', products.length);
-    console.log('[IAP DEBUG] Parsed products:', JSON.stringify(products, null, 2));
-
-    if (products.length > 0) {
-      return products;
-    }
-
-    // Retry by ID to surface partial availability or invalid IDs.
-    const perIdProducts = await Promise.all(uniqueProductIds.map(async (id) => {
-      try {
-        const single = await NativePurchases.getProduct({
-          productIdentifier: id,
-          productType: PURCHASE_TYPE.SUBS,
-        }) as unknown;
-        return ((single as { product?: IAPProduct })?.product) ?? null;
-      } catch (error) {
-        console.warn(`[IAP DEBUG] getProduct failed for ${id}:`, extractErrorMessage(error));
-        return null;
-      }
-    }));
-
-    const fallbackProducts = perIdProducts.filter((product): product is IAPProduct => product !== null);
-    if (fallbackProducts.length > 0) {
-      return fallbackProducts;
-    }
-
-    throw new Error(`No App Store products were returned for IDs: ${uniqueProductIds.join(', ')}`);
-  } catch (error) {
-    console.error('[IAP DEBUG] Get products failed:', error);
-    if (typeof error === 'object' && error !== null) {
-      console.error('[IAP DEBUG] Error details:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
-    }
-    throw new Error(extractErrorMessage(error));
-  }
+export const getProducts = async (_productIds: string[], offerings?: PurchasesOfferings | null): Promise<IAPProduct[]> => {
+  await initializeRevenueCat();
+  return getProductsFromOfferings(offerings);
 };
 
 export const openManageSubscriptions = async (): Promise<void> => {
-  if (isIAPAvailable()) {
-    await NativePurchases.manageSubscriptions();
-    return;
-  }
+  throw new Error("Use RevenueCat Customer Center to manage subscriptions.");
+};
 
-  window.open('https://apps.apple.com/account/subscriptions', '_blank');
+export const getEntitlementInfo = (customerInfo: CustomerInfo | null | undefined) => {
+  return getCosmiqProEntitlement(customerInfo);
+};
+
+export const getEntitlementIdentifier = (): string => COSMIQ_PRO_ENTITLEMENT;
+
+export const getPlanFromCustomerInfo = (customerInfo: CustomerInfo | null | undefined): IAPPlan | null => {
+  return resolveActivePlan(customerInfo);
 };

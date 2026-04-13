@@ -109,7 +109,7 @@ export default function Partners() {
               </div>
               <div className="flex items-center gap-2">
                 <DollarSign className="h-5 w-5 text-primary" />
-                <span>Up to $12 per referral</span>
+                <span>20% of annual or 50% of monthly</span>
               </div>
               <div className="flex items-center gap-2">
                 <TrendingUp className="h-5 w-5 text-primary" />
@@ -229,8 +229,8 @@ export default function Partners() {
               <Card className="p-8 cosmic-glass">
                 <Trophy className="h-10 w-10 text-primary mb-4" />
                 <h3 className="text-2xl font-bold mb-2">Annual Subscription</h3>
-                <p className="text-4xl font-bold text-primary mb-4">$12</p>
-                <p className="text-muted-foreground">20% of first year ($59.99)</p>
+                <p className="text-4xl font-bold text-primary mb-4">20%</p>
+                <p className="text-muted-foreground">20% of the first annual purchase amount</p>
               </Card>
             </div>
             <Card className="p-6 cosmic-glass">

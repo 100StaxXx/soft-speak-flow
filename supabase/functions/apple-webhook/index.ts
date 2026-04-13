@@ -23,6 +23,19 @@ if (appleWebhookAudiences.length === 0) {
 
 const appleWebhookJWKS = createRemoteJWKSet(new URL("https://appleid.apple.com/auth/keys"));
 
+const normalizeProductIds = (envKey: string, defaults: string[]) => {
+  const envValue = Deno.env.get(envKey);
+  if (!envValue) return defaults;
+  return envValue
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+};
+
+const referralYearlyProductIds = normalizeProductIds("APPLE_REFERRAL_YEARLY_PRODUCT_IDS", [
+  "cosmiq_referral_yearly",
+]);
+
 /**
  * Apple Server-to-Server Notification Webhook
  * 
@@ -149,7 +162,8 @@ serve(async (req) => {
           supabaseClient,
           userId,
           originalTransactionId,
-          plan
+          plan,
+          productId,
         );
         break;
         
@@ -386,6 +400,8 @@ async function handleRenewalStatusChange(
     is_active: expiresDate > new Date(),
     ends_at: expiresDate.toISOString(),
     metadata: {
+      billing_provider: "revenuecat",
+      billing_source_of_truth: "revenuecat_customer_info",
       webhook_event: "renewal_status_change",
     },
   });
@@ -413,6 +429,8 @@ async function handlePlanChange(
     plan: newPlan,
     ends_at: expiresDate.toISOString(),
     metadata: {
+      billing_provider: "revenuecat",
+      billing_source_of_truth: "revenuecat_customer_info",
       webhook_event: "plan_change",
     },
   });
@@ -440,6 +458,8 @@ async function handleBillingIssue(
     is_active: expiresDate > new Date(),
     ends_at: expiresDate.toISOString(),
     metadata: {
+      billing_provider: "revenuecat",
+      billing_source_of_truth: "revenuecat_customer_info",
       webhook_event: "billing_issue",
     },
   });
@@ -472,6 +492,8 @@ async function handleCancellation(
     is_active: isStillActive,
     ends_at: expiresDate.toISOString(),
     metadata: {
+      billing_provider: "revenuecat",
+      billing_source_of_truth: "revenuecat_customer_info",
       webhook_event: "cancellation",
       cancelled_at: cancellationDate.toISOString(),
     },
@@ -499,6 +521,8 @@ async function handleRefund(
     is_active: false,
     ends_at: new Date().toISOString(),
     metadata: {
+      billing_provider: "revenuecat",
+      billing_source_of_truth: "revenuecat_customer_info",
       webhook_event: "refund",
       refunded_transaction_id: transactionId,
     },
@@ -516,7 +540,8 @@ async function createReferralPayout(
   supabase: any,
   userId: string,
   transactionId: string,
-  plan: string
+  plan: string,
+  productId?: string | null,
 ) {
   // Check if user was referred by someone using referral code
   const { data: profile } = await supabase
@@ -544,9 +569,19 @@ async function createReferralPayout(
     return;
   }
 
-  // Calculate payout amount based on plan
-  // Yearly: 20% of $59.99 = $12.00, Monthly: 50% of $9.99 = $5.00
-  const payoutAmount = plan === "yearly" ? 12.00 : 5.00;
+  // Calculate payout amount based on actual configured plan price.
+  const normalizedProductId = (productId ?? "").toLowerCase();
+  const isReferralYearly =
+    plan === "yearly" &&
+    referralYearlyProductIds.some((id) => normalizedProductId.includes(id.toLowerCase()));
+  const yearlyPriceCents = Number(
+    Deno.env.get(isReferralYearly ? "APPLE_REFERRAL_YEARLY_PRICE_CENTS" : "APPLE_YEARLY_PRICE_CENTS") ??
+      (isReferralYearly ? "6999" : "9999"),
+  );
+  const monthlyPriceCents = Number(Deno.env.get("APPLE_MONTHLY_PRICE_CENTS") ?? "999");
+  const baseAmount = plan === "yearly" ? yearlyPriceCents / 100 : monthlyPriceCents / 100;
+  const commissionPercent = plan === "yearly" ? 20 : 50;
+  const payoutAmount = Number((baseAmount * (commissionPercent / 100)).toFixed(2));
   const payoutType = plan === "yearly" ? "first_year" : "first_month";
 
   // Check if payout already exists to avoid duplicates

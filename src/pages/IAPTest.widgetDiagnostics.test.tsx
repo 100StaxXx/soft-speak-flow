@@ -35,6 +35,13 @@ vi.mock("@/hooks/useAppleSubscription", () => ({
   }),
 }));
 
+vi.mock("@/hooks/useRevenueCat", () => ({
+  useRevenueCat: () => ({
+    customerInfo: null,
+    refreshCustomerInfo: vi.fn().mockResolvedValue(null),
+  }),
+}));
+
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     auth: {

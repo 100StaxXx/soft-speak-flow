@@ -1,180 +1,43 @@
-import { useCallback, useEffect, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { queryKeys } from '@/lib/queryKeys';
-import {
-  purchaseProduct,
-  restorePurchases,
-  IAP_PRODUCTS,
-  isIAPAvailable,
-  getProducts,
-  IAPProduct,
-  openManageSubscriptions,
-  getAllIAPProductIds,
-  getProductIdsForPlan,
-  resolvePlanFromProductId,
-} from '@/utils/appleIAP';
-import {
-  parseFunctionInvokeError,
-  toUserFacingFunctionError,
-  type ParsedFunctionInvokeError,
-} from '@/utils/supabaseFunctionErrors';
-import { useToast } from './use-toast';
-import { useAuth } from './useAuth';
-
-const PRODUCT_FETCH_ERROR_MESSAGE = "Premium subscriptions are temporarily unavailable. Please try again later.";
-const PRODUCT_IDS = getAllIAPProductIds();
-const APPLE_PROVIDER_ERROR_CODES = new Set([
-  "APPLE_API_AUTH_FAILED",
-  "APPLE_API_CONFIG_MISSING",
-  "APPLE_API_REQUEST_FAILED",
-]);
-const SAFE_APPLE_ERROR_MESSAGES = new Set([
-  "This purchase is already linked to another account.",
-  "This purchase is missing its app-account binding. Update the app and restore the purchase again.",
-  "No transaction ID or receipt data available",
-  "No transaction ID or receipt data available for subscription",
-  "No subscription transaction was found for this purchase.",
-]);
-
-const toProductFetchErrorMessage = (error: unknown): string => {
-  const message = error instanceof Error ? error.message : String(error ?? '');
-  if (!message || message === 'undefined' || message === 'null') {
-    return PRODUCT_FETCH_ERROR_MESSAGE;
-  }
-  if (/ios 15/i.test(message)) {
-    return message;
-  }
-  return `${PRODUCT_FETCH_ERROR_MESSAGE} (${message})`;
-};
-
-const isAppleProviderFailure = (parsed: ParsedFunctionInvokeError): boolean => {
-  const errorCode = parsed.code ?? parsed.responsePayload?.code;
-  const upstreamError = parsed.upstreamError?.toLowerCase() ?? "";
-  const backendMessage = parsed.backendMessage?.toLowerCase() ?? "";
-
-  return (
-    APPLE_PROVIDER_ERROR_CODES.has(errorCode ?? "") ||
-    parsed.upstreamStatus === 401 ||
-    parsed.upstreamStatus === 403 ||
-    upstreamError.includes("apple api") ||
-    backendMessage.includes("apple api")
-  );
-};
-
-const getSafeAppleErrorMessage = (parsed: ParsedFunctionInvokeError): string | null => {
-  const messages = [parsed.backendMessage?.trim(), parsed.message?.trim()];
-
-  for (const message of messages) {
-    if (!message) continue;
-    if (SAFE_APPLE_ERROR_MESSAGES.has(message)) {
-      return message;
-    }
-  }
-
-  return null;
-};
-
-const toSubscriptionErrorMessage = (
-  parsed: ParsedFunctionInvokeError,
-  action: string,
-): string => {
-  const safeMessage = getSafeAppleErrorMessage(parsed);
-  if (safeMessage) {
-    return safeMessage;
-  }
-
-  if (isAppleProviderFailure(parsed)) {
-    return PRODUCT_FETCH_ERROR_MESSAGE;
-  }
-
-  return toUserFacingFunctionError(parsed, { action });
-};
+import { useCallback, useMemo, useState } from "react";
+import { getProductsFromOfferings, isIAPAvailable, type IAPProduct } from "@/utils/appleIAP";
+import { useToast } from "./use-toast";
+import { useAuth } from "./useAuth";
+import { useProfile } from "./useProfile";
+import { useRevenueCat } from "./useRevenueCat";
+import { getRevenueCatErrorMessage, isRevenueCatCancellationError } from "@/services/revenueCat";
+import { trackPaywallEvent } from "@/utils/paywallTelemetry";
 
 export function useAppleSubscription() {
-  const queryClient = useQueryClient();
   const { toast } = useToast();
   const { user } = useAuth();
+  const { profile } = useProfile();
+  const {
+    isAvailable,
+    offerings,
+    offeringsLoading,
+    purchasePlan,
+    restorePurchases,
+    presentCustomerCenter,
+  } = useRevenueCat();
   const [loading, setLoading] = useState(false);
-  const [products, setProducts] = useState<IAPProduct[]>([]);
-  const [productsLoading, setProductsLoading] = useState(false);
   const [productError, setProductError] = useState<string | null>(null);
-  const [hasAttemptedProductFetch, setHasAttemptedProductFetch] = useState(false);
   const [manageLoading, setManageLoading] = useState(false);
+  const hasReferralPricing = Boolean(profile?.referred_by_code);
 
-  const fetchProducts = useCallback(async () => {
-    console.log('[HOOK DEBUG] fetchProducts called');
-    console.log('[HOOK DEBUG] IAP_PRODUCTS:', JSON.stringify(IAP_PRODUCTS));
-    console.log('[HOOK DEBUG] isIAPAvailable:', isIAPAvailable());
-    
-    if (!isIAPAvailable()) {
-      console.log('[HOOK DEBUG] IAP not available, setting error');
-      setProducts([]);
-      setProductError("In-App Purchases are only available on iOS devices");
-      setHasAttemptedProductFetch(true);
-      return [];
-    }
+  const products = useMemo<IAPProduct[]>(() => getProductsFromOfferings(offerings), [offerings]);
+  const hasLoadedProducts = Boolean(offerings);
+  const productsLoading = offeringsLoading;
 
-    setProductsLoading(true);
+  const reloadProducts = useCallback(async () => {
     setProductError(null);
-
-    try {
-      console.log('[HOOK DEBUG] About to call getProducts...');
-      const loadedProducts = await getProducts(PRODUCT_IDS);
-      console.log('[HOOK DEBUG] getProducts returned:', loadedProducts.length, 'products');
-      console.log('[HOOK DEBUG] Products:', JSON.stringify(loadedProducts));
-
-      if (!loadedProducts.length) {
-        console.log('[HOOK DEBUG] No products returned, throwing error');
-        throw new Error(`No App Store products were returned for IDs: ${PRODUCT_IDS.join(', ')}`);
-      }
-
-      setProducts(loadedProducts);
-      console.log('[HOOK DEBUG] Products set successfully');
-      return loadedProducts;
-    } catch (error) {
-      console.error('[HOOK DEBUG] Product load error:', error);
-      setProducts([]);
-      setProductError(toProductFetchErrorMessage(error));
-      return [];
-    } finally {
-      setProductsLoading(false);
-      setHasAttemptedProductFetch(true);
-      console.log('[HOOK DEBUG] fetchProducts complete');
+    if (!products.length && isAvailable) {
+      setProductError("No RevenueCat packages are available in the current offering.");
     }
-  }, []);
-
-  useEffect(() => {
-    fetchProducts();
-  }, [fetchProducts]);
-
-  const ensureProductsAvailable = useCallback(async () => {
-    console.log('[ENSURE DEBUG] ensureProductsAvailable called');
-    console.log('[ENSURE DEBUG] hasAttemptedProductFetch:', hasAttemptedProductFetch);
-    console.log('[ENSURE DEBUG] products.length:', products.length);
-    
-    if (!hasAttemptedProductFetch || products.length === 0) {
-      console.log('[ENSURE DEBUG] Condition met - calling fetchProducts()');
-      const loadedProducts = await fetchProducts();
-      console.log('[ENSURE DEBUG] fetchProducts returned:', loadedProducts.length, 'products');
-      const result = loadedProducts.length ? loadedProducts : null;
-      console.log('[ENSURE DEBUG] Returning:', result ? 'products' : 'NULL');
-      return result;
-    }
-
-    console.log('[ENSURE DEBUG] Using existing products:', products.length);
     return products;
-  }, [fetchProducts, hasAttemptedProductFetch, products]);
+  }, [isAvailable, products]);
 
-  const handlePurchase = async (productId: string) => {
-    console.log('[PURCHASE DEBUG] ========== handlePurchase START ==========');
-    console.log('[PURCHASE DEBUG] productId:', productId);
-    console.log('[PURCHASE DEBUG] isIAPAvailable():', isIAPAvailable());
-    console.log('[PURCHASE DEBUG] Current products state:', products.length);
-    console.log('[PURCHASE DEBUG] hasAttemptedProductFetch:', hasAttemptedProductFetch);
-    
+  const handlePurchase = useCallback(async (productId: string, surface: "trial_gate" | "premium" = "premium") => {
     if (!isIAPAvailable()) {
-      console.log('[PURCHASE DEBUG] IAP not available - returning false');
       toast({
         title: "Not Available",
         description: "In-App Purchases are only available on iOS devices",
@@ -182,15 +45,17 @@ export function useAppleSubscription() {
       });
       return false;
     }
+
     if (!user?.id) {
       toast({
         title: "Sign in required",
-        description: "Please sign in before purchasing premium.",
+        description: "Please sign in before purchasing Cosmiq Pro.",
         variant: "destructive",
       });
       return false;
     }
-    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
       toast({
         title: "Connection required",
         description: "This action requires a live connection. Try again when online.",
@@ -199,218 +64,147 @@ export function useAppleSubscription() {
       return false;
     }
 
-    setLoading(true);
-    try {
-      console.log('[PURCHASE DEBUG] Calling ensureProductsAvailable...');
-      const availableProducts = await ensureProductsAvailable();
-      console.log('[PURCHASE DEBUG] ensureProductsAvailable returned:', availableProducts ? availableProducts.length + ' products' : 'NULL');
-      if (!availableProducts) {
-        toast({
-          title: "Unavailable",
-          description: PRODUCT_FETCH_ERROR_MESSAGE,
-          variant: "destructive",
-        });
-        return false;
-      }
-
-      console.log('[HOOK DEBUG] Checking productId:', productId);
-      console.log('[HOOK DEBUG] Available identifiers:', availableProducts.map(p => p.identifier));
-      const requestedPlan = resolvePlanFromProductId(productId);
-      const candidateProductIds = requestedPlan ? getProductIdsForPlan(requestedPlan) : [productId];
-      const matchedProduct = availableProducts.find((product) => candidateProductIds.includes(product.identifier));
-      console.log('[HOOK DEBUG] matchedProduct:', matchedProduct?.identifier ?? 'none');
-      if (!matchedProduct) {
-        toast({
-          title: "Unavailable",
-          description: "Selected premium plan is not ready yet. Please try again in a moment.",
-          variant: "destructive",
-        });
-        return false;
-      }
-
-      const purchase = await purchaseProduct(matchedProduct.identifier, user.id);
-      
-      console.log('[IAP] Purchase response:', JSON.stringify(purchase, null, 2));
-      
-      if (!purchase) {
-        throw new Error("Purchase returned no data");
-      }
-      
-      // Prefer transactionId for StoreKit 2 App Store Server API verification
-      // Fall back to receipt for legacy verification
-      const transactionId = purchase.transactionId;
-      const receipt = purchase.receipt ?? purchase.transactionReceipt;
-      
-      console.log('[IAP] Verification payload:', { transactionId: !!transactionId, receipt: !!receipt });
-      
-      if (!transactionId && !receipt) {
-        throw new Error("No transaction ID or receipt data available");
-      }
-      
-      const { error } = await supabase.functions.invoke('verify-apple-receipt', {
-        body: {
-          transactionId: transactionId ?? null,
-          receipt: receipt ?? null,
-        },
-      });
-
-      if (error) throw error;
-
-      await queryClient.invalidateQueries({ queryKey: queryKeys.access.detail(user.id) });
-
+    const selectedProduct = products.find((product) => product.identifier === productId);
+    if (!selectedProduct) {
       toast({
-        title: "Success!",
-        description: "Your subscription is now active",
+        title: "Unavailable",
+        description: "Selected premium plan is not ready yet. Please try again in a moment.",
+        variant: "destructive",
       });
+      return false;
+    }
 
+    setLoading(true);
+    setProductError(null);
+    try {
+      trackPaywallEvent("purchase_started", {
+        surface,
+        plan: selectedProduct.plan,
+        packageTarget: selectedProduct.packageTarget,
+        productId: selectedProduct.identifier,
+        hasReferralPricing,
+      });
+      const customerInfo = await purchasePlan(selectedProduct.packageTarget);
+      if (!customerInfo) {
+        trackPaywallEvent("purchase_cancelled", {
+          surface,
+          plan: selectedProduct.plan,
+          packageTarget: selectedProduct.packageTarget,
+          productId: selectedProduct.identifier,
+          hasReferralPricing,
+        });
+        return false;
+      }
+
+      trackPaywallEvent("purchase_completed", {
+        surface,
+        plan: selectedProduct.plan,
+        packageTarget: selectedProduct.packageTarget,
+        productId: selectedProduct.identifier,
+        hasReferralPricing,
+      });
+      toast({
+        title: "Premium unlocked",
+        description: "Cosmiq Pro is now active on your account.",
+      });
       return true;
     } catch (error) {
-      console.error('Purchase error:', error);
-      const parsed = await parseFunctionInvokeError(error);
-      const errorMessage = toSubscriptionErrorMessage(parsed, "activate premium");
+      if (isRevenueCatCancellationError(error)) {
+        trackPaywallEvent("purchase_cancelled", {
+          surface,
+          plan: selectedProduct.plan,
+          packageTarget: selectedProduct.packageTarget,
+          productId: selectedProduct.identifier,
+          hasReferralPricing,
+        });
+        return false;
+      }
+
+      const message = getRevenueCatErrorMessage(error);
+      trackPaywallEvent("purchase_failed", {
+        surface,
+        plan: selectedProduct.plan,
+        packageTarget: selectedProduct.packageTarget,
+        productId: selectedProduct.identifier,
+        hasReferralPricing,
+        message,
+      });
+      setProductError(message);
       toast({
-        title: "Purchase Failed",
-        description: errorMessage,
+        title: "Purchase failed",
+        description: message,
         variant: "destructive",
       });
       return false;
     } finally {
       setLoading(false);
     }
-  };
+  }, [hasReferralPricing, products, purchasePlan, toast, user?.id]);
 
-  const handleRestore = async () => {
+  const handleRestore = useCallback(async (surface: "trial_gate" | "premium" = "premium") => {
     if (!isIAPAvailable()) {
       toast({
         title: "Not Available",
-        description: "In-App Purchases are only available on iOS devices",
+        description: "Restore is only available on iOS devices",
         variant: "destructive",
       });
-      return;
-    }
-    if (!user?.id) {
-      toast({
-        title: "Sign in required",
-        description: "Please sign in before restoring purchases.",
-        variant: "destructive",
-      });
-      return;
-    }
-    if (typeof navigator !== 'undefined' && !navigator.onLine) {
-      toast({
-        title: "Connection required",
-        description: "This action requires a live connection. Try again when online.",
-        variant: "destructive",
-      });
-      return;
+      return false;
     }
 
     setLoading(true);
     try {
-      const restored = await restorePurchases(user.id);
-      
-      if (!restored || !Array.isArray(restored) || restored.length === 0) {
-        toast({
-          title: "No Purchases Found",
-          description: "No previous purchases to restore",
-        });
-        return;
+      trackPaywallEvent("restore_started", { surface });
+      const customerInfo = await restorePurchases();
+      if (!customerInfo) {
+        return false;
       }
 
-      // Type guard for purchase objects
-      const isValidPurchase = (p: unknown): p is { 
-        transactionDate?: number; 
-        productId?: string;
-        transactionId?: string;
-        transactionReceipt?: string;
-        receipt?: string;
-      } => {
-        return typeof p === 'object' && p !== null;
-      };
-
-      // Sort by date, newest first
-      const sortedPurchases = [...restored]
-        .filter(isValidPurchase)
-        .sort((a, b) => {
-          const dateA = a.transactionDate || 0;
-          const dateB = b.transactionDate || 0;
-          return dateB - dateA;
-        });
-      
-      // Find subscription purchase (contains "premium" in product ID)
-      const subscriptionPurchase = sortedPurchases.find(p => 
-        resolvePlanFromProductId(p.productId) !== null
-      );
-      
-      if (!subscriptionPurchase) {
-        toast({
-          title: "No Subscription Found",
-          description: "No active subscription to restore",
-        });
-        return;
-      }
-
-      // Prefer transactionId for StoreKit 2 App Store Server API verification
-      const transactionId = subscriptionPurchase.transactionId;
-      const receipt = subscriptionPurchase.transactionReceipt ?? subscriptionPurchase.receipt;
-      
-      if (!transactionId && !receipt) {
-        throw new Error("No transaction ID or receipt data available for subscription");
-      }
-
-      // Verify with backend - prefer transactionId for modern API
-      const { error } = await supabase.functions.invoke('verify-apple-receipt', {
-        body: {
-          transactionId: transactionId ?? null,
-          receipt: receipt ?? null,
-        },
+      trackPaywallEvent("restore_completed", {
+        surface,
+        activeProductIdentifiers: customerInfo.allPurchasedProductIdentifiers,
       });
-
-      if (error) {
-        throw error;
-      }
-
-      await queryClient.invalidateQueries({ queryKey: queryKeys.access.detail(user.id) });
-
       toast({
-        title: "Restored!",
-        description: "Your subscription has been restored",
+        title: "Purchases restored",
+        description: "Your App Store purchases have been restored successfully.",
       });
+      return true;
     } catch (error) {
-      console.error('Restore error:', error);
-      const parsed = await parseFunctionInvokeError(error);
-      const errorMessage = toSubscriptionErrorMessage(parsed, "restore your purchase");
+      const message = getRevenueCatErrorMessage(error);
+      trackPaywallEvent("restore_failed", { surface, message });
       toast({
-        title: "Restore Failed",
-        description: errorMessage,
+        title: "Restore failed",
+        description: message,
         variant: "destructive",
       });
+      return false;
     } finally {
       setLoading(false);
     }
-  };
+  }, [restorePurchases, toast]);
 
-  const handleManageSubscriptions = async () => {
-    setManageLoading(true);
-
-    try {
-      await openManageSubscriptions();
+  const handleManageSubscriptions = useCallback(async () => {
+    if (!isIAPAvailable()) {
       toast({
-        title: "Manage Subscription",
-        description: "Opening Apple's subscription settings...",
+        title: "Not Available",
+        description: "Subscription management is only available in the iOS app",
+        variant: "destructive",
       });
+      return;
+    }
+
+    setManageLoading(true);
+    try {
+      await presentCustomerCenter();
     } catch (error) {
-      console.error('Manage subscription error:', error);
-      const errorMessage = error instanceof Error ? error.message : "Please try again";
       toast({
-        title: "Unable to open subscriptions",
-        description: errorMessage,
+        title: "Unable to open Customer Center",
+        description: getRevenueCatErrorMessage(error),
         variant: "destructive",
       });
     } finally {
       setManageLoading(false);
     }
-  };
+  }, [presentCustomerCenter, toast]);
 
   return {
     handlePurchase,
@@ -418,11 +212,12 @@ export function useAppleSubscription() {
     handleManageSubscriptions,
     loading,
     manageLoading,
+    isAvailable,
     products,
     productsLoading,
     productError,
-    hasLoadedProducts: hasAttemptedProductFetch,
-    reloadProducts: fetchProducts,
-    isAvailable: isIAPAvailable(),
+    hasLoadedProducts,
+    reloadProducts,
+    hasReferralPricing,
   };
 }

@@ -49,6 +49,7 @@ import { WallpaperManifestProvider } from "@/contexts/WallpaperManifestContext";
 import { GlobalWidgetSyncBridge } from "@/components/GlobalWidgetSyncBridge";
 import { queryKeys } from "@/lib/queryKeys";
 import { toast } from "@/components/ui/sonner";
+import { RevenueCatProvider } from "@/providers/RevenueCatProvider";
 import {
   clearPendingReferralCode,
   getReferralCodeFromSearch,
@@ -489,24 +490,26 @@ const App = () => {
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <TimeProvider>
-            <EvolutionProvider>
-              <CelebrationProvider>
-                <TooltipProvider>
-                  <Toaster />
-                  <Sonner />
-                  <InstallPWA />
-                  <UpdateAvailablePrompt />
-                  <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-                    <DeepLinkProvider>
-                      <ScrollToTop />
-                      <AppContent />
-                    </DeepLinkProvider>
-                  </BrowserRouter>
-                </TooltipProvider>
-              </CelebrationProvider>
-            </EvolutionProvider>
-          </TimeProvider>
+          <RevenueCatProvider>
+            <TimeProvider>
+              <EvolutionProvider>
+                <CelebrationProvider>
+                  <TooltipProvider>
+                    <Toaster />
+                    <Sonner />
+                    <InstallPWA />
+                    <UpdateAvailablePrompt />
+                    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+                      <DeepLinkProvider>
+                        <ScrollToTop />
+                        <AppContent />
+                      </DeepLinkProvider>
+                    </BrowserRouter>
+                  </TooltipProvider>
+                </CelebrationProvider>
+              </EvolutionProvider>
+            </TimeProvider>
+          </RevenueCatProvider>
         </AuthProvider>
       </QueryClientProvider>
     </ErrorBoundary>

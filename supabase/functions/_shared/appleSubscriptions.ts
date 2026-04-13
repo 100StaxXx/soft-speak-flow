@@ -43,19 +43,32 @@ const PROD_VERIFY_URL = "https://buy.itunes.apple.com/verifyReceipt";
 const SANDBOX_VERIFY_URL = "https://sandbox.itunes.apple.com/verifyReceipt";
 
 const DEFAULT_MONTHLY_PRICE_CENTS = 999; // $9.99
-const DEFAULT_YEARLY_PRICE_CENTS = 5999; // $59.99 promotional pricing
+const DEFAULT_YEARLY_PRICE_CENTS = 9999; // $99.99 standard pricing
+const DEFAULT_REFERRAL_YEARLY_PRICE_CENTS = 6999; // $69.99 referral pricing
 
 export const APPLE_BINDING_CONFLICT_ERROR =
   "This purchase is already linked to another account.";
 export const APPLE_BINDING_MISSING_ERROR =
   "This purchase is missing its app-account binding. Update the app and restore the purchase again.";
 
-function getPriceCents(plan: "monthly" | "yearly") {
+function getPriceCents(plan: "monthly" | "yearly", productId?: string) {
+  const normalizedProductId = (productId ?? "").toLowerCase();
+  const isReferralYearly =
+    plan === "yearly" &&
+    referralYearlyProductIds.some((id) => normalizedProductId.includes(id.toLowerCase()));
+
   const envValue = Deno.env.get(
-    plan === "monthly" ? "APPLE_MONTHLY_PRICE_CENTS" : "APPLE_YEARLY_PRICE_CENTS",
+    plan === "monthly"
+      ? "APPLE_MONTHLY_PRICE_CENTS"
+      : isReferralYearly
+        ? "APPLE_REFERRAL_YEARLY_PRICE_CENTS"
+        : "APPLE_YEARLY_PRICE_CENTS",
   );
   const parsed = envValue ? Number(envValue) : NaN;
-  if (!Number.isFinite(parsed)) return plan === "monthly" ? DEFAULT_MONTHLY_PRICE_CENTS : DEFAULT_YEARLY_PRICE_CENTS;
+  if (!Number.isFinite(parsed)) {
+    if (plan === "monthly") return DEFAULT_MONTHLY_PRICE_CENTS;
+    return isReferralYearly ? DEFAULT_REFERRAL_YEARLY_PRICE_CENTS : DEFAULT_YEARLY_PRICE_CENTS;
+  }
   return parsed;
 }
 
@@ -75,6 +88,9 @@ const monthlyProductIds = normalizeProductIds("APPLE_MONTHLY_PRODUCT_IDS", [
 const yearlyProductIds = normalizeProductIds("APPLE_YEARLY_PRODUCT_IDS", [
   "cosmiq_premium_yearly",
   "com.darrylgraham.revolution.yearly",
+]);
+const referralYearlyProductIds = normalizeProductIds("APPLE_REFERRAL_YEARLY_PRODUCT_IDS", [
+  "cosmiq_referral_yearly",
 ]);
 
 export function resolvePlanFromProduct(productId: string | undefined): "monthly" | "yearly" {
@@ -313,7 +329,7 @@ export async function upsertSubscription(
 
   const status = buildSubscriptionStatus(payload.expiresAt, payload.cancellationDate);
   const now = new Date().toISOString();
-  const amountCents = getPriceCents(payload.plan);
+  const amountCents = getPriceCents(payload.plan, payload.productId);
   const isActive = payload.expiresAt > new Date() &&
     (status === "active" || status === "trialing" || status === "past_due" || status === "cancelled");
 
@@ -360,6 +376,9 @@ export async function upsertSubscription(
     billing_customer_id: originalTransactionId,
     billing_subscription_id: originalTransactionId,
     metadata: {
+      billing_provider: "revenuecat",
+      billing_source_of_truth: "revenuecat_customer_info",
+      purchase_amount_cents: amountCents,
       product_id: payload.productId,
       original_transaction_id: originalTransactionId,
       environment: payload.environment ?? "unknown",
@@ -379,6 +398,9 @@ export async function upsertSubscription(
       created_at: payload.purchaseDate.toISOString(),
       updated_at: now,
       metadata: {
+        billing_provider: "revenuecat",
+        billing_source_of_truth: "revenuecat_customer_info",
+        purchase_amount_cents: amountCents,
         product_id: payload.productId,
         original_transaction_id: originalTransactionId,
         environment: payload.environment ?? "unknown",

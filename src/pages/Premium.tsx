@@ -1,76 +1,97 @@
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Crown, Sparkles, Zap, Bell, Download, Check, Moon, RefreshCw, CreditCard } from "lucide-react";
+import { Crown, Sparkles, Zap, Bell, Download, Check, Moon, RefreshCw, CreditCard, TicketPercent } from "lucide-react";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useAppleSubscription } from "@/hooks/useAppleSubscription";
 import { useTrialStatus } from "@/hooks/useTrialStatus";
-import { getProductForPlan, getPurchaseProductIdForPlan } from "@/utils/appleIAP";
+import { getProductForPlan, getPurchaseProductIdForPlan, type IAPPlan } from "@/utils/appleIAP";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import paywallSubscriptionBackground from "@/assets/backgrounds/paywall-subscription.jpg";
+import { trackPaywallEvent } from "@/utils/paywallTelemetry";
 
-type PlanType = "monthly" | "yearly";
+type PlanType = IAPPlan;
+
+const PLAN_ORDER: PlanType[] = ["monthly", "yearly"];
 
 export default function Premium() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { isActive } = useSubscription();
-  const { 
-    handlePurchase, 
-    handleRestore, 
-    loading, 
+  const {
+    handlePurchase,
+    handleRestore,
+    handleManageSubscriptions,
+    loading,
     isAvailable,
     products,
     productsLoading,
     productError,
     reloadProducts,
-    hasLoadedProducts,
+    hasReferralPricing,
   } = useAppleSubscription();
   const { isInTrial, trialDaysRemaining } = useTrialStatus();
   const [selectedPlan, setSelectedPlan] = useState<PlanType>("yearly");
 
-  const monthlyProduct = useMemo(() => getProductForPlan("monthly", products), [products]);
-  const yearlyProduct = useMemo(() => getProductForPlan("yearly", products), [products]);
-  const selectedProduct = selectedPlan === "yearly" ? yearlyProduct : monthlyProduct;
-  const selectedProductId = useMemo(
-    () => getPurchaseProductIdForPlan(selectedPlan, products),
-    [selectedPlan, products],
+  const selectedProduct = useMemo(
+    () => getProductForPlan(selectedPlan, products, { preferReferral: hasReferralPricing }),
+    [hasReferralPricing, products, selectedPlan],
   );
+  const selectedProductId = useMemo(
+    () => getPurchaseProductIdForPlan(selectedPlan, products, { preferReferral: hasReferralPricing }),
+    [hasReferralPricing, selectedPlan, products],
+  );
+
+  useEffect(() => {
+    trackPaywallEvent("paywall_viewed", {
+      surface: "premium",
+      hasReferralPricing,
+      isInTrial,
+      selectedPlan,
+      selectedProductId,
+    });
+  }, [hasReferralPricing, isInTrial, selectedPlan, selectedProductId]);
 
   const handleSubscribe = useCallback(async () => {
     if (!selectedProduct) {
       toast({
         title: "Almost ready",
-        description: "We're still loading Apple pricing information. Please try again in a moment.",
+        description: "We’re still loading RevenueCat pricing information. Please try again in a moment.",
         variant: "destructive",
       });
       return;
     }
 
-    const success = await handlePurchase(selectedProductId);
+    trackPaywallEvent("package_selected", {
+      surface: "premium",
+      plan: selectedPlan,
+      productId: selectedProductId,
+      hasReferralPricing,
+    });
+    const success = await handlePurchase(selectedProductId, "premium");
     if (success) {
-      navigate('/premium/success');
+      navigate("/premium/success");
     }
-  }, [selectedProduct, selectedProductId, handlePurchase, navigate, toast]);
+  }, [handlePurchase, navigate, selectedProduct, selectedProductId, toast]);
 
-  const plans = useMemo(() => ({
+  const plans = useMemo<Record<PlanType, { fallbackPrice: string; period: string; savings: string | null; description: string }>>(() => ({
     monthly: {
       fallbackPrice: "$9.99",
       period: "/month",
       savings: null,
-      description: "Billed monthly",
+      description: "Flexible monthly billing",
     },
     yearly: {
-      fallbackPrice: "$59.99",
+      fallbackPrice: hasReferralPricing ? "$69.99" : "$99.99",
       period: "/year",
-      savings: "Save 50%",
-      description: "Just $4.99/month",
+      savings: hasReferralPricing ? "Referral price" : "Best value",
+      description: hasReferralPricing ? "Referral unlock annual price" : "Lower effective monthly price",
     },
-  }), []);
+  }), [hasReferralPricing]);
 
-  // Show premium user view
   if (isActive) {
     return (
       <div className="min-h-screen pb-nav-safe bg-background flex items-center justify-center p-4">
@@ -78,11 +99,9 @@ export default function Premium() {
           <div className="bg-gradient-to-br from-primary to-accent p-6 rounded-full w-24 h-24 mx-auto mb-6 flex items-center justify-center shadow-glow">
             <Crown className="h-12 w-12 text-primary-foreground" />
           </div>
-          <h1 className="font-display text-4xl text-foreground mb-4">
-            You're Premium!
-          </h1>
+          <h1 className="font-display text-4xl text-foreground mb-4">You’re Pro!</h1>
           <p className="text-muted-foreground mb-4">
-            Enjoy unlimited access to all content
+            Cosmiq Pro is active, so you have full access to premium guidance, companions, and quests.
           </p>
           <div className="space-y-3">
             <Button
@@ -91,11 +110,7 @@ export default function Premium() {
             >
               Back to Home
             </Button>
-            <Button
-              variant="ghost"
-              onClick={() => navigate("/profile")}
-              className="w-full"
-            >
+            <Button variant="ghost" onClick={handleManageSubscriptions} className="w-full">
               Manage Subscription
             </Button>
           </div>
@@ -105,109 +120,105 @@ export default function Premium() {
   }
 
   return (
-    <div className="min-h-screen pb-nav-safe bg-gradient-to-br from-background via-background to-primary/5 p-6">
-      <div className="max-w-4xl mx-auto space-y-8">
-        {/* Header */}
+    <div className="min-h-screen pb-nav-safe p-6 relative overflow-hidden">
+      <div
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: `url(${paywallSubscriptionBackground})` }}
+        aria-hidden="true"
+      />
+      <div className="absolute inset-0 bg-gradient-to-b from-background/35 via-background/65 to-background/95" aria-hidden="true" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.10),transparent_38%)]" aria-hidden="true" />
+
+      <div className="max-w-4xl mx-auto space-y-8 relative z-10">
         <div className="text-center space-y-4">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-br from-primary to-accent mb-4 shadow-glow animate-pulse">
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-br from-primary/90 to-accent/90 mb-4 shadow-glow animate-pulse backdrop-blur-sm">
             <Crown className="h-10 w-10 text-primary-foreground" />
           </div>
+          <p className="text-sm uppercase tracking-[0.35em] text-muted-foreground">Step 2 of 2</p>
           <h1 className="font-display text-5xl text-foreground">
-            {isInTrial ? "Upgrade to Premium" : "Subscribe to Continue"}
+            {isInTrial ? "Choose Your Cosmiq Pro Plan" : "Finish Unlocking Cosmiq Pro"}
           </h1>
           {isInTrial && trialDaysRemaining > 0 && (
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-accent/10 border border-accent/20">
               <span className="text-sm font-medium text-foreground">
-                {trialDaysRemaining === 1 
-                  ? "1 day left in your free trial" 
-                  : `${trialDaysRemaining} days left in your free trial`}
+                {trialDaysRemaining === 1 ? "1 day left in your free trial" : `${trialDaysRemaining} days left in your free trial`}
               </span>
             </div>
           )}
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Full access to all features. No commitment.
+            Your referral step is complete. Choose the plan that fits your rhythm and finish checkout here.
           </p>
+          {hasReferralPricing && (
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-accent/10 border border-accent/20">
+              <TicketPercent className="h-4 w-4 text-accent" />
+              <span className="text-sm font-medium text-foreground">Referral pricing unlocked: annual is $69.99/year</span>
+            </div>
+          )}
         </div>
 
-        {/* Plan Toggle Cards */}
-        <div className="flex gap-4 max-w-md mx-auto">
-          {(["monthly", "yearly"] as PlanType[]).map((plan) => (
-            <Card
-              key={plan}
-              onClick={() => setSelectedPlan(plan)}
-              className={cn(
-                "flex-1 cursor-pointer transition-all relative overflow-hidden",
-                selectedPlan === plan
-                  ? "border-2 border-primary bg-primary/5 shadow-glow"
-                  : "border border-border hover:border-primary/50"
-              )}
-            >
-              {plans[plan].savings && (
-                <div className="absolute top-0 right-0 bg-accent text-accent-foreground text-xs font-bold px-2 py-1 rounded-bl-lg">
-                  {plans[plan].savings}
-                </div>
-              )}
-              <CardContent className="p-5 text-center">
-                <p className="text-sm font-medium text-muted-foreground capitalize mb-2">
-                  {plan}
-                </p>
-                <p className="text-3xl font-bold text-foreground">
-                  {(plan === "yearly" ? yearlyProduct?.priceString : monthlyProduct?.priceString) ?? plans[plan].fallbackPrice}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {plans[plan].period}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {plans[plan].description}
-                </p>
-              </CardContent>
-            </Card>
-          ))}
+        <div className="grid gap-4 max-w-3xl mx-auto md:grid-cols-2">
+          {PLAN_ORDER.map((plan) => {
+            const product = getProductForPlan(plan, products, { preferReferral: hasReferralPricing });
+            const isSelected = selectedPlan === plan;
+            const Icon = plan === "yearly" && hasReferralPricing ? TicketPercent : Crown;
+
+            return (
+              <Card
+                key={plan}
+                onClick={() => {
+                  setSelectedPlan(plan);
+                  trackPaywallEvent("package_selected", {
+                    surface: "premium",
+                    plan,
+                    productId: product?.identifier ?? plan,
+                    hasReferralPricing,
+                  });
+                }}
+                className={cn(
+                  "cursor-pointer transition-all relative overflow-hidden",
+                  isSelected
+                    ? "border-2 border-primary bg-primary/5 shadow-glow"
+                    : "border border-border hover:border-primary/50",
+                )}
+              >
+                {plans[plan].savings && (
+                  <div className="absolute top-0 right-0 bg-accent text-accent-foreground text-xs font-bold px-2 py-1 rounded-bl-lg">
+                    {plans[plan].savings}
+                  </div>
+                )}
+                <CardContent className="p-5 text-center">
+                  <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+                    <Icon className="h-5 w-5 text-primary" />
+                  </div>
+                  <p className="text-sm font-medium text-muted-foreground capitalize mb-2">{plan}</p>
+                  <p className="text-3xl font-bold text-foreground">
+                    {product?.priceString ?? plans[plan].fallbackPrice}
+                  </p>
+                  <p className="text-sm text-muted-foreground">{plans[plan].period}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{plans[plan].description}</p>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
 
-        {/* Pricing Card */}
-        <Card className="border-2 border-primary/20 shadow-2xl bg-card/80 backdrop-blur">
+        <Card className="border-2 border-primary/20 shadow-2xl bg-card/72 backdrop-blur-md">
           <CardHeader className="text-center pb-4">
-            <CardTitle className="text-2xl font-bold text-foreground">What's included</CardTitle>
+            <CardTitle className="text-2xl font-bold text-foreground">What’s included</CardTitle>
             <CardDescription className="text-base">
               Everything you need for your self-improvement journey
             </CardDescription>
           </CardHeader>
 
           <CardContent className="space-y-6">
-            {/* Features List */}
             <div className="space-y-4">
               {[
-                {
-                  icon: Sparkles,
-                  title: "Full Companion Evolution",
-                  description: "Watch your companion grow from Stage 0 • Egg to Stage 100 • Ascended"
-                },
-                {
-                  icon: Moon,
-                  title: "Personalized Cosmiq Insight",
-                  description: "Daily horoscope with rising sign and planetary transit influences"
-                },
-                {
-                  icon: Crown,
-                  title: "Unlimited Quests & Epics",
-                  description: "Create unlimited daily quests and join shared epics with friends"
-                },
-                {
-                  icon: Zap,
-                  title: "Guide Chat",
-                  description: "Unlimited personalized guidance from your chosen guide"
-                },
-                {
-                  icon: Bell,
-                  title: "Smart Quest Reminders",
-                  description: "Never miss a quest with intelligent notifications"
-                },
-                {
-                  icon: Download,
-                  title: "All Premium Features",
-                  description: "Pet Mode, Guild Stories, Weekly Challenges, and more"
-                }
+                { icon: Sparkles, title: "Full Companion Evolution", description: "Watch your companion grow all the way to Ascended." },
+                { icon: Moon, title: "Personalized Cosmiq Insight", description: "Daily astrology guidance tuned to your chart." },
+                { icon: Crown, title: "Unlimited Quests & Epics", description: "Create more structure, rituals, and big goals." },
+                { icon: Zap, title: "Guide Chat", description: "Unlimited personalized guidance from your chosen guide." },
+                { icon: Bell, title: "Smart Quest Reminders", description: "Stay on track with timely nudges." },
+                { icon: Download, title: "All Premium Features", description: "New stories, companion perks, and future unlocks." },
               ].map((feature, index) => (
                 <div key={index} className="flex items-start gap-3 group hover:bg-primary/5 p-3 rounded-lg transition-colors">
                   <div className="mt-1 p-2 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
@@ -215,9 +226,7 @@ export default function Premium() {
                   </div>
                   <div>
                     <h3 className="font-semibold text-foreground mb-1">{feature.title}</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {feature.description}
-                    </p>
+                    <p className="text-sm text-muted-foreground">{feature.description}</p>
                   </div>
                   <Check className="h-5 w-5 text-primary ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
@@ -228,15 +237,14 @@ export default function Premium() {
               <CreditCard className="h-4 w-4" />
               <AlertTitle>Billing clarity</AlertTitle>
               <AlertDescription>
-                Cosmiq uses Apple&apos;s native subscription sheet (StoreKit) when you tap Subscribe. There is no separate Apple Pay button—PassKit is only bundled because the Capgo Native Purchases plugin links it. You can manage or cancel anytime in Settings ▸ {`[Your Name]`} ▸ Subscriptions.
+                RevenueCat handles plans, entitlements, paywalls, and Customer Center, while Apple still handles the actual billing sheet and renewal management.
               </AlertDescription>
             </Alert>
 
-            {/* Apple IAP Notice */}
             {!isAvailable && (
               <div className="bg-muted/30 rounded-lg p-4">
                 <p className="text-sm text-muted-foreground text-center">
-                  In-App Purchases are only available on iOS devices
+                  In-app purchases are only available inside the native iOS Cosmiq app.
                 </p>
               </div>
             )}
@@ -244,7 +252,7 @@ export default function Premium() {
             {productsLoading && (
               <div className="flex items-center gap-2 rounded-lg border border-dashed border-muted-foreground/30 px-3 py-2 text-sm text-muted-foreground">
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-muted-foreground" />
-                Contacting the App Store...
+                Loading RevenueCat offering...
               </div>
             )}
 
@@ -253,76 +261,31 @@ export default function Premium() {
                 <span>{productError}</span>
                 <div className="flex flex-wrap gap-2">
                   <Button size="sm" variant="outline" onClick={() => { void reloadProducts(); }}>
+                    <RefreshCw className="mr-2 h-3 w-3" />
                     Try Again
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => navigate("/support/report")}
-                  >
-                    Contact support
                   </Button>
                 </div>
               </div>
             )}
 
-            {/* CTA Button */}
             <Button
-              onClick={handleSubscribe}
-              disabled={
-                loading || 
-                !isAvailable || 
-                productsLoading || 
-                !hasLoadedProducts ||
-                !selectedProduct
-              }
-              className="w-full py-7 text-lg font-black uppercase tracking-wider bg-gradient-to-r from-primary to-accent hover:opacity-90 text-primary-foreground shadow-glow"
-              size="lg"
+              onClick={() => { void handleSubscribe(); }}
+              disabled={!isAvailable || loading || productsLoading || !selectedProduct}
+              className="w-full bg-gradient-to-r from-primary to-accent hover:opacity-90 text-primary-foreground font-medium py-6 rounded-2xl shadow-soft"
             >
-              {loading ? (
-                <>
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary-foreground mr-2" />
-                  Processing...
-                </>
-              ) : (
-                `Subscribe ${selectedPlan === "yearly" ? "Yearly" : "Monthly"} - ${(selectedProduct?.priceString ?? plans[selectedPlan].fallbackPrice)}${selectedPlan === "yearly" ? " /year" : " /month"}`
-              )}
+              {loading ? "Processing..." : `Continue with ${selectedPlan}`}
             </Button>
 
-            {/* Restore Purchases */}
-            <Button
-              variant="ghost"
-              onClick={handleRestore}
-              disabled={loading}
-              className="w-full text-muted-foreground hover:text-foreground"
-            >
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Restore Purchases
-            </Button>
-
-            <p className="text-xs text-center text-muted-foreground leading-relaxed">
-              Payment will be charged to your Apple ID account at confirmation of purchase.
-              Subscription automatically renews unless canceled at least 24 hours before the end of the current period.
-              Your account will be charged for renewal within 24 hours prior to the end of the current period.
-              You can manage and cancel your subscriptions by going to Settings {">"} [Your Name] {">"} Subscriptions after purchase.
-            </p>
-            <div className="flex justify-center gap-4 text-xs">
-              <a href="/privacy" className="text-muted-foreground underline hover:text-foreground">Privacy Policy</a>
-              <a href="/terms" className="text-muted-foreground underline hover:text-foreground">Terms of Use</a>
+            <div className="grid gap-3 md:grid-cols-2">
+              <Button variant="outline" onClick={() => { void handleRestore("premium"); }}>
+                Restore Purchases
+              </Button>
+              <Button variant="ghost" onClick={() => { void handleManageSubscriptions(); }}>
+                Open Customer Center
+              </Button>
             </div>
           </CardContent>
         </Card>
-
-        {/* Back Button */}
-        <div className="text-center">
-          <Button 
-            variant="ghost" 
-            onClick={() => navigate(-1)}
-            className="text-muted-foreground hover:text-foreground"
-          >
-            Maybe later
-          </Button>
-        </div>
       </div>
     </div>
   );

@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { queryKeys } from "@/lib/queryKeys";
 import { useAuth } from "./useAuth";
+import { useRevenueCat } from "./useRevenueCat";
 
 export type AccessSource = "subscription" | "promo_code" | "trial" | "manual" | "none";
 
@@ -25,6 +26,7 @@ const DEFAULT_ACCESS_STATE: AccessState = {
 
 export function useAccessState() {
   const { user, loading: authLoading } = useAuth();
+  const { activeEntitlement, activePlan, isConfigured, isPro } = useRevenueCat();
 
   const query = useQuery({
     queryKey: user ? queryKeys.access.detail(user.id) : queryKeys.access.all,
@@ -46,8 +48,30 @@ export function useAccessState() {
   });
 
   const accessState = useMemo(
-    () => query.data ?? DEFAULT_ACCESS_STATE,
-    [query.data],
+    () => {
+      const baseState = query.data ?? DEFAULT_ACCESS_STATE;
+
+      if (!isConfigured || !activeEntitlement?.isActive || !isPro) {
+        return baseState;
+      }
+
+      const status =
+        activeEntitlement.billingIssueDetectedAt ? "past_due" :
+        activeEntitlement.unsubscribeDetectedAt ? "cancelled" :
+        activeEntitlement.periodType === "TRIAL" || activeEntitlement.periodType === "INTRO" ? "trialing" :
+        "active";
+
+      return {
+        ...baseState,
+        has_access: true,
+        access_source: "subscription" as const,
+        subscribed: true,
+        status,
+        plan: activePlan ?? baseState.plan,
+        subscription_end: activeEntitlement.expirationDate,
+      };
+    },
+    [activeEntitlement, activePlan, isConfigured, isPro, query.data],
   );
 
   return {
