@@ -546,6 +546,7 @@ export const useXPRewards = () => {
       return await awardXPEventAsync(eventType, effectiveAmount, metadata);
     } catch (error) {
       logger.error('Error awarding custom XP:', error);
+      throw error;
     }
   };
 

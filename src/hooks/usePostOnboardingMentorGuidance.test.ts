@@ -369,7 +369,15 @@ describe("guided tutorial intro dialogue sequence", () => {
 
   afterEach(() => {
     document
-      .querySelectorAll('[data-tour="add-quest-launcher"], [data-tour="add-quest-create-button"]')
+      .querySelectorAll(
+        [
+          '[data-tour="add-quest-launcher"]',
+          '[data-tour="add-quest-create-button"]',
+          '[data-tour="add-quest-time-panel"]',
+          '[data-tour="add-quest-time-input"]',
+          '[data-tour="add-quest-time-chip"]',
+        ].join(", ")
+      )
       .forEach((element) => element.remove());
   });
 
@@ -465,6 +473,54 @@ describe("guided tutorial intro dialogue sequence", () => {
         '[data-tour="add-quest-launcher"]',
       ]);
       expect(result.current.activeTargetSelector).toBe('[data-tour="add-quest-launcher"]');
+    });
+  });
+
+  it("retargets select_time from the chip to the open time panel", async () => {
+    mocks.state.guidedTutorial = {
+      version: 2,
+      eligible: true,
+      completed: false,
+      completedSteps: ["quests_campaigns_intro"],
+      xpAwardedSteps: [],
+      milestonesCompleted: ["mentor_intro_hello", "quests_campaigns_intro"],
+      substeps: {
+        create_quest: {
+          current: "select_time",
+          completed: ["open_add_quest", "enter_title"],
+        },
+      },
+    };
+
+    const timeChip = document.createElement("button");
+    timeChip.setAttribute("data-tour", "add-quest-time-chip");
+    document.body.appendChild(timeChip);
+
+    const { result } = renderHook(() => usePostOnboardingMentorGuidance(), {
+      wrapper: createWrapper("/journeys"),
+    });
+
+    await waitFor(() => {
+      expect(result.current.currentStep).toBe("create_quest");
+      expect(result.current.currentSubstep).toBe("select_time");
+      expect(result.current.activeTargetSelectors).toEqual([
+        '[data-tour="add-quest-time-panel"]',
+        '[data-tour="add-quest-time-input"]',
+        '[data-tour="add-quest-time-chip"]',
+      ]);
+      expect(result.current.activeTargetSelector).toBe('[data-tour="add-quest-time-chip"]');
+    });
+
+    const timePanel = document.createElement("div");
+    timePanel.setAttribute("data-tour", "add-quest-time-panel");
+    document.body.appendChild(timePanel);
+
+    await act(async () => {
+      window.dispatchEvent(new Event("resize"));
+    });
+
+    await waitFor(() => {
+      expect(result.current.activeTargetSelector).toBe('[data-tour="add-quest-time-panel"]');
     });
   });
 

@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => {
   const existingMissionResponses: Array<{ data: unknown; error: unknown }> = [];
   const awardCustomXP = vi.fn();
   const checkFirstTimeAchievements = vi.fn();
+  const checkDailyCompletionAchievement = vi.fn();
 
   return {
     toast,
@@ -31,6 +32,7 @@ const mocks = vi.hoisted(() => {
     existingMissionResponses,
     awardCustomXP,
     checkFirstTimeAchievements,
+    checkDailyCompletionAchievement,
     user: { id: "user-1" },
   };
 });
@@ -65,6 +67,7 @@ vi.mock("./useXPRewards", () => ({
 vi.mock("./useAchievements", () => ({
   useAchievements: () => ({
     checkFirstTimeAchievements: mocks.checkFirstTimeAchievements,
+    checkDailyCompletionAchievement: mocks.checkDailyCompletionAchievement,
   }),
 }));
 
@@ -132,6 +135,9 @@ describe("useDailyMissions", () => {
   beforeEach(() => {
     mocks.toast.mockClear();
     mocks.invoke.mockReset();
+    mocks.awardCustomXP.mockReset();
+    mocks.checkFirstTimeAchievements.mockReset();
+    mocks.checkDailyCompletionAchievement.mockReset();
     mocks.from.mockImplementation((table: string) => {
       if (table === "daily_missions") {
         return buildSelectQueryResponse();
@@ -311,5 +317,144 @@ describe("useDailyMissions", () => {
     expect(firstToast.description).toContain("Mission generation input is invalid.");
     expect(result.current.generationErrorMessage).toBe("Mission generation input is invalid.");
     expect(mocks.invoke).toHaveBeenCalledTimes(1);
+  });
+
+  it("awards manual mission XP with a stable event type and mission metadata", async () => {
+    const mission = makeMission("m1", "connection");
+    mocks.existingMissionResponses.push({ data: [mission], error: null });
+    mocks.awardCustomXP.mockResolvedValue({ xpAwarded: mission.xp_reward });
+    mocks.checkDailyCompletionAchievement.mockResolvedValue(undefined);
+    mocks.checkFirstTimeAchievements.mockResolvedValue(undefined);
+
+    let dailyMissionCallCount = 0;
+    mocks.from.mockImplementation((table: string) => {
+      if (table !== "daily_missions") {
+        throw new Error(`Unexpected table access: ${table}`);
+      }
+
+      dailyMissionCallCount += 1;
+
+      if (dailyMissionCallCount === 1) {
+        return buildSelectQueryResponse();
+      }
+
+      if (dailyMissionCallCount === 2) {
+        const builder = {
+          update: () => builder,
+          eq: () => builder,
+          select: () => builder,
+          maybeSingle: () =>
+            Promise.resolve({
+              data: { ...mission, completed: true, completed_at: "2026-03-02T12:00:00.000Z" },
+              error: null,
+            }),
+        };
+        return builder;
+      }
+
+      if (dailyMissionCallCount === 3) {
+        const builder = {
+          select: () => builder,
+          eq: (() => {
+            let eqCount = 0;
+            return () => {
+              eqCount += 1;
+              if (eqCount >= 2) {
+                return Promise.resolve({ count: 1, error: null });
+              }
+              return builder;
+            };
+          })(),
+        };
+        return builder;
+      }
+
+      throw new Error(`Unexpected daily_missions access #${dailyMissionCallCount}`);
+    });
+
+    const { result } = renderHook(() => useDailyMissions(), {
+      wrapper: createHookWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.missions).toHaveLength(1);
+    });
+
+    await act(async () => {
+      await result.current.completeMission(mission.id);
+    });
+
+    expect(mocks.awardCustomXP).toHaveBeenCalledWith(
+      mission.xp_reward,
+      "mission_complete",
+      "Mission Complete!",
+      {
+        mission_id: mission.id,
+        mission_type: mission.mission_type,
+        mission_category: mission.category,
+      },
+    );
+    expect(mocks.toast).toHaveBeenCalledWith({
+      title: "Mission Complete!",
+      description: "XP awarded!",
+    });
+  });
+
+  it("does not show the success toast when mission XP awarding fails", async () => {
+    const mission = makeMission("m2", "growth");
+    const xpError = new Error("Unsupported event_type: mission_growth");
+    mocks.existingMissionResponses.push({ data: [mission], error: null });
+    mocks.awardCustomXP.mockRejectedValue(xpError);
+
+    let dailyMissionCallCount = 0;
+    mocks.from.mockImplementation((table: string) => {
+      if (table !== "daily_missions") {
+        throw new Error(`Unexpected table access: ${table}`);
+      }
+
+      dailyMissionCallCount += 1;
+
+      if (dailyMissionCallCount === 1) {
+        return buildSelectQueryResponse();
+      }
+
+      if (dailyMissionCallCount === 2) {
+        const builder = {
+          update: () => builder,
+          eq: () => builder,
+          select: () => builder,
+          maybeSingle: () =>
+            Promise.resolve({
+              data: { ...mission, completed: true, completed_at: "2026-03-02T12:00:00.000Z" },
+              error: null,
+            }),
+        };
+        return builder;
+      }
+
+      throw new Error(`Unexpected daily_missions access #${dailyMissionCallCount}`);
+    });
+
+    const { result } = renderHook(() => useDailyMissions(), {
+      wrapper: createHookWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.missions).toHaveLength(1);
+    });
+
+    await act(async () => {
+      await expect(result.current.completeMission(mission.id)).rejects.toThrow(xpError.message);
+    });
+
+    const successToasts = mocks.toast.mock.calls.filter(
+      (call) => call[0]?.title === "Mission Complete!" && call[0]?.description === "XP awarded!",
+    );
+    expect(successToasts).toHaveLength(0);
+    expect(mocks.toast).toHaveBeenCalledWith({
+      title: "Mission not completed",
+      description: xpError.message,
+      variant: "destructive",
+    });
   });
 });

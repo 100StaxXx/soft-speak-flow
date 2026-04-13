@@ -161,7 +161,11 @@ const getTargetSelectorsForMilestone = (milestoneId: GuidedMilestoneId): string[
     case "enter_title":
       return ['[data-tour="add-quest-title-input"]'];
     case "select_time":
-      return ['[data-tour="add-quest-time-chip"]', '[data-tour="add-quest-time-input"]'];
+      return [
+        '[data-tour="add-quest-time-panel"]',
+        '[data-tour="add-quest-time-input"]',
+        '[data-tour="add-quest-time-chip"]',
+      ];
     case "submit_create_quest":
       return ['[data-tour="add-quest-create-button"]', ...QUEST_ADD_LAUNCHER_SELECTORS];
     case "open_companion_tab":

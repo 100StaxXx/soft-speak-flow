@@ -1,13 +1,45 @@
 import type { ParsedTask } from "@/features/tasks/hooks";
 import { parseNaturalLanguage } from "@/features/tasks/hooks";
 import type { QuestComposerPrefillDraft } from "@/features/quests/types";
+import { format, startOfDay } from "date-fns";
 
 const QUEST_WEEKDAYS = [0, 1, 2, 3, 4] as const;
+const MONTH_NAME_PATTERN = String.raw`(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)`;
+const WEEKDAY_NAME_PATTERN = String.raw`(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)`;
 
 const trimOrNull = (value: string | null | undefined): string | null => {
   const trimmed = value?.trim();
   return trimmed ? trimmed : null;
 };
+
+const resolveOrdinalVoiceDate = (transcript: string): string | null => {
+  const ordinalMatch = transcript.match(
+    /\b(?:on\s+)?(?:the\s+)?(\d{1,2})(?:st|nd|rd|th)\b/i,
+  );
+
+  if (!ordinalMatch) return null;
+
+  const dayOfMonth = Number.parseInt(ordinalMatch[1] ?? "", 10);
+  if (!Number.isFinite(dayOfMonth) || dayOfMonth < 1 || dayOfMonth > 31) {
+    return null;
+  }
+
+  const today = startOfDay(new Date());
+
+  for (let monthOffset = 0; monthOffset < 14; monthOffset += 1) {
+    const candidate = new Date(today.getFullYear(), today.getMonth() + monthOffset, dayOfMonth);
+
+    if (candidate.getDate() !== dayOfMonth) continue;
+    if (candidate < today) continue;
+
+    return format(candidate, "yyyy-MM-dd");
+  }
+
+  return null;
+};
+
+const resolveVoiceScheduledDate = (parsed: ParsedTask, transcript: string) =>
+  parsed.scheduledDate ?? resolveOrdinalVoiceDate(transcript);
 
 const resolvePrefillTitle = (parsed: ParsedTask, transcript: string) => {
   const sanitizeTitle = (value: string) =>
@@ -22,10 +54,22 @@ const resolvePrefillTitle = (parsed: ParsedTask, transcript: string) => {
       /\snotes?:/i,
       /\sin\s+half\s*(?:an?\s*)?hour\b/i,
       /\sin\s+(?:\d+|a|an|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety(?:[-\s](?:one|two|three|four|five|six|seven|eight|nine))?)\s*(?:h(?:ours?|rs?)|m(?:in(?:ute)?s?)?)\b/i,
+      /\sday\s*after\s*tomorrow\b/i,
       /\stomorrow\b/i,
       /\stoday\b/i,
-      /\sday\s*after\s*tomorrow\b/i,
-      /\snext\s+\w+/i,
+      new RegExp(String.raw`\snext\s+${WEEKDAY_NAME_PATTERN}\b`, "i"),
+      /\snext\s+week(?:end)?\b/i,
+      /\snext\s+month\b/i,
+      /\sthis\s+weekend\b/i,
+      new RegExp(String.raw`\s+on\s+the\s+\d{1,2}(?:st|nd|rd|th)\b`, "i"),
+      new RegExp(String.raw`\s+the\s+\d{1,2}(?:st|nd|rd|th)\b`, "i"),
+      new RegExp(String.raw`\s+on\s+\d{1,2}(?:st|nd|rd|th)\b`, "i"),
+      new RegExp(String.raw`\s+on\s+${MONTH_NAME_PATTERN}\s+\d{1,2}(?:st|nd|rd|th)?\b`, "i"),
+      new RegExp(String.raw`\s+${MONTH_NAME_PATTERN}\s+\d{1,2}(?:st|nd|rd|th)?\b`, "i"),
+      new RegExp(String.raw`\s+on\s+\d{1,2}(?:st|nd|rd|th)?\s+${MONTH_NAME_PATTERN}\b`, "i"),
+      new RegExp(String.raw`\s+\d{1,2}(?:st|nd|rd|th)?\s+${MONTH_NAME_PATTERN}\b`, "i"),
+      /\s+on\s+\d{1,2}[/-]\d{1,2}\b/i,
+      /\s+\d{1,2}[/-]\d{1,2}\b/i,
       /\sat\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)?\b/i,
       /\s(?:for|with)\s+\d+\s*(?:h(?:ours?)?|m(?:in(?:ute)?s?)?)\b/i,
       /\s(?:it(?:'s| is)\s+)?(?:gonna|going\s+to|will|should|can|could)?\s*(?:last|take|run|be)\b/i,
@@ -154,11 +198,16 @@ const resolveRecurrencePrefill = (
 export function buildVoiceQuestPrefillFromTranscript(transcript: string): QuestComposerPrefillDraft {
   const cleanedTranscript = transcript.trim();
   const parsed = parseNaturalLanguage(cleanedTranscript);
-  const recurrencePrefill = resolveRecurrencePrefill(parsed);
+  const resolvedScheduledDate = resolveVoiceScheduledDate(parsed, cleanedTranscript);
+  const parsedWithVoiceSchedule =
+    resolvedScheduledDate === parsed.scheduledDate
+      ? parsed
+      : { ...parsed, scheduledDate: resolvedScheduledDate };
+  const recurrencePrefill = resolveRecurrencePrefill(parsedWithVoiceSchedule);
 
   return {
-    text: resolvePrefillTitle(parsed, cleanedTranscript),
-    taskDate: parsed.scheduledDate,
+    text: resolvePrefillTitle(parsedWithVoiceSchedule, cleanedTranscript),
+    taskDate: resolvedScheduledDate,
     difficulty: parsed.difficulty,
     scheduledTime: parsed.scheduledTime,
     estimatedDuration: parsed.estimatedDuration,

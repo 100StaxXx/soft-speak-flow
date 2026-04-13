@@ -1330,6 +1330,7 @@ describe("AddQuestSheet", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Time" }));
     expect(dispatchSpy).not.toHaveBeenCalledWith(expect.objectContaining({ type: "add-quest-time-selected" }));
+    expect(document.querySelector('[data-tour="add-quest-time-panel"]')).not.toBeNull();
 
     const explicitTimeButton = document.querySelector('[data-tour="add-quest-time-slot"]');
     expect(explicitTimeButton).not.toBeNull();

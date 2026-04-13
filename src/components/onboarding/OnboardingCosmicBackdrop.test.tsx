@@ -4,12 +4,6 @@ import {
   OnboardingCosmicBackdrop,
   resolveOnboardingBackdropPreset,
 } from "./OnboardingCosmicBackdrop";
-import {
-  galaxyPortalBackground,
-  welcomeBackground,
-  cosmicPath1Background,
-  cosmicPath2Background,
-} from "@/assets/backgrounds";
 import { useMotionProfile } from "@/hooks/useMotionProfile";
 
 vi.mock("@/hooks/useMotionProfile", () => ({
@@ -39,12 +33,22 @@ describe("OnboardingCosmicBackdrop", () => {
     mockedUseMotionProfile.mockReturnValue(defaultMotionProfile);
   });
 
-  it("resolves stage presets to the curated onboarding photo set", () => {
-    expect(resolveOnboardingBackdropPreset("prologue").background).toEqual(welcomeBackground);
-    expect(resolveOnboardingBackdropPreset("destiny").background).toEqual(galaxyPortalBackground);
-    expect(resolveOnboardingBackdropPreset("questionnaire").background).toEqual(cosmicPath1Background);
-    expect(resolveOnboardingBackdropPreset("calculating").background).toEqual(cosmicPath1Background);
-    expect(resolveOnboardingBackdropPreset("journey-begins").background).toEqual(cosmicPath2Background);
+  it("resolves stage presets to abstract cosmic backdrop values", () => {
+    expect(resolveOnboardingBackdropPreset("prologue")).toMatchObject({
+      ringScale: 0.92,
+      particleDensity: 12,
+      accentStrength: 0.2,
+    });
+    expect(resolveOnboardingBackdropPreset("calculating")).toMatchObject({
+      ringScale: 1.16,
+      ringOpacity: 0.34,
+      particleDensity: 16,
+    });
+    expect(resolveOnboardingBackdropPreset("journey-begins")).toMatchObject({
+      ringScale: 1.1,
+      ringSpread: 0.22,
+      vignetteOpacity: 0.54,
+    });
   });
 
   it("renders faction tint only when a faction is provided", () => {
@@ -70,14 +74,15 @@ describe("OnboardingCosmicBackdrop", () => {
     });
 
     const { container } = render(<OnboardingCosmicBackdrop stage="calculating" />);
-    expect(screen.getByTestId("onb-photo-backdrop")).toBeInTheDocument();
+    expect(screen.queryByTestId("onb-photo-backdrop")).not.toBeInTheDocument();
     expect(container.querySelectorAll(".onb-animated")).toHaveLength(0);
   });
 
-  it("renders the stage photo backdrop with the mapped image source", () => {
+  it("renders the abstract ring layers instead of a photo backdrop", () => {
     render(<OnboardingCosmicBackdrop stage="journey-begins" />);
 
-    const backdrop = screen.getByTestId("onb-photo-backdrop") as HTMLImageElement;
-    expect(backdrop.src).toContain(cosmicPath2Background.src);
+    expect(screen.queryByTestId("onb-photo-backdrop")).not.toBeInTheDocument();
+    expect(document.querySelectorAll(".onb-cosmic-ring")).toHaveLength(4);
+    expect(document.querySelectorAll(".onb-cosmic-particle").length).toBeGreaterThan(0);
   });
 });

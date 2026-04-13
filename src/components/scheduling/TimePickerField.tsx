@@ -1,4 +1,13 @@
-import { type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type ButtonHTMLAttributes,
+  type HTMLAttributes,
+  type InputHTMLAttributes,
+  type ReactNode,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { ChevronRight, Clock } from "lucide-react";
 import { centerSelectedTimeInWheel } from "@/components/quest-shared";
 import { Input } from "@/components/ui/input";
@@ -27,6 +36,7 @@ export interface TimePickerFieldProps {
   endTimeHint?: string | null;
   suggestionAction?: ReactNode;
   triggerProps?: ButtonHTMLAttributes<HTMLButtonElement>;
+  panelProps?: HTMLAttributes<HTMLDivElement>;
   inputProps?: Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "value" | "onChange">;
   getSlotButtonProps?: (slot: string) => ButtonHTMLAttributes<HTMLButtonElement> | undefined;
   className?: string;
@@ -45,6 +55,7 @@ export function TimePickerField({
   endTimeHint,
   suggestionAction,
   triggerProps,
+  panelProps,
   inputProps,
   getSlotButtonProps,
   className,
@@ -107,7 +118,10 @@ export function TimePickerField({
       </div>
 
       {open ? (
-        <div className={styles.panel}>
+        <div
+          {...panelProps}
+          className={cn(styles.panel, panelProps?.className)}
+        >
           <Input
             type="time"
             step={60}

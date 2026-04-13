@@ -1,13 +1,5 @@
 import { useMemo, type CSSProperties } from "react";
 import { useMotionProfile } from "@/hooks/useMotionProfile";
-import {
-  galaxyPortalBackground,
-  getStaticBackgroundSrcSet,
-  type StaticBackgroundAsset,
-  welcomeBackground,
-  cosmicPath1Background,
-  cosmicPath2Background,
-} from "@/assets/backgrounds";
 import type { FactionType } from "./FactionSelector";
 
 export type OnboardingBackdropStage =
@@ -20,72 +12,66 @@ export type OnboardingBackdropStage =
 export type OnboardingMotionLevel = "subtle" | "balanced" | "high";
 
 export interface OnboardingBackdropPreset {
-  background: StaticBackgroundAsset;
-  mobileObjectPosition: string;
-  desktopObjectPosition: string;
+  ringScale: number;
+  ringOpacity: number;
+  ringSpread: number;
   hazeOpacity: number;
+  particleDensity: number;
   accentStrength: number;
   centerMaskOpacity: number;
   vignetteOpacity: number;
-  topScrimOpacity: number;
-  bottomScrimOpacity: number;
 }
 
 export const ONBOARDING_BACKDROP_PRESETS: Record<OnboardingBackdropStage, OnboardingBackdropPreset> = {
   prologue: {
-    background: welcomeBackground,
-    mobileObjectPosition: "50% 36%",
-    desktopObjectPosition: "50% 42%",
-    hazeOpacity: 0.14,
-    accentStrength: 0.12,
-    centerMaskOpacity: 0.44,
-    vignetteOpacity: 0.44,
-    topScrimOpacity: 0.34,
-    bottomScrimOpacity: 0.52,
+    ringScale: 0.92,
+    ringOpacity: 0.18,
+    ringSpread: 0.16,
+    hazeOpacity: 0.52,
+    particleDensity: 12,
+    accentStrength: 0.2,
+    centerMaskOpacity: 0.42,
+    vignetteOpacity: 0.48,
   },
   destiny: {
-    background: galaxyPortalBackground,
-    mobileObjectPosition: "50% 34%",
-    desktopObjectPosition: "50% 40%",
-    hazeOpacity: 0.16,
-    accentStrength: 0.12,
+    ringScale: 0.98,
+    ringOpacity: 0.24,
+    ringSpread: 0.18,
+    hazeOpacity: 0.58,
+    particleDensity: 14,
+    accentStrength: 0.24,
     centerMaskOpacity: 0.38,
-    vignetteOpacity: 0.48,
-    topScrimOpacity: 0.3,
-    bottomScrimOpacity: 0.48,
+    vignetteOpacity: 0.5,
   },
   questionnaire: {
-    background: cosmicPath1Background,
-    mobileObjectPosition: "50% 28%",
-    desktopObjectPosition: "50% 34%",
-    hazeOpacity: 0.18,
-    accentStrength: 0.14,
-    centerMaskOpacity: 0.46,
-    vignetteOpacity: 0.56,
-    topScrimOpacity: 0.42,
-    bottomScrimOpacity: 0.58,
+    ringScale: 1.02,
+    ringOpacity: 0.23,
+    ringSpread: 0.2,
+    hazeOpacity: 0.56,
+    particleDensity: 13,
+    accentStrength: 0.28,
+    centerMaskOpacity: 0.36,
+    vignetteOpacity: 0.48,
   },
   calculating: {
-    background: cosmicPath1Background,
-    mobileObjectPosition: "50% 24%",
-    desktopObjectPosition: "50% 30%",
-    hazeOpacity: 0.2,
-    accentStrength: 0.16,
-    centerMaskOpacity: 0.5,
-    vignetteOpacity: 0.6,
-    topScrimOpacity: 0.48,
-    bottomScrimOpacity: 0.66,
+    ringScale: 1.16,
+    ringOpacity: 0.34,
+    ringSpread: 0.26,
+    hazeOpacity: 0.62,
+    particleDensity: 16,
+    accentStrength: 0.3,
+    centerMaskOpacity: 0.34,
+    vignetteOpacity: 0.52,
   },
   "journey-begins": {
-    background: cosmicPath2Background,
-    mobileObjectPosition: "50% 26%",
-    desktopObjectPosition: "50% 36%",
-    hazeOpacity: 0.16,
-    accentStrength: 0.12,
-    centerMaskOpacity: 0.42,
-    vignetteOpacity: 0.52,
-    topScrimOpacity: 0.38,
-    bottomScrimOpacity: 0.56,
+    ringScale: 1.1,
+    ringOpacity: 0.3,
+    ringSpread: 0.22,
+    hazeOpacity: 0.6,
+    particleDensity: 15,
+    accentStrength: 0.28,
+    centerMaskOpacity: 0.33,
+    vignetteOpacity: 0.54,
   },
 };
 
@@ -94,6 +80,14 @@ const FACTION_ACCENTS: Record<FactionType, string> = {
   void: "272 78% 60%",
   stellar: "198 86% 62%",
 };
+
+const MOTION_MULTIPLIER: Record<OnboardingMotionLevel, number> = {
+  subtle: 0.72,
+  balanced: 1,
+  high: 1.25,
+};
+
+const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 
 export const resolveOnboardingBackdropPreset = (stage: OnboardingBackdropStage): OnboardingBackdropPreset =>
   ONBOARDING_BACKDROP_PRESETS[stage];
@@ -134,20 +128,40 @@ export const OnboardingCosmicBackdrop = ({
   const isReducedMotion = !allowsAnimation;
   const animationEnabled = allowsAnimation && motionLevel !== "subtle";
 
+  const particleCount = useMemo(() => {
+    const scaledCount = Math.round(preset.particleDensity * MOTION_MULTIPLIER[motionLevel]);
+    const liteCap = Math.max(4, Math.floor(capabilities.maxParticles * 0.45));
+    const maxCount = isReducedMotion ? liteCap : capabilities.maxParticles;
+    return clamp(scaledCount, 4, maxCount);
+  }, [capabilities.maxParticles, isReducedMotion, motionLevel, preset.particleDensity]);
+
   const particles = useMemo<Particle[]>(() => {
-    const baseCount = motionLevel === "high" ? 8 : motionLevel === "subtle" ? 4 : 6;
-    const particleCount = isReducedMotion ? 0 : Math.min(baseCount, capabilities.maxParticles);
     return Array.from({ length: particleCount }, (_, index) => ({
       id: index,
       x: Math.random() * 100,
       y: Math.random() * 100,
-      size: Math.random() * 1.4 + 0.8,
-      opacity: Math.random() * 0.22 + 0.1,
+      size: Math.random() * 1.8 + 0.8,
+      opacity: Math.random() * 0.45 + 0.25,
       delay: Math.random() * 4,
-      duration: Math.random() * 10 + 14,
-      driftDistance: Math.random() * 20 + 12,
+      duration: Math.random() * 9 + 12,
+      driftDistance: Math.random() * 32 + 18,
     }));
-  }, [capabilities.maxParticles, isReducedMotion, motionLevel, stage]);
+  }, [particleCount, stage]);
+
+  const ringLayers = useMemo(
+    () =>
+      Array.from({ length: 4 }, (_, index) => {
+        const spread = 1 + preset.ringSpread * index;
+        return {
+          id: index,
+          size: (56 + index * 16) * preset.ringScale * spread,
+          opacity: Math.max(0.08, preset.ringOpacity - index * 0.04),
+          duration: 16 + index * 4,
+          delay: index * 1.3,
+        };
+      }),
+    [preset.ringOpacity, preset.ringScale, preset.ringSpread],
+  );
 
   const factionTintStyle = useMemo<CSSProperties | undefined>(() => {
     if (!factionAccent) return undefined;
@@ -157,27 +171,6 @@ export const OnboardingCosmicBackdrop = ({
     };
   }, [factionAccent, preset.accentStrength]);
 
-  const backgroundStyle = useMemo<CSSProperties>(
-    () => ({
-      ["--onb-photo-mobile-position" as string]: preset.mobileObjectPosition,
-      ["--onb-photo-desktop-position" as string]: preset.desktopObjectPosition,
-    }),
-    [preset.desktopObjectPosition, preset.mobileObjectPosition],
-  );
-
-  const backgroundSrcSet = useMemo(
-    () => getStaticBackgroundSrcSet(preset.background),
-    [preset.background],
-  );
-
-  const scrimStyle = useMemo<CSSProperties>(
-    () => ({
-      ["--onb-top-scrim-opacity" as string]: `${preset.topScrimOpacity}`,
-      ["--onb-bottom-scrim-opacity" as string]: `${preset.bottomScrimOpacity}`,
-    }),
-    [preset.bottomScrimOpacity, preset.topScrimOpacity],
-  );
-
   return (
     <div
       className="onb-cosmic-backdrop absolute inset-0 z-0 overflow-hidden pointer-events-none"
@@ -186,19 +179,6 @@ export const OnboardingCosmicBackdrop = ({
       data-reduced-motion={isReducedMotion}
     >
       <div className="absolute inset-0 onb-cosmic-base" />
-      <picture className="absolute inset-0">
-        <source srcSet={backgroundSrcSet} />
-        <img
-          alt=""
-          aria-hidden="true"
-          className="absolute inset-0 h-full w-full object-cover onb-photo-backdrop"
-          data-testid="onb-photo-backdrop"
-          src={preset.background.src}
-          style={backgroundStyle}
-        />
-      </picture>
-
-      <div className="absolute inset-0 onb-photo-scrim" style={scrimStyle} />
 
       <div
         className={`absolute inset-0 onb-nebula-haze ${animationEnabled ? "onb-animate-nebula-drift onb-animated" : ""}`}
@@ -212,6 +192,22 @@ export const OnboardingCosmicBackdrop = ({
           style={factionTintStyle}
         />
       )}
+
+      <div className="absolute inset-0 flex items-center justify-center">
+        {ringLayers.map((ring) => (
+          <div
+            key={`ring-${ring.id}`}
+            className={`onb-cosmic-ring ${animationEnabled ? "onb-animate-ring-breathe onb-animated" : ""}`}
+            style={{
+              width: `${ring.size}vmax`,
+              height: `${ring.size}vmax`,
+              opacity: ring.opacity,
+              animationDuration: `${ring.duration}s`,
+              animationDelay: `${ring.delay}s`,
+            }}
+          />
+        ))}
+      </div>
 
       <div className="absolute inset-0">
         {particles.map((particle) => (

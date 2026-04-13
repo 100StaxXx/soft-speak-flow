@@ -786,6 +786,9 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                   triggerProps={{
                     "data-tour": "add-quest-time-chip",
                   }}
+                  panelProps={{
+                    "data-tour": "add-quest-time-panel",
+                  }}
                   inputProps={{
                     "data-tour": "add-quest-time-input",
                     onBlur: handleTimeInputBlur,

@@ -52,6 +52,16 @@ describe("buildVoiceQuestPrefillFromTranscript", () => {
     }));
   });
 
+  it("removes bare ordinal date phrasing from the voice title while preserving the scheduled date", () => {
+    const prefill = buildVoiceQuestPrefillFromTranscript("Pilates on the 14th");
+
+    expect(prefill).toEqual(expect.objectContaining({
+      text: "Pilates",
+      taskDate: "2026-04-14",
+      creationSource: "voice",
+    }));
+  });
+
   it("strips spoken duration phrasing from the quest title while keeping the parsed minutes", () => {
     const prefill = buildVoiceQuestPrefillFromTranscript("Deep work it's gonna last 60 minutes tomorrow");
 
@@ -59,6 +69,28 @@ describe("buildVoiceQuestPrefillFromTranscript", () => {
       text: "Deep work",
       taskDate: "2026-04-10",
       estimatedDuration: 60,
+    }));
+  });
+
+  it("removes relative scheduling phrases from the title while keeping the parsed date and time", () => {
+    const prefill = buildVoiceQuestPrefillFromTranscript("Pilates tomorrow at 8am");
+
+    expect(prefill).toEqual(expect.objectContaining({
+      text: "Pilates",
+      taskDate: "2026-04-10",
+      scheduledTime: "08:00",
+      creationSource: "voice",
+    }));
+  });
+
+  it("removes weekday scheduling phrases from the title while keeping the parsed schedule", () => {
+    const prefill = buildVoiceQuestPrefillFromTranscript("Pilates next Tuesday at 8am");
+
+    expect(prefill).toEqual(expect.objectContaining({
+      text: "Pilates",
+      taskDate: "2026-04-14",
+      scheduledTime: "08:00",
+      creationSource: "voice",
     }));
   });
 

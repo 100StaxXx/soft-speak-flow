@@ -283,9 +283,13 @@ export const useDailyMissions = () => {
       // Award XP with display reason
       await awardCustomXP(
         mission.xp_reward, 
-        `mission_${mission.mission_type}`, 
+        "mission_complete",
         "Mission Complete!",
-        { mission_id: mission.id }
+        {
+          mission_id: mission.id,
+          mission_type: mission.mission_type,
+          mission_category: mission.category,
+        }
       );
       
       // Check for first mission achievement

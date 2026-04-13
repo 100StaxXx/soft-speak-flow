@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   awardDisciplineForHabitCompletionMock: vi.fn(),
   triggerQuestCompleteMock: vi.fn().mockResolvedValue(undefined),
   invalidateQueriesMock: vi.fn().mockResolvedValue(undefined),
+  loggerErrorMock: vi.fn(),
 }));
 
 vi.mock("@/integrations/supabase/client", () => ({
@@ -77,6 +78,15 @@ vi.mock("./useLivingCompanion", () => ({
   }),
 }));
 
+vi.mock("@/utils/logger", () => ({
+  logger: {
+    error: mocks.loggerErrorMock,
+    log: vi.fn(),
+    warn: vi.fn(),
+    info: vi.fn(),
+  },
+}));
+
 vi.mock("@tanstack/react-query", async () => {
   const actual = await vi.importActual<typeof import("@tanstack/react-query")>("@tanstack/react-query");
   return {
@@ -113,6 +123,7 @@ describe("useXPRewards discipline rebalance", () => {
     mocks.updateFromStreakMilestoneMock.mockClear();
     mocks.awardDisciplineForHabitCompletionMock.mockClear();
     mocks.invalidateQueriesMock.mockClear();
+    mocks.loggerErrorMock.mockClear();
   });
 
   it("keeps check-ins on the alignment path without touching discipline", async () => {
@@ -181,5 +192,26 @@ describe("useXPRewards discipline rebalance", () => {
     });
     expect(mocks.showXPToastMock).toHaveBeenCalledTimes(1);
     expect(mocks.showXPToastMock).toHaveBeenCalledWith(8, "Pep Talk Listened!");
+  });
+
+  it("rethrows custom XP award failures after logging them", async () => {
+    const xpError = new Error("Unsupported event_type: mission_growth");
+    mocks.awardXPMutateAsyncMock.mockRejectedValueOnce(xpError);
+
+    const { result } = renderHook(() => useXPRewards(), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await expect(
+        result.current.awardCustomXP(8, "mission_complete", "Mission Complete!", {
+          mission_id: "mission-1",
+          mission_type: "growth",
+        }),
+      ).rejects.toThrow(xpError.message);
+    });
+
+    expect(mocks.showXPToastMock).toHaveBeenCalledWith(8, "Mission Complete!");
+    expect(mocks.loggerErrorMock).toHaveBeenCalledWith("Error awarding custom XP:", xpError);
   });
 });
