@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState, useEffect, useLayoutEffect, useCallback, memo, type CSSProperties, type MouseEvent as ReactMouseEvent } from "react";
 import { createPortal } from "react-dom";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTimelineDrag } from "@/hooks/useTimelineDrag";
 import { addDays, format, isSameDay } from "date-fns";
 import { AnimatePresence, motion, useMotionValue, useReducedMotion, type MotionValue } from "framer-motion";
@@ -51,8 +51,10 @@ import { cn, formatDisplayLabel, stripMarkdown } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { MAIN_QUEST_XP_MULTIPLIER } from "@/config/xpRewards";
 
+import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { playStrikethrough } from "@/utils/soundEffects";
+import { loadLocalHabits } from "@/utils/plannerSync";
 
 import { type DragHandleProps as ListDragHandleProps } from "./DraggableTaskList";
 import { MarqueeText } from "@/components/ui/marquee-text";
@@ -73,6 +75,7 @@ import {
   DesktopQuestDetailsPopover,
 } from "@/components/DesktopQuestDetailsPopover";
 import { QUEST_LAUNCHER_SCROLL_CLEARANCE_PX } from "@/components/quest-launchers/metrics";
+import type { Habit } from "@/features/habits/types";
 
 // Helper to calculate days remaining
 const getDaysLeft = (epic: { start_date: string; target_days: number; end_date?: string | null }) =>
@@ -138,6 +141,10 @@ interface DisplayAttachment {
 }
 
 const FALLBACK_ATTACHMENT_NAME = "Photo attachment";
+type HabitWithDescription = Habit & { description?: string | null };
+
+const normalizeDetailText = (text: string | null | undefined): string =>
+  stripMarkdown(text).replace(/\s+/g, " ").trim();
 
 const normalizeDisplayAttachments = (task: Task): DisplayAttachment[] => {
   const normalized = (task.attachments ?? [])
@@ -644,6 +651,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   hasCalendarLink,
   onOpenMonthView,
 }: TodaysAgendaProps) {
+  const { user } = useAuth();
   const prefersReducedMotion = useReducedMotion();
   const { capabilities } = useMotionProfile();
   const [isDesktopLayout, setIsDesktopLayout] = useState(() => {
@@ -664,7 +672,25 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   const mobileFabScrollClearance = isDesktopLayout ? undefined : `${MOBILE_FAB_SCROLL_CLEARANCE_PX}px`;
   const { profile } = useProfile();
   const queryClient = useQueryClient();
+  const habitsQuery = useQuery({
+    queryKey: ["habits", user?.id],
+    queryFn: async () => {
+      if (!user?.id) throw new Error("User not authenticated");
+      return loadLocalHabits(user.id) as Promise<HabitWithDescription[]>;
+    },
+    enabled: !!user?.id,
+  });
   const keepInPlace = profile?.completed_tasks_stay_in_place ?? true;
+  const habitDescriptionById = useMemo(() => {
+    const descriptions = new Map<string, string>();
+    for (const habit of habitsQuery.data ?? []) {
+      const description = habit.description?.trim();
+      if (description) {
+        descriptions.set(habit.id, description);
+      }
+    }
+    return descriptions;
+  }, [habitsQuery.data]);
 
   const toggleSubtask = useMutation({
     mutationFn: async ({
@@ -1816,9 +1842,13 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   // Check if a task has expandable details
   const hasExpandableDetails = useCallback((task: Task) => {
     const displayAttachments = normalizeDisplayAttachments(task);
+    const ritualDescription = task.habit_source_id
+      ? habitDescriptionById.get(task.habit_source_id) ?? null
+      : null;
     return !!(
       (task.subtasks && task.subtasks.length > 0) ||
       displayAttachments.length > 0 ||
+      normalizeDetailText(ritualDescription) ||
       task.notes || 
       task.priority || 
       task.estimated_duration || 
@@ -1826,7 +1856,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       task.difficulty ||
       task.category
     );
-  }, []);
+  }, [habitDescriptionById]);
 
   const toggleTaskExpanded = useCallback((taskId: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -1875,6 +1905,13 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     const subtasks = task.subtasks ?? [];
     const displayAttachments = normalizeDisplayAttachments(task);
     const completedSubtaskCount = subtasks.filter(subtask => !!subtask.completed).length;
+    const ritualDescription = isRitual && task.habit_source_id
+      ? habitDescriptionById.get(task.habit_source_id) ?? null
+      : null;
+    const normalizedRitualDescription = normalizeDetailText(ritualDescription);
+    const normalizedTaskNotes = normalizeDetailText(task.notes);
+    const shouldRenderRitualDescription = normalizedRitualDescription.length > 0;
+    const shouldRenderNotes = normalizedTaskNotes.length > 0 && normalizedTaskNotes !== normalizedRitualDescription;
     const hasDetailBadges = !!(
       (CategoryIcon && task.category) ||
       task.difficulty ||
@@ -2320,8 +2357,20 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                 </div>
               )}
 
+              {shouldRenderRitualDescription && (
+                useLiteAnimations ? (
+                  <p className="text-sm leading-relaxed whitespace-pre-line text-celestial-blue/80">
+                    {stripMarkdown(ritualDescription)}
+                  </p>
+                ) : (
+                  <motion.p className="text-sm leading-relaxed whitespace-pre-line text-celestial-blue/80">
+                    {stripMarkdown(ritualDescription)}
+                  </motion.p>
+                )
+              )}
+
               {/* Notes */}
-              {task.notes && (
+              {shouldRenderNotes && (
                 useLiteAnimations ? (
                   <div className="flex items-start gap-2 text-sm text-muted-foreground">
                     <FileText className="w-4 h-4 flex-shrink-0 mt-0.5" />
@@ -2410,6 +2459,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     onMoveQuestToNextDay,
     expandedTasks,
     hasExpandableDetails,
+    habitDescriptionById,
     toggleTaskExpanded,
     justCompletedTasks,
     optimisticCompleted,

@@ -5,6 +5,19 @@
 - The Edge Function constructs a Supabase client using the `SUPABASE_SERVICE_ROLE_KEY` and calls the `delete_user_account` RPC before removing the user through `supabase.auth.admin.deleteUser`.
 - The SQL function `delete_user_account` is defined in migrations and requires execution with the `service_role` role.
 
+## 2026-04-12 production drift verification
+- Linked Supabase project ref: `opbfpbbqvuksuvmtmssd` from `supabase/config.toml`.
+- Remote `delete-user` function status:
+  - `ACTIVE`
+  - version `16`
+  - last updated `2026-04-04 18:16:01 UTC`
+- Remote migration history is behind local repo state. As of 2026-04-12, the linked project is missing these local migrations:
+  - `20260411111500_cap_astral_encounter_daily_xp.sql`
+  - `20260411143000_refine_daily_mission_pulse_percentages.sql`
+  - `20260412113000_fix_delete_user_account_companion_fk_cleanup.sql`
+  - `20260412134500_notification_install_dedupe.sql`
+- The account-deletion-specific drift is the missing `20260412113000_fix_delete_user_account_companion_fk_cleanup.sql` migration plus the older April 4 `delete-user` deploy. That is enough to explain why production can still return the old generic failure surface.
+
 ## Likely root causes of non-2xx responses
 1. **Missing service role secret in the Edge Function environment**
    - The Edge Function hard-requires both `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`. If the service role key is not present, it throws `"Missing Supabase environment variables"`, which results in a 500 response.

@@ -67,6 +67,19 @@ const isAccountDeletionStage = (value: unknown): value is AccountDeletionStage =
 const getAccountDeletionStage = (value: unknown): AccountDeletionStage | undefined =>
   isAccountDeletionStage(value) ? value : undefined;
 
+const inferAccountDeletionStageFromCode = (code?: string): AccountDeletionStage | undefined => {
+  switch (code) {
+    case "ACCOUNT_DELETION_STORAGE_CLEANUP_FAILED":
+      return "storage_cleanup";
+    case "ACCOUNT_DELETION_RELATIONAL_CLEANUP_FAILED":
+      return "relational_cleanup";
+    case "ACCOUNT_DELETION_AUTH_DELETE_FAILED":
+      return "auth_delete";
+    default:
+      return undefined;
+  }
+};
+
 const getParsedFunctionCode = (parsed: ParsedFunctionInvokeError): string | undefined =>
   parsed.code ?? parsed.responsePayload?.code;
 
@@ -74,7 +87,7 @@ const getParsedFunctionRequestId = (parsed: ParsedFunctionInvokeError): string |
   parsed.requestId ?? parsed.responsePayload?.requestId;
 
 const getParsedFunctionStage = (parsed: ParsedFunctionInvokeError): AccountDeletionStage | undefined =>
-  getAccountDeletionStage(parsed.responsePayload?.stage);
+  getAccountDeletionStage(parsed.responsePayload?.stage) ?? inferAccountDeletionStageFromCode(getParsedFunctionCode(parsed));
 
 const normalizeWarnings = (raw: unknown): AccountDeletionWarning[] => {
   if (!Array.isArray(raw)) return [];
@@ -171,11 +184,17 @@ export const getAccountDeletionErrorMetadata = (error: unknown): AccountDeletion
   }
 
   const candidate = error as AccountDeletionErrorMetadata;
+  const code = typeof candidate.code === "string" ? candidate.code : undefined;
+  const stage =
+    isAccountDeletionStage(candidate.stage)
+      ? candidate.stage
+      : inferAccountDeletionStageFromCode(code);
+
   return {
-    ...(typeof candidate.code === "string" ? { code: candidate.code } : {}),
+    ...(code ? { code } : {}),
     ...(typeof candidate.status === "number" ? { status: candidate.status } : {}),
     ...(typeof candidate.requestId === "string" ? { requestId: candidate.requestId } : {}),
-    ...(isAccountDeletionStage(candidate.stage) ? { stage: candidate.stage } : {}),
+    ...(stage ? { stage } : {}),
   };
 };
 
@@ -243,7 +262,7 @@ export const deleteCurrentAccount = async ({ queryClient, userId, signOut }: Del
         code: data?.code,
         status: data?.status,
         requestId: data?.requestId,
-        stage: getAccountDeletionStage(data?.stage),
+        stage: getAccountDeletionStage(data?.stage) ?? inferAccountDeletionStageFromCode(data?.code),
       },
       data,
     );

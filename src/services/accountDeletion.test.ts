@@ -206,6 +206,48 @@ describe("accountDeletion", () => {
     );
   });
 
+  it("infers a stage-specific failure from the edge function code when stage is omitted", async () => {
+    const rawError = new Error("Edge function returned a non-2xx status code");
+    mocks.invoke.mockResolvedValue({
+      data: null,
+      error: rawError,
+    });
+    mocks.parseFunctionInvokeError.mockResolvedValue({
+      category: "http",
+      status: 500,
+      message: "Edge function returned a non-2xx status code",
+      backendMessage: "Account deletion is temporarily unavailable. Please try again later.",
+      code: "ACCOUNT_DELETION_RELATIONAL_CLEANUP_FAILED",
+      responsePayload: {
+        error: "Account deletion is temporarily unavailable. Please try again later.",
+        code: "ACCOUNT_DELETION_RELATIONAL_CLEANUP_FAILED",
+        requestId: "req-delete-code-only",
+      },
+      requestId: "req-delete-code-only",
+      retryAfterSeconds: undefined,
+      upstreamStatus: undefined,
+      upstreamError: undefined,
+      isOffline: false,
+      name: "FunctionsHttpError",
+    });
+
+    const error = await deleteCurrentAccount({
+      queryClient,
+      userId: "user-1",
+      signOut,
+    }).catch((caughtError) => caughtError);
+
+    expect(getAccountDeletionErrorMetadata(error)).toEqual({
+      code: "ACCOUNT_DELETION_RELATIONAL_CLEANUP_FAILED",
+      status: 500,
+      requestId: "req-delete-code-only",
+      stage: "relational_cleanup",
+    });
+    expect(getAccountDeletionFailureMessage(error)).toBe(
+      "We couldn't finish removing your account data, so your account wasn't removed. Please try again.",
+    );
+  });
+
   it("maps non-success function payloads without clearing local state", async () => {
     mocks.invoke.mockResolvedValue({
       data: {
@@ -236,6 +278,33 @@ describe("accountDeletion", () => {
     );
     expect(mocks.clearAuthScopedClientState).not.toHaveBeenCalled();
     expect(signOut).not.toHaveBeenCalled();
+  });
+
+  it("infers a stage-specific failure from a non-success payload code when stage is omitted", async () => {
+    mocks.invoke.mockResolvedValue({
+      data: {
+        success: false,
+        code: "ACCOUNT_DELETION_STORAGE_CLEANUP_FAILED",
+        error: "Account deletion is temporarily unavailable. Please try again later.",
+        requestId: "req-delete-payload-code-only",
+      },
+      error: null,
+    });
+
+    const error = await deleteCurrentAccount({
+      queryClient,
+      userId: "user-1",
+      signOut,
+    }).catch((caughtError) => caughtError);
+
+    expect(getAccountDeletionErrorMetadata(error)).toEqual({
+      code: "ACCOUNT_DELETION_STORAGE_CLEANUP_FAILED",
+      requestId: "req-delete-payload-code-only",
+      stage: "storage_cleanup",
+    });
+    expect(getAccountDeletionFailureMessage(error)).toBe(
+      "We couldn't finish deleting your uploaded files, so your account wasn't removed. Please try again.",
+    );
   });
 
   it("clears local state and signs out after edge function success", async () => {

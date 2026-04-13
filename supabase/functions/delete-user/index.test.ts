@@ -66,6 +66,10 @@ type OwnedStorageObject = {
   owner?: string | null;
   owner_id?: string | null;
 };
+type ListedStorageObject = {
+  bucket: string;
+  path: string;
+};
 
 const createRpcResult = (error: unknown | null = null): RpcResult => ({
   error,
@@ -83,6 +87,65 @@ const createStorageListResult = (
 const createStorageRemoveResult = (
   error: unknown | null = null,
 ): StorageRemoveResult => ({ error });
+
+const buildStoragePath = (prefix: string, name: string): string =>
+  prefix ? `${prefix}/${name}` : name;
+
+const parseListKey = (
+  key: string,
+): { bucket: string; prefix: string; offset: number } | null => {
+  const [bucket, prefix, offsetRaw] = key.split(":");
+  const offset = Number.parseInt(offsetRaw ?? "", 10);
+
+  if (!bucket || prefix === undefined || !Number.isFinite(offset)) {
+    return null;
+  }
+
+  return { bucket, prefix, offset };
+};
+
+const listEntriesFromRemainingObjects = (
+  bucket: string,
+  prefix: string,
+  offset: number,
+  remainingListedStorageObjects: ListedStorageObject[],
+): StorageListResult => {
+  const childEntries = new Map<string, StorageListEntry>();
+
+  for (const entry of remainingListedStorageObjects) {
+    if (entry.bucket !== bucket) continue;
+
+    const relativePath = prefix
+      ? entry.path.startsWith(`${prefix}/`)
+        ? entry.path.slice(prefix.length + 1)
+        : null
+      : entry.path;
+
+    if (!relativePath || relativePath.length === 0) {
+      continue;
+    }
+
+    const [childName, ...rest] = relativePath.split("/");
+    if (!childName) {
+      continue;
+    }
+
+    if (rest.length === 0) {
+      childEntries.set(childName, { name: childName, id: `listed-${childName}` });
+      continue;
+    }
+
+    if (!childEntries.has(childName)) {
+      childEntries.set(childName, { name: childName, id: null });
+    }
+  }
+
+  const data = Array.from(childEntries.values())
+    .sort((left, right) => left.name.localeCompare(right.name))
+    .slice(offset, offset + 100);
+
+  return createStorageListResult(data);
+};
 
 const createHandleDeleteUserHarness = ({
   rpcResults = [createRpcResult()],
@@ -112,6 +175,22 @@ const createHandleDeleteUserHarness = ({
   const operations: string[] = [];
   const removeCalls: Array<{ bucket: string; paths: string[] }> = [];
   let remainingOwnedStorageObjects = [...ownedStorageObjects];
+  let remainingListedStorageObjects = Object.entries(listResultsByKey)
+    .flatMap(([key, results]) => {
+      const parsedKey = parseListKey(key);
+      if (!parsedKey || parsedKey.offset !== 0) {
+        return [];
+      }
+
+      return results.flatMap((result) =>
+        result.data
+          .filter((entry) => entry.id !== null)
+          .map((entry) => ({
+            bucket: parsedKey.bucket,
+            path: buildStoragePath(parsedKey.prefix, entry.name),
+          }))
+      );
+    });
 
   const getListResult = (
     bucket: string,
@@ -119,10 +198,20 @@ const createHandleDeleteUserHarness = ({
     offset: number,
   ): StorageListResult => {
     const key = `${bucket}:${prefix}:${offset}`;
-    const results = listResultsByKey[key] ?? [createStorageListResult()];
+    const results = listResultsByKey[key];
     const currentCallCount = listCallCountByKey.get(key) ?? 0;
     listCallCountByKey.set(key, currentCallCount + 1);
-    return results[Math.min(currentCallCount, results.length - 1)];
+
+    if (results && currentCallCount < results.length) {
+      return results[currentCallCount];
+    }
+
+    return listEntriesFromRemainingObjects(
+      bucket,
+      prefix,
+      offset,
+      remainingListedStorageObjects,
+    );
   };
 
   const createStorageObjectsQueryBuilder = () => {
@@ -201,6 +290,9 @@ const createHandleDeleteUserHarness = ({
           ];
           if (!result.error && !persistOwnedStorageObjectsAfterRemove) {
             remainingOwnedStorageObjects = remainingOwnedStorageObjects.filter((
+              entry,
+            ) => !(entry.bucket === bucket && paths.includes(entry.path)));
+            remainingListedStorageObjects = remainingListedStorageObjects.filter((
               entry,
             ) => !(entry.bucket === bucket && paths.includes(entry.path)));
           }

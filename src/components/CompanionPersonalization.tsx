@@ -26,7 +26,7 @@ import {
   getUniversalEggAssetUrl,
 } from "@/lib/companionAssetResolver";
 
-type CompanionPersonalizationMode = "onboarding" | "migration" | "hatch";
+type CompanionPersonalizationMode = "onboarding" | "migration" | "hatch" | "reset";
 
 interface CompanionSelectionData {
   presetId: CompanionPresetId | null;
@@ -71,9 +71,9 @@ export const CompanionPersonalization = ({
   const [selectedTone, setSelectedTone] = useState<CompanionStoryTone>(initialStoryTone);
   const [brokenPreviewKeys, setBrokenPreviewKeys] = useState<Record<string, boolean>>({});
   const isFullscreen = layout === "fullscreen";
-  const isEggSelectionMode = mode === "onboarding";
+  const isResetMode = mode === "reset";
+  const isEggSelectionMode = mode === "onboarding" || isResetMode;
   const isHatchMode = mode === "hatch";
-  const isMigrationMode = mode === "migration";
 
   const selectedPreset = useMemo(
     () => COMPANION_PICKER_PRESETS.find((preset) => preset.id === selectedPresetId) ?? COMPANION_PICKER_PRESETS[0],
@@ -96,21 +96,127 @@ export const CompanionPersonalization = ({
     return <CompanionCreationLoader />;
   }
 
-  const heading = isEggSelectionMode
-    ? "Choose Your Egg"
+  const heading = isResetMode
+    ? "Choose Your New Egg"
+    : isEggSelectionMode
+      ? "Choose Your Egg"
     : isHatchMode
       ? "Your Egg Is Hatching"
       : "Choose Your Companion Form";
-  const subheading = isEggSelectionMode
-    ? "Select the elemental egg your journey begins with. The creature form will be chosen when it hatches."
+  const subheading = isResetMode
+    ? "Start fresh by choosing the elemental egg, the species sleeping inside it, and the story tone that will guide the bond."
+    : isEggSelectionMode
+      ? "Select the elemental egg your journey begins with. The creature form will be chosen when it hatches."
     : isHatchMode
       ? "Choose the creature form your egg will awaken into. Its element and story tone stay locked from the egg you chose."
       : "Your companion needs a preset form before we can continue. Pick the creature, element skin, and story tone you want to carry forward.";
-  const cta = isEggSelectionMode
-    ? "Begin Your Journey"
+  const cta = isResetMode
+    ? "Begin Again"
+    : isEggSelectionMode
+      ? "Begin Your Journey"
     : isHatchMode
       ? "Hatch Companion"
       : "Save Companion Form";
+  const renderPresetCarousel = () => (
+    <div className="flex gap-4 overflow-x-auto pb-3 snap-x snap-mandatory">
+      {COMPANION_PICKER_PRESETS.map((preset) => {
+        const previewUrl = getPresetPreviewUrl(preset.id, selectedElement);
+        const previewKey = `${preset.id}:${selectedElement}`;
+        const isSupported = isPilotCompanionPreset(preset.id);
+        const isSelected = isSupported && preset.id === selectedPreset.id;
+
+        return (
+          <button
+            key={preset.id}
+            type="button"
+            onClick={() => {
+              if (!isSupported) return;
+              setSelectedPresetId(preset.id);
+            }}
+            disabled={!isSupported}
+            aria-disabled={!isSupported}
+            className={[
+              "snap-center shrink-0 w-[250px] rounded-3xl border text-left transition-all duration-300 overflow-hidden disabled:cursor-not-allowed",
+              isSelected
+                ? "border-primary/70 bg-primary/10 shadow-[0_0_40px_rgba(168,85,247,0.20)] scale-[1.01]"
+                : isSupported
+                  ? "border-white/10 bg-white/5 hover:border-white/25 hover:bg-white/10"
+                  : "border-white/10 bg-white/[0.03] opacity-70 saturate-50",
+            ].join(" ")}
+            data-supported={isSupported ? "true" : "false"}
+          >
+            <div className="relative h-[260px] bg-gradient-to-br from-slate-950/80 via-slate-900/80 to-slate-950/95">
+              {!brokenPreviewKeys[previewKey] ? (
+                <CompanionPortraitShell
+                  src={previewUrl}
+                  element={selectedElement}
+                  className="h-full w-full"
+                  contentClassName="h-full w-full p-4"
+                >
+                  <CompanionImage
+                    src={previewUrl}
+                    alt={preset.displayName}
+                    fit="portrait"
+                    element={selectedElement}
+                    className={isSupported ? "h-full w-full" : "h-full w-full opacity-70"}
+                    loading="lazy"
+                    onError={() =>
+                      setBrokenPreviewKeys((current) => ({
+                        ...current,
+                        [previewKey]: true,
+                      }))
+                    }
+                  />
+                </CompanionPortraitShell>
+              ) : (
+                <div className="h-full w-full p-5 flex flex-col justify-between">
+                  <div
+                    className="h-28 w-28 rounded-full blur-3xl"
+                    style={{ backgroundColor: selectedElementMeta.anchorColor }}
+                  />
+                  <div className="space-y-2">
+                    <div className="text-xs uppercase tracking-[0.3em] text-white/50">
+                      Companion Preset
+                    </div>
+                    <div className="text-3xl font-heading font-black text-white">
+                      {preset.displayName}
+                    </div>
+                  </div>
+                </div>
+              )}
+              <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-slate-950 via-slate-950/90 to-transparent">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-lg font-heading font-bold text-white">
+                      {preset.displayName}
+                    </div>
+                    <div className="text-xs uppercase tracking-[0.2em] text-white/55">
+                      {preset.role}
+                    </div>
+                  </div>
+                  {isSelected && (
+                    <span className="rounded-full border border-primary/60 bg-primary/20 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-primary-foreground">
+                      Selected
+                    </span>
+                  )}
+                  {!isSelected && !isSupported && (
+                    <span className="rounded-full border border-white/10 bg-black/35 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/70">
+                      {COMPANION_FUTURE_STATE_LABEL}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="p-4">
+              <p className="text-sm text-foreground/90">
+                {preset.revealCopy}
+              </p>
+            </div>
+          </button>
+        );
+      })}
+    </div>
+  );
 
   return (
     <div className={isFullscreen ? "min-h-screen px-4 pt-safe pb-safe flex items-center justify-center relative z-10" : "w-full"}>
@@ -149,183 +255,99 @@ export const CompanionPersonalization = ({
             </div>
 
             {isEggSelectionMode ? (
-              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                {COMPANION_ELEMENTS.map((element) => {
-                  const isSupported = isPilotCompanionElement(element.id);
-                  const isSelected = isSupported && element.id === selectedElement;
-                  return (
-                    <button
-                      key={element.id}
-                      type="button"
-                      onClick={() => {
-                        if (!isSupported) return;
-                        setSelectedElement(element.id);
-                      }}
-                      disabled={!isSupported}
-                      aria-disabled={!isSupported}
-                      className={[
-                        "rounded-3xl border text-left transition-all duration-300 overflow-hidden disabled:cursor-not-allowed",
-                        isSelected
-                          ? "border-primary/70 bg-primary/10 shadow-[0_0_40px_rgba(168,85,247,0.20)] scale-[1.01]"
-                          : isSupported
-                            ? "border-white/10 bg-white/5 hover:border-white/25 hover:bg-white/10"
-                            : "border-white/10 bg-white/[0.03] opacity-70 saturate-50",
-                      ].join(" ")}
-                      data-supported={isSupported ? "true" : "false"}
-                    >
-                      <div className="relative h-[220px] bg-gradient-to-br from-slate-950/80 via-slate-900/80 to-slate-950/95">
-                        <CompanionImage
-                          src={getEggPreviewUrl(element.id)}
-                          alt={getCompanionEggLabel(element.id)}
-                          fit="contain"
-                          className="h-full w-full p-4"
-                          loading="lazy"
-                        />
-                        <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-slate-950 via-slate-950/90 to-transparent">
-                          <div className="flex items-center justify-between gap-3">
-                            <div>
-                              <div className="text-lg font-heading font-bold text-white">
-                                {getCompanionEggLabel(element.id)}
+              <>
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  {COMPANION_ELEMENTS.map((element) => {
+                    const isSupported = isPilotCompanionElement(element.id);
+                    const isSelected = isSupported && element.id === selectedElement;
+                    return (
+                      <button
+                        key={element.id}
+                        type="button"
+                        onClick={() => {
+                          if (!isSupported) return;
+                          setSelectedElement(element.id);
+                        }}
+                        disabled={!isSupported}
+                        aria-disabled={!isSupported}
+                        className={[
+                          "rounded-3xl border text-left transition-all duration-300 overflow-hidden disabled:cursor-not-allowed",
+                          isSelected
+                            ? "border-primary/70 bg-primary/10 shadow-[0_0_40px_rgba(168,85,247,0.20)] scale-[1.01]"
+                            : isSupported
+                              ? "border-white/10 bg-white/5 hover:border-white/25 hover:bg-white/10"
+                              : "border-white/10 bg-white/[0.03] opacity-70 saturate-50",
+                        ].join(" ")}
+                        data-supported={isSupported ? "true" : "false"}
+                      >
+                        <div className="relative h-[220px] bg-gradient-to-br from-slate-950/80 via-slate-900/80 to-slate-950/95">
+                          <CompanionImage
+                            src={getEggPreviewUrl(element.id)}
+                            alt={getCompanionEggLabel(element.id)}
+                            fit="contain"
+                            className="h-full w-full p-4"
+                            loading="lazy"
+                          />
+                          <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-slate-950 via-slate-950/90 to-transparent">
+                            <div className="flex items-center justify-between gap-3">
+                              <div>
+                                <div className="text-lg font-heading font-bold text-white">
+                                  {getCompanionEggLabel(element.id)}
+                                </div>
+                                <div className="text-xs uppercase tracking-[0.2em] text-white/55">
+                                  Stage 0 • Egg
+                                </div>
                               </div>
-                              <div className="text-xs uppercase tracking-[0.2em] text-white/55">
-                                Stage 0 • Egg
-                              </div>
+                              {isSelected && (
+                                <span className="rounded-full border border-primary/60 bg-primary/20 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-primary-foreground">
+                                  Selected
+                                </span>
+                              )}
+                              {!isSelected && !isSupported && (
+                                <span className="rounded-full border border-white/10 bg-black/35 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/70">
+                                  {COMPANION_FUTURE_STATE_LABEL}
+                                </span>
+                              )}
                             </div>
-                            {isSelected && (
-                              <span className="rounded-full border border-primary/60 bg-primary/20 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-primary-foreground">
-                                Selected
-                              </span>
-                            )}
-                            {!isSelected && !isSupported && (
-                              <span className="rounded-full border border-white/10 bg-black/35 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/70">
-                                {COMPANION_FUTURE_STATE_LABEL}
-                              </span>
-                            )}
                           </div>
                         </div>
-                      </div>
-                      <div className="p-4 space-y-2">
-                        <p className="text-sm text-foreground/90">
-                          {element.summary}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          This egg permanently sets your companion&apos;s element.
-                        </p>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="flex gap-4 overflow-x-auto pb-3 snap-x snap-mandatory">
-                {COMPANION_PICKER_PRESETS.map((preset) => {
-                  const previewUrl = getPresetPreviewUrl(preset.id, selectedElement);
-                  const previewKey = `${preset.id}:${selectedElement}`;
-                  const isSupported = isPilotCompanionPreset(preset.id);
-                  const isSelected = isSupported && preset.id === selectedPreset.id;
-
-                  return (
-                    <button
-                      key={preset.id}
-                      type="button"
-                      onClick={() => {
-                        if (!isSupported) return;
-                        setSelectedPresetId(preset.id);
-                      }}
-                      disabled={!isSupported}
-                      aria-disabled={!isSupported}
-                      className={[
-                        "snap-center shrink-0 w-[250px] rounded-3xl border text-left transition-all duration-300 overflow-hidden disabled:cursor-not-allowed",
-                        isSelected
-                          ? "border-primary/70 bg-primary/10 shadow-[0_0_40px_rgba(168,85,247,0.20)] scale-[1.01]"
-                          : isSupported
-                            ? "border-white/10 bg-white/5 hover:border-white/25 hover:bg-white/10"
-                            : "border-white/10 bg-white/[0.03] opacity-70 saturate-50",
-                      ].join(" ")}
-                      data-supported={isSupported ? "true" : "false"}
-                    >
-                      <div className="relative h-[260px] bg-gradient-to-br from-slate-950/80 via-slate-900/80 to-slate-950/95">
-                        {!brokenPreviewKeys[previewKey] ? (
-                          <CompanionPortraitShell
-                            src={previewUrl}
-                            element={selectedElement}
-                            className="h-full w-full"
-                            contentClassName="h-full w-full p-4"
-                          >
-                            <CompanionImage
-                              src={previewUrl}
-                              alt={preset.displayName}
-                              fit="portrait"
-                              element={selectedElement}
-                              className={isSupported ? "h-full w-full" : "h-full w-full opacity-70"}
-                              loading="lazy"
-                              onError={() =>
-                                setBrokenPreviewKeys((current) => ({
-                                  ...current,
-                                  [previewKey]: true,
-                                }))
-                              }
-                            />
-                          </CompanionPortraitShell>
-                        ) : (
-                          <div className="h-full w-full p-5 flex flex-col justify-between">
-                            <div
-                              className="h-28 w-28 rounded-full blur-3xl"
-                              style={{ backgroundColor: selectedElementMeta.anchorColor }}
-                            />
-                            <div className="space-y-2">
-                              <div className="text-xs uppercase tracking-[0.3em] text-white/50">
-                                Companion Preset
-                              </div>
-                              <div className="text-3xl font-heading font-black text-white">
-                                {preset.displayName}
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                        <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-slate-950 via-slate-950/90 to-transparent">
-                          <div className="flex items-center justify-between gap-3">
-                            <div>
-                              <div className="text-lg font-heading font-bold text-white">
-                                {preset.displayName}
-                              </div>
-                              <div className="text-xs uppercase tracking-[0.2em] text-white/55">
-                                {preset.role}
-                              </div>
-                            </div>
-                            {isSelected && (
-                              <span className="rounded-full border border-primary/60 bg-primary/20 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-primary-foreground">
-                                Selected
-                              </span>
-                            )}
-                            {!isSelected && !isSupported && (
-                              <span className="rounded-full border border-white/10 bg-black/35 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/70">
-                                {COMPANION_FUTURE_STATE_LABEL}
-                              </span>
-                            )}
-                          </div>
+                        <div className="p-4 space-y-2">
+                          <p className="text-sm text-foreground/90">
+                            {element.summary}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            This egg permanently sets your companion&apos;s element.
+                          </p>
                         </div>
-                      </div>
-                      <div className="p-4">
-                        <p className="text-sm text-foreground/90">
-                          {preset.revealCopy}
-                        </p>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+                      </button>
+                    );
+                  })}
+                </div>
+                {isResetMode ? (
+                  <div className="space-y-4 pt-2">
+                    <div className="space-y-2">
+                      <Label className="text-lg font-semibold text-foreground">Sleeping Species</Label>
+                      <p className="text-sm text-muted-foreground">
+                        Lock the species inside your new egg now so the first hatch reveals the companion you want.
+                      </p>
+                    </div>
+                    {renderPresetCarousel()}
+                  </div>
+                ) : null}
+              </>
+            ) : renderPresetCarousel()}
           </div>
 
           <div className="space-y-6">
             <div className="rounded-3xl border border-white/10 bg-white/5 p-5 space-y-4">
               <div className="space-y-1">
                 <Label className="text-lg font-semibold text-foreground">
-                  {isEggSelectionMode ? "Selected Egg" : "Selected Companion"}
+                  {isResetMode ? "Selected Egg And Species" : isEggSelectionMode ? "Selected Egg" : "Selected Companion"}
                 </Label>
                 <p className="text-sm text-muted-foreground">
-                  {isEggSelectionMode
+                  {isResetMode
+                    ? `${selectedElementMeta.label} energy sealed around a sleeping ${selectedPreset.displayName}.`
+                    : isEggSelectionMode
                     ? `${selectedElementMeta.label} energy sealed inside a living cosmic shell.`
                     : `${selectedPreset.displayName} with a ${selectedElementMeta.label.toLowerCase()} skin.`}
                 </p>
@@ -345,8 +367,17 @@ export const CompanionPersonalization = ({
                     <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Creature form revealed at first hatch</div>
                     <p className="text-sm text-foreground/85">{selectedElementMeta.summary}</p>
                     <p className="text-xs text-muted-foreground">
-                      Stage 0 is shared across the roster. The egg locks your element now, and you&apos;ll choose the creature form when it hatches.
+                      {isResetMode
+                        ? "Stage 0 art stays shared across the roster. Your reset locks both the element and species now, then reveals that species when the shell cracks."
+                        : "Stage 0 is shared across the roster. The egg locks your element now, and you&apos;ll choose the creature form when it hatches."}
                     </p>
+                    {isResetMode ? (
+                      <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-left">
+                        <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Sleeping Species</div>
+                        <div className="mt-1 font-semibold text-foreground">{selectedPreset.displayName}</div>
+                        <p className="mt-1 text-xs text-muted-foreground">{selectedPreset.revealCopy}</p>
+                      </div>
+                    ) : null}
                   </div>
                 ) : (
                   <>
@@ -462,12 +493,16 @@ export const CompanionPersonalization = ({
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="space-y-1">
               <p className="text-sm font-semibold text-foreground">
-                {isEggSelectionMode
+                {isResetMode
+                  ? `${selectedEggLabel} • ${selectedPreset.displayName} • ${selectedToneMeta.label}`
+                  : isEggSelectionMode
                   ? `${selectedEggLabel} • ${selectedToneMeta.label}`
                   : `${selectedPreset.displayName} • ${selectedElementMeta.label} • ${selectedToneMeta.label}`}
               </p>
               <p className="text-xs text-muted-foreground">
-                {isEggSelectionMode
+                {isResetMode
+                  ? "Your fresh start keeps the shared egg at stage 0 while locking the species, element, and tone you want for the next hatch."
+                  : isEggSelectionMode
                   ? "Your egg locks the element now. Creature form is chosen when the shell cracks."
                   : isHatchMode
                     ? "Hatching preserves the egg&apos;s element and story tone while locking the creature form."
@@ -476,16 +511,16 @@ export const CompanionPersonalization = ({
             </div>
             <Button
               onClick={() => onComplete({
-                presetId: isEggSelectionMode ? null : selectedPreset.id,
+                presetId: isResetMode ? selectedPreset.id : isEggSelectionMode ? null : selectedPreset.id,
                 favoriteColor: getCompanionElementAnchorColor(selectedElement),
-                spiritAnimal: isEggSelectionMode ? "Egg" : selectedPreset.displayName,
+                spiritAnimal: isResetMode ? selectedPreset.displayName : isEggSelectionMode ? "Egg" : selectedPreset.displayName,
                 coreElement: selectedElement,
                 storyTone: selectedTone,
               })}
               disabled={
                 isLoading
                 || !isPilotCompanionElement(selectedElement)
-                || (!isEggSelectionMode && !isPilotCompanionPreset(selectedPreset.id))
+                || ((isResetMode || !isEggSelectionMode) && !isPilotCompanionPreset(selectedPreset.id))
               }
               className="min-w-[220px]"
               size="lg"

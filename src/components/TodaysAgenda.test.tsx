@@ -100,14 +100,29 @@ const mocks = vi.hoisted(() => {
     dragOffsetMotionValue,
     dragEdgeMotionValue,
     timelineDragState,
+    loadLocalHabitsMock: vi.fn(),
   };
 });
+
+vi.mock("@/hooks/useAuth", () => ({
+  useAuth: () => ({
+    user: { id: "user-1" },
+  }),
+}));
 
 vi.mock("@/hooks/useProfile", () => ({
   useProfile: () => ({
     profile: { completed_tasks_stay_in_place: true },
   }),
 }));
+
+vi.mock("@/utils/plannerSync", async () => {
+  const actual = await vi.importActual<typeof import("@/utils/plannerSync")>("@/utils/plannerSync");
+  return {
+    ...actual,
+    loadLocalHabits: (...args: unknown[]) => mocks.loadLocalHabitsMock(...args),
+  };
+});
 
 vi.mock("@/hooks/useMotionProfile", () => ({
   useMotionProfile: () => ({
@@ -323,6 +338,8 @@ beforeEach(() => {
   elementScrollToSpy.mockClear();
   document.documentElement.style.removeProperty("--bottom-nav-runtime-offset");
   document.documentElement.style.removeProperty("--bottom-nav-safe-offset");
+  mocks.loadLocalHabitsMock.mockReset();
+  mocks.loadLocalHabitsMock.mockResolvedValue([]);
 });
 
 describe("TodaysAgenda subtasks", () => {
@@ -660,6 +677,72 @@ describe("TodaysAgenda campaign visibility", () => {
     });
   });
 
+  it("shows linked habit descriptions inside expanded campaign ritual rows", async () => {
+    mocks.loadLocalHabitsMock.mockResolvedValue([
+      {
+        id: "habit-1",
+        user_id: "user-1",
+        title: "Morning journal",
+        frequency: "daily",
+        custom_days: null,
+        custom_month_days: null,
+        difficulty: "medium",
+        category: "mind",
+        is_active: true,
+        current_streak: 0,
+        longest_streak: 0,
+        created_at: null,
+        description: "Capture wins, friction, and tomorrow's focus.",
+      },
+    ]);
+
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    const { container } = render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "ritual-1",
+            task_text: "Morning journal",
+            completed: false,
+            xp_reward: 15,
+            habit_source_id: "habit-1",
+            epic_id: "epic-1",
+            epic_title: "Fallback Campaign",
+          },
+        ]}
+        selectedDate={new Date("2026-02-14T16:34:00")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+        activeEpics={[]}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    const campaignChevron = container.querySelector("svg.lucide-chevron-down");
+    expect(campaignChevron).toBeTruthy();
+    fireEvent.click(campaignChevron!.closest("button")!);
+
+    const ritualLabel = await screen.findByText("Morning journal");
+    const ritualCard = ritualLabel.closest('[data-quest-card-shell="true"]');
+    expect(ritualCard).toBeTruthy();
+
+    await waitFor(() => {
+      expect(within(ritualCard as HTMLElement).getAllByRole("button")).toHaveLength(2);
+    });
+
+    fireEvent.click(within(ritualCard as HTMLElement).getAllByRole("button")[1]!);
+
+    expect(await screen.findByText("Capture wins, friction, and tomorrow's focus.")).toBeInTheDocument();
+  });
+
   it("keeps newly added campaign groups collapsed by default", () => {
     const queryClient = new QueryClient({
       defaultOptions: {
@@ -803,6 +886,131 @@ describe("TodaysAgenda campaign visibility", () => {
     );
 
     expect(screen.getByText("Loading campaigns...")).toBeInTheDocument();
+  });
+});
+
+describe("TodaysAgenda ritual descriptions", () => {
+  it("gives standalone ritual rows a chevron when the linked habit only adds a description", async () => {
+    mocks.loadLocalHabitsMock.mockResolvedValue([
+      {
+        id: "habit-standalone",
+        user_id: "user-1",
+        title: "Hydrate",
+        frequency: "daily",
+        custom_days: null,
+        custom_month_days: null,
+        difficulty: "easy",
+        category: "body",
+        is_active: true,
+        current_streak: 0,
+        longest_streak: 0,
+        created_at: null,
+        description: "Drink water before coffee and after workouts.",
+      },
+    ]);
+
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "ritual-standalone",
+            task_text: "Hydrate",
+            completed: false,
+            xp_reward: 12,
+            habit_source_id: "habit-standalone",
+          },
+        ]}
+        selectedDate={new Date("2026-02-14T16:34:00")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+        activeEpics={[]}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    const ritualLabel = await screen.findByText("Hydrate");
+    const ritualCard = ritualLabel.closest('[data-quest-card-shell="true"]');
+    expect(ritualCard).toBeTruthy();
+
+    await waitFor(() => {
+      expect(within(ritualCard as HTMLElement).getAllByRole("button")).toHaveLength(2);
+    });
+
+    fireEvent.click(within(ritualCard as HTMLElement).getAllByRole("button")[1]!);
+
+    expect(await screen.findByText("Drink water before coffee and after workouts.")).toBeInTheDocument();
+  });
+
+  it("renders duplicate task notes only once when they match the linked ritual description", async () => {
+    mocks.loadLocalHabitsMock.mockResolvedValue([
+      {
+        id: "habit-1",
+        user_id: "user-1",
+        title: "Lift",
+        frequency: "daily",
+        custom_days: null,
+        custom_month_days: null,
+        difficulty: "hard",
+        category: "body",
+        is_active: true,
+        current_streak: 0,
+        longest_streak: 0,
+        created_at: null,
+        description: "Lift heavy and log sets.",
+      },
+    ]);
+
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "ritual-1",
+            task_text: "Lift",
+            completed: false,
+            xp_reward: 18,
+            habit_source_id: "habit-1",
+            notes: "**Lift heavy and log sets.**",
+          },
+        ]}
+        selectedDate={new Date("2026-02-14T16:34:00")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+        activeEpics={[]}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    const ritualLabel = await screen.findByText("Lift");
+    const ritualCard = ritualLabel.closest('[data-quest-card-shell="true"]');
+    expect(ritualCard).toBeTruthy();
+
+    await waitFor(() => {
+      expect(within(ritualCard as HTMLElement).getAllByRole("button")).toHaveLength(2);
+    });
+
+    fireEvent.click(within(ritualCard as HTMLElement).getAllByRole("button")[1]!);
+
+    await waitFor(() => {
+      expect(screen.getAllByText("Lift heavy and log sets.")).toHaveLength(1);
+    });
   });
 });
 

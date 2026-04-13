@@ -93,4 +93,33 @@ describe("CompanionPersonalization", () => {
       "Buttercat",
     ]);
   });
+
+  it("lets reset mode lock a species while keeping the stage 0 egg flow", () => {
+    const onComplete = vi.fn();
+
+    render(
+      <CompanionPersonalization
+        onComplete={onComplete}
+        mode="reset"
+        layout="compact"
+      />,
+    );
+
+    expect(screen.getAllByText("Sleeping Species").length).toBeGreaterThan(0);
+
+    const phoenixButton = screen.getByText("Phoenix").closest("button");
+    expect(phoenixButton).not.toBeNull();
+    expect(phoenixButton).toBeEnabled();
+    fireEvent.click(phoenixButton!);
+
+    fireEvent.click(screen.getByRole("button", { name: "Begin Again" }));
+
+    expect(onComplete).toHaveBeenCalledWith({
+      presetId: "phoenix",
+      favoriteColor: "#F97316",
+      spiritAnimal: "Phoenix",
+      coreElement: "fire",
+      storyTone: "epic_adventure",
+    });
+  });
 });
