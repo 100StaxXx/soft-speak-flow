@@ -681,7 +681,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     enabled: !!user?.id,
   });
   const keepInPlace = profile?.completed_tasks_stay_in_place ?? true;
-  const habitDescriptionById = useMemo(() => {
+  const habitDescriptionByIdFromHabits = useMemo(() => {
     const descriptions = new Map<string, string>();
     for (const habit of habitsQuery.data ?? []) {
       const description = habit.description?.trim();
@@ -691,6 +691,24 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     }
     return descriptions;
   }, [habitsQuery.data]);
+  const habitDescriptionById = useMemo(() => {
+    const descriptions = new Map<string, string>();
+
+    for (const epic of activeEpics) {
+      for (const link of epic.epic_habits ?? []) {
+        const description = link.habits?.description?.trim();
+        if (description) {
+          descriptions.set(link.habit_id, description);
+        }
+      }
+    }
+
+    habitDescriptionByIdFromHabits.forEach((description, habitId) => {
+      descriptions.set(habitId, description);
+    });
+
+    return descriptions;
+  }, [activeEpics, habitDescriptionByIdFromHabits]);
 
   const toggleSubtask = useMutation({
     mutationFn: async ({
