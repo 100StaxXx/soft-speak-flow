@@ -463,6 +463,67 @@ describe("useEpics", () => {
     expect(insertedEpic).not.toHaveProperty("epic_habits");
   });
 
+  it("persists shared-epic visibility when campaign creation requests a public invite flow", async () => {
+    const habitsInsertMock = vi.fn().mockResolvedValue({ error: null });
+    const epicsInsertMock = vi.fn().mockResolvedValue({ error: null });
+    const linksInsertMock = vi.fn().mockResolvedValue({ error: null });
+
+    mocks.fromMock.mockImplementation((table: string) => {
+      if (table === "habits") {
+        return {
+          insert: habitsInsertMock,
+          select: mocks.selectMock,
+        };
+      }
+
+      if (table === "epics") {
+        return {
+          insert: epicsInsertMock,
+          select: mocks.selectMock,
+        };
+      }
+
+      if (["epic_habits", "journey_phases", "epic_milestones"].includes(table)) {
+        return {
+          insert: linksInsertMock,
+          select: mocks.selectMock,
+        };
+      }
+
+      return {
+        select: mocks.selectMock,
+      };
+    });
+
+    const { result } = renderHook(() => useEpics(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    await act(async () => {
+      await result.current.createEpic({
+        title: "Shareable Campaign",
+        target_days: 10,
+        is_public: true,
+        habits: [
+          {
+            title: "Momentum ritual",
+            difficulty: "easy",
+            frequency: "daily",
+            custom_days: [1, 2, 3, 4, 5],
+          },
+        ],
+      });
+    });
+
+    expect(epicsInsertMock.mock.calls[0]?.[0]).toEqual(expect.objectContaining({
+      is_public: true,
+    }));
+  });
+
   it("preserves monthly ritual cadence and month days during campaign creation", async () => {
     const habitsInsertMock = vi.fn().mockResolvedValue({ error: null });
     const epicsInsertMock = vi.fn().mockResolvedValue({ error: null });

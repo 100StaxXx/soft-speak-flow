@@ -49,90 +49,41 @@ const JoinEpic = () => {
     enabled: !!code,
   });
 
-  const MAX_EPICS = 3;
-
   // Join epic mutation
   const joinEpic = useMutation({
     mutationFn: async () => {
-      if (!user || !epic) throw new Error("Not authenticated or epic not found");
+      if (!user || !epic || !code) throw new Error("Not authenticated or epic not found");
 
-      // Check epic limit (owned + joined)
-      const { data: ownedEpics } = await supabase
-        .from('epics')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('status', 'active');
-      
-      const { data: joinedEpics } = await supabase
-        .from('epic_members')
-        .select('epic_id, epics!inner(user_id, status)')
-        .eq('user_id', user.id)
-        .neq('epics.user_id', user.id)
-        .eq('epics.status', 'active');
+      const { data, error } = await (supabase.rpc as unknown as (
+        fn: string,
+        args: Record<string, unknown>,
+      ) => Promise<{ data: Array<{
+        success: boolean;
+        code: string;
+        message: string;
+        epic_id: string | null;
+        epic_title: string | null;
+        copied_habit_count: number;
+      }> | null; error: { message?: string } | null }>)("join_epic_by_invite_code", {
+        p_invite_code: code,
+      });
 
-      const totalActiveEpics = (ownedEpics?.length || 0) + (joinedEpics?.length || 0);
-      
-      if (totalActiveEpics >= MAX_EPICS) {
-        throw new Error(`You can only have ${MAX_EPICS} active epics at a time. Complete or abandon an epic to join a new one.`);
+      if (error) throw error;
+
+      const result = data?.[0];
+      if (!result) {
+        throw new Error("Failed to join epic");
       }
 
-      // Check if already a member
-      const { data: existingMember } = await supabase
-        .from("epic_members")
-        .select("id")
-        .eq("epic_id", epic.id)
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (existingMember) {
-        throw new Error("You're already part of this epic!");
+      if (!result.success) {
+        throw new Error(result.message || "Failed to join epic");
       }
 
-      // Add user as member
-      const { error: memberError } = await supabase
-        .from("epic_members")
-        .insert({
-          epic_id: epic.id,
-          user_id: user.id,
-        });
-
-      if (memberError) throw memberError;
-
-      // Copy all epic habits to user's habits.
-      if (epic.epic_habits && epic.epic_habits.length > 0) {
-        const { data: copiedHabits, error: habitError } = await supabase
-          .from("habits")
-          .insert(
-            epic.epic_habits.map((eh: any) => ({
-              user_id: user.id,
-              title: eh.habits.title,
-              difficulty: eh.habits.difficulty,
-              frequency: eh.habits.frequency || "daily",
-              custom_days: eh.habits.custom_days || null,
-              custom_month_days: eh.habits.custom_month_days || null,
-            }))
-          )
-          .select();
-
-        if (habitError) throw habitError;
-
-        // Link copied habits to the epic for this user
-        const { error: linkError } = await supabase
-          .from("epic_habits")
-          .insert(
-            copiedHabits.map((habit) => ({
-              epic_id: epic.id,
-              habit_id: habit.id,
-            }))
-          );
-
-        if (linkError) throw linkError;
-      }
-
-      return epic;
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["epics"] });
+      queryClient.invalidateQueries({ queryKey: ["habits"] });
       toast.success("Epic Joined! ⚔️", {
         description: "You're now part of this legendary quest!",
       });

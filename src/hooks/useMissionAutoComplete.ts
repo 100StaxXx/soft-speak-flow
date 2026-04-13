@@ -4,8 +4,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { useActivityFeed } from "./useActivityFeed";
 import { MISSION_ACTIVITY_MAP } from "@/config/missionTemplates";
-import { useXPRewards } from "./useXPRewards";
 import { useToast } from "./use-toast";
+import { useXPToast } from "@/contexts/XPContext";
+import {
+  completeDailyMissionWithXp,
+  getMissionCompletionError,
+  showMissionRewardFeedback,
+} from "@/lib/dailyMissionCompletion";
 import { playMissionComplete } from "@/utils/soundEffects";
 import confetti from "canvas-confetti";
 
@@ -16,8 +21,8 @@ import confetti from "canvas-confetti";
 export const useMissionAutoComplete = () => {
   const { user } = useAuth();
   const { activities } = useActivityFeed();
-  const { awardCustomXP } = useXPRewards();
   const { toast } = useToast();
+  const { showXPToast } = useXPToast();
   const queryClient = useQueryClient();
   const now = new Date();
   const today = now.toLocaleDateString('en-CA');
@@ -101,44 +106,27 @@ export const useMissionAutoComplete = () => {
 
           // Complete mission if criteria met
           if (shouldComplete && !mission.completed && mounted) {
-            // ATOMIC: Only update if not already completed (prevent double XP)
-            const { data: updateResult, error } = await supabase
-              .from('daily_missions')
-              .update({ 
-                completed: true, 
-                completed_at: new Date().toISOString(),
-                progress_current: mission.progress_target 
-              })
-              .eq('id', mission.id)
-              .eq('user_id', user.id)
-              .eq('completed', false) // CRITICAL: only update if not already completed
-              .select();
+            const completionResult = await completeDailyMissionWithXp({
+              missionId: mission.id,
+              completionSource: "auto_complete",
+              progressCurrent: mission.progress_target,
+            });
 
-            // VERIFY: Only award XP if the update actually changed a row
-            if (!error && updateResult && updateResult.length > 0 && mounted) {
-              // Award XP
-              await awardCustomXP(
-                mission.xp_reward, 
-                "mission_complete",
+            if (completionResult.status === "completed" && mounted) {
+              showMissionRewardFeedback(
+                completionResult,
+                showXPToast,
                 `Mission Complete! ${mission.mission_text}`,
-                {
-                  mission_id: mission.id,
-                  mission_type: mission.mission_type,
-                  mission_category: mission.category,
-                  source: 'auto_complete',
-                }
               );
+              await queryClient.invalidateQueries({ queryKey: ["companion"] });
 
-              // Show toast
-              toast({ 
-                title: "Mission Auto-Completed! 🎯", 
-                description: `${mission.mission_text} (+${mission.xp_reward} XP)`
+              toast({
+                title: "Mission Auto-Completed! 🎯",
+                description: `${mission.mission_text} (+${completionResult.xp_awarded} XP)`,
               });
 
-              // Play sound
               playMissionComplete();
 
-              // Small confetti
               confetti({
                 particleCount: 50,
                 spread: 60,
@@ -146,8 +134,9 @@ export const useMissionAutoComplete = () => {
                 colors: ['#A76CFF', '#C084FC', '#E879F9'],
               });
 
-              // Invalidate queries
               queryClient.invalidateQueries({ queryKey: ['daily-missions'] });
+            } else if (completionResult.status !== "already_completed") {
+              throw getMissionCompletionError(completionResult);
             }
           }
         }
@@ -161,5 +150,5 @@ export const useMissionAutoComplete = () => {
     return () => {
       mounted = false;
     };
-  }, [activities, user, today, todayStartMs, awardCustomXP, toast, queryClient]);
+  }, [activities, user, today, todayStartMs, queryClient, showXPToast, toast]);
 };

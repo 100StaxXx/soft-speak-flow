@@ -642,6 +642,7 @@ export const useEpics = (options: EpicsOptions = {}) => {
         }),
         epic_habits: [],
         xp_reward: Math.floor(epicData.target_days * 10),
+        is_public: epicData.is_public ?? false,
         invite_code: inviteCode,
         theme_color: normalizeThemeColor(epicData.theme_color),
         story_type_slug: epicData.story_type_slug || null,

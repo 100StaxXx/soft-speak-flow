@@ -34,6 +34,8 @@ import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionHealth } from "@/hooks/useCompanionHealth";
 import { useMilestones } from "@/hooks/useMilestones";
 import { getEpicDaysRemaining, resolveEpicEndDate } from "@/utils/epicDates";
+import { safeClipboardWrite, getClipboardErrorMessage } from "@/utils/clipboard";
+import { buildEpicInviteLink, buildEpicInviteShareText } from "@/utils/epicInviteShare";
 
 interface Journey {
   id: string;
@@ -154,19 +156,39 @@ export const JourneyCard = memo(function JourneyCard({ journey, onRename, onComp
   }, [milestones]);
 
   const handleShareJourney = useCallback(async () => {
-    if (!journey.invite_code) return;
-    
+    if (!journey.invite_code || !journey.is_public) return;
+
+    const inviteLink = buildEpicInviteLink(journey.invite_code);
+    const shareText = buildEpicInviteShareText(journey.title, journey.invite_code);
+
     try {
-      await navigator.clipboard.writeText(journey.invite_code);
+      if (navigator.share) {
+        await navigator.share({
+          title: `Join ${journey.title}`,
+          text: shareText,
+          url: inviteLink,
+        });
+      } else {
+        const didCopy = await safeClipboardWrite(`${shareText}\n\n${inviteLink}`);
+        if (!didCopy) {
+          throw new Error("Clipboard unavailable");
+        }
+      }
+
       setCopied(true);
-      toast.success("Invite code copied!", {
-        description: "Share this code with others to invite them to your journey",
+      toast.success(navigator.share ? "Invite ready to share!" : "Invite link copied!", {
+        description: "Friends can open the link directly or use the invite code to join.",
       });
       setTimeout(() => setCopied(false), 2000);
-    } catch {
-      toast.error("Failed to copy code");
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message.toLowerCase() : "";
+      if (errorMsg.includes("abort") || errorMsg.includes("cancel")) {
+        return;
+      }
+
+      toast.error(getClipboardErrorMessage(error));
     }
-  }, [journey.invite_code]);
+  }, [journey.invite_code, journey.title]);
 
   const openRenameDialog = useCallback(() => {
     setRenameTitle(journey.title);
@@ -213,12 +235,13 @@ export const JourneyCard = memo(function JourneyCard({ journey, onRename, onComp
                   <Target className="w-5 h-5 text-primary" />
                 )}
                 <h3 className="text-lg font-bold">{journey.title}</h3>
-                {journey.invite_code && (
+                {journey.invite_code && journey.is_public && (
                   <Button
                     variant="ghost"
                     size="sm"
                     className="h-6 px-2 text-primary hover:text-primary hover:bg-primary/10"
                     onClick={handleShareJourney}
+                    aria-label="Share campaign invite"
                   >
                     {copied ? (
                       <Check className="w-3.5 h-3.5" />

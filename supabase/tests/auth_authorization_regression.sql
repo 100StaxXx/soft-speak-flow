@@ -1131,6 +1131,220 @@ $$;
 
 do $$
 declare
+  v_mission_id uuid := '44444444-4444-4444-4444-444444444441';
+  v_first_result record;
+  v_second_result record;
+  v_xp_before integer;
+begin
+  delete from public.daily_missions
+  where id = v_mission_id;
+
+  insert into public.daily_missions (
+    id,
+    user_id,
+    mission_type,
+    mission_text,
+    xp_reward,
+    mission_date,
+    completed,
+    category
+  )
+  values (
+    v_mission_id,
+    '11111111-1111-1111-1111-111111111111',
+    'library_explore',
+    'Complete the atomic mission',
+    8,
+    current_date,
+    false,
+    'atomic-rpc-success'
+  );
+
+  select current_xp
+  into v_xp_before
+  from public.user_companion
+  where user_id = '11111111-1111-1111-1111-111111111111';
+
+  execute 'set local role authenticated';
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
+
+  select *
+  into v_first_result
+  from public.complete_daily_mission_with_xp(v_mission_id, 'manual', null);
+
+  perform public.test_assert(
+    v_first_result.status = 'completed',
+    'complete_daily_mission_with_xp should complete eligible missions'
+  );
+
+  execute 'reset role';
+
+  perform public.test_assert(
+    (select completed = true from public.daily_missions where id = v_mission_id),
+    'complete_daily_mission_with_xp should mark the mission complete after a successful XP award'
+  );
+
+  perform public.test_assert(
+    (select current_xp = v_xp_before + 8 from public.user_companion where user_id = '11111111-1111-1111-1111-111111111111'),
+    'complete_daily_mission_with_xp should award mission XP atomically'
+  );
+
+  perform public.test_assert(
+    (
+      select count(*) = 1
+      from public.xp_events
+      where user_id = '11111111-1111-1111-1111-111111111111'
+        and event_type = 'mission_complete'
+        and event_metadata ->> 'mission_id' = v_mission_id::text
+    ),
+    'complete_daily_mission_with_xp should log exactly one mission_complete XP event'
+  );
+
+  execute 'set local role authenticated';
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
+
+  select *
+  into v_second_result
+  from public.complete_daily_mission_with_xp(v_mission_id, 'manual', null);
+
+  perform public.test_assert(
+    v_second_result.status = 'already_completed',
+    'complete_daily_mission_with_xp should return already_completed on duplicate claims'
+  );
+
+  execute 'reset role';
+
+  perform public.test_assert(
+    (
+      select count(*) = 1
+      from public.xp_events
+      where user_id = '11111111-1111-1111-1111-111111111111'
+        and event_type = 'mission_complete'
+        and event_metadata ->> 'mission_id' = v_mission_id::text
+    ),
+    'duplicate mission claims must not create a second XP event'
+  );
+end
+$$;
+
+do $$
+declare
+  v_mission_id uuid := '44444444-4444-4444-4444-444444444442';
+  v_result record;
+begin
+  delete from public.daily_missions
+  where id = v_mission_id;
+
+  insert into public.daily_missions (
+    id,
+    user_id,
+    mission_type,
+    mission_text,
+    xp_reward,
+    mission_date,
+    completed,
+    category
+  )
+  values (
+    v_mission_id,
+    '22222222-2222-2222-2222-222222222222',
+    'library_explore',
+    'User B mission',
+    8,
+    current_date,
+    false,
+    'atomic-rpc-cross-user'
+  );
+
+  execute 'set local role authenticated';
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
+
+  select *
+  into v_result
+  from public.complete_daily_mission_with_xp(v_mission_id, 'manual', null);
+
+  execute 'reset role';
+
+  perform public.test_assert(
+    v_result.status = 'failed'
+      and position('mission not found' in lower(coalesce(v_result.message, ''))) > 0,
+    'complete_daily_mission_with_xp should reject cross-user mission claims'
+  );
+
+  perform public.test_assert(
+    (select completed = false from public.daily_missions where id = v_mission_id),
+    'cross-user mission completion attempts must not mutate another users mission'
+  );
+end
+$$;
+
+do $$
+declare
+  v_mission_id uuid := '44444444-4444-4444-4444-444444444443';
+  v_result record;
+begin
+  delete from public.daily_missions
+  where id = v_mission_id;
+
+  insert into public.daily_missions (
+    id,
+    user_id,
+    mission_type,
+    mission_text,
+    xp_reward,
+    mission_date,
+    completed,
+    category
+  )
+  values (
+    v_mission_id,
+    '99999999-9999-9999-9999-999999999999',
+    'library_explore',
+    'Missing companion mission',
+    8,
+    current_date,
+    false,
+    'atomic-rpc-missing-companion'
+  );
+
+  execute 'set local role authenticated';
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '99999999-9999-9999-9999-999999999999', true);
+
+  select *
+  into v_result
+  from public.complete_daily_mission_with_xp(v_mission_id, 'manual', null);
+
+  execute 'reset role';
+
+  perform public.test_assert(
+    v_result.status = 'failed'
+      and position('companion' in lower(coalesce(v_result.message, ''))) > 0,
+    'complete_daily_mission_with_xp should surface companion failures'
+  );
+
+  perform public.test_assert(
+    (select completed = false from public.daily_missions where id = v_mission_id),
+    'mission completion should roll back when the XP award fails'
+  );
+
+  perform public.test_assert(
+    (
+      select count(*) = 0
+      from public.xp_events
+      where event_type = 'mission_complete'
+        and event_metadata ->> 'mission_id' = v_mission_id::text
+    ),
+    'mission completion rollback should not leave behind mission XP events'
+  );
+end
+$$;
+
+do $$
+declare
   v_visible_count integer;
 begin
   if to_regclass('public.achievements') is not null then

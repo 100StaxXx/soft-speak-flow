@@ -27,6 +27,8 @@ import { useCompanionHealth } from "@/hooks/useCompanionHealth";
 import { useCompanionPostcards } from "@/hooks/useCompanionPostcards";
 import { useMilestones } from "@/hooks/useMilestones";
 import { useXPRewards } from "@/hooks/useXPRewards";
+import { safeClipboardWrite, getClipboardErrorMessage } from "@/utils/clipboard";
+import { buildEpicInviteLink, buildEpicInviteShareText } from "@/utils/epicInviteShare";
 
 import { useEpicRewards } from "@/hooks/useEpicRewards";
 import { getEpicDaysRemaining, resolveEpicEndDate } from "@/utils/epicDates";
@@ -219,17 +221,37 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
   }, [epic.progress_percentage, epic.id, companion, isActive, checkAndGeneratePostcard]);
 
   const handleShareEpic = async () => {
-    if (!epic.invite_code) return;
-    
+    if (!epic.invite_code || !epic.is_public) return;
+
+    const inviteLink = buildEpicInviteLink(epic.invite_code);
+    const shareText = buildEpicInviteShareText(epic.title, epic.invite_code);
+
     try {
-      await navigator.clipboard.writeText(epic.invite_code);
+      if (navigator.share) {
+        await navigator.share({
+          title: `Join ${epic.title}`,
+          text: shareText,
+          url: inviteLink,
+        });
+      } else {
+        const didCopy = await safeClipboardWrite(`${shareText}\n\n${inviteLink}`);
+        if (!didCopy) {
+          throw new Error("Clipboard unavailable");
+        }
+      }
+
       setCopied(true);
-      toast.success("Invite code copied!", {
-        description: "Share this code with others to invite them to your guild",
+      toast.success(navigator.share ? "Invite ready to share!" : "Invite link copied!", {
+        description: "Friends can open the link directly or use the invite code to join.",
       });
       setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      toast.error("Failed to copy code");
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message.toLowerCase() : "";
+      if (errorMsg.includes("abort") || errorMsg.includes("cancel")) {
+        return;
+      }
+
+      toast.error(getClipboardErrorMessage(error));
     }
   };
 
@@ -265,12 +287,13 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
                 <Target className="w-6 h-6 text-celestial-blue" />
               )}
               <h3 className="text-xl font-bold">{epic.title}</h3>
-              {epic.invite_code && (
+              {epic.invite_code && epic.is_public && (
                 <Button
                   variant="ghost"
                   size="sm"
                   className="h-7 px-2 text-primary hover:text-primary hover:bg-primary/10"
                   onClick={handleShareEpic}
+                  aria-label="Share epic invite"
                 >
                   {copied ? (
                     <Check className="w-4 h-4" />

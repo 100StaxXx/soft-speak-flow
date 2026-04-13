@@ -46,7 +46,7 @@ const mentorVoices: Record<string, MentorVoiceConfig> = {
     style_exaggeration: 1.0,
     use_speaker_boost: true,
   },
-  carmen: { voiceId: "hZLR2VL7jAuie9sowsXqg", stability: 0.75, similarity_boost: 0.85, style_exaggeration: 0.7 },
+  carmen: { voiceId: "4opnKWPbOJPB3xz3YUBh", stability: 0.75, similarity_boost: 0.85, style_exaggeration: 0.7 },
   reign: {
     voiceId: "GTQ4ImqrRljZAa9VJX6B",
     stability: 0.52,

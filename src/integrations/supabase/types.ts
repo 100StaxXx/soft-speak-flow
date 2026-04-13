@@ -8253,6 +8253,33 @@ export type Database = {
           xp_before: number
         }[]
       }
+      complete_daily_mission_with_xp: {
+        Args: {
+          p_completion_source?: string
+          p_mission_id: string
+          p_progress_current?: number
+        }
+        Returns: {
+          cap_applied: boolean
+          claimed_stage_after: number | null
+          completed_at: string | null
+          earned_level_after: number | null
+          earned_tier_after: string | null
+          level_after: number | null
+          level_before: number | null
+          message: string | null
+          mission_id: string | null
+          next_threshold: number | null
+          pending_evolution_count: number | null
+          should_evolve: boolean
+          status: string
+          tier_after: string | null
+          tier_before: string | null
+          xp_after: number | null
+          xp_awarded: number
+          xp_before: number | null
+        }[]
+      }
       apply_referral_code_secure: {
         Args: { p_referral_code: string }
         Returns: {

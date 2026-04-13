@@ -1,6 +1,6 @@
 import type { HTMLAttributes, ReactNode } from "react";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("framer-motion", () => ({
   motion: {
@@ -108,6 +108,11 @@ const baseJourney = {
   epic_habits: [],
 };
 
+afterEach(() => {
+  vi.restoreAllMocks();
+  Reflect.deleteProperty(navigator, "share");
+});
+
 describe("JourneyCard rename", () => {
   it("renders the rename affordance for active campaigns when onRename is provided", () => {
     render(<JourneyCard journey={baseJourney} onRename={vi.fn()} />);
@@ -162,5 +167,31 @@ describe("JourneyCard rename", () => {
     await waitFor(() => {
       expect(screen.queryByLabelText("Campaign name")).not.toBeInTheDocument();
     });
+  });
+
+  it("shares a direct invite link when the campaign has an invite code", async () => {
+    const shareMock = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { share: shareMock });
+
+    render(
+      <JourneyCard
+        journey={{
+          ...baseJourney,
+          invite_code: "EPIC-QUEST-1234",
+          is_public: true,
+        }}
+        onRename={vi.fn()}
+      />,
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByLabelText("Share campaign invite"));
+    });
+
+    expect(shareMock).toHaveBeenCalledWith(expect.objectContaining({
+      title: "Join Campaign Alpha",
+      text: expect.stringContaining("EPIC-QUEST-1234"),
+      url: `${window.location.origin}/join/EPIC-QUEST-1234`,
+    }));
   });
 });

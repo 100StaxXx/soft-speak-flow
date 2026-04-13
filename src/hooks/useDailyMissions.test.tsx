@@ -20,8 +20,9 @@ const mocks = vi.hoisted(() => {
   const toast = vi.fn();
   const invoke = vi.fn();
   const from = vi.fn();
+  const rpc = vi.fn();
   const existingMissionResponses: Array<{ data: unknown; error: unknown }> = [];
-  const awardCustomXP = vi.fn();
+  const showXPToast = vi.fn();
   const checkFirstTimeAchievements = vi.fn();
   const checkDailyCompletionAchievement = vi.fn();
 
@@ -29,8 +30,9 @@ const mocks = vi.hoisted(() => {
     toast,
     invoke,
     from,
+    rpc,
     existingMissionResponses,
-    awardCustomXP,
+    showXPToast,
     checkFirstTimeAchievements,
     checkDailyCompletionAchievement,
     user: { id: "user-1" },
@@ -40,6 +42,7 @@ const mocks = vi.hoisted(() => {
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: mocks.from,
+    rpc: mocks.rpc,
     functions: {
       invoke: mocks.invoke,
     },
@@ -58,9 +61,9 @@ vi.mock("./use-toast", () => ({
   }),
 }));
 
-vi.mock("./useXPRewards", () => ({
-  useXPRewards: () => ({
-    awardCustomXP: mocks.awardCustomXP,
+vi.mock("@/contexts/XPContext", () => ({
+  useXPToast: () => ({
+    showXPToast: mocks.showXPToast,
   }),
 }));
 
@@ -135,7 +138,8 @@ describe("useDailyMissions", () => {
   beforeEach(() => {
     mocks.toast.mockClear();
     mocks.invoke.mockReset();
-    mocks.awardCustomXP.mockReset();
+    mocks.rpc.mockReset();
+    mocks.showXPToast.mockReset();
     mocks.checkFirstTimeAchievements.mockReset();
     mocks.checkDailyCompletionAchievement.mockReset();
     mocks.from.mockImplementation((table: string) => {
@@ -322,7 +326,29 @@ describe("useDailyMissions", () => {
   it("awards manual mission XP with a stable event type and mission metadata", async () => {
     const mission = makeMission("m1", "connection");
     mocks.existingMissionResponses.push({ data: [mission], error: null });
-    mocks.awardCustomXP.mockResolvedValue({ xpAwarded: mission.xp_reward });
+    mocks.rpc.mockResolvedValue({
+      data: [{
+        status: "completed",
+        message: null,
+        mission_id: mission.id,
+        completed_at: "2026-03-02T12:00:00.000Z",
+        xp_awarded: mission.xp_reward,
+        xp_before: 100,
+        xp_after: 108,
+        should_evolve: false,
+        next_threshold: 120,
+        cap_applied: false,
+        level_before: 10,
+        level_after: 10,
+        tier_before: "base",
+        tier_after: "base",
+        earned_level_after: 10,
+        earned_tier_after: "base",
+        claimed_stage_after: 10,
+        pending_evolution_count: 0,
+      }],
+      error: null,
+    });
     mocks.checkDailyCompletionAchievement.mockResolvedValue(undefined);
     mocks.checkFirstTimeAchievements.mockResolvedValue(undefined);
 
@@ -339,20 +365,6 @@ describe("useDailyMissions", () => {
       }
 
       if (dailyMissionCallCount === 2) {
-        const builder = {
-          update: () => builder,
-          eq: () => builder,
-          select: () => builder,
-          maybeSingle: () =>
-            Promise.resolve({
-              data: { ...mission, completed: true, completed_at: "2026-03-02T12:00:00.000Z" },
-              error: null,
-            }),
-        };
-        return builder;
-      }
-
-      if (dailyMissionCallCount === 3) {
         const builder = {
           select: () => builder,
           eq: (() => {
@@ -384,55 +396,43 @@ describe("useDailyMissions", () => {
       await result.current.completeMission(mission.id);
     });
 
-    expect(mocks.awardCustomXP).toHaveBeenCalledWith(
-      mission.xp_reward,
-      "mission_complete",
-      "Mission Complete!",
-      {
-        mission_id: mission.id,
-        mission_type: mission.mission_type,
-        mission_category: mission.category,
-      },
-    );
+    expect(mocks.rpc).toHaveBeenCalledWith("complete_daily_mission_with_xp", {
+      p_completion_source: "manual",
+      p_mission_id: mission.id,
+      p_progress_current: null,
+    });
+    expect(mocks.showXPToast).toHaveBeenCalledWith(mission.xp_reward, "Mission Complete!");
     expect(mocks.toast).toHaveBeenCalledWith({
       title: "Mission Complete!",
       description: "XP awarded!",
     });
   });
 
-  it("does not show the success toast when mission XP awarding fails", async () => {
+  it("shows a clear duplicate-completion toast when the RPC reports an already completed mission", async () => {
     const mission = makeMission("m2", "growth");
-    const xpError = new Error("Unsupported event_type: mission_growth");
     mocks.existingMissionResponses.push({ data: [mission], error: null });
-    mocks.awardCustomXP.mockRejectedValue(xpError);
-
-    let dailyMissionCallCount = 0;
-    mocks.from.mockImplementation((table: string) => {
-      if (table !== "daily_missions") {
-        throw new Error(`Unexpected table access: ${table}`);
-      }
-
-      dailyMissionCallCount += 1;
-
-      if (dailyMissionCallCount === 1) {
-        return buildSelectQueryResponse();
-      }
-
-      if (dailyMissionCallCount === 2) {
-        const builder = {
-          update: () => builder,
-          eq: () => builder,
-          select: () => builder,
-          maybeSingle: () =>
-            Promise.resolve({
-              data: { ...mission, completed: true, completed_at: "2026-03-02T12:00:00.000Z" },
-              error: null,
-            }),
-        };
-        return builder;
-      }
-
-      throw new Error(`Unexpected daily_missions access #${dailyMissionCallCount}`);
+    mocks.rpc.mockResolvedValue({
+      data: [{
+        status: "already_completed",
+        message: "XP has already been claimed for this mission.",
+        mission_id: mission.id,
+        completed_at: "2026-03-02T12:00:00.000Z",
+        xp_awarded: 0,
+        xp_before: null,
+        xp_after: null,
+        should_evolve: false,
+        next_threshold: null,
+        cap_applied: false,
+        level_before: null,
+        level_after: null,
+        tier_before: null,
+        tier_after: null,
+        earned_level_after: null,
+        earned_tier_after: null,
+        claimed_stage_after: null,
+        pending_evolution_count: 0,
+      }],
+      error: null,
     });
 
     const { result } = renderHook(() => useDailyMissions(), {
@@ -444,7 +444,57 @@ describe("useDailyMissions", () => {
     });
 
     await act(async () => {
-      await expect(result.current.completeMission(mission.id)).rejects.toThrow(xpError.message);
+      await expect(result.current.completeMission(mission.id)).rejects.toThrow(
+        "XP has already been claimed for this mission.",
+      );
+    });
+
+    expect(mocks.toast).toHaveBeenCalledWith({
+      title: "Mission already completed",
+      description: "XP has already been claimed for this mission.",
+    });
+    expect(mocks.showXPToast).not.toHaveBeenCalled();
+  });
+
+  it("does not show the success toast when the atomic mission RPC fails", async () => {
+    const mission = makeMission("m3", "identity");
+    mocks.existingMissionResponses.push({ data: [mission], error: null });
+    mocks.rpc.mockResolvedValue({
+      data: [{
+        status: "failed",
+        message: "No companion found for user",
+        mission_id: mission.id,
+        completed_at: null,
+        xp_awarded: 0,
+        xp_before: null,
+        xp_after: null,
+        should_evolve: false,
+        next_threshold: null,
+        cap_applied: false,
+        level_before: null,
+        level_after: null,
+        tier_before: null,
+        tier_after: null,
+        earned_level_after: null,
+        earned_tier_after: null,
+        claimed_stage_after: null,
+        pending_evolution_count: 0,
+      }],
+      error: null,
+    });
+
+    const { result } = renderHook(() => useDailyMissions(), {
+      wrapper: createHookWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.missions).toHaveLength(1);
+    });
+
+    await act(async () => {
+      await expect(result.current.completeMission(mission.id)).rejects.toThrow(
+        "No companion found for user",
+      );
     });
 
     const successToasts = mocks.toast.mock.calls.filter(
@@ -453,8 +503,9 @@ describe("useDailyMissions", () => {
     expect(successToasts).toHaveLength(0);
     expect(mocks.toast).toHaveBeenCalledWith({
       title: "Mission not completed",
-      description: xpError.message,
+      description: "No companion found for user",
       variant: "destructive",
     });
+    expect(mocks.showXPToast).not.toHaveBeenCalled();
   });
 });

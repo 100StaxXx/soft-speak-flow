@@ -2,8 +2,14 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { useToast } from "./use-toast";
-import { useXPRewards } from "./useXPRewards";
 import { useAchievements } from "./useAchievements";
+import { useXPToast } from "@/contexts/XPContext";
+import {
+  completeDailyMissionWithXp,
+  getMissionCompletionError,
+  MissionCompletionError,
+  showMissionRewardFeedback,
+} from "@/lib/dailyMissionCompletion";
 import { playMissionComplete } from "@/utils/soundEffects";
 import { useState, useEffect, useRef } from "react";
 import { getEffectiveMissionDate } from "@/utils/timezone";
@@ -65,8 +71,8 @@ const log = logger.scope("useDailyMissions");
 export const useDailyMissions = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { showXPToast } = useXPToast();
   const queryClient = useQueryClient();
-  const { awardCustomXP } = useXPRewards();
   const { checkDailyCompletionAchievement, checkFirstTimeAchievements } = useAchievements();
   const today = getEffectiveMissionDate(); // Uses 2 AM reset in user's timezone
   const [generationErrorMessage, setGenerationErrorMessage] = useState<string | null>(null);
@@ -260,38 +266,24 @@ export const useDailyMissions = () => {
       const mission = missions?.find(m => m.id === missionId);
       if (!mission) throw new Error("Mission not found");
 
-      // Check if already completed to prevent XP spam
       if (mission.completed) {
-        throw new Error("Mission already completed");
+        throw new MissionCompletionError(
+          "XP has already been claimed for this mission.",
+          "already_completed",
+        );
       }
 
-      const { data, error } = await supabase
-        .from('daily_missions')
-        .update({ 
-          completed: true, 
-          completed_at: new Date().toISOString() 
-        })
-        .eq('id', missionId)
-        .eq('user_id', user.id)
-        .eq('completed', false) // Only update if not already completed
-        .select()
-        .maybeSingle();
+      const completionResult = await completeDailyMissionWithXp({
+        missionId,
+        completionSource: "manual",
+      });
+      if (completionResult.status !== "completed") {
+        throw getMissionCompletionError(completionResult);
+      }
 
-      if (error) throw error;
-      if (!data) throw new Error("Mission already completed");
-      
-      // Award XP with display reason
-      await awardCustomXP(
-        mission.xp_reward, 
-        "mission_complete",
-        "Mission Complete!",
-        {
-          mission_id: mission.id,
-          mission_type: mission.mission_type,
-          mission_category: mission.category,
-        }
-      );
-      
+      showMissionRewardFeedback(completionResult, showXPToast, "Mission Complete!");
+      await queryClient.invalidateQueries({ queryKey: ["companion"] });
+
       // Check for first mission achievement
       const { count } = await supabase
         .from('daily_missions')
@@ -305,7 +297,7 @@ export const useDailyMissions = () => {
 
       await checkDailyCompletionAchievement(today);
       
-      return data;
+      return completionResult;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['daily-missions'] });
@@ -317,6 +309,14 @@ export const useDailyMissions = () => {
       window.dispatchEvent(new CustomEvent('quest-completed'));
     },
     onError: (error: Error) => {
+      if (error instanceof MissionCompletionError && error.kind === "already_completed") {
+        toast({
+          title: "Mission already completed",
+          description: error.message,
+        });
+        return;
+      }
+
       toast({
         title: "Mission not completed",
         description: error.message,
