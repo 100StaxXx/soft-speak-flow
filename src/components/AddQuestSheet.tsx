@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, memo, useMemo } from "react";
+import { useState, useRef, useEffect, useCallback, memo, useMemo, type FocusEvent, type KeyboardEvent } from "react";
 import { format, isToday, addMinutes } from "date-fns";
 import { Sliders, CalendarIcon, Inbox, Map, X, Zap, Flame, Mountain, Trash2, Sparkles, History } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -157,6 +157,8 @@ export const AddQuestSheet = memo(function AddQuestSheet({
 
   const subtaskInputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const hasEmittedTitleEnteredRef = useRef(false);
+  const hasEditedTitleRef = useRef(false);
+  const hasEmittedTimeSelectedRef = useRef(false);
   const lastPrefillKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -192,6 +194,8 @@ export const AddQuestSheet = memo(function AddQuestSheet({
       setIsHandlingTemplatePrompt(false);
       lastPrefillKeyRef.current = null;
       hasEmittedTitleEnteredRef.current = false;
+      hasEditedTitleRef.current = false;
+      hasEmittedTimeSelectedRef.current = false;
     } else {
       setTaskDate(format(selectedDate, "yyyy-MM-dd"));
     }
@@ -492,23 +496,46 @@ export const AddQuestSheet = memo(function AddQuestSheet({
     window.dispatchEvent(new CustomEvent("add-quest-sheet-opened"));
   }, [open]);
 
-  useEffect(() => {
+  const emitTitleEntered = useCallback(() => {
     if (!open) return;
     if (hasEmittedTitleEnteredRef.current) return;
+    if (!hasEditedTitleRef.current) return;
     if (!taskText.trim()) return;
 
     hasEmittedTitleEnteredRef.current = true;
     window.dispatchEvent(new CustomEvent("add-quest-title-entered"));
   }, [open, taskText]);
 
-  useEffect(() => {
-    if (!scheduledTime) return;
+  const emitTimeSelected = useCallback((selectedValue: string | null) => {
+    if (!open) return;
+    if (hasEmittedTimeSelectedRef.current) return;
+    if (!selectedValue) return;
+
+    hasEmittedTimeSelectedRef.current = true;
     window.dispatchEvent(
       new CustomEvent("add-quest-time-selected", {
-        detail: { scheduledTime },
+        detail: { scheduledTime: selectedValue },
       })
     );
-  }, [scheduledTime]);
+  }, [open]);
+
+  const handleTaskTextChange = useCallback((value: string) => {
+    hasEditedTitleRef.current = true;
+    setTaskText(value);
+  }, []);
+
+  const handleTaskTextBlur = useCallback(() => {
+    emitTitleEntered();
+  }, [emitTitleEntered]);
+
+  const handleTaskTextKeyDown = useCallback((event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== "Enter") return;
+    emitTitleEntered();
+  }, [emitTitleEntered]);
+
+  const handleTimeInputBlur = useCallback((event: FocusEvent<HTMLInputElement>) => {
+    emitTimeSelected(event.currentTarget.value || null);
+  }, [emitTimeSelected]);
 
   return (
     <Sheet open={open} onOpenChange={requestOpenChange}>
@@ -552,7 +579,9 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                   data-tour="add-quest-title-input"
                   placeholder="Quest Title"
                   value={taskText}
-                  onChange={(e) => setTaskText(e.target.value)}
+                  onChange={(e) => handleTaskTextChange(e.target.value)}
+                  onBlur={handleTaskTextBlur}
+                  onKeyDown={handleTaskTextKeyDown}
                   disabled={isAdding}
                   className={QUEST_FORM_STYLES.desktopPanelInput}
                 />
@@ -605,7 +634,9 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                         data-tour="add-quest-title-input"
                         placeholder="Quest Title"
                         value={taskText}
-                        onChange={(e) => setTaskText(e.target.value)}
+                        onChange={(e) => handleTaskTextChange(e.target.value)}
+                        onBlur={handleTaskTextBlur}
+                        onKeyDown={handleTaskTextKeyDown}
                         disabled={isAdding}
                         className={QUEST_FORM_STYLES.titleInput}
                       />
@@ -757,10 +788,12 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                   }}
                   inputProps={{
                     "data-tour": "add-quest-time-input",
+                    onBlur: handleTimeInputBlur,
                   }}
                   getSlotButtonProps={(slot) => ({
                     "data-tour": "add-quest-time-slot",
                     "data-time-slot": slot,
+                    onClick: () => emitTimeSelected(slot),
                   })}
                 />
 

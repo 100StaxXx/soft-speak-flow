@@ -9,6 +9,8 @@ struct WidgetTaskData: Codable {
     let ritualCompleted: Int?
     let date: String
     let updatedAt: String?
+    let profileWallpaperRelativePath: String?
+    let profileWallpaperDateKey: String?
     
     /// Combined count of all tasks (quests + rituals)
     var totalAllCount: Int {
@@ -107,7 +109,9 @@ class WidgetDataManager {
             ritualCount: 0,
             ritualCompleted: 0,
             date: date,
-            updatedAt: nil
+            updatedAt: nil,
+            profileWallpaperRelativePath: nil,
+            profileWallpaperDateKey: nil
         )
     }
     
@@ -124,7 +128,24 @@ class WidgetDataManager {
             ritualCount: 4,
             ritualCompleted: 2,
             date: WidgetTaskData.localDateString(),
-            updatedAt: nil
+            updatedAt: nil,
+            profileWallpaperRelativePath: nil,
+            profileWallpaperDateKey: nil
         )
+    }
+
+    func profileWallpaperFileURL(for relativePath: String?) -> URL? {
+        guard
+            let relativePath,
+            !relativePath.isEmpty,
+            !relativePath.contains(".."),
+            let containerURL = FileManager.default.containerURL(
+                forSecurityApplicationGroupIdentifier: appGroupId
+            )
+        else {
+            return nil
+        }
+
+        return containerURL.appendingPathComponent(relativePath, isDirectory: false)
     }
 }

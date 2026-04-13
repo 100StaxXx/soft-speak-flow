@@ -41,6 +41,12 @@ const mocks = vi.hoisted(() => {
       refetchQueries: vi.fn().mockResolvedValue(undefined),
     },
     refreshConnection: vi.fn().mockResolvedValue(undefined),
+    eveningReflection: {
+      shouldShowBanner: false,
+      isDrawerOpen: false,
+      setIsDrawerOpen: vi.fn(),
+      isLoading: false,
+    },
     profilesUpdateEqMock,
     profilesUpdateMock,
     fromMock,
@@ -108,6 +114,10 @@ vi.mock("@/contexts/ThemeContext", () => ({
 
 vi.mock("@/contexts/MainTabVisibilityContext", () => ({
   useMainTabVisibility: () => ({ isTabActive: true }),
+}));
+
+vi.mock("@/hooks/useEveningReflection", () => ({
+  useEveningReflection: () => mocks.eveningReflection,
 }));
 
 vi.mock("@/components/PageTransition", () => ({
@@ -191,6 +201,12 @@ describe("Index onboarding guard", () => {
       data: null,
       isLoading: false,
       isError: false,
+    };
+    mocks.eveningReflection = {
+      shouldShowBanner: false,
+      isDrawerOpen: false,
+      setIsDrawerOpen: vi.fn(),
+      isLoading: false,
     };
     mocks.profilesUpdateEqMock.mockClear();
     mocks.profilesUpdateMock.mockClear();

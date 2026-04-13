@@ -28,6 +28,12 @@ const mocks = vi.hoisted(() => ({
     isActive: false,
     currentStep: null as string | null,
   },
+  eveningReflection: {
+    shouldShowBanner: true,
+    isDrawerOpen: false,
+    setIsDrawerOpen: vi.fn(),
+    isLoading: false,
+  },
 }));
 
 vi.mock("@tanstack/react-query", () => ({
@@ -81,6 +87,10 @@ vi.mock("@/contexts/MainTabVisibilityContext", () => ({
 
 vi.mock("@/hooks/usePostOnboardingMentorGuidance", () => ({
   usePostOnboardingMentorGuidance: () => mocks.guidance,
+}));
+
+vi.mock("@/hooks/useEveningReflection", () => ({
+  useEveningReflection: () => mocks.eveningReflection,
 }));
 
 vi.mock("@/hooks/useFirstTimeModal", () => ({
@@ -169,6 +179,12 @@ describe("Index mentor connection state", () => {
     mocks.guidance = {
       isActive: false,
       currentStep: null,
+    };
+    mocks.eveningReflection = {
+      shouldShowBanner: true,
+      isDrawerOpen: false,
+      setIsDrawerOpen: vi.fn(),
+      isLoading: false,
     };
     mocks.effectiveMentorId = null;
     mocks.mentorStatus = "recovering";

@@ -53,7 +53,7 @@ describe("OnboardingStoryToneSelection", () => {
     const dragonCard = screen.getByText("Dragon").closest("button");
     expect(dragonCard).not.toBeNull();
     expect(dragonCard).toBeDisabled();
-    expect(screen.getAllByText("Awaiting Awakening").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Coming Soon").length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole("button", { name: /Kitsune/i }));
     expect(screen.getByRole("button", { name: "Continue" })).toBeEnabled();
     expect(screen.getByTestId("species-silhouette-fox")).toHaveAttribute(

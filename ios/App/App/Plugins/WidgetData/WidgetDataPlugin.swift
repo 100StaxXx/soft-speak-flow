@@ -22,6 +22,10 @@ public class WidgetDataPlugin: CAPPlugin, CAPBridgedPlugin {
     private let diagnosticsDirectoryName = "WidgetSync"
     private let diagnosticsFileName = "widget-sync-diagnostics.jsonl"
     private let diagnosticsMaxFileBytes = 256 * 1024
+    private let profileWallpaperSourceUrlKey = "widget_profile_wallpaper_source_url"
+    private let profileWallpaperDateKeyKey = "widget_profile_wallpaper_date_key"
+    private let profileWallpaperRelativePathKey = "widget_profile_wallpaper_relative_path"
+    private let profileWallpaperRelativePath = "WidgetBackgrounds/profile-wallpaper"
 
     private enum ErrorCode {
         static let appGroupInaccessible = "APP_GROUP_INACCESSIBLE"
@@ -32,6 +36,11 @@ public class WidgetDataPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     private static let probePayloadKey = "widget_sync_probe"
+
+    private struct ProfileWallpaperState {
+        let relativePath: String?
+        let dateKey: String?
+    }
     
     @objc func updateWidgetData(_ call: CAPPluginCall) {
         guard let tasksArray = call.getArray("tasks") as? [[String: Any]],
@@ -58,6 +67,8 @@ public class WidgetDataPlugin: CAPPlugin, CAPBridgedPlugin {
         // Get ritual counts (default to 0 if not provided)
         let ritualCount = call.getInt("ritualCount") ?? 0
         let ritualCompleted = call.getInt("ritualCompleted") ?? 0
+        let profileWallpaperImageUrl = normalizedOptionalString(call.getString("profileWallpaperImageUrl"))
+        let profileWallpaperDateKey = normalizedOptionalString(call.getString("profileWallpaperDateKey"))
         appendDiagnosticsLog(
             event: "updateWidgetData_start",
             details: [
@@ -66,20 +77,12 @@ public class WidgetDataPlugin: CAPPlugin, CAPBridgedPlugin {
                 "totalCount": totalCount,
                 "completedCount": completedCount,
                 "ritualCount": ritualCount,
-                "ritualCompleted": ritualCompleted
+                "ritualCompleted": ritualCompleted,
+                "hasProfileWallpaperImageUrl": profileWallpaperImageUrl != nil,
+                "profileWallpaperDateKey": profileWallpaperDateKey ?? NSNull()
             ]
         )
-        
-        let widgetData: [String: Any] = [
-            "tasks": tasksArray,
-            "completedCount": completedCount,
-            "totalCount": totalCount,
-            "ritualCount": ritualCount,
-            "ritualCompleted": ritualCompleted,
-            "date": date,
-            "updatedAt": isoFormatter.string(from: Date())
-        ]
-        
+
         // Write to App Group shared container
         guard let userDefaults = UserDefaults(suiteName: appGroupId) else {
             print("[WidgetDataPlugin] updateWidgetData rejected: failed to access App Group container \(appGroupId)")
@@ -100,78 +103,42 @@ public class WidgetDataPlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
 
-        guard let jsonData = try? JSONSerialization.data(withJSONObject: widgetData) else {
-            print("[WidgetDataPlugin] updateWidgetData rejected: failed to serialize widget payload")
-            appendDiagnosticsLog(
-                event: "updateWidgetData_failed",
-                status: "error",
-                details: [
-                    "date": date,
-                    "errorCode": ErrorCode.payloadSerializationFailed,
-                    "errorMessage": "Failed to serialize widget data"
-                ]
-            )
-            reject(
-                call,
-                message: "Failed to serialize widget data",
-                code: ErrorCode.payloadSerializationFailed
-            )
-            return
-        }
-
-        userDefaults.set(jsonData, forKey: dataKey)
-        let didSynchronize = userDefaults.synchronize()
-        guard let readBackData = userDefaults.data(forKey: dataKey), !readBackData.isEmpty else {
-            print("[WidgetDataPlugin] updateWidgetData rejected: payload missing after write")
-            appendDiagnosticsLog(
-                event: "updateWidgetData_failed",
-                status: "error",
-                details: [
-                    "date": date,
-                    "errorCode": ErrorCode.payloadWriteFailed,
-                    "errorMessage": "Failed to write widget payload to shared storage",
-                    "payloadByteCount": jsonData.count,
-                    "synchronized": didSynchronize
-                ]
-            )
-            reject(
-                call,
-                message: "Failed to write widget payload to shared storage",
-                code: ErrorCode.payloadWriteFailed
-            )
-            return
-        }
-
-        print(
-            "[WidgetDataPlugin] Wrote widget payload " +
-            "date=\(date) " +
-            "tasks=\(tasksArray.count) " +
-            "total=\(totalCount) " +
-            "completed=\(completedCount) " +
-            "rituals=\(ritualCompleted)/\(ritualCount) " +
-            "bytes=\(jsonData.count) " +
-            "readBackBytes=\(readBackData.count) " +
-            "synchronized=\(didSynchronize)"
-        )
-        appendDiagnosticsLog(
-            event: "updateWidgetData_succeeded",
-            status: "success",
-            details: [
-                "date": date,
-                "taskCount": tasksArray.count,
-                "totalCount": totalCount,
+        syncProfileWallpaper(
+            imageUrl: profileWallpaperImageUrl,
+            dateKey: profileWallpaperDateKey,
+            userDefaults: userDefaults
+        ) { wallpaperState in
+            var widgetData: [String: Any] = [
+                "tasks": tasksArray,
                 "completedCount": completedCount,
+                "totalCount": totalCount,
                 "ritualCount": ritualCount,
                 "ritualCompleted": ritualCompleted,
-                "payloadByteCount": jsonData.count,
-                "readBackByteCount": readBackData.count,
-                "synchronized": didSynchronize
+                "date": date,
+                "updatedAt": self.isoFormatter.string(from: Date())
             ]
-        )
 
-        clearLastError()
-        triggerWidgetReload(withDelay: 0.15, reason: "updateWidgetData")
-        call.resolve()
+            if let relativePath = wallpaperState.relativePath {
+                widgetData["profileWallpaperRelativePath"] = relativePath
+            }
+
+            if let wallpaperDateKey = wallpaperState.dateKey {
+                widgetData["profileWallpaperDateKey"] = wallpaperDateKey
+            }
+
+            self.writeWidgetPayload(
+                call,
+                userDefaults: userDefaults,
+                widgetData: widgetData,
+                date: date,
+                taskCount: tasksArray.count,
+                totalCount: totalCount,
+                completedCount: completedCount,
+                ritualCount: ritualCount,
+                ritualCompleted: ritualCompleted,
+                wallpaperState: wallpaperState
+            )
+        }
     }
 
     @objc func reloadWidget(_ call: CAPPluginCall) {
@@ -447,6 +414,302 @@ public class WidgetDataPlugin: CAPPlugin, CAPBridgedPlugin {
             WidgetCenter.shared.reloadTimelines(ofKind: "CosmiqWidget")
             WidgetCenter.shared.reloadAllTimelines()
         }
+    }
+
+    private func writeWidgetPayload(
+        _ call: CAPPluginCall,
+        userDefaults: UserDefaults,
+        widgetData: [String: Any],
+        date: String,
+        taskCount: Int,
+        totalCount: Int,
+        completedCount: Int,
+        ritualCount: Int,
+        ritualCompleted: Int,
+        wallpaperState: ProfileWallpaperState
+    ) {
+        guard let jsonData = try? JSONSerialization.data(withJSONObject: widgetData) else {
+            print("[WidgetDataPlugin] updateWidgetData rejected: failed to serialize widget payload")
+            appendDiagnosticsLog(
+                event: "updateWidgetData_failed",
+                status: "error",
+                details: [
+                    "date": date,
+                    "errorCode": ErrorCode.payloadSerializationFailed,
+                    "errorMessage": "Failed to serialize widget data"
+                ]
+            )
+            DispatchQueue.main.async {
+                self.reject(
+                    call,
+                    message: "Failed to serialize widget data",
+                    code: ErrorCode.payloadSerializationFailed
+                )
+            }
+            return
+        }
+
+        userDefaults.set(jsonData, forKey: dataKey)
+        let didSynchronize = userDefaults.synchronize()
+        guard let readBackData = userDefaults.data(forKey: dataKey), !readBackData.isEmpty else {
+            print("[WidgetDataPlugin] updateWidgetData rejected: payload missing after write")
+            appendDiagnosticsLog(
+                event: "updateWidgetData_failed",
+                status: "error",
+                details: [
+                    "date": date,
+                    "errorCode": ErrorCode.payloadWriteFailed,
+                    "errorMessage": "Failed to write widget payload to shared storage",
+                    "payloadByteCount": jsonData.count,
+                    "synchronized": didSynchronize
+                ]
+            )
+            DispatchQueue.main.async {
+                self.reject(
+                    call,
+                    message: "Failed to write widget payload to shared storage",
+                    code: ErrorCode.payloadWriteFailed
+                )
+            }
+            return
+        }
+
+        print(
+            "[WidgetDataPlugin] Wrote widget payload " +
+            "date=\(date) " +
+            "tasks=\(taskCount) " +
+            "total=\(totalCount) " +
+            "completed=\(completedCount) " +
+            "rituals=\(ritualCompleted)/\(ritualCount) " +
+            "bytes=\(jsonData.count) " +
+            "readBackBytes=\(readBackData.count) " +
+            "synchronized=\(didSynchronize) " +
+            "hasProfileWallpaper=\(wallpaperState.relativePath != nil)"
+        )
+        appendDiagnosticsLog(
+            event: "updateWidgetData_succeeded",
+            status: "success",
+            details: [
+                "date": date,
+                "taskCount": taskCount,
+                "totalCount": totalCount,
+                "completedCount": completedCount,
+                "ritualCount": ritualCount,
+                "ritualCompleted": ritualCompleted,
+                "payloadByteCount": jsonData.count,
+                "readBackByteCount": readBackData.count,
+                "synchronized": didSynchronize,
+                "profileWallpaperRelativePath": wallpaperState.relativePath ?? NSNull(),
+                "profileWallpaperDateKey": wallpaperState.dateKey ?? NSNull()
+            ]
+        )
+
+        clearLastError()
+        triggerWidgetReload(withDelay: 0.15, reason: "updateWidgetData")
+        DispatchQueue.main.async {
+            call.resolve()
+        }
+    }
+
+    private func syncProfileWallpaper(
+        imageUrl: String?,
+        dateKey: String?,
+        userDefaults: UserDefaults,
+        completion: @escaping (ProfileWallpaperState) -> Void
+    ) {
+        guard let imageUrl, let dateKey else {
+            clearCachedProfileWallpaper(userDefaults: userDefaults)
+            completion(ProfileWallpaperState(relativePath: nil, dateKey: nil))
+            return
+        }
+
+        if let cachedState = cachedProfileWallpaperState(
+            imageUrl: imageUrl,
+            dateKey: dateKey,
+            userDefaults: userDefaults
+        ) {
+            completion(cachedState)
+            return
+        }
+
+        guard let remoteURL = URL(string: imageUrl) else {
+            appendDiagnosticsLog(
+                event: "updateWidgetData_wallpaper_skipped",
+                status: "error",
+                details: [
+                    "profileWallpaperDateKey": dateKey,
+                    "errorMessage": "Invalid profile wallpaper URL"
+                ]
+            )
+            clearCachedProfileWallpaper(userDefaults: userDefaults)
+            completion(ProfileWallpaperState(relativePath: nil, dateKey: nil))
+            return
+        }
+
+        let request = URLRequest(
+            url: remoteURL,
+            cachePolicy: .reloadIgnoringLocalCacheData,
+            timeoutInterval: 20
+        )
+
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let error {
+                self.appendDiagnosticsLog(
+                    event: "updateWidgetData_wallpaper_skipped",
+                    status: "error",
+                    details: [
+                        "profileWallpaperDateKey": dateKey,
+                        "errorMessage": error.localizedDescription
+                    ]
+                )
+                self.clearCachedProfileWallpaper(userDefaults: userDefaults)
+                completion(ProfileWallpaperState(relativePath: nil, dateKey: nil))
+                return
+            }
+
+            if let httpResponse = response as? HTTPURLResponse,
+               !(200...299).contains(httpResponse.statusCode) {
+                self.appendDiagnosticsLog(
+                    event: "updateWidgetData_wallpaper_skipped",
+                    status: "error",
+                    details: [
+                        "profileWallpaperDateKey": dateKey,
+                        "errorMessage": "Wallpaper request failed with status \(httpResponse.statusCode)"
+                    ]
+                )
+                self.clearCachedProfileWallpaper(userDefaults: userDefaults)
+                completion(ProfileWallpaperState(relativePath: nil, dateKey: nil))
+                return
+            }
+
+            guard let data, !data.isEmpty else {
+                self.appendDiagnosticsLog(
+                    event: "updateWidgetData_wallpaper_skipped",
+                    status: "error",
+                    details: [
+                        "profileWallpaperDateKey": dateKey,
+                        "errorMessage": "Wallpaper response was empty"
+                    ]
+                )
+                self.clearCachedProfileWallpaper(userDefaults: userDefaults)
+                completion(ProfileWallpaperState(relativePath: nil, dateKey: nil))
+                return
+            }
+
+            do {
+                let relativePath = try self.writeProfileWallpaperImage(data: data)
+                userDefaults.set(imageUrl, forKey: self.profileWallpaperSourceUrlKey)
+                userDefaults.set(dateKey, forKey: self.profileWallpaperDateKeyKey)
+                userDefaults.set(relativePath, forKey: self.profileWallpaperRelativePathKey)
+                userDefaults.synchronize()
+                self.appendDiagnosticsLog(
+                    event: "updateWidgetData_wallpaper_cached",
+                    status: "success",
+                    details: [
+                        "profileWallpaperDateKey": dateKey,
+                        "profileWallpaperRelativePath": relativePath,
+                        "payloadByteCount": data.count
+                    ]
+                )
+                completion(ProfileWallpaperState(relativePath: relativePath, dateKey: dateKey))
+            } catch {
+                self.appendDiagnosticsLog(
+                    event: "updateWidgetData_wallpaper_skipped",
+                    status: "error",
+                    details: [
+                        "profileWallpaperDateKey": dateKey,
+                        "errorMessage": error.localizedDescription
+                    ]
+                )
+                self.clearCachedProfileWallpaper(userDefaults: userDefaults)
+                completion(ProfileWallpaperState(relativePath: nil, dateKey: nil))
+            }
+        }.resume()
+    }
+
+    private func cachedProfileWallpaperState(
+        imageUrl: String,
+        dateKey: String,
+        userDefaults: UserDefaults
+    ) -> ProfileWallpaperState? {
+        guard
+            let sourceUrl = normalizedOptionalString(userDefaults.string(forKey: profileWallpaperSourceUrlKey)),
+            let cachedDateKey = normalizedOptionalString(userDefaults.string(forKey: profileWallpaperDateKeyKey)),
+            let relativePath = normalizedOptionalString(userDefaults.string(forKey: profileWallpaperRelativePathKey)),
+            let fileURL = profileWallpaperFileURL(relativePath: relativePath),
+            FileManager.default.fileExists(atPath: fileURL.path),
+            sourceUrl == imageUrl,
+            cachedDateKey == dateKey
+        else {
+            return nil
+        }
+
+        return ProfileWallpaperState(relativePath: relativePath, dateKey: cachedDateKey)
+    }
+
+    private func writeProfileWallpaperImage(data: Data) throws -> String {
+        let relativePath = profileWallpaperRelativePath
+        guard let targetURL = profileWallpaperFileURL(relativePath: relativePath) else {
+            throw NSError(
+                domain: "WidgetDataPlugin",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "Failed to access App Group wallpaper directory"]
+            )
+        }
+
+        let directoryURL = targetURL.deletingLastPathComponent()
+        let tempURL = directoryURL.appendingPathComponent("profile-wallpaper.tmp", isDirectory: false)
+        try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+
+        if FileManager.default.fileExists(atPath: tempURL.path) {
+            try? FileManager.default.removeItem(at: tempURL)
+        }
+
+        try data.write(to: tempURL, options: .atomic)
+
+        if FileManager.default.fileExists(atPath: targetURL.path) {
+            _ = try FileManager.default.replaceItemAt(targetURL, withItemAt: tempURL)
+        } else {
+            try FileManager.default.moveItem(at: tempURL, to: targetURL)
+        }
+
+        return relativePath
+    }
+
+    private func clearCachedProfileWallpaper(userDefaults: UserDefaults) {
+        if let relativePath = normalizedOptionalString(userDefaults.string(forKey: profileWallpaperRelativePathKey)),
+           let fileURL = profileWallpaperFileURL(relativePath: relativePath),
+           FileManager.default.fileExists(atPath: fileURL.path) {
+            try? FileManager.default.removeItem(at: fileURL)
+        }
+
+        userDefaults.removeObject(forKey: profileWallpaperSourceUrlKey)
+        userDefaults.removeObject(forKey: profileWallpaperDateKeyKey)
+        userDefaults.removeObject(forKey: profileWallpaperRelativePathKey)
+        userDefaults.synchronize()
+    }
+
+    private func profileWallpaperFileURL(relativePath: String) -> URL? {
+        guard
+            !relativePath.isEmpty,
+            !relativePath.contains(".."),
+            let containerURL = FileManager.default.containerURL(
+                forSecurityApplicationGroupIdentifier: appGroupId
+            )
+        else {
+            return nil
+        }
+
+        return containerURL.appendingPathComponent(relativePath, isDirectory: false)
+    }
+
+    private func normalizedOptionalString(_ value: String?) -> String? {
+        guard let value else {
+            return nil
+        }
+
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 
     private func diagnosticsLogFileURL() -> URL? {

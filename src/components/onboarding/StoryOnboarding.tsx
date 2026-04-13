@@ -31,7 +31,7 @@ import {
   getUniversalEggAssetUrl,
 } from "@/lib/companionAssetResolver";
 import {
-  getCompanionElement,
+  getCompanionEggLabel,
   getCompanionElementAnchorColor,
   getCompanionPreset,
   type CompanionStoryTone,
@@ -666,7 +666,7 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
   }, []);
 
   const getCompanionSelectionDisplayName = useCallback((preferences: CompanionSelectionPreferences) => {
-    const eggDisplayName = `${getCompanionElement(preferences.coreElement).label} Egg`;
+    const eggDisplayName = getCompanionEggLabel(preferences.coreElement);
     return preferences.presetId ? preferences.spiritAnimal : eggDisplayName;
   }, []);
 
@@ -688,7 +688,7 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
     const startedAt = Date.now();
     let onboardingFinalized = false;
     const enterJourneyImmediately = options.enterJourneyImmediately === true;
-    const eggDisplayName = `${getCompanionElement(preferences.coreElement).label} Egg`;
+    const eggDisplayName = getCompanionEggLabel(preferences.coreElement);
     const selectionDisplayName = getCompanionSelectionDisplayName(preferences);
 
     setPendingCompanionSetup(preferences);

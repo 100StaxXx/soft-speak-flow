@@ -7,6 +7,7 @@ import { format } from "date-fns";
 import { Haptics, ImpactStyle, NotificationType } from "@capacitor/haptics";
 import { cosmicPathBackgrounds, getStaticBackgroundSrcSet } from "@/assets/backgrounds";
 import { useJourneyPathImage } from "@/hooks/useJourneyPathImage";
+import { usePreloadedImageUrl } from "@/hooks/usePreloadedImageUrl";
 import { getJourneyPathCardImageUrl } from "@/utils/journeyPathUrls";
 import { CompanionImage } from "@/components/CompanionImage";
 import { Button } from "@/components/ui/button";
@@ -999,12 +1000,17 @@ export const ConstellationTrail = memo(function ConstellationTrail({
     () => getJourneyPathCardImageUrl(pathImageUrl),
     [pathImageUrl],
   );
-  const hasGeneratedBackground = Boolean(optimizedPathImageUrl);
+  const {
+    hasError: generatedImageFailed,
+    resolvedImageUrl: loadedPathImageUrl,
+  } = usePreloadedImageUrl(optimizedPathImageUrl);
+
+  const hasGeneratedBackground = Boolean(loadedPathImageUrl) && !generatedImageFailed;
   const showEpicSyncPending = Boolean(!hasGeneratedBackground && isWaitingForEpicSync && !isGenerating);
   const showEpicSyncError = Boolean(!hasGeneratedBackground && epicSyncStatus === "failed" && !isGenerating);
   const showGenerationError = Boolean(!hasGeneratedBackground && generationError && !isGenerating && epicSyncStatus !== "failed");
   const fallbackBackgroundUrl = !transparentBackground ? fallbackBackground.src : null;
-  const fallbackBackgroundSrcSet = !hasGeneratedBackground && !transparentBackground
+  const fallbackBackgroundSrcSet = !transparentBackground
     ? getStaticBackgroundSrcSet(fallbackBackground)
     : undefined;
 
@@ -1012,7 +1018,7 @@ export const ConstellationTrail = memo(function ConstellationTrail({
     <div 
       className={cn(
         "relative w-full h-56 rounded-xl overflow-hidden",
-        !transparentBackground && !optimizedPathImageUrl && !fallbackBackgroundUrl && "bg-gradient-to-br from-slate-950 via-purple-950/50 to-slate-950",
+        !transparentBackground && !fallbackBackgroundUrl && "bg-gradient-to-br from-slate-950 via-purple-950/50 to-slate-950",
         className
       )}
       style={!transparentBackground ? {
@@ -1024,28 +1030,10 @@ export const ConstellationTrail = memo(function ConstellationTrail({
         `
       } : undefined}
     >
-      {/* Generated background */}
-      {optimizedPathImageUrl ? (
-        <div key="journey-path-generated" className="absolute inset-0">
-          <img 
-            src={optimizedPathImageUrl}
-            alt="Journey path"
-            data-testid="journey-path-image"
-            loading="eager"
-            decoding="async"
-            fetchPriority="high"
-            className="w-full h-full object-cover"
-          />
-          <div
-            className={cn(
-              "absolute inset-0",
-              "bg-gradient-to-t from-slate-950/58 via-slate-950/22 to-slate-950/30",
-            )}
-            data-testid="journey-path-overlay"
-            data-overlay-mode="generated"
-          />
-        </div>
-      ) : fallbackBackgroundUrl ? (
+      {/* Fallback background — always rendered behind the generated image so it
+           shows instantly while the generated image loads and as a safety net when
+           the generated image URL is broken (404 / CORS / etc). */}
+      {fallbackBackgroundUrl && (
         <div key="journey-path-fallback" className="absolute inset-0">
           <img
             src={fallbackBackgroundUrl}
@@ -1064,7 +1052,31 @@ export const ConstellationTrail = memo(function ConstellationTrail({
             data-overlay-mode="fallback"
           />
         </div>
-      ) : null}
+      )}
+
+      {/* Generated background — layered on top of fallback */}
+      {hasGeneratedBackground && loadedPathImageUrl && (
+        <div key="journey-path-generated" className="absolute inset-0">
+          <img
+            src={loadedPathImageUrl}
+            alt=""
+            aria-hidden="true"
+            data-testid="journey-path-image"
+            loading="eager"
+            decoding="async"
+            fetchPriority="high"
+            className="w-full h-full object-cover"
+          />
+          <div
+            className={cn(
+              "absolute inset-0",
+              "bg-gradient-to-t from-slate-950/58 via-slate-950/22 to-slate-950/30",
+            )}
+            data-testid="journey-path-overlay"
+            data-overlay-mode="generated"
+          />
+        </div>
+      )}
       
       {isGenerating && (
         <motion.div

@@ -23,6 +23,10 @@ import {
   resolveSourceAcknowledgement,
   TERMINAL_NO_DEVICE_ERROR,
 } from "./queueDelivery.ts";
+import {
+  selectDeviceTokensForDispatch,
+  type DispatchDeviceTokenRow,
+} from "./deviceTokens.ts";
 
 interface QueueRow {
   id: string;
@@ -36,12 +40,6 @@ interface QueueRow {
   payload: Record<string, unknown> | null;
   attempt_count: number | null;
   status: string;
-}
-
-interface DeviceTokenRow {
-  id: string;
-  device_token: string;
-  updated_at: string | null;
 }
 
 interface CompanionRow {
@@ -330,7 +328,7 @@ serve(async (req) => {
 
       const { data: deviceTokens, error: tokenError } = await supabase
         .from("push_device_tokens")
-        .select("id, device_token, updated_at")
+        .select("id, device_token, updated_at, installation_id")
         .eq("user_id", row.user_id)
         .eq("platform", "ios")
         .order("updated_at", { ascending: false });
@@ -368,10 +366,10 @@ serve(async (req) => {
       let transientFailure = false;
       let terminalReason: string | null = null;
       const tokenIdsToDelete: string[] = [];
-      const orderedTokens = (deviceTokens as DeviceTokenRow[]).slice();
-      const tokensToAttempt = tokenFanoutMode === "all"
-        ? orderedTokens
-        : orderedTokens.slice(0, 1);
+      const orderedTokens = selectDeviceTokensForDispatch(
+        ((deviceTokens as DispatchDeviceTokenRow[] | null) ?? []).slice(),
+      );
+      const tokensToAttempt = orderedTokens;
       const deliveryCopy = resolveDeliveryCopy(
         row,
         companionContextMap.get(row.user_id) ?? null,

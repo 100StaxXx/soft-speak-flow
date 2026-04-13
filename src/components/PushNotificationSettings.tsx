@@ -38,7 +38,15 @@ const timeOptions = [
 
 type QueueDebugRow = Pick<
   Database["public"]["Tables"]["push_notification_queue"]["Row"],
-  "id" | "notification_type" | "status" | "scheduled_for" | "delivered_at" | "last_error"
+  | "id"
+  | "notification_type"
+  | "status"
+  | "scheduled_for"
+  | "delivered_at"
+  | "last_error"
+  | "dedupe_key"
+  | "payload"
+  | "source_table"
 >;
 
 type NotificationProfileUpdates = Partial<Pick<
@@ -56,6 +64,64 @@ type NotificationTimeField = "daily_push_time" | "daily_quote_push_time";
 
 const RECENT_QUEUE_LIMIT = 12;
 const QUEST_NOTIFICATION_TYPES = new Set(["task_start", "task_reminder"]);
+
+const toQueuePayload = (value: QueueDebugRow["payload"]): Record<string, unknown> => {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+};
+
+const buildLogicalQueueKey = (row: QueueDebugRow): string => {
+  if (typeof row.dedupe_key === "string" && row.dedupe_key.trim().length > 0 && !row.dedupe_key.startsWith("legacy:")) {
+    return row.dedupe_key;
+  }
+
+  const payload = toQueuePayload(row.payload);
+
+  if (typeof payload.pep_talk_id === "string") {
+    return `daily_pep:${payload.pep_talk_id}`;
+  }
+
+  if (typeof payload.daily_quote_id === "string") {
+    return `daily_quote:${payload.daily_quote_id}`;
+  }
+
+  if (typeof payload.task_id === "string") {
+    const reminderMinutes = typeof payload.reminder_minutes_before === "number" ? payload.reminder_minutes_before : "start";
+    return `${row.notification_type}:${payload.task_id}:${reminderMinutes}`;
+  }
+
+  if (typeof payload.habit_id === "string" && typeof payload.local_date === "string") {
+    return `habit_reminder:${payload.habit_id}:${payload.local_date}`;
+  }
+
+  if (typeof payload.nudge_id === "string") {
+    return `mentor_nudge:${payload.nudge_id}`;
+  }
+
+  if (typeof payload.reminder_id === "string") {
+    return `contact_reminder:${payload.reminder_id}`;
+  }
+
+  if (typeof payload.local_date === "string") {
+    return `${row.notification_type}:${payload.local_date}`;
+  }
+
+  return `${row.notification_type}:${row.source_table}:${String(row.scheduled_for).slice(0, 10)}`;
+};
+
+const findDuplicateLogicalQueueKeys = (rows: QueueDebugRow[]): string[] => {
+  const counts = new Map<string, number>();
+
+  for (const row of rows) {
+    const key = buildLogicalQueueKey(row);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+
+  return [...counts.entries()]
+    .filter(([, count]) => count > 1)
+    .map(([key]) => key);
+};
 
 const formatRelativeTokenAge = (value: string | null): string => {
   if (!value) {
@@ -495,8 +561,11 @@ const PushDebugPanel = memo(({ userId }: { userId?: string }) => {
     hasToken: boolean;
     profileTimezone: string | null;
     tokenCount: number;
+    installationCount: number;
+    legacyTokenCount: number;
     latestTokenUpdatedAt: string | null;
     latestTokenPreview: string | null;
+    currentInstallationIdPreview: string | null;
     recentQueueRows: QueueDebugRow[];
     recentSkippedBudget: boolean;
     recentFailedTerminal: boolean;
@@ -505,6 +574,7 @@ const PushDebugPanel = memo(({ userId }: { userId?: string }) => {
     recentRollbackEnabled: boolean;
     recentRolloutBlocked: boolean;
     recentQuestRows: QueueDebugRow[];
+    duplicateLogicalQueueKeys: string[];
     error?: string;
   } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -521,8 +591,11 @@ const PushDebugPanel = memo(({ userId }: { userId?: string }) => {
           hasToken: false,
           profileTimezone: null,
           tokenCount: 0,
+          installationCount: 0,
+          legacyTokenCount: 0,
           latestTokenUpdatedAt: null,
           latestTokenPreview: null,
+          currentInstallationIdPreview: null,
           recentQueueRows: [],
           recentSkippedBudget: false,
           recentFailedTerminal: false,
@@ -531,6 +604,7 @@ const PushDebugPanel = memo(({ userId }: { userId?: string }) => {
           recentRollbackEnabled: false,
           recentRolloutBlocked: false,
           recentQuestRows: [],
+          duplicateLogicalQueueKeys: [],
         });
         return;
       }
@@ -540,7 +614,7 @@ const PushDebugPanel = memo(({ userId }: { userId?: string }) => {
         getNativePushTokenDebugSnapshot(userId),
         supabase
           .from("push_notification_queue")
-          .select("id, notification_type, status, scheduled_for, delivered_at, last_error")
+          .select("id, notification_type, status, scheduled_for, delivered_at, last_error, dedupe_key, payload, source_table")
           .eq("user_id", userId)
           .order("scheduled_for", { ascending: false })
           .limit(RECENT_QUEUE_LIMIT),
@@ -560,14 +634,18 @@ const PushDebugPanel = memo(({ userId }: { userId?: string }) => {
 
       const recentQueueRows = (queueResult.data ?? []) as QueueDebugRow[];
       const recentQuestRows = recentQueueRows.filter((row) => QUEST_NOTIFICATION_TYPES.has(row.notification_type));
+      const duplicateLogicalQueueKeys = findDuplicateLogicalQueueKeys(recentQueueRows);
 
       setDebugInfo({
         ...info,
         hasToken,
         profileTimezone: profileResult.data?.timezone ?? null,
         tokenCount: tokenSnapshot.tokenCount,
+        installationCount: tokenSnapshot.installationCount,
+        legacyTokenCount: tokenSnapshot.legacyTokenCount,
         latestTokenUpdatedAt: tokenSnapshot.latestUpdatedAt,
         latestTokenPreview: tokenSnapshot.latestTokenPreview,
+        currentInstallationIdPreview: tokenSnapshot.currentInstallationIdPreview,
         recentQueueRows,
         recentQuestRows,
         recentSkippedBudget: recentQueueRows.some((row) => row.status === "skipped_budget"),
@@ -576,6 +654,7 @@ const PushDebugPanel = memo(({ userId }: { userId?: string }) => {
         recentShadowMode: recentQueueRows.some((row) => row.last_error === "shadow_mode"),
         recentRollbackEnabled: recentQueueRows.some((row) => row.last_error === "rollback_enabled"),
         recentRolloutBlocked: recentQueueRows.some((row) => String(row.last_error ?? "").startsWith("rollout_")),
+        duplicateLogicalQueueKeys,
       });
     } catch (error) {
       console.error('Debug info error:', error);
@@ -681,9 +760,23 @@ const PushDebugPanel = memo(({ userId }: { userId?: string }) => {
                 <span className="text-foreground">{debugInfo.tokenCount}</span>
               </div>
               <div className="flex items-center gap-2 col-span-2">
+                <span className="text-muted-foreground">Installations:</span>
+                <span className="text-foreground">{debugInfo.installationCount}</span>
+              </div>
+              <div className="flex items-center gap-2 col-span-2">
+                <span className="text-muted-foreground">Legacy Token Rows:</span>
+                <span className="text-foreground">{debugInfo.legacyTokenCount}</span>
+              </div>
+              <div className="flex items-center gap-2 col-span-2">
                 <span className="text-muted-foreground">Profile Timezone:</span>
                 <span className="text-foreground font-mono text-xs">{debugInfo.profileTimezone ?? "Unknown"}</span>
               </div>
+              {debugInfo.currentInstallationIdPreview && (
+                <div className="flex items-center gap-2 col-span-2">
+                  <span className="text-muted-foreground">This Installation:</span>
+                  <span className="text-foreground font-mono text-xs">{debugInfo.currentInstallationIdPreview}</span>
+                </div>
+              )}
               {debugInfo.latestTokenUpdatedAt && (
                 <div className="flex items-center gap-2 col-span-2">
                   <span className="text-muted-foreground">Latest Token Updated:</span>
@@ -737,6 +830,21 @@ const PushDebugPanel = memo(({ userId }: { userId?: string }) => {
                     Recent rollout block
                   </span>
                 )}
+                {debugInfo.tokenCount > 1 && (
+                  <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-xs text-amber-700 dark:text-amber-300">
+                    Multiple iOS token rows
+                  </span>
+                )}
+                {debugInfo.legacyTokenCount > 0 && (
+                  <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-xs text-amber-700 dark:text-amber-300">
+                    Legacy token rows
+                  </span>
+                )}
+                {debugInfo.duplicateLogicalQueueKeys.length > 0 && (
+                  <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-xs text-amber-700 dark:text-amber-300">
+                    Repeated logical notifications
+                  </span>
+                )}
                 {!debugInfo.recentSkippedBudget && !debugInfo.recentFailedTerminal && !debugInfo.recentNoDeviceTokens && (
                   <span className="rounded-full border border-border bg-background px-2 py-1 text-xs text-muted-foreground">
                     No recent queue failures
@@ -744,6 +852,19 @@ const PushDebugPanel = memo(({ userId }: { userId?: string }) => {
                 )}
               </div>
             </div>
+
+            {(
+              debugInfo.legacyTokenCount > 0 ||
+              debugInfo.duplicateLogicalQueueKeys.length > 0 ||
+              debugInfo.tokenCount > Math.max(debugInfo.installationCount, 1)
+            ) && (
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription className="text-xs">
+                  Potential duplicate risk detected. Legacy token records, repeated logical queue entries, or more token rows than tracked installations can fan out extra alerts unless the install-aware path fully replaces the old rows.
+                </AlertDescription>
+              </Alert>
+            )}
             
             {debugInfo.error && (
               <Alert variant="destructive" className="mt-2">

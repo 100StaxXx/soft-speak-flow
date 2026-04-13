@@ -15,11 +15,17 @@ const mocks = vi.hoisted(() => {
     taskDate: "2026-02-22",
   };
 
+  const profileWallpaper = {
+    imageUrl: "https://example.com/profile-wallpaper.jpg",
+    dateKey: "2026-02-22",
+  };
+
   return {
     useTasksQueryMock,
     useWidgetSyncMock,
     authState,
     tasksState,
+    profileWallpaper,
   };
 });
 
@@ -57,7 +63,7 @@ describe("useGlobalWidgetSync", () => {
     expect(mocks.useWidgetSyncMock).toHaveBeenCalledWith(
       mocks.tasksState.tasks,
       mocks.tasksState.taskDate,
-      { enabled: true },
+      { enabled: true, profileWallpaper: null },
     );
   });
 
@@ -68,7 +74,7 @@ describe("useGlobalWidgetSync", () => {
     expect(mocks.useWidgetSyncMock).toHaveBeenCalledWith(
       mocks.tasksState.tasks,
       mocks.tasksState.taskDate,
-      { enabled: false },
+      { enabled: false, profileWallpaper: null },
     );
   });
 
@@ -81,7 +87,7 @@ describe("useGlobalWidgetSync", () => {
     expect(mocks.useWidgetSyncMock).toHaveBeenCalledWith(
       mocks.tasksState.tasks,
       mocks.tasksState.taskDate,
-      { enabled: true },
+      { enabled: true, profileWallpaper: null },
     );
   });
 
@@ -95,7 +101,17 @@ describe("useGlobalWidgetSync", () => {
     expect(mocks.useWidgetSyncMock).toHaveBeenCalledWith(
       mocks.tasksState.tasks,
       mocks.tasksState.taskDate,
-      { enabled: false },
+      { enabled: false, profileWallpaper: null },
+    );
+  });
+
+  it("passes profile wallpaper metadata through to widget sync", () => {
+    renderHook(() => useGlobalWidgetSync({ profileWallpaper: mocks.profileWallpaper }));
+
+    expect(mocks.useWidgetSyncMock).toHaveBeenCalledWith(
+      mocks.tasksState.tasks,
+      mocks.tasksState.taskDate,
+      { enabled: true, profileWallpaper: mocks.profileWallpaper },
     );
   });
 });

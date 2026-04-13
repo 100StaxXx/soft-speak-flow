@@ -1,6 +1,6 @@
 import type { CompanionElementId, CompanionPresetId } from "./companionCatalog";
 
-export const COMPANION_FUTURE_STATE_LABEL = "Awaiting Awakening" as const;
+export const COMPANION_FUTURE_STATE_LABEL = "Coming Soon" as const;
 
 export const PILOT_COMPANION_PRESET_IDS = [
   "fox",

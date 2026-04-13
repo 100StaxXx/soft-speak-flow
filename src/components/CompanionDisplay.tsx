@@ -38,6 +38,7 @@ import { deriveCompanionPalette } from "@/lib/companionPalette";
 import { deriveCompanionDisplayState } from "@/lib/companionDisplayState";
 import { resolveCompanionName } from "@/lib/companionName";
 import { resolveCompanionVisualAssetUrl } from "@/lib/companionAssetResolver";
+import { getCompanionEggLabel } from "@/config/companionCatalog";
 import { isCompanionPresetImageSource } from "@/lib/companionImageFocal";
 import { useMotionProfile } from "@/hooks/useMotionProfile";
 import { useCompanionMotionSafe } from "@/contexts/CompanionMotionContext";
@@ -509,7 +510,7 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
     : getVisualStageLabelForLevel(nextVisualStageBoundaryLevel);
   const shouldAnimateIdleDrift = !prefersReducedMotion && imageLoaded && !imageError && !isRegenerating;
   const displayedCreatureName = isStageZeroEgg
-    ? `${formatDisplayLabel(displayCompanion.core_element)} Egg`
+    ? getCompanionEggLabel(displayCompanion.core_element)
     : (creatureName || "Companion");
 
   const handleEvolvePress = () => {

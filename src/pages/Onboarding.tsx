@@ -19,7 +19,7 @@ import {
   buildEstablishedProfileSelfHealPatch,
   getOnboardingGateState,
 } from "@/utils/profileOnboarding";
-import { getCompanionElement, getCompanionPreset } from "@/config/companionCatalog";
+import { getCompanionEggLabel, getCompanionPreset } from "@/config/companionCatalog";
 
 export default function Onboarding() {
   const { user, status, signOut } = useAuth();
@@ -55,7 +55,7 @@ export default function Onboarding() {
     const presetName = companion?.preset_id
       ? getCompanionPreset(companion.preset_id)?.displayName ?? null
       : null;
-    const elementalEggLabel = `${getCompanionElement(companion?.core_element).label} Egg`;
+    const elementalEggLabel = getCompanionEggLabel(companion?.core_element);
     const companionLabel =
       presetName
       || (spiritAnimal.length > 0 && spiritAnimal !== "Egg" ? spiritAnimal : elementalEggLabel);

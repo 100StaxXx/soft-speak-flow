@@ -14,6 +14,8 @@ export class WidgetDataWeb extends WebPlugin implements WidgetDataPlugin {
     ritualCount: number;
     ritualCompleted: number;
     date: string;
+    profileWallpaperImageUrl?: string;
+    profileWallpaperDateKey?: string;
   }): Promise<void> {
     if (import.meta.env.DEV) {
       console.debug('[WidgetData] Web fallback - no widget support');

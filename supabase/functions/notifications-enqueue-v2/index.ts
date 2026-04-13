@@ -16,7 +16,12 @@ import {
 } from "../_shared/notificationsV2.ts";
 import { composeNotificationCopy, type CompanionNotificationContext } from "../_shared/notificationComposer.ts";
 import { resolveNotificationCompanionContextMap } from "../_shared/companionName.ts";
+import {
+  buildDailyPepQueueDedupeKey,
+  buildDailyQuoteQueueDedupeKey,
+} from "./dedupeKeys.ts";
 import { scanPaginatedRows } from "./pagination.ts";
+import { getCheckinReminderUrl } from "./reflectionNavigation.ts";
 import {
   buildTaskNotificationCandidates,
   type TaskCandidateRow,
@@ -505,7 +510,7 @@ serve(async (req) => {
         type: "daily_pep",
         sourceTable: "user_daily_pushes",
         sourceId: push.id,
-        dedupeKey: `daily_pep:${push.id}`,
+        dedupeKey: buildDailyPepQueueDedupeKey(push.user_id, push.daily_pep_talk_id),
         scheduledFor: push.scheduled_at ?? nowIso,
         payload: {
           pep_talk_id: push.daily_pep_talk_id,
@@ -559,7 +564,7 @@ serve(async (req) => {
         type: "daily_quote",
         sourceTable: "user_daily_quote_pushes",
         sourceId: push.id,
-        dedupeKey: `daily_quote:${push.id}`,
+        dedupeKey: buildDailyQuoteQueueDedupeKey(push.user_id, push.daily_quote_id),
         scheduledFor: push.scheduled_at ?? nowIso,
         payload: {
           daily_quote_id: dailyQuote.id,
@@ -831,7 +836,7 @@ serve(async (req) => {
                   local_target_minutes: morningTarget,
                   timezone,
                   type: "checkin_morning_reminder",
-                  url: "/",
+                  url: getCheckinReminderUrl("morning"),
                 },
               }));
             }
@@ -858,7 +863,7 @@ serve(async (req) => {
                   local_target_minutes: eveningTarget,
                   timezone,
                   type: "checkin_evening_reminder",
-                  url: "/reflection",
+                  url: getCheckinReminderUrl("evening"),
                 },
               }));
             }

@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   useJourneyPathImageMock: vi.fn(),
@@ -11,8 +11,38 @@ vi.mock("@/hooks/useJourneyPathImage", () => ({
 
 import { ConstellationTrail } from "./ConstellationTrail";
 
+class MockPreloadImage {
+  complete = false;
+  naturalWidth = 0;
+  onerror: ((this: GlobalEventHandlers, ev: Event | string) => unknown) | null = null;
+  onload: ((this: GlobalEventHandlers, ev: Event) => unknown) | null = null;
+  private currentSrc = "";
+
+  get src() {
+    return this.currentSrc;
+  }
+
+  set src(value: string) {
+    this.currentSrc = value;
+
+    queueMicrotask(() => {
+      if (value.includes("broken-path")) {
+        this.complete = false;
+        this.naturalWidth = 0;
+        this.onerror?.call(window, new Event("error"));
+        return;
+      }
+
+      this.complete = true;
+      this.naturalWidth = 1536;
+      this.onload?.call(window, new Event("load"));
+    });
+  }
+}
+
 describe("ConstellationTrail", () => {
   beforeEach(() => {
+    vi.stubGlobal("Image", MockPreloadImage);
     vi.clearAllMocks();
     mocks.useJourneyPathImageMock.mockReturnValue({
       pathImageUrl: null,
@@ -31,7 +61,11 @@ describe("ConstellationTrail", () => {
     });
   });
 
-  it("renders the persisted/generated path immediately without a blocking loading state", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("renders the persisted/generated path as soon as it finishes preloading", async () => {
     mocks.useJourneyPathImageMock.mockReturnValue({
       pathImageUrl: "https://example.supabase.co/storage/v1/object/public/journey-paths/user-1/epic-1/path.png",
       currentMilestoneIndex: 1,
@@ -50,11 +84,16 @@ describe("ConstellationTrail", () => {
 
     render(<ConstellationTrail progress={18} targetDays={30} epicId="epic-1" />);
 
-    expect(screen.getByTestId("journey-path-image")).toHaveAttribute(
-      "src",
-      "https://example.supabase.co/storage/v1/object/public/journey-paths/user-1/epic-1/path.png",
+    await waitFor(() =>
+      expect(screen.getByTestId("journey-path-image")).toHaveAttribute(
+        "src",
+        "https://example.supabase.co/storage/v1/object/public/journey-paths/user-1/epic-1/path.png",
+      ),
     );
-    expect(screen.getByTestId("journey-path-overlay")).toHaveAttribute("data-overlay-mode", "generated");
+    expect(screen.getByTestId("journey-path-image")).toBeInTheDocument();
+    expect(
+      screen.getAllByTestId("journey-path-overlay").some((el) => el.getAttribute("data-overlay-mode") === "generated"),
+    ).toBe(true);
     expect(screen.queryByText(/mapping your path/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/loading journey path/i)).not.toBeInTheDocument();
   });
@@ -148,7 +187,7 @@ describe("ConstellationTrail", () => {
     expect(screen.queryByText(/loading journey path/i)).not.toBeInTheDocument();
   });
 
-  it("replaces the fallback with the generated image once a real path becomes available", () => {
+  it("replaces the fallback with the generated image once a real path becomes available", async () => {
     mocks.useJourneyPathImageMock.mockReturnValue({
       pathImageUrl: null,
       currentMilestoneIndex: -1,
@@ -188,12 +227,43 @@ describe("ConstellationTrail", () => {
 
     rerender(<ConstellationTrail progress={43} targetDays={45} epicId="epic-9" />);
 
-    expect(screen.queryByTestId("journey-path-fallback")).not.toBeInTheDocument();
-    expect(screen.getByTestId("journey-path-image")).toHaveAttribute(
-      "src",
-      "https://example.supabase.co/storage/v1/object/public/journey-paths/user-1/epic-9/path.png",
+    // Fallback remains rendered underneath as a safety net
+    expect(screen.getByTestId("journey-path-fallback")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByTestId("journey-path-image")).toHaveAttribute(
+        "src",
+        "https://example.supabase.co/storage/v1/object/public/journey-paths/user-1/epic-9/path.png",
+      ),
     );
-    expect(screen.getByTestId("journey-path-overlay")).toHaveAttribute("data-overlay-mode", "generated");
+    expect(
+      screen.getAllByTestId("journey-path-overlay").some((el) => el.getAttribute("data-overlay-mode") === "generated"),
+    ).toBe(true);
+  });
+
+  it("keeps the fallback visible when the generated image cannot be preloaded", async () => {
+    mocks.useJourneyPathImageMock.mockReturnValue({
+      pathImageUrl: "https://example.supabase.co/storage/v1/object/public/journey-paths/user-1/epic-3/broken-path.png",
+      currentMilestoneIndex: 0,
+      generationError: null,
+      epicSyncErrorMessage: null,
+      epicSyncStatus: "idle",
+      isGenerating: false,
+      isWaitingForEpicSync: false,
+      isLoading: false,
+      error: null,
+      generateInitialPath: vi.fn(),
+      retryInitialPath: vi.fn(),
+      retryEpicSync: vi.fn(),
+      regeneratePathForMilestone: vi.fn(),
+    });
+
+    render(<ConstellationTrail progress={21} targetDays={30} epicId="epic-3" />);
+
+    expect(screen.getByTestId("journey-path-fallback")).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("journey-path-image")).not.toBeInTheDocument();
+    });
   });
 
   it("shows a retryable error state over the fallback background when generation fails", () => {

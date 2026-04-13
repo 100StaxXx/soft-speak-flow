@@ -1,11 +1,19 @@
 import { memo } from "react";
 import { Moon, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
-import { useEveningReflection } from "@/hooks/useEveningReflection";
 import { EveningReflectionDrawer } from "./EveningReflectionDrawer";
 
-export const EveningReflectionBanner = memo(() => {
-  const { shouldShowBanner, isDrawerOpen, setIsDrawerOpen } = useEveningReflection();
+interface EveningReflectionBannerProps {
+  shouldShowBanner: boolean;
+  isDrawerOpen: boolean;
+  setIsDrawerOpen: (open: boolean) => void;
+}
+
+export const EveningReflectionBanner = memo(({
+  shouldShowBanner,
+  isDrawerOpen,
+  setIsDrawerOpen,
+}: EveningReflectionBannerProps) => {
 
   if (!shouldShowBanner) return null;
 

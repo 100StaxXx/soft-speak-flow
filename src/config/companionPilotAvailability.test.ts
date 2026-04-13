@@ -14,7 +14,7 @@ describe("companionPilotAvailability", () => {
   it("locks the launch pilot matrix", () => {
     expect(PILOT_COMPANION_PRESET_IDS).toEqual(["fox", "phoenix", "leviathan"]);
     expect(PILOT_COMPANION_ELEMENT_IDS).toEqual(["fire", "ice", "nature"]);
-    expect(COMPANION_FUTURE_STATE_LABEL).toBe("Awaiting Awakening");
+    expect(COMPANION_FUTURE_STATE_LABEL).toBe("Coming Soon");
   });
 
   it("recognizes supported presets and elements", () => {

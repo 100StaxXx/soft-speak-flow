@@ -97,8 +97,8 @@ describe("companion preset asset coverage", () => {
     expect(getCompanionElement("nature").label).toBe("Nature");
 
     expect(getCompanionElementProductLabel("fire")).toBe("Ember");
-    expect(getCompanionElementProductLabel("ice")).toBe("Frost");
-    expect(getCompanionElementProductLabel("nature")).toBe("Terra");
+    expect(getCompanionElementProductLabel("ice")).toBe("Ice");
+    expect(getCompanionElementProductLabel("nature")).toBe("Nature");
   });
 
   it("exposes the curated onboarding and personalization picker roster", () => {

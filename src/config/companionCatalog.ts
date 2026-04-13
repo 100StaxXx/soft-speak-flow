@@ -323,7 +323,7 @@ export const COMPANION_ELEMENTS: readonly CompanionElementDefinition[] = [
   {
     id: "ice",
     label: "Ice",
-    productLabel: "Frost",
+    productLabel: "Ice",
     anchorColor: "#60A5FA",
     accentColor: "#BFDBFE",
     summary: "Glacial blues and crisp luminous edges.",
@@ -339,7 +339,7 @@ export const COMPANION_ELEMENTS: readonly CompanionElementDefinition[] = [
   {
     id: "nature",
     label: "Nature",
-    productLabel: "Terra",
+    productLabel: "Nature",
     anchorColor: "#34D399",
     accentColor: "#86EFAC",
     summary: "Verdant glow, mossy warmth, and living energy.",
@@ -600,6 +600,10 @@ export const getCompanionElement = (elementId: string | null | undefined): Compa
 export const getCompanionElementProductLabel = (
   elementId: string | null | undefined,
 ): string => getCompanionElement(elementId).productLabel;
+
+export const getCompanionEggLabel = (
+  elementId: string | null | undefined,
+): string => `${getCompanionElementProductLabel(elementId)} Egg`;
 
 export const resolveCompanionArtTier = (stage: number): CompanionArtTier => {
   const safeStage = clampProgressionLevel(stage);

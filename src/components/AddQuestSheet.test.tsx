@@ -292,7 +292,7 @@ describe("AddQuestSheet", () => {
     expect(createButton).toBeEnabled();
   });
 
-  it("auto-fills time on first time-chip tap", async () => {
+  it("auto-fills time on first time-chip tap without emitting tutorial completion", () => {
     const dispatchSpy = vi.spyOn(window, "dispatchEvent");
 
     render(
@@ -313,10 +313,39 @@ describe("AddQuestSheet", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Time" }));
 
-    await waitFor(() => {
-      expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: "add-quest-time-selected" }));
-    });
+    expect(dispatchSpy).not.toHaveBeenCalledWith(expect.objectContaining({ type: "add-quest-time-selected" }));
     expect(createButton).toBeEnabled();
+    dispatchSpy.mockRestore();
+  });
+
+  it("emits tutorial events only after the user commits title and time", () => {
+    const dispatchSpy = vi.spyOn(window, "dispatchEvent");
+
+    render(
+      <AddQuestSheet
+        open
+        onOpenChange={vi.fn()}
+        selectedDate={selectedDate}
+        onAdd={vi.fn().mockResolvedValue(undefined)}
+      />
+    );
+
+    const titleInput = screen.getByPlaceholderText("Quest Title");
+    fireEvent.change(titleInput, {
+      target: { value: "Committed quest" },
+    });
+
+    expect(dispatchSpy).not.toHaveBeenCalledWith(expect.objectContaining({ type: "add-quest-title-entered" }));
+
+    fireEvent.blur(titleInput);
+    expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: "add-quest-title-entered" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Time" }));
+    expect(dispatchSpy).not.toHaveBeenCalledWith(expect.objectContaining({ type: "add-quest-time-selected" }));
+
+    fireEvent.blur(screen.getByLabelText("Custom quest time"));
+    expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: "add-quest-time-selected" }));
+
     dispatchSpy.mockRestore();
   });
 
@@ -1290,12 +1319,21 @@ describe("AddQuestSheet", () => {
 
     expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: "add-quest-sheet-opened" }));
 
-    fireEvent.change(screen.getByPlaceholderText("Quest Title"), {
+    const titleInput = screen.getByPlaceholderText("Quest Title");
+    fireEvent.change(titleInput, {
       target: { value: "Evented quest" },
     });
+    expect(dispatchSpy).not.toHaveBeenCalledWith(expect.objectContaining({ type: "add-quest-title-entered" }));
+
+    fireEvent.keyDown(titleInput, { key: "Enter" });
     expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: "add-quest-title-entered" }));
 
     fireEvent.click(screen.getByRole("button", { name: "Time" }));
+    expect(dispatchSpy).not.toHaveBeenCalledWith(expect.objectContaining({ type: "add-quest-time-selected" }));
+
+    const explicitTimeButton = document.querySelector('[data-tour="add-quest-time-slot"]');
+    expect(explicitTimeButton).not.toBeNull();
+    fireEvent.click(explicitTimeButton as Element);
     expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: "add-quest-time-selected" }));
 
     fireEvent.click(screen.getByRole("button", { name: "Add Quest" }));

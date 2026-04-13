@@ -306,4 +306,77 @@ describe("useOfflineQueue", () => {
       expect(result.current.syncStatus).toBe("success");
     });
   });
+
+  it("replays queued EPIC_RITUAL_CREATE actions by upserting the habit before the epic link", async () => {
+    await initOfflineDB();
+    await enqueueAction({
+      userId: "user-1",
+      actionKind: "EPIC_RITUAL_CREATE",
+      entityType: "epic",
+      entityId: "epic-1",
+      payload: {
+        habit: {
+          id: "habit-1",
+          user_id: "user-1",
+          title: "Queued Ritual",
+          difficulty: "medium",
+          frequency: "daily",
+          custom_days: [0, 1, 2, 3, 4, 5, 6],
+          custom_month_days: null,
+          reminder_enabled: false,
+          reminder_minutes_before: 15,
+          is_active: true,
+          current_streak: 0,
+          longest_streak: 0,
+          created_at: "2026-04-11T00:00:00.000Z",
+        },
+        epicHabit: {
+          id: "epic-habit-1",
+          epic_id: "epic-1",
+          habit_id: "habit-1",
+        },
+      },
+    });
+
+    const habitsUpsertMock = vi.fn().mockResolvedValue({ error: null });
+    const epicHabitsUpsertMock = vi.fn().mockResolvedValue({ error: null });
+
+    mocks.from.mockImplementation((table: string) => {
+      if (table === "habits") {
+        return {
+          upsert: habitsUpsertMock,
+        };
+      }
+
+      if (table === "epic_habits") {
+        return {
+          upsert: epicHabitsUpsertMock,
+        };
+      }
+
+      return {
+        upsert: vi.fn().mockResolvedValue({ error: null }),
+      };
+    });
+
+    const { result } = renderHook(() => useOfflineQueue());
+
+    await waitFor(() => {
+      expect(habitsUpsertMock).toHaveBeenCalledWith(expect.objectContaining({
+        id: "habit-1",
+        title: "Queued Ritual",
+      }));
+    });
+
+    expect(epicHabitsUpsertMock).toHaveBeenCalledWith(expect.objectContaining({
+      id: "epic-habit-1",
+      epic_id: "epic-1",
+      habit_id: "habit-1",
+    }));
+
+    await waitFor(() => {
+      expect(result.current.pendingCount).toBe(0);
+      expect(result.current.syncStatus).toBe("success");
+    });
+  });
 });

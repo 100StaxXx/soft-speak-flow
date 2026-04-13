@@ -41,6 +41,8 @@ export interface WidgetDataPlugin {
     ritualCount: number;
     ritualCompleted: number;
     date: string;
+    profileWallpaperImageUrl?: string;
+    profileWallpaperDateKey?: string;
   }): Promise<void>;
   reloadWidget(): Promise<void>;
   getWidgetSyncDiagnostics(): Promise<WidgetSyncDiagnostics>;

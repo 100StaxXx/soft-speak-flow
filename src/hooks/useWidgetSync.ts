@@ -19,6 +19,10 @@ import type { DailyTask } from './useTasksQuery';
  */
 interface WidgetSyncOptions {
   enabled?: boolean;
+  profileWallpaper?: {
+    imageUrl: string;
+    dateKey: string;
+  } | null;
 }
 
 export const WIDGET_SYNC_DIAGNOSTICS_STORAGE_KEY = 'widget-sync-diagnostics';
@@ -29,7 +33,7 @@ export const useWidgetSync = (
   taskDate: string,
   options: WidgetSyncOptions = {},
 ) => {
-  const { enabled = true } = options;
+  const { enabled = true, profileWallpaper = null } = options;
   const lastSyncRef = useRef<string>('');
   const syncRef = useRef<(force?: boolean) => void>(() => {});
   const sessionSyncDisabledRef = useRef(false);
@@ -83,6 +87,8 @@ export const useWidgetSync = (
       questCompleted: completedCount,
       ritualCount: rituals.length,
       ritualCompleted,
+      profileWallpaperImageUrl: profileWallpaper?.imageUrl ?? null,
+      profileWallpaperDateKey: profileWallpaper?.dateKey ?? null,
     });
     
     // Skip if nothing changed (unless force)
@@ -98,6 +104,12 @@ export const useWidgetSync = (
         ritualCount: rituals.length,
         ritualCompleted,
         date: taskDate,
+        ...(profileWallpaper?.imageUrl
+          ? {
+              profileWallpaperImageUrl: profileWallpaper.imageUrl,
+              profileWallpaperDateKey: profileWallpaper.dateKey,
+            }
+          : {}),
       });
       lastSyncRef.current = fingerprint;
       persistWidgetErrorToSession(null);
@@ -109,6 +121,7 @@ export const useWidgetSync = (
         ritualCount: rituals.length,
         ritualCompleted,
         widgetTaskCount: widgetTasks.length,
+        profileWallpaperDateKey: profileWallpaper?.dateKey ?? null,
       });
     } catch (error) {
       if (isUnimplementedPluginError(error)) {
@@ -129,7 +142,7 @@ export const useWidgetSync = (
         message: details.message,
       });
     }
-  }, [enabled, isIOS, taskDate, tasks]);
+  }, [enabled, isIOS, profileWallpaper?.dateKey, profileWallpaper?.imageUrl, taskDate, tasks]);
 
   useEffect(() => {
     syncRef.current = syncToWidget;

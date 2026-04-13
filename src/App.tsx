@@ -34,7 +34,6 @@ import { AstralEncounterProvider } from "@/components/astral-encounters";
 import { WeeklyRecapModal } from "@/components/WeeklyRecapModal";
 import { WeeklyRecapProvider } from "@/contexts/WeeklyRecapContext";
 import { useAppResumeRefresh } from "@/hooks/useAppResumeRefresh";
-import { useGlobalWidgetSync } from "@/hooks/useGlobalWidgetSync";
 import { TalkPopupProvider } from "@/contexts/TalkPopupContext";
 import { MainTabsKeepAlive, isMainTabPath } from "@/components/MainTabsKeepAlive";
 import { BottomNav } from "@/components/BottomNav";
@@ -47,6 +46,7 @@ import { ResilienceProvider } from "@/contexts/ResilienceContext";
 import { ResilienceStatusBanner } from "@/components/resilience/ResilienceStatusBanner";
 import { MentorConnectionProvider, useMentorConnection } from "@/contexts/MentorConnectionContext";
 import { WallpaperManifestProvider } from "@/contexts/WallpaperManifestContext";
+import { GlobalWidgetSyncBridge } from "@/components/GlobalWidgetSyncBridge";
 import { queryKeys } from "@/lib/queryKeys";
 import { toast } from "@/components/ui/sonner";
 import {
@@ -55,6 +55,7 @@ import {
   readPendingReferralCode,
   storePendingReferralCode,
 } from "@/utils/referralAttribution";
+import { EVENING_REFLECTION_CANONICAL_PATH } from "@/utils/eveningReflectionNavigation";
 
 // Lazy load pages for code splitting
 const Home = lazy(() => import("./pages/Home"));
@@ -71,8 +72,6 @@ const PromoCodeRedeem = lazy(() => import("./pages/PromoCodeRedeem"));
 const Admin = lazy(() => import("./pages/Admin"));
 const MentorSelection = lazy(() => import("./pages/MentorSelection"));
 const NotFound = lazy(() => import("./pages/NotFound"));
-// Tasks removed - consolidated into Journeys
-const Reflection = lazy(() => import("./pages/Reflection"));
 const MentorChat = lazy(() => import("./pages/MentorChat"));
 const Library = lazy(() => import("./pages/Library"));
 const Challenges = lazy(() => import("./pages/Challenges"));
@@ -215,7 +214,6 @@ const AppContent = memo(() => {
   
   // Refresh critical data on app resume (iOS/Android) or tab visibility (web)
   useAppResumeRefresh({ enabled: status === "authenticated" && Boolean(session?.user) });
-  useGlobalWidgetSync({ enabled: Boolean(session?.user) });
   
   // Handle password recovery tokens BEFORE routes render - prevents paywall from blocking reset
   useEffect(() => {
@@ -394,6 +392,7 @@ const AppContent = memo(() => {
             enabled={Boolean(session?.user)}
             userTimezone={profile?.timezone ?? null}
           >
+            <GlobalWidgetSyncBridge enabled={Boolean(session?.user)} />
             <ResilienceStatusBanner />
             <ViewModeProvider>
               <CompanionMotionProvider>
@@ -437,7 +436,7 @@ const AppContent = memo(() => {
                   <Route path="/horoscope" element={<Navigate to="/journeys" replace />} />
                   <Route path="/cosmic/:placement/:sign" element={<Navigate to="/journeys" replace />} />
                   <Route path="/challenges" element={<ProtectedRoute><Challenges /></ProtectedRoute>} />
-                  <Route path="/reflection" element={<ProtectedRoute><Reflection /></ProtectedRoute>} />
+                  <Route path="/reflection" element={<Navigate to={EVENING_REFLECTION_CANONICAL_PATH} replace />} />
                   <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
                   <Route path="/pep-talks" element={<ProtectedRoute><PepTalks /></ProtectedRoute>} />
                   <Route path="/inspire" element={<Navigate to="/pep-talks" replace />} />

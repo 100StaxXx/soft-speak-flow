@@ -1,9 +1,10 @@
 import type { ReactNode } from "react";
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { passthroughProvider } = vi.hoisted(() => ({
+const { passthroughProvider, isMainTabPathMock } = vi.hoisted(() => ({
   passthroughProvider: ({ children }: { children?: ReactNode }) => <>{children}</>,
+  isMainTabPathMock: vi.fn((pathname: string) => pathname === "/mentor"),
 }));
 
 vi.mock("@/components/ui/toaster", () => ({
@@ -144,8 +145,10 @@ vi.mock("@/components/astral-encounters", () => ({
 }));
 
 vi.mock("@/components/MainTabsKeepAlive", () => ({
-  MainTabsKeepAlive: () => null,
-  isMainTabPath: () => false,
+  MainTabsKeepAlive: ({ activePath }: { activePath: string }) => (
+    <div data-testid="main-tabs">{activePath}</div>
+  ),
+  isMainTabPath: (pathname: string) => isMainTabPathMock(pathname),
 }));
 
 vi.mock("@/hooks/useAppResumeRefresh", () => ({
@@ -210,11 +213,28 @@ vi.mock("./pages/NotFound", () => ({
 import App from "./App";
 
 describe("App preview route", () => {
+  beforeEach(() => {
+    isMainTabPathMock.mockImplementation((pathname: string) => pathname === "/mentor");
+  });
+
   it("falls through to not found when /preview is requested", async () => {
     window.history.pushState({}, "", "/preview");
 
     render(<App />);
 
     expect(await screen.findByText("Page Not Found")).toBeInTheDocument();
+  });
+
+  it("redirects legacy reflection routes to the canonical mentor reflection URL", async () => {
+    window.history.pushState({}, "", "/reflection");
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(window.location.pathname).toBe("/mentor");
+      expect(window.location.search).toBe("?open=evening-reflection");
+    });
+
+    expect(screen.getByTestId("main-tabs")).toHaveTextContent("/mentor");
   });
 });

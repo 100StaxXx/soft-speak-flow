@@ -18,7 +18,8 @@ import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { playStrikethrough } from "@/utils/soundEffects";
 import { useHabitSurfacing } from "@/hooks/useHabitSurfacing";
 import { useTaskMutations } from "@/hooks/useTaskMutations";
- import { useLivingCompanionSafe } from "@/hooks/useLivingCompanion";
+import { useLivingCompanionSafe } from "@/hooks/useLivingCompanion";
+import { useEpics } from "@/hooks/useEpics";
 import { getClampedMonthDays, isHabitScheduledForDate } from "@/utils/habitSchedule";
 interface Habit {
   id: string;
@@ -99,6 +100,7 @@ interface EpicCheckInDrawerProps {
 export const EpicCheckInDrawer = memo(function EpicCheckInDrawer({ epicId, habits, isActive, onAdjustPlan, showAdjustPlan, renderTrigger }: EpicCheckInDrawerProps) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { createCampaignRitual } = useEpics({ enabled: false });
   const [open, setOpen] = useState(false);
   const [expandedHabit, setExpandedHabit] = useState<string | null>(null);
   const [editingRitual, setEditingRitual] = useState<RitualData | null>(null);
@@ -260,44 +262,20 @@ export const EpicCheckInDrawer = memo(function EpicCheckInDrawer({ epicId, habit
     try {
       // Determine frequency based on days selected
       const frequency = newRitualDays.length === 7 ? 'daily' : 'custom';
-      
-      // Insert new habit (epic_id is linked via junction table, not directly)
-      const { data: newHabit, error } = await supabase
-        .from('habits')
-        .insert({
-          user_id: user.id,
-          title: newRitualTitle.trim(),
-          difficulty: newRitualDifficulty,
-          frequency,
-          custom_days: newRitualDays,
-          is_active: true,
-        })
-        .select('id')
-        .single();
-      
-      if (error) throw error;
+      await createCampaignRitual({
+        epicId,
+        title: newRitualTitle,
+        difficulty: newRitualDifficulty,
+        frequency,
+        customDays: newRitualDays,
+      });
 
-      // Also link via epic_habits junction table
-      if (newHabit?.id) {
-        await supabase.from('epic_habits').insert({
-          epic_id: epicId,
-          habit_id: newHabit.id,
-        });
-      }
-
-      // Invalidate queries to refresh data
-      queryClient.invalidateQueries({ queryKey: ['habits'] });
-      queryClient.invalidateQueries({ queryKey: ['epics'] });
-      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
-      
-      toast.success('Ritual added to campaign!');
       setNewRitualTitle("");
       setNewRitualDifficulty('medium');
       setNewRitualDays([0, 1, 2, 3, 4, 5, 6]); // Reset to daily
       setIsAddingRitual(false);
     } catch (error) {
       console.error('Error adding ritual:', error);
-      toast.error('Failed to add ritual');
     } finally {
       setIsAddingLoading(false);
     }

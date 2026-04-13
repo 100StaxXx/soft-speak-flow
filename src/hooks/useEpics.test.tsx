@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => {
   const queueActionMock = vi.fn();
   const requestJourneyPathGenerationMock = vi.fn();
   const retryNowMock = vi.fn();
+  const dispatchPlannerSyncFinishedMock = vi.fn();
   const rpcMock = vi.fn();
   const getAllLocalTasksForUserMock = vi.fn();
   const getLocalEpicHabitsMock = vi.fn();
@@ -25,6 +26,10 @@ const mocks = vi.hoisted(() => {
   const upsertPlannerRecordsMock = vi.fn();
   let shouldQueueWrites = false;
   const warmEpicsQueryFromRemoteMock = vi.fn();
+  const withPlannerRemoteSyncLockMock = vi.fn(async (_userId: string, operation: () => Promise<unknown>) => operation());
+  const toastSuccessMock = vi.fn();
+  const toastErrorMock = vi.fn();
+  const toastMock = vi.fn();
 
   return {
     fromMock,
@@ -35,6 +40,7 @@ const mocks = vi.hoisted(() => {
     queueActionMock,
     requestJourneyPathGenerationMock,
     retryNowMock,
+    dispatchPlannerSyncFinishedMock,
     rpcMock,
     getAllLocalTasksForUserMock,
     getLocalEpicHabitsMock,
@@ -53,6 +59,10 @@ const mocks = vi.hoisted(() => {
       shouldQueueWrites = value;
     },
     warmEpicsQueryFromRemoteMock,
+    withPlannerRemoteSyncLockMock,
+    toastSuccessMock,
+    toastErrorMock,
+    toastMock,
   };
 });
 
@@ -82,6 +92,16 @@ vi.mock("@/contexts/ResilienceContext", () => ({
   }),
 }));
 
+vi.mock("@/components/ui/sonner", () => ({
+  toast: Object.assign(
+    (...args: unknown[]) => mocks.toastMock(...args),
+    {
+      success: (...args: unknown[]) => mocks.toastSuccessMock(...args),
+      error: (...args: unknown[]) => mocks.toastErrorMock(...args),
+    },
+  ),
+}));
+
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: (...args: unknown[]) => mocks.fromMock(...args),
@@ -98,7 +118,9 @@ vi.mock("@/utils/journeyPathCache", () => ({
 
 vi.mock("@/utils/plannerSync", () => ({
   PLANNER_SYNC_EVENT: "planner-sync-finished",
+  dispatchPlannerSyncFinished: (...args: unknown[]) => mocks.dispatchPlannerSyncFinishedMock(...args),
   loadLocalEpics: (...args: unknown[]) => mocks.loadLocalEpicsMock(...args),
+  withPlannerRemoteSyncLock: (...args: unknown[]) => mocks.withPlannerRemoteSyncLockMock(...args),
   warmEpicsQueryFromRemote: (...args: unknown[]) => mocks.warmEpicsQueryFromRemoteMock(...args),
 }));
 
@@ -144,8 +166,13 @@ describe("useEpics", () => {
     mocks.queueActionMock.mockResolvedValue(undefined);
     mocks.requestJourneyPathGenerationMock.mockResolvedValue(null);
     mocks.retryNowMock.mockResolvedValue(undefined);
+    mocks.dispatchPlannerSyncFinishedMock.mockReset();
     mocks.rpcMock.mockResolvedValue({ data: 0, error: null });
     mocks.warmEpicsQueryFromRemoteMock.mockResolvedValue([]);
+    mocks.withPlannerRemoteSyncLockMock.mockImplementation(async (_userId: string, operation: () => Promise<unknown>) => operation());
+    mocks.toastSuccessMock.mockReset();
+    mocks.toastErrorMock.mockReset();
+    mocks.toastMock.mockReset();
     mocks.getAllLocalTasksForUserMock.mockResolvedValue([]);
     mocks.getLocalEpicHabitsMock.mockResolvedValue([]);
     mocks.getLocalHabitCompletionsMock.mockResolvedValue([]);
@@ -787,6 +814,338 @@ describe("useEpics", () => {
       },
     });
     expect(mocks.retryNowMock).toHaveBeenCalled();
+  });
+
+  it("creates a campaign ritual locally, syncs it remotely, and updates the cached epics immediately", async () => {
+    let localHabits: Array<Record<string, unknown>> = [];
+    let localEpicHabits: Array<{ id: string; epic_id: string; habit_id: string }> = [];
+    const baseEpic = {
+      id: "epic-1",
+      user_id: "user-1",
+      title: "Campaign Alpha",
+      description: null,
+      status: "active",
+      progress_percentage: 40,
+      target_days: 14,
+      start_date: "2026-02-10",
+      end_date: null,
+      created_at: "2026-02-10T00:00:00.000Z",
+    };
+
+    const buildLocalEpics = () => [
+      {
+        ...baseEpic,
+        epic_habits: localEpicHabits.map((link) => ({
+          habit_id: link.habit_id,
+          habits: (localHabits.find((habit) => habit.id === link.habit_id) as Record<string, unknown> | undefined) ?? null,
+        })),
+      },
+    ];
+
+    mocks.loadLocalEpicsMock.mockImplementation(async () => buildLocalEpics());
+    mocks.upsertPlannerRecordMock.mockImplementation(async (storeName: string, record: Record<string, unknown>) => {
+      if (storeName === "habits") {
+        localHabits = [...localHabits.filter((habit) => habit.id !== record.id), record];
+      }
+      if (storeName === "epic_habits") {
+        localEpicHabits = [...localEpicHabits.filter((link) => link.id !== record.id), record as { id: string; epic_id: string; habit_id: string }];
+      }
+    });
+
+    const habitsInsertMock = vi.fn().mockResolvedValue({ error: null });
+    const linksInsertMock = vi.fn().mockResolvedValue({ error: null });
+
+    mocks.fromMock.mockImplementation((table: string) => {
+      if (table === "habits") {
+        return {
+          insert: habitsInsertMock,
+          select: mocks.selectMock,
+        };
+      }
+
+      if (table === "epic_habits") {
+        return {
+          insert: linksInsertMock,
+          select: mocks.selectMock,
+        };
+      }
+
+      return {
+        select: mocks.selectMock,
+      };
+    });
+
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+
+    const { result } = renderHook(() => useEpics({ enabled: false }), { wrapper });
+
+    await act(async () => {
+      await result.current.createCampaignRitual({
+        epicId: "epic-1",
+        title: "Evening Walk",
+        difficulty: "easy",
+        frequency: "daily",
+        customDays: [0, 1, 2, 3, 4, 5, 6],
+      });
+    });
+
+    const cachedEpics = queryClient.getQueryData<Array<{ epic_habits: Array<{ habits: { title?: string } | null }> }>>(["epics", "user-1"]);
+    expect(cachedEpics?.[0]?.epic_habits.some((link) => link.habits?.title === "Evening Walk")).toBe(true);
+    expect(mocks.upsertPlannerRecordMock).toHaveBeenCalledWith(
+      "habits",
+      expect.objectContaining({
+        title: "Evening Walk",
+        frequency: "daily",
+      }),
+    );
+    expect(mocks.upsertPlannerRecordMock).toHaveBeenCalledWith(
+      "epic_habits",
+      expect.objectContaining({
+        epic_id: "epic-1",
+      }),
+    );
+    expect(habitsInsertMock).toHaveBeenCalledTimes(1);
+    expect(linksInsertMock).toHaveBeenCalledTimes(1);
+    expect(mocks.dispatchPlannerSyncFinishedMock).toHaveBeenCalledTimes(1);
+    expect(mocks.toastSuccessMock).toHaveBeenCalledWith(
+      "Ritual added to campaign!",
+      expect.objectContaining({
+        description: expect.stringContaining("Evening Walk"),
+      }),
+    );
+  });
+
+  it("rolls back a campaign ritual when the epic link insert fails and never shows a success toast", async () => {
+    let localHabits: Array<Record<string, unknown>> = [];
+    let localEpicHabits: Array<{ id: string; epic_id: string; habit_id: string }> = [];
+    const baseEpic = {
+      id: "epic-1",
+      user_id: "user-1",
+      title: "Campaign Alpha",
+      description: null,
+      status: "active",
+      progress_percentage: 40,
+      target_days: 14,
+      start_date: "2026-02-10",
+      end_date: null,
+      created_at: "2026-02-10T00:00:00.000Z",
+    };
+
+    const buildLocalEpics = () => [
+      {
+        ...baseEpic,
+        epic_habits: localEpicHabits.map((link) => ({
+          habit_id: link.habit_id,
+          habits: (localHabits.find((habit) => habit.id === link.habit_id) as Record<string, unknown> | undefined) ?? null,
+        })),
+      },
+    ];
+
+    mocks.loadLocalEpicsMock.mockImplementation(async () => buildLocalEpics());
+    mocks.upsertPlannerRecordMock.mockImplementation(async (storeName: string, record: Record<string, unknown>) => {
+      if (storeName === "habits") {
+        localHabits = [...localHabits.filter((habit) => habit.id !== record.id), record];
+      }
+      if (storeName === "epic_habits") {
+        localEpicHabits = [...localEpicHabits.filter((link) => link.id !== record.id), record as { id: string; epic_id: string; habit_id: string }];
+      }
+    });
+    mocks.removePlannerRecordMock.mockImplementation(async (storeName: string, recordId: string) => {
+      if (storeName === "habits") {
+        localHabits = localHabits.filter((habit) => habit.id !== recordId);
+      }
+      if (storeName === "epic_habits") {
+        localEpicHabits = localEpicHabits.filter((link) => link.id !== recordId);
+      }
+    });
+
+    const habitsInsertMock = vi.fn().mockResolvedValue({ error: null });
+    const linksInsertError = { message: "violates check constraint", status: 400 };
+    const linksInsertMock = vi.fn().mockResolvedValue({ error: linksInsertError });
+    const deleteLinkEqMock = vi.fn().mockResolvedValue({ error: null });
+    const deleteHabitUserEqMock = vi.fn().mockResolvedValue({ error: null });
+
+    mocks.fromMock.mockImplementation((table: string) => {
+      if (table === "habits") {
+        return {
+          insert: habitsInsertMock,
+          delete: () => ({
+            eq: () => ({
+              eq: deleteHabitUserEqMock,
+            }),
+          }),
+          select: mocks.selectMock,
+        };
+      }
+
+      if (table === "epic_habits") {
+        return {
+          insert: linksInsertMock,
+          delete: () => ({
+            eq: deleteLinkEqMock,
+          }),
+          select: mocks.selectMock,
+        };
+      }
+
+      return {
+        select: mocks.selectMock,
+      };
+    });
+
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+
+    const { result } = renderHook(() => useEpics({ enabled: false }), { wrapper });
+
+    let mutationError: unknown = null;
+    await act(async () => {
+      try {
+        await result.current.createCampaignRitual({
+          epicId: "epic-1",
+          title: "Evening Walk",
+          difficulty: "easy",
+          frequency: "daily",
+          customDays: [0, 1, 2, 3, 4, 5, 6],
+        });
+      } catch (error) {
+        mutationError = error;
+      }
+    });
+
+    expect(mutationError).toEqual(linksInsertError);
+
+    const cachedEpics = queryClient.getQueryData<Array<{ epic_habits: Array<{ habits: { title?: string } | null }> }>>(["epics", "user-1"]);
+    expect(localHabits).toHaveLength(0);
+    expect(localEpicHabits).toHaveLength(0);
+    expect(cachedEpics?.[0]?.epic_habits ?? []).toEqual([]);
+    expect(mocks.dispatchPlannerSyncFinishedMock).toHaveBeenCalledTimes(2);
+    expect(mocks.toastSuccessMock).not.toHaveBeenCalled();
+    expect(mocks.toastErrorMock).toHaveBeenCalledWith("Failed to add ritual");
+  });
+
+  it("keeps a locally created campaign ritual when the remote write falls back to the offline queue", async () => {
+    let localHabits: Array<Record<string, unknown>> = [];
+    let localEpicHabits: Array<{ id: string; epic_id: string; habit_id: string }> = [];
+    const baseEpic = {
+      id: "epic-1",
+      user_id: "user-1",
+      title: "Campaign Alpha",
+      description: null,
+      status: "active",
+      progress_percentage: 40,
+      target_days: 14,
+      start_date: "2026-02-10",
+      end_date: null,
+      created_at: "2026-02-10T00:00:00.000Z",
+    };
+
+    const buildLocalEpics = () => [
+      {
+        ...baseEpic,
+        epic_habits: localEpicHabits.map((link) => ({
+          habit_id: link.habit_id,
+          habits: (localHabits.find((habit) => habit.id === link.habit_id) as Record<string, unknown> | undefined) ?? null,
+        })),
+      },
+    ];
+
+    mocks.loadLocalEpicsMock.mockImplementation(async () => buildLocalEpics());
+    mocks.upsertPlannerRecordMock.mockImplementation(async (storeName: string, record: Record<string, unknown>) => {
+      if (storeName === "habits") {
+        localHabits = [...localHabits.filter((habit) => habit.id !== record.id), record];
+      }
+      if (storeName === "epic_habits") {
+        localEpicHabits = [...localEpicHabits.filter((link) => link.id !== record.id), record as { id: string; epic_id: string; habit_id: string }];
+      }
+    });
+
+    const habitsInsertMock = vi.fn().mockResolvedValue({ error: null });
+    const linksInsertMock = vi.fn().mockResolvedValue({ error: new Error("Failed to fetch") });
+
+    mocks.fromMock.mockImplementation((table: string) => {
+      if (table === "habits") {
+        return {
+          insert: habitsInsertMock,
+          select: mocks.selectMock,
+        };
+      }
+
+      if (table === "epic_habits") {
+        return {
+          insert: linksInsertMock,
+          select: mocks.selectMock,
+        };
+      }
+
+      return {
+        select: mocks.selectMock,
+      };
+    });
+
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+
+    const { result } = renderHook(() => useEpics(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    await act(async () => {
+      await result.current.createCampaignRitual({
+        epicId: "epic-1",
+        title: "Evening Walk",
+        difficulty: "easy",
+        frequency: "daily",
+        customDays: [0, 1, 2, 3, 4, 5, 6],
+      });
+    });
+
+    const cachedEpics = queryClient.getQueryData<Array<{ epic_habits: Array<{ habits: { title?: string } | null }> }>>(["epics", "user-1"]);
+    expect(cachedEpics?.[0]?.epic_habits.some((link) => link.habits?.title === "Evening Walk")).toBe(true);
+    expect(mocks.queueActionMock).toHaveBeenCalledWith({
+      actionKind: "EPIC_RITUAL_CREATE",
+      entityType: "epic",
+      entityId: "epic-1",
+      payload: expect.objectContaining({
+        habit: expect.objectContaining({
+          title: "Evening Walk",
+        }),
+        epicHabit: expect.objectContaining({
+          epic_id: "epic-1",
+        }),
+      }),
+    });
+    expect(mocks.retryNowMock).toHaveBeenCalled();
+    expect(mocks.toastSuccessMock).toHaveBeenCalledWith(
+      "Ritual saved offline",
+      expect.objectContaining({
+        description: expect.stringContaining("back online"),
+      }),
+    );
   });
 
   it("surfaces hydrated latest journey-path data after a reopen-style load", async () => {

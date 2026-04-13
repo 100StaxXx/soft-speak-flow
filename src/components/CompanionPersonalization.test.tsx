@@ -24,7 +24,7 @@ describe("CompanionPersonalization", () => {
       />,
     );
 
-    const eggImages = screen.getAllByRole("img", { name: "Fire Egg" });
+    const eggImages = screen.getAllByRole("img", { name: "Ember Egg" });
     expect(eggImages.some((image) =>
       image.getAttribute("data-companion-image-fit") === "contain"
       && image.getAttribute("data-companion-image-focal-source") === "manifest"
@@ -44,7 +44,7 @@ describe("CompanionPersonalization", () => {
     const stormButton = screen.getByRole("button", { name: /Storm Egg/i });
     expect(stormButton).toBeDisabled();
     expect(stormButton).toHaveAttribute("data-supported", "false");
-    expect(screen.getAllByText("Awaiting Awakening").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Coming Soon").length).toBeGreaterThan(0);
   });
 
   it("dims unsupported presets during hatch mode and keeps supported presets selectable", () => {

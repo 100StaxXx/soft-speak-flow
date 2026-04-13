@@ -8,17 +8,100 @@ import { Capacitor, type PluginListenerHandle } from '@capacitor/core';
 import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/utils/logger';
 import { isNativeIOSHandheld } from '@/utils/platformTargets';
+import { safeLocalStorage } from '@/utils/storage';
 
 let currentPushUserId: string | null = null;
 let initializedUserId: string | null = null;
 let initializationPromise: Promise<void> | null = null;
 let listenerHandles: PluginListenerHandle[] = [];
 let listenersBound = false;
+const PUSH_INSTALLATION_ID_STORAGE_KEY = 'native_push_installation_id';
+
+interface PushDeviceTokenRow {
+  id: string;
+  device_token: string;
+  installation_id: string | null;
+}
 
 export interface NativePushTokenDebugSnapshot {
   tokenCount: number;
+  installationCount: number;
+  legacyTokenCount: number;
   latestUpdatedAt: string | null;
   latestTokenPreview: string | null;
+  currentInstallationIdPreview: string | null;
+}
+
+export interface PushDeviceTokenRegistrationPlanInput {
+  userId: string;
+  installationId: string;
+  deviceToken: string;
+  userAgent: string;
+  nowIso: string;
+  existingRows: PushDeviceTokenRow[];
+}
+
+export interface PushDeviceTokenRegistrationPlan {
+  deleteIds: string[];
+  upsertRow: {
+    user_id: string;
+    installation_id: string;
+    device_token: string;
+    platform: 'ios';
+    user_agent: string;
+    updated_at: string;
+  };
+}
+
+function readPushInstallationId(): string | null {
+  const value = safeLocalStorage.getItem(PUSH_INSTALLATION_ID_STORAGE_KEY);
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+}
+
+function generatePushInstallationId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+
+  return `install-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+export function getOrCreatePushInstallationId(): string {
+  const existing = readPushInstallationId();
+  if (existing) {
+    return existing;
+  }
+
+  const generated = generatePushInstallationId();
+  safeLocalStorage.setItem(PUSH_INSTALLATION_ID_STORAGE_KEY, generated);
+  return generated;
+}
+
+function previewValue(value: string | null): string | null {
+  if (!value) return null;
+  if (value.length <= 12) return value;
+  return `${value.slice(0, 8)}...${value.slice(-4)}`;
+}
+
+export function buildDeviceTokenRegistrationPlan(
+  input: PushDeviceTokenRegistrationPlanInput,
+): PushDeviceTokenRegistrationPlan {
+  const deleteIds = input.existingRows
+    .filter((row) => row.installation_id !== input.installationId && row.device_token === input.deviceToken)
+    .map((row) => row.id);
+
+  return {
+    deleteIds,
+    upsertRow: {
+      user_id: input.userId,
+      installation_id: input.installationId,
+      device_token: input.deviceToken,
+      platform: 'ios',
+      user_agent: input.userAgent,
+      updated_at: input.nowIso,
+    },
+  };
 }
 
 function delay(ms: number): Promise<void> {
@@ -197,9 +280,10 @@ export async function initializeNativePush(userId: string): Promise<void> {
  */
 export async function getNativePushTokenDebugSnapshot(userId: string): Promise<NativePushTokenDebugSnapshot> {
   try {
+    const currentInstallationId = getOrCreatePushInstallationId();
     const { data, error } = await supabase
       .from('push_device_tokens')
-      .select('device_token,updated_at')
+      .select('device_token,updated_at,installation_id')
       .eq('user_id', userId)
       .eq('platform', 'ios')
       .order('updated_at', { ascending: false })
@@ -209,22 +293,30 @@ export async function getNativePushTokenDebugSnapshot(userId: string): Promise<N
 
     const tokens = data ?? [];
     const latest = tokens[0];
-    const latestToken = latest?.device_token;
-    const preview = typeof latestToken === 'string' && latestToken.length >= 12
-      ? `${latestToken.slice(0, 8)}...${latestToken.slice(-4)}`
-      : null;
+    const installationIds = new Set(
+      tokens
+        .map((row) => row.installation_id?.trim())
+        .filter((value): value is string => Boolean(value)),
+    );
+    const legacyTokenCount = tokens.filter((row) => !row.installation_id?.trim()).length;
 
     return {
       tokenCount: tokens.length,
+      installationCount: installationIds.size,
+      legacyTokenCount,
       latestUpdatedAt: latest?.updated_at ?? null,
-      latestTokenPreview: preview,
+      latestTokenPreview: previewValue(latest?.device_token ?? null),
+      currentInstallationIdPreview: previewValue(currentInstallationId),
     };
   } catch (error) {
     console.log('[NativePush] Failed to load token snapshot:', error);
     return {
       tokenCount: 0,
+      installationCount: 0,
+      legacyTokenCount: 0,
       latestUpdatedAt: null,
       latestTokenPreview: null,
+      currentInstallationIdPreview: previewValue(readPushInstallationId()),
     };
   }
 }
@@ -251,21 +343,50 @@ export async function waitForNativePushToken(
 /**
  * Save device token to database
  */
-async function saveDeviceToken(userId: string, deviceToken: string): Promise<void> {
+export async function saveDeviceTokenForInstallation(
+  userId: string,
+  deviceToken: string,
+  installationId = getOrCreatePushInstallationId(),
+): Promise<void> {
   console.log('[NativePush] Saving token to database...');
   console.log('[NativePush] User:', userId);
   console.log('[NativePush] Token (first 20 chars):', deviceToken.substring(0, 20) + '...');
   
   try {
+    const { data: existingRows, error: existingRowsError } = await supabase
+      .from('push_device_tokens')
+      .select('id,device_token,installation_id')
+      .eq('user_id', userId)
+      .eq('platform', 'ios');
+
+    if (existingRowsError) {
+      throw existingRowsError;
+    }
+
+    const registrationPlan = buildDeviceTokenRegistrationPlan({
+      userId,
+      installationId,
+      deviceToken,
+      userAgent: navigator.userAgent,
+      nowIso: new Date().toISOString(),
+      existingRows: (existingRows ?? []) as PushDeviceTokenRow[],
+    });
+
+    if (registrationPlan.deleteIds.length > 0) {
+      const { error: deleteError } = await supabase
+        .from('push_device_tokens')
+        .delete()
+        .in('id', registrationPlan.deleteIds);
+
+      if (deleteError) {
+        throw deleteError;
+      }
+    }
+
     const { error } = await supabase
       .from('push_device_tokens')
-      .upsert({
-        user_id: userId,
-        device_token: deviceToken,
-        platform: 'ios',
-        user_agent: navigator.userAgent
-      }, {
-        onConflict: 'user_id,device_token'
+      .upsert(registrationPlan.upsertRow, {
+        onConflict: 'user_id,platform,installation_id'
       });
 
     if (error) {
@@ -281,6 +402,10 @@ async function saveDeviceToken(userId: string, deviceToken: string): Promise<voi
     logger.error('Error saving device token:', error);
     throw error;
   }
+}
+
+async function saveDeviceToken(userId: string, deviceToken: string): Promise<void> {
+  await saveDeviceTokenForInstallation(userId, deviceToken);
 }
 
 /**
@@ -308,12 +433,15 @@ export async function unregisterNativePush(userId: string): Promise<void> {
     const deliveredNotifications = await PushNotifications.getDeliveredNotifications();
     console.log('[NativePush] Delivered notifications:', deliveredNotifications);
 
+    const installationId = getOrCreatePushInstallationId();
+
     // Delete device token from database
     const { error } = await supabase
       .from('push_device_tokens')
       .delete()
       .eq('user_id', userId)
-      .eq('platform', 'ios');
+      .eq('platform', 'ios')
+      .eq('installation_id', installationId);
 
     if (error) {
       console.log('[NativePush] Error deleting token:', error);
@@ -341,11 +469,13 @@ export async function unregisterNativePush(userId: string): Promise<void> {
  */
 export async function hasActiveNativePushSubscription(userId: string): Promise<boolean> {
   try {
+    const installationId = getOrCreatePushInstallationId();
     const { data, error } = await supabase
       .from('push_device_tokens')
       .select('id')
       .eq('user_id', userId)
       .eq('platform', 'ios')
+      .eq('installation_id', installationId)
       .limit(1);
 
     if (error) throw error;

@@ -182,6 +182,39 @@ describe("useWidgetSync", () => {
     });
   });
 
+  it("includes profile wallpaper metadata when available", async () => {
+    const today = localDateString();
+    const profileWallpaper = {
+      imageUrl: "https://example.com/profile-wallpaper.jpg",
+      dateKey: today,
+    };
+
+    renderHook(() => useWidgetSync([makeTask()], today, { profileWallpaper }));
+    await flushEffects();
+
+    expect(mocks.updateWidgetDataMock).toHaveBeenCalledWith({
+      tasks: [
+        {
+          id: "task-1",
+          text: "Daily focus",
+          completed: false,
+          xpReward: 50,
+          isMainQuest: false,
+          category: "mindset",
+          section: "morning",
+          scheduledTime: "09:00",
+        },
+      ],
+      completedCount: 0,
+      totalCount: 1,
+      ritualCount: 0,
+      ritualCompleted: 0,
+      date: today,
+      profileWallpaperImageUrl: profileWallpaper.imageUrl,
+      profileWallpaperDateKey: profileWallpaper.dateKey,
+    });
+  });
+
   it("syncs an empty today payload to clear stale widget tasks", async () => {
     const today = localDateString();
 

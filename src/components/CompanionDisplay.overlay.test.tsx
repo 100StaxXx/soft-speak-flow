@@ -398,7 +398,7 @@ describe("CompanionDisplay overlay stack", () => {
 
     render(<CompanionDisplay />);
 
-    expect(screen.getByText("Fire Egg")).toBeInTheDocument();
+    expect(screen.getByText("Ember Egg")).toBeInTheDocument();
     expect(screen.queryByText("Nova")).not.toBeInTheDocument();
     expect(screen.getAllByText("Ready to evolve to Level 1").length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: "HATCH" })).toBeInTheDocument();
@@ -429,7 +429,7 @@ describe("CompanionDisplay overlay stack", () => {
 
     render(<CompanionDisplay />);
 
-    expect(screen.getByText("Fire Egg")).toBeInTheDocument();
+    expect(screen.getByText("Ember Egg")).toBeInTheDocument();
     expect(screen.queryByText("Nova")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "HATCH" })).toBeInTheDocument();
   });
@@ -449,7 +449,7 @@ describe("CompanionDisplay overlay stack", () => {
     render(<CompanionDisplay />);
 
     expect(await screen.findByText("Nova")).toBeInTheDocument();
-    expect(screen.queryByText("Fire Egg")).not.toBeInTheDocument();
+    expect(screen.queryByText("Ember Egg")).not.toBeInTheDocument();
     expect(screen.getByTestId("companion-visual-stage")).toHaveTextContent("Stage 1 • Hatchling");
     expect(screen.getByTestId("companion-level-chip")).toHaveTextContent("Level 1");
     expect(screen.getByText(/XP to Level 2/)).toBeInTheDocument();

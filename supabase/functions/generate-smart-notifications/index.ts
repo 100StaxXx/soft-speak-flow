@@ -522,12 +522,13 @@ serve(async (req) => {
 
     for (const profile of profiles || []) {
       try {
+        const dedupeKey = `smart_notification:${profile.id}:${today}`;
+
         // Check if user already has a notification scheduled for today
         const { data: existingNotif } = await supabase
           .from('push_notification_queue')
           .select('id')
-          .eq('user_id', profile.id)
-          .gte('scheduled_for', today)
+          .eq('dedupe_key', dedupeKey)
           .limit(1)
           .maybeSingle();
 
@@ -671,12 +672,21 @@ serve(async (req) => {
             title,
             body,
             scheduled_for: scheduledFor.toISOString(),
+            status: 'queued',
+            source_table: 'profiles',
+            source_id: profile.id,
+            dedupe_key: dedupeKey,
+            priority: 40,
             context: {
               companion_name: userContext.companion.companionDisplayName,
               companion_mood: userContext.companion.currentMood,
               companion_species: userContext.companion.spiritAnimal,
               streak: userContext.currentStreak,
               inactive_days: userContext.companion.inactiveDays,
+            },
+            payload: {
+              type: notificationType,
+              local_date: today,
             },
           });
 

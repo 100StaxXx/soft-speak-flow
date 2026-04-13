@@ -444,6 +444,25 @@ async function executeQueuedAction(userId: string, action: QueuedAction): Promis
       return;
     }
 
+    case "EPIC_RITUAL_CREATE": {
+      const payload = action.payload as {
+        habit: Record<string, unknown>;
+        epicHabit: Record<string, unknown>;
+      };
+
+      const { error: habitError } = await supabase
+        .from("habits")
+        .upsert(payload.habit);
+      if (habitError) throw habitError;
+
+      const { error: linkError } = await supabase
+        .from("epic_habits")
+        .upsert(payload.epicHabit);
+      if (linkError) throw linkError;
+
+      return;
+    }
+
     case "EPIC_UPDATE": {
       const { epicId, updates } = action.payload as {
         epicId: string;

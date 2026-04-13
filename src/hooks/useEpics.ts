@@ -8,12 +8,14 @@ import { useAIInteractionTracker } from "@/hooks/useAIInteractionTracker";
 import { useAchievements } from "@/hooks/useAchievements";
 import { format } from "date-fns";
 import type { StoryTypeSlug } from "@/types/narrativeTypes";
-import type { EpicRecord } from "@/hooks/epicsQuery";
+import { getEpicsQueryKey, type EpicRecord } from "@/hooks/epicsQuery";
 import { requestJourneyPathGeneration } from "@/utils/journeyPathCache";
 import { useResilience } from "@/contexts/ResilienceContext";
 import {
   PLANNER_SYNC_EVENT,
+  dispatchPlannerSyncFinished,
   loadLocalEpics,
+  withPlannerRemoteSyncLock,
   warmEpicsQueryFromRemote,
 } from "@/utils/plannerSync";
 import { resolveEpicEndDate } from "@/utils/epicDates";
@@ -194,6 +196,38 @@ type LocalEpicPayload = {
   milestones: Array<{ id: string; epic_id: string; user_id: string; title: string; description: string | null; target_date: string; milestone_percent: number; is_postcard_milestone: boolean; phase_order: number; phase_name: string | null }>;
 };
 
+type LocalEpicHabitRow = {
+  id: string;
+  epic_id: string;
+  habit_id: string;
+};
+
+type LocalCampaignRitualPayload = {
+  habit: LocalHabitRow;
+  epicHabit: LocalEpicHabitRow;
+};
+
+export interface CreateCampaignRitualInput {
+  epicId: string;
+  title: string;
+  difficulty: string;
+  frequency: string;
+  customDays?: number[] | null;
+  customMonthDays?: number[] | null;
+  preferredTime?: string | null;
+  estimatedMinutes?: number | null;
+  description?: string | null;
+  category?: string | null;
+  reminderEnabled?: boolean | null;
+  reminderMinutesBefore?: number | null;
+}
+
+export interface CreateCampaignRitualResult {
+  queued: boolean;
+  habit: LocalHabitRow;
+  epicHabit: LocalEpicHabitRow;
+}
+
 type LocalTaskEpicTitleRow = {
   id: string;
   user_id: string;
@@ -271,6 +305,37 @@ async function rollbackRemoteEpicPayload(userId: string, payload: LocalEpicPaylo
       .eq("user_id", userId);
     if (error) throw error;
   }
+}
+
+async function applyLocalCampaignRitualPayload(payload: LocalCampaignRitualPayload) {
+  await upsertPlannerRecord("habits", payload.habit);
+  await upsertPlannerRecord("epic_habits", payload.epicHabit);
+}
+
+async function rollbackLocalCampaignRitualPayload(payload: LocalCampaignRitualPayload) {
+  await removePlannerRecord("epic_habits", payload.epicHabit.id);
+  await removePlannerRecord("habits", payload.habit.id);
+}
+
+async function rollbackRemoteCampaignRitualPayload(userId: string, payload: LocalCampaignRitualPayload) {
+  const { error: linkError } = await supabase
+    .from("epic_habits")
+    .delete()
+    .eq("id", payload.epicHabit.id);
+  if (linkError) throw linkError;
+
+  const { error: habitError } = await supabase
+    .from("habits")
+    .delete()
+    .eq("id", payload.habit.id)
+    .eq("user_id", userId);
+  if (habitError) throw habitError;
+}
+
+async function refreshEpicsQueryFromLocalStore(queryClient: ReturnType<typeof useQueryClient>, userId: string) {
+  const nextEpics = await loadLocalEpics(userId);
+  queryClient.setQueryData(getEpicsQueryKey(userId), nextEpics);
+  return nextEpics;
 }
 
 async function applyLocalEpicStatusChange(userId: string, epicId: string, status: "completed" | "abandoned") {
@@ -932,6 +997,145 @@ export const useEpics = (options: EpicsOptions = {}) => {
     },
   });
 
+  const createCampaignRitual = useMutation({
+    mutationFn: async (input: CreateCampaignRitualInput): Promise<CreateCampaignRitualResult> => {
+      if (!user?.id) {
+        throw new Error("User not authenticated");
+      }
+
+      return withPlannerRemoteSyncLock(user.id, async () => {
+        const trimmedTitle = input.title.trim();
+        if (!trimmedTitle) {
+          throw new Error("Ritual title cannot be empty");
+        }
+
+        const localEpics = await loadLocalEpics(user.id);
+        const epic = localEpics.find((candidate) => candidate.id === input.epicId);
+        if (!epic) {
+          throw new Error("Campaign not found");
+        }
+
+        if (epic.status !== "active") {
+          throw new Error("Only active campaigns can receive new rituals");
+        }
+
+        const payload: LocalCampaignRitualPayload = {
+          habit: {
+            id: createOfflinePlannerId("habit"),
+            user_id: user.id,
+            title: trimmedTitle,
+            description: input.description?.trim() ? input.description.trim() : null,
+            difficulty: normalizeDifficulty(input.difficulty),
+            frequency: normalizeFrequency(input.frequency),
+            estimated_minutes: input.estimatedMinutes ?? null,
+            preferred_time: input.preferredTime ?? null,
+            category: input.category ?? null,
+            custom_days: input.customDays?.length ? [...input.customDays] : null,
+            custom_month_days: input.customMonthDays?.length ? [...input.customMonthDays] : null,
+            reminder_enabled: input.reminderEnabled ?? false,
+            reminder_minutes_before: input.reminderMinutesBefore ?? 15,
+            is_active: true,
+            current_streak: 0,
+            longest_streak: 0,
+            created_at: new Date().toISOString(),
+            sort_order: null,
+          },
+          epicHabit: {
+            id: createOfflinePlannerId("epic-habit"),
+            epic_id: input.epicId,
+            habit_id: "",
+          },
+        };
+        payload.epicHabit.habit_id = payload.habit.id;
+
+        await applyLocalCampaignRitualPayload(payload);
+        await refreshEpicsQueryFromLocalStore(queryClient, user.id);
+        await queryClient.invalidateQueries({ queryKey: ["epics"] });
+        dispatchPlannerSyncFinished();
+
+        if (shouldQueueWrites) {
+          await queueAction({
+            actionKind: "EPIC_RITUAL_CREATE",
+            entityType: "epic",
+            entityId: input.epicId,
+            payload,
+          });
+          return {
+            queued: true,
+            habit: payload.habit,
+            epicHabit: payload.epicHabit,
+          };
+        }
+
+        try {
+          const { error: habitError } = await supabase
+            .from("habits")
+            .insert(payload.habit);
+          if (habitError) throw habitError;
+
+          const { error: epicHabitError } = await supabase
+            .from("epic_habits")
+            .insert(payload.epicHabit);
+          if (epicHabitError) throw epicHabitError;
+
+          return {
+            queued: false,
+            habit: payload.habit,
+            epicHabit: payload.epicHabit,
+          };
+        } catch (error) {
+          if (!isQueueableWriteError(error)) {
+            try {
+              await rollbackLocalCampaignRitualPayload(payload);
+              await refreshEpicsQueryFromLocalStore(queryClient, user.id);
+              await queryClient.invalidateQueries({ queryKey: ["epics"] });
+              dispatchPlannerSyncFinished();
+            } catch (rollbackError) {
+              console.warn("Failed to roll back local campaign ritual after create error:", rollbackError);
+            }
+
+            try {
+              await rollbackRemoteCampaignRitualPayload(user.id, payload);
+            } catch (rollbackError) {
+              console.warn("Failed to roll back remote campaign ritual after create error:", rollbackError);
+            }
+
+            throw error;
+          }
+
+          await queueAction({
+            actionKind: "EPIC_RITUAL_CREATE",
+            entityType: "epic",
+            entityId: input.epicId,
+            payload,
+          });
+          void retryNow();
+          return {
+            queued: true,
+            habit: payload.habit,
+            epicHabit: payload.epicHabit,
+          };
+        }
+      });
+    },
+    onSuccess: ({ queued, habit }) => {
+      queryClient.invalidateQueries({ queryKey: ["epics"] });
+      queryClient.invalidateQueries({ queryKey: ["habits"] });
+      queryClient.invalidateQueries({ queryKey: ["habit-surfacing"] });
+      queryClient.invalidateQueries({ queryKey: ["user-ai-context"] });
+
+      toast.success(queued ? "Ritual saved offline" : "Ritual added to campaign!", {
+        description: queued
+          ? "Your new ritual will sync when you're back online."
+          : `"${habit.title}" is now part of this campaign.`,
+      });
+    },
+    onError: (error) => {
+      console.error("Failed to create campaign ritual:", error);
+      toast.error("Failed to add ritual");
+    },
+  });
+
   const addHabitToEpic = useMutation({
     mutationFn: async ({
       epicId,
@@ -1029,6 +1233,8 @@ export const useEpics = (options: EpicsOptions = {}) => {
     isCreateSuccess: createEpic.isSuccess,
     renameEpic: renameEpic.mutateAsync,
     updateEpicStatus: updateEpicStatus.mutate,
+    createCampaignRitual: createCampaignRitual.mutateAsync,
+    isCreatingCampaignRitual: createCampaignRitual.isPending,
     addHabitToEpic: addHabitToEpic.mutate,
     removeHabitFromEpic: removeHabitFromEpic.mutate,
   };

@@ -40,7 +40,7 @@ describe("OnboardingEggSelection", () => {
       screen.queryByText("Choose the element now. Your dragon will sleep within the shell until it hatches."),
     ).not.toBeInTheDocument();
     expect(screen.queryByText("Ember")).not.toBeInTheDocument();
-    expect(screen.queryByText("Frost")).not.toBeInTheDocument();
+    expect(screen.queryByText("Ice")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
   });
 
@@ -129,9 +129,9 @@ describe("OnboardingEggSelection", () => {
     const stormSlot = screen.getByTestId("egg-slot-storm");
     expect(stormSlot).toBeDisabled();
     expect(stormSlot).toHaveAttribute("data-supported", "false");
-    expect(screen.getAllByText("Awaiting Awakening").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Coming Soon").length).toBeGreaterThan(0);
 
-    fireEvent.click(screen.getByRole("button", { name: "Select Terra element" }));
+    fireEvent.click(screen.getByRole("button", { name: "Select Nature element" }));
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
     expect(onComplete).toHaveBeenCalledWith({
@@ -155,7 +155,7 @@ describe("OnboardingEggSelection", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Select Frost element" }));
+    fireEvent.click(screen.getByRole("button", { name: "Select Ice element" }));
 
     expect(screen.getByTestId("egg-slot-ice")).toHaveAttribute("data-selected", "true");
     expect(screen.getByTestId("egg-slot-fire")).toHaveAttribute("data-selected", "false");

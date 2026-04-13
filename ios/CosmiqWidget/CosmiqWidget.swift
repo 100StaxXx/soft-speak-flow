@@ -1,30 +1,119 @@
 import WidgetKit
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 // MARK: - Cosmic Color Palette
 
 extension Color {
     static let cosmicBackground = Color(red: 0.05, green: 0.02, blue: 0.15)
-    static let cosmicBackgroundEnd = Color(red: 0.08, green: 0.04, blue: 0.20)
     static let cosmicPurple = Color(red: 0.55, green: 0.36, blue: 0.95)
     static let cosmicGold = Color(red: 0.95, green: 0.75, blue: 0.30)
     static let cosmicText = Color.white
     static let cosmicSecondary = Color.white.opacity(0.72)
     static let cosmicGreen = Color(red: 0.4, green: 0.9, blue: 0.5)
+    static let profileWidgetBase = Color(red: 0.08, green: 0.10, blue: 0.14)
+    static let profileWidgetMid = Color(red: 0.12, green: 0.15, blue: 0.20)
+    static let profileWidgetEdge = Color(red: 0.18, green: 0.22, blue: 0.28)
+    static let profileWidgetHighlight = Color(red: 0.75, green: 0.83, blue: 0.88)
+    static let profileWidgetGlow = Color(red: 0.30, green: 0.43, blue: 0.50)
 }
 
-// MARK: - Cosmic Background Gradient
+// MARK: - Widget Background
 
-struct CosmicGradientBackground: View {
+struct ProfileWidgetFallbackBackground: View {
     var body: some View {
-        LinearGradient(
-            colors: [
-                Color.clear,
-                Color.white.opacity(0.04)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
+        ZStack {
+            LinearGradient(
+                colors: [
+                    .profileWidgetBase,
+                    .profileWidgetMid,
+                    .profileWidgetEdge
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            RadialGradient(
+                colors: [
+                    .profileWidgetHighlight.opacity(0.16),
+                    .clear
+                ],
+                center: .topLeading,
+                startRadius: 0,
+                endRadius: 180
+            )
+
+            RadialGradient(
+                colors: [
+                    .profileWidgetGlow.opacity(0.22),
+                    .clear
+                ],
+                center: UnitPoint(x: 0.86, y: 0.82),
+                startRadius: 0,
+                endRadius: 210
+            )
+        }
+    }
+}
+
+struct ProfileWidgetBackground: View {
+    let entry: TaskEntry
+
+    var body: some View {
+        ZStack {
+            if let wallpaperImage {
+                Image(uiImage: wallpaperImage)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                ProfileWidgetFallbackBackground()
+            }
+
+            LinearGradient(
+                colors: [
+                    Color.black.opacity(0.18),
+                    Color.black.opacity(0.06),
+                    Color.black.opacity(0.52)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+
+            RadialGradient(
+                colors: [
+                    Color.white.opacity(0.08),
+                    .clear
+                ],
+                center: .top,
+                startRadius: 0,
+                endRadius: 180
+            )
+
+            RadialGradient(
+                colors: [
+                    .profileWidgetGlow.opacity(0.18),
+                    .clear
+                ],
+                center: UnitPoint(x: 0.84, y: 0.80),
+                startRadius: 0,
+                endRadius: 200
+            )
+        }
+        .clipped()
+    }
+
+    private var wallpaperImage: UIImage? {
+        guard
+            let fileURL = WidgetDataManager.shared.profileWallpaperFileURL(
+                for: entry.data?.profileWallpaperRelativePath
+            )
+        else {
+            return nil
+        }
+
+        return UIImage(contentsOfFile: fileURL.path)
     }
 }
 
@@ -67,12 +156,12 @@ struct CosmiqWidget: Widget {
             if #available(iOS 17.0, *) {
                 CosmiqWidgetEntryView(entry: entry)
                     .containerBackground(for: .widget) {
-                        CosmicGradientBackground()
+                        ProfileWidgetBackground(entry: entry)
                     }
             } else {
                 CosmiqWidgetEntryView(entry: entry)
                     .padding()
-                    .background(CosmicGradientBackground())
+                    .background(ProfileWidgetBackground(entry: entry))
             }
         }
         .configurationDisplayName("Cosmiq Quests")

@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { ConstellationTrail } from "@/components/ConstellationTrail";
 import { JourneyDetailDrawer } from "@/components/JourneyDetailDrawer";
 import { useJourneyPathImage } from "@/hooks/useJourneyPathImage";
+import { usePreloadedImageUrl } from "@/hooks/usePreloadedImageUrl";
 import { useMilestones } from "@/hooks/useMilestones";
 import { useCompanion } from "@/hooks/useCompanion";
 import { getJourneyPathDrawerImageUrl } from "@/utils/journeyPathUrls";
@@ -54,6 +55,7 @@ export const JourneyPathDrawer = memo(function JourneyPathDrawer({
   
   const { pathImageUrl } = useJourneyPathImage(epic.id);
   const drawerImageUrl = useMemo(() => getJourneyPathDrawerImageUrl(pathImageUrl), [pathImageUrl]);
+  const { resolvedImageUrl: loadedDrawerImageUrl } = usePreloadedImageUrl(drawerImageUrl);
   const { milestones, totalCount } = useMilestones(epic.id);
   const { companion } = useCompanion();
   const resolvedEndDate = useMemo(() => resolveEpicEndDate(epic), [epic]);
@@ -123,11 +125,12 @@ export const JourneyPathDrawer = memo(function JourneyPathDrawer({
               {/* Combined Journey Visualization */}
               <div className="relative h-56 w-full overflow-hidden">
                 {/* AI-Generated Path Image Background */}
-                {drawerImageUrl && (
+                {loadedDrawerImageUrl && (
                   <>
                     <img
-                      src={drawerImageUrl}
-                      alt="Your journey path"
+                      src={loadedDrawerImageUrl}
+                      alt=""
+                      aria-hidden="true"
                       loading="eager"
                       decoding="async"
                       fetchPriority="high"
@@ -148,7 +151,7 @@ export const JourneyPathDrawer = memo(function JourneyPathDrawer({
                   showCompanion={true}
                   milestones={trailMilestones}
                   epicId={epic.id}
-                  transparentBackground={!!drawerImageUrl}
+                  transparentBackground={!!loadedDrawerImageUrl}
                   className="absolute inset-0"
                 />
               </div>

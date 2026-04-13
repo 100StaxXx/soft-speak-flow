@@ -57,8 +57,11 @@ const mocks = vi.hoisted(() => {
     })),
     getNativePushTokenDebugSnapshot: vi.fn(() => Promise.resolve({
       tokenCount: 2,
+      installationCount: 1,
+      legacyTokenCount: 1,
       latestUpdatedAt: "2026-03-31T18:00:00.000Z",
       latestTokenPreview: "abcd1234...wxyz",
+      currentInstallationIdPreview: "install-a...1234",
     })),
     waitForNativePushToken: vi.fn(() => Promise.resolve(true)),
     initializeNativePush: vi.fn(() => Promise.resolve()),
@@ -168,6 +171,12 @@ describe("PushNotificationSettings debug panel", () => {
           scheduled_for: "2026-03-31T18:30:00.000Z",
           delivered_at: "2026-03-31T18:31:00.000Z",
           last_error: "spacing_guard",
+          dedupe_key: "task_reminder:task-1:15",
+          payload: {
+            task_id: "task-1",
+            reminder_minutes_before: 15,
+          },
+          source_table: "daily_tasks",
         },
         {
           id: "queue-2",
@@ -176,6 +185,38 @@ describe("PushNotificationSettings debug panel", () => {
           scheduled_for: "2026-03-31T19:00:00.000Z",
           delivered_at: "2026-03-31T19:01:00.000Z",
           last_error: "no_device_tokens",
+          dedupe_key: "habit_reminder:habit-1:2026-03-31",
+          payload: {
+            habit_id: "habit-1",
+            local_date: "2026-03-31",
+          },
+          source_table: "habits",
+        },
+        {
+          id: "queue-3",
+          notification_type: "daily_pep",
+          status: "sent",
+          scheduled_for: "2026-03-31T19:05:00.000Z",
+          delivered_at: "2026-03-31T19:06:00.000Z",
+          last_error: null,
+          dedupe_key: "legacy:queue-3",
+          payload: {
+            pep_talk_id: "pep-1",
+          },
+          source_table: "user_daily_pushes",
+        },
+        {
+          id: "queue-4",
+          notification_type: "daily_pep",
+          status: "sent",
+          scheduled_for: "2026-03-31T19:07:00.000Z",
+          delivered_at: "2026-03-31T19:08:00.000Z",
+          last_error: null,
+          dedupe_key: "legacy:queue-4",
+          payload: {
+            pep_talk_id: "pep-1",
+          },
+          source_table: "user_daily_pushes",
         },
       ],
       error: null,
@@ -210,6 +251,10 @@ describe("PushNotificationSettings debug panel", () => {
     expect(screen.getByText("Recent skipped_budget")).toBeInTheDocument();
     expect(screen.getByText("Recent failed_terminal")).toBeInTheDocument();
     expect(screen.getByText("Recent no_device_tokens")).toBeInTheDocument();
+    expect(screen.getByText("Multiple iOS token rows")).toBeInTheDocument();
+    expect(screen.getByText("Legacy token rows")).toBeInTheDocument();
+    expect(screen.getByText("Repeated logical notifications")).toBeInTheDocument();
+    expect(screen.getByText(/Potential duplicate risk detected/i)).toBeInTheDocument();
     expect(screen.getByText("Recent Quest Queue Rows")).toBeInTheDocument();
     expect(screen.getByText("Reason: no_device_tokens")).toBeInTheDocument();
     expect(screen.getAllByText("task_reminder").length).toBeGreaterThan(0);

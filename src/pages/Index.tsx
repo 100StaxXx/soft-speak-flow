@@ -33,6 +33,11 @@ import { getEffectiveDailyDate } from "@/utils/timezone";
 import { safeSessionStorage } from "@/utils/storage";
 import { usePostOnboardingMentorGuidance } from "@/hooks/usePostOnboardingMentorGuidance";
 import { CinematicPageBackground } from "@/components/CinematicPageBackground";
+import { useEveningReflection } from "@/hooks/useEveningReflection";
+import {
+  clearEveningReflectionOpenRequest,
+  isEveningReflectionOpenRequest,
+} from "@/utils/eveningReflectionNavigation";
 
 type IndexProps = {
   enableOnboardingGuard?: boolean;
@@ -142,11 +147,42 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
   );
   const isTutorialMorningCheckinStep = !isDesktop && isTutorialActive && tutorialStep === "morning_checkin";
   const shouldUseGuideTiffanyTheme = location.pathname === "/mentor";
+  const {
+    shouldShowBanner: shouldShowEveningReflectionBanner,
+    isDrawerOpen: isEveningReflectionDrawerOpen,
+    setIsDrawerOpen: setEveningReflectionDrawerOpen,
+    isLoading: isEveningReflectionLoading,
+  } = useEveningReflection();
 
   // Scroll to top on mount
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
+
+  useEffect(() => {
+    if (location.pathname !== "/mentor") return;
+    if (!isEveningReflectionOpenRequest(location.search)) return;
+    if (isEveningReflectionLoading) return;
+
+    if (shouldShowEveningReflectionBanner) {
+      setEveningReflectionDrawerOpen(true);
+    }
+
+    navigate(
+      {
+        pathname: location.pathname,
+        search: clearEveningReflectionOpenRequest(location.search),
+      },
+      { replace: true },
+    );
+  }, [
+    isEveningReflectionLoading,
+    location.pathname,
+    location.search,
+    navigate,
+    setEveningReflectionDrawerOpen,
+    shouldShowEveningReflectionBanner,
+  ]);
 
   useEffect(() => {
     if (!isTutorialMorningCheckinStep) {
@@ -462,7 +498,11 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
 
       <ParallaxCard offset={10}>
         <ErrorBoundary>
-          <EveningReflectionBanner />
+          <EveningReflectionBanner
+            shouldShowBanner={shouldShowEveningReflectionBanner}
+            isDrawerOpen={isEveningReflectionDrawerOpen}
+            setIsDrawerOpen={setEveningReflectionDrawerOpen}
+          />
         </ErrorBoundary>
       </ParallaxCard>
 
@@ -623,7 +663,11 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
 
         <ParallaxCard offset={8}>
           <ErrorBoundary>
-            <EveningReflectionBanner />
+            <EveningReflectionBanner
+              shouldShowBanner={shouldShowEveningReflectionBanner}
+              isDrawerOpen={isEveningReflectionDrawerOpen}
+              setIsDrawerOpen={setEveningReflectionDrawerOpen}
+            />
           </ErrorBoundary>
         </ParallaxCard>
 

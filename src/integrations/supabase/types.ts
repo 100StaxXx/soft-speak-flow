@@ -5705,6 +5705,7 @@ export type Database = {
           created_at: string | null
           device_token: string
           id: string
+          installation_id: string | null
           platform: string
           updated_at: string | null
           user_agent: string | null
@@ -5714,6 +5715,7 @@ export type Database = {
           created_at?: string | null
           device_token: string
           id?: string
+          installation_id?: string | null
           platform: string
           updated_at?: string | null
           user_agent?: string | null
@@ -5723,6 +5725,7 @@ export type Database = {
           created_at?: string | null
           device_token?: string
           id?: string
+          installation_id?: string | null
           platform?: string
           updated_at?: string | null
           user_agent?: string | null

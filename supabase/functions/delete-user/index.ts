@@ -8,6 +8,9 @@ interface ErrorWithOptionalFields {
   code?: unknown;
   name?: unknown;
   status?: unknown;
+  details?: unknown;
+  hint?: unknown;
+  cause?: unknown;
 }
 
 interface StorageListEntry {
@@ -51,19 +54,27 @@ const LEGACY_USER_STORAGE_PREFIX_TARGETS = [
   { bucket: "quest-attachments", prefix: (userId: string) => userId },
   { bucket: "mentors-avatars", prefix: (userId: string) => userId },
   { bucket: "journey-paths", prefix: (userId: string) => userId },
-  { bucket: "evolution-cards", prefix: (userId: string) => `postcards/${userId}` },
+  {
+    bucket: "evolution-cards",
+    prefix: (userId: string) => `postcards/${userId}`,
+  },
 ] as const;
 const LEGACY_USER_STORAGE_FILTER_TARGETS = [
   {
     bucket: "journey-paths",
     prefix: "campaign-welcome",
-    matchesFileName: (fileName: string, userId: string) => fileName.startsWith(`welcome-${userId}-`),
+    matchesFileName: (fileName: string, userId: string) =>
+      fileName.startsWith(`welcome-${userId}-`),
   },
 ] as const;
 
-type AccountDeletionErrorCode =
-  (typeof ACCOUNT_DELETION_ERROR_CODES)[keyof typeof ACCOUNT_DELETION_ERROR_CODES];
-type AccountDeletionStage = "storage_cleanup" | "relational_cleanup" | "auth_delete";
+type AccountDeletionErrorCode = (typeof ACCOUNT_DELETION_ERROR_CODES)[
+  keyof typeof ACCOUNT_DELETION_ERROR_CODES
+];
+type AccountDeletionStage =
+  | "storage_cleanup"
+  | "relational_cleanup"
+  | "auth_delete";
 
 interface SanitizedDeleteUserError {
   code: AccountDeletionErrorCode;
@@ -98,7 +109,10 @@ type SupabaseAdminClient = ReturnType<typeof createClient<any>>;
 
 interface HandleDeleteUserDependencies {
   env?: Pick<typeof Deno.env, "get">;
-  createAdminClient?: (supabaseUrl: string, serviceRoleKey: string) => SupabaseAdminClient;
+  createAdminClient?: (
+    supabaseUrl: string,
+    serviceRoleKey: string,
+  ) => SupabaseAdminClient;
   sleep?: (ms: number) => Promise<void>;
 }
 
@@ -142,7 +156,10 @@ const createStageFailureError = (
     stage,
   });
 
-const createAdminClient = (supabaseUrl: string, serviceRoleKey: string): SupabaseAdminClient =>
+const createAdminClient = (
+  supabaseUrl: string,
+  serviceRoleKey: string,
+): SupabaseAdminClient =>
   createClient<any>(supabaseUrl, serviceRoleKey, {
     auth: {
       autoRefreshToken: false,
@@ -150,7 +167,8 @@ const createAdminClient = (supabaseUrl: string, serviceRoleKey: string): Supabas
     },
   });
 
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+const sleep = (ms: number) =>
+  new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 const asString = (value: unknown): string | undefined =>
   typeof value === "string" && value.trim().length > 0 ? value : undefined;
@@ -159,7 +177,9 @@ const asNumber = (value: unknown): number | undefined =>
   typeof value === "number" && Number.isFinite(value) ? value : undefined;
 
 const getErrorFieldRecord = (error: unknown): ErrorWithOptionalFields | null =>
-  error && typeof error === "object" ? (error as ErrorWithOptionalFields) : null;
+  error && typeof error === "object"
+    ? (error as ErrorWithOptionalFields)
+    : null;
 
 const getErrorMessage = (error: unknown): string | undefined => {
   if (error instanceof Error && error.message.trim().length > 0) {
@@ -188,6 +208,20 @@ const getErrorStatus = (error: unknown): number | undefined => {
   return asNumber(getErrorFieldRecord(error)?.status);
 };
 
+const getErrorDetails = (error: unknown): string | undefined =>
+  asString(getErrorFieldRecord(error)?.details);
+
+const getErrorHint = (error: unknown): string | undefined =>
+  asString(getErrorFieldRecord(error)?.hint);
+
+const getErrorCause = (error: unknown): unknown => {
+  if (error instanceof Error) {
+    return (error as Error & { cause?: unknown }).cause;
+  }
+
+  return getErrorFieldRecord(error)?.cause;
+};
+
 const normalizeErrorText = (value: string): string =>
   value
     .replace(/([a-z])([A-Z])/g, "$1 $2")
@@ -198,18 +232,71 @@ const normalizeErrorText = (value: string): string =>
 const getNormalizedErrorText = (error: unknown): string =>
   normalizeErrorText(
     [getErrorName(error), getErrorCode(error), getErrorMessage(error)]
-      .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+      .filter((value): value is string =>
+        typeof value === "string" && value.trim().length > 0
+      )
       .join(" "),
   );
 
-const describeError = (error: unknown): Record<string, unknown> => ({
+const describeSingleError = (error: unknown): Record<string, unknown> => ({
   name: getErrorName(error) ?? null,
   code: getErrorCode(error) ?? null,
   status: getErrorStatus(error) ?? null,
   message: getErrorMessage(error) ?? String(error),
+  details: getErrorDetails(error) ?? null,
+  hint: getErrorHint(error) ?? null,
 });
 
-const buildRequestHeaders = (corsHeaders: HeadersInit, requestId: string): HeadersInit => ({
+const getInnermostError = (error: unknown): unknown => {
+  const seen = new Set<unknown>();
+  let current = error;
+
+  while (current !== undefined && current !== null && !seen.has(current)) {
+    seen.add(current);
+    const cause = getErrorCause(current);
+    if (cause === undefined || cause === null || cause === current) {
+      return current;
+    }
+    current = cause;
+  }
+
+  return error;
+};
+
+const describeError = (error: unknown): Record<string, unknown> => {
+  const seen = new Set<unknown>();
+
+  const buildDescription = (
+    current: unknown,
+    depth: number,
+  ): Record<string, unknown> => {
+    const description = describeSingleError(current);
+    if (depth <= 0) {
+      return description;
+    }
+
+    const cause = getErrorCause(current);
+    if (
+      cause === undefined || cause === null || cause === current ||
+      seen.has(cause)
+    ) {
+      return description;
+    }
+
+    seen.add(cause);
+    return {
+      ...description,
+      cause: buildDescription(cause, depth - 1),
+    };
+  };
+
+  return buildDescription(error, 3);
+};
+
+const buildRequestHeaders = (
+  corsHeaders: HeadersInit,
+  requestId: string,
+): HeadersInit => ({
   ...corsHeaders,
   "Content-Type": "application/json",
   "X-Request-Id": requestId,
@@ -228,16 +315,20 @@ const isNotFoundStyleError = (error: unknown): boolean => {
   const status = getErrorStatus(error);
   const normalizedText = getNormalizedErrorText(error);
 
-  return status === 404 || normalizedText.includes("not found") || normalizedText.includes("no rows");
+  return status === 404 || normalizedText.includes("not found") ||
+    normalizedText.includes("no rows");
 };
 
 const isAlreadyDeletedAuthUserError = (error: unknown): boolean => {
   const normalizedText = getNormalizedErrorText(error);
 
-  return isNotFoundStyleError(error) || normalizedText.includes("user not found");
+  return isNotFoundStyleError(error) ||
+    normalizedText.includes("user not found");
 };
 
-export const isTransientDeleteUserInfrastructureError = (error: unknown): boolean => {
+export const isTransientDeleteUserInfrastructureError = (
+  error: unknown,
+): boolean => {
   const status = getErrorStatus(error);
   const normalizedText = getNormalizedErrorText(error);
 
@@ -246,11 +337,11 @@ export const isTransientDeleteUserInfrastructureError = (error: unknown): boolea
   }
 
   if (
-    normalizedText.includes("unauthorized")
-    || normalizedText.includes("invalid token")
-    || normalizedText.includes("jwt")
-    || normalizedText.includes("user not found")
-    || normalizedText.includes("no rows")
+    normalizedText.includes("unauthorized") ||
+    normalizedText.includes("invalid token") ||
+    normalizedText.includes("jwt") ||
+    normalizedText.includes("user not found") ||
+    normalizedText.includes("no rows")
   ) {
     return false;
   }
@@ -263,7 +354,9 @@ export const isTransientDeleteUserInfrastructureError = (error: unknown): boolea
     return true;
   }
 
-  return RETRYABLE_ERROR_PATTERNS.some((pattern) => normalizedText.includes(pattern));
+  return RETRYABLE_ERROR_PATTERNS.some((pattern) =>
+    normalizedText.includes(pattern)
+  );
 };
 
 function sanitizeError(error: unknown): SanitizedDeleteUserError {
@@ -282,11 +375,11 @@ function sanitizeError(error: unknown): SanitizedDeleteUserError {
   const normalizedMessage = getNormalizedErrorText(error);
 
   if (
-    status === 401
-    || status === 403
-    || normalizedMessage.includes("unauthorized")
-    || normalizedMessage.includes("invalid token")
-    || normalizedMessage.includes("jwt")
+    status === 401 ||
+    status === 403 ||
+    normalizedMessage.includes("unauthorized") ||
+    normalizedMessage.includes("invalid token") ||
+    normalizedMessage.includes("jwt")
   ) {
     return {
       message: "Unauthorized",
@@ -296,9 +389,9 @@ function sanitizeError(error: unknown): SanitizedDeleteUserError {
   }
 
   if (
-    status === 404
-    || normalizedMessage.includes("not found")
-    || normalizedMessage.includes("no rows")
+    status === 404 ||
+    normalizedMessage.includes("not found") ||
+    normalizedMessage.includes("no rows")
   ) {
     return {
       message: "User not found",
@@ -382,17 +475,20 @@ const listStorageDirectoryEntries = async (
 ): Promise<StorageListEntry[]> => {
   const entries: StorageListEntry[] = [];
 
-  for (let offset = 0; ; offset += STORAGE_LIST_PAGE_SIZE) {
+  for (let offset = 0;; offset += STORAGE_LIST_PAGE_SIZE) {
     let pageEntries: StorageListEntry[] = [];
 
     await runDeleteStepWithRetry(
       `storage list ${bucket}/${prefix || "."}`,
       async () => {
-        const { data, error } = await supabase.storage.from(bucket).list(prefix, {
-          limit: STORAGE_LIST_PAGE_SIZE,
-          offset,
-          sortBy: { column: "name", order: "asc" },
-        });
+        const { data, error } = await supabase.storage.from(bucket).list(
+          prefix,
+          {
+            limit: STORAGE_LIST_PAGE_SIZE,
+            offset,
+            sortBy: { column: "name", order: "asc" },
+          },
+        );
 
         if (error) {
           if (isNotFoundStyleError(error)) {
@@ -425,7 +521,12 @@ const collectStoragePathsUnderPrefix = async (
   prefix: string,
   waitForRetry: (ms: number) => Promise<void>,
 ): Promise<string[]> => {
-  const entries = await listStorageDirectoryEntries(supabase, bucket, prefix, waitForRetry);
+  const entries = await listStorageDirectoryEntries(
+    supabase,
+    bucket,
+    prefix,
+    waitForRetry,
+  );
   const filePaths: string[] = [];
   const folderPaths: string[] = [];
 
@@ -445,7 +546,14 @@ const collectStoragePathsUnderPrefix = async (
   }
 
   for (const folderPath of folderPaths) {
-    filePaths.push(...await collectStoragePathsUnderPrefix(supabase, bucket, folderPath, waitForRetry));
+    filePaths.push(
+      ...await collectStoragePathsUnderPrefix(
+        supabase,
+        bucket,
+        folderPath,
+        waitForRetry,
+      ),
+    );
   }
 
   return filePaths;
@@ -459,7 +567,12 @@ const collectStoragePathsByFileName = async (
   matchesFileName: (fileName: string, userId: string) => boolean,
   waitForRetry: (ms: number) => Promise<void>,
 ): Promise<string[]> => {
-  const entries = await listStorageDirectoryEntries(supabase, bucket, prefix, waitForRetry);
+  const entries = await listStorageDirectoryEntries(
+    supabase,
+    bucket,
+    prefix,
+    waitForRetry,
+  );
   const filePaths: string[] = [];
 
   for (const entry of entries) {
@@ -486,7 +599,11 @@ const removeStoragePaths = async (
 ): Promise<void> => {
   const uniquePaths = Array.from(new Set(paths));
 
-  for (let index = 0; index < uniquePaths.length; index += STORAGE_REMOVE_BATCH_SIZE) {
+  for (
+    let index = 0;
+    index < uniquePaths.length;
+    index += STORAGE_REMOVE_BATCH_SIZE
+  ) {
     const batch = uniquePaths.slice(index, index + STORAGE_REMOVE_BATCH_SIZE);
 
     await runDeleteStepWithRetry(
@@ -503,8 +620,9 @@ const removeStoragePaths = async (
   }
 };
 
-const getStorageObjectBucketId = (entry: StorageObjectOwnershipEntry): string | undefined =>
-  asString(entry?.bucket_id);
+const getStorageObjectBucketId = (
+  entry: StorageObjectOwnershipEntry,
+): string | undefined => asString(entry?.bucket_id);
 
 const listOwnedStorageObjectsForColumn = async (
   supabase: SupabaseAdminClient,
@@ -514,7 +632,7 @@ const listOwnedStorageObjectsForColumn = async (
 ): Promise<Array<{ bucket: string; path: string }>> => {
   const entries: Array<{ bucket: string; path: string }> = [];
 
-  for (let offset = 0; ; offset += STORAGE_LIST_PAGE_SIZE) {
+  for (let offset = 0;; offset += STORAGE_LIST_PAGE_SIZE) {
     let pageEntries: StorageObjectOwnershipEntry[] = [];
 
     await runDeleteStepWithRetry(
@@ -534,14 +652,17 @@ const listOwnedStorageObjectsForColumn = async (
           // uselessly retried — these require a config fix, not a retry.
           const errorText = getNormalizedErrorText(error);
           if (
-            getErrorStatus(error) === 403
-            || errorText.includes("permission denied")
-            || errorText.includes("rls")
-            || errorText.includes("policy")
+            getErrorStatus(error) === 403 ||
+            errorText.includes("permission denied") ||
+            errorText.includes("rls") ||
+            errorText.includes("policy")
           ) {
-            console.error(`[delete-user] storage ownership query (${ownershipColumn}) blocked by permissions`, {
-              ...describeError(error),
-            });
+            console.error(
+              `[delete-user] storage ownership query (${ownershipColumn}) blocked by permissions`,
+              {
+                ...describeError(error),
+              },
+            );
             throw createStageFailureError(
               "storage_cleanup",
               ACCOUNT_DELETION_ERROR_CODES.STORAGE_CLEANUP_FAILED,
@@ -552,7 +673,9 @@ const listOwnedStorageObjectsForColumn = async (
           throw error;
         }
 
-        pageEntries = Array.isArray(data) ? data as StorageObjectOwnershipEntry[] : [];
+        pageEntries = Array.isArray(data)
+          ? data as StorageObjectOwnershipEntry[]
+          : [];
       },
       ACCOUNT_DELETION_ERROR_CODES.BACKEND_UNAVAILABLE,
       waitForRetry,
@@ -585,7 +708,12 @@ const listOwnedStorageObjects = async (
   const dedupedEntries = new Map<string, { bucket: string; path: string }>();
 
   for (const ownershipColumn of ["owner", "owner_id"] as const) {
-    const entries = await listOwnedStorageObjectsForColumn(supabase, userId, ownershipColumn, waitForRetry);
+    const entries = await listOwnedStorageObjectsForColumn(
+      supabase,
+      userId,
+      ownershipColumn,
+      waitForRetry,
+    );
 
     for (const entry of entries) {
       dedupedEntries.set(`${entry.bucket}:${entry.path}`, entry);
@@ -680,7 +808,9 @@ const checkStorageDeadline = (startTime: number, phase: string): void => {
     throw createStageFailureError(
       "storage_cleanup",
       ACCOUNT_DELETION_ERROR_CODES.STORAGE_CLEANUP_FAILED,
-      { message: `Storage cleanup timed out during ${phase} after ${elapsed}ms` },
+      {
+        message: `Storage cleanup timed out during ${phase} after ${elapsed}ms`,
+      },
     );
   }
 };
@@ -691,19 +821,32 @@ const deleteUserStorageAssets = async (
   waitForRetry: (ms: number) => Promise<void>,
 ): Promise<void> => {
   const storageStartTime = Date.now();
-  const legacyStoragePathsByBucket = await collectLegacyUserStoragePaths(supabase, userId, waitForRetry);
+  const legacyStoragePathsByBucket = await collectLegacyUserStoragePaths(
+    supabase,
+    userId,
+    waitForRetry,
+  );
   checkStorageDeadline(storageStartTime, "legacy collection");
 
-  await removeStoragePathsByBucket(supabase, legacyStoragePathsByBucket, waitForRetry);
+  await removeStoragePathsByBucket(
+    supabase,
+    legacyStoragePathsByBucket,
+    waitForRetry,
+  );
   checkStorageDeadline(storageStartTime, "legacy removal");
 
   // Validate legacy storage was actually removed by re-collecting and checking
   if (legacyStoragePathsByBucket.size > 0) {
-    const remainingLegacyPaths = await collectLegacyUserStoragePaths(supabase, userId, waitForRetry);
-    const remainingLegacyCount = Array.from(remainingLegacyPaths.values()).reduce(
-      (sum, paths) => sum + paths.length,
-      0,
+    const remainingLegacyPaths = await collectLegacyUserStoragePaths(
+      supabase,
+      userId,
+      waitForRetry,
     );
+    const remainingLegacyCount = Array.from(remainingLegacyPaths.values())
+      .reduce(
+        (sum, paths) => sum + paths.length,
+        0,
+      );
 
     if (remainingLegacyCount > 0) {
       const remainingSummary: Record<string, number> = {};
@@ -727,10 +870,16 @@ const deleteUserStorageAssets = async (
 
   checkStorageDeadline(storageStartTime, "legacy validation");
 
-  const ownedStorageObjects = await listOwnedStorageObjects(supabase, userId, waitForRetry);
+  const ownedStorageObjects = await listOwnedStorageObjects(
+    supabase,
+    userId,
+    waitForRetry,
+  );
   checkStorageDeadline(storageStartTime, "ownership query");
 
-  const ownedStoragePathsByBucket = groupStoragePathsByBucket(ownedStorageObjects);
+  const ownedStoragePathsByBucket = groupStoragePathsByBucket(
+    ownedStorageObjects,
+  );
 
   if (ownedStorageObjects.length > 0) {
     console.log("[delete-user] removing owned storage objects", {
@@ -740,10 +889,18 @@ const deleteUserStorageAssets = async (
     });
   }
 
-  await removeStoragePathsByBucket(supabase, ownedStoragePathsByBucket, waitForRetry);
+  await removeStoragePathsByBucket(
+    supabase,
+    ownedStoragePathsByBucket,
+    waitForRetry,
+  );
   checkStorageDeadline(storageStartTime, "ownership removal");
 
-  const remainingOwnedObjects = await listOwnedStorageObjects(supabase, userId, waitForRetry);
+  const remainingOwnedObjects = await listOwnedStorageObjects(
+    supabase,
+    userId,
+    waitForRetry,
+  );
   if (remainingOwnedObjects.length > 0) {
     console.error("[delete-user] owned storage objects remain after cleanup", {
       userId,
@@ -781,7 +938,8 @@ export const handleDeleteUser = async (
 
   try {
     const env = dependencies.env ?? Deno.env;
-    const adminClientFactory = dependencies.createAdminClient ?? createAdminClient;
+    const adminClientFactory = dependencies.createAdminClient ??
+      createAdminClient;
     const waitForRetry = dependencies.sleep ?? sleep;
 
     const supabaseUrl = env.get("SUPABASE_URL") ?? "";
@@ -793,30 +951,49 @@ export const handleDeleteUser = async (
         hasSupabaseUrl: Boolean(supabaseUrl),
         hasServiceRoleKey: Boolean(serviceRoleKey),
       });
-      throw createTemporaryUnavailableError(ACCOUNT_DELETION_ERROR_CODES.CONFIG_ERROR);
+      throw createTemporaryUnavailableError(
+        ACCOUNT_DELETION_ERROR_CODES.CONFIG_ERROR,
+      );
     }
 
     const supabase = adminClientFactory(supabaseUrl, serviceRoleKey);
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
-      return createErrorResponse(corsHeaders, requestId, sanitizeError(createUnauthorizedError()));
+      return createErrorResponse(
+        corsHeaders,
+        requestId,
+        sanitizeError(createUnauthorizedError()),
+      );
     }
 
     const token = authHeader.replace("Bearer", "").trim();
     if (!token) {
-      return createErrorResponse(corsHeaders, requestId, sanitizeError(createUnauthorizedError()));
+      return createErrorResponse(
+        corsHeaders,
+        requestId,
+        sanitizeError(createUnauthorizedError()),
+      );
     }
 
-    const { data: userResult, error: userError } = await supabase.auth.getUser(token);
+    const { data: userResult, error: userError } = await supabase.auth.getUser(
+      token,
+    );
     if (userError) {
-      console.error("[delete-user] auth.getUser failed", { requestId, ...describeError(userError) });
+      console.error("[delete-user] auth.getUser failed", {
+        requestId,
+        ...describeError(userError),
+      });
       throw createUnauthorizedError(userError);
     }
 
     const user = userResult?.user;
     if (!user) {
-      return createErrorResponse(corsHeaders, requestId, sanitizeError(createUnauthorizedError()));
+      return createErrorResponse(
+        corsHeaders,
+        requestId,
+        sanitizeError(createUnauthorizedError()),
+      );
     }
 
     try {
@@ -828,14 +1005,20 @@ export const handleDeleteUser = async (
         stage: "storage_cleanup",
         ...describeError(error),
       });
-      throw createStageFailureError("storage_cleanup", ACCOUNT_DELETION_ERROR_CODES.STORAGE_CLEANUP_FAILED, error);
+      throw createStageFailureError(
+        "storage_cleanup",
+        ACCOUNT_DELETION_ERROR_CODES.STORAGE_CLEANUP_FAILED,
+        error,
+      );
     }
 
     try {
       await runDeleteStepWithRetry(
         "delete_user_account rpc",
         async () => {
-          const { error } = await supabase.rpc("delete_user_account", { p_user_id: user.id });
+          const { error } = await supabase.rpc("delete_user_account", {
+            p_user_id: user.id,
+          });
           if (error) {
             throw error;
           }
@@ -844,10 +1027,12 @@ export const handleDeleteUser = async (
         waitForRetry,
       );
     } catch (error) {
+      const rpcError = getInnermostError(error);
       console.error("[delete-user] relational cleanup failed", {
         requestId,
         userId: user.id,
         stage: "relational_cleanup",
+        rpcError: describeSingleError(rpcError),
         ...describeError(error),
       });
       throw createStageFailureError(
@@ -862,7 +1047,9 @@ export const handleDeleteUser = async (
     // Rather than throwing (which tells the client nothing was deleted), we treat
     // auth deletion failure as a degraded success with a warning so the client can
     // navigate the user away and the orphaned auth record can be cleaned up later.
-    const warnings: Array<{ code: string; message: string; details?: unknown }> = [];
+    const warnings: Array<
+      { code: string; message: string; details?: unknown }
+    > = [];
 
     try {
       await runDeleteStepWithRetry(
@@ -877,23 +1064,30 @@ export const handleDeleteUser = async (
         waitForRetry,
       );
     } catch (error) {
-      console.error("[delete-user] auth deletion failed after profile removal — returning degraded success", {
-        requestId,
-        userId: user.id,
-        stage: "auth_delete",
-        ...describeError(error),
-      });
+      console.error(
+        "[delete-user] auth deletion failed after profile removal — returning degraded success",
+        {
+          requestId,
+          userId: user.id,
+          stage: "auth_delete",
+          ...describeError(error),
+        },
+      );
       warnings.push({
         code: "AUTH_DELETE_DEFERRED",
-        message: "Your data was deleted but sign-in record removal was delayed. It will be cleaned up automatically.",
+        message:
+          "Your data was deleted but sign-in record removal was delayed. It will be cleaned up automatically.",
         details: describeError(error),
       });
     }
 
-    return new Response(JSON.stringify({ success: true, requestId, warnings }), {
-      status: 200,
-      headers: buildRequestHeaders(corsHeaders, requestId),
-    });
+    return new Response(
+      JSON.stringify({ success: true, requestId, warnings }),
+      {
+        status: 200,
+        headers: buildRequestHeaders(corsHeaders, requestId),
+      },
+    );
   } catch (error) {
     console.error("[delete-user] request failed", {
       requestId,

@@ -9,6 +9,7 @@ import {
   COMPANION_PICKER_PRESETS,
   COMPANION_STORY_TONES,
   getCompanionElementAnchorColor,
+  getCompanionEggLabel,
   type CompanionElementId,
   type CompanionPresetId,
   type CompanionStoryTone,
@@ -85,6 +86,10 @@ export const CompanionPersonalization = ({
   const selectedToneMeta = useMemo(
     () => COMPANION_STORY_TONES.find((tone) => tone.value === selectedTone) ?? COMPANION_STORY_TONES[0],
     [selectedTone],
+  );
+  const selectedEggLabel = useMemo(
+    () => getCompanionEggLabel(selectedElement),
+    [selectedElement],
   );
 
   if (isLoading) {
@@ -171,7 +176,7 @@ export const CompanionPersonalization = ({
                       <div className="relative h-[220px] bg-gradient-to-br from-slate-950/80 via-slate-900/80 to-slate-950/95">
                         <CompanionImage
                           src={getEggPreviewUrl(element.id)}
-                          alt={`${element.label} Egg`}
+                          alt={getCompanionEggLabel(element.id)}
                           fit="contain"
                           className="h-full w-full p-4"
                           loading="lazy"
@@ -180,7 +185,7 @@ export const CompanionPersonalization = ({
                           <div className="flex items-center justify-between gap-3">
                             <div>
                               <div className="text-lg font-heading font-bold text-white">
-                                {element.label} Egg
+                                {getCompanionEggLabel(element.id)}
                               </div>
                               <div className="text-xs uppercase tracking-[0.2em] text-white/55">
                                 Stage 0 • Egg
@@ -331,12 +336,12 @@ export const CompanionPersonalization = ({
                     <div className="mx-auto h-44 w-44">
                       <CompanionImage
                         src={getEggPreviewUrl(selectedElement)}
-                        alt={`${selectedElementMeta.label} Egg`}
+                        alt={selectedEggLabel}
                         fit="contain"
                         className="h-full w-full"
                       />
                     </div>
-                    <div className="text-sm font-medium text-foreground">{selectedElementMeta.label} Egg</div>
+                    <div className="text-sm font-medium text-foreground">{selectedEggLabel}</div>
                     <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Creature form revealed at first hatch</div>
                     <p className="text-sm text-foreground/85">{selectedElementMeta.summary}</p>
                     <p className="text-xs text-muted-foreground">
@@ -458,7 +463,7 @@ export const CompanionPersonalization = ({
             <div className="space-y-1">
               <p className="text-sm font-semibold text-foreground">
                 {isEggSelectionMode
-                  ? `${selectedElementMeta.label} Egg • ${selectedToneMeta.label}`
+                  ? `${selectedEggLabel} • ${selectedToneMeta.label}`
                   : `${selectedPreset.displayName} • ${selectedElementMeta.label} • ${selectedToneMeta.label}`}
               </p>
               <p className="text-xs text-muted-foreground">
