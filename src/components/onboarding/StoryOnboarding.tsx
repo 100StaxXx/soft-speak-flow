@@ -481,7 +481,9 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
         return;
       }
 
-      const assignment = resolveAssignedMentorFromActiveMentors(questionAnswers, mentorPool);
+      const energyPref = getEnergyPreferenceFromAnswers(questionAnswers);
+      const { candidates: genderFilteredPool } = filterMentorsByEnergyPreference(mentorPool, energyPref);
+      const assignment = resolveAssignedMentorFromActiveMentors(questionAnswers, genderFilteredPool);
       const bestMatch = assignment.mentor;
 
       if (bestMatch) {
