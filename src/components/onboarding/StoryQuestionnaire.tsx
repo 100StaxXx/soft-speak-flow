@@ -57,9 +57,9 @@ const questions: StoryQuestion[] = [
     narrative: "",
     question: "Would you prefer your guide to be a man or a woman?",
     options: [
-      { optionId: "man", text: "Man", tags: ["masculine_preference"] },
-      { optionId: "woman", text: "Woman", tags: ["feminine_preference"] },
-      { optionId: "no_preference", text: "No preference", tags: [] },
+      { optionId: "masculine_presence", text: "Man", tags: ["masculine_preference"] },
+      { optionId: "feminine_presence", text: "Woman", tags: ["feminine_preference"] },
+      { optionId: "either_works", text: "No preference", tags: [] },
     ],
   },
   {
