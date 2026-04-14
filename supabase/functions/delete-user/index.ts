@@ -49,7 +49,7 @@ const RETRYABLE_ERROR_PATTERNS = [
 ];
 const STORAGE_LIST_PAGE_SIZE = 100;
 const STORAGE_REMOVE_BATCH_SIZE = 500;
-const STORAGE_CLEANUP_DEADLINE_MS = 8_000; // Leave headroom before edge function timeout
+const STORAGE_CLEANUP_DEADLINE_MS = 14_000; // Leave headroom before edge function timeout
 const LEGACY_USER_STORAGE_PREFIX_TARGETS = [
   { bucket: "quest-attachments", prefix: (userId: string) => userId },
   { bucket: "mentors-avatars", prefix: (userId: string) => userId },
@@ -890,11 +890,37 @@ const checkStorageDeadline = (startTime: number, phase: string): void => {
   }
 };
 
-const deleteUserStorageAssets = async (
+const deleteOwnedStorageObjectsDirectly = async (
   supabase: SupabaseAdminClient,
   userId: string,
   waitForRetry: (ms: number) => Promise<void>,
 ): Promise<void> => {
+  for (const ownershipColumn of ["owner", "owner_id"] as const) {
+    await runDeleteStepWithRetry(
+      `storage.objects direct delete (${ownershipColumn})`,
+      async () => {
+        const { error } = await supabase
+          .schema("storage")
+          .from("objects")
+          .delete()
+          .eq(ownershipColumn, userId);
+
+        if (error) {
+          throw error;
+        }
+      },
+      ACCOUNT_DELETION_ERROR_CODES.BACKEND_UNAVAILABLE,
+      waitForRetry,
+    );
+  }
+};
+
+const deleteUserStorageAssets = async (
+  supabase: SupabaseAdminClient,
+  userId: string,
+  waitForRetry: (ms: number) => Promise<void>,
+): Promise<string[]> => {
+  const storageWarnings: string[] = [];
   const storageStartTime = Date.now();
   const registeredStorageAssets = await listRegisteredStorageAssets(
     supabase,
@@ -971,17 +997,14 @@ const deleteUserStorageAssets = async (
       for (const [bucket, paths] of remainingLegacyPaths.entries()) {
         remainingSummary[bucket] = paths.length;
       }
-      console.error("[delete-user] legacy storage paths remain after cleanup", {
+      // Demoted from fatal error to warning — the ownership sweep that follows
+      // will catch any stragglers, and orphaned files should not block deletion.
+      console.warn("[delete-user] legacy storage paths remain after cleanup — continuing", {
         userId,
         buckets: remainingSummary,
       });
-      throw createStageFailureError(
-        "storage_cleanup",
-        ACCOUNT_DELETION_ERROR_CODES.STORAGE_CLEANUP_FAILED,
-        {
-          message: "Legacy storage paths remain after cleanup",
-          remainingBuckets: remainingSummary,
-        },
+      storageWarnings.push(
+        `Legacy storage paths remain after cleanup: ${JSON.stringify(remainingSummary)}`,
       );
     }
   }
@@ -1026,26 +1049,48 @@ const deleteUserStorageAssets = async (
   );
   checkStorageDeadline(storageStartTime, "ownership removal");
 
-  const remainingOwnedObjects = await listOwnedStorageObjects(
+  let remainingOwnedObjects = await listOwnedStorageObjects(
     supabase,
     userId,
     waitForRetry,
   );
   if (remainingOwnedObjects.length > 0) {
-    console.error("[delete-user] owned storage objects remain after cleanup", {
+    console.warn("[delete-user] owned storage objects remain after Storage API remove — attempting direct delete", {
       userId,
       buckets: summarizeOwnedStorageObjects(remainingOwnedObjects),
       samplePaths: remainingOwnedObjects.slice(0, 10),
     });
-    throw createStageFailureError(
-      "storage_cleanup",
-      ACCOUNT_DELETION_ERROR_CODES.STORAGE_CLEANUP_FAILED,
-      {
-        message: "Owned storage objects remain after cleanup",
-        remainingBuckets: summarizeOwnedStorageObjects(remainingOwnedObjects),
-      },
-    );
+
+    try {
+      await deleteOwnedStorageObjectsDirectly(supabase, userId, waitForRetry);
+      checkStorageDeadline(storageStartTime, "direct delete");
+
+      remainingOwnedObjects = await listOwnedStorageObjects(
+        supabase,
+        userId,
+        waitForRetry,
+      );
+    } catch (directDeleteError) {
+      console.warn("[delete-user] direct storage.objects delete failed — continuing", {
+        userId,
+        ...describeError(directDeleteError),
+      });
+    }
+
+    if (remainingOwnedObjects.length > 0) {
+      const remainingSummary = summarizeOwnedStorageObjects(remainingOwnedObjects);
+      console.warn("[delete-user] owned storage objects still remain after fallback — continuing", {
+        userId,
+        buckets: remainingSummary,
+        samplePaths: remainingOwnedObjects.slice(0, 10),
+      });
+      storageWarnings.push(
+        `Owned storage objects remain after cleanup: ${JSON.stringify(remainingSummary)}`,
+      );
+    }
   }
+
+  return storageWarnings;
 };
 
 export const handleDeleteUser = async (
@@ -1126,8 +1171,9 @@ export const handleDeleteUser = async (
       );
     }
 
+    let storageWarnings: string[] = [];
     try {
-      await deleteUserStorageAssets(supabase, user.id, waitForRetry);
+      storageWarnings = await deleteUserStorageAssets(supabase, user.id, waitForRetry);
     } catch (error) {
       console.error("[delete-user] storage cleanup failed", {
         requestId,
@@ -1180,6 +1226,13 @@ export const handleDeleteUser = async (
     const warnings: Array<
       { code: string; message: string; details?: unknown }
     > = [];
+
+    for (const storageWarning of storageWarnings) {
+      warnings.push({
+        code: "STORAGE_CLEANUP_INCOMPLETE",
+        message: storageWarning,
+      });
+    }
 
     try {
       await runDeleteStepWithRetry(

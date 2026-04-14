@@ -160,6 +160,8 @@ const createHandleDeleteUserHarness = ({
   ownedStorageObjects = [],
   registeredStorageAssets = [],
   persistOwnedStorageObjectsAfterRemove = false,
+  persistOwnedStorageObjectsAfterDirectDelete = false,
+  directDeleteError = null as unknown | null,
 }: {
   rpcResults?: RpcResult[];
   authDeleteResults?: AuthDeleteResult[];
@@ -172,10 +174,13 @@ const createHandleDeleteUserHarness = ({
   ownedStorageObjects?: OwnedStorageObject[];
   registeredStorageAssets?: RegisteredStorageAsset[];
   persistOwnedStorageObjectsAfterRemove?: boolean;
+  persistOwnedStorageObjectsAfterDirectDelete?: boolean;
+  directDeleteError?: unknown | null;
 } = {}) => {
   let rpcCallCount = 0;
   let authDeleteCallCount = 0;
   let removeCallCount = 0;
+  let directDeleteCallCount = 0;
   const listCallCountByKey = new Map<string, number>();
   const sleepCalls: number[] = [];
   const operations: string[] = [];
@@ -220,12 +225,41 @@ const createHandleDeleteUserHarness = ({
     );
   };
 
+  const createStorageObjectsDeleteBuilder = () => {
+    let deleteOwnershipColumn: "owner" | "owner_id" | null = null;
+
+    const deleteBuilder = {
+      eq: async (column: "owner" | "owner_id", value: string) => {
+        deleteOwnershipColumn = column;
+        operations.push(
+          `storage.objects.delete:${column}:${value}`,
+        );
+        directDeleteCallCount++;
+
+        if (directDeleteError) {
+          return { error: directDeleteError };
+        }
+
+        if (!persistOwnedStorageObjectsAfterDirectDelete) {
+          remainingOwnedStorageObjects = remainingOwnedStorageObjects.filter(
+            (entry) => entry[column] !== value,
+          );
+        }
+
+        return { error: null };
+      },
+    };
+
+    return deleteBuilder;
+  };
+
   const createStorageObjectsQueryBuilder = () => {
     let ownershipColumn: "owner" | "owner_id" | null = null;
     let ownershipValue: string | null = null;
 
     const builder = {
       select: (_columns: string) => builder,
+      delete: () => createStorageObjectsDeleteBuilder(),
       eq: (column: "owner" | "owner_id", value: string) => {
         ownershipColumn = column;
         ownershipValue = value;
@@ -382,6 +416,7 @@ const createHandleDeleteUserHarness = ({
     getRpcCallCount: () => rpcCallCount,
     getAuthDeleteCallCount: () => authDeleteCallCount,
     getRemoveCallCount: () => removeCallCount,
+    getDirectDeleteCallCount: () => directDeleteCallCount,
     sleepCalls,
     operations,
     removeCalls,
@@ -659,7 +694,7 @@ Deno.test("delete-user retries transient storage removal failures and succeeds",
   );
 });
 
-Deno.test("delete-user returns a storage_cleanup stage failure when owned objects remain after cleanup", async () => {
+Deno.test("delete-user succeeds with warning when owned objects remain after all cleanup attempts", async () => {
   const harness = createHandleDeleteUserHarness({
     ownedStorageObjects: [
       {
@@ -669,6 +704,7 @@ Deno.test("delete-user returns a storage_cleanup stage failure when owned object
       },
     ],
     persistOwnedStorageObjectsAfterRemove: true,
+    persistOwnedStorageObjectsAfterDirectDelete: true,
   });
 
   const response = await module.handleDeleteUser(
@@ -679,29 +715,86 @@ Deno.test("delete-user returns a storage_cleanup stage failure when owned object
 
   assertEquals(
     response.status,
-    500,
-    "Expected lingering owned objects to fail account deletion",
+    200,
+    "Expected account deletion to succeed even with lingering storage objects",
   );
-  assertEquals(body.success, false, "Expected failure response body");
-  assertEquals(
-    body.code,
-    "ACCOUNT_DELETION_STORAGE_CLEANUP_FAILED",
-    "Expected storage cleanup error code",
-  );
-  assertEquals(body.stage, "storage_cleanup", "Expected storage cleanup stage");
+  assertEquals(body.success, true, "Expected success response body");
   assert(
     typeof body.requestId === "string" && body.requestId.length > 0,
-    "Expected a requestId on failure",
+    "Expected a requestId on success",
+  );
+  assert(
+    Array.isArray(body.warnings) && body.warnings.length > 0,
+    "Expected storage cleanup warnings in response",
+  );
+  assert(
+    body.warnings.some((w: { code: string }) => w.code === "STORAGE_CLEANUP_INCOMPLETE"),
+    "Expected STORAGE_CLEANUP_INCOMPLETE warning code",
   );
   assertEquals(
     harness.getRpcCallCount(),
-    0,
-    "Expected rpc deletion not to run when storage cleanup fails",
+    1,
+    "Expected rpc deletion to still run after non-fatal storage cleanup",
   );
   assertEquals(
     harness.getAuthDeleteCallCount(),
+    1,
+    "Expected auth deletion to still run after non-fatal storage cleanup",
+  );
+  assert(
+    harness.getDirectDeleteCallCount() > 0,
+    "Expected direct delete fallback to be attempted",
+  );
+});
+
+Deno.test("delete-user uses direct delete fallback when Storage API remove leaves owned objects", async () => {
+  const harness = createHandleDeleteUserHarness({
+    ownedStorageObjects: [
+      {
+        bucket: "quest-attachments",
+        path: "user-1/stuck-upload.png",
+        owner: USER_ID,
+      },
+      {
+        bucket: "companion-images",
+        path: "user-1/dormant/companion.png",
+        owner_id: USER_ID,
+      },
+    ],
+    persistOwnedStorageObjectsAfterRemove: true,
+    // Direct delete succeeds (default: persistOwnedStorageObjectsAfterDirectDelete = false)
+  });
+
+  const response = await module.handleDeleteUser(
+    createRequest(),
+    harness.dependencies,
+  );
+  const body = await response.json();
+
+  assertEquals(
+    response.status,
+    200,
+    "Expected delete-user to succeed via direct delete fallback",
+  );
+  assertEquals(body.success, true, "Expected success response body");
+  assert(
+    harness.getDirectDeleteCallCount() > 0,
+    "Expected direct delete fallback to be attempted",
+  );
+  assertEquals(
+    harness.getRemainingOwnedStorageObjects().length,
     0,
-    "Expected auth deletion not to run when storage cleanup fails",
+    "Expected direct delete to clear remaining owned objects",
+  );
+  assertEquals(
+    harness.getRpcCallCount(),
+    1,
+    "Expected rpc deletion to run after successful direct delete fallback",
+  );
+  // No storage warnings expected since direct delete cleaned up
+  assert(
+    !body.warnings || body.warnings.every((w: { code: string }) => w.code !== "STORAGE_CLEANUP_INCOMPLETE"),
+    "Expected no storage cleanup warnings when direct delete succeeds",
   );
 });
 
