@@ -5,13 +5,6 @@ const capacitorMocks = vi.hoisted(() => ({
   getPlatform: vi.fn(),
 }));
 
-const revenueCatMocks = vi.hoisted(() => ({
-  initializeRevenueCat: vi.fn(),
-  isRevenueCatAvailable: vi.fn(),
-  purchasePackage: vi.fn(),
-  restoreRevenueCatPurchases: vi.fn(),
-}));
-
 vi.mock("@capacitor/core", () => ({
   Capacitor: {
     isNativePlatform: capacitorMocks.isNativePlatform,
@@ -19,62 +12,42 @@ vi.mock("@capacitor/core", () => ({
   },
 }));
 
-vi.mock("@/services/revenueCat", () => ({
-  COSMIQ_PRO_ENTITLEMENT: "Cosmiq Pro",
-  PREMIUM_YEARLY_PRODUCT_ID: "cosmiq_premium_yearly",
-  REFERRAL_YEARLY_PRODUCT_ID: "cosmiq_referral_yearly",
-  getCosmiqProEntitlement: vi.fn(),
-  getCurrentOfferingPackages: vi.fn((offerings) => offerings?.current?.availablePackages ?? []),
-  getPackageForPlan: vi.fn((plan, offerings) =>
-    offerings?.current?.availablePackages?.find((pkg: { identifier: string; product: { identifier: string } }) =>
-      pkg.identifier === plan || pkg.product.identifier === plan,
-    ),
-  ),
-  getRevenueCatErrorMessage: vi.fn((error) => error instanceof Error ? error.message : String(error)),
-  initializeRevenueCat: revenueCatMocks.initializeRevenueCat,
-  isRevenueCatAvailable: revenueCatMocks.isRevenueCatAvailable,
-  isRevenueCatCancellationError: vi.fn(() => false),
-  purchasePackage: revenueCatMocks.purchasePackage,
-  resolveActivePlan: vi.fn(),
-  resolvePlanFromProductIdentifier: vi.fn((value: string | null | undefined) => {
-    const normalized = (value ?? "").toLowerCase();
-    if (normalized.includes("lifetime")) return "lifetime";
-    if (normalized.includes("year")) return "yearly";
-    if (normalized.includes("month")) return "monthly";
-    return null;
-  }),
-  restorePurchases: revenueCatMocks.restoreRevenueCatPurchases,
+vi.mock("@/utils/platformTargets", () => ({
+  isNativeIOSHandheld: () => capacitorMocks.getPlatform() === "ios",
 }));
 
-import { getPurchaseProductIdForPlan, isIAPAvailable, purchaseProduct, restorePurchases } from "@/utils/appleIAP";
+import {
+  isIAPAvailable,
+  resolvePlanFromProductId,
+  storeKitProductToIAP,
+  getProductForPlan,
+  getPurchaseProductIdForPlan,
+  PREMIUM_MONTHLY_PRODUCT_ID,
+  PREMIUM_YEARLY_PRODUCT_ID,
+} from "@/utils/appleIAP";
+import type { StoreKitProduct } from "@/plugins/StoreKitPlugin";
 
-const baseOfferings = {
-  current: {
-    availablePackages: [
-      {
-        identifier: "monthly",
-        product: {
-          identifier: "monthly",
-          title: "Monthly",
-          description: "Monthly plan",
-          price: 9.99,
-          priceString: "$9.99",
-          currencyCode: "USD",
-        },
-      },
-    ],
+const mockProducts: StoreKitProduct[] = [
+  {
+    identifier: "cosmiq_premium_monthly",
+    displayName: "Monthly",
+    description: "Monthly plan",
+    price: 9.99,
+    displayPrice: "$9.99",
   },
-};
+  {
+    identifier: "cosmiq_premium_yearly",
+    displayName: "Yearly",
+    description: "Yearly plan",
+    price: 99.99,
+    displayPrice: "$99.99",
+  },
+];
 
-describe("appleIAP RevenueCat bridge", () => {
+describe("appleIAP StoreKit 2 utilities", () => {
   beforeEach(() => {
     capacitorMocks.isNativePlatform.mockReset();
     capacitorMocks.getPlatform.mockReset();
-    revenueCatMocks.initializeRevenueCat.mockReset();
-    revenueCatMocks.isRevenueCatAvailable.mockReset();
-    revenueCatMocks.purchasePackage.mockReset();
-    revenueCatMocks.restoreRevenueCatPurchases.mockReset();
-    revenueCatMocks.isRevenueCatAvailable.mockReturnValue(true);
     capacitorMocks.isNativePlatform.mockReturnValue(true);
     capacitorMocks.getPlatform.mockReturnValue("ios");
   });
@@ -83,64 +56,92 @@ describe("appleIAP RevenueCat bridge", () => {
     vi.clearAllMocks();
   });
 
-  it("returns RevenueCat availability", () => {
-    revenueCatMocks.isRevenueCatAvailable.mockReturnValue(false);
-    expect(isIAPAvailable()).toBe(false);
-  });
-
-  it("purchases through the matching RevenueCat package", async () => {
-    revenueCatMocks.purchasePackage.mockResolvedValue({
-      productIdentifier: "monthly",
-      customerInfo: { requestDate: "2026-04-13T00:00:00.000Z" },
+  describe("isIAPAvailable", () => {
+    it("returns true on native iOS", () => {
+      expect(isIAPAvailable()).toBe(true);
     });
 
-    await purchaseProduct("monthly", baseOfferings as never);
-
-    expect(revenueCatMocks.initializeRevenueCat).toHaveBeenCalled();
-    expect(revenueCatMocks.purchasePackage).toHaveBeenCalledWith(baseOfferings.current.availablePackages[0]);
-  });
-
-  it("prefers the separate referral yearly sku for referred users", () => {
-    const products = [
-      {
-        identifier: "cosmiq_premium_yearly",
-        title: "Yearly",
-        description: "Standard yearly plan",
-        price: 99.99,
-        priceString: "$99.99",
-        currencyCode: "USD",
-        packageIdentifier: "annual",
-        plan: "yearly",
-        packageTarget: "yearly",
-        hasReferralDiscount: false,
-      },
-      {
-        identifier: "cosmiq_referral_yearly",
-        title: "Referral Yearly",
-        description: "Referral yearly plan",
-        price: 69.99,
-        priceString: "$69.99",
-        currencyCode: "USD",
-        packageIdentifier: "referral_annual",
-        plan: "yearly",
-        packageTarget: "referral_yearly",
-        hasReferralDiscount: true,
-      },
-    ];
-
-    expect(getPurchaseProductIdForPlan("yearly", products as never, { preferReferral: true })).toBe("cosmiq_referral_yearly");
-    expect(getPurchaseProductIdForPlan("yearly", products as never, { preferReferral: false })).toBe("cosmiq_premium_yearly");
-  });
-
-  it("restores purchases through RevenueCat", async () => {
-    revenueCatMocks.restoreRevenueCatPurchases.mockResolvedValue({
-      allPurchasedProductIdentifiers: ["monthly"],
-      requestDate: "2026-04-13T00:00:00.000Z",
+    it("returns false on web", () => {
+      capacitorMocks.isNativePlatform.mockReturnValue(false);
+      capacitorMocks.getPlatform.mockReturnValue("web");
+      expect(isIAPAvailable()).toBe(false);
     });
 
-    const purchases = await restorePurchases();
+    it("returns false on native Android", () => {
+      capacitorMocks.getPlatform.mockReturnValue("android");
+      expect(isIAPAvailable()).toBe(false);
+    });
+  });
 
-    expect(revenueCatMocks.restoreRevenueCatPurchases).toHaveBeenCalled();
-    expect(purchases[0]?.productId).toBe("monthly");
+  describe("resolvePlanFromProductId", () => {
+    it("resolves yearly from product ID", () => {
+      expect(resolvePlanFromProductId("cosmiq_premium_yearly")).toBe("yearly");
+    });
+
+    it("resolves monthly from product ID", () => {
+      expect(resolvePlanFromProductId("cosmiq_premium_monthly")).toBe("monthly");
+    });
+
+    it("returns null for null/undefined", () => {
+      expect(resolvePlanFromProductId(null)).toBeNull();
+      expect(resolvePlanFromProductId(undefined)).toBeNull();
+    });
+
+    it("returns null for unrecognized product ID", () => {
+      expect(resolvePlanFromProductId("unknown_product")).toBeNull();
+    });
+  });
+
+  describe("storeKitProductToIAP", () => {
+    it("converts a StoreKit product to IAPProduct", () => {
+      const result = storeKitProductToIAP(mockProducts[0]);
+      expect(result).toEqual({
+        identifier: "cosmiq_premium_monthly",
+        displayName: "Monthly",
+        description: "Monthly plan",
+        price: 9.99,
+        displayPrice: "$9.99",
+        plan: "monthly",
+      });
+    });
+
+    it("returns null for unrecognized product", () => {
+      const result = storeKitProductToIAP({
+        identifier: "unknown",
+        displayName: "Unknown",
+        description: "",
+        price: 0,
+        displayPrice: "$0.00",
+      });
+      expect(result).toBeNull();
+    });
+  });
+
+  describe("getProductForPlan", () => {
+    it("finds the monthly product", () => {
+      const product = getProductForPlan("monthly", mockProducts);
+      expect(product?.identifier).toBe("cosmiq_premium_monthly");
+    });
+
+    it("finds the yearly product", () => {
+      const product = getProductForPlan("yearly", mockProducts);
+      expect(product?.identifier).toBe("cosmiq_premium_yearly");
+    });
+
+    it("returns undefined when no match", () => {
+      expect(getProductForPlan("monthly", [])).toBeUndefined();
+    });
+  });
+
+  describe("getPurchaseProductIdForPlan", () => {
+    it("returns product identifier from loaded products", () => {
+      expect(getPurchaseProductIdForPlan("monthly", mockProducts)).toBe("cosmiq_premium_monthly");
+      expect(getPurchaseProductIdForPlan("yearly", mockProducts)).toBe("cosmiq_premium_yearly");
+    });
+
+    it("falls back to constant when products are empty", () => {
+      expect(getPurchaseProductIdForPlan("monthly", [])).toBe(PREMIUM_MONTHLY_PRODUCT_ID);
+      expect(getPurchaseProductIdForPlan("yearly", [])).toBe(PREMIUM_YEARLY_PRODUCT_ID);
+    });
   });
 });

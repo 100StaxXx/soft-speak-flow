@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { queryKeys } from "@/lib/queryKeys";
 import { useAuth } from "./useAuth";
-import { useRevenueCat } from "./useRevenueCat";
+import { useStoreKit } from "./useStoreKit";
 
 export type AccessSource = "subscription" | "promo_code" | "trial" | "manual" | "none";
 
@@ -26,7 +26,7 @@ const DEFAULT_ACCESS_STATE: AccessState = {
 
 export function useAccessState() {
   const { user, loading: authLoading } = useAuth();
-  const { activeEntitlement, activePlan, isConfigured, isPro } = useRevenueCat();
+  const { isPro, activePlan, currentEntitlement, isLoading: storeKitLoading } = useStoreKit();
 
   const query = useQuery({
     queryKey: user ? queryKeys.access.detail(user.id) : queryKeys.access.all,
@@ -51,32 +51,26 @@ export function useAccessState() {
     () => {
       const baseState = query.data ?? DEFAULT_ACCESS_STATE;
 
-      if (!isConfigured || !activeEntitlement?.isActive || !isPro) {
+      if (!isPro || !currentEntitlement) {
         return baseState;
       }
-
-      const status =
-        activeEntitlement.billingIssueDetectedAt ? "past_due" :
-        activeEntitlement.unsubscribeDetectedAt ? "cancelled" :
-        activeEntitlement.periodType === "TRIAL" || activeEntitlement.periodType === "INTRO" ? "trialing" :
-        "active";
 
       return {
         ...baseState,
         has_access: true,
         access_source: "subscription" as const,
         subscribed: true,
-        status,
+        status: "active",
         plan: activePlan ?? baseState.plan,
-        subscription_end: activeEntitlement.expirationDate,
+        subscription_end: currentEntitlement.expirationDate,
       };
     },
-    [activeEntitlement, activePlan, isConfigured, isPro, query.data],
+    [activePlan, currentEntitlement, isPro, query.data],
   );
 
   return {
     accessState,
-    isLoading: authLoading || (!!user && query.isLoading),
+    isLoading: authLoading || storeKitLoading || (!!user && query.isLoading),
     error: query.error,
     refetch: query.refetch,
   };

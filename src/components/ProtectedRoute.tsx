@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useAccessStatus } from "@/hooks/useAccessStatus";
 import { Progress } from "@/components/ui/progress";
-import { TrialExpiredPaywall } from "@/components/TrialExpiredPaywall";
+import { Paywall } from "@/components/Paywall";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -72,7 +72,7 @@ export const ProtectedRoute = ({
 
   // Show hard paywall if no access.
   if (requireAccess && !hasAccess) {
-    return <TrialExpiredPaywall variant={gateReason === "trial_expired" ? "trial_expired" : "pre_trial_signup"} />;
+    return <Paywall variant={gateReason === "trial_expired" ? "trial_expired" : "pre_trial_signup"} />;
   }
 
   return <>{children}</>;

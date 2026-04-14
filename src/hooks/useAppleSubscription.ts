@@ -1,11 +1,27 @@
-import { useCallback, useMemo, useState } from "react";
-import { getProductsFromOfferings, isIAPAvailable, type IAPProduct } from "@/utils/appleIAP";
+import { useCallback, useState } from "react";
+import { Capacitor } from "@capacitor/core";
+import { isNativeIOSHandheld } from "@/utils/platformTargets";
 import { useToast } from "./use-toast";
 import { useAuth } from "./useAuth";
 import { useProfile } from "./useProfile";
-import { useRevenueCat } from "./useRevenueCat";
-import { getRevenueCatErrorMessage, isRevenueCatCancellationError } from "@/services/revenueCat";
+import { useStoreKit } from "./useStoreKit";
 import { trackPaywallEvent } from "@/utils/paywallTelemetry";
+
+function isIAPAvailable(): boolean {
+  return Capacitor.isNativePlatform() && isNativeIOSHandheld();
+}
+
+function isCancellationError(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  const message = (error as { message?: string }).message ?? "";
+  return message.includes("cancel") || message.includes("Cancel");
+}
+
+function getErrorMessage(error: unknown): string {
+  if (typeof error === "string" && error) return error;
+  if (error instanceof Error && error.message) return error.message;
+  return "Something went wrong with subscriptions. Please try again.";
+}
 
 export function useAppleSubscription() {
   const { toast } = useToast();
@@ -13,30 +29,31 @@ export function useAppleSubscription() {
   const { profile } = useProfile();
   const {
     isAvailable,
-    offerings,
-    offeringsLoading,
-    purchasePlan,
+    products,
+    productsLoading,
+    purchase,
+    purchaseWithPromoOffer,
     restorePurchases,
-    presentCustomerCenter,
-  } = useRevenueCat();
+    manageSubscriptions,
+    refreshProducts,
+  } = useStoreKit();
   const [loading, setLoading] = useState(false);
-  const [productError, setProductError] = useState<string | null>(null);
   const [manageLoading, setManageLoading] = useState(false);
-  const hasReferralPricing = Boolean(profile?.referred_by_code);
+  const [productError, setProductError] = useState<string | null>(null);
+  const hasOfferCode = Boolean(profile?.referred_by_code);
 
-  const products = useMemo<IAPProduct[]>(() => getProductsFromOfferings(offerings), [offerings]);
-  const hasLoadedProducts = Boolean(offerings);
-  const productsLoading = offeringsLoading;
+  const hasLoadedProducts = products.length > 0;
 
   const reloadProducts = useCallback(async () => {
     setProductError(null);
+    await refreshProducts();
     if (!products.length && isAvailable) {
-      setProductError("No RevenueCat packages are available in the current offering.");
+      setProductError("No products are available. Please try again later.");
     }
     return products;
-  }, [isAvailable, products]);
+  }, [isAvailable, products, refreshProducts]);
 
-  const handlePurchase = useCallback(async (productId: string, surface: "trial_gate" | "premium" = "premium") => {
+  const handlePurchase = useCallback(async (productId: string, surface: string = "paywall") => {
     if (!isIAPAvailable()) {
       toast({
         title: "Not Available",
@@ -64,7 +81,7 @@ export function useAppleSubscription() {
       return false;
     }
 
-    const selectedProduct = products.find((product) => product.identifier === productId);
+    const selectedProduct = products.find((p) => p.identifier === productId);
     if (!selectedProduct) {
       toast({
         title: "Unavailable",
@@ -74,61 +91,43 @@ export function useAppleSubscription() {
       return false;
     }
 
+    const plan = productId.includes("yearly") ? "yearly" : "monthly";
+
     setLoading(true);
     setProductError(null);
     try {
       trackPaywallEvent("purchase_started", {
         surface,
-        plan: selectedProduct.plan,
-        packageTarget: selectedProduct.packageTarget,
-        productId: selectedProduct.identifier,
-        hasReferralPricing,
+        plan,
+        productId,
+        hasOfferCode,
       });
-      const customerInfo = await purchasePlan(selectedProduct.packageTarget);
-      if (!customerInfo) {
-        trackPaywallEvent("purchase_cancelled", {
-          surface,
-          plan: selectedProduct.plan,
-          packageTarget: selectedProduct.packageTarget,
-          productId: selectedProduct.identifier,
-          hasReferralPricing,
-        });
+
+      // Use promotional offer for yearly if user has an offer code
+      const usePromoOffer = hasOfferCode && productId.includes("yearly");
+      const result = usePromoOffer
+        ? await purchaseWithPromoOffer(productId)
+        : await purchase(productId);
+
+      if (!result) {
+        trackPaywallEvent("purchase_cancelled", { surface, plan, productId, hasOfferCode });
         return false;
       }
 
-      trackPaywallEvent("purchase_completed", {
-        surface,
-        plan: selectedProduct.plan,
-        packageTarget: selectedProduct.packageTarget,
-        productId: selectedProduct.identifier,
-        hasReferralPricing,
-      });
+      trackPaywallEvent("purchase_completed", { surface, plan, productId, hasOfferCode });
       toast({
         title: "Premium unlocked",
         description: "Cosmiq Pro is now active on your account.",
       });
       return true;
     } catch (error) {
-      if (isRevenueCatCancellationError(error)) {
-        trackPaywallEvent("purchase_cancelled", {
-          surface,
-          plan: selectedProduct.plan,
-          packageTarget: selectedProduct.packageTarget,
-          productId: selectedProduct.identifier,
-          hasReferralPricing,
-        });
+      if (isCancellationError(error)) {
+        trackPaywallEvent("purchase_cancelled", { surface, plan, productId, hasOfferCode });
         return false;
       }
 
-      const message = getRevenueCatErrorMessage(error);
-      trackPaywallEvent("purchase_failed", {
-        surface,
-        plan: selectedProduct.plan,
-        packageTarget: selectedProduct.packageTarget,
-        productId: selectedProduct.identifier,
-        hasReferralPricing,
-        message,
-      });
+      const message = getErrorMessage(error);
+      trackPaywallEvent("purchase_failed", { surface, plan, productId, hasOfferCode, message });
       setProductError(message);
       toast({
         title: "Purchase failed",
@@ -139,9 +138,9 @@ export function useAppleSubscription() {
     } finally {
       setLoading(false);
     }
-  }, [hasReferralPricing, products, purchasePlan, toast, user?.id]);
+  }, [hasOfferCode, products, purchase, purchaseWithPromoOffer, toast, user?.id]);
 
-  const handleRestore = useCallback(async (surface: "trial_gate" | "premium" = "premium") => {
+  const handleRestore = useCallback(async (surface: string = "paywall") => {
     if (!isIAPAvailable()) {
       toast({
         title: "Not Available",
@@ -154,22 +153,18 @@ export function useAppleSubscription() {
     setLoading(true);
     try {
       trackPaywallEvent("restore_started", { surface });
-      const customerInfo = await restorePurchases();
-      if (!customerInfo) {
-        return false;
-      }
+      const entitlement = await restorePurchases();
 
-      trackPaywallEvent("restore_completed", {
-        surface,
-        activeProductIdentifiers: customerInfo.allPurchasedProductIdentifiers,
-      });
+      trackPaywallEvent("restore_completed", { surface });
       toast({
         title: "Purchases restored",
-        description: "Your App Store purchases have been restored successfully.",
+        description: entitlement
+          ? "Your App Store purchases have been restored successfully."
+          : "No active subscriptions found.",
       });
-      return true;
+      return Boolean(entitlement);
     } catch (error) {
-      const message = getRevenueCatErrorMessage(error);
+      const message = getErrorMessage(error);
       trackPaywallEvent("restore_failed", { surface, message });
       toast({
         title: "Restore failed",
@@ -194,17 +189,17 @@ export function useAppleSubscription() {
 
     setManageLoading(true);
     try {
-      await presentCustomerCenter();
+      await manageSubscriptions();
     } catch (error) {
       toast({
-        title: "Unable to open Customer Center",
-        description: getRevenueCatErrorMessage(error),
+        title: "Unable to open subscription management",
+        description: getErrorMessage(error),
         variant: "destructive",
       });
     } finally {
       setManageLoading(false);
     }
-  }, [presentCustomerCenter, toast]);
+  }, [manageSubscriptions, toast]);
 
   return {
     handlePurchase,
@@ -218,6 +213,6 @@ export function useAppleSubscription() {
     productError,
     hasLoadedProducts,
     reloadProducts,
-    hasReferralPricing,
+    hasOfferCode,
   };
 }

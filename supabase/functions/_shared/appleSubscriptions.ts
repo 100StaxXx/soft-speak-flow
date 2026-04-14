@@ -376,8 +376,8 @@ export async function upsertSubscription(
     billing_customer_id: originalTransactionId,
     billing_subscription_id: originalTransactionId,
     metadata: {
-      billing_provider: "revenuecat",
-      billing_source_of_truth: "revenuecat_customer_info",
+      billing_provider: "storekit2",
+      billing_source_of_truth: "storekit2_transaction",
       purchase_amount_cents: amountCents,
       product_id: payload.productId,
       original_transaction_id: originalTransactionId,
@@ -398,8 +398,8 @@ export async function upsertSubscription(
       created_at: payload.purchaseDate.toISOString(),
       updated_at: now,
       metadata: {
-        billing_provider: "revenuecat",
-        billing_source_of_truth: "revenuecat_customer_info",
+        billing_provider: "storekit2",
+        billing_source_of_truth: "storekit2_transaction",
         purchase_amount_cents: amountCents,
         product_id: payload.productId,
         original_transaction_id: originalTransactionId,

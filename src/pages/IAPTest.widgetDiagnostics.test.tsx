@@ -10,7 +10,6 @@ const mocks = vi.hoisted(() => ({
   handlePurchaseMock: vi.fn(),
   handleRestoreMock: vi.fn(),
   handleManageSubscriptionsMock: vi.fn(),
-  purchaseProductMock: vi.fn(),
   toastMock: vi.fn(),
 }));
 
@@ -35,10 +34,21 @@ vi.mock("@/hooks/useAppleSubscription", () => ({
   }),
 }));
 
-vi.mock("@/hooks/useRevenueCat", () => ({
-  useRevenueCat: () => ({
-    customerInfo: null,
-    refreshCustomerInfo: vi.fn().mockResolvedValue(null),
+vi.mock("@/hooks/useStoreKit", () => ({
+  useStoreKit: () => ({
+    currentEntitlement: null,
+    refreshEntitlement: vi.fn().mockResolvedValue(undefined),
+    purchaseWithPromoOffer: vi.fn().mockResolvedValue(null),
+    isAvailable: true,
+    products: [],
+    productsLoading: false,
+    isPro: false,
+    activePlan: null,
+    expirationDate: null,
+    purchase: vi.fn().mockResolvedValue(null),
+    restorePurchases: vi.fn().mockResolvedValue(null),
+    manageSubscriptions: vi.fn().mockResolvedValue(undefined),
+    refreshProducts: vi.fn().mockResolvedValue(undefined),
   }),
 }));
 
@@ -58,10 +68,12 @@ vi.mock("@/hooks/use-toast", () => ({
 }));
 
 vi.mock("@/utils/appleIAP", () => ({
-  IAP_PRODUCTS: {
-    monthly: "com.darrylgraham.revolution.monthly",
-  },
-  purchaseProduct: mocks.purchaseProductMock,
+  PREMIUM_MONTHLY_PRODUCT_ID: "cosmiq_premium_monthly",
+  PREMIUM_YEARLY_PRODUCT_ID: "cosmiq_premium_yearly",
+  isIAPAvailable: () => true,
+  resolvePlanFromProductId: () => "monthly",
+  getProductForPlan: () => undefined,
+  getPurchaseProductIdForPlan: () => "cosmiq_premium_monthly",
 }));
 
 vi.mock("@/plugins/WidgetDataPlugin", () => ({
@@ -82,7 +94,6 @@ describe("IAPTest widget diagnostics", () => {
     mocks.handlePurchaseMock.mockResolvedValue(true);
     mocks.handleRestoreMock.mockResolvedValue(undefined);
     mocks.handleManageSubscriptionsMock.mockResolvedValue(undefined);
-    mocks.purchaseProductMock.mockResolvedValue({ success: true });
     if (!HTMLElement.prototype.scrollIntoView) {
       Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
         configurable: true,

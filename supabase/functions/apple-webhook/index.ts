@@ -400,8 +400,8 @@ async function handleRenewalStatusChange(
     is_active: expiresDate > new Date(),
     ends_at: expiresDate.toISOString(),
     metadata: {
-      billing_provider: "revenuecat",
-      billing_source_of_truth: "revenuecat_customer_info",
+      billing_provider: "storekit2",
+      billing_source_of_truth: "storekit2_transaction",
       webhook_event: "renewal_status_change",
     },
   });
@@ -429,8 +429,8 @@ async function handlePlanChange(
     plan: newPlan,
     ends_at: expiresDate.toISOString(),
     metadata: {
-      billing_provider: "revenuecat",
-      billing_source_of_truth: "revenuecat_customer_info",
+      billing_provider: "storekit2",
+      billing_source_of_truth: "storekit2_transaction",
       webhook_event: "plan_change",
     },
   });
@@ -458,8 +458,8 @@ async function handleBillingIssue(
     is_active: expiresDate > new Date(),
     ends_at: expiresDate.toISOString(),
     metadata: {
-      billing_provider: "revenuecat",
-      billing_source_of_truth: "revenuecat_customer_info",
+      billing_provider: "storekit2",
+      billing_source_of_truth: "storekit2_transaction",
       webhook_event: "billing_issue",
     },
   });
@@ -492,8 +492,8 @@ async function handleCancellation(
     is_active: isStillActive,
     ends_at: expiresDate.toISOString(),
     metadata: {
-      billing_provider: "revenuecat",
-      billing_source_of_truth: "revenuecat_customer_info",
+      billing_provider: "storekit2",
+      billing_source_of_truth: "storekit2_transaction",
       webhook_event: "cancellation",
       cancelled_at: cancellationDate.toISOString(),
     },
@@ -521,8 +521,8 @@ async function handleRefund(
     is_active: false,
     ends_at: new Date().toISOString(),
     metadata: {
-      billing_provider: "revenuecat",
-      billing_source_of_truth: "revenuecat_customer_info",
+      billing_provider: "storekit2",
+      billing_source_of_truth: "storekit2_transaction",
       webhook_event: "refund",
       refunded_transaction_id: transactionId,
     },

@@ -1,12 +1,11 @@
 import { useMemo, useState, memo } from "react";
-import { useNavigate } from "react-router-dom";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useAppleSubscription } from "@/hooks/useAppleSubscription";
+import { getProductForPlan, getPurchaseProductIdForPlan, type IAPPlan } from "@/utils/appleIAP";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Crown, Loader2, RefreshCw, Settings, TicketPercent } from "lucide-react";
-import { getProductForPlan, getPurchaseProductIdForPlan, type IAPPlan } from "@/utils/appleIAP";
+import { Crown, Loader2, RefreshCw, Settings } from "lucide-react";
 
 type PlanOption = {
   id: IAPPlan;
@@ -39,7 +38,6 @@ const PLAN_OPTIONS: PlanOption[] = [
 ];
 
 export const SubscriptionManagement = memo(function SubscriptionManagement() {
-  const navigate = useNavigate();
   const { subscription, isLoading, isActive, nextBillingDate, planPrice, plan, isCancelled } = useSubscription();
   const {
     handlePurchase,
@@ -52,17 +50,15 @@ export const SubscriptionManagement = memo(function SubscriptionManagement() {
     productsLoading,
     productError,
     reloadProducts,
-    hasReferralPricing,
   } = useAppleSubscription();
 
   const [selectedPlan, setSelectedPlan] = useState<IAPPlan>("yearly");
-  const selectedPlanOption = PLAN_OPTIONS.find((option) => option.id === selectedPlan);
-  const selectedProduct = getProductForPlan(selectedPlan, products, { preferReferral: hasReferralPricing });
-  const selectedProductId = getPurchaseProductIdForPlan(selectedPlan, products, { preferReferral: hasReferralPricing });
+  const selectedProduct = getProductForPlan(selectedPlan, products);
+  const selectedProductId = getPurchaseProductIdForPlan(selectedPlan, products);
 
   const subscriptionStatusText = subscription
     ? `You have Cosmiq Pro (${plan ? plan.charAt(0).toUpperCase() + plan.slice(1) : "Active"})`
-    : "You’re on the free plan";
+    : "You're on the free plan";
 
   const statusLabel = subscription
     ? subscription.status === "cancelled"
@@ -82,12 +78,10 @@ export const SubscriptionManagement = memo(function SubscriptionManagement() {
 
   const priceByPlan = useMemo(() => {
     return PLAN_OPTIONS.reduce<Record<string, string>>((acc, option) => {
-      const fallbackPrice =
-        option.id === "yearly" && hasReferralPricing ? "$69.99" : option.fallbackPrice;
-      acc[option.id] = getProductForPlan(option.id, products, { preferReferral: hasReferralPricing })?.priceString ?? fallbackPrice;
+      acc[option.id] = getProductForPlan(option.id, products)?.displayPrice ?? option.fallbackPrice;
       return acc;
     }, {});
-  }, [hasReferralPricing, products]);
+  }, [products]);
 
   if (isLoading) {
     return (
@@ -113,16 +107,10 @@ export const SubscriptionManagement = memo(function SubscriptionManagement() {
             {subscriptionStatusText}
           </div>
 
-          {hasReferralPricing && (
-            <div className="rounded-lg border border-accent/30 bg-accent/5 px-3 py-2 text-sm text-foreground">
-              Referral pricing is active on your account. Annual access is discounted to $69.99/year.
-            </div>
-          )}
-
           {productsLoading && (
             <div className="flex items-center gap-2 rounded-lg border border-dashed border-muted-foreground/30 px-3 py-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Loading RevenueCat offering...
+              Loading products...
             </div>
           )}
 
@@ -145,7 +133,6 @@ export const SubscriptionManagement = memo(function SubscriptionManagement() {
           <div className="grid gap-4 md:grid-cols-2">
             {PLAN_OPTIONS.map((planOption) => {
               const isSelected = selectedPlan === planOption.id;
-              const Icon = planOption.id === "yearly" && hasReferralPricing ? TicketPercent : Crown;
 
               return (
                 <button
@@ -159,7 +146,7 @@ export const SubscriptionManagement = memo(function SubscriptionManagement() {
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <Icon className="h-4 w-4 text-primary" />
+                      <Crown className="h-4 w-4 text-primary" />
                       <p className="text-sm uppercase tracking-wide text-muted-foreground">{planOption.label}</p>
                     </div>
                     {planOption.badge && <Badge variant="secondary" className="text-xs">{planOption.badge}</Badge>}
@@ -179,7 +166,7 @@ export const SubscriptionManagement = memo(function SubscriptionManagement() {
 
           <Button
             onClick={() => { void handlePurchase(selectedProductId); }}
-            disabled={!isAvailable || !selectedPlanOption || purchasing || productsLoading || !selectedProduct}
+            disabled={!isAvailable || purchasing || productsLoading || !selectedProduct}
             className="w-full"
           >
             {purchasing ? (
@@ -188,18 +175,15 @@ export const SubscriptionManagement = memo(function SubscriptionManagement() {
                 Processing...
               </>
             ) : (
-              `Unlock with ${selectedPlanOption?.label ?? "Plan"}`
+              `Unlock with ${PLAN_OPTIONS.find((o) => o.id === selectedPlan)?.label ?? "Plan"}`
             )}
           </Button>
 
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-            <Button variant="outline" className="w-full sm:flex-1" onClick={() => navigate("/premium")}>
-              View premium details
-            </Button>
             <Button variant="outline" className="w-full sm:flex-1" disabled={manageLoading} onClick={handleManageSubscriptions}>
-              {manageLoading ? "Opening..." : "Customer Center"}
+              {manageLoading ? "Opening..." : "Manage Subscription"}
             </Button>
-            <Button variant="ghost" className="w-full sm:flex-1" disabled={purchasing} onClick={handleRestore}>
+            <Button variant="ghost" className="w-full sm:flex-1" disabled={purchasing} onClick={() => { void handleRestore(); }}>
               {purchasing ? "Restoring..." : "Restore purchases"}
             </Button>
           </div>
@@ -248,9 +232,9 @@ export const SubscriptionManagement = memo(function SubscriptionManagement() {
       <CardFooter className="flex flex-col gap-2">
         <Button onClick={handleManageSubscriptions} variant="outline" className="w-full" disabled={manageLoading}>
           <Settings className="mr-2 h-4 w-4" />
-          {manageLoading ? "Opening Customer Center..." : "Manage in Customer Center"}
+          {manageLoading ? "Opening..." : "Manage Subscription"}
         </Button>
-        <Button onClick={handleRestore} disabled={purchasing} variant="ghost" className="w-full">
+        <Button onClick={() => { void handleRestore(); }} disabled={purchasing} variant="ghost" className="w-full">
           {purchasing ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />

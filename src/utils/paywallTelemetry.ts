@@ -1,13 +1,9 @@
 import { logger } from "@/utils/logger";
 
-type PaywallSurface = "trial_gate" | "premium";
-
 type PaywallEventName =
   | "paywall_viewed"
-  | "referral_apply_started"
-  | "referral_apply_succeeded"
-  | "referral_apply_failed"
-  | "continue_to_subscription"
+  | "offer_code_applied"
+  | "offer_code_failed"
   | "package_selected"
   | "purchase_started"
   | "purchase_completed"
@@ -17,9 +13,7 @@ type PaywallEventName =
   | "restore_completed"
   | "restore_failed";
 
-type PaywallTelemetryPayload = Record<string, unknown> & {
-  surface: PaywallSurface;
-};
+type PaywallTelemetryPayload = Record<string, unknown>;
 
 export function trackPaywallEvent(
   eventName: PaywallEventName,
