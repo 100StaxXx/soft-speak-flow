@@ -23,6 +23,7 @@
 		NC1000001000000000000002 /* Plugins/NativeCalendar/NativeCalendarPlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = NC2000001000000000000002 /* Plugins/NativeCalendar/NativeCalendarPlugin.m */; };
 		WD1000001000000000000001 /* Plugins/WidgetData/WidgetDataPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = WD2000001000000000000001 /* Plugins/WidgetData/WidgetDataPlugin.swift */; };
 		WD1000001000000000000002 /* Plugins/WidgetData/WidgetDataPlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = WD2000001000000000000002 /* Plugins/WidgetData/WidgetDataPlugin.m */; };
+		SK1000001000000000000001 /* Plugins/StoreKit/StoreKitPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = SK2000001000000000000001 /* Plugins/StoreKit/StoreKitPlugin.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -74,6 +75,7 @@
 		NC2000001000000000000002 /* Plugins/NativeCalendar/NativeCalendarPlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Plugins/NativeCalendar/NativeCalendarPlugin.m; sourceTree = "<group>"; };
 		WD2000001000000000000001 /* Plugins/WidgetData/WidgetDataPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Plugins/WidgetData/WidgetDataPlugin.swift; sourceTree = "<group>"; };
 		WD2000001000000000000002 /* Plugins/WidgetData/WidgetDataPlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Plugins/WidgetData/WidgetDataPlugin.m; sourceTree = "<group>"; };
+		SK2000001000000000000001 /* Plugins/StoreKit/StoreKitPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Plugins/StoreKit/StoreKitPlugin.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -134,6 +136,7 @@
 				NC2000001000000000000002 /* Plugins/NativeCalendar/NativeCalendarPlugin.m */,
 				WD2000001000000000000001 /* Plugins/WidgetData/WidgetDataPlugin.swift */,
 				WD2000001000000000000002 /* Plugins/WidgetData/WidgetDataPlugin.m */,
+				SK2000001000000000000001 /* Plugins/StoreKit/StoreKitPlugin.swift */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
 				504EC30E1FED79650016851F /* Assets.xcassets */,
 				504EC3101FED79650016851F /* LaunchScreen.storyboard */,
@@ -389,6 +392,7 @@
 				NC1000001000000000000002 /* Plugins/NativeCalendar/NativeCalendarPlugin.m in Sources */,
 				WD1000001000000000000001 /* Plugins/WidgetData/WidgetDataPlugin.swift in Sources */,
 				WD1000001000000000000002 /* Plugins/WidgetData/WidgetDataPlugin.m in Sources */,
+				SK1000001000000000000001 /* Plugins/StoreKit/StoreKitPlugin.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
