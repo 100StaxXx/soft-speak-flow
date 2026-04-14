@@ -47,15 +47,7 @@ import { ResilienceStatusBanner } from "@/components/resilience/ResilienceStatus
 import { MentorConnectionProvider, useMentorConnection } from "@/contexts/MentorConnectionContext";
 import { WallpaperManifestProvider } from "@/contexts/WallpaperManifestContext";
 import { GlobalWidgetSyncBridge } from "@/components/GlobalWidgetSyncBridge";
-import { queryKeys } from "@/lib/queryKeys";
-import { toast } from "@/components/ui/sonner";
-import { RevenueCatProvider } from "@/providers/RevenueCatProvider";
-import {
-  clearPendingReferralCode,
-  getReferralCodeFromSearch,
-  readPendingReferralCode,
-  storePendingReferralCode,
-} from "@/utils/referralAttribution";
+import { StoreKitProvider } from "@/providers/StoreKitProvider";
 import { EVENING_REFLECTION_CANONICAL_PATH } from "@/utils/eveningReflectionNavigation";
 
 // Lazy load pages for code splitting
@@ -67,7 +59,6 @@ const Onboarding = lazy(() => import("./pages/Onboarding"));
 const Welcome = lazy(() => import("./pages/Welcome"));
 
 const Profile = lazy(() => import("./pages/Profile"));
-const Premium = lazy(() => import("./pages/Premium"));
 const PepTalkDetail = lazy(() => import("./pages/PepTalkDetail"));
 const PromoCodeRedeem = lazy(() => import("./pages/PromoCodeRedeem"));
 const Admin = lazy(() => import("./pages/Admin"));
@@ -209,7 +200,6 @@ const AppContent = memo(() => {
   const [splashHidden, setSplashHidden] = useState(false);
   const [recoveryChecked, setRecoveryChecked] = useState(false);
   const previousPushUserIdRef = useRef<string | null>(null);
-  const autoAppliedReferralKeyRef = useRef<string | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
   
@@ -250,76 +240,6 @@ const AppContent = memo(() => {
     return () => window.removeEventListener('deep-link-navigation', handler as EventListener);
   }, [navigate]);
 
-  useEffect(() => {
-    const referralCode = getReferralCodeFromSearch(location.search);
-    if (!referralCode) return;
-
-    const existingCode = readPendingReferralCode();
-    if (existingCode === referralCode) return;
-
-    storePendingReferralCode(referralCode);
-  }, [location.search]);
-
-  useEffect(() => {
-    const userId = session?.user?.id ?? null;
-    if (!userId || profileLoading || !profile) return;
-
-    const pendingReferralCode = readPendingReferralCode();
-    if (!pendingReferralCode) return;
-
-    if (profile.referred_by_code) {
-      clearPendingReferralCode();
-      return;
-    }
-
-    if (profile.referral_code?.toUpperCase() === pendingReferralCode) {
-      clearPendingReferralCode();
-      return;
-    }
-
-    const attemptKey = `${userId}:${pendingReferralCode}`;
-    if (autoAppliedReferralKeyRef.current === attemptKey) return;
-    autoAppliedReferralKeyRef.current = attemptKey;
-
-    void (async () => {
-      try {
-        const { data, error } = await (supabase.rpc as any)(
-          "apply_referral_code_secure",
-          { p_referral_code: pendingReferralCode },
-        ) as {
-          data: Array<{ success: boolean; message: string }> | { success: boolean; message: string } | null;
-          error: Error | null;
-        };
-
-        if (error) {
-          throw error;
-        }
-
-        const result = Array.isArray(data) ? data[0] : data;
-        if (!result?.success) {
-          const message = result?.message ?? "Unable to apply referral code";
-          const terminalMessage = message.toLowerCase();
-          if (
-            terminalMessage.includes("already used") ||
-            terminalMessage.includes("invalid referral code") ||
-            terminalMessage.includes("cannot use your own")
-          ) {
-            clearPendingReferralCode();
-          }
-          return;
-        }
-
-        clearPendingReferralCode();
-        await Promise.all([
-          queryClient.invalidateQueries({ queryKey: queryKeys.profile.detail(userId) }),
-          queryClient.invalidateQueries({ queryKey: queryKeys.referrals.stats(userId) }),
-        ]);
-        toast.success("Referral code applied automatically.");
-      } catch (error) {
-        console.error("Failed to auto-apply pending referral code:", error);
-      }
-    })();
-  }, [profile, profileLoading, queryClient, session?.user?.id]);
   
   const pushUserId = session?.user?.id ?? null;
 
@@ -424,7 +344,7 @@ const AppContent = memo(() => {
                   
                   <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
                   <Route path="/promo-code" element={<ProtectedRoute requireAccess={false}><PromoCodeRedeem /></ProtectedRoute>} />
-                  <Route path="/premium" element={<ProtectedRoute><Premium /></ProtectedRoute>} />
+                  <Route path="/premium" element={<Navigate to="/" replace />} />
                   <Route path="/premium/success" element={<ProtectedRoute><PremiumSuccess /></ProtectedRoute>} />
                   <Route path="/pep-talk/:id" element={<ProtectedRoute><PepTalkDetail /></ProtectedRoute>} />
                   <Route path="/mentor-selection" element={<ProtectedRoute><MentorSelection /></ProtectedRoute>} />
@@ -490,7 +410,7 @@ const App = () => {
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <RevenueCatProvider>
+          <StoreKitProvider>
             <TimeProvider>
               <EvolutionProvider>
                 <CelebrationProvider>
@@ -509,7 +429,7 @@ const App = () => {
                 </CelebrationProvider>
               </EvolutionProvider>
             </TimeProvider>
-          </RevenueCatProvider>
+          </StoreKitProvider>
         </AuthProvider>
       </QueryClientProvider>
     </ErrorBoundary>

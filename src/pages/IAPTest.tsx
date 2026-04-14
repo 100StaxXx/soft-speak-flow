@@ -7,9 +7,9 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ArrowLeft, RefreshCw, Smartphone, Check, X, Copy, Trash2, RotateCcw, Settings, Loader2, TestTube, Database } from "lucide-react";
 import { useAppleSubscription } from "@/hooks/useAppleSubscription";
-import { useRevenueCat } from "@/hooks/useRevenueCat";
+import { useStoreKit } from "@/hooks/useStoreKit";
 import { useToast } from "@/hooks/use-toast";
-import { IAP_PRODUCTS, purchaseProduct } from "@/utils/appleIAP";
+import { PREMIUM_MONTHLY_PRODUCT_ID, PREMIUM_YEARLY_PRODUCT_ID } from "@/utils/appleIAP";
 import {
   WidgetData,
   type WidgetSyncDiagnostics,
@@ -33,6 +33,11 @@ interface WidgetSyncErrorSnapshot {
   source: string;
 }
 
+const HARDCODED_PRODUCTS: Record<string, string> = {
+  monthly: PREMIUM_MONTHLY_PRODUCT_ID,
+  yearly: PREMIUM_YEARLY_PRODUCT_ID,
+};
+
 const StatusBadge = memo(({ value, label }: { value: boolean | string; label: string }) => {
   const isBoolean = typeof value === 'boolean';
   return (
@@ -54,10 +59,10 @@ StatusBadge.displayName = 'StatusBadge';
 const IAPTest = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { customerInfo, refreshCustomerInfo } = useRevenueCat();
+  const { currentEntitlement, refreshEntitlement, purchaseWithPromoOffer } = useStoreKit();
   const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [verificationResult, setVerificationResult] = useState<any>(null);
-  const [isVerifying, setIsVerifying] = useState(false);
+  const [entitlementResult, setEntitlementResult] = useState<any>(null);
+  const [isRefreshingEntitlement, setIsRefreshingEntitlement] = useState(false);
   const [purchasingProductId, setPurchasingProductId] = useState<string | null>(null);
   const [lastPurchaseResult, setLastPurchaseResult] = useState<{
     productId: string;
@@ -72,6 +77,7 @@ const IAPTest = () => {
   const [isFetchingWidgetDiagnostics, setIsFetchingWidgetDiagnostics] = useState(false);
   const [isRunningWidgetProbe, setIsRunningWidgetProbe] = useState(false);
   const [isReloadingWidget, setIsReloadingWidget] = useState(false);
+  const [promoOfferLoading, setPromoOfferLoading] = useState(false);
   const logsEndRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -93,32 +99,12 @@ const IAPTest = () => {
       const result = await reloadProducts();
       addLog(`[FETCH] Returned ${result.length} products`, result.length ? 'success' : 'info');
       result.forEach((p, i) => {
-        addLog(`[FETCH] Product ${i}: id="${p.identifier}" title="${p.title}" price="${p.priceString}"`, 'info');
+        addLog(`[FETCH] Product ${i}: id="${p.identifier}" name="${p.displayName}" price="${p.displayPrice}"`, 'info');
       });
     } catch (error) {
       addLog(`[FETCH] Failed: ${error instanceof Error ? error.message : String(error)}`, 'error');
     }
   }, [reloadProducts]);
-
-  // Direct purchase - bypasses hook validation for debugging
-  const handleDirectPurchase = async (productId: string) => {
-    setPurchasingProductId(productId);
-    const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false });
-    
-    addLog(`[DIRECT] Attempting direct purchase (bypassing hook): ${productId}`, 'info');
-    
-    try {
-      const result = await purchaseProduct(productId);
-      addLog(`[DIRECT] Result: ${JSON.stringify(result)}`, 'success');
-      setLastPurchaseResult({ productId, success: true, message: `Direct purchase result: ${JSON.stringify(result)}`, timestamp });
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error);
-      addLog(`[DIRECT] Error: ${errorMsg}`, 'error');
-      setLastPurchaseResult({ productId, success: false, message: errorMsg, timestamp });
-    } finally {
-      setPurchasingProductId(null);
-    }
-  };
 
   // Environment info
   const platform = Capacitor.getPlatform();
@@ -127,10 +113,10 @@ const IAPTest = () => {
 
   // Add log entry
   const addLog = (message: string, type: LogEntry['type'] = 'info') => {
-    const timestamp = new Date().toLocaleTimeString('en-US', { 
-      hour12: false, 
-      hour: '2-digit', 
-      minute: '2-digit', 
+    const timestamp = new Date().toLocaleTimeString('en-US', {
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit',
       second: '2-digit',
     });
     setLogs(prev => [...prev.slice(-100), { timestamp, message, type }]);
@@ -286,19 +272,19 @@ const IAPTest = () => {
     }
   }, []);
 
-  // Intercept console.log for IAP-related messages - broadened to capture more
+  // Intercept console.log for IAP-related messages
   useEffect(() => {
     const originalLog = console.log;
     const originalError = console.error;
 
     const shouldCapture = (message: string) => {
-      const keywords = ['[IAP', '[HOOK', '[Apple', 'NativePurchases', 'product', 'purchase', 'subscription', 'receipt', 'transaction'];
+      const keywords = ['[IAP', '[HOOK', '[Apple', '[StoreKit', 'product', 'purchase', 'subscription', 'receipt', 'transaction', 'entitlement'];
       return keywords.some(k => message.toLowerCase().includes(k.toLowerCase()));
     };
 
     console.log = (...args) => {
       originalLog(...args);
-      const message = args.map(a => 
+      const message = args.map(a =>
         typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a)
       ).join(' ');
       if (shouldCapture(message)) {
@@ -308,7 +294,7 @@ const IAPTest = () => {
 
     console.error = (...args) => {
       originalError(...args);
-      const message = args.map(a => 
+      const message = args.map(a =>
         typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a)
       ).join(' ');
       if (shouldCapture(message)) {
@@ -334,33 +320,58 @@ const IAPTest = () => {
     loadWidgetSessionSnapshots();
   }, [loadWidgetSessionSnapshots]);
 
-  // Handle purchase with logging - checks return value properly
+  // Handle purchase with logging
   const handleTestPurchase = async (productId: string) => {
     setPurchasingProductId(productId);
     const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false });
-    
+
     addLog(`[TEST] Starting purchase for: ${productId}`, 'info');
     addLog(`[TEST] Current products count: ${products.length}`, 'info');
     addLog(`[TEST] hasLoadedProducts: ${hasLoadedProducts}`, 'info');
-    
+
     try {
       addLog(`[TEST] Calling handlePurchase...`, 'info');
       const success = await handlePurchase(productId);
       addLog(`[TEST] handlePurchase returned: ${success}`, success ? 'success' : 'error');
-      
+
       if (success) {
-        addLog(`✅ Purchase SUCCESS for: ${productId}`, 'success');
+        addLog(`Purchase SUCCESS for: ${productId}`, 'success');
         setLastPurchaseResult({ productId, success: true, message: 'Purchase completed successfully', timestamp });
       } else {
-        addLog(`❌ Purchase BLOCKED for: ${productId} - check toast messages`, 'error');
+        addLog(`Purchase BLOCKED for: ${productId} - check toast messages`, 'error');
         setLastPurchaseResult({ productId, success: false, message: 'Purchase blocked or failed', timestamp });
       }
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      addLog(`❌ Purchase EXCEPTION: ${errorMsg}`, 'error');
+      addLog(`Purchase EXCEPTION: ${errorMsg}`, 'error');
       setLastPurchaseResult({ productId, success: false, message: errorMsg, timestamp });
     } finally {
       setPurchasingProductId(null);
+    }
+  };
+
+  // Test promotional offer purchase
+  const handleTestPromoOffer = async (productId: string) => {
+    setPromoOfferLoading(true);
+    const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false });
+
+    addLog(`[PROMO] Attempting promotional offer purchase for: ${productId}`, 'info');
+
+    try {
+      const result = await purchaseWithPromoOffer(productId);
+      if (result) {
+        addLog(`[PROMO] Promo offer purchase SUCCESS: ${JSON.stringify(result)}`, 'success');
+        setLastPurchaseResult({ productId, success: true, message: `Promo offer purchase succeeded`, timestamp });
+      } else {
+        addLog(`[PROMO] Promo offer purchase cancelled or pending`, 'info');
+        setLastPurchaseResult({ productId, success: false, message: 'Cancelled or pending', timestamp });
+      }
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      addLog(`[PROMO] Promo offer purchase FAILED: ${errorMsg}`, 'error');
+      setLastPurchaseResult({ productId, success: false, message: errorMsg, timestamp });
+    } finally {
+      setPromoOfferLoading(false);
     }
   };
 
@@ -375,22 +386,22 @@ const IAPTest = () => {
     }
   };
 
-  // Manual verification
-  const verifyManualTransaction = async () => {
-    setIsVerifying(true);
-    setVerificationResult(null);
-    addLog("Refreshing RevenueCat customer info", 'info');
+  // Refresh StoreKit entitlement
+  const handleRefreshEntitlement = async () => {
+    setIsRefreshingEntitlement(true);
+    setEntitlementResult(null);
+    addLog("[StoreKit] Refreshing entitlement...", 'info');
 
     try {
-      const refreshed = await refreshCustomerInfo();
-      addLog("RevenueCat customer info refreshed", "success");
-      setVerificationResult(refreshed ?? customerInfo);
+      await refreshEntitlement();
+      addLog("[StoreKit] Entitlement refreshed", "success");
+      setEntitlementResult(currentEntitlement);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      addLog(`RevenueCat refresh exception: ${message}`, 'error');
-      setVerificationResult({ error: message });
+      addLog(`[StoreKit] Entitlement refresh failed: ${message}`, 'error');
+      setEntitlementResult({ error: message });
     } finally {
-      setIsVerifying(false);
+      setIsRefreshingEntitlement(false);
     }
   };
 
@@ -423,8 +434,8 @@ const IAPTest = () => {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-lg font-bold">🧪 IAP Test Page</h1>
-            <p className="text-xs text-muted-foreground">Development & Debug Tools</p>
+            <h1 className="text-lg font-bold">IAP Test Page</h1>
+            <p className="text-xs text-muted-foreground">StoreKit 2 Development & Debug Tools</p>
           </div>
         </div>
       </div>
@@ -514,15 +525,15 @@ const IAPTest = () => {
           </CardContent>
         </Card>
 
-        {/* Refresh + Fetch Buttons */}
+        {/* App Store Products */}
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm">App Store Products</CardTitle>
               <div className="flex gap-1">
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={handleFetchProducts}
                   disabled={productsLoading}
                   title="Fetch Products"
@@ -538,7 +549,7 @@ const IAPTest = () => {
                 Loading products...
               </div>
             )}
-            
+
             {productError && (
               <div className="text-sm text-red-500 py-2 px-3 bg-red-500/10 rounded-lg">
                 {productError}
@@ -552,18 +563,18 @@ const IAPTest = () => {
             )}
 
             {products.map((product) => (
-              <div 
-                key={product.identifier} 
+              <div
+                key={product.identifier}
                 className="flex items-center justify-between p-3 bg-muted/30 rounded-lg"
               >
                 <div>
-                  <p className="font-medium text-sm">{product.title || product.identifier}</p>
+                  <p className="font-medium text-sm">{product.displayName || product.identifier}</p>
                   <p className="text-xs text-muted-foreground">
-                    {product.priceString} • {product.identifier}
+                    {product.displayPrice} • {product.identifier}
                   </p>
                 </div>
-                <Button 
-                  size="sm" 
+                <Button
+                  size="sm"
                   onClick={() => handleTestPurchase(product.identifier)}
                   disabled={purchasingProductId === product.identifier}
                 >
@@ -590,17 +601,17 @@ const IAPTest = () => {
             </p>
           </CardHeader>
           <CardContent className="pt-0 space-y-2">
-            {Object.entries(IAP_PRODUCTS).map(([key, productId]) => (
-              <div 
-                key={key} 
+            {Object.entries(HARDCODED_PRODUCTS).map(([key, productId]) => (
+              <div
+                key={key}
                 className="flex items-center justify-between p-3 bg-muted/30 rounded-lg"
               >
                 <div>
                   <p className="font-medium text-sm">{key}</p>
                   <p className="text-xs text-muted-foreground font-mono">{productId}</p>
                 </div>
-                <Button 
-                  size="sm" 
+                <Button
+                  size="sm"
                   variant="outline"
                   onClick={() => handleTestPurchase(productId)}
                   disabled={purchasingProductId === productId}
@@ -616,7 +627,42 @@ const IAPTest = () => {
           </CardContent>
         </Card>
 
-        {/* Product State Debug - Enhanced */}
+        {/* Promotional Offer Test */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <TestTube className="h-4 w-4" />
+              Promotional Offer Test
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Tests server-signed promotional offer purchase flow (Cosmiq_PromoOffer_yearly)
+            </p>
+          </CardHeader>
+          <CardContent className="pt-0 space-y-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => handleTestPromoOffer(PREMIUM_YEARLY_PRODUCT_ID)}
+              disabled={promoOfferLoading}
+              className="w-full"
+            >
+              {promoOfferLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Processing...
+                </>
+              ) : (
+                'Purchase Yearly with Promo Offer ($69.99)'
+              )}
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              Requires a valid offer code applied to your profile (profile.referred_by_code).
+              Calls generate-promo-offer-signature edge function, then StoreKit purchaseWithPromoOffer.
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Product State Debug */}
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
@@ -635,30 +681,6 @@ const IAPTest = () => {
                 fullProducts: products
               }, null, 2)}
             </pre>
-            
-            {/* Direct Purchase Buttons */}
-            <div className="pt-2 border-t border-border/50">
-              <p className="text-xs text-muted-foreground mb-2">
-                Direct Purchase (bypasses validation):
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {Object.entries(IAP_PRODUCTS).map(([key, productId]) => (
-                  <Button
-                    key={key}
-                    size="sm"
-                    variant="destructive"
-                    onClick={() => handleDirectPurchase(productId)}
-                    disabled={purchasingProductId === productId}
-                    className="text-xs"
-                  >
-                    {purchasingProductId === productId ? (
-                      <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                    ) : null}
-                    Direct: {key}
-                  </Button>
-                ))}
-              </div>
-            </div>
           </CardContent>
         </Card>
 
@@ -678,7 +700,7 @@ const IAPTest = () => {
             <CardContent className="pt-0">
               <div className="text-sm space-y-1">
                 <p><strong>Product:</strong> <span className="font-mono text-xs">{lastPurchaseResult.productId}</span></p>
-                <p><strong>Result:</strong> {lastPurchaseResult.success ? '✅ Success' : '❌ Failed'}</p>
+                <p><strong>Result:</strong> {lastPurchaseResult.success ? 'Success' : 'Failed'}</p>
                 <p><strong>Message:</strong> {lastPurchaseResult.message}</p>
                 <p className="text-xs text-muted-foreground">{lastPurchaseResult.timestamp}</p>
               </div>
@@ -686,26 +708,33 @@ const IAPTest = () => {
           </Card>
         )}
 
-        {/* Manual Verification */}
+        {/* StoreKit Entitlement */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm">RevenueCat Customer Info</CardTitle>
+            <CardTitle className="text-sm">StoreKit Entitlement</CardTitle>
           </CardHeader>
           <CardContent className="pt-0 space-y-3">
             <Button
-              onClick={verifyManualTransaction}
-              disabled={isVerifying}
+              onClick={handleRefreshEntitlement}
+              disabled={isRefreshingEntitlement}
               size="sm"
             >
-              {isVerifying ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Refresh Customer Info'}
+              {isRefreshingEntitlement ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Refresh Entitlement'}
             </Button>
 
-            {verificationResult && (
+            <div className="rounded-lg border border-border/50 px-3 py-2 space-y-1">
+              <StatusBadge label="Has Entitlement" value={Boolean(currentEntitlement)} />
+              <StatusBadge label="Product ID" value={currentEntitlement?.productId ?? "none"} />
+              <StatusBadge label="Expiration" value={currentEntitlement?.expirationDate ?? "none"} />
+              <StatusBadge label="Revoked" value={Boolean(currentEntitlement?.revocationDate)} />
+            </div>
+
+            {(entitlementResult || currentEntitlement) && (
               <div className="mt-3">
-                <Label className="text-xs">Result</Label>
+                <Label className="text-xs">Raw Entitlement</Label>
                 <ScrollArea className="h-32 mt-1">
                   <pre className="text-xs bg-muted/50 p-3 rounded-lg overflow-x-auto font-mono">
-                    {JSON.stringify(verificationResult, null, 2)}
+                    {JSON.stringify(entitlementResult ?? currentEntitlement, null, 2)}
                   </pre>
                 </ScrollArea>
               </div>
@@ -735,8 +764,8 @@ const IAPTest = () => {
                   <div className="text-muted-foreground">No logs yet...</div>
                 ) : (
                   logs.map((log, i) => (
-                    <div 
-                      key={i} 
+                    <div
+                      key={i}
                       className={`
                         ${log.type === 'error' ? 'text-red-400' : ''}
                         ${log.type === 'success' ? 'text-green-400' : ''}
@@ -760,9 +789,9 @@ const IAPTest = () => {
           </CardHeader>
           <CardContent className="pt-0">
             <div className="grid grid-cols-2 gap-2">
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={handleTestRestore}
                 disabled={loading}
                 className="text-xs"
@@ -770,9 +799,9 @@ const IAPTest = () => {
                 <RotateCcw className={`h-3 w-3 mr-1.5 ${loading ? 'animate-spin' : ''}`} />
                 Restore Purchases
               </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={handleManageSubscriptions}
                 className="text-xs"
               >
@@ -787,8 +816,8 @@ const IAPTest = () => {
         <Card className="border-dashed">
           <CardContent className="py-4">
             <p className="text-xs text-muted-foreground leading-relaxed">
-              <strong>How to test:</strong> Build in Xcode → Run on device/simulator → 
-              Use Sandbox Apple ID for purchases → Transactions appear in console above.
+              <strong>How to test:</strong> Build in Xcode &rarr; Run on device/simulator &rarr;
+              Use Sandbox Apple ID for purchases &rarr; Transactions appear in console above.
               Access this page by long-pressing "Command Center" on Profile.
             </p>
           </CardContent>

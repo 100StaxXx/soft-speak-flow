@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useRevenueCat } from "./useRevenueCat";
+import { useStoreKit } from "./useStoreKit";
 
 export interface Subscription {
   status: "active" | "cancelled" | "past_due" | "trialing" | "incomplete" | "expired";
@@ -7,44 +7,34 @@ export interface Subscription {
   trial_ends_at?: string | null;
   current_period_end?: string | null;
   product_identifier?: string | null;
-  billing_provider?: "revenuecat";
+  billing_provider?: "storekit2";
 }
 
 export function useSubscription() {
   const {
-    activeEntitlement,
+    currentEntitlement,
+    isPro,
     activePlan,
-    customerInfo,
     expirationDate,
     isLoading,
-    isPro,
-    refreshCustomerInfo,
-  } = useRevenueCat();
+    refreshEntitlement,
+  } = useStoreKit();
 
-  const subscription = useMemo(() => {
-    if (!activeEntitlement?.isActive || !activePlan) return null;
-
-    const status: Subscription["status"] =
-      activeEntitlement.billingIssueDetectedAt ? "past_due" :
-      activeEntitlement.unsubscribeDetectedAt ? "cancelled" :
-      activeEntitlement.periodType === "TRIAL" || activeEntitlement.periodType === "INTRO" ? "trialing" :
-      "active";
+  const subscription = useMemo((): Subscription | null => {
+    if (!isPro || !activePlan || !currentEntitlement) return null;
 
     return {
-      status,
+      status: "active",
       plan: activePlan,
-      current_period_end: activeEntitlement.expirationDate,
-      product_identifier: activeEntitlement.productIdentifier,
-      billing_provider: "revenuecat",
-      trial_ends_at:
-        activeEntitlement.periodType === "TRIAL" || activeEntitlement.periodType === "INTRO"
-          ? activeEntitlement.expirationDate
-          : null,
+      current_period_end: currentEntitlement.expirationDate ?? null,
+      product_identifier: currentEntitlement.productId,
+      billing_provider: "storekit2",
+      trial_ends_at: null,
     };
-  }, [activeEntitlement, activePlan]);
+  }, [activePlan, currentEntitlement, isPro]);
 
   const isActive = isPro;
-  const isCancelled = subscription?.status === "cancelled";
+  const isCancelled = false; // StoreKit 2 entitlements are only present while active
 
   const nextBillingDate = useMemo(() => {
     if (subscription?.current_period_end) {
@@ -54,27 +44,22 @@ export function useSubscription() {
   }, [expirationDate, subscription?.current_period_end]);
 
   const planPrice = useMemo(() => {
-    if (subscription?.plan === "yearly") {
-      const normalizedIdentifier = subscription.product_identifier?.toLowerCase() ?? "";
-      const hasReferralDiscount =
-        normalizedIdentifier.includes("referral") || normalizedIdentifier.includes("discount");
-      return hasReferralDiscount ? "$69.99/year" : "$99.99/year";
-    }
+    if (subscription?.plan === "yearly") return "$99.99/year";
     if (subscription?.plan === "monthly") return "$9.99/month";
     return null;
-  }, [subscription?.plan, subscription?.product_identifier]);
+  }, [subscription?.plan]);
 
   return {
     subscription,
     isLoading,
     error: null,
-    refetch: refreshCustomerInfo,
+    refetch: refreshEntitlement,
     isActive,
     isCancelled,
     hasPremium: isActive,
     nextBillingDate,
     planPrice,
     plan: subscription?.plan,
-    customerInfo,
+    customerInfo: null,
   };
 }

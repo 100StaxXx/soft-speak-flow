@@ -31,10 +31,10 @@ import paywallPrimaryBackground from "@/assets/backgrounds/paywall-primary.webp"
 import { trackPaywallEvent } from "@/utils/paywallTelemetry";
 
 type PlanType = "monthly" | "yearly";
-export type TrialGateVariant = "pre_trial_signup" | "trial_expired";
+export type PaywallVariant = "pre_trial_signup" | "trial_expired";
 
-interface TrialExpiredPaywallProps {
-  variant?: TrialGateVariant;
+interface PaywallProps {
+  variant?: PaywallVariant;
 }
 
 const blurActiveElement = () => {
@@ -45,124 +45,109 @@ const blurActiveElement = () => {
   }
 };
 
-export const TrialExpiredPaywall = ({ variant = "pre_trial_signup" }: TrialExpiredPaywallProps) => {
+export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
   const [selectedPlan, setSelectedPlan] = useState<PlanType>("yearly");
-  const [referralCode, setReferralCode] = useState("");
+  const [offerCode, setOfferCode] = useState("");
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const deleteConfirmationInputRef = useRef<HTMLInputElement | null>(null);
   const deleteSubmitButtonRef = useRef<HTMLButtonElement | null>(null);
-  
-  const { 
-    handlePurchase, 
-    handleRestore, 
-    loading, 
+
+  const {
+    handlePurchase,
+    handleRestore,
+    loading,
     isAvailable,
     products,
     productsLoading,
     productError,
     reloadProducts,
-    hasLoadedProducts,
-    hasReferralPricing,
+    hasOfferCode,
   } = useAppleSubscription();
   const { toast } = useToast();
   const { user, signOut } = useAuth();
-  const { referralStats, applyReferralCode } = useReferrals();
+  const { applyReferralCode } = useReferrals();
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
   const returnTo = `${location.pathname}${location.search}${location.hash}`;
 
   const monthlyProduct = useMemo(() => getProductForPlan("monthly", products), [products]);
-  const yearlyProduct = useMemo(
-    () => getProductForPlan("yearly", products, { preferReferral: hasReferralPricing }),
-    [hasReferralPricing, products],
-  );
+  const yearlyProduct = useMemo(() => getProductForPlan("yearly", products), [products]);
   const selectedProduct = selectedPlan === "yearly" ? yearlyProduct : monthlyProduct;
   const selectedProductId = useMemo(
-    () => getPurchaseProductIdForPlan(selectedPlan, products, { preferReferral: hasReferralPricing }),
-    [hasReferralPricing, selectedPlan, products],
+    () => getPurchaseProductIdForPlan(selectedPlan, products),
+    [selectedPlan, products],
   );
-  const hasAppliedReferralCode = Boolean(referralStats?.referred_by || hasReferralPricing);
 
   useEffect(() => {
     trackPaywallEvent("paywall_viewed", {
-      surface: "trial_gate",
+      surface: "paywall",
       variant,
-      hasReferralPricing,
-      hasAppliedReferralCode,
+      hasOfferCode,
     });
-  }, [hasAppliedReferralCode, hasReferralPricing, variant]);
+  }, [hasOfferCode, variant]);
 
   const handleSubscribe = async () => {
     if (!selectedProduct) {
       toast({
         title: "Almost ready",
-        description: "We're still fetching Apple pricing details. Please try again in a moment.",
+        description: "We're still fetching pricing details. Please try again in a moment.",
         variant: "destructive",
       });
       return;
     }
 
     trackPaywallEvent("package_selected", {
-      surface: "trial_gate",
+      surface: "paywall",
       plan: selectedPlan,
       productId: selectedProductId,
-      hasReferralPricing,
-      hasAppliedReferralCode,
+      hasOfferCode,
     });
-    await handlePurchase(selectedProductId, "trial_gate");
+    const success = await handlePurchase(selectedProductId, "paywall");
+    if (success) {
+      navigate("/premium/success");
+    }
   };
 
-  const handleContinueToSubscription = useCallback(() => {
-    trackPaywallEvent("continue_to_subscription", {
-      surface: "trial_gate",
-      hasReferralPricing,
-      hasAppliedReferralCode,
-    });
-    navigate("/premium");
-  }, [hasAppliedReferralCode, hasReferralPricing, navigate]);
-
-  const handleApplyReferralCode = useCallback(async (event: FormEvent<HTMLFormElement>) => {
+  const handleApplyOfferCode = useCallback(async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    const sanitized = referralCode.trim().toUpperCase();
+    const sanitized = offerCode.trim().toUpperCase();
     if (!sanitized || !user?.id) return;
 
     try {
-      trackPaywallEvent("referral_apply_started", {
-        surface: "trial_gate",
-        referralCode: sanitized,
+      trackPaywallEvent("offer_code_applied", {
+        surface: "paywall",
+        offerCode: sanitized,
       });
       await applyReferralCode.mutateAsync(sanitized);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["profile", user.id] }),
         queryClient.invalidateQueries({ queryKey: ["referral-stats", user.id] }),
       ]);
-      trackPaywallEvent("referral_apply_succeeded", {
-        surface: "trial_gate",
-        referralCode: sanitized,
+      setOfferCode("");
+      toast({
+        title: "Offer code applied",
+        description: "Your yearly plan is now discounted to $69.99/year.",
       });
-      setReferralCode("");
-      navigate("/premium");
     } catch (error) {
-      trackPaywallEvent("referral_apply_failed", {
-        surface: "trial_gate",
-        referralCode: sanitized,
+      trackPaywallEvent("offer_code_failed", {
+        surface: "paywall",
+        offerCode: sanitized,
         message: error instanceof Error ? error.message : "unknown_error",
       });
-      // errors are surfaced by the hook
     }
-  }, [applyReferralCode, navigate, queryClient, referralCode, user?.id]);
+  }, [applyReferralCode, queryClient, offerCode, toast, user?.id]);
 
   const handleSignOut = async () => {
     setIsSigningOut(true);
     try {
       await signOut();
       navigate("/auth");
-    } catch (error) {
+    } catch {
       toast({
         title: "Error",
         description: "Failed to sign out. Please try again.",
@@ -225,7 +210,7 @@ export const TrialExpiredPaywall = ({ variant = "pre_trial_signup" }: TrialExpir
         navigate("/auth", { replace: true });
       } else {
         const errorMetadata = getAccountDeletionErrorMetadata(error);
-        logger.error("[Account Deletion] Trial paywall deletion failed", {
+        logger.error("[Account Deletion] Paywall deletion failed", {
           surface: variant,
           userId: user?.id ?? null,
           code: errorMetadata.code,
@@ -258,15 +243,10 @@ export const TrialExpiredPaywall = ({ variant = "pre_trial_signup" }: TrialExpir
     const nextValue = event.target.value;
     setDeleteConfirmText(nextValue);
 
-    if (nextValue !== "DELETE") {
-      return;
-    }
+    if (nextValue !== "DELETE") return;
 
     window.setTimeout(() => {
-      if (document.activeElement !== deleteConfirmationInputRef.current) {
-        return;
-      }
-
+      if (document.activeElement !== deleteConfirmationInputRef.current) return;
       deleteConfirmationInputRef.current?.blur();
       deleteSubmitButtonRef.current?.focus();
     }, 0);
@@ -287,9 +267,9 @@ export const TrialExpiredPaywall = ({ variant = "pre_trial_signup" }: TrialExpir
       savings: null,
     },
     yearly: {
-      fallbackPrice: hasReferralPricing ? "$69.99" : "$99.99",
+      fallbackPrice: hasOfferCode ? "$69.99" : "$99.99",
       period: "/year",
-      savings: hasReferralPricing ? "Referral price" : "Best value",
+      savings: hasOfferCode ? "Offer applied" : "Best value",
     },
   };
 
@@ -332,6 +312,7 @@ export const TrialExpiredPaywall = ({ variant = "pre_trial_signup" }: TrialExpir
           </p>
         </div>
 
+        {/* Offer Code Section */}
         <Card className="border-white/15 bg-background/60 backdrop-blur-md shadow-2xl">
           <CardContent className="p-5 space-y-4">
             <div className="flex items-start gap-3">
@@ -339,75 +320,50 @@ export const TrialExpiredPaywall = ({ variant = "pre_trial_signup" }: TrialExpir
                 <Gift className="h-5 w-5 text-primary" />
               </div>
               <div className="space-y-1">
-                <h2 className="text-lg font-semibold text-foreground">Have a referral code?</h2>
+                <h2 className="text-lg font-semibold text-foreground">Have an offer code?</h2>
                 <p className="text-sm text-muted-foreground">
-                  Enter it here to unlock the discounted annual offer before you continue to subscriptions.
+                  Enter it here to unlock the discounted annual price.
                 </p>
               </div>
             </div>
 
-            {hasAppliedReferralCode ? (
+            {hasOfferCode ? (
               <div className="rounded-2xl border border-primary/30 bg-primary/10 p-4">
                 <div className="flex items-start gap-3">
                   <CheckCircle2 className="mt-0.5 h-5 w-5 text-primary" />
                   <div className="space-y-1">
-                    <p className="font-medium text-foreground">Referral pricing is unlocked</p>
+                    <p className="font-medium text-foreground">Offer code applied</p>
                     <p className="text-sm text-muted-foreground">
-                      Your annual plan will show the discounted referral price on the next screen.
+                      Your annual plan is discounted to $69.99/year.
                     </p>
                   </div>
                 </div>
               </div>
             ) : (
-              <form className="space-y-3" onSubmit={handleApplyReferralCode}>
+              <form className="space-y-3" onSubmit={handleApplyOfferCode}>
                 <Input
-                  placeholder="ENTER REFERRAL CODE"
-                  value={referralCode}
-                  onChange={(event) => setReferralCode(event.target.value.toUpperCase())}
+                  placeholder="ENTER OFFER CODE"
+                  value={offerCode}
+                  onChange={(event) => setOfferCode(event.target.value.toUpperCase())}
                   maxLength={24}
                   className="h-12 border-white/15 bg-background/70 text-center text-base tracking-[0.2em] uppercase"
                 />
                 <Button
                   type="submit"
-                  disabled={applyReferralCode.isPending || !referralCode.trim()}
+                  disabled={applyReferralCode.isPending || !offerCode.trim()}
                   className="w-full"
                 >
-                  {applyReferralCode.isPending ? "Applying..." : "Apply Referral Code"}
+                  {applyReferralCode.isPending ? "Applying..." : "Apply Offer Code"}
                 </Button>
                 <p className="text-center text-xs text-muted-foreground">
-                  Entering a valid code unlocks discounted annual pricing. You can also skip this step.
+                  Entering a valid code unlocks discounted annual pricing.
                 </p>
               </form>
             )}
-
-            <Button
-              onClick={handleContinueToSubscription}
-              className="w-full py-6 text-base font-semibold bg-gradient-to-r from-primary to-accent hover:opacity-90 text-primary-foreground shadow-glow"
-            >
-              {hasAppliedReferralCode ? "Continue to Subscription" : "Skip and Continue"}
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
           </CardContent>
         </Card>
 
-        {/* Features */}
-        <Card className="border-white/10 bg-background/50 backdrop-blur-md">
-          <CardContent className="p-5 space-y-3">
-          {[
-            { icon: Sparkles, text: "All 15 evolution stages" },
-            { icon: MessageCircle, text: "Unlimited guide chat" },
-            { icon: Lock, text: "Unlimited Quests & Epics" },
-            { icon: Crown, text: "All premium features" },
-          ].map((feature, idx) => (
-            <div key={idx} className="flex items-center gap-3 text-sm">
-              <feature.icon className="h-5 w-5 text-primary flex-shrink-0" />
-              <span className="text-foreground">{feature.text}</span>
-            </div>
-          ))}
-          </CardContent>
-        </Card>
-
-        {/* Plan Preview */}
+        {/* Plan Selection */}
         <div className="flex gap-3">
           {(["monthly", "yearly"] as PlanType[]).map((plan) => (
             <Card
@@ -430,7 +386,7 @@ export const TrialExpiredPaywall = ({ variant = "pre_trial_signup" }: TrialExpir
                   {plan}
                 </p>
                 <p className="text-2xl font-bold text-foreground">
-                  {(plan === "yearly" ? yearlyProduct?.priceString : monthlyProduct?.priceString) ?? plans[plan].fallbackPrice}
+                  {(plan === "yearly" ? yearlyProduct?.displayPrice : monthlyProduct?.displayPrice) ?? plans[plan].fallbackPrice}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {plans[plan].period}
@@ -439,6 +395,33 @@ export const TrialExpiredPaywall = ({ variant = "pre_trial_signup" }: TrialExpir
             </Card>
           ))}
         </div>
+
+        {/* Features */}
+        <Card className="border-white/10 bg-background/50 backdrop-blur-md">
+          <CardContent className="p-5 space-y-3">
+            {[
+              { icon: Sparkles, text: "All 15 evolution stages" },
+              { icon: MessageCircle, text: "Unlimited guide chat" },
+              { icon: Lock, text: "Unlimited Quests & Epics" },
+              { icon: Crown, text: "All premium features" },
+            ].map((feature, idx) => (
+              <div key={idx} className="flex items-center gap-3 text-sm">
+                <feature.icon className="h-5 w-5 text-primary flex-shrink-0" />
+                <span className="text-foreground">{feature.text}</span>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        {/* Subscribe Button */}
+        <Button
+          onClick={() => { void handleSubscribe(); }}
+          disabled={!isAvailable || loading || productsLoading || !selectedProduct}
+          className="w-full py-6 text-base font-semibold bg-gradient-to-r from-primary to-accent hover:opacity-90 text-primary-foreground shadow-glow"
+        >
+          {loading ? "Processing..." : copy.cta}
+          {!loading && <ArrowRight className="ml-2 h-4 w-4" />}
+        </Button>
 
         {/* IAP Notice */}
         {!isAvailable && (
@@ -487,7 +470,7 @@ export const TrialExpiredPaywall = ({ variant = "pre_trial_signup" }: TrialExpir
           </Button>
           <Button
             variant="ghost"
-            onClick={() => { void handleRestore("trial_gate"); }}
+            onClick={() => { void handleRestore("paywall"); }}
             disabled={loading}
             className="text-muted-foreground hover:text-foreground"
           >
@@ -497,14 +480,14 @@ export const TrialExpiredPaywall = ({ variant = "pre_trial_signup" }: TrialExpir
         </div>
 
         <p className="text-xs text-center text-muted-foreground leading-relaxed">
-          You’ll review the full subscription details on the next screen. {copy.legalIntro}
+          {copy.legalIntro}
         </p>
         <div className="flex justify-center gap-4 text-xs">
           <a href="/privacy" className="text-muted-foreground underline hover:text-foreground">Privacy Policy</a>
           <a href="/terms" className="text-muted-foreground underline hover:text-foreground">Terms of Use</a>
         </div>
 
-        {/* Subtle account options */}
+        {/* Account options */}
         <div className="pt-1 text-center space-y-2">
           <p className="text-xs text-muted-foreground">Need another account?</p>
           <div className="flex items-center justify-center gap-3">
@@ -550,7 +533,7 @@ export const TrialExpiredPaywall = ({ variant = "pre_trial_signup" }: TrialExpir
           </AlertDialogHeader>
           <form className="space-y-4" onSubmit={handleDeleteAccountSubmit}>
             <Input
-              id="trial-delete-confirmation-input"
+              id="paywall-delete-confirmation-input"
               aria-label="Type DELETE to confirm"
               ref={deleteConfirmationInputRef}
               value={deleteConfirmText}
