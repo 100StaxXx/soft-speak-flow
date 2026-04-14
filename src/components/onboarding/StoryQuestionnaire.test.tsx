@@ -108,7 +108,7 @@ describe("StoryQuestionnaire", () => {
 
     expect(onComplete).toHaveBeenCalledTimes(1);
     expect(onComplete).toHaveBeenCalledWith([
-      expect.objectContaining({ questionId: "mentor_energy", optionId: "woman" }),
+      expect.objectContaining({ questionId: "mentor_energy", optionId: "feminine_presence" }),
       expect.objectContaining({ questionId: "focus_area", optionId: "clarity_mindset" }),
       expect.objectContaining({ questionId: "guidance_tone", optionId: "gentle_compassionate" }),
       expect.objectContaining({ questionId: "progress_style", optionId: "principles_logic" }),
