@@ -85,6 +85,7 @@ interface CreatedCampaignData {
 }
 
 type DesktopPlannerMode = "week" | "day";
+const MAC_TIMED_TASK_DURATION_FALLBACK_MINUTES = 30;
 
 const Journeys = () => {
   const prefersReducedMotion = useReducedMotion();
@@ -95,6 +96,9 @@ const Journeys = () => {
   const isDesktopLayout = journeysLayoutMode === "desktop";
   const isMacHostedIOSApp = useMemo(() => isMacDesignedForIPadIOSApp(), []);
   const isMacDesktopSession = useMemo(() => isMacSession(), []);
+  const macTimedTaskDurationFallbackMinutes = isMacDesktopSession
+    ? MAC_TIMED_TASK_DURATION_FALLBACK_MINUTES
+    : undefined;
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showPageInfo, setShowPageInfo] = useState(false);
   const [showAddSheet, setShowAddSheet] = useState(false);
@@ -1112,6 +1116,7 @@ const Journeys = () => {
                 isCampaignsLoading={epicsLoading}
                 hideAnytimeRow={isMacDesktopSession}
                 plannerMode={desktopPlannerMode}
+                timedTaskDurationFallbackMinutes={macTimedTaskDurationFallbackMinutes}
                 desktopInteractionResetKey={desktopInteractionResetKey}
                 onDateSelect={setSelectedDate}
                 onPlannerModeChange={setDesktopPlannerMode}
@@ -1142,6 +1147,8 @@ const Journeys = () => {
                 currentStreak={currentStreak}
                 desktopPlannerMode={desktopPlannerMode}
                 desktopInteractionResetKey={desktopInteractionResetKey}
+                timedTaskDurationFallbackMinutes={macTimedTaskDurationFallbackMinutes}
+                useMacDurationSizedDesktopTimelineRows={isMacDesktopSession}
                 onUndoToggle={handleUndoToggle}
                 onEditQuest={handleEditQuest}
                 weekTasks={weekCalendarTasks}

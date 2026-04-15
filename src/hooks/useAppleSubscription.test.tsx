@@ -5,12 +5,21 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   toast: vi.fn(),
   purchase: vi.fn(),
-  purchaseWithPromoOffer: vi.fn(),
+  redeemOfferCode: vi.fn(),
   restorePurchases: vi.fn(),
   manageSubscriptions: vi.fn(),
   refreshProducts: vi.fn(),
   user: { id: "11111111-1111-4111-8111-111111111111" } as { id: string } | null,
-  profile: null as { referred_by_code?: string | null } | null,
+  appliedReferralCodeState: {
+    code: null,
+    owner_type: null,
+    affiliate_provider: null,
+    is_active: false,
+    apple_offer_code_status: null,
+    apple_offer_campaign_identifier: null,
+    apple_offer_code_expires_at: null,
+    is_apple_offer_eligible: false,
+  },
 }));
 
 vi.mock("@/hooks/use-toast", () => ({
@@ -21,8 +30,13 @@ vi.mock("@/hooks/useAuth", () => ({
   useAuth: () => ({ user: mocks.user }),
 }));
 
-vi.mock("@/hooks/useProfile", () => ({
-  useProfile: () => ({ profile: mocks.profile }),
+vi.mock("@/hooks/useAppliedReferralCodeState", () => ({
+  useAppliedReferralCodeState: () => ({
+    appliedReferralCodeState: mocks.appliedReferralCodeState,
+    loading: false,
+    error: null,
+    refetch: vi.fn(),
+  }),
 }));
 
 vi.mock("@/hooks/useStoreKit", () => ({
@@ -34,7 +48,8 @@ vi.mock("@/hooks/useStoreKit", () => ({
     ],
     productsLoading: false,
     purchase: (...args: unknown[]) => mocks.purchase(...args),
-    purchaseWithPromoOffer: (...args: unknown[]) => mocks.purchaseWithPromoOffer(...args),
+    purchaseWithPromoOffer: vi.fn(),
+    redeemOfferCode: (...args: unknown[]) => mocks.redeemOfferCode(...args),
     restorePurchases: (...args: unknown[]) => mocks.restorePurchases(...args),
     manageSubscriptions: (...args: unknown[]) => mocks.manageSubscriptions(...args),
     refreshProducts: (...args: unknown[]) => mocks.refreshProducts(...args),
@@ -62,9 +77,18 @@ describe("useAppleSubscription", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.user = { id: "11111111-1111-4111-8111-111111111111" };
-    mocks.profile = null;
+    mocks.appliedReferralCodeState = {
+      code: null,
+      owner_type: null,
+      affiliate_provider: null,
+      is_active: false,
+      apple_offer_code_status: null,
+      apple_offer_campaign_identifier: null,
+      apple_offer_code_expires_at: null,
+      is_apple_offer_eligible: false,
+    };
     mocks.purchase.mockResolvedValue({ productId: "cosmiq_premium_monthly", transactionId: "tx-1" });
-    mocks.purchaseWithPromoOffer.mockResolvedValue({ productId: "cosmiq_premium_yearly", transactionId: "tx-2" });
+    mocks.redeemOfferCode.mockResolvedValue({ status: "presented", entitlement: null });
     mocks.restorePurchases.mockResolvedValue({ productId: "cosmiq_premium_monthly", transactionId: "tx-r" });
     mocks.refreshProducts.mockResolvedValue(undefined);
   });
@@ -77,11 +101,19 @@ describe("useAppleSubscription", () => {
     });
 
     expect(mocks.purchase).toHaveBeenCalledWith("cosmiq_premium_monthly");
-    expect(mocks.purchaseWithPromoOffer).not.toHaveBeenCalled();
+    expect(mocks.redeemOfferCode).not.toHaveBeenCalled();
   });
 
-  it("calls purchaseWithPromoOffer for yearly when user has offer code", async () => {
-    mocks.profile = { referred_by_code: "OFFER123" };
+  it("starts offer code redemption for yearly when user has offer code", async () => {
+    mocks.appliedReferralCodeState = {
+      ...mocks.appliedReferralCodeState,
+      code: "OFFER123",
+      owner_type: "influencer",
+      affiliate_provider: "tolt",
+      is_active: true,
+      apple_offer_code_status: "active",
+      is_apple_offer_eligible: true,
+    };
 
     const { result } = renderHook(() => useAppleSubscription());
 
@@ -89,12 +121,41 @@ describe("useAppleSubscription", () => {
       await result.current.handlePurchase("cosmiq_premium_yearly");
     });
 
-    expect(mocks.purchaseWithPromoOffer).toHaveBeenCalledWith("cosmiq_premium_yearly");
+    expect(mocks.redeemOfferCode).toHaveBeenCalledTimes(1);
     expect(mocks.purchase).not.toHaveBeenCalled();
   });
 
+  it("purchases yearly after the offer code redemption step is primed", async () => {
+    mocks.appliedReferralCodeState = {
+      ...mocks.appliedReferralCodeState,
+      code: "OFFER123",
+      owner_type: "influencer",
+      affiliate_provider: "tolt",
+      is_active: true,
+      apple_offer_code_status: "active",
+      is_apple_offer_eligible: true,
+    };
+
+    const { result } = renderHook(() => useAppleSubscription());
+
+    await act(async () => {
+      await result.current.handlePurchase("cosmiq_premium_yearly");
+    });
+
+    await act(async () => {
+      await result.current.handlePurchase("cosmiq_premium_yearly");
+    });
+
+    expect(mocks.redeemOfferCode).toHaveBeenCalledTimes(1);
+    expect(mocks.purchase).toHaveBeenCalledWith("cosmiq_premium_yearly");
+  });
+
   it("calls regular purchase for yearly when no offer code", async () => {
-    mocks.profile = null;
+    mocks.appliedReferralCodeState = {
+      ...mocks.appliedReferralCodeState,
+      code: null,
+      is_apple_offer_eligible: false,
+    };
 
     const { result } = renderHook(() => useAppleSubscription());
 
@@ -103,7 +164,7 @@ describe("useAppleSubscription", () => {
     });
 
     expect(mocks.purchase).toHaveBeenCalledWith("cosmiq_premium_yearly");
-    expect(mocks.purchaseWithPromoOffer).not.toHaveBeenCalled();
+    expect(mocks.redeemOfferCode).not.toHaveBeenCalled();
   });
 
   it("returns false and shows toast when user is not authenticated", async () => {
@@ -183,14 +244,28 @@ describe("useAppleSubscription", () => {
     );
   });
 
-  it("exposes hasOfferCode from profile", () => {
-    mocks.profile = { referred_by_code: "OFFER123" };
+  it("exposes hasOfferCode from the applied code eligibility state", () => {
+    mocks.appliedReferralCodeState = {
+      ...mocks.appliedReferralCodeState,
+      code: "OFFER123",
+      owner_type: "influencer",
+      affiliate_provider: "tolt",
+      is_active: true,
+      apple_offer_code_status: "active",
+      is_apple_offer_eligible: true,
+    };
     const { result } = renderHook(() => useAppleSubscription());
     expect(result.current.hasOfferCode).toBe(true);
   });
 
-  it("hasOfferCode is false when no profile code", () => {
-    mocks.profile = null;
+  it("keeps hasOfferCode false when a saved code is not Apple-offer eligible", () => {
+    mocks.appliedReferralCodeState = {
+      ...mocks.appliedReferralCodeState,
+      code: "USERFRIEND",
+      owner_type: "user",
+      is_active: true,
+      is_apple_offer_eligible: false,
+    };
     const { result } = renderHook(() => useAppleSubscription());
     expect(result.current.hasOfferCode).toBe(false);
   });

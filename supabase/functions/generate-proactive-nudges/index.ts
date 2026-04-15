@@ -4,6 +4,8 @@ installOpenAICompatibilityShim();
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { requireServiceRoleAuth } from "../_shared/auth.ts";
+import { resolveNotificationCompanionContext } from "../_shared/companionName.ts";
+import { buildProactiveNudgeCompanionIdentity } from "./companionIdentity.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -25,12 +27,6 @@ const getConcernLevel = (inactiveDays: number) => {
   if (inactiveDays >= 8 && inactiveDays < 14) return { level: 'hopeful', tone: 'still hopeful, missing you', sendPush: false };
   if (inactiveDays >= 14) return { level: 'final', tone: 'sad but hopeful, like a friend who misses you deeply', sendPush: true };
   return null;
-};
-
-const normalizeCompanionName = (value: string | null | undefined): string | null => {
-  if (typeof value !== 'string') return null;
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
 };
 
 serve(async (req) => {
@@ -79,11 +75,16 @@ serve(async (req) => {
         // Check if user has an inactive companion
         const { data: companion } = await supabase
           .from('user_companion')
-          .select('inactive_days, spirit_animal, cached_creature_name')
+          .select('id, user_id, current_stage, inactive_days, spirit_animal, cached_creature_name')
           .eq('user_id', profile.id)
           .maybeSingle()
 
         if (companion && companion.inactive_days >= 1) {
+          const companionContext = await resolveNotificationCompanionContext({
+            supabase,
+            companion,
+            logPrefix: "[generate-proactive-nudges]",
+          });
           const concernInfo = getConcernLevel(companion.inactive_days);
           
           if (concernInfo) {
@@ -104,10 +105,10 @@ serve(async (req) => {
                 .maybeSingle()
 
               if (mentor) {
-                const companionDisplayName = normalizeCompanionName(companion.cached_creature_name);
-                const companionIdentity = companionDisplayName
-                  ? `their companion ${companionDisplayName}`
-                  : 'their companion';
+                const {
+                  companionDisplayName,
+                  companionIdentity,
+                } = buildProactiveNudgeCompanionIdentity(companionContext?.displayName);
                 
                 let contextPrompt = '';
                 switch (concernInfo.level) {

@@ -63,6 +63,7 @@
     "submit-support-report",
     "suggest-task-times",
     "sync-daily-pep-talk-transcript",
+    "tolt-webhook",
     "verify-admin-access",
     "verify-apple-receipt"
   ],
@@ -88,6 +89,7 @@
     "rotate-daily-wallpapers",
     "send-apns-notification",
     "sync-daily-pep-talk-transcript",
+    "tolt-webhook",
     "transcribe-audio"
   ],
   "scheduled": [
@@ -189,6 +191,7 @@
     "submit-support-report",
     "suggest-task-times",
     "sync-daily-pep-talk-transcript",
+    "tolt-webhook",
     "transcribe-audio",
     "verify-admin-access",
     "verify-apple-receipt"

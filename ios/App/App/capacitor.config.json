@@ -39,8 +39,6 @@
 		"ScreenOrientationPlugin",
 		"SharePlugin",
 		"SplashScreenPlugin",
-		"SocialLoginPlugin",
-		"PurchasesPlugin",
-		"RevenueCatUIPlugin"
+		"SocialLoginPlugin"
 	]
 }

@@ -214,13 +214,32 @@ serve(async (req) => {
     // Look up referral_code_id with current conversion count
     const { data: codeData, error: codeError } = await supabaseClient
       .from("referral_codes")
-      .select("id, code, owner_type, total_conversions, tier")
+      .select("id, code, owner_type, total_conversions, tier, affiliate_provider, tolt_partner_id")
       .eq("code", referral_code.toUpperCase())
       .single();
 
     if (codeError || !codeData) {
       console.error(`Referral code not found: ${referral_code}`);
       return errorResponse(req, "Referral code not found", 400);
+    }
+
+    const isToltLinked = codeData.affiliate_provider === "tolt" && Boolean(codeData.tolt_partner_id);
+    if (isToltLinked) {
+      console.log(`Skipping legacy payout creation for Tolt-linked code ${referral_code}`);
+      return jsonResponse(req, {
+        success: true,
+        message: "Tolt-linked affiliate commissions are handled by the Apple webhook yearly flow",
+        skipped: true,
+      });
+    }
+
+    if (plan !== "yearly") {
+      console.log(`Skipping legacy payout creation for non-yearly referral purchase on code ${referral_code}`);
+      return jsonResponse(req, {
+        success: true,
+        message: "Affiliate commissions only apply to discounted yearly purchases.",
+        skipped: true,
+      });
     }
 
     // Check for duplicate payout (prevent double-counting)
@@ -284,7 +303,7 @@ serve(async (req) => {
       .single();
 
     const newConversionCount = (currentData?.total_conversions || 0) + 1;
-    const newRevenue = (currentData?.total_revenue || 0) + payoutAmount;
+    const newRevenue = (currentData?.total_revenue || 0) + numAmount;
 
     // Update with incremented values (tier will be updated by trigger)
     const { error: updateError } = await supabaseClient

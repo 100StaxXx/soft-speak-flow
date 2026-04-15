@@ -11,6 +11,7 @@ public class StoreKitPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "getProducts", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "purchase", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "purchaseWithPromoOffer", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "presentOfferCodeRedeemSheet", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "restorePurchases", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getCurrentEntitlement", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "manageSubscriptions", returnType: CAPPluginReturnPromise),
@@ -48,6 +49,44 @@ public class StoreKitPlugin: CAPPlugin, CAPBridgedPlugin {
                 call.resolve(["products": result])
             } catch {
                 call.reject("Failed to load products: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    // MARK: - presentOfferCodeRedeemSheet
+
+    @objc func presentOfferCodeRedeemSheet(_ call: CAPPluginCall) {
+        let redemptionURLString = call.getString("redemptionURL")
+
+        DispatchQueue.main.async {
+            if #available(iOS 16.0, *) {
+                guard let windowScene = UIApplication.shared.connectedScenes
+                    .compactMap({ $0 as? UIWindowScene })
+                    .first else {
+                    if let redemptionURLString = redemptionURLString {
+                        self.openRedemptionURL(redemptionURLString, call: call)
+                    } else {
+                        call.reject("No active window scene")
+                    }
+                    return
+                }
+
+                Task {
+                    do {
+                        try await AppStore.presentOfferCodeRedeemSheet(in: windowScene)
+                        call.resolve(["status": "presented"])
+                    } catch {
+                        if let redemptionURLString = redemptionURLString {
+                            self.openRedemptionURL(redemptionURLString, call: call)
+                        } else {
+                            call.reject("Failed to present offer code redemption: \(error.localizedDescription)")
+                        }
+                    }
+                }
+            } else if let redemptionURLString = redemptionURLString {
+                self.openRedemptionURL(redemptionURLString, call: call)
+            } else {
+                call.reject("Offer code redemption requires iOS 16 or later")
             }
         }
     }
@@ -273,8 +312,30 @@ public class StoreKitPlugin: CAPPlugin, CAPBridgedPlugin {
         if let appAccountToken = transaction.appAccountToken {
             dict["appAccountToken"] = appAccountToken.uuidString
         }
+        if #available(iOS 17.2, *), let offerID = transaction.offerID {
+            dict["offerIdentifier"] = offerID
+        }
+        if #available(iOS 17.2, *), let offerType = transaction.offerType {
+            dict["offerType"] = offerType.rawValue
+        }
         dict["isUpgraded"] = transaction.isUpgraded
         return dict
+    }
+
+    private func openRedemptionURL(_ redemptionURLString: String, call: CAPPluginCall) {
+        let sanitized = redemptionURLString.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let url = URL(string: sanitized) else {
+            call.reject("Invalid redemption URL")
+            return
+        }
+
+        UIApplication.shared.open(url, options: [:]) { success in
+            if success {
+                call.resolve(["status": "opened_url"])
+            } else {
+                call.reject("Failed to open redemption URL")
+            }
+        }
     }
 
     private func findCurrentEntitlement() async -> [String: Any]? {

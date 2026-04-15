@@ -9,6 +9,10 @@ const storageState = vi.hoisted(() => ({
   store: new Map<string, string>(),
 }));
 
+const supabaseMocks = vi.hoisted(() => ({
+  rpc: vi.fn(),
+}));
+
 vi.mock("@capacitor/core", () => ({
   Capacitor: {
     isNativePlatform: capacitorMocks.isNativePlatform,
@@ -21,7 +25,9 @@ vi.mock("@capacitor/push-notifications", () => ({
 }));
 
 vi.mock("@/integrations/supabase/client", () => ({
-  supabase: {},
+  supabase: {
+    rpc: supabaseMocks.rpc,
+  },
 }));
 
 vi.mock("@/utils/storage", () => ({
@@ -43,13 +49,16 @@ vi.mock("@/utils/storage", () => ({
 }));
 
 import {
-  buildDeviceTokenRegistrationPlan,
+  buildPushDeviceTokenClaimArgs,
   getOrCreatePushInstallationId,
+  saveDeviceTokenForInstallation,
 } from "@/utils/nativePushNotifications";
 
-describe("native push registration planning", () => {
+describe("native push registration", () => {
   beforeEach(() => {
     storageState.store.clear();
+    supabaseMocks.rpc.mockReset();
+    supabaseMocks.rpc.mockResolvedValue({ data: null, error: null });
   });
 
   afterEach(() => {
@@ -64,83 +73,40 @@ describe("native push registration planning", () => {
     expect(second).toBe(first);
   });
 
-  it("keeps a same-install registration stable when the token has not changed", () => {
-    const plan = buildDeviceTokenRegistrationPlan({
-      userId: "user-1",
-      installationId: "install-a",
-      deviceToken: "token-1",
-      userAgent: "test-agent",
-      nowIso: "2026-04-12T19:00:00.000Z",
-      existingRows: [
-        {
-          id: "row-1",
-          installation_id: "install-a",
-          device_token: "token-1",
-        },
-      ],
+  it("builds claim args for the current install token", () => {
+    const args = buildPushDeviceTokenClaimArgs({
+      installationId: " install-a ",
+      deviceToken: " token-1 ",
+      userAgent: " test-agent ",
     });
 
-    expect(plan.deleteIds).toEqual([]);
-    expect(plan.upsertRow.installation_id).toBe("install-a");
-    expect(plan.upsertRow.device_token).toBe("token-1");
+    expect(args).toEqual({
+      p_installation_id: "install-a",
+      p_device_token: "token-1",
+      p_platform: "ios",
+      p_user_agent: "test-agent",
+    });
   });
 
-  it("updates the same install in place when APNs rotates the token", () => {
-    const plan = buildDeviceTokenRegistrationPlan({
-      userId: "user-1",
-      installationId: "install-a",
-      deviceToken: "token-2",
-      userAgent: "test-agent",
-      nowIso: "2026-04-12T19:00:00.000Z",
-      existingRows: [
-        {
-          id: "row-1",
-          installation_id: "install-a",
-          device_token: "token-1",
-        },
-      ],
-    });
+  it("uses the server-side claim RPC so an install can be re-owned across accounts", async () => {
+    await saveDeviceTokenForInstallation("user-2", "token-2", "install-a");
 
-    expect(plan.deleteIds).toEqual([]);
-    expect(plan.upsertRow.installation_id).toBe("install-a");
-    expect(plan.upsertRow.device_token).toBe("token-2");
+    expect(supabaseMocks.rpc).toHaveBeenCalledWith("claim_push_device_token", {
+      p_installation_id: "install-a",
+      p_device_token: "token-2",
+      p_platform: "ios",
+      p_user_agent: navigator.userAgent,
+    });
   });
 
-  it("does not disturb a different installation for the same user", () => {
-    const plan = buildDeviceTokenRegistrationPlan({
-      userId: "user-1",
-      installationId: "install-a",
-      deviceToken: "token-a",
-      userAgent: "test-agent",
-      nowIso: "2026-04-12T19:00:00.000Z",
-      existingRows: [
-        {
-          id: "row-1",
-          installation_id: "install-b",
-          device_token: "token-b",
-        },
-      ],
+  it("surfaces claim RPC errors during token registration", async () => {
+    supabaseMocks.rpc.mockResolvedValue({
+      data: null,
+      error: { message: "duplicate claim failed" },
     });
 
-    expect(plan.deleteIds).toEqual([]);
-  });
-
-  it("removes stale rows that reuse the same APNs token on another install", () => {
-    const plan = buildDeviceTokenRegistrationPlan({
-      userId: "user-1",
-      installationId: "install-a",
-      deviceToken: "token-a",
-      userAgent: "test-agent",
-      nowIso: "2026-04-12T19:00:00.000Z",
-      existingRows: [
-        {
-          id: "row-legacy",
-          installation_id: null,
-          device_token: "token-a",
-        },
-      ],
-    });
-
-    expect(plan.deleteIds).toEqual(["row-legacy"]);
+    await expect(
+      saveDeviceTokenForInstallation("user-1", "token-a", "install-a"),
+    ).rejects.toMatchObject({ message: "duplicate claim failed" });
   });
 });

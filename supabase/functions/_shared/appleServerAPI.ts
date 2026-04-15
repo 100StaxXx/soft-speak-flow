@@ -18,6 +18,8 @@ export interface AppleTransactionInfo {
   revocationDate?: number;
   revocationReason?: number;
   appAccountToken?: string;
+  offerIdentifier?: string;
+  offerType?: number;
 }
 
 export interface AppleSubscriptionStatus {

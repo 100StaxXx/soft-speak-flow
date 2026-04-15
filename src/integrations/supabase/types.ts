@@ -5933,6 +5933,13 @@ export type Database = {
       }
       referral_codes: {
         Row: {
+          affiliate_provider: string | null
+          apple_offer_campaign_identifier: string | null
+          apple_offer_code_expires_at: string | null
+          apple_offer_code_id: string | null
+          apple_offer_code_last_error: string | null
+          apple_offer_code_status: string | null
+          apple_offer_code_synced_at: string | null
           code: string
           created_at: string | null
           id: string
@@ -5950,6 +5957,13 @@ export type Database = {
           total_signups: number | null
         }
         Insert: {
+          affiliate_provider?: string | null
+          apple_offer_campaign_identifier?: string | null
+          apple_offer_code_expires_at?: string | null
+          apple_offer_code_id?: string | null
+          apple_offer_code_last_error?: string | null
+          apple_offer_code_status?: string | null
+          apple_offer_code_synced_at?: string | null
           code: string
           created_at?: string | null
           id?: string
@@ -5967,6 +5981,13 @@ export type Database = {
           total_signups?: number | null
         }
         Update: {
+          affiliate_provider?: string | null
+          apple_offer_campaign_identifier?: string | null
+          apple_offer_code_expires_at?: string | null
+          apple_offer_code_id?: string | null
+          apple_offer_code_last_error?: string | null
+          apple_offer_code_status?: string | null
+          apple_offer_code_synced_at?: string | null
           code?: string
           created_at?: string | null
           id?: string
@@ -8287,6 +8308,19 @@ export type Database = {
           success: boolean
         }[]
       }
+      get_applied_referral_code_state: {
+        Args: { p_user_id: string }
+        Returns: {
+          affiliate_provider: string | null
+          apple_offer_campaign_identifier: string | null
+          apple_offer_code_expires_at: string | null
+          apple_offer_code_status: string | null
+          code: string | null
+          is_active: boolean
+          is_apple_offer_eligible: boolean
+          owner_type: string | null
+        }[]
+      }
       apply_companion_preset_selection: {
         Args: {
           p_companion_id: string
@@ -8357,6 +8391,24 @@ export type Database = {
           current_image_url: string
           image_regenerations_used: number
         }[]
+      }
+      claim_push_device_token: {
+        Args: {
+          p_device_token: string
+          p_installation_id: string
+          p_platform: string
+          p_user_agent?: string | null
+        }
+        Returns: {
+          created_at: string
+          device_token: string
+          id: string
+          installation_id: string | null
+          platform: string
+          updated_at: string
+          user_agent: string | null
+          user_id: string
+        }
       }
       mark_companion_active: {
         Args: never

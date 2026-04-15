@@ -1,4 +1,11 @@
 import { cn } from "@/lib/utils";
+import { durationMinutesToPixels } from "@/utils/taskDurationLayout";
+
+interface TimelineTaskRowDurationLayout {
+  fallbackMinutes: number;
+  minHeightPx: number;
+  pxPerMinute: number;
+}
 
 interface TimelineTaskRowProps extends React.HTMLAttributes<HTMLDivElement> {
   time?: string | null;
@@ -7,6 +14,7 @@ interface TimelineTaskRowProps extends React.HTMLAttributes<HTMLDivElement> {
   rowKind?: "task" | "marker";
   tone?: "default" | "now";
   durationMinutes?: number | null;
+  durationLayout?: TimelineTaskRowDurationLayout | null;
   laneIndex?: number;
   laneCount?: number;
   overlapCount?: number;
@@ -31,7 +39,8 @@ export function TimelineTaskRow({
   label,
   rowKind = "task",
   tone = "default",
-  durationMinutes: _durationMinutes,
+  durationMinutes,
+  durationLayout,
   laneIndex = 0,
   laneCount = 1,
   overlapCount = 0,
@@ -48,14 +57,29 @@ export function TimelineTaskRow({
   const isTaskRow = rowKind === "task";
   const isMarkerRow = rowKind === "marker";
   const showTimelineMetadata = isTaskRow && !!displayTime;
+  const rowDurationHeightPx = isTaskRow && durationLayout
+    ? durationMinutesToPixels(durationMinutes, durationLayout)
+    : null;
+  const rootStyle = {
+    ...rootProps.style,
+    ...(rowDurationHeightPx !== null ? { minHeight: `${rowDurationHeightPx}px` } : null),
+  };
 
   return (
     <div
-      className={cn("relative flex gap-2", isDragTarget && "rounded-lg", className)}
+      {...rootProps}
+      className={cn(
+        "relative flex gap-2",
+        isTaskRow && "items-stretch",
+        isDragTarget && "rounded-lg",
+        className,
+      )}
       data-timeline-lane={showTimelineMetadata ? laneIndex : undefined}
       data-timeline-lane-count={showTimelineMetadata ? laneCount : undefined}
       data-timeline-overlap={showTimelineMetadata ? overlapCount : undefined}
-      {...rootProps}
+      data-duration-minutes={showTimelineMetadata && durationMinutes != null ? durationMinutes : undefined}
+      data-duration-height-px={rowDurationHeightPx ?? undefined}
+      style={rootStyle}
     >
       {/* Time label column - fixed width */}
       <div className={cn("w-9 flex-shrink-0 text-left", isMarkerRow ? "pt-[8px]" : "pt-[22px]")}>
@@ -79,8 +103,10 @@ export function TimelineTaskRow({
       </div>
 
       {/* Task card */}
-      <div className={cn("flex-1 min-w-0", isMarkerRow ? "py-0" : "py-1")}>
-        {children}
+      <div className={cn("flex-1 min-w-0", isMarkerRow ? "py-0" : "flex items-stretch py-1")}>
+        <div className={cn("min-w-0", isTaskRow && "flex-1 h-full")}>
+          {children}
+        </div>
       </div>
     </div>
   );

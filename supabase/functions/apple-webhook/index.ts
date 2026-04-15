@@ -5,10 +5,19 @@ import { upsertAccountEntitlement } from "../_shared/accountEntitlements.ts";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
 import {
   fetchAppleTransactionBinding,
+  getPriceCents,
+  getDiscountedYearlyOfferId,
+  isDiscountedYearlyOffer,
   resolvePlanFromProduct,
   upsertSubscription,
 } from "../_shared/appleSubscriptions.ts";
 import { normalizeAppAccountToken } from "../_shared/appleServerAPI.ts";
+import {
+  createToltCommission,
+  createToltCustomer,
+  createToltTransaction,
+  updateToltCustomer,
+} from "../_shared/tolt.ts";
 
 const defaultAppleBundleId = "com.darrylgraham.revolution";
 const appleWebhookAudiences = [
@@ -22,19 +31,6 @@ if (appleWebhookAudiences.length === 0) {
 }
 
 const appleWebhookJWKS = createRemoteJWKSet(new URL("https://appleid.apple.com/auth/keys"));
-
-const normalizeProductIds = (envKey: string, defaults: string[]) => {
-  const envValue = Deno.env.get(envKey);
-  if (!envValue) return defaults;
-  return envValue
-    .split(",")
-    .map((value) => value.trim())
-    .filter(Boolean);
-};
-
-const referralYearlyProductIds = normalizeProductIds("APPLE_REFERRAL_YEARLY_PRODUCT_IDS", [
-  "cosmiq_referral_yearly",
-]);
 
 /**
  * Apple Server-to-Server Notification Webhook
@@ -58,6 +54,7 @@ const referralYearlyProductIds = normalizeProductIds("APPLE_REFERRAL_YEARLY_PROD
 // Notification types from Apple
 enum NotificationType {
   INITIAL_BUY = "INITIAL_BUY",
+  SUBSCRIBED = "SUBSCRIBED",
   DID_RENEW = "DID_RENEW",
   DID_CHANGE_RENEWAL_STATUS = "DID_CHANGE_RENEWAL_STATUS",
   DID_CHANGE_RENEWAL_PREF = "DID_CHANGE_RENEWAL_PREF",
@@ -68,6 +65,10 @@ enum NotificationType {
   RENEWAL_EXTENDED = "RENEWAL_EXTENDED",
   REVOKE = "REVOKE",
   PRICE_INCREASE_CONSENT = "PRICE_INCREASE_CONSENT",
+}
+
+enum NotificationSubtype {
+  INITIAL_BUY = "INITIAL_BUY",
 }
 
 serve(async (req) => {
@@ -100,7 +101,7 @@ serve(async (req) => {
       });
     }
 
-    const { notificationType, latestReceiptInfo, autoRenewStatus, transactionInfo, environment } = notificationContext;
+    const { notificationType, notificationSubtype, latestReceiptInfo, autoRenewStatus, transactionInfo, environment } = notificationContext;
     
     if (!latestReceiptInfo) {
       console.error("No receipt info in notification");
@@ -145,6 +146,7 @@ serve(async (req) => {
     // Process notification based on type
     switch (notificationType) {
       case NotificationType.INITIAL_BUY:
+      case NotificationType.SUBSCRIBED:
         // First-time subscription - handle activation AND referral payout
         await handleActivation(
           supabaseClient,
@@ -152,19 +154,27 @@ serve(async (req) => {
           latestTransactionId,
           originalTransactionId,
           appAccountToken,
-          plan,
+          productId,
+          typeof transactionInfo?.offerIdentifier === "string" ? transactionInfo.offerIdentifier : null,
+          typeof transactionInfo?.offerType === "number" ? transactionInfo.offerType : null,
           expiresDateMs,
           purchaseDateMs,
           environment,
         );
-        // Create referral payout if user was referred
-        await createReferralPayout(
-          supabaseClient,
-          userId,
-          originalTransactionId,
-          plan,
-          productId,
-        );
+        if (
+          notificationType === NotificationType.INITIAL_BUY ||
+          notificationSubtype === NotificationSubtype.INITIAL_BUY
+        ) {
+          await createReferralPayout(
+            supabaseClient,
+            userId,
+            originalTransactionId,
+            plan,
+            productId,
+            typeof transactionInfo?.offerIdentifier === "string" ? transactionInfo.offerIdentifier : null,
+            typeof transactionInfo?.offerType === "number" ? transactionInfo.offerType : null,
+          );
+        }
         break;
         
       case NotificationType.DID_RENEW:
@@ -176,7 +186,9 @@ serve(async (req) => {
           latestTransactionId,
           originalTransactionId,
           appAccountToken,
-          plan,
+          productId,
+          typeof transactionInfo?.offerIdentifier === "string" ? transactionInfo.offerIdentifier : null,
+          typeof transactionInfo?.offerType === "number" ? transactionInfo.offerType : null,
           expiresDateMs,
           purchaseDateMs,
           environment,
@@ -261,20 +273,24 @@ async function handleActivation(
   transactionId: string,
   originalTransactionId: string,
   appAccountToken: string | null,
-  plan: string,
+  productId: string,
+  offerIdentifier: string | null,
+  offerType: number | null,
   expiresDateMs: string,
   purchaseDateMs: string,
   environment?: string,
 ) {
   const expiresDate = new Date(parseInt(expiresDateMs));
   const purchaseDate = new Date(parseInt(purchaseDateMs));
-  const normalizedPlan = resolvePlanFromProduct(plan);
+  const normalizedPlan = resolvePlanFromProduct(productId);
 
   await upsertSubscription(supabase, {
     userId,
     transactionId,
     originalTransactionId,
-    productId: plan,
+    productId,
+    offerIdentifier,
+    offerType,
     appAccountToken,
     plan: normalizedPlan,
     expiresAt: expiresDate,
@@ -291,6 +307,7 @@ type AppleJWSPayload = Record<string, unknown>;
 
 async function buildNotificationContext(body: any) {
   let notificationType = body?.notification_type as NotificationType | undefined;
+  let notificationSubtype = body?.subtype as NotificationSubtype | undefined;
   let latestReceiptInfo = body?.latest_receipt_info;
   let autoRenewStatus = body?.auto_renew_status;
   let transactionInfo: AppleJWSPayload | null = null;
@@ -299,6 +316,7 @@ async function buildNotificationContext(body: any) {
   if (body?.signedPayload) {
     const rootPayload = await verifyAppleNotification(body.signedPayload, appleWebhookAudiences);
     notificationType = rootPayload.notificationType as NotificationType;
+    notificationSubtype = rootPayload.subtype as NotificationSubtype | undefined;
 
     const data = (rootPayload.data ?? {}) as Record<string, unknown>;
     const bundleAudience = typeof data.bundleId === "string" ? data.bundleId : appleWebhookAudiences;
@@ -325,7 +343,7 @@ async function buildNotificationContext(body: any) {
     throw new Error("Apple notification missing type");
   }
 
-  return { notificationType, latestReceiptInfo, autoRenewStatus, transactionInfo, environment };
+  return { notificationType, notificationSubtype, latestReceiptInfo, autoRenewStatus, transactionInfo, environment };
 }
 
 async function verifyAppleNotification(token: string, audience: string | string[]) {
@@ -542,11 +560,13 @@ async function createReferralPayout(
   transactionId: string,
   plan: string,
   productId?: string | null,
+  offerIdentifier?: string | null,
+  offerType?: number | null,
 ) {
   // Check if user was referred by someone using referral code
   const { data: profile } = await supabase
     .from("profiles")
-    .select("referred_by_code")
+    .select("referred_by_code, email")
     .eq("id", userId)
     .single();
 
@@ -560,7 +580,7 @@ async function createReferralPayout(
   // Find the referral_code record with owner info
   const { data: codeData } = await supabase
     .from("referral_codes")
-    .select("id, owner_type, owner_user_id")
+    .select("id, owner_type, owner_user_id, affiliate_provider, tolt_partner_id, tolt_link_id, is_active, apple_offer_code_status, apple_offer_code_expires_at")
     .eq("code", referralCode)
     .single();
 
@@ -569,20 +589,47 @@ async function createReferralPayout(
     return;
   }
 
-  // Calculate payout amount based on actual configured plan price.
-  const normalizedProductId = (productId ?? "").toLowerCase();
-  const isReferralYearly =
-    plan === "yearly" &&
-    referralYearlyProductIds.some((id) => normalizedProductId.includes(id.toLowerCase()));
-  const yearlyPriceCents = Number(
-    Deno.env.get(isReferralYearly ? "APPLE_REFERRAL_YEARLY_PRICE_CENTS" : "APPLE_YEARLY_PRICE_CENTS") ??
-      (isReferralYearly ? "6999" : "9999"),
+  const isToltLinked = codeData.affiliate_provider === "tolt" && Boolean(codeData.tolt_partner_id);
+  const isAppleOfferCodeEligible = Boolean(
+    codeData.is_active &&
+    codeData.apple_offer_code_status === "active" &&
+    (!codeData.apple_offer_code_expires_at || codeData.apple_offer_code_expires_at >= new Date().toISOString().slice(0, 10)),
   );
-  const monthlyPriceCents = Number(Deno.env.get("APPLE_MONTHLY_PRICE_CENTS") ?? "999");
-  const baseAmount = plan === "yearly" ? yearlyPriceCents / 100 : monthlyPriceCents / 100;
-  const commissionPercent = plan === "yearly" ? 20 : 50;
-  const payoutAmount = Number((baseAmount * (commissionPercent / 100)).toFixed(2));
-  const payoutType = plan === "yearly" ? "first_year" : "first_month";
+  const hasDiscountedYearlyOffer = plan === "yearly" && isDiscountedYearlyOffer({
+    offerIdentifier,
+    offerType,
+  });
+
+  if (isToltLinked && !isAppleOfferCodeEligible) {
+    console.log(`Skipping Tolt commission for code ${referralCode} because the Apple custom offer code is not active`);
+    return;
+  }
+
+  if (!hasDiscountedYearlyOffer) {
+    console.log(`Skipping affiliate commission for code ${referralCode} because the yearly offer-code discount was not redeemed`);
+    return;
+  }
+
+  if (isToltLinked) {
+    await createToltAffiliateConversion(
+      supabase,
+      {
+        userId,
+        userEmail: profile.email ?? null,
+        referralCodeId: codeData.id,
+        partnerId: codeData.tolt_partner_id,
+        originalTransactionId: transactionId,
+        productId: productId ?? "cosmiq_premium_yearly",
+        offerIdentifier,
+        offerType,
+      },
+    );
+    return;
+  }
+
+  const yearlyPriceCents = getPriceCents("yearly", { offerIdentifier, offerType });
+  const payoutAmount = Number(((yearlyPriceCents / 100) * 0.2).toFixed(2));
+  const payoutType = "first_year";
 
   // Check if payout already exists to avoid duplicates
   const { data: existingPayout } = await supabase
@@ -591,7 +638,7 @@ async function createReferralPayout(
     .eq("referral_code_id", codeData.id)
     .eq("referee_id", userId)
     .eq("payout_type", payoutType)
-    .single();
+    .maybeSingle();
 
   if (existingPayout) {
     console.log(`Payout already exists for code ${referralCode}, referee ${userId}`);
@@ -621,6 +668,190 @@ async function createReferralPayout(
 
   // Auto-approve payouts when threshold is reached ($50 minimum)
   await autoApprovePayoutsIfThresholdReached(supabase, codeData.id, referralCode);
+}
+
+type ToltAffiliateConversionInput = {
+  userId: string;
+  userEmail: string | null;
+  referralCodeId: string;
+  partnerId: string;
+  originalTransactionId: string;
+  productId: string;
+  offerIdentifier?: string | null;
+  offerType?: number | null;
+};
+
+async function createToltAffiliateConversion(
+  supabase: any,
+  input: ToltAffiliateConversionInput,
+) {
+  const normalizedOfferIdentifier = input.offerIdentifier?.trim() || getDiscountedYearlyOfferId();
+  const revenueCents = getPriceCents("yearly", {
+    offerIdentifier: normalizedOfferIdentifier,
+    offerType: input.offerType,
+  });
+  const commissionCents = Math.round(revenueCents * 0.2);
+  const createdAt = new Date().toISOString();
+  const fallbackEmail = input.userEmail?.trim().toLowerCase() || `${input.userId}@users.cosmiq.quest`;
+  let conversion: any = null;
+
+  try {
+    const { data: existingConversion, error: conversionLookupError } = await supabase
+      .from("affiliate_conversions")
+      .select("*")
+      .eq("provider", "tolt")
+      .eq("source_transaction_id", input.originalTransactionId)
+      .maybeSingle();
+
+    if (conversionLookupError) {
+      throw conversionLookupError;
+    }
+
+    conversion = existingConversion;
+
+    if (!conversion) {
+      const { data: insertedConversion, error: insertError } = await supabase
+        .from("affiliate_conversions")
+        .insert({
+          provider: "tolt",
+          referral_code_id: input.referralCodeId,
+          user_id: input.userId,
+          source_transaction_id: input.originalTransactionId,
+          source_product_id: input.productId,
+          plan: "yearly",
+          amount_cents: revenueCents,
+          commission_cents: commissionCents,
+          applied_offer_id: normalizedOfferIdentifier,
+          provider_partner_id: input.partnerId,
+          status: "pending",
+          metadata: {
+            billing_source: "apple_webhook",
+          },
+        })
+        .select("*")
+        .single();
+
+      if (insertError) {
+        throw insertError;
+      }
+
+      conversion = insertedConversion;
+    }
+
+    if (conversion.status === "reported") {
+      console.log(`Tolt conversion already reported for Apple transaction ${input.originalTransactionId}`);
+      return;
+    }
+
+    let customerId = conversion.provider_customer_id as string | null;
+    if (!customerId) {
+      const customer = await createToltCustomer({
+        partnerId: input.partnerId,
+        email: fallbackEmail,
+        customerId: input.userId,
+        subscriptionId: input.originalTransactionId,
+        activeAt: createdAt,
+        status: "active",
+      });
+      customerId = customer.id;
+
+      const { error } = await supabase
+        .from("affiliate_conversions")
+        .update({
+          provider_customer_id: customerId,
+          provider_partner_id: input.partnerId,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", conversion.id);
+
+      if (error) {
+        throw error;
+      }
+    } else {
+      await updateToltCustomer(customerId, {
+        status: "active",
+        subscriptionId: input.originalTransactionId,
+        activeAt: createdAt,
+      });
+    }
+
+    let providerTransactionId = conversion.provider_transaction_id as string | null;
+    if (!providerTransactionId) {
+      const transaction = await createToltTransaction({
+        customerId,
+        chargeId: input.originalTransactionId,
+        amountCents: revenueCents,
+        interval: "year",
+        productId: input.productId,
+        productName: "Cosmiq Premium Yearly",
+        createdAt,
+      });
+      providerTransactionId = transaction.id;
+
+      const { error } = await supabase
+        .from("affiliate_conversions")
+        .update({
+          provider_transaction_id: providerTransactionId,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", conversion.id);
+
+      if (error) {
+        throw error;
+      }
+    }
+
+    let providerCommissionId = conversion.provider_commission_id as string | null;
+    if (!providerCommissionId) {
+      const commission = await createToltCommission({
+        customerId,
+        transactionId: providerTransactionId,
+        chargeId: input.originalTransactionId,
+        amountCents: commissionCents,
+        revenueCents,
+        createdAt,
+      });
+      providerCommissionId = commission.id;
+    }
+
+    const { error: finalizeError } = await supabase
+      .from("affiliate_conversions")
+      .update({
+        provider_partner_id: input.partnerId,
+        provider_customer_id: customerId,
+        provider_transaction_id: providerTransactionId,
+        provider_commission_id: providerCommissionId,
+        status: "reported",
+        last_error: null,
+        updated_at: new Date().toISOString(),
+        metadata: {
+          ...(conversion.metadata ?? {}),
+          billing_source: "apple_webhook",
+          reported_offer_id: normalizedOfferIdentifier,
+        },
+      })
+      .eq("id", conversion.id);
+
+    if (finalizeError) {
+      throw finalizeError;
+    }
+
+    console.log(
+      `Reported yearly Tolt conversion for user ${input.userId} at $${(revenueCents / 100).toFixed(2)} revenue and $${(commissionCents / 100).toFixed(2)} commission`,
+    );
+  } catch (error) {
+    if (conversion?.id) {
+      await supabase
+        .from("affiliate_conversions")
+        .update({
+          status: "failed",
+          last_error: error instanceof Error ? error.message : String(error),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", conversion.id);
+    }
+    throw error;
+  }
 }
 
 const MINIMUM_PAYOUT_THRESHOLD = 50.00;

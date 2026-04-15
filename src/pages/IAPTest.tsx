@@ -59,7 +59,7 @@ StatusBadge.displayName = 'StatusBadge';
 const IAPTest = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { currentEntitlement, refreshEntitlement, purchaseWithPromoOffer } = useStoreKit();
+  const { currentEntitlement, refreshEntitlement, redeemOfferCode } = useStoreKit();
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [entitlementResult, setEntitlementResult] = useState<any>(null);
   const [isRefreshingEntitlement, setIsRefreshingEntitlement] = useState(false);
@@ -77,7 +77,7 @@ const IAPTest = () => {
   const [isFetchingWidgetDiagnostics, setIsFetchingWidgetDiagnostics] = useState(false);
   const [isRunningWidgetProbe, setIsRunningWidgetProbe] = useState(false);
   const [isReloadingWidget, setIsReloadingWidget] = useState(false);
-  const [promoOfferLoading, setPromoOfferLoading] = useState(false);
+  const [offerCodeLoading, setOfferCodeLoading] = useState(false);
   const logsEndRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -350,28 +350,23 @@ const IAPTest = () => {
     }
   };
 
-  // Test promotional offer purchase
-  const handleTestPromoOffer = async (productId: string) => {
-    setPromoOfferLoading(true);
+  // Test offer code redemption
+  const handleTestOfferCodeRedemption = async (productId: string) => {
+    setOfferCodeLoading(true);
     const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false });
 
-    addLog(`[PROMO] Attempting promotional offer purchase for: ${productId}`, 'info');
+    addLog(`[OFFER] Attempting offer code redemption for: ${productId}`, 'info');
 
     try {
-      const result = await purchaseWithPromoOffer(productId);
-      if (result) {
-        addLog(`[PROMO] Promo offer purchase SUCCESS: ${JSON.stringify(result)}`, 'success');
-        setLastPurchaseResult({ productId, success: true, message: `Promo offer purchase succeeded`, timestamp });
-      } else {
-        addLog(`[PROMO] Promo offer purchase cancelled or pending`, 'info');
-        setLastPurchaseResult({ productId, success: false, message: 'Cancelled or pending', timestamp });
-      }
+      const result = await redeemOfferCode();
+      addLog(`[OFFER] Offer code flow status: ${result.status}`, 'success');
+      setLastPurchaseResult({ productId, success: true, message: `Offer code flow opened (${result.status})`, timestamp });
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      addLog(`[PROMO] Promo offer purchase FAILED: ${errorMsg}`, 'error');
+      addLog(`[OFFER] Offer code redemption FAILED: ${errorMsg}`, 'error');
       setLastPurchaseResult({ productId, success: false, message: errorMsg, timestamp });
     } finally {
-      setPromoOfferLoading(false);
+      setOfferCodeLoading(false);
     }
   };
 
@@ -627,37 +622,37 @@ const IAPTest = () => {
           </CardContent>
         </Card>
 
-        {/* Promotional Offer Test */}
+        {/* Offer Code Test */}
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
               <TestTube className="h-4 w-4" />
-              Promotional Offer Test
+              Offer Code Redemption Test
             </CardTitle>
             <p className="text-xs text-muted-foreground">
-              Tests server-signed promotional offer purchase flow (Cosmiq_PromoOffer_yearly)
+              Tests Apple&apos;s offer-code redemption UI for the discounted yearly creator flow.
             </p>
           </CardHeader>
           <CardContent className="pt-0 space-y-2">
             <Button
               size="sm"
               variant="outline"
-              onClick={() => handleTestPromoOffer(PREMIUM_YEARLY_PRODUCT_ID)}
-              disabled={promoOfferLoading}
+              onClick={() => handleTestOfferCodeRedemption(PREMIUM_YEARLY_PRODUCT_ID)}
+              disabled={offerCodeLoading}
               className="w-full"
             >
-              {promoOfferLoading ? (
+              {offerCodeLoading ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
                   Processing...
                 </>
               ) : (
-                'Purchase Yearly with Promo Offer ($69.99)'
+                'Open Yearly Offer Code Redemption'
               )}
             </Button>
             <p className="text-xs text-muted-foreground">
-              Requires a valid offer code applied to your profile (profile.referred_by_code).
-              Calls generate-promo-offer-signature edge function, then StoreKit purchaseWithPromoOffer.
+              Requires a valid Apple-eligible creator code applied to your profile.
+              Opens Apple&apos;s offer-code redemption UI, then lets you complete the yearly purchase path.
             </p>
           </CardContent>
         </Card>

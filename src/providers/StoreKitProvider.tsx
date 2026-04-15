@@ -13,20 +13,11 @@ import { App as CapacitorApp } from "@capacitor/app";
 import { isNativeIOSHandheld } from "@/utils/platformTargets";
 import { StoreKit, type StoreKitProduct, type StoreKitTransaction } from "@/plugins/StoreKitPlugin";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
 
 const PRODUCT_IDS = ["cosmiq_premium_monthly", "cosmiq_premium_yearly"];
+const OFFER_CODE_REDEMPTION_URL = import.meta.env.VITE_APPLE_OFFER_CODE_REDEMPTION_URL;
 
 export type StoreKitPlan = "monthly" | "yearly";
-
-interface PromoOfferSignature {
-  offerID: string;
-  keyID: string;
-  nonce: string;
-  signature: string;
-  timestamp: number;
-  appAccountToken: string;
-}
 
 type StoreKitContextValue = {
   isAvailable: boolean;
@@ -39,6 +30,7 @@ type StoreKitContextValue = {
   expirationDate: Date | null;
   purchase: (productId: string) => Promise<StoreKitTransaction | null>;
   purchaseWithPromoOffer: (productId: string) => Promise<StoreKitTransaction | null>;
+  redeemOfferCode: () => Promise<{ status: "presented" | "opened_url"; entitlement: StoreKitTransaction | null }>;
   restorePurchases: () => Promise<StoreKitTransaction | null>;
   manageSubscriptions: () => Promise<void>;
   refreshEntitlement: () => Promise<void>;
@@ -152,32 +144,31 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
   }, [isAvailable, user?.id]);
 
   const purchaseWithPromoOffer = useCallback(async (productId: string): Promise<StoreKitTransaction | null> => {
-    if (!isAvailable) return null;
-
-    // Fetch the promotional offer signature from the server
-    const { data, error } = await supabase.functions.invoke("generate-promo-offer-signature", {
-      body: { product_id: productId, offer_id: "Cosmiq_PromoOffer_yearly" },
-    });
-
-    if (error || !data) {
-      throw new Error(error?.message ?? "Failed to generate offer signature");
+    if (!isAvailable) {
+      throw new Error("Promotional offers are no longer used for the affiliate yearly discount flow.");
     }
 
-    const sig = data as PromoOfferSignature;
-    const result = await StoreKit.purchaseWithPromoOffer({
-      productId,
-      appAccountToken: user?.id,
-      offerID: sig.offerID,
-      keyID: sig.keyID,
-      nonce: sig.nonce,
-      signature: sig.signature,
-      timestamp: sig.timestamp,
+    throw new Error("Promotional offers are no longer used for the affiliate yearly discount flow.");
+  }, [isAvailable]);
+
+  const redeemOfferCode = useCallback(async () => {
+    if (!isAvailable) {
+      throw new Error("Offer code redemption is only available on iOS devices");
+    }
+
+    const result = await StoreKit.presentOfferCodeRedeemSheet({
+      redemptionURL: OFFER_CODE_REDEMPTION_URL,
     });
 
-    if (result.cancelled || result.pending) return null;
-    setCurrentEntitlement(result);
-    return result;
-  }, [isAvailable, user?.id]);
+    await refreshProducts();
+    const { entitlement } = await StoreKit.getCurrentEntitlement();
+    setCurrentEntitlement(entitlement);
+
+    return {
+      status: result.status,
+      entitlement,
+    };
+  }, [isAvailable, refreshProducts]);
 
   const restorePurchasesHandler = useCallback(async (): Promise<StoreKitTransaction | null> => {
     if (!isAvailable) return null;
@@ -209,6 +200,7 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
     expirationDate,
     purchase,
     purchaseWithPromoOffer,
+    redeemOfferCode,
     restorePurchases: restorePurchasesHandler,
     manageSubscriptions: manageSubscriptionsHandler,
     refreshEntitlement,
@@ -225,6 +217,7 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
     productsLoading,
     purchase,
     purchaseWithPromoOffer,
+    redeemOfferCode,
     refreshEntitlement,
     refreshProducts,
     restorePurchasesHandler,

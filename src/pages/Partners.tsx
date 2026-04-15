@@ -1,98 +1,28 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { ArrowRight, CheckCircle2, DollarSign, Sparkles, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { TurnstileWidget } from "@/components/security/TurnstileWidget";
-import { toast } from "@/components/ui/sonner";
-import { 
-  Sparkles, 
-  Rocket, 
-  Trophy, 
-  Heart, 
-  Zap,
-  CheckCircle2,
-  DollarSign,
-  Users,
-  TrendingUp,
-  ArrowRight
-} from "lucide-react";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
+import { toast } from "@/components/ui/sonner";
+
+const toltPartnerPortalUrl = import.meta.env.VITE_TOLT_PARTNER_PORTAL_URL as string | undefined;
 
 export default function Partners() {
-  const navigate = useNavigate();
-  const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined;
-  const turnstileRequired = import.meta.env.PROD || Boolean(turnstileSiteKey);
-  const turnstileUnavailable = turnstileRequired && !turnstileSiteKey;
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    handle: "",
-    paypal_email: "",
-  });
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
-  const [turnstileResetSignal, setTurnstileResetSignal] = useState(0);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (turnstileUnavailable) {
-      toast.error("Creator signup is temporarily unavailable until the security check is configured.");
+  const openPortal = () => {
+    if (!toltPartnerPortalUrl) {
+      toast.error("Partner portal is not configured yet. Please add VITE_TOLT_PARTNER_PORTAL_URL.");
       return;
     }
 
-    if (turnstileSiteKey && !turnstileToken) {
-      toast.error("Please complete the security check.");
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      const { data, error } = await supabase.functions.invoke(
-        "create-influencer-code",
-        {
-          body: {
-            ...formData,
-            turnstile_token: turnstileToken,
-          },
-        }
-      );
-
-      if (error) throw error;
-      if (data.error) throw new Error(data.error);
-
-      toast.success(data.message || "Your referral code is ready. Check your email for dashboard access.");
-      navigate("/creator", {
-        state: {
-          creatorSignupResult: data,
-        },
-      });
-    } catch (error) {
-      console.error("Failed to create code:", error);
-      toast.error(
-        error instanceof Error ? error.message : "Failed to create referral code"
-      );
-    } finally {
-      setIsSubmitting(false);
-      if (turnstileSiteKey) {
-        setTurnstileToken(null);
-        setTurnstileResetSignal((value) => value + 1);
-      }
-    }
+    window.location.href = toltPartnerPortalUrl;
   };
 
   return (
     <div className="min-h-screen pb-nav-safe relative overflow-hidden">
       <StarfieldBackground />
-      
+
       <div className="relative z-10">
-        {/* Hero Section */}
         <section className="min-h-screen flex items-center justify-center px-4 py-20">
-          <div className="max-w-4xl mx-auto text-center">
+          <div className="max-w-5xl mx-auto text-center">
             <div className="mb-8 animate-pulse">
               <Sparkles className="h-20 w-20 text-primary mx-auto" />
             </div>
@@ -100,309 +30,90 @@ export default function Partners() {
               Partner with Cosmiq
             </h1>
             <p className="text-xl md:text-2xl text-muted-foreground mb-8">
-              Earn cash rewards when your audience transforms their habits
+              Share your creator code, unlock the discounted annual offer for your audience, and earn 20% on the first yearly subscription.
             </p>
+
             <div className="flex flex-wrap gap-8 justify-center mb-12 text-sm">
               <div className="flex items-center gap-2">
                 <Users className="h-5 w-5 text-primary" />
-                <span>Growing Community</span>
+                <span>Affiliate portal powered by Tolt</span>
               </div>
               <div className="flex items-center gap-2">
                 <DollarSign className="h-5 w-5 text-primary" />
-                <span>20% of annual or 50% of monthly</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-primary" />
-                <span>Passive Income</span>
+                <span>20% of discounted yearly revenue only</span>
               </div>
             </div>
-            <Button 
-              size="lg" 
-              className="text-lg px-8"
-              onClick={() => document.getElementById('signup-form')?.scrollIntoView({ behavior: 'smooth' })}
-            >
-              Get Your Referral Code
-              <ArrowRight className="ml-2 h-5 w-5" />
-            </Button>
+
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+              <Button size="lg" className="text-lg px-8" onClick={openPortal}>
+                Apply To The Partner Program
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </Button>
+              <Button size="lg" variant="outline" className="text-lg px-8" onClick={openPortal}>
+                Open Partner Portal
+              </Button>
+            </div>
           </div>
         </section>
 
-        {/* About Cosmiq */}
         <section className="py-20 px-4">
-          <div className="max-w-6xl mx-auto">
-            <h2 className="font-heading text-4xl md:text-5xl font-bold text-center mb-16">
-              What is Cosmiq?
-            </h2>
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <Card className="p-6 cosmic-glass text-center">
-                <Rocket className="h-12 w-12 text-primary mx-auto mb-4" />
-                <h3 className="font-semibold text-lg mb-2">Gamified Growth</h3>
-                <p className="text-sm text-muted-foreground">
-                  Transform habits into epic quests with XP, achievements, and rewards
-                </p>
-              </Card>
-              <Card className="p-6 cosmic-glass text-center">
-                <Heart className="h-12 w-12 text-primary mx-auto mb-4" />
-                <h3 className="font-semibold text-lg mb-2">Your Companion</h3>
-                <p className="text-sm text-muted-foreground">
-                  A magical creature that evolves as you complete quests and grow
-                </p>
-              </Card>
-              <Card className="p-6 cosmic-glass text-center">
-                <Sparkles className="h-12 w-12 text-primary mx-auto mb-4" />
-                <h3 className="font-semibold text-lg mb-2">Cosmiq Insights</h3>
-                <p className="text-sm text-muted-foreground">
-                  Personalized astrology readings tailored to your zodiac profile
-                </p>
-              </Card>
-              <Card className="p-6 cosmic-glass text-center">
-                <Trophy className="h-12 w-12 text-primary mx-auto mb-4" />
-                <h3 className="font-semibold text-lg mb-2">Epic Guilds</h3>
-                <p className="text-sm text-muted-foreground">
-                  Join shared goals with friends and compete on leaderboards
-                </p>
-              </Card>
-            </div>
-          </div>
-        </section>
-
-        {/* How It Works */}
-        <section className="py-20 px-4 bg-background/30">
-          <div className="max-w-4xl mx-auto">
-            <h2 className="font-heading text-4xl md:text-5xl font-bold text-center mb-16">
-              How It Works
-            </h2>
-            <div className="grid md:grid-cols-4 gap-8">
-              <div className="text-center">
-                <div className="w-16 h-16 rounded-full bg-primary/20 border-2 border-primary flex items-center justify-center mx-auto mb-4">
-                  <span className="text-2xl font-bold">1</span>
-                </div>
-                <h3 className="font-semibold mb-2">Sign Up</h3>
-                <p className="text-sm text-muted-foreground">
-                  Get your unique referral code instantly
-                </p>
-              </div>
-              <div className="text-center">
-                <div className="w-16 h-16 rounded-full bg-primary/20 border-2 border-primary flex items-center justify-center mx-auto mb-4">
-                  <span className="text-2xl font-bold">2</span>
-                </div>
-                <h3 className="font-semibold mb-2">Share</h3>
-                <p className="text-sm text-muted-foreground">
-                  Share your code with your audience
-                </p>
-              </div>
-              <div className="text-center">
-                <div className="w-16 h-16 rounded-full bg-primary/20 border-2 border-primary flex items-center justify-center mx-auto mb-4">
-                  <span className="text-2xl font-bold">3</span>
-                </div>
-                <h3 className="font-semibold mb-2">Earn</h3>
-                <p className="text-sm text-muted-foreground">
-                  Get paid when they subscribe
-                </p>
-              </div>
-              <div className="text-center">
-                <div className="w-16 h-16 rounded-full bg-primary/20 border-2 border-primary flex items-center justify-center mx-auto mb-4">
-                  <span className="text-2xl font-bold">4</span>
-                </div>
-                <h3 className="font-semibold mb-2">Get Paid</h3>
-                <p className="text-sm text-muted-foreground">
-                  Receive payouts via PayPal
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Earnings Breakdown */}
-        <section className="py-20 px-4">
-          <div className="max-w-4xl mx-auto">
-            <h2 className="font-heading text-4xl md:text-5xl font-bold text-center mb-16">
-              Earnings Breakdown
-            </h2>
-            <div className="grid md:grid-cols-2 gap-6 mb-8">
-              <Card className="p-8 cosmic-glass">
-                <Zap className="h-10 w-10 text-primary mb-4" />
-                <h3 className="text-2xl font-bold mb-2">Monthly Subscription</h3>
-                <p className="text-4xl font-bold text-primary mb-4">$5</p>
-                <p className="text-muted-foreground">50% of first month ($9.99)</p>
-              </Card>
-              <Card className="p-8 cosmic-glass">
-                <Trophy className="h-10 w-10 text-primary mb-4" />
-                <h3 className="text-2xl font-bold mb-2">Annual Subscription</h3>
-                <p className="text-4xl font-bold text-primary mb-4">20%</p>
-                <p className="text-muted-foreground">20% of the first annual purchase amount</p>
-              </Card>
-            </div>
-            <Card className="p-6 cosmic-glass">
-              <h3 className="font-semibold mb-4">Important Details</h3>
-              <ul className="space-y-3">
-                <li className="flex items-start gap-3">
-                  <CheckCircle2 className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
-                  <span className="text-sm text-muted-foreground">
-                    <strong className="text-foreground">Minimum payout:</strong> $50 (accumulate at least $50 before payout eligibility)
-                  </span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <CheckCircle2 className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
-                  <span className="text-sm text-muted-foreground">
-                    <strong className="text-foreground">Payment method:</strong> PayPal only
-                  </span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <CheckCircle2 className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
-                  <span className="text-sm text-muted-foreground">
-                    <strong className="text-foreground">Admin approval:</strong> Payouts require approval before transfer
-                  </span>
-                </li>
-              </ul>
-            </Card>
-          </div>
-        </section>
-
-        {/* Signup Form */}
-        <section id="signup-form" className="py-20 px-4">
-          <div className="max-w-md mx-auto">
+          <div className="max-w-5xl mx-auto grid gap-6 md:grid-cols-3">
             <Card className="p-8 cosmic-glass">
-              <div className="text-center mb-8">
-                <Sparkles className="h-12 w-12 text-primary mx-auto mb-4" />
-                <h2 className="font-heading text-3xl font-bold mb-2">
-                  Get Your Code
-                </h2>
-                <p className="text-muted-foreground">
-                  Start earning rewards today
-                </p>
-              </div>
-
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <Label htmlFor="name">Name *</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) =>
-                      setFormData({ ...formData, name: e.target.value })
-                    }
-                    required
-                    placeholder="Your full name"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="email">Email *</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) =>
-                      setFormData({ ...formData, email: e.target.value })
-                    }
-                    required
-                    placeholder="your@email.com"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="handle">Social Handle *</Label>
-                  <Input
-                    id="handle"
-                    value={formData.handle}
-                    onChange={(e) =>
-                      setFormData({ ...formData, handle: e.target.value })
-                    }
-                    required
-                    placeholder="@yourusername"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Your TikTok, Instagram, or other social media handle
-                  </p>
-                </div>
-
-                <div>
-                  <Label htmlFor="paypal_email">PayPal Email *</Label>
-                  <Input
-                    id="paypal_email"
-                    type="email"
-                    value={formData.paypal_email}
-                    onChange={(e) =>
-                      setFormData({ ...formData, paypal_email: e.target.value })
-                    }
-                    required
-                    placeholder="paypal@email.com"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Where we'll send your payouts
-                  </p>
-                </div>
-
-                {turnstileSiteKey ? (
-                  <div>
-                    <Label>Security Check</Label>
-                    <div className="mt-2 rounded-lg border border-border/60 p-3">
-                      <TurnstileWidget
-                        siteKey={turnstileSiteKey}
-                        onTokenChange={setTurnstileToken}
-                        resetSignal={turnstileResetSignal}
-                      />
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      This helps protect the creator portal from automated abuse.
-                    </p>
-                  </div>
-                ) : turnstileUnavailable ? (
-                  <p className="text-sm text-destructive">
-                    Creator signup is temporarily unavailable until the security check is configured.
-                  </p>
-                ) : null}
-
-                <Button
-                  type="submit"
-                  className="w-full"
-                  size="lg"
-                  disabled={isSubmitting || turnstileUnavailable || (Boolean(turnstileSiteKey) && !turnstileToken)}
-                >
-                  {isSubmitting ? "Creating..." : "Get My Referral Code"}
-                </Button>
-              </form>
+              <h2 className="font-heading text-2xl font-bold mb-4">1. Join Through Tolt</h2>
+              <p className="text-sm text-muted-foreground">
+                Creators now apply and manage their partnership through the Tolt portal instead of the legacy in-app signup form.
+              </p>
+            </Card>
+            <Card className="p-8 cosmic-glass">
+              <h2 className="font-heading text-2xl font-bold mb-4">2. Share Your Code</h2>
+              <p className="text-sm text-muted-foreground">
+                Your partner record syncs back to Cosmiq and creates a local <code>?ref=CODE</code> link that unlocks the discounted annual offer.
+              </p>
+            </Card>
+            <Card className="p-8 cosmic-glass">
+              <h2 className="font-heading text-2xl font-bold mb-4">3. Earn On Yearly Only</h2>
+              <p className="text-sm text-muted-foreground">
+                Monthly subscriptions do not earn commission. Partners receive 20% of the discounted yearly purchase amount when Apple confirms the first paid annual subscription.
+              </p>
             </Card>
           </div>
         </section>
 
-        {/* FAQ */}
         <section className="py-20 px-4 bg-background/30">
-          <div className="max-w-4xl mx-auto">
-            <h2 className="font-heading text-4xl md:text-5xl font-bold text-center mb-16">
-              Frequently Asked Questions
+          <div className="max-w-4xl mx-auto space-y-6">
+            <h2 className="font-heading text-4xl md:text-5xl font-bold text-center">
+              What Partners Need To Know
             </h2>
-            <div className="space-y-6">
-              <Card className="p-6 cosmic-glass">
-                <h3 className="font-semibold mb-2">When do I get paid?</h3>
+
+            <Card className="p-6 cosmic-glass">
+              <div className="flex items-start gap-3">
+                <CheckCircle2 className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
                 <p className="text-sm text-muted-foreground">
-                  Payouts are processed after reaching the $50 minimum threshold and receiving admin approval. You'll be notified when your payout is ready.
+                  Creator onboarding, reporting, and payouts now run through Tolt.
                 </p>
-              </Card>
-              <Card className="p-6 cosmic-glass">
-                <h3 className="font-semibold mb-2">How do I track my referrals?</h3>
+              </div>
+            </Card>
+
+            <Card className="p-6 cosmic-glass">
+              <div className="flex items-start gap-3">
+                <CheckCircle2 className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
                 <p className="text-sm text-muted-foreground">
-                  After signing up, you'll receive a link to your personal dashboard where you can track signups, conversions, and earnings in real-time.
+                  Audience members still enter a referral code inside Cosmiq and then purchase through Apple’s in-app purchase flow.
                 </p>
-              </Card>
-              <Card className="p-6 cosmic-glass">
-                <h3 className="font-semibold mb-2">Can I change my PayPal email later?</h3>
+              </div>
+            </Card>
+
+            <Card className="p-6 cosmic-glass">
+              <div className="flex items-start gap-3">
+                <CheckCircle2 className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
                 <p className="text-sm text-muted-foreground">
-                  Contact our support team to update your payout information. Make sure to do this before your payout is processed.
+                  Eligible commission is created only after Apple confirms the first yearly purchase at the discounted promotional-offer price.
                 </p>
-              </Card>
-              <Card className="p-6 cosmic-glass">
-                <h3 className="font-semibold mb-2">Is there a limit to how much I can earn?</h3>
-                <p className="text-sm text-muted-foreground">
-                  No limits! The more people who subscribe using your code, the more you earn. Top creators are earning hundreds per month.
-                </p>
-              </Card>
-            </div>
+              </div>
+            </Card>
           </div>
         </section>
 
-        {/* Footer */}
         <footer className="py-12 px-4 border-t border-border/50">
           <div className="max-w-4xl mx-auto text-center">
             <div className="flex justify-center gap-6 mb-6 text-sm">
@@ -414,7 +125,7 @@ export default function Partners() {
               </a>
             </div>
             <p className="text-sm text-muted-foreground">
-              © 2024 Cosmiq. Transform your habits into an epic journey.
+              © 2026 Cosmiq. Transform your habits into an epic journey.
             </p>
           </div>
         </footer>

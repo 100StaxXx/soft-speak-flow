@@ -18,6 +18,7 @@ import { MAIN_QUEST_XP_MULTIPLIER } from "@/config/xpRewards";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { durationMinutesToPixels } from "@/utils/taskDurationLayout";
 import {
   DesktopQuestDetailsPopover,
   useDesktopQuestCardClickHandlers,
@@ -54,6 +55,7 @@ interface DesktopWeekPlannerProps {
   isCampaignsLoading?: boolean;
   hideAnytimeRow?: boolean;
   plannerMode?: "week" | "day";
+  timedTaskDurationFallbackMinutes?: number;
   desktopInteractionResetKey?: string | number;
   onDateSelect: (date: Date) => void;
   onPlannerModeChange?: (mode: "week" | "day") => void;
@@ -96,6 +98,9 @@ interface WeekPlannerTaskCardProps {
 
 const DEFAULT_TIMELINE_START_HOUR = 6;
 const DEFAULT_TIMELINE_END_HOUR = 21;
+const HOUR_HEIGHT_PX = 84;
+const MIN_TASK_HEIGHT_PX = 28;
+const TASK_PAD_PX = 4;
 const JOURNEYS_QUEST_CARD_SHELL_CLASS_NAME =
   "journeys-quest-card-shell overflow-hidden border bg-white/[0.04] shadow-[0_12px_22px_rgba(0,0,0,0.14)] transition-colors";
 const JOURNEYS_QUEST_CARD_SHELL_ACTIVE_CLASS_NAME = "journeys-quest-card-shell--active";
@@ -145,6 +150,86 @@ const sortWeekTasks = (left: DailyTask, right: DailyTask) => {
   return (right.created_at ?? "").localeCompare(left.created_at ?? "");
 };
 
+interface PositionedTask {
+  task: DailyTask;
+  topPx: number;
+  heightPx: number;
+  column: number;
+  totalColumns: number;
+}
+
+const calculateTaskTop = (scheduledTime: string | null | undefined, firstHour: number): number => {
+  const totalMinutes = parseMinute(scheduledTime);
+  if (totalMinutes === null) return 0;
+  return ((totalMinutes - firstHour * 60) / 60) * HOUR_HEIGHT_PX;
+};
+
+const calculateWeekTaskHeight = (
+  duration: number | null | undefined,
+  fallbackMinutes: number,
+): number => (
+  durationMinutesToPixels(duration, {
+    fallbackMinutes,
+    pxPerMinute: HOUR_HEIGHT_PX / 60,
+    minHeightPx: MIN_TASK_HEIGHT_PX,
+  })
+);
+
+const computeOverlapColumns = (
+  dayTasks: DailyTask[],
+  firstHour: number,
+  timedTaskDurationFallbackMinutes: number,
+): PositionedTask[] => {
+  const timed = dayTasks
+    .filter((t) => t.scheduled_time)
+    .map((task) => ({
+      task,
+      topPx: calculateTaskTop(task.scheduled_time, firstHour),
+      heightPx: calculateWeekTaskHeight(task.estimated_duration, timedTaskDurationFallbackMinutes),
+      column: 0,
+      totalColumns: 1,
+    }))
+    .sort((a, b) => a.topPx - b.topPx || b.heightPx - a.heightPx);
+
+  const columnEnds: number[] = [];
+
+  for (const entry of timed) {
+    let placed = false;
+    for (let col = 0; col < columnEnds.length; col++) {
+      if (entry.topPx >= columnEnds[col]) {
+        entry.column = col;
+        columnEnds[col] = entry.topPx + entry.heightPx;
+        placed = true;
+        break;
+      }
+    }
+    if (!placed) {
+      entry.column = columnEnds.length;
+      columnEnds.push(entry.topPx + entry.heightPx);
+    }
+  }
+
+  // Compute totalColumns per overlap group
+  for (let i = 0; i < timed.length; i++) {
+    const group = [timed[i]];
+    let groupBottom = timed[i].topPx + timed[i].heightPx;
+
+    for (let j = i + 1; j < timed.length; j++) {
+      if (timed[j].topPx < groupBottom) {
+        group.push(timed[j]);
+        groupBottom = Math.max(groupBottom, timed[j].topPx + timed[j].heightPx);
+      }
+    }
+
+    const maxCol = Math.max(...group.map((g) => g.column)) + 1;
+    for (const member of group) {
+      member.totalColumns = Math.max(member.totalColumns, maxCol);
+    }
+  }
+
+  return timed;
+};
+
 function WeekPlannerTaskCard({
   task,
   compact = false,
@@ -176,7 +261,7 @@ function WeekPlannerTaskCard({
       data-quest-card-shell="true"
       className={cn(
         JOURNEYS_QUEST_CARD_SHELL_CLASS_NAME,
-        "rounded-[18px] border-white/10 p-2",
+        "h-full rounded-[18px] border-white/10 p-2",
         compact && "rounded-[16px]",
         isOpen && JOURNEYS_QUEST_CARD_SHELL_ACTIVE_CLASS_NAME,
         isOpen && "border-primary/40 bg-primary/[0.08]",
@@ -250,6 +335,7 @@ export function DesktopWeekPlanner({
   isCampaignsLoading = false,
   hideAnytimeRow = false,
   plannerMode = "week",
+  timedTaskDurationFallbackMinutes = 60,
   desktopInteractionResetKey,
   onDateSelect,
   onPlannerModeChange,
@@ -376,6 +462,21 @@ export function DesktopWeekPlanner({
 
     return Array.from({ length: endHour - startHour + 1 }, (_, index) => startHour + index);
   }, [tasks]);
+
+  const positionedTasksByDate = useMemo(() => {
+    const result = new Map<string, PositionedTask[]>();
+    const firstHour = timelineHours[0] ?? DEFAULT_TIMELINE_START_HOUR;
+
+    tasksByDate.forEach((dayTasks, dateKey) => {
+      const timed = dayTasks.filter((t) => t.scheduled_time);
+      result.set(
+        dateKey,
+        computeOverlapColumns(timed, firstHour, timedTaskDurationFallbackMinutes),
+      );
+    });
+
+    return result;
+  }, [tasksByDate, timedTaskDurationFallbackMinutes, timelineHours]);
 
   const ritualTasks = useMemo(
     () => tasks.filter((task) => !!task.habit_source_id),
@@ -571,79 +672,83 @@ export function DesktopWeekPlanner({
 
         <div className="overflow-hidden rounded-[28px] border border-white/8 bg-black/10">
           <div className="overflow-auto" style={{ maxHeight: "min(72vh, 820px)" }}>
-            <div className="grid min-w-[1120px] grid-cols-[72px_repeat(7,minmax(150px,1fr))]">
-              <div className="sticky left-0 top-0 z-40 border-b border-r border-white/8 bg-[rgba(19,16,29,0.98)] px-3 py-4 backdrop-blur-xl">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground/75">
-                  Schedule
-                </p>
+            <div className="min-w-[1120px]">
+              {/* Header row */}
+              <div className="sticky top-0 z-40 grid grid-cols-[72px_repeat(7,minmax(150px,1fr))]">
+                <div className="border-b border-r border-white/8 bg-[rgba(19,16,29,0.98)] px-3 py-4 backdrop-blur-xl">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground/75">
+                    Schedule
+                  </p>
+                </div>
+
+                {weekDays.map((day) => {
+                  const dateKey = format(day, "yyyy-MM-dd");
+                  const dayStats = dayStatsByDate.get(dateKey) ?? { total: 0, completed: 0, timed: 0 };
+                  const isSelected = isSameDay(day, selectedDate);
+                  const dayIsToday = isToday(day);
+
+                  return (
+                    <div
+                      key={dateKey}
+                      data-testid={`desktop-week-day-${dateKey}`}
+                      className={cn(
+                        "border-b border-r border-white/8 px-3 py-3 backdrop-blur-xl",
+                        isSelected
+                          ? "bg-primary/[0.12]"
+                          : dayIsToday
+                          ? "bg-celestial-blue/[0.1]"
+                          : "bg-[rgba(24,21,38,0.98)]",
+                      )}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => onDateSelect(day)}
+                        className="w-full rounded-2xl text-left transition-opacity hover:opacity-90"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <p
+                              className={cn(
+                                "text-[11px] font-semibold uppercase tracking-[0.18em]",
+                                isSelected
+                                  ? "text-primary-foreground/78"
+                                  : dayIsToday
+                                  ? "text-celestial-blue"
+                                  : "text-muted-foreground/75",
+                              )}
+                            >
+                              {format(day, "EEE")}
+                            </p>
+                            <h3 className="mt-1 text-2xl font-semibold leading-none text-foreground">
+                              {format(day, "d")}
+                            </h3>
+                            <p className="mt-1 text-xs text-muted-foreground">{format(day, "MMMM d")}</p>
+                          </div>
+                          {dayIsToday ? (
+                            <span
+                              className={cn(
+                                "rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-wide",
+                                isSelected ? "bg-white/14 text-white" : "bg-celestial-blue/15 text-celestial-blue",
+                              )}
+                            >
+                              Today
+                            </span>
+                          ) : null}
+                        </div>
+
+                        <div className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground">
+                          <span>{dayStats.total === 0 ? "Open day" : `${dayStats.completed}/${dayStats.total} done`}</span>
+                          <span>{dayStats.timed} timed</span>
+                        </div>
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
 
-              {weekDays.map((day) => {
-                const dateKey = format(day, "yyyy-MM-dd");
-                const dayStats = dayStatsByDate.get(dateKey) ?? { total: 0, completed: 0, timed: 0 };
-                const isSelected = isSameDay(day, selectedDate);
-                const dayIsToday = isToday(day);
-
-                return (
-                  <div
-                    key={dateKey}
-                    data-testid={`desktop-week-day-${dateKey}`}
-                    className={cn(
-                      "sticky top-0 z-30 border-b border-r border-white/8 px-3 py-3 backdrop-blur-xl",
-                      isSelected
-                        ? "bg-primary/[0.12]"
-                        : dayIsToday
-                        ? "bg-celestial-blue/[0.1]"
-                        : "bg-[rgba(24,21,38,0.98)]",
-                    )}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => onDateSelect(day)}
-                      className="w-full rounded-2xl text-left transition-opacity hover:opacity-90"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <p
-                            className={cn(
-                              "text-[11px] font-semibold uppercase tracking-[0.18em]",
-                              isSelected
-                                ? "text-primary-foreground/78"
-                                : dayIsToday
-                                ? "text-celestial-blue"
-                                : "text-muted-foreground/75",
-                            )}
-                          >
-                            {format(day, "EEE")}
-                          </p>
-                          <h3 className="mt-1 text-2xl font-semibold leading-none text-foreground">
-                            {format(day, "d")}
-                          </h3>
-                          <p className="mt-1 text-xs text-muted-foreground">{format(day, "MMMM d")}</p>
-                        </div>
-                        {dayIsToday ? (
-                          <span
-                            className={cn(
-                              "rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-wide",
-                              isSelected ? "bg-white/14 text-white" : "bg-celestial-blue/15 text-celestial-blue",
-                            )}
-                          >
-                            Today
-                          </span>
-                        ) : null}
-                      </div>
-
-                      <div className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground">
-                        <span>{dayStats.total === 0 ? "Open day" : `${dayStats.completed}/${dayStats.total} done`}</span>
-                        <span>{dayStats.timed} timed</span>
-                      </div>
-                    </button>
-                  </div>
-                );
-              })}
-
+              {/* Anytime row */}
               {hideAnytimeRow ? null : (
-                <>
+                <div className="grid grid-cols-[72px_repeat(7,minmax(150px,1fr))]">
                   <div className="sticky left-0 z-20 border-b border-r border-white/8 bg-[rgba(19,16,29,0.98)] px-3 py-3 backdrop-blur-xl">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/75">
                       Anytime
@@ -681,49 +786,77 @@ export function DesktopWeekPlanner({
                       </div>
                     );
                   })}
-                </>
+                </div>
               )}
 
-              {timelineHours.map((hour) => (
-                <div key={hour} className="contents">
-                  <div
-                    className="sticky left-0 z-10 border-b border-r border-white/8 bg-[rgba(19,16,29,0.98)] px-3 py-3 text-right text-[11px] font-semibold text-muted-foreground/75 backdrop-blur-xl"
-                    data-testid={`desktop-week-hour-${hour}`}
-                  >
-                    {formatHourLabel(hour)}
-                  </div>
-
-                  {weekDays.map((day) => {
-                    const dateKey = format(day, "yyyy-MM-dd");
-                    const buckets = dayBucketsByDate.get(dateKey) ?? { anytime: [], timedByHour: new Map<number, DailyTask[]>() };
-                    const hourTasks = buckets.timedByHour.get(hour) ?? [];
-                    const isSelected = isSameDay(day, selectedDate);
-                    const dayIsToday = isToday(day);
-
-                    return (
-                      <div
-                        key={`${dateKey}-${hour}`}
-                        className={cn(
-                          "min-h-[84px] border-b border-r border-white/8 p-2 align-top",
-                          isSelected
-                            ? "bg-primary/[0.04]"
-                            : dayIsToday
-                            ? "bg-celestial-blue/[0.03]"
-                            : "bg-transparent",
-                        )}
-                      >
-                        {hourTasks.length > 0 ? (
-                          <div className="space-y-2">
-                            {hourTasks.map((task) => renderTaskCard(task))}
-                          </div>
-                        ) : (
-                          <div className="min-h-[68px] rounded-[16px] border border-dashed border-transparent" />
-                        )}
-                      </div>
-                    );
-                  })}
+              {/* Timeline with proportional task heights */}
+              <div className="grid grid-cols-[72px_repeat(7,minmax(150px,1fr))]">
+                {/* Time labels column */}
+                <div className="sticky left-0 z-10 bg-[rgba(19,16,29,0.98)] backdrop-blur-xl">
+                  {timelineHours.map((hour) => (
+                    <div
+                      key={hour}
+                      data-testid={`desktop-week-hour-${hour}`}
+                      className="flex items-start justify-end border-b border-r border-white/8 px-3 py-3 text-[11px] font-semibold text-muted-foreground/75"
+                      style={{ height: `${HOUR_HEIGHT_PX}px` }}
+                    >
+                      {formatHourLabel(hour)}
+                    </div>
+                  ))}
                 </div>
-              ))}
+
+                {/* Day columns with absolutely-positioned tasks */}
+                {weekDays.map((day) => {
+                  const dateKey = format(day, "yyyy-MM-dd");
+                  const positioned = positionedTasksByDate.get(dateKey) ?? [];
+                  const isSelected = isSameDay(day, selectedDate);
+                  const dayIsToday = isToday(day);
+
+                  return (
+                    <div
+                      key={`${dateKey}-timeline`}
+                      className="relative border-r border-white/8"
+                    >
+                      {/* Hour grid lines */}
+                      {timelineHours.map((hour) => (
+                        <div
+                          key={hour}
+                          className={cn(
+                            "border-b border-white/8",
+                            isSelected
+                              ? "bg-primary/[0.04]"
+                              : dayIsToday
+                              ? "bg-celestial-blue/[0.03]"
+                              : "bg-transparent",
+                          )}
+                          style={{ height: `${HOUR_HEIGHT_PX}px` }}
+                        />
+                      ))}
+
+                      {/* Absolutely positioned task cards */}
+                      {positioned.map(({ task, topPx, heightPx, column, totalColumns }) => {
+                        const widthPercent = 100 / totalColumns;
+                        const leftPercent = column * widthPercent;
+
+                        return (
+                          <div
+                            key={task.id}
+                            className="absolute z-10 px-1"
+                            style={{
+                              top: `${topPx}px`,
+                              height: `${heightPx}px`,
+                              left: `calc(${leftPercent}% + ${TASK_PAD_PX}px)`,
+                              width: `calc(${widthPercent}% - ${TASK_PAD_PX * 2}px)`,
+                            }}
+                          >
+                            {renderTaskCard(task, heightPx < 50)}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>

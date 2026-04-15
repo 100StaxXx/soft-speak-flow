@@ -238,6 +238,8 @@ interface TodaysAgendaProps {
   onSendToCalendar?: (taskId: string) => void;
   hasCalendarLink?: (taskId: string) => boolean;
   onOpenMonthView?: () => void;
+  timedTaskDurationFallbackMinutes?: number;
+  useMacDurationSizedDesktopTimelineRows?: boolean;
 }
 
 type ActiveEpic = NonNullable<TodaysAgendaProps["activeEpics"]>[number];
@@ -265,6 +267,8 @@ const MOBILE_FAB_SCROLL_CLEARANCE_PX = QUEST_LAUNCHER_SCROLL_CLEARANCE_PX;
 const DRAG_OVERLAY_TOP_PADDING_PX = 8;
 const DRAG_OVERLAY_BOTTOM_PADDING_PX = 10;
 const DRAG_OVERLAY_NAV_GAP_PX = 4;
+const DESKTOP_TIMELINE_DURATION_BASE_MINUTES = 30;
+const DESKTOP_TIMELINE_DURATION_BASE_HEIGHT_PX = 60;
 const EDGE_HOLD_ACTIVATION_MS = 180;
 const EDGE_HOLD_PIN_THRESHOLD_PX = 0.5;
 const EDGE_HOLD_TOP_NEUTRAL_OVERSHOOT_PX = 24;
@@ -630,6 +634,8 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   disableTimelineDrag = false,
   desktopPlannerMode = "day",
   desktopInteractionResetKey,
+  timedTaskDurationFallbackMinutes = 30,
+  useMacDurationSizedDesktopTimelineRows = false,
   onToggle,
   onAddQuest,
   onVoiceAddQuest,
@@ -1848,6 +1854,13 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   const selectedDateHeading = safeFormat(selectedDate, "EEEE", "Day plan");
   const selectedDateSubheading = safeFormat(selectedDate, "MMMM d, yyyy", "");
   const isSelectedToday = isSameDay(selectedDate, new Date());
+  const desktopTimelineDurationLayout = isDesktopLayout && useMacDurationSizedDesktopTimelineRows
+    ? {
+        fallbackMinutes: timedTaskDurationFallbackMinutes,
+        minHeightPx: DESKTOP_TIMELINE_DURATION_BASE_HEIGHT_PX,
+        pxPerMinute: DESKTOP_TIMELINE_DURATION_BASE_HEIGHT_PX / DESKTOP_TIMELINE_DURATION_BASE_MINUTES,
+      }
+    : null;
 
   const triggerHaptic = async (style: ImpactStyle) => {
     try {
@@ -1983,7 +1996,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
           data-quest-card-shell="true"
           className={cn(
             JOURNEYS_QUEST_CARD_SHELL_CLASS_NAME,
-            "group flex items-center gap-2 rounded-[18px] border-white/10 p-2",
+            "group flex h-full items-stretch gap-2 rounded-[18px] border-white/10 p-2",
             isDesktopDetailOpen && JOURNEYS_QUEST_CARD_SHELL_ACTIVE_CLASS_NAME,
             isDesktopDetailOpen && "border-primary/40 bg-primary/[0.08]",
             isComplete && "opacity-70",
@@ -1995,7 +2008,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             data-interactive="true"
             onClick={handleCheckboxClick}
             className={cn(
-              "flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border-2 transition-colors",
+              "flex h-5 w-5 flex-shrink-0 self-center items-center justify-center rounded-full border-2 transition-colors",
               isComplete
                 ? "border-primary bg-primary text-primary-foreground"
                 : "border-white/25 text-transparent hover:border-primary/70",
@@ -2031,12 +2044,12 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             }}
             anchor={(
               <button
-                type="button"
-                onClick={() => scheduleDesktopTaskSingleClick(task)}
-                onDoubleClick={() => handleDesktopTaskDoubleClick(task)}
-                className="min-w-0 flex-1 rounded-[14px] px-2 py-1.5 text-left transition-colors hover:bg-white/[0.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
-                data-testid={`desktop-timeline-task-button-${task.id}`}
-              >
+              type="button"
+              onClick={() => scheduleDesktopTaskSingleClick(task)}
+              onDoubleClick={() => handleDesktopTaskDoubleClick(task)}
+              className="flex h-full min-w-0 flex-1 items-center rounded-[14px] px-2 py-1.5 text-left transition-colors hover:bg-white/[0.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+              data-testid={`desktop-timeline-task-button-${task.id}`}
+            >
                 <div className="flex items-center gap-2">
                   {isRitual ? (
                     <Repeat className="h-3.5 w-3.5 flex-shrink-0 text-accent" />
@@ -3126,6 +3139,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                             isLast={index === timelineRows.length - 1}
                             isDragTarget={isThisDragging}
                             durationMinutes={task.estimated_duration}
+                            durationLayout={desktopTimelineDurationLayout}
                             laneIndex={laneIndex}
                             laneCount={laneCount}
                             overlapCount={rowFlow?.overlapCount}
@@ -3215,6 +3229,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                 overrideTime={timelinePreviewTime ?? undefined}
                 isDragTarget
                 durationMinutes={draggedScheduledTask.estimated_duration}
+                durationLayout={desktopTimelineDurationLayout}
                 laneIndex={draggedScheduledFlow?.laneIndex}
                 laneCount={draggedScheduledFlow?.laneCount}
                 overlapCount={draggedScheduledFlow?.overlapCount}

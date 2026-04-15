@@ -2,8 +2,59 @@ import {
   NOTIFICATION_COMPANION_FALLBACK_NAME,
   getNotificationSafeCompanionName,
   isAssignedCompanionName,
+  resolveNotificationCompanionContext,
   resolveStoredCompanionDisplayName,
 } from "./companionName.ts";
+
+function createCompanionNameSupabaseMock(params: {
+  evolutionCards?: Array<{ companion_id: string; evolution_stage: number | null; creature_name: string | null }>;
+  updateError?: { message: string } | null;
+}) {
+  const updateCalls: Array<{ table: string; payload: Record<string, unknown>; id: string | null }> = [];
+
+  return {
+    updateCalls,
+    client: {
+      from(table: string) {
+        if (table === "companion_evolution_cards") {
+          return {
+            select() {
+              return {
+                eq() {
+                  return {
+                    order() {
+                      return Promise.resolve({
+                        data: params.evolutionCards ?? [],
+                        error: null,
+                      });
+                    },
+                  };
+                },
+              };
+            },
+          };
+        }
+
+        if (table === "user_companion") {
+          return {
+            update(payload: Record<string, unknown>) {
+              return {
+                eq(_column: string, id: string) {
+                  updateCalls.push({ table, payload, id });
+                  return Promise.resolve({
+                    error: params.updateError ?? null,
+                  });
+                },
+              };
+            },
+          };
+        }
+
+        throw new Error(`Unexpected table ${table}`);
+      },
+    },
+  };
+}
 
 Deno.test("resolveStoredCompanionDisplayName keeps a valid cached proper name", () => {
   const resolution = resolveStoredCompanionDisplayName({
@@ -94,5 +145,70 @@ Deno.test("notification-safe companion helpers reject species labels as proper n
   const safeName = getNotificationSafeCompanionName("Phoenix", "Phoenix");
   if (safeName !== NOTIFICATION_COMPANION_FALLBACK_NAME) {
     throw new Error(`Expected generic fallback, got ${safeName}`);
+  }
+});
+
+Deno.test("resolveNotificationCompanionContext recovers a proper name and persists it when cache only stores species", async () => {
+  const supabase = createCompanionNameSupabaseMock({
+    evolutionCards: [
+      { companion_id: "comp-5", evolution_stage: 1, creature_name: "Phoenix" },
+      { companion_id: "comp-5", evolution_stage: 3, creature_name: "Nova" },
+    ],
+  });
+
+  const context = await resolveNotificationCompanionContext({
+    supabase: supabase.client,
+    companion: {
+      id: "comp-5",
+      user_id: "user-5",
+      current_stage: 3,
+      cached_creature_name: "Phoenix",
+      spirit_animal: "Phoenix",
+      current_mood: "calm",
+      inactive_days: 2,
+    },
+    logPrefix: "[test]",
+  });
+
+  if (context?.displayName !== "Nova") {
+    throw new Error(`Expected recovered name Nova, got ${context?.displayName ?? null}`);
+  }
+
+  if (context?.cachedCreatureName !== "Nova") {
+    throw new Error(`Expected cached creature name to be updated to Nova, got ${context?.cachedCreatureName ?? null}`);
+  }
+
+  if (supabase.updateCalls.length !== 1) {
+    throw new Error(`Expected one cache update, got ${supabase.updateCalls.length}`);
+  }
+});
+
+Deno.test("resolveNotificationCompanionContext falls back to generic companion text when no proper name exists", async () => {
+  const supabase = createCompanionNameSupabaseMock({
+    evolutionCards: [
+      { companion_id: "comp-6", evolution_stage: 1, creature_name: "Leviathan" },
+    ],
+  });
+
+  const context = await resolveNotificationCompanionContext({
+    supabase: supabase.client,
+    companion: {
+      id: "comp-6",
+      user_id: "user-6",
+      current_stage: 1,
+      cached_creature_name: "Leviathan",
+      spirit_animal: "Leviathan",
+      current_mood: null,
+      inactive_days: 6,
+    },
+    logPrefix: "[test]",
+  });
+
+  if (context?.displayName !== NOTIFICATION_COMPANION_FALLBACK_NAME) {
+    throw new Error(`Expected generic fallback, got ${context?.displayName ?? null}`);
+  }
+
+  if (supabase.updateCalls.length !== 0) {
+    throw new Error(`Expected no cache updates for fallback case, got ${supabase.updateCalls.length}`);
   }
 });

@@ -55,26 +55,6 @@
           "referenceName" : "Cosmiq Pro Yearly",
           "subscriptionPrice" : "99.99",
           "type" : "RecurringSubscription"
-        },
-        {
-          "adHocOffers" : [ ],
-          "codeOffers" : [ ],
-          "displayPrice" : "69.99",
-          "familyShareable" : false,
-          "groupNumber" : 1,
-          "internalID" : "A8D0DF40-0A9E-4E43-9C5A-C05M1Q5S003",
-          "introductoryOffer" : null,
-          "localizations" : [
-            {
-              "description" : "Cosmiq referral annual subscription",
-              "displayName" : "Cosmiq Referral Yearly"
-            }
-          ],
-          "productID" : "cosmiq_referral_yearly",
-          "recurringSubscriptionPeriod" : "P1Y",
-          "referenceName" : "Cosmiq Referral Yearly",
-          "subscriptionPrice" : "69.99",
-          "type" : "RecurringSubscription"
         }
       ]
     }

@@ -4,6 +4,8 @@ import type {
   StoreKitProduct,
   StoreKitTransaction,
   PromoOfferParams,
+  OfferCodeRedemptionParams,
+  OfferCodeRedemptionResult,
 } from './StoreKitPlugin';
 
 export class StoreKitWeb extends WebPlugin implements StoreKitPluginInterface {
@@ -20,6 +22,10 @@ export class StoreKitWeb extends WebPlugin implements StoreKitPluginInterface {
 
   async purchaseWithPromoOffer(_options: PromoOfferParams): Promise<StoreKitTransaction> {
     throw new Error('In-App Purchases are only available on iOS devices');
+  }
+
+  async presentOfferCodeRedeemSheet(_options?: OfferCodeRedemptionParams): Promise<OfferCodeRedemptionResult> {
+    throw new Error('Offer code redemption is only available on iOS devices');
   }
 
   async restorePurchases(): Promise<{ restored: boolean; entitlement: StoreKitTransaction | null }> {

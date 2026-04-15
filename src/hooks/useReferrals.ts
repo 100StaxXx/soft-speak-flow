@@ -112,6 +112,7 @@ export const useReferrals = () => {
     onSuccess: () => {
       // Invalidate queries to trigger refetch (UI updates asynchronously)
       queryClient.invalidateQueries({ queryKey: ["referral-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["applied-referral-code-state", user?.id] });
       toast.success("Referral code applied! Your friend will earn rewards when you reach Stage 5 • Initiate.");
     },
     onError: (error: Error) => {

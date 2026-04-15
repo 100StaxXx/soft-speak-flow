@@ -1,9 +1,9 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { isNativeIOSHandheld } from "@/utils/platformTargets";
 import { useToast } from "./use-toast";
 import { useAuth } from "./useAuth";
-import { useProfile } from "./useProfile";
+import { useAppliedReferralCodeState } from "./useAppliedReferralCodeState";
 import { useStoreKit } from "./useStoreKit";
 import { trackPaywallEvent } from "@/utils/paywallTelemetry";
 
@@ -26,13 +26,13 @@ function getErrorMessage(error: unknown): string {
 export function useAppleSubscription() {
   const { toast } = useToast();
   const { user } = useAuth();
-  const { profile } = useProfile();
+  const { appliedReferralCodeState } = useAppliedReferralCodeState();
   const {
     isAvailable,
     products,
     productsLoading,
     purchase,
-    purchaseWithPromoOffer,
+    redeemOfferCode,
     restorePurchases,
     manageSubscriptions,
     refreshProducts,
@@ -40,7 +40,16 @@ export function useAppleSubscription() {
   const [loading, setLoading] = useState(false);
   const [manageLoading, setManageLoading] = useState(false);
   const [productError, setProductError] = useState<string | null>(null);
-  const hasOfferCode = Boolean(profile?.referred_by_code);
+  const [offerCodePurchaseReady, setOfferCodePurchaseReady] = useState(false);
+  const hasOfferCode = appliedReferralCodeState.is_apple_offer_eligible;
+  const hasAppliedReferralCode = Boolean(appliedReferralCodeState.code);
+  const appliedReferralCode = appliedReferralCodeState.code;
+
+  useEffect(() => {
+    if (!hasOfferCode) {
+      setOfferCodePurchaseReady(false);
+    }
+  }, [hasOfferCode]);
 
   const hasLoadedProducts = products.length > 0;
 
@@ -92,10 +101,50 @@ export function useAppleSubscription() {
     }
 
     const plan = productId.includes("yearly") ? "yearly" : "monthly";
+    const usesOfferCodeDiscount = hasOfferCode && plan === "yearly";
 
     setLoading(true);
     setProductError(null);
     try {
+      if (usesOfferCodeDiscount && !offerCodePurchaseReady) {
+        trackPaywallEvent("offer_code_redemption_started", {
+          surface,
+          plan,
+          productId,
+          hasOfferCode,
+        });
+
+        const redemption = await redeemOfferCode();
+
+        trackPaywallEvent("offer_code_redemption_completed", {
+          surface,
+          plan,
+          productId,
+          hasOfferCode,
+          status: redemption.status,
+          entitlementActivated: Boolean(redemption.entitlement),
+        });
+
+        if (redemption.entitlement) {
+          toast({
+            title: "Premium unlocked",
+            description: "Your discounted yearly access is now active.",
+          });
+          setOfferCodePurchaseReady(false);
+          return true;
+        }
+
+        setOfferCodePurchaseReady(true);
+        toast({
+          title: "Finish redeeming with Apple",
+          description:
+            redemption.status === "opened_url"
+              ? "Complete the Apple offer-code redemption, then return and tap Subscribe Yearly."
+              : "Use the same code in Apple's redemption screen, then tap Subscribe Yearly to finish.",
+        });
+        return false;
+      }
+
       trackPaywallEvent("purchase_started", {
         surface,
         plan,
@@ -103,17 +152,14 @@ export function useAppleSubscription() {
         hasOfferCode,
       });
 
-      // Use promotional offer for yearly if user has an offer code
-      const usePromoOffer = hasOfferCode && productId.includes("yearly");
-      const result = usePromoOffer
-        ? await purchaseWithPromoOffer(productId)
-        : await purchase(productId);
+      const result = await purchase(productId);
 
       if (!result) {
         trackPaywallEvent("purchase_cancelled", { surface, plan, productId, hasOfferCode });
         return false;
       }
 
+      setOfferCodePurchaseReady(false);
       trackPaywallEvent("purchase_completed", { surface, plan, productId, hasOfferCode });
       toast({
         title: "Premium unlocked",
@@ -121,6 +167,15 @@ export function useAppleSubscription() {
       });
       return true;
     } catch (error) {
+      if (usesOfferCodeDiscount && !offerCodePurchaseReady) {
+        trackPaywallEvent("offer_code_redemption_failed", {
+          surface,
+          plan,
+          productId,
+          hasOfferCode,
+          message: getErrorMessage(error),
+        });
+      }
       if (isCancellationError(error)) {
         trackPaywallEvent("purchase_cancelled", { surface, plan, productId, hasOfferCode });
         return false;
@@ -138,7 +193,7 @@ export function useAppleSubscription() {
     } finally {
       setLoading(false);
     }
-  }, [hasOfferCode, products, purchase, purchaseWithPromoOffer, toast, user?.id]);
+  }, [hasOfferCode, offerCodePurchaseReady, products, purchase, redeemOfferCode, toast, user?.id]);
 
   const handleRestore = useCallback(async (surface: string = "paywall") => {
     if (!isIAPAvailable()) {
@@ -214,5 +269,8 @@ export function useAppleSubscription() {
     hasLoadedProducts,
     reloadProducts,
     hasOfferCode,
+    hasAppliedReferralCode,
+    appliedReferralCode,
+    offerCodePurchaseReady,
   };
 }

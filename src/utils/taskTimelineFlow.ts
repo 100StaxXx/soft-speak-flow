@@ -1,7 +1,6 @@
 import { getScheduledTimeParts } from "./scheduledTime";
 import { getTaskConflictSetForTask, type TaskConflictCandidate } from "./taskTimeConflicts";
-
-const DEFAULT_DURATION_MINUTES = 30;
+import { resolveTimedTaskDurationMinutes } from "./taskDurationLayout";
 
 interface ScheduledTimelineTask extends TaskConflictCandidate {
   startMinute: number;
@@ -24,10 +23,7 @@ export interface TaskTimelineFlowResult {
 }
 
 const getDurationMinutes = (task: TaskConflictCandidate): number => {
-  if (!Number.isFinite(task.estimated_duration) || (task.estimated_duration ?? 0) <= 0) {
-    return DEFAULT_DURATION_MINUTES;
-  }
-  return Number(task.estimated_duration);
+  return resolveTimedTaskDurationMinutes(task.estimated_duration);
 };
 
 const getStartMinute = (value: string | null | undefined): number | null => {
@@ -143,4 +139,3 @@ export const buildTaskTimelineFlow = (
     byTaskId,
   };
 };
-

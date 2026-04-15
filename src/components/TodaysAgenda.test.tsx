@@ -188,7 +188,8 @@ vi.mock("@/components/TimelineTaskRow", () => ({
     overrideTime,
     time,
     tone,
-    durationMinutes: _durationMinutes,
+    durationMinutes,
+    durationLayout,
     laneIndex,
     laneCount,
     overlapCount,
@@ -204,6 +205,11 @@ vi.mock("@/components/TimelineTaskRow", () => ({
     time?: string | null;
     tone?: "default" | "now";
     durationMinutes?: number | null;
+    durationLayout?: {
+      fallbackMinutes: number;
+      minHeightPx: number;
+      pxPerMinute: number;
+    } | null;
     laneIndex?: number;
     laneCount?: number;
     overlapCount?: number;
@@ -214,6 +220,17 @@ vi.mock("@/components/TimelineTaskRow", () => ({
     isDragTarget?: boolean;
   } & Record<string, unknown>) => {
     const displayTime = overrideTime ?? time;
+    const resolvedDurationMinutes = !durationLayout
+      ? null
+      : !Number.isFinite(durationMinutes) || (durationMinutes ?? 0) <= 0
+      ? durationLayout.fallbackMinutes
+      : Number(durationMinutes);
+    const minHeight = !durationLayout || resolvedDurationMinutes === null
+      ? undefined
+      : `${Math.max(
+          durationLayout.minHeightPx,
+          resolvedDurationMinutes * durationLayout.pxPerMinute,
+        )}px`;
     return (
       <div
         data-testid="timeline-row"
@@ -221,6 +238,7 @@ vi.mock("@/components/TimelineTaskRow", () => ({
         data-timeline-lane-count={laneCount}
         data-timeline-overlap={overlapCount}
         data-timeline-tone={tone}
+        style={minHeight ? { minHeight } : undefined}
         {...props}
       >
         {displayTime ? <span data-testid="timeline-row-time">{displayTime}</span> : null}
@@ -2361,6 +2379,92 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     );
 
     expect(screen.queryByTestId("timeline-duration-indicator")).not.toBeInTheDocument();
+  });
+
+  it("uses duration-proportional row heights for mac desktop scheduled tasks", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-scheduled-1",
+            task_text: "Deep work block",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "09:00",
+            estimated_duration: 60,
+          },
+          {
+            id: "task-scheduled-2",
+            task_text: "Standup",
+            completed: false,
+            xp_reward: 15,
+            scheduled_time: "10:00",
+            estimated_duration: 30,
+          },
+          {
+            id: "task-scheduled-3",
+            task_text: "Fallback block",
+            completed: false,
+            xp_reward: 15,
+            scheduled_time: "11:00",
+            estimated_duration: null,
+          },
+        ]}
+        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+        layoutMode="desktop"
+        useMacDurationSizedDesktopTimelineRows
+        timedTaskDurationFallbackMinutes={30}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={3}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    expect(screen.getByTestId("timeline-row-task-scheduled-1")).toHaveStyle({ minHeight: "120px" });
+    expect(screen.getByTestId("timeline-row-task-scheduled-2")).toHaveStyle({ minHeight: "60px" });
+    expect(screen.getByTestId("timeline-row-task-scheduled-3")).toHaveStyle({ minHeight: "60px" });
+  });
+
+  it("keeps default desktop scheduled row sizing when mac duration sizing is disabled", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-scheduled-1",
+            task_text: "Deep work block",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "09:00",
+            estimated_duration: 60,
+          },
+        ]}
+        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+        layoutMode="desktop"
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    expect(screen.getByTestId("timeline-row-task-scheduled-1").style.minHeight).toBe("");
   });
 
   it("removes added spacing between scheduled rows", () => {

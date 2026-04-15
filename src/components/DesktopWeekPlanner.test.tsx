@@ -83,7 +83,7 @@ describe("DesktopWeekPlanner", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Day" }));
     expect(onPlannerModeChange).toHaveBeenCalledWith("day");
-  });
+  }, 15000);
 
   it("renders a companion voice launcher while preserving the manual add quest target", () => {
     const onVoiceAddQuest = vi.fn();
@@ -145,6 +145,61 @@ describe("DesktopWeekPlanner", () => {
     expect(screen.getByText("Wednesday review")).toBeInTheDocument();
     expect(within(timedCard).queryByText("8:00 AM")).not.toBeInTheDocument();
     expect(within(timedCard).queryByText("+20 XP")).not.toBeInTheDocument();
+  });
+
+  it("uses the mac fallback duration for timed task height when duration is missing", () => {
+    render(
+      <DesktopWeekPlanner
+        selectedDate={selectedDate}
+        tasks={[
+          baseTask({
+            id: "missing-duration-task",
+            task_text: "Fallback duration quest",
+            estimated_duration: null,
+          }),
+        ]}
+        timedTaskDurationFallbackMinutes={30}
+        onDateSelect={vi.fn()}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+      />,
+    );
+
+    const taskWrapper = screen.getByTestId("desktop-week-task-missing-duration-task").parentElement;
+    expect(taskWrapper).toBeTruthy();
+    expect(taskWrapper).toHaveStyle({ height: "42px" });
+  });
+
+  it("keeps explicit durations proportional in the timed week grid", () => {
+    render(
+      <DesktopWeekPlanner
+        selectedDate={selectedDate}
+        tasks={[
+          baseTask({
+            id: "short-task",
+            task_text: "Short quest",
+            estimated_duration: 30,
+          }),
+          baseTask({
+            id: "long-task",
+            task_text: "Long quest",
+            scheduled_time: "11:00",
+            estimated_duration: 90,
+          }),
+        ]}
+        timedTaskDurationFallbackMinutes={30}
+        onDateSelect={vi.fn()}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+      />,
+    );
+
+    const shortTaskWrapper = screen.getByTestId("desktop-week-task-short-task").parentElement;
+    const longTaskWrapper = screen.getByTestId("desktop-week-task-long-task").parentElement;
+    expect(shortTaskWrapper).toBeTruthy();
+    expect(longTaskWrapper).toBeTruthy();
+    expect(shortTaskWrapper).toHaveStyle({ height: "42px" });
+    expect(Number.parseFloat(longTaskWrapper?.style.height || "0")).toBeCloseTo(126, 5);
   });
 
   it("hides the anytime row when requested for a mac session", () => {

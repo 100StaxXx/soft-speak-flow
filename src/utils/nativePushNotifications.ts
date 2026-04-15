@@ -32,25 +32,11 @@ export interface NativePushTokenDebugSnapshot {
   currentInstallationIdPreview: string | null;
 }
 
-export interface PushDeviceTokenRegistrationPlanInput {
-  userId: string;
-  installationId: string;
-  deviceToken: string;
-  userAgent: string;
-  nowIso: string;
-  existingRows: PushDeviceTokenRow[];
-}
-
-export interface PushDeviceTokenRegistrationPlan {
-  deleteIds: string[];
-  upsertRow: {
-    user_id: string;
-    installation_id: string;
-    device_token: string;
-    platform: 'ios';
-    user_agent: string;
-    updated_at: string;
-  };
+export interface ClaimPushDeviceTokenArgs {
+  p_installation_id: string;
+  p_device_token: string;
+  p_platform: 'ios';
+  p_user_agent: string | null;
 }
 
 function readPushInstallationId(): string | null {
@@ -84,23 +70,16 @@ function previewValue(value: string | null): string | null {
   return `${value.slice(0, 8)}...${value.slice(-4)}`;
 }
 
-export function buildDeviceTokenRegistrationPlan(
-  input: PushDeviceTokenRegistrationPlanInput,
-): PushDeviceTokenRegistrationPlan {
-  const deleteIds = input.existingRows
-    .filter((row) => row.installation_id !== input.installationId && row.device_token === input.deviceToken)
-    .map((row) => row.id);
-
+export function buildPushDeviceTokenClaimArgs(input: {
+  installationId: string;
+  deviceToken: string;
+  userAgent?: string | null;
+}): ClaimPushDeviceTokenArgs {
   return {
-    deleteIds,
-    upsertRow: {
-      user_id: input.userId,
-      installation_id: input.installationId,
-      device_token: input.deviceToken,
-      platform: 'ios',
-      user_agent: input.userAgent,
-      updated_at: input.nowIso,
-    },
+    p_installation_id: input.installationId.trim(),
+    p_device_token: input.deviceToken.trim(),
+    p_platform: 'ios',
+    p_user_agent: input.userAgent?.trim() || null,
   };
 }
 
@@ -353,41 +332,12 @@ export async function saveDeviceTokenForInstallation(
   console.log('[NativePush] Token (first 20 chars):', deviceToken.substring(0, 20) + '...');
   
   try {
-    const { data: existingRows, error: existingRowsError } = await supabase
-      .from('push_device_tokens')
-      .select('id,device_token,installation_id')
-      .eq('user_id', userId)
-      .eq('platform', 'ios');
-
-    if (existingRowsError) {
-      throw existingRowsError;
-    }
-
-    const registrationPlan = buildDeviceTokenRegistrationPlan({
-      userId,
+    const claimArgs = buildPushDeviceTokenClaimArgs({
       installationId,
       deviceToken,
       userAgent: navigator.userAgent,
-      nowIso: new Date().toISOString(),
-      existingRows: (existingRows ?? []) as PushDeviceTokenRow[],
     });
-
-    if (registrationPlan.deleteIds.length > 0) {
-      const { error: deleteError } = await supabase
-        .from('push_device_tokens')
-        .delete()
-        .in('id', registrationPlan.deleteIds);
-
-      if (deleteError) {
-        throw deleteError;
-      }
-    }
-
-    const { error } = await supabase
-      .from('push_device_tokens')
-      .upsert(registrationPlan.upsertRow, {
-        onConflict: 'user_id,platform,installation_id'
-      });
+    const { error } = await supabase.rpc('claim_push_device_token', claimArgs);
 
     if (error) {
       console.log('[NativePush] Database error:', error);

@@ -20,6 +20,8 @@ export interface StoreKitTransaction {
   expirationDate?: string;
   revocationDate?: string;
   appAccountToken?: string;
+  offerIdentifier?: string;
+  offerType?: number;
   isUpgraded?: boolean;
   cancelled?: boolean;
   pending?: boolean;
@@ -35,10 +37,19 @@ export interface PromoOfferParams {
   timestamp: number;
 }
 
+export interface OfferCodeRedemptionParams {
+  redemptionURL?: string;
+}
+
+export interface OfferCodeRedemptionResult {
+  status: "presented" | "opened_url";
+}
+
 export interface StoreKitPluginInterface {
   getProducts(options: { productIds: string[] }): Promise<{ products: StoreKitProduct[] }>;
   purchase(options: { productId: string; appAccountToken?: string }): Promise<StoreKitTransaction>;
   purchaseWithPromoOffer(options: PromoOfferParams): Promise<StoreKitTransaction>;
+  presentOfferCodeRedeemSheet(options?: OfferCodeRedemptionParams): Promise<OfferCodeRedemptionResult>;
   restorePurchases(): Promise<{ restored: boolean; entitlement: StoreKitTransaction | null }>;
   getCurrentEntitlement(): Promise<{ entitlement: StoreKitTransaction | null }>;
   manageSubscriptions(): Promise<void>;

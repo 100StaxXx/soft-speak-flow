@@ -136,8 +136,8 @@ serve(async (req) => {
 
     if (action === "create_test_conversion") {
       const code = typeof body?.code === "string" ? body.code.trim().toUpperCase() : "";
-      const plan = body?.plan === "yearly" ? "yearly" : "monthly";
-      const amount = Number(body?.amount ?? (plan === "yearly" ? 99 : 9.99));
+      const plan = "yearly";
+      const amount = Number(body?.amount ?? 69.99);
 
       if (!code) {
         return new Response(JSON.stringify({ error: "Missing code" }), {
@@ -155,7 +155,7 @@ serve(async (req) => {
 
       const { data: codeData, error: codeError } = await supabase
         .from("referral_codes")
-        .select("id, code, owner_user_id, total_conversions, total_revenue")
+        .select("id, code, owner_user_id, total_conversions, total_revenue, affiliate_provider, tolt_partner_id")
         .eq("code", code)
         .maybeSingle();
 
@@ -168,8 +168,18 @@ serve(async (req) => {
         });
       }
 
-      const payoutType = plan === "yearly" ? "first_year" : "first_month";
-      const commissionPercent = plan === "yearly" ? 20 : 50;
+      const isToltLinked = codeData.affiliate_provider === "tolt" && Boolean(codeData.tolt_partner_id);
+      if (isToltLinked) {
+        return new Response(JSON.stringify({
+          error: "Tolt-linked codes are reported through the Apple yearly webhook flow, not local test payouts.",
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const payoutType = "first_year";
+      const commissionPercent = 20;
       const payoutAmount = Number((amount * (commissionPercent / 100)).toFixed(2));
       const refereeId = isUuid(body?.refereeId) ? body.refereeId : adminRequest.userId;
 

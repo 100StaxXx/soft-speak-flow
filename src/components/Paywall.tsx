@@ -65,6 +65,9 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
     productError,
     reloadProducts,
     hasOfferCode,
+    hasAppliedReferralCode,
+    appliedReferralCode,
+    offerCodePurchaseReady,
   } = useAppleSubscription();
   const { toast } = useToast();
   const { user, signOut } = useAuth();
@@ -130,7 +133,7 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
       ]);
       setOfferCode("");
       toast({
-        title: "Offer code applied",
+        title: "Creator code applied",
         description: "Your yearly plan is now discounted to $69.99/year.",
       });
     } catch (error) {
@@ -269,7 +272,7 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
     yearly: {
       fallbackPrice: hasOfferCode ? "$69.99" : "$99.99",
       period: "/year",
-      savings: hasOfferCode ? "Offer applied" : "Best value",
+      savings: hasOfferCode ? "Code applied" : "Best value",
     },
   };
 
@@ -287,6 +290,9 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
         legalIntro:
           "No charge today. Your Apple ID account will be charged when the free trial ends unless canceled at least 24 hours before the end of the trial.",
       };
+  const ctaLabel = selectedPlan === "yearly" && hasOfferCode
+    ? (offerCodePurchaseReady ? "Subscribe Yearly" : "Redeem Discount with Apple")
+    : copy.cta;
 
   return (
     <div className="fixed inset-0 z-50 bg-background flex flex-col items-center justify-start px-6 pt-safe pb-[var(--bottom-nav-runtime-offset,var(--bottom-nav-safe-offset))] overflow-y-auto">
@@ -320,29 +326,38 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
                 <Gift className="h-5 w-5 text-primary" />
               </div>
               <div className="space-y-1">
-                <h2 className="text-lg font-semibold text-foreground">Have an offer code?</h2>
+                <h2 className="text-lg font-semibold text-foreground">Have a creator code?</h2>
                 <p className="text-sm text-muted-foreground">
                   Enter it here to unlock the discounted annual price.
                 </p>
               </div>
             </div>
 
-            {hasOfferCode ? (
+            {hasAppliedReferralCode ? (
               <div className="rounded-2xl border border-primary/30 bg-primary/10 p-4">
                 <div className="flex items-start gap-3">
                   <CheckCircle2 className="mt-0.5 h-5 w-5 text-primary" />
                   <div className="space-y-1">
-                    <p className="font-medium text-foreground">Offer code applied</p>
-                    <p className="text-sm text-muted-foreground">
-                      Your annual plan is discounted to $69.99/year.
+                    <p className="font-medium text-foreground">
+                      {hasOfferCode ? "Creator code applied" : "Referral code applied"}
                     </p>
+                    <p className="text-sm text-muted-foreground">
+                      {hasOfferCode
+                        ? "Your annual plan is discounted to $69.99/year."
+                        : "This code is saved to your account, but it does not unlock the Apple creator discount."}
+                    </p>
+                    {hasOfferCode && appliedReferralCode ? (
+                      <p className="text-xs text-muted-foreground">
+                        Use <span className="font-mono tracking-[0.18em] text-foreground">{appliedReferralCode}</span> in Apple&apos;s offer-code redemption screen.
+                      </p>
+                    ) : null}
                   </div>
                 </div>
               </div>
             ) : (
               <form className="space-y-3" onSubmit={handleApplyOfferCode}>
                 <Input
-                  placeholder="ENTER OFFER CODE"
+                  placeholder="ENTER CREATOR CODE"
                   value={offerCode}
                   onChange={(event) => setOfferCode(event.target.value.toUpperCase())}
                   maxLength={24}
@@ -353,7 +368,7 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
                   disabled={applyReferralCode.isPending || !offerCode.trim()}
                   className="w-full"
                 >
-                  {applyReferralCode.isPending ? "Applying..." : "Apply Offer Code"}
+                  {applyReferralCode.isPending ? "Applying..." : "Apply Creator Code"}
                 </Button>
                 <p className="text-center text-xs text-muted-foreground">
                   Entering a valid code unlocks discounted annual pricing.
@@ -419,7 +434,7 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
           disabled={!isAvailable || loading || productsLoading || !selectedProduct}
           className="w-full py-6 text-base font-semibold bg-gradient-to-r from-primary to-accent hover:opacity-90 text-primary-foreground shadow-glow"
         >
-          {loading ? "Processing..." : copy.cta}
+          {loading ? "Processing..." : ctaLabel}
           {!loading && <ArrowRight className="ml-2 h-4 w-4" />}
         </Button>
 

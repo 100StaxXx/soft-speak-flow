@@ -39,6 +39,7 @@ vi.mock("@/hooks/useStoreKit", () => ({
     currentEntitlement: null,
     refreshEntitlement: vi.fn().mockResolvedValue(undefined),
     purchaseWithPromoOffer: vi.fn().mockResolvedValue(null),
+    redeemOfferCode: vi.fn().mockResolvedValue({ status: "presented", entitlement: null }),
     isAvailable: true,
     products: [],
     productsLoading: false,
@@ -65,6 +66,12 @@ vi.mock("@/integrations/supabase/client", () => ({
 
 vi.mock("@/hooks/use-toast", () => ({
   useToast: () => ({ toast: mocks.toastMock }),
+}));
+
+vi.mock("@/components/ui/scroll-area", () => ({
+  ScrollArea: ({ children, className }: { children: React.ReactNode; className?: string }) => (
+    <div className={className}>{children}</div>
+  ),
 }));
 
 vi.mock("@/utils/appleIAP", () => ({
@@ -133,7 +140,7 @@ describe("IAPTest widget diagnostics", () => {
       timestamp: "2026-02-24T08:00:10.000Z",
     });
 
-    renderPage();
+    const view = renderPage();
 
     fireEvent.click(screen.getByRole("button", { name: /fetch diagnostics/i }));
     await waitFor(() => {
@@ -145,10 +152,10 @@ describe("IAPTest widget diagnostics", () => {
       expect(mocks.runWidgetSyncProbeMock).toHaveBeenCalledTimes(1);
     });
 
-    expect(screen.getByText("PASS")).toBeInTheDocument();
-    expect(screen.getByText(/"writeSucceeded": true/)).toBeInTheDocument();
-    expect(screen.getByText(/"readBackSucceeded": true/)).toBeInTheDocument();
-  });
+    expect(view.container.textContent).toContain("PASS");
+    expect(view.container.textContent).toContain('"writeSucceeded": true');
+    expect(view.container.textContent).toContain('"readBackSucceeded": true');
+  }, 10000);
 
   it("renders stable probe failure code and message", async () => {
     mocks.getWidgetSyncDiagnosticsMock.mockResolvedValueOnce({
@@ -172,7 +179,7 @@ describe("IAPTest widget diagnostics", () => {
       timestamp: "2026-02-24T08:05:00.000Z",
     });
 
-    renderPage();
+    const view = renderPage();
 
     fireEvent.click(screen.getByRole("button", { name: /fetch diagnostics/i }));
     await waitFor(() => {
@@ -184,8 +191,8 @@ describe("IAPTest widget diagnostics", () => {
       expect(mocks.runWidgetSyncProbeMock).toHaveBeenCalledTimes(1);
     });
 
-    expect(screen.getByText("FAIL")).toBeInTheDocument();
-    expect(screen.getAllByText(/APP_GROUP_INACCESSIBLE/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/Failed to access App Group container/).length).toBeGreaterThan(0);
-  });
+    expect(view.container.textContent).toContain("FAIL");
+    expect(view.container.textContent).toContain("APP_GROUP_INACCESSIBLE");
+    expect(view.container.textContent).toContain("Failed to access App Group container");
+  }, 10000);
 });

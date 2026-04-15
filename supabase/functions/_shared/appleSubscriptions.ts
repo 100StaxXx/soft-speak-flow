@@ -29,6 +29,8 @@ type SubscriptionUpsert = {
   transactionId: string;
   originalTransactionId?: string;
   productId: string;
+  offerIdentifier?: string | null;
+  offerType?: number | null;
   appAccountToken?: string | null;
   allowCreateWithoutAppAccountToken?: boolean;
   plan: "monthly" | "yearly";
@@ -44,30 +46,49 @@ const SANDBOX_VERIFY_URL = "https://sandbox.itunes.apple.com/verifyReceipt";
 
 const DEFAULT_MONTHLY_PRICE_CENTS = 999; // $9.99
 const DEFAULT_YEARLY_PRICE_CENTS = 9999; // $99.99 standard pricing
-const DEFAULT_REFERRAL_YEARLY_PRICE_CENTS = 6999; // $69.99 referral pricing
+const DEFAULT_DISCOUNTED_YEARLY_PRICE_CENTS = 6999; // $69.99 offer-code pricing
+const DEFAULT_DISCOUNTED_YEARLY_OFFER_ID = "Cosmiq_OfferCode_yearly";
+const APPLE_OFFER_TYPE_CODE = 3;
 
 export const APPLE_BINDING_CONFLICT_ERROR =
   "This purchase is already linked to another account.";
 export const APPLE_BINDING_MISSING_ERROR =
   "This purchase is missing its app-account binding. Update the app and restore the purchase again.";
 
-function getPriceCents(plan: "monthly" | "yearly", productId?: string) {
-  const normalizedProductId = (productId ?? "").toLowerCase();
-  const isReferralYearly =
-    plan === "yearly" &&
-    referralYearlyProductIds.some((id) => normalizedProductId.includes(id.toLowerCase()));
+export function getDiscountedYearlyOfferId() {
+  return (
+    Deno.env.get("APPLE_OFFER_CODE_IDENTIFIER")?.trim() ||
+    Deno.env.get("APPLE_YEARLY_OFFER_CODE_ID")?.trim() ||
+    Deno.env.get("APPLE_PROMO_OFFER_ID")?.trim() ||
+    DEFAULT_DISCOUNTED_YEARLY_OFFER_ID
+  );
+}
+
+export function isDiscountedYearlyOffer(options?: { offerIdentifier?: string | null; offerType?: number | null }) {
+  const normalizedOfferIdentifier = options?.offerIdentifier?.trim();
+  if (normalizedOfferIdentifier && normalizedOfferIdentifier === getDiscountedYearlyOfferId()) {
+    return true;
+  }
+  return options?.offerType === APPLE_OFFER_TYPE_CODE;
+}
+
+export function getPriceCents(
+  plan: "monthly" | "yearly",
+  options?: { offerIdentifier?: string | null; offerType?: number | null },
+) {
+  const isDiscountedYearly = plan === "yearly" && isDiscountedYearlyOffer(options);
 
   const envValue = Deno.env.get(
     plan === "monthly"
       ? "APPLE_MONTHLY_PRICE_CENTS"
-      : isReferralYearly
-        ? "APPLE_REFERRAL_YEARLY_PRICE_CENTS"
+      : isDiscountedYearly
+        ? "APPLE_OFFER_CODE_YEARLY_PRICE_CENTS"
         : "APPLE_YEARLY_PRICE_CENTS",
   );
   const parsed = envValue ? Number(envValue) : NaN;
   if (!Number.isFinite(parsed)) {
     if (plan === "monthly") return DEFAULT_MONTHLY_PRICE_CENTS;
-    return isReferralYearly ? DEFAULT_REFERRAL_YEARLY_PRICE_CENTS : DEFAULT_YEARLY_PRICE_CENTS;
+    return isDiscountedYearly ? DEFAULT_DISCOUNTED_YEARLY_PRICE_CENTS : DEFAULT_YEARLY_PRICE_CENTS;
   }
   return parsed;
 }
@@ -88,9 +109,6 @@ const monthlyProductIds = normalizeProductIds("APPLE_MONTHLY_PRODUCT_IDS", [
 const yearlyProductIds = normalizeProductIds("APPLE_YEARLY_PRODUCT_IDS", [
   "cosmiq_premium_yearly",
   "com.darrylgraham.revolution.yearly",
-]);
-const referralYearlyProductIds = normalizeProductIds("APPLE_REFERRAL_YEARLY_PRODUCT_IDS", [
-  "cosmiq_referral_yearly",
 ]);
 
 export function resolvePlanFromProduct(productId: string | undefined): "monthly" | "yearly" {
@@ -329,7 +347,10 @@ export async function upsertSubscription(
 
   const status = buildSubscriptionStatus(payload.expiresAt, payload.cancellationDate);
   const now = new Date().toISOString();
-  const amountCents = getPriceCents(payload.plan, payload.productId);
+  const amountCents = getPriceCents(payload.plan, {
+    offerIdentifier: payload.offerIdentifier,
+    offerType: payload.offerType,
+  });
   const isActive = payload.expiresAt > new Date() &&
     (status === "active" || status === "trialing" || status === "past_due" || status === "cancelled");
 
@@ -375,14 +396,16 @@ export async function upsertSubscription(
     trial_ends_at: status === "trialing" ? payload.expiresAt.toISOString() : null,
     billing_customer_id: originalTransactionId,
     billing_subscription_id: originalTransactionId,
-    metadata: {
-      billing_provider: "storekit2",
-      billing_source_of_truth: "storekit2_transaction",
-      purchase_amount_cents: amountCents,
-      product_id: payload.productId,
-      original_transaction_id: originalTransactionId,
-      environment: payload.environment ?? "unknown",
-      source: payload.source,
+      metadata: {
+        billing_provider: "storekit2",
+        billing_source_of_truth: "storekit2_transaction",
+        purchase_amount_cents: amountCents,
+        product_id: payload.productId,
+        offer_identifier: payload.offerIdentifier ?? null,
+        offer_type: payload.offerType ?? null,
+        original_transaction_id: originalTransactionId,
+        environment: payload.environment ?? "unknown",
+        source: payload.source,
     },
   });
 
@@ -402,6 +425,8 @@ export async function upsertSubscription(
         billing_source_of_truth: "storekit2_transaction",
         purchase_amount_cents: amountCents,
         product_id: payload.productId,
+        offer_identifier: payload.offerIdentifier ?? null,
+        offer_type: payload.offerType ?? null,
         original_transaction_id: originalTransactionId,
         environment: payload.environment ?? "unknown",
       },

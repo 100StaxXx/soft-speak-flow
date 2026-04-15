@@ -10,6 +10,11 @@ import {
   resolveCompanionSpiritLockProfile,
 } from "../_shared/companionSpiritLock.ts";
 import { requireServiceRoleAuth } from "../_shared/auth.ts";
+import {
+  NOTIFICATION_COMPANION_FALLBACK_NAME,
+  isAssignedCompanionName,
+  resolveNotificationCompanionContext,
+} from "../_shared/companionName.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -54,12 +59,6 @@ interface VoiceTemplate {
   encouragementTemplates: string[];
   concernTemplates: string[];
 }
-
-const normalizeCompanionName = (value: string | null | undefined): string | null => {
-  if (typeof value !== 'string') return null;
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
-};
 
 const resolveVoiceTemplate = (
   templateMap: Map<string, VoiceTemplate>,
@@ -159,11 +158,17 @@ const generateNotificationContent = async (
   openAIApiKey: string
 ): Promise<{ title: string; body: string }> => {
   
-  const assignedCompanionName = normalizeCompanionName(context.companion?.companionDisplayName);
-  const hasAssignedCompanionName = Boolean(assignedCompanionName);
-  const companionTitleName = assignedCompanionName || 'Your companion';
-  const companionReference = assignedCompanionName || 'your companion';
   const companionSpecies = context.companion?.spiritAnimal || 'companion';
+  const rawCompanionName =
+    typeof context.companion?.companionDisplayName === "string"
+      ? context.companion.companionDisplayName.trim()
+      : null;
+  const assignedCompanionName = isAssignedCompanionName(rawCompanionName, companionSpecies)
+    ? rawCompanionName
+    : null;
+  const hasAssignedCompanionName = Boolean(assignedCompanionName);
+  const companionTitleName = assignedCompanionName || NOTIFICATION_COMPANION_FALLBACK_NAME;
+  const companionReference = assignedCompanionName || 'your companion';
   const spiritLockProfile = resolveCompanionSpiritLockProfile(companionSpecies);
   const spiritLockPromptBlock = spiritLockProfile
     ? buildSpiritLockPromptBlock(spiritLockProfile, "notification")
@@ -552,7 +557,7 @@ serve(async (req) => {
         const [companionRes, mentorRes, checkInRes, horoscopeRes, activityRes] = await Promise.all([
           supabase
             .from('user_companion')
-            .select('spirit_animal, current_mood, current_stage, inactive_days, cached_creature_name')
+            .select('id, user_id, spirit_animal, current_mood, current_stage, inactive_days, cached_creature_name')
             .eq('user_id', profile.id)
             .maybeSingle(),
           profile.selected_mentor_id 
@@ -592,13 +597,20 @@ serve(async (req) => {
         
         // Get lunar phase
         const lunarPhase = getLunarPhase();
+        const companionContext = companionRes.data
+          ? await resolveNotificationCompanionContext({
+            supabase,
+            companion: companionRes.data,
+            logPrefix: "[generate-smart-notifications]",
+          })
+          : null;
 
         const userContext: UserContext = {
           userId: profile.id,
           displayName: profile.display_name,
           zodiac: profile.zodiac,
           companion: companionRes.data ? {
-            companionDisplayName: normalizeCompanionName(companionRes.data.cached_creature_name),
+            companionDisplayName: companionContext?.displayName ?? NOTIFICATION_COMPANION_FALLBACK_NAME,
             spiritAnimal: companionRes.data.spirit_animal,
             currentMood: companionRes.data.current_mood,
             currentStage: companionRes.data.current_stage,

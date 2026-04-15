@@ -185,6 +185,50 @@ async function persistRecoveredCompanionNames(
   });
 }
 
+export async function resolveNotificationCompanionContext(params: {
+  supabase: { from: (table: string) => any };
+  companion: CompanionNameSourceRow | null;
+  logPrefix?: string;
+}): Promise<ResolvedCompanionNotificationContext | null> {
+  const { supabase, companion, logPrefix = "[companion-name]" } = params;
+
+  if (!companion) {
+    return null;
+  }
+
+  let evolutionCards: CompanionEvolutionCardNameRow[] = [];
+  if (!isAssignedCompanionName(companion.cached_creature_name, companion.spirit_animal)) {
+    const { data, error } = await supabase
+      .from("companion_evolution_cards")
+      .select("companion_id, evolution_stage, creature_name")
+      .eq("companion_id", companion.id)
+      .order("evolution_stage", { ascending: true });
+
+    if (error) {
+      throw error;
+    }
+
+    evolutionCards = (data as CompanionEvolutionCardNameRow[] | null) ?? [];
+  }
+
+  const resolution = resolveStoredCompanionDisplayName(companion, evolutionCards);
+  if (resolution.recoveredName && resolution.recoveredName !== companion.cached_creature_name) {
+    await persistRecoveredCompanionNames(
+      supabase,
+      [{ companionId: companion.id, recoveredName: resolution.recoveredName }],
+      logPrefix,
+    );
+  }
+
+  return {
+    displayName: resolution.displayName,
+    cachedCreatureName: resolution.recoveredName ?? companion.cached_creature_name,
+    spiritAnimal: companion.spirit_animal,
+    currentMood: companion.current_mood ?? null,
+    inactiveDays: companion.inactive_days ?? null,
+  };
+}
+
 export async function resolveNotificationCompanionContextMap(params: {
   supabase: { from: (table: string) => any };
   companions: CompanionNameSourceRow[] | null;
