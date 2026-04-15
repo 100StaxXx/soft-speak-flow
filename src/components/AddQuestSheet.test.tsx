@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AddQuestSheet, type AddQuestData } from "./AddQuestSheet";
 import type { QuestAttachmentInput } from "@/types/questAttachments";
 import type { PersonalQuestTemplate, QuestComposerPrefillDraft } from "@/features/quests/types";
+import { DIFFICULTY_COLORS } from "@/components/quest-shared";
 
 const mocks = vi.hoisted(() => ({
   integrationVisible: false,
@@ -67,6 +68,12 @@ const getRecurrenceSection = (): HTMLElement => {
     throw new Error("Recurrence section not found");
   }
   return section as HTMLElement;
+};
+
+const expectElementToIncludeClasses = (element: HTMLElement, classes: string) => {
+  for (const token of classes.split(" ").filter(Boolean)) {
+    expect(element.className).toContain(token);
+  }
 };
 
 vi.mock("@/components/QuestAttachmentPicker", () => ({
@@ -290,6 +297,48 @@ describe("AddQuestSheet", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Time" }));
     expect(createButton).toBeEnabled();
+  });
+
+  it("colors the Add Quest CTA green when easy is selected", () => {
+    render(
+      <AddQuestSheet
+        open
+        onOpenChange={vi.fn()}
+        selectedDate={selectedDate}
+        onAdd={vi.fn().mockResolvedValue(undefined)}
+      />
+    );
+
+    fireEvent.change(screen.getByPlaceholderText("Quest Title"), {
+      target: { value: "Take a quick walk" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Time" }));
+    fireEvent.click(screen.getByRole("button", { name: "Easy" }));
+
+    const createButton = screen.getByRole("button", { name: "Add Quest" });
+    expect(createButton).toBeEnabled();
+    expectElementToIncludeClasses(createButton, DIFFICULTY_COLORS.easy.primaryButton);
+  });
+
+  it("colors the Add Quest CTA orange when medium is selected", () => {
+    render(
+      <AddQuestSheet
+        open
+        onOpenChange={vi.fn()}
+        selectedDate={selectedDate}
+        onAdd={vi.fn().mockResolvedValue(undefined)}
+      />
+    );
+
+    fireEvent.change(screen.getByPlaceholderText("Quest Title"), {
+      target: { value: "Plan the weekly sprint" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Time" }));
+    fireEvent.click(screen.getByRole("button", { name: "Medium" }));
+
+    const createButton = screen.getByRole("button", { name: "Add Quest" });
+    expect(createButton).toBeEnabled();
+    expectElementToIncludeClasses(createButton, DIFFICULTY_COLORS.medium.primaryButton);
   });
 
   it("auto-fills time on first time-chip tap without emitting tutorial completion", () => {

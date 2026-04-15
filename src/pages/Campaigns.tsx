@@ -10,6 +10,7 @@ import { Pathfinder } from "@/components/Pathfinder";
 import { CampaignCreatedAnimation } from "@/components/CampaignCreatedAnimation";
 import { Button } from "@/components/ui/button";
 import { clearShellCardClassName } from "@/components/ui/card";
+import { ACTIVE_CAMPAIGN_LIMIT_MESSAGE, hasReachedActiveCampaignLimit } from "@/features/epics/constants";
 import { useEpics } from "@/hooks/useEpics";
 import { useMainTabVisibility } from "@/contexts/MainTabVisibilityContext";
 import { cn } from "@/lib/utils";
@@ -19,7 +20,6 @@ interface CreatedCampaignData {
   habits: Array<{ title: string }>;
 }
 
-const CAMPAIGN_LIMIT = 3;
 const CAMPAIGN_STAT_CARD_CLASS = cn(
   "rounded-[24px] border border-celestial-blue/18 p-4",
   clearShellCardClassName,
@@ -48,7 +48,7 @@ const Campaigns = () => {
   const [createdCampaignData, setCreatedCampaignData] = useState<CreatedCampaignData | null>(null);
 
   const hasCampaigns = activeEpics.length > 0 || completedEpics.length > 0;
-  const hasReachedLimit = activeEpics.length >= CAMPAIGN_LIMIT;
+  const hasReachedLimit = hasReachedActiveCampaignLimit(activeEpics.length);
   const completionRate = useMemo(() => {
     const total = activeEpics.length + completedEpics.length;
     if (total === 0) return 0;
@@ -128,17 +128,17 @@ const Campaigns = () => {
               type="button"
               size="lg"
               variant="outline"
-              data-testid="campaigns-create-button"
-              className={CAMPAIGN_CTA_CLASS}
-              disabled={hasReachedLimit}
-              onClick={() => setShowPathfinder(true)}
+                data-testid="campaigns-create-button"
+                className={CAMPAIGN_CTA_CLASS}
+                disabled={hasReachedLimit}
+                onClick={() => setShowPathfinder(true)}
             >
               <Plus className="h-4 w-4" />
               {hasCampaigns ? "Create campaign" : "Start your first campaign"}
             </Button>
             {hasReachedLimit ? (
               <p className="text-sm text-muted-foreground">
-                You already have {CAMPAIGN_LIMIT} active campaigns. Complete or abandon one before starting another.
+                {ACTIVE_CAMPAIGN_LIMIT_MESSAGE}
               </p>
             ) : (
               <p className="text-sm text-muted-foreground">

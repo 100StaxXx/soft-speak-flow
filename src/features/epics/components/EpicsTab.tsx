@@ -9,6 +9,7 @@ import { useEpics } from "@/hooks/useEpics";
 import { useFirstTimeModal } from "@/hooks/useFirstTimeModal";
 import { Plus } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { ACTIVE_CAMPAIGN_LIMIT, hasReachedActiveCampaignLimit } from "@/features/epics/constants";
 
 interface CreatedCampaignData {
   title: string;
@@ -121,13 +122,14 @@ export const EpicsTab = memo(function EpicsTab() {
             ))}
 
             {/* Subtle Add Button - Only when has campaigns and under limit */}
-            {hasCampaigns && activeEpics.length < 2 && (
+            {hasCampaigns && !hasReachedActiveCampaignLimit(activeEpics.length) && (
               <motion.button
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-              onClick={handleAddCampaign}
+                onClick={handleAddCampaign}
+                aria-label={`Create campaign (${ACTIVE_CAMPAIGN_LIMIT} max active)`}
                 className="mx-auto flex items-center justify-center w-10 h-10 text-muted-foreground/50 hover:text-muted-foreground transition-all"
               >
                 <Plus className="w-4 h-4" />

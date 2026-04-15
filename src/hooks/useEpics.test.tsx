@@ -144,6 +144,21 @@ vi.mock("@/utils/plannerLocalStore", async () => {
 
 import { normalizeCreateCampaignError, useEpics } from "./useEpics";
 import { resolveEpicEndDate } from "@/utils/epicDates";
+import { ACTIVE_CAMPAIGN_LIMIT_MESSAGE } from "@/features/epics/constants";
+
+const buildActiveEpic = (id: string) => ({
+  id,
+  user_id: "user-1",
+  title: `Campaign ${id}`,
+  description: null,
+  status: "active" as const,
+  progress_percentage: 0,
+  target_days: 30,
+  start_date: "2026-03-01",
+  end_date: "2026-03-31",
+  created_at: "2026-03-01T00:00:00.000Z",
+  epic_habits: [],
+});
 
 const createWrapper = () => {
   const queryClient = new QueryClient({
@@ -618,6 +633,178 @@ describe("useEpics", () => {
 
     expect(mocks.queueActionMock).toHaveBeenCalled();
     expect(mocks.requestJourneyPathGenerationMock).not.toHaveBeenCalled();
+  });
+
+  it("allows campaign creation when the user already has 2 active campaigns", async () => {
+    const activeEpics = [buildActiveEpic("epic-1"), buildActiveEpic("epic-2")];
+    const habitsInsertMock = vi.fn().mockResolvedValue({ error: null });
+    const epicsInsertMock = vi.fn().mockResolvedValue({ error: null });
+    const linksInsertMock = vi.fn().mockResolvedValue({ error: null });
+
+    mocks.loadLocalEpicsMock.mockResolvedValue(activeEpics);
+    mocks.warmEpicsQueryFromRemoteMock.mockImplementationOnce(async (queryClient: QueryClient, userId: string) => {
+      queryClient.setQueryData(["epics", userId], activeEpics);
+      return activeEpics;
+    });
+    mocks.rpcMock.mockResolvedValue({ data: 2, error: null });
+
+    mocks.fromMock.mockImplementation((table: string) => {
+      if (table === "habits") {
+        return {
+          insert: habitsInsertMock,
+          select: mocks.selectMock,
+        };
+      }
+
+      if (table === "epics") {
+        return {
+          insert: epicsInsertMock,
+          select: mocks.selectMock,
+        };
+      }
+
+      if (["epic_habits", "journey_phases", "epic_milestones"].includes(table)) {
+        return {
+          insert: linksInsertMock,
+          select: mocks.selectMock,
+        };
+      }
+
+      return {
+        select: mocks.selectMock,
+      };
+    });
+
+    const { result } = renderHook(() => useEpics(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.activeEpics).toHaveLength(2);
+    });
+
+    await act(async () => {
+      await result.current.createEpic({
+        title: "Third Campaign",
+        target_days: 14,
+        habits: [
+          {
+            title: "Morning focus",
+            difficulty: "easy",
+            frequency: "daily",
+            custom_days: [1, 2, 3, 4, 5],
+          },
+        ],
+      });
+    });
+
+    expect(mocks.rpcMock).toHaveBeenCalledWith("count_user_epics", {
+      p_user_id: "user-1",
+    });
+    expect(epicsInsertMock).toHaveBeenCalledTimes(1);
+    expect(habitsInsertMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("blocks campaign creation from local state once 3 active campaigns are already loaded", async () => {
+    const activeEpics = [
+      buildActiveEpic("epic-1"),
+      buildActiveEpic("epic-2"),
+      buildActiveEpic("epic-3"),
+    ];
+
+    mocks.loadLocalEpicsMock.mockResolvedValue(activeEpics);
+    mocks.warmEpicsQueryFromRemoteMock.mockImplementationOnce(async (queryClient: QueryClient, userId: string) => {
+      queryClient.setQueryData(["epics", userId], activeEpics);
+      return activeEpics;
+    });
+
+    const { result } = renderHook(() => useEpics(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.activeEpics).toHaveLength(3);
+    });
+
+    await act(async () => {
+      await expect(result.current.createEpic({
+        title: "Blocked Campaign",
+        target_days: 21,
+        habits: [
+          {
+            title: "Evening reflection",
+            difficulty: "easy",
+            frequency: "daily",
+            custom_days: [0, 1, 2, 3, 4, 5, 6],
+          },
+        ],
+      })).rejects.toThrow(ACTIVE_CAMPAIGN_LIMIT_MESSAGE);
+    });
+
+    expect(mocks.rpcMock).not.toHaveBeenCalled();
+  });
+
+  it("blocks campaign creation when the remote active campaign count is already 3", async () => {
+    const activeEpics = [buildActiveEpic("epic-1"), buildActiveEpic("epic-2")];
+    const habitsInsertMock = vi.fn().mockResolvedValue({ error: null });
+    const epicsInsertMock = vi.fn().mockResolvedValue({ error: null });
+
+    mocks.loadLocalEpicsMock.mockResolvedValue(activeEpics);
+    mocks.warmEpicsQueryFromRemoteMock.mockImplementationOnce(async (queryClient: QueryClient, userId: string) => {
+      queryClient.setQueryData(["epics", userId], activeEpics);
+      return activeEpics;
+    });
+    mocks.rpcMock.mockResolvedValue({ data: 3, error: null });
+
+    mocks.fromMock.mockImplementation((table: string) => {
+      if (table === "habits") {
+        return {
+          insert: habitsInsertMock,
+          select: mocks.selectMock,
+        };
+      }
+
+      if (table === "epics") {
+        return {
+          insert: epicsInsertMock,
+          select: mocks.selectMock,
+        };
+      }
+
+      return {
+        insert: vi.fn().mockResolvedValue({ error: null }),
+        select: mocks.selectMock,
+      };
+    });
+
+    const { result } = renderHook(() => useEpics(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.activeEpics).toHaveLength(2);
+    });
+
+    await act(async () => {
+      await expect(result.current.createEpic({
+        title: "Remote Blocked Campaign",
+        target_days: 14,
+        habits: [
+          {
+            title: "Morning focus",
+            difficulty: "easy",
+            frequency: "daily",
+            custom_days: [1, 2, 3, 4, 5],
+          },
+        ],
+      })).rejects.toThrow(ACTIVE_CAMPAIGN_LIMIT_MESSAGE);
+    });
+
+    expect(mocks.rpcMock).toHaveBeenCalledWith("count_user_epics", {
+      p_user_id: "user-1",
+    });
+    expect(habitsInsertMock).not.toHaveBeenCalled();
+    expect(epicsInsertMock).not.toHaveBeenCalled();
   });
 
   it("rolls back and rejects when campaign creation fails with a non-queueable server error", async () => {

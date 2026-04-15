@@ -2,6 +2,7 @@ import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ACTIVE_CAMPAIGN_LIMIT_WARNING } from "@/features/epics/constants";
 
 const mocks = vi.hoisted(() => ({
   invoke: vi.fn(),
@@ -79,5 +80,40 @@ describe("useUserAIContext", () => {
     });
 
     expect(mocks.from).not.toHaveBeenCalled();
+  });
+
+  it("returns the shared campaign-limit warning when the user is at capacity", async () => {
+    mocks.invoke.mockResolvedValueOnce({
+      data: {
+        activeEpics: [{ id: "epic-1" }, { id: "epic-2" }, { id: "epic-3" }],
+        activeHabits: [],
+        pendingQuestsCount: 0,
+        currentStreaks: { maxHabitStreak: 0, dailyTaskStreak: 0 },
+        completionRates: { thisWeek: 80, thisMonth: 70 },
+        averageHabitsPerDay: 2,
+        preferredDifficulty: "medium",
+        preferredEpicDuration: 30,
+        preferredHabitFrequency: "daily",
+        commonContexts: ["focus"],
+        preferenceWeights: { story_type: {}, theme_color: {}, categories: {} },
+        tonePreference: null,
+        atEpicLimit: true,
+        overloaded: false,
+        suggestedWorkload: "normal",
+        recentCompletedEpics: 1,
+        recentAbandonedEpics: 0,
+      },
+      error: null,
+    });
+
+    const { result } = renderHook(() => useUserAIContext(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isAtEpicLimit).toBe(true);
+    });
+
+    expect(result.current.capacityWarning).toBe(ACTIVE_CAMPAIGN_LIMIT_WARNING);
   });
 });

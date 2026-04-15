@@ -2,6 +2,7 @@ import { memo } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { ACTIVE_CAMPAIGN_LIMIT_WARNING } from '@/features/epics/constants';
 
 interface CapacityWarningBannerProps {
   isAtEpicLimit?: boolean;
@@ -44,7 +45,7 @@ export const CapacityWarningBanner = memo(function CapacityWarningBanner({
             {isOverloaded 
               ? "You seem overloaded. Consider simplifying current habits first."
               : isAtEpicLimit 
-                ? "You have 3 active campaigns. Complete one before starting another."
+                ? ACTIVE_CAMPAIGN_LIMIT_WARNING
                 : suggestedWorkload === 'light'
                   ? "Consider a lighter workload today."
                   : null

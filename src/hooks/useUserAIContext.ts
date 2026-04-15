@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { ACTIVE_CAMPAIGN_LIMIT_WARNING } from '@/features/epics/constants';
 
 interface EnrichedContext {
   activeEpics: Array<{
@@ -121,7 +122,7 @@ export function useUserAIContext() {
   // Capacity warning message
   const getCapacityWarning = (): string | null => {
     if (isAtEpicLimit) {
-      return 'You have 3 active campaigns. Consider completing one before starting another.';
+      return ACTIVE_CAMPAIGN_LIMIT_WARNING;
     }
     if (isOverloaded) {
       return 'You seem overloaded. Consider simplifying your current habits before adding more.';

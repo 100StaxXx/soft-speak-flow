@@ -12,6 +12,12 @@ import { getEpicsQueryKey, type EpicRecord } from "@/hooks/epicsQuery";
 import { requestJourneyPathGeneration } from "@/utils/journeyPathCache";
 import { useResilience } from "@/contexts/ResilienceContext";
 import {
+  ACTIVE_CAMPAIGN_LIMIT,
+  ACTIVE_CAMPAIGN_LIMIT_MESSAGE,
+  hasReachedActiveCampaignLimit,
+  isActiveCampaignLimitHaystack,
+} from "@/features/epics/constants";
+import {
   PLANNER_SYNC_EVENT,
   dispatchPlannerSyncFinished,
   loadLocalEpics,
@@ -78,10 +84,6 @@ interface EpicsOptions {
   enabled?: boolean;
 }
 
-const ACTIVE_CAMPAIGN_LIMIT = 3;
-const CAMPAIGN_LIMIT_REACHED_MESSAGE =
-  `You can only have ${ACTIVE_CAMPAIGN_LIMIT} active campaigns at a time. Complete or abandon one before creating another.`;
-
 type ErrorLike = {
   message?: string;
   details?: string;
@@ -121,14 +123,10 @@ const isLegacyMonthSchemaError = (error: unknown): boolean => {
 export const normalizeCreateCampaignError = (error: unknown): { title: string; description?: string } => {
   const haystack = toErrorHaystack(error);
 
-  if (
-    haystack.includes("3 active epics") ||
-    haystack.includes("active epics at a time") ||
-    haystack.includes("active campaigns at a time")
-  ) {
+  if (isActiveCampaignLimitHaystack(haystack)) {
     return {
       title: "Campaign limit reached",
-      description: CAMPAIGN_LIMIT_REACHED_MESSAGE,
+      description: ACTIVE_CAMPAIGN_LIMIT_MESSAGE,
     };
   }
 
@@ -599,8 +597,8 @@ export const useEpics = (options: EpicsOptions = {}) => {
         throw new Error("Campaign must have at least one ritual");
       }
 
-      if (epics.filter((epic) => epic.status === "active").length >= ACTIVE_CAMPAIGN_LIMIT) {
-        throw new Error(CAMPAIGN_LIMIT_REACHED_MESSAGE);
+      if (hasReachedActiveCampaignLimit(epics.filter((epic) => epic.status === "active").length)) {
+        throw new Error(ACTIVE_CAMPAIGN_LIMIT_MESSAGE);
       }
 
       const nowIso = new Date().toISOString();
@@ -704,8 +702,8 @@ export const useEpics = (options: EpicsOptions = {}) => {
       });
       if (countError) {
         console.error("Failed to check active campaign limit (continuing):", countError);
-      } else if ((activeCampaignCount ?? 0) >= ACTIVE_CAMPAIGN_LIMIT) {
-        throw new Error(CAMPAIGN_LIMIT_REACHED_MESSAGE);
+      } else if (hasReachedActiveCampaignLimit(activeCampaignCount ?? 0)) {
+        throw new Error(ACTIVE_CAMPAIGN_LIMIT_MESSAGE);
       }
 
       await applyLocalEpicPayload(payload);

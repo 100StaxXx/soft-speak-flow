@@ -1,12 +1,19 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EditQuestDialog } from "./EditQuestDialog";
+import { DIFFICULTY_COLORS } from "@/components/quest-shared";
 
 const mocks = vi.hoisted(() => ({
   addSubtask: vi.fn(),
   toggleSubtask: vi.fn(),
   deleteSubtask: vi.fn(),
 }));
+
+const expectElementToIncludeClasses = (element: HTMLElement, classes: string) => {
+  for (const token of classes.split(" ").filter(Boolean)) {
+    expect(element.className).toContain(token);
+  }
+};
 
 vi.mock("@/hooks/useQuestImagePicker", () => ({
   useQuestImagePicker: () => ({
@@ -122,6 +129,42 @@ describe("EditQuestDialog", () => {
 
     expect(screen.getByDisplayValue("Legacy quest")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save Changes" })).toBeEnabled();
+  });
+
+  it("colors the Save Changes CTA green when easy is selected", () => {
+    render(
+      <EditQuestDialog
+        task={legacyTask}
+        open
+        onOpenChange={vi.fn()}
+        onSave={vi.fn().mockResolvedValue(undefined)}
+        isSaving={false}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Easy" }));
+
+    const saveButton = screen.getByRole("button", { name: "Save Changes" });
+    expect(saveButton).toBeEnabled();
+    expectElementToIncludeClasses(saveButton, DIFFICULTY_COLORS.easy.primaryButton);
+  });
+
+  it("colors the Save Changes CTA orange when medium is selected", () => {
+    render(
+      <EditQuestDialog
+        task={legacyTask}
+        open
+        onOpenChange={vi.fn()}
+        onSave={vi.fn().mockResolvedValue(undefined)}
+        isSaving={false}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Medium" }));
+
+    const saveButton = screen.getByRole("button", { name: "Save Changes" });
+    expect(saveButton).toBeEnabled();
+    expectElementToIncludeClasses(saveButton, DIFFICULTY_COLORS.medium.primaryButton);
   });
 
   it("renders the desktop panel presentation when requested", () => {

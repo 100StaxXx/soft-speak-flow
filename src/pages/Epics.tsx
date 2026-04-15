@@ -16,6 +16,7 @@ import { StarPathsBrowser } from "@/components/StarPathsBrowser";
 import { EpicTemplate } from "@/hooks/useEpicTemplates";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { EpicsPageSkeleton } from "@/components/skeletons/EpicsPageSkeleton";
+import { ACTIVE_CAMPAIGN_LIMIT_MESSAGE, hasReachedActiveCampaignLimit } from "@/features/epics/constants";
 import {
   Dialog,
   DialogContent,
@@ -39,8 +40,7 @@ const Epics = () => {
     updateEpicStatus,
   } = useEpics();
 
-  const MAX_EPICS = 3;
-  const hasReachedLimit = activeEpics.length >= MAX_EPICS;
+  const hasReachedLimit = hasReachedActiveCampaignLimit(activeEpics.length);
 
   const handleCreateEpic = (data: {
     title: string;
@@ -135,7 +135,7 @@ const Epics = () => {
         >
           {hasReachedLimit ? (
             <div className="w-full h-14 flex items-center justify-center bg-secondary/30 rounded-lg border border-border/50 text-muted-foreground text-sm">
-              You can only have {MAX_EPICS} active epics at a time
+              {ACTIVE_CAMPAIGN_LIMIT_MESSAGE}
             </div>
           ) : (
             <>

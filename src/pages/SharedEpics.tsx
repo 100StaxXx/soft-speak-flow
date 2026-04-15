@@ -8,8 +8,11 @@ import { toast } from "@/components/ui/sonner";
 import { Share2, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
-
-const MAX_EPICS = 3;
+import {
+  ACTIVE_CAMPAIGN_LIMIT_MESSAGE,
+  hasReachedActiveCampaignLimit,
+  isActiveCampaignLimitHaystack,
+} from "@/features/epics/constants";
 
 export default function SharedEpics() {
   const { user } = useAuth();
@@ -56,8 +59,8 @@ export default function SharedEpics() {
 
       const totalActiveEpics = (ownedEpics?.length || 0) + (joinedEpics?.length || 0);
       
-      if (totalActiveEpics >= MAX_EPICS) {
-        throw new Error(`You can only have ${MAX_EPICS} active epics at a time. Complete or abandon an epic to join a new one.`);
+      if (hasReachedActiveCampaignLimit(totalActiveEpics)) {
+        throw new Error(ACTIVE_CAMPAIGN_LIMIT_MESSAGE);
       }
 
       // Fetch the epic with habits
@@ -143,7 +146,7 @@ export default function SharedEpics() {
       navigate('/campaigns');
     },
     onError: (error: Error) => {
-      toast.error(error.message);
+      toast.error(isActiveCampaignLimitHaystack(error.message.toLowerCase()) ? ACTIVE_CAMPAIGN_LIMIT_MESSAGE : error.message);
     }
   });
 

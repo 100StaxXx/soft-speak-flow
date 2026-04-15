@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { ACTIVE_CAMPAIGN_LIMIT_MESSAGE } from "@/features/epics/constants";
 
 interface JoinEpicDialogProps {
   open: boolean;
@@ -17,7 +18,6 @@ export const JoinEpicDialog = memo(function JoinEpicDialog({ open, onOpenChange 
   const [isLoading, setIsLoading] = useState(false);
   const [epicLimitReached, setEpicLimitReached] = useState(false);
   const queryClient = useQueryClient();
-  const MAX_EPICS = 3;
 
   // Reset state when dialog opens
   useEffect(() => {
@@ -73,6 +73,8 @@ export const JoinEpicDialog = memo(function JoinEpicDialog({ open, onOpenChange 
       if (!result.success) {
         if (result.code === 'epic_limit_reached') {
           setEpicLimitReached(true);
+          toast.error(ACTIVE_CAMPAIGN_LIMIT_MESSAGE);
+          return;
         }
 
         toast.error(result.message || 'Failed to join guild');
@@ -123,7 +125,7 @@ export const JoinEpicDialog = memo(function JoinEpicDialog({ open, onOpenChange 
           </div>
           {epicLimitReached ? (
             <p className="text-sm text-amber-500 text-center py-2">
-              You can only have {MAX_EPICS} active epics at a time. Complete or abandon an epic to join a new one.
+              {ACTIVE_CAMPAIGN_LIMIT_MESSAGE}
             </p>
           ) : (
             <Button 
