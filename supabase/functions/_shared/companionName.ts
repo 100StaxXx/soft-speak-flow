@@ -1,17 +1,27 @@
+import {
+  isAssignedCompanionName as isAssignedCompanionNameShared,
+  normalizeCompanionName,
+  synthesizeAssignedCompanionName,
+  type CompanionIdentityLike,
+} from "../../../src/lib/companionNameIdentity.ts";
+
 export const NOTIFICATION_COMPANION_FALLBACK_NAME = "Your companion";
 
 export interface NotificationCompanionNameContext {
   displayName?: string | null;
   cachedCreatureName?: string | null;
   spiritAnimal?: string | null;
+  presetId?: string | null;
 }
 
 export interface CompanionNameSourceRow {
   id: string;
   user_id: string;
+  preset_id?: string | null;
   current_stage: number | null;
   cached_creature_name: string | null;
   spirit_animal: string | null;
+  core_element?: string | null;
   current_mood?: string | null;
   inactive_days?: number | null;
   created_at?: string | null;
@@ -26,7 +36,7 @@ export interface CompanionEvolutionCardNameRow {
 export interface CompanionNameResolution {
   displayName: string;
   recoveredName: string | null;
-  source: "cache" | "current_stage_card" | "earliest_card" | "fallback";
+  source: "cache" | "current_stage_card" | "earliest_card" | "synthesized";
 }
 
 export interface ResolvedCompanionNotificationContext extends NotificationCompanionNameContext {
@@ -34,55 +44,46 @@ export interface ResolvedCompanionNotificationContext extends NotificationCompan
   inactiveDays?: number | null;
 }
 
-function normalizeCompanionName(value: string | null | undefined): string | null {
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
+function buildCompanionIdentity(
+  companion: {
+    spirit_animal?: string | null;
+    preset_id?: string | null;
+    spiritAnimal?: string | null;
+    presetId?: string | null;
+  } | null | undefined,
+): CompanionIdentityLike {
+  return {
+    spiritAnimal: companion?.spirit_animal ?? companion?.spiritAnimal,
+    presetId: companion?.preset_id ?? companion?.presetId,
+  };
 }
-
-function normalizeComparable(value: string | null | undefined): string | null {
-  return normalizeCompanionName(value)
-    ?.toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim() ?? null;
-}
-
-const RESERVED_COMPANION_NAMES = new Set([
-  "companion",
-  "your companion",
-  "unknown",
-]);
 
 export function isAssignedCompanionName(
   value: string | null | undefined,
-  spiritAnimal?: string | null,
+  identity?: CompanionIdentityLike,
 ): boolean {
-  const normalized = normalizeComparable(value);
-  if (!normalized) return false;
-  if (RESERVED_COMPANION_NAMES.has(normalized)) return false;
-
-  const normalizedSpiritAnimal = normalizeComparable(spiritAnimal);
-  if (normalizedSpiritAnimal && normalized === normalizedSpiritAnimal) {
-    return false;
-  }
-
-  return true;
+  return isAssignedCompanionNameShared(value, identity);
 }
 
 export function getNotificationSafeCompanionName(
   value: string | null | undefined,
-  spiritAnimal?: string | null,
+  identity?: CompanionIdentityLike,
 ): string {
-  return isAssignedCompanionName(value, spiritAnimal)
+  return isAssignedCompanionName(value, identity)
     ? normalizeCompanionName(value) ?? NOTIFICATION_COMPANION_FALLBACK_NAME
     : NOTIFICATION_COMPANION_FALLBACK_NAME;
 }
 
 export function resolveStoredCompanionDisplayName(
-  companion: Pick<CompanionNameSourceRow, "id" | "current_stage" | "cached_creature_name" | "spirit_animal">,
+  companion: Pick<
+    CompanionNameSourceRow,
+    "id" | "user_id" | "preset_id" | "current_stage" | "cached_creature_name" | "spirit_animal" | "core_element"
+  >,
   evolutionCards: CompanionEvolutionCardNameRow[],
 ): CompanionNameResolution {
-  if (isAssignedCompanionName(companion.cached_creature_name, companion.spirit_animal)) {
+  const companionIdentity = buildCompanionIdentity(companion);
+
+  if (isAssignedCompanionName(companion.cached_creature_name, companionIdentity)) {
     return {
       displayName: normalizeCompanionName(companion.cached_creature_name) ?? NOTIFICATION_COMPANION_FALLBACK_NAME,
       recoveredName: null,
@@ -95,7 +96,7 @@ export function resolveStoredCompanionDisplayName(
     const currentStageCard = evolutionCards.find((card) =>
       card.companion_id === companion.id &&
       card.evolution_stage === currentStage &&
-      isAssignedCompanionName(card.creature_name, companion.spirit_animal)
+      isAssignedCompanionName(card.creature_name, companionIdentity)
     );
 
     if (currentStageCard?.creature_name) {
@@ -109,7 +110,7 @@ export function resolveStoredCompanionDisplayName(
 
   const earliestValidCard = evolutionCards.find((card) =>
     card.companion_id === companion.id &&
-    isAssignedCompanionName(card.creature_name, companion.spirit_animal)
+    isAssignedCompanionName(card.creature_name, companionIdentity)
   );
 
   if (earliestValidCard?.creature_name) {
@@ -120,10 +121,16 @@ export function resolveStoredCompanionDisplayName(
     };
   }
 
+  const synthesizedName = synthesizeAssignedCompanionName(
+    `${companion.id}:${companion.user_id}:${companion.current_stage ?? 0}`,
+    companion.core_element,
+    companionIdentity,
+  );
+
   return {
-    displayName: NOTIFICATION_COMPANION_FALLBACK_NAME,
-    recoveredName: null,
-    source: "fallback",
+    displayName: synthesizedName,
+    recoveredName: synthesizedName,
+    source: "synthesized",
   };
 }
 
@@ -197,7 +204,7 @@ export async function resolveNotificationCompanionContext(params: {
   }
 
   let evolutionCards: CompanionEvolutionCardNameRow[] = [];
-  if (!isAssignedCompanionName(companion.cached_creature_name, companion.spirit_animal)) {
+  if (!isAssignedCompanionName(companion.cached_creature_name, buildCompanionIdentity(companion))) {
     const { data, error } = await supabase
       .from("companion_evolution_cards")
       .select("companion_id, evolution_stage, creature_name")
@@ -224,6 +231,7 @@ export async function resolveNotificationCompanionContext(params: {
     displayName: resolution.displayName,
     cachedCreatureName: resolution.recoveredName ?? companion.cached_creature_name,
     spiritAnimal: companion.spirit_animal,
+    presetId: companion.preset_id ?? null,
     currentMood: companion.current_mood ?? null,
     inactiveDays: companion.inactive_days ?? null,
   };
@@ -243,7 +251,7 @@ export async function resolveNotificationCompanionContextMap(params: {
   }
 
   const unresolvedCompanionIds = latestCompanions
-    .filter((row) => !isAssignedCompanionName(row.cached_creature_name, row.spirit_animal))
+    .filter((row) => !isAssignedCompanionName(row.cached_creature_name, buildCompanionIdentity(row)))
     .map((row) => row.id);
 
   let evolutionCards: CompanionEvolutionCardNameRow[] = [];
@@ -273,13 +281,14 @@ export async function resolveNotificationCompanionContextMap(params: {
       });
     }
 
-    if (resolution.source === "fallback") {
-      console.warn(`${logPrefix} no valid proper companion name found`, {
+    if (resolution.source === "synthesized") {
+      console.warn(`${logPrefix} synthesized canonical companion name`, {
         companionId: companion.id,
         userId: companion.user_id,
         currentStage: companion.current_stage,
         cachedCreatureName: companion.cached_creature_name,
         spiritAnimal: companion.spirit_animal,
+        presetId: companion.preset_id ?? null,
       });
     }
 
@@ -287,6 +296,7 @@ export async function resolveNotificationCompanionContextMap(params: {
       displayName: resolution.displayName,
       cachedCreatureName: resolution.recoveredName ?? companion.cached_creature_name,
       spiritAnimal: companion.spirit_animal,
+      presetId: companion.preset_id ?? null,
       currentMood: companion.current_mood ?? null,
       inactiveDays: companion.inactive_days ?? null,
     });

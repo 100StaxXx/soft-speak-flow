@@ -67,9 +67,11 @@ interface MentorRow {
 interface CompanionRow {
   id: string;
   user_id: string;
+  preset_id: string | null;
   current_stage: number | null;
   cached_creature_name: string | null;
   spirit_animal: string | null;
+  core_element: string | null;
   current_mood: string | null;
   inactive_days: number | null;
   created_at: string | null;
@@ -132,7 +134,7 @@ async function loadCompanionContextMap(
 
   const { data, error } = await supabase
     .from("user_companion")
-    .select("id, user_id, current_stage, cached_creature_name, spirit_animal, current_mood, inactive_days, created_at")
+    .select("id, user_id, preset_id, current_stage, cached_creature_name, spirit_animal, core_element, current_mood, inactive_days, created_at")
     .in("user_id", userIds);
 
   if (error) throw error;

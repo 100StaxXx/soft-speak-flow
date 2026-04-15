@@ -687,6 +687,12 @@ describe("AddQuestSheet", () => {
 
   it("saves the customized template before creating the quest", async () => {
     const onAdd = vi.fn().mockResolvedValue(undefined);
+    let resolveRefresh: (() => void) | null = null;
+    mocks.refreshPersonalTemplates.mockImplementationOnce(
+      () => new Promise<void>((resolve) => {
+        resolveRefresh = resolve;
+      }),
+    );
 
     render(
       <AddQuestSheet
@@ -712,10 +718,14 @@ describe("AddQuestSheet", () => {
     });
 
     expect(mocks.saveTemplateMock.mock.invocationCallOrder[0]).toBeLessThan(onAdd.mock.invocationCallOrder[0] ?? Infinity);
+    expect(mocks.refreshPersonalTemplates).toHaveBeenCalledTimes(1);
+    expect(mocks.refreshPersonalTemplates.mock.invocationCallOrder[0]).toBeLessThan(onAdd.mock.invocationCallOrder[0] ?? Infinity);
     expect(mocks.saveTemplateMock).toHaveBeenCalledWith(expect.objectContaining({
       sourceCommonTemplateId: "work-respond-to-emails",
       title: "Respond to priority emails",
     }));
+
+    resolveRefresh?.();
   });
 
   it("does not prompt when only schedule fields change after selecting a template", async () => {

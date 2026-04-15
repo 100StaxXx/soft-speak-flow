@@ -23,7 +23,10 @@ export interface NotificationComposeInput {
 function getCompanionName(companion?: CompanionNotificationContext | null): string {
   return getNotificationSafeCompanionName(
     companion?.displayName ?? companion?.cachedCreatureName,
-    companion?.spiritAnimal,
+    {
+      spiritAnimal: companion?.spiritAnimal,
+      presetId: companion?.presetId,
+    },
   );
 }
 

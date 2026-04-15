@@ -99,9 +99,11 @@ interface TaskAttachmentPersistResult {
 }
 
 type TaskCreateQueueReason = "offline" | "outage_retry" | "network_timeout" | "network_error";
+type TaskCreateWarning = "attachments_failed" | "attachments_skipped_schema" | "subtasks_failed";
 
 type TaskCreateMutationResult = Partial<DailyTask> & {
   attachmentsSkippedDueToSchema: boolean;
+  postCreateWarnings: TaskCreateWarning[];
   queued?: boolean;
   queueReason?: TaskCreateQueueReason;
   syncPending?: boolean;
@@ -258,6 +260,8 @@ const resolveQuestSource = (
   ?? (normalizedScheduling.task_date === null ? "inbox" : "manual");
 
 const MONTHLY_RECURRENCE_SCHEMA_MESSAGE = "Monthly recurrence is temporarily unavailable until backend update completes.";
+const REGULAR_QUEST_REQUIRES_TIME_OR_INBOX_ERROR = "REGULAR_QUEST_REQUIRES_TIME_OR_INBOX";
+const REGULAR_QUEST_REQUIRES_TIME_OR_INBOX_MESSAGE = "Scheduled quests need a time. Pick a time or send it to Inbox instead.";
 const CREATE_TASK_REMOTE_TIMEOUT_MS = 3_000;
 const CREATE_TASK_EXISTENCE_CHECK_MS = 1_500;
 const CREATE_TASK_EXISTENCE_CHECK_INTERVAL_MS = 150;
@@ -332,6 +336,10 @@ function buildRecurrenceRequiresScheduledTimeError(): Error {
   return new Error(RECURRENCE_REQUIRES_SCHEDULED_TIME_ERROR);
 }
 
+function buildRegularQuestRequiresTimeOrInboxError(): Error {
+  return new Error(REGULAR_QUEST_REQUIRES_TIME_OR_INBOX_ERROR);
+}
+
 function isNavigatorOffline(): boolean {
   return typeof navigator !== "undefined" && navigator.onLine === false;
 }
@@ -367,7 +375,53 @@ function getTaskMutationErrorMessage(error: Error): string {
     return RECURRENCE_REQUIRES_SCHEDULED_TIME_MESSAGE;
   }
 
+  if (error.message === REGULAR_QUEST_REQUIRES_TIME_OR_INBOX_ERROR) {
+    return REGULAR_QUEST_REQUIRES_TIME_OR_INBOX_MESSAGE;
+  }
+
   return error.message;
+}
+
+function getTaskCreateWarningToast(warnings: TaskCreateWarning[]): {
+  title: string;
+  description: string;
+} | null {
+  if (warnings.length === 0) return null;
+
+  const uniqueWarnings = Array.from(new Set(warnings));
+  const hasAttachmentFailure = uniqueWarnings.includes("attachments_failed");
+  const hasAttachmentSchemaWarning = uniqueWarnings.includes("attachments_skipped_schema");
+  const hasSubtaskFailure = uniqueWarnings.includes("subtasks_failed");
+
+  if (hasAttachmentFailure && hasSubtaskFailure) {
+    return {
+      title: "Quest added with warnings",
+      description: "Attachments and subtasks could not be saved. Reopen the quest to try again.",
+    };
+  }
+
+  if (hasAttachmentFailure) {
+    return {
+      title: "Quest added with warnings",
+      description: "Attachments could not be saved. Reopen the quest to try again.",
+    };
+  }
+
+  if (hasAttachmentSchemaWarning) {
+    return {
+      title: "Quest added with warnings",
+      description: "Attachments could not be stored right now. Please try again after the backend update finishes.",
+    };
+  }
+
+  if (hasSubtaskFailure) {
+    return {
+      title: "Quest added with warnings",
+      description: "Subtasks could not be saved. Reopen the quest to try again.",
+    };
+  }
+
+  return null;
 }
 
 function isMonthBasedRecurrencePayload(payload: Record<string, unknown>): boolean {
@@ -466,12 +520,6 @@ export const useTaskMutations = (taskDate: string) => {
   } = useResilience();
 
   const addInProgress = useRef(false);
-  const showAttachmentsUnavailableToast = () => {
-    toast({
-      title: "Attachments unavailable",
-      description: "Quest saved, but attachments could not be stored. Please try again after the backend migration finishes.",
-    });
-  };
   const getRequiredUserId = () => {
     if (!user?.id) throw new Error("User not authenticated");
     return user.id;
@@ -769,21 +817,28 @@ export const useTaskMutations = (taskDate: string) => {
   const persistTaskAttachments = async (
     taskId: string,
     attachments: QuestAttachmentInput[],
+    options: {
+      replaceExisting: boolean;
+    } = {
+      replaceExisting: true,
+    },
   ): Promise<TaskAttachmentPersistResult> => {
     if (!user?.id) throw new Error('User not authenticated');
     const remoteTaskId = getRemoteTaskId(taskId);
 
-    const { error: deleteError } = await supabase
-      .from('task_attachments' as any)
-      .delete()
-      .eq('task_id', remoteTaskId)
-      .eq('user_id', user.id);
+    if (options.replaceExisting) {
+      const { error: deleteError } = await supabase
+        .from('task_attachments' as any)
+        .delete()
+        .eq('task_id', remoteTaskId)
+        .eq('user_id', user.id);
 
-    if (deleteError) {
-      if (isTaskAttachmentsTableMissingError(deleteError)) {
-        return { attachmentsSkippedDueToSchema: true };
+      if (deleteError) {
+        if (isTaskAttachmentsTableMissingError(deleteError)) {
+          return { attachmentsSkippedDueToSchema: true };
+        }
+        throw deleteError;
       }
-      throw deleteError;
     }
 
     if (attachments.length === 0) return emptyAttachmentPersistResult();
@@ -838,6 +893,11 @@ export const useTaskMutations = (taskDate: string) => {
 
       if (recurrenceWrite.hasRecurrence && !normalizedScheduling.scheduled_time) {
         throw buildRecurrenceRequiresScheduledTimeError();
+      }
+
+      const explicitlyRequestedInbox = params.source === "inbox" || params.taskDate === null;
+      if (normalizedScheduling.normalizedToInbox && !explicitlyRequestedInbox) {
+        throw buildRegularQuestRequiresTimeOrInboxError();
       }
 
       if (!user?.id) throw new Error('User not authenticated');
@@ -941,15 +1001,19 @@ export const useTaskMutations = (taskDate: string) => {
       const buildTaskCreateResult = (
         taskData: Partial<DailyTask> | null | undefined,
         attachmentPersistResult: TaskAttachmentPersistResult,
+        postCreateWarnings: TaskCreateWarning[],
       ): TaskCreateMutationResult => ({
         ...localTaskRow,
         ...(taskData ?? {}),
         attachmentsSkippedDueToSchema: attachmentPersistResult.attachmentsSkippedDueToSchema,
+        postCreateWarnings,
       });
 
       let localPersistMs: number | null = null;
       let remoteInsertMs: number | null = null;
       let existenceCheckMs: number | null = null;
+      let attachmentPersistMs: number | null = null;
+      let subtaskPersistMs: number | null = null;
 
       const trackTaskCreateResult = (result: TaskCreateMutationResult) => {
         trackResilienceEvent("task_create_result", {
@@ -959,6 +1023,10 @@ export const useTaskMutations = (taskDate: string) => {
           localPersistMs,
           remoteInsertMs,
           existenceCheckMs,
+          attachmentPersistMs,
+          subtaskPersistMs,
+          partialSuccess: result.postCreateWarnings.length > 0,
+          postCreateWarnings: result.postCreateWarnings,
         });
       };
 
@@ -971,6 +1039,7 @@ export const useTaskMutations = (taskDate: string) => {
           queueReason,
           syncPending: true,
           attachmentsSkippedDueToSchema: false,
+          postCreateWarnings: [],
         };
         trackTaskCreateResult(queuedResult);
         return queuedResult;
@@ -1090,37 +1159,65 @@ export const useTaskMutations = (taskDate: string) => {
         }
 
         let attachmentPersistResult = emptyAttachmentPersistResult();
+        const postCreateWarnings: TaskCreateWarning[] = [];
+
         if (persistedRemoteTask?.id) {
-          try {
-            attachmentPersistResult = await persistTaskAttachments(persistedRemoteTask.id, normalizedAttachments);
-          } catch (attachmentsError) {
-            await supabase
-              .from('daily_tasks')
-              .delete()
-              .eq('id', persistedRemoteTask.id)
-              .eq('user_id', user.id);
-            throw attachmentsError;
-          }
+          const remoteTaskId = persistedRemoteTask.id;
+          const [attachmentWarnings, subtaskWarnings] = await Promise.all([
+            (async (): Promise<TaskCreateWarning[]> => {
+              if (normalizedAttachments.length === 0) return [];
+
+              const attachmentPersistStartedAt = Date.now();
+              try {
+                attachmentPersistResult = await persistTaskAttachments(
+                  remoteTaskId,
+                  normalizedAttachments,
+                  { replaceExisting: false },
+                );
+                attachmentPersistMs = Date.now() - attachmentPersistStartedAt;
+
+                return attachmentPersistResult.attachmentsSkippedDueToSchema
+                  ? ["attachments_skipped_schema"]
+                  : [];
+              } catch (attachmentsError) {
+                attachmentPersistMs = Date.now() - attachmentPersistStartedAt;
+                reportApiFailure(attachmentsError, {
+                  source: "task_add_attachments_nonfatal",
+                  remoteTaskId,
+                });
+                return ["attachments_failed"];
+              }
+            })(),
+            (async (): Promise<TaskCreateWarning[]> => {
+              if (cleanedSubtasks.length === 0) return [];
+
+              const subtaskPersistStartedAt = Date.now();
+              try {
+                await persistRemoteSubtasks(
+                  remoteTaskId,
+                  (localTaskRow.subtasks ?? []) as NonNullable<DailyTask["subtasks"]>,
+                );
+                subtaskPersistMs = Date.now() - subtaskPersistStartedAt;
+                return [];
+              } catch (subtasksError) {
+                subtaskPersistMs = Date.now() - subtaskPersistStartedAt;
+                reportApiFailure(subtasksError, {
+                  source: "task_add_subtasks_nonfatal",
+                  remoteTaskId,
+                });
+                return ["subtasks_failed"];
+              }
+            })(),
+          ]);
+
+          postCreateWarnings.push(...attachmentWarnings, ...subtaskWarnings);
         }
 
-        if (cleanedSubtasks.length > 0 && persistedRemoteTask?.id) {
-          try {
-            await persistRemoteSubtasks(
-              persistedRemoteTask.id,
-              (localTaskRow.subtasks ?? []) as NonNullable<DailyTask["subtasks"]>,
-            );
-          } catch (subtasksError) {
-            // Best-effort rollback to keep create behavior predictable.
-            await supabase
-              .from('daily_tasks')
-              .delete()
-              .eq('id', persistedRemoteTask.id)
-              .eq('user_id', user.id);
-            throw subtasksError;
-          }
-        }
-
-        const createResult = buildTaskCreateResult(persistedRemoteTask, attachmentPersistResult);
+        const createResult = buildTaskCreateResult(
+          persistedRemoteTask,
+          attachmentPersistResult,
+          postCreateWarnings,
+        );
         trackTaskCreateResult(createResult);
         return createResult;
       } catch (error) {
@@ -1242,8 +1339,9 @@ export const useTaskMutations = (taskDate: string) => {
         return;
       }
       toast({ title: "Quest added!" });
-      if (createdTask?.attachmentsSkippedDueToSchema) {
-        showAttachmentsUnavailableToast();
+      const warningToast = getTaskCreateWarningToast(createdTask?.postCreateWarnings ?? []);
+      if (warningToast) {
+        toast(warningToast);
       }
       
       // Track task creation for learning
@@ -2123,7 +2221,9 @@ export const useTaskMutations = (taskDate: string) => {
       if (error) throw error;
 
       if (hasAttachmentUpdates) {
-        const attachmentPersistResult = await persistTaskAttachments(remoteTaskId, updates.attachments ?? []);
+        const attachmentPersistResult = await persistTaskAttachments(remoteTaskId, updates.attachments ?? [], {
+          replaceExisting: true,
+        });
         attachmentsSkippedDueToSchema = attachmentPersistResult.attachmentsSkippedDueToSchema;
       }
 
@@ -2148,7 +2248,10 @@ export const useTaskMutations = (taskDate: string) => {
       }
 
       if (data?.attachmentsSkippedDueToSchema) {
-        showAttachmentsUnavailableToast();
+        toast({
+          title: "Attachments unavailable",
+          description: "Quest saved, but attachments could not be stored. Please try again after the backend migration finishes.",
+        });
       }
 
       const definedFields = Object.entries(variables.updates)

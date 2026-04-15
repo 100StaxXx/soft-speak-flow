@@ -23,6 +23,7 @@ import { useCalendarIntegrations } from "@/hooks/useCalendarIntegrations";
 import { useMainTabVisibility } from "@/contexts/MainTabVisibilityContext";
 import { SEND_TO_CALENDAR_ENABLED } from "@/utils/calendarFeatureFlags";
 import { isMacDesignedForIPadIOSApp } from "@/utils/platformTargets";
+import { trackResilienceEvent } from "@/utils/resilienceTelemetry";
 
 const TIME_24H_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const DATE_INPUT_REGEX = /^\d{4}-\d{2}-\d{2}$/;
@@ -215,15 +216,22 @@ const InboxPage = memo(function InboxPage() {
       attachments: data.attachments,
     });
 
+    setShowAddQuest(false);
+
     if (SEND_TO_CALENDAR_ENABLED && data.sendToCalendar && createdTask?.id) {
-      await handleSendTaskToCalendar(createdTask.id);
+      const calendarSyncStartedAt = Date.now();
+      void handleSendTaskToCalendar(createdTask.id).finally(() => {
+        trackResilienceEvent("task_create_calendar_sync", {
+          taskId: createdTask.id,
+          calendarSyncMs: Date.now() - calendarSyncStartedAt,
+        });
+      });
     }
     if (!data.sendToInbox) {
       queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
     }
     queryClient.invalidateQueries({ queryKey: ["inbox-tasks"] });
     queryClient.invalidateQueries({ queryKey: ["inbox-count"] });
-    setShowAddQuest(false);
   }, [user?.id, addTask, handleSendTaskToCalendar, queryClient]);
 
   return (

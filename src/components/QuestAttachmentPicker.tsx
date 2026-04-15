@@ -57,7 +57,7 @@ export function QuestAttachmentPicker({
           className={cn(
             "gap-2",
             isQuestSoft
-              ? "rounded-[22px] border-white/10 bg-white/[0.06] text-white shadow-[0_10px_18px_rgba(0,0,0,0.12)] hover:bg-white/[0.1]"
+              ? "rounded-[16px] border-white/8 bg-white/[0.05] text-white/82 shadow-[0_8px_14px_rgba(0,0,0,0.12)] hover:bg-white/[0.08] hover:text-white"
               : "",
           )}
         >
@@ -81,7 +81,7 @@ export function QuestAttachmentPicker({
               className={cn(
                 "relative p-2",
                 isQuestSoft
-                  ? "rounded-[22px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.10),rgba(255,255,255,0.04))] shadow-[0_10px_18px_rgba(0,0,0,0.12)]"
+                  ? "rounded-[16px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.025))] shadow-[0_8px_16px_rgba(0,0,0,0.12)]"
                   : "rounded-lg border border-border/60 bg-card",
               )}
             >
@@ -91,7 +91,7 @@ export function QuestAttachmentPicker({
                 className={cn(
                   "absolute right-1 top-1 rounded-full p-1",
                   isQuestSoft
-                    ? "bg-black/20 text-white/70 hover:bg-black/30 hover:text-white"
+                    ? "bg-black/18 text-white/60 hover:bg-black/28 hover:text-white"
                     : "bg-background/80 text-muted-foreground hover:text-destructive",
                 )}
                 aria-label={`Remove ${attachment.fileName}`}

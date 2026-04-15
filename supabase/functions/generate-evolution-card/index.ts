@@ -15,64 +15,15 @@ import {
   getCompanionEvolutionCardRarity,
   MAX_COMPANION_STAGE,
 } from "../../../src/config/companionCatalog.ts";
+import {
+  isAssignedCompanionName,
+  normalizeCompanionName,
+  synthesizeAssignedCompanionName,
+} from "../../../src/lib/companionNameIdentity.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-const normalizeName = (value: string | null | undefined) =>
-  typeof value === "string" ? value.trim() : "";
-
-const normalizeComparable = (value: string | null | undefined) =>
-  normalizeName(value).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-
-const RESERVED_NAMES = new Set(["", "companion", "your companion", "unknown"]);
-
-const NAME_PREFIXES: Record<string, readonly string[]> = {
-  fire: ["sol", "pyra", "igni", "kae", "ember"],
-  water: ["aqua", "mar", "thal", "nera", "sere"],
-  earth: ["gaia", "bryn", "terra", "mora", "verd"],
-  air: ["aero", "zeph", "lyra", "cael", "syl"],
-  light: ["luma", "heli", "auri", "cira", "sera"],
-  shadow: ["nyx", "umbra", "vela", "mora", "shade"],
-  void: ["vora", "noxa", "zael", "xyra", "khae"],
-  electric: ["vol", "zira", "tesa", "arca", "rael"],
-  cosmic: ["nova", "astra", "oria", "cela", "vexa"],
-  default: ["kae", "lyra", "sera", "nova", "aeri"],
-};
-
-const NAME_MIDDLES = ["l", "r", "v", "th", "n", "s"];
-const NAME_SUFFIXES = ["a", "is", "or", "en", "yn", "el", "ia", "eth"];
-
-const capitalize = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
-
-const hashSeed = (value: string) => {
-  let hash = 0;
-  for (let index = 0; index < value.length; index += 1) {
-    hash = (hash * 31 + value.charCodeAt(index)) | 0;
-  }
-  return Math.abs(hash);
-};
-
-const isAssignedCompanionName = (value: string | null | undefined, species: string) => {
-  const normalized = normalizeComparable(value);
-  if (RESERVED_NAMES.has(normalized)) return false;
-  return normalized !== normalizeComparable(species);
-};
-
-const synthesizeAssignedCompanionName = (seedInput: string, element: string, species: string) => {
-  const normalizedElement = normalizeComparable(element) || "default";
-  const prefixPool = NAME_PREFIXES[normalizedElement] ?? NAME_PREFIXES.default;
-  const seed = hashSeed(`${seedInput}:${normalizedElement}:${normalizeComparable(species)}`);
-  const prefix = prefixPool[seed % prefixPool.length] ?? NAME_PREFIXES.default[0];
-  const middle = NAME_MIDDLES[Math.floor(seed / 7) % NAME_MIDDLES.length] ?? "";
-  const suffix = NAME_SUFFIXES[Math.floor(seed / 17) % NAME_SUFFIXES.length] ?? "a";
-  return capitalize(
-    `${prefix}${middle}${suffix}`
-      .replace(/(.)\1{2,}/g, "$1$1")
-      .replace(/[^a-z]/gi, ""),
-  );
 };
 
 type EvolutionCardContent = {
@@ -149,7 +100,7 @@ serve(async (req) => {
 
     const { data: companionRecord, error: companionError } = await supabaseClient
       .from('user_companion')
-      .select('id, user_id, spirit_animal, core_element, favorite_color')
+      .select('id, user_id, preset_id, spirit_animal, core_element, favorite_color')
       .eq('id', companionId)
       .maybeSingle();
 
@@ -194,6 +145,10 @@ serve(async (req) => {
     const species = resolvedSpecies;
     const element = resolvedElement;
     const color = resolvedColor;
+    const companionIdentity = {
+      spiritAnimal: species,
+      presetId: companionRecord.preset_id,
+    };
 
     const rateLimit = await checkRateLimit(
       supabaseClient,
@@ -216,7 +171,10 @@ serve(async (req) => {
       .order('evolution_stage', { ascending: true })
       .limit(1);
 
-    const existingName = existingCards && existingCards.length > 0 ? existingCards[0].creature_name : null;
+    const existingName = existingCards && existingCards.length > 0
+      && isAssignedCompanionName(existingCards[0].creature_name, companionIdentity)
+      ? existingCards[0].creature_name
+      : null;
     console.log('Existing creature name:', existingName);
 
     // Generate card ID
@@ -267,9 +225,11 @@ serve(async (req) => {
     let skipAI = false;
     
     if (stage === MAX_COMPANION_STAGE && !existingName) {
-      const powerTitles = ['Sovereign', 'Apex', 'Colossus', 'Warlord', 'Primeborn', 'Overlord', 'Sentinel', 'Emperor', 'Archon', 'Omega'];
-      const randomTitle = powerTitles[Math.floor(Math.random() * powerTitles.length)];
-      finalCreatureName = `${element} ${randomTitle} ${species}`;
+      finalCreatureName = synthesizeAssignedCompanionName(
+        `${companionId}:${user.id}:${stage}:final-stage`,
+        element,
+        companionIdentity,
+      );
       skipAI = true;
       console.log('Generated final-stage ultimate title:', finalCreatureName);
     }
@@ -458,23 +418,23 @@ Make it LEGENDARY. This is the birth of a companion.`;
             if (compliance.isCompliant) {
               cardData = retriedCardData;
             } else {
-              const fallbackName = normalizeName(retriedCardData.creature_name)
-                || normalizeName(existingName)
+              const fallbackName = normalizeCompanionName(retriedCardData.creature_name)
+                || normalizeCompanionName(existingName)
                 || synthesizeAssignedCompanionName(
                   `${companionId}:${user.id}:${stage}:spirit-lock-fallback`,
                   element,
-                  species,
+                  companionIdentity,
                 );
               cardData = buildMechanicalCardFallback(fallbackName, stage, species, element);
             }
           } catch (retryError) {
             console.error("[SpiritLock] retry failed, using deterministic fallback", retryError);
-            const fallbackName = normalizeName(cardData?.creature_name)
-              || normalizeName(existingName)
+            const fallbackName = normalizeCompanionName(cardData?.creature_name)
+              || normalizeCompanionName(existingName)
               || synthesizeAssignedCompanionName(
                 `${companionId}:${user.id}:${stage}:spirit-lock-fallback`,
                 element,
-                species,
+                companionIdentity,
               );
             cardData = buildMechanicalCardFallback(fallbackName, stage, species, element);
           }
@@ -500,22 +460,22 @@ Make it LEGENDARY. This is the birth of a companion.`;
           phase: "final_guardrail_fallback",
           violations: finalCompliance.violations,
         });
-        const fallbackName = normalizeName(cardData?.creature_name)
-          || normalizeName(existingName)
+        const fallbackName = normalizeCompanionName(cardData?.creature_name)
+          || normalizeCompanionName(existingName)
           || synthesizeAssignedCompanionName(
             `${companionId}:${user.id}:${stage}:final-guardrail`,
             element,
-            species,
+            companionIdentity,
           );
         cardData = buildMechanicalCardFallback(fallbackName, stage, species, element);
       }
     }
 
-    if (!isAssignedCompanionName(cardData?.creature_name, species)) {
+    if (!isAssignedCompanionName(cardData?.creature_name, companionIdentity)) {
       const fallbackName = synthesizeAssignedCompanionName(
         `${companionId}:${user.id}:${stage}`,
         element,
-        species,
+        companionIdentity,
       );
       console.warn("Replacing invalid creature name with synthesized fallback", {
         invalidName: cardData?.creature_name ?? null,

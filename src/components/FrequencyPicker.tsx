@@ -63,7 +63,7 @@ export const FrequencyPicker = ({
             aria-label={DAYS[index]}
             className={cn(
               "aspect-square flex items-center justify-center text-xs font-bold transition-all",
-              isQuestSoft ? "rounded-[18px] border" : "rounded-full border-2",
+              isQuestSoft ? "rounded-[14px] border" : "rounded-full border-2",
               selectedDays.includes(index)
                 ? cn(
                   isQuestSoft
@@ -72,7 +72,7 @@ export const FrequencyPicker = ({
                   isQuestSoft && activeTone ? activeTone : "",
                 )
                 : isQuestSoft
-                  ? "border-white/8 bg-white/[0.06] text-white/72 hover:bg-white/[0.10]"
+                  ? "border-white/7 bg-white/[0.05] text-white/68 hover:bg-white/[0.08] hover:text-white/84"
                   : "border-border bg-card text-muted-foreground hover:border-primary/50"
             )}
           >

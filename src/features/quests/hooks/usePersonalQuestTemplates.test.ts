@@ -234,31 +234,16 @@ describe("usePersonalQuestTemplates", () => {
     });
   });
 
-  it("saves an explicit personal template and refreshes the merged list", async () => {
+  it("saves an explicit personal template without blocking on a refresh", async () => {
     const { result } = renderHook(() => usePersonalQuestTemplates());
 
     await waitFor(() => {
       expect(result.current.templates).toEqual([]);
     });
 
-    mocks.fetchExplicitPersonalQuestTemplatesMock.mockResolvedValue([
-      {
-        id: "explicit-template-1",
-        user_id: "user-1",
-        source_common_template_id: "work-deep-work-block",
-        normalized_title: "deep work sprint",
-        title: "Deep Work Sprint",
-        difficulty: "hard",
-        estimated_duration: 75,
-        notes: "Save the customized version",
-        subtasks: ["Choose one priority", "Block distractions"],
-        created_at: "2026-01-20T09:00:00.000Z",
-        updated_at: "2026-01-20T09:00:00.000Z",
-      },
-    ]);
-
+    let savedTemplate: Awaited<ReturnType<typeof result.current.saveTemplate>> | undefined;
     await act(async () => {
-      await result.current.saveTemplate({
+      savedTemplate = await result.current.saveTemplate({
         sourceCommonTemplateId: "work-deep-work-block",
         title: "Deep Work Sprint",
         difficulty: "hard",
@@ -272,13 +257,11 @@ describe("usePersonalQuestTemplates", () => {
       userId: "user-1",
       title: "Deep Work Sprint",
     }));
-
-    await waitFor(() => {
-      expect(result.current.templates[0]).toMatchObject({
-        id: "explicit-template-1",
-        templateOrigin: "personal_explicit",
-        title: "Deep Work Sprint",
-      });
+    expect(savedTemplate).toMatchObject({
+      id: "explicit-template-1",
+      templateOrigin: "personal_explicit",
+      title: "Deep Work Sprint",
     });
+    expect(result.current.templates).toEqual([]);
   });
 });

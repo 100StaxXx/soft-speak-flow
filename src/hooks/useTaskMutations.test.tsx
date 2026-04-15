@@ -42,6 +42,7 @@ const mocks = vi.hoisted(() => {
   const dailyTasksUpdateExecuteMock = vi.fn();
   const taskAttachmentsDeleteExecuteMock = vi.fn();
   const taskAttachmentsInsertExecuteMock = vi.fn();
+  const subtasksInsertExecuteMock = vi.fn();
   const withTimeoutMock = vi.fn();
   const pollWithDeadlineMock = vi.fn();
 
@@ -79,6 +80,7 @@ const mocks = vi.hoisted(() => {
     dailyTasksUpdateExecuteMock,
     taskAttachmentsDeleteExecuteMock,
     taskAttachmentsInsertExecuteMock,
+    subtasksInsertExecuteMock,
     withTimeoutMock,
     pollWithDeadlineMock,
   };
@@ -558,6 +560,7 @@ describe("useTaskMutations attachment handling", () => {
     mocks.dailyTasksUpdateExecuteMock.mockResolvedValue({ error: null });
     mocks.taskAttachmentsDeleteExecuteMock.mockResolvedValue({ error: null });
     mocks.taskAttachmentsInsertExecuteMock.mockResolvedValue({ error: null });
+    mocks.subtasksInsertExecuteMock.mockResolvedValue({ error: null });
     mocks.withTimeoutMock.mockImplementation(async (promiseOrFactory: Promise<unknown> | (() => Promise<unknown>)) => (
       typeof promiseOrFactory === "function" ? promiseOrFactory() : promiseOrFactory
     ));
@@ -633,10 +636,10 @@ describe("useTaskMutations attachment handling", () => {
       }
 
       if (table === "subtasks") {
-        return {
-          insert: vi.fn().mockResolvedValue({ error: null }),
-        };
-      }
+      return {
+        insert: mocks.subtasksInsertExecuteMock,
+      };
+    }
 
       if (table === "epic_habits") {
         return {
@@ -686,11 +689,13 @@ describe("useTaskMutations attachment handling", () => {
         taskText: "Ship feature",
         difficulty: "medium",
         taskDate: "2026-02-20",
+        scheduledTime: "09:00",
       });
     });
 
     expect(createdTask?.id).toBe("task-1");
     expect(createdTask?.queued).not.toBe(true);
+    expect(createdTask?.postCreateWarnings).toEqual([]);
     expect(mocks.queueTaskActionMock).not.toHaveBeenCalled();
     expect(mocks.upsertPlannerRecordMock).toHaveBeenCalledTimes(1);
     expect(mocks.toastMock).toHaveBeenCalledWith(expect.objectContaining({ title: "Quest added!" }));
@@ -761,6 +766,7 @@ describe("useTaskMutations attachment handling", () => {
         taskText: "Ship feature",
         difficulty: "medium",
         taskDate: "2026-02-20",
+        scheduledTime: "09:00",
         contactId: legacyContactId,
       });
     });
@@ -791,6 +797,7 @@ describe("useTaskMutations attachment handling", () => {
         taskText: "Ship feature",
         difficulty: "medium",
         taskDate: "2026-02-20",
+        scheduledTime: "09:00",
       });
     });
 
@@ -867,6 +874,7 @@ describe("useTaskMutations attachment handling", () => {
         taskText: "Ship feature",
         difficulty: "medium",
         taskDate: "2026-02-20",
+        scheduledTime: "09:00",
       });
     });
 
@@ -902,6 +910,7 @@ describe("useTaskMutations attachment handling", () => {
         taskText: "Ship feature",
         difficulty: "medium",
         taskDate: "2026-02-20",
+        scheduledTime: "09:00",
       });
     });
 
@@ -960,7 +969,7 @@ describe("useTaskMutations attachment handling", () => {
   });
 
   it("creates a quest when task_attachments table is missing and shows warning", async () => {
-    mocks.taskAttachmentsDeleteExecuteMock.mockResolvedValue({
+    mocks.taskAttachmentsInsertExecuteMock.mockResolvedValue({
       error: taskAttachmentsMissingTableError,
     });
 
@@ -974,15 +983,18 @@ describe("useTaskMutations attachment handling", () => {
         taskText: "Ship feature",
         difficulty: "medium",
         taskDate: "2026-02-20",
+        scheduledTime: "09:00",
         attachments: [buildAttachment()],
       });
     });
 
     expect(createdTask?.id).toBe("task-1");
     expect(createdTask?.attachmentsSkippedDueToSchema).toBe(true);
-    expect(mocks.taskAttachmentsInsertExecuteMock).not.toHaveBeenCalled();
+    expect(createdTask?.postCreateWarnings).toEqual(["attachments_skipped_schema"]);
+    expect(mocks.taskAttachmentsDeleteExecuteMock).not.toHaveBeenCalled();
+    expect(mocks.taskAttachmentsInsertExecuteMock).toHaveBeenCalledTimes(1);
     expect(mocks.toastMock).toHaveBeenCalledWith(expect.objectContaining({ title: "Quest added!" }));
-    expect(mocks.toastMock).toHaveBeenCalledWith(expect.objectContaining({ title: "Attachments unavailable" }));
+    expect(mocks.toastMock).toHaveBeenCalledWith(expect.objectContaining({ title: "Quest added with warnings" }));
   });
 
   it("retries basic custom-week creation without month recurrence columns when schema lags", async () => {
@@ -1082,6 +1094,7 @@ describe("useTaskMutations attachment handling", () => {
         taskText: "Another quest",
         difficulty: "medium",
         taskDate: "2026-02-20",
+        scheduledTime: "09:00",
       }),
     ).rejects.toMatchObject({
       message: "Maximum quest limit reached for this date (limit: 10)",
@@ -1111,6 +1124,7 @@ describe("useTaskMutations attachment handling", () => {
         taskText: "Ship feature",
         difficulty: "medium",
         taskDate: "2026-02-20",
+        scheduledTime: "09:00",
       }),
     ).rejects.toMatchObject({
       message: "invalid input syntax for type uuid: \"task-e47e5651-7522-4888-a04d-6eff518fa4ba\"",
@@ -1121,7 +1135,7 @@ describe("useTaskMutations attachment handling", () => {
     expect(mocks.toastMock).toHaveBeenCalledWith(expect.objectContaining({ title: "Failed to add quest" }));
   });
 
-  it("fails quest creation and rolls back when attachment persistence has non-schema errors", async () => {
+  it("preserves the quest when attachment persistence has non-schema errors", async () => {
     mocks.taskAttachmentsInsertExecuteMock.mockResolvedValue({
       error: {
         code: "23514",
@@ -1135,18 +1149,57 @@ describe("useTaskMutations attachment handling", () => {
       wrapper: createWrapper(),
     });
 
-    await expect(
-      result.current.addTask({
+    let createdTask: any;
+    await act(async () => {
+      createdTask = await result.current.addTask({
         taskText: "Ship feature",
         difficulty: "medium",
         taskDate: "2026-02-20",
+        scheduledTime: "09:00",
         attachments: [buildAttachment()],
-      }),
-    ).rejects.toMatchObject({ message: "insert failed" });
+      });
+    });
 
     expect(mocks.taskAttachmentsInsertExecuteMock).toHaveBeenCalledTimes(1);
-    expect(mocks.dailyTasksDeleteExecuteMock).toHaveBeenCalledTimes(1);
-    expect(mocks.toastMock).toHaveBeenCalledWith(expect.objectContaining({ title: "Failed to add quest" }));
+    expect(mocks.taskAttachmentsDeleteExecuteMock).not.toHaveBeenCalled();
+    expect(mocks.dailyTasksDeleteExecuteMock).not.toHaveBeenCalled();
+    expect(createdTask?.id).toBe("task-1");
+    expect(createdTask?.postCreateWarnings).toEqual(["attachments_failed"]);
+    expect(mocks.toastMock).toHaveBeenCalledWith(expect.objectContaining({ title: "Quest added!" }));
+    expect(mocks.toastMock).toHaveBeenCalledWith(expect.objectContaining({ title: "Quest added with warnings" }));
+  });
+
+  it("preserves the quest when subtask persistence fails", async () => {
+    mocks.subtasksInsertExecuteMock.mockResolvedValue({
+      error: {
+        code: "23514",
+        message: "subtasks insert failed",
+        details: null,
+        hint: null,
+      },
+    });
+
+    const { result } = renderHook(() => useTaskMutations("2026-02-20"), {
+      wrapper: createWrapper(),
+    });
+
+    let createdTask: any;
+    await act(async () => {
+      createdTask = await result.current.addTask({
+        taskText: "Ship feature",
+        difficulty: "medium",
+        taskDate: "2026-02-20",
+        scheduledTime: "09:00",
+        subtasks: ["One", "Two"],
+      });
+    });
+
+    expect(mocks.subtasksInsertExecuteMock).toHaveBeenCalledTimes(1);
+    expect(mocks.dailyTasksDeleteExecuteMock).not.toHaveBeenCalled();
+    expect(createdTask?.id).toBe("task-1");
+    expect(createdTask?.postCreateWarnings).toEqual(["subtasks_failed"]);
+    expect(mocks.toastMock).toHaveBeenCalledWith(expect.objectContaining({ title: "Quest added!" }));
+    expect(mocks.toastMock).toHaveBeenCalledWith(expect.objectContaining({ title: "Quest added with warnings" }));
   });
 
   it("blocks recurring quest creation when no scheduled time is provided", async () => {
@@ -1170,6 +1223,29 @@ describe("useTaskMutations attachment handling", () => {
     expect(mocks.toastMock).toHaveBeenCalledWith(expect.objectContaining({
       title: "Failed to add quest",
       description: RECURRENCE_REQUIRES_SCHEDULED_TIME_MESSAGE,
+    }));
+  });
+
+  it("blocks dated untimed quest creation before the remote insert runs", async () => {
+    const { result } = renderHook(() => useTaskMutations("2026-02-20"), {
+      wrapper: createWrapper(),
+    });
+
+    await expect(
+      result.current.addTask({
+        taskText: "Untimed quest",
+        difficulty: "medium",
+        taskDate: "2026-02-20",
+        scheduledTime: null,
+      }),
+    ).rejects.toMatchObject({
+      message: "REGULAR_QUEST_REQUIRES_TIME_OR_INBOX",
+    });
+
+    expect(mocks.dailyTasksInsertMock).not.toHaveBeenCalled();
+    expect(mocks.toastMock).toHaveBeenCalledWith(expect.objectContaining({
+      title: "Failed to add quest",
+      description: "Scheduled quests need a time. Pick a time or send it to Inbox instead.",
     }));
   });
 

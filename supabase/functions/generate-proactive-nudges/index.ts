@@ -75,7 +75,7 @@ serve(async (req) => {
         // Check if user has an inactive companion
         const { data: companion } = await supabase
           .from('user_companion')
-          .select('id, user_id, current_stage, inactive_days, spirit_animal, cached_creature_name')
+          .select('id, user_id, preset_id, current_stage, inactive_days, spirit_animal, core_element, cached_creature_name')
           .eq('user_id', profile.id)
           .maybeSingle()
 

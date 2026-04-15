@@ -67,6 +67,7 @@ import { QuestInboxSection } from "@/components/QuestInboxSection";
 import { QUEST_ACTION_TOAST_DURATION_MS } from "@/constants/questToast";
 import type { QuestComposerPrefillDraft } from "@/features/quests/types";
 import { buildVoiceQuestPrefillFromTranscript } from "@/features/quests/utils/voiceQuestPrefill";
+import { trackResilienceEvent } from "@/utils/resilienceTelemetry";
 
 const TIME_24H_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const DATE_INPUT_REGEX = /^\d{4}-\d{2}-\d{2}$/;
@@ -692,8 +693,16 @@ const Journeys = () => {
       attachments: data.attachments,
     });
 
+    setShowAddSheet(false);
+
     if (SEND_TO_CALENDAR_ENABLED && data.sendToCalendar && createdTask?.id) {
-      await handleSendTaskToCalendar(createdTask.id);
+      const calendarSyncStartedAt = Date.now();
+      void handleSendTaskToCalendar(createdTask.id).finally(() => {
+        trackResilienceEvent("task_create_calendar_sync", {
+          taskId: createdTask.id,
+          calendarSyncMs: Date.now() - calendarSyncStartedAt,
+        });
+      });
     }
     if (data.sendToInbox) {
       setIsInboxExpanded(true);
@@ -701,7 +710,6 @@ const Journeys = () => {
         inboxSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       });
     }
-    setShowAddSheet(false);
   }, [selectedDate, addTask, handleSendTaskToCalendar]);
 
   const handleToggleTask = useCallback((taskId: string, completed: boolean, xpReward: number, taskData?: { scheduled_time?: string | null; difficulty?: string | null; category?: string | null; ai_generated?: boolean | null; task_text?: string | null }) => {

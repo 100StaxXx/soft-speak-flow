@@ -28,6 +28,7 @@ interface UserContext {
   companion: {
     companionDisplayName: string | null;
     spiritAnimal: string;
+    presetId: string | null;
     currentMood: string;
     currentStage: number;
     inactiveDays: number;
@@ -163,7 +164,10 @@ const generateNotificationContent = async (
     typeof context.companion?.companionDisplayName === "string"
       ? context.companion.companionDisplayName.trim()
       : null;
-  const assignedCompanionName = isAssignedCompanionName(rawCompanionName, companionSpecies)
+  const assignedCompanionName = isAssignedCompanionName(rawCompanionName, {
+    spiritAnimal: companionSpecies,
+    presetId: context.companion?.presetId,
+  })
     ? rawCompanionName
     : null;
   const hasAssignedCompanionName = Boolean(assignedCompanionName);
@@ -557,7 +561,7 @@ serve(async (req) => {
         const [companionRes, mentorRes, checkInRes, horoscopeRes, activityRes] = await Promise.all([
           supabase
             .from('user_companion')
-            .select('id, user_id, spirit_animal, current_mood, current_stage, inactive_days, cached_creature_name')
+            .select('id, user_id, preset_id, spirit_animal, core_element, current_mood, current_stage, inactive_days, cached_creature_name')
             .eq('user_id', profile.id)
             .maybeSingle(),
           profile.selected_mentor_id 
@@ -612,6 +616,7 @@ serve(async (req) => {
           companion: companionRes.data ? {
             companionDisplayName: companionContext?.displayName ?? NOTIFICATION_COMPANION_FALLBACK_NAME,
             spiritAnimal: companionRes.data.spirit_animal,
+            presetId: companionRes.data.preset_id ?? null,
             currentMood: companionRes.data.current_mood,
             currentStage: companionRes.data.current_stage,
             inactiveDays: companionRes.data.inactive_days || 0,

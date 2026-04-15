@@ -167,16 +167,18 @@ describe("resolveCompanionName", () => {
   });
 
   it("rejects species labels as assigned names", () => {
-    expect(isAssignedCompanionName("Mechanical Dragon", "Mechanical Dragon")).toBe(false);
-    expect(isAssignedCompanionName("Companion", "Mechanical Dragon")).toBe(false);
-    expect(isAssignedCompanionName("Zephyra", "Mechanical Dragon")).toBe(true);
+    expect(isAssignedCompanionName("Mechanical Dragon", { spiritAnimal: "Mechanical Dragon" })).toBe(false);
+    expect(isAssignedCompanionName("Companion", { spiritAnimal: "Mechanical Dragon" })).toBe(false);
+    expect(isAssignedCompanionName("Kitsune", { spiritAnimal: "Fox", presetId: "fox" })).toBe(false);
+    expect(isAssignedCompanionName("Zephyra", { spiritAnimal: "Mechanical Dragon", presetId: "mechanicaldragon" })).toBe(true);
   });
 
-  it("does not reveal or cache a proper name before stage 1 when using the companion fallback", async () => {
+  it("synthesizes and caches a canonical proper name before stage 1", async () => {
     const value = await resolveCompanionName({
       companion: {
         id: "comp-7",
         current_stage: 0,
+        preset_id: "mechanicaldragon",
         cached_creature_name: "Mechanical Dragon",
         spirit_animal: "Mechanical Dragon",
         core_element: "water",
@@ -184,12 +186,12 @@ describe("resolveCompanionName", () => {
       fallback: "companion",
     });
 
-    expect(value).toBe("Companion");
-    expect(mocks.evolutionMaybeSingle).not.toHaveBeenCalled();
-    expect(mocks.updateEq).not.toHaveBeenCalled();
+    expect(value).not.toBe("Companion");
+    expect(value).not.toBe("Mechanical Dragon");
+    expect(mocks.updateEq).toHaveBeenCalledWith("id", "comp-7");
   });
 
-  it("can still use the species fallback before stage 1 without querying or caching names", async () => {
+  it("still prefers a canonical proper name over the species fallback before stage 1", async () => {
     mocks.evolutionMaybeSingle
       .mockResolvedValueOnce({ data: { creature_name: "Mechanical Dragon" } })
       .mockResolvedValueOnce({ data: { creature_name: "Mechanical Dragon" } });
@@ -198,6 +200,7 @@ describe("resolveCompanionName", () => {
       companion: {
         id: "comp-8",
         current_stage: 0,
+        preset_id: "mechanicaldragon",
         cached_creature_name: null,
         spirit_animal: "Mechanical Dragon",
         core_element: "water",
@@ -205,8 +208,8 @@ describe("resolveCompanionName", () => {
       fallback: "species",
     });
 
-    expect(value).toBe("Mechanical Dragon");
-    expect(mocks.evolutionMaybeSingle).not.toHaveBeenCalled();
-    expect(mocks.updateEq).not.toHaveBeenCalled();
+    expect(value).not.toBe("Mechanical Dragon");
+    expect(value).not.toBe("");
+    expect(mocks.updateEq).toHaveBeenCalledWith("id", "comp-8");
   });
 });

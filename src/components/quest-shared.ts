@@ -4,37 +4,37 @@ import { cn } from "@/lib/utils";
 // --- Difficulty color helpers ---
 export const DIFFICULTY_COLORS = {
   easy: {
-    bg: "bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.28),transparent_42%),linear-gradient(180deg,#53d79e_0%,#36bf84_48%,#289e6b_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.26),0_24px_44px_rgba(18,102,69,0.28)]",
+    bg: "bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_52%),linear-gradient(180deg,rgba(35,48,45,0.98),rgba(24,34,31,0.98))] shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_20px_40px_rgba(0,0,0,0.26)]",
     text: "text-emerald-50",
-    pill: "bg-[linear-gradient(180deg,#8bf1c2_0%,#4fd49a_46%,#2cb97e_100%)]",
-    border: "border-emerald-100/35",
-    difficultyActive: "border-white/70 bg-white/[0.22] text-white shadow-[0_16px_28px_rgba(10,83,52,0.22),inset_0_1px_0_rgba(255,255,255,0.24)]",
-    iconBubble: "border-white/30 bg-white/[0.20] text-white",
-    primaryButton: "bg-[linear-gradient(180deg,#79ebb7_0%,#3fd597_45%,#1ab675_100%)] text-[#103323] shadow-[0_18px_28px_rgba(20,116,74,0.34)]",
-    primaryButtonDisabled: "bg-[linear-gradient(180deg,rgba(121,235,183,0.26),rgba(26,182,117,0.22))] text-[#17392d]/65 shadow-none",
-    highlightBadge: "border-white/20 bg-white/[0.16]",
+    pill: "bg-[linear-gradient(180deg,rgba(90,192,145,0.9),rgba(47,146,105,0.95))]",
+    border: "border-emerald-300/28",
+    difficultyActive: "border-emerald-300/40 bg-emerald-400/[0.14] text-emerald-50 shadow-[0_12px_22px_rgba(7,44,31,0.22),inset_0_1px_0_rgba(255,255,255,0.08)]",
+    iconBubble: "border-emerald-300/20 bg-emerald-400/[0.12] text-emerald-50",
+    primaryButton: "bg-[linear-gradient(180deg,#65d8a5_0%,#38bf86_55%,#239a67_100%)] text-[#0e261d] shadow-[0_16px_28px_rgba(17,85,58,0.26)]",
+    primaryButtonDisabled: "bg-[linear-gradient(180deg,rgba(101,216,165,0.18),rgba(35,154,103,0.18))] text-[#dff8ed]/45 shadow-none",
+    highlightBadge: "border-emerald-300/20 bg-emerald-400/[0.10]",
   },
   medium: {
-    bg: "bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.3),transparent_42%),linear-gradient(180deg,#f2a96c_0%,#e08a4f_48%,#cc723f_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.24),0_24px_44px_rgba(120,58,24,0.28)]",
+    bg: "bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_52%),linear-gradient(180deg,rgba(47,39,33,0.98),rgba(34,28,24,0.98))] shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_20px_40px_rgba(0,0,0,0.26)]",
     text: "text-amber-50",
-    pill: "bg-[linear-gradient(180deg,#ffd1ab_0%,#f3a264_44%,#df7f41_100%)]",
-    border: "border-orange-100/35",
-    difficultyActive: "border-white/70 bg-white/[0.22] text-white shadow-[0_16px_28px_rgba(111,55,22,0.22),inset_0_1px_0_rgba(255,255,255,0.24)]",
-    iconBubble: "border-white/30 bg-white/[0.20] text-white",
-    primaryButton: "bg-[linear-gradient(180deg,#ffd5b4_0%,#f4a166_42%,#e27d41_100%)] text-[#4d2309] shadow-[0_18px_28px_rgba(156,79,33,0.34)]",
-    primaryButtonDisabled: "bg-[linear-gradient(180deg,rgba(255,213,180,0.26),rgba(226,125,65,0.24))] text-[#4d2309]/55 shadow-none",
-    highlightBadge: "border-white/20 bg-white/[0.16]",
+    pill: "bg-[linear-gradient(180deg,rgba(237,166,103,0.92),rgba(185,108,57,0.96))]",
+    border: "border-amber-300/28",
+    difficultyActive: "border-amber-300/40 bg-amber-400/[0.14] text-amber-50 shadow-[0_12px_22px_rgba(64,35,13,0.24),inset_0_1px_0_rgba(255,255,255,0.08)]",
+    iconBubble: "border-amber-300/20 bg-amber-400/[0.12] text-amber-50",
+    primaryButton: "bg-[linear-gradient(180deg,#f2c39d_0%,#df965f_52%,#bf6d38_100%)] text-[#2f180a] shadow-[0_16px_28px_rgba(98,54,25,0.28)]",
+    primaryButtonDisabled: "bg-[linear-gradient(180deg,rgba(242,195,157,0.18),rgba(191,109,56,0.18))] text-[#fff1e5]/45 shadow-none",
+    highlightBadge: "border-amber-300/20 bg-amber-400/[0.10]",
   },
   hard: {
-    bg: "bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.28),transparent_42%),linear-gradient(180deg,#d07cff_0%,#ad5bf1_48%,#8c43da_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_24px_44px_rgba(76,32,123,0.3)]",
+    bg: "bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_52%),linear-gradient(180deg,rgba(43,33,50,0.98),rgba(31,24,37,0.98))] shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_20px_40px_rgba(0,0,0,0.26)]",
     text: "text-fuchsia-50",
-    pill: "bg-[linear-gradient(180deg,#f0c2ff_0%,#cc7bff_44%,#a24cf1_100%)]",
-    border: "border-fuchsia-100/35",
-    difficultyActive: "border-white/70 bg-white/[0.22] text-white shadow-[0_16px_28px_rgba(66,22,111,0.24),inset_0_1px_0_rgba(255,255,255,0.24)]",
-    iconBubble: "border-white/30 bg-white/[0.20] text-white",
-    primaryButton: "bg-[linear-gradient(180deg,#f2cbff_0%,#d685ff_42%,#af58f3_100%)] text-[#38164f] shadow-[0_18px_28px_rgba(108,50,163,0.36)]",
-    primaryButtonDisabled: "bg-[linear-gradient(180deg,rgba(242,203,255,0.24),rgba(175,88,243,0.22))] text-[#38164f]/58 shadow-none",
-    highlightBadge: "border-white/20 bg-white/[0.16]",
+    pill: "bg-[linear-gradient(180deg,rgba(191,133,236,0.92),rgba(128,78,185,0.96))]",
+    border: "border-fuchsia-300/28",
+    difficultyActive: "border-fuchsia-300/38 bg-fuchsia-400/[0.14] text-fuchsia-50 shadow-[0_12px_22px_rgba(44,20,67,0.26),inset_0_1px_0_rgba(255,255,255,0.08)]",
+    iconBubble: "border-fuchsia-300/20 bg-fuchsia-400/[0.12] text-fuchsia-50",
+    primaryButton: "bg-[linear-gradient(180deg,#d9b5f0_0%,#b77fe1_52%,#8e5bbb_100%)] text-[#261332] shadow-[0_16px_28px_rgba(73,38,105,0.28)]",
+    primaryButtonDisabled: "bg-[linear-gradient(180deg,rgba(217,181,240,0.18),rgba(142,91,187,0.18))] text-[#f4eafe]/45 shadow-none",
+    highlightBadge: "border-fuchsia-300/20 bg-fuchsia-400/[0.10]",
   },
 } as const;
 
@@ -49,81 +49,95 @@ export const DifficultyIconMap = {
 
 export const QUEST_FORM_STYLES = {
   sheet:
-    "border border-white/10 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.05),transparent_28%),linear-gradient(180deg,rgba(31,27,44,0.98),rgba(24,21,37,0.98))] shadow-[0_-18px_54px_rgba(0,0,0,0.34)]",
+    "border border-white/8 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.04),transparent_26%),linear-gradient(180deg,rgba(26,23,36,0.985),rgba(19,17,27,0.99))] shadow-[0_-18px_54px_rgba(0,0,0,0.34)]",
   body:
-    "bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.03),transparent_26%),linear-gradient(180deg,rgba(31,27,44,0.98),rgba(24,21,37,0.98))]",
+    "bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.025),transparent_24%),linear-gradient(180deg,rgba(26,23,36,0.985),rgba(19,17,27,0.99))]",
   sectionCard:
-    "rounded-[30px] border border-white/8 bg-[linear-gradient(180deg,rgba(42,37,58,0.96),rgba(31,27,46,0.96))] shadow-[0_16px_32px_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl",
+    "rounded-[24px] border border-white/7 bg-[linear-gradient(180deg,rgba(36,31,49,0.94),rgba(27,24,38,0.96))] shadow-[0_14px_28px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.045)] backdrop-blur-xl",
   sectionCardSoft:
-    "rounded-[26px] border border-white/8 bg-[linear-gradient(180deg,rgba(46,40,63,0.92),rgba(34,29,49,0.92))] shadow-[0_12px_26px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-lg",
+    "rounded-[20px] border border-white/7 bg-[linear-gradient(180deg,rgba(39,34,53,0.9),rgba(29,25,41,0.92))] shadow-[0_10px_22px_rgba(0,0,0,0.16),inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-lg",
   insetPanel:
-    "rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.04))] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]",
+    "rounded-[18px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.025))] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]",
   heroIcon:
-    "inline-flex h-12 w-12 items-center justify-center rounded-[18px] border border-white/24 bg-white/[0.16] shadow-[0_10px_18px_rgba(0,0,0,0.14),inset_0_1px_0_rgba(255,255,255,0.22)] backdrop-blur-md",
+    "inline-flex h-11 w-11 items-center justify-center rounded-[14px] border border-white/12 bg-white/[0.07] text-white/84 shadow-[0_10px_18px_rgba(0,0,0,0.16)] backdrop-blur-md",
   heroAction:
-    "inline-flex items-center gap-1.5 rounded-full border border-white/24 bg-white/[0.15] px-3.5 py-1.5 text-[13px] font-semibold text-white shadow-[0_10px_18px_rgba(0,0,0,0.12)] backdrop-blur-md transition-all duration-200 ease-out hover:bg-white/[0.2] active:scale-[0.98] motion-reduce:transition-none",
+    "inline-flex items-center gap-1.5 rounded-[15px] border border-white/10 bg-white/[0.05] px-3 py-1.5 text-[12px] font-semibold text-white/76 shadow-[0_8px_14px_rgba(0,0,0,0.12)] backdrop-blur-md transition-all duration-200 ease-out hover:bg-white/[0.09] hover:text-white active:scale-[0.98] motion-reduce:transition-none",
   titleFieldShell:
-    "w-full rounded-[28px] border border-white/26 bg-[linear-gradient(180deg,rgba(255,255,255,0.18),rgba(255,255,255,0.08))] p-[1px] shadow-[inset_0_1px_0_rgba(255,255,255,0.18)] backdrop-blur-md",
+    "w-full rounded-[20px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] p-[1px] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-md",
   titleFieldInner:
-    "rounded-[27px] border border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.12),rgba(255,255,255,0.05))] px-3 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]",
+    "rounded-[19px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.015))] px-2.5 py-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]",
   titleInput:
-    "h-10 border-0 bg-transparent px-3.5 text-[15px] font-semibold text-white placeholder:text-white/62 focus-visible:ring-0 focus-visible:ring-offset-0",
+    "h-9 border-0 bg-transparent px-3 text-[15px] font-semibold text-white placeholder:text-white/50 focus-visible:ring-0 focus-visible:ring-offset-0",
   selectorChip:
-    "rounded-[24px] border border-white/8 bg-[linear-gradient(180deg,rgba(44,39,61,0.98),rgba(34,29,49,0.98))] px-4 py-3 shadow-[0_12px_24px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.05)] transition-all duration-200 ease-out hover:border-white/16 hover:bg-[linear-gradient(180deg,rgba(50,44,69,0.98),rgba(38,32,54,0.98))] motion-reduce:transition-none",
+    "rounded-[18px] border border-white/7 bg-[linear-gradient(180deg,rgba(38,33,52,0.98),rgba(29,25,41,0.98))] px-4 py-3 shadow-[0_10px_20px_rgba(0,0,0,0.16),inset_0_1px_0_rgba(255,255,255,0.04)] transition-all duration-200 ease-out hover:border-white/12 hover:bg-[linear-gradient(180deg,rgba(42,36,57,0.98),rgba(31,27,44,0.98))] motion-reduce:transition-none",
   selectorChipMuted:
-    "border-dashed text-white/58",
+    "border-dashed text-white/48",
   timeWheel:
-    "relative h-[180px] overflow-y-auto rounded-[26px] border border-white/8 bg-[linear-gradient(180deg,rgba(44,39,61,0.98),rgba(33,29,48,0.98))] shadow-[0_14px_28px_rgba(0,0,0,0.2)] snap-y snap-mandatory scrollbar-none",
+    "relative h-[180px] overflow-y-auto rounded-[20px] border border-white/7 bg-[linear-gradient(180deg,rgba(38,33,52,0.98),rgba(28,24,40,0.98))] shadow-[0_12px_24px_rgba(0,0,0,0.18)] snap-y snap-mandatory scrollbar-none",
   timeWheelFadeTop:
-    "sticky top-0 h-12 bg-gradient-to-b from-[rgba(35,31,50,0.98)] via-[rgba(35,31,50,0.78)] to-transparent z-10 pointer-events-none",
+    "sticky top-0 h-12 bg-gradient-to-b from-[rgba(31,27,43,0.98)] via-[rgba(31,27,43,0.82)] to-transparent z-10 pointer-events-none",
   timeWheelFadeBottom:
-    "sticky bottom-0 h-12 bg-gradient-to-t from-[rgba(35,31,50,0.98)] via-[rgba(35,31,50,0.78)] to-transparent z-10 pointer-events-none",
+    "sticky bottom-0 h-12 bg-gradient-to-t from-[rgba(31,27,43,0.98)] via-[rgba(31,27,43,0.82)] to-transparent z-10 pointer-events-none",
   optionPill:
-    "rounded-[18px] border border-white/8 bg-white/[0.06] px-4 py-2 text-sm font-semibold text-white/74 shadow-[0_8px_14px_rgba(0,0,0,0.1)] transition-all duration-200 ease-out hover:bg-white/[0.11] motion-reduce:transition-none",
+    "rounded-[14px] border border-white/7 bg-white/[0.05] px-4 py-2 text-sm font-semibold text-white/70 shadow-[0_8px_14px_rgba(0,0,0,0.1)] transition-all duration-200 ease-out hover:bg-white/[0.08] motion-reduce:transition-none",
   optionPillCompact:
-    "rounded-[16px] border border-white/8 bg-white/[0.06] px-3 py-2 text-sm font-semibold text-white/74 shadow-[0_8px_14px_rgba(0,0,0,0.1)] transition-all duration-200 ease-out hover:bg-white/[0.11] motion-reduce:transition-none",
+    "rounded-[13px] border border-white/7 bg-white/[0.05] px-3 py-2 text-sm font-semibold text-white/70 shadow-[0_8px_14px_rgba(0,0,0,0.1)] transition-all duration-200 ease-out hover:bg-white/[0.08] motion-reduce:transition-none",
   difficultyButton:
-    "relative flex min-w-[80px] flex-col items-center justify-center gap-0.5 rounded-[20px] border px-2.5 py-2 text-center transition-all duration-200 ease-out active:scale-[0.98] motion-safe:hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:hover:translate-y-0",
+    "relative flex min-w-[72px] flex-col items-center justify-center gap-0.5 rounded-[16px] border px-2.5 py-2 text-center transition-all duration-200 ease-out active:scale-[0.98] motion-safe:hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:hover:translate-y-0",
   difficultyButtonInactive:
-    "border-white/10 bg-white/[0.12] text-white/78 shadow-[0_10px_18px_rgba(0,0,0,0.08)] hover:bg-white/[0.18]",
+    "border-white/8 bg-white/[0.05] text-white/68 shadow-[0_8px_14px_rgba(0,0,0,0.08)] hover:bg-white/[0.08] hover:text-white/84",
   difficultyIconBubble:
-    "flex h-7 w-7 items-center justify-center rounded-full border border-white/14 bg-white/[0.08]",
+    "flex h-6.5 w-6.5 items-center justify-center rounded-[999px] border border-white/10 bg-white/[0.05]",
   footerReview:
-    "rounded-[24px] border border-white/8 bg-[linear-gradient(180deg,rgba(43,38,60,0.96),rgba(34,29,49,0.96))] px-4 py-3 text-white/74 shadow-[0_12px_24px_rgba(0,0,0,0.18)]",
+    "rounded-[18px] border border-white/7 bg-[linear-gradient(180deg,rgba(36,31,49,0.94),rgba(28,24,39,0.96))] px-4 py-3 text-white/66 shadow-[0_10px_20px_rgba(0,0,0,0.16)]",
   secondaryButton:
-    "rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(47,41,66,0.98),rgba(36,31,52,0.98))] text-white/88 shadow-[0_12px_24px_rgba(0,0,0,0.16)] transition-all duration-200 ease-out hover:border-white/18 hover:bg-[linear-gradient(180deg,rgba(54,47,74,0.98),rgba(40,35,57,0.98))] motion-reduce:transition-none",
+    "rounded-[18px] border border-white/9 bg-[linear-gradient(180deg,rgba(39,34,53,0.98),rgba(29,25,42,0.98))] text-white/84 shadow-[0_10px_20px_rgba(0,0,0,0.14)] transition-all duration-200 ease-out hover:border-white/14 hover:bg-[linear-gradient(180deg,rgba(43,37,58,0.98),rgba(32,28,45,0.98))] motion-reduce:transition-none",
   iconSecondaryButton:
-    "rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(47,41,66,0.98),rgba(36,31,52,0.98))] text-white/88 shadow-[0_12px_24px_rgba(0,0,0,0.16)] transition-all duration-200 ease-out hover:border-white/18 hover:bg-[linear-gradient(180deg,rgba(54,47,74,0.98),rgba(40,35,57,0.98))] motion-reduce:transition-none",
+    "rounded-[18px] border border-white/9 bg-[linear-gradient(180deg,rgba(39,34,53,0.98),rgba(29,25,42,0.98))] text-white/84 shadow-[0_10px_20px_rgba(0,0,0,0.14)] transition-all duration-200 ease-out hover:border-white/14 hover:bg-[linear-gradient(180deg,rgba(43,37,58,0.98),rgba(32,28,45,0.98))] motion-reduce:transition-none",
   advancedTrigger:
-    "w-full justify-between rounded-[24px] border border-white/8 bg-[linear-gradient(180deg,rgba(44,39,61,0.96),rgba(34,29,49,0.96))] px-4 py-3 text-white/76 shadow-[0_12px_24px_rgba(0,0,0,0.16)] hover:bg-[linear-gradient(180deg,rgba(49,43,67,0.98),rgba(38,32,54,0.98))]",
+    "w-full justify-between rounded-[18px] border border-white/7 bg-[linear-gradient(180deg,rgba(38,33,52,0.96),rgba(29,25,41,0.96))] px-4 py-3 text-white/72 shadow-[0_10px_20px_rgba(0,0,0,0.14)] hover:bg-[linear-gradient(180deg,rgba(42,36,57,0.98),rgba(31,27,44,0.98))]",
   helperText: "text-[12px] leading-5 text-white/58",
   label: "text-[13px] font-semibold tracking-[0.01em] text-white/84",
   divider: "border-white/6",
   subtleBadge:
-    "inline-flex items-center rounded-full border border-white/14 bg-white/[0.08] px-2.5 py-1 text-[11px] font-medium text-white/72",
+    "inline-flex items-center rounded-full border border-white/10 bg-white/[0.05] px-2.5 py-1 text-[11px] font-medium text-white/66",
   popover:
-    "rounded-[26px] border border-white/10 bg-[linear-gradient(180deg,rgba(43,37,60,0.98),rgba(33,28,47,0.98))] p-2 text-white shadow-[0_20px_36px_rgba(0,0,0,0.28)] backdrop-blur-2xl",
+    "rounded-[20px] border border-white/8 bg-[linear-gradient(180deg,rgba(37,32,51,0.98),rgba(28,24,40,0.98))] p-2 text-white shadow-[0_18px_32px_rgba(0,0,0,0.26)] backdrop-blur-2xl",
   footerLink:
     "text-sm text-white/68 transition-colors hover:text-white/90",
+  mobileHeader:
+    "relative isolate overflow-hidden border-b border-white/8 bg-[linear-gradient(180deg,rgba(34,30,47,0.98),rgba(24,21,34,0.98))]",
+  mobileHeaderGlow:
+    "pointer-events-none absolute inset-x-0 top-0 h-16 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_70%)]",
+  mobileHeaderUtilityButton:
+    "rounded-[14px] border border-white/10 bg-white/[0.05] p-2 text-white/72 shadow-[0_8px_14px_rgba(0,0,0,0.14)] backdrop-blur-md transition-all duration-200 ease-out hover:bg-white/[0.08] hover:text-white active:scale-[0.97] motion-reduce:transition-none",
+  mobileHeaderKicker:
+    "text-[11px] font-semibold uppercase tracking-[0.22em] text-white/36",
+  mobileHeaderSummary:
+    "mt-1 text-sm text-white/56",
+  mobileHeaderToolbar:
+    "mt-3 flex items-center justify-between gap-2",
+  mobileDifficultyGroup:
+    "mt-4 inline-flex w-full items-stretch gap-2 rounded-[20px] border border-white/7 bg-black/10 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]",
   desktopPanelShell:
-    "border border-white/10 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.06),transparent_24%),linear-gradient(180deg,rgba(31,27,44,0.985),rgba(23,20,34,0.985))] shadow-[0_28px_60px_rgba(0,0,0,0.38)]",
+    "border border-white/8 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.04),transparent_22%),linear-gradient(180deg,rgba(28,25,39,0.985),rgba(20,18,28,0.99))] shadow-[0_28px_60px_rgba(0,0,0,0.38)]",
   desktopPanelHeader:
-    "border-b border-white/8 bg-[linear-gradient(180deg,rgba(40,35,57,0.96),rgba(28,24,41,0.98))]",
+    "border-b border-white/8 bg-[linear-gradient(180deg,rgba(35,31,48,0.96),rgba(26,23,37,0.98))]",
   desktopPanelHeaderCard:
-    "rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.09),rgba(255,255,255,0.03))] p-4 shadow-[0_14px_28px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.06)]",
+    "rounded-[22px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-4 shadow-[0_12px_24px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.04)]",
   desktopPanelFooter:
-    "border-t border-white/8 bg-[linear-gradient(180deg,rgba(31,27,44,0.92),rgba(23,20,34,0.98))] backdrop-blur-xl",
+    "border-t border-white/8 bg-[linear-gradient(180deg,rgba(28,25,39,0.92),rgba(20,18,28,0.98))] backdrop-blur-xl",
   desktopPanelCloseButton:
-    "rounded-full border border-white/12 bg-white/[0.06] p-2 text-white/72 shadow-[0_10px_18px_rgba(0,0,0,0.14)] transition-all duration-200 ease-out hover:bg-white/[0.1] hover:text-white active:scale-[0.97] motion-reduce:transition-none",
+    "rounded-[14px] border border-white/10 bg-white/[0.05] p-2 text-white/72 shadow-[0_8px_14px_rgba(0,0,0,0.14)] transition-all duration-200 ease-out hover:bg-white/[0.08] hover:text-white active:scale-[0.97] motion-reduce:transition-none",
   desktopPanelToolbarButton:
-    "inline-flex items-center gap-2 rounded-[18px] border border-white/10 bg-white/[0.05] px-3 py-2 text-sm font-semibold text-white/74 shadow-[0_10px_18px_rgba(0,0,0,0.12)] transition-all duration-200 ease-out hover:bg-white/[0.09] hover:text-white motion-reduce:transition-none",
+    "inline-flex items-center gap-2 rounded-[14px] border border-white/10 bg-white/[0.05] px-3 py-2 text-sm font-semibold text-white/74 shadow-[0_8px_14px_rgba(0,0,0,0.12)] transition-all duration-200 ease-out hover:bg-white/[0.08] hover:text-white motion-reduce:transition-none",
   desktopPanelInput:
-    "h-12 rounded-[20px] border-white/10 bg-white/[0.06] px-4 text-[15px] font-semibold text-white placeholder:text-white/40 focus-visible:ring-1 focus-visible:ring-white/15 focus-visible:ring-offset-0",
+    "h-11 rounded-[16px] border-white/9 bg-white/[0.05] px-4 text-[15px] font-semibold text-white placeholder:text-white/40 focus-visible:ring-1 focus-visible:ring-white/15 focus-visible:ring-offset-0",
 } as const;
 
 export const QUEST_TEMPLATE_BROWSER_STYLES = {
   header:
-    "border-b border-white/8 bg-[linear-gradient(180deg,rgba(37,32,53,0.98),rgba(30,26,43,0.98))] shadow-[0_10px_20px_rgba(0,0,0,0.16)]",
+    "border-b border-white/8 bg-[linear-gradient(180deg,rgba(35,31,48,0.98),rgba(27,24,38,0.98))] shadow-[0_10px_20px_rgba(0,0,0,0.16)]",
   tabList:
     "grid w-full grid-cols-2 rounded-[22px] border border-white/8 bg-white/[0.05] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]",
   tabTrigger:
@@ -134,13 +148,13 @@ export const QUEST_TEMPLATE_BROWSER_STYLES = {
   filterChipActive: "border-white/20 bg-white/[0.14] text-white shadow-[0_8px_14px_rgba(0,0,0,0.12)]",
   filterChipInactive: "border-white/10 bg-white/[0.05] text-white/66 hover:text-white hover:bg-white/[0.1]",
   row:
-    "w-full rounded-[28px] border px-4 py-4 text-left transition-all duration-200 ease-out motion-safe:hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:hover:translate-y-0",
+    "w-full rounded-[22px] border px-4 py-4 text-left transition-all duration-200 ease-out motion-safe:hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:hover:translate-y-0",
   rowHighlighted:
-    "border-white/14 bg-[linear-gradient(180deg,rgba(255,255,255,0.11),rgba(255,255,255,0.05))] shadow-[0_16px_28px_rgba(0,0,0,0.18)]",
+    "border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.03))] shadow-[0_14px_24px_rgba(0,0,0,0.18)]",
   rowDefault:
-    "border-white/8 bg-[linear-gradient(180deg,rgba(44,39,61,0.96),rgba(33,29,47,0.96))] shadow-[0_12px_24px_rgba(0,0,0,0.16)]",
+    "border-white/8 bg-[linear-gradient(180deg,rgba(38,33,52,0.96),rgba(28,24,40,0.96))] shadow-[0_12px_22px_rgba(0,0,0,0.16)]",
   emptyState:
-    "rounded-[28px] border border-dashed border-white/10 bg-white/[0.04] px-5 py-10 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]",
+    "rounded-[22px] border border-dashed border-white/10 bg-white/[0.04] px-5 py-10 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]",
 } as const;
 
 export function getQuestDifficultyOptionClasses(

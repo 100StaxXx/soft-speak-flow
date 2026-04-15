@@ -255,12 +255,11 @@ export const usePersonalQuestTemplates = ({ enabled = true }: UsePersonalQuestTe
         ...input,
         userId: user.id,
       });
-      await refresh().catch(() => undefined);
       return mapExplicitPersonalQuestTemplate(savedTemplate);
     } finally {
       setIsSavingTemplate(false);
     }
-  }, [refresh, user?.id]);
+  }, [user?.id]);
 
   useEffect(() => {
     void refresh().catch(() => undefined);

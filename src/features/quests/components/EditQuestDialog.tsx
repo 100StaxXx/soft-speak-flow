@@ -325,19 +325,18 @@ export function EditQuestDialog({
             </div>
           </div>
         ) : (
-          <div className={cn("relative isolate overflow-hidden px-4 pt-3 pb-4 flex-shrink-0", colors.bg)}>
-            <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.26),transparent_72%)] opacity-80" />
-            <div className="pointer-events-none absolute -left-10 top-10 h-24 w-24 rounded-full bg-white/[0.10] blur-2xl" />
-            <div className="pointer-events-none absolute -right-8 bottom-5 h-28 w-28 rounded-full bg-black/10 blur-2xl" />
-            <div className="flex items-center gap-2.5">
+          <div className={cn("px-4 pt-4 pb-4 flex-shrink-0", QUEST_FORM_STYLES.mobileHeader)}>
+            <div className={QUEST_FORM_STYLES.mobileHeaderGlow} />
+            <div className="flex items-start gap-2.5">
               <button
                 onClick={() => onOpenChange(false)}
-                className="rounded-full border border-white/22 bg-black/10 p-2 text-white shadow-[0_10px_18px_rgba(0,0,0,0.14)] backdrop-blur-md transition-all duration-200 ease-out hover:bg-black/18 active:scale-[0.97] motion-reduce:transition-none"
+                className={QUEST_FORM_STYLES.mobileHeaderUtilityButton}
                 aria-label="Close"
               >
                 <ArrowLeft className="h-4 w-4" />
               </button>
               <div className="flex-1 min-w-0">
+                <p className={QUEST_FORM_STYLES.mobileHeaderKicker}>Edit Quest</p>
                 <div className={QUEST_FORM_STYLES.titleFieldShell}>
                   <div className={QUEST_FORM_STYLES.titleFieldInner}>
                     <Input
@@ -348,23 +347,23 @@ export function EditQuestDialog({
                     />
                   </div>
                 </div>
-                <p className="mt-1.5 text-sm text-white/80">{summaryLine}</p>
+                <p className={QUEST_FORM_STYLES.mobileHeaderSummary}>{summaryLine}</p>
               </div>
               <button
                 onClick={() => onOpenChange(false)}
-                className="rounded-full border border-white/22 bg-black/10 p-2 text-white shadow-[0_10px_18px_rgba(0,0,0,0.14)] backdrop-blur-md transition-all duration-200 ease-out hover:bg-black/18 active:scale-[0.97] motion-reduce:transition-none"
+                className={QUEST_FORM_STYLES.mobileHeaderUtilityButton}
                 aria-label="Close"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            <div className="mt-3 flex justify-center gap-2">
+            <div className={QUEST_FORM_STYLES.mobileDifficultyGroup}>
               {difficultyOptions.map(({ value, icon: Icon, label }) => (
                 <button
                   key={value}
                   onClick={() => setDifficulty(value)}
-                  className={getQuestDifficultyOptionClasses(value, difficulty === value)}
+                  className={cn("flex-1", getQuestDifficultyOptionClasses(value, difficulty === value))}
                 >
                   <span className={getQuestDifficultyIconClasses(value, difficulty === value)}>
                     <Icon className="h-3.5 w-3.5" />
