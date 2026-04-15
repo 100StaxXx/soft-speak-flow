@@ -11,6 +11,7 @@ import { QuestAttachmentPicker } from "@/components/QuestAttachmentPicker";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
@@ -38,11 +39,17 @@ import { usePersonalQuestTemplates } from "@/features/quests/hooks/usePersonalQu
 import type {
   QuestComposerPrefillDraft,
   QuestCreationSource,
+  QuestDraftSnapshot,
   QuestTemplateBrowserTab,
   QuestTemplatePrefill,
 } from "@/features/quests/types";
 import { hasQuestTemplateCustomization } from "@/features/quests/utils/templateDraftDiff";
 import { trackResilienceEvent } from "@/utils/resilienceTelemetry";
+import {
+  clearQuestDraftSnapshot,
+  readQuestDraftSnapshot,
+  writeQuestDraftSnapshot,
+} from "@/utils/draftPersistence";
 
 export interface AddQuestData {
   text: string;
@@ -133,8 +140,11 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   const [creationSource, setCreationSource] = useState<QuestCreationSource>("manual");
   const [selectedTemplate, setSelectedTemplate] = useState<QuestTemplatePrefill | null>(null);
   const [showTemplateUpdatePrompt, setShowTemplateUpdatePrompt] = useState(false);
+  const [showDraftRestorePrompt, setShowDraftRestorePrompt] = useState(false);
+  const [pendingQuestDraftRestore, setPendingQuestDraftRestore] = useState<QuestDraftSnapshot | null>(null);
   const [pendingSubmitIntent, setPendingSubmitIntent] = useState<SubmitIntent | null>(null);
   const [isHandlingTemplatePrompt, setIsHandlingTemplatePrompt] = useState(false);
+  const [draftRestoreStatus, setDraftRestoreStatus] = useState<"idle" | "pending" | "prompt" | "ready">("idle");
   const {
     templates: personalTemplates,
     isSavingTemplate,
@@ -142,6 +152,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
     saveTemplate,
   } = usePersonalQuestTemplates({ enabled: open });
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const { integrationVisible, defaultProvider, connections } = useCalendarIntegrations();
   const effectiveProvider = useMemo(() => {
@@ -163,6 +174,57 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   const hasEmittedTimeSelectedRef = useRef(false);
   const lastPrefillKeyRef = useRef<string | null>(null);
 
+  const applyQuestDraftSnapshot = useCallback((snapshot: QuestDraftSnapshot) => {
+    setTaskText(snapshot.text);
+    setDifficulty(snapshot.difficulty);
+    setScheduledTime(snapshot.scheduledTime);
+    setEstimatedDuration(snapshot.estimatedDuration);
+    setRecurrencePattern(snapshot.recurrencePattern);
+    setRecurrenceDays(snapshot.recurrenceDays);
+    setRecurrenceMonthDays(snapshot.recurrenceMonthDays);
+    setRecurrenceCustomPeriod(snapshot.recurrenceCustomPeriod);
+    setReminderEnabled(snapshot.reminderEnabled);
+    setReminderMinutesBefore(snapshot.reminderMinutesBefore);
+    setMoreInformation(snapshot.moreInformation);
+    setLocation(snapshot.location);
+    setTaskDate(snapshot.taskDate);
+    setSendToCalendar(snapshot.sendToCalendar);
+    setSubtasks([...snapshot.subtasks]);
+    setAttachments([...snapshot.attachments]);
+    setCreationSource(snapshot.creationSource);
+    setSelectedTemplate(snapshot.selectedTemplate ? {
+      ...snapshot.selectedTemplate,
+      subtasks: [...snapshot.selectedTemplate.subtasks],
+    } : null);
+    setShowAdvanced(false);
+    setShowTemplateUpdatePrompt(false);
+    setPendingSubmitIntent(null);
+    setIsHandlingTemplatePrompt(false);
+    setShowDatePicker(false);
+    setSheetView("editor");
+  }, []);
+
+  const isQuestDraftMeaningful = useCallback((snapshot: QuestDraftSnapshot) => (
+    snapshot.text.trim().length > 0
+    || snapshot.moreInformation?.trim().length
+    || snapshot.location?.trim().length
+    || snapshot.subtasks.some((subtask) => subtask.trim().length > 0)
+    || snapshot.attachments.length > 0
+    || snapshot.selectedTemplate !== null
+    || snapshot.creationSource !== "manual"
+    || snapshot.sendToCalendar
+    || snapshot.scheduledTime !== null
+    || snapshot.taskDate !== format(selectedDate, "yyyy-MM-dd")
+    || snapshot.estimatedDuration !== 30
+    || snapshot.reminderEnabled
+    || snapshot.reminderMinutesBefore !== 15
+    || snapshot.difficulty !== "medium"
+    || snapshot.recurrencePattern !== null
+    || snapshot.recurrenceDays.length > 0
+    || snapshot.recurrenceMonthDays.length > 0
+    || snapshot.recurrenceCustomPeriod !== null
+  ), [selectedDate]);
+
   useEffect(() => {
     if (prefilledTime) setScheduledTime(prefilledTime);
   }, [prefilledTime]);
@@ -170,6 +232,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   // Reset when sheet closes
   useEffect(() => {
     if (!open) {
+      setDraftRestoreStatus("idle");
       setSheetView("editor");
       setTemplateBrowserInitialTab("common");
       setTaskText("");
@@ -192,6 +255,8 @@ export const AddQuestSheet = memo(function AddQuestSheet({
       setCreationSource("manual");
       setSelectedTemplate(null);
       setShowTemplateUpdatePrompt(false);
+      setShowDraftRestorePrompt(false);
+      setPendingQuestDraftRestore(null);
       setPendingSubmitIntent(null);
       setIsHandlingTemplatePrompt(false);
       lastPrefillKeyRef.current = null;
@@ -199,6 +264,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
       hasEditedTitleRef.current = false;
       hasEmittedTimeSelectedRef.current = false;
     } else {
+      setDraftRestoreStatus("pending");
       setTaskDate(format(selectedDate, "yyyy-MM-dd"));
     }
   }, [open, selectedDate]);
@@ -227,6 +293,25 @@ export const AddQuestSheet = memo(function AddQuestSheet({
     setShowTemplateUpdatePrompt(false);
     setPendingSubmitIntent(null);
   }, [open, prefillDraft, prefillKey, selectedDate]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (prefillDraft && prefillKey) {
+      setDraftRestoreStatus("ready");
+      return;
+    }
+    if (draftRestoreStatus !== "pending") return;
+
+    const savedDraft = readQuestDraftSnapshot(user?.id);
+    if (!savedDraft) {
+      setDraftRestoreStatus("ready");
+      return;
+    }
+
+    setPendingQuestDraftRestore(savedDraft);
+    setShowDraftRestorePrompt(true);
+    setDraftRestoreStatus("prompt");
+  }, [draftRestoreStatus, open, prefillDraft, prefillKey, user?.id]);
 
   const endTime = useMemo(() => {
     if (!scheduledTime || !estimatedDuration) return null;
@@ -272,6 +357,46 @@ export const AddQuestSheet = memo(function AddQuestSheet({
     notes: moreInformation,
     subtasks,
   }), [taskText, difficulty, estimatedDuration, moreInformation, subtasks]);
+  const currentQuestDraftSnapshot = useMemo<QuestDraftSnapshot>(() => ({
+    text: taskText,
+    taskDate,
+    difficulty,
+    scheduledTime,
+    estimatedDuration,
+    recurrencePattern,
+    recurrenceDays,
+    recurrenceMonthDays,
+    recurrenceCustomPeriod,
+    reminderEnabled,
+    reminderMinutesBefore,
+    moreInformation,
+    location,
+    sendToCalendar,
+    subtasks,
+    attachments,
+    creationSource,
+    selectedTemplate,
+    updatedAt: new Date().toISOString(),
+  }), [
+    attachments,
+    creationSource,
+    difficulty,
+    estimatedDuration,
+    location,
+    moreInformation,
+    recurrenceCustomPeriod,
+    recurrenceDays,
+    recurrenceMonthDays,
+    recurrencePattern,
+    reminderEnabled,
+    reminderMinutesBefore,
+    scheduledTime,
+    selectedTemplate,
+    sendToCalendar,
+    subtasks,
+    taskDate,
+    taskText,
+  ]);
   const hasTemplateCustomizations = useMemo(
     () => selectedTemplate
       ? hasQuestTemplateCustomization(selectedTemplate, currentTemplateDraft)
@@ -421,8 +546,9 @@ export const AddQuestSheet = memo(function AddQuestSheet({
       attachments,
       creationSource: resolvedCreationSource,
     });
+    clearQuestDraftSnapshot(user?.id);
     onOpenChange(false);
-  }, [taskText, recurrencePattern, creationSource, scheduledTime, onAdd, taskDate, difficulty, estimatedDuration, recurrenceDays, recurrenceMonthDays, recurrenceCustomPeriod, reminderEnabled, reminderMinutesBefore, moreInformation, location, sendToCalendar, canShowCalendarSendOption, subtasks, attachments, onOpenChange]);
+  }, [taskText, recurrencePattern, creationSource, scheduledTime, onAdd, taskDate, difficulty, estimatedDuration, recurrenceDays, recurrenceMonthDays, recurrenceCustomPeriod, reminderEnabled, reminderMinutesBefore, moreInformation, location, sendToCalendar, canShowCalendarSendOption, subtasks, attachments, onOpenChange, user?.id]);
 
   const submitWithTemplateHandling = useCallback(async (intent: SubmitIntent) => {
     if (selectedTemplate && hasTemplateCustomizations) {
@@ -499,6 +625,35 @@ export const AddQuestSheet = memo(function AddQuestSheet({
       setIsHandlingTemplatePrompt(false);
     }
   }, [currentTemplateDraft, executeSubmit, pendingSubmitIntent, saveTemplate, selectedTemplate, toast]);
+
+  const handleRestoreQuestDraft = useCallback(() => {
+    if (!pendingQuestDraftRestore) return;
+
+    applyQuestDraftSnapshot(pendingQuestDraftRestore);
+    setPendingQuestDraftRestore(null);
+    setShowDraftRestorePrompt(false);
+    setDraftRestoreStatus("ready");
+  }, [applyQuestDraftSnapshot, pendingQuestDraftRestore]);
+
+  const handleDiscardQuestDraft = useCallback(() => {
+    clearQuestDraftSnapshot(user?.id);
+    setPendingQuestDraftRestore(null);
+    setShowDraftRestorePrompt(false);
+    setDraftRestoreStatus("ready");
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (draftRestoreStatus !== "ready") return;
+    if (!user?.id) return;
+
+    if (!isQuestDraftMeaningful(currentQuestDraftSnapshot)) {
+      clearQuestDraftSnapshot(user.id);
+      return;
+    }
+
+    writeQuestDraftSnapshot(user.id, currentQuestDraftSnapshot);
+  }, [currentQuestDraftSnapshot, draftRestoreStatus, isQuestDraftMeaningful, open, user?.id]);
 
   useEffect(() => {
     if (!open) return;
@@ -1068,6 +1223,37 @@ export const AddQuestSheet = memo(function AddQuestSheet({
           </div>
         )}
       </SheetContent>
+      <AlertDialog
+        open={showDraftRestorePrompt}
+        onOpenChange={(nextOpen) => {
+          if (nextOpen) return;
+          setShowDraftRestorePrompt(true);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Restore saved quest draft?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have an unfinished quest draft saved on this device. Restore it, or discard it and start fresh.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleDiscardQuestDraft}
+            >
+              Discard draft
+            </Button>
+            <Button
+              type="button"
+              onClick={handleRestoreQuestDraft}
+            >
+              Restore draft
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <AlertDialog
         open={showTemplateUpdatePrompt}
         onOpenChange={(nextOpen) => {

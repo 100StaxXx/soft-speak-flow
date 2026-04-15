@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { getMorningCheckInDraftStorageKey } from "@/utils/accountLocalState";
 
 const mocks = vi.hoisted(() => ({
   user: { id: "user-1" } as { id: string } | null,
@@ -38,6 +39,22 @@ const mocks = vi.hoisted(() => ({
   insertCheckIn: vi.fn(),
   countCheckIns: vi.fn(),
   invokeFunction: vi.fn(),
+  storage: new Map<string, string>(),
+  safeLocalStorage: {
+    getItem: (key: string) => mocks.storage.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      mocks.storage.set(key, value);
+      return true;
+    },
+    removeItem: (key: string) => {
+      mocks.storage.delete(key);
+      return true;
+    },
+    clear: () => {
+      mocks.storage.clear();
+      return true;
+    },
+  },
   guidance: {
     isActive: false,
     currentStep: null as string | null,
@@ -53,6 +70,10 @@ vi.mock("@tanstack/react-query", () => ({
 
 vi.mock("@/hooks/useAuth", () => ({
   useAuth: () => ({ user: mocks.user }),
+}));
+
+vi.mock("@/utils/storage", () => ({
+  safeLocalStorage: mocks.safeLocalStorage,
 }));
 
 vi.mock("@/hooks/use-toast", () => ({
@@ -144,6 +165,7 @@ import { MorningCheckIn } from "./MorningCheckIn";
 describe("MorningCheckIn completion portrait", () => {
   beforeEach(() => {
     mocks.user = { id: "user-1" };
+    mocks.safeLocalStorage.clear();
     mocks.existingCheckIn = {
       completed_at: "2026-02-21T12:00:00.000Z",
       intention: "Ship the thing",
@@ -308,5 +330,82 @@ describe("MorningCheckIn completion portrait", () => {
     expect(await screen.findByTestId("mentor-response-status")).toHaveTextContent(
       "Too many AI requests. Please try again later.",
     );
+  });
+
+  it("restores an unfinished morning check-in draft after remount", async () => {
+    mocks.existingCheckIn = null;
+
+    const { unmount } = render(<MorningCheckIn />);
+
+    fireEvent.click(screen.getByRole("button", { name: /motivated/i }));
+    fireEvent.change(screen.getByPlaceholderText("I will..."), {
+      target: { value: "Finish the draft" },
+    });
+
+    await waitFor(() => {
+      expect(mocks.safeLocalStorage.getItem(getMorningCheckInDraftStorageKey("user-1"))).toContain("Finish the draft");
+    });
+
+    unmount();
+
+    render(<MorningCheckIn />);
+
+    expect(screen.getByDisplayValue("Finish the draft")).toBeInTheDocument();
+  });
+
+  it("clears a stale morning check-in draft from a previous day", async () => {
+    mocks.existingCheckIn = null;
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toLocaleDateString("en-CA");
+    mocks.safeLocalStorage.setItem(
+      getMorningCheckInDraftStorageKey("user-1"),
+      JSON.stringify({
+        mood: "motivated",
+        intention: "Old plan",
+        date: yesterday,
+        updatedAt: "2026-04-14T10:00:00.000Z",
+      }),
+    );
+
+    render(<MorningCheckIn />);
+
+    await waitFor(() => {
+      expect(mocks.safeLocalStorage.getItem(getMorningCheckInDraftStorageKey("user-1"))).toBeNull();
+    });
+    expect(screen.getByPlaceholderText("I will...")).toHaveValue("");
+  });
+
+  it("clears the stored morning check-in draft after a successful submission", async () => {
+    mocks.existingCheckIn = null;
+    mocks.insertCheckIn
+      .mockResolvedValueOnce({ data: null })
+      .mockResolvedValueOnce({
+        data: {
+          id: "check-in-1",
+          user_id: "user-1",
+          completed_at: "2026-02-21T12:00:00.000Z",
+        },
+        error: null,
+      });
+    mocks.countCheckIns.mockResolvedValue({ count: 2 });
+    mocks.invokeFunction.mockResolvedValue({ error: null });
+
+    render(<MorningCheckIn />);
+
+    fireEvent.click(screen.getByRole("button", { name: /motivated/i }));
+    fireEvent.change(screen.getByPlaceholderText("I will..."), {
+      target: { value: "Ship it" },
+    });
+
+    await waitFor(() => {
+      expect(mocks.safeLocalStorage.getItem(getMorningCheckInDraftStorageKey("user-1"))).toContain("Ship it");
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /check in/i }));
+
+    await waitFor(() => {
+      expect(mocks.insertCheckIn).toHaveBeenCalledTimes(2);
+    });
+
+    expect(mocks.safeLocalStorage.getItem(getMorningCheckInDraftStorageKey("user-1"))).toBeNull();
   });
 });

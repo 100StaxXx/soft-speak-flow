@@ -20,6 +20,11 @@ import { setPendingMentorMood } from "@/utils/mentorMoodSignal";
 import { usePostOnboardingMentorGuidance } from "@/hooks/usePostOnboardingMentorGuidance";
 import { cn } from "@/lib/utils";
 import {
+  clearMorningCheckInDraftSnapshot,
+  readMorningCheckInDraftSnapshot,
+  writeMorningCheckInDraftSnapshot,
+} from "@/utils/draftPersistence";
+import {
   parseFunctionInvokeError,
   toUserFacingFunctionError,
 } from "@/utils/supabaseFunctionErrors";
@@ -54,6 +59,7 @@ const MorningCheckInContent = () => {
   const [mentorResponseIssue, setMentorResponseIssue] = useState<MentorResponseIssue>(null);
   // Use ref for pollStartTime to avoid stale closure in refetchInterval callback
   const pollStartTimeRef = useRef<number | null>(null);
+  const hasHydratedDraftRef = useRef(false);
   const isTutorialMorningCheckinStep = isTutorialActive && tutorialStep === "morning_checkin";
 
   const today = new Date().toLocaleDateString('en-CA');
@@ -126,6 +132,57 @@ const MorningCheckInContent = () => {
       return false; // Stop polling once we have the response
     },
   });
+
+  useEffect(() => {
+    hasHydratedDraftRef.current = false;
+  }, [today, user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) {
+      hasHydratedDraftRef.current = true;
+      return;
+    }
+
+    if (existingCheckIn?.completed_at) {
+      clearMorningCheckInDraftSnapshot(user.id);
+      hasHydratedDraftRef.current = true;
+      return;
+    }
+
+    const savedDraft = readMorningCheckInDraftSnapshot(user.id);
+    if (!savedDraft) {
+      hasHydratedDraftRef.current = true;
+      return;
+    }
+
+    if (savedDraft.date !== today) {
+      clearMorningCheckInDraftSnapshot(user.id);
+      hasHydratedDraftRef.current = true;
+      return;
+    }
+
+    setMood(savedDraft.mood);
+    setIntention(savedDraft.intention);
+    hasHydratedDraftRef.current = true;
+  }, [existingCheckIn?.completed_at, today, user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    if (!hasHydratedDraftRef.current) return;
+    if (existingCheckIn?.completed_at) return;
+
+    if (!mood && !intention.trim()) {
+      clearMorningCheckInDraftSnapshot(user.id);
+      return;
+    }
+
+    writeMorningCheckInDraftSnapshot(user.id, {
+      mood,
+      intention,
+      date: today,
+      updatedAt: new Date().toISOString(),
+    });
+  }, [existingCheckIn?.completed_at, intention, mood, today, user?.id]);
 
   useEffect(() => {
     if (existingCheckIn?.completed_at) {
@@ -238,6 +295,7 @@ const MorningCheckInContent = () => {
       window.dispatchEvent(new CustomEvent('quest-completed'));
       window.dispatchEvent(new CustomEvent('morning-checkin-completed'));
       setPendingMentorMood(null);
+      clearMorningCheckInDraftSnapshot(user.id);
 
       // Start polling timer (using ref to avoid stale closure)
       pollStartTimeRef.current = Date.now();

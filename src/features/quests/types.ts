@@ -2,6 +2,8 @@
  * Quest feature types
  */
 
+import type { QuestAttachmentInput } from "@/types/questAttachments";
+
 export type QuestDifficulty = "easy" | "medium" | "hard";
 export type QuestCreationSource = "manual" | "inbox" | "voice" | "nlp";
 export type QuestTemplateCategory = "work" | "health" | "home" | "admin" | "personal";
@@ -62,6 +64,28 @@ export interface QuestComposerPrefillDraft {
   moreInformation?: string | null;
   location?: string | null;
   creationSource?: QuestCreationSource;
+}
+
+export interface QuestDraftSnapshot {
+  text: string;
+  taskDate: string | null;
+  difficulty: QuestDifficulty;
+  scheduledTime: string | null;
+  estimatedDuration: number | null;
+  recurrencePattern: string | null;
+  recurrenceDays: number[];
+  recurrenceMonthDays: number[];
+  recurrenceCustomPeriod: "week" | "month" | null;
+  reminderEnabled: boolean;
+  reminderMinutesBefore: number;
+  moreInformation: string | null;
+  location: string | null;
+  sendToCalendar: boolean;
+  subtasks: string[];
+  attachments: QuestAttachmentInput[];
+  creationSource: QuestCreationSource;
+  selectedTemplate: QuestTemplatePrefill | null;
+  updatedAt: string;
 }
 
 export interface QuestFormState {

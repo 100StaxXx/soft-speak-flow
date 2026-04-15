@@ -427,6 +427,12 @@ const createHandleDeleteUserHarness = ({
 Deno.test("delete-user removes legacy storage assets before rpc and auth delete", async () => {
   const harness = createHandleDeleteUserHarness({
     listResultsByKey: {
+      "companion-images:user-1:0": [
+        createStorageListResult([{ name: "dormant", id: null }]),
+      ],
+      "companion-images:user-1/dormant:0": [
+        createStorageListResult([{ name: "companion-1.png", id: "file-0" }]),
+      ],
       "journey-paths:user-1:0": [
         createStorageListResult([{ name: "epic-1", id: null }]),
       ],
@@ -480,6 +486,10 @@ Deno.test("delete-user removes legacy storage assets before rpc and auth delete"
           "user-1/epic-1/0.png",
           "campaign-welcome/welcome-user-1-123.png",
         ],
+      },
+      {
+        bucket: "companion-images",
+        paths: ["user-1/dormant/companion-1.png"],
       },
       { bucket: "evolution-cards", paths: ["postcards/user-1/card.png"] },
     ],

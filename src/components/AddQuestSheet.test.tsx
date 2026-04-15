@@ -4,6 +4,7 @@ import { AddQuestSheet, type AddQuestData } from "./AddQuestSheet";
 import type { QuestAttachmentInput } from "@/types/questAttachments";
 import type { PersonalQuestTemplate, QuestComposerPrefillDraft } from "@/features/quests/types";
 import { DIFFICULTY_COLORS } from "@/components/quest-shared";
+import { getQuestDraftStorageKey } from "@/utils/accountLocalState";
 
 const mocks = vi.hoisted(() => ({
   integrationVisible: false,
@@ -13,6 +14,32 @@ const mocks = vi.hoisted(() => ({
   refreshPersonalTemplates: vi.fn(),
   saveTemplateMock: vi.fn(),
   toastMock: vi.fn(),
+  storage: new Map<string, string>(),
+  safeLocalStorage: {
+    getItem: (key: string) => mocks.storage.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      mocks.storage.set(key, value);
+      return true;
+    },
+    removeItem: (key: string) => {
+      mocks.storage.delete(key);
+      return true;
+    },
+    clear: () => {
+      mocks.storage.clear();
+      return true;
+    },
+  },
+}));
+
+vi.mock("@/hooks/useAuth", () => ({
+  useAuth: () => ({
+    user: { id: "user-1" },
+  }),
+}));
+
+vi.mock("@/utils/storage", () => ({
+  safeLocalStorage: mocks.safeLocalStorage,
 }));
 
 vi.mock("@/hooks/useCalendarIntegrations", () => ({
@@ -111,6 +138,7 @@ describe("AddQuestSheet", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.safeLocalStorage.clear();
     mocks.integrationVisible = false;
     mocks.defaultProvider = null;
     mocks.connections = [];
@@ -948,6 +976,7 @@ describe("AddQuestSheet", () => {
       />
     );
 
+    fireEvent.click(screen.getByRole("button", { name: "Discard draft" }));
     fireEvent.click(screen.getByRole("button", { name: "30 min" }));
     expect(screen.queryByPlaceholderText("Minutes")).not.toBeInTheDocument();
   });
@@ -1496,5 +1525,160 @@ describe("AddQuestSheet", () => {
         recurrenceDays: [3], // 2026-01-15 is Thursday (Mon=0)
       }),
     );
+  });
+
+  it("persists a quest draft across close and lets the user restore it", async () => {
+    const onOpenChange = vi.fn();
+    const { unmount } = render(
+      <AddQuestSheet
+        open
+        onOpenChange={onOpenChange}
+        selectedDate={selectedDate}
+        onAdd={vi.fn().mockResolvedValue(undefined)}
+      />,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText("Quest Title"), {
+      target: { value: "Persistent quest" },
+    });
+
+    await waitFor(() => {
+      expect(mocks.safeLocalStorage.getItem(getQuestDraftStorageKey("user-1"))).toContain("Persistent quest");
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(mocks.safeLocalStorage.getItem(getQuestDraftStorageKey("user-1"))).toContain("Persistent quest");
+
+    unmount();
+
+    render(
+      <AddQuestSheet
+        open
+        onOpenChange={vi.fn()}
+        selectedDate={selectedDate}
+        onAdd={vi.fn().mockResolvedValue(undefined)}
+      />,
+    );
+
+    expect(await screen.findByText("Restore saved quest draft?")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Restore draft" }));
+
+    expect(screen.getByPlaceholderText("Quest Title")).toHaveValue("Persistent quest");
+  });
+
+  it("discards a saved quest draft when requested", async () => {
+    mocks.safeLocalStorage.setItem(
+      getQuestDraftStorageKey("user-1"),
+      JSON.stringify({
+        text: "Throwaway quest",
+        taskDate: "2026-01-15",
+        difficulty: "medium",
+        scheduledTime: null,
+        estimatedDuration: 30,
+        recurrencePattern: null,
+        recurrenceDays: [],
+        recurrenceMonthDays: [],
+        recurrenceCustomPeriod: null,
+        reminderEnabled: false,
+        reminderMinutesBefore: 15,
+        moreInformation: null,
+        location: null,
+        sendToCalendar: false,
+        subtasks: [],
+        attachments: [],
+        creationSource: "manual",
+        selectedTemplate: null,
+        updatedAt: "2026-01-15T10:00:00.000Z",
+      }),
+    );
+
+    render(
+      <AddQuestSheet
+        open
+        onOpenChange={vi.fn()}
+        selectedDate={selectedDate}
+        onAdd={vi.fn().mockResolvedValue(undefined)}
+      />,
+    );
+
+    expect(await screen.findByText("Restore saved quest draft?")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Discard draft" }));
+
+    await waitFor(() => {
+      expect(mocks.safeLocalStorage.getItem(getQuestDraftStorageKey("user-1"))).toBeNull();
+    });
+    expect(screen.getByPlaceholderText("Quest Title")).toHaveValue("");
+  });
+
+  it("clears the saved quest draft after a successful submission", async () => {
+    const onAdd = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <AddQuestSheet
+        open
+        onOpenChange={vi.fn()}
+        selectedDate={selectedDate}
+        prefilledTime="09:00"
+        onAdd={onAdd}
+      />,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText("Quest Title"), {
+      target: { value: "Submit clears draft" },
+    });
+
+    await waitFor(() => {
+      expect(mocks.safeLocalStorage.getItem(getQuestDraftStorageKey("user-1"))).toContain("Submit clears draft");
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Add Quest" }));
+
+    await waitFor(() => {
+      expect(onAdd).toHaveBeenCalledTimes(1);
+    });
+
+    expect(mocks.safeLocalStorage.getItem(getQuestDraftStorageKey("user-1"))).toBeNull();
+  });
+
+  it("prefers an explicit prefill over an older saved draft", () => {
+    mocks.safeLocalStorage.setItem(
+      getQuestDraftStorageKey("user-1"),
+      JSON.stringify({
+        text: "Saved local draft",
+        taskDate: "2026-01-15",
+        difficulty: "medium",
+        scheduledTime: "08:00",
+        estimatedDuration: 30,
+        recurrencePattern: null,
+        recurrenceDays: [],
+        recurrenceMonthDays: [],
+        recurrenceCustomPeriod: null,
+        reminderEnabled: false,
+        reminderMinutesBefore: 15,
+        moreInformation: null,
+        location: null,
+        sendToCalendar: false,
+        subtasks: [],
+        attachments: [],
+        creationSource: "manual",
+        selectedTemplate: null,
+        updatedAt: "2026-01-15T10:00:00.000Z",
+      }),
+    );
+
+    render(
+      <AddQuestSheet
+        open
+        onOpenChange={vi.fn()}
+        selectedDate={selectedDate}
+        prefillDraft={buildVoicePrefill({ text: "Voice wins" })}
+        prefillKey="voice-prefill-1"
+        onAdd={vi.fn().mockResolvedValue(undefined)}
+      />,
+    );
+
+    expect(screen.queryByText("Restore saved quest draft?")).not.toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Quest Title")).toHaveValue("Voice wins");
   });
 });

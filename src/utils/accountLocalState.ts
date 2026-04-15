@@ -7,6 +7,8 @@ const LEGACY_WEEKLY_RECAP_PATTERN = /^recap-dismissed-\d{4}-\d{2}-\d{2}$/;
 export const ENCOUNTER_PASSES_LEGACY_KEY = "encounter_passes";
 
 export const getEncounterPassesStorageKey = (userId: string) => `encounter_passes_${userId}`;
+export const getQuestDraftStorageKey = (userId: string) => `quest_draft_${userId}`;
+export const getMorningCheckInDraftStorageKey = (userId: string) => `morning_checkin_draft_${userId}`;
 
 export const getWeeklyRecapDismissedKey = (userId: string, weekStartDate: string) =>
   `${WEEKLY_RECAP_DISMISSED_PREFIX}${userId}-${weekStartDate}`;
@@ -32,9 +34,17 @@ export const clearUserAccountLocalState = (userId: string | null | undefined): v
   const userRecapPrefix = `${WEEKLY_RECAP_DISMISSED_PREFIX}${userId}-`;
   const encounterKey = getEncounterPassesStorageKey(userId);
   const guidedTutorialKey = getGuidedTutorialLocalProgressKey(userId);
+  const questDraftKey = getQuestDraftStorageKey(userId);
+  const morningCheckInDraftKey = getMorningCheckInDraftStorageKey(userId);
 
   for (const key of getLocalStorageKeys()) {
-    if (key.startsWith(userRecapPrefix) || key === encounterKey || key === guidedTutorialKey) {
+    if (
+      key.startsWith(userRecapPrefix)
+      || key === encounterKey
+      || key === guidedTutorialKey
+      || key === questDraftKey
+      || key === morningCheckInDraftKey
+    ) {
       safeLocalStorage.removeItem(key);
     }
   }
