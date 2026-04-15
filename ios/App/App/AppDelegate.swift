@@ -149,5 +149,10 @@ class AppBridgeViewController: CAPBridgeViewController {
         } else {
             print("⚠️ StoreKitPlugin not found; skipping registration. Ensure StoreKitPlugin.swift is added to the Xcode target.")
         }
+        if let pluginType = NSClassFromString("WinWinKitPlugin") as? (CAPPlugin & CAPBridgedPlugin).Type {
+            bridge?.registerPluginInstance(pluginType.init())
+        } else {
+            print("⚠️ WinWinKitPlugin not found; skipping registration. Ensure WinWinKitPlugin.swift is added to the Xcode target.")
+        }
     }
 }

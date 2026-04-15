@@ -1,19 +1,18 @@
+import { useEffect } from "react";
 import { ArrowRight, CheckCircle2, DollarSign, Sparkles, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
-import { toast } from "@/components/ui/sonner";
-
-const toltPartnerPortalUrl = import.meta.env.VITE_TOLT_PARTNER_PORTAL_URL as string | undefined;
+import { WINWINKIT_AFFILIATES_URL } from "@/constants/winwinkit";
+import { redirectToWinWinKit } from "@/utils/winwinkit";
 
 export default function Partners() {
-  const openPortal = () => {
-    if (!toltPartnerPortalUrl) {
-      toast.error("Partner portal is not configured yet. Please add VITE_TOLT_PARTNER_PORTAL_URL.");
-      return;
-    }
+  useEffect(() => {
+    redirectToWinWinKit();
+  }, []);
 
-    window.location.href = toltPartnerPortalUrl;
+  const openPortal = () => {
+    window.location.href = WINWINKIT_AFFILIATES_URL;
   };
 
   return (
@@ -36,7 +35,7 @@ export default function Partners() {
             <div className="flex flex-wrap gap-8 justify-center mb-12 text-sm">
               <div className="flex items-center gap-2">
                 <Users className="h-5 w-5 text-primary" />
-                <span>Affiliate portal powered by Tolt</span>
+                <span>Affiliate portal powered by WinWinKit</span>
               </div>
               <div className="flex items-center gap-2">
                 <DollarSign className="h-5 w-5 text-primary" />
@@ -59,9 +58,9 @@ export default function Partners() {
         <section className="py-20 px-4">
           <div className="max-w-5xl mx-auto grid gap-6 md:grid-cols-3">
             <Card className="p-8 cosmic-glass">
-              <h2 className="font-heading text-2xl font-bold mb-4">1. Join Through Tolt</h2>
+              <h2 className="font-heading text-2xl font-bold mb-4">1. Join Through WinWinKit</h2>
               <p className="text-sm text-muted-foreground">
-                Creators now apply and manage their partnership through the Tolt portal instead of the legacy in-app signup form.
+                Creators now apply and manage their partnership through the WinWinKit portal instead of the legacy in-app signup form.
               </p>
             </Card>
             <Card className="p-8 cosmic-glass">
@@ -89,7 +88,7 @@ export default function Partners() {
               <div className="flex items-start gap-3">
                 <CheckCircle2 className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
                 <p className="text-sm text-muted-foreground">
-                  Creator onboarding, reporting, and payouts now run through Tolt.
+                  Creator onboarding, reporting, and payouts now run through WinWinKit.
                 </p>
               </div>
             </Card>

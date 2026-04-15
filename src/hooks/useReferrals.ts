@@ -1,12 +1,15 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Capacitor } from "@capacitor/core";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { toast } from "@/components/ui/sonner";
+import { WinWinKit } from "@/plugins/WinWinKitPlugin";
+import { isNativeIOSHandheld } from "@/utils/platformTargets";
 
-// Secure response type from apply_referral_code_secure RPC
 interface ApplyReferralResult {
   success: boolean;
   message: string;
+  code_type?: "affiliate" | "promo" | "referral" | string;
 }
 
 export const useReferrals = () => {
@@ -81,39 +84,46 @@ export const useReferrals = () => {
     },
   });
 
-  // Apply referral code - uses secure server-side RPC
   const applyReferralCode = useMutation({
     mutationFn: async (code: string) => {
       if (!user) throw new Error("User not authenticated");
 
       const normalizedCode = code.trim().toUpperCase();
+      const isNativeIOS = Capacitor.isNativePlatform() && isNativeIOSHandheld();
 
-      // SECURITY FIX: Use secure RPC that handles everything server-side
-      // This RPC validates the code, checks for self-referral, and applies it
-      // without ever exposing owner_user_id or other sensitive data to the client
-       
-      const { data: result, error } = await (supabase.rpc as any)(
-        "apply_referral_code_secure",
-        { p_referral_code: normalizedCode }
-      ) as { data: ApplyReferralResult[] | null; error: Error | null };
+      if (isNativeIOS) {
+        await WinWinKit.claimCode({ code: normalizedCode });
+      }
+
+      const { data: result, error } = await supabase.functions.invoke("claim-referral-code", {
+        body: {
+          code: normalizedCode,
+          provider_claimed: isNativeIOS,
+        },
+      }) as { data: ApplyReferralResult | null; error: Error | null };
 
       if (error) {
         throw new Error("Unable to apply referral code. Please try again.");
       }
 
-      const applyResult = (result?.[0] || result) as ApplyReferralResult | undefined;
+      const applyResult = result ?? undefined;
       
       if (!applyResult?.success) {
         throw new Error(applyResult?.message || "Failed to apply referral code");
       }
 
-      return { success: true };
+      return applyResult;
     },
-    onSuccess: () => {
-      // Invalidate queries to trigger refetch (UI updates asynchronously)
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["referral-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["profile", user?.id] });
       queryClient.invalidateQueries({ queryKey: ["applied-referral-code-state", user?.id] });
-      toast.success("Referral code applied! Your friend will earn rewards when you reach Stage 5 • Initiate.");
+
+      const defaultMessage = result.code_type === "affiliate"
+        ? "Creator code applied! Your yearly plan is now eligible for the Apple discount flow."
+        : "Referral code applied! Your friend will earn rewards when you reach Stage 5 • Initiate.";
+
+      toast.success(result.message || defaultMessage);
     },
     onError: (error: Error) => {
       toast.error(error.message);

@@ -96,5 +96,7 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>WinWinKitAPIKey</key>
+	<string>$(WINWINKIT_IOS_API_KEY)</string>
 </dict>
 </plist>

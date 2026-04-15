@@ -1,0 +1,33 @@
+{
+  "originHash" : "278304a4ad8b469fe9f1dcf3aba95e1675b239804d0e6c623637919faf7dfffd",
+  "pins" : [
+    {
+      "identity" : "anycodable",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/Flight-School/AnyCodable",
+      "state" : {
+        "revision" : "862808b2070cd908cb04f9aafe7de83d35f81b05",
+        "version" : "0.6.7"
+      }
+    },
+    {
+      "identity" : "swift-log",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-log.git",
+      "state" : {
+        "revision" : "5073617dac96330a486245e4c0179cb0a6fd2256",
+        "version" : "1.12.0"
+      }
+    },
+    {
+      "identity" : "winwinkit-swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/winwinkit/winwinkit-swift.git",
+      "state" : {
+        "branch" : "main",
+        "revision" : "90dafabe2812fbcb48e582936936da1a7718685e"
+      }
+    }
+  ],
+  "version" : 3
+}

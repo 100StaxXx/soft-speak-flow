@@ -113,6 +113,7 @@ describe("Paywall creator offer-code eligibility", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("CREATOR123")).toBeInTheDocument();
     expect(screen.getByText("Redeem Discount with Apple")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Redeem Promo Code" })).not.toBeInTheDocument();
   });
 
   it("keeps standard pricing when a saved referral code is not Apple-offer eligible", () => {
@@ -132,5 +133,6 @@ describe("Paywall creator offer-code eligibility", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("$99.99")).toBeInTheDocument();
     expect(screen.queryByText("Redeem Discount with Apple")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Redeem Promo Code" })).not.toBeInTheDocument();
   });
 });

@@ -31,20 +31,6 @@
     
     <!-- Google Fonts - Optimized for faction styles -->
     <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@400;500;600;700&family=Barlow:wght@400;500;600;700;800&family=Cinzel:wght@400;600;700&family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <script>
-      (function loadTolt() {
-        var publicKey = "%VITE_TOLT_PUBLIC_KEY%";
-        if (!publicKey || publicKey === "%VITE_TOLT_PUBLIC_KEY%") {
-          return;
-        }
-
-        var script = document.createElement("script");
-        script.async = true;
-        script.src = "https://files.tlt-cdn.com/tlt.js";
-        script.setAttribute("data-tolt", publicKey);
-        document.head.appendChild(script);
-      })();
-    </script>
   </head>
 
   <body>

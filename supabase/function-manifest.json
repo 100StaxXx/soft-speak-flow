@@ -9,6 +9,7 @@
     "auth-gateway",
     "backfill-companion-image-focal",
     "check-apple-subscription",
+    "claim-referral-code",
     "classify-task-intent",
     "create-influencer-code",
     "decompose-task",
@@ -62,8 +63,8 @@
     "send-shout-notification",
     "submit-support-report",
     "suggest-task-times",
+    "sync-winwinkit-user",
     "sync-daily-pep-talk-transcript",
-    "tolt-webhook",
     "verify-admin-access",
     "verify-apple-receipt"
   ],
@@ -89,7 +90,6 @@
     "rotate-daily-wallpapers",
     "send-apns-notification",
     "sync-daily-pep-talk-transcript",
-    "tolt-webhook",
     "transcribe-audio"
   ],
   "scheduled": [
@@ -110,6 +110,7 @@
     "auth-gateway",
     "backfill-companion-image-focal",
     "check-apple-subscription",
+    "claim-referral-code",
     "check-contact-reminders",
     "check-habit-reminders",
     "check-task-reminders",
@@ -190,8 +191,8 @@
     "send-shout-notification",
     "submit-support-report",
     "suggest-task-times",
+    "sync-winwinkit-user",
     "sync-daily-pep-talk-transcript",
-    "tolt-webhook",
     "transcribe-audio",
     "verify-admin-access",
     "verify-apple-receipt"

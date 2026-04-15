@@ -155,7 +155,7 @@ serve(async (req) => {
 
       const { data: codeData, error: codeError } = await supabase
         .from("referral_codes")
-        .select("id, code, owner_user_id, total_conversions, total_revenue, affiliate_provider, tolt_partner_id")
+        .select("id, code, owner_user_id, total_conversions, total_revenue, affiliate_provider")
         .eq("code", code)
         .maybeSingle();
 
@@ -168,10 +168,10 @@ serve(async (req) => {
         });
       }
 
-      const isToltLinked = codeData.affiliate_provider === "tolt" && Boolean(codeData.tolt_partner_id);
-      if (isToltLinked) {
+      const isProviderLinkedAffiliate = codeData.affiliate_provider === "winwinkit";
+      if (isProviderLinkedAffiliate) {
         return new Response(JSON.stringify({
-          error: "Tolt-linked codes are reported through the Apple yearly webhook flow, not local test payouts.",
+          error: "WinWinKit-linked codes are reported through the Apple yearly webhook flow, not local test payouts.",
         }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },

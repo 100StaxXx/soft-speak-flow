@@ -49,6 +49,7 @@ import { WallpaperManifestProvider } from "@/contexts/WallpaperManifestContext";
 import { GlobalWidgetSyncBridge } from "@/components/GlobalWidgetSyncBridge";
 import { StoreKitProvider } from "@/providers/StoreKitProvider";
 import { EVENING_REFLECTION_CANONICAL_PATH } from "@/utils/eveningReflectionNavigation";
+import { useWinWinKitSync } from "@/hooks/useWinWinKitSync";
 
 // Lazy load pages for code splitting
 const Home = lazy(() => import("./pages/Home"));
@@ -60,7 +61,6 @@ const Welcome = lazy(() => import("./pages/Welcome"));
 
 const Profile = lazy(() => import("./pages/Profile"));
 const PepTalkDetail = lazy(() => import("./pages/PepTalkDetail"));
-const PromoCodeRedeem = lazy(() => import("./pages/PromoCodeRedeem"));
 const Admin = lazy(() => import("./pages/Admin"));
 const MentorSelection = lazy(() => import("./pages/MentorSelection"));
 const NotFound = lazy(() => import("./pages/NotFound"));
@@ -202,6 +202,8 @@ const AppContent = memo(() => {
   const previousPushUserIdRef = useRef<string | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
+
+  useWinWinKitSync();
   
   // Refresh critical data on app resume (iOS/Android) or tab visibility (web)
   useAppResumeRefresh({ enabled: status === "authenticated" && Boolean(session?.user) });
@@ -343,7 +345,6 @@ const AppContent = memo(() => {
                   <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
                   
                   <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-                  <Route path="/promo-code" element={<ProtectedRoute requireAccess={false}><PromoCodeRedeem /></ProtectedRoute>} />
                   <Route path="/premium" element={<Navigate to="/" replace />} />
                   <Route path="/premium/success" element={<ProtectedRoute><PremiumSuccess /></ProtectedRoute>} />
                   <Route path="/pep-talk/:id" element={<ProtectedRoute><PepTalkDetail /></ProtectedRoute>} />

@@ -214,7 +214,7 @@ serve(async (req) => {
     // Look up referral_code_id with current conversion count
     const { data: codeData, error: codeError } = await supabaseClient
       .from("referral_codes")
-      .select("id, code, owner_type, total_conversions, tier, affiliate_provider, tolt_partner_id")
+      .select("id, code, owner_type, total_conversions, tier, affiliate_provider")
       .eq("code", referral_code.toUpperCase())
       .single();
 
@@ -223,12 +223,12 @@ serve(async (req) => {
       return errorResponse(req, "Referral code not found", 400);
     }
 
-    const isToltLinked = codeData.affiliate_provider === "tolt" && Boolean(codeData.tolt_partner_id);
-    if (isToltLinked) {
-      console.log(`Skipping legacy payout creation for Tolt-linked code ${referral_code}`);
+    const isProviderLinkedAffiliate = codeData.affiliate_provider === "winwinkit";
+    if (isProviderLinkedAffiliate) {
+      console.log(`Skipping local payout creation for WinWinKit-linked code ${referral_code}`);
       return jsonResponse(req, {
         success: true,
-        message: "Tolt-linked affiliate commissions are handled by the Apple webhook yearly flow",
+        message: "WinWinKit affiliate commissions are handled by the Apple webhook yearly flow",
         skipped: true,
       });
     }

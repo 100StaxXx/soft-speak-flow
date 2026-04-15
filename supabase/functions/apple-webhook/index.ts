@@ -13,11 +13,9 @@ import {
 } from "../_shared/appleSubscriptions.ts";
 import { normalizeAppAccountToken } from "../_shared/appleServerAPI.ts";
 import {
-  createToltCommission,
-  createToltCustomer,
-  createToltTransaction,
-  updateToltCustomer,
-} from "../_shared/tolt.ts";
+  markAffiliateConversionAudit,
+} from "../_shared/referralState.ts";
+import { createOrUpdateWinWinKitUser } from "../_shared/winwinkit.ts";
 
 const defaultAppleBundleId = "com.darrylgraham.revolution";
 const appleWebhookAudiences = [
@@ -301,6 +299,30 @@ async function handleActivation(
   });
 
   console.log(`Activated subscription for user ${userId}`);
+  await syncWinWinKitPremiumStatus(supabase, userId, true);
+}
+
+async function syncWinWinKitPremiumStatus(
+  supabase: any,
+  userId: string,
+  isPremium: boolean,
+) {
+  const { data: profile, error } = await supabase
+    .from("profiles")
+    .select("created_at, email")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  await createOrUpdateWinWinKitUser({
+    appUserId: userId,
+    firstSeenAt: profile?.created_at ?? new Date().toISOString(),
+    isPremium,
+    metadata: profile?.email ? { email: profile.email } : undefined,
+  });
 }
 
 type AppleJWSPayload = Record<string, unknown>;
@@ -454,6 +476,7 @@ async function handlePlanChange(
   });
 
   console.log(`Plan changed for user ${userId} to ${newPlan}`);
+  await syncWinWinKitPremiumStatus(supabase, userId, true);
 }
 
 async function handleBillingIssue(
@@ -483,6 +506,7 @@ async function handleBillingIssue(
   });
 
   console.log(`Billing issue for user ${userId}`);
+  await syncWinWinKitPremiumStatus(supabase, userId, expiresDate > new Date());
 }
 
 async function handleCancellation(
@@ -518,6 +542,7 @@ async function handleCancellation(
   });
 
   console.log(`Subscription cancelled for user ${userId}, expires ${expiresDate.toISOString()}`);
+  await syncWinWinKitPremiumStatus(supabase, userId, isStillActive);
 }
 
 async function handleRefund(
@@ -552,6 +577,7 @@ async function handleRefund(
   }).eq("stripe_payment_intent_id", transactionId);
 
   console.log(`Refund processed for user ${userId}`);
+  await syncWinWinKitPremiumStatus(supabase, userId, false);
 }
 
 async function createReferralPayout(
@@ -580,7 +606,7 @@ async function createReferralPayout(
   // Find the referral_code record with owner info
   const { data: codeData } = await supabase
     .from("referral_codes")
-    .select("id, owner_type, owner_user_id, affiliate_provider, tolt_partner_id, tolt_link_id, is_active, apple_offer_code_status, apple_offer_code_expires_at")
+    .select("id, owner_type, owner_user_id, affiliate_provider, is_active, apple_offer_code_status, apple_offer_code_expires_at")
     .eq("code", referralCode)
     .single();
 
@@ -589,7 +615,7 @@ async function createReferralPayout(
     return;
   }
 
-  const isToltLinked = codeData.affiliate_provider === "tolt" && Boolean(codeData.tolt_partner_id);
+  const isProviderLinkedAffiliate = codeData.affiliate_provider === "winwinkit";
   const isAppleOfferCodeEligible = Boolean(
     codeData.is_active &&
     codeData.apple_offer_code_status === "active" &&
@@ -600,8 +626,8 @@ async function createReferralPayout(
     offerType,
   });
 
-  if (isToltLinked && !isAppleOfferCodeEligible) {
-    console.log(`Skipping Tolt commission for code ${referralCode} because the Apple custom offer code is not active`);
+  if (isProviderLinkedAffiliate && !isAppleOfferCodeEligible) {
+    console.log(`Skipping WinWinKit conversion audit for code ${referralCode} because the Apple custom offer code is not active`);
     return;
   }
 
@@ -610,20 +636,29 @@ async function createReferralPayout(
     return;
   }
 
-  if (isToltLinked) {
-    await createToltAffiliateConversion(
+  if (isProviderLinkedAffiliate) {
+    const normalizedOfferIdentifier = offerIdentifier?.trim() || getDiscountedYearlyOfferId();
+    const revenueCents = getPriceCents("yearly", {
+      offerIdentifier: normalizedOfferIdentifier,
+      offerType,
+    });
+    const commissionCents = Math.round(revenueCents * 0.2);
+
+    await markAffiliateConversionAudit({
       supabase,
-      {
-        userId,
-        userEmail: profile.email ?? null,
-        referralCodeId: codeData.id,
-        partnerId: codeData.tolt_partner_id,
-        originalTransactionId: transactionId,
-        productId: productId ?? "cosmiq_premium_yearly",
-        offerIdentifier,
-        offerType,
+      referralCodeId: codeData.id,
+      userId,
+      sourceTransactionId: transactionId,
+      sourceProductId: productId ?? "cosmiq_premium_yearly",
+      appliedOfferId: normalizedOfferIdentifier,
+      amountCents: revenueCents,
+      commissionCents,
+      metadata: {
+        billing_source: "apple_webhook",
+        user_email: profile.email ?? null,
       },
-    );
+    });
+    await syncWinWinKitPremiumStatus(supabase, userId, true);
     return;
   }
 
@@ -668,190 +703,6 @@ async function createReferralPayout(
 
   // Auto-approve payouts when threshold is reached ($50 minimum)
   await autoApprovePayoutsIfThresholdReached(supabase, codeData.id, referralCode);
-}
-
-type ToltAffiliateConversionInput = {
-  userId: string;
-  userEmail: string | null;
-  referralCodeId: string;
-  partnerId: string;
-  originalTransactionId: string;
-  productId: string;
-  offerIdentifier?: string | null;
-  offerType?: number | null;
-};
-
-async function createToltAffiliateConversion(
-  supabase: any,
-  input: ToltAffiliateConversionInput,
-) {
-  const normalizedOfferIdentifier = input.offerIdentifier?.trim() || getDiscountedYearlyOfferId();
-  const revenueCents = getPriceCents("yearly", {
-    offerIdentifier: normalizedOfferIdentifier,
-    offerType: input.offerType,
-  });
-  const commissionCents = Math.round(revenueCents * 0.2);
-  const createdAt = new Date().toISOString();
-  const fallbackEmail = input.userEmail?.trim().toLowerCase() || `${input.userId}@users.cosmiq.quest`;
-  let conversion: any = null;
-
-  try {
-    const { data: existingConversion, error: conversionLookupError } = await supabase
-      .from("affiliate_conversions")
-      .select("*")
-      .eq("provider", "tolt")
-      .eq("source_transaction_id", input.originalTransactionId)
-      .maybeSingle();
-
-    if (conversionLookupError) {
-      throw conversionLookupError;
-    }
-
-    conversion = existingConversion;
-
-    if (!conversion) {
-      const { data: insertedConversion, error: insertError } = await supabase
-        .from("affiliate_conversions")
-        .insert({
-          provider: "tolt",
-          referral_code_id: input.referralCodeId,
-          user_id: input.userId,
-          source_transaction_id: input.originalTransactionId,
-          source_product_id: input.productId,
-          plan: "yearly",
-          amount_cents: revenueCents,
-          commission_cents: commissionCents,
-          applied_offer_id: normalizedOfferIdentifier,
-          provider_partner_id: input.partnerId,
-          status: "pending",
-          metadata: {
-            billing_source: "apple_webhook",
-          },
-        })
-        .select("*")
-        .single();
-
-      if (insertError) {
-        throw insertError;
-      }
-
-      conversion = insertedConversion;
-    }
-
-    if (conversion.status === "reported") {
-      console.log(`Tolt conversion already reported for Apple transaction ${input.originalTransactionId}`);
-      return;
-    }
-
-    let customerId = conversion.provider_customer_id as string | null;
-    if (!customerId) {
-      const customer = await createToltCustomer({
-        partnerId: input.partnerId,
-        email: fallbackEmail,
-        customerId: input.userId,
-        subscriptionId: input.originalTransactionId,
-        activeAt: createdAt,
-        status: "active",
-      });
-      customerId = customer.id;
-
-      const { error } = await supabase
-        .from("affiliate_conversions")
-        .update({
-          provider_customer_id: customerId,
-          provider_partner_id: input.partnerId,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", conversion.id);
-
-      if (error) {
-        throw error;
-      }
-    } else {
-      await updateToltCustomer(customerId, {
-        status: "active",
-        subscriptionId: input.originalTransactionId,
-        activeAt: createdAt,
-      });
-    }
-
-    let providerTransactionId = conversion.provider_transaction_id as string | null;
-    if (!providerTransactionId) {
-      const transaction = await createToltTransaction({
-        customerId,
-        chargeId: input.originalTransactionId,
-        amountCents: revenueCents,
-        interval: "year",
-        productId: input.productId,
-        productName: "Cosmiq Premium Yearly",
-        createdAt,
-      });
-      providerTransactionId = transaction.id;
-
-      const { error } = await supabase
-        .from("affiliate_conversions")
-        .update({
-          provider_transaction_id: providerTransactionId,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", conversion.id);
-
-      if (error) {
-        throw error;
-      }
-    }
-
-    let providerCommissionId = conversion.provider_commission_id as string | null;
-    if (!providerCommissionId) {
-      const commission = await createToltCommission({
-        customerId,
-        transactionId: providerTransactionId,
-        chargeId: input.originalTransactionId,
-        amountCents: commissionCents,
-        revenueCents,
-        createdAt,
-      });
-      providerCommissionId = commission.id;
-    }
-
-    const { error: finalizeError } = await supabase
-      .from("affiliate_conversions")
-      .update({
-        provider_partner_id: input.partnerId,
-        provider_customer_id: customerId,
-        provider_transaction_id: providerTransactionId,
-        provider_commission_id: providerCommissionId,
-        status: "reported",
-        last_error: null,
-        updated_at: new Date().toISOString(),
-        metadata: {
-          ...(conversion.metadata ?? {}),
-          billing_source: "apple_webhook",
-          reported_offer_id: normalizedOfferIdentifier,
-        },
-      })
-      .eq("id", conversion.id);
-
-    if (finalizeError) {
-      throw finalizeError;
-    }
-
-    console.log(
-      `Reported yearly Tolt conversion for user ${input.userId} at $${(revenueCents / 100).toFixed(2)} revenue and $${(commissionCents / 100).toFixed(2)} commission`,
-    );
-  } catch (error) {
-    if (conversion?.id) {
-      await supabase
-        .from("affiliate_conversions")
-        .update({
-          status: "failed",
-          last_error: error instanceof Error ? error.message : String(error),
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", conversion.id);
-    }
-    throw error;
-  }
 }
 
 const MINIMUM_PAYOUT_THRESHOLD = 50.00;

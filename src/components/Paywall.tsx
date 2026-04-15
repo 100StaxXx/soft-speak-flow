@@ -26,7 +26,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import paywallPrimaryBackground from "@/assets/backgrounds/paywall-primary.webp";
 import { trackPaywallEvent } from "@/utils/paywallTelemetry";
 
@@ -73,9 +73,7 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
   const { user, signOut } = useAuth();
   const { applyReferralCode } = useReferrals();
   const navigate = useNavigate();
-  const location = useLocation();
   const queryClient = useQueryClient();
-  const returnTo = `${location.pathname}${location.search}${location.hash}`;
 
   const monthlyProduct = useMemo(() => getProductForPlan("monthly", products), [products]);
   const yearlyProduct = useMemo(() => getProductForPlan("yearly", products), [products]);
@@ -475,14 +473,7 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
           </div>
         )}
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Button
-            variant="outline"
-            onClick={() => navigate("/promo-code", { state: { returnTo } })}
-            className="border-white/15 bg-background/45 backdrop-blur-md"
-          >
-            Redeem Promo Code
-          </Button>
+        <div className="grid gap-3">
           <Button
             variant="ghost"
             onClick={() => { void handleRestore("paywall"); }}

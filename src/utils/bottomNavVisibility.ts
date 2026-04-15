@@ -2,7 +2,6 @@ const HIDDEN_EXACT_PATHS = new Set([
   "/welcome",
   "/terms",
   "/privacy",
-  "/promo-code",
   "/test-scroll",
   "/test-day-planner",
 ]);
