@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
@@ -26,6 +26,7 @@ import {
 } from "@/utils/plannerSync";
 import { resolveEpicEndDate } from "@/utils/epicDates";
 import { isQueueableWriteError } from "@/utils/networkErrors";
+import { trackResilienceEvent } from "@/utils/resilienceTelemetry";
 import {
   createOfflinePlannerId,
   getAllLocalTasksForUser,
@@ -40,6 +41,7 @@ import {
   upsertPlannerRecords,
 } from "@/utils/plannerLocalStore";
 import { toRemoteEpicInsertPayload } from "@/utils/epicRemotePayload";
+import { getQueuedActions, type QueuedAction } from "@/utils/offlineStorage";
 
 const normalizeDifficulty = (value: string): "easy" | "medium" | "hard" => {
   const lower = value?.toLowerCase()?.trim() || "medium";
@@ -153,14 +155,14 @@ export const normalizeCreateCampaignError = (error: unknown): { title: string; d
 
   if (haystack.includes("failed to create habits") || haystack.includes("no habits were created")) {
     return {
-      title: "Failed to create campaign",
-      description: "We couldn't save your rituals. Please review your plan and try again.",
+      title: "Campaign needs attention",
+      description: "We couldn't finish saving every part of this campaign. Please review it and try again.",
     };
   }
 
   return {
-    title: "Failed to create campaign",
-    description: "Please try again in a moment. If this keeps happening, close and reopen the planner.",
+    title: "Confirming your campaign",
+    description: "We couldn't confirm it yet. Keep the planner open and check your campaigns again in a moment.",
   };
 };
 
@@ -205,6 +207,93 @@ type LocalCampaignRitualPayload = {
   epicHabit: LocalEpicHabitRow;
 };
 
+type CreateEpicInput = {
+  title: string;
+  description?: string;
+  target_days: number;
+  is_public?: boolean;
+  theme_color?: string;
+  story_type_slug?: StoryTypeSlug;
+  habits: Array<{
+    title: string;
+    description?: string;
+    difficulty: string;
+    frequency: string;
+    custom_days: number[];
+    custom_month_days?: number[];
+    preferred_time?: string;
+    reminder_enabled?: boolean;
+    reminder_minutes_before?: number;
+    estimated_minutes?: number;
+    category?: string | null;
+  }>;
+  milestones?: Array<{
+    title: string;
+    description?: string;
+    target_date: string;
+    milestone_percent: number;
+    is_postcard_milestone: boolean;
+    phase_name?: string;
+    phaseName?: string;
+  }>;
+  phases?: Array<{
+    name: string;
+    description: string;
+    start_date: string;
+    end_date: string;
+    phase_order: number;
+  }>;
+};
+
+type CreateEpicMutationResult = {
+  queued: boolean;
+  epic: LocalEpicRow;
+  isNewCreate: boolean;
+};
+
+type EpicCreateMatch = {
+  epic: LocalEpicRow;
+  queued: boolean;
+};
+
+type FingerprintHabit = {
+  title: string;
+  description: string | null;
+  difficulty: "easy" | "medium" | "hard";
+  frequency: "daily" | "5x_week" | "3x_week" | "monthly" | "custom";
+  custom_days: number[] | null;
+  custom_month_days: number[] | null;
+  preferred_time: string | null;
+  estimated_minutes: number | null;
+  category: string | null;
+  reminder_enabled: boolean;
+  reminder_minutes_before: number;
+};
+
+type FingerprintMilestone = {
+  title: string;
+  description: string | null;
+  target_date: string;
+  milestone_percent: number;
+  is_postcard_milestone: boolean;
+  phase_name: string | null;
+};
+
+type FingerprintPhase = {
+  name: string;
+  description: string | null;
+  start_date: string;
+  end_date: string;
+  phase_order: number;
+};
+
+const RECENT_EPIC_CREATE_WINDOW_MS = 5 * 60 * 1000;
+const inFlightEpicCreateRequests = new Map<string, Promise<CreateEpicMutationResult>>();
+
+const wait = (ms: number) => new Promise<void>((resolve) => {
+  window.setTimeout(resolve, ms);
+});
+
 export interface CreateCampaignRitualInput {
   epicId: string;
   title: string;
@@ -232,6 +321,241 @@ type LocalTaskEpicTitleRow = {
   epic_id: string | null;
   epic_title?: string | null;
 };
+
+const normalizeFingerprintText = (value: string | null | undefined): string | null => {
+  const normalized = value?.trim().replace(/\s+/g, " ") ?? "";
+  return normalized.length > 0 ? normalized.toLowerCase() : null;
+};
+
+const sortNumbers = (values: number[] | null | undefined): number[] | null =>
+  values?.length ? [...values].sort((left, right) => left - right) : null;
+
+const sortByStableJson = <T,>(items: T[]): T[] =>
+  items
+    .slice()
+    .sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)));
+
+const normalizeFingerprintHabit = (
+  habit: Pick<
+    LocalHabitRow,
+    | "title"
+    | "description"
+    | "difficulty"
+    | "frequency"
+    | "custom_days"
+    | "custom_month_days"
+    | "preferred_time"
+    | "estimated_minutes"
+    | "category"
+    | "reminder_enabled"
+    | "reminder_minutes_before"
+  >,
+): FingerprintHabit => ({
+  title: normalizeFingerprintText(habit.title) ?? "",
+  description: normalizeFingerprintText(habit.description),
+  difficulty: normalizeDifficulty(habit.difficulty ?? "medium"),
+  frequency: normalizeFrequency(habit.frequency),
+  custom_days: sortNumbers(habit.custom_days),
+  custom_month_days: sortNumbers(habit.custom_month_days),
+  preferred_time: normalizeFingerprintText(habit.preferred_time),
+  estimated_minutes: habit.estimated_minutes ?? null,
+  category: normalizeFingerprintText(habit.category),
+  reminder_enabled: Boolean(habit.reminder_enabled),
+  reminder_minutes_before: habit.reminder_minutes_before ?? 15,
+});
+
+const normalizeFingerprintInputHabit = (
+  habit: CreateEpicInput["habits"][number],
+): FingerprintHabit =>
+  normalizeFingerprintHabit({
+    title: habit.title,
+    description: habit.description ?? null,
+    difficulty: habit.difficulty,
+    frequency: habit.frequency,
+    custom_days: habit.custom_days ?? null,
+    custom_month_days: habit.custom_month_days ?? null,
+    preferred_time: habit.preferred_time ?? null,
+    estimated_minutes: habit.estimated_minutes ?? null,
+    category: habit.category ?? null,
+    reminder_enabled: habit.reminder_enabled ?? false,
+    reminder_minutes_before: habit.reminder_minutes_before ?? 15,
+  });
+
+const normalizeFingerprintMilestone = (
+  milestone: Pick<
+    LocalEpicPayload["milestones"][number],
+    "title" | "description" | "target_date" | "milestone_percent" | "is_postcard_milestone" | "phase_name"
+  >,
+): FingerprintMilestone => ({
+  title: normalizeFingerprintText(milestone.title) ?? "",
+  description: normalizeFingerprintText(milestone.description),
+  target_date: milestone.target_date,
+  milestone_percent: milestone.milestone_percent,
+  is_postcard_milestone: Boolean(milestone.is_postcard_milestone),
+  phase_name: normalizeFingerprintText(milestone.phase_name),
+});
+
+const normalizeFingerprintInputMilestone = (
+  milestone: NonNullable<CreateEpicInput["milestones"]>[number],
+): FingerprintMilestone =>
+  normalizeFingerprintMilestone({
+    title: milestone.title,
+    description: milestone.description ?? null,
+    target_date: milestone.target_date,
+    milestone_percent: milestone.milestone_percent,
+    is_postcard_milestone: milestone.is_postcard_milestone,
+    phase_name: milestone.phase_name ?? milestone.phaseName ?? null,
+  });
+
+const normalizeFingerprintPhase = (
+  phase: Pick<LocalEpicPayload["phases"][number], "name" | "description" | "start_date" | "end_date" | "phase_order">,
+): FingerprintPhase => ({
+  name: normalizeFingerprintText(phase.name) ?? "",
+  description: normalizeFingerprintText(phase.description),
+  start_date: phase.start_date,
+  end_date: phase.end_date,
+  phase_order: phase.phase_order,
+});
+
+const buildCampaignCreateFingerprint = (userId: string, epicData: CreateEpicInput): string =>
+  JSON.stringify({
+    user_id: userId,
+    title: normalizeFingerprintText(epicData.title) ?? "",
+    target_days: epicData.target_days,
+    story_type_slug: normalizeFingerprintText(epicData.story_type_slug ?? null),
+    habits: sortByStableJson(epicData.habits.map(normalizeFingerprintInputHabit)),
+    milestones: sortByStableJson((epicData.milestones ?? []).map(normalizeFingerprintInputMilestone)),
+    phases: sortByStableJson((epicData.phases ?? []).map(normalizeFingerprintPhase)),
+  });
+
+const buildCampaignCreateFingerprintFromPayload = (userId: string, payload: LocalEpicPayload): string =>
+  JSON.stringify({
+    user_id: userId,
+    title: normalizeFingerprintText(payload.epic.title) ?? "",
+    target_days: payload.epic.target_days,
+    story_type_slug: normalizeFingerprintText(payload.epic.story_type_slug ?? null),
+    habits: sortByStableJson(payload.habits.map(normalizeFingerprintHabit)),
+    milestones: sortByStableJson(payload.milestones.map(normalizeFingerprintMilestone)),
+    phases: sortByStableJson(payload.phases.map(normalizeFingerprintPhase)),
+  });
+
+const isRecentEpicCreateTimestamp = (value: string | number | null | undefined, nowMs: number): boolean => {
+  if (typeof value === "number") {
+    return nowMs - value <= RECENT_EPIC_CREATE_WINDOW_MS;
+  }
+
+  if (typeof value === "string") {
+    const parsed = Date.parse(value);
+    if (!Number.isNaN(parsed)) {
+      return nowMs - parsed <= RECENT_EPIC_CREATE_WINDOW_MS;
+    }
+  }
+
+  return false;
+};
+
+const isActiveQueuedEpicCreateStatus = (status: QueuedAction["status"]) =>
+  status === "queued" || status === "syncing" || status === "failed";
+
+const findRecentMatchingQueuedEpicCreate = async (
+  userId: string,
+  fingerprint: string,
+): Promise<EpicCreateMatch | null> => {
+  const queuedActions = await getQueuedActions(userId);
+  const nowMs = Date.now();
+
+  for (const action of queuedActions) {
+    if (action.action_kind !== "EPIC_CREATE" || !isActiveQueuedEpicCreateStatus(action.status)) {
+      continue;
+    }
+
+    if (!isRecentEpicCreateTimestamp(action.created_at, nowMs)) {
+      continue;
+    }
+
+    const payload = action.payload as Partial<LocalEpicPayload> | undefined;
+    if (!payload?.epic || !Array.isArray(payload.habits) || !Array.isArray(payload.phases) || !Array.isArray(payload.milestones)) {
+      continue;
+    }
+
+    const normalizedPayload: LocalEpicPayload = {
+      epic: payload.epic as LocalEpicRow,
+      habits: payload.habits as LocalHabitRow[],
+      epicHabits: Array.isArray(payload.epicHabits) ? payload.epicHabits as LocalEpicPayload["epicHabits"] : [],
+      phases: payload.phases as LocalEpicPayload["phases"],
+      milestones: payload.milestones as LocalEpicPayload["milestones"],
+    };
+
+    if (buildCampaignCreateFingerprintFromPayload(userId, normalizedPayload) === fingerprint) {
+      return {
+        epic: normalizedPayload.epic,
+        queued: true,
+      };
+    }
+  }
+
+  return null;
+};
+
+const findRecentMatchingLocalEpicCreate = async (
+  userId: string,
+  fingerprint: string,
+): Promise<EpicCreateMatch | null> => {
+  const [localEpics, localHabits] = await Promise.all([
+    loadLocalEpics(userId),
+    getLocalHabits<LocalHabitRow>(userId),
+  ]);
+  const recentLocalEpics = localEpics.filter((epic) => isRecentEpicCreateTimestamp(epic.created_at, Date.now()));
+  if (recentLocalEpics.length === 0) {
+    return null;
+  }
+
+  const habitsById = new Map(localHabits.map((habit) => [habit.id, habit]));
+
+  for (const epic of recentLocalEpics) {
+    const [phases, milestones] = await Promise.all([
+      getLocalJourneyPhases<LocalEpicPayload["phases"][number]>(epic.id),
+      getLocalEpicMilestones<LocalEpicPayload["milestones"][number]>(epic.id),
+    ]);
+
+    const habits = epic.epic_habits
+      .map((link) => habitsById.get(link.habit_id))
+      .filter((habit): habit is LocalHabitRow => Boolean(habit));
+
+    const payload: LocalEpicPayload = {
+      epic,
+      habits,
+      epicHabits: epic.epic_habits.map((link) => ({
+        id: `${epic.id}:${link.habit_id}`,
+        epic_id: epic.id,
+        habit_id: link.habit_id,
+      })),
+      phases,
+      milestones,
+    };
+
+    if (buildCampaignCreateFingerprintFromPayload(userId, payload) === fingerprint) {
+      return {
+        epic,
+        queued: false,
+      };
+    }
+  }
+
+  return null;
+};
+
+async function reconcileRecentEpicCreate(
+  userId: string,
+  fingerprint: string,
+): Promise<EpicCreateMatch | null> {
+  const queuedMatch = await findRecentMatchingQueuedEpicCreate(userId, fingerprint);
+  if (queuedMatch) {
+    return queuedMatch;
+  }
+
+  return findRecentMatchingLocalEpicCreate(userId, fingerprint);
+}
 
 async function applyLocalEpicPayload(payload: LocalEpicPayload) {
   await upsertPlannerRecords("habits", payload.habits);
@@ -500,7 +824,7 @@ export const useEpics = (options: EpicsOptions = {}) => {
   const { awardCustomXP } = useXPRewards();
   const { checkFirstTimeAchievements, checkStoryCompletionAchievement } = useAchievements();
   const { trackEpicOutcome } = useAIInteractionTracker();
-  const { queueAction, shouldQueueWrites, retryNow } = useResilience();
+  const { queueAction, shouldQueueWrites, retryNow, reportApiFailure } = useResilience();
   const { enabled = true } = options;
   const [hasHydratedFromRemote, setHasHydratedFromRemote] = useState(() => !enabled || !user?.id);
 
@@ -552,191 +876,249 @@ export const useEpics = (options: EpicsOptions = {}) => {
 
   const epics = epicsQuery.data ?? [];
 
-  const createEpic = useMutation({
-    mutationFn: async (epicData: {
-      title: string;
-      description?: string;
-      target_days: number;
-      is_public?: boolean;
-      theme_color?: string;
-      story_type_slug?: StoryTypeSlug;
-      habits: Array<{
-        title: string;
-        description?: string;
-        difficulty: string;
-        frequency: string;
-        custom_days: number[];
-        custom_month_days?: number[];
-        preferred_time?: string;
-        reminder_enabled?: boolean;
-        reminder_minutes_before?: number;
-        estimated_minutes?: number;
-      }>;
-      milestones?: Array<{
-        title: string;
-        description?: string;
-        target_date: string;
-        milestone_percent: number;
-        is_postcard_milestone: boolean;
-        phase_name?: string;
-        phaseName?: string;
-      }>;
-      phases?: Array<{
-        name: string;
-        description: string;
-        start_date: string;
-        end_date: string;
-        phase_order: number;
-      }>;
-    }) => {
+  const createEpicMutation = useMutation({
+    mutationFn: async (epicData: CreateEpicInput): Promise<CreateEpicMutationResult> => {
       if (!user?.id) {
         throw new Error("Not authenticated. Please refresh and try again.");
       }
 
-      if (!epicData.habits || epicData.habits.length === 0) {
-        throw new Error("Campaign must have at least one ritual");
-      }
+      return withPlannerRemoteSyncLock(user.id, async () => {
+        const createAttemptId = `epic-create-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const createStartedAt = Date.now();
+        let localPersistMs: number | null = null;
+        let remotePersistMs: number | null = null;
 
-      if (hasReachedActiveCampaignLimit(epics.filter((epic) => epic.status === "active").length)) {
-        throw new Error(ACTIVE_CAMPAIGN_LIMIT_MESSAGE);
-      }
+        if (!epicData.habits || epicData.habits.length === 0) {
+          throw new Error("Campaign must have at least one ritual");
+        }
 
-      const nowIso = new Date().toISOString();
-      const startDate = nowIso.split("T")[0];
-      const epicId = createOfflinePlannerId("epic");
-      const inviteCode = `EPIC-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
-      const habits = epicData.habits.map((habit) => ({
-        id: createOfflinePlannerId("habit"),
-        user_id: user.id,
-        title: habit.title,
-        description: habit.description || null,
-        difficulty: normalizeDifficulty(habit.difficulty),
-        frequency: normalizeFrequency(habit.frequency),
-        custom_days: habit.custom_days?.length ? habit.custom_days : null,
-        custom_month_days: habit.custom_month_days?.length ? habit.custom_month_days : null,
-        preferred_time: habit.preferred_time || null,
-        reminder_enabled: habit.reminder_enabled || false,
-        reminder_minutes_before: habit.reminder_minutes_before || 15,
-        estimated_minutes: habit.estimated_minutes || null,
-        category: null,
-        is_active: true,
-        current_streak: 0,
-        longest_streak: 0,
-        created_at: nowIso,
-      })) satisfies LocalHabitRow[];
+        const fingerprint = buildCampaignCreateFingerprint(user.id, epicData);
+        const recentMatch = await reconcileRecentEpicCreate(user.id, fingerprint);
+        if (recentMatch) {
+          trackResilienceEvent("campaign_create_result", {
+            attemptId: createAttemptId,
+            result: recentMatch.queued ? "reused_queued" : "reused_existing",
+            fingerprint,
+            totalMs: Date.now() - createStartedAt,
+          });
+          return {
+            queued: recentMatch.queued,
+            epic: recentMatch.epic,
+            isNewCreate: false,
+          };
+        }
 
-      const epic: LocalEpicRow = {
-        id: epicId,
-        user_id: user.id,
-        title: epicData.title,
-        description: epicData.description || null,
-        status: "active",
-        progress_percentage: 0,
-        target_days: epicData.target_days,
-        start_date: startDate,
-        end_date: resolveEpicEndDate({
-          start_date: startDate,
+        if (hasReachedActiveCampaignLimit(epics.filter((epic) => epic.status === "active").length)) {
+          throw new Error(ACTIVE_CAMPAIGN_LIMIT_MESSAGE);
+        }
+
+        const nowIso = new Date().toISOString();
+        const startDate = nowIso.split("T")[0];
+        const epicId = createOfflinePlannerId("epic");
+        const inviteCode = `EPIC-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+        const habits = epicData.habits.map((habit) => ({
+          id: createOfflinePlannerId("habit"),
+          user_id: user.id,
+          title: habit.title,
+          description: habit.description || null,
+          difficulty: normalizeDifficulty(habit.difficulty),
+          frequency: normalizeFrequency(habit.frequency),
+          custom_days: habit.custom_days?.length ? habit.custom_days : null,
+          custom_month_days: habit.custom_month_days?.length ? habit.custom_month_days : null,
+          preferred_time: habit.preferred_time || null,
+          reminder_enabled: habit.reminder_enabled || false,
+          reminder_minutes_before: habit.reminder_minutes_before || 15,
+          estimated_minutes: habit.estimated_minutes || null,
+          category: habit.category?.trim() || null,
+          is_active: true,
+          current_streak: 0,
+          longest_streak: 0,
+          created_at: nowIso,
+        })) satisfies LocalHabitRow[];
+
+        const epic: LocalEpicRow = {
+          id: epicId,
+          user_id: user.id,
+          title: epicData.title,
+          description: epicData.description || null,
+          status: "active",
+          progress_percentage: 0,
           target_days: epicData.target_days,
-        }),
-        epic_habits: [],
-        xp_reward: Math.floor(epicData.target_days * 10),
-        is_public: epicData.is_public ?? false,
-        invite_code: inviteCode,
-        theme_color: normalizeThemeColor(epicData.theme_color),
-        story_type_slug: epicData.story_type_slug || null,
-        created_at: nowIso,
-        completed_at: null,
-      } as LocalEpicRow;
+          start_date: startDate,
+          end_date: resolveEpicEndDate({
+            start_date: startDate,
+            target_days: epicData.target_days,
+          }),
+          epic_habits: [],
+          xp_reward: Math.floor(epicData.target_days * 10),
+          is_public: epicData.is_public ?? false,
+          invite_code: inviteCode,
+          theme_color: normalizeThemeColor(epicData.theme_color),
+          story_type_slug: epicData.story_type_slug || null,
+          created_at: nowIso,
+          completed_at: null,
+        } as LocalEpicRow;
 
-      const epicHabits = habits.map((habit) => ({
-        id: createOfflinePlannerId("epic-habit"),
-        epic_id: epicId,
-        habit_id: habit.id,
-      }));
+        const epicHabits = habits.map((habit) => ({
+          id: createOfflinePlannerId("epic-habit"),
+          epic_id: epicId,
+          habit_id: habit.id,
+        }));
 
-      const phases = (epicData.phases ?? []).map((phase) => ({
-        id: createOfflinePlannerId("journey-phase"),
-        epic_id: epicId,
-        user_id: user.id,
-        name: phase.name,
-        description: phase.description,
-        start_date: phase.start_date,
-        end_date: phase.end_date,
-        phase_order: phase.phase_order,
-      }));
+        const phases = (epicData.phases ?? []).map((phase) => ({
+          id: createOfflinePlannerId("journey-phase"),
+          epic_id: epicId,
+          user_id: user.id,
+          name: phase.name,
+          description: phase.description,
+          start_date: phase.start_date,
+          end_date: phase.end_date,
+          phase_order: phase.phase_order,
+        }));
 
-      const milestones = (epicData.milestones ?? []).map((milestone, index) => ({
-        id: createOfflinePlannerId("epic-milestone"),
-        epic_id: epicId,
-        user_id: user.id,
-        title: milestone.title,
-        description: milestone.description || null,
-        target_date: milestone.target_date,
-        milestone_percent: milestone.milestone_percent,
-        is_postcard_milestone: milestone.is_postcard_milestone ?? false,
-        phase_order: index + 1,
-        phase_name: milestone.phase_name || milestone.phaseName || null,
-      }));
+        const milestones = (epicData.milestones ?? []).map((milestone, index) => ({
+          id: createOfflinePlannerId("epic-milestone"),
+          epic_id: epicId,
+          user_id: user.id,
+          title: milestone.title,
+          description: milestone.description || null,
+          target_date: milestone.target_date,
+          milestone_percent: milestone.milestone_percent,
+          is_postcard_milestone: milestone.is_postcard_milestone ?? false,
+          phase_order: index + 1,
+          phase_name: milestone.phase_name || milestone.phaseName || null,
+        }));
 
-      const payload: LocalEpicPayload = {
-        epic,
-        habits,
-        epicHabits,
-        phases,
-        milestones,
-      };
+        const payload: LocalEpicPayload = {
+          epic,
+          habits,
+          epicHabits,
+          phases,
+          milestones,
+        };
 
-      if (shouldQueueWrites) {
-        await applyLocalEpicPayload(payload);
-        await queueAction({
-          actionKind: "EPIC_CREATE",
-          entityType: "epic",
-          entityId: epicId,
-          payload,
+        const reconcileAfterRemoteRefresh = async (): Promise<EpicCreateMatch | null> => {
+          const retryDelaysMs = [0, 350, 1200];
+
+          for (const delayMs of retryDelaysMs) {
+            if (delayMs > 0) {
+              await wait(delayMs);
+            }
+
+            const directMatch = await reconcileRecentEpicCreate(user.id, fingerprint);
+            if (directMatch) {
+              return directMatch;
+            }
+
+            try {
+              await warmEpicsQueryFromRemote(queryClient, user.id);
+            } catch (refreshError) {
+              console.warn("Failed to refresh remote campaigns during create reconciliation:", refreshError);
+            }
+
+            const refreshedMatch = await reconcileRecentEpicCreate(user.id, fingerprint);
+            if (refreshedMatch) {
+              return refreshedMatch;
+            }
+          }
+
+          return null;
+        };
+
+        if (shouldQueueWrites) {
+          const localPersistStartedAt = Date.now();
+          await applyLocalEpicPayload(payload);
+          localPersistMs = Date.now() - localPersistStartedAt;
+          await queueAction({
+            actionKind: "EPIC_CREATE",
+            entityType: "epic",
+            entityId: epicId,
+            payload,
+          });
+          trackResilienceEvent("campaign_create_result", {
+            attemptId: createAttemptId,
+            result: "queued_offline",
+            fingerprint,
+            localPersistMs,
+            totalMs: Date.now() - createStartedAt,
+          });
+          return { queued: true, epic, isNewCreate: true };
+        }
+
+        const { data: activeCampaignCount, error: countError } = await supabase.rpc("count_user_epics", {
+          p_user_id: user.id,
         });
-        return { queued: true, epic };
-      }
-
-      const { data: activeCampaignCount, error: countError } = await supabase.rpc("count_user_epics", {
-        p_user_id: user.id,
-      });
-      if (countError) {
-        console.error("Failed to check active campaign limit (continuing):", countError);
-      } else if (hasReachedActiveCampaignLimit(activeCampaignCount ?? 0)) {
-        throw new Error(ACTIVE_CAMPAIGN_LIMIT_MESSAGE);
-      }
-
-      await applyLocalEpicPayload(payload);
-
-      try {
-        const { error: habitsError } = await supabase.from("habits").insert(habits);
-        if (habitsError) throw habitsError;
-
-        const { error: epicError } = await supabase
-          .from("epics")
-          .insert(toRemoteEpicInsertPayload(epic));
-        if (epicError) throw epicError;
-
-        if (epicHabits.length > 0) {
-          const { error: linkError } = await supabase.from("epic_habits").insert(epicHabits);
-          if (linkError) throw linkError;
+        if (countError) {
+          console.error("Failed to check active campaign limit (continuing):", countError);
+        } else if (hasReachedActiveCampaignLimit(activeCampaignCount ?? 0)) {
+          throw new Error(ACTIVE_CAMPAIGN_LIMIT_MESSAGE);
         }
 
-        if (phases.length > 0) {
-          const { error: phasesError } = await supabase.from("journey_phases").insert(phases);
-          if (phasesError) throw phasesError;
-        }
+        const localPersistStartedAt = Date.now();
+        await applyLocalEpicPayload(payload);
+        localPersistMs = Date.now() - localPersistStartedAt;
 
-        if (milestones.length > 0) {
-          const { error: milestonesError } = await supabase.from("epic_milestones").insert(milestones);
-          if (milestonesError) throw milestonesError;
-        }
+        try {
+          const remotePersistStartedAt = Date.now();
+          const { error: habitsError } = await supabase.from("habits").insert(habits);
+          if (habitsError) throw habitsError;
 
-        return { queued: false, epic };
-      } catch (error) {
-        if (!isQueueableWriteError(error)) {
+          const { error: epicError } = await supabase
+            .from("epics")
+            .insert(toRemoteEpicInsertPayload(epic));
+          if (epicError) throw epicError;
+
+          if (epicHabits.length > 0) {
+            const { error: linkError } = await supabase.from("epic_habits").insert(epicHabits);
+            if (linkError) throw linkError;
+          }
+
+          if (phases.length > 0) {
+            const { error: phasesError } = await supabase.from("journey_phases").insert(phases);
+            if (phasesError) throw phasesError;
+          }
+
+          if (milestones.length > 0) {
+            const { error: milestonesError } = await supabase.from("epic_milestones").insert(milestones);
+            if (milestonesError) throw milestonesError;
+          }
+
+          remotePersistMs = Date.now() - remotePersistStartedAt;
+          trackResilienceEvent("campaign_create_result", {
+            attemptId: createAttemptId,
+            result: "created",
+            fingerprint,
+            localPersistMs,
+            remotePersistMs,
+            totalMs: Date.now() - createStartedAt,
+          });
+          return { queued: false, epic, isNewCreate: true };
+        } catch (error) {
+          if (isQueueableWriteError(error)) {
+            const queuedMatch = await findRecentMatchingQueuedEpicCreate(user.id, fingerprint);
+            if (!queuedMatch) {
+              await queueAction({
+                actionKind: "EPIC_CREATE",
+                entityType: "epic",
+                entityId: epicId,
+                payload,
+              });
+            }
+            void retryNow();
+            trackResilienceEvent("campaign_create_result", {
+              attemptId: createAttemptId,
+              result: "queued_after_network_error",
+              fingerprint,
+              localPersistMs,
+              remotePersistMs,
+              totalMs: Date.now() - createStartedAt,
+            });
+            return { queued: true, epic, isNewCreate: true };
+          }
+
           try {
             await rollbackLocalEpicPayload(payload);
+            await refreshEpicsQueryFromLocalStore(queryClient, user.id);
           } catch (rollbackError) {
             console.warn("Failed to roll back local campaign after create error:", rollbackError);
           }
@@ -747,27 +1129,50 @@ export const useEpics = (options: EpicsOptions = {}) => {
             console.warn("Failed to roll back remote campaign after create error:", rollbackError);
           }
 
+          const recoveredMatch = await reconcileAfterRemoteRefresh();
+          if (recoveredMatch) {
+            trackResilienceEvent("campaign_create_result", {
+              attemptId: createAttemptId,
+              result: recoveredMatch.queued ? "recovered_queued" : "recovered_remote",
+              fingerprint,
+              localPersistMs,
+              remotePersistMs,
+              totalMs: Date.now() - createStartedAt,
+            });
+            return {
+              queued: recoveredMatch.queued,
+              epic: recoveredMatch.epic,
+              isNewCreate: false,
+            };
+          }
+
+          reportApiFailure(error, {
+            source: "campaign_create_nonqueueable",
+            attemptId: createAttemptId,
+            fingerprint,
+            localPersistMs,
+            remotePersistMs,
+          });
+          trackResilienceEvent("campaign_create_result", {
+            attemptId: createAttemptId,
+            result: "failed",
+            fingerprint,
+            localPersistMs,
+            remotePersistMs,
+            totalMs: Date.now() - createStartedAt,
+          });
           throw error;
         }
-
-        await queueAction({
-          actionKind: "EPIC_CREATE",
-          entityType: "epic",
-          entityId: epicId,
-          payload,
-        });
-        void retryNow();
-        return { queued: true, epic };
-      }
+      });
     },
-    onSuccess: async ({ queued, epic }) => {
+    onSuccess: async ({ queued, epic, isNewCreate }) => {
       queryClient.invalidateQueries({ queryKey: ["epics"] });
       queryClient.invalidateQueries({ queryKey: ["habits"] });
       queryClient.invalidateQueries({ queryKey: ["habit-surfacing"] });
       queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
       queryClient.invalidateQueries({ queryKey: ["user-ai-context"] });
 
-      if (!queued && user?.id) {
+      if (!queued && isNewCreate && user?.id) {
         const { count } = await supabase
           .from("epics")
           .select("*", { count: "exact", head: true })
@@ -778,7 +1183,7 @@ export const useEpics = (options: EpicsOptions = {}) => {
         }
       }
 
-      if (!queued && user?.id) {
+      if (!queued && isNewCreate && user?.id) {
         void requestJourneyPathGeneration({
           epicId: epic.id,
           milestoneIndex: 0,
@@ -798,12 +1203,40 @@ export const useEpics = (options: EpicsOptions = {}) => {
     },
     onError: (error) => {
       console.error("Failed to create campaign:", error);
+      reportApiFailure(error, { source: "campaign_create_onError" });
       const normalized = normalizeCreateCampaignError(error);
       toast.error(normalized.title, {
         description: normalized.description,
       });
     },
   });
+
+  const createEpic = useCallback((epicData: CreateEpicInput) => {
+    if (!user?.id) {
+      return createEpicMutation.mutateAsync(epicData);
+    }
+
+    const fingerprint = buildCampaignCreateFingerprint(user.id, epicData);
+    const existingRequest = inFlightEpicCreateRequests.get(fingerprint);
+    if (existingRequest) {
+      trackResilienceEvent("campaign_create_result", {
+        result: "deduped_inflight",
+        fingerprint,
+      });
+      return existingRequest;
+    }
+
+    const nextRequest = createEpicMutation
+      .mutateAsync(epicData)
+      .finally(() => {
+        if (inFlightEpicCreateRequests.get(fingerprint) === nextRequest) {
+          inFlightEpicCreateRequests.delete(fingerprint);
+        }
+      });
+
+    inFlightEpicCreateRequests.set(fingerprint, nextRequest);
+    return nextRequest;
+  }, [createEpicMutation, user?.id]);
 
   const updateEpicStatus = useMutation({
     mutationFn: async ({
@@ -1227,9 +1660,9 @@ export const useEpics = (options: EpicsOptions = {}) => {
     completedEpics,
     isLoading: (epicsQuery.isLoading && epics.length === 0) || isAwaitingInitialHydration,
     error: epicsQuery.error,
-    createEpic: createEpic.mutateAsync,
-    isCreating: createEpic.isPending,
-    isCreateSuccess: createEpic.isSuccess,
+    createEpic,
+    isCreating: createEpicMutation.isPending,
+    isCreateSuccess: createEpicMutation.isSuccess,
     renameEpic: renameEpic.mutateAsync,
     updateEpicStatus: updateEpicStatus.mutate,
     createCampaignRitual: createCampaignRitual.mutateAsync,

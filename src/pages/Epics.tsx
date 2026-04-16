@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { PageTransition } from "@/components/PageTransition";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -42,7 +42,7 @@ const Epics = () => {
 
   const hasReachedLimit = hasReachedActiveCampaignLimit(activeEpics.length);
 
-  const handleCreateEpic = (data: {
+  const handleCreateEpic = useCallback(async (data: {
     title: string;
     description?: string;
     target_days: number;
@@ -51,14 +51,14 @@ const Epics = () => {
       title: string;
       difficulty: string;
       frequency: string;
-      custom_days: number[];
-      custom_month_days?: number[];
+        custom_days: number[];
+        custom_month_days?: number[];
     }>;
   }) => {
-    createEpic(data);
+    await createEpic(data);
     setCreateDialogOpen(false);
     setSelectedTemplate(null);
-  };
+  }, [createEpic]);
 
   const handleSelectTemplate = (template: EpicTemplate) => {
     setSelectedTemplate(template);
@@ -239,8 +239,8 @@ const Epics = () => {
         <Pathfinder
           open={smartWizardOpen}
           onOpenChange={setSmartWizardOpen}
-          onCreateEpic={(data) => {
-            createEpic(data);
+          onCreateEpic={async (data) => {
+            await createEpic(data);
             setSmartWizardOpen(false);
           }}
           isCreating={isCreating}

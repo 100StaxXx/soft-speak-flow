@@ -81,7 +81,7 @@ interface CreateEpicDialogProps {
     is_public?: boolean;
     theme_color?: EpicTheme;
     story_type_slug?: StoryTypeSlug;
-  }) => void;
+  }) => Promise<unknown> | void;
   isCreating: boolean;
   template?: EpicTemplate | null;
 }
@@ -108,6 +108,7 @@ export const CreateEpicDialog = ({
   const [currentReminderEnabled, setCurrentReminderEnabled] = useState(false);
   const [currentReminderMinutes, setCurrentReminderMinutes] = useState(15);
   const [editingHabitIndex, setEditingHabitIndex] = useState<number | null>(null);
+  const [isSubmittingCreate, setIsSubmittingCreate] = useState(false);
 
   // Pre-fill from template when selected
   useEffect(() => {
@@ -193,22 +194,27 @@ export const CreateEpicDialog = ({
     setNewHabits(prev => prev.filter((_, i) => i !== index));
   }, []);
 
-  const handleSubmit = useCallback(() => {
-    if (!title.trim() || newHabits.length === 0) return;
+  const handleSubmit = useCallback(async () => {
+    if (!title.trim() || newHabits.length === 0 || isCreating || isSubmittingCreate) return;
 
-    onCreateEpic({
-      title: title.trim(),
-      description: description.trim() || undefined,
-      target_days: targetDays,
-      habits: newHabits,
-      is_public: true,
-      theme_color: themeColor,
-      story_type_slug: storyType || undefined,
-    });
+    setIsSubmittingCreate(true);
 
-    // Reset form
-    resetForm();
-  }, [title, description, targetDays, newHabits, themeColor, storyType, onCreateEpic]);
+    try {
+      await Promise.resolve(onCreateEpic({
+        title: title.trim(),
+        description: description.trim() || undefined,
+        target_days: targetDays,
+        habits: newHabits,
+        is_public: true,
+        theme_color: themeColor,
+        story_type_slug: storyType || undefined,
+      }));
+
+      resetForm();
+    } finally {
+      setIsSubmittingCreate(false);
+    }
+  }, [title, description, targetDays, newHabits, themeColor, storyType, onCreateEpic, isCreating, isSubmittingCreate]);
 
   const resetForm = () => {
     setStep("story");
@@ -231,6 +237,7 @@ export const CreateEpicDialog = ({
   const handleOpenChange = (isOpen: boolean) => {
     if (!isOpen) {
       resetForm();
+      setIsSubmittingCreate(false);
     }
     onOpenChange(isOpen);
   };
@@ -479,10 +486,10 @@ export const CreateEpicDialog = ({
             {/* Submit */}
             <Button
               onClick={handleSubmit}
-              disabled={!title.trim() || newHabits.length === 0 || isCreating}
+              disabled={!title.trim() || newHabits.length === 0 || isCreating || isSubmittingCreate}
               className="w-full bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90"
             >
-              {isCreating ? "Creating Epic..." : template ? `Start ${template.name}! 🎯` : "Begin Epic Quest! 🎯"}
+              {isCreating || isSubmittingCreate ? "Creating Epic..." : template ? `Start ${template.name}! 🎯` : "Begin Epic Quest! 🎯"}
             </Button>
           </div>
         )}

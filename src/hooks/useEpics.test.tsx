@@ -24,6 +24,8 @@ const mocks = vi.hoisted(() => {
   const removePlannerRecordsMock = vi.fn();
   const upsertPlannerRecordMock = vi.fn();
   const upsertPlannerRecordsMock = vi.fn();
+  const getQueuedActionsMock = vi.fn();
+  const reportApiFailureMock = vi.fn();
   let shouldQueueWrites = false;
   const warmEpicsQueryFromRemoteMock = vi.fn();
   const withPlannerRemoteSyncLockMock = vi.fn(async (_userId: string, operation: () => Promise<unknown>) => operation());
@@ -52,6 +54,8 @@ const mocks = vi.hoisted(() => {
     removePlannerRecordsMock,
     upsertPlannerRecordMock,
     upsertPlannerRecordsMock,
+    getQueuedActionsMock,
+    reportApiFailureMock,
     get shouldQueueWrites() {
       return shouldQueueWrites;
     },
@@ -89,6 +93,7 @@ vi.mock("@/contexts/ResilienceContext", () => ({
     queueAction: (...args: unknown[]) => mocks.queueActionMock(...args),
     shouldQueueWrites: mocks.shouldQueueWrites,
     retryNow: (...args: unknown[]) => mocks.retryNowMock(...args),
+    reportApiFailure: (...args: unknown[]) => mocks.reportApiFailureMock(...args),
   }),
 }));
 
@@ -114,6 +119,10 @@ vi.mock("@/integrations/supabase/client", () => ({
 
 vi.mock("@/utils/journeyPathCache", () => ({
   requestJourneyPathGeneration: (...args: unknown[]) => mocks.requestJourneyPathGenerationMock(...args),
+}));
+
+vi.mock("@/utils/offlineStorage", () => ({
+  getQueuedActions: (...args: unknown[]) => mocks.getQueuedActionsMock(...args),
 }));
 
 vi.mock("@/utils/plannerSync", () => ({
@@ -198,6 +207,8 @@ describe("useEpics", () => {
     mocks.removePlannerRecordsMock.mockResolvedValue(undefined);
     mocks.upsertPlannerRecordMock.mockResolvedValue(undefined);
     mocks.upsertPlannerRecordsMock.mockResolvedValue(undefined);
+    mocks.getQueuedActionsMock.mockResolvedValue([]);
+    mocks.reportApiFailureMock.mockReset();
 
     mocks.fromMock.mockReturnValue({
       select: mocks.selectMock,
@@ -361,6 +372,297 @@ describe("useEpics", () => {
       "Summer Gains",
       "Get Money",
     ]);
+  });
+
+  it("reuses the same in-flight create request for duplicate campaign submissions", async () => {
+    let resolveHabitsInsert: ((value: { error: null }) => void) | null = null;
+    const habitsInsertMock = vi.fn().mockImplementation(
+      () =>
+        new Promise<{ error: null }>((resolve) => {
+          resolveHabitsInsert = resolve;
+        }),
+    );
+    const epicsInsertMock = vi.fn().mockResolvedValue({ error: null });
+    const linksInsertMock = vi.fn().mockResolvedValue({ error: null });
+
+    mocks.fromMock.mockImplementation((table: string) => {
+      if (table === "habits") {
+        return {
+          insert: habitsInsertMock,
+          select: mocks.selectMock,
+        };
+      }
+
+      if (table === "epics") {
+        return {
+          insert: epicsInsertMock,
+          select: mocks.selectMock,
+        };
+      }
+
+      if (["epic_habits", "journey_phases", "epic_milestones"].includes(table)) {
+        return {
+          insert: linksInsertMock,
+          select: mocks.selectMock,
+        };
+      }
+
+      return {
+        select: mocks.selectMock,
+      };
+    });
+
+    const { result } = renderHook(() => useEpics(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    const input = {
+      title: "Pass the bar exam",
+      target_days: 182,
+      habits: [
+        {
+          title: "Morning focus",
+          difficulty: "easy",
+          frequency: "daily",
+          custom_days: [1, 2, 3, 4, 5],
+        },
+      ],
+    };
+
+    let firstRequest!: Promise<unknown>;
+    let secondRequest!: Promise<unknown>;
+
+    await act(async () => {
+      firstRequest = result.current.createEpic(input);
+      secondRequest = result.current.createEpic(input);
+
+      expect(firstRequest).toBe(secondRequest);
+
+      await waitFor(() => {
+        expect(resolveHabitsInsert).not.toBeNull();
+      });
+      resolveHabitsInsert?.({ error: null });
+      await Promise.all([firstRequest, secondRequest]);
+    });
+
+    expect(habitsInsertMock).toHaveBeenCalledTimes(1);
+    expect(epicsInsertMock).toHaveBeenCalledTimes(1);
+    expect(linksInsertMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("reuses an existing queued campaign create instead of creating a duplicate", async () => {
+    const queuedEpic = {
+      ...buildActiveEpic("epic-queued"),
+      title: "Pass the bar exam",
+      target_days: 182,
+      created_at: new Date().toISOString(),
+      story_type_slug: null,
+    };
+
+    mocks.getQueuedActionsMock.mockResolvedValue([
+      {
+        id: "queued-action-1",
+        user_id: "user-1",
+        action_kind: "EPIC_CREATE",
+        entity_type: "epic",
+        entity_id: "epic-queued",
+        status: "queued",
+        retry_count: 0,
+        last_error: null,
+        created_at: Date.now(),
+        updated_at: Date.now(),
+        payload: {
+          epic: queuedEpic,
+          habits: [
+            {
+              id: "habit-queued",
+              user_id: "user-1",
+              title: "Morning focus",
+              description: null,
+              difficulty: "easy",
+              frequency: "daily",
+              custom_days: [1, 2, 3, 4, 5],
+              custom_month_days: null,
+              preferred_time: null,
+              reminder_enabled: false,
+              reminder_minutes_before: 15,
+              estimated_minutes: null,
+              category: null,
+              is_active: true,
+              current_streak: 0,
+              longest_streak: 0,
+              created_at: new Date().toISOString(),
+            },
+          ],
+          epicHabits: [],
+          phases: [],
+          milestones: [],
+        },
+      },
+    ]);
+
+    const { result } = renderHook(() => useEpics(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    let createResult: Awaited<ReturnType<typeof result.current.createEpic>> | undefined;
+
+    await act(async () => {
+      createResult = await result.current.createEpic({
+        title: "Pass the bar exam",
+        target_days: 182,
+        habits: [
+          {
+            title: "Morning focus",
+            difficulty: "easy",
+            frequency: "daily",
+            custom_days: [1, 2, 3, 4, 5],
+          },
+        ],
+      });
+    });
+
+    expect(createResult).toMatchObject({
+      queued: true,
+      epic: expect.objectContaining({ id: "epic-queued" }),
+    });
+    expect(mocks.fromMock).not.toHaveBeenCalled();
+    expect(mocks.queueActionMock).not.toHaveBeenCalled();
+  });
+
+  it("treats a partially successful create as success after remote reconciliation", async () => {
+    let localEpics: Array<ReturnType<typeof buildActiveEpic>> = [];
+    let localHabits: Array<Record<string, unknown>> = [];
+    const habitsInsertMock = vi.fn().mockResolvedValue({ error: null });
+    const epicsInsertMock = vi.fn().mockResolvedValue({
+      error: { message: "violates check constraint", status: 400 },
+    });
+    const deleteEpicHabitsInMock = vi.fn().mockResolvedValue({ error: null });
+    const deleteHabitsEqMock = vi.fn().mockResolvedValue({ error: null });
+    const deleteHabitsInMock = vi.fn().mockReturnValue({ eq: deleteHabitsEqMock });
+    const deleteEpicsEqUserMock = vi.fn().mockResolvedValue({ error: null });
+    const deleteEpicsEqIdMock = vi.fn().mockReturnValue({ eq: deleteEpicsEqUserMock });
+
+    mocks.loadLocalEpicsMock.mockImplementation(async () => localEpics);
+    mocks.getLocalHabitsMock.mockImplementation(async () => localHabits);
+    mocks.getLocalJourneyPhasesMock.mockResolvedValue([]);
+    mocks.getLocalEpicMilestonesMock.mockResolvedValue([]);
+    mocks.warmEpicsQueryFromRemoteMock.mockImplementationOnce(async (queryClient: QueryClient, userId: string) => {
+      const recoveredEpic = {
+        ...buildActiveEpic("epic-recovered"),
+        title: "Recovered Campaign",
+        target_days: 30,
+        created_at: new Date().toISOString(),
+        story_type_slug: null,
+        epic_habits: [{ habit_id: "habit-recovered", habits: null }],
+      };
+
+      localEpics = [recoveredEpic];
+      localHabits = [
+        {
+          id: "habit-recovered",
+          user_id: "user-1",
+          title: "Morning focus",
+          description: null,
+          difficulty: "easy",
+          frequency: "daily",
+          custom_days: [1, 2, 3, 4, 5],
+          custom_month_days: null,
+          preferred_time: null,
+          reminder_enabled: false,
+          reminder_minutes_before: 15,
+          estimated_minutes: null,
+          category: null,
+          is_active: true,
+          current_streak: 0,
+          longest_streak: 0,
+          created_at: new Date().toISOString(),
+        },
+      ];
+      queryClient.setQueryData(["epics", userId], localEpics);
+      return localEpics;
+    });
+
+    mocks.fromMock.mockImplementation((table: string) => {
+      if (table === "habits") {
+        return {
+          insert: habitsInsertMock,
+          delete: vi.fn().mockReturnValue({ in: deleteHabitsInMock }),
+          select: mocks.selectMock,
+        };
+      }
+
+      if (table === "epics") {
+        return {
+          insert: epicsInsertMock,
+          delete: vi.fn().mockReturnValue({ eq: deleteEpicsEqIdMock }),
+          select: mocks.selectMock,
+        };
+      }
+
+      if (table === "epic_habits") {
+        return {
+          delete: vi.fn().mockReturnValue({ in: deleteEpicHabitsInMock }),
+          select: mocks.selectMock,
+        };
+      }
+
+      if (table === "journey_phases" || table === "epic_milestones") {
+        return {
+          delete: vi.fn().mockReturnValue({
+            in: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ error: null }),
+            }),
+          }),
+          select: mocks.selectMock,
+        };
+      }
+
+      return {
+        select: mocks.selectMock,
+      };
+    });
+
+    const { result } = renderHook(() => useEpics(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    let createResult: Awaited<ReturnType<typeof result.current.createEpic>> | undefined;
+
+    await act(async () => {
+      createResult = await result.current.createEpic({
+        title: "Recovered Campaign",
+        target_days: 30,
+        habits: [
+          {
+            title: "Morning focus",
+            difficulty: "easy",
+            frequency: "daily",
+            custom_days: [1, 2, 3, 4, 5],
+          },
+        ],
+      });
+    });
+
+    expect(createResult).toMatchObject({
+      queued: false,
+      epic: expect.objectContaining({ id: "epic-recovered" }),
+    });
+    expect(mocks.toastErrorMock).not.toHaveBeenCalled();
+    expect(mocks.requestJourneyPathGenerationMock).not.toHaveBeenCalled();
+    expect(mocks.warmEpicsQueryFromRemoteMock).toHaveBeenCalledTimes(1);
   });
 
   it("starts background initial journey-path generation after a successful remote create", async () => {
