@@ -21,6 +21,7 @@
 		CW1000001000000000000004 /* CosmiqWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = CW3000001000000000000001 /* CosmiqWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		NC1000001000000000000001 /* Plugins/NativeCalendar/NativeCalendarPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = NC2000001000000000000001 /* Plugins/NativeCalendar/NativeCalendarPlugin.swift */; };
 		NC1000001000000000000002 /* Plugins/NativeCalendar/NativeCalendarPlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = NC2000001000000000000002 /* Plugins/NativeCalendar/NativeCalendarPlugin.m */; };
+		SK1000001000000000000001 /* Plugins/StoreKit/StoreKitPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = SK2000001000000000000001 /* Plugins/StoreKit/StoreKitPlugin.swift */; };
 		WD1000001000000000000001 /* Plugins/WidgetData/WidgetDataPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = WD2000001000000000000001 /* Plugins/WidgetData/WidgetDataPlugin.swift */; };
 		WD1000001000000000000002 /* Plugins/WidgetData/WidgetDataPlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = WD2000001000000000000002 /* Plugins/WidgetData/WidgetDataPlugin.m */; };
 		WW1000001000000000000001 /* Plugins/WinWinKit/WinWinKitPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = WW2000001000000000000001 /* Plugins/WinWinKit/WinWinKitPlugin.swift */; };
@@ -77,6 +78,7 @@
 		FC68EB0AF532CFC21C3344DD /* Pods-App.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.debug.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.debug.xcconfig"; sourceTree = "<group>"; };
 		NC2000001000000000000001 /* Plugins/NativeCalendar/NativeCalendarPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Plugins/NativeCalendar/NativeCalendarPlugin.swift; sourceTree = "<group>"; };
 		NC2000001000000000000002 /* Plugins/NativeCalendar/NativeCalendarPlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Plugins/NativeCalendar/NativeCalendarPlugin.m; sourceTree = "<group>"; };
+		SK2000001000000000000001 /* Plugins/StoreKit/StoreKitPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Plugins/StoreKit/StoreKitPlugin.swift; sourceTree = "<group>"; };
 		WD2000001000000000000001 /* Plugins/WidgetData/WidgetDataPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Plugins/WidgetData/WidgetDataPlugin.swift; sourceTree = "<group>"; };
 		WD2000001000000000000002 /* Plugins/WidgetData/WidgetDataPlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Plugins/WidgetData/WidgetDataPlugin.m; sourceTree = "<group>"; };
 		WW2000001000000000000001 /* Plugins/WinWinKit/WinWinKitPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Plugins/WinWinKit/WinWinKitPlugin.swift; sourceTree = "<group>"; };
@@ -142,6 +144,7 @@
 				504EC3071FED79650016851F /* AppDelegate.swift */,
 				NC2000001000000000000001 /* Plugins/NativeCalendar/NativeCalendarPlugin.swift */,
 				NC2000001000000000000002 /* Plugins/NativeCalendar/NativeCalendarPlugin.m */,
+				SK2000001000000000000001 /* Plugins/StoreKit/StoreKitPlugin.swift */,
 				WW2000001000000000000001 /* Plugins/WinWinKit/WinWinKitPlugin.swift */,
 				WD2000001000000000000001 /* Plugins/WidgetData/WidgetDataPlugin.swift */,
 				WD2000001000000000000002 /* Plugins/WidgetData/WidgetDataPlugin.m */,
@@ -392,6 +395,7 @@
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				NC1000001000000000000001 /* Plugins/NativeCalendar/NativeCalendarPlugin.swift in Sources */,
 				NC1000001000000000000002 /* Plugins/NativeCalendar/NativeCalendarPlugin.m in Sources */,
+				SK1000001000000000000001 /* Plugins/StoreKit/StoreKitPlugin.swift in Sources */,
 				WW1000001000000000000001 /* Plugins/WinWinKit/WinWinKitPlugin.swift in Sources */,
 				WD1000001000000000000001 /* Plugins/WidgetData/WidgetDataPlugin.swift in Sources */,
 				WD1000001000000000000002 /* Plugins/WidgetData/WidgetDataPlugin.m in Sources */,
@@ -566,7 +570,7 @@
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 257;
+				CURRENT_PROJECT_VERSION = 258;
 				DEVELOPMENT_TEAM = B6VW78ABTR;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				INFOPLIST_FILE = App/Info.plist;
@@ -597,7 +601,7 @@
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 257;
+				CURRENT_PROJECT_VERSION = 258;
 				DEVELOPMENT_TEAM = B6VW78ABTR;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				INFOPLIST_FILE = App/Info.plist;
@@ -626,7 +630,7 @@
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_ENTITLEMENTS = ../CosmiqWidget/CosmiqWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 257;
+				CURRENT_PROJECT_VERSION = 258;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = ../CosmiqWidget/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = CosmiqWidget;
@@ -654,7 +658,7 @@
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_ENTITLEMENTS = ../CosmiqWidget/CosmiqWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 257;
+				CURRENT_PROJECT_VERSION = 258;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = ../CosmiqWidget/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = CosmiqWidget;

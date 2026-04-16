@@ -144,15 +144,7 @@ class AppBridgeViewController: CAPBridgeViewController {
         // Local plugins are not auto-registered from capacitor.config.json packageClassList.
         bridge?.registerPluginInstance(WidgetDataPlugin())
         bridge?.registerPluginInstance(NativeCalendarPlugin())
-        if let pluginType = NSClassFromString("StoreKitPlugin") as? (CAPPlugin & CAPBridgedPlugin).Type {
-            bridge?.registerPluginInstance(pluginType.init())
-        } else {
-            print("⚠️ StoreKitPlugin not found; skipping registration. Ensure StoreKitPlugin.swift is added to the Xcode target.")
-        }
-        if let pluginType = NSClassFromString("WinWinKitPlugin") as? (CAPPlugin & CAPBridgedPlugin).Type {
-            bridge?.registerPluginInstance(pluginType.init())
-        } else {
-            print("⚠️ WinWinKitPlugin not found; skipping registration. Ensure WinWinKitPlugin.swift is added to the Xcode target.")
-        }
+        bridge?.registerPluginInstance(StoreKitPlugin())
+        bridge?.registerPluginInstance(WinWinKitPlugin())
     }
 }

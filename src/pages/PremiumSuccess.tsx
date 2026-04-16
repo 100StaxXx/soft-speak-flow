@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useSubscription } from "@/hooks/useSubscription";
 import Confetti from "react-confetti";
+import { PREMIUM_BENEFITS } from "@/config/premiumBenefits";
 
 export default function PremiumSuccess() {
   const navigate = useNavigate();
@@ -68,11 +69,9 @@ export default function PremiumSuccess() {
         <div className="space-y-3 mb-8 text-left bg-muted/30 rounded-lg p-4">
           <h3 className="font-semibold text-sm text-foreground mb-3">What you get:</h3>
           <div className="space-y-2 text-sm text-muted-foreground">
-            <p>✓ Unlimited access to all content</p>
-            <p>✓ All guides unlocked</p>
-            <p>✓ Unlimited guide chat</p>
-            <p>✓ Offline downloads</p>
-            <p>✓ Priority support</p>
+            {PREMIUM_BENEFITS.map((benefit) => (
+              <p key={benefit}>✓ {benefit}</p>
+            ))}
           </div>
         </div>
 

@@ -6,6 +6,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Crown, Loader2, RefreshCw, Settings } from "lucide-react";
+import { PREMIUM_BENEFITS, PREMIUM_PLAN_NOTE, PREMIUM_BENEFITS_SUMMARY } from "@/config/premiumBenefits";
 
 type PlanOption = {
   id: IAPPlan;
@@ -21,16 +22,16 @@ const PLAN_OPTIONS: PlanOption[] = [
   {
     id: "monthly",
     label: "Monthly",
-    description: "Full access billed every month",
-    hint: "Flexible billing",
+    description: PREMIUM_BENEFITS_SUMMARY,
+    hint: "Full Cosmiq Pro access billed monthly.",
     fallbackPrice: "$9.99",
     billingPeriodLabel: "/month",
   },
   {
     id: "yearly",
     label: "Yearly",
-    description: "Best recurring value",
-    hint: "Lower effective monthly price",
+    description: PREMIUM_BENEFITS_SUMMARY,
+    hint: "Full Cosmiq Pro access billed yearly with the best recurring value.",
     fallbackPrice: "$99.99",
     billingPeriodLabel: "/year",
     badge: "Most popular",
@@ -73,7 +74,7 @@ export const SubscriptionManagement = memo(function SubscriptionManagement() {
         ? `Access until ${nextBillingDate.toLocaleDateString()}`
         : `Renews on ${nextBillingDate.toLocaleDateString()}`
       : "Renewal date not available yet"
-    : "Upgrade to unlock Cosmiq Pro";
+    : `Subscribe for ${PREMIUM_BENEFITS_SUMMARY.toLowerCase()}`;
 
   const priceByPlan = useMemo(() => {
     return PLAN_OPTIONS.reduce<Record<string, string>>((acc, option) => {
@@ -98,12 +99,21 @@ export const SubscriptionManagement = memo(function SubscriptionManagement() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Crown className="h-5 w-5 text-primary" />
-            Unlock Cosmiq Pro
+            Unlock unlimited guide chat, quests, and offline access
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-5">
           <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-sm text-foreground">
             {subscriptionStatusText}
+          </div>
+
+          <div className="rounded-xl border border-border/60 bg-card/40 p-4">
+            <p className="text-sm font-medium text-foreground">Every plan includes:</p>
+            <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
+              {PREMIUM_BENEFITS.map((benefit) => (
+                <li key={benefit}>{benefit}</li>
+              ))}
+            </ul>
           </div>
 
           {productsLoading && (
@@ -177,6 +187,10 @@ export const SubscriptionManagement = memo(function SubscriptionManagement() {
               `Unlock with ${PLAN_OPTIONS.find((o) => o.id === selectedPlan)?.label ?? "Plan"}`
             )}
           </Button>
+
+          <p className="text-xs text-center text-muted-foreground">
+            {PREMIUM_PLAN_NOTE}
+          </p>
 
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
             <Button variant="outline" className="w-full sm:flex-1" disabled={manageLoading} onClick={handleManageSubscriptions}>

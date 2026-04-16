@@ -41,7 +41,7 @@ public class StoreKitPlugin: CAPPlugin, CAPBridgedPlugin {
                         "type": product.type.rawValue
                     ]
                     if let subscription = product.subscription {
-                        dict["subscriptionPeriodUnit"] = subscription.subscriptionPeriod.unit.rawValue
+                        dict["subscriptionPeriodUnit"] = self.subscriptionPeriodUnitValue(subscription.subscriptionPeriod.unit)
                         dict["subscriptionPeriodValue"] = subscription.subscriptionPeriod.value
                     }
                     return dict
@@ -50,6 +50,21 @@ public class StoreKitPlugin: CAPPlugin, CAPBridgedPlugin {
             } catch {
                 call.reject("Failed to load products: \(error.localizedDescription)")
             }
+        }
+    }
+
+    private func subscriptionPeriodUnitValue(_ unit: Product.SubscriptionPeriod.Unit) -> Int {
+        switch unit {
+        case .day:
+            return 0
+        case .week:
+            return 1
+        case .month:
+            return 2
+        case .year:
+            return 3
+        @unknown default:
+            return -1
         }
     }
 

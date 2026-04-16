@@ -29,6 +29,7 @@ import { Input } from "@/components/ui/input";
 import { useNavigate } from "react-router-dom";
 import paywallPrimaryBackground from "@/assets/backgrounds/paywall-primary.webp";
 import { trackPaywallEvent } from "@/utils/paywallTelemetry";
+import { PREMIUM_BENEFITS, PREMIUM_BENEFITS_SUMMARY, PREMIUM_PLAN_NOTE } from "@/config/premiumBenefits";
 
 type PlanType = "monthly" | "yearly";
 export type PaywallVariant = "pre_trial_signup" | "trial_expired";
@@ -277,13 +278,13 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
   const copy = variant === "trial_expired"
     ? {
         title: "Your Free Trial Has Ended",
-        subtitle: "Subscribe to keep building momentum with your companion",
+        subtitle: `Subscribe to keep ${PREMIUM_BENEFITS_SUMMARY.toLowerCase()}`,
         cta: `Subscribe ${selectedPlan === "yearly" ? "Yearly" : "Monthly"}`,
         legalIntro: "Payment will be charged to your Apple ID account at confirmation of purchase.",
       }
     : {
         title: "Keep Your Journey Going",
-        subtitle: "Start your free trial to unlock premium guidance, quests, and companion growth",
+        subtitle: `Start your free trial to get ${PREMIUM_BENEFITS_SUMMARY.toLowerCase()}`,
         cta: "Start 7-Day Free Trial",
         legalIntro:
           "No charge today. Your Apple ID account will be charged when the free trial ends unless canceled at least 24 hours before the end of the trial.",
@@ -412,11 +413,14 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
         {/* Features */}
         <Card className="border-white/10 bg-background/50 backdrop-blur-md">
           <CardContent className="p-5 space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Every plan includes:
+            </p>
             {[
-              { icon: Sparkles, text: "All 15 evolution stages" },
-              { icon: MessageCircle, text: "Unlimited guide chat" },
-              { icon: Lock, text: "Unlimited Quests & Epics" },
-              { icon: Crown, text: "All premium features" },
+              { icon: MessageCircle, text: PREMIUM_BENEFITS[0] },
+              { icon: Sparkles, text: PREMIUM_BENEFITS[1] },
+              { icon: Lock, text: PREMIUM_BENEFITS[2] },
+              { icon: Crown, text: PREMIUM_BENEFITS[3] },
             ].map((feature, idx) => (
               <div key={idx} className="flex items-center gap-3 text-sm">
                 <feature.icon className="h-5 w-5 text-primary flex-shrink-0" />
@@ -485,6 +489,9 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
           </Button>
         </div>
 
+        <p className="text-xs text-center text-muted-foreground leading-relaxed">
+          {PREMIUM_PLAN_NOTE}
+        </p>
         <p className="text-xs text-center text-muted-foreground leading-relaxed">
           {copy.legalIntro}
         </p>

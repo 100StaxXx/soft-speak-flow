@@ -135,4 +135,27 @@ describe("Paywall creator offer-code eligibility", () => {
     expect(screen.queryByText("Redeem Discount with Apple")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Redeem Promo Code" })).not.toBeInTheDocument();
   });
+
+  it("describes the subscription benefits clearly across the paywall", () => {
+    render(
+      <MemoryRouter>
+        <Paywall />
+      </MemoryRouter>,
+    );
+
+    expect(
+      screen.getByText(
+        "Start your free trial to get unlimited guide chat, all 15 evolution stages, unlimited quests & epics, and offline access to downloaded content.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Every plan includes:")).toBeInTheDocument();
+    expect(screen.getByText("Unlimited guide chat")).toBeInTheDocument();
+    expect(screen.getByText("All 15 evolution stages")).toBeInTheDocument();
+    expect(screen.getByText("Unlimited Quests & Epics")).toBeInTheDocument();
+    expect(screen.getByText("Offline access to downloaded content")).toBeInTheDocument();
+    expect(
+      screen.getByText("Both monthly and yearly plans include the same Cosmiq Pro features and renew automatically until canceled."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("All premium features")).not.toBeInTheDocument();
+  });
 });
