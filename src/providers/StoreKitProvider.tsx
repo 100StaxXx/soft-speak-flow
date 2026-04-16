@@ -10,7 +10,7 @@ import {
 } from "react";
 import { Capacitor } from "@capacitor/core";
 import { App as CapacitorApp } from "@capacitor/app";
-import { isNativeIOSHandheld } from "@/utils/platformTargets";
+import { isNativeIOS } from "@/utils/platformTargets";
 import { StoreKit, type StoreKitProduct, type StoreKitTransaction } from "@/plugins/StoreKitPlugin";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -34,7 +34,7 @@ type StoreKitContextValue = {
   restorePurchases: () => Promise<StoreKitTransaction | null>;
   manageSubscriptions: () => Promise<void>;
   refreshEntitlement: () => Promise<void>;
-  refreshProducts: () => Promise<void>;
+  refreshProducts: () => Promise<StoreKitProduct[]>;
 };
 
 const StoreKitContext = createContext<StoreKitContextValue | undefined>(undefined);
@@ -55,16 +55,33 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
   const [entitlementLoading, setEntitlementLoading] = useState(false);
   const listenerStartedRef = useRef(false);
 
-  const isAvailable = Capacitor.isNativePlatform() && isNativeIOSHandheld();
+  const isAvailable = Capacitor.isNativePlatform() && isNativeIOS();
 
   const refreshProducts = useCallback(async () => {
-    if (!isAvailable) return;
+    if (!isAvailable) return [];
     setProductsLoading(true);
     try {
       const { products: loaded } = await StoreKit.getProducts({ productIds: PRODUCT_IDS });
+      console.info("[StoreKit] Loaded products", {
+        productIds: PRODUCT_IDS,
+        loadedCount: loaded.length,
+        platform: Capacitor.getPlatform(),
+      });
+      if (!loaded.length) {
+        console.warn("[StoreKit] Product fetch returned no products", {
+          productIds: PRODUCT_IDS,
+          platform: Capacitor.getPlatform(),
+        });
+      }
       setProducts(loaded);
+      return loaded;
     } catch (error) {
-      console.error("[StoreKit] Failed to load products:", error);
+      console.error("[StoreKit] Failed to load products", {
+        productIds: PRODUCT_IDS,
+        platform: Capacitor.getPlatform(),
+        error,
+      });
+      return [];
     } finally {
       setProductsLoading(false);
     }

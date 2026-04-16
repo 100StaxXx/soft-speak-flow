@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Capacitor } from "@capacitor/core";
-import { isNativeIOSHandheld } from "@/utils/platformTargets";
+import { isNativeIOS } from "@/utils/platformTargets";
 import { useToast } from "./use-toast";
 import { useAuth } from "./useAuth";
 import { useAppliedReferralCodeState } from "./useAppliedReferralCodeState";
@@ -8,7 +8,7 @@ import { useStoreKit } from "./useStoreKit";
 import { trackPaywallEvent } from "@/utils/paywallTelemetry";
 
 function isIAPAvailable(): boolean {
-  return Capacitor.isNativePlatform() && isNativeIOSHandheld();
+  return Capacitor.isNativePlatform() && isNativeIOS();
 }
 
 function isCancellationError(error: unknown): boolean {
@@ -55,12 +55,12 @@ export function useAppleSubscription() {
 
   const reloadProducts = useCallback(async () => {
     setProductError(null);
-    await refreshProducts();
-    if (!products.length && isAvailable) {
+    const loadedProducts = await refreshProducts();
+    if (!loadedProducts.length && isAvailable) {
       setProductError("No products are available. Please try again later.");
     }
-    return products;
-  }, [isAvailable, products, refreshProducts]);
+    return loadedProducts;
+  }, [isAvailable, refreshProducts]);
 
   const handlePurchase = useCallback(async (productId: string, surface: string = "paywall") => {
     if (!isIAPAvailable()) {
@@ -85,16 +85,6 @@ export function useAppleSubscription() {
       toast({
         title: "Connection required",
         description: "This action requires a live connection. Try again when online.",
-        variant: "destructive",
-      });
-      return false;
-    }
-
-    const selectedProduct = products.find((p) => p.identifier === productId);
-    if (!selectedProduct) {
-      toast({
-        title: "Unavailable",
-        description: "Selected premium plan is not ready yet. Please try again in a moment.",
         variant: "destructive",
       });
       return false;
@@ -193,7 +183,7 @@ export function useAppleSubscription() {
     } finally {
       setLoading(false);
     }
-  }, [hasOfferCode, offerCodePurchaseReady, products, purchase, redeemOfferCode, toast, user?.id]);
+  }, [hasOfferCode, offerCodePurchaseReady, purchase, redeemOfferCode, toast, user?.id]);
 
   const handleRestore = useCallback(async (surface: string = "paywall") => {
     if (!isIAPAvailable()) {

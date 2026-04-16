@@ -1,5 +1,5 @@
 import { Capacitor } from "@capacitor/core";
-import { isNativeIOSHandheld } from "@/utils/platformTargets";
+import { isNativeIOS } from "@/utils/platformTargets";
 import type { StoreKitProduct } from "@/plugins/StoreKitPlugin";
 
 export type IAPPlan = "monthly" | "yearly";
@@ -17,7 +17,7 @@ export const PREMIUM_YEARLY_PRODUCT_ID = "cosmiq_premium_yearly";
 export const PREMIUM_MONTHLY_PRODUCT_ID = "cosmiq_premium_monthly";
 
 export const isIAPAvailable = (): boolean => {
-  return Capacitor.isNativePlatform() && isNativeIOSHandheld();
+  return Capacitor.isNativePlatform() && isNativeIOS();
 };
 
 export const resolvePlanFromProductId = (productId: string | null | undefined): IAPPlan | null => {

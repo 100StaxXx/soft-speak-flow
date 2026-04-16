@@ -76,6 +76,17 @@ describe("platformTargets", () => {
     expect(isMacSession()).toBe(false);
   });
 
+  it("does not misclassify touch-capable native iPad sessions that report a Macintosh-style user agent", () => {
+    capacitorMocks.isNativePlatform.mockReturnValue(true);
+    capacitorMocks.getPlatform.mockReturnValue("ios");
+    setNavigatorValues("Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0)", 5);
+
+    expect(isNativeIOS()).toBe(true);
+    expect(isMacDesignedForIPadIOSApp()).toBe(false);
+    expect(isNativeIOSHandheld()).toBe(true);
+    expect(isMacSession()).toBe(false);
+  });
+
   it("detects Mac-hosted iOS app and excludes it from handheld target", () => {
     capacitorMocks.isNativePlatform.mockReturnValue(true);
     capacitorMocks.getPlatform.mockReturnValue("ios");

@@ -53,7 +53,6 @@ export const SubscriptionManagement = memo(function SubscriptionManagement() {
   } = useAppleSubscription();
 
   const [selectedPlan, setSelectedPlan] = useState<IAPPlan>("yearly");
-  const selectedProduct = getProductForPlan(selectedPlan, products);
   const selectedProductId = getPurchaseProductIdForPlan(selectedPlan, products);
 
   const subscriptionStatusText = subscription
@@ -166,7 +165,7 @@ export const SubscriptionManagement = memo(function SubscriptionManagement() {
 
           <Button
             onClick={() => { void handlePurchase(selectedProductId); }}
-            disabled={!isAvailable || purchasing || productsLoading || !selectedProduct}
+            disabled={!isAvailable || purchasing}
             className="w-full"
           >
             {purchasing ? (

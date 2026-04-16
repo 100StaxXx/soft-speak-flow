@@ -13,7 +13,7 @@ vi.mock("@capacitor/core", () => ({
 }));
 
 vi.mock("@/utils/platformTargets", () => ({
-  isNativeIOSHandheld: () => capacitorMocks.getPlatform() === "ios",
+  isNativeIOS: () => capacitorMocks.getPlatform() === "ios",
 }));
 
 import {

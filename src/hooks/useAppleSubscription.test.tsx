@@ -9,6 +9,10 @@ const mocks = vi.hoisted(() => ({
   restorePurchases: vi.fn(),
   manageSubscriptions: vi.fn(),
   refreshProducts: vi.fn(),
+  storeKitProducts: [
+    { identifier: "cosmiq_premium_monthly", displayName: "Monthly", description: "", price: 9.99, displayPrice: "$9.99" },
+    { identifier: "cosmiq_premium_yearly", displayName: "Yearly", description: "", price: 99.99, displayPrice: "$99.99" },
+  ],
   user: { id: "11111111-1111-4111-8111-111111111111" } as { id: string } | null,
   appliedReferralCodeState: {
     code: null,
@@ -42,10 +46,7 @@ vi.mock("@/hooks/useAppliedReferralCodeState", () => ({
 vi.mock("@/hooks/useStoreKit", () => ({
   useStoreKit: () => ({
     isAvailable: true,
-    products: [
-      { identifier: "cosmiq_premium_monthly", displayName: "Monthly", description: "", price: 9.99, displayPrice: "$9.99" },
-      { identifier: "cosmiq_premium_yearly", displayName: "Yearly", description: "", price: 99.99, displayPrice: "$99.99" },
-    ],
+    products: mocks.storeKitProducts,
     productsLoading: false,
     purchase: (...args: unknown[]) => mocks.purchase(...args),
     purchaseWithPromoOffer: vi.fn(),
@@ -64,7 +65,7 @@ vi.mock("@capacitor/core", () => ({
 }));
 
 vi.mock("@/utils/platformTargets", () => ({
-  isNativeIOSHandheld: () => true,
+  isNativeIOS: () => true,
 }));
 
 vi.mock("@/utils/paywallTelemetry", () => ({
@@ -76,6 +77,10 @@ import { useAppleSubscription } from "./useAppleSubscription";
 describe("useAppleSubscription", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.storeKitProducts = [
+      { identifier: "cosmiq_premium_monthly", displayName: "Monthly", description: "", price: 9.99, displayPrice: "$9.99" },
+      { identifier: "cosmiq_premium_yearly", displayName: "Yearly", description: "", price: 99.99, displayPrice: "$99.99" },
+    ];
     mocks.user = { id: "11111111-1111-4111-8111-111111111111" };
     mocks.appliedReferralCodeState = {
       code: null,
@@ -90,7 +95,7 @@ describe("useAppleSubscription", () => {
     mocks.purchase.mockResolvedValue({ productId: "cosmiq_premium_monthly", transactionId: "tx-1" });
     mocks.redeemOfferCode.mockResolvedValue({ status: "presented", entitlement: null });
     mocks.restorePurchases.mockResolvedValue({ productId: "cosmiq_premium_monthly", transactionId: "tx-r" });
-    mocks.refreshProducts.mockResolvedValue(undefined);
+    mocks.refreshProducts.mockResolvedValue(mocks.storeKitProducts);
   });
 
   it("calls purchase for monthly products", async () => {
@@ -165,6 +170,21 @@ describe("useAppleSubscription", () => {
 
     expect(mocks.purchase).toHaveBeenCalledWith("cosmiq_premium_yearly");
     expect(mocks.redeemOfferCode).not.toHaveBeenCalled();
+  });
+
+  it("still calls purchase when cached products are empty", async () => {
+    mocks.storeKitProducts = [];
+
+    const { result } = renderHook(() => useAppleSubscription());
+
+    await act(async () => {
+      await result.current.handlePurchase("cosmiq_premium_yearly");
+    });
+
+    expect(mocks.purchase).toHaveBeenCalledWith("cosmiq_premium_yearly");
+    expect(mocks.toast).not.toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Unavailable" }),
+    );
   });
 
   it("returns false and shows toast when user is not authenticated", async () => {
@@ -242,6 +262,29 @@ describe("useAppleSubscription", () => {
         variant: "destructive",
       }),
     );
+  });
+
+  it("uses freshly loaded products when reloading product availability", async () => {
+    mocks.storeKitProducts = [];
+    mocks.refreshProducts.mockResolvedValueOnce([]);
+
+    const { result } = renderHook(() => useAppleSubscription());
+
+    await act(async () => {
+      await result.current.reloadProducts();
+    });
+
+    expect(result.current.productError).toBe("No products are available. Please try again later.");
+
+    mocks.refreshProducts.mockResolvedValueOnce([
+      { identifier: "cosmiq_premium_yearly", displayName: "Yearly", description: "", price: 99.99, displayPrice: "$99.99" },
+    ]);
+
+    await act(async () => {
+      await result.current.reloadProducts();
+    });
+
+    expect(result.current.productError).toBeNull();
   });
 
   it("exposes hasOfferCode from the applied code eligibility state", () => {
