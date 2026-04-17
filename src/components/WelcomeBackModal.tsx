@@ -10,7 +10,6 @@ import { useLivingCompanionSafe } from "@/hooks/useLivingCompanion";
 import { useAchievements } from "@/hooks/useAchievements";
 import { CompanionImage, CompanionPortraitShell } from "@/components/CompanionImage";
 import { isCompanionPresetImageSource } from "@/lib/companionImageFocal";
-import { resolveCompanionVisualAssetUrl } from "@/lib/companionAssetResolver";
 
 interface WelcomeBackModalProps {
   isOpen: boolean;
@@ -25,18 +24,10 @@ export const WelcomeBackModal = ({ isOpen, onClose }: WelcomeBackModalProps) => 
   const { triggerComeback } = useLivingCompanionSafe();
   const [showReunion, setShowReunion] = useState(false);
   const [hasAwarded, setHasAwarded] = useState(false);
-  const resolvedHappyImageUrl =
-    resolveCompanionVisualAssetUrl(companion, "normal") ?? companion?.current_image_url ?? "";
-  const resolvedSadImageUrl =
-    resolveCompanionVisualAssetUrl(companion, "neglected")
-    ?? health.neglectedImageUrl
-    ?? resolvedHappyImageUrl;
-  const sadImageUrl = resolvedSadImageUrl;
+  const sadImageUrl = health.neglectedImageUrl || companion?.current_image_url || "";
   const usesSadPortraitShell = isCompanionPresetImageSource(sadImageUrl);
-  const happyImageUrl = resolvedHappyImageUrl;
+  const happyImageUrl = companion?.current_image_url || "";
   const usesHappyPortraitShell = isCompanionPresetImageSource(happyImageUrl);
-  const sadUsesStoredNeglectedFocal = sadImageUrl === (health.neglectedImageUrl ?? null);
-  const happyUsesStoredCurrentFocal = happyImageUrl === (companion?.current_image_url ?? null);
 
   // Calculate stats lost during absence
   const statsLost = Math.min(health.daysInactive * 5, 50); // -5 per day, max 50
@@ -136,16 +127,8 @@ export const WelcomeBackModal = ({ isOpen, onClose }: WelcomeBackModalProps) => 
                         alt="Your sad companion"
                         fit="portrait"
                         element={companion.core_element}
-                        focalX={
-                          sadUsesStoredNeglectedFocal
-                            ? health.neglectedImageFocalX ?? companion.current_image_focal_x ?? null
-                            : null
-                        }
-                        focalY={
-                          sadUsesStoredNeglectedFocal
-                            ? health.neglectedImageFocalY ?? companion.current_image_focal_y ?? null
-                            : null
-                        }
+                        focalX={health.neglectedImageFocalX ?? companion.current_image_focal_x ?? null}
+                        focalY={health.neglectedImageFocalY ?? companion.current_image_focal_y ?? null}
                         className="w-full h-full rounded-2xl"
                         style={{
                           filter: !health.neglectedImageUrl
@@ -158,16 +141,8 @@ export const WelcomeBackModal = ({ isOpen, onClose }: WelcomeBackModalProps) => 
                     <CompanionImage
                       src={sadImageUrl}
                       alt="Your sad companion"
-                      focalX={
-                        sadUsesStoredNeglectedFocal
-                          ? health.neglectedImageFocalX ?? companion.current_image_focal_x ?? null
-                          : null
-                      }
-                      focalY={
-                        sadUsesStoredNeglectedFocal
-                          ? health.neglectedImageFocalY ?? companion.current_image_focal_y ?? null
-                          : null
-                      }
+                      focalX={health.neglectedImageFocalX ?? companion.current_image_focal_x ?? null}
+                      focalY={health.neglectedImageFocalY ?? companion.current_image_focal_y ?? null}
                       className="w-48 h-48 rounded-2xl"
                       style={{
                         filter: !health.neglectedImageUrl
@@ -202,8 +177,8 @@ export const WelcomeBackModal = ({ isOpen, onClose }: WelcomeBackModalProps) => 
                         alt="Your happy companion"
                         fit="portrait"
                         element={companion.core_element}
-                        focalX={happyUsesStoredCurrentFocal ? companion.current_image_focal_x ?? null : null}
-                        focalY={happyUsesStoredCurrentFocal ? companion.current_image_focal_y ?? null : null}
+                        focalX={companion.current_image_focal_x ?? null}
+                        focalY={companion.current_image_focal_y ?? null}
                         className="w-full h-full rounded-2xl"
                       />
                     </CompanionPortraitShell>
@@ -211,8 +186,8 @@ export const WelcomeBackModal = ({ isOpen, onClose }: WelcomeBackModalProps) => 
                     <CompanionImage
                       src={happyImageUrl}
                       alt="Your happy companion"
-                      focalX={happyUsesStoredCurrentFocal ? companion.current_image_focal_x ?? null : null}
-                      focalY={happyUsesStoredCurrentFocal ? companion.current_image_focal_y ?? null : null}
+                      focalX={companion.current_image_focal_x ?? null}
+                      focalY={companion.current_image_focal_y ?? null}
                       className="w-48 h-48 rounded-2xl ring-4 ring-primary/50"
                     />
                   )}

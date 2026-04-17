@@ -274,6 +274,7 @@ const COMPANION_PRESETS_WITH_FULL_REMOTE_ASSET_COVERAGE: readonly CompanionPrese
   "lion",
   "phoenix",
   "pegasus",
+  "raven",
   "leviathan",
   "buttercat",
 ] as const;

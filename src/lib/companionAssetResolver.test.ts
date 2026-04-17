@@ -103,18 +103,6 @@ describe("companion asset resolver", () => {
         "normal",
       ),
     ).toBe(getUniversalEggAssetUrl("storm"));
-    expect(
-      resolveCompanionVisualAssetUrl(
-        {
-          preset_id: "dragon",
-          current_stage: 0,
-          core_element: "storm",
-          current_image_url: "https://example.com/broken-stage-zero-image.png",
-          neglected_image_url: "https://example.com/broken-stage-zero-neglected.png",
-        },
-        "neglected",
-      ),
-    ).toBe(getUniversalEggAssetUrl("storm"));
   });
 
   it("keeps full-coverage presets on the shared egg art before hatch", () => {

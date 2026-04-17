@@ -4,7 +4,6 @@ import { useCompanion } from './useCompanion';
 import { useAuth } from './useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { resolveCompanionName } from '@/lib/companionName';
-import { resolveCompanionVisualAssetUrl } from '@/lib/companionAssetResolver';
 import { useCompanionMotionSafe } from '@/contexts/CompanionMotionContext';
 
 const WAKE_UP_SEEN_KEY = 'companion_wake_up_seen';
@@ -159,25 +158,16 @@ export function useCompanionWakeUp(): WakeUpState {
     memoryTriggered.current = false;
   }, []);
 
-  const resolvedCompanionImageUrl =
-    resolveCompanionVisualAssetUrl(companion, 'normal') ?? companion?.current_image_url ?? '';
-  const resolvedDormantImageUrl =
-    resolveCompanionVisualAssetUrl(companion, 'dormant') ?? companion?.dormant_image_url ?? null;
-  const usesStoredCurrentFocal =
-    resolvedCompanionImageUrl === (companion?.current_image_url ?? null);
-  const usesStoredDormantFocal =
-    resolvedDormantImageUrl === (companion?.dormant_image_url ?? null);
-
   return {
     showCelebration,
     dismissCelebration,
     companionName,
-    companionImageUrl: resolvedCompanionImageUrl,
-    companionImageFocalX: usesStoredCurrentFocal ? companion?.current_image_focal_x ?? null : null,
-    companionImageFocalY: usesStoredCurrentFocal ? companion?.current_image_focal_y ?? null : null,
-    dormantImageUrl: resolvedDormantImageUrl,
-    dormantImageFocalX: usesStoredDormantFocal ? companion?.dormant_image_focal_x ?? null : null,
-    dormantImageFocalY: usesStoredDormantFocal ? companion?.dormant_image_focal_y ?? null : null,
+    companionImageUrl: companion?.current_image_url || '',
+    companionImageFocalX: companion?.current_image_focal_x ?? null,
+    companionImageFocalY: companion?.current_image_focal_y ?? null,
+    dormantImageUrl: companion?.dormant_image_url || null,
+    dormantImageFocalX: companion?.dormant_image_focal_x ?? null,
+    dormantImageFocalY: companion?.dormant_image_focal_y ?? null,
     bondLevel: care?.bond?.level || 1,
   };
 }
