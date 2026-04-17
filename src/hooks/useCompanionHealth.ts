@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { useCompanion } from "./useCompanion";
 import { useMemo } from "react";
+import { resolveCompanionVisualAssetUrl } from "@/lib/companionAssetResolver";
 
 export type CompanionMoodState = 'happy' | 'content' | 'neutral' | 'worried' | 'sad' | 'sick';
 
@@ -119,18 +120,65 @@ export const useCompanionHealth = () => {
     const isNeglected = inactiveDays >= 3;
     const isRecovering = recoveryProgress < 100;
     const isCritical = inactiveDays >= 5;
-    
-    // Determine which image to show based on mood
-    const shouldShowNeglectedImage = isNeglected && companionHealthData?.neglected_image_url;
-    const imageUrl = shouldShowNeglectedImage 
-      ? companionHealthData.neglected_image_url 
-      : (companionHealthData?.current_image_url || companion?.current_image_url || null);
+
+    const companionForResolution = companion
+      ? {
+        ...companion,
+        current_image_url: companionHealthData?.current_image_url ?? companion.current_image_url ?? null,
+        current_image_focal_x:
+          companionHealthData?.current_image_focal_x ?? companion.current_image_focal_x ?? null,
+        current_image_focal_y:
+          companionHealthData?.current_image_focal_y ?? companion.current_image_focal_y ?? null,
+        neglected_image_url:
+          companionHealthData?.neglected_image_url ?? companion.neglected_image_url ?? null,
+        neglected_image_focal_x:
+          companionHealthData?.neglected_image_focal_x ?? companion.neglected_image_focal_x ?? null,
+        neglected_image_focal_y:
+          companionHealthData?.neglected_image_focal_y ?? companion.neglected_image_focal_y ?? null,
+      }
+      : null;
+
+    const rawCurrentImageUrl = companionHealthData?.current_image_url ?? companion?.current_image_url ?? null;
+    const rawCurrentImageFocalX =
+      companionHealthData?.current_image_focal_x ?? companion?.current_image_focal_x ?? null;
+    const rawCurrentImageFocalY =
+      companionHealthData?.current_image_focal_y ?? companion?.current_image_focal_y ?? null;
+    const resolvedCurrentImageUrl =
+      resolveCompanionVisualAssetUrl(companionForResolution, "normal") ?? rawCurrentImageUrl;
+    const resolvedCurrentImageFocalX =
+      resolvedCurrentImageUrl && resolvedCurrentImageUrl !== rawCurrentImageUrl
+        ? null
+        : rawCurrentImageFocalX;
+    const resolvedCurrentImageFocalY =
+      resolvedCurrentImageUrl && resolvedCurrentImageUrl !== rawCurrentImageUrl
+        ? null
+        : rawCurrentImageFocalY;
+
+    const rawNeglectedImageUrl =
+      companionHealthData?.neglected_image_url ?? companion?.neglected_image_url ?? null;
+    const rawNeglectedImageFocalX =
+      companionHealthData?.neglected_image_focal_x ?? companion?.neglected_image_focal_x ?? null;
+    const rawNeglectedImageFocalY =
+      companionHealthData?.neglected_image_focal_y ?? companion?.neglected_image_focal_y ?? null;
+    const resolvedNeglectedImageUrl =
+      resolveCompanionVisualAssetUrl(companionForResolution, "neglected") ?? rawNeglectedImageUrl;
+    const resolvedNeglectedImageFocalX =
+      resolvedNeglectedImageUrl && resolvedNeglectedImageUrl !== rawNeglectedImageUrl
+        ? null
+        : rawNeglectedImageFocalX;
+    const resolvedNeglectedImageFocalY =
+      resolvedNeglectedImageUrl && resolvedNeglectedImageUrl !== rawNeglectedImageUrl
+        ? null
+        : rawNeglectedImageFocalY;
+
+    const shouldShowNeglectedImage = isNeglected && resolvedNeglectedImageUrl;
+    const imageUrl = shouldShowNeglectedImage ? resolvedNeglectedImageUrl : resolvedCurrentImageUrl;
     const imageFocalX = shouldShowNeglectedImage
-      ? companionHealthData?.neglected_image_focal_x ?? null
-      : companionHealthData?.current_image_focal_x ?? companion?.current_image_focal_x ?? null;
+      ? resolvedNeglectedImageFocalX
+      : resolvedCurrentImageFocalX;
     const imageFocalY = shouldShowNeglectedImage
-      ? companionHealthData?.neglected_image_focal_y ?? null
-      : companionHealthData?.current_image_focal_y ?? companion?.current_image_focal_y ?? null;
+      ? resolvedNeglectedImageFocalY
+      : resolvedCurrentImageFocalY;
 
     return {
       healthPercentage,
@@ -140,9 +188,9 @@ export const useCompanionHealth = () => {
       imageUrl,
       imageFocalX,
       imageFocalY,
-      neglectedImageUrl: companionHealthData?.neglected_image_url || null,
-      neglectedImageFocalX: companionHealthData?.neglected_image_focal_x ?? null,
-      neglectedImageFocalY: companionHealthData?.neglected_image_focal_y ?? null,
+      neglectedImageUrl: resolvedNeglectedImageUrl,
+      neglectedImageFocalX: resolvedNeglectedImageFocalX,
+      neglectedImageFocalY: resolvedNeglectedImageFocalY,
       body,
       mind,
       soul,

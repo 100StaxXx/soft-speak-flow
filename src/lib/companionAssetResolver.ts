@@ -101,7 +101,7 @@ export const resolveCompanionVisualAssetUrl = (
 
   // Level 0 always renders the shared elemental egg art. Persisted stage-0 URLs
   // can be stale or point at preset art that does not exist yet.
-  if (isStageZeroEgg && state === "normal") {
+  if (isStageZeroEgg) {
     return getUniversalEggAssetUrl(normalizedElement);
   }
 

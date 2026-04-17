@@ -50,10 +50,15 @@ const Campaigns = () => {
   const hasCampaigns = activeEpics.length > 0 || completedEpics.length > 0;
   const hasReachedLimit = hasReachedActiveCampaignLimit(activeEpics.length);
   const completionRate = useMemo(() => {
-    const total = activeEpics.length + completedEpics.length;
-    if (total === 0) return 0;
-    return Math.round((completedEpics.length / total) * 100);
-  }, [activeEpics.length, completedEpics.length]);
+    if (activeEpics.length === 0) return 0;
+
+    const totalProgress = activeEpics.reduce(
+      (sum, epic) => sum + (epic.progress_percentage ?? 0),
+      0,
+    );
+
+    return Math.round(totalProgress / activeEpics.length);
+  }, [activeEpics]);
 
   const handleCreateCampaign = useCallback(async (data: Parameters<typeof createEpic>[0]) => {
     try {

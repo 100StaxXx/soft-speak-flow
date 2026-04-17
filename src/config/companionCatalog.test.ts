@@ -74,7 +74,7 @@ describe("companion preset asset coverage", () => {
     ).toBe(false);
   });
 
-  it("preserves full remote coverage for existing remote presets", () => {
+  it("preserves full remote coverage for shipped legacy-compatible presets only", () => {
     expect(
       hasRemoteCompanionPresetAssetCoverage({
         presetId: "dragon",
@@ -88,7 +88,7 @@ describe("companion preset asset coverage", () => {
         stage: 0,
         state: "normal",
       }),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it("keeps canonical internal labels while exposing renamed product-facing labels", () => {
