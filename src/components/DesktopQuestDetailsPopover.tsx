@@ -21,6 +21,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { QuestLocationLink } from "@/components/QuestLocationLink";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import { cn, formatDisplayLabel, stripMarkdown } from "@/lib/utils";
 import type { TaskAttachment } from "@/types/questAttachments";
@@ -50,6 +51,7 @@ export interface DesktopQuestDetailsTask {
   image_url?: string | null;
   attachments?: TaskAttachment[] | null;
   subtasks?: DesktopQuestSubtask[];
+  location?: string | null;
 }
 
 interface DesktopQuestDetailsPopoverProps<T extends DesktopQuestDetailsTask> {
@@ -281,6 +283,15 @@ export function DesktopQuestDetailsPopover<T extends DesktopQuestDetailsTask>({
                 {stripMarkdown(task.notes)}
               </p>
             </div>
+          ) : null}
+
+          {task.location ? (
+            <QuestLocationLink
+              location={task.location}
+              label="Address"
+              className="bg-white/[0.04]"
+              textClassName="text-muted-foreground"
+            />
           ) : null}
 
           {subtasks.length > 0 ? (

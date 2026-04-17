@@ -21,6 +21,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { AdvancedQuestOptions } from "@/components/AdvancedQuestOptions";
+import { QuestLocationLink } from "@/components/QuestLocationLink";
 import { QuestAttachmentPicker } from "@/components/QuestAttachmentPicker";
 import { useSubtasks } from "@/features/tasks/hooks/useSubtasks";
 import {
@@ -500,6 +501,15 @@ export function EditQuestDialog({
                 data-vaul-no-drag
               />
             </div>
+
+            {location ? (
+              <QuestLocationLink
+                location={location}
+                label="Address"
+                className={cn(QUEST_FORM_STYLES.sectionCard, "text-white")}
+                textClassName="text-white"
+              />
+            ) : null}
 
             {/* Attachments Section */}
             <div className={cn(QUEST_FORM_STYLES.sectionCard, "space-y-3 px-4 py-4")}>

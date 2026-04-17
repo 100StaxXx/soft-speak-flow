@@ -152,6 +152,12 @@ function DurationHarness() {
 }
 
 describe("AdvancedQuestOptions recurrence", () => {
+  it("uses address-focused copy for the location input", () => {
+    render(<RecurrenceHarness selectedDate={new Date(2026, 0, 12)} />);
+
+    expect(screen.getByPlaceholderText("Address or place name (optional)")).toBeInTheDocument();
+  });
+
   it("renders expanded recurrence options", () => {
     render(<RecurrenceHarness selectedDate={new Date(2026, 0, 12)} />);
 

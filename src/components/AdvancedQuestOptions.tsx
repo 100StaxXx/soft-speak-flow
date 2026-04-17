@@ -679,7 +679,7 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
           <Input
             value={props.location || ''}
             onChange={(e) => props.onLocationChange(e.target.value || null)}
-            placeholder="Where will this happen? (optional)"
+            placeholder="Address or place name (optional)"
             className={cn(isQuestSoft ? inputClassName : "bg-muted/30 border-border/50")}
           />
         </div>
