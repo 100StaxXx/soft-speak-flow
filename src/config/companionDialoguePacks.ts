@@ -321,7 +321,7 @@ const WITTY_RAW: RawTonePack = {
     ["Reality check", "Chaos report", "Hot take", "Tiny intervention", "Field note", "Plot twist"],
     [
       "one finished task would instantly improve this timeline and your reputation inside it",
-      "we should steal a quick win before your brain turns this into an improv workshop",
+      "we should steal a quick win before your brain turns this into a low-budget improv workshop",
       "a five-minute move beats another grand speech from the Department of Excuses",
       "one clean action would shut down half this amateur nonsense immediately",
       "we can grab momentum before the day gets weird again because of you",
@@ -342,7 +342,7 @@ const WITTY_RAW: RawTonePack = {
       "we are one sharp move away from a very funny glow-up",
       "this is the kind of moment that compounds fast if you stop fumbling it",
       "one focused action now could shove the whole story forward",
-      "the next move has dangerous levels of momentum in it, assuming you stop dating distraction",
+      "the next move has dangerous levels of momentum in it, assuming you break up with distraction",
       "our trajectory is basically daring us to go bigger and less embarrassing",
     ],
     [" today.", " right now.", " before the window gets cocky and leaves."],
@@ -353,14 +353,14 @@ const WITTY_RAW: RawTonePack = {
     [
       "let's pick the one move that is actually worth the oxygen",
       "we should choose the highest-impact step and stop fake-browsing our options like underqualified royalty",
-      "a sixty-second review would rescue this plan from the decorative chaos you put on it",
-      "I can cut the noise and point at the move that matters before you adopt three worse ideas",
+      "a sixty-second review would rescue this plan from the decorative chaos you draped over it",
+      "I can cut the noise and point at the move that matters before you wander off and adopt three worse ideas",
     ],
     [" right now.", " in one minute.", " before your attention starts parkouring."],
     COMPANION_DIALOGUE_BUCKET_COUNTS.clarity_moments,
   ),
   mystery_moments: [
-    "I found a weird little opening in the timeline. Want it?",
+    "I found a weird little opening in the timeline. Try not to waste it.",
     "Suspicious amount of opportunity just appeared. Try not to scare it away.",
     "I have a ridiculous idea, and annoyingly, it might work.",
     "Something rare just wandered into our mess.",
@@ -377,7 +377,7 @@ const WITTY_RAW: RawTonePack = {
     ["Reality check", "No-shame protocol", "Comeback memo", "Reset strategy", "Recovery directive"],
     [
       "one tiny action can still save this day",
-      "we can stop the slide with an easy task before this gets more pathetic",
+      "we can stop the slide with an easy task before this turns into a full collapse montage",
       "starting small is still the sharpest move on the board, even if your ego hates it",
       "one clean win gets us back in the driver's seat instead of whatever that last hour was",
       "we should reboot momentum before the nonsense calcifies into a lifestyle",
@@ -399,7 +399,7 @@ const WITTY_RAW: RawTonePack = {
   ],
   recovery_moments: [
     "Look who re-entered the timeline. Strong choice.",
-    "You came back. Late, theatrical, but effective.",
+    "You came back. Late, dramatic, a little disrespectful to the calendar, but effective.",
     "That comeback had real weight to it.",
     "Your return just changed the whole trajectory.",
     "Consistency is sneaking back in, and I love that for us.",
@@ -412,7 +412,7 @@ const WITTY_RAW: RawTonePack = {
     "Welcome back. Let's make it hard to doubt again.",
   ],
   critical_gentle_moments: [
-    "Okay. Chaos sidekick to human. We go tiny from here.",
+    "Okay. Voice-in-your-ear time. We go tiny from here.",
     "No speeches. One doable move. That's the whole trick, you magnificent train wreck.",
     "No shame required. Just one honest step and less theatrical collapse.",
     "We can still turn today without pretending to be superheroes.",

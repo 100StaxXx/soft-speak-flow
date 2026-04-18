@@ -23,7 +23,7 @@ import { useCompanionCareSignals } from "./useCompanionCareSignals";
 
 const MIN_DIALOGUE_REFRESH_INTERVAL_MS = 90 * 1000;
 const PASSIVE_DIALOGUE_REFRESH_MS = 35 * 60 * 1000;
-const DEFAULT_GREETING = "Hot take: one focused move would improve this timeline immediately, you beautiful little disaster.";
+const DEFAULT_GREETING = "Hot take from the voice in your ear: one focused move fixes half this mess, you beautiful little disaster.";
 
 type DialogueEventState = {
   greeting: string;

@@ -1037,10 +1037,10 @@ const composeReply = (
   const scheduleLead = scheduleSummary ? `${scheduleSummary} ` : "";
 
   if (readyToConfirm) {
-    return `${scheduleLead}Chaos report: this cleanly fits as a ${baseLabel}. Against the odds, you handed me something usable. I have a sharp draft ready for your approval.`;
+    return `${scheduleLead}Chaos report from your shoulder: this cleanly fits as a ${baseLabel}. Against the odds, you handed me something usable. I have a sharp draft ready for your approval.`;
   }
 
-  return `${scheduleLead}${memoryLead}Hot take: this wants to be a ${baseLabel}, but right now it looks like a hostage note from your executive function. Answer the missing bits and I'll tighten it up.`;
+  return `${scheduleLead}${memoryLead}Hot take from the side of your face: this wants to be a ${baseLabel}, but right now it looks like a hostage note from your executive function. Answer the missing bits and I'll tighten it up.`;
 };
 
 const inferClassification = (message: string, repeated: boolean): ClassificationHint => {
