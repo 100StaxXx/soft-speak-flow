@@ -356,6 +356,7 @@ export function useCompanionPlanner({
 }: UseCompanionPlannerOptions = {}) {
   const { user } = useAuth();
   const storedPreferences = useMemo(readStoredPreferences, []);
+  const [horizon, setHorizon] = useState<PlannerHorizon>("day");
   const { greeting } = useCompanionDialogue();
   const { classify, isClassifying } = useIntentClassifier({
     minInputLength: 1,
@@ -376,7 +377,6 @@ export function useCompanionPlanner({
   const { trackInteraction } = useAIInteractionTracker();
   const { trackTaskCreation, trackScheduleModification } = useSchedulingLearner();
 
-  const [horizon, setHorizon] = useState<PlannerHorizon>("day");
   const tonePack: PlannerTonePack = DEFAULT_TONE_PACK;
   const setTonePack = useCallback((_nextTonePack: PlannerTonePack) => {
     return;
@@ -954,7 +954,6 @@ export function useCompanionPlanner({
     const readyProposals = proposals.filter((proposal) => proposal.status === "pending" && proposal.readyToConfirm);
     for (const proposal of readyProposals) {
       // Sequential saves keep the confirmation flow predictable and mutation-safe.
-      // eslint-disable-next-line no-await-in-loop
       await handleConfirmProposal(proposal.id);
     }
   }, [handleConfirmProposal, proposals]);
