@@ -3,16 +3,18 @@ import { toast } from "@/components/ui/sonner";
 import { useAIInteractionTracker } from "@/hooks/useAIInteractionTracker";
 import { useAuth } from "@/hooks/useAuth";
 import { useCompanion } from "@/hooks/useCompanion";
+import { useVoiceInput } from "@/hooks/useVoiceInput";
 import { supabase } from "@/integrations/supabase/client";
 import type {
   CompanionChatInputMode,
   CompanionChatRequest,
   CompanionChatResponse,
 } from "@/types/companionConversation";
+import { resolveCompanionChatError } from "@/utils/companionChatErrors";
 
 const MAX_HISTORY_MESSAGES = 8;
 
-export const JOURNEYS_COMPANION_OPENER = "What's gucci fam?";
+export const JOURNEYS_COMPANION_OPENER = "What would help most with your quests right now?";
 
 type JourneysCompanionMessage = {
   id: string;
@@ -55,6 +57,9 @@ export function useJourneysCompanionConversation() {
 
   const [messages, setMessages] = useState<JourneysCompanionMessage[]>(() => createInitialMessages());
   const [draftInput, setDraftInput] = useState("");
+  const [interimText, setInterimText] = useState("");
+  const [showPermissionDialog, setShowPermissionDialog] = useState(false);
+  const [isRequestingPermission, setIsRequestingPermission] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pendingPlannerHandoffMessage, setPendingPlannerHandoffMessage] = useState<string | null>(null);
 
@@ -62,6 +67,9 @@ export function useJourneysCompanionConversation() {
     sessionIdRef.current = generateId();
     setMessages(createInitialMessages());
     setDraftInput("");
+    setInterimText("");
+    setShowPermissionDialog(false);
+    setIsRequestingPermission(false);
     setIsSubmitting(false);
     setPendingPlannerHandoffMessage(null);
   }, [companion?.id]);
@@ -96,6 +104,7 @@ export function useJourneysCompanionConversation() {
 
     setIsSubmitting(true);
     setDraftInput("");
+    setInterimText("");
     setPendingPlannerHandoffMessage(null);
 
     const optimisticUserMessage = createMessage("user", message, { inputMode });
@@ -142,7 +151,7 @@ export function useJourneysCompanionConversation() {
       });
     } catch (error) {
       console.error("Failed to submit journeys companion message:", error);
-      toast.error("Your companion lost the thread for a moment. Try again.");
+      toast.error(await resolveCompanionChatError(error));
       setMessages((previous) => [
         ...previous,
         createMessage(
@@ -155,14 +164,54 @@ export function useJourneysCompanionConversation() {
     }
   }, [companion?.id, conversationHistory, isSubmitting, trackInteraction, user?.id]);
 
+  const { isRecording, isAutoStopping, isSupported, permissionStatus, toggleRecording, requestPermission } = useVoiceInput({
+    onInterimResult: (text) => {
+      setInterimText(text);
+    },
+    onFinalResult: (text) => {
+      const nextMessage = text.trim();
+      if (!nextMessage) return;
+      void submitMessage(nextMessage, "voice");
+    },
+    onError: (message) => {
+      toast.error(message);
+    },
+    onPermissionNeeded: () => {
+      setShowPermissionDialog(true);
+    },
+  });
+
+  const requestMicrophonePermission = useCallback(async () => {
+    setIsRequestingPermission(true);
+    try {
+      const status = await requestPermission();
+      if (status === "granted") {
+        setShowPermissionDialog(false);
+        toggleRecording();
+      }
+    } finally {
+      setIsRequestingPermission(false);
+    }
+  }, [requestPermission, toggleRecording]);
+
   return {
     messages,
     draftInput,
     setDraftInput,
+    interimText,
     isSubmitting,
     pendingPlannerHandoffMessage,
     clearPlannerHandoff,
+    isRecording,
+    isAutoStopping,
+    isVoiceSupported: isSupported,
+    permissionStatus,
+    showPermissionDialog,
+    setShowPermissionDialog,
+    isRequestingPermission,
     submitTypedMessage: () => submitMessage(draftInput, "text"),
     submitMessage,
+    toggleRecording,
+    requestMicrophonePermission,
   };
 }

@@ -19,6 +19,7 @@ import type {
   CompanionChatRequest,
   CompanionChatResponse,
 } from "@/types/companionConversation";
+import { resolveCompanionChatError } from "@/utils/companionChatErrors";
 import { safeLocalStorage } from "@/utils/storage";
 
 const STORAGE_KEY = "companion-chat-voice-settings-v1";
@@ -307,7 +308,7 @@ export function useCompanionChat({ enabled = true }: UseCompanionChatOptions = {
       void speakReplyIfNeeded(response);
     } catch (error) {
       console.error("Failed to submit companion chat message:", error);
-      toast.error("The companion lost the thread for a moment. Try again.");
+      toast.error(await resolveCompanionChatError(error));
       setMessages((previous) => [
         ...previous,
         createMessage(

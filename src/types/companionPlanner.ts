@@ -9,6 +9,7 @@ export type CompanionPlannerProposalKind =
   | "update_quest"
   | "create_campaign"
   | "update_campaign"
+  | "adjust_campaign_plan"
   | "create_ritual"
   | "update_ritual"
   | "suggest_reminder";
@@ -113,6 +114,16 @@ export interface PlannerContextRitual {
   preferredTime: string | null;
 }
 
+export interface PlannerContextCalendarEvent {
+  id: string;
+  title: string;
+  start: string;
+  end: string;
+  isAllDay: boolean;
+  provider: string;
+  readOnly: boolean;
+}
+
 export interface PlannerScheduleConflict {
   date: string;
   taskAId: string;
@@ -210,6 +221,7 @@ export interface CompanionPlannerRequest {
     inboxTasks: PlannerContextTask[];
     activeEpics: PlannerContextEpic[];
     rituals: PlannerContextRitual[];
+    calendarEvents: PlannerContextCalendarEvent[];
     scheduleInsights?: PlannerScheduleInsights;
     plannerMemory?: PlannerMemoryProfile;
     aiSignals?: {

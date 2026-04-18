@@ -8,12 +8,18 @@ import {
   type KeyboardEvent,
 } from "react";
 import {
+  Mic,
+  MicOff,
   Check,
   Loader2,
   Send,
   X,
 } from "lucide-react";
+
+import { AudioReactiveWaveform } from "@/components/AudioReactiveWaveform";
 import { CompanionImage, CompanionPortraitShell } from "@/components/CompanionImage";
+import { PermissionRequestDialog } from "@/components/PermissionRequestDialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -31,9 +37,8 @@ import {
 } from "@/components/ui/drawer";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useJourneysCompanionConversation } from "@/hooks/useJourneysCompanionConversation";
+import { useCompanionAssistant } from "@/hooks/useCompanionAssistant";
 import { useJourneysCompanionVisual } from "@/hooks/useJourneysCompanionVisual";
-import { useCompanionPlanner } from "@/hooks/useCompanionPlanner";
 import { cn } from "@/lib/utils";
 import type {
   CompanionPlannerProposal,
@@ -48,13 +53,10 @@ interface JourneysCompanionPlannerModalProps {
   presentation: JourneysCompanionPlannerModalPresentation;
 }
 
-type OverlayMode = "chat" | "plan";
-
 type DialogueEntry = {
   id: string;
   role: "assistant" | "user";
   content: string;
-  source: "chat" | "plan" | "question";
 };
 
 type PlannerQuestionHistoryEntry = {
@@ -63,6 +65,30 @@ type PlannerQuestionHistoryEntry = {
   options: string[];
 };
 
+type StarterQuickReply = {
+  label: string;
+  message: string;
+};
+
+const STARTER_QUICK_REPLIES: StarterQuickReply[] = [
+  {
+    label: "Plan today",
+    message: "Help me plan today's quests.",
+  },
+  {
+    label: "Break one down",
+    message: "Help me break one quest into smaller steps.",
+  },
+  {
+    label: "Rework my schedule",
+    message: "Help me reorganize what's on my plate today.",
+  },
+  {
+    label: "Pep talk",
+    message: "I need a quick pep talk before I start.",
+  },
+];
+
 const questionEntryId = (question: CompanionPlannerQuestion) => `planner-question-${question.id}`;
 
 const proposalKindLabel = (proposal: CompanionPlannerProposal) => ({
@@ -70,6 +96,7 @@ const proposalKindLabel = (proposal: CompanionPlannerProposal) => ({
   update_quest: "Quest edit",
   create_campaign: "Campaign",
   update_campaign: "Campaign edit",
+  adjust_campaign_plan: "Campaign adjust",
   create_ritual: "Ritual",
   update_ritual: "Ritual edit",
   suggest_reminder: "Reminder",
@@ -89,12 +116,12 @@ const JourneysCompanionOverlayBody = memo(() => {
     element,
     usesPortraitShell,
   } = useJourneysCompanionVisual();
-  const conversation = useJourneysCompanionConversation();
-  const planner = useCompanionPlanner({ bootstrapGreeting: false });
+  const assistant = useCompanionAssistant({
+    surface: "journeys",
+    conversationEnabled: true,
+  });
   const prefersReducedMotion = getReducedMotionPreference();
 
-  const [mode, setMode] = useState<OverlayMode>("chat");
-  const [plannerHandoffMessage, setPlannerHandoffMessage] = useState<string | null>(null);
   const [plannerQuestionHistory, setPlannerQuestionHistory] = useState<PlannerQuestionHistoryEntry[]>([]);
   const [typingMessageId, setTypingMessageId] = useState<string | null>(null);
   const [typedAssistantContent, setTypedAssistantContent] = useState("");
@@ -105,25 +132,11 @@ const JourneysCompanionOverlayBody = memo(() => {
   const transcriptEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (!conversation.pendingPlannerHandoffMessage) return;
-
-    const message = conversation.pendingPlannerHandoffMessage;
-    setMode("plan");
-    setPlannerHandoffMessage(message);
-    conversation.clearPlannerHandoff();
-    void planner.submitMessage(message, "text");
-  }, [
-    conversation.clearPlannerHandoff,
-    conversation.pendingPlannerHandoffMessage,
-    planner.submitMessage,
-  ]);
-
-  useEffect(() => {
-    if (planner.questions.length === 0) return;
+    if (assistant.questions.length === 0) return;
 
     setPlannerQuestionHistory((previous) => {
       const knownIds = new Set(previous.map((entry) => entry.id));
-      const nextEntries = planner.questions
+      const nextEntries = assistant.questions
         .filter((question) => !knownIds.has(questionEntryId(question)))
         .map((question) => ({
           id: questionEntryId(question),
@@ -133,46 +146,20 @@ const JourneysCompanionOverlayBody = memo(() => {
 
       return nextEntries.length > 0 ? [...previous, ...nextEntries] : previous;
     });
-  }, [planner.questions]);
-
-  const filteredPlannerMessages = useMemo(() => {
-    let skippedHandoffEcho = false;
-
-    return planner.messages.filter((message) => {
-      if (
-        plannerHandoffMessage
-        && !skippedHandoffEcho
-        && message.role === "user"
-        && message.content === plannerHandoffMessage
-      ) {
-        skippedHandoffEcho = true;
-        return false;
-      }
-
-      return true;
-    });
-  }, [planner.messages, plannerHandoffMessage]);
+  }, [assistant.questions]);
 
   const dialogueEntries = useMemo<DialogueEntry[]>(() => [
-    ...conversation.messages.map((message) => ({
+    ...assistant.messages.map((message) => ({
       id: message.id,
       role: message.role,
       content: message.content,
-      source: "chat" as const,
-    })),
-    ...filteredPlannerMessages.map((message) => ({
-      id: message.id,
-      role: message.role === "companion" ? "assistant" as const : "user" as const,
-      content: message.content,
-      source: "plan" as const,
     })),
     ...plannerQuestionHistory.map((question) => ({
       id: question.id,
       role: "assistant" as const,
       content: question.prompt,
-      source: "question" as const,
     })),
-  ], [conversation.messages, filteredPlannerMessages, plannerQuestionHistory]);
+  ], [assistant.messages, plannerQuestionHistory]);
 
   const latestAssistantEntry = useMemo(
     () => [...dialogueEntries].reverse().find((entry) => entry.role === "assistant") ?? null,
@@ -265,19 +252,8 @@ const JourneysCompanionOverlayBody = memo(() => {
       return;
     }
 
-    if (mode === "plan") {
-      planner.submitTypedMessage();
-      return;
-    }
-
-    conversation.submitTypedMessage();
-  }, [
-    completeCurrentAssistantLine,
-    conversation,
-    mode,
-    planner,
-    typingMessageId,
-  ]);
+    assistant.submitTypedMessage();
+  }, [assistant, completeCurrentAssistantLine, typingMessageId]);
 
   const handleComposerKeyDown = useCallback((event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key !== "Enter" || event.shiftKey) return;
@@ -291,21 +267,33 @@ const JourneysCompanionOverlayBody = memo(() => {
       return;
     }
 
-    void planner.submitMessage(option, "text");
-  }, [completeCurrentAssistantLine, planner, typingMessageId]);
+    void assistant.submitMessage(option, "text");
+  }, [assistant, completeCurrentAssistantLine, typingMessageId]);
 
-  const composerValue = mode === "plan" ? planner.draftInput : conversation.draftInput;
-  const isSending = mode === "plan"
-    ? planner.isSubmitting || planner.isClassifying
-    : conversation.isSubmitting;
-  const sendDisabled = isSending || (!typingMessageId && !composerValue.trim());
+  const handleStarterQuickReply = useCallback((starter: StarterQuickReply) => {
+    if (typingMessageId) {
+      completeCurrentAssistantLine();
+    }
 
-  const activeProposal = mode === "plan"
-    ? planner.pendingProposals[0] ?? null
-    : null;
-  const activeOptionQuestions = mode === "plan"
-    ? planner.questions.filter((question) => (question.options?.length ?? 0) > 0)
-    : [];
+    void assistant.submitMessage(starter.message, "text");
+  }, [assistant, completeCurrentAssistantLine, typingMessageId]);
+
+  const handleVoiceToggle = useCallback(() => {
+    if (typingMessageId) {
+      completeCurrentAssistantLine();
+    }
+
+    assistant.toggleRecording();
+  }, [assistant, completeCurrentAssistantLine, typingMessageId]);
+
+  const sendDisabled = assistant.isSubmitting || assistant.isClassifying || (!typingMessageId && !assistant.draftInput.trim());
+  const activeProposal = assistant.pendingProposals[0] ?? null;
+  const activeOptionQuestions = assistant.questions.filter((question) => (question.options?.length ?? 0) > 0);
+  const showStarterQuickReplies = assistant.messages.length === 1
+    && assistant.messages[0]?.role === "assistant"
+    && plannerQuestionHistory.length === 0
+    && assistant.pendingProposals.length === 0;
+  const micButtonLabel = assistant.isRecording ? "Stop voice reply" : "Start voice reply";
 
   const portrait = usesPortraitShell ? (
     <CompanionPortraitShell
@@ -360,6 +348,16 @@ const JourneysCompanionOverlayBody = memo(() => {
               {companionLabel}
             </p>
           </div>
+          {assistant.scheduleInsights ? (
+            <div className="w-full rounded-[14px] border border-[#e8d9aa]/25 bg-[rgba(255,255,255,0.08)] px-2 py-2 text-[#f5e6b9]">
+              <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-[#f5e6b9]/75">
+                Schedule
+              </p>
+              <p className="mt-1 text-[11px] leading-4 text-[#f8eed4]">
+                {assistant.scheduleInsights.summary}
+              </p>
+            </div>
+          ) : null}
         </aside>
 
         <div className="flex min-h-0 flex-col">
@@ -414,12 +412,33 @@ const JourneysCompanionOverlayBody = memo(() => {
             </ScrollArea>
           </div>
 
-          {activeOptionQuestions.length > 0 ? (
+          {showStarterQuickReplies || activeOptionQuestions.length > 0 ? (
             <div
               className="mt-3 rounded-[18px] border border-[#8d7b57]/60 bg-[linear-gradient(180deg,rgba(247,235,201,0.92),rgba(233,219,182,0.9))] px-3 py-3 text-[#2f2415]"
-              data-testid="journeys-companion-planner-inline-options"
+              data-testid={showStarterQuickReplies ? "journeys-companion-planner-starter-options" : "journeys-companion-planner-inline-options"}
             >
               <div className="space-y-3">
+                {showStarterQuickReplies ? (
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#6f5738]">
+                      Quick start
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {STARTER_QUICK_REPLIES.map((starter) => (
+                        <Button
+                          key={starter.label}
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="border-[#a58d64] bg-[#f5e6c0] text-[#2f2415] hover:bg-[#f0ddb0]"
+                          onClick={() => handleStarterQuickReply(starter)}
+                        >
+                          {starter.label}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
                 {activeOptionQuestions.map((question) => (
                   <div key={question.id}>
                     <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#6f5738]">
@@ -450,16 +469,28 @@ const JourneysCompanionOverlayBody = memo(() => {
               className="mt-3 rounded-[18px] border border-[#8d7b57]/60 bg-[linear-gradient(180deg,rgba(247,235,201,0.92),rgba(233,219,182,0.9))] px-3 py-3 text-[#2f2415]"
               data-testid="journeys-companion-planner-inline-proposal"
             >
-              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#6f5738]">
-                {proposalKindLabel(activeProposal)}
-              </p>
-              <p className="mt-1 text-sm font-semibold">{activeProposal.title}</p>
-              <p className="mt-1 text-sm text-[#5d4a31]">{activeProposal.summary}</p>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#6f5738]">
+                    {proposalKindLabel(activeProposal)}
+                  </p>
+                  <p className="mt-1 text-sm font-semibold">{activeProposal.title}</p>
+                  <p className="mt-1 text-sm text-[#5d4a31]">{activeProposal.summary}</p>
+                  {!activeProposal.readyToConfirm && activeProposal.missingFields?.length ? (
+                    <p className="mt-1 text-xs text-[#805b3a]">
+                      Still waiting on: {activeProposal.missingFields.join(", ")}.
+                    </p>
+                  ) : null}
+                </div>
+                <Badge variant="outline" className="border-[#bfa16b] bg-[#f5e6c0] text-[#5d4a31]">
+                  {activeProposal.status}
+                </Badge>
+              </div>
               <div className="mt-3 flex flex-wrap gap-2">
                 <Button
                   type="button"
                   size="sm"
-                  onClick={() => planner.confirmProposal(activeProposal.id)}
+                  onClick={() => assistant.confirmProposal(activeProposal.id)}
                   disabled={!activeProposal.readyToConfirm}
                 >
                   <Check className="mr-2 h-4 w-4" />
@@ -469,32 +500,67 @@ const JourneysCompanionOverlayBody = memo(() => {
                   type="button"
                   size="sm"
                   variant="outline"
-                  onClick={() => planner.rejectProposal(activeProposal.id)}
+                  onClick={() => assistant.rejectProposal(activeProposal.id)}
                 >
                   <X className="mr-2 h-4 w-4" />
                   Reject
                 </Button>
+                {assistant.readyProposalCount > 1 ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={assistant.confirmAll}
+                  >
+                    Confirm all
+                  </Button>
+                ) : null}
               </div>
             </div>
           ) : null}
 
+          {assistant.isRecording || assistant.interimText ? (
+            <div
+              className="mt-3 rounded-[18px] border border-[#8d7b57]/60 bg-[linear-gradient(180deg,rgba(247,235,201,0.92),rgba(233,219,182,0.9))] px-3 py-3 text-[#2f2415]"
+              data-testid="journeys-companion-planner-voice-preview"
+            >
+              <AudioReactiveWaveform
+                isActive={assistant.isRecording && !assistant.isAutoStopping}
+                className="justify-start text-[#6f5738]"
+              />
+              <p className="mt-2 text-sm text-[#5d4a31]">
+                {assistant.interimText || "Listening for your reply..."}
+              </p>
+            </div>
+          ) : null}
+
           <div className="mt-3 flex items-center gap-2 rounded-[18px] border border-white/10 bg-black/20 p-2.5">
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              className={cn(
+                "h-11 w-11 shrink-0 rounded-[14px] border border-white/10 bg-white/5 text-white hover:bg-white/10",
+                assistant.isRecording && "border-rose-300/35 bg-rose-400/15 text-rose-50",
+              )}
+              onClick={handleVoiceToggle}
+              disabled={!assistant.isVoiceSupported && !assistant.isRecording}
+              aria-label={micButtonLabel}
+              data-testid="journeys-companion-planner-mic-button"
+            >
+              {assistant.isRecording ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+            </Button>
             <label htmlFor="journeys-companion-chat-input" className="sr-only">
-              {mode === "plan" ? "Tell your companion what to plan" : "Chat with your companion"}
+              Message your companion
             </label>
             <Input
               id="journeys-companion-chat-input"
-              value={composerValue}
+              value={assistant.draftInput}
               onChange={(event) => {
-                if (mode === "plan") {
-                  planner.setDraftInput(event.target.value);
-                  return;
-                }
-
-                conversation.setDraftInput(event.target.value);
+                assistant.setDraftInput(event.target.value);
               }}
               onKeyDown={handleComposerKeyDown}
-              placeholder={mode === "plan" ? "Answer or refine the plan..." : "Type your reply..."}
+              placeholder={assistant.placeholder}
               className="h-11 border-white/10 bg-white/5 text-white placeholder:text-white/38"
               data-testid="journeys-companion-planner-text-input"
             />
@@ -504,7 +570,7 @@ const JourneysCompanionOverlayBody = memo(() => {
               disabled={sendDisabled}
               data-testid="journeys-companion-planner-send-button"
             >
-              {isSending ? (
+              {assistant.isSubmitting || assistant.isClassifying ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Thinking
@@ -519,6 +585,14 @@ const JourneysCompanionOverlayBody = memo(() => {
           </div>
         </div>
       </div>
+
+      <PermissionRequestDialog
+        isOpen={assistant.showPermissionDialog}
+        onClose={() => assistant.setShowPermissionDialog(false)}
+        onRequestPermission={assistant.requestMicrophonePermission}
+        permissionStatus={assistant.permissionStatus}
+        isRequesting={assistant.isRequestingPermission}
+      />
     </div>
   );
 });

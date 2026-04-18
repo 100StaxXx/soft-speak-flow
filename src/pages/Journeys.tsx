@@ -66,9 +66,11 @@ import { isMacDesignedForIPadIOSApp, isMacSession } from "@/utils/platformTarget
 import { QuestInboxSection } from "@/components/QuestInboxSection";
 import { QUEST_ACTION_TOAST_DURATION_MS } from "@/constants/questToast";
 import { trackResilienceEvent } from "@/utils/resilienceTelemetry";
+import { safeLocalStorage } from "@/utils/storage";
 
 const TIME_24H_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const DATE_INPUT_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+const JOURNEYS_COMPANION_PINNED_KEY = "journeys-companion-planner-pinned-v1";
 const isQueuedTaskMutationResult = (
   value: unknown,
 ): value is { queued: true } => (
@@ -85,6 +87,7 @@ interface CreatedCampaignData {
 
 type DesktopPlannerMode = "week" | "day";
 const MAC_TIMED_TASK_DURATION_FALLBACK_MINUTES = 30;
+const readPinnedCompanionPlannerPreference = () => safeLocalStorage.getItem(JOURNEYS_COMPANION_PINNED_KEY) === "true";
 
 const Journeys = () => {
   const prefersReducedMotion = useReducedMotion();
@@ -101,7 +104,7 @@ const Journeys = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showPageInfo, setShowPageInfo] = useState(false);
   const [showAddSheet, setShowAddSheet] = useState(false);
-  const [showCompanionPlanner, setShowCompanionPlanner] = useState(false);
+  const [isCompanionPlannerPinned, setIsCompanionPlannerPinned] = useState(readPinnedCompanionPlannerPreference);
   const [showMonthView, setShowMonthView] = useState(false);
   const [desktopPlannerMode, setDesktopPlannerMode] = useState<DesktopPlannerMode>("week");
   
@@ -152,13 +155,12 @@ const Journeys = () => {
     if (options?.date) {
       setSelectedDate(options.date);
     }
-    setShowCompanionPlanner(false);
     setPrefilledTime(options?.time ?? null);
     setShowAddSheet(true);
   }, []);
 
   const openCompanionPlanner = useCallback(() => {
-    setShowCompanionPlanner(true);
+    setIsCompanionPlannerPinned(true);
   }, []);
 
   const syncSelectedDateToTodayIfStale = useCallback(() => {
@@ -295,6 +297,16 @@ const Journeys = () => {
   
   // Edit ritual state (for tasks linked to habits)
   const [editingRitual, setEditingRitual] = useState<RitualData | null>(null);
+  const isCompanionPlannerBlocked = showAddSheet
+    || showMonthView
+    || showPageInfo
+    || showQuickAdjust
+    || showPathfinder
+    || !!editingTask
+    || !!editingRitual
+    || needsStreakDecision
+    || isInteractionModalOpen;
+  const showCompanionPlanner = isCompanionPlannerPinned && !isCompanionPlannerBlocked;
   const desktopInteractionResetKey = useMemo(
     () => [
       format(selectedDate, "yyyy-MM-dd"),
@@ -329,6 +341,10 @@ const Journeys = () => {
       window.cancelAnimationFrame(frameId);
     };
   }, [isInboxRequested]);
+
+  useEffect(() => {
+    safeLocalStorage.setItem(JOURNEYS_COMPANION_PINNED_KEY, String(isCompanionPlannerPinned));
+  }, [isCompanionPlannerPinned]);
 
   useEffect(() => {
     if (!isMacHostedIOSApp || location.pathname !== JOURNEYS_ROUTE) return;
@@ -1177,7 +1193,7 @@ const Journeys = () => {
 
         <JourneysCompanionPlannerModal
           open={showCompanionPlanner}
-          onOpenChange={setShowCompanionPlanner}
+          onOpenChange={setIsCompanionPlannerPinned}
           presentation={isDesktopLayout || isMacHostedIOSApp ? "dialog" : "drawer"}
         />
         

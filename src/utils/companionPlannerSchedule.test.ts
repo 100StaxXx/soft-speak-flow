@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildCompanionPlannerScheduleInsights } from "@/utils/companionPlannerSchedule";
-import type { PlannerContextTask } from "@/types/companionPlanner";
+import type { PlannerContextCalendarEvent, PlannerContextTask } from "@/types/companionPlanner";
 
 const buildTask = (overrides: Partial<PlannerContextTask> = {}): PlannerContextTask => ({
   id: crypto.randomUUID(),
@@ -15,6 +15,19 @@ const buildTask = (overrides: Partial<PlannerContextTask> = {}): PlannerContextT
   source: "manual",
   epicId: null,
   epicTitle: null,
+  ...overrides,
+});
+
+const buildCalendarEvent = (
+  overrides: Partial<PlannerContextCalendarEvent> = {},
+): PlannerContextCalendarEvent => ({
+  id: crypto.randomUUID(),
+  title: "Calendar event",
+  start: "2026-04-18T16:00:00.000Z",
+  end: "2026-04-18T17:00:00.000Z",
+  isAllDay: false,
+  provider: "google",
+  readOnly: true,
   ...overrides,
 });
 
@@ -81,5 +94,30 @@ describe("buildCompanionPlannerScheduleInsights", () => {
       taskId: "heavy-1",
     });
     expect(insights.dayLoads.find((load) => load.date === "2026-04-19")?.status).toBe("open");
+  });
+
+  it("treats connected calendar events as occupied time when finding conflicts and openings", () => {
+    const insights = buildCompanionPlannerScheduleInsights({
+      horizon: "day",
+      selectedDate: "2026-04-18",
+      plannerMemory: {
+        wakeTime: "08:00",
+        windDownTime: "21:00",
+      },
+      tasks: [
+        buildTask({ id: "task-a", title: "Workout", scheduledTime: "09:00", estimatedDuration: 60 }),
+      ],
+      calendarEvents: [
+        buildCalendarEvent({
+          id: "event-a",
+          title: "Doctor",
+          start: "2026-04-18T16:00:00.000Z",
+          end: "2026-04-18T17:30:00.000Z",
+        }),
+      ],
+    });
+
+    expect(insights.dayLoads[0]?.totalMinutes).toBeGreaterThan(120);
+    expect(insights.suggestedSlots.some((slot) => slot.time === "16:00")).toBe(false);
   });
 });

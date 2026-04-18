@@ -8,6 +8,7 @@ import { useIntentClassifier } from "@/hooks/useIntentClassifier";
 import { useVoiceInput } from "@/hooks/useVoiceInput";
 import { useTasksQuery } from "@/hooks/useTasksQuery";
 import { useCalendarTasks } from "@/hooks/useCalendarTasks";
+import { useExternalCalendarEvents } from "@/hooks/useExternalCalendarEvents";
 import { useInboxTasks } from "@/hooks/useInboxTasks";
 import { useEpics } from "@/hooks/useEpics";
 import { useTaskMutations } from "@/hooks/useTaskMutations";
@@ -29,6 +30,7 @@ import type {
   CompanionPlannerRequest,
   CompanionPlannerResponse,
   CompanionPlannerSessionState,
+  PlannerContextCalendarEvent,
   PlannerContextEpic,
   PlannerContextRitual,
   PlannerContextTask,
@@ -364,6 +366,8 @@ export function useCompanionPlanner({
   const todayTasksQuery = useTasksQuery(today);
   const weekTasksQuery = useCalendarTasks(today, "week");
   const monthTasksQuery = useCalendarTasks(today, "month");
+  const activeEventsQuery = useExternalCalendarEvents(today, horizon);
+  const contextEventsQuery = useExternalCalendarEvents(today, horizon === "month" ? "month" : "week");
   const { inboxTasks } = useInboxTasks();
   const { activeEpics, createEpic, renameEpic, createCampaignRitual } = useEpics();
   const { addTask, updateTask } = useTaskMutations();
@@ -433,6 +437,10 @@ export function useCompanionPlanner({
     if (horizon === "week") return weekTasksQuery.tasks;
     return todayTasksQuery.tasks;
   }, [horizon, monthTasksQuery.tasks, todayTasksQuery.tasks, weekTasksQuery.tasks]);
+
+  const contextTasks = useMemo(() => (
+    horizon === "month" ? monthTasksQuery.tasks : weekTasksQuery.tasks
+  ), [horizon, monthTasksQuery.tasks, weekTasksQuery.tasks]);
 
   const plannerMemory = useMemo<PlannerMemoryProfile>(() => {
     const remoteProfile = extractPlannerProfile(plannerMemoryQuery.data?.preferredWorkBlocks);
@@ -508,16 +516,18 @@ export function useCompanionPlanner({
   const scheduleInsights = useMemo<PlannerScheduleInsights>(() =>
     buildCompanionPlannerScheduleInsights({
       tasks: activeTasks.map(serializeTaskContext),
+      calendarEvents: activeEventsQuery.events,
       horizon,
       selectedDate: todayIso,
       plannerMemory,
-    }), [activeTasks, horizon, plannerMemory, todayIso]);
+    }), [activeEventsQuery.events, activeTasks, horizon, plannerMemory, todayIso]);
 
   const plannerContext = useMemo<CompanionPlannerRequest["plannerContext"]>(() => ({
-    tasks: mapTasksToContext(activeTasks.map(serializeTaskContext)),
+    tasks: mapTasksToContext(contextTasks.map(serializeTaskContext)),
     inboxTasks: mapTasksToContext(inboxTasks.map(serializeTaskContext)),
     activeEpics: mapEpicsToContext(activeEpics),
     rituals: mapRitualsToContext(activeEpics),
+    calendarEvents: contextEventsQuery.events as PlannerContextCalendarEvent[],
     scheduleInsights,
     plannerMemory,
     aiSignals: enrichedContext
@@ -529,7 +539,7 @@ export function useCompanionPlanner({
           suggestedWorkload: enrichedContext.suggestedWorkload,
         }
       : undefined,
-  }), [activeEpics, activeTasks, enrichedContext, inboxTasks, plannerMemory, scheduleInsights]);
+  }), [activeEpics, contextEventsQuery.events, contextTasks, enrichedContext, inboxTasks, plannerMemory, scheduleInsights]);
 
   useEffect(() => {
     if (!bootstrapGreeting) return;
@@ -794,6 +804,44 @@ export function useCompanionPlanner({
           await renameEpic(payload);
           break;
         }
+        case "adjust_campaign_plan": {
+          const payload = proposal.payload as {
+            epicId: string;
+            adjustmentType?: "extend_deadline" | "reduce_scope" | "add_habits" | "remove_habits" | "reschedule" | "custom";
+            reason?: string | null;
+          };
+
+          const { data: adjustmentResult, error: adjustmentError } = await supabase.functions.invoke("adjust-epic-plan", {
+            body: {
+              epicId: payload.epicId,
+              adjustmentType: payload.adjustmentType ?? "custom",
+              reason: payload.reason ?? undefined,
+              customRequest: payload.reason ?? undefined,
+            },
+          });
+
+          if (adjustmentError) throw adjustmentError;
+
+          const suggestions = Array.isArray((adjustmentResult as { suggestions?: unknown[] } | null)?.suggestions)
+            ? (adjustmentResult as { suggestions: unknown[] }).suggestions
+            : [];
+
+          if (suggestions.length === 0) {
+            throw new Error("No campaign adjustments were generated.");
+          }
+
+          const { error: applyError } = await supabase.functions.invoke("apply-epic-adjustments", {
+            body: {
+              epicId: payload.epicId,
+              adjustments: suggestions,
+              adjustmentType: payload.adjustmentType ?? "custom",
+              reason: payload.reason ?? undefined,
+            },
+          });
+
+          if (applyError) throw applyError;
+          break;
+        }
         case "create_ritual": {
           const payload = proposal.payload as Parameters<typeof createCampaignRitual>[0];
           await createCampaignRitual(payload);
@@ -982,6 +1030,12 @@ export function useCompanionPlanner({
     plannerMemory,
     scheduleInsights,
     todayLabel: format(today, "EEEE, MMMM d"),
-    isLoadingContext: todayTasksQuery.isLoading || weekTasksQuery.isLoading || monthTasksQuery.isLoading || plannerMemoryQuery.isLoading,
+    isLoadingContext:
+      todayTasksQuery.isLoading
+      || weekTasksQuery.isLoading
+      || monthTasksQuery.isLoading
+      || activeEventsQuery.isLoading
+      || contextEventsQuery.isLoading
+      || plannerMemoryQuery.isLoading,
   };
 }

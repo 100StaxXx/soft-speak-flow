@@ -4,6 +4,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   invoke: vi.fn(),
   trackInteraction: vi.fn(),
+  toggleRecording: vi.fn(),
+  requestPermission: vi.fn().mockResolvedValue("granted"),
+  toastError: vi.fn(),
 }));
 
 vi.mock("@/hooks/useAuth", () => ({
@@ -22,6 +25,25 @@ vi.mock("@/hooks/useAIInteractionTracker", () => ({
   useAIInteractionTracker: () => ({
     trackInteraction: mocks.trackInteraction,
   }),
+}));
+
+vi.mock("@/hooks/useVoiceInput", () => ({
+  useVoiceInput: () => ({
+    isRecording: false,
+    isAutoStopping: false,
+    isSupported: true,
+    permissionStatus: "prompt" as const,
+    startRecording: vi.fn(),
+    stopRecording: vi.fn(),
+    toggleRecording: mocks.toggleRecording,
+    requestPermission: mocks.requestPermission,
+  }),
+}));
+
+vi.mock("@/components/ui/sonner", () => ({
+  toast: {
+    error: mocks.toastError,
+  },
 }));
 
 vi.mock("@/integrations/supabase/client", () => ({
@@ -47,6 +69,7 @@ describe("useJourneysCompanionConversation", () => {
 
     expect(result.current.messages).toHaveLength(1);
     expect(result.current.messages[0]?.content).toBe(JOURNEYS_COMPANION_OPENER);
+    expect(result.current.messages[0]?.content).toBe("What would help most with your quests right now?");
   });
 
   it("appends a normal assistant reply and tags the request as journeys", async () => {
@@ -115,5 +138,31 @@ describe("useJourneysCompanionConversation", () => {
 
     expect(result.current.messages).toHaveLength(2);
     expect(result.current.messages[1]?.content).toBe("Help me plan tomorrow");
+  });
+
+  it("shows a rollout-aware error when the companion chat function is missing", async () => {
+    mocks.invoke.mockResolvedValue({
+      data: null,
+      error: {
+        name: "FunctionsHttpError",
+        message: "Edge Function returned a non-2xx status code",
+        context: new Response("", { status: 404 }),
+      },
+    });
+
+    const { result } = renderHook(() => useJourneysCompanionConversation());
+
+    await act(async () => {
+      await result.current.submitMessage("Are you there?", "text");
+    });
+
+    await waitFor(() => {
+      expect(mocks.toastError).toHaveBeenCalledWith(
+        "Companion Talk isn't live in this environment yet. Please try again after the backend is updated.",
+      );
+    });
+
+    expect(result.current.messages).toHaveLength(3);
+    expect(result.current.messages[2]?.content).toContain("Cosmic static.");
   });
 });

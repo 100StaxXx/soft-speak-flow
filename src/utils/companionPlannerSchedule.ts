@@ -1,6 +1,7 @@
 import { addDays, format, parseISO } from "date-fns";
-import { detectTaskTimeConflicts } from "@/utils/taskTimeConflicts";
+
 import type {
+  PlannerContextCalendarEvent,
   PlannerContextTask,
   PlannerDayLoad,
   PlannerHorizon,
@@ -19,12 +20,15 @@ const TOTAL_SLOT_LIMIT = 6;
 
 type BuildScheduleInsightsInput = {
   tasks: PlannerContextTask[];
+  calendarEvents?: PlannerContextCalendarEvent[];
   horizon: PlannerHorizon;
   selectedDate: string;
   plannerMemory?: PlannerMemoryProfile | null;
 };
 
-type TaskInterval = {
+type TimelineInterval = {
+  id: string;
+  title: string;
   startMinutes: number;
   endMinutes: number;
 };
@@ -101,7 +105,19 @@ const getPreferredWindows = (plannerMemory?: PlannerMemoryProfile | null): Prefe
   ];
 };
 
-const buildTaskIntervals = (tasks: PlannerContextTask[]): TaskInterval[] =>
+const getWakeMinutes = (plannerMemory?: PlannerMemoryProfile | null) =>
+  parseTimeToMinutes(plannerMemory?.wakeTime ?? DEFAULT_WAKE_TIME) ?? 8 * 60;
+
+const getWindDownMinutes = (plannerMemory?: PlannerMemoryProfile | null) =>
+  parseTimeToMinutes(plannerMemory?.windDownTime ?? DEFAULT_WIND_DOWN_TIME) ?? 21 * 60;
+
+const getDayBounds = (date: string) => {
+  const start = parseISO(`${date}T00:00:00`);
+  const end = parseISO(`${date}T23:59:59`);
+  return { start, end };
+};
+
+const buildTaskIntervals = (tasks: PlannerContextTask[]): TimelineInterval[] =>
   tasks
     .filter((task) => task.completed !== true && task.taskDate && task.scheduledTime)
     .map((task) => {
@@ -109,12 +125,75 @@ const buildTaskIntervals = (tasks: PlannerContextTask[]): TaskInterval[] =>
       if (startMinutes === null) return null;
 
       return {
+        id: task.id,
+        title: task.title,
         startMinutes,
         endMinutes: startMinutes + getTaskDuration(task),
       };
     })
-    .filter((interval): interval is TaskInterval => Boolean(interval))
+    .filter((interval): interval is TimelineInterval => Boolean(interval))
     .sort((left, right) => left.startMinutes - right.startMinutes);
+
+const buildCalendarIntervals = (
+  date: string,
+  events: PlannerContextCalendarEvent[],
+  wakeMinutes: number,
+  windDownMinutes: number,
+): TimelineInterval[] => {
+  const { start: dayStart, end: dayEnd } = getDayBounds(date);
+
+  return events
+    .map((event) => {
+      const eventStart = new Date(event.start);
+      const eventEnd = new Date(event.end);
+
+      if (eventEnd <= dayStart || eventStart >= dayEnd) {
+        return null;
+      }
+
+      if (event.isAllDay) {
+        return {
+          id: event.id,
+          title: event.title,
+          startMinutes: wakeMinutes,
+          endMinutes: windDownMinutes,
+        };
+      }
+
+      const localStart = eventStart < dayStart ? dayStart : eventStart;
+      const localEnd = eventEnd > dayEnd ? dayEnd : eventEnd;
+      const startMinutes = (localStart.getHours() * 60) + localStart.getMinutes();
+      const endMinutes = (localEnd.getHours() * 60) + localEnd.getMinutes();
+
+      if (endMinutes <= startMinutes) return null;
+
+      return {
+        id: event.id,
+        title: event.title,
+        startMinutes,
+        endMinutes,
+      };
+    })
+    .filter((interval): interval is TimelineInterval => Boolean(interval))
+    .sort((left, right) => left.startMinutes - right.startMinutes);
+};
+
+const buildIntervalsForDate = ({
+  date,
+  tasks,
+  calendarEvents,
+  wakeMinutes,
+  windDownMinutes,
+}: {
+  date: string;
+  tasks: PlannerContextTask[];
+  calendarEvents: PlannerContextCalendarEvent[];
+  wakeMinutes: number;
+  windDownMinutes: number;
+}) => [
+  ...buildTaskIntervals(tasks),
+  ...buildCalendarIntervals(date, calendarEvents, wakeMinutes, windDownMinutes),
+].sort((left, right) => left.startMinutes - right.startMinutes);
 
 const getDayLoadStatus = (totalMinutes: number, taskCount: number): PlannerDayLoad["status"] => {
   if (taskCount === 0 || totalMinutes === 0) return "open";
@@ -189,12 +268,14 @@ const scoreSlot = ({
 const buildSuggestedSlots = ({
   rangeDates,
   tasksByDate,
+  calendarEvents,
   selectedDate,
   dayLoads,
   plannerMemory,
 }: {
   rangeDates: string[];
   tasksByDate: Map<string, PlannerContextTask[]>;
+  calendarEvents: PlannerContextCalendarEvent[];
   selectedDate: string;
   dayLoads: PlannerDayLoad[];
   plannerMemory?: PlannerMemoryProfile | null;
@@ -209,15 +290,21 @@ const buildSuggestedSlots = ({
     .filter((minutes): minutes is number => minutes !== null)
     .map((minutes) => Math.floor(minutes / 60));
   const learnedPeakHours = peakHours.length > 0 ? peakHours : fallbackPeakHours;
-  const wakeMinutes = parseTimeToMinutes(plannerMemory?.wakeTime ?? DEFAULT_WAKE_TIME) ?? 8 * 60;
-  const windDownMinutes = parseTimeToMinutes(plannerMemory?.windDownTime ?? DEFAULT_WIND_DOWN_TIME) ?? 21 * 60;
+  const wakeMinutes = getWakeMinutes(plannerMemory);
+  const windDownMinutes = getWindDownMinutes(plannerMemory);
   const minimumSlotMinutes = 30;
 
   const slots: PlannerOpenSlot[] = [];
 
   rangeDates.forEach((date) => {
     const dayTasks = tasksByDate.get(date) ?? [];
-    const intervals = buildTaskIntervals(dayTasks);
+    const intervals = buildIntervalsForDate({
+      date,
+      tasks: dayTasks,
+      calendarEvents,
+      wakeMinutes,
+      windDownMinutes,
+    });
     const dayLoad = dayLoads.find((candidate) => candidate.date === date) ?? {
       date,
       totalMinutes: 0,
@@ -361,14 +448,45 @@ const buildSummary = ({
   return `${openCount} lighter day${openCount === 1 ? "" : "s"} and ${overloadedCount} overloaded day${overloadedCount === 1 ? "" : "s"} in view.${firstSlot ? ` Best opening: ${firstSlot.date} at ${firstSlot.time}.` : ""}`;
 };
 
+const buildConflicts = (intervals: TimelineInterval[]): PlannerScheduleConflict[] => {
+  if (intervals.length < 2) return [];
+
+  const conflicts: PlannerScheduleConflict[] = [];
+
+  for (let i = 0; i < intervals.length - 1; i += 1) {
+    const current = intervals[i];
+    for (let j = i + 1; j < intervals.length; j += 1) {
+      const next = intervals[j];
+      if (next.startMinutes >= current.endMinutes) break;
+
+      const overlapMinutes = Math.min(current.endMinutes, next.endMinutes) - next.startMinutes;
+      if (overlapMinutes <= 0) continue;
+
+      conflicts.push({
+        date: "",
+        taskAId: current.id,
+        taskATitle: current.title,
+        taskBId: next.id,
+        taskBTitle: next.title,
+        overlapMinutes,
+      });
+    }
+  }
+
+  return conflicts;
+};
+
 export const buildCompanionPlannerScheduleInsights = ({
   tasks,
+  calendarEvents = [],
   horizon,
   selectedDate,
   plannerMemory,
 }: BuildScheduleInsightsInput): PlannerScheduleInsights => {
   const rangeDates = getRangeDates(selectedDate, horizon);
   const tasksByDate = new Map<string, PlannerContextTask[]>();
+  const wakeMinutes = getWakeMinutes(plannerMemory);
+  const windDownMinutes = getWindDownMinutes(plannerMemory);
 
   tasks.forEach((task) => {
     if (!task.taskDate || !rangeDates.includes(task.taskDate)) return;
@@ -382,44 +500,42 @@ export const buildCompanionPlannerScheduleInsights = ({
 
   const dayLoads = rangeDates.map((date) => {
     const dateTasks = (tasksByDate.get(date) ?? []).filter((task) => task.completed !== true);
-    const totalMinutes = dateTasks.reduce((sum, task) => sum + getTaskDuration(task), 0);
+    const intervals = buildIntervalsForDate({
+      date,
+      tasks: dateTasks,
+      calendarEvents,
+      wakeMinutes,
+      windDownMinutes,
+    });
+    const totalMinutes = intervals.reduce((sum, interval) => sum + Math.max(0, interval.endMinutes - interval.startMinutes), 0);
 
     return {
       date,
       totalMinutes,
-      taskCount: dateTasks.length,
-      status: getDayLoadStatus(totalMinutes, dateTasks.length),
+      taskCount: intervals.length,
+      status: getDayLoadStatus(totalMinutes, intervals.length),
     } satisfies PlannerDayLoad;
   });
 
-  const conflicts = rangeDates.flatMap((date) => {
-    const dateTasks = tasksByDate.get(date) ?? [];
-    const conflictCandidates = dateTasks
-      .filter((task) => task.completed !== true)
-      .map((task) => ({
-        id: task.id,
-        scheduled_time: task.scheduledTime,
-        estimated_duration: task.estimatedDuration,
-      }));
-
-    return detectTaskTimeConflicts(conflictCandidates).map((conflict) => {
-      const taskA = dateTasks.find((task) => task.id === conflict.taskAId);
-      const taskB = dateTasks.find((task) => task.id === conflict.taskBId);
-
-      return {
+  const conflicts = rangeDates.flatMap((date) =>
+    buildConflicts(
+      buildIntervalsForDate({
         date,
-        taskAId: conflict.taskAId,
-        taskATitle: taskA?.title ?? "Task",
-        taskBId: conflict.taskBId,
-        taskBTitle: taskB?.title ?? "Task",
-        overlapMinutes: conflict.overlapMinutes,
-      } satisfies PlannerScheduleConflict;
-    });
-  });
+        tasks: tasksByDate.get(date) ?? [],
+        calendarEvents,
+        wakeMinutes,
+        windDownMinutes,
+      }),
+    ).map((conflict) => ({
+      ...conflict,
+      date,
+    })),
+  );
 
   const suggestedSlots = buildSuggestedSlots({
     rangeDates,
     tasksByDate,
+    calendarEvents,
     selectedDate,
     dayLoads,
     plannerMemory,

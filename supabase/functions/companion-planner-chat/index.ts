@@ -92,6 +92,15 @@ const PlannerRequestSchema = z.object({
       frequency: z.string().nullable(),
       preferredTime: z.string().nullable(),
     })),
+    calendarEvents: z.array(z.object({
+      id: z.string(),
+      title: z.string(),
+      start: z.string(),
+      end: z.string(),
+      isAllDay: z.boolean(),
+      provider: z.string(),
+      readOnly: z.boolean(),
+    })),
     scheduleInsights: z.object({
       horizon: z.enum(["day", "week", "month"]),
       selectedDate: z.string(),

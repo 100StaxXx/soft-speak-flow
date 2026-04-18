@@ -1,20 +1,24 @@
 import { assertEquals, assertStringIncludes } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import { buildPlannerResponse, type PlannerBuildInput } from "./planner.ts";
 
-const baseInput = (overrides: Partial<PlannerBuildInput> = {}): PlannerBuildInput => ({
-  message: "Call mom",
-  currentDate: "2026-04-18",
-  horizon: "day",
-  tonePack: "soft",
-  sessionState: {
+type PlannerBuildInputOverrides = Partial<Omit<PlannerBuildInput, "plannerContext" | "parsedInput" | "sessionState" | "classificationHint">> & {
+  plannerContext?: Partial<PlannerBuildInput["plannerContext"]>;
+  parsedInput?: Partial<NonNullable<PlannerBuildInput["parsedInput"]>>;
+  sessionState?: Partial<PlannerBuildInput["sessionState"]>;
+  classificationHint?: Partial<NonNullable<PlannerBuildInput["classificationHint"]>>;
+};
+
+const baseInput = (overrides: PlannerBuildInputOverrides = {}): PlannerBuildInput => {
+  const defaultSessionState: PlannerBuildInput["sessionState"] = {
     draft: {},
     openQuestionIds: [],
     preferredTimeOfDay: null,
     preferredTimeReason: null,
     reminderPreference: null,
     lastClassification: null,
-  },
-  parsedInput: {
+  };
+
+  const defaultParsedInput: NonNullable<PlannerBuildInput["parsedInput"]> = {
     text: "Call mom",
     scheduledTime: null,
     scheduledDate: null,
@@ -27,17 +31,14 @@ const baseInput = (overrides: Partial<PlannerBuildInput> = {}): PlannerBuildInpu
     notes: null,
     category: null,
     newTitle: null,
-  },
-  classificationHint: {
-    type: "quest",
-    confidence: 0.92,
-    reasoning: "One-off task",
-  },
-  plannerContext: {
+  };
+
+  const defaultPlannerContext: PlannerBuildInput["plannerContext"] = {
     tasks: [],
     inboxTasks: [],
     activeEpics: [],
     rituals: [],
+    calendarEvents: [],
     aiSignals: {
       preferredDifficulty: "medium",
       preferredHabitFrequency: "daily",
@@ -45,9 +46,33 @@ const baseInput = (overrides: Partial<PlannerBuildInput> = {}): PlannerBuildInpu
       suggestedWorkload: "normal",
       commonContexts: [],
     },
-  },
-  ...overrides,
-});
+  };
+
+  return {
+    message: overrides.message ?? "Call mom",
+    currentDate: overrides.currentDate ?? "2026-04-18",
+    horizon: overrides.horizon ?? "day",
+    tonePack: overrides.tonePack ?? "soft",
+    sessionState: {
+      ...defaultSessionState,
+      ...(overrides.sessionState ?? {}),
+    },
+    parsedInput: {
+      ...defaultParsedInput,
+      ...(overrides.parsedInput ?? {}),
+    },
+    classificationHint: {
+      type: "quest",
+      confidence: 0.92,
+      reasoning: "One-off task",
+      ...(overrides.classificationHint ?? {}),
+    },
+    plannerContext: {
+      ...defaultPlannerContext,
+      ...(overrides.plannerContext ?? {}),
+    },
+  };
+};
 
 Deno.test("turns a one-off request into a quest and asks for time and reason", () => {
   const result = buildPlannerResponse(baseInput());
@@ -324,4 +349,226 @@ Deno.test("adds a balancing question when the selected window is overloaded", ()
 
   assertEquals(result.followUpQuestions.some((question) => question.field === "details"), true);
   assertStringIncludes(result.followUpQuestions.find((question) => question.field === "details")?.prompt ?? "", "2026-04-19");
+});
+
+Deno.test("answers schedule questions with quests and connected calendar events without creating proposals", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "What do I have scheduled today?",
+    plannerContext: {
+      tasks: [
+        {
+          id: "task-1",
+          title: "Workout",
+          taskDate: "2026-04-18",
+          scheduledTime: "09:00",
+          estimatedDuration: 45,
+          recurrencePattern: null,
+        },
+      ],
+      inboxTasks: [],
+      activeEpics: [],
+      rituals: [],
+      calendarEvents: [
+        {
+          id: "event-1",
+          title: "Therapy",
+          start: "2026-04-18T14:00:00.000Z",
+          end: "2026-04-18T15:00:00.000Z",
+          isAllDay: false,
+          provider: "google",
+          readOnly: true,
+        },
+      ],
+    },
+  }));
+
+  assertEquals(result.proposals.length, 0);
+  assertEquals(result.followUpQuestions.length, 0);
+  assertStringIncludes(result.reply, "Cosmiq quests");
+  assertStringIncludes(result.reply, "Connected calendar events");
+});
+
+Deno.test("answers availability questions using both quests and calendar events", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "When am I free tomorrow afternoon?",
+    plannerContext: {
+      tasks: [
+        {
+          id: "task-1",
+          title: "Deep work",
+          taskDate: "2026-04-19",
+          scheduledTime: "13:00",
+          estimatedDuration: 60,
+          recurrencePattern: null,
+        },
+      ],
+      inboxTasks: [],
+      activeEpics: [],
+      rituals: [],
+      calendarEvents: [
+        {
+          id: "event-1",
+          title: "Doctor",
+          start: "2026-04-19T22:00:00.000Z",
+          end: "2026-04-19T23:00:00.000Z",
+          isAllDay: false,
+          provider: "google",
+          readOnly: true,
+        },
+      ],
+      plannerMemory: {
+        wakeTime: "08:00",
+        windDownTime: "21:00",
+      },
+    },
+  }));
+
+  assertEquals(result.proposals.length, 0);
+  assertStringIncludes(result.reply, "2026-04-19");
+  assertStringIncludes(result.reply, "afternoon");
+});
+
+Deno.test("prepares a direct quest move without asking for a time reason when the time is explicit", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Move my workout quest to 6 pm",
+    parsedInput: {
+      text: "Move my workout quest",
+      scheduledTime: "18:00",
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+    plannerContext: {
+      tasks: [
+        {
+          id: "task-1",
+          title: "Workout quest",
+          taskDate: "2026-04-18",
+          scheduledTime: "09:00",
+          estimatedDuration: 45,
+          recurrencePattern: null,
+        },
+      ],
+      inboxTasks: [],
+      activeEpics: [],
+      rituals: [],
+      calendarEvents: [],
+    },
+  }));
+
+  assertEquals(result.proposals[0].kind, "update_quest");
+  assertEquals(result.proposals[0].readyToConfirm, true);
+  assertEquals(result.followUpQuestions.length, 0);
+});
+
+Deno.test("creates one proposal per quest for batch rescheduling", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Move the rest of my quests to tomorrow",
+    plannerContext: {
+      tasks: [
+        {
+          id: "task-1",
+          title: "Workout",
+          taskDate: "2026-04-18",
+          scheduledTime: "09:00",
+          estimatedDuration: 45,
+          recurrencePattern: null,
+        },
+        {
+          id: "task-2",
+          title: "Newsletter",
+          taskDate: "2026-04-18",
+          scheduledTime: "14:00",
+          estimatedDuration: 60,
+          recurrencePattern: null,
+        },
+      ],
+      inboxTasks: [],
+      activeEpics: [],
+      rituals: [],
+      calendarEvents: [],
+    },
+  }));
+
+  assertEquals(result.proposals.length, 2);
+  assertEquals(result.proposals.every((proposal) => proposal.kind === "update_quest"), true);
+  assertEquals(result.proposals.every((proposal) => proposal.readyToConfirm), true);
+});
+
+Deno.test("returns an adjust campaign proposal for complex campaign changes", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Push Campaign Aurora by two weeks and remove the least important ritual",
+    classificationHint: {
+      type: "epic",
+      confidence: 0.95,
+      reasoning: "Campaign adjustment",
+    },
+    plannerContext: {
+      tasks: [],
+      inboxTasks: [],
+      activeEpics: [{ id: "epic-1", title: "Campaign Aurora", endDate: "2026-06-01" }],
+      rituals: [
+        {
+          id: "ritual-1",
+          epicId: "epic-1",
+          epicTitle: "Campaign Aurora",
+          title: "Practice",
+          frequency: "daily",
+          preferredTime: "09:00",
+        },
+      ],
+      calendarEvents: [],
+    },
+  }));
+
+  assertEquals(result.proposals[0].kind, "adjust_campaign_plan");
+  assertEquals(result.proposals[0].readyToConfirm, true);
+  assertStringIncludes(result.proposals[0].summary, "Campaign Aurora");
+});
+
+Deno.test("explains that external calendar events are read-only when asked to edit one", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Move my dentist appointment to 4 pm",
+    parsedInput: {
+      text: "Move my dentist appointment",
+      scheduledTime: "16:00",
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+    plannerContext: {
+      tasks: [],
+      inboxTasks: [],
+      activeEpics: [],
+      rituals: [],
+      calendarEvents: [
+        {
+          id: "event-1",
+          title: "Dentist appointment",
+          start: "2026-04-18T22:00:00.000Z",
+          end: "2026-04-18T23:00:00.000Z",
+          isAllDay: false,
+          provider: "google",
+          readOnly: true,
+        },
+      ],
+    },
+  }));
+
+  assertEquals(result.proposals.length, 0);
+  assertStringIncludes(result.reply, "read-only");
 });

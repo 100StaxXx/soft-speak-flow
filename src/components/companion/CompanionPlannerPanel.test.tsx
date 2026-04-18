@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -13,32 +13,18 @@ const mocks = vi.hoisted(() => ({
     trialEndsAt: null,
     loading: false,
   },
-  planner: {
-    setTonePack: vi.fn(),
+  assistant: {
     setHorizon: vi.fn(),
     setDraftInput: vi.fn(),
     submitTypedMessage: vi.fn(),
     toggleRecording: vi.fn(),
     requestMicrophonePermission: vi.fn(),
+    setShowPermissionDialog: vi.fn(),
     confirmProposal: vi.fn(),
     rejectProposal: vi.fn(),
     confirmAll: vi.fn(),
-    setShowPermissionDialog: vi.fn(),
-  },
-  chat: {
-    setDraftInput: vi.fn(),
-    submitTypedMessage: vi.fn(),
-    toggleRecording: vi.fn(),
-    requestMicrophonePermission: vi.fn(),
-    setShowPermissionDialog: vi.fn(),
     setAutoplayVoice: vi.fn(),
     setMuteSpokenReplies: vi.fn(),
-    clearPlannerHandoff: vi.fn(),
-    stopSpeaking: vi.fn(),
-  },
-  chatState: {
-    handoffToPlanner: false,
-    speechProvider: "device" as "device" | "cloud" | "none",
   },
 }));
 
@@ -46,153 +32,98 @@ vi.mock("@/hooks/useAccessStatus", () => ({
   useAccessStatus: () => mocks.accessState,
 }));
 
-vi.mock("@/hooks/useCompanionChat", () => ({
-  useCompanionChat: () => ({
+vi.mock("@/hooks/useCompanionAssistant", () => ({
+  useCompanionAssistant: () => ({
     greeting: "I’m right here with you.",
     messages: [
       {
-        id: "c1",
-        role: "assistant",
-        content: "I’m right here with you.",
+        id: "a1",
+        role: "assistant" as const,
+        content: "Here is your schedule for 2026-04-18.",
         createdAt: "2026-04-18T08:00:00.000Z",
+        source: "plan" as const,
       },
       {
-        id: "c2",
-        role: "user",
-        content: "Can we talk through a hard day?",
+        id: "a2",
+        role: "user" as const,
+        content: "Move my workout quest to 6 pm",
         createdAt: "2026-04-18T08:01:00.000Z",
-        inputMode: "text",
-      },
-    ],
-    draftInput: "Can we talk through a hard day?",
-    setDraftInput: mocks.chat.setDraftInput,
-    interimText: "",
-    isSubmitting: false,
-    isLoadingHistory: false,
-    autoplayVoice: true,
-    setAutoplayVoice: mocks.chat.setAutoplayVoice,
-    muteSpokenReplies: false,
-    setMuteSpokenReplies: mocks.chat.setMuteSpokenReplies,
-    isSpeaking: false,
-    speechProvider: mocks.chatState.speechProvider,
-    handoffToPlanner: mocks.chatState.handoffToPlanner,
-    clearPlannerHandoff: mocks.chat.clearPlannerHandoff,
-    isRecording: false,
-    isAutoStopping: false,
-    isVoiceSupported: true,
-    permissionStatus: "granted",
-    showPermissionDialog: false,
-    setShowPermissionDialog: mocks.chat.setShowPermissionDialog,
-    isRequestingPermission: false,
-    submitTypedMessage: mocks.chat.submitTypedMessage,
-    submitMessage: vi.fn(),
-    toggleRecording: mocks.chat.toggleRecording,
-    requestMicrophonePermission: mocks.chat.requestMicrophonePermission,
-    stopSpeaking: mocks.chat.stopSpeaking,
-  }),
-}));
-
-vi.mock("@/hooks/useCompanionPlanner", () => ({
-  useCompanionPlanner: () => ({
-    greeting: "Let's shape today together.",
-    tonePack: "soft",
-    setTonePack: mocks.planner.setTonePack,
-    horizon: "day",
-    setHorizon: mocks.planner.setHorizon,
-    messages: [
-      {
-        id: "m1",
-        role: "companion",
-        content: "Let's shape today together.",
-        createdAt: "2026-04-18T08:00:00.000Z",
-      },
-      {
-        id: "m2",
-        role: "user",
-        content: "Write for my newsletter every weekday",
-        createdAt: "2026-04-18T08:01:00.000Z",
-        inputMode: "text",
+        source: "plan" as const,
       },
     ],
     questions: [
       {
-        id: "time_of_day",
-        prompt: "What time of day should this live in your schedule?",
-        reason: "I want to place it where you're likely to follow through.",
+        id: "details",
+        prompt: "Which quest did you mean?",
+        reason: "I do not want to move the wrong thing.",
         required: true,
-        field: "time_of_day",
-        options: ["Morning", "Afternoon", "Evening", "Night"],
+        field: "details" as const,
+        options: ["Workout", "Workout follow-up"],
       },
     ],
     proposals: [
       {
         id: "proposal-1",
-        kind: "create_quest",
-        title: "Create Write for my newsletter",
-        summary: "Create a recurring quest for writing your newsletter.",
-        reasoning: "Repeated work defaults to a recurring quest.",
+        kind: "update_quest" as const,
+        title: "Move Workout",
+        summary: "Move Workout to 2026-04-19 at 18:00.",
+        reasoning: "This is a direct quest adjustment.",
         payload: {},
-        status: "pending",
-        readyToConfirm: false,
-        missingFields: ["time of day", "why that time works"],
+        status: "pending" as const,
+        readyToConfirm: true,
+        missingFields: [],
+      },
+      {
+        id: "proposal-2",
+        kind: "adjust_campaign_plan" as const,
+        title: "Adjust Campaign Aurora",
+        summary: "Generate a revised plan for Campaign Aurora.",
+        reasoning: "This is a campaign restructure request.",
+        payload: {},
+        status: "pending" as const,
+        readyToConfirm: true,
+        missingFields: [],
       },
     ],
-    pendingProposals: [],
-    readyProposalCount: 0,
-    draftInput: "Help me plan my month",
-    setDraftInput: mocks.planner.setDraftInput,
-    interimText: "",
-    isSubmitting: false,
-    isClassifying: false,
-    isRecording: false,
-    isAutoStopping: false,
-    isVoiceSupported: true,
-    permissionStatus: "granted",
-    showPermissionDialog: false,
-    setShowPermissionDialog: mocks.planner.setShowPermissionDialog,
-    isRequestingPermission: false,
-    submitTypedMessage: mocks.planner.submitTypedMessage,
-    submitMessage: vi.fn(),
-    toggleRecording: mocks.planner.toggleRecording,
-    requestMicrophonePermission: mocks.planner.requestMicrophonePermission,
-    confirmProposal: mocks.planner.confirmProposal,
-    rejectProposal: mocks.planner.rejectProposal,
-    confirmAll: mocks.planner.confirmAll,
-    sessionState: {
-      draft: {},
-      openQuestionIds: [],
-      preferredTimeOfDay: null,
-      preferredTimeReason: null,
-      reminderPreference: null,
-      lastClassification: "habit",
-    },
+    pendingProposals: [
+      {
+        id: "proposal-1",
+        kind: "update_quest" as const,
+        title: "Move Workout",
+        summary: "Move Workout to 2026-04-19 at 18:00.",
+        payload: {},
+        status: "pending" as const,
+        readyToConfirm: true,
+      },
+      {
+        id: "proposal-2",
+        kind: "adjust_campaign_plan" as const,
+        title: "Adjust Campaign Aurora",
+        summary: "Generate a revised plan for Campaign Aurora.",
+        payload: {},
+        status: "pending" as const,
+        readyToConfirm: true,
+      },
+    ],
+    readyProposalCount: 2,
     plannerMemory: {
       preferredTimeOfDay: "morning",
       preferredTimeReason: "I have the most energy before email.",
     },
     scheduleInsights: {
-      horizon: "day",
+      horizon: "day" as const,
       selectedDate: "2026-04-18",
       dayLoads: [
         {
           date: "2026-04-18",
           totalMinutes: 180,
           taskCount: 3,
-          status: "balanced",
+          status: "balanced" as const,
         },
       ],
       overloadedDates: [],
       emptyDates: [],
-      conflicts: [
-        {
-          date: "2026-04-18",
-          taskAId: "m1",
-          taskATitle: "Morning review",
-          taskBId: "m2",
-          taskBTitle: "Newsletter draft",
-          overlapMinutes: 15,
-        },
-      ],
+      conflicts: [],
       suggestedSlots: [
         {
           date: "2026-04-18",
@@ -202,20 +133,40 @@ vi.mock("@/hooks/useCompanionPlanner", () => ({
           reason: "Fits your usual morning rhythm.",
         },
       ],
-      moveSuggestions: [
-        {
-          fromDate: "2026-04-18",
-          toDate: "2026-04-19",
-          taskId: "proposal-1",
-          taskTitle: "Write for my newsletter",
-          suggestedTime: "09:00",
-          reason: "Tomorrow is lighter.",
-        },
-      ],
-      summary: "Today has room at 09:00, but there is one overlap to resolve.",
+      moveSuggestions: [],
+      summary: "Today has room at 09:00.",
     },
     todayLabel: "Saturday, April 18",
     isLoadingContext: false,
+    horizon: "day" as const,
+    setHorizon: mocks.assistant.setHorizon,
+    draftInput: "What do I have scheduled today?",
+    setDraftInput: mocks.assistant.setDraftInput,
+    interimText: "",
+    placeholder: "Talk, ask about your schedule, or tell me what to adjust...",
+    isSubmitting: false,
+    isClassifying: false,
+    isRecording: false,
+    isAutoStopping: false,
+    isVoiceSupported: true,
+    permissionStatus: "granted" as const,
+    showPermissionDialog: false,
+    setShowPermissionDialog: mocks.assistant.setShowPermissionDialog,
+    isRequestingPermission: false,
+    submitTypedMessage: mocks.assistant.submitTypedMessage,
+    submitMessage: vi.fn(),
+    toggleRecording: mocks.assistant.toggleRecording,
+    requestMicrophonePermission: mocks.assistant.requestMicrophonePermission,
+    confirmProposal: mocks.assistant.confirmProposal,
+    rejectProposal: mocks.assistant.rejectProposal,
+    confirmAll: mocks.assistant.confirmAll,
+    autoplayVoice: true,
+    setAutoplayVoice: mocks.assistant.setAutoplayVoice,
+    muteSpokenReplies: false,
+    setMuteSpokenReplies: mocks.assistant.setMuteSpokenReplies,
+    isSpeaking: false,
+    speechProvider: "device" as const,
+    stopSpeaking: vi.fn(),
   }),
 }));
 
@@ -225,70 +176,48 @@ describe("CompanionPlannerPanel", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.accessState.isSubscribed = true;
-    mocks.chatState.handoffToPlanner = false;
-    mocks.chatState.speechProvider = "device";
   });
 
-  it("defaults premium users into Talk mode with voice controls and transcript", async () => {
+  it("renders a unified assistant transcript with schedule insight and proposals", () => {
     render(<CompanionPlannerPanel />);
 
     expect(screen.getByTestId("companion-planner-panel")).toBeInTheDocument();
-    expect(screen.getByTestId("companion-mode-tabs")).toBeInTheDocument();
-    await waitFor(() => {
-      expect(screen.getByTestId("companion-talk-text-input")).toBeInTheDocument();
-      expect(screen.getByTestId("companion-talk-transcript")).toBeInTheDocument();
-      expect(screen.getByTestId("companion-talk-autoplay-toggle")).toBeInTheDocument();
-      expect(screen.getByTestId("companion-talk-mute-toggle")).toBeInTheDocument();
-      expect(screen.getByText(/on-device voice/i)).toBeInTheDocument();
-    });
+    expect(screen.getByTestId("companion-assistant-transcript")).toBeInTheDocument();
+    expect(screen.getByTestId("assistant-schedule-insights")).toBeInTheDocument();
+    expect(screen.getByText("Today has room at 09:00.")).toBeInTheDocument();
+    expect(screen.getByText("Move Workout")).toBeInTheDocument();
+    expect(screen.getByText("Adjust Campaign Aurora")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Confirm all" })).toBeInTheDocument();
   });
 
-  it("routes Talk and Plan actions through their respective hooks", async () => {
-    const firstRender = render(<CompanionPlannerPanel />);
+  it("routes composer, mic, horizon, and proposal actions through the assistant hook", () => {
+    render(<CompanionPlannerPanel />);
 
-    await waitFor(() => {
-      expect(screen.getByTestId("companion-talk-send-button")).toBeInTheDocument();
+    fireEvent.change(screen.getByTestId("companion-assistant-text-input"), {
+      target: { value: "Move the rest of my quests to tomorrow" },
     });
+    fireEvent.click(screen.getByTestId("companion-assistant-send-button"));
+    fireEvent.click(screen.getByTestId("companion-assistant-mic-button"));
+    fireEvent.click(screen.getByRole("radio", { name: "Week" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Confirm" })[0]);
+    fireEvent.click(screen.getAllByRole("button", { name: "Reject" })[0]);
+    fireEvent.click(screen.getByRole("button", { name: "Confirm all" }));
 
-    fireEvent.click(screen.getByTestId("companion-talk-mic-button"));
-    fireEvent.click(screen.getByTestId("companion-talk-send-button"));
+    expect(mocks.assistant.setDraftInput).toHaveBeenCalledWith("Move the rest of my quests to tomorrow");
+    expect(mocks.assistant.submitTypedMessage).toHaveBeenCalledTimes(1);
+    expect(mocks.assistant.toggleRecording).toHaveBeenCalledTimes(1);
+    expect(mocks.assistant.setHorizon).toHaveBeenCalledWith("week");
+    expect(mocks.assistant.confirmProposal).toHaveBeenCalledWith("proposal-1");
+    expect(mocks.assistant.rejectProposal).toHaveBeenCalledWith("proposal-1");
+    expect(mocks.assistant.confirmAll).toHaveBeenCalledTimes(1);
+  });
 
-    expect(mocks.chat.toggleRecording).toHaveBeenCalledTimes(1);
-    expect(mocks.chat.submitTypedMessage).toHaveBeenCalledTimes(1);
-
-    firstRender.unmount();
+  it("shows the premium notice while keeping the assistant available", () => {
     mocks.accessState.isSubscribed = false;
 
     render(<CompanionPlannerPanel />);
 
-    fireEvent.click(screen.getByTestId("planner-mic-button"));
-    fireEvent.click(screen.getByTestId("planner-send-button"));
-    fireEvent.click(screen.getByRole("button", { name: "Reject" }));
-
-    expect(mocks.planner.toggleRecording).toHaveBeenCalledTimes(1);
-    expect(mocks.planner.submitTypedMessage).toHaveBeenCalledTimes(1);
-    expect(mocks.planner.rejectProposal).toHaveBeenCalledWith("proposal-1");
-  });
-
-  it("keeps Plan available for non-premium users while showing the Talk upsell state", () => {
-    mocks.accessState.isSubscribed = false;
-
-    render(<CompanionPlannerPanel />);
-
-    expect(screen.getByTestId("companion-talk-locked")).toBeInTheDocument();
-    expect(screen.getByTestId("planner-text-input")).toBeInTheDocument();
-    expect(screen.queryByTestId("companion-talk-text-input")).not.toBeInTheDocument();
-  });
-
-  it("switches to Plan when Talk returns a planner handoff", async () => {
-    mocks.chatState.handoffToPlanner = true;
-    mocks.chatState.speechProvider = "none";
-
-    render(<CompanionPlannerPanel />);
-
-    await waitFor(() => {
-      expect(screen.getByTestId("planner-handoff-banner")).toBeInTheDocument();
-      expect(screen.getByTestId("planner-text-input")).toBeInTheDocument();
-    });
+    expect(screen.getByText(/conversation voice is premium/i)).toBeInTheDocument();
+    expect(screen.getByTestId("companion-assistant-text-input")).toBeInTheDocument();
   });
 });
