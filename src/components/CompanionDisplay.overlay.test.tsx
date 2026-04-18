@@ -236,8 +236,8 @@ vi.mock("@/components/companion/EvolutionPathBadge", () => ({
   EvolutionPathBadge: () => null,
 }));
 
-vi.mock("@/components/companion/CompanionPlannerPanel", () => ({
-  CompanionPlannerPanel: () => <div>Planner Panel</div>,
+vi.mock("@/components/companion/CompanionDialogue", () => ({
+  CompanionDialogue: () => <div>Dialogue Panel</div>,
 }));
 
 vi.mock("@/components/companion/WakeUpCelebration", () => ({
@@ -335,6 +335,7 @@ describe("CompanionDisplay overlay stack", () => {
     expect(screen.getByTestId("companion-visual-stage")).toHaveTextContent("Stage 2 • Initiate");
     expect(screen.getByTestId("companion-level-chip")).toHaveTextContent("Level 8");
     expect(screen.getByText("Bond")).toBeInTheDocument();
+    expect(screen.getByText("Dialogue Panel")).toBeInTheDocument();
     expect(outerShell.className).toContain("bg-white/[0.03]");
     expect(outerShell.className).toContain("backdrop-blur-none");
     expect(outerShell.className).toContain("border-white/10");

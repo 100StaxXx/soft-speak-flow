@@ -1,8 +1,10 @@
 import type { ReactNode } from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  chatDraftInput: "Talk me through tomorrow",
+  plannerDraftInput: "Make it a real quest",
   setChatDraftInput: vi.fn(),
   submitChatTypedMessage: vi.fn(),
   clearPlannerHandoff: vi.fn(),
@@ -11,7 +13,6 @@ const mocks = vi.hoisted(() => ({
   submitPlannerMessage: vi.fn().mockResolvedValue(undefined),
   confirmProposal: vi.fn(),
   rejectProposal: vi.fn(),
-  confirmAll: vi.fn(),
   pendingPlannerHandoffMessage: null as string | null,
   conversationMessages: [
     {
@@ -61,7 +62,7 @@ vi.mock("@/hooks/useJourneysCompanionVisual", () => ({
 vi.mock("@/hooks/useJourneysCompanionConversation", () => ({
   useJourneysCompanionConversation: () => ({
     messages: mocks.conversationMessages,
-    draftInput: "Talk me through tomorrow",
+    draftInput: mocks.chatDraftInput,
     setDraftInput: mocks.setChatDraftInput,
     isSubmitting: false,
     pendingPlannerHandoffMessage: mocks.pendingPlannerHandoffMessage,
@@ -77,7 +78,7 @@ vi.mock("@/hooks/useCompanionPlanner", () => ({
     questions: mocks.plannerQuestions,
     pendingProposals: mocks.pendingProposals,
     readyProposalCount: mocks.pendingProposals.filter((proposal) => proposal.readyToConfirm).length,
-    draftInput: "Make it a real quest",
+    draftInput: mocks.plannerDraftInput,
     setDraftInput: mocks.setPlannerDraftInput,
     isSubmitting: false,
     isClassifying: false,
@@ -85,7 +86,6 @@ vi.mock("@/hooks/useCompanionPlanner", () => ({
     submitMessage: mocks.submitPlannerMessage,
     confirmProposal: mocks.confirmProposal,
     rejectProposal: mocks.rejectProposal,
-    confirmAll: mocks.confirmAll,
   }),
 }));
 
@@ -108,8 +108,13 @@ vi.mock("@/components/ui/drawer", () => ({
 import { JourneysCompanionPlannerModal } from "./JourneysCompanionPlannerModal";
 
 describe("JourneysCompanionPlannerModal", () => {
+  const originalMatchMedia = window.matchMedia;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useRealTimers();
+    mocks.chatDraftInput = "Talk me through tomorrow";
+    mocks.plannerDraftInput = "Make it a real quest";
     mocks.pendingPlannerHandoffMessage = null;
     mocks.conversationMessages = [
       {
@@ -123,9 +128,25 @@ describe("JourneysCompanionPlannerModal", () => {
     mocks.plannerMessages = [];
     mocks.plannerQuestions = [];
     mocks.pendingProposals = [];
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      writable: true,
+      value: originalMatchMedia,
+    });
   });
 
-  it("renders the large companion opener state", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      writable: true,
+      value: originalMatchMedia,
+    });
+  });
+
+  it("renders the portrait rail and a single shared dialogue screen", () => {
+    vi.useFakeTimers();
+
     render(
       <JourneysCompanionPlannerModal
         open
@@ -133,14 +154,22 @@ describe("JourneysCompanionPlannerModal", () => {
         presentation="dialog"
       />,
     );
+
+    act(() => {
+      vi.runAllTimers();
+    });
 
     expect(screen.getByTestId("journeys-companion-planner-modal")).toBeInTheDocument();
-    expect(screen.getByText("Nova")).toBeInTheDocument();
+    expect(screen.getByTestId("journeys-companion-planner-portrait-rail")).toBeInTheDocument();
+    expect(screen.getByTestId("journeys-companion-planner-dialogue-screen")).toBeInTheDocument();
+    expect(screen.getAllByText("Nova")).toHaveLength(2);
     expect(screen.getByText("What's gucci fam?")).toBeInTheDocument();
-    expect(screen.getByTestId("journeys-companion-planner-transcript")).toBeInTheDocument();
+    expect(screen.queryByText("A light RPG-style overlay for talking through quests, momentum, and whatever is on your mind.")).not.toBeInTheDocument();
   });
 
-  it("routes chat composer changes and send through the journeys conversation hook", () => {
+  it("routes chat composer changes and send through the journeys conversation hook after typing finishes", () => {
+    vi.useFakeTimers();
+
     render(
       <JourneysCompanionPlannerModal
         open
@@ -148,6 +177,10 @@ describe("JourneysCompanionPlannerModal", () => {
         presentation="dialog"
       />,
     );
+
+    act(() => {
+      vi.runAllTimers();
+    });
 
     fireEvent.change(screen.getByTestId("journeys-companion-planner-text-input"), {
       target: { value: "Let me vent for a second" },
@@ -158,7 +191,97 @@ describe("JourneysCompanionPlannerModal", () => {
     expect(mocks.submitChatTypedMessage).toHaveBeenCalledTimes(1);
   });
 
-  it("switches into planner mode on handoff and keeps compact proposal actions inline", async () => {
+  it("reveals assistant text letter-by-letter and lets send finish the current line", () => {
+    vi.useFakeTimers();
+    mocks.chatDraftInput = "";
+    mocks.conversationMessages = [
+      {
+        id: "chat-1",
+        role: "assistant",
+        content: "Animate this line slowly",
+        createdAt: "2026-04-18T08:00:00.000Z",
+        isSeed: true,
+      },
+    ];
+
+    render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        presentation="dialog"
+      />,
+    );
+
+    expect(screen.queryByText("Animate this line slowly")).not.toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(54);
+    });
+
+    expect(screen.getByText(/^Ani/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("journeys-companion-planner-send-button"));
+
+    expect(screen.getByText("Animate this line slowly")).toBeInTheDocument();
+    expect(mocks.submitChatTypedMessage).not.toHaveBeenCalled();
+  });
+
+  it("lets tapping the dialogue screen finish the current assistant line", () => {
+    vi.useFakeTimers();
+    mocks.conversationMessages = [
+      {
+        id: "chat-1",
+        role: "assistant",
+        content: "Tap to finish me",
+        createdAt: "2026-04-18T08:00:00.000Z",
+        isSeed: true,
+      },
+    ];
+
+    render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        presentation="dialog"
+      />,
+    );
+
+    act(() => {
+      vi.advanceTimersByTime(36);
+    });
+
+    expect(screen.queryByText("Tap to finish me")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("journeys-companion-planner-dialogue-screen"));
+
+    expect(screen.getByText("Tap to finish me")).toBeInTheDocument();
+  });
+
+  it("renders assistant lines instantly when reduced motion is preferred", () => {
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      writable: true,
+      value: vi.fn().mockReturnValue({
+        matches: true,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+      }),
+    });
+
+    render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        presentation="dialog"
+      />,
+    );
+
+    expect(screen.getByText("What's gucci fam?")).toBeInTheDocument();
+  });
+
+  it("keeps planning in the same shell with inline options and only the active proposal visible", async () => {
     mocks.pendingPlannerHandoffMessage = "Plan tomorrow for me";
     mocks.conversationMessages = [
       {
@@ -208,6 +331,15 @@ describe("JourneysCompanionPlannerModal", () => {
         status: "pending",
         readyToConfirm: true,
       },
+      {
+        id: "proposal-2",
+        kind: "create_quest",
+        title: "Create Backup quest",
+        summary: "Keep a second backup focus block.",
+        payload: {},
+        status: "pending",
+        readyToConfirm: true,
+      },
     ];
 
     render(
@@ -221,12 +353,24 @@ describe("JourneysCompanionPlannerModal", () => {
     await waitFor(() => {
       expect(mocks.submitPlannerMessage).toHaveBeenCalledWith("Plan tomorrow for me", "text");
     });
+
     expect(mocks.clearPlannerHandoff).toHaveBeenCalledTimes(1);
-    expect(screen.getByTestId("journeys-companion-planner-handoff-banner")).toBeInTheDocument();
-    expect(screen.getByText("I can turn that into a clean quest flow.")).toBeInTheDocument();
-    expect(screen.getByTestId("journeys-companion-planner-questions")).toBeInTheDocument();
-    expect(screen.getByTestId("journeys-companion-planner-proposals")).toBeInTheDocument();
+    expect(screen.getByTestId("journeys-companion-planner-dialogue-screen")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText("I can turn that into a clean quest flow.")).toBeInTheDocument();
+      expect(screen.getByText("What time of day should this live in your schedule?")).toBeInTheDocument();
+    });
+    expect(screen.getByTestId("journeys-companion-planner-inline-options")).toBeInTheDocument();
+    expect(screen.getByTestId("journeys-companion-planner-inline-proposal")).toBeInTheDocument();
+    expect(screen.getByText("Create Focus quest")).toBeInTheDocument();
+    expect(screen.queryByText("Create Backup quest")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("journeys-companion-planner-handoff-banner")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("journeys-companion-planner-questions")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("journeys-companion-planner-proposals")).not.toBeInTheDocument();
     expect(screen.queryAllByText("Plan tomorrow for me")).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "Morning" }));
+    expect(mocks.submitPlannerMessage).toHaveBeenCalledWith("Morning", "text");
 
     fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
     fireEvent.click(screen.getByRole("button", { name: "Reject" }));

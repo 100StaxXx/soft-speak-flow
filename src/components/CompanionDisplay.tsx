@@ -21,7 +21,7 @@ import { CompanionRegenerateDialog } from "@/components/CompanionRegenerateDialo
 import { EvolveButton } from "@/components/companion/EvolveButton";
 import { EvolutionPathBadge } from "@/components/companion/EvolutionPathBadge";
 import { DormancyWarning, DormantOverlay } from "@/components/companion/DormancyWarning";
-import { CompanionPlannerPanel } from "@/components/companion/CompanionPlannerPanel";
+import { CompanionDialogue } from "@/components/companion/CompanionDialogue";
 import { CompanionMotionSurface } from "@/components/companion/motion/CompanionMotionSurface";
 import { WakeUpCelebration } from "@/components/companion/WakeUpCelebration";
 import { CompanionAttributes } from "@/components/CompanionAttributes";
@@ -944,7 +944,13 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
             )}
           </div>
 
-          <CompanionPlannerPanel />
+          <CompanionDialogue
+            className="mt-2"
+            companionName={displayedCreatureName}
+            companionOverride={displayCompanion}
+            progressToNextOverride={displayProgressToNext}
+            canEvolveOverride={displayCanEvolve}
+          />
 
           {/* Evolve Button - shows when ready */}
           <AnimatePresence>
