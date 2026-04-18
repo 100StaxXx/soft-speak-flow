@@ -49,6 +49,13 @@ export type CompanionElementId =
 
 export type CompanionVisualState = "normal" | "neglected" | "dormant";
 
+export type CompanionExpressionMood =
+  | "excited"
+  | "happy"
+  | "calm"
+  | "concerned"
+  | "sleepy";
+
 export type CompanionArtTier =
   | "t0_egg"
   | "t1_hatchling"
@@ -450,6 +457,16 @@ export type CompanionStorageArtTier =
   | "t4_mythic"
   | "t5_apex";
 
+export const COMPANION_EXPRESSION_MOODS = [
+  "excited",
+  "happy",
+  "calm",
+  "concerned",
+  "sleepy",
+] as const satisfies readonly CompanionExpressionMood[];
+
+export const COMPANION_EXPRESSION_VARIANT_COUNT = 5;
+
 const COMPANION_ART_TIER_STORAGE_FALLBACKS: Record<CompanionArtTier, CompanionStorageArtTier> = {
   t0_egg: "t0_egg",
   t1_hatchling: "t1_youth",
@@ -471,6 +488,14 @@ const buildRemoteCompanionPresetAssetCoverageKey = ({
   state: CompanionVisualState;
 }): string => `${presetId}:${tier}:${state}`;
 
+const buildExpressiveCompanionPresetAssetCoverageKey = ({
+  presetId,
+  tier,
+}: {
+  presetId: CompanionPresetId;
+  tier: CompanionArtTier;
+}): string => `${presetId}:${tier}`;
+
 const REMOTE_COMPANION_PRESET_ASSET_COVERAGE = new Set<string>([
   ...COMPANION_PRESETS_WITH_FULL_REMOTE_ASSET_COVERAGE.flatMap((presetId) =>
     COMPANION_ART_TIER_RANGES.flatMap(({ id: tier }) =>
@@ -490,6 +515,24 @@ const REMOTE_COMPANION_PRESET_ASSET_COVERAGE = new Set<string>([
       state: "normal",
     })),
 ]);
+
+const BUNDLED_EXPRESSIVE_COMPANION_PRESET_ASSET_COVERAGE = new Set<string>(
+  COMPANION_PRESETS_WITH_BUNDLED_YOUTH_ASSETS.map((presetId) =>
+    buildExpressiveCompanionPresetAssetCoverageKey({
+      presetId,
+      tier: "t1_hatchling",
+    }),
+  ),
+);
+
+const REMOTE_EXPRESSIVE_COMPANION_PRESET_ASSET_COVERAGE = new Set<string>(
+  COMPANION_PRESETS_WITH_INITIATE_NORMAL_REMOTE_ASSETS.map((presetId) =>
+    buildExpressiveCompanionPresetAssetCoverageKey({
+      presetId,
+      tier: "t2_initiate",
+    }),
+  ),
+);
 
 const normalizeKey = (value: string) =>
   value
@@ -592,6 +635,64 @@ export const hasRemoteCompanionPresetStageAssetCoverage = ({
 export const hasBundledYouthCompanionPresetAssets = (presetId: CompanionPresetId): boolean =>
   COMPANION_PRESETS_WITH_BUNDLED_YOUTH_ASSETS.includes(presetId);
 
+export const hasBundledCompanionPresetExpressiveAssetCoverage = ({
+  presetId,
+  tier,
+}: {
+  presetId: string | null | undefined;
+  tier: CompanionArtTier;
+}): boolean => {
+  const normalizedPresetId = coerceCompanionPresetId(presetId);
+  if (!normalizedPresetId) return false;
+
+  return BUNDLED_EXPRESSIVE_COMPANION_PRESET_ASSET_COVERAGE.has(
+    buildExpressiveCompanionPresetAssetCoverageKey({
+      presetId: normalizedPresetId,
+      tier,
+    }),
+  );
+};
+
+export const hasRemoteCompanionPresetExpressiveAssetCoverage = ({
+  presetId,
+  tier,
+}: {
+  presetId: string | null | undefined;
+  tier: CompanionArtTier;
+}): boolean => {
+  const normalizedPresetId = coerceCompanionPresetId(presetId);
+  if (!normalizedPresetId) return false;
+
+  return REMOTE_EXPRESSIVE_COMPANION_PRESET_ASSET_COVERAGE.has(
+    buildExpressiveCompanionPresetAssetCoverageKey({
+      presetId: normalizedPresetId,
+      tier,
+    }),
+  );
+};
+
+export const hasCompanionPresetExpressiveAssetCoverage = ({
+  presetId,
+  tier,
+}: {
+  presetId: string | null | undefined;
+  tier: CompanionArtTier;
+}): boolean =>
+  hasBundledCompanionPresetExpressiveAssetCoverage({ presetId, tier })
+  || hasRemoteCompanionPresetExpressiveAssetCoverage({ presetId, tier });
+
+export const hasCompanionPresetStageExpressiveAssetCoverage = ({
+  presetId,
+  stage,
+}: {
+  presetId: string | null | undefined;
+  stage: number;
+}): boolean =>
+  hasCompanionPresetExpressiveAssetCoverage({
+    presetId,
+    tier: resolveCompanionArtTier(stage),
+  });
+
 export const getCompanionElement = (elementId: string | null | undefined): CompanionElementDefinition => {
   const normalized = coerceCompanionElementId(elementId);
   return ELEMENT_LOOKUP.get(normalized) ?? COMPANION_ELEMENTS[0];
@@ -647,6 +748,46 @@ export const buildCompanionPresetAssetPath = ({
   return `${presetId}/${storageTier}/${state}/${buildCompanionPresetAssetFilename({ presetId, tier, state, element })}`;
 };
 
+export const buildCompanionExpressiveAssetFilename = ({
+  presetId,
+  tier,
+  mood,
+  variant,
+  element,
+}: {
+  presetId: CompanionPresetId;
+  tier: CompanionArtTier;
+  mood: CompanionExpressionMood;
+  variant: number;
+  element: CompanionElementId;
+}): string => {
+  const storageTier = COMPANION_ART_TIER_STORAGE_FALLBACKS[tier];
+  return `${presetId}__${storageTier}__${mood}__v${variant}__${element}.png`;
+};
+
+export const buildCompanionExpressiveAssetPath = ({
+  presetId,
+  tier,
+  mood,
+  variant,
+  element,
+}: {
+  presetId: CompanionPresetId;
+  tier: CompanionArtTier;
+  mood: CompanionExpressionMood;
+  variant: number;
+  element: CompanionElementId;
+}): string => {
+  const storageTier = COMPANION_ART_TIER_STORAGE_FALLBACKS[tier];
+  return `${presetId}/${storageTier}/${mood}/${buildCompanionExpressiveAssetFilename({
+    presetId,
+    tier,
+    mood,
+    variant,
+    element,
+  })}`;
+};
+
 export const resolveCompanionAssetPath = ({
   presetId,
   stage,
@@ -662,6 +803,27 @@ export const resolveCompanionAssetPath = ({
     presetId,
     tier: resolveCompanionArtTier(stage),
     state,
+    element,
+  });
+
+export const resolveCompanionExpressiveAssetPath = ({
+  presetId,
+  stage,
+  mood,
+  variant,
+  element,
+}: {
+  presetId: CompanionPresetId;
+  stage: number;
+  mood: CompanionExpressionMood;
+  variant: number;
+  element: CompanionElementId;
+}): string =>
+  buildCompanionExpressiveAssetPath({
+    presetId,
+    tier: resolveCompanionArtTier(stage),
+    mood,
+    variant,
     element,
   });
 

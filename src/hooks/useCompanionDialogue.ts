@@ -1,4 +1,3 @@
-import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   selectCompanionDialogueEvent,
@@ -11,14 +10,20 @@ import type {
   CompanionDialogueTonePack,
   CompanionShimmerType,
 } from "@/config/companionDialoguePacks";
-import { supabase } from "@/integrations/supabase/client";
+import {
+  LOCKED_COMPANION_BOND_LEVEL_DIALOGUE,
+  LOCKED_COMPANION_ENCOURAGEMENT_TEMPLATES,
+  LOCKED_COMPANION_PERSONALITY_TRAITS,
+  LOCKED_COMPANION_TONE_PACK,
+  LOCKED_COMPANION_VOICE_STYLE,
+} from "@/shared/companionChaosVoice";
 import { useAuth } from "./useAuth";
 import { useCompanion } from "./useCompanion";
 import { useCompanionCareSignals } from "./useCompanionCareSignals";
 
 const MIN_DIALOGUE_REFRESH_INTERVAL_MS = 90 * 1000;
 const PASSIVE_DIALOGUE_REFRESH_MS = 35 * 60 * 1000;
-const DEFAULT_GREETING = "Could we spend a little focused time together?";
+const DEFAULT_GREETING = "Hot take: one focused move would improve this timeline immediately, you beautiful little disaster.";
 
 type DialogueEventState = {
   greeting: string;
@@ -30,7 +35,7 @@ type DialogueEventState = {
   lineId: string;
 };
 
-const DIALOGUE_FALLBACK_LINE_ID = "soft.base_greetings.00";
+const DIALOGUE_FALLBACK_LINE_ID = `${LOCKED_COMPANION_TONE_PACK}.base_greetings.01`;
 
 const toDialogueEventState = (selected: {
   greeting: string;
@@ -74,20 +79,20 @@ const createBootstrapDialogueEvent = (): DialogueEventState => {
       shimmerType: "none",
       microTitle: null,
       outcomeTag: "basic_checkin",
-      tonePack: "soft",
+      tonePack: LOCKED_COMPANION_TONE_PACK,
       bucketKey: "base_greetings",
       lineId: DIALOGUE_FALLBACK_LINE_ID,
     };
   }
 };
 
-interface VoiceTemplate {
-  species: string;
-  voice_style: string;
-  personality_traits: string[];
-  encouragement_templates: string[];
-  bond_level_dialogue: Record<string, string[]>;
-}
+const LOCKED_COMPANION_VOICE_TEMPLATE = {
+  species: "universal",
+  voice_style: LOCKED_COMPANION_VOICE_STYLE,
+  personality_traits: [...LOCKED_COMPANION_PERSONALITY_TRAITS],
+  encouragement_templates: [...LOCKED_COMPANION_ENCOURAGEMENT_TEMPLATES],
+  bond_level_dialogue: LOCKED_COMPANION_BOND_LEVEL_DIALOGUE,
+} as const;
 
 export type DialogueMood = SelectorDialogueMood;
 
@@ -113,33 +118,7 @@ export function useCompanionDialogue() {
   const { user } = useAuth();
   const { companion, progressToNext, nextEvolutionXP } = useCompanion();
   const { care, isLoading: careLoading } = useCompanionCareSignals();
-
-  const { data: voiceTemplate, isLoading: templateLoading } = useQuery({
-    queryKey: ["companion-voice-template"],
-    queryFn: async (): Promise<VoiceTemplate | null> => {
-      const { data, error } = await supabase
-        .from("companion_voice_templates")
-        .select("species, voice_style, personality_traits, encouragement_templates, bond_level_dialogue")
-        .eq("species", "universal")
-        .maybeSingle();
-
-      if (error) {
-        console.error("Failed to fetch voice template:", error);
-        return null;
-      }
-
-      if (!data) return null;
-
-      return {
-        species: data.species,
-        voice_style: data.voice_style,
-        personality_traits: data.personality_traits || [],
-        encouragement_templates: data.encouragement_templates || [],
-        bond_level_dialogue: (data.bond_level_dialogue as Record<string, string[]>) || {},
-      };
-    },
-    staleTime: 1000 * 60 * 5,
-  });
+  const voiceTemplate = LOCKED_COMPANION_VOICE_TEMPLATE;
 
   const dialogueMood = useMemo((): DialogueMood => {
     if (!care) return "content";
@@ -186,7 +165,7 @@ export function useCompanionDialogue() {
         companion && typeof nextEvolutionXP === "number"
           ? Math.max(0, nextEvolutionXP - companion.current_xp)
           : Number.MAX_SAFE_INTEGER,
-      voiceStyle: voiceTemplate?.voice_style ?? "",
+      voiceStyle: voiceTemplate.voice_style,
       needsClarity:
         !care?.hasDormancyWarning
         && (dialogueMood === "content" || dialogueMood === "thriving")
@@ -204,7 +183,6 @@ export function useCompanionDialogue() {
       companion,
       progressToNext,
       nextEvolutionXP,
-      voiceTemplate?.voice_style,
       hasRequiredContext,
     ],
   );
@@ -315,7 +293,7 @@ export function useCompanionDialogue() {
   }, []);
 
   const bondDialogue = useMemo(() => {
-    if (!voiceTemplate || !care?.bond) return null;
+    if (!care?.bond) return null;
 
     const bondLevel = Math.min(5, Math.max(1, care.bond.level));
     const bondLines = voiceTemplate.bond_level_dialogue?.[String(bondLevel)];
@@ -325,7 +303,6 @@ export function useCompanionDialogue() {
   }, [voiceTemplate, care?.bond, pickRandom]);
 
   const encouragement = useMemo(() => {
-    if (!voiceTemplate) return null;
     return pickRandom(voiceTemplate.encouragement_templates, "encouragement");
   }, [voiceTemplate, pickRandom]);
 
@@ -347,6 +324,6 @@ export function useCompanionDialogue() {
     bucketKey: dialogueEvent.bucketKey,
     lineId: dialogueEvent.lineId,
     refreshDialogue,
-    isLoading: templateLoading || careLoading,
+    isLoading: careLoading,
   };
 }

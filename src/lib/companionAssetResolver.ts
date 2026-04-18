@@ -2,13 +2,18 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   COMPANION_PRESET_BUCKET,
   COMPANION_PREVIEW_TIER,
+  COMPANION_EXPRESSION_VARIANT_COUNT,
   coerceCompanionElementId,
   coerceCompanionPresetId,
+  hasBundledCompanionPresetExpressiveAssetCoverage,
   hasBundledYouthCompanionPresetAssets,
+  hasRemoteCompanionPresetExpressiveAssetCoverage,
   hasRemoteCompanionPresetStageAssetCoverage,
   resolveCompanionAssetPath,
   resolveBundledYouthCompanionAssetPath,
   resolveCompanionArtTier,
+  resolveCompanionExpressiveAssetPath,
+  type CompanionExpressionMood,
   type CompanionVisualState,
 } from "@/config/companionCatalog";
 
@@ -88,6 +93,87 @@ export const getPresetCompanionAssetUrl = ({
   }
 
   return state === "normal" ? bundledYouthUrl : null;
+};
+
+export const getPresetCompanionExpressiveAssetUrl = ({
+  presetId,
+  stage,
+  element,
+  mood,
+  variant,
+}: {
+  presetId: string;
+  stage: number;
+  element: string;
+  mood: CompanionExpressionMood;
+  variant: number;
+}): string | null => {
+  const normalizedPresetId = coerceCompanionPresetId(presetId);
+  if (!normalizedPresetId || stage <= 0) return null;
+
+  const normalizedElement = coerceCompanionElementId(element);
+  const normalizedVariant = Math.max(1, Math.min(COMPANION_EXPRESSION_VARIANT_COUNT, Math.floor(variant)));
+  const tier = resolveCompanionArtTier(stage);
+
+  if (
+    hasBundledCompanionPresetExpressiveAssetCoverage({
+      presetId: normalizedPresetId,
+      tier,
+    })
+  ) {
+    return `/${COMPANION_PRESET_BUCKET}/${resolveCompanionExpressiveAssetPath({
+      presetId: normalizedPresetId,
+      stage,
+      mood,
+      variant: normalizedVariant,
+      element: normalizedElement,
+    })}`;
+  }
+
+  if (
+    hasRemoteCompanionPresetExpressiveAssetCoverage({
+      presetId: normalizedPresetId,
+      tier,
+    })
+  ) {
+    return supabase.storage
+      .from(COMPANION_PRESET_BUCKET)
+      .getPublicUrl(
+        resolveCompanionExpressiveAssetPath({
+          presetId: normalizedPresetId,
+          stage,
+          mood,
+          variant: normalizedVariant,
+          element: normalizedElement,
+        }),
+      )
+      .data.publicUrl;
+  }
+
+  return null;
+};
+
+export const resolveCompanionExpressiveAssetUrl = (
+  companion: CompanionAssetSource | null | undefined,
+  {
+    mood,
+    variant,
+  }: {
+    mood: CompanionExpressionMood;
+    variant: number;
+  },
+): string | null => {
+  if (!companion?.preset_id || (companion.current_stage ?? 0) <= 0) {
+    return null;
+  }
+
+  return getPresetCompanionExpressiveAssetUrl({
+    presetId: companion.preset_id,
+    stage: companion.current_stage ?? 0,
+    element: companion.core_element ?? "fire",
+    mood,
+    variant,
+  });
 };
 
 export const resolveCompanionVisualAssetUrl = (

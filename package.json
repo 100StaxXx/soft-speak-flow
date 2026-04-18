@@ -28,6 +28,8 @@
     "companions:stage2:generate-sheets": "node --import tsx scripts/generate-companion-stage2-sheets.ts",
     "companions:stage2:extract-sheet": "node --import tsx scripts/extract-companion-element-sheet.ts",
     "companions:stage2:sheets": "node --import tsx scripts/render-companion-stage2-contact-sheets.ts",
+    "companions:expressive:manifest": "node --import tsx scripts/generate-companion-expressive-manifest.ts",
+    "companions:expressive:sheets": "node --import tsx scripts/render-companion-expressive-contact-sheets.ts",
     "companions:portraits:refresh": "node scripts/refresh-companion-portrait-assets.mjs",
     "companions:hatchlings:import": "node --import tsx scripts/import-companion-hatchling-assets.ts",
     "companions:hatchlings:pipeline": "npm run companions:hatchlings:import",

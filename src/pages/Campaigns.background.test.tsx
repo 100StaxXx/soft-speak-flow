@@ -52,6 +52,7 @@ vi.mock("@/hooks/useEpics", () => ({
     isLoading: false,
     createEpic: vi.fn(),
     isCreating: false,
+    renameEpic: vi.fn(),
     updateEpicStatus: vi.fn(),
   }),
 }));
@@ -64,12 +65,11 @@ describe("Campaigns background", () => {
 
     expect(screen.getByTestId("cinematic-background")).toHaveAttribute("data-preset", "campaigns");
     expect(screen.queryByText("Campaign command center")).not.toBeInTheDocument();
-    expect(screen.getByTestId("campaigns-create-button")).toHaveClass("bg-celestial-blue/14");
     expect(screen.getByTestId("campaigns-empty-state-button")).toHaveClass("bg-celestial-blue/14");
-    expect(screen.getByTestId("campaigns-stat-active")).toHaveClass("border-celestial-blue/18");
-    expect(screen.getByTestId("campaigns-stat-active").className).toContain("bg-transparent");
-    expect(screen.getByTestId("campaigns-stat-active").className).toContain("backdrop-blur-none");
-    expect(screen.getByTestId("campaigns-stat-active").className).toContain("shadow-none");
+    expect(screen.queryByTestId("campaigns-create-button")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("campaigns-stat-active")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("campaigns-stat-completed")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("campaigns-stat-completion")).not.toBeInTheDocument();
     expect(screen.getByTestId("campaigns-empty-state-panel")).toHaveClass("border-celestial-blue/18");
     expect(screen.getByTestId("campaigns-empty-state-panel")).toHaveClass("border-dashed");
     expect(screen.getByTestId("campaigns-empty-state-panel").className).toContain("bg-transparent");

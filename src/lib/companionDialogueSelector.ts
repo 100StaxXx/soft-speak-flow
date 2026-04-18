@@ -7,6 +7,7 @@ import {
   getAllLinesForBucket,
   getLinesForToneAndBucket,
 } from "@/config/companionDialoguePacks";
+import { LOCKED_COMPANION_TONE_PACK } from "@/shared/companionChaosVoice";
 import { safeLocalStorage } from "@/utils/storage";
 
 export type DialogueMood = "thriving" | "content" | "concerned" | "desperate" | "recovering";
@@ -111,12 +112,10 @@ const BUCKETS_BY_SHIMMER: Record<CompanionShimmerType, CompanionDialogueBucketKe
   gold: ["legendary_moments"],
 };
 
-const TONE_PRIORS: Record<DialogueMood, Record<CompanionDialogueTonePack, number>> = {
-  thriving: { soft: 0.15, playful: 0.45, witty_sassy: 0.4 },
-  content: { soft: 0.25, playful: 0.4, witty_sassy: 0.35 },
-  concerned: { soft: 0.5, playful: 0.2, witty_sassy: 0.3 },
-  desperate: { soft: 0.65, playful: 0.1, witty_sassy: 0.25 },
-  recovering: { soft: 0.5, playful: 0.35, witty_sassy: 0.15 },
+const LOCKED_TONE_WEIGHTS: Record<CompanionDialogueTonePack, number> = {
+  soft: 0,
+  playful: 0,
+  witty_sassy: 1,
 };
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
@@ -178,27 +177,12 @@ const pickWeighted = <T extends string>(weights: Record<T, number>, rng: () => n
   return entries[entries.length - 1][0];
 };
 
-const getToneWeightsForMood = (mood: DialogueMood) => ({ ...TONE_PRIORS[mood] });
+const getToneWeightsForMood = (_mood: DialogueMood) => ({ ...LOCKED_TONE_WEIGHTS });
 
 const applyVoiceStyleBias = (
   weights: Record<CompanionDialogueTonePack, number>,
-  voiceStyle?: string,
-) => {
-  if (!voiceStyle) return weights;
-
-  const normalizedStyle = voiceStyle.toLowerCase();
-  if (/(warm|gentle|calm|nurtur|compassion|soft)/.test(normalizedStyle)) {
-    weights.soft += 0.15;
-  }
-  if (/(playful|energetic|light|fun|upbeat)/.test(normalizedStyle)) {
-    weights.playful += 0.15;
-  }
-  if (/(direct|sharp|bold|blunt|crisp)/.test(normalizedStyle)) {
-    weights.witty_sassy += 0.15;
-  }
-
-  return weights;
-};
+  _voiceStyle?: string,
+) => weights;
 
 const getBucketsForShimmer = (shimmerType: CompanionShimmerType) => BUCKETS_BY_SHIMMER[shimmerType];
 
@@ -517,7 +501,7 @@ export const selectDialogueLineCandidate = ({
   const baseCandidates = filterLinesAgainstHistory(getAllLinesForBucket("base_greetings"), history, now);
   const baseLine =
     pickLineFromCandidates(baseCandidates, rng)
-    ?? getLinesForToneAndBucket("soft", "base_greetings")[0];
+    ?? getLinesForToneAndBucket(LOCKED_COMPANION_TONE_PACK, "base_greetings")[0];
 
   return {
     line: baseLine,

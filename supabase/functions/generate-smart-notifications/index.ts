@@ -15,6 +15,14 @@ import {
   isAssignedCompanionName,
   resolveNotificationCompanionContext,
 } from "../_shared/companionName.ts";
+import {
+  LOCKED_COMPANION_CONCERN_TEMPLATES,
+  LOCKED_COMPANION_ENCOURAGEMENT_TEMPLATES,
+  LOCKED_COMPANION_GREETING_TEMPLATES,
+  LOCKED_COMPANION_PERSONALITY_TRAITS,
+  LOCKED_COMPANION_VOICE_GUARDRAILS,
+  LOCKED_COMPANION_VOICE_STYLE,
+} from "../../../src/shared/companionChaosVoice.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -61,15 +69,13 @@ interface VoiceTemplate {
   concernTemplates: string[];
 }
 
-const resolveVoiceTemplate = (
-  templateMap: Map<string, VoiceTemplate>,
-  spiritAnimal: string,
-): VoiceTemplate | null => {
-  const normalizedSpecies = spiritAnimal.toLowerCase();
-  return (
-    templateMap.get(normalizedSpecies)
-    ?? (normalizedSpecies === 'kitsune' ? templateMap.get('fox') ?? null : null)
-  );
+const LOCKED_NOTIFICATION_VOICE_TEMPLATE: VoiceTemplate = {
+  species: "universal",
+  personalityTraits: [...LOCKED_COMPANION_PERSONALITY_TRAITS],
+  voiceStyle: LOCKED_COMPANION_VOICE_STYLE,
+  greetingTemplates: [...LOCKED_COMPANION_GREETING_TEMPLATES],
+  encouragementTemplates: [...LOCKED_COMPANION_ENCOURAGEMENT_TEMPLATES],
+  concernTemplates: [...LOCKED_COMPANION_CONCERN_TEMPLATES],
 };
 
 // Calculate lunar phase (simplified)
@@ -155,7 +161,7 @@ const selectNotificationType = (context: UserContext): string => {
 const generateNotificationContent = async (
   context: UserContext,
   notificationType: string,
-  voiceTemplate: VoiceTemplate | null,
+  voiceTemplate: VoiceTemplate,
   openAIApiKey: string
 ): Promise<{ title: string; body: string }> => {
   
@@ -190,15 +196,16 @@ const generateNotificationContent = async (
   let systemPrompt = '';
   let userPrompt = '';
   
-  if (voiceTemplate) {
-    systemPrompt = `You are ${hasAssignedCompanionName ? assignedCompanionName : 'a loyal companion'} with these traits: ${voiceTemplate.personalityTraits.join(', ')}.
+  systemPrompt = `You are ${hasAssignedCompanionName ? assignedCompanionName : 'a loyal companion'} with these traits: ${voiceTemplate.personalityTraits.join(', ')}.
 Voice style: ${voiceTemplate.voiceStyle}
 You speak in first person as the companion, directly to your human.
 Keep messages SHORT (1-2 sentences max). Be warm but authentic to your personality.
-Never use emojis in the message body. Never start with "Hey" or generic greetings.`;
-    if (spiritLockPromptBlock) {
-      systemPrompt += `\n${spiritLockPromptBlock}\nCRITICAL: Do not use any organic body language. Keep diction explicitly mechanical.`;
-    }
+Never use emojis in the message body. Never start with "Hey" or generic greetings.
+Avoid therapy-speak, Hallmark sweetness, or generic cheerleading.
+Lean savage rather than gentle when roasting helps the line land, but never make the human feel attacked.
+${LOCKED_COMPANION_VOICE_GUARDRAILS.join("\n")}`;
+  if (spiritLockPromptBlock) {
+    systemPrompt += `\n${spiritLockPromptBlock}\nCRITICAL: Do not use any organic body language. Keep diction explicitly mechanical.`;
   }
   
   switch (notificationType) {
@@ -444,29 +451,22 @@ Make the companion feel cosmically attuned, sharing this celestial wisdom as a g
     console.error('Error generating notification:', error);
     
     // Fallback to template-based message
-    if (voiceTemplate) {
-      const templates = notificationType.includes('concern') || notificationType === 'neglect_escalation'
-        ? voiceTemplate.concernTemplates
-        : notificationType.includes('morning')
-        ? voiceTemplate.greetingTemplates
-        : voiceTemplate.encouragementTemplates;
-      
-      const randomTemplate = templates[Math.floor(Math.random() * templates.length)] || "I'm here for you.";
-      const fallbackBody = spiritLockProfile
-        ? evaluateSpiritLockTextCompliance(randomTemplate, spiritLockProfile).isCompliant
-          ? randomTemplate
-          : spiritLockFallbackBody
-        : randomTemplate;
-      
-      return {
-        title: `From ${companionReference}`,
-        body: fallbackBody,
-      };
-    }
-    
+    const templates = notificationType.includes('concern') || notificationType === 'neglect_escalation'
+      ? voiceTemplate.concernTemplates
+      : notificationType.includes('morning')
+      ? voiceTemplate.greetingTemplates
+      : voiceTemplate.encouragementTemplates;
+
+    const randomTemplate = templates[Math.floor(Math.random() * templates.length)] || "I am still here, and one move changes everything.";
+    const fallbackBody = spiritLockProfile
+      ? evaluateSpiritLockTextCompliance(randomTemplate, spiritLockProfile).isCompliant
+        ? randomTemplate
+        : spiritLockFallbackBody
+      : randomTemplate;
+
     return {
-      title: 'Your companion',
-      body: spiritLockProfile ? spiritLockFallbackBody : "I'm thinking of you today.",
+      title: `From ${companionReference}`,
+      body: fallbackBody,
     };
   }
 };
@@ -508,23 +508,6 @@ serve(async (req) => {
     }
 
     console.log(`Processing ${profiles?.length || 0} profiles...`);
-
-    // Get voice templates
-    const { data: voiceTemplates } = await supabase
-      .from('companion_voice_templates')
-      .select('*');
-
-    const templateMap = new Map<string, VoiceTemplate>();
-    voiceTemplates?.forEach(t => {
-      templateMap.set(t.species.toLowerCase(), {
-        species: t.species,
-        personalityTraits: t.personality_traits,
-        voiceStyle: t.voice_style,
-        greetingTemplates: t.greeting_templates,
-        encouragementTemplates: t.encouragement_templates,
-        concernTemplates: t.concern_templates,
-      });
-    });
 
     let notificationsQueued = 0;
     const today = new Date().toLocaleDateString('en-CA');
@@ -648,14 +631,11 @@ serve(async (req) => {
         // Select notification type
         const notificationType = selectNotificationType(userContext);
         
-        // Get voice template for this species
-        const voiceTemplate = resolveVoiceTemplate(templateMap, userContext.companion.spiritAnimal);
-
         // Generate notification content
         const { title, body } = await generateNotificationContent(
           userContext,
           notificationType,
-          voiceTemplate,
+          LOCKED_NOTIFICATION_VOICE_TEMPLATE,
           openAIApiKey
         );
 

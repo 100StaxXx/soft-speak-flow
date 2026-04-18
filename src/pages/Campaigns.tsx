@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Plus, Sparkles, Target, Trophy } from "lucide-react";
 import { PageTransition } from "@/components/PageTransition";
@@ -20,10 +20,6 @@ interface CreatedCampaignData {
   habits: Array<{ title: string }>;
 }
 
-const CAMPAIGN_STAT_CARD_CLASS = cn(
-  "rounded-[24px] border border-celestial-blue/18 p-4",
-  clearShellCardClassName,
-);
 const CAMPAIGN_CTA_CLASS = "gap-2 border-celestial-blue/32 bg-celestial-blue/14 text-cyan-50 shadow-[0_14px_32px_rgba(16,75,130,0.2)] backdrop-blur-xl hover:bg-celestial-blue/20 hover:border-celestial-blue/42 hover:text-white";
 const CAMPAIGN_PANEL_CLASS = cn(
   "rounded-[32px] border border-celestial-blue/18",
@@ -49,16 +45,6 @@ const Campaigns = () => {
 
   const hasCampaigns = activeEpics.length > 0 || completedEpics.length > 0;
   const hasReachedLimit = hasReachedActiveCampaignLimit(activeEpics.length);
-  const completionRate = useMemo(() => {
-    if (activeEpics.length === 0) return 0;
-
-    const totalProgress = activeEpics.reduce(
-      (sum, epic) => sum + (epic.progress_percentage ?? 0),
-      0,
-    );
-
-    return Math.round(totalProgress / activeEpics.length);
-  }, [activeEpics]);
 
   const handleCreateCampaign = useCallback(async (data: Parameters<typeof createEpic>[0]) => {
     try {
@@ -104,58 +90,7 @@ const Campaigns = () => {
           <motion.div
             initial={prefersReducedMotion ? false : { opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: prefersReducedMotion ? 0 : 0.04, duration: prefersReducedMotion ? 0 : 0.2 }}
-            className="mb-6 grid gap-3 sm:grid-cols-3"
-          >
-            {[
-              { label: "Active", value: activeEpics.length, accent: "text-celestial-blue" },
-              { label: "Completed", value: completedEpics.length, accent: "text-sky-200" },
-              { label: "Completion", value: `${completionRate}%`, accent: "text-stardust-gold" },
-            ].map((stat) => (
-              <div
-                key={stat.label}
-                data-testid={`campaigns-stat-${stat.label.toLowerCase()}`}
-                className={CAMPAIGN_STAT_CARD_CLASS}
-              >
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/75">{stat.label}</p>
-                <p className={cn("mt-2 text-2xl font-semibold", stat.accent)}>{stat.value}</p>
-              </div>
-            ))}
-          </motion.div>
-
-          <motion.div
-            initial={prefersReducedMotion ? false : { opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
             transition={{ delay: prefersReducedMotion ? 0 : 0.08, duration: prefersReducedMotion ? 0 : 0.2 }}
-            className="mb-6 flex flex-wrap items-center gap-3"
-          >
-            <Button
-              type="button"
-              size="lg"
-              variant="outline"
-                data-testid="campaigns-create-button"
-                className={CAMPAIGN_CTA_CLASS}
-                disabled={hasReachedLimit}
-                onClick={() => setShowPathfinder(true)}
-            >
-              <Plus className="h-4 w-4" />
-              {hasCampaigns ? "Create campaign" : "Start your first campaign"}
-            </Button>
-            {hasReachedLimit ? (
-              <p className="text-sm text-muted-foreground">
-                {ACTIVE_CAMPAIGN_LIMIT_MESSAGE}
-              </p>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Use campaigns to turn bigger goals into repeatable rituals.
-              </p>
-            )}
-          </motion.div>
-
-          <motion.div
-            initial={prefersReducedMotion ? false : { opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: prefersReducedMotion ? 0 : 0.12, duration: prefersReducedMotion ? 0 : 0.2 }}
             className="space-y-6"
           >
             {isLoading ? (
@@ -193,10 +128,35 @@ const Campaigns = () => {
               </div>
             ) : (
               <>
-                <section>
-                  <div className="mb-3 flex items-center gap-2 text-sm font-medium uppercase tracking-wide text-muted-foreground">
-                    <Target className="h-4 w-4 text-celestial-blue" />
-                    Active campaigns
+                <section data-testid="campaigns-existing-section">
+                  <div className="mb-4 space-y-3">
+                    <div className="flex items-center gap-2 text-sm font-medium uppercase tracking-wide text-muted-foreground">
+                      <Target className="h-4 w-4 text-celestial-blue" />
+                      Existing campaigns
+                    </div>
+                    <div className="flex flex-col items-start gap-3">
+                      <Button
+                        type="button"
+                        size="lg"
+                        variant="outline"
+                        data-testid="campaigns-create-button"
+                        className={CAMPAIGN_CTA_CLASS}
+                        disabled={hasReachedLimit}
+                        onClick={() => setShowPathfinder(true)}
+                      >
+                        <Plus className="h-4 w-4" />
+                        Create campaign
+                      </Button>
+                      {hasReachedLimit ? (
+                        <p className="text-sm text-muted-foreground">
+                          {ACTIVE_CAMPAIGN_LIMIT_MESSAGE}
+                        </p>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">
+                          Use campaigns to turn bigger goals into repeatable rituals.
+                        </p>
+                      )}
+                    </div>
                   </div>
                   <div className="space-y-4">
                     {activeEpics.length > 0 ? (

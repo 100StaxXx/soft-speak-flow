@@ -202,6 +202,12 @@ verify_jwt = true
 [functions.mentor-chat]
 verify_jwt = true
 
+[functions.companion-chat]
+verify_jwt = true
+
+[functions.generate-companion-tts]
+verify_jwt = true
+
 [functions.send-apns-notification]
 verify_jwt = false
 

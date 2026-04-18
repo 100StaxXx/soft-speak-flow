@@ -81,3 +81,36 @@ companion-presets/
 4. Derive the six element variants for each preset tier.
 5. Derive `neglected` and `dormant` from the matching preset tier+element render.
 6. QA for silhouette drift, framing drift, and anatomy violations before upload.
+
+## Expressive Portraits v1
+- Runtime moods: `excited`, `happy`, `calm`, `concerned`, `sleepy`
+- Alternates: `v1..v5` for each mood
+- Rollout tiers: `t1_youth` and `t2_guardian` only for the first expressive pass
+- Elements remain unchanged: `fire`, `ice`, `storm`, `nature`, `void`, `light`
+- Expression variants must preserve the same model sheet identity, crop family, and silhouette lock as the matching base portrait
+
+### Expressive filename convention
+```text
+dragon__t1_youth__happy__v3__fire.png
+griffin__t2_guardian__concerned__v5__void.png
+buttercat__t1_youth__sleepy__v1__light.png
+```
+
+### Expressive storage layout
+```text
+companion-presets/
+  {preset_slug}/
+    {tier}/
+      {expression}/
+        {preset_slug}__{tier}__{expression}__v{1-5}__{element}.png
+```
+
+### Expressive asset count
+- Per tier+element pack: `5 moods * 5 variants = 25`
+- v1 shipped tiers per preset: `2 tiers * 6 elements * 25 = 300`
+- Active roster v1 expressive total: `13 presets * 300 = 3900`
+
+### Expressive review tooling
+- Manifest + prompt pack: `npm run companions:expressive:manifest`
+- 5x5 review sheets: `npm run companions:expressive:sheets`
+- Review sheet layout: rows = moods, columns = variants, one sheet per preset+tier+element

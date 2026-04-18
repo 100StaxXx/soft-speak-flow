@@ -1,6 +1,6 @@
 import type { HTMLAttributes, ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 
 type MockEpic = {
   id: string;
@@ -98,13 +98,13 @@ vi.mock("@/hooks/useEpics", () => ({
 
 import Campaigns from "./Campaigns";
 
-describe("Campaigns completion summary", () => {
+describe("Campaigns populated layout", () => {
   beforeEach(() => {
     mocks.activeEpics = [];
     mocks.completedEpics = [];
   });
 
-  it("reflects the active campaign progress when completed campaigns also exist", () => {
+  it("places the create button inside the existing campaigns section above the active campaign cards", () => {
     mocks.activeEpics = [createEpic({ id: "active-1", status: "active", progress_percentage: 40 })];
     mocks.completedEpics = [
       createEpic({ id: "completed-1", status: "completed", progress_percentage: 100 }),
@@ -113,33 +113,27 @@ describe("Campaigns completion summary", () => {
 
     render(<Campaigns />);
 
-    expect(screen.getByTestId("campaigns-stat-completion")).toHaveTextContent("40%");
+    const existingSection = screen.getByTestId("campaigns-existing-section");
+    const createButton = within(existingSection).getByTestId("campaigns-create-button");
+    const firstCampaignCard = within(existingSection).getAllByTestId("journey-card")[0];
+
+    expect(within(existingSection).getByText("Existing campaigns")).toBeInTheDocument();
+    expect(
+      createButton.compareDocumentPosition(firstCampaignCard) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 
-  it("averages the progress across active campaigns", () => {
+  it("does not render the removed campaign summary stats", () => {
     mocks.activeEpics = [
       createEpic({ id: "active-1", status: "active", progress_percentage: 10 }),
       createEpic({ id: "active-2", status: "active", progress_percentage: 90 }),
     ];
-
-    render(<Campaigns />);
-
-    expect(screen.getByTestId("campaigns-stat-completion")).toHaveTextContent("50%");
-  });
-
-  it("shows 0 percent when there are no active campaigns", () => {
     mocks.completedEpics = [createEpic({ id: "completed-1", status: "completed", progress_percentage: 100 })];
 
     render(<Campaigns />);
 
-    expect(screen.getByTestId("campaigns-stat-completion")).toHaveTextContent("0%");
-  });
-
-  it("treats missing active progress as zero", () => {
-    mocks.activeEpics = [createEpic({ id: "active-1", status: "active", progress_percentage: null })];
-
-    render(<Campaigns />);
-
-    expect(screen.getByTestId("campaigns-stat-completion")).toHaveTextContent("0%");
+    expect(screen.queryByTestId("campaigns-stat-active")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("campaigns-stat-completed")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("campaigns-stat-completion")).not.toBeInTheDocument();
   });
 });

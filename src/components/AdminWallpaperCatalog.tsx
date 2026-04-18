@@ -186,7 +186,7 @@ export const AdminWallpaperCatalog = () => {
         <div>
           <h2 className="font-heading text-2xl font-semibold">Wallpaper Catalog</h2>
           <p className="text-muted-foreground">
-            Auto-live daily scenic wallpapers for Guide, Quests, Campaigns, Companion, and Profile. Current wallpaper day: {todayKey}.
+            Auto-live daily scenic wallpapers for Guide, Quests, Campaigns, Companion, Profile, and Pep Talk. Current wallpaper day: {todayKey}.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">

@@ -15,6 +15,17 @@ if (!HTMLElement.prototype.scrollTo) {
 }
 const elementScrollToSpy = vi.spyOn(HTMLElement.prototype, "scrollTo").mockImplementation(() => undefined);
 
+vi.mock("@/hooks/useJourneysCompanionVisual", () => ({
+  useJourneysCompanionVisual: () => ({
+    companionLabel: "Nova",
+    imageUrl: "/placeholder-companion.svg",
+    focalX: null,
+    focalY: null,
+    element: "fire",
+    usesPortraitShell: false,
+  }),
+}));
+
 const mocks = vi.hoisted(() => {
   const createMotionValueMock = (initial = 0) => {
     let current = initial;
@@ -1469,14 +1480,14 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(screen.queryByRole("button", { name: /drag to reschedule/i })).not.toBeInTheDocument();
   });
 
-  it("renders a voice launcher next to the visible add quest CTA when provided", () => {
+  it("routes the visible companion launcher through the planner entry callback", () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
         mutations: { retry: false },
       },
     });
-    const onVoiceAddQuest = vi.fn();
+    const onOpenCompanionPlanner = vi.fn();
 
     render(
       <TodaysAgenda
@@ -1484,16 +1495,18 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
         selectedDate={new Date("2026-02-13T09:00:00.000Z")}
         onToggle={vi.fn()}
         onAddQuest={vi.fn()}
-        onVoiceAddQuest={onVoiceAddQuest}
+        onOpenCompanionPlanner={onOpenCompanionPlanner}
         completedCount={0}
         totalCount={0}
       />,
       { wrapper: createWrapper(queryClient) },
     );
 
-    fireEvent.click(screen.getAllByRole("button", { name: "Add quest with voice" })[0]);
-    expect(onVoiceAddQuest).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole("button", { name: /^Add Quest$/i })).toHaveAttribute("data-tour", "add-quest-launcher");
+    const launcher = screen.getByRole("button", { name: /Start with companion/i });
+    fireEvent.click(launcher);
+
+    expect(onOpenCompanionPlanner).toHaveBeenCalledTimes(1);
+    expect(launcher).toHaveAttribute("data-tour", "add-quest-launcher");
   });
 
   it("adds mobile timeline clearance for the stacked quest launchers", () => {

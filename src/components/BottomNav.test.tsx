@@ -141,10 +141,10 @@ describe("BottomNav", () => {
     renderBottomNav("/mentor");
     scrollToSpy.mockClear();
 
-    fireEvent.click(screen.getByText("Campaigns"));
+    fireEvent.click(screen.getByText("Companion"));
 
     await waitFor(() => {
-      expect(screen.getByTestId("pathname")).toHaveTextContent("/campaigns");
+      expect(screen.getByTestId("pathname")).toHaveTextContent("/companion");
     });
     expect(mocks.hapticsLight).toHaveBeenCalledTimes(1);
     expect(scrollToSpy).not.toHaveBeenCalled();
@@ -161,14 +161,13 @@ describe("BottomNav", () => {
     expect(mocks.hapticsLight).toHaveBeenCalledTimes(1);
   });
 
-  it("warms local-first journeys and campaigns caches on tab prefetch interactions", () => {
+  it("warms the local-first journeys cache on tab prefetch interactions", () => {
     renderBottomNav("/mentor");
 
     fireEvent.pointerDown(screen.getByText("Quests"));
-    fireEvent.pointerDown(screen.getByText("Campaigns"));
 
     expect(mocks.warmDailyTasksQueryFromRemote).toHaveBeenCalledWith(expect.any(Object), "user-1", expect.any(String));
-    expect(mocks.warmEpicsQueryFromRemote).toHaveBeenCalledWith(expect.any(Object), "user-1");
+    expect(mocks.warmEpicsQueryFromRemote).not.toHaveBeenCalled();
   });
 
   it("renders the reordered main tabs", () => {
@@ -176,10 +175,15 @@ describe("BottomNav", () => {
 
     expect(screen.getAllByRole("link").map((link) => link.textContent)).toEqual([
       "Guide",
-      "Quests",
-      "Campaigns",
       "Companion",
+      "Quests",
     ]);
+  });
+
+  it("does not render a campaigns tab", () => {
+    renderBottomNav("/mentor");
+
+    expect(screen.queryByText("Campaigns")).not.toBeInTheDocument();
   });
 
   it("does not show companion ready badge when companion is not evolvable", () => {

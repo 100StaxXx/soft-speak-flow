@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => ({
     id: "companion-1",
     current_xp: 180,
     current_stage: 8,
+    current_image_url: "/companion-presets/phoenix/t2_guardian/normal/phoenix__t2_guardian__normal__fire.png",
+    preset_id: "phoenix",
     spirit_animal: "phoenix",
     core_element: "fire",
     favorite_color: "#FF6B35",
@@ -35,9 +37,16 @@ const mocks = vi.hoisted(() => ({
   canEvolve: false,
   requiresHatchSelection: false,
   isRegenerating: true,
+  isDormant: true,
   guidedStep: null as string | null,
   isPreHatchCompanionStep: false,
   isEvolvingLoading: false,
+  expressionState: {
+    mood: "calm" as const,
+    variant: 2,
+    reason: "stable",
+    isEventDriven: false,
+  },
 }));
 
 vi.mock("@/hooks/useCompanion", () => ({
@@ -91,7 +100,7 @@ vi.mock("@/hooks/useCompanionVisualState", () => ({
       path: null,
       isLocked: false,
     },
-    isDormant: true,
+    isDormant: mocks.isDormant,
     hasDormancyWarning: false,
   }),
 }));
@@ -158,6 +167,15 @@ vi.mock("@/hooks/useMotionProfile", () => ({
   }),
 }));
 
+vi.mock("@/hooks/useCompanionExpressionState", () => ({
+  useCompanionExpressionState: () => ({
+    mood: mocks.expressionState.mood,
+    variant: mocks.expressionState.variant,
+    reason: mocks.expressionState.reason,
+    isEventDriven: mocks.expressionState.isEventDriven,
+  }),
+}));
+
 vi.mock("@/contexts/CompanionMotionContext", () => ({
   useCompanionMotionSafe: () => ({
     activeEvent: mocks.activeEvent,
@@ -218,8 +236,8 @@ vi.mock("@/components/companion/EvolutionPathBadge", () => ({
   EvolutionPathBadge: () => null,
 }));
 
-vi.mock("@/components/companion/CompanionDialogue", () => ({
-  CompanionDialogue: () => <div>Dialogue</div>,
+vi.mock("@/components/companion/CompanionPlannerPanel", () => ({
+  CompanionPlannerPanel: () => <div>Planner Panel</div>,
 }));
 
 vi.mock("@/components/companion/WakeUpCelebration", () => ({
@@ -240,6 +258,14 @@ vi.mock("@/lib/companionName", () => ({
 }));
 
 vi.mock("@/lib/companionAssetResolver", () => ({
+  resolveCompanionExpressiveAssetUrl: vi.fn().mockImplementation((companion: {
+    current_stage?: number | null;
+    core_element?: string | null;
+  }, options: { mood: string; variant: number }) => (
+    (companion.current_stage ?? 0) <= 0
+      ? null
+      : `/companion-presets/phoenix/t2_guardian/${options.mood}/phoenix__t2_guardian__${options.mood}__v${options.variant}__${String(companion.core_element ?? "fire").toLowerCase()}.png`
+  )),
   resolveCompanionVisualAssetUrl: vi.fn().mockImplementation((companion: {
     current_stage?: number | null;
     core_element?: string | null;
@@ -249,9 +275,13 @@ vi.mock("@/lib/companionAssetResolver", () => ({
       ? `/companion-eggs/egg__t0_egg__normal__${String(companion.core_element ?? "fire").toLowerCase()}.png`
       : (companion.current_image_url ?? "/companion.png")
   )),
+  resolveCompanionExpressiveAssetUrl: vi.fn().mockImplementation((companion: {
+    current_image_url?: string | null;
+  }) => companion.current_image_url ?? "/companion.png"),
 }));
 
 import { CompanionDisplay } from "./CompanionDisplay";
+import { resolveCompanionExpressiveAssetUrl } from "@/lib/companionAssetResolver";
 
 describe("CompanionDisplay overlay stack", () => {
   beforeEach(() => {
@@ -263,6 +293,7 @@ describe("CompanionDisplay overlay stack", () => {
     mocks.canEvolve = false;
     mocks.requiresHatchSelection = false;
     mocks.isRegenerating = true;
+    mocks.isDormant = true;
     mocks.guidedStep = null;
     mocks.isPreHatchCompanionStep = false;
     mocks.isEvolvingLoading = false;
@@ -270,6 +301,8 @@ describe("CompanionDisplay overlay stack", () => {
       id: "companion-1",
       current_xp: 180,
       current_stage: 8,
+      current_image_url: "/companion-presets/phoenix/t2_guardian/normal/phoenix__t2_guardian__normal__fire.png",
+      preset_id: "phoenix",
       spirit_animal: "phoenix",
       core_element: "fire",
       favorite_color: "#FF6B35",
@@ -279,6 +312,12 @@ describe("CompanionDisplay overlay stack", () => {
       image_regenerations_used: 1,
       story_tone: "epic_adventure",
       cached_creature_name: "Nova",
+    };
+    mocks.expressionState = {
+      mood: "calm",
+      variant: 2,
+      reason: "stable",
+      isEventDriven: false,
     };
   });
 
@@ -317,6 +356,7 @@ describe("CompanionDisplay overlay stack", () => {
 
   it("starts subtle idle drift once the companion art has loaded", async () => {
     mocks.isRegenerating = false;
+    mocks.isDormant = false;
 
     render(<CompanionDisplay />);
 
@@ -332,6 +372,58 @@ describe("CompanionDisplay overlay stack", () => {
     });
 
     expect(shell).toHaveClass("animate-companion-idle-drift");
+  });
+
+  it("uses expressive portraits when available and exposes the active expression metadata", async () => {
+    mocks.isRegenerating = false;
+    mocks.isDormant = false;
+    mocks.expressionState = {
+      mood: "happy",
+      variant: 4,
+      reason: "positive-mood",
+      isEventDriven: false,
+    };
+
+    render(<CompanionDisplay />);
+    await screen.findByText("Nova");
+
+    const shell = screen.getByTestId("companion-image-shell");
+
+    expect(shell).toHaveAttribute("data-companion-expression-mood", "happy");
+    expect(shell).toHaveAttribute("data-companion-expression-variant", "4");
+    expect(shell).toHaveAttribute("data-companion-expression-reason", "positive-mood");
+    expect(vi.mocked(resolveCompanionExpressiveAssetUrl)).toHaveBeenCalledWith(
+      expect.objectContaining({
+        current_stage: 8,
+        preset_id: "phoenix",
+      }),
+      {
+        mood: "happy",
+        variant: 4,
+      },
+    );
+  });
+
+  it("falls back to the normal portrait when an expressive portrait is missing", async () => {
+    mocks.isRegenerating = false;
+    mocks.isDormant = false;
+    mocks.expressionState = {
+      mood: "excited",
+      variant: 3,
+      reason: "recent-reward-event",
+      isEventDriven: true,
+    };
+
+    render(<CompanionDisplay />);
+    await screen.findByText("Nova");
+
+    const image = screen.getByAltText(/companion at level 8/i);
+
+    fireEvent.error(image);
+
+    await waitFor(() => {
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    });
   });
 
   it("shows a direct HATCH action for preset-backed stage 0 eggs", async () => {

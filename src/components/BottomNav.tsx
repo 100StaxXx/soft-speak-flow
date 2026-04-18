@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
-import { PawPrint, User, Compass, Target } from "lucide-react";
+import { PawPrint, User, Compass } from "lucide-react";
 
 import { NavLink } from "@/components/NavLink";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -15,11 +15,10 @@ import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 import {
   warmDailyTasksQueryFromRemote,
-  warmEpicsQueryFromRemote,
 } from "@/utils/plannerSync";
 import { useMentorConnection } from "@/contexts/MentorConnectionContext";
 
-type PrefetchTarget = "mentor" | "journeys" | "campaigns" | "companion";
+type PrefetchTarget = "mentor" | "journeys" | "companion";
 
 export const BottomNav = memo(() => {
   const navRef = useRef<HTMLElement | null>(null);
@@ -82,23 +81,13 @@ export const BottomNav = memo(() => {
     void Promise.resolve(warmDailyTasksQueryFromRemote(queryClient, user.id, today)).catch(() => undefined);
   }, [queryClient, user?.id]);
 
-  const prefetchCampaigns = useCallback(() => {
-    if (!user?.id) return;
-
-    void Promise.resolve(warmEpicsQueryFromRemote(queryClient, user.id)).catch(() => undefined);
-  }, [queryClient, user?.id]);
-
   // Prefetch on hover/focus for even faster perceived navigation
   const handlePrefetch = useCallback((page: PrefetchTarget) => {
     if (page === "journeys") {
       prefetchJourneysTasks();
       return;
     }
-
-    if (page === "campaigns") {
-      prefetchCampaigns();
-    }
-  }, [prefetchCampaigns, prefetchJourneysTasks]);
+  }, [prefetchJourneysTasks]);
 
   const openMentorSwitcher = useCallback(() => {
     suppressGuideNavigationRef.current = true;
@@ -207,46 +196,6 @@ export const BottomNav = memo(() => {
           </NavLink>
 
           <NavLink
-            to="/journeys"
-            className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation min-w-[58px] min-h-[56px]"
-            activeClassName="bg-cosmiq-glow/12"
-            data-tour="quests-tab"
-            onClick={() => haptics.light()}
-            onPointerDown={prefetchJourneysTasks}
-            onMouseEnter={() => handlePrefetch('journeys')}
-            onFocus={() => handlePrefetch('journeys')}
-          >
-            {({ isActive }) => (
-              <>
-                <Compass className={`h-6 w-6 transition-colors duration-200 ${isActive ? 'text-cosmiq-glow' : 'text-muted-foreground'}`} />
-                <span className={`text-[11px] font-medium transition-colors duration-200 ${isActive ? 'text-cosmiq-glow' : 'text-muted-foreground/85'}`}>
-                  Quests
-                </span>
-              </>
-            )}
-          </NavLink>
-
-          <NavLink
-            to="/campaigns"
-            className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation min-w-[58px] min-h-[56px]"
-            activeClassName="bg-celestial-blue/12"
-            data-tour="campaigns-tab"
-            onClick={() => haptics.light()}
-            onPointerDown={prefetchCampaigns}
-            onMouseEnter={() => handlePrefetch('campaigns')}
-            onFocus={() => handlePrefetch('campaigns')}
-          >
-            {({ isActive }) => (
-              <>
-                <Target className={`h-6 w-6 transition-colors duration-200 ${isActive ? 'text-celestial-blue' : 'text-muted-foreground'}`} />
-                <span className={`text-[11px] font-medium transition-colors duration-200 ${isActive ? 'text-celestial-blue' : 'text-muted-foreground/85'}`}>
-                  Campaigns
-                </span>
-              </>
-            )}
-          </NavLink>
-
-          <NavLink
             to="/companion"
             className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation min-w-[58px] min-h-[56px] relative"
             activeClassName="bg-stardust-gold/12"
@@ -268,6 +217,26 @@ export const BottomNav = memo(() => {
                 </div>
                 <span className={`text-[11px] font-medium transition-colors duration-200 ${isActive ? 'text-stardust-gold' : 'text-muted-foreground/85'}`}>
                   Companion
+                </span>
+              </>
+            )}
+          </NavLink>
+
+          <NavLink
+            to="/journeys"
+            className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation min-w-[58px] min-h-[56px]"
+            activeClassName="bg-cosmiq-glow/12"
+            data-tour="quests-tab"
+            onClick={() => haptics.light()}
+            onPointerDown={prefetchJourneysTasks}
+            onMouseEnter={() => handlePrefetch('journeys')}
+            onFocus={() => handlePrefetch('journeys')}
+          >
+            {({ isActive }) => (
+              <>
+                <Compass className={`h-6 w-6 transition-colors duration-200 ${isActive ? 'text-cosmiq-glow' : 'text-muted-foreground'}`} />
+                <span className={`text-[11px] font-medium transition-colors duration-200 ${isActive ? 'text-cosmiq-glow' : 'text-muted-foreground/85'}`}>
+                  Quests
                 </span>
               </>
             )}

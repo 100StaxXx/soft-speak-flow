@@ -9,6 +9,17 @@ vi.mock("@/features/tasks/components/ProgressRing", () => ({
   ProgressRing: ({ percent }: { percent: number }) => <div data-testid="progress-ring">{percent}</div>,
 }));
 
+vi.mock("@/hooks/useJourneysCompanionVisual", () => ({
+  useJourneysCompanionVisual: () => ({
+    companionLabel: "Nova",
+    imageUrl: "/placeholder-companion.svg",
+    focalX: null,
+    focalY: null,
+    element: "fire",
+    usesPortraitShell: false,
+  }),
+}));
+
 const selectedDate = new Date(2026, 2, 31, 12, 0, 0, 0);
 
 const baseTask = (overrides: Partial<DailyTask> = {}): DailyTask => ({
@@ -79,14 +90,14 @@ describe("DesktopWeekPlanner", () => {
     expect(screen.getByTestId("desktop-week-hour-6")).toBeInTheDocument();
     expect(screen.getByRole("group", { name: /desktop planner mode/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Today" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^Add Quest$/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Plan with companion/i })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Day" }));
     expect(onPlannerModeChange).toHaveBeenCalledWith("day");
   }, 15000);
 
-  it("renders a companion voice launcher while preserving the manual add quest target", () => {
-    const onVoiceAddQuest = vi.fn();
+  it("routes the compact companion launcher through the planner entry callback", () => {
+    const onOpenCompanionPlanner = vi.fn();
 
     render(
       <DesktopWeekPlanner
@@ -97,14 +108,16 @@ describe("DesktopWeekPlanner", () => {
         onPlannerModeChange={vi.fn()}
         onToggle={vi.fn()}
         onAddQuest={vi.fn()}
-        onVoiceAddQuest={onVoiceAddQuest}
+        onOpenCompanionPlanner={onOpenCompanionPlanner}
         onOpenMonthView={vi.fn()}
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Add quest with voice" }));
-    expect(onVoiceAddQuest).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole("button", { name: /^Add Quest$/i })).toHaveAttribute("data-tour", "add-quest-launcher");
+    const launcher = screen.getByRole("button", { name: /Plan with companion/i });
+    fireEvent.click(launcher);
+
+    expect(onOpenCompanionPlanner).toHaveBeenCalledTimes(1);
+    expect(launcher).toHaveAttribute("data-tour", "add-quest-launcher");
   });
 
   it("places timed tasks into hour rows and keeps cards title-only until clicked", () => {

@@ -1,14 +1,13 @@
 import { motion } from "framer-motion";
-import { Mic, Plus } from "lucide-react";
+import { JourneysCompanionLauncher } from "@/components/journeys/JourneysCompanionLauncher";
 import { useDraggableFAB } from "@/hooks/useDraggableFAB";
 import { cn } from "@/lib/utils";
 
 interface DraggableFABProps {
-  onTap: () => void;
-  onVoiceTap?: () => void;
+  onOpenCompanionPlanner: () => void;
 }
 
-export const DraggableFAB = ({ onTap, onVoiceTap }: DraggableFABProps) => {
+export const DraggableFAB = ({ onOpenCompanionPlanner }: DraggableFABProps) => {
   const {
     position,
     isDragging,
@@ -47,42 +46,24 @@ export const DraggableFAB = ({ onTap, onVoiceTap }: DraggableFABProps) => {
       {...dragControls}
       {...longPressHandlers}
     >
-      {onVoiceTap ? (
-        <button
-          type="button"
-          aria-label="Add quest with voice"
-          data-testid="voice-quest-fab"
-          onClick={() => {
-            if (canTriggerTap) {
-              onVoiceTap();
-            }
-          }}
-          onTouchStart={handleTouchStart}
-          className="flex h-11 w-11 items-center justify-center rounded-full border border-primary/30 bg-primary/90 text-primary-foreground shadow-[0_12px_24px_rgba(83,76,255,0.28)] transition-colors hover:bg-primary touch-none select-none"
-        >
-          <Mic className="h-5 w-5" />
-        </button>
-      ) : null}
-
-      <button
-        type="button"
+      <JourneysCompanionLauncher
+        variant="floating"
+        aria-label="Open companion planner"
         data-tour="add-quest-fab"
-        data-testid="manual-quest-fab"
+        data-testid="journeys-companion-launcher-floating"
         onClick={() => {
           if (canTriggerTap) {
-            onTap();
+            onOpenCompanionPlanner();
           }
         }}
         onTouchStart={handleTouchStart}
-        className="flex h-11 w-11 items-center justify-center rounded-full border border-border/50 bg-muted/60 backdrop-blur-sm transition-colors hover:bg-muted/80 touch-none select-none"
+        className="touch-none select-none"
         style={{
           boxShadow: isDragging
             ? "0 8px 30px rgba(0,0,0,0.3)"
             : "0 2px 8px rgba(0,0,0,0.1)",
         }}
-      >
-        <Plus className="h-5 w-5 text-muted-foreground" />
-      </button>
+      />
     </motion.div>
   );
 };

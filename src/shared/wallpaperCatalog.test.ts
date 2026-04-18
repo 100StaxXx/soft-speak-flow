@@ -9,6 +9,7 @@ import {
   pickBestEligibleWallpaperCandidateForDate,
   pickBestWallpaperPromotionCandidate,
   pickLatestEligibleWallpaperCandidate,
+  resolvePepTalkWallpaperThemeForDate,
   wallpaperGenerationSpecs,
   wallpaperPromptRecipes,
 } from "@/shared/wallpaperCatalog";
@@ -30,6 +31,38 @@ describe("wallpaper date resolution", () => {
 });
 
 describe("deterministic wallpaper recipes", () => {
+  it("maps pep talk wallpapers to the fixed weekday theme schedule", () => {
+    expect(resolvePepTalkWallpaperThemeForDate("2026-04-06")).toEqual({
+      weekday: "monday",
+      key: "forge",
+      title: "Forge",
+    });
+    expect(resolvePepTalkWallpaperThemeForDate("2026-04-07")).toEqual({
+      weekday: "tuesday",
+      key: "focus",
+      title: "Focus",
+    });
+    expect(resolvePepTalkWallpaperThemeForDate("2026-04-12")).toEqual({
+      weekday: "sunday",
+      key: "reflection",
+      title: "Reflection",
+    });
+  });
+
+  it("stores per-surface image metadata, including the pep talk landscape format", () => {
+    expect(wallpaperGenerationSpecs.guide.image).toEqual({
+      size: "1024x1536",
+      width: 1024,
+      height: 1536,
+    });
+    expect(wallpaperGenerationSpecs.pep_talk.image).toEqual({
+      size: "1536x1024",
+      width: 1536,
+      height: 1024,
+    });
+    expect(wallpaperGenerationSpecs.pep_talk.safeZoneGuidance).toContain("middle 60 percent");
+  });
+
   it("does not reuse a recipe key for the same page inside the 4-day rolling window", () => {
     const horizonDates = getWallpaperHorizonDates("2026-04-08");
 
@@ -53,6 +86,14 @@ describe("deterministic wallpaper recipes", () => {
         expect(new Set(sceneTitles).size).toBe(3);
       }
     }
+  });
+
+  it("restricts pep talk recipe selection to the matching weekday theme bucket", () => {
+    const mondayRecipes = getDeterministicWallpaperRecipes("pep_talk", "2026-04-06", 3);
+    const fridayRecipes = getDeterministicWallpaperRecipes("pep_talk", "2026-04-10", 3);
+
+    expect(mondayRecipes.every((recipe) => recipe.themeKey === "forge")).toBe(true);
+    expect(fridayRecipes.every((recipe) => recipe.themeKey === "triumph")).toBe(true);
   });
 
   it("bakes the scenic diversity guidance into every page-level prompt", () => {

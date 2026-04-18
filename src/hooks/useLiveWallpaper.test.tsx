@@ -101,6 +101,7 @@ const AllPagesConsumer = () => {
   const campaigns = useResolvedWallpaper("campaigns");
   const companion = useResolvedWallpaper("companion");
   const profile = useResolvedWallpaper("profile");
+  const pepTalk = useResolvedWallpaper("pep_talk");
   const resolveState = (wallpaper: ReturnType<typeof useResolvedWallpaper>) => (
     wallpaper?.source ?? (manifest.currentDateReady ? "none" : "loading")
   );
@@ -113,6 +114,7 @@ const AllPagesConsumer = () => {
       <div data-testid="campaigns-source">{resolveState(campaigns)}</div>
       <div data-testid="companion-source">{resolveState(companion)}</div>
       <div data-testid="profile-source">{resolveState(profile)}</div>
+      <div data-testid="pep-talk-source">{resolveState(pepTalk)}</div>
     </div>
   );
 };
@@ -194,7 +196,7 @@ describe("WallpaperManifestProvider", () => {
     expect(screen.getByTestId("error-message")).toHaveTextContent("none");
   });
 
-  it("returns no wallpaper for all five pages when the manifest resolves with zero rows", async () => {
+  it("returns no wallpaper for all six surfaces when the manifest resolves with zero rows", async () => {
     await renderProvider(<AllPagesConsumer />);
     await settleProvider();
 
@@ -204,6 +206,7 @@ describe("WallpaperManifestProvider", () => {
     expect(screen.getByTestId("campaigns-source")).toHaveTextContent("none");
     expect(screen.getByTestId("companion-source")).toHaveTextContent("none");
     expect(screen.getByTestId("profile-source")).toHaveTextContent("none");
+    expect(screen.getByTestId("pep-talk-source")).toHaveTextContent("none");
   });
 
   it("returns no wallpaper and exposes the error when the manifest fetch fails", async () => {

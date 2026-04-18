@@ -2,6 +2,9 @@ import { memo, useState, useEffect, useCallback, useMemo, type KeyboardEvent } f
 import { motion, AnimatePresence } from "framer-motion";
 import { useCompanionDialogue, DialogueMood } from "@/hooks/useCompanionDialogue";
 import { useCompanion, type Companion } from "@/hooks/useCompanion";
+import { useCompanionHealth } from "@/hooks/useCompanionHealth";
+import { useCompanionExpressionState } from "@/hooks/useCompanionExpressionState";
+import { useCompanionVisualState } from "@/hooks/useCompanionVisualState";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { CompanionImage, CompanionPortraitShell } from "@/components/CompanionImage";
 import {
@@ -19,7 +22,10 @@ import {
   getBundledCompanionImageFocalPoint,
   isCompanionPresetImageSource,
 } from "@/lib/companionImageFocal";
-import { resolveCompanionVisualAssetUrl } from "@/lib/companionAssetResolver";
+import {
+  resolveCompanionExpressiveAssetUrl,
+  resolveCompanionVisualAssetUrl,
+} from "@/lib/companionAssetResolver";
 
 interface MoodConfig {
   color: string;
@@ -82,11 +88,11 @@ const shimmerConfig: Record<CompanionShimmerType, ShimmerConfig> = {
 };
 
 const NEAR_EVOLUTION_LINES = [
-  "I can feel a new form stirring inside me.",
-  "We are so close to a breakthrough together.",
-  "Something bright is building in me.",
-  "One more push and I will transform.",
-  "My next form is almost ready to awaken.",
+  "Chaos report: a new form is trying to kick the door down because apparently subtlety died here.",
+  "We are one good push away from a very dramatic upgrade, assuming you stop fumbling the layup.",
+  "Something in me is winding up and it is already more organized than your current approach.",
+  "One more clean move and I evolve in spectacular fashion while you pretend this was always the plan.",
+  "My next form is basically pacing backstage, waiting for you to stop stalling.",
 ] as const;
 
 interface CompanionDialogueProps {
@@ -134,16 +140,74 @@ export const CompanionDialogue = memo(({
     progressToNext: rawProgressToNext,
     canEvolve: rawCanEvolve,
   } = useCompanion();
+  const { health } = useCompanionHealth();
+  const expressionState = useCompanionExpressionState();
+  const { isDormant } = useCompanionVisualState(
+    health.moodState,
+    health.hunger,
+    health.happiness,
+    health.isAlive,
+    health.recoveryProgress,
+  );
   const companion = companionOverride ?? rawCompanion;
   const progressToNext = progressToNextOverride ?? rawProgressToNext;
   const canEvolve = canEvolveOverride ?? rawCanEvolve;
   const { dismiss: dismissTalkPopup } = useTalkPopupContextSafe();
-  const companionImageUrl = resolveCompanionVisualAssetUrl(companion, "normal")
-    ?? companion?.current_image_url
-    ?? null;
+  const [fallbackToDefaultPortrait, setFallbackToDefaultPortrait] = useState(false);
+
+  const normalCompanionImageUrl = useMemo(() => {
+    if (!companion) return null;
+
+    if (isDormant) {
+      return resolveCompanionVisualAssetUrl(companion, "dormant");
+    }
+    if (health.isNeglected && health.neglectedImageUrl) {
+      return health.neglectedImageUrl;
+    }
+    if (health.isNeglected) {
+      return resolveCompanionVisualAssetUrl(companion, "neglected");
+    }
+    return resolveCompanionVisualAssetUrl(companion, "normal")
+      ?? companion.current_image_url
+      ?? null;
+  }, [
+    companion,
+    health.isNeglected,
+    health.neglectedImageUrl,
+    isDormant,
+  ]);
+
+  const expressiveCompanionImageUrl = useMemo(() => {
+    if (!companion || isDormant || health.isNeglected) {
+      return null;
+    }
+
+    return resolveCompanionExpressiveAssetUrl(companion, {
+      mood: expressionState.mood,
+      variant: expressionState.variant,
+    });
+  }, [
+    companion,
+    expressionState.mood,
+    expressionState.variant,
+    health.isNeglected,
+    isDormant,
+  ]);
+
+  const companionImageUrl = fallbackToDefaultPortrait || !expressiveCompanionImageUrl
+    ? normalCompanionImageUrl
+    : expressiveCompanionImageUrl;
   const bundledCompanionImageFocal = getBundledCompanionImageFocalPoint(companionImageUrl);
-  const companionImageFocalX = bundledCompanionImageFocal?.x ?? companion?.current_image_focal_x ?? null;
-  const companionImageFocalY = bundledCompanionImageFocal?.y ?? companion?.current_image_focal_y ?? null;
+  const companionImageFocalX = isDormant
+    ? companion?.dormant_image_focal_x ?? companion?.current_image_focal_x ?? null
+    : health.isNeglected
+      ? health.neglectedImageFocalX ?? companion?.neglected_image_focal_x ?? companion?.current_image_focal_x ?? null
+      : bundledCompanionImageFocal?.x ?? companion?.current_image_focal_x ?? null;
+  const companionImageFocalY = isDormant
+    ? companion?.dormant_image_focal_y ?? companion?.current_image_focal_y ?? null
+    : health.isNeglected
+      ? health.neglectedImageFocalY ?? companion?.neglected_image_focal_y ?? companion?.current_image_focal_y ?? null
+      : bundledCompanionImageFocal?.y ?? companion?.current_image_focal_y ?? null;
   const usesPortraitAvatar = isCompanionPresetImageSource(companionImageUrl);
   const cachedCompanionName =
     companion && companion.current_stage > 0
@@ -169,6 +233,10 @@ export const CompanionDialogue = memo(({
     typeof window !== "undefined"
     && typeof window.matchMedia === "function"
     && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  useEffect(() => {
+    setFallbackToDefaultPortrait(false);
+  }, [expressiveCompanionImageUrl, isDormant, health.isNeglected]);
 
   // Animate text change
   useEffect(() => {
@@ -219,6 +287,9 @@ export const CompanionDialogue = memo(({
         type="button"
         data-testid="companion-dialogue-trigger"
         data-shimmer-type={shimmerType}
+        data-companion-expression-mood={expressionState.mood}
+        data-companion-expression-variant={expressionState.variant}
+        data-companion-expression-reason={expressionState.reason}
         className={cn(
           "relative w-full overflow-hidden rounded-xl border text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
           shimmer.borderClass,
@@ -268,6 +339,11 @@ export const CompanionDialogue = memo(({
                         focalX={companionImageFocalX}
                         focalY={companionImageFocalY}
                         className="rounded-lg"
+                        onError={() => {
+                          if (!fallbackToDefaultPortrait && expressiveCompanionImageUrl) {
+                            setFallbackToDefaultPortrait(true);
+                          }
+                        }}
                       />
                     </CompanionPortraitShell>
                   ) : (
@@ -278,6 +354,11 @@ export const CompanionDialogue = memo(({
                       focalX={companionImageFocalX}
                       focalY={companionImageFocalY}
                       className="object-cover"
+                      onError={() => {
+                        if (!fallbackToDefaultPortrait && expressiveCompanionImageUrl) {
+                          setFallbackToDefaultPortrait(true);
+                        }
+                      }}
                     />
                   )
                 ) : null}
@@ -350,6 +431,11 @@ export const CompanionDialogue = memo(({
                         focalX={companionImageFocalX}
                         focalY={companionImageFocalY}
                         className="rounded-lg"
+                        onError={() => {
+                          if (!fallbackToDefaultPortrait && expressiveCompanionImageUrl) {
+                            setFallbackToDefaultPortrait(true);
+                          }
+                        }}
                       />
                     </CompanionPortraitShell>
                   ) : (
@@ -360,6 +446,11 @@ export const CompanionDialogue = memo(({
                       focalX={companionImageFocalX}
                       focalY={companionImageFocalY}
                       className="object-cover"
+                      onError={() => {
+                        if (!fallbackToDefaultPortrait && expressiveCompanionImageUrl) {
+                          setFallbackToDefaultPortrait(true);
+                        }
+                      }}
                     />
                   )
                 ) : null}

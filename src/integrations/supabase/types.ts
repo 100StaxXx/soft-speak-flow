@@ -1593,6 +1593,47 @@ export type Database = {
           },
         ]
       }
+      companion_chats: {
+        Row: {
+          companion_id: string
+          content: string
+          created_at: string
+          id: string
+          input_mode: string | null
+          role: "assistant" | "user"
+          session_id: string
+          user_id: string
+        }
+        Insert: {
+          companion_id: string
+          content: string
+          created_at?: string
+          id?: string
+          input_mode?: string | null
+          role: "assistant" | "user"
+          session_id: string
+          user_id: string
+        }
+        Update: {
+          companion_id?: string
+          content?: string
+          created_at?: string
+          id?: string
+          input_mode?: string | null
+          role?: "assistant" | "user"
+          session_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "companion_chats_companion_id_fkey"
+            columns: ["companion_id"]
+            isOneToOne: false
+            referencedRelation: "user_companion"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       companion_pending_consequences: {
         Row: {
           companion_id: string
@@ -6701,6 +6742,7 @@ export type Database = {
         Row: {
           acceptance_rate: number | null
           common_contexts: string[] | null
+          conversation_profile: Json | null
           created_at: string
           day_of_week_patterns: Json | null
           energy_by_hour: Json | null
@@ -6709,6 +6751,7 @@ export type Database = {
           id: string
           inferred_work_style: string | null
           interaction_count: number | null
+          last_companion_chat_at: string | null
           last_interaction_at: string | null
           modification_rate: number | null
           overwhelm_signals: number | null
@@ -6728,6 +6771,7 @@ export type Database = {
         Insert: {
           acceptance_rate?: number | null
           common_contexts?: string[] | null
+          conversation_profile?: Json | null
           created_at?: string
           day_of_week_patterns?: Json | null
           energy_by_hour?: Json | null
@@ -6736,6 +6780,7 @@ export type Database = {
           id?: string
           inferred_work_style?: string | null
           interaction_count?: number | null
+          last_companion_chat_at?: string | null
           last_interaction_at?: string | null
           modification_rate?: number | null
           overwhelm_signals?: number | null
@@ -6755,6 +6800,7 @@ export type Database = {
         Update: {
           acceptance_rate?: number | null
           common_contexts?: string[] | null
+          conversation_profile?: Json | null
           created_at?: string
           day_of_week_patterns?: Json | null
           energy_by_hour?: Json | null
@@ -6763,6 +6809,7 @@ export type Database = {
           id?: string
           inferred_work_style?: string | null
           interaction_count?: number | null
+          last_companion_chat_at?: string | null
           last_interaction_at?: string | null
           modification_rate?: number | null
           overwhelm_signals?: number | null

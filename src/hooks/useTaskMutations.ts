@@ -222,6 +222,7 @@ interface TaskUpdateInput {
   recurrence_days?: number[];
   recurrence_month_days?: number[];
   recurrence_custom_period?: "week" | "month" | null;
+  recurrence_end_date?: string | null;
   reminder_enabled?: boolean;
   reminder_minutes_before?: number;
   category?: string | null;
@@ -2067,6 +2068,9 @@ export const useTaskMutations = (taskDate: string) => {
       if (updates.recurrence_custom_period !== undefined) {
         updateData.recurrence_custom_period = updates.recurrence_custom_period;
       }
+      if (updates.recurrence_end_date !== undefined) {
+        updateData.recurrence_end_date = updates.recurrence_end_date;
+      }
       if (updates.reminder_enabled !== undefined) {
         updateData.reminder_enabled = updates.reminder_enabled;
       }
@@ -2107,6 +2111,7 @@ export const useTaskMutations = (taskDate: string) => {
         || updates.recurrence_days !== undefined
         || updates.recurrence_month_days !== undefined
         || updates.recurrence_custom_period !== undefined
+        || updates.recurrence_end_date !== undefined
       );
 
       if (!shouldQueueWrites && (

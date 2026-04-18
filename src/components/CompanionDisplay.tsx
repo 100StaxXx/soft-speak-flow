@@ -5,6 +5,7 @@ import { PawPrint, Sparkles } from "lucide-react";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useReferrals } from "@/hooks/useReferrals";
 import { useCompanionHealth } from "@/hooks/useCompanionHealth";
+import { useCompanionExpressionState } from "@/hooks/useCompanionExpressionState";
 import { useCompanionVisualState } from "@/hooks/useCompanionVisualState";
 import { useCompanionRegenerate } from "@/hooks/useCompanionRegenerate";
 import { useCompanionWakeUp } from "@/hooks/useCompanionWakeUp";
@@ -20,7 +21,7 @@ import { CompanionRegenerateDialog } from "@/components/CompanionRegenerateDialo
 import { EvolveButton } from "@/components/companion/EvolveButton";
 import { EvolutionPathBadge } from "@/components/companion/EvolutionPathBadge";
 import { DormancyWarning, DormantOverlay } from "@/components/companion/DormancyWarning";
-import { CompanionDialogue } from "@/components/companion/CompanionDialogue";
+import { CompanionPlannerPanel } from "@/components/companion/CompanionPlannerPanel";
 import { CompanionMotionSurface } from "@/components/companion/motion/CompanionMotionSurface";
 import { WakeUpCelebration } from "@/components/companion/WakeUpCelebration";
 import { CompanionAttributes } from "@/components/CompanionAttributes";
@@ -37,7 +38,10 @@ import { cn, formatDisplayLabel } from "@/lib/utils";
 import { deriveCompanionPalette } from "@/lib/companionPalette";
 import { deriveCompanionDisplayState } from "@/lib/companionDisplayState";
 import { resolveCompanionName } from "@/lib/companionName";
-import { resolveCompanionVisualAssetUrl } from "@/lib/companionAssetResolver";
+import {
+  resolveCompanionExpressiveAssetUrl,
+  resolveCompanionVisualAssetUrl,
+} from "@/lib/companionAssetResolver";
 import { getCompanionEggLabel } from "@/config/companionCatalog";
 import { isCompanionPresetImageSource } from "@/lib/companionImageFocal";
 import { useMotionProfile } from "@/hooks/useMotionProfile";
@@ -171,9 +175,11 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
     health.isAlive,
     health.recoveryProgress
   );
+  const expressionState = useCompanionExpressionState();
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [imageKey, setImageKey] = useState(0); // Force image reload
+  const [fallbackToDefaultPortrait, setFallbackToDefaultPortrait] = useState(false);
   const [showWelcomeBack, setShowWelcomeBack] = useState(false);
   const [welcomeBackDismissed, setWelcomeBackDismissed] = useState(false);
   const [showRegenerateDialog, setShowRegenerateDialog] = useState(false);
@@ -363,9 +369,7 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
     }
   }, [needsWelcomeBack, welcomeBackDismissed, companion]);
 
-  // Calculate effective image URL (must be before the useEffect that depends on it)
-  // Priority: dormant image > neglected image > current image
-  const displayImageUrl = useMemo(() => {
+  const normalDisplayImageUrl = useMemo(() => {
     if (!displayCompanion) return null;
 
     if (isDormant) {
@@ -384,7 +388,28 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
     health.neglectedImageUrl,
     isDormant,
   ]);
-  
+
+  const expressiveImageUrl = useMemo(() => {
+    if (!displayCompanion || isDormant || health.isNeglected) {
+      return null;
+    }
+
+    return resolveCompanionExpressiveAssetUrl(displayCompanion, {
+      mood: expressionState.mood,
+      variant: expressionState.variant,
+    });
+  }, [
+    displayCompanion,
+    expressionState.mood,
+    expressionState.variant,
+    health.isNeglected,
+    isDormant,
+  ]);
+
+  const displayImageUrl = fallbackToDefaultPortrait || !expressiveImageUrl
+    ? normalDisplayImageUrl
+    : expressiveImageUrl;
+
   const effectiveImageUrl = displayImageUrl || COMPANION_PLACEHOLDER;
   const usesPresetPortraitShell = isCompanionPresetImageSource(effectiveImageUrl);
   const effectiveImageFocal = useMemo(() => {
@@ -433,6 +458,10 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
     setImageLoaded(false);
     setImageError(false);
   }, [effectiveImageUrl]);
+
+  useEffect(() => {
+    setFallbackToDefaultPortrait(false);
+  }, [expressiveImageUrl, isDormant, health.isNeglected]);
 
   const companionPalette = useMemo(
     () =>
@@ -508,7 +537,25 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
   const nextVisualStageLabel = nextVisualStageBoundaryLevel === null
     ? null
     : getVisualStageLabelForLevel(nextVisualStageBoundaryLevel);
-  const shouldAnimateIdleDrift = !prefersReducedMotion && imageLoaded && !imageError && !isRegenerating;
+  const expressionAnimationClass = prefersReducedMotion
+    ? ""
+    : ({
+      excited: "animate-companion-bounce",
+      happy: "animate-companion-pulse",
+      calm: "",
+      concerned: "animate-companion-droop",
+      sleepy: "animate-companion-slow-breathe",
+    } as const)[expressionState.mood];
+  const activePortraitAnimationClass = isDormant || health.isNeglected
+    ? animationClass
+    : expressionAnimationClass;
+  const shouldAnimateIdleDrift = !prefersReducedMotion
+    && imageLoaded
+    && !imageError
+    && !isRegenerating
+    && !isDormant
+    && !health.isNeglected
+    && expressionState.mood === "calm";
   const displayedCreatureName = isStageZeroEgg
     ? getCompanionEggLabel(displayCompanion.core_element)
     : (creatureName || "Companion");
@@ -675,6 +722,9 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
                 )}
                 data-testid="companion-image-shell"
                 data-companion-idle-motion={shouldAnimateIdleDrift ? "active" : "inactive"}
+                data-companion-expression-mood={expressionState.mood}
+                data-companion-expression-variant={expressionState.variant}
+                data-companion-expression-reason={expressionState.reason}
               >
                 <CompanionMotionSurface
                   variant="companion"
@@ -730,7 +780,7 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
                           imageLoaded ? "opacity-100" : "opacity-0 absolute inset-0",
                           health.isNeglected ? "ring-destructive/50" : "ring-primary/30",
                           isRegenerating && "animate-pulse",
-                          animationClass,
+                          activePortraitAnimationClass,
                         )}
                       >
                         <CompanionImage
@@ -748,6 +798,11 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
                             setImageError(false);
                           }}
                           onError={() => {
+                            if (!fallbackToDefaultPortrait && expressiveImageUrl) {
+                              setFallbackToDefaultPortrait(true);
+                              setImageKey((prev) => prev + 1);
+                              return;
+                            }
                             setImageError(true);
                             setImageLoaded(false);
                           }}
@@ -770,7 +825,7 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
                           imageLoaded ? "opacity-100" : "opacity-0 absolute",
                           health.isNeglected ? "ring-destructive/50" : "ring-primary/30",
                           isRegenerating && "animate-pulse",
-                          animationClass,
+                          activePortraitAnimationClass,
                         )}
                         style={{ ...skinStyles, ...careStyles, ...equippedCosmeticStyles }}
                         onLoad={() => {
@@ -778,6 +833,11 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
                           setImageError(false);
                         }}
                         onError={() => {
+                          if (!fallbackToDefaultPortrait && expressiveImageUrl) {
+                            setFallbackToDefaultPortrait(true);
+                            setImageKey((prev) => prev + 1);
+                            return;
+                          }
                           setImageError(true);
                           setImageLoaded(false);
                         }}
@@ -884,14 +944,7 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
             )}
           </div>
 
-          {/* Companion Dialogue - emotional responses based on care signals */}
-          <CompanionDialogue
-            className="mt-2"
-            companionName={displayedCreatureName}
-            companionOverride={displayCompanion}
-            progressToNextOverride={displayProgressToNext}
-            canEvolveOverride={displayCanEvolve}
-          />
+          <CompanionPlannerPanel />
 
           {/* Evolve Button - shows when ready */}
           <AnimatePresence>

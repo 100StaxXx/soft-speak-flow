@@ -22,15 +22,18 @@ const DEFAULT_VALIDATION_RESULT: WallpaperValidationResult = {
   rejectionReasons: [],
 };
 
-export const buildWallpaperValidationPrompt = (spec: WallpaperGenerationSpec) => `You are reviewing an AI-generated mobile wallpaper for the ${spec.label} page in the Cosmiq app.
+export const buildWallpaperValidationPrompt = (spec: WallpaperGenerationSpec) => `You are reviewing an AI-generated wallpaper for the ${spec.label} surface in the Cosmiq app.
 
 Goal:
 - scenic, gorgeous, awe-inspiring wallpaper first
 - no text, no logos, no UI chrome, no mockup browser bars, no buttons, no forms
 - safe for dark app content over the top, middle, and bottom
+- render target: ${spec.image.size}
 
 Target mood:
 ${spec.pageDescription}
+
+${spec.safeZoneGuidance ? `Additional safe-zone guidance:\n${spec.safeZoneGuidance}\n` : ""}
 
 Review the image for:
 1. Readable text, letters, logos, or watermark-like marks

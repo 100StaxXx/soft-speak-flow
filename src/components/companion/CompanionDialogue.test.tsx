@@ -26,6 +26,12 @@ const mocks = vi.hoisted(() => ({
     id: "companion-1",
     current_stage: 4,
     current_image_url: null as string | null,
+    dormant_image_url: null as string | null,
+    neglected_image_url: null as string | null,
+    neglected_image_focal_x: null as number | null,
+    neglected_image_focal_y: null as number | null,
+    dormant_image_focal_x: null as number | null,
+    dormant_image_focal_y: null as number | null,
     current_image_focal_x: 0.5 as number | null,
     current_image_focal_y: 0.5 as number | null,
     preset_id: null as string | null,
@@ -34,6 +40,24 @@ const mocks = vi.hoisted(() => ({
     spirit_animal: "Wolf",
     progressToNext: 50,
     canEvolve: false,
+  },
+  health: {
+    moodState: "happy" as const,
+    hunger: 0,
+    happiness: 100,
+    isAlive: true,
+    recoveryProgress: 0,
+    isNeglected: false,
+    neglectedImageUrl: null as string | null,
+    neglectedImageFocalX: null as number | null,
+    neglectedImageFocalY: null as number | null,
+  },
+  isDormant: false,
+  expressionState: {
+    mood: "calm" as const,
+    variant: 2,
+    reason: "stable",
+    isEventDriven: false,
   },
   talkPopup: {
     dismiss: vi.fn(),
@@ -62,6 +86,12 @@ vi.mock("@/hooks/useCompanion", () => ({
       id: mocks.companion.id,
       current_stage: mocks.companion.current_stage,
       current_image_url: mocks.companion.current_image_url,
+      dormant_image_url: mocks.companion.dormant_image_url,
+      neglected_image_url: mocks.companion.neglected_image_url,
+      neglected_image_focal_x: mocks.companion.neglected_image_focal_x,
+      neglected_image_focal_y: mocks.companion.neglected_image_focal_y,
+      dormant_image_focal_x: mocks.companion.dormant_image_focal_x,
+      dormant_image_focal_y: mocks.companion.dormant_image_focal_y,
       current_image_focal_x: mocks.companion.current_image_focal_x,
       current_image_focal_y: mocks.companion.current_image_focal_y,
       preset_id: mocks.companion.preset_id,
@@ -72,6 +102,35 @@ vi.mock("@/hooks/useCompanion", () => ({
     progressToNext: mocks.companion.progressToNext,
     canEvolve: mocks.companion.canEvolve,
   }),
+}));
+
+vi.mock("@/hooks/useCompanionHealth", () => ({
+  useCompanionHealth: () => ({
+    health: mocks.health,
+    needsWelcomeBack: false,
+  }),
+}));
+
+vi.mock("@/hooks/useCompanionVisualState", () => ({
+  useCompanionVisualState: () => ({
+    cssStyles: {},
+    animationClass: "",
+    care: {
+      dormancy: {
+        isDormant: mocks.isDormant,
+      },
+    },
+    evolutionPath: {
+      path: null,
+      isLocked: false,
+    },
+    isDormant: mocks.isDormant,
+    hasDormancyWarning: false,
+  }),
+}));
+
+vi.mock("@/hooks/useCompanionExpressionState", () => ({
+  useCompanionExpressionState: () => mocks.expressionState,
 }));
 
 vi.mock("@/integrations/supabase/client", () => ({
@@ -125,6 +184,12 @@ describe("CompanionDialogue", () => {
     mocks.companion.id = "companion-1";
     mocks.companion.current_stage = 4;
     mocks.companion.current_image_url = null;
+    mocks.companion.dormant_image_url = null;
+    mocks.companion.neglected_image_url = null;
+    mocks.companion.neglected_image_focal_x = null;
+    mocks.companion.neglected_image_focal_y = null;
+    mocks.companion.dormant_image_focal_x = null;
+    mocks.companion.dormant_image_focal_y = null;
     mocks.companion.current_image_focal_x = 0.5;
     mocks.companion.current_image_focal_y = 0.5;
     mocks.companion.preset_id = null;
@@ -133,6 +198,24 @@ describe("CompanionDialogue", () => {
     mocks.companion.spirit_animal = "Wolf";
     mocks.companion.progressToNext = 50;
     mocks.companion.canEvolve = false;
+    mocks.health = {
+      moodState: "happy",
+      hunger: 0,
+      happiness: 100,
+      isAlive: true,
+      recoveryProgress: 0,
+      isNeglected: false,
+      neglectedImageUrl: null,
+      neglectedImageFocalX: null,
+      neglectedImageFocalY: null,
+    };
+    mocks.isDormant = false;
+    mocks.expressionState = {
+      mood: "calm",
+      variant: 2,
+      reason: "stable",
+      isEventDriven: false,
+    };
     mocks.talkPopup.dismiss.mockClear();
     mocks.talkPopup.show.mockClear();
     getPublicUrlMock.mockClear();
@@ -213,8 +296,8 @@ describe("CompanionDialogue", () => {
     expect(within(dialog).getByText("W")).toBeInTheDocument();
   });
 
-  it("uses resolved preset art when a positive-stage companion still stores the egg image", () => {
-    mocks.companion.current_stage = 6;
+  it("falls back to bundled youth preset art when expressive portraits are not available for the current tier", () => {
+    mocks.companion.current_stage = 21;
     mocks.companion.current_image_url = "/companion-eggs/egg__t0_egg__normal__fire.png";
     mocks.companion.preset_id = "griffin";
     mocks.companion.core_element = "fire";
@@ -224,14 +307,69 @@ describe("CompanionDialogue", () => {
     const { container } = render(<CompanionDialogue />);
 
     expect(container.innerHTML).toContain(
-      "griffin/t2_guardian/normal/griffin__t2_guardian__normal__fire.png",
+      "griffin/t1_youth/normal/griffin__t1_youth__normal__fire.png",
     );
     expect(container.innerHTML).not.toContain("/companion-eggs/egg__t0_egg__normal__fire.png");
 
     fireEvent.click(screen.getByRole("button", { name: /open griffin dialogue/i }));
     const dialog = screen.getByRole("dialog", { name: "Griffin" });
     expect(dialog.innerHTML).toContain(
-      "griffin/t2_guardian/normal/griffin__t2_guardian__normal__fire.png",
+      "griffin/t1_youth/normal/griffin__t1_youth__normal__fire.png",
+    );
+  });
+
+  it("uses expressive portraits for the dialogue avatar when the active tier supports them", () => {
+    mocks.companion.current_stage = 6;
+    mocks.companion.current_image_url = "/companion-eggs/egg__t0_egg__normal__fire.png";
+    mocks.companion.preset_id = "griffin";
+    mocks.companion.core_element = "fire";
+    mocks.companion.cached_creature_name = "Griffin";
+    mocks.companion.spirit_animal = "Griffin";
+    mocks.expressionState = {
+      mood: "happy",
+      variant: 4,
+      reason: "positive-mood",
+      isEventDriven: false,
+    };
+
+    const { container } = render(<CompanionDialogue />);
+
+    expect(screen.getByTestId("companion-dialogue-trigger")).toHaveAttribute(
+      "data-companion-expression-mood",
+      "happy",
+    );
+    expect(screen.getByTestId("companion-dialogue-trigger")).toHaveAttribute(
+      "data-companion-expression-variant",
+      "4",
+    );
+    expect(container.innerHTML).toContain(
+      "griffin/t2_guardian/happy/griffin__t2_guardian__happy__v4__fire.png",
+    );
+  });
+
+  it("keeps dormant overrides ahead of expressive portraits", () => {
+    mocks.companion.current_stage = 6;
+    mocks.companion.current_image_url = "https://example.com/current.png";
+    mocks.companion.dormant_image_url = "/companion-presets/griffin/t2_guardian/dormant/griffin__t2_guardian__dormant__fire.png";
+    mocks.companion.preset_id = "griffin";
+    mocks.companion.core_element = "fire";
+    mocks.companion.cached_creature_name = "Griffin";
+    mocks.companion.spirit_animal = "Griffin";
+    mocks.isDormant = true;
+    mocks.expressionState = {
+      mood: "excited",
+      variant: 5,
+      reason: "recent-reward-event",
+      isEventDriven: true,
+    };
+
+    const { container } = render(<CompanionDialogue />);
+
+    expect(container.innerHTML).toContain(
+      "/companion-presets/griffin/t2_guardian/dormant/griffin__t2_guardian__dormant__fire.png",
+    );
+    expect(container.innerHTML).not.toContain(
+      "griffin/t2_guardian/excited/griffin__t2_guardian__excited__v5__fire.png",
     );
   });
 

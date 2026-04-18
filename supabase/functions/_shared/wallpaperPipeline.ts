@@ -1,8 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
-  WALLPAPER_IMAGE_HEIGHT,
-  WALLPAPER_IMAGE_SIZE,
-  WALLPAPER_IMAGE_WIDTH,
   WALLPAPER_PROMPT_VERSION,
   pickBestEligibleWallpaperCandidateForDate,
   pickLatestEligibleWallpaperCandidate,
@@ -165,7 +162,10 @@ const logWallpaperRecipeValidationFailure = (args: {
   }));
 };
 
-export const generateWallpaperImage = async (promptText: string) => {
+export const generateWallpaperImage = async (
+  promptText: string,
+  imageSize: string,
+) => {
   const openAIApiKey = getOpenAIApiKey();
   if (!openAIApiKey) {
     throw new Error("OPENAI_API_KEY is not configured");
@@ -179,7 +179,7 @@ export const generateWallpaperImage = async (promptText: string) => {
     },
     body: JSON.stringify({
       model: getRenderModel(),
-      image_size: WALLPAPER_IMAGE_SIZE,
+      image_size: imageSize,
       messages: [{ role: "user", content: promptText }],
       modalities: ["image", "text"],
     }),
@@ -313,8 +313,8 @@ export const insertWallpaperAsset = async (
     render_model: getRenderModel(),
     storage_path: args.storagePath,
     image_url: args.imageUrl,
-    image_width: WALLPAPER_IMAGE_WIDTH,
-    image_height: WALLPAPER_IMAGE_HEIGHT,
+    image_width: spec.image.width,
+    image_height: spec.image.height,
     mobile_focus_x: args.validationResult.mobileFocusX ?? spec.mobileFocus.x,
     mobile_focus_y: args.validationResult.mobileFocusY ?? spec.mobileFocus.y,
     desktop_focus_x: args.validationResult.desktopFocusX ?? spec.desktopFocus.x,
@@ -349,9 +349,10 @@ export const generateAndStoreWallpaperAsset = async (
     batchLabel?: string | null;
   },
 ): Promise<GeneratedWallpaperAssetRecord> => {
+  const spec = wallpaperGenerationSpecs[args.pageKey];
   let generatedImageUrl: string;
   try {
-    generatedImageUrl = await generateWallpaperImage(args.promptText);
+    generatedImageUrl = await generateWallpaperImage(args.promptText, spec.image.size);
   } catch (error) {
     logWallpaperRecipeFailure({
       pageKey: args.pageKey,

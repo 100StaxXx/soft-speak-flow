@@ -19,8 +19,10 @@ vi.mock("@/integrations/supabase/client", () => ({
 }));
 
 import {
+  getPresetCompanionExpressiveAssetUrl,
   getPresetCompanionAssetUrl,
   getUniversalEggAssetUrl,
+  resolveCompanionExpressiveAssetUrl,
   resolveCompanionVisualAssetUrl,
 } from "./companionAssetResolver";
 
@@ -141,5 +143,78 @@ describe("companion asset resolver", () => {
     ).toBe(
       "https://example.supabase.co/storage/v1/object/public/companion-presets/dragon/t3_champion/dormant/dragon__t3_champion__dormant__storm.png",
     );
+  });
+
+  it("resolves bundled hatchling expressive art from the public companion preset pack", () => {
+    expect(
+      getPresetCompanionExpressiveAssetUrl({
+        presetId: "griffin",
+        stage: 1,
+        element: "fire",
+        mood: "happy",
+        variant: 3,
+      }),
+    ).toBe(
+      "/companion-presets/griffin/t1_youth/happy/griffin__t1_youth__happy__v3__fire.png",
+    );
+    expect(getPublicUrlMock).not.toHaveBeenCalled();
+  });
+
+  it("resolves remote initiate expressive art for active preset tiers", () => {
+    expect(
+      getPresetCompanionExpressiveAssetUrl({
+        presetId: "griffin",
+        stage: 5,
+        element: "fire",
+        mood: "excited",
+        variant: 2,
+      }),
+    ).toBe(
+      "https://example.supabase.co/storage/v1/object/public/companion-presets/griffin/t2_guardian/excited/griffin__t2_guardian__excited__v2__fire.png",
+    );
+  });
+
+  it("falls back to normal portraits when expressive tiers are not covered yet", () => {
+    expect(
+      getPresetCompanionExpressiveAssetUrl({
+        presetId: "griffin",
+        stage: 21,
+        element: "fire",
+        mood: "calm",
+        variant: 4,
+      }),
+    ).toBeNull();
+  });
+
+  it("resolves expressive URLs from companion records only for post-hatch preset companions", () => {
+    expect(
+      resolveCompanionExpressiveAssetUrl(
+        {
+          preset_id: "griffin",
+          current_stage: 5,
+          core_element: "fire",
+        },
+        {
+          mood: "sleepy",
+          variant: 5,
+        },
+      ),
+    ).toBe(
+      "https://example.supabase.co/storage/v1/object/public/companion-presets/griffin/t2_guardian/sleepy/griffin__t2_guardian__sleepy__v5__fire.png",
+    );
+
+    expect(
+      resolveCompanionExpressiveAssetUrl(
+        {
+          preset_id: "griffin",
+          current_stage: 0,
+          core_element: "fire",
+        },
+        {
+          mood: "sleepy",
+          variant: 5,
+        },
+      ),
+    ).toBeNull();
   });
 });

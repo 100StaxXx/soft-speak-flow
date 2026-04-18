@@ -55,7 +55,7 @@ import { InteractionLogModal } from "@/components/tasks/InteractionLogModal";
 import { useQuestCalendarSync } from "@/hooks/useQuestCalendarSync";
 import { useCalendarIntegrations } from "@/hooks/useCalendarIntegrations";
 import { HourlyViewModal } from "@/components/HourlyViewModal";
-import { VoiceQuestCaptureDrawer } from "@/components/VoiceQuestCaptureDrawer";
+import { JourneysCompanionPlannerModal } from "@/components/journeys/JourneysCompanionPlannerModal";
 import { usePostOnboardingMentorGuidance } from "@/hooks/usePostOnboardingMentorGuidance";
 import { getTodayIfDateStale, JOURNEYS_ROUTE } from "@/pages/journeysDateSync";
 import { isOnboardingCleanupEligible } from "@/pages/journeysCleanupEligibility";
@@ -65,8 +65,6 @@ import { useJourneysLayoutMode } from "@/hooks/useJourneysLayoutMode";
 import { isMacDesignedForIPadIOSApp, isMacSession } from "@/utils/platformTargets";
 import { QuestInboxSection } from "@/components/QuestInboxSection";
 import { QUEST_ACTION_TOAST_DURATION_MS } from "@/constants/questToast";
-import type { QuestComposerPrefillDraft } from "@/features/quests/types";
-import { buildVoiceQuestPrefillFromTranscript } from "@/features/quests/utils/voiceQuestPrefill";
 import { trackResilienceEvent } from "@/utils/resilienceTelemetry";
 
 const TIME_24H_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
@@ -103,13 +101,11 @@ const Journeys = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showPageInfo, setShowPageInfo] = useState(false);
   const [showAddSheet, setShowAddSheet] = useState(false);
-  const [showVoiceQuestCapture, setShowVoiceQuestCapture] = useState(false);
+  const [showCompanionPlanner, setShowCompanionPlanner] = useState(false);
   const [showMonthView, setShowMonthView] = useState(false);
   const [desktopPlannerMode, setDesktopPlannerMode] = useState<DesktopPlannerMode>("week");
   
   const [prefilledTime, setPrefilledTime] = useState<string | null>(null);
-  const [voicePrefillDraft, setVoicePrefillDraft] = useState<QuestComposerPrefillDraft | null>(null);
-  const [voicePrefillKey, setVoicePrefillKey] = useState<string | null>(null);
   const [showQuickAdjust, setShowQuickAdjust] = useState(false);
   
   // Campaign creation state
@@ -145,39 +141,24 @@ const Journeys = () => {
     isResolving 
   } = useStreakAtRisk();
 
-  const clearVoiceQuestPrefill = useCallback(() => {
-    setVoicePrefillDraft(null);
-    setVoicePrefillKey(null);
-  }, []);
-
   const handleAddQuestSheetOpenChange = useCallback((nextOpen: boolean) => {
     setShowAddSheet(nextOpen);
     if (!nextOpen) {
       setPrefilledTime(null);
-      clearVoiceQuestPrefill();
     }
-  }, [clearVoiceQuestPrefill]);
+  }, []);
 
   const openAddQuestSheet = useCallback((options?: { date?: Date; time?: string | null }) => {
     if (options?.date) {
       setSelectedDate(options.date);
     }
-    clearVoiceQuestPrefill();
-    setShowVoiceQuestCapture(false);
+    setShowCompanionPlanner(false);
     setPrefilledTime(options?.time ?? null);
     setShowAddSheet(true);
-  }, [clearVoiceQuestPrefill]);
-
-  const openVoiceQuestCapture = useCallback(() => {
-    setShowVoiceQuestCapture(true);
   }, []);
 
-  const handleVoiceQuestCapture = useCallback((transcript: string) => {
-    setShowVoiceQuestCapture(false);
-    setPrefilledTime(null);
-    setVoicePrefillDraft(buildVoiceQuestPrefillFromTranscript(transcript));
-    setVoicePrefillKey(globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-voice-quest`);
-    setShowAddSheet(true);
+  const openCompanionPlanner = useCallback(() => {
+    setShowCompanionPlanner(true);
   }, []);
 
   const syncSelectedDateToTodayIfStale = useCallback(() => {
@@ -364,6 +345,7 @@ const Journeys = () => {
       if (event.key.toLowerCase() !== "n") return;
       if (
         showAddSheet
+        || showCompanionPlanner
         || showMonthView
         || showPageInfo
         || showQuickAdjust
@@ -398,6 +380,7 @@ const Journeys = () => {
     needsStreakDecision,
     openAddQuestSheet,
     showAddSheet,
+    showCompanionPlanner,
     showMonthView,
     showPageInfo,
     showPathfinder,
@@ -1101,6 +1084,7 @@ const Journeys = () => {
                 isExpanded={isInboxExpanded}
                 onExpandedChange={setIsInboxExpanded}
                 onAddQuest={() => openAddQuestSheet()}
+                onOpenCompanionPlanner={openCompanionPlanner}
                 onToggleQuest={handleToggleInboxQuest}
                 onEditQuest={handleEditQuest}
                 onDeleteQuest={handleDeleteInboxQuest}
@@ -1130,7 +1114,7 @@ const Journeys = () => {
                 onPlannerModeChange={setDesktopPlannerMode}
                 onToggle={handleToggleTask}
                 onAddQuest={() => openAddQuestSheet()}
-                onVoiceAddQuest={isMacHostedIOSApp ? openVoiceQuestCapture : undefined}
+                onOpenCompanionPlanner={openCompanionPlanner}
                 onOpenMonthView={() => setShowMonthView(true)}
                 onUndoToggle={handleUndoToggle}
                 onEditQuest={handleEditQuest}
@@ -1149,7 +1133,7 @@ const Journeys = () => {
                 disableTimelineDrag={showAddSheet || !!editingTask || !!editingRitual}
                 onToggle={handleToggleTask}
                 onAddQuest={() => openAddQuestSheet()}
-                onVoiceAddQuest={isMacHostedIOSApp ? openVoiceQuestCapture : undefined}
+                onOpenCompanionPlanner={openCompanionPlanner}
                 completedCount={completedCount}
                 totalCount={totalCount}
                 currentStreak={currentStreak}
@@ -1186,17 +1170,15 @@ const Journeys = () => {
           onAdd={handleAddQuest}
           isAdding={isAdding}
           prefilledTime={prefilledTime}
-          prefillDraft={voicePrefillDraft}
-          prefillKey={voicePrefillKey}
           autoFillTimeOnFirstTap={shouldAutoFillTutorialTime}
           presentation={isMacHostedIOSApp ? "desktop-panel" : "mobile-sheet"}
           onCreateCampaign={() => setShowPathfinder(true)}
         />
 
-        <VoiceQuestCaptureDrawer
-          open={showVoiceQuestCapture}
-          onOpenChange={setShowVoiceQuestCapture}
-          onCapture={handleVoiceQuestCapture}
+        <JourneysCompanionPlannerModal
+          open={showCompanionPlanner}
+          onOpenChange={setShowCompanionPlanner}
+          presentation={isDesktopLayout || isMacHostedIOSApp ? "dialog" : "drawer"}
         />
         
         {/* Edit Quest Dialog (for regular quests) */}
@@ -1317,8 +1299,7 @@ const Journeys = () => {
         {/* Draggable FAB */}
         {!isMacHostedIOSApp ? (
           <DraggableFAB
-            onTap={() => openAddQuestSheet()}
-            onVoiceTap={openVoiceQuestCapture}
+            onOpenCompanionPlanner={openCompanionPlanner}
           />
         ) : null}
       </div>

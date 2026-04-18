@@ -78,6 +78,7 @@ const isWallpaperPageKey = (value: string | null | undefined): value is Wallpape
   || value === "campaigns"
   || value === "companion"
   || value === "profile"
+  || value === "pep_talk"
 );
 
 const mergeDateKeys = (current: string[], next: string[]) => (

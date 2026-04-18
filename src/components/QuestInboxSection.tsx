@@ -1,9 +1,10 @@
 import { memo, useEffect, useMemo, useState, type RefObject } from "react";
+import { JourneysCompanionLauncher } from "@/components/journeys/JourneysCompanionLauncher";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { haptics } from "@/utils/haptics";
-import { Check, ChevronDown, Inbox, Pencil, Plus, Trash2 } from "lucide-react";
+import { Check, ChevronDown, Inbox, Pencil, Trash2 } from "lucide-react";
 
 const PREVIEW_LIMIT = 4;
 
@@ -34,6 +35,7 @@ interface QuestInboxSectionProps {
   isExpanded: boolean;
   onExpandedChange: (expanded: boolean) => void;
   onAddQuest: () => void;
+  onOpenCompanionPlanner?: () => void;
   onToggleQuest: (taskId: string, completed: boolean) => void;
   onEditQuest: (task: InboxQuestItem) => void | Promise<void>;
   onDeleteQuest: (taskId: string) => void | Promise<void>;
@@ -46,6 +48,7 @@ export const QuestInboxSection = memo(function QuestInboxSection({
   isExpanded,
   onExpandedChange,
   onAddQuest,
+  onOpenCompanionPlanner,
   onToggleQuest,
   onEditQuest,
   onDeleteQuest,
@@ -67,6 +70,7 @@ export const QuestInboxSection = memo(function QuestInboxSection({
   }, [showAllTasks, tasks]);
 
   const hiddenTaskCount = Math.max(0, tasks.length - visibleTasks.length);
+  const plannerLauncherAction = onOpenCompanionPlanner ?? onAddQuest;
 
   return (
     <section
@@ -93,18 +97,16 @@ export const QuestInboxSection = memo(function QuestInboxSection({
         </div>
 
         <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            size="sm"
-            className="gap-2"
+          <JourneysCompanionLauncher
+            variant="inline"
+            compact
+            data-tour="add-quest-launcher"
+            text="Plan with companion"
             onClick={() => {
               haptics.light();
-              onAddQuest();
+              plannerLauncherAction();
             }}
-          >
-            <Plus className="h-4 w-4" />
-            Add quest
-          </Button>
+          />
           <Button
             type="button"
             size="icon"

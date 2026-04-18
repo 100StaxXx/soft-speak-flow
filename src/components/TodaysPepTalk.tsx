@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef, useCallback, memo, useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
+import { StaticBackgroundImage } from "@/components/StaticBackgroundImage";
 import { useXPRewards } from "@/hooks/useXPRewards";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -15,6 +16,7 @@ import { Capacitor } from "@capacitor/core";
 import { applyScriptPunctuationToTranscript } from "@/utils/transcriptPunctuation";
 import { useMentorConnection } from "@/contexts/MentorConnectionContext";
 import { useMainTabVisibility } from "@/contexts/MainTabVisibilityContext";
+import { useResolvedWallpaper, useWallpaperManifest } from "@/contexts/WallpaperManifestContext";
 import { getEffectiveDailyDate } from "@/utils/timezone";
 import { globalAudio } from "@/utils/globalAudio";
 import { createIOSOptimizedAudio, isIOS, iosAudioManager, safePlay } from "@/utils/iosAudio";
@@ -177,6 +179,8 @@ export const TodaysPepTalk = memo(() => {
   const { profile } = useProfile();
   const { mentorId: resolvedMentorId } = useMentorConnection();
   const { isTabActive } = useMainTabVisibility();
+  const pepTalkWallpaper = useResolvedWallpaper("pep_talk");
+  const { reportWallpaperRenderError } = useWallpaperManifest();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { awardPepTalkListenedAsync } = useXPRewards();
@@ -226,6 +230,7 @@ export const TodaysPepTalk = memo(() => {
   const loading = pepTalkQuery.isPending || (pepTalkQuery.isFetching && !pepTalkQuery.data);
   const error = pepTalkQuery.isError && !pepTalk;
   const { refetch: refetchPepTalk } = pepTalkQuery;
+  const backdropSource = pepTalkWallpaper ? "remote" : "fallback";
 
   useEffect(() => {
     if (!pepTalk?.id) return;
@@ -767,13 +772,67 @@ export const TodaysPepTalk = memo(() => {
     );
   };
 
+  const renderSectionBackdrop = () => (
+    <div
+      className="absolute inset-0"
+      data-testid="pep-talk-section-backdrop"
+      data-pep-talk-backdrop={backdropSource}
+    >
+      <div
+        className="absolute inset-0"
+        style={{
+          background: "radial-gradient(circle at 50% 20%, rgba(83, 198, 206, 0.22), transparent 32%), linear-gradient(180deg, rgba(6, 13, 24, 0.82), rgba(8, 12, 22, 0.96))",
+        }}
+      />
+
+      {pepTalkWallpaper ? (
+        <>
+          <StaticBackgroundImage
+            background={pepTalkWallpaper.background}
+            className="absolute inset-0 h-full w-full object-cover select-none opacity-[0.82] md:hidden"
+            objectPosition={pepTalkWallpaper.mobileObjectPosition}
+            onError={() => reportWallpaperRenderError("pep_talk", pepTalkWallpaper.imageUrl)}
+            testId="pep-talk-backdrop-image-mobile"
+          />
+          <StaticBackgroundImage
+            background={pepTalkWallpaper.background}
+            className="absolute inset-0 hidden h-full w-full object-cover select-none opacity-[0.82] md:block"
+            objectPosition={pepTalkWallpaper.desktopObjectPosition}
+            onError={() => reportWallpaperRenderError("pep_talk", pepTalkWallpaper.imageUrl)}
+            testId="pep-talk-backdrop-image-desktop"
+          />
+        </>
+      ) : null}
+
+      <div
+        className="absolute inset-0"
+        style={{
+          background: "linear-gradient(180deg, rgba(5, 10, 18, 0.32) 0%, rgba(5, 10, 18, 0.12) 18%, rgba(5, 10, 18, 0.52) 100%)",
+        }}
+      />
+      <div
+        className="absolute inset-0"
+        style={{
+          background: "radial-gradient(circle at 50% 50%, rgba(5, 10, 18, 0.08) 0%, rgba(5, 10, 18, 0.14) 28%, rgba(5, 10, 18, 0.48) 74%, rgba(5, 10, 18, 0.76) 100%)",
+        }}
+      />
+      <div
+        className="absolute inset-0"
+        style={{
+          background: "linear-gradient(90deg, rgba(5, 10, 18, 0.54) 0%, rgba(5, 10, 18, 0.18) 22%, rgba(5, 10, 18, 0.12) 50%, rgba(5, 10, 18, 0.18) 78%, rgba(5, 10, 18, 0.54) 100%)",
+        }}
+      />
+    </div>
+  );
+
   if (loading) {
     return (
       <Card
         data-testid="pep-talk-shell"
-        className={cn("rounded-3xl border p-6 animate-pulse", transparentShellClassName)}
+        className={cn("relative overflow-hidden rounded-3xl border p-6 animate-pulse", transparentShellClassName)}
       >
-        <div className="space-y-4">
+        {renderSectionBackdrop()}
+        <div className="relative space-y-4">
           <div className="h-4 bg-muted rounded w-1/3" />
           <div className="h-20 bg-muted rounded" />
         </div>
@@ -787,6 +846,7 @@ export const TodaysPepTalk = memo(() => {
         data-testid="pep-talk-shell"
         className={cn("relative overflow-hidden rounded-3xl border p-6", transparentShellClassName)}
       >
+        {renderSectionBackdrop()}
         <div className="relative space-y-4 text-center">
           <div className="flex items-center justify-center gap-2">
             <Sparkles className="h-5 w-5 text-muted-foreground" />
@@ -841,6 +901,7 @@ export const TodaysPepTalk = memo(() => {
         isNativeIOS && "gpu-layer",
       )}
     >
+      {renderSectionBackdrop()}
       <div className="relative p-6 md:p-8 space-y-6">
         <div className="flex items-center justify-center gap-2">
           <div className="relative">

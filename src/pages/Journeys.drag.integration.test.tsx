@@ -5,6 +5,17 @@ import { isSameDay } from "date-fns";
 import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("@/hooks/useJourneysCompanionVisual", () => ({
+  useJourneysCompanionVisual: () => ({
+    companionLabel: "Nova",
+    imageUrl: "/placeholder-companion.svg",
+    focalX: null,
+    focalY: null,
+    element: "fire",
+    usesPortraitShell: false,
+  }),
+}));
+
 const mocks = vi.hoisted(() => ({
   addTask: vi.fn(),
   toggleTask: vi.fn(),
@@ -63,10 +74,10 @@ const mocks = vi.hoisted(() => ({
       creationSource?: string;
     } | null;
   },
-  lastVoiceQuestCaptureProps: null as null | {
+  lastCompanionPlannerModalProps: null as null | {
     open?: boolean;
     onOpenChange?: (open: boolean) => void;
-    onCapture?: (transcript: string) => void;
+    presentation?: string;
   },
   tutorialGuidance: {
     isActive: false,
@@ -181,28 +192,22 @@ vi.mock("@/components/AddQuestSheet", () => ({
   },
 }));
 
-vi.mock("@/components/VoiceQuestCaptureDrawer", () => ({
-  VoiceQuestCaptureDrawer: (props: {
+vi.mock("@/components/journeys/JourneysCompanionPlannerModal", () => ({
+  JourneysCompanionPlannerModal: (props: {
     open?: boolean;
     onOpenChange?: (open: boolean) => void;
-    onCapture?: (transcript: string) => void;
+    presentation?: string;
   }) => {
-    mocks.lastVoiceQuestCaptureProps = props;
+    mocks.lastCompanionPlannerModalProps = props;
 
     if (!props.open) {
       return null;
     }
 
     return (
-      <div data-testid="voice-quest-capture-drawer">
-        <button
-          type="button"
-          onClick={() => props.onCapture?.("Deep work tomorrow at 3pm for 2 hours with a 30 minute reminder notes: bring roadmap")}
-        >
-          emit-voice-capture
-        </button>
+      <div data-testid="journeys-companion-planner-modal">
         <button type="button" onClick={() => props.onOpenChange?.(false)}>
-          close-voice-drawer
+          close-planner-modal
         </button>
       </div>
     );
@@ -257,23 +262,22 @@ vi.mock("@/components/CampaignCreatedAnimation", () => ({
 
 vi.mock("@/components/DraggableFAB", () => ({
   DraggableFAB: ({
-    onTap,
-    onVoiceTap,
+    onOpenCompanionPlanner,
   }: {
-    onTap?: () => void;
-    onVoiceTap?: () => void;
+    onOpenCompanionPlanner?: () => void;
   }) => {
     mocks.draggableFabRenderCount += 1;
     return (
       <div data-testid="draggable-fab">
-        <button type="button" data-testid="manual-quest-fab" data-tour="add-quest-fab" onClick={() => onTap?.()}>
+        <button
+          type="button"
+          data-testid="journeys-companion-launcher-floating"
+          data-tour="add-quest-fab"
+          aria-label="Open companion planner"
+          onClick={() => onOpenCompanionPlanner?.()}
+        >
           fab
         </button>
-        {onVoiceTap ? (
-          <button type="button" data-testid="voice-quest-fab" aria-label="Add quest with voice" onClick={() => onVoiceTap()}>
-            voice
-          </button>
-        ) : null}
       </div>
     );
   },
@@ -569,7 +573,7 @@ describe("Journeys row drag integration", () => {
     mocks.draggableFabRenderCount = 0;
     mocks.lastDatePillSelectedDate = null;
     mocks.lastAddQuestSheetProps = null;
-    mocks.lastVoiceQuestCaptureProps = null;
+    mocks.lastCompanionPlannerModalProps = null;
     mocks.tutorialGuidance = {
       isActive: false,
       currentStep: null,
@@ -649,7 +653,7 @@ describe("Journeys row drag integration", () => {
     expect(mocks.lastAddQuestSheetProps?.autoFillTimeOnFirstTap).toBe(true);
   });
 
-  it("renders the desktop header Add Quest CTA and suppresses the floating FAB on Mac-hosted iOS", async () => {
+  it("renders the desktop companion launcher CTA and suppresses the floating FAB on Mac-hosted iOS", async () => {
     mocks.isMacHostedIOSApp = true;
     Object.defineProperty(window, "innerWidth", {
       configurable: true,
@@ -672,13 +676,13 @@ describe("Journeys row drag integration", () => {
       </QueryClientProvider>,
     );
 
-    const addQuestButton = await screen.findByRole("button", { name: /^Add Quest$/i });
-    expect(addQuestButton).toBeInTheDocument();
-    expect(addQuestButton).toHaveAttribute("data-tour", "add-quest-launcher");
-    expect(screen.getAllByRole("button", { name: "Add quest with voice" }).length).toBeGreaterThan(0);
+    const launcher = await screen.findByRole("button", { name: /Plan with companion/i });
+    expect(launcher).toBeInTheDocument();
+    expect(launcher).toHaveAttribute("data-tour", "add-quest-launcher");
     expect(screen.queryByTestId("draggable-fab")).not.toBeInTheDocument();
     expect(mocks.draggableFabRenderCount).toBe(0);
     expect(mocks.lastAddQuestSheetProps?.presentation).toBe("desktop-panel");
+    expect(mocks.lastCompanionPlannerModalProps?.presentation).toBe("dialog");
   });
 
   it("keeps the mobile floating add quest FAB targetable for the tutorial", async () => {
@@ -698,12 +702,11 @@ describe("Journeys row drag integration", () => {
     );
 
     const fab = await screen.findByTestId("draggable-fab");
-    expect(within(fab).getByTestId("manual-quest-fab")).toHaveAttribute("data-tour", "add-quest-fab");
-    expect(within(fab).getByTestId("voice-quest-fab")).toBeInTheDocument();
+    expect(within(fab).getByTestId("journeys-companion-launcher-floating")).toHaveAttribute("data-tour", "add-quest-fab");
     expect(mocks.draggableFabRenderCount).toBe(1);
   });
 
-  it("captures voice on Mac-hosted iOS and reopens the existing sheet with parsed prefills", async () => {
+  it("opens the companion planner modal from the desktop journeys launcher", async () => {
     mocks.isMacHostedIOSApp = true;
     Object.defineProperty(window, "innerWidth", {
       configurable: true,
@@ -726,30 +729,13 @@ describe("Journeys row drag integration", () => {
       </QueryClientProvider>,
     );
 
-    const voiceButtons = await screen.findAllByRole("button", { name: "Add quest with voice" });
-    fireEvent.click(voiceButtons[0]);
+    const launcher = await screen.findByRole("button", { name: /Plan with companion/i });
+    fireEvent.click(launcher);
 
     await waitFor(() => {
-      expect(mocks.lastVoiceQuestCaptureProps?.open).toBe(true);
+      expect(mocks.lastCompanionPlannerModalProps?.open).toBe(true);
     });
-
-    fireEvent.click(screen.getByRole("button", { name: "emit-voice-capture" }));
-
-    await waitFor(() => {
-      expect(mocks.lastAddQuestSheetProps?.open).toBe(true);
-    });
-
-    expect(mocks.lastAddQuestSheetProps?.presentation).toBe("desktop-panel");
-    expect(mocks.lastAddQuestSheetProps?.prefillKey).toBeTruthy();
-    expect(mocks.lastAddQuestSheetProps?.prefillDraft).toEqual(expect.objectContaining({
-      creationSource: "voice",
-      text: "Deep work",
-      scheduledTime: "15:00",
-      estimatedDuration: 120,
-      reminderEnabled: true,
-      reminderMinutesBefore: 30,
-      moreInformation: "bring roadmap",
-    }));
+    expect(screen.getByTestId("journeys-companion-planner-modal")).toBeInTheDocument();
   });
 
   it("opens the add flow with meta+n on Mac-hosted iOS", async () => {

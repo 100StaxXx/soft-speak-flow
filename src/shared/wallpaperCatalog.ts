@@ -3,9 +3,12 @@ export const WALLPAPER_RESET_HOUR = 2 as const;
 export const WALLPAPER_HORIZON_DAYS = 4 as const;
 export const WALLPAPER_DEFAULT_CANDIDATE_COUNT = 3 as const;
 export const WALLPAPER_PROMPT_VERSION = 5 as const;
-export const WALLPAPER_IMAGE_SIZE = "1024x1536" as const;
-export const WALLPAPER_IMAGE_WIDTH = 1024 as const;
-export const WALLPAPER_IMAGE_HEIGHT = 1536 as const;
+export const WALLPAPER_PORTRAIT_IMAGE_SIZE = "1024x1536" as const;
+export const WALLPAPER_PORTRAIT_IMAGE_WIDTH = 1024 as const;
+export const WALLPAPER_PORTRAIT_IMAGE_HEIGHT = 1536 as const;
+export const WALLPAPER_LANDSCAPE_IMAGE_SIZE = "1536x1024" as const;
+export const WALLPAPER_LANDSCAPE_IMAGE_WIDTH = 1536 as const;
+export const WALLPAPER_LANDSCAPE_IMAGE_HEIGHT = 1024 as const;
 
 export const WALLPAPER_PAGE_KEYS = [
   "guide",
@@ -13,6 +16,7 @@ export const WALLPAPER_PAGE_KEYS = [
   "campaigns",
   "companion",
   "profile",
+  "pep_talk",
 ] as const;
 
 export type WallpaperPageKey = (typeof WALLPAPER_PAGE_KEYS)[number];
@@ -51,6 +55,12 @@ export interface WallpaperGenerationSpec {
   label: string;
   pageDescription: string;
   prompt: string;
+  image: {
+    size: `${number}x${number}`;
+    width: number;
+    height: number;
+  };
+  safeZoneGuidance?: string;
   mobileFocus: {
     x: number;
     y: number;
@@ -66,6 +76,7 @@ export interface WallpaperPromptRecipe {
   pageKey: WallpaperPageKey;
   title: string;
   prompt: string;
+  themeKey?: string;
 }
 
 export interface WallpaperPromotionCandidate<TId extends string = string> {
@@ -111,6 +122,7 @@ const wallpaperPageLabels: Record<WallpaperPageKey, string> = {
   campaigns: "Campaigns",
   companion: "Companion",
   profile: "Profile",
+  pep_talk: "Pep Talk",
 };
 
 const wallpaperPageDescriptions: Record<WallpaperPageKey, string> = {
@@ -119,12 +131,19 @@ const wallpaperPageDescriptions: Record<WallpaperPageKey, string> = {
   campaigns: "Large-scale strategic vista or monumental overlook for long-range momentum, ambition, and ritual building.",
   companion: "Peaceful sanctuary backdrop across natural or refined built environments that leaves the companion card as the hero.",
   profile: "Quiet premium observatory, skyline terrace, courtyard, or restrained scenic backdrop for settings and account surfaces.",
+  pep_talk: "Wide scenic landscape backdrop for the daily pep talk section, with emotional intensity around the edges and a calm readable center behind the player card.",
 };
 
-const WALLPAPER_SHARED_FIDELITY_CLAUSE = [
+const WALLPAPER_PORTRAIT_FIDELITY_CLAUSE = [
   "Portrait 9:16 mobile wallpaper composition.",
   "Mixed cinematic realism: grounded enough to feel like a real landscape, but polished enough to feel premium and awe-inspiring.",
   "Very high detail, sharp focus, crisp terrain texture, premium wallpaper fidelity, not soft or muddy.",
+].join(" ");
+
+const WALLPAPER_LANDSCAPE_FIDELITY_CLAUSE = [
+  "Landscape 3:2 scenic section composition for a wide pep talk module inside a mobile app.",
+  "Compose the scene with expansive left-to-right depth and a calm center band suited to a dark overlay card stack.",
+  "Mixed cinematic realism with very high detail, sharp focus, crisp terrain texture, and premium wallpaper fidelity.",
 ].join(" ");
 
 const WALLPAPER_SHARED_PALETTE_CLAUSE = [
@@ -150,81 +169,169 @@ const WALLPAPER_SHARED_SAFE_ZONE_CLAUSE = [
   "Avoid placing the brightest or busiest subject directly in the top bar or bottom 18 percent of the frame.",
 ].join(" ");
 
+const WALLPAPER_PORTRAIT_IMAGE = {
+  size: WALLPAPER_PORTRAIT_IMAGE_SIZE,
+  width: WALLPAPER_PORTRAIT_IMAGE_WIDTH,
+  height: WALLPAPER_PORTRAIT_IMAGE_HEIGHT,
+} as const;
+
+const WALLPAPER_LANDSCAPE_IMAGE = {
+  size: WALLPAPER_LANDSCAPE_IMAGE_SIZE,
+  width: WALLPAPER_LANDSCAPE_IMAGE_WIDTH,
+  height: WALLPAPER_LANDSCAPE_IMAGE_HEIGHT,
+} as const;
+
+const getWallpaperCompositionClause = (
+  image: WallpaperGenerationSpec["image"],
+) => image.width > image.height
+  ? WALLPAPER_LANDSCAPE_FIDELITY_CLAUSE
+  : WALLPAPER_PORTRAIT_FIDELITY_CLAUSE;
+
+const buildWallpaperSafeZoneClause = (
+  safeZoneGuidance?: string,
+) => [
+  WALLPAPER_SHARED_SAFE_ZONE_CLAUSE,
+  safeZoneGuidance,
+].filter(Boolean).join(" ");
+
 const buildWallpaperPrompt = (
   pageKey: WallpaperPageKey,
   scenePrompt: string,
   emphasisPrompt: string,
   atmospherePrompt?: string,
+  options?: {
+    image?: WallpaperGenerationSpec["image"];
+    safeZoneGuidance?: string;
+  },
 ) => [
-  `Create a breathtaking cinematic mobile wallpaper for the ${wallpaperPageLabels[pageKey]} page in the Cosmiq app.`,
+  `Create a breathtaking cinematic wallpaper for the ${wallpaperPageLabels[pageKey]} surface in the Cosmiq app.`,
   `Target mood: ${wallpaperPageDescriptions[pageKey]}`,
   scenePrompt,
   emphasisPrompt,
   atmospherePrompt,
-  WALLPAPER_SHARED_FIDELITY_CLAUSE,
+  getWallpaperCompositionClause(options?.image ?? WALLPAPER_PORTRAIT_IMAGE),
   WALLPAPER_SHARED_DIVERSITY_CLAUSE,
   WALLPAPER_SHARED_PALETTE_CLAUSE,
-  WALLPAPER_SHARED_SAFE_ZONE_CLAUSE,
+  buildWallpaperSafeZoneClause(options?.safeZoneGuidance),
   WALLPAPER_SHARED_NEGATIVE_CLAUSE,
 ].filter(Boolean).join(" ");
 
-export const wallpaperGenerationSpecs: Record<WallpaperPageKey, WallpaperGenerationSpec> = {
-  guide: {
-    label: wallpaperPageLabels.guide,
-    pageDescription: wallpaperPageDescriptions.guide,
+const createWallpaperGenerationSpec = (args: {
+  pageKey: WallpaperPageKey;
+  scenePrompt: string;
+  emphasisPrompt: string;
+  atmospherePrompt?: string;
+  image?: WallpaperGenerationSpec["image"];
+  safeZoneGuidance?: string;
+  mobileFocus: WallpaperGenerationSpec["mobileFocus"];
+  desktopFocus: WallpaperGenerationSpec["desktopFocus"];
+}): WallpaperGenerationSpec => {
+  const image = args.image ?? WALLPAPER_PORTRAIT_IMAGE;
+
+  return {
+    label: wallpaperPageLabels[args.pageKey],
+    pageDescription: wallpaperPageDescriptions[args.pageKey],
     prompt: buildWallpaperPrompt(
-      "guide",
-      "Show a calm observatory, moonlit terrace, rooftop study, forest lookout, coastal platform, desert telescope site, or serene city-night retreat with subtle celestial detail and elegant atmospheric depth.",
-      "Prioritize wisdom, steadiness, and readability for guidance cards. The image should feel premium and supportive, never loud or distracting.",
+      args.pageKey,
+      args.scenePrompt,
+      args.emphasisPrompt,
+      args.atmospherePrompt,
+      {
+        image,
+        safeZoneGuidance: args.safeZoneGuidance,
+      },
     ),
+    image,
+    safeZoneGuidance: args.safeZoneGuidance,
+    mobileFocus: args.mobileFocus,
+    desktopFocus: args.desktopFocus,
+  };
+};
+
+export const wallpaperGenerationSpecs: Record<WallpaperPageKey, WallpaperGenerationSpec> = {
+  guide: createWallpaperGenerationSpec({
+    pageKey: "guide",
+    scenePrompt:
+      "Show a calm observatory, moonlit terrace, rooftop study, forest lookout, coastal platform, desert telescope site, or serene city-night retreat with subtle celestial detail and elegant atmospheric depth.",
+    emphasisPrompt:
+      "Prioritize wisdom, steadiness, and readability for guidance cards. The image should feel premium and supportive, never loud or distracting.",
     mobileFocus: { x: 50, y: 30 },
     desktopFocus: { x: 52, y: 34 },
-  },
-  quests: {
-    label: wallpaperPageLabels.quests,
-    pageDescription: wallpaperPageDescriptions.quests,
-    prompt: buildWallpaperPrompt(
-      "quests",
+  }),
+  quests: createWallpaperGenerationSpec({
+    pageKey: "quests",
+    scenePrompt:
       "Show a gorgeous path, trail, boardwalk, stairway, elevated walkway, shoreline road, dune route, or other clearly readable way forward through varied scenery. The image should spark planning energy and motion.",
+    emphasisPrompt:
       "Prioritize route clarity, beauty, depth, and a sense of personal momentum over spectacle or fantasy noise.",
-    ),
     mobileFocus: { x: 56, y: 56 },
     desktopFocus: { x: 58, y: 50 },
-  },
-  campaigns: {
-    label: wallpaperPageLabels.campaigns,
-    pageDescription: wallpaperPageDescriptions.campaigns,
-    prompt: buildWallpaperPrompt(
-      "campaigns",
+  }),
+  campaigns: createWallpaperGenerationSpec({
+    pageKey: "campaigns",
+    scenePrompt:
       "Show a majestic large-scale vista such as a desert basin, tundra shelf, forest canopy overlook, delta coast, volcanic plateau, port city horizon, or monumental civic terrace built for long-range ambition and strategic planning.",
+    emphasisPrompt:
       "The image should feel enormous, strategic, and high-definition, with commanding scenic depth rather than dreamy haze.",
-    ),
     mobileFocus: { x: 46, y: 42 },
     desktopFocus: { x: 50, y: 46 },
-  },
-  companion: {
-    label: wallpaperPageLabels.companion,
-    pageDescription: wallpaperPageDescriptions.companion,
-    prompt: buildWallpaperPrompt(
-      "companion",
+  }),
+  companion: createWallpaperGenerationSpec({
+    pageKey: "companion",
+    scenePrompt:
       "Show a serene sanctuary such as a glade, lagoon, meadow, courtyard, rooftop garden, oasis, wetland refuge, or snow field with a peaceful center, soft atmosphere, and gentle luminous beauty.",
+    emphasisPrompt:
       "Keep the center especially calm and uncluttered so the companion card remains the visual hero. Avoid bright competing subjects behind the card area.",
-    ),
     mobileFocus: { x: 50, y: 26 },
     desktopFocus: { x: 50, y: 30 },
-  },
-  profile: {
-    label: wallpaperPageLabels.profile,
-    pageDescription: wallpaperPageDescriptions.profile,
-    prompt: buildWallpaperPrompt(
-      "profile",
+  }),
+  profile: createWallpaperGenerationSpec({
+    pageKey: "profile",
+    scenePrompt:
       "Show a refined coastal observatory, rooftop skyline terrace, forest retreat, elegant courtyard, snowy horizon, or restrained waterside overlook with quiet premium atmosphere.",
+    emphasisPrompt:
       "Keep the image elegant, subtle, and uncluttered rather than dramatic or loud.",
-    ),
     mobileFocus: { x: 50, y: 34 },
     desktopFocus: { x: 50, y: 36 },
-  },
+  }),
+  pep_talk: createWallpaperGenerationSpec({
+    pageKey: "pep_talk",
+    image: WALLPAPER_LANDSCAPE_IMAGE,
+    safeZoneGuidance:
+      "Keep the middle 60 percent of the frame especially calm, darker than the outer edges, and free of bright focal subjects so the pep talk player, transcript panel, and CTA remain readable. Avoid faces, statues, suns, moons, horizons, or architectural features landing behind the central card stack.",
+    scenePrompt:
+      "Show a wide premium landscape or monumental scenic environment charged with motivation, discipline, and emotional momentum without any people, text, or UI-like shapes.",
+    emphasisPrompt:
+      "The backdrop should feel cinematic and emotionally strong around the edges, but the center must stay spacious, restrained, and highly usable behind a dark overlay card.",
+    atmospherePrompt:
+      "Favor rich teal, cyan, slate, ember, silver, and deep blue neutrals with clean contrast and grounded scenic realism.",
+    mobileFocus: { x: 50, y: 48 },
+    desktopFocus: { x: 50, y: 52 },
+  }),
 };
+
+export const PEP_TALK_WEEKDAY_THEMES = {
+  monday: { key: "forge", title: "Forge" },
+  tuesday: { key: "focus", title: "Focus" },
+  wednesday: { key: "endurance", title: "Endurance" },
+  thursday: { key: "ascent", title: "Ascent" },
+  friday: { key: "triumph", title: "Triumph" },
+  saturday: { key: "recovery", title: "Recovery" },
+  sunday: { key: "reflection", title: "Reflection" },
+} as const;
+
+export type PepTalkWallpaperWeekday = keyof typeof PEP_TALK_WEEKDAY_THEMES;
+export type PepTalkWallpaperThemeKey = typeof PEP_TALK_WEEKDAY_THEMES[PepTalkWallpaperWeekday]["key"];
+
+const WALLPAPER_WEEKDAY_ORDER = [
+  "sunday",
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+] as const satisfies readonly PepTalkWallpaperWeekday[];
 
 interface RecipeSceneDescriptor {
   key: string;
@@ -243,6 +350,9 @@ const createPromptRecipeFamily = (
   scenes: readonly RecipeSceneDescriptor[],
   atmospheres: readonly RecipeAtmosphereDescriptor[],
   emphasisPrompt: string,
+  options?: {
+    themeKey?: string;
+  },
 ) => atmospheres.flatMap((atmosphere) => scenes.map((scene) => ({
   key: `${pageKey}-${scene.key}-${atmosphere.key}`,
   pageKey,
@@ -252,8 +362,34 @@ const createPromptRecipeFamily = (
     scene.scenePrompt,
     emphasisPrompt,
     atmosphere.atmospherePrompt,
+    {
+      image: wallpaperGenerationSpecs[pageKey].image,
+      safeZoneGuidance: wallpaperGenerationSpecs[pageKey].safeZoneGuidance,
+    },
   ),
+  themeKey: options?.themeKey,
 })));
+
+const getWallpaperWeekdayFromDateKey = (
+  dateKey: string,
+): PepTalkWallpaperWeekday => {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  const weekdayIndex = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+  return WALLPAPER_WEEKDAY_ORDER[weekdayIndex] ?? "monday";
+};
+
+export const resolvePepTalkWallpaperThemeForDate = (
+  dateKey: string,
+) => {
+  const weekday = getWallpaperWeekdayFromDateKey(dateKey);
+  const theme = PEP_TALK_WEEKDAY_THEMES[weekday];
+
+  return {
+    weekday,
+    key: theme.key,
+    title: theme.title,
+  };
+};
 
 const wallpaperRecipeFamilies = {
   guide: createPromptRecipeFamily(
@@ -571,6 +707,211 @@ const wallpaperRecipeFamilies = {
     ],
     "Keep the image elegant, subtle, and uncluttered rather than dramatic or loud.",
   ),
+  pep_talk: [
+    ...createPromptRecipeFamily(
+      "pep_talk",
+      [
+        {
+          key: "forge-basalt-causeway",
+          title: "Basalt Causeway",
+          scenePrompt: "Show a vast basalt causeway across dark coastal rock with ember light at the edges, disciplined geometry, and a broad calm center band.",
+        },
+        {
+          key: "forge-desert-courtyard",
+          title: "Desert Courtyard",
+          scenePrompt: "Show a monumental desert forge courtyard of stone, steel, and wind-carved walls with restrained furnace glow pushed to the edges and a spacious center.",
+        },
+        {
+          key: "forge-training-overlook",
+          title: "Training Overlook",
+          scenePrompt: "Show a cliffside training overlook above a storm-dark sea with powerful terrain, disciplined architecture, and no bright central focal subject.",
+        },
+      ],
+      [
+        {
+          key: "forge",
+          title: "Forge",
+          atmospherePrompt: "Use ember accents, dark slate, iron, sea spray, and disciplined contrast that feels like resolve being hammered into shape.",
+        },
+      ],
+      "The mood should feel like strength is being earned through pressure, discipline, and focus while the center remains calm enough for the pep talk card overlay.",
+      { themeKey: "forge" },
+    ),
+    ...createPromptRecipeFamily(
+      "pep_talk",
+      [
+        {
+          key: "focus-mirror-lake",
+          title: "Mirror Lake",
+          scenePrompt: "Show a perfectly still mirror lake framed by dark pines and narrow stone paths with crisp sightlines and a wide uncluttered center.",
+        },
+        {
+          key: "focus-cedar-corridor",
+          title: "Cedar Corridor",
+          scenePrompt: "Show a long cedar corridor or forest promenade with precise depth, controlled light, and a centered field of visual calm.",
+        },
+        {
+          key: "focus-ridge-causeway",
+          title: "Ridge Causeway",
+          scenePrompt: "Show an elevated ridge causeway across cool tundra or moorland with clean horizon control and a broad steady center channel.",
+        },
+      ],
+      [
+        {
+          key: "focus",
+          title: "Focus",
+          atmospherePrompt: "Favor clean blue, teal, silver, and graphite tones with crisp air, high clarity, and zero visual clutter.",
+        },
+      ],
+      "The scene should feel mentally sharp and controlled, with the eye drawn into stillness instead of spectacle.",
+      { themeKey: "focus" },
+    ),
+    ...createPromptRecipeFamily(
+      "pep_talk",
+      [
+        {
+          key: "endurance-salt-flat",
+          title: "Salt Flat",
+          scenePrompt: "Show an immense salt flat or dry lake bed under dramatic weather with long distance, grounded texture, and a central zone that stays usable and restrained.",
+        },
+        {
+          key: "endurance-glacier-pass",
+          title: "Glacier Pass",
+          scenePrompt: "Show a broad glacier pass or cold expedition shelf with hard-earned scale, deep blue shadow, and no bright competing center subject.",
+        },
+        {
+          key: "endurance-storm-boardwalk",
+          title: "Storm Boardwalk",
+          scenePrompt: "Show a long storm-tested boardwalk through marsh or tidal flats with grit, repetition, and a determined sense of carrying on.",
+        },
+      ],
+      [
+        {
+          key: "endurance",
+          title: "Endurance",
+          atmospherePrompt: "Use weathered contrast, cold silver light, dark teal shadow, and subtle warmth only at the far edges to suggest perseverance.",
+        },
+      ],
+      "The image should feel steady under pressure and emotionally durable, never frantic or chaotic in the center.",
+      { themeKey: "endurance" },
+    ),
+    ...createPromptRecipeFamily(
+      "pep_talk",
+      [
+        {
+          key: "ascent-sky-stair",
+          title: "Sky Stair",
+          scenePrompt: "Show a monumental stair or ascending civic terrace toward open sky with huge scale, clean geometry, and a calm central viewing band.",
+        },
+        {
+          key: "ascent-alpine-switchback",
+          title: "Alpine Switchback",
+          scenePrompt: "Show broad alpine switchbacks cutting through open terrain with unmistakable upward motion and center readability preserved.",
+        },
+        {
+          key: "ascent-hanging-bridge",
+          title: "Hanging Bridge",
+          scenePrompt: "Show a long hanging bridge or elevated crossing over a vast valley with confident movement upward and balanced open space behind the card zone.",
+        },
+      ],
+      [
+        {
+          key: "ascent",
+          title: "Ascent",
+          atmospherePrompt: "Favor clean dawn edges, deep slate shadow, cool cyan air, and a feeling of momentum climbing into something greater.",
+        },
+      ],
+      "The backdrop should feel upward-moving and ambitious while staying composed and premium in the center.",
+      { themeKey: "ascent" },
+    ),
+    ...createPromptRecipeFamily(
+      "pep_talk",
+      [
+        {
+          key: "triumph-summit-plateau",
+          title: "Summit Plateau",
+          scenePrompt: "Show a vast summit plateau with commanding light at the far edges, huge breathing room, and a composed center that feels earned rather than flashy.",
+        },
+        {
+          key: "triumph-victory-shore",
+          title: "Victory Shore",
+          scenePrompt: "Show a dramatic victory shore or sea wall overlook with luminous distance, disciplined contrast, and a strong but readable center band.",
+        },
+        {
+          key: "triumph-skyline-overlook",
+          title: "Skyline Overlook",
+          scenePrompt: "Show a polished skyline overlook above a calm city with celebratory scale, premium restraint, and no bright subject placed behind the central card stack.",
+        },
+      ],
+      [
+        {
+          key: "triumph",
+          title: "Triumph",
+          atmospherePrompt: "Use bright reward cues only at the outer edges, with silver, gold, cyan, and deep blue tones that feel victorious but controlled.",
+        },
+      ],
+      "The scene should feel like the aftermath of a win, powerful and expansive without becoming loud or gaudy.",
+      { themeKey: "triumph" },
+    ),
+    ...createPromptRecipeFamily(
+      "pep_talk",
+      [
+        {
+          key: "recovery-hot-spring",
+          title: "Hot Spring",
+          scenePrompt: "Show a hidden hot spring valley or geothermal refuge with soft steam, grounded stone, and a broad central calm.",
+        },
+        {
+          key: "recovery-moon-garden",
+          title: "Moon Garden",
+          scenePrompt: "Show a moon garden cloister or quiet retreat courtyard with restorative stillness, soft edge lighting, and lots of usable center space.",
+        },
+        {
+          key: "recovery-beach-retreat",
+          title: "Beach Retreat",
+          scenePrompt: "Show a quiet beach retreat or dune sanctuary at blue hour with restorative openness and restrained highlights kept away from center.",
+        },
+      ],
+      [
+        {
+          key: "recovery",
+          title: "Recovery",
+          atmospherePrompt: "Favor gentle teal, seafoam, silver, and moonlit neutrals with soft restorative air and low visual noise.",
+        },
+      ],
+      "The mood should feel restorative and spacious, like rebuilding energy without losing premium scenic depth.",
+      { themeKey: "recovery" },
+    ),
+    ...createPromptRecipeFamily(
+      "pep_talk",
+      [
+        {
+          key: "reflection-observatory-lake",
+          title: "Observatory Lake",
+          scenePrompt: "Show an observatory lake or still waterside overlook under a reflective sky with balanced symmetry and a calm central band.",
+        },
+        {
+          key: "reflection-cliff-cloister",
+          title: "Cliff Cloister",
+          scenePrompt: "Show a contemplative cliff cloister or lantern terrace above fog and sea with deep thoughtfulness and no busy center subject.",
+        },
+        {
+          key: "reflection-marsh-boardwalk",
+          title: "Marsh Boardwalk",
+          scenePrompt: "Show a still marsh boardwalk or wetland path at dusk with polished quiet, emotional depth, and strong center readability.",
+        },
+      ],
+      [
+        {
+          key: "reflection",
+          title: "Reflection",
+          atmospherePrompt: "Use silver, slate, deep blue, and restrained teal with reflective surfaces and quiet end-of-week depth.",
+        },
+      ],
+      "The image should feel introspective and emotionally grounded, with beauty that supports contemplation rather than intensity.",
+      { themeKey: "reflection" },
+    ),
+  ],
 } as const satisfies Record<WallpaperPageKey, WallpaperPromptRecipe[]>;
 
 export const wallpaperPromptRecipes = Object.freeze(
@@ -725,12 +1066,30 @@ const stableHash = (value: string) => (
   value.split("").reduce((hash, char) => (hash * 31 + char.charCodeAt(0)) >>> 0, 7)
 );
 
+const getWallpaperRecipeFamilyForDate = (
+  pageKey: WallpaperPageKey,
+  dateKey: string,
+) => {
+  if (pageKey !== "pep_talk") {
+    return wallpaperRecipeFamilies[pageKey];
+  }
+
+  const themeKey = resolvePepTalkWallpaperThemeForDate(dateKey).key;
+  const themedFamily = wallpaperRecipeFamilies.pep_talk
+    .filter((recipe) => recipe.themeKey === themeKey);
+
+  return themedFamily.length > 0 ? themedFamily : wallpaperRecipeFamilies.pep_talk;
+};
+
 export const getDeterministicWallpaperRecipes = (
   pageKey: WallpaperPageKey,
   dateKey: string,
   candidateCount: number = WALLPAPER_DEFAULT_CANDIDATE_COUNT,
 ): WallpaperPromptRecipe[] => {
-  const family = wallpaperRecipeFamilies[pageKey];
+  const family = getWallpaperRecipeFamilyForDate(pageKey, dateKey);
+  if (family.length === 0) {
+    return [];
+  }
   const cappedCount = Math.max(1, Math.min(candidateCount, family.length));
   const recipeStart = (
     stableHash(pageKey) + getWallpaperDateSerial(dateKey) * cappedCount

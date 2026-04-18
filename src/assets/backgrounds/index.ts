@@ -22,7 +22,7 @@ export interface StaticBackgroundAsset {
   src2x: string;
 }
 
-export type CinematicPageBackgroundKey = WallpaperPageKey;
+export type CinematicPageBackgroundKey = Exclude<WallpaperPageKey, "pep_talk">;
 
 export interface CinematicBackgroundScrim {
   topGradientTopAlpha: number;

@@ -6,6 +6,7 @@ import {
 import {
   WALLPAPER_PAGE_KEYS,
   getDeterministicWallpaperRecipes,
+  resolvePepTalkWallpaperThemeForDate,
 } from "../../../src/shared/wallpaperCatalog.ts";
 
 const withGenerationSlotBudget = async (
@@ -60,8 +61,8 @@ const createDeps = (overrides: Partial<RotationDeps> = {}): RotationDeps => ({
   ...overrides,
 });
 
-Deno.test("rotateWallpaperAssignments fills the 4-day horizon for all five pages", async () => {
-  await withGenerationSlotBudget(20, async () => {
+Deno.test("rotateWallpaperAssignments fills the 4-day horizon for all six surfaces", async () => {
+  await withGenerationSlotBudget(WALLPAPER_PAGE_KEYS.length * 4, async () => {
     const assigned: Array<{ pageKey: string; dateKey: string; assetId: string; assignmentSource: string }> = [];
     const generated: Array<{ pageKey: string; dateKey: string; variantKey: string | null }> = [];
     const deps = createDeps({
@@ -87,7 +88,7 @@ Deno.test("rotateWallpaperAssignments fills the 4-day horizon for all five pages
     }, deps);
 
     if (outcomes.length !== WALLPAPER_PAGE_KEYS.length * 4) {
-      throw new Error(`Expected 20 outcomes, got ${outcomes.length}`);
+      throw new Error(`Expected ${WALLPAPER_PAGE_KEYS.length * 4} outcomes, got ${outcomes.length}`);
     }
 
     if (outcomes.some((outcome) => outcome.status !== "generated")) {
@@ -103,6 +104,25 @@ Deno.test("rotateWallpaperAssignments fills the 4-day horizon for all five pages
       throw new Error(`Expected every page/date to be assigned, got ${assigned.length}`);
     }
   });
+});
+
+Deno.test("pep_talk recipes stay inside the scheduled weekday theme bucket", () => {
+  const mondayTheme = resolvePepTalkWallpaperThemeForDate("2026-04-06");
+  const saturdayTheme = resolvePepTalkWallpaperThemeForDate("2026-04-11");
+  const mondayRecipes = getDeterministicWallpaperRecipes("pep_talk", "2026-04-06", 3);
+  const saturdayRecipes = getDeterministicWallpaperRecipes("pep_talk", "2026-04-11", 3);
+
+  if (mondayTheme.key !== "forge" || saturdayTheme.key !== "recovery") {
+    throw new Error(`Unexpected pep talk theme schedule: ${JSON.stringify({ mondayTheme, saturdayTheme })}`);
+  }
+
+  if (mondayRecipes.some((recipe) => recipe.themeKey !== mondayTheme.key)) {
+    throw new Error(`Expected Monday pep talk recipes to stay in the forge bucket, got ${JSON.stringify(mondayRecipes)}`);
+  }
+
+  if (saturdayRecipes.some((recipe) => recipe.themeKey !== saturdayTheme.key)) {
+    throw new Error(`Expected Saturday pep talk recipes to stay in the recovery bucket, got ${JSON.stringify(saturdayRecipes)}`);
+  }
 });
 
 Deno.test("rotatePageWallpaper retries a carry-forward assignment instead of treating it as final", async () => {

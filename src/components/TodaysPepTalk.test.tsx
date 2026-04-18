@@ -55,6 +55,15 @@ const mocks = vi.hoisted(() => {
     isTabActive: boolean;
     isGloballyMuted: boolean;
     mentor: { slug: string; name: string };
+    pepTalkWallpaper: {
+      dateKey: string;
+      imageUrl: string;
+      background: { src: string; src2x: string };
+      mobileObjectPosition: string;
+      desktopObjectPosition: string;
+      source: "remote";
+      assignmentSource: null;
+    } | null;
   } = {
     todayPepTalk: null,
     fallbackPepTalk: null,
@@ -67,6 +76,7 @@ const mocks = vi.hoisted(() => {
     isTabActive: true,
     isGloballyMuted: false,
     mentor: { slug: "carmen", name: "Carmen" },
+    pepTalkWallpaper: null,
   };
 
   const awardPepTalkListenedAsync = vi.fn();
@@ -77,6 +87,7 @@ const mocks = vi.hoisted(() => {
   const safePlayMock = vi.fn(async () => true);
   const registerAudioMock = vi.fn();
   const unregisterAudioMock = vi.fn();
+  const reportWallpaperRenderError = vi.fn();
 
   const invoke = vi.fn(async (fnName: string) => {
     if (fnName === "sync-daily-pep-talk-transcript") {
@@ -134,6 +145,7 @@ const mocks = vi.hoisted(() => {
     safePlayMock,
     registerAudioMock,
     unregisterAudioMock,
+    reportWallpaperRenderError,
     audioListeners,
     safeLocalStorage: {
       getItem: (key: string) => storage.get(key) ?? null,
@@ -180,6 +192,13 @@ vi.mock("@/contexts/MentorConnectionContext", () => ({
     mentorId: "mentor-1",
     status: "ready",
     refreshConnection: vi.fn(),
+  }),
+}));
+
+vi.mock("@/contexts/WallpaperManifestContext", () => ({
+  useResolvedWallpaper: () => mocks.state.pepTalkWallpaper,
+  useWallpaperManifest: () => ({
+    reportWallpaperRenderError: mocks.reportWallpaperRenderError,
   }),
 }));
 
@@ -321,6 +340,7 @@ describe("TodaysPepTalk transcript expand behavior", () => {
     mocks.safePlayMock.mockClear();
     mocks.registerAudioMock.mockClear();
     mocks.unregisterAudioMock.mockClear();
+    mocks.reportWallpaperRenderError.mockClear();
     mocks.supabase.from.mockClear();
     mocks.supabase.functions.invoke.mockClear();
     mocks.state.syncResponse = Promise.resolve({ data: {}, error: null });
@@ -338,6 +358,7 @@ describe("TodaysPepTalk transcript expand behavior", () => {
     mocks.state.isTabActive = true;
     mocks.state.isGloballyMuted = false;
     mocks.state.mentor = { slug: "carmen", name: "Carmen" };
+    mocks.state.pepTalkWallpaper = null;
     mocks.audioListeners.clear();
   });
 
@@ -392,6 +413,45 @@ describe("TodaysPepTalk transcript expand behavior", () => {
     expect(shell).toHaveClass("shadow-none");
     expect(shell.querySelector(".animate-gradient-shift")).toBeNull();
     expect(shell.querySelector(".from-card\\/90")).not.toBeNull();
+  });
+
+  it("renders a remote pep talk backdrop when a live pep talk wallpaper exists", async () => {
+    mocks.state.pepTalkWallpaper = {
+      dateKey: "2026-02-20",
+      imageUrl: "https://example.com/pep-talk-wallpaper.png",
+      background: {
+        src: "https://example.com/pep-talk-wallpaper.png",
+        src2x: "https://example.com/pep-talk-wallpaper@2x.png",
+      },
+      mobileObjectPosition: "50% 48%",
+      desktopObjectPosition: "50% 52%",
+      source: "remote",
+      assignmentSource: null,
+    };
+
+    renderComponent();
+
+    await screen.findByText("Execute Your Vision");
+
+    expect(screen.getByTestId("pep-talk-section-backdrop")).toHaveAttribute("data-pep-talk-backdrop", "remote");
+    expect(screen.getByTestId("pep-talk-backdrop-image-mobile")).toHaveAttribute(
+      "src",
+      "https://example.com/pep-talk-wallpaper.png",
+    );
+    expect(screen.getByTestId("pep-talk-backdrop-image-desktop")).toHaveAttribute(
+      "src",
+      "https://example.com/pep-talk-wallpaper.png",
+    );
+  });
+
+  it("uses the section gradient fallback when no pep talk wallpaper is available", async () => {
+    renderComponent();
+
+    await screen.findByText("Execute Your Vision");
+
+    expect(screen.getByTestId("pep-talk-section-backdrop")).toHaveAttribute("data-pep-talk-backdrop", "fallback");
+    expect(screen.queryByTestId("pep-talk-backdrop-image-mobile")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("pep-talk-backdrop-image-desktop")).not.toBeInTheDocument();
   });
 
   it("shows full raw script when transcript array is empty", async () => {

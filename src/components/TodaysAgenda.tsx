@@ -9,8 +9,6 @@ import { toast } from "@/components/ui/sonner";
 import { 
   Flame, 
   Trophy, 
-  Mic,
-  Plus,
   Check,
   Circle,
   Clock,
@@ -35,6 +33,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
+import { JourneysCompanionLauncher } from "@/components/journeys/JourneysCompanionLauncher";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -200,6 +199,7 @@ interface TodaysAgendaProps {
   desktopInteractionResetKey?: string | number;
   onToggle: (taskId: string, completed: boolean, xpReward: number) => void;
   onAddQuest: () => void;
+  onOpenCompanionPlanner?: () => void;
   onVoiceAddQuest?: () => void;
   completedCount: number;
   totalCount: number;
@@ -638,6 +638,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   useMacDurationSizedDesktopTimelineRows = false,
   onToggle,
   onAddQuest,
+  onOpenCompanionPlanner,
   onVoiceAddQuest,
   completedCount,
   totalCount,
@@ -658,6 +659,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   onOpenMonthView,
 }: TodaysAgendaProps) {
   const { user } = useAuth();
+  const plannerLauncherAction = onOpenCompanionPlanner ?? onVoiceAddQuest ?? onAddQuest;
   const prefersReducedMotion = useReducedMotion();
   const { capabilities } = useMotionProfile();
   const [isDesktopLayout, setIsDesktopLayout] = useState(() => {
@@ -2583,29 +2585,14 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             </p>
           )}
           {!hideDesktopRailAddButton && !isDesktopLayout ? (
-            <div className="mt-4 flex items-center gap-2">
-              {onVoiceAddQuest ? (
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="outline"
-                  aria-label="Add quest with voice"
-                  className="h-9 w-9 rounded-2xl border-primary/20 bg-primary/10 text-primary hover:bg-primary/15"
-                  onClick={onVoiceAddQuest}
-                >
-                  <Mic className="h-4 w-4" />
-                </Button>
-              ) : null}
-              <Button
-                variant="outline"
-                size="sm"
+            <div className="mt-4">
+              <JourneysCompanionLauncher
+                variant="inline"
                 data-tour="add-quest-launcher"
-                className="w-full rounded-2xl border-white/10 bg-white/[0.04] hover:bg-white/[0.08]"
-                onClick={onAddQuest}
-              >
-                <Plus className="h-4 w-4" />
-                Add Quest
-              </Button>
+                text="Plan with companion"
+                className="w-full"
+                onClick={plannerLauncherAction}
+              />
             </div>
           ) : null}
         </div>
@@ -2852,28 +2839,14 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                 </Button>
               ) : null}
               <div className="flex items-center gap-2">
-                {onVoiceAddQuest ? (
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="outline"
-                    aria-label="Add quest with voice"
-                    className="h-9 w-9 rounded-[18px] border-primary/20 bg-primary/10 text-primary hover:bg-primary/15"
-                    onClick={onVoiceAddQuest}
-                  >
-                    <Mic className="h-4 w-4" />
-                  </Button>
-                ) : null}
-                <Button
-                  type="button"
-                  size="sm"
+                <JourneysCompanionLauncher
+                  variant="inline"
+                  compact
                   data-tour="add-quest-launcher"
-                  className="h-9 rounded-[18px] px-4 shadow-[0_14px_28px_rgba(122,61,255,0.2)]"
-                  onClick={onAddQuest}
-                >
-                  <Plus className="h-4 w-4" />
-                  Add Quest
-                </Button>
+                  text="Plan with companion"
+                  className="shadow-[0_14px_28px_rgba(122,61,255,0.2)]"
+                  onClick={plannerLauncherAction}
+                />
               </div>
             </div>
           </div>
@@ -2938,29 +2911,14 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                   ? "Your day is still open. Add a quest to give the planner some shape."
                   : `Nothing is planned for ${selectedDateHeading} yet. Add a quest to anchor the day.`}
               </p>
-              <div className="mt-4 flex items-center justify-center gap-2">
-                {onVoiceAddQuest ? (
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="outline"
-                    aria-label="Add quest with voice"
-                    className="h-9 w-9 rounded-2xl border-primary/20 bg-primary/10 text-primary hover:bg-primary/15"
-                    onClick={onVoiceAddQuest}
-                  >
-                    <Mic className="h-4 w-4" />
-                  </Button>
-                ) : null}
-                <Button
-                  variant="outline"
-                  size="sm"
+              <div className="mt-4 flex items-center justify-center">
+                <JourneysCompanionLauncher
+                  variant="inline"
                   data-tour="add-quest-launcher"
-                  className="rounded-2xl border-white/10 bg-white/[0.04] hover:bg-white/[0.08]"
-                  onClick={onAddQuest}
-                >
-                  <Plus className="mr-1.5 h-3 w-3" />
-                  Add Quest
-                </Button>
+                  text="Start with companion"
+                  className="w-full max-w-xs justify-center"
+                  onClick={plannerLauncherAction}
+                />
               </div>
             </div>
           ) : (
