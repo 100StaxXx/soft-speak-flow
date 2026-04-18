@@ -1502,7 +1502,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
       { wrapper: createWrapper(queryClient) },
     );
 
-    const launcher = screen.getByRole("button", { name: /Start with companion/i });
+    const launcher = screen.getByRole("button", { name: /Chat with companion/i });
     fireEvent.click(launcher);
 
     expect(onOpenCompanionPlanner).toHaveBeenCalledTimes(1);

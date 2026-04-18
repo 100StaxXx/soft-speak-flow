@@ -21,6 +21,8 @@ const canUseSpeechSynthesis = () =>
   && typeof window.SpeechSynthesisUtterance !== "undefined";
 
 const normalizeStyle = (voiceStyle?: string | null) => (voiceStyle ?? "").trim().toLowerCase();
+const hasStyleKeyword = (voiceStyle: string, keywords: string[]) =>
+  keywords.some((keyword) => voiceStyle.includes(keyword));
 
 const pickDeviceVoice = (voiceStyle?: string | null) => {
   if (!canUseSpeechSynthesis()) return null;
@@ -29,7 +31,9 @@ const pickDeviceVoice = (voiceStyle?: string | null) => {
   if (!voices.length) return null;
 
   const normalizedStyle = normalizeStyle(voiceStyle);
-  const preferredKeywords = normalizedStyle.includes("playful")
+  const preferredKeywords = hasStyleKeyword(normalizedStyle, ["gritty", "streetwise", "raspy", "shadow", "deep"])
+    ? ["daniel", "fred", "alex", "tom", "aaron", "jorge", "david"]
+    : normalizedStyle.includes("playful")
     ? ["female", "samantha", "victoria", "ava", "serena"]
     : normalizedStyle.includes("wise") || normalizedStyle.includes("grounded")
       ? ["daniel", "fred", "alex", "tom", "aaron"]
@@ -57,7 +61,10 @@ const applyVoiceStyle = (
   utterance.pitch = 1;
   utterance.lang = "en-US";
 
-  if (normalizedStyle.includes("playful") || normalizedStyle.includes("bright")) {
+  if (hasStyleKeyword(normalizedStyle, ["gritty", "streetwise", "raspy", "shadow"])) {
+    utterance.rate = 0.9;
+    utterance.pitch = 0.86;
+  } else if (normalizedStyle.includes("playful") || normalizedStyle.includes("bright")) {
     utterance.rate = 1.03;
     utterance.pitch = 1.12;
   } else if (normalizedStyle.includes("calm") || normalizedStyle.includes("gentle")) {

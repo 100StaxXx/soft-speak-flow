@@ -51,9 +51,16 @@ async function enforceDailyTtsCap(supabase: any, userId: string) {
 
 const selectVoice = (voiceStyle?: string | null) => {
   const normalized = (voiceStyle ?? "").toLowerCase();
+  if (
+    normalized.includes("gritty")
+    || normalized.includes("streetwise")
+    || normalized.includes("raspy")
+    || normalized.includes("shadow")
+    || normalized.includes("deep")
+  ) return "onyx";
   if (normalized.includes("playful") || normalized.includes("bright")) return "nova";
   if (normalized.includes("wise") || normalized.includes("story")) return "fable";
-  if (normalized.includes("grounded") || normalized.includes("deep")) return "onyx";
+  if (normalized.includes("grounded")) return "onyx";
   if (normalized.includes("calm") || normalized.includes("gentle") || normalized.includes("warm")) return "shimmer";
   return "alloy";
 };

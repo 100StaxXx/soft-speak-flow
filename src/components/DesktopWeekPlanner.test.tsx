@@ -90,7 +90,7 @@ describe("DesktopWeekPlanner", () => {
     expect(screen.getByTestId("desktop-week-hour-6")).toBeInTheDocument();
     expect(screen.getByRole("group", { name: /desktop planner mode/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Today" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Plan with companion/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Chat with companion/i })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Day" }));
     expect(onPlannerModeChange).toHaveBeenCalledWith("day");
@@ -113,7 +113,7 @@ describe("DesktopWeekPlanner", () => {
       />,
     );
 
-    const launcher = screen.getByRole("button", { name: /Plan with companion/i });
+    const launcher = screen.getByRole("button", { name: /Chat with companion/i });
     fireEvent.click(launcher);
 
     expect(onOpenCompanionPlanner).toHaveBeenCalledTimes(1);

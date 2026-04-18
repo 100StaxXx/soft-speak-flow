@@ -9,6 +9,10 @@ import {
   createCostGuardrailSupabaseClient,
   isCostGuardrailBlockedError,
 } from "../_shared/costGuardrails.ts";
+import {
+  normalizeCompanionChatSurface,
+  surfaceRequiresPremiumAccess,
+} from "./surfaceAccess.ts";
 
 const RequestSchema = z.object({
   message: z.string().min(1).max(4000).trim(),
@@ -18,6 +22,7 @@ const RequestSchema = z.object({
   })).max(24).default([]),
   companionId: z.string().uuid(),
   inputMode: z.enum(["text", "voice"]),
+  surface: z.enum(["companion", "journeys"]).optional().default("companion"),
   sessionId: z.string().min(1).max(200).optional(),
 });
 
@@ -255,7 +260,7 @@ const buildSystemPrompt = (context: {
 }) => {
   const voiceStyle = typeof context.voiceTemplate?.voice_style === "string"
     ? context.voiceTemplate.voice_style
-    : "warm, grounded, encouraging";
+    : "Original gritty chaos sidekick. Deep-voiced, streetwise shoulder commentator. Fast-talking, irreverent, dryly funny, fearless, secretly loyal, and always pushing the human toward action.";
   const traits = asStringArray(context.voiceTemplate?.personality_traits).join(", ");
   const memories = context.memories
     .map((memory) => {
@@ -291,6 +296,7 @@ const buildSystemPrompt = (context: {
         }).slice(0, 700)}`
       : "",
     "Be concise, emotionally present, and natural.",
+    "Keep the performance original. Do not imitate or name any real actor, celebrity, or copyrighted character, even if the user asks.",
     "Reply in plain text only. Keep most answers under 120 words unless the user asks for more.",
     "Do not mention internal context, models, memory extraction, or implementation details.",
     "If the user asks for planning, scheduling, reminders, campaigns, rituals, or saving changes, steer them to the planning surface instead of inventing saved changes yourself.",
@@ -556,15 +562,19 @@ serve(async (req) => {
 
     const userId = protectedRequest.auth.userId;
     const sessionId = parsed.data.sessionId ?? crypto.randomUUID();
-    const hasPremiumAccess = await ensurePremiumAccess(protectedRequest.supabase, userId);
+    const surface = normalizeCompanionChatSurface(parsed.data.surface);
 
-    if (!hasPremiumAccess) {
-      return createSafeErrorResponse(req, {
-        status: 403,
-        code: "PREMIUM_REQUIRED",
-        error: "Companion Talk requires Premium access",
-        requestId,
-      });
+    if (surfaceRequiresPremiumAccess(surface)) {
+      const hasPremiumAccess = await ensurePremiumAccess(protectedRequest.supabase, userId);
+
+      if (!hasPremiumAccess) {
+        return createSafeErrorResponse(req, {
+          status: 403,
+          code: "PREMIUM_REQUIRED",
+          error: "Companion Talk requires Premium access",
+          requestId,
+        });
+      }
     }
 
     const underTurnCap = await enforceDailyTurnCap(protectedRequest.supabase, userId);

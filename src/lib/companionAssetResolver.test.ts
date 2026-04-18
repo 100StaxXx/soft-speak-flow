@@ -22,6 +22,7 @@ import {
   getPresetCompanionExpressiveAssetUrl,
   getPresetCompanionAssetUrl,
   getUniversalEggAssetUrl,
+  normalizeCompanionStoredImageUrl,
   resolveCompanionExpressiveAssetUrl,
   resolveCompanionVisualAssetUrl,
 } from "./companionAssetResolver";
@@ -43,6 +44,15 @@ describe("companion asset resolver", () => {
     expect(getPublicUrlMock).not.toHaveBeenCalled();
   });
 
+  it("keeps bundled youth relative URLs intact when normalizing stored image paths", () => {
+    expect(
+      normalizeCompanionStoredImageUrl(
+        "/companion-presets/griffin/t1_youth/normal/griffin__t1_youth__normal__fire.png",
+      ),
+    ).toBe("/companion-presets/griffin/t1_youth/normal/griffin__t1_youth__normal__fire.png");
+    expect(getPublicUrlMock).not.toHaveBeenCalled();
+  });
+
   it("resolves Initiate normal art from remote storage for newly covered presets", () => {
     expect(
       getPresetCompanionAssetUrl({
@@ -53,6 +63,23 @@ describe("companion asset resolver", () => {
       }),
     ).toBe(
       "https://example.supabase.co/storage/v1/object/public/companion-presets/griffin/t2_guardian/normal/griffin__t2_guardian__normal__fire.png",
+    );
+  });
+
+  it("normalizes relative remote preset URLs for legacy stage 2 companions", () => {
+    expect(
+      resolveCompanionVisualAssetUrl(
+        {
+          preset_id: null,
+          current_stage: 8,
+          core_element: "ice",
+          current_image_url:
+            "/companion-presets/fox/t2_guardian/normal/fox__t2_guardian__normal__ice.png",
+        },
+        "normal",
+      ),
+    ).toBe(
+      "https://example.supabase.co/storage/v1/object/public/companion-presets/fox/t2_guardian/normal/fox__t2_guardian__normal__ice.png",
     );
   });
 

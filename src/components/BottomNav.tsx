@@ -196,33 +196,6 @@ export const BottomNav = memo(() => {
           </NavLink>
 
           <NavLink
-            to="/companion"
-            className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation min-w-[58px] min-h-[56px] relative"
-            activeClassName="bg-stardust-gold/12"
-            data-tour="companion-tab"
-            onClick={() => haptics.light()}
-            onMouseEnter={() => handlePrefetch('companion')}
-            onFocus={() => handlePrefetch('companion')}
-          >
-          {({ isActive }) => (
-              <>
-                <div className="relative">
-                  <CompanionNavPresence isActive={isActive} />
-                  <PawPrint fill="currentColor" className={`h-6 w-6 -rotate-45 transition-colors duration-200 ${isActive ? 'text-stardust-gold' : 'text-muted-foreground'}`} />
-                  {companion && canEvolve && (
-                    <Badge className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center text-[9px] bg-stardust-gold text-black animate-pulse">
-                      !
-                    </Badge>
-                  )}
-                </div>
-                <span className={`text-[11px] font-medium transition-colors duration-200 ${isActive ? 'text-stardust-gold' : 'text-muted-foreground/85'}`}>
-                  Companion
-                </span>
-              </>
-            )}
-          </NavLink>
-
-          <NavLink
             to="/journeys"
             className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation min-w-[58px] min-h-[56px]"
             activeClassName="bg-cosmiq-glow/12"
@@ -237,6 +210,33 @@ export const BottomNav = memo(() => {
                 <Compass className={`h-6 w-6 transition-colors duration-200 ${isActive ? 'text-cosmiq-glow' : 'text-muted-foreground'}`} />
                 <span className={`text-[11px] font-medium transition-colors duration-200 ${isActive ? 'text-cosmiq-glow' : 'text-muted-foreground/85'}`}>
                   Quests
+                </span>
+              </>
+            )}
+          </NavLink>
+
+          <NavLink
+            to="/companion"
+            className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation min-w-[58px] min-h-[56px] relative"
+            activeClassName="bg-stardust-gold/12"
+            data-tour="companion-tab"
+            onClick={() => haptics.light()}
+            onMouseEnter={() => handlePrefetch('companion')}
+            onFocus={() => handlePrefetch('companion')}
+          >
+            {({ isActive }) => (
+              <>
+                <div className="relative">
+                  <CompanionNavPresence isActive={isActive} />
+                  <PawPrint fill="currentColor" className={`h-6 w-6 -rotate-45 transition-colors duration-200 ${isActive ? 'text-stardust-gold' : 'text-muted-foreground'}`} />
+                  {companion && canEvolve && (
+                    <Badge className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center text-[9px] bg-stardust-gold text-black animate-pulse">
+                      !
+                    </Badge>
+                  )}
+                </div>
+                <span className={`text-[11px] font-medium transition-colors duration-200 ${isActive ? 'text-stardust-gold' : 'text-muted-foreground/85'}`}>
+                  Companion
                 </span>
               </>
             )}

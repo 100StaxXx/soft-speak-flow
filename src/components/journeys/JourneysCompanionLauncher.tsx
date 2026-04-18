@@ -16,7 +16,7 @@ export function JourneysCompanionLauncher({
   variant,
   compact = false,
   text,
-  caption = "Companion planner",
+  caption = "Companion chat",
   className,
   type = "button",
   ...props
@@ -30,7 +30,7 @@ export function JourneysCompanionLauncher({
     usesPortraitShell,
   } = useJourneysCompanionVisual();
 
-  const resolvedText = text ?? `Plan with ${companionLabel}`;
+  const resolvedText = text ?? `Chat with ${companionLabel}`;
   const portraitClassName = variant === "floating" ? "h-9 w-9" : compact ? "h-9 w-9" : "h-10 w-10";
 
   const portrait = usesPortraitShell ? (

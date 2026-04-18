@@ -2589,7 +2589,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
               <JourneysCompanionLauncher
                 variant="inline"
                 data-tour="add-quest-launcher"
-                text="Plan with companion"
+                text="Chat with companion"
                 className="w-full"
                 onClick={plannerLauncherAction}
               />
@@ -2843,7 +2843,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                   variant="inline"
                   compact
                   data-tour="add-quest-launcher"
-                  text="Plan with companion"
+                  text="Chat with companion"
                   className="shadow-[0_14px_28px_rgba(122,61,255,0.2)]"
                   onClick={plannerLauncherAction}
                 />
@@ -2915,7 +2915,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                 <JourneysCompanionLauncher
                   variant="inline"
                   data-tour="add-quest-launcher"
-                  text="Start with companion"
+                  text="Chat with companion"
                   className="w-full max-w-xs justify-center"
                   onClick={plannerLauncherAction}
                 />

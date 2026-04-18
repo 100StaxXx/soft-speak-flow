@@ -101,7 +101,7 @@ export const QuestInboxSection = memo(function QuestInboxSection({
             variant="inline"
             compact
             data-tour="add-quest-launcher"
-            text="Plan with companion"
+            text="Chat with companion"
             onClick={() => {
               haptics.light();
               plannerLauncherAction();

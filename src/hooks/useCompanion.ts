@@ -17,6 +17,7 @@ import {
 import {
   getPresetCompanionAssetUrl,
   getUniversalEggAssetUrl,
+  normalizeCompanionAssetSourceUrls,
   resolveCompanionVisualAssetUrl,
 } from "@/lib/companionAssetResolver";
 import {
@@ -90,6 +91,9 @@ type CompanionEvolutionHistoryRow = {
   xp_at_evolution?: number | null;
   evolved_at?: string | null;
 };
+
+const normalizeCompanionRecord = (companion: Companion | null): Companion | null =>
+  companion ? normalizeCompanionAssetSourceUrls(companion) : null;
 
 const resolveHighestValidClaimedStageFromHistory = (
   historyRows: CompanionEvolutionHistoryRow[],
@@ -292,7 +296,7 @@ export const fetchCompanion = async (userId: string): Promise<Companion | null> 
 
   const companion = data as Companion | null;
   if (!companion || companion.current_stage <= 0) {
-    return companion;
+    return normalizeCompanionRecord(companion);
   }
 
   const { data: repairData, error: repairError } = await supabase.rpc(
@@ -313,10 +317,10 @@ export const fetchCompanion = async (userId: string): Promise<Companion | null> 
       userId,
       reason: "repair_rpc_failed",
     });
-    return repairStalePresetCompanionNormalImage({
+    return normalizeCompanionRecord(await repairStalePresetCompanionNormalImage({
       companion: resolvedCompanion,
       userId,
-    });
+    }));
   }
 
   const repairResult = (Array.isArray(repairData) ? repairData[0] : repairData) as
@@ -334,10 +338,10 @@ export const fetchCompanion = async (userId: string): Promise<Companion | null> 
       userId,
       reason: "repair_rpc_empty",
     });
-    return repairStalePresetCompanionNormalImage({
+    return normalizeCompanionRecord(await repairStalePresetCompanionNormalImage({
       companion: resolvedCompanion,
       userId,
-    });
+    }));
   }
 
   if (!repairResult.repaired) {
@@ -354,10 +358,10 @@ export const fetchCompanion = async (userId: string): Promise<Companion | null> 
       userId,
       reason: "repair_rpc_unresolved",
     });
-    return repairStalePresetCompanionNormalImage({
+    return normalizeCompanionRecord(await repairStalePresetCompanionNormalImage({
       companion: resolvedCompanion,
       userId,
-    });
+    }));
   }
 
   logger.warn("Repaired auto-advanced companion state", {
@@ -378,7 +382,7 @@ export const fetchCompanion = async (userId: string): Promise<Companion | null> 
   };
 
   if (resolvedCompanion.current_stage <= 0) {
-    return resolvedCompanion;
+    return normalizeCompanionRecord(resolvedCompanion);
   }
 
   const verifiedCompanion = await reconcileCompanionClaimedStageLocally({
@@ -386,10 +390,10 @@ export const fetchCompanion = async (userId: string): Promise<Companion | null> 
     userId,
     reason: "post_repair_verification",
   });
-  return repairStalePresetCompanionNormalImage({
+  return normalizeCompanionRecord(await repairStalePresetCompanionNormalImage({
     companion: verifiedCompanion,
     userId,
-  });
+  }));
 };
 
 interface DirectEvolutionResponse {

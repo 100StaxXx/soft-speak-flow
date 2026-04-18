@@ -345,7 +345,13 @@ const applyMemoryUpdates = (
 const findProposalById = (proposals: CompanionPlannerProposal[], proposalId: string) =>
   proposals.find((proposal) => proposal.id === proposalId) ?? null;
 
-export function useCompanionPlanner() {
+interface UseCompanionPlannerOptions {
+  bootstrapGreeting?: boolean;
+}
+
+export function useCompanionPlanner({
+  bootstrapGreeting = true,
+}: UseCompanionPlannerOptions = {}) {
   const { user } = useAuth();
   const storedPreferences = useMemo(readStoredPreferences, []);
   const { greeting } = useCompanionDialogue();
@@ -526,6 +532,7 @@ export function useCompanionPlanner() {
   }), [activeEpics, activeTasks, enrichedContext, inboxTasks, plannerMemory, scheduleInsights]);
 
   useEffect(() => {
+    if (!bootstrapGreeting) return;
     if (bootstrappedGreetingRef.current) return;
     if (!greeting) return;
 
@@ -536,7 +543,7 @@ export function useCompanionPlanner() {
         proposalIds: [],
       }),
     ]);
-  }, [greeting]);
+  }, [bootstrapGreeting, greeting]);
 
   useEffect(() => {
     writeStoredPreferences({

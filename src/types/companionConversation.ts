@@ -1,4 +1,5 @@
 export type CompanionConversationMode = "talk" | "plan";
+export type CompanionChatSurface = "companion" | "journeys";
 
 export type CompanionChatRole = "assistant" | "user";
 
@@ -30,6 +31,7 @@ export interface CompanionChatRequest {
   }>;
   companionId: string;
   inputMode: CompanionChatInputMode;
+  surface?: CompanionChatSurface;
   sessionId?: string;
 }
 

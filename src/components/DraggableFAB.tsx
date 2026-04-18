@@ -48,7 +48,7 @@ export const DraggableFAB = ({ onOpenCompanionPlanner }: DraggableFABProps) => {
     >
       <JourneysCompanionLauncher
         variant="floating"
-        aria-label="Open companion planner"
+        aria-label="Open companion chat"
         data-tour="add-quest-fab"
         data-testid="journeys-companion-launcher-floating"
         onClick={() => {

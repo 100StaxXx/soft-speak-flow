@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import {
   COMPANION_PRESET_BUCKET,
+  COMPANION_EXPRESSION_MOODS,
   COMPANION_PREVIEW_TIER,
   COMPANION_EXPRESSION_VARIANT_COUNT,
   coerceCompanionElementId,
@@ -16,8 +17,10 @@ import {
   type CompanionExpressionMood,
   type CompanionVisualState,
 } from "@/config/companionCatalog";
+import { getCompanionPresetImageAssetKey } from "@/lib/companionImageFocal";
 
 const UNIVERSAL_EGG_ASSET_DIR = "companion-eggs";
+const COMPANION_PRESET_PUBLIC_PATH_SEGMENT = `/storage/v1/object/public/${COMPANION_PRESET_BUCKET}/`;
 
 interface CompanionAssetSource {
   preset_id?: string | null;
@@ -39,6 +42,61 @@ export const resolveUniversalEggAssetPath = ({
 
 export const getUniversalEggAssetUrl = (element: string): string =>
   `/${resolveUniversalEggAssetPath({ element })}`;
+
+const isBundledYouthPresetAssetPath = (storagePath: string): boolean => {
+  const [presetSegment, storageTier, variantSegment] = storagePath.split("/");
+  const normalizedPresetId = coerceCompanionPresetId(presetSegment);
+
+  if (!normalizedPresetId || storageTier !== "t1_youth") {
+    return false;
+  }
+
+  return hasBundledYouthCompanionPresetAssets(normalizedPresetId)
+    && (
+      variantSegment === "normal"
+      || COMPANION_EXPRESSION_MOODS.includes(variantSegment as CompanionExpressionMood)
+    );
+};
+
+export const normalizeCompanionStoredImageUrl = (
+  imageUrl: string | null | undefined,
+): string | null => {
+  if (typeof imageUrl !== "string") return null;
+
+  const trimmed = imageUrl.trim();
+  if (trimmed.length === 0) return null;
+
+  if (
+    trimmed.startsWith("data:")
+    || trimmed.startsWith("blob:")
+    || trimmed.includes(COMPANION_PRESET_PUBLIC_PATH_SEGMENT)
+  ) {
+    return trimmed;
+  }
+
+  const assetKey = getCompanionPresetImageAssetKey(trimmed);
+  if (!assetKey) {
+    return trimmed;
+  }
+
+  const storagePath = assetKey.replace(new RegExp(`^${COMPANION_PRESET_BUCKET}/`), "");
+  if (storagePath.length === 0) {
+    return trimmed;
+  }
+
+  if (isBundledYouthPresetAssetPath(storagePath)) {
+    return `/${assetKey}`;
+  }
+
+  return supabase.storage.from(COMPANION_PRESET_BUCKET).getPublicUrl(storagePath).data.publicUrl;
+};
+
+export const normalizeCompanionAssetSourceUrls = <T extends CompanionAssetSource>(companion: T): T => ({
+  ...companion,
+  current_image_url: normalizeCompanionStoredImageUrl(companion.current_image_url),
+  dormant_image_url: normalizeCompanionStoredImageUrl(companion.dormant_image_url),
+  neglected_image_url: normalizeCompanionStoredImageUrl(companion.neglected_image_url),
+});
 
 export const getPresetCompanionAssetUrl = ({
   presetId,
@@ -182,6 +240,10 @@ export const resolveCompanionVisualAssetUrl = (
 ): string | null => {
   if (!companion) return null;
 
+  const normalizedCurrentImageUrl = normalizeCompanionStoredImageUrl(companion.current_image_url);
+  const normalizedDormantImageUrl = normalizeCompanionStoredImageUrl(companion.dormant_image_url);
+  const normalizedNeglectedImageUrl = normalizeCompanionStoredImageUrl(companion.neglected_image_url);
+
   const normalizedElement = companion.core_element ?? "fire";
   const isStageZeroEgg = (companion.current_stage ?? 0) <= 0;
 
@@ -203,10 +265,10 @@ export const resolveCompanionVisualAssetUrl = (
   if (presetUrl) return presetUrl;
 
   if (state === "dormant") {
-    return companion.dormant_image_url ?? companion.current_image_url ?? null;
+    return normalizedDormantImageUrl ?? normalizedCurrentImageUrl ?? null;
   }
   if (state === "neglected") {
-    return companion.neglected_image_url ?? companion.current_image_url ?? null;
+    return normalizedNeglectedImageUrl ?? normalizedCurrentImageUrl ?? null;
   }
-  return companion.current_image_url ?? null;
+  return normalizedCurrentImageUrl ?? null;
 };

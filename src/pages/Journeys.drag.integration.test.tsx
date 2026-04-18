@@ -273,7 +273,7 @@ vi.mock("@/components/DraggableFAB", () => ({
           type="button"
           data-testid="journeys-companion-launcher-floating"
           data-tour="add-quest-fab"
-          aria-label="Open companion planner"
+          aria-label="Open companion chat"
           onClick={() => onOpenCompanionPlanner?.()}
         >
           fab
@@ -676,7 +676,7 @@ describe("Journeys row drag integration", () => {
       </QueryClientProvider>,
     );
 
-    const launcher = await screen.findByRole("button", { name: /Plan with companion/i });
+    const launcher = await screen.findByRole("button", { name: /Chat with companion/i });
     expect(launcher).toBeInTheDocument();
     expect(launcher).toHaveAttribute("data-tour", "add-quest-launcher");
     expect(screen.queryByTestId("draggable-fab")).not.toBeInTheDocument();
@@ -729,7 +729,7 @@ describe("Journeys row drag integration", () => {
       </QueryClientProvider>,
     );
 
-    const launcher = await screen.findByRole("button", { name: /Plan with companion/i });
+    const launcher = await screen.findByRole("button", { name: /Chat with companion/i });
     fireEvent.click(launcher);
 
     await waitFor(() => {

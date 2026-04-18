@@ -170,13 +170,13 @@ describe("BottomNav", () => {
     expect(mocks.warmEpicsQueryFromRemote).not.toHaveBeenCalled();
   });
 
-  it("renders the reordered main tabs", () => {
+  it("renders quests before companion in the bottom nav", () => {
     renderBottomNav("/mentor");
 
     expect(screen.getAllByRole("link").map((link) => link.textContent)).toEqual([
       "Guide",
-      "Companion",
       "Quests",
+      "Companion",
     ]);
   });
 

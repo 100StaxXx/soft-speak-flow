@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { useCompanion } from "./useCompanion";
 import { useMemo } from "react";
+import { normalizeCompanionAssetSourceUrls } from "@/lib/companionAssetResolver";
 
 export type CompanionMoodState = 'happy' | 'content' | 'neutral' | 'worried' | 'sad' | 'sick';
 
@@ -104,15 +105,19 @@ export const useCompanionHealth = () => {
 
   // Compute health metrics
   const health: CompanionHealth = useMemo(() => {
-    const body = companionHealthData?.body ?? 100;
-    const mind = companionHealthData?.mind ?? 0;
-    const soul = companionHealthData?.soul ?? 0;
-    const inactiveDays = companionHealthData?.inactive_days ?? 0;
-    const isAlive = companionHealthData?.is_alive ?? true;
-    const hunger = companionHealthData?.hunger ?? 100;
-    const happiness = companionHealthData?.happiness ?? 100;
-    const careScore = companionHealthData?.care_score ?? 100;
-    const recoveryProgress = companionHealthData?.recovery_progress ?? 100;
+    const normalizedCompanionHealthData = companionHealthData
+      ? normalizeCompanionAssetSourceUrls(companionHealthData)
+      : null;
+
+    const body = normalizedCompanionHealthData?.body ?? 100;
+    const mind = normalizedCompanionHealthData?.mind ?? 0;
+    const soul = normalizedCompanionHealthData?.soul ?? 0;
+    const inactiveDays = normalizedCompanionHealthData?.inactive_days ?? 0;
+    const isAlive = normalizedCompanionHealthData?.is_alive ?? true;
+    const hunger = normalizedCompanionHealthData?.hunger ?? 100;
+    const happiness = normalizedCompanionHealthData?.happiness ?? 100;
+    const careScore = normalizedCompanionHealthData?.care_score ?? 100;
+    const recoveryProgress = normalizedCompanionHealthData?.recovery_progress ?? 100;
     
     const healthPercentage = Math.round((body + mind + soul) / 3);
     const moodState = getMoodState(inactiveDays);
@@ -121,16 +126,16 @@ export const useCompanionHealth = () => {
     const isCritical = inactiveDays >= 5;
     
     // Determine which image to show based on mood
-    const shouldShowNeglectedImage = isNeglected && companionHealthData?.neglected_image_url;
+    const shouldShowNeglectedImage = isNeglected && normalizedCompanionHealthData?.neglected_image_url;
     const imageUrl = shouldShowNeglectedImage 
-      ? companionHealthData.neglected_image_url 
-      : (companionHealthData?.current_image_url || companion?.current_image_url || null);
+      ? normalizedCompanionHealthData.neglected_image_url
+      : (normalizedCompanionHealthData?.current_image_url || companion?.current_image_url || null);
     const imageFocalX = shouldShowNeglectedImage
-      ? companionHealthData?.neglected_image_focal_x ?? null
-      : companionHealthData?.current_image_focal_x ?? companion?.current_image_focal_x ?? null;
+      ? normalizedCompanionHealthData?.neglected_image_focal_x ?? null
+      : normalizedCompanionHealthData?.current_image_focal_x ?? companion?.current_image_focal_x ?? null;
     const imageFocalY = shouldShowNeglectedImage
-      ? companionHealthData?.neglected_image_focal_y ?? null
-      : companionHealthData?.current_image_focal_y ?? companion?.current_image_focal_y ?? null;
+      ? normalizedCompanionHealthData?.neglected_image_focal_y ?? null
+      : normalizedCompanionHealthData?.current_image_focal_y ?? companion?.current_image_focal_y ?? null;
 
     return {
       healthPercentage,
@@ -140,13 +145,13 @@ export const useCompanionHealth = () => {
       imageUrl,
       imageFocalX,
       imageFocalY,
-      neglectedImageUrl: companionHealthData?.neglected_image_url || null,
-      neglectedImageFocalX: companionHealthData?.neglected_image_focal_x ?? null,
-      neglectedImageFocalY: companionHealthData?.neglected_image_focal_y ?? null,
+      neglectedImageUrl: normalizedCompanionHealthData?.neglected_image_url || null,
+      neglectedImageFocalX: normalizedCompanionHealthData?.neglected_image_focal_x ?? null,
+      neglectedImageFocalY: normalizedCompanionHealthData?.neglected_image_focal_y ?? null,
       body,
       mind,
       soul,
-      lastActivityDate: companionHealthData?.last_activity_date || null,
+      lastActivityDate: normalizedCompanionHealthData?.last_activity_date || null,
       isAlive,
       hunger,
       happiness,

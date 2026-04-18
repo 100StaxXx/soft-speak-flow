@@ -651,7 +651,7 @@ export function DesktopWeekPlanner({
                 variant="inline"
                 compact
                 data-tour="add-quest-launcher"
-                text="Plan with companion"
+                text="Chat with companion"
                 className="shadow-[0_14px_28px_rgba(122,61,255,0.2)]"
                 onClick={plannerLauncherAction}
               />
