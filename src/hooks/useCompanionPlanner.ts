@@ -629,6 +629,10 @@ export function useCompanionPlanner({
         return [...settled, ...incoming];
       }
 
+      if (response.followUpQuestions.length > 0) {
+        return settled;
+      }
+
       return [...settled, ...previous.filter((proposal) => proposal.status === "pending")];
     });
     setMessages((previous) => [

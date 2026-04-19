@@ -8,8 +8,6 @@ export const COMPANION_PLANNER_STARTER_TEMPLATES = [
   "Help me break a big goal into steps.",
 ] as const;
 
-export const COMPANION_PLANNER_CUSTOM_ENTRY_LABEL = "I'll type my own.";
-
 const DEFAULT_COMPANION_PLANNER_OPENER = COMPANION_PLANNER_OPENER_TEMPLATES[0];
 
 const getPlannerDayKey = (date: Date) => {

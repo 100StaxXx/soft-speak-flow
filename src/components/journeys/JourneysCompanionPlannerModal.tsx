@@ -40,10 +40,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useCompanionAssistant } from "@/hooks/useCompanionAssistant";
 import { useJourneysCompanionVisual } from "@/hooks/useJourneysCompanionVisual";
 import { cn } from "@/lib/utils";
-import {
-  COMPANION_PLANNER_CUSTOM_ENTRY_LABEL,
-  COMPANION_PLANNER_STARTER_TEMPLATES,
-} from "@/shared/companionPlannerCopy";
+import { COMPANION_PLANNER_STARTER_TEMPLATES } from "@/shared/companionPlannerCopy";
 import type {
   CompanionPlannerProposal,
   CompanionPlannerQuestion,
@@ -112,7 +109,6 @@ const JourneysCompanionOverlayBody = memo(() => {
   const typingTargetRef = useRef<{ id: string; content: string } | null>(null);
   const animatedAssistantIdsRef = useRef<Set<string>>(new Set());
   const transcriptEndRef = useRef<HTMLDivElement | null>(null);
-  const composerInputRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
     if (assistant.questions.length === 0) return;
@@ -260,14 +256,6 @@ const JourneysCompanionOverlayBody = memo(() => {
 
     void assistant.submitPlannerMessage(starter, "text");
   }, [assistant, completeCurrentAssistantLine, typingMessageId]);
-
-  const handleCustomEntry = useCallback(() => {
-    if (typingMessageId) {
-      completeCurrentAssistantLine();
-    }
-
-    composerInputRef.current?.focus();
-  }, [completeCurrentAssistantLine, typingMessageId]);
 
   const handleVoiceToggle = useCallback(() => {
     if (typingMessageId) {
@@ -476,17 +464,6 @@ const JourneysCompanionOverlayBody = memo(() => {
                             </Button>
                           ))
                         : null}
-                      {showStarterQuickReplies ? (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          className="border-white/[0.12] bg-white/[0.08] text-white hover:bg-white/[0.14]"
-                          onClick={handleCustomEntry}
-                        >
-                          {COMPANION_PLANNER_CUSTOM_ENTRY_LABEL}
-                        </Button>
-                      ) : null}
                       {activeOptionQuestions.flatMap((question) => (
                         question.options?.map((option) => (
                           <Button
@@ -547,7 +524,6 @@ const JourneysCompanionOverlayBody = memo(() => {
               </label>
               <Textarea
                 id="journeys-companion-chat-input"
-                ref={composerInputRef}
                 value={assistant.draftInput}
                 onChange={(event) => {
                   assistant.setDraftInput(event.target.value);

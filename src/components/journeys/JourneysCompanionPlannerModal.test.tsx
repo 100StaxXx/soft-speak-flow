@@ -1,10 +1,7 @@
 import type { ReactNode } from "react";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  COMPANION_PLANNER_CUSTOM_ENTRY_LABEL,
-  COMPANION_PLANNER_STARTER_TEMPLATES,
-} from "@/shared/companionPlannerCopy";
+import { COMPANION_PLANNER_STARTER_TEMPLATES } from "@/shared/companionPlannerCopy";
 
 const mocks = vi.hoisted(() => ({
   assistant: {
@@ -331,7 +328,7 @@ describe("JourneysCompanionPlannerModal", () => {
     for (const starter of COMPANION_PLANNER_STARTER_TEMPLATES) {
       expect(screen.getByRole("button", { name: starter })).toBeInTheDocument();
     }
-    expect(screen.getByRole("button", { name: COMPANION_PLANNER_CUSTOM_ENTRY_LABEL })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "I'll type my own." })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Help me break a big goal into steps." }));
 
@@ -341,38 +338,6 @@ describe("JourneysCompanionPlannerModal", () => {
         "text",
       );
     });
-    expect(mocks.assistant.submitMessage).not.toHaveBeenCalled();
-  });
-
-  it("focuses the composer when the custom entry option is chosen", () => {
-    mocks.state.messages = [
-      {
-        id: "chat-1",
-        role: "assistant",
-        content: "The road's open. What are we setting in motion?",
-        createdAt: "2026-04-18T08:00:00.000Z",
-        source: "chat",
-      },
-    ];
-    mocks.state.questions = [];
-    mocks.state.proposals = [];
-    mocks.state.pendingProposals = [];
-    mocks.state.readyProposalCount = 0;
-
-    render(
-      <JourneysCompanionPlannerModal
-        open
-        onOpenChange={vi.fn()}
-        presentation="dialog"
-      />,
-    );
-
-    const composer = screen.getByTestId("journeys-companion-planner-text-input");
-
-    fireEvent.click(screen.getByRole("button", { name: COMPANION_PLANNER_CUSTOM_ENTRY_LABEL }));
-
-    expect(composer).toHaveFocus();
-    expect(mocks.assistant.submitPlannerMessage).not.toHaveBeenCalled();
     expect(mocks.assistant.submitMessage).not.toHaveBeenCalled();
   });
 

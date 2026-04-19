@@ -1,6 +1,9 @@
 export type PlannerHorizon = "day" | "week" | "month";
 export type PlannerTonePack = "soft" | "playful" | "witty_sassy";
-export type PlannerResponseMode = "conversational" | "schedule_read" | "proposal";
+export type PlannerResponseMode =
+  | "conversational"
+  | "schedule_read"
+  | "proposal";
 export type PlannerProposalKind =
   | "create_quest"
   | "update_quest"
@@ -286,6 +289,8 @@ const DAY_KEYWORDS = [
 const DEFAULT_TASK_DURATION_MINUTES = 30;
 const DEFAULT_WAKE_TIME = "08:00";
 const DEFAULT_WIND_DOWN_TIME = "21:00";
+const BREAK_BIG_GOAL_STARTER_INTENT = "help me break a big goal into steps";
+const MAKE_ROOM_STARTER_INTENT = "help me make room for what matters";
 const STOP_WORDS = new Set([
   "the",
   "and",
@@ -302,7 +307,10 @@ const STOP_WORDS = new Set([
 ]);
 
 const normalizeText = (value: string | null | undefined): string =>
-  (value ?? "").trim().toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+  (value ?? "").trim().toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(
+    /\s+/g,
+    " ",
+  ).trim();
 
 const parseDateKey = (value: string): Date => new Date(`${value}T00:00:00`);
 
@@ -319,7 +327,9 @@ const addDaysToDateKey = (value: string, days: number): string => {
   return formatDateKey(next);
 };
 
-const parseTimeToMinutes = (value: string | null | undefined): number | null => {
+const parseTimeToMinutes = (
+  value: string | null | undefined,
+): number | null => {
   if (!value) return null;
   const match = value.match(/^(\d{1,2}):(\d{2})/);
   if (!match) return null;
@@ -334,6 +344,18 @@ const formatMinutes = (minutes: number): string => {
   const safeMinutes = Math.max(0, Math.min(minutes, (23 * 60) + 59));
   const hour = Math.floor(safeMinutes / 60);
   const minute = safeMinutes % 60;
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+};
+
+const normalizeClockTime = (value: string): string | null => {
+  const match = value.match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return null;
+
+  const hour = Number.parseInt(match[1] ?? "", 10);
+  const minute = Number.parseInt(match[2] ?? "", 10);
+  if (Number.isNaN(hour) || Number.isNaN(minute)) return null;
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+
   return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
 };
 
@@ -357,7 +379,8 @@ const getWakeMinutes = (plannerMemory?: PlannerMemoryProfile | null) =>
   parseTimeToMinutes(plannerMemory?.wakeTime ?? DEFAULT_WAKE_TIME) ?? (8 * 60);
 
 const getWindDownMinutes = (plannerMemory?: PlannerMemoryProfile | null) =>
-  parseTimeToMinutes(plannerMemory?.windDownTime ?? DEFAULT_WIND_DOWN_TIME) ?? (21 * 60);
+  parseTimeToMinutes(plannerMemory?.windDownTime ?? DEFAULT_WIND_DOWN_TIME) ??
+    (21 * 60);
 
 const getTaskDuration = (task: PlannerContextTask): number =>
   Number.isFinite(task.estimatedDuration) && (task.estimatedDuration ?? 0) > 0
@@ -377,30 +400,45 @@ const entityTitleMatches = (haystack: string, title: string): boolean => {
   const titleTokens = getMeaningfulTokens(normalizedTitle);
   if (titleTokens.length === 0) return false;
 
-  const matchedTokenCount = titleTokens.filter((token) => haystack.includes(token)).length;
+  const matchedTokenCount =
+    titleTokens.filter((token) => haystack.includes(token)).length;
   if (titleTokens.length === 1) return matchedTokenCount === 1;
   return matchedTokenCount >= Math.min(2, titleTokens.length);
 };
 
-const hasExplicitDateReference = (message: string, parsedInput?: ParsedInputHint | null): boolean =>
-  Boolean(parsedInput?.scheduledDate)
-  || /\b(today|tomorrow|day after tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i.test(message);
+const hasExplicitDateReference = (
+  message: string,
+  parsedInput?: ParsedInputHint | null,
+): boolean =>
+  Boolean(parsedInput?.scheduledDate) ||
+  /\b(today|tomorrow|day after tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i
+    .test(message);
 
 const isScheduleQuestion = (message: string): boolean =>
-  /\b(what do i have coming up|what(?:'s| is) coming up|what do i have scheduled|what(?:'s| is) on my calendar|what do i have today|what do i have tomorrow|when am i free|am i free|where do i have room|what(?:'s| is) my schedule|what(?:'s| is) on my plate)\b/i.test(message);
+  /\b(what do i have coming up|what(?:'s| is) coming up|what do i have scheduled|what(?:'s| is) on my calendar|what do i have today|what do i have tomorrow|when am i free|am i free|where do i have room|what(?:'s| is) my schedule|what(?:'s| is) on my plate|show me today(?:'s)? route|show me tomorrow(?:'s)? route)\b/i
+    .test(message);
 
 const isAvailabilityQuestion = (message: string): boolean =>
-  /\b(when am i free|am i free|where do i have room|what openings do i have|what time do i have free)\b/i.test(message);
+  /\b(when am i free|am i free|where do i have room|what openings do i have|what time do i have free)\b/i
+    .test(message);
 
 const isUpcomingDigestQuestion = (message: string): boolean =>
-  /\b(what do i have coming up|what(?:'s| is) coming up|what(?:'s| is) on my plate)\b/i.test(message);
+  /\b(what do i have coming up|what(?:'s| is) coming up|what(?:'s| is) on my plate)\b/i
+    .test(message);
 
 const isQuestCollectionIntent = (message: string): boolean =>
   /\b(rest|all)\b.+\b(quests|tasks)\b/i.test(message);
 
+const isBreakBigGoalStarterIntent = (message: string): boolean =>
+  normalizeText(message) === BREAK_BIG_GOAL_STARTER_INTENT;
+
+const isMakeRoomStarterIntent = (message: string): boolean =>
+  normalizeText(message) === MAKE_ROOM_STARTER_INTENT;
+
 const isCampaignAdjustmentIntent = (message: string): boolean =>
-  /\b(push|extend|delay|stretch|restructure|reshape|scope|trim|reduce|remove|drop|add|change|adjust)\b/i.test(message)
-  && /\b(campaign|journey|epic|ritual|habit)\b/i.test(message);
+  /\b(push|extend|delay|stretch|restructure|reshape|scope|trim|reduce|remove|drop|add|change|adjust)\b/i
+    .test(message) &&
+  /\b(campaign|journey|epic|ritual|habit)\b/i.test(message);
 
 const parseRequestedDate = (
   message: string,
@@ -408,48 +446,76 @@ const parseRequestedDate = (
   parsedInput?: ParsedInputHint | null,
 ): string => {
   if (parsedInput?.scheduledDate) return parsedInput.scheduledDate;
-  if (/\bday after tomorrow\b/i.test(message)) return addDaysToDateKey(currentDate, 2);
+  if (/\bday after tomorrow\b/i.test(message)) {
+    return addDaysToDateKey(currentDate, 2);
+  }
   if (/\btomorrow\b/i.test(message)) return addDaysToDateKey(currentDate, 1);
   return currentDate;
 };
 
-const resolveDayPartRange = (message: string): { start: number; end: number; label: string } | null => {
-  if (/\bmorning\b/i.test(message)) return { start: 8 * 60, end: 12 * 60, label: "morning" };
-  if (/\bafternoon\b/i.test(message)) return { start: 12 * 60, end: 17 * 60, label: "afternoon" };
-  if (/\bevening\b/i.test(message)) return { start: 17 * 60, end: 21 * 60, label: "evening" };
-  if (/\bnight\b/i.test(message)) return { start: 20 * 60, end: 23 * 60, label: "night" };
+const resolveDayPartRange = (
+  message: string,
+): { start: number; end: number; label: string } | null => {
+  if (/\bmorning\b/i.test(message)) {
+    return { start: 8 * 60, end: 12 * 60, label: "morning" };
+  }
+  if (/\bafternoon\b/i.test(message)) {
+    return { start: 12 * 60, end: 17 * 60, label: "afternoon" };
+  }
+  if (/\bevening\b/i.test(message)) {
+    return { start: 17 * 60, end: 21 * 60, label: "evening" };
+  }
+  if (/\bnight\b/i.test(message)) {
+    return { start: 20 * 60, end: 23 * 60, label: "night" };
+  }
   return null;
 };
 
 const createId = () => crypto.randomUUID();
 
-const isRepeatedIntent = (message: string, parsedInput?: ParsedInputHint | null): boolean => {
+const isRepeatedIntent = (
+  message: string,
+  parsedInput?: ParsedInputHint | null,
+): boolean => {
   if (parsedInput?.recurrencePattern) return true;
 
-  return /\b(daily|weekly|monthly|every day|every morning|every evening|every week|every month|every weekday|weekdays|repeat|recurring|each day|each week)\b/i.test(message);
+  return /\b(daily|weekly|monthly|every day|every morning|every evening|every week|every month|every weekday|weekdays|repeat|recurring|each day|each week)\b/i
+    .test(message);
 };
 
 const isEditIntent = (message: string): boolean =>
-  /\b(move|reschedule|shift|change|adjust|update|edit|rename|make it|instead|push|pull|switch)\b/i.test(message);
+  /\b(move|reschedule|shift|change|adjust|update|edit|rename|make it|instead|push|pull|switch)\b/i
+    .test(message);
 
 const isReminderIntent = (message: string): boolean =>
   /\b(remind|reminder|alert|ping me|nudge me)\b/i.test(message);
 
 const hasPlanningVerb = (message: string): boolean =>
-  /\b(plan|schedule|reschedule|move|shift|push|pull|adjust|update|edit|rename|create|add|set up|break down|make time|organize|prioritize|fit|repeat|remind|turn .+ into)\b/i.test(message);
+  /\b(plan|schedule|reschedule|move|shift|push|pull|adjust|update|edit|rename|create|add|set up|break down|make time|organize|prioritize|fit|repeat|remind|turn .+ into)\b/i
+    .test(message);
 
-const looksLikeActionableTitle = (message: string, parsedInput?: ParsedInputHint | null): boolean => {
+const looksLikeActionableTitle = (
+  message: string,
+  parsedInput?: ParsedInputHint | null,
+): boolean => {
   const normalized = message.trim().toLowerCase();
   if (normalized.endsWith("?")) return false;
-  if (/\b(i('| a)m|i feel|i'm feeling|help me think|pep talk|talk it through|talk to me|how do i|what should i|can you|could you|should i)\b/i.test(normalized)) {
+  if (
+    /\b(i('| a)m|i feel|i'm feeling|help me think|pep talk|talk it through|talk to me|how do i|what should i|can you|could you|should i)\b/i
+      .test(normalized)
+  ) {
     return false;
   }
   if (hasPlanningVerb(normalized)) return true;
-  if (/^(call|write|get|finish|book|send|draft|review|plan|move|practice|prep|clean|organize|outline|work on)\b/i.test(normalized)) {
+  if (
+    /^(call|write|get|finish|book|send|draft|review|plan|move|practice|prep|clean|organize|outline|work on)\b/i
+      .test(normalized)
+  ) {
     return true;
   }
 
-  return Boolean(parsedInput?.text?.trim()) && normalized.split(/\s+/).length <= 10;
+  return Boolean(parsedInput?.text?.trim()) &&
+    normalized.split(/\s+/).length <= 10;
 };
 
 const looksConversational = (
@@ -460,12 +526,20 @@ const looksConversational = (
 ): boolean => {
   if (input.sessionState.openQuestionIds.length > 0) return false;
   if (isScheduleQuestion(input.message)) return false;
-  if (isEditIntent(input.message) || isReminderIntent(input.message) || isCampaignAdjustmentIntent(input.message)) {
+  if (
+    isEditIntent(input.message) || isReminderIntent(input.message) ||
+    isCampaignAdjustmentIntent(input.message)
+  ) {
     return false;
   }
   if (repeated) return false;
-  if (classificationHint.type === "epic" || classificationHint.type === "habit") return false;
-  if (input.parsedInput?.scheduledDate || input.parsedInput?.scheduledTime || input.parsedInput?.newTitle) {
+  if (
+    classificationHint.type === "epic" || classificationHint.type === "habit"
+  ) return false;
+  if (
+    input.parsedInput?.scheduledDate || input.parsedInput?.scheduledTime ||
+    input.parsedInput?.newTitle
+  ) {
     return false;
   }
   if (matched.task || matched.ritual || matched.epic) {
@@ -478,22 +552,134 @@ const looksConversational = (
     return false;
   }
 
-  return classificationHint.type === "brain-dump"
-    || !/\b(quest|tasks?|campaign|ritual|calendar|today|tomorrow|week)\b/i.test(input.message);
+  return classificationHint.type === "brain-dump" ||
+    !/\b(quest|tasks?|campaign|ritual|calendar|today|tomorrow|week)\b/i.test(
+      input.message,
+    );
 };
 
-const isLikelyAnswerOnly = (message: string, sessionState: PlannerSessionState): boolean => {
-  if (!sessionState.draft.title || sessionState.openQuestionIds.length === 0) return false;
+const isVaguePlanningPrompt = (
+  input: PlannerBuildInput,
+  matched: MatchedEntities,
+  repeated: boolean,
+): boolean => {
+  if (input.sessionState.openQuestionIds.length > 0) return false;
+  if (isScheduleQuestion(input.message)) return false;
+  if (
+    isEditIntent(input.message) || isReminderIntent(input.message) ||
+    isCampaignAdjustmentIntent(input.message)
+  ) {
+    return false;
+  }
+  if (
+    input.parsedInput?.scheduledDate || input.parsedInput?.scheduledTime ||
+    input.parsedInput?.newTitle
+  ) {
+    return false;
+  }
+  if (matched.task || matched.ritual || matched.epic || matched.calendarEvent) {
+    return false;
+  }
+  if (repeated) return false;
+
+  return /\b(help me make room for what matters|make room for what matters|help me break a big goal into steps|break a big goal into steps|help me plan(?: my day| today| tomorrow| this week)?|plan(?: my day| today| tomorrow| this week)|help me prioritize(?: my day| today| this week)?|prioritize(?: my day| today| this week)?|help me organize(?: my day| today| this week)?|organize(?: my day| today| this week)?|help me figure out(?: my day| what matters| what to focus on)?|figure out(?: my day| what matters| what to focus on)|what matters most)\b/i
+    .test(input.message);
+};
+
+const isLikelyAnswerOnly = (
+  message: string,
+  sessionState: PlannerSessionState,
+): boolean => {
+  if (!sessionState.draft.title || sessionState.openQuestionIds.length === 0) {
+    return false;
+  }
 
   return (
-    message.length <= 160
-    && !/\b(add|create|make|plan|move|rename|reschedule|change|update|need to|want to|set up)\b/i.test(message)
+    message.length <= 160 &&
+    !/\b(add|create|make|plan|move|rename|reschedule|change|update|need to|want to|set up)\b/i
+      .test(message)
   );
 };
 
-const extractTimeOfDay = (message: string, parsedInput?: ParsedInputHint | null): string | null => {
+const extractTimeQuestionSlotAnswer = (
+  message: string,
+  sessionState: PlannerSessionState,
+): { scheduledDate: string | null; scheduledTime: string } | null => {
+  if (!sessionState.openQuestionIds.includes("time_of_day")) return null;
+
+  const trimmed = message.trim();
+  const datedMatch = trimmed.match(/^(\d{4}-\d{2}-\d{2})\s+(\d{1,2}:\d{2})\b/);
+  if (datedMatch?.[1] && datedMatch?.[2]) {
+    const scheduledTime = normalizeClockTime(datedMatch[2]);
+    if (!scheduledTime) return null;
+
+    return {
+      scheduledDate: datedMatch[1],
+      scheduledTime,
+    };
+  }
+
+  const timeOnlyMatch = trimmed.match(/^(\d{1,2}:\d{2})\b/);
+  if (!timeOnlyMatch?.[1]) return null;
+
+  const scheduledTime = normalizeClockTime(timeOnlyMatch[1]);
+  if (!scheduledTime) return null;
+
+  return {
+    scheduledDate: null,
+    scheduledTime,
+  };
+};
+
+const ensureParsedInput = (
+  input: PlannerBuildInput,
+): NonNullable<PlannerBuildInput["parsedInput"]> => ({
+  text: input.message,
+  scheduledTime: null,
+  scheduledDate: null,
+  estimatedDuration: null,
+  recurrencePattern: null,
+  recurrenceDays: [],
+  recurrenceMonthDays: [],
+  recurrenceCustomPeriod: null,
+  recurrenceEndDate: null,
+  notes: null,
+  category: null,
+  newTitle: null,
+  ...(input.parsedInput ?? {}),
+});
+
+const withResolvedTimeQuestionAnswer = (
+  input: PlannerBuildInput,
+): PlannerBuildInput => {
+  if (input.parsedInput?.scheduledTime) return input;
+
+  const slotAnswer = extractTimeQuestionSlotAnswer(
+    input.message,
+    input.sessionState,
+  );
+  if (!slotAnswer) return input;
+
+  const parsedInput = ensureParsedInput(input);
+  return {
+    ...input,
+    parsedInput: {
+      ...parsedInput,
+      scheduledDate: slotAnswer.scheduledDate ?? parsedInput.scheduledDate,
+      scheduledTime: slotAnswer.scheduledTime,
+    },
+  };
+};
+
+const extractTimeOfDay = (
+  message: string,
+  parsedInput?: ParsedInputHint | null,
+): string | null => {
   if (parsedInput?.scheduledTime) {
-    const hour = Number.parseInt(parsedInput.scheduledTime.split(":")[0] ?? "", 10);
+    const hour = Number.parseInt(
+      parsedInput.scheduledTime.split(":")[0] ?? "",
+      10,
+    );
     if (Number.isNaN(hour)) return null;
     if (hour < 12) return "morning";
     if (hour < 17) return "afternoon";
@@ -508,14 +694,22 @@ const extractTimeOfDay = (message: string, parsedInput?: ParsedInputHint | null)
   return null;
 };
 
-const extractTimeReason = (message: string, sessionState: PlannerSessionState): string | null => {
+const extractTimeReason = (
+  message: string,
+  sessionState: PlannerSessionState,
+): string | null => {
   const becauseMatch = message.match(/\b(?:because|since)\s+(.+)/i);
   if (becauseMatch?.[1]) return becauseMatch[1].trim();
 
-  const worksMatch = message.match(/\b(.+?)\s+(?:works best|fits best|helps me|keeps me|feels best)\b/i);
+  const worksMatch = message.match(
+    /\b(.+?)\s+(?:works best|fits best|helps me|keeps me|feels best)\b/i,
+  );
   if (worksMatch?.[1]) return worksMatch[1].trim();
 
-  if (sessionState.openQuestionIds.includes("time_reason") && message.trim().length > 18) {
+  if (
+    sessionState.openQuestionIds.includes("time_reason") &&
+    message.trim().length > 18
+  ) {
     return message.trim();
   }
 
@@ -523,7 +717,9 @@ const extractTimeReason = (message: string, sessionState: PlannerSessionState): 
 };
 
 const extractReminderMinutes = (message: string): number | null => {
-  const explicit = message.match(/\b(\d{1,3})\s*(?:minutes?|mins?)\s*(?:before|ahead|early)\b/i);
+  const explicit = message.match(
+    /\b(\d{1,3})\s*(?:minutes?|mins?)\s*(?:before|ahead|early)\b/i,
+  );
   if (explicit?.[1]) return Number.parseInt(explicit[1], 10);
 
   if (/\b15\s*(?:min|minute)/i.test(message)) return 15;
@@ -541,14 +737,19 @@ const inferReminderMinutes = (
   if (explicitReminderMinutes !== null) return explicitReminderMinutes;
   if (!scheduledTime) return null;
 
-  if (kind === "create_campaign" || kind === "create_ritual" || kind === "update_ritual") {
+  if (
+    kind === "create_campaign" || kind === "create_ritual" ||
+    kind === "update_ritual"
+  ) {
     return 10;
   }
 
   return 15;
 };
 
-const timeOfDayToClock = (timeOfDay: string | null | undefined): string | null => {
+const timeOfDayToClock = (
+  timeOfDay: string | null | undefined,
+): string | null => {
   switch (timeOfDay) {
     case "morning":
       return "09:00";
@@ -573,10 +774,18 @@ const findMatchedEntities = (
   const haystack = normalizeText(message);
   const tasks = [...context.tasks, ...context.inboxTasks];
 
-  const matchedTasks = tasks.filter((task) => entityTitleMatches(haystack, task.title));
-  const matchedRituals = context.rituals.filter((ritual) => entityTitleMatches(haystack, ritual.title));
-  const matchedEpics = context.activeEpics.filter((epic) => entityTitleMatches(haystack, epic.title));
-  const matchedCalendarEvents = context.calendarEvents.filter((event) => entityTitleMatches(haystack, event.title));
+  const matchedTasks = tasks.filter((task) =>
+    entityTitleMatches(haystack, task.title)
+  );
+  const matchedRituals = context.rituals.filter((ritual) =>
+    entityTitleMatches(haystack, ritual.title)
+  );
+  const matchedEpics = context.activeEpics.filter((epic) =>
+    entityTitleMatches(haystack, epic.title)
+  );
+  const matchedCalendarEvents = context.calendarEvents.filter((event) =>
+    entityTitleMatches(haystack, event.title)
+  );
 
   const matchedTask = matchedTasks[0] ?? null;
   const matchedRitual = matchedRituals[0] ?? null;
@@ -591,7 +800,9 @@ const findMatchedEntities = (
     epics: matchedEpics,
     epic: matchedEpic ?? (
       matchedRitual
-        ? context.activeEpics.find((epic) => epic.id === matchedRitual.epicId) ?? null
+        ? context.activeEpics.find((epic) =>
+          epic.id === matchedRitual.epicId
+        ) ?? null
         : null
     ),
     calendarEvents: matchedCalendarEvents,
@@ -600,15 +811,24 @@ const findMatchedEntities = (
 };
 
 const parseRenameTitle = (message: string): string | null => {
-  const renameMatch = message.match(/\b(?:rename|change(?: the name of)?)\b.+?\bto\b\s+[""]?(.+?)[""]?$/i);
+  const renameMatch = message.match(
+    /\b(?:rename|change(?: the name of)?)\b.+?\bto\b\s+[""]?(.+?)[""]?$/i,
+  );
   if (renameMatch?.[1]) return renameMatch[1].trim();
   return null;
 };
 
-const resolveCadence = (message: string, parsedInput?: ParsedInputHint | null): ResolvedCadence => {
+const resolveCadence = (
+  message: string,
+  parsedInput?: ParsedInputHint | null,
+): ResolvedCadence => {
   const pattern = parsedInput?.recurrencePattern ?? null;
-  const recurrenceDays = parsedInput?.recurrenceDays?.length ? [...parsedInput.recurrenceDays] : null;
-  const recurrenceMonthDays = parsedInput?.recurrenceMonthDays?.length ? [...parsedInput.recurrenceMonthDays] : null;
+  const recurrenceDays = parsedInput?.recurrenceDays?.length
+    ? [...parsedInput.recurrenceDays]
+    : null;
+  const recurrenceMonthDays = parsedInput?.recurrenceMonthDays?.length
+    ? [...parsedInput.recurrenceMonthDays]
+    : null;
   const recurrenceCustomPeriod = parsedInput?.recurrenceCustomPeriod ?? null;
 
   if (pattern === "daily") {
@@ -676,7 +896,9 @@ const resolveCadence = (message: string, parsedInput?: ParsedInputHint | null): 
     };
   }
 
-  const dayMatches = DAY_KEYWORDS.filter(([word]) => new RegExp(`\\b${word}\\b`, "i").test(message)).map(([, day]) => day);
+  const dayMatches = DAY_KEYWORDS.filter(([word]) =>
+    new RegExp(`\\b${word}\\b`, "i").test(message)
+  ).map(([, day]) => day);
   if (dayMatches.length > 0) {
     return {
       label: "weekly",
@@ -750,44 +972,54 @@ const mergeDraft = (
   const parsed = input.parsedInput;
   const plannerMemory = input.plannerContext.plannerMemory;
 
-  const timeOfDay = extractTimeOfDay(input.message, parsed)
-    ?? base.timeOfDay
-    ?? input.sessionState.preferredTimeOfDay
-    ?? plannerMemory?.preferredTimeOfDay
-    ?? null;
-  const timeReason = extractTimeReason(input.message, input.sessionState)
-    ?? base.timeReason
-    ?? input.sessionState.preferredTimeReason
-    ?? plannerMemory?.preferredTimeReason
-    ?? null;
-  const cadence = resolveCadence(input.message, parsed).label ?? base.cadence ?? null;
+  const timeOfDay = extractTimeOfDay(input.message, parsed) ??
+    base.timeOfDay ??
+    input.sessionState.preferredTimeOfDay ??
+    plannerMemory?.preferredTimeOfDay ??
+    null;
+  const timeReason = extractTimeReason(input.message, input.sessionState) ??
+    base.timeReason ??
+    input.sessionState.preferredTimeReason ??
+    plannerMemory?.preferredTimeReason ??
+    null;
+  const cadence = resolveCadence(input.message, parsed).label ?? base.cadence ??
+    null;
 
   const parsedTitle = parsed?.text?.trim() || null;
-  const renameTitle = parsed?.newTitle?.trim() || parseRenameTitle(input.message) || null;
+  const renameTitle = parsed?.newTitle?.trim() ||
+    parseRenameTitle(input.message) || null;
 
-  const draftTitle = matched.task?.title
-    ?? matched.ritual?.title
-    ?? base.title
-    ?? (carryForward ? base.title ?? null : parsedTitle);
+  const draftTitle = matched.task?.title ??
+    matched.ritual?.title ??
+    base.title ??
+    (carryForward ? base.title ?? null : parsedTitle);
 
   return {
     ...base,
-    title: renameTitle ? matched.epic?.title ?? matched.task?.title ?? matched.ritual?.title ?? draftTitle : draftTitle,
+    title: renameTitle
+      ? matched.epic?.title ?? matched.task?.title ?? matched.ritual?.title ??
+        draftTitle
+      : draftTitle,
     taskId: matched.task?.id ?? base.taskId ?? null,
     ritualId: matched.ritual?.id ?? base.ritualId ?? null,
     epicId: matched.epic?.id ?? matched.ritual?.epicId ?? base.epicId ?? null,
-    epicTitle: matched.epic?.title ?? matched.ritual?.epicTitle ?? base.epicTitle ?? null,
-    scheduledDate: parsed?.scheduledDate ?? base.scheduledDate ?? matched.task?.taskDate ?? input.currentDate,
+    epicTitle: matched.epic?.title ?? matched.ritual?.epicTitle ??
+      base.epicTitle ?? null,
+    scheduledDate: parsed?.scheduledDate ?? base.scheduledDate ??
+      matched.task?.taskDate ?? input.currentDate,
     scheduledTime: parsed?.scheduledTime ?? base.scheduledTime ?? null,
     timeOfDay,
     timeReason,
     cadence,
-    endDate: parsed?.recurrenceEndDate ?? input.classificationHint?.suggestedDeadline ?? base.endDate ?? null,
-    durationMinutes: parsed?.estimatedDuration ?? input.classificationHint?.suggestedDuration ?? base.durationMinutes ?? null,
-    reminderMinutesBefore: extractReminderMinutes(input.message)
-      ?? base.reminderMinutesBefore
-      ?? plannerMemory?.reminderMinutesBefore
-      ?? null,
+    endDate: parsed?.recurrenceEndDate ??
+      input.classificationHint?.suggestedDeadline ?? base.endDate ?? null,
+    durationMinutes: parsed?.estimatedDuration ??
+      input.classificationHint?.suggestedDuration ?? base.durationMinutes ??
+      null,
+    reminderMinutesBefore: extractReminderMinutes(input.message) ??
+      base.reminderMinutesBefore ??
+      plannerMemory?.reminderMinutesBefore ??
+      null,
   };
 };
 
@@ -798,10 +1030,13 @@ const resolveKind = (
   repeated: boolean,
 ): PlannerProposalKind => {
   const editIntent = isEditIntent(input.message);
-  const renameTitle = input.parsedInput?.newTitle ?? parseRenameTitle(input.message);
+  const renameTitle = input.parsedInput?.newTitle ??
+    parseRenameTitle(input.message);
 
   if (matched.ritual && editIntent) return "update_ritual";
-  if (matched.epic && isCampaignAdjustmentIntent(input.message) && !renameTitle) return "adjust_campaign_plan";
+  if (
+    matched.epic && isCampaignAdjustmentIntent(input.message) && !renameTitle
+  ) return "adjust_campaign_plan";
   if (matched.task && editIntent) return "update_quest";
   if (matched.epic && renameTitle) return "update_campaign";
 
@@ -809,14 +1044,19 @@ const resolveKind = (
   if (matched.ritual && repeated) return "update_ritual";
 
   if (input.classificationHint?.type === "epic") return "create_campaign";
-  if (input.classificationHint?.type === "habit" && draft.epicId) return "create_ritual";
+  if (input.classificationHint?.type === "habit" && draft.epicId) {
+    return "create_ritual";
+  }
   if (input.classificationHint?.type === "habit") return "create_quest";
 
   if (repeated && draft.epicId) return "create_ritual";
   return "create_quest";
 };
 
-const defaultQuestDate = (input: PlannerBuildInput, draft: PlannerDraftState): string | null => {
+const defaultQuestDate = (
+  input: PlannerBuildInput,
+  draft: PlannerDraftState,
+): string | null => {
   if (draft.scheduledDate) return draft.scheduledDate;
   if (input.horizon === "day") return input.currentDate;
   return input.currentDate;
@@ -826,19 +1066,27 @@ const shouldAskTimingQuestions = (
   input: PlannerBuildInput,
   kind: PlannerProposalKind,
 ): boolean => {
-  if (kind === "create_campaign" || kind === "update_campaign" || kind === "adjust_campaign_plan") {
+  if (
+    kind === "create_campaign" || kind === "update_campaign" ||
+    kind === "adjust_campaign_plan"
+  ) {
     return false;
   }
 
   if (kind === "update_quest" || kind === "update_ritual") {
-    const explicitSchedule =
-      Boolean(input.parsedInput?.scheduledDate)
-      || Boolean(input.parsedInput?.scheduledTime)
-      || /\b(today|tomorrow|morning|afternoon|evening|night|at \d)/i.test(input.message);
-    const renameOnly = Boolean(input.parsedInput?.newTitle ?? parseRenameTitle(input.message));
+    const explicitSchedule = Boolean(input.parsedInput?.scheduledDate) ||
+      Boolean(input.parsedInput?.scheduledTime) ||
+      /\b(today|tomorrow|morning|afternoon|evening|night|at \d)/i.test(
+        input.message,
+      );
+    const renameOnly = Boolean(
+      input.parsedInput?.newTitle ?? parseRenameTitle(input.message),
+    );
 
     if (renameOnly) return false;
-    if (explicitSchedule && !isRepeatedIntent(input.message, input.parsedInput)) {
+    if (
+      explicitSchedule && !isRepeatedIntent(input.message, input.parsedInput)
+    ) {
       return false;
     }
   }
@@ -860,11 +1108,19 @@ const missingFieldsForKind = (
     if (!draft.timeReason) missing.add("why that time works");
   }
 
-  if ((kind === "create_quest" || kind === "update_quest") && (draft.draftKind === "create_quest" || draft.draftKind === "update_quest")) {
-    if (draft.cadence && !cadence.recurrencePattern) missing.add("repeat cadence");
+  if (
+    (kind === "create_quest" || kind === "update_quest") &&
+    (draft.draftKind === "create_quest" || draft.draftKind === "update_quest")
+  ) {
+    if (draft.cadence && !cadence.recurrencePattern) {
+      missing.add("repeat cadence");
+    }
   }
 
-  if ((kind === "create_quest" || kind === "update_quest") && draft.cadence && !draft.endDate) {
+  if (
+    (kind === "create_quest" || kind === "update_quest") && draft.cadence &&
+    !draft.endDate
+  ) {
     missing.add("end date");
   }
 
@@ -881,7 +1137,9 @@ const missingFieldsForKind = (
   return [...missing];
 };
 
-const question = (input: Omit<PlannerQuestion, "id"> & { id?: string }): PlannerQuestion => ({
+const question = (
+  input: Omit<PlannerQuestion, "id"> & { id?: string },
+): PlannerQuestion => ({
   id: input.id ?? input.field,
   prompt: input.prompt,
   reason: input.reason ?? null,
@@ -891,24 +1149,27 @@ const question = (input: Omit<PlannerQuestion, "id"> & { id?: string }): Planner
 });
 
 const formatSlotLabel = (slot: PlannerOpenSlot, selectedDate: string): string =>
-  slot.date === selectedDate
-    ? slot.time
-    : `${slot.date} ${slot.time}`;
+  slot.date === selectedDate ? slot.time : `${slot.date} ${slot.time}`;
 
 const buildTimeQuestion = (input: PlannerBuildInput): PlannerQuestion => {
   const insights = input.plannerContext.scheduleInsights;
   const plannerMemory = input.plannerContext.plannerMemory;
   const suggestedSlots = insights?.suggestedSlots?.slice(0, 3) ?? [];
-  const slotOptions = suggestedSlots.map((slot) => formatSlotLabel(slot, insights?.selectedDate ?? input.currentDate));
-  const preferredTimeOfDay = plannerMemory?.preferredTimeOfDay ?? input.sessionState.preferredTimeOfDay ?? null;
-  const preferredReason = plannerMemory?.preferredTimeReason ?? input.sessionState.preferredTimeReason ?? null;
+  const slotOptions = suggestedSlots.map((slot) =>
+    formatSlotLabel(slot, insights?.selectedDate ?? input.currentDate)
+  );
+  const preferredTimeOfDay = plannerMemory?.preferredTimeOfDay ??
+    input.sessionState.preferredTimeOfDay ?? null;
+  const preferredReason = plannerMemory?.preferredTimeReason ??
+    input.sessionState.preferredTimeReason ?? null;
 
   if (suggestedSlots.length > 0) {
     const slotText = slotOptions.join(", ");
     if (preferredTimeOfDay) {
       return question({
         field: "time_of_day",
-        prompt: `I found a few open windows: ${slotText}. You usually lean ${preferredTimeOfDay}. Which one fits this best?`,
+        prompt:
+          `I found a few open windows: ${slotText}. You usually lean ${preferredTimeOfDay}. Which one fits this best?`,
         reason: preferredReason
           ? `You've said ${preferredTimeOfDay} works because ${preferredReason}. I can reuse that rhythm if it still fits.`
           : "I want to place this in a real opening instead of guessing.",
@@ -919,8 +1180,10 @@ const buildTimeQuestion = (input: PlannerBuildInput): PlannerQuestion => {
 
     return question({
       field: "time_of_day",
-      prompt: `I found a few open windows: ${slotText}. Which one feels right for this?`,
-      reason: suggestedSlots[0]?.reason ?? "I want to place this in a real opening instead of guessing.",
+      prompt:
+        `I found a few open windows: ${slotText}. Which one feels right for this?`,
+      reason: suggestedSlots[0]?.reason ??
+        "I want to place this in a real opening instead of guessing.",
       required: true,
       options: slotOptions,
     });
@@ -929,7 +1192,8 @@ const buildTimeQuestion = (input: PlannerBuildInput): PlannerQuestion => {
   if (preferredTimeOfDay) {
     return question({
       field: "time_of_day",
-      prompt: `You usually prefer ${preferredTimeOfDay} for this kind of work. Want me to place it there again, or shift it?`,
+      prompt:
+        `You usually prefer ${preferredTimeOfDay} for this kind of work. Want me to place it there again, or shift it?`,
       reason: preferredReason
         ? `You've told me ${preferredTimeOfDay} works because ${preferredReason}.`
         : "I'll use that pattern unless this one needs a different rhythm.",
@@ -941,26 +1205,36 @@ const buildTimeQuestion = (input: PlannerBuildInput): PlannerQuestion => {
   return question({
     field: "time_of_day",
     prompt: "What time of day should this live in your schedule?",
-    reason: "I want to place it where you're actually likely to follow through.",
+    reason:
+      "I want to place it where you're actually likely to follow through.",
     required: true,
     options: ["Morning", "Afternoon", "Evening", "Night"],
   });
 };
 
-const buildBalanceQuestion = (input: PlannerBuildInput): PlannerQuestion | null => {
-  const suggestion = input.plannerContext.scheduleInsights?.moveSuggestions?.[0];
+const buildBalanceQuestion = (
+  input: PlannerBuildInput,
+): PlannerQuestion | null => {
+  const suggestion = input.plannerContext.scheduleInsights?.moveSuggestions
+    ?.[0];
   if (!suggestion) return null;
 
   return question({
     id: "details",
     field: "details",
     prompt: suggestion.suggestedTime
-      ? `${suggestion.fromDate} looks crowded. Want me to aim "${suggestion.taskTitle ?? "this"}" for ${suggestion.toDate} at ${suggestion.suggestedTime} instead?`
-      : `${suggestion.fromDate} looks crowded. Want me to aim "${suggestion.taskTitle ?? "this"}" for ${suggestion.toDate} instead?`,
+      ? `${suggestion.fromDate} looks crowded. Want me to aim "${
+        suggestion.taskTitle ?? "this"
+      }" for ${suggestion.toDate} at ${suggestion.suggestedTime} instead?`
+      : `${suggestion.fromDate} looks crowded. Want me to aim "${
+        suggestion.taskTitle ?? "this"
+      }" for ${suggestion.toDate} instead?`,
     reason: suggestion.reason,
     required: false,
     options: [
-      suggestion.suggestedTime ? `${suggestion.toDate} ${suggestion.suggestedTime}` : suggestion.toDate,
+      suggestion.suggestedTime
+        ? `${suggestion.toDate} ${suggestion.suggestedTime}`
+        : suggestion.toDate,
       "Keep the original day",
     ],
   });
@@ -975,9 +1249,16 @@ const buildFollowUpQuestions = (
   const questions: PlannerQuestion[] = [];
   const effectiveTime = preferredTime(draft);
   const explicitTimeOfDay = extractTimeOfDay(input.message, input.parsedInput);
-  const explicitTimeReason = extractTimeReason(input.message, input.sessionState);
-  const carryForwardAnswer = isLikelyAnswerOnly(input.message, input.sessionState);
-  const shouldConfirmLearnedTime = !carryForwardAnswer && !input.parsedInput?.scheduledTime && !explicitTimeOfDay;
+  const explicitTimeReason = extractTimeReason(
+    input.message,
+    input.sessionState,
+  );
+  const carryForwardAnswer = isLikelyAnswerOnly(
+    input.message,
+    input.sessionState,
+  );
+  const shouldConfirmLearnedTime = !carryForwardAnswer &&
+    !input.parsedInput?.scheduledTime && !explicitTimeOfDay;
   const shouldConfirmLearnedReason = !carryForwardAnswer && !explicitTimeReason;
   const askTimingQuestions = shouldAskTimingQuestions(input, kind);
 
@@ -991,12 +1272,17 @@ const buildFollowUpQuestions = (
       prompt: input.plannerContext.plannerMemory?.preferredTimeReason
         ? `Why does this timing work today? I know you've previously said ${input.plannerContext.plannerMemory.preferredTimeReason}.`
         : "Why does that time work for you?",
-      reason: "I'll reuse your reasoning when I suggest future timing and reminders.",
+      reason:
+        "I'll reuse your reasoning when I suggest future timing and reminders.",
       required: true,
     }));
   }
 
-  if ((kind === "create_quest" || kind === "update_quest" || kind === "create_ritual" || kind === "update_ritual") && isRepeatedIntent(input.message, input.parsedInput)) {
+  if (
+    (kind === "create_quest" || kind === "update_quest" ||
+      kind === "create_ritual" || kind === "update_ritual") &&
+    isRepeatedIntent(input.message, input.parsedInput)
+  ) {
     if (!cadence.label) {
       questions.push(question({
         field: "cadence",
@@ -1007,23 +1293,34 @@ const buildFollowUpQuestions = (
       }));
     }
 
-    if ((kind === "create_quest" || kind === "update_quest") && !draft.endDate) {
+    if (
+      (kind === "create_quest" || kind === "update_quest") && !draft.endDate
+    ) {
       questions.push(question({
         field: "end_date",
         prompt: "When should this repetition stop?",
-        reason: "That helps me choose a recurring quest instead of an open-ended loop.",
+        reason:
+          "That helps me choose a recurring quest instead of an open-ended loop.",
         required: true,
       }));
     }
   }
 
-  if ((kind === "create_quest" || kind === "create_ritual") && input.plannerContext.activeEpics.length > 0 && !draft.epicId && isRepeatedIntent(input.message, input.parsedInput)) {
+  if (
+    (kind === "create_quest" || kind === "create_ritual") &&
+    input.plannerContext.activeEpics.length > 0 && !draft.epicId &&
+    isRepeatedIntent(input.message, input.parsedInput)
+  ) {
     questions.push(question({
       field: "campaign_link",
       prompt: "Should this support one of your campaigns, or stay standalone?",
-      reason: "If it feeds a bigger goal, I can turn it into a campaign ritual instead.",
+      reason:
+        "If it feeds a bigger goal, I can turn it into a campaign ritual instead.",
       required: false,
-      options: [...input.plannerContext.activeEpics.map((epic) => epic.title), "Keep it standalone"],
+      options: [
+        ...input.plannerContext.activeEpics.map((epic) => epic.title),
+        "Keep it standalone",
+      ],
     }));
   }
 
@@ -1037,7 +1334,10 @@ const buildFollowUpQuestions = (
   }
 
   const balanceQuestion = buildBalanceQuestion(input);
-  if (balanceQuestion && !questions.some((candidate) => candidate.id === balanceQuestion.id)) {
+  if (
+    balanceQuestion &&
+    !questions.some((candidate) => candidate.id === balanceQuestion.id)
+  ) {
     questions.push(balanceQuestion);
   }
 
@@ -1045,7 +1345,9 @@ const buildFollowUpQuestions = (
 };
 
 const stripUndefined = <T extends Record<string, unknown>>(value: T): T =>
-  Object.fromEntries(Object.entries(value).filter(([, entry]) => entry !== undefined)) as T;
+  Object.fromEntries(
+    Object.entries(value).filter(([, entry]) => entry !== undefined),
+  ) as T;
 
 const buildQuestProposal = (
   input: PlannerBuildInput,
@@ -1055,12 +1357,18 @@ const buildQuestProposal = (
   matchedTask: PlannerContextTask | null,
 ): PlannerProposal => {
   const scheduledTime = preferredTime(draft);
-  const reminderMinutesBefore = inferReminderMinutes(kind, scheduledTime, draft.reminderMinutesBefore ?? null);
-  const title = matchedTask?.title ?? draft.title ?? input.parsedInput?.text ?? input.message.trim();
+  const reminderMinutesBefore = inferReminderMinutes(
+    kind,
+    scheduledTime,
+    draft.reminderMinutesBefore ?? null,
+  );
+  const title = matchedTask?.title ?? draft.title ?? input.parsedInput?.text ??
+    input.message.trim();
 
   if (kind === "update_quest" && matchedTask) {
     const updates = stripUndefined({
-      task_text: input.parsedInput?.newTitle ?? parseRenameTitle(input.message) ?? undefined,
+      task_text: input.parsedInput?.newTitle ??
+        parseRenameTitle(input.message) ?? undefined,
       task_date: draft.scheduledDate ?? matchedTask.taskDate ?? undefined,
       scheduled_time: scheduledTime ?? undefined,
       estimated_duration: draft.durationMinutes ?? undefined,
@@ -1080,9 +1388,14 @@ const buildQuestProposal = (
       kind,
       title: `Update ${matchedTask.title}`,
       summary: cadence.recurrencePattern
-        ? `Update "${matchedTask.title}" as a recurring quest with ${cadence.label ?? "your chosen cadence"}${draft.endDate ? ` until ${draft.endDate}` : ""}.`
-        : `Adjust "${matchedTask.title}"${scheduledTime ? ` to ${scheduledTime}` : ""}${draft.scheduledDate ? ` on ${draft.scheduledDate}` : ""}.`,
-      reasoning: "This reads like an existing quest adjustment rather than a brand-new structure.",
+        ? `Update "${matchedTask.title}" as a recurring quest with ${
+          cadence.label ?? "your chosen cadence"
+        }${draft.endDate ? ` until ${draft.endDate}` : ""}.`
+        : `Adjust "${matchedTask.title}"${
+          scheduledTime ? ` to ${scheduledTime}` : ""
+        }${draft.scheduledDate ? ` on ${draft.scheduledDate}` : ""}.`,
+      reasoning:
+        "This reads like an existing quest adjustment rather than a brand-new structure.",
       payload: {
         taskId: matchedTask.id,
         updates,
@@ -1098,14 +1411,19 @@ const buildQuestProposal = (
     kind,
     title: `Create ${title}`,
     summary: cadence.recurrencePattern
-      ? `Create a recurring quest for "${title}"${draft.endDate ? ` until ${draft.endDate}` : ""}.`
-      : `Create a quest for "${title}"${scheduledTime ? ` at ${scheduledTime}` : ""}.`,
+      ? `Create a recurring quest for "${title}"${
+        draft.endDate ? ` until ${draft.endDate}` : ""
+      }.`
+      : `Create a quest for "${title}"${
+        scheduledTime ? ` at ${scheduledTime}` : ""
+      }.`,
     reasoning: cadence.recurrencePattern
       ? "This is repeated work, so I'm treating it as a recurring quest by default."
       : "This looks like a one-off or short-lived action, so it fits best as a quest.",
     payload: {
       taskText: title,
-      difficulty: input.plannerContext.aiSignals?.preferredDifficulty ?? "medium",
+      difficulty: input.plannerContext.aiSignals?.preferredDifficulty ??
+        "medium",
       taskDate: defaultQuestDate(input, draft),
       scheduledTime,
       estimatedDuration: draft.durationMinutes ?? 30,
@@ -1134,12 +1452,17 @@ const buildCampaignProposal = (
   matchedEpic: PlannerContextEpic | null,
 ): PlannerProposal => {
   const scheduledTime = preferredTime(draft);
-  const reminderMinutesBefore = inferReminderMinutes(kind, scheduledTime, draft.reminderMinutesBefore ?? null);
-  const renamedTitle = input.parsedInput?.newTitle ?? parseRenameTitle(input.message);
+  const reminderMinutesBefore = inferReminderMinutes(
+    kind,
+    scheduledTime,
+    draft.reminderMinutesBefore ?? null,
+  );
+  const renamedTitle = input.parsedInput?.newTitle ??
+    parseRenameTitle(input.message);
   const title = draft.title ?? input.parsedInput?.text ?? input.message.trim();
-  const targetDays = input.classificationHint?.suggestedDuration
-    ?? input.plannerContext.aiSignals?.preferredEpicDuration
-    ?? 30;
+  const targetDays = input.classificationHint?.suggestedDuration ??
+    input.plannerContext.aiSignals?.preferredEpicDuration ??
+    30;
 
   if (kind === "update_campaign" && matchedEpic && renamedTitle) {
     return {
@@ -1147,7 +1470,8 @@ const buildCampaignProposal = (
       kind,
       title: `Rename ${matchedEpic.title}`,
       summary: `Rename "${matchedEpic.title}" to "${renamedTitle}".`,
-      reasoning: "I found a live campaign reference and this message reads like a title change.",
+      reasoning:
+        "I found a live campaign reference and this message reads like a title change.",
       payload: {
         epicId: matchedEpic.id,
         title: renamedTitle,
@@ -1162,16 +1486,20 @@ const buildCampaignProposal = (
     id: createId(),
     kind: "create_campaign",
     title: `Create ${title}`,
-    summary: `Create a campaign for "${title}" with a starter ritual so it becomes actionable right away.`,
-    reasoning: "This feels like a multi-step outcome that belongs in a campaign rather than a single quest.",
+    summary:
+      `Create a campaign for "${title}" with a starter ritual so it becomes actionable right away.`,
+    reasoning:
+      "This feels like a multi-step outcome that belongs in a campaign rather than a single quest.",
     payload: {
       title,
       target_days: targetDays,
       habits: [
         {
           title: `Work on ${title}`,
-          difficulty: input.plannerContext.aiSignals?.preferredDifficulty ?? "medium",
-          frequency: cadence.habitFrequency ?? input.plannerContext.aiSignals?.preferredHabitFrequency ?? "daily",
+          difficulty: input.plannerContext.aiSignals?.preferredDifficulty ??
+            "medium",
+          frequency: cadence.habitFrequency ??
+            input.plannerContext.aiSignals?.preferredHabitFrequency ?? "daily",
           custom_days: cadence.habitCustomDays ?? [],
           custom_month_days: cadence.habitCustomMonthDays ?? [],
           preferred_time: scheduledTime,
@@ -1196,23 +1524,32 @@ const buildRitualProposal = (
   matchedRitual: PlannerContextRitual | null,
 ): PlannerProposal => {
   const scheduledTime = preferredTime(draft);
-  const reminderMinutesBefore = inferReminderMinutes(kind, scheduledTime, draft.reminderMinutesBefore ?? null);
-  const title = matchedRitual?.title ?? draft.title ?? input.parsedInput?.text ?? input.message.trim();
+  const reminderMinutesBefore = inferReminderMinutes(
+    kind,
+    scheduledTime,
+    draft.reminderMinutesBefore ?? null,
+  );
+  const title = matchedRitual?.title ?? draft.title ??
+    input.parsedInput?.text ?? input.message.trim();
   const epicId = draft.epicId ?? matchedRitual?.epicId ?? null;
-  const epicTitle = draft.epicTitle ?? matchedRitual?.epicTitle ?? "your campaign";
+  const epicTitle = draft.epicTitle ?? matchedRitual?.epicTitle ??
+    "your campaign";
 
   if (kind === "update_ritual" && matchedRitual) {
     return {
       id: createId(),
       kind,
       title: `Update ${matchedRitual.title}`,
-      summary: `Update the ritual "${matchedRitual.title}" inside ${matchedRitual.epicTitle}.`,
-      reasoning: "You referenced an existing campaign ritual, so I'm keeping the change attached to that campaign.",
+      summary:
+        `Update the ritual "${matchedRitual.title}" inside ${matchedRitual.epicTitle}.`,
+      reasoning:
+        "You referenced an existing campaign ritual, so I'm keeping the change attached to that campaign.",
       payload: {
         habitId: matchedRitual.id,
         title,
         description: input.parsedInput?.notes ?? null,
-        difficulty: input.plannerContext.aiSignals?.preferredDifficulty ?? "medium",
+        difficulty: input.plannerContext.aiSignals?.preferredDifficulty ??
+          "medium",
         frequency: cadence.habitFrequency ?? matchedRitual.frequency ?? "daily",
         estimatedMinutes: draft.durationMinutes ?? 30,
         preferredTime: scheduledTime,
@@ -1233,12 +1570,15 @@ const buildRitualProposal = (
     kind: "create_ritual",
     title: `Add ${title}`,
     summary: `Add "${title}" as a ritual inside ${epicTitle}.`,
-    reasoning: "This repeat work seems tied to a bigger goal, so it belongs as a campaign ritual.",
+    reasoning:
+      "This repeat work seems tied to a bigger goal, so it belongs as a campaign ritual.",
     payload: {
       epicId,
       title,
-      difficulty: input.plannerContext.aiSignals?.preferredDifficulty ?? "medium",
-      frequency: cadence.habitFrequency ?? input.plannerContext.aiSignals?.preferredHabitFrequency ?? "daily",
+      difficulty: input.plannerContext.aiSignals?.preferredDifficulty ??
+        "medium",
+      frequency: cadence.habitFrequency ??
+        input.plannerContext.aiSignals?.preferredHabitFrequency ?? "daily",
       customDays: cadence.habitCustomDays,
       customMonthDays: cadence.habitCustomMonthDays,
       preferredTime: scheduledTime,
@@ -1255,9 +1595,15 @@ const buildRitualProposal = (
 };
 
 const extractCampaignAdjustmentType = (message: string): string => {
-  if (/\b(push|extend|delay|stretch)\b/i.test(message)) return "extend_deadline";
-  if (/\b(remove|drop)\b/i.test(message) && /\b(ritual|habit)\b/i.test(message)) return "remove_habits";
-  if (/\b(add|include)\b/i.test(message) && /\b(ritual|habit)\b/i.test(message)) return "add_habits";
+  if (/\b(push|extend|delay|stretch)\b/i.test(message)) {
+    return "extend_deadline";
+  }
+  if (
+    /\b(remove|drop)\b/i.test(message) && /\b(ritual|habit)\b/i.test(message)
+  ) return "remove_habits";
+  if (
+    /\b(add|include)\b/i.test(message) && /\b(ritual|habit)\b/i.test(message)
+  ) return "add_habits";
   if (/\b(scope|trim|reduce)\b/i.test(message)) return "reduce_scope";
   if (/\b(reschedule|move|shift)\b/i.test(message)) return "reschedule";
   return "custom";
@@ -1274,9 +1620,17 @@ const buildCampaignAdjustmentProposal = (
     const weekMatch = input.message.match(/\b(\d+)\s+week/i);
     const dayMatch = input.message.match(/\b(\d+)\s+day/i);
     if (weekMatch?.[1]) {
-      summaryParts.push(`move the timeline out by ${weekMatch[1]} week${weekMatch[1] === "1" ? "" : "s"}`);
+      summaryParts.push(
+        `move the timeline out by ${weekMatch[1]} week${
+          weekMatch[1] === "1" ? "" : "s"
+        }`,
+      );
     } else if (dayMatch?.[1]) {
-      summaryParts.push(`move the timeline out by ${dayMatch[1]} day${dayMatch[1] === "1" ? "" : "s"}`);
+      summaryParts.push(
+        `move the timeline out by ${dayMatch[1]} day${
+          dayMatch[1] === "1" ? "" : "s"
+        }`,
+      );
     }
   }
   if (/\b(remove|drop)\b.+\b(ritual|habit)\b/i.test(input.message)) {
@@ -1291,9 +1645,12 @@ const buildCampaignAdjustmentProposal = (
     kind: "adjust_campaign_plan",
     title: `Adjust ${matchedEpic.title}`,
     summary: summaryParts.length > 1
-      ? `Generate a revised plan for "${matchedEpic.title}" to ${summaryParts.slice(1).join(" and ")}.`
+      ? `Generate a revised plan for "${matchedEpic.title}" to ${
+        summaryParts.slice(1).join(" and ")
+      }.`
       : `Generate a revised plan for "${matchedEpic.title}" based on this request.`,
-    reasoning: "This reads like a campaign restructure, so I'm preparing an adjustment plan instead of a simple rename.",
+    reasoning:
+      "This reads like a campaign restructure, so I'm preparing an adjustment plan instead of a simple rename.",
     payload: {
       epicId: matchedEpic.id,
       epicTitle: matchedEpic.title,
@@ -1307,9 +1664,14 @@ const buildCampaignAdjustmentProposal = (
   };
 };
 
-const buildTaskIntervalsForDate = (tasks: PlannerContextTask[], date: string): TimelineInterval[] =>
+const buildTaskIntervalsForDate = (
+  tasks: PlannerContextTask[],
+  date: string,
+): TimelineInterval[] =>
   tasks
-    .filter((task) => task.completed !== true && task.taskDate === date && task.scheduledTime)
+    .filter((task) =>
+      task.completed !== true && task.taskDate === date && task.scheduledTime
+    )
     .map((task): TimelineInterval | null => {
       const startMinutes = parseTimeToMinutes(task.scheduledTime);
       if (startMinutes === null) return null;
@@ -1354,7 +1716,8 @@ const buildCalendarIntervalsForDate = (
 
       const localStart = start < dayStart ? dayStart : start;
       const localEnd = end > dayEnd ? dayEnd : end;
-      const startMinutes = (localStart.getHours() * 60) + localStart.getMinutes();
+      const startMinutes = (localStart.getHours() * 60) +
+        localStart.getMinutes();
       const endMinutes = (localEnd.getHours() * 60) + localEnd.getMinutes();
       if (endMinutes <= startMinutes) return null;
 
@@ -1374,8 +1737,15 @@ const buildIntervalsForDate = (
   input: PlannerBuildInput,
   date: string,
 ): TimelineInterval[] => ([
-  ...buildTaskIntervalsForDate([...input.plannerContext.tasks, ...input.plannerContext.inboxTasks], date),
-  ...buildCalendarIntervalsForDate(input.plannerContext.calendarEvents, date, input.plannerContext.plannerMemory),
+  ...buildTaskIntervalsForDate([
+    ...input.plannerContext.tasks,
+    ...input.plannerContext.inboxTasks,
+  ], date),
+  ...buildCalendarIntervalsForDate(
+    input.plannerContext.calendarEvents,
+    date,
+    input.plannerContext.plannerMemory,
+  ),
 ].sort((left, right) => left.startMinutes - right.startMinutes));
 
 const buildFreeWindowsForDate = (
@@ -1384,8 +1754,10 @@ const buildFreeWindowsForDate = (
   dayPart: { start: number; end: number; label: string } | null,
 ) => {
   const intervals = buildIntervalsForDate(input, date);
-  const wakeMinutes = dayPart?.start ?? getWakeMinutes(input.plannerContext.plannerMemory);
-  const windDownMinutes = dayPart?.end ?? getWindDownMinutes(input.plannerContext.plannerMemory);
+  const wakeMinutes = dayPart?.start ??
+    getWakeMinutes(input.plannerContext.plannerMemory);
+  const windDownMinutes = dayPart?.end ??
+    getWindDownMinutes(input.plannerContext.plannerMemory);
   const windows: Array<{ start: string; end: string }> = [];
   const currentDateKey = getLocalDateFromDateTime(input.currentDateTime);
   const currentMinutes = getLocalMinutesFromDateTime(input.currentDateTime);
@@ -1395,7 +1767,10 @@ const buildFreeWindowsForDate = (
     cursor = Math.max(cursor, currentMinutes);
   }
   for (const interval of intervals) {
-    if (interval.endMinutes <= wakeMinutes || interval.startMinutes >= windDownMinutes) continue;
+    if (
+      interval.endMinutes <= wakeMinutes ||
+      interval.startMinutes >= windDownMinutes
+    ) continue;
     if (interval.startMinutes > cursor) {
       windows.push({
         start: formatMinutes(cursor),
@@ -1412,7 +1787,9 @@ const buildFreeWindowsForDate = (
     });
   }
 
-  return windows.filter((window) => parseTimeToMinutes(window.end)! - parseTimeToMinutes(window.start)! >= 30);
+  return windows.filter((window) =>
+    parseTimeToMinutes(window.end)! - parseTimeToMinutes(window.start)! >= 30
+  );
 };
 
 const formatEventTimeLabel = (event: PlannerContextCalendarEvent): string => {
@@ -1420,8 +1797,12 @@ const formatEventTimeLabel = (event: PlannerContextCalendarEvent): string => {
 
   const start = new Date(event.start);
   const end = new Date(event.end);
-  const startLabel = `${String(start.getHours()).padStart(2, "0")}:${String(start.getMinutes()).padStart(2, "0")}`;
-  const endLabel = `${String(end.getHours()).padStart(2, "0")}:${String(end.getMinutes()).padStart(2, "0")}`;
+  const startLabel = `${String(start.getHours()).padStart(2, "0")}:${
+    String(start.getMinutes()).padStart(2, "0")
+  }`;
+  const endLabel = `${String(end.getHours()).padStart(2, "0")}:${
+    String(end.getMinutes()).padStart(2, "0")
+  }`;
   return `${startLabel}-${endLabel}`;
 };
 
@@ -1433,7 +1814,10 @@ const collectScheduleItemsForDate = (
   const now = new Date(input.currentDateTime);
   const currentDateKey = getLocalDateFromDateTime(input.currentDateTime);
   const currentMinutes = getLocalMinutesFromDateTime(input.currentDateTime);
-  const tasks = [...input.plannerContext.tasks, ...input.plannerContext.inboxTasks]
+  const tasks = [
+    ...input.plannerContext.tasks,
+    ...input.plannerContext.inboxTasks,
+  ]
     .filter((task) => task.completed !== true && task.taskDate === date)
     .filter((task) => {
       if (!remainingOnly || date !== currentDateKey) return true;
@@ -1458,7 +1842,9 @@ const collectScheduleItemsForDate = (
     })
     .map((event) => ({
       label: `${formatEventTimeLabel(event)} ${event.title}`,
-      sortMinutes: event.isAllDay ? -1 : parseTimeToMinutes(formatEventTimeLabel(event)),
+      sortMinutes: event.isAllDay
+        ? -1
+        : parseTimeToMinutes(formatEventTimeLabel(event)),
     }));
 
   return [...tasks, ...events].sort((left, right) => (
@@ -1481,7 +1867,9 @@ const buildDayDigest = (
 
   const nextItems = items.slice(0, 3).map((item) => item.label).join("; ");
   const openingText = openings.length > 0
-    ? `Best opening${openings.length === 1 ? "" : "s"}: ${openings.map((window) => `${window.start}-${window.end}`).join(", ")}.`
+    ? `Best opening${openings.length === 1 ? "" : "s"}: ${
+      openings.map((window) => `${window.start}-${window.end}`).join(", ")
+    }.`
     : "No obvious open window yet without reshuffling something.";
 
   if (items.length === 0) {
@@ -1489,19 +1877,75 @@ const buildDayDigest = (
   }
 
   const overflowCount = items.length - 3;
-  const overflowText = overflowCount > 0 ? ` Plus ${overflowCount} more item${overflowCount === 1 ? "" : "s"}.` : "";
+  const overflowText = overflowCount > 0
+    ? ` Plus ${overflowCount} more item${overflowCount === 1 ? "" : "s"}.`
+    : "";
   return `${label}: ${nextItems}.${overflowText} ${openingText}`;
 };
 
 const buildUpcomingDigestReply = (input: PlannerBuildInput): string => {
   const tomorrow = addDaysToDateKey(input.currentDate, 1);
-  const weekSummary = input.plannerContext.scheduleInsights?.summary ?? "The week still has room to flex.";
+  const weekSummary = input.plannerContext.scheduleInsights?.summary ??
+    "The week still has room to flex.";
 
   return [
     "Here's the shape of what's coming up.",
     buildDayDigest(input, input.currentDate, "Today", true),
     buildDayDigest(input, tomorrow, "Tomorrow"),
     `Week ahead: ${weekSummary}`,
+    "Tell me what feels most important, and I'll help from there.",
+  ].join("\n\n");
+};
+
+const buildMakeRoomStarterReply = (input: PlannerBuildInput): string => {
+  const weekSummary = input.plannerContext.scheduleInsights?.summary ??
+    "The week still has room to flex.";
+
+  return [
+    "Here's the room I see right now.",
+    buildDayDigest(input, input.currentDate, "Today", true),
+    `Week ahead: ${weekSummary}`,
+    "Tell me what matters most, and I'll help make room for it.",
+  ].join("\n\n");
+};
+
+const describeScheduleTarget = (
+  currentDate: string,
+  targetDate: string,
+): { leadLabel: string; digestLabel: string } => {
+  if (targetDate === currentDate) {
+    return {
+      leadLabel: "today",
+      digestLabel: "Today",
+    };
+  }
+
+  if (targetDate === addDaysToDateKey(currentDate, 1)) {
+    return {
+      leadLabel: "tomorrow",
+      digestLabel: "Tomorrow",
+    };
+  }
+
+  return {
+    leadLabel: targetDate,
+    digestLabel: targetDate,
+  };
+};
+
+const buildDayOverviewReply = (
+  input: PlannerBuildInput,
+  targetDate: string,
+): string => {
+  const { leadLabel, digestLabel } = describeScheduleTarget(
+    input.currentDate,
+    targetDate,
+  );
+
+  return [
+    `Here's the shape of ${leadLabel}.`,
+    buildDayDigest(input, targetDate, digestLabel),
+    "Tell me what feels most important, and I'll help from there.",
   ].join("\n\n");
 };
 
@@ -1509,68 +1953,38 @@ const buildReadOnlyScheduleReply = (
   input: PlannerBuildInput,
   message: string,
 ): string => {
-  if (isUpcomingDigestQuestion(message) && !hasExplicitDateReference(message, input.parsedInput)) {
+  if (
+    isUpcomingDigestQuestion(message) &&
+    !hasExplicitDateReference(message, input.parsedInput)
+  ) {
     return buildUpcomingDigestReply(input);
   }
 
-  const targetDate = parseRequestedDate(message, input.currentDate, input.parsedInput);
-  const currentDateKey = getLocalDateFromDateTime(input.currentDateTime);
-  const currentMinutes = getLocalMinutesFromDateTime(input.currentDateTime);
-  const now = new Date(input.currentDateTime);
-  const targetTasks = [...input.plannerContext.tasks, ...input.plannerContext.inboxTasks]
-    .filter((task) => task.completed !== true && task.taskDate === targetDate)
-    .filter((task) => {
-      if (targetDate !== currentDateKey) return true;
-      const scheduledMinutes = parseTimeToMinutes(task.scheduledTime);
-      if (scheduledMinutes === null || currentMinutes === null) return true;
-      return scheduledMinutes >= currentMinutes;
-    })
-    .sort((left, right) => (parseTimeToMinutes(left.scheduledTime) ?? 9999) - (parseTimeToMinutes(right.scheduledTime) ?? 9999));
-  const targetEvents = input.plannerContext.calendarEvents
-    .filter((event) => {
-      const start = new Date(event.start);
-      const end = new Date(event.end);
-      const dayStart = new Date(`${targetDate}T00:00:00`);
-      const dayEnd = new Date(`${addDaysToDateKey(targetDate, 1)}T00:00:00`);
-      if (!(end > dayStart && start < dayEnd)) return false;
-      if (targetDate !== currentDateKey) return true;
-      return end > now;
-    })
-    .sort((left, right) => left.start.localeCompare(right.start));
+  const targetDate = parseRequestedDate(
+    message,
+    input.currentDate,
+    input.parsedInput,
+  );
 
   if (isAvailabilityQuestion(message)) {
     const dayPart = resolveDayPartRange(message);
-    const freeWindows = buildFreeWindowsForDate(input, targetDate, dayPart).slice(0, 3);
+    const freeWindows = buildFreeWindowsForDate(input, targetDate, dayPart)
+      .slice(0, 3);
     if (freeWindows.length === 0) {
       return dayPart
         ? `I don't see a clean ${dayPart.label} opening on ${targetDate} yet. I can still help you reshuffle quests around those blocks if you want.`
         : `I don't see a clear opening on ${targetDate} yet. I can still help you reshuffle quests around those blocks if you want.`;
     }
 
-    const windowsLabel = freeWindows.map((window) => `${window.start}-${window.end}`).join(", ");
+    const windowsLabel = freeWindows.map((window) =>
+      `${window.start}-${window.end}`
+    ).join(", ");
     return dayPart
       ? `Your best ${dayPart.label} openings on ${targetDate} are ${windowsLabel}. That includes both Cosmiq quests and connected calendar events.`
       : `Your best openings on ${targetDate} are ${windowsLabel}. That includes both Cosmiq quests and connected calendar events.`;
   }
 
-  if (targetTasks.length === 0 && targetEvents.length === 0) {
-    return `${targetDate} looks open right now. I don't see any scheduled Cosmiq quests or connected calendar events on it yet.`;
-  }
-
-  const questSummary = targetTasks.length > 0
-    ? targetTasks
-      .slice(0, 3)
-      .map((task) => `${task.scheduledTime ?? "Unscheduled"} ${task.title}`)
-      .join("; ")
-    : "no scheduled Cosmiq quests";
-  const calendarSummary = targetEvents.length > 0
-    ? targetEvents
-      .slice(0, 3)
-      .map((event) => `${formatEventTimeLabel(event)} ${event.title}`)
-      .join("; ")
-    : "no connected calendar events";
-
-  return `${targetDate} looks like this right now: ${questSummary}. Calendar: ${calendarSummary}.`;
+  return buildDayOverviewReply(input, targetDate);
 };
 
 const buildAmbiguousEntityResponse = (
@@ -1579,7 +1993,8 @@ const buildAmbiguousEntityResponse = (
   sessionState: PlannerSessionState,
 ): PlannerBuildResult => ({
   mode: "conversational",
-  reply: `I found a few ${label}s that could fit. Pick one and I'll keep the change scoped correctly.`,
+  reply:
+    `I found a few ${label}s that could fit. Pick one and I'll keep the change scoped correctly.`,
   followUpQuestions: [question({
     field: "details",
     prompt: `Which ${label} did you mean?`,
@@ -1626,15 +2041,23 @@ const buildBatchQuestProposals = (
   targetDate: string,
   targetTime: string | null,
 ): PlannerProposal[] => {
-  const sourceTasks = [...input.plannerContext.tasks, ...input.plannerContext.inboxTasks]
-    .filter((task) => task.completed !== true && task.taskDate === input.currentDate);
+  const sourceTasks = [
+    ...input.plannerContext.tasks,
+    ...input.plannerContext.inboxTasks,
+  ]
+    .filter((task) =>
+      task.completed !== true && task.taskDate === input.currentDate
+    );
 
   return sourceTasks.map((task) => ({
     id: createId(),
     kind: "update_quest" as const,
     title: `Move ${task.title}`,
-    summary: `Move "${task.title}" to ${targetDate}${targetTime ? ` at ${targetTime}` : ""}.`,
-    reasoning: "This reads like a batch reschedule request, so I'm preparing one confirmable quest update per matching quest.",
+    summary: `Move "${task.title}" to ${targetDate}${
+      targetTime ? ` at ${targetTime}` : ""
+    }.`,
+    reasoning:
+      "This reads like a batch reschedule request, so I'm preparing one confirmable quest update per matching quest.",
     payload: {
       taskId: task.id,
       updates: {
@@ -1665,7 +2088,8 @@ const composeReply = (
     suggest_reminder: "reminder tweak",
   })[kind];
   const scheduleSummary = input.plannerContext.scheduleInsights?.summary;
-  const preferredTimeOfDay = input.plannerContext.plannerMemory?.preferredTimeOfDay;
+  const preferredTimeOfDay = input.plannerContext.plannerMemory
+    ?.preferredTimeOfDay;
   const memoryLead = preferredTimeOfDay
     ? `You usually land work like this in the ${preferredTimeOfDay}. `
     : "";
@@ -1685,21 +2109,26 @@ const buildConversationalResponse = (
 ): PlannerBuildResult => {
   const message = input.message.toLowerCase();
   const scheduleSummary = input.plannerContext.scheduleInsights?.summary;
-  const scheduleLead = /\b(today|tomorrow|week|calendar|schedule)\b/i.test(message) && scheduleSummary
-    ? `${scheduleSummary} `
-    : "";
+  const scheduleLead =
+    /\b(today|tomorrow|week|calendar|schedule)\b/i.test(message) &&
+      scheduleSummary
+      ? `${scheduleSummary} `
+      : "";
 
   return {
     mode: "conversational",
-    reply: `${scheduleLead}I'm here with you. Tell me what feels most important, or ask me to turn it into a draft quest or campaign when you're ready.`,
+    reply:
+      `${scheduleLead}I'm here with you. Tell me what feels most important, or ask me to turn it into a draft quest or campaign when you're ready.`,
     followUpQuestions: [],
     proposals: [],
     suggestedReminders: [],
     memoryUpdates: {
-      preferredTimeOfDay: sessionState.preferredTimeOfDay ?? input.plannerContext.plannerMemory?.preferredTimeOfDay ?? null,
-      preferredTimeReason: sessionState.preferredTimeReason ?? input.plannerContext.plannerMemory?.preferredTimeReason ?? null,
-      reminderPreference: sessionState.reminderPreference
-        ?? (input.plannerContext.plannerMemory?.reminderMinutesBefore
+      preferredTimeOfDay: sessionState.preferredTimeOfDay ??
+        input.plannerContext.plannerMemory?.preferredTimeOfDay ?? null,
+      preferredTimeReason: sessionState.preferredTimeReason ??
+        input.plannerContext.plannerMemory?.preferredTimeReason ?? null,
+      reminderPreference: sessionState.reminderPreference ??
+        (input.plannerContext.plannerMemory?.reminderMinutesBefore
           ? `${input.plannerContext.plannerMemory.reminderMinutesBefore} minutes`
           : null),
     },
@@ -1711,8 +2140,84 @@ const buildConversationalResponse = (
   };
 };
 
-const inferClassification = (message: string, repeated: boolean): ClassificationHint => {
-  if (/\b(license|exam|launch|build|learn|train for|prepare for|by [a-z]+|\bin \d+ (weeks?|months?)\b)\b/i.test(message)) {
+const buildGoalBreakdownStarterResponse = (
+  input: PlannerBuildInput,
+  sessionState: PlannerSessionState,
+  classificationHint: ClassificationHint,
+): PlannerBuildResult => ({
+  mode: "conversational",
+  reply:
+    "Name the goal you want to break down, and I'll help turn it into concrete steps.",
+  followUpQuestions: [question({
+    field: "details",
+    prompt: "What's the goal you want to break down?",
+    reason:
+      "Once I have the real goal, I can shape it into a campaign or first steps instead of guessing.",
+    required: true,
+  })],
+  proposals: [],
+  suggestedReminders: [],
+  memoryUpdates: {
+    preferredTimeOfDay: sessionState.preferredTimeOfDay ??
+      input.plannerContext.plannerMemory?.preferredTimeOfDay ?? null,
+    preferredTimeReason: sessionState.preferredTimeReason ??
+      input.plannerContext.plannerMemory?.preferredTimeReason ?? null,
+    reminderPreference: sessionState.reminderPreference ??
+      (input.plannerContext.plannerMemory?.reminderMinutesBefore
+        ? `${input.plannerContext.plannerMemory.reminderMinutesBefore} minutes`
+        : null),
+  },
+  sessionState: {
+    ...sessionState,
+    draft: {},
+    openQuestionIds: ["details"],
+    lastClassification: classificationHint.type,
+  },
+});
+
+const buildIntentFirstResponse = (
+  input: PlannerBuildInput,
+  sessionState: PlannerSessionState,
+  classificationHint: ClassificationHint,
+): PlannerBuildResult => ({
+  mode: "conversational",
+  reply:
+    "Let's start with what you want to get done. Once I have that, I'll look at what's open.",
+  followUpQuestions: [question({
+    field: "details",
+    prompt: "What do you want to get done?",
+    reason:
+      "Once you name the goal, I'll look at what's open and shape the plan around it.",
+    required: true,
+  })],
+  proposals: [],
+  suggestedReminders: [],
+  memoryUpdates: {
+    preferredTimeOfDay: sessionState.preferredTimeOfDay ??
+      input.plannerContext.plannerMemory?.preferredTimeOfDay ?? null,
+    preferredTimeReason: sessionState.preferredTimeReason ??
+      input.plannerContext.plannerMemory?.preferredTimeReason ?? null,
+    reminderPreference: sessionState.reminderPreference ??
+      (input.plannerContext.plannerMemory?.reminderMinutesBefore
+        ? `${input.plannerContext.plannerMemory.reminderMinutesBefore} minutes`
+        : null),
+  },
+  sessionState: {
+    ...sessionState,
+    draft: {},
+    openQuestionIds: ["details"],
+    lastClassification: classificationHint.type,
+  },
+});
+
+const inferClassification = (
+  message: string,
+  repeated: boolean,
+): ClassificationHint => {
+  if (
+    /\b(license|exam|launch|build|learn|train for|prepare for|by [a-z]+|\bin \d+ (weeks?|months?)\b)\b/i
+      .test(message)
+  ) {
     return {
       type: "epic",
       confidence: 0.7,
@@ -1735,72 +2240,135 @@ const inferClassification = (message: string, repeated: boolean): Classification
   };
 };
 
-export function buildPlannerResponse(input: PlannerBuildInput): PlannerBuildResult {
-  const repeated = isRepeatedIntent(input.message, input.parsedInput);
-  const classificationHint = input.classificationHint ?? inferClassification(input.message, repeated);
-  const matched = findMatchedEntities(input.message, input.plannerContext);
+export function buildPlannerResponse(
+  input: PlannerBuildInput,
+): PlannerBuildResult {
+  const resolvedInput = withResolvedTimeQuestionAnswer(input);
+  const repeated = isRepeatedIntent(
+    resolvedInput.message,
+    resolvedInput.parsedInput,
+  );
+  const classificationHint = resolvedInput.classificationHint ??
+    inferClassification(resolvedInput.message, repeated);
+  const matched = findMatchedEntities(
+    resolvedInput.message,
+    resolvedInput.plannerContext,
+  );
 
-  if (isScheduleQuestion(input.message)) {
+  if (isScheduleQuestion(resolvedInput.message)) {
     return buildReadOnlyResponse(
-      buildReadOnlyScheduleReply(input, input.message),
+      buildReadOnlyScheduleReply(resolvedInput, resolvedInput.message),
       {
-        ...input.sessionState,
+        ...resolvedInput.sessionState,
         lastClassification: classificationHint.type,
       },
       "schedule_read",
     );
   }
 
-  if (looksConversational(input, matched, repeated, classificationHint)) {
-    return buildConversationalResponse(input, input.sessionState, classificationHint);
+  if (isBreakBigGoalStarterIntent(resolvedInput.message)) {
+    return buildGoalBreakdownStarterResponse(
+      resolvedInput,
+      resolvedInput.sessionState,
+      classificationHint,
+    );
   }
 
-  if (isEditIntent(input.message) && matched.tasks.length > 1 && !isQuestCollectionIntent(input.message)) {
+  if (isMakeRoomStarterIntent(resolvedInput.message)) {
+    return buildReadOnlyResponse(
+      buildMakeRoomStarterReply(resolvedInput),
+      {
+        ...resolvedInput.sessionState,
+        lastClassification: classificationHint.type,
+      },
+      "schedule_read",
+    );
+  }
+
+  if (isVaguePlanningPrompt(resolvedInput, matched, repeated)) {
+    return buildIntentFirstResponse(
+      resolvedInput,
+      resolvedInput.sessionState,
+      classificationHint,
+    );
+  }
+
+  if (
+    looksConversational(resolvedInput, matched, repeated, classificationHint)
+  ) {
+    return buildConversationalResponse(
+      resolvedInput,
+      resolvedInput.sessionState,
+      classificationHint,
+    );
+  }
+
+  if (
+    isEditIntent(resolvedInput.message) && matched.tasks.length > 1 &&
+    !isQuestCollectionIntent(resolvedInput.message)
+  ) {
     return buildAmbiguousEntityResponse(
       "quest",
       matched.tasks.map((task) => task.title),
       {
-        ...input.sessionState,
-        lastClassification: classificationHint.type,
-      },
-    );
-  }
-
-  if ((parseRenameTitle(input.message) || isCampaignAdjustmentIntent(input.message)) && matched.epics.length > 1) {
-    return buildAmbiguousEntityResponse(
-      "campaign",
-      matched.epics.map((epic) => epic.title),
-      {
-        ...input.sessionState,
+        ...resolvedInput.sessionState,
         lastClassification: classificationHint.type,
       },
     );
   }
 
   if (
-    isEditIntent(input.message)
-    && matched.tasks.length === 0
-    && matched.calendarEvents.length > 0
-    && !isQuestCollectionIntent(input.message)
+    (parseRenameTitle(resolvedInput.message) ||
+      isCampaignAdjustmentIntent(resolvedInput.message)) &&
+    matched.epics.length > 1
   ) {
-    return buildReadOnlyResponse(
-      `I found the connected calendar event "${matched.calendarEvents[0]?.title ?? "that event"}", but external calendar events are read-only here for now. I can still move your Cosmiq quests around it if you want.`,
+    return buildAmbiguousEntityResponse(
+      "campaign",
+      matched.epics.map((epic) => epic.title),
       {
-        ...input.sessionState,
+        ...resolvedInput.sessionState,
         lastClassification: classificationHint.type,
       },
     );
   }
 
-  if (isEditIntent(input.message) && isQuestCollectionIntent(input.message)) {
-    const targetDate = parseRequestedDate(input.message, input.currentDate, input.parsedInput);
-    const proposals = buildBatchQuestProposals(input, targetDate, input.parsedInput?.scheduledTime ?? null);
+  if (
+    isEditIntent(resolvedInput.message) &&
+    matched.tasks.length === 0 &&
+    matched.calendarEvents.length > 0 &&
+    !isQuestCollectionIntent(resolvedInput.message)
+  ) {
+    return buildReadOnlyResponse(
+      `I found the connected calendar event "${
+        matched.calendarEvents[0]?.title ?? "that event"
+      }", but external calendar events are read-only here for now. I can still move your Cosmiq quests around it if you want.`,
+      {
+        ...resolvedInput.sessionState,
+        lastClassification: classificationHint.type,
+      },
+    );
+  }
+
+  if (
+    isEditIntent(resolvedInput.message) &&
+    isQuestCollectionIntent(resolvedInput.message)
+  ) {
+    const targetDate = parseRequestedDate(
+      resolvedInput.message,
+      resolvedInput.currentDate,
+      resolvedInput.parsedInput,
+    );
+    const proposals = buildBatchQuestProposals(
+      resolvedInput,
+      targetDate,
+      resolvedInput.parsedInput?.scheduledTime ?? null,
+    );
 
     if (proposals.length === 0) {
       return buildReadOnlyResponse(
-        `I do not see any matching Cosmiq quests on ${input.currentDate} to move yet.`,
+        `I do not see any matching Cosmiq quests on ${resolvedInput.currentDate} to move yet.`,
         {
-          ...input.sessionState,
+          ...resolvedInput.sessionState,
           lastClassification: classificationHint.type,
         },
       );
@@ -1808,25 +2376,31 @@ export function buildPlannerResponse(input: PlannerBuildInput): PlannerBuildResu
 
     return {
       mode: "proposal",
-      reply: `I pulled together ${proposals.length} quest move${proposals.length === 1 ? "" : "s"} for ${targetDate}. Review them and use confirm all when you're ready.`,
+      reply: `I pulled together ${proposals.length} quest move${
+        proposals.length === 1 ? "" : "s"
+      } for ${targetDate}. Review them and use confirm all when you're ready.`,
       followUpQuestions: [],
       proposals,
       suggestedReminders: [],
       memoryUpdates: {
-        preferredTimeOfDay: input.sessionState.preferredTimeOfDay ?? input.plannerContext.plannerMemory?.preferredTimeOfDay ?? null,
-        preferredTimeReason: input.sessionState.preferredTimeReason ?? input.plannerContext.plannerMemory?.preferredTimeReason ?? null,
-        reminderPreference: input.sessionState.reminderPreference
-          ?? (input.plannerContext.plannerMemory?.reminderMinutesBefore
-            ? `${input.plannerContext.plannerMemory.reminderMinutesBefore} minutes`
+        preferredTimeOfDay: resolvedInput.sessionState.preferredTimeOfDay ??
+          resolvedInput.plannerContext.plannerMemory?.preferredTimeOfDay ??
+          null,
+        preferredTimeReason: resolvedInput.sessionState.preferredTimeReason ??
+          resolvedInput.plannerContext.plannerMemory?.preferredTimeReason ??
+          null,
+        reminderPreference: resolvedInput.sessionState.reminderPreference ??
+          (resolvedInput.plannerContext.plannerMemory?.reminderMinutesBefore
+            ? `${resolvedInput.plannerContext.plannerMemory.reminderMinutesBefore} minutes`
             : null),
       },
       sessionState: {
-        ...input.sessionState,
+        ...resolvedInput.sessionState,
         draft: {
-          ...input.sessionState.draft,
+          ...resolvedInput.sessionState.draft,
           draftKind: "update_quest",
           scheduledDate: targetDate,
-          scheduledTime: input.parsedInput?.scheduledTime ?? null,
+          scheduledTime: resolvedInput.parsedInput?.scheduledTime ?? null,
         },
         openQuestionIds: [],
         lastClassification: classificationHint.type,
@@ -1834,59 +2408,107 @@ export function buildPlannerResponse(input: PlannerBuildInput): PlannerBuildResu
     };
   }
 
-  const draft = mergeDraft({ ...input, classificationHint }, matched);
-  const cadence = resolveCadence(input.message, input.parsedInput);
+  const draft = mergeDraft({ ...resolvedInput, classificationHint }, matched);
+  const cadence = resolveCadence(
+    resolvedInput.message,
+    resolvedInput.parsedInput,
+  );
 
   if (!draft.epicId && draft.epicTitle) {
-    const matchingEpic = input.plannerContext.activeEpics.find((epic) => normalizeText(epic.title) === normalizeText(draft.epicTitle));
+    const matchingEpic = resolvedInput.plannerContext.activeEpics.find((epic) =>
+      normalizeText(epic.title) === normalizeText(draft.epicTitle)
+    );
     if (matchingEpic) {
       draft.epicId = matchingEpic.id;
       draft.epicTitle = matchingEpic.title;
     }
   }
 
-  const kind = resolveKind({ ...input, classificationHint }, draft, matched, repeated);
+  const kind = resolveKind(
+    { ...resolvedInput, classificationHint },
+    draft,
+    matched,
+    repeated,
+  );
   draft.draftKind = kind;
 
   const proposal = kind === "adjust_campaign_plan" && matched.epic
-    ? buildCampaignAdjustmentProposal({ ...input, classificationHint }, draft, matched.epic)
+    ? buildCampaignAdjustmentProposal(
+      { ...resolvedInput, classificationHint },
+      draft,
+      matched.epic,
+    )
     : kind === "create_campaign" || kind === "update_campaign"
-      ? buildCampaignProposal({ ...input, classificationHint }, draft, cadence, kind, matched.epic)
-      : kind === "create_ritual" || kind === "update_ritual"
-        ? buildRitualProposal({ ...input, classificationHint }, draft, cadence, kind, matched.ritual)
-        : buildQuestProposal({ ...input, classificationHint }, draft, cadence, kind as "create_quest" | "update_quest", matched.task);
+    ? buildCampaignProposal(
+      { ...resolvedInput, classificationHint },
+      draft,
+      cadence,
+      kind,
+      matched.epic,
+    )
+    : kind === "create_ritual" || kind === "update_ritual"
+    ? buildRitualProposal(
+      { ...resolvedInput, classificationHint },
+      draft,
+      cadence,
+      kind,
+      matched.ritual,
+    )
+    : buildQuestProposal(
+      { ...resolvedInput, classificationHint },
+      draft,
+      cadence,
+      kind as "create_quest" | "update_quest",
+      matched.task,
+    );
 
-  const followUpQuestions = buildFollowUpQuestions({ ...input, classificationHint }, kind, draft, cadence);
-  const missingFields = missingFieldsForKind(input, kind, draft, cadence);
-  proposal.readyToConfirm = followUpQuestions.length === 0 && missingFields.length === 0;
+  const followUpQuestions = buildFollowUpQuestions(
+    { ...resolvedInput, classificationHint },
+    kind,
+    draft,
+    cadence,
+  );
+  const missingFields = missingFieldsForKind(
+    resolvedInput,
+    kind,
+    draft,
+    cadence,
+  );
+  proposal.readyToConfirm = followUpQuestions.length === 0 &&
+    missingFields.length === 0;
   proposal.missingFields = missingFields;
 
   const memoryUpdates = {
-    preferredTimeOfDay: draft.timeOfDay
-      ?? input.sessionState.preferredTimeOfDay
-      ?? input.plannerContext.plannerMemory?.preferredTimeOfDay
-      ?? null,
-    preferredTimeReason: draft.timeReason
-      ?? input.sessionState.preferredTimeReason
-      ?? input.plannerContext.plannerMemory?.preferredTimeReason
-      ?? null,
+    preferredTimeOfDay: draft.timeOfDay ??
+      resolvedInput.sessionState.preferredTimeOfDay ??
+      resolvedInput.plannerContext.plannerMemory?.preferredTimeOfDay ??
+      null,
+    preferredTimeReason: draft.timeReason ??
+      resolvedInput.sessionState.preferredTimeReason ??
+      resolvedInput.plannerContext.plannerMemory?.preferredTimeReason ??
+      null,
     reminderPreference: draft.reminderMinutesBefore !== null
       ? `${draft.reminderMinutesBefore} minutes`
-      : input.sessionState.reminderPreference
-        ?? (input.plannerContext.plannerMemory?.reminderMinutesBefore
-          ? `${input.plannerContext.plannerMemory.reminderMinutesBefore} minutes`
+      : resolvedInput.sessionState.reminderPreference ??
+        (resolvedInput.plannerContext.plannerMemory?.reminderMinutesBefore
+          ? `${resolvedInput.plannerContext.plannerMemory.reminderMinutesBefore} minutes`
           : null),
   };
 
   return {
     mode: "proposal",
-    reply: composeReply(input, input.tonePack, proposal.kind, proposal.readyToConfirm),
+    reply: composeReply(
+      resolvedInput,
+      resolvedInput.tonePack,
+      proposal.kind,
+      proposal.readyToConfirm,
+    ),
     followUpQuestions,
     proposals: [proposal],
     suggestedReminders: [],
     memoryUpdates,
     sessionState: {
-      ...input.sessionState,
+      ...resolvedInput.sessionState,
       draft,
       openQuestionIds: followUpQuestions.map((question) => question.id),
       preferredTimeOfDay: memoryUpdates.preferredTimeOfDay,

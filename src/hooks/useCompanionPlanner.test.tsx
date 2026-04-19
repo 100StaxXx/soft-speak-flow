@@ -241,4 +241,88 @@ describe("useCompanionPlanner", () => {
     expect(request?.body.conversationHistory).toEqual([]);
     expect("timelineAnalysis" in request.body.classificationHint).toBe(false);
   });
+
+  it("clears stale pending proposals when the planner responds with a clarification question only", async () => {
+    mocks.invoke
+      .mockResolvedValueOnce({
+        data: {
+          mode: "proposal",
+          reply: "I turned this into a quest draft.",
+          followUpQuestions: [],
+          proposals: [
+            {
+              id: "proposal-1",
+              kind: "create_quest",
+              title: "Write my launch notes",
+              summary: "Draft a focused writing block.",
+              payload: {},
+              status: "pending",
+              readyToConfirm: true,
+              missingFields: [],
+            },
+          ],
+          suggestedReminders: [],
+          memoryUpdates: {},
+          sessionState: {
+            draft: {
+              title: "Write my launch notes",
+              draftKind: "create_quest",
+            },
+            openQuestionIds: [],
+            preferredTimeOfDay: null,
+            preferredTimeReason: null,
+            reminderPreference: null,
+            lastClassification: "quest",
+          },
+        },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: {
+          mode: "conversational",
+          reply: "Let's start with what you want to get done.",
+          followUpQuestions: [
+            {
+              id: "details",
+              prompt: "What do you want to get done?",
+              reason: "Once you name the goal, I'll look at what's open and shape the plan around it.",
+              required: true,
+              field: "details",
+            },
+          ],
+          proposals: [],
+          suggestedReminders: [],
+          memoryUpdates: {},
+          sessionState: {
+            draft: {},
+            openQuestionIds: ["details"],
+            preferredTimeOfDay: null,
+            preferredTimeReason: null,
+            reminderPreference: null,
+            lastClassification: "quest",
+          },
+        },
+        error: null,
+      });
+
+    const { result } = renderHook(() => useCompanionPlanner({ bootstrapGreeting: false }));
+
+    await act(async () => {
+      await result.current.submitMessage("Write my launch notes", "text");
+    });
+
+    await waitFor(() => {
+      expect(result.current.pendingProposals).toHaveLength(1);
+    });
+
+    await act(async () => {
+      await result.current.submitMessage("Help me make room for what matters.", "text");
+    });
+
+    await waitFor(() => {
+      expect(result.current.pendingProposals).toHaveLength(0);
+    });
+
+    expect(result.current.questions.map((question) => question.field)).toEqual(["details"]);
+  });
 });
