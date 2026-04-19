@@ -2,7 +2,7 @@ import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ACTIVE_CAMPAIGN_LIMIT_MESSAGE } from "@/features/epics/constants";
+import { ACTIVE_CAMPAIGN_LIMIT, ACTIVE_CAMPAIGN_LIMIT_MESSAGE } from "@/features/epics/constants";
 
 const mocks = vi.hoisted(() => ({
   rpcMock: vi.fn(),
@@ -51,13 +51,13 @@ describe("JoinEpicDialog", () => {
     vi.clearAllMocks();
   });
 
-  it("shows the campaign limit message when joining would exceed 3 active campaigns", async () => {
+  it("shows the campaign limit message when joining would exceed the active campaign limit", async () => {
     mocks.rpcMock.mockResolvedValue({
       data: [
         {
           success: false,
           code: "epic_limit_reached",
-          message: "You can only have 3 active epics at a time",
+          message: `You can only have ${ACTIVE_CAMPAIGN_LIMIT} active epics at a time`,
           epic_id: null,
           epic_title: null,
           copied_habit_count: 0,

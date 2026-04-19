@@ -547,6 +547,17 @@ const createPointerDownEvent = (clientY: number) => {
   return event;
 };
 
+const performTouchTimelineDrag = (row: HTMLElement, moveY: number, startY = 100) => {
+  vi.useFakeTimers();
+  act(() => {
+    fireEvent.touchStart(row, { touches: [{ clientX: 0, clientY: startY }] });
+    vi.advanceTimersByTime(500);
+    dispatchTouchMove(moveY);
+    dispatchTouchEnd();
+  });
+  vi.useRealTimers();
+};
+
 const createDeferred = <T,>() => {
   let resolve!: (value: T | PromiseLike<T>) => void;
   let reject!: (reason?: unknown) => void;
@@ -812,7 +823,7 @@ describe("Journeys row drag integration", () => {
     input.remove();
   });
 
-  it("reschedules a quest from the timeline row drag path on /journeys", async () => {
+  it("does not reschedule a quest from pointer row drag on /journeys", async () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -834,21 +845,11 @@ describe("Journeys row drag integration", () => {
     act(() => {
       fireEvent(row, createPointerDownEvent(100));
       dispatchPointerMove(825);
-    });
-
-    act(() => {
       window.dispatchEvent(new Event("pointerup"));
     });
 
-    await waitFor(() => {
-      expect(mocks.updateTask).toHaveBeenCalledTimes(1);
-    });
-    const firstUpdate = mocks.updateTask.mock.calls[0]?.[0];
-    expect(firstUpdate?.taskId).toBe("task-1");
-    expect(firstUpdate?.updates?.scheduled_time).toMatch(/^([01]\d|2[0-3]):([0-5]\d)$/);
-    expect(firstUpdate?.updates?.scheduled_time).not.toBe("08:00");
-
-    expect(mocks.syncTaskUpdateMutateAsync).toHaveBeenCalledWith({ taskId: "task-1" });
+    expect(mocks.updateTask).not.toHaveBeenCalled();
+    expect(mocks.syncTaskUpdateMutateAsync).not.toHaveBeenCalled();
     expect(screen.getByText("Plan your quests for the week ahead.")).toBeInTheDocument();
   });
 
@@ -898,14 +899,7 @@ describe("Journeys row drag integration", () => {
 
     const row = await screen.findByTestId("timeline-row-task-1");
 
-    vi.useFakeTimers();
-    act(() => {
-      fireEvent.touchStart(row, { touches: [{ clientX: 0, clientY: 100 }] });
-      vi.advanceTimersByTime(500);
-      dispatchTouchMove(820);
-      dispatchTouchEnd();
-    });
-    vi.useRealTimers();
+    performTouchTimelineDrag(row, 820);
 
     await waitFor(() => {
       expect(mocks.updateTask).toHaveBeenCalledTimes(1);
@@ -937,18 +931,15 @@ describe("Journeys row drag integration", () => {
 
     const row = await screen.findByTestId("timeline-row-task-1");
 
-    act(() => {
-      fireEvent(row, createPointerDownEvent(100));
-      dispatchPointerMove(825);
-      window.dispatchEvent(new Event("pointerup"));
-    });
+    performTouchTimelineDrag(row, 825);
 
     await waitFor(() => {
-      expect(mocks.updateTask).toHaveBeenCalledWith({
-        taskId: "task-1",
-        updates: { scheduled_time: "19:45" },
-      });
+      expect(mocks.updateTask).toHaveBeenCalledTimes(1);
     });
+    const firstUpdate = mocks.updateTask.mock.calls[0]?.[0];
+    expect(firstUpdate?.taskId).toBe("task-1");
+    expect(firstUpdate?.updates?.scheduled_time).toMatch(/^([01]\d|2[0-3]):([0-5]\d)$/);
+    expect(firstUpdate?.updates?.scheduled_time).not.toBe("08:00");
 
     expect(mocks.syncTaskUpdateMutateAsync).not.toHaveBeenCalled();
 
@@ -982,18 +973,15 @@ describe("Journeys row drag integration", () => {
 
     const row = await screen.findByTestId("timeline-row-task-1");
 
-    act(() => {
-      fireEvent(row, createPointerDownEvent(100));
-      dispatchPointerMove(825);
-      window.dispatchEvent(new Event("pointerup"));
-    });
+    performTouchTimelineDrag(row, 825);
 
     await waitFor(() => {
-      expect(mocks.updateTask).toHaveBeenCalledWith({
-        taskId: "task-1",
-        updates: { scheduled_time: "19:45" },
-      });
+      expect(mocks.updateTask).toHaveBeenCalledTimes(1);
     });
+    const firstUpdate = mocks.updateTask.mock.calls[0]?.[0];
+    expect(firstUpdate?.taskId).toBe("task-1");
+    expect(firstUpdate?.updates?.scheduled_time).toMatch(/^([01]\d|2[0-3]):([0-5]\d)$/);
+    expect(firstUpdate?.updates?.scheduled_time).not.toBe("08:00");
 
     await act(async () => {
       await Promise.resolve();
@@ -1071,23 +1059,16 @@ describe("Journeys row drag integration", () => {
     const rowTaskOne = await screen.findByTestId("timeline-row-task-1");
     await screen.findByTestId("timeline-row-task-2");
 
-    act(() => {
-      fireEvent(rowTaskOne, createPointerDownEvent(100));
-      dispatchPointerMove(825);
-    });
-
-    act(() => {
-      window.dispatchEvent(new Event("pointerup"));
-    });
+    performTouchTimelineDrag(rowTaskOne, 825);
 
     await waitFor(() => {
       expect(mocks.updateTask).toHaveBeenCalledTimes(1);
     });
 
-    expect(mocks.updateTask).toHaveBeenCalledWith({
-      taskId: "task-1",
-      updates: { scheduled_time: "19:45" },
-    });
+    const firstUpdate = mocks.updateTask.mock.calls[0]?.[0];
+    expect(firstUpdate?.taskId).toBe("task-1");
+    expect(firstUpdate?.updates?.scheduled_time).toMatch(/^([01]\d|2[0-3]):([0-5]\d)$/);
+    expect(firstUpdate?.updates?.scheduled_time).not.toBe("08:00");
     expect(mocks.updateTask).not.toHaveBeenCalledWith(
       expect.objectContaining({ taskId: "task-2" }),
     );
@@ -1137,14 +1118,7 @@ describe("Journeys row drag integration", () => {
     const rowTaskOne = await screen.findByTestId("timeline-row-task-1");
     await screen.findByTestId("timeline-row-task-2");
 
-    act(() => {
-      fireEvent(rowTaskOne, createPointerDownEvent(100));
-      dispatchPointerMove(6000);
-    });
-
-    act(() => {
-      window.dispatchEvent(new Event("pointerup"));
-    });
+    performTouchTimelineDrag(rowTaskOne, 6000);
 
     await waitFor(() => {
       expect(mocks.updateTask).toHaveBeenCalledTimes(1);

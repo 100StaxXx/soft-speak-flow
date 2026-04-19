@@ -153,7 +153,7 @@ vi.mock("@/utils/plannerLocalStore", async () => {
 
 import { normalizeCreateCampaignError, useEpics } from "./useEpics";
 import { resolveEpicEndDate } from "@/utils/epicDates";
-import { ACTIVE_CAMPAIGN_LIMIT_MESSAGE } from "@/features/epics/constants";
+import { ACTIVE_CAMPAIGN_LIMIT, ACTIVE_CAMPAIGN_LIMIT_MESSAGE } from "@/features/epics/constants";
 
 const buildActiveEpic = (id: string) => ({
   id,
@@ -937,8 +937,10 @@ describe("useEpics", () => {
     expect(mocks.requestJourneyPathGenerationMock).not.toHaveBeenCalled();
   });
 
-  it("allows campaign creation when the user already has 2 active campaigns", async () => {
-    const activeEpics = [buildActiveEpic("epic-1"), buildActiveEpic("epic-2")];
+  it("allows campaign creation when the user is one campaign under the limit", async () => {
+    const activeEpics = Array.from({ length: ACTIVE_CAMPAIGN_LIMIT - 1 }, (_, index) =>
+      buildActiveEpic(`epic-${index + 1}`)
+    );
     const habitsInsertMock = vi.fn().mockResolvedValue({ error: null });
     const epicsInsertMock = vi.fn().mockResolvedValue({ error: null });
     const linksInsertMock = vi.fn().mockResolvedValue({ error: null });
@@ -948,7 +950,7 @@ describe("useEpics", () => {
       queryClient.setQueryData(["epics", userId], activeEpics);
       return activeEpics;
     });
-    mocks.rpcMock.mockResolvedValue({ data: 2, error: null });
+    mocks.rpcMock.mockResolvedValue({ data: ACTIVE_CAMPAIGN_LIMIT - 1, error: null });
 
     mocks.fromMock.mockImplementation((table: string) => {
       if (table === "habits") {
@@ -982,12 +984,12 @@ describe("useEpics", () => {
     });
 
     await waitFor(() => {
-      expect(result.current.activeEpics).toHaveLength(2);
+      expect(result.current.activeEpics).toHaveLength(ACTIVE_CAMPAIGN_LIMIT - 1);
     });
 
     await act(async () => {
       await result.current.createEpic({
-        title: "Third Campaign",
+        title: "Next Campaign",
         target_days: 14,
         habits: [
           {
@@ -1007,12 +1009,10 @@ describe("useEpics", () => {
     expect(habitsInsertMock).toHaveBeenCalledTimes(1);
   });
 
-  it("blocks campaign creation from local state once 3 active campaigns are already loaded", async () => {
-    const activeEpics = [
-      buildActiveEpic("epic-1"),
-      buildActiveEpic("epic-2"),
-      buildActiveEpic("epic-3"),
-    ];
+  it("blocks campaign creation from local state once the active campaign limit is already loaded", async () => {
+    const activeEpics = Array.from({ length: ACTIVE_CAMPAIGN_LIMIT }, (_, index) =>
+      buildActiveEpic(`epic-${index + 1}`)
+    );
 
     mocks.loadLocalEpicsMock.mockResolvedValue(activeEpics);
     mocks.warmEpicsQueryFromRemoteMock.mockImplementationOnce(async (queryClient: QueryClient, userId: string) => {
@@ -1025,7 +1025,7 @@ describe("useEpics", () => {
     });
 
     await waitFor(() => {
-      expect(result.current.activeEpics).toHaveLength(3);
+      expect(result.current.activeEpics).toHaveLength(ACTIVE_CAMPAIGN_LIMIT);
     });
 
     await act(async () => {
@@ -1046,8 +1046,10 @@ describe("useEpics", () => {
     expect(mocks.rpcMock).not.toHaveBeenCalled();
   });
 
-  it("blocks campaign creation when the remote active campaign count is already 3", async () => {
-    const activeEpics = [buildActiveEpic("epic-1"), buildActiveEpic("epic-2")];
+  it("blocks campaign creation when the remote active campaign count is already at the limit", async () => {
+    const activeEpics = Array.from({ length: ACTIVE_CAMPAIGN_LIMIT - 1 }, (_, index) =>
+      buildActiveEpic(`epic-${index + 1}`)
+    );
     const habitsInsertMock = vi.fn().mockResolvedValue({ error: null });
     const epicsInsertMock = vi.fn().mockResolvedValue({ error: null });
 
@@ -1056,7 +1058,7 @@ describe("useEpics", () => {
       queryClient.setQueryData(["epics", userId], activeEpics);
       return activeEpics;
     });
-    mocks.rpcMock.mockResolvedValue({ data: 3, error: null });
+    mocks.rpcMock.mockResolvedValue({ data: ACTIVE_CAMPAIGN_LIMIT, error: null });
 
     mocks.fromMock.mockImplementation((table: string) => {
       if (table === "habits") {
@@ -1084,7 +1086,7 @@ describe("useEpics", () => {
     });
 
     await waitFor(() => {
-      expect(result.current.activeEpics).toHaveLength(2);
+      expect(result.current.activeEpics).toHaveLength(ACTIVE_CAMPAIGN_LIMIT - 1);
     });
 
     await act(async () => {
@@ -1737,11 +1739,13 @@ describe("useEpics", () => {
 });
 
 describe("normalizeCreateCampaignError", () => {
-  it("returns campaign-limit messaging for 3-active-epics backend errors", () => {
-    const result = normalizeCreateCampaignError("User can only have 3 active epics at a time");
+  it("returns campaign-limit messaging for active-epics backend errors", () => {
+    const result = normalizeCreateCampaignError(
+      `User can only have ${ACTIVE_CAMPAIGN_LIMIT} active epics at a time`
+    );
 
     expect(result.title).toBe("Campaign limit reached");
-    expect(result.description).toContain("3 active campaigns");
+    expect(result.description).toContain(`${ACTIVE_CAMPAIGN_LIMIT} active campaigns`);
   });
 
   it("prioritizes legacy active habit limit errors over generic habit creation failures", () => {

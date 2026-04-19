@@ -3054,19 +3054,18 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                           : undefined;
                         const timelineRowDragProps = baseTimelineRowDragProps
                           ? {
-                              ...baseTimelineRowDragProps,
-                              onPointerDownCapture: (
-                                event: Parameters<NonNullable<typeof baseTimelineRowDragProps.onPointerDownCapture>>[0],
-                              ) => {
-                                seedDragOverlaySnapshotForTask(task.id);
-                                baseTimelineRowDragProps.onPointerDownCapture?.(event);
-                              },
+                              // Keep touch hold-to-reschedule, but skip pointer row drag so
+                              // clicks/trackpad drags do not hijack normal quest interactions.
                               onTouchStartCapture: (
                                 event: Parameters<NonNullable<typeof baseTimelineRowDragProps.onTouchStartCapture>>[0],
                               ) => {
                                 seedDragOverlaySnapshotForTask(task.id);
                                 baseTimelineRowDragProps.onTouchStartCapture?.(event);
                               },
+                              onTouchStart: baseTimelineRowDragProps.onTouchStart,
+                              onTouchMove: baseTimelineRowDragProps.onTouchMove,
+                              onTouchEnd: baseTimelineRowDragProps.onTouchEnd,
+                              onTouchCancel: baseTimelineRowDragProps.onTouchCancel,
                             }
                           : undefined;
                         const isRowDraggable = !!timelineRowDragProps;

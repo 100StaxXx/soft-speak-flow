@@ -41,6 +41,7 @@ vi.mock("./CampaignEmptyStateModal", () => ({
   CampaignEmptyStateModal: () => null,
 }));
 
+import { ACTIVE_CAMPAIGN_LIMIT } from "@/features/epics/constants";
 import { EpicsTab } from "./EpicsTab";
 
 const buildCampaign = (id: string) => ({
@@ -62,9 +63,11 @@ describe("EpicsTab", () => {
     });
   });
 
-  it("keeps the add-campaign affordance visible when the user has 2 active campaigns", () => {
+  it("keeps the add-campaign affordance visible when the user is one campaign under the limit", () => {
     mocks.useEpicsMock.mockReturnValue({
-      activeEpics: [buildCampaign("1"), buildCampaign("2")],
+      activeEpics: Array.from({ length: ACTIVE_CAMPAIGN_LIMIT - 1 }, (_, index) =>
+        buildCampaign(String(index + 1))
+      ),
       completedEpics: [],
       isLoading: false,
       createEpic: vi.fn(),
@@ -77,9 +80,11 @@ describe("EpicsTab", () => {
     expect(screen.getByLabelText(/Create campaign/i)).toBeInTheDocument();
   });
 
-  it("hides the add-campaign affordance once the user has 3 active campaigns", () => {
+  it("hides the add-campaign affordance once the user reaches the active campaign limit", () => {
     mocks.useEpicsMock.mockReturnValue({
-      activeEpics: [buildCampaign("1"), buildCampaign("2"), buildCampaign("3")],
+      activeEpics: Array.from({ length: ACTIVE_CAMPAIGN_LIMIT }, (_, index) =>
+        buildCampaign(String(index + 1))
+      ),
       completedEpics: [],
       isLoading: false,
       createEpic: vi.fn(),

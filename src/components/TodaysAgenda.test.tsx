@@ -1887,7 +1887,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(mocks.getRowDragPropsMock).not.toHaveBeenCalled();
   });
 
-  it("forwards row pointer down to row drag handler", () => {
+  it("does not forward row pointer down to row drag handler", () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -1918,8 +1918,8 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     const row = screen.getByTestId("timeline-row-task-scheduled-1");
     fireEvent.pointerDown(row, { pointerType: "mouse", button: 0, clientY: 100 });
 
-    expect(mocks.rowPointerDownCaptureSpy).toHaveBeenCalledTimes(1);
-    expect(mocks.rowPointerDownSpy).toHaveBeenCalledTimes(1);
+    expect(mocks.rowPointerDownCaptureSpy).not.toHaveBeenCalled();
+    expect(mocks.rowPointerDownSpy).not.toHaveBeenCalled();
     expect(mocks.handlePointerDownCaptureSpy).not.toHaveBeenCalled();
     expect(mocks.handlePointerDownSpy).not.toHaveBeenCalled();
   });
@@ -1961,7 +1961,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(mocks.handleTouchStartSpy).not.toHaveBeenCalled();
   });
 
-  it("does not forward row pointer and touch starts to handle-only drag handlers", () => {
+  it("keeps pointer starts off row drag wiring and touch starts off handle-only drag wiring", () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -1993,8 +1993,8 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     fireEvent.pointerDown(row, { pointerType: "mouse", button: 0, clientY: 100 });
     fireEvent.touchStart(row, { touches: [{ clientX: 0, clientY: 100 }] });
 
-    expect(mocks.rowPointerDownCaptureSpy).toHaveBeenCalledTimes(1);
-    expect(mocks.rowPointerDownSpy).toHaveBeenCalledTimes(1);
+    expect(mocks.rowPointerDownCaptureSpy).not.toHaveBeenCalled();
+    expect(mocks.rowPointerDownSpy).not.toHaveBeenCalled();
     expect(mocks.rowTouchStartCaptureSpy).toHaveBeenCalledTimes(1);
     expect(mocks.rowTouchStartSpy).toHaveBeenCalledTimes(1);
     expect(mocks.handlePointerDownCaptureSpy).not.toHaveBeenCalled();

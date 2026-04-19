@@ -1,8 +1,7 @@
 {
-  "generatedAt": "2026-04-19T00:06:45Z",
+  "generatedAt": "2026-04-19T23:35:30Z",
   "frontendInvoked": [
     "adjust-epic-plan",
-    "adjust-saved-daily-plan",
     "analyze-user-patterns",
     "apple-native-auth",
     "apply-epic-adjustments",
@@ -101,7 +100,6 @@
   ],
   "allowList": [
     "adjust-epic-plan",
-    "adjust-saved-daily-plan",
     "ai-orchestrator",
     "analyze-user-patterns",
     "apple-native-auth",

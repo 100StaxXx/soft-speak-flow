@@ -157,7 +157,7 @@ export async function handleAiOrchestrator(req: Request) {
             
             // If suggesting an epic but at limit, add warning
             if (detectedIntent === 'epic' && enrichedContext.atEpicLimit) {
-              (aiResponse as any).warning = 'You already have 3 active campaigns. Consider completing one before starting another.';
+              (aiResponse as any).warning = 'You already have 5 active campaigns. Consider completing one before starting another.';
             }
           }
         } else {

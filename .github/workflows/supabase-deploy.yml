@@ -289,8 +289,6 @@ jobs:
             ELEVENLABS_API_KEY
             OUTLOOK_CLIENT_ID
             OUTLOOK_CLIENT_SECRET
-            COST_ALERT_WEBHOOK_URL
-            COST_ALERT_WEBHOOK_BEARER_TOKEN
           )
 
           missing=0
@@ -333,6 +331,16 @@ jobs:
           set -euo pipefail
           deno test supabase/functions/outlook-calendar-events/index.test.ts
           deno test supabase/functions/outlook-todo-tasks/index.test.ts
+
+      - name: Deno check companion stats analysis function
+        run: |
+          set -euo pipefail
+          deno check supabase/functions/generate-companion-stat-analysis/index.ts
+
+      - name: Deno test companion stats analysis function
+        run: |
+          set -euo pipefail
+          deno test --allow-env supabase/functions/generate-companion-stat-analysis/index.test.ts
 
       - name: Deploy allow-listed Edge Functions
         run: |

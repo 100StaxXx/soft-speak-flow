@@ -2,6 +2,7 @@ import {
   memo,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -75,12 +76,18 @@ type DialogueEntry = {
   id: string;
   role: "assistant" | "user";
   content: string;
+  isSeed?: boolean;
 };
 
 type PlannerQuestionHistoryEntry = {
   id: string;
   prompt: string;
   options: string[];
+};
+
+type JourneysCompanionDrawerLayout = {
+  shellHeight: number;
+  keyboardInset: number;
 };
 
 const STARTER_QUICK_REPLIES = [...COMPANION_PLANNER_STARTER_TEMPLATES];
@@ -106,18 +113,26 @@ const getReducedMotionPreference = () =>
   && typeof window.matchMedia === "function"
   && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-const getDrawerViewportHeight = () => {
+const getDrawerLayout = (): JourneysCompanionDrawerLayout => {
   if (typeof window === "undefined") {
-    return MOBILE_DRAWER_HEIGHT_MIN_PX;
+    return {
+      shellHeight: MOBILE_DRAWER_HEIGHT_MIN_PX,
+      keyboardInset: 0,
+    };
   }
 
   const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
   const safeViewportHeight = Number.isFinite(viewportHeight) ? viewportHeight : window.innerHeight;
+  const viewportOffsetTop = window.visualViewport?.offsetTop ?? 0;
+  const keyboardInset = Math.max(0, window.innerHeight - (viewportOffsetTop + safeViewportHeight));
 
-  return Math.max(
-    MOBILE_DRAWER_HEIGHT_MIN_PX,
-    Math.min(MOBILE_DRAWER_HEIGHT_MAX_PX, safeViewportHeight - MOBILE_DRAWER_VIEWPORT_OFFSET_PX),
-  );
+  return {
+    shellHeight: Math.max(
+      MOBILE_DRAWER_HEIGHT_MIN_PX,
+      Math.min(MOBILE_DRAWER_HEIGHT_MAX_PX, safeViewportHeight - MOBILE_DRAWER_VIEWPORT_OFFSET_PX),
+    ),
+    keyboardInset,
+  };
 };
 
 const formatThreadTimestamp = (value: string) => {
@@ -244,11 +259,13 @@ const JourneysCompanionOverlayBody = memo(({
   launchIntent,
   onLaunchIntentConsumed,
   onOpenCampaignBuilder,
+  drawerLayout,
 }: {
   presentation: JourneysCompanionPlannerModalPresentation;
   launchIntent?: CompanionPlannerLaunchIntent | null;
   onLaunchIntentConsumed?: (intentId: string) => void;
   onOpenCampaignBuilder?: (message: string) => void;
+  drawerLayout?: JourneysCompanionDrawerLayout;
 }) => {
   const {
     companionLabel,
@@ -272,15 +289,14 @@ const JourneysCompanionOverlayBody = memo(({
   const [isThreadPickerOpen, setIsThreadPickerOpen] = useState(false);
   const [typingMessageId, setTypingMessageId] = useState<string | null>(null);
   const [typedAssistantContent, setTypedAssistantContent] = useState("");
-  const [drawerViewportHeight, setDrawerViewportHeight] = useState<number>(() => getDrawerViewportHeight());
 
   const typingIntervalRef = useRef<number | null>(null);
   const typingTargetRef = useRef<{ id: string; content: string } | null>(null);
-  const animatedAssistantIdsRef = useRef<Set<string>>(new Set());
+  const hasSettledInitialTranscriptRef = useRef(false);
   const transcriptEndRef = useRef<HTMLDivElement | null>(null);
   const transcriptScrollAreaRef = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (assistant.questions.length === 0) return;
 
     setPlannerQuestionHistory((previous) => {
@@ -302,6 +318,7 @@ const JourneysCompanionOverlayBody = memo(({
       id: message.id,
       role: message.role,
       content: message.content,
+      isSeed: message.isSeed,
     })),
     ...plannerQuestionHistory.map((question) => ({
       id: question.id,
@@ -327,7 +344,6 @@ const JourneysCompanionOverlayBody = memo(({
     if (!typingTarget) return false;
 
     clearTypingTimer();
-    animatedAssistantIdsRef.current.add(typingTarget.id);
     setTypingMessageId(null);
     setTypedAssistantContent(typingTarget.content);
     typingTargetRef.current = null;
@@ -339,54 +355,23 @@ const JourneysCompanionOverlayBody = memo(({
   }, [clearTypingTimer]);
 
   useEffect(() => {
+    hasSettledInitialTranscriptRef.current = false;
+    clearTypingTimer();
+    typingTargetRef.current = null;
+    setTypingMessageId(null);
+    setTypedAssistantContent("");
+  }, [assistant.activeThread?.sessionId, clearTypingTimer]);
+
+  useEffect(() => {
     if (!latestAssistantEntry) return;
 
-    if (prefersReducedMotion) {
-      animatedAssistantIdsRef.current.add(latestAssistantEntry.id);
-      setTypingMessageId(null);
-      setTypedAssistantContent(latestAssistantEntry.content);
-      typingTargetRef.current = null;
-      clearTypingTimer();
-      return;
-    }
-
-    if (animatedAssistantIdsRef.current.has(latestAssistantEntry.id)) {
-      setTypingMessageId(null);
-      setTypedAssistantContent(latestAssistantEntry.content);
-      typingTargetRef.current = null;
-      clearTypingTimer();
-      return;
-    }
-
     clearTypingTimer();
-    typingTargetRef.current = {
-      id: latestAssistantEntry.id,
-      content: latestAssistantEntry.content,
-    };
-    setTypingMessageId(latestAssistantEntry.id);
-    setTypedAssistantContent("");
-
-    const characters = Array.from(latestAssistantEntry.content);
-    const characterStep = Math.max(1, Math.ceil(characters.length / 24));
-    let nextIndex = 0;
-
-    typingIntervalRef.current = window.setInterval(() => {
-      nextIndex = Math.min(characters.length, nextIndex + characterStep);
-      setTypedAssistantContent(characters.slice(0, nextIndex).join(""));
-
-      if (nextIndex >= characters.length) {
-        completeCurrentAssistantLine();
-      }
-    }, 18);
-
-    return () => {
-      clearTypingTimer();
-    };
+    typingTargetRef.current = null;
+    setTypingMessageId(null);
+    setTypedAssistantContent(latestAssistantEntry.content);
   }, [
     clearTypingTimer,
-    completeCurrentAssistantLine,
     latestAssistantEntry,
-    prefersReducedMotion,
   ]);
 
   const keepBottomContentVisible = useCallback((behavior: ScrollBehavior = prefersReducedMotion ? "auto" : "smooth") => {
@@ -407,43 +392,28 @@ const JourneysCompanionOverlayBody = memo(({
   }, [prefersReducedMotion]);
 
   useEffect(() => {
-    keepBottomContentVisible();
-  }, [dialogueEntries, typedAssistantContent, assistant.questions, assistant.pendingProposals, keepBottomContentVisible]);
+    const behavior: ScrollBehavior = hasSettledInitialTranscriptRef.current && !assistant.isLoadingThreads
+      ? (prefersReducedMotion ? "auto" : "smooth")
+      : "auto";
 
-  useEffect(() => {
-    if (!isDrawerPresentation || typeof window === "undefined") return;
-
-    const syncDrawerViewportLayout = () => {
-      setDrawerViewportHeight(getDrawerViewportHeight());
-      keepBottomContentVisible("auto");
-    };
-
-    syncDrawerViewportLayout();
-
-    const viewport = window.visualViewport;
-    const canListenToViewport = !!viewport
-      && typeof viewport.addEventListener === "function"
-      && typeof viewport.removeEventListener === "function";
-
-    window.addEventListener("resize", syncDrawerViewportLayout);
-    if (canListenToViewport) {
-      viewport.addEventListener("resize", syncDrawerViewportLayout);
-      viewport.addEventListener("scroll", syncDrawerViewportLayout);
+    keepBottomContentVisible(behavior);
+    if (!assistant.isLoadingThreads) {
+      hasSettledInitialTranscriptRef.current = true;
     }
-
-    return () => {
-      window.removeEventListener("resize", syncDrawerViewportLayout);
-      if (canListenToViewport) {
-        viewport.removeEventListener("resize", syncDrawerViewportLayout);
-        viewport.removeEventListener("scroll", syncDrawerViewportLayout);
-      }
-    };
-  }, [isDrawerPresentation, keepBottomContentVisible]);
+  }, [
+    assistant.isLoadingThreads,
+    assistant.pendingProposals,
+    assistant.questions,
+    dialogueEntries,
+    keepBottomContentVisible,
+    prefersReducedMotion,
+    typedAssistantContent,
+  ]);
 
   useEffect(() => {
     if (!isDrawerPresentation) return;
     keepBottomContentVisible("auto");
-  }, [drawerViewportHeight, isDrawerPresentation, keepBottomContentVisible]);
+  }, [drawerLayout, isDrawerPresentation, keepBottomContentVisible]);
 
   const handleSubmit = useCallback(() => {
     if (typingMessageId) {
@@ -558,7 +528,9 @@ const JourneysCompanionOverlayBody = memo(({
     : assistant.isSubmitting || assistant.isClassifying
       ? "Replying..."
       : assistant.todayLabel;
-  const plannerShellStyle = isDrawerPresentation ? { height: `${drawerViewportHeight}px` } : undefined;
+  const plannerShellStyle = isDrawerPresentation && drawerLayout
+    ? { height: `${drawerLayout.shellHeight}px` }
+    : undefined;
 
   return (
     <div
@@ -956,12 +928,51 @@ export const JourneysCompanionPlannerModal = memo(function JourneysCompanionPlan
   onLaunchIntentConsumed,
   onOpenCampaignBuilder,
 }: JourneysCompanionPlannerModalProps) {
+  const isDrawerPresentation = presentation === "drawer";
+  const [drawerLayout, setDrawerLayout] = useState<JourneysCompanionDrawerLayout>(() => getDrawerLayout());
+
+  useLayoutEffect(() => {
+    if (!open || !isDrawerPresentation || typeof window === "undefined") return;
+
+    const syncDrawerLayout = () => {
+      const nextLayout = getDrawerLayout();
+      setDrawerLayout((previous) => (
+        previous.shellHeight === nextLayout.shellHeight
+          && previous.keyboardInset === nextLayout.keyboardInset
+      )
+        ? previous
+        : nextLayout);
+    };
+
+    syncDrawerLayout();
+
+    const viewport = window.visualViewport;
+    const canListenToViewport = !!viewport
+      && typeof viewport.addEventListener === "function"
+      && typeof viewport.removeEventListener === "function";
+
+    window.addEventListener("resize", syncDrawerLayout);
+    if (canListenToViewport) {
+      viewport.addEventListener("resize", syncDrawerLayout);
+      viewport.addEventListener("scroll", syncDrawerLayout);
+    }
+
+    return () => {
+      window.removeEventListener("resize", syncDrawerLayout);
+      if (canListenToViewport) {
+        viewport.removeEventListener("resize", syncDrawerLayout);
+        viewport.removeEventListener("scroll", syncDrawerLayout);
+      }
+    };
+  }, [isDrawerPresentation, open]);
+
   const content = open ? (
     <JourneysCompanionOverlayBody
       presentation={presentation}
       launchIntent={launchIntent}
       onLaunchIntentConsumed={onLaunchIntentConsumed}
       onOpenCampaignBuilder={onOpenCampaignBuilder}
+      drawerLayout={isDrawerPresentation ? drawerLayout : undefined}
     />
   ) : null;
 
@@ -983,7 +994,11 @@ export const JourneysCompanionPlannerModal = memo(function JourneysCompanionPlan
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange} repositionInputs={false}>
-      <DrawerContent className="border-none bg-transparent p-0 shadow-none">
+      <DrawerContent
+        className="border-none bg-transparent p-0 shadow-none"
+        style={{ bottom: `${drawerLayout.keyboardInset}px` }}
+        data-testid="journeys-companion-planner-drawer-content"
+      >
         <DrawerHeader className="sr-only">
           <DrawerTitle>Companion chat</DrawerTitle>
           <DrawerDescription>

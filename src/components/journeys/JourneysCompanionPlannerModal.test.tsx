@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { HTMLAttributes, ReactNode } from "react";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { COMPANION_PLANNER_STARTER_TEMPLATES } from "@/shared/companionPlannerCopy";
@@ -239,7 +239,13 @@ vi.mock("@/components/ui/drawer", () => ({
     mocks.drawerRootProps.push({ open, ...props });
     return open ? <div>{children}</div> : null;
   },
-  DrawerContent: ({ children, className }: { children: ReactNode; className?: string }) => <div className={className}>{children}</div>,
+  DrawerContent: ({
+    children,
+    className,
+    ...props
+  }: HTMLAttributes<HTMLDivElement> & { children: ReactNode }) => (
+    <div className={className} {...props}>{children}</div>
+  ),
   DrawerHeader: ({ children, className }: { children: ReactNode; className?: string }) => <div className={className}>{children}</div>,
   DrawerTitle: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   DrawerDescription: ({ children }: { children: ReactNode }) => <div>{children}</div>,
@@ -627,8 +633,10 @@ describe("JourneysCompanionPlannerModal", () => {
       );
 
       const shell = screen.getByTestId("journeys-companion-planner-shell");
+      const drawerContent = screen.getByTestId("journeys-companion-planner-drawer-content");
       await waitFor(() => {
         expect(shell).toHaveStyle("height: 616px");
+        expect(drawerContent).toHaveStyle("bottom: 0px");
       });
 
       act(() => {
@@ -638,6 +646,122 @@ describe("JourneysCompanionPlannerModal", () => {
 
       await waitFor(() => {
         expect(shell).toHaveStyle("height: 456px");
+      });
+    } finally {
+      Object.defineProperty(window, "innerHeight", {
+        configurable: true,
+        value: originalInnerHeight,
+      });
+    }
+  });
+
+  it("lifts the mobile drawer above the keyboard when the visual viewport shrinks", async () => {
+    const originalInnerHeight = window.innerHeight;
+    const listeners = {
+      resize: [] as Array<() => void>,
+      scroll: [] as Array<() => void>,
+    };
+    const visualViewport = {
+      height: 540,
+      offsetTop: 0,
+      addEventListener: vi.fn((event: "resize" | "scroll", handler: () => void) => {
+        listeners[event].push(handler);
+      }),
+      removeEventListener: vi.fn((event: "resize" | "scroll", handler: () => void) => {
+        listeners[event] = listeners[event].filter((entry) => entry !== handler);
+      }),
+    };
+
+    try {
+      Object.defineProperty(window, "innerHeight", {
+        configurable: true,
+        value: 820,
+      });
+      Object.defineProperty(window, "visualViewport", {
+        configurable: true,
+        value: visualViewport,
+      });
+
+      render(
+        <JourneysCompanionPlannerModal
+          open
+          onOpenChange={vi.fn()}
+          presentation="drawer"
+        />,
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId("journeys-companion-planner-drawer-content")).toHaveStyle("bottom: 280px");
+      });
+    } finally {
+      Object.defineProperty(window, "innerHeight", {
+        configurable: true,
+        value: originalInnerHeight,
+      });
+    }
+  });
+
+  it("updates and resets the mobile drawer lift as the viewport changes", async () => {
+    const originalInnerHeight = window.innerHeight;
+    const listeners = {
+      resize: [] as Array<() => void>,
+      scroll: [] as Array<() => void>,
+    };
+    const visualViewport = {
+      height: 620,
+      offsetTop: 0,
+      addEventListener: vi.fn((event: "resize" | "scroll", handler: () => void) => {
+        listeners[event].push(handler);
+      }),
+      removeEventListener: vi.fn((event: "resize" | "scroll", handler: () => void) => {
+        listeners[event] = listeners[event].filter((entry) => entry !== handler);
+      }),
+    };
+
+    try {
+      Object.defineProperty(window, "innerHeight", {
+        configurable: true,
+        value: 700,
+      });
+      Object.defineProperty(window, "visualViewport", {
+        configurable: true,
+        value: visualViewport,
+      });
+
+      render(
+        <JourneysCompanionPlannerModal
+          open
+          onOpenChange={vi.fn()}
+          presentation="drawer"
+        />,
+      );
+
+      const shell = screen.getByTestId("journeys-companion-planner-shell");
+      const drawerContent = screen.getByTestId("journeys-companion-planner-drawer-content");
+
+      await waitFor(() => {
+        expect(shell).toHaveStyle("height: 596px");
+        expect(drawerContent).toHaveStyle("bottom: 80px");
+      });
+
+      act(() => {
+        visualViewport.height = 480;
+        listeners.resize.forEach((handler) => handler());
+      });
+
+      await waitFor(() => {
+        expect(shell).toHaveStyle("height: 456px");
+        expect(drawerContent).toHaveStyle("bottom: 220px");
+      });
+
+      act(() => {
+        visualViewport.height = 700;
+        listeners.resize.forEach((handler) => handler());
+      });
+
+      await waitFor(() => {
+        expect(shell).toHaveStyle("height: 676px");
+        expect(drawerContent).toHaveStyle("bottom: 0px");
       });
     } finally {
       Object.defineProperty(window, "innerHeight", {
@@ -760,7 +884,7 @@ describe("JourneysCompanionPlannerModal", () => {
     expect(screen.getByText("Past chats will show up after the latest backend update.")).toBeInTheDocument();
   });
 
-  it("reveals assistant text letter-by-letter and lets send finish the current line", () => {
+  it("does not treat existing planner text as active typing when the modal opens", async () => {
     vi.useFakeTimers();
     Object.defineProperty(window, "matchMedia", {
       configurable: true,
@@ -782,15 +906,74 @@ describe("JourneysCompanionPlannerModal", () => {
       />,
     );
 
-    act(() => {
-      vi.advanceTimersByTime(54);
-    });
-
-    expect(screen.queryByText("What time of day should this live in your schedule?")).not.toBeInTheDocument();
+    await act(async () => {});
 
     fireEvent.click(screen.getByTestId("journeys-companion-planner-send-button"));
 
-    expect(screen.getByText("What time of day should this live in your schedule?")).toBeInTheDocument();
-    expect(mocks.assistant.submitTypedMessage).not.toHaveBeenCalled();
+    expect(mocks.assistant.submitTypedMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the composer in submit mode when follow-up questions appear", async () => {
+    vi.useFakeTimers();
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      writable: true,
+      value: vi.fn().mockReturnValue({
+        matches: false,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+      }),
+    });
+
+    mocks.state.messages = [
+      {
+        id: "chat-1",
+        role: "assistant",
+        content: "The road's open. What are we setting in motion?",
+        createdAt: "2026-04-18T08:00:00.000Z",
+        source: "chat",
+        isSeed: true,
+      },
+    ];
+    mocks.state.questions = [];
+    mocks.state.proposals = [];
+    mocks.state.pendingProposals = [];
+    mocks.state.readyProposalCount = 0;
+
+    const { rerender } = render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        presentation="dialog"
+      />,
+    );
+
+    mocks.state.questions = [
+      {
+        id: "time_of_day",
+        prompt: "What time of day should this live in your schedule?",
+        required: true,
+        field: "time_of_day",
+        options: ["Morning", "Afternoon", "Evening"],
+      },
+    ];
+
+    rerender(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        presentation="dialog"
+      />,
+    );
+
+    await act(async () => {});
+
+    fireEvent.click(screen.getByTestId("journeys-companion-planner-send-button"));
+
+    await act(async () => {});
+
+    expect(mocks.assistant.submitTypedMessage).toHaveBeenCalledTimes(1);
   });
 });

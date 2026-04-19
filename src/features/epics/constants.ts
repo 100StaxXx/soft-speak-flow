@@ -1,4 +1,4 @@
-export const ACTIVE_CAMPAIGN_LIMIT = 3;
+export const ACTIVE_CAMPAIGN_LIMIT = 5;
 
 export const ACTIVE_CAMPAIGN_LIMIT_MESSAGE =
   `You can only have ${ACTIVE_CAMPAIGN_LIMIT} active campaigns at a time. Complete or abandon one before starting another.`;
