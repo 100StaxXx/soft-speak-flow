@@ -1,17 +1,14 @@
 export const COMPANION_PLANNER_OPENER_TEMPLATES = [
-  "What's gucci, fam. Hand me the calendar.",
-  "Let's see what's coming up before the day starts freelancing.",
-  "Show me the board. We're making room for what actually matters.",
-  "Calendar check. We protect the priorities and cut the noise.",
-  "All right, let's sort this day out before it gets disrespectful.",
-  "You bring the goals. I'll help make the time.",
+  "The road's open. What are we setting in motion?",
 ] as const;
 
 export const COMPANION_PLANNER_STARTER_TEMPLATES = [
-  "What do I have coming up?",
-  "Help me make time for what matters most today.",
-  "Help me break down a big goal.",
+  "Show me today's route.",
+  "Help me make room for what matters.",
+  "Help me break a big goal into steps.",
 ] as const;
+
+export const COMPANION_PLANNER_CUSTOM_ENTRY_LABEL = "I'll type my own.";
 
 const DEFAULT_COMPANION_PLANNER_OPENER = COMPANION_PLANNER_OPENER_TEMPLATES[0];
 

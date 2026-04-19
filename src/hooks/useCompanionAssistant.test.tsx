@@ -121,7 +121,7 @@ vi.mock("@/hooks/useCompanionChat", () => ({
 
 vi.mock("@/hooks/useJourneysCompanionConversation", () => ({
   useJourneysCompanionConversation: () => ({
-    greeting: "What's gucci, fam. Hand me the calendar.",
+    greeting: "The road's open. What are we setting in motion?",
     messages: mocks.state.journeysMessages,
     isSubmitting: false,
     submitMessage: mocks.journeysSubmit,
@@ -145,7 +145,7 @@ vi.mock("@/hooks/useJourneysCompanionConversation", () => ({
 
 vi.mock("@/hooks/useCompanionPlanner", () => ({
   useCompanionPlanner: () => ({
-    greeting: "What's gucci, fam. Hand me the calendar.",
+    greeting: "The road's open. What are we setting in motion?",
     messages: mocks.state.plannerMessages,
     questions: mocks.state.plannerQuestions,
     proposals: mocks.state.pendingProposals,
@@ -252,10 +252,10 @@ describe("useCompanionAssistant", () => {
     const { result } = renderHook(() => useCompanionAssistant({ surface: "journeys" }));
 
     await act(async () => {
-      await result.current.submitPlannerMessage("Help me break down a big goal.", "text");
+      await result.current.submitPlannerMessage("Help me break a big goal into steps.", "text");
     });
 
-    expect(mocks.plannerSubmit).toHaveBeenCalledWith("Help me break down a big goal.", "text");
+    expect(mocks.plannerSubmit).toHaveBeenCalledWith("Help me break a big goal into steps.", "text");
     expect(mocks.journeysSubmit).not.toHaveBeenCalled();
     expect(mocks.companionSubmit).not.toHaveBeenCalled();
   });
@@ -266,8 +266,25 @@ describe("useCompanionAssistant", () => {
 
     expect(companion.result.current.greeting).toBe("You made it back.");
     expect(journeys.result.current.greeting).toBe(
-      "What's gucci, fam. Hand me the calendar.",
+      "The road's open. What are we setting in motion?",
     );
+  });
+
+  it("uses the journeys-specific placeholder copy across planner states", () => {
+    const journeys = renderHook(() => useCompanionAssistant({ surface: "journeys" }));
+    expect(journeys.result.current.placeholder).toBe("Tell me the move.");
+
+    mocks.state.plannerQuestions = [
+      {
+        id: "time-of-day",
+        prompt: "When should this happen?",
+        required: true,
+        field: "details",
+      },
+    ];
+
+    const withOpenThread = renderHook(() => useCompanionAssistant({ surface: "journeys" }));
+    expect(withOpenThread.result.current.placeholder).toBe("Tell me the move.");
   });
 
   it("keeps routing follow-up answers to the planner while a planner thread is open", async () => {

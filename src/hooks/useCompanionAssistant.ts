@@ -109,7 +109,9 @@ export function useCompanionAssistant({
   const companionChat = useCompanionChat({
     enabled: surface === "companion" && conversationEnabled,
   });
-  const planner = useCompanionPlanner({ bootstrapGreeting: false });
+  const planner = useCompanionPlanner({
+    bootstrapGreeting: surface === "journeys",
+  });
   const conversation = companionChat;
 
   const [draftInput, setDraftInput] = useState("");
@@ -132,10 +134,10 @@ export function useCompanionAssistant({
   const hasOpenPlannerThread = planner.questions.length > 0
     || planner.pendingProposals.some((proposal) => proposal.status === "pending");
 
-  const activePlaceholder = hasOpenPlannerThread
-    ? "Answer or refine the plan..."
-    : surface === "journeys"
-      ? "Ask what's coming up, talk it through, or tell me what you want to change..."
+  const activePlaceholder = surface === "journeys"
+    ? "Tell me the move."
+    : hasOpenPlannerThread
+      ? "Answer or refine the plan..."
       : "Talk, ask about your schedule, or tell me what to adjust...";
 
   const submitPlannerMessage = useCallback(async (

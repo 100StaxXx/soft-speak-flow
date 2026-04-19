@@ -1,7 +1,10 @@
 import type { ReactNode } from "react";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { COMPANION_PLANNER_STARTER_TEMPLATES } from "@/shared/companionPlannerCopy";
+import {
+  COMPANION_PLANNER_CUSTOM_ENTRY_LABEL,
+  COMPANION_PLANNER_STARTER_TEMPLATES,
+} from "@/shared/companionPlannerCopy";
 
 const mocks = vi.hoisted(() => ({
   assistant: {
@@ -17,12 +20,12 @@ const mocks = vi.hoisted(() => ({
     setShowPermissionDialog: vi.fn(),
   },
   state: {
-    greeting: "What's gucci, fam. Hand me the calendar.",
+    greeting: "The road's open. What are we setting in motion?",
     messages: [
       {
         id: "chat-1",
         role: "assistant" as const,
-        content: "What's gucci, fam. Hand me the calendar.",
+        content: "The road's open. What are we setting in motion?",
         createdAt: "2026-04-18T08:00:00.000Z",
         source: "chat" as const,
       },
@@ -126,7 +129,7 @@ vi.mock("@/hooks/useCompanionAssistant", () => ({
     draftInput: mocks.state.draftInput,
     setDraftInput: mocks.assistant.setDraftInput,
     interimText: "",
-    placeholder: "Pick a starter or tell me what's stuck...",
+    placeholder: "Tell me the move.",
     isSubmitting: false,
     isClassifying: false,
     isRecording: false,
@@ -178,12 +181,12 @@ describe("JourneysCompanionPlannerModal", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useRealTimers();
-    mocks.state.greeting = "What's gucci, fam. Hand me the calendar.";
+    mocks.state.greeting = "The road's open. What are we setting in motion?";
     mocks.state.messages = [
       {
         id: "chat-1",
         role: "assistant",
-        content: "What's gucci, fam. Hand me the calendar.",
+        content: "The road's open. What are we setting in motion?",
         createdAt: "2026-04-18T08:00:00.000Z",
         source: "chat",
       },
@@ -280,8 +283,7 @@ describe("JourneysCompanionPlannerModal", () => {
     expect(screen.getByTestId("journeys-companion-planner-modal")).toBeInTheDocument();
     expect(screen.getByTestId("journeys-companion-planner-portrait-rail")).toBeInTheDocument();
     expect(screen.getByTestId("journeys-companion-planner-dialogue-screen")).toBeInTheDocument();
-    expect(screen.getAllByText("Nova").length).toBeGreaterThanOrEqual(2);
-    expect(screen.getByText("What's gucci, fam. Hand me the calendar.")).toBeInTheDocument();
+    expect(screen.getByText("The road's open. What are we setting in motion?")).toBeInTheDocument();
     await waitFor(() => {
       expect(screen.getByText("I can help you shape that into something concrete when you're ready.")).toBeInTheDocument();
       expect(screen.getByText("What time of day should this live in your schedule?")).toBeInTheDocument();
@@ -290,6 +292,10 @@ describe("JourneysCompanionPlannerModal", () => {
     expect(screen.getByTestId("journeys-companion-planner-inline-proposal")).toBeInTheDocument();
     expect(screen.getByText("Create Focus quest")).toBeInTheDocument();
     expect(screen.queryByText("Create Backup quest")).not.toBeInTheDocument();
+    expect(screen.queryByText("Nova")).not.toBeInTheDocument();
+    expect(screen.queryByText("You")).not.toBeInTheDocument();
+    expect(screen.queryByText("Quick reply")).not.toBeInTheDocument();
+    expect(screen.queryByText("Schedule")).not.toBeInTheDocument();
   });
 
   it("shows the seeded opener and starter templates on first load", async () => {
@@ -297,7 +303,7 @@ describe("JourneysCompanionPlannerModal", () => {
       {
         id: "chat-1",
         role: "assistant",
-        content: "What's gucci, fam. Hand me the calendar.",
+        content: "The road's open. What are we setting in motion?",
         createdAt: "2026-04-18T08:00:00.000Z",
         source: "chat",
       },
@@ -315,21 +321,56 @@ describe("JourneysCompanionPlannerModal", () => {
       />,
     );
 
-    expect(screen.getByText("What's gucci, fam. Hand me the calendar.")).toBeInTheDocument();
+    expect(screen.getByText("The road's open. What are we setting in motion?")).toBeInTheDocument();
     expect(screen.getByTestId("journeys-companion-planner-starter-options")).toBeInTheDocument();
+    expect(screen.getByTestId("journeys-companion-planner-text-input")).toHaveAttribute("placeholder", "Tell me the move.");
+    expect(screen.queryByText("Quick start")).not.toBeInTheDocument();
 
     for (const starter of COMPANION_PLANNER_STARTER_TEMPLATES) {
       expect(screen.getByRole("button", { name: starter })).toBeInTheDocument();
     }
+    expect(screen.getByRole("button", { name: COMPANION_PLANNER_CUSTOM_ENTRY_LABEL })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Help me break down a big goal." }));
+    fireEvent.click(screen.getByRole("button", { name: "Help me break a big goal into steps." }));
 
     await waitFor(() => {
       expect(mocks.assistant.submitPlannerMessage).toHaveBeenCalledWith(
-        "Help me break down a big goal.",
+        "Help me break a big goal into steps.",
         "text",
       );
     });
+    expect(mocks.assistant.submitMessage).not.toHaveBeenCalled();
+  });
+
+  it("focuses the composer when the custom entry option is chosen", () => {
+    mocks.state.messages = [
+      {
+        id: "chat-1",
+        role: "assistant",
+        content: "The road's open. What are we setting in motion?",
+        createdAt: "2026-04-18T08:00:00.000Z",
+        source: "chat",
+      },
+    ];
+    mocks.state.questions = [];
+    mocks.state.proposals = [];
+    mocks.state.pendingProposals = [];
+    mocks.state.readyProposalCount = 0;
+
+    render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        presentation="dialog"
+      />,
+    );
+
+    const composer = screen.getByTestId("journeys-companion-planner-text-input");
+
+    fireEvent.click(screen.getByRole("button", { name: COMPANION_PLANNER_CUSTOM_ENTRY_LABEL }));
+
+    expect(composer).toHaveFocus();
+    expect(mocks.assistant.submitPlannerMessage).not.toHaveBeenCalled();
     expect(mocks.assistant.submitMessage).not.toHaveBeenCalled();
   });
 

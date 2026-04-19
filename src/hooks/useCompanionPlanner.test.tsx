@@ -228,7 +228,7 @@ describe("useCompanionPlanner", () => {
     const { result } = renderHook(() => useCompanionPlanner({ bootstrapGreeting: false }));
 
     await act(async () => {
-      await result.current.submitMessage("What do I have coming up?", "text");
+      await result.current.submitMessage("Show me today's route.", "text");
     });
 
     const request = mocks.invoke.mock.calls[0]?.[1];

@@ -40,7 +40,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { useCompanionAssistant } from "@/hooks/useCompanionAssistant";
 import { useJourneysCompanionVisual } from "@/hooks/useJourneysCompanionVisual";
 import { cn } from "@/lib/utils";
-import { COMPANION_PLANNER_STARTER_TEMPLATES } from "@/shared/companionPlannerCopy";
+import {
+  COMPANION_PLANNER_CUSTOM_ENTRY_LABEL,
+  COMPANION_PLANNER_STARTER_TEMPLATES,
+} from "@/shared/companionPlannerCopy";
 import type {
   CompanionPlannerProposal,
   CompanionPlannerQuestion,
@@ -109,6 +112,7 @@ const JourneysCompanionOverlayBody = memo(() => {
   const typingTargetRef = useRef<{ id: string; content: string } | null>(null);
   const animatedAssistantIdsRef = useRef<Set<string>>(new Set());
   const transcriptEndRef = useRef<HTMLDivElement | null>(null);
+  const composerInputRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
     if (assistant.questions.length === 0) return;
@@ -257,6 +261,14 @@ const JourneysCompanionOverlayBody = memo(() => {
     void assistant.submitPlannerMessage(starter, "text");
   }, [assistant, completeCurrentAssistantLine, typingMessageId]);
 
+  const handleCustomEntry = useCallback(() => {
+    if (typingMessageId) {
+      completeCurrentAssistantLine();
+    }
+
+    composerInputRef.current?.focus();
+  }, [completeCurrentAssistantLine, typingMessageId]);
+
   const handleVoiceToggle = useCallback(() => {
     if (typingMessageId) {
       completeCurrentAssistantLine();
@@ -312,7 +324,7 @@ const JourneysCompanionOverlayBody = memo(() => {
 
       <div className="grid min-h-[28rem] grid-cols-[96px_minmax(0,1fr)] gap-3 p-4 sm:grid-cols-[132px_minmax(0,1fr)] sm:gap-5 sm:p-5">
         <aside
-          className="flex flex-col items-center justify-start gap-3 rounded-[20px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.07),rgba(255,255,255,0.03))] px-2 py-4 sm:px-3"
+          className="flex flex-col items-center justify-center rounded-[20px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.07),rgba(255,255,255,0.03))] px-2 py-4 sm:px-3"
           data-testid="journeys-companion-planner-portrait-rail"
         >
           <div className="relative">
@@ -322,21 +334,6 @@ const JourneysCompanionOverlayBody = memo(() => {
               className="pointer-events-none absolute inset-[-12%] rounded-[24px] bg-[radial-gradient(circle,rgba(125,211,252,0.24),transparent_72%)] blur-xl"
             />
           </div>
-          <div className="w-full rounded-[14px] border border-[#e8d9aa]/25 bg-[linear-gradient(180deg,rgba(255,243,209,0.18),rgba(232,217,170,0.08))] px-2 py-1.5 text-center shadow-[0_10px_24px_-18px_rgba(0,0,0,0.95)]">
-            <p className="truncate text-[10px] font-semibold uppercase tracking-[0.18em] text-[#f5e6b9] sm:text-[11px]">
-              {companionLabel}
-            </p>
-          </div>
-          {assistant.scheduleInsights ? (
-            <div className="w-full rounded-[14px] border border-[#e8d9aa]/25 bg-[rgba(255,255,255,0.08)] px-2 py-2 text-[#f5e6b9]">
-              <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-[#f5e6b9]/75">
-                Schedule
-              </p>
-              <p className="mt-1 text-[11px] leading-4 text-[#f8eed4]">
-                {assistant.scheduleInsights.summary}
-              </p>
-            </div>
-          ) : null}
         </aside>
 
         <div className="flex min-h-0 flex-col">
@@ -371,15 +368,7 @@ const JourneysCompanionOverlayBody = memo(() => {
                     >
                       <p
                         className={cn(
-                          "text-[10px] font-semibold uppercase tracking-[0.16em]",
-                          entry.role === "assistant" ? "text-[#786041]" : "text-[#5c6f93]",
-                        )}
-                      >
-                        {entry.role === "assistant" ? companionLabel : "You"}
-                      </p>
-                      <p
-                        className={cn(
-                          "mt-1 whitespace-pre-wrap text-sm leading-6 sm:text-[0.95rem]",
+                          "whitespace-pre-wrap text-sm leading-6 sm:text-[0.95rem]",
                           entry.role === "assistant" ? "text-[#2f2415]" : "text-[#26406b]",
                         )}
                       >
@@ -400,32 +389,32 @@ const JourneysCompanionOverlayBody = memo(() => {
             >
               <div className="space-y-3">
                 {showStarterQuickReplies ? (
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#6f5738]">
-                      Quick start
-                    </p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {STARTER_QUICK_REPLIES.map((starter) => (
-                        <Button
-                          key={starter}
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          className="border-[#a58d64] bg-[#f5e6c0] text-[#2f2415] hover:bg-[#f0ddb0]"
-                          onClick={() => handleStarterQuickReply(starter)}
-                        >
-                          {starter}
-                        </Button>
-                      ))}
-                    </div>
+                  <div className="flex flex-wrap gap-2">
+                    {STARTER_QUICK_REPLIES.map((starter) => (
+                      <Button
+                        key={starter}
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="border-[#a58d64] bg-[#f5e6c0] text-[#2f2415] hover:bg-[#f0ddb0]"
+                        onClick={() => handleStarterQuickReply(starter)}
+                      >
+                        {starter}
+                      </Button>
+                    ))}
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="border-[#a58d64] bg-[#f5e6c0] text-[#2f2415] hover:bg-[#f0ddb0]"
+                      onClick={handleCustomEntry}
+                    >
+                      {COMPANION_PLANNER_CUSTOM_ENTRY_LABEL}
+                    </Button>
                   </div>
                 ) : null}
                 {activeOptionQuestions.map((question) => (
-                  <div key={question.id}>
-                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#6f5738]">
-                      Quick reply
-                    </p>
-                    <div className="mt-2 flex flex-wrap gap-2">
+                  <div key={question.id} className="flex flex-wrap gap-2">
                       {question.options?.map((option) => (
                         <Button
                           key={`${question.id}-${option}`}
@@ -438,7 +427,6 @@ const JourneysCompanionOverlayBody = memo(() => {
                           {option}
                         </Button>
                       ))}
-                    </div>
                   </div>
                 ))}
               </div>
@@ -536,6 +524,7 @@ const JourneysCompanionOverlayBody = memo(() => {
             </label>
             <Textarea
               id="journeys-companion-chat-input"
+              ref={composerInputRef}
               value={assistant.draftInput}
               onChange={(event) => {
                 assistant.setDraftInput(event.target.value);
