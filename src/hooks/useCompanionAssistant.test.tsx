@@ -121,7 +121,7 @@ vi.mock("@/hooks/useCompanionChat", () => ({
 
 vi.mock("@/hooks/useJourneysCompanionConversation", () => ({
   useJourneysCompanionConversation: () => ({
-    greeting: "I'm here. Ask what's coming up, talk through the day, or tell me what you want to change.",
+    greeting: "What's gucci, fam. Hand me the calendar.",
     messages: mocks.state.journeysMessages,
     isSubmitting: false,
     submitMessage: mocks.journeysSubmit,
@@ -145,7 +145,7 @@ vi.mock("@/hooks/useJourneysCompanionConversation", () => ({
 
 vi.mock("@/hooks/useCompanionPlanner", () => ({
   useCompanionPlanner: () => ({
-    greeting: "I'm here. Ask what's coming up, talk through the day, or tell me what you want to change.",
+    greeting: "What's gucci, fam. Hand me the calendar.",
     messages: mocks.state.plannerMessages,
     questions: mocks.state.plannerQuestions,
     proposals: mocks.state.pendingProposals,
@@ -266,7 +266,7 @@ describe("useCompanionAssistant", () => {
 
     expect(companion.result.current.greeting).toBe("You made it back.");
     expect(journeys.result.current.greeting).toBe(
-      "I'm here. Ask what's coming up, talk through the day, or tell me what you want to change.",
+      "What's gucci, fam. Hand me the calendar.",
     );
   });
 

@@ -17,12 +17,12 @@ const mocks = vi.hoisted(() => ({
     setShowPermissionDialog: vi.fn(),
   },
   state: {
-    greeting: "I'm here. Ask what's coming up, talk through the day, or tell me what you want to change.",
+    greeting: "What's gucci, fam. Hand me the calendar.",
     messages: [
       {
         id: "chat-1",
         role: "assistant" as const,
-        content: "I'm here. Ask what's coming up, talk through the day, or tell me what you want to change.",
+        content: "What's gucci, fam. Hand me the calendar.",
         createdAt: "2026-04-18T08:00:00.000Z",
         source: "chat" as const,
       },
@@ -178,12 +178,12 @@ describe("JourneysCompanionPlannerModal", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useRealTimers();
-    mocks.state.greeting = "I'm here. Ask what's coming up, talk through the day, or tell me what you want to change.";
+    mocks.state.greeting = "What's gucci, fam. Hand me the calendar.";
     mocks.state.messages = [
       {
         id: "chat-1",
         role: "assistant",
-        content: "I'm here. Ask what's coming up, talk through the day, or tell me what you want to change.",
+        content: "What's gucci, fam. Hand me the calendar.",
         createdAt: "2026-04-18T08:00:00.000Z",
         source: "chat",
       },
@@ -281,7 +281,7 @@ describe("JourneysCompanionPlannerModal", () => {
     expect(screen.getByTestId("journeys-companion-planner-portrait-rail")).toBeInTheDocument();
     expect(screen.getByTestId("journeys-companion-planner-dialogue-screen")).toBeInTheDocument();
     expect(screen.getAllByText("Nova").length).toBeGreaterThanOrEqual(2);
-    expect(screen.getByText("I'm here. Ask what's coming up, talk through the day, or tell me what you want to change.")).toBeInTheDocument();
+    expect(screen.getByText("What's gucci, fam. Hand me the calendar.")).toBeInTheDocument();
     await waitFor(() => {
       expect(screen.getByText("I can help you shape that into something concrete when you're ready.")).toBeInTheDocument();
       expect(screen.getByText("What time of day should this live in your schedule?")).toBeInTheDocument();
@@ -297,7 +297,7 @@ describe("JourneysCompanionPlannerModal", () => {
       {
         id: "chat-1",
         role: "assistant",
-        content: "I'm here. Ask what's coming up, talk through the day, or tell me what you want to change.",
+        content: "What's gucci, fam. Hand me the calendar.",
         createdAt: "2026-04-18T08:00:00.000Z",
         source: "chat",
       },
@@ -315,7 +315,7 @@ describe("JourneysCompanionPlannerModal", () => {
       />,
     );
 
-    expect(screen.getByText("I'm here. Ask what's coming up, talk through the day, or tell me what you want to change.")).toBeInTheDocument();
+    expect(screen.getByText("What's gucci, fam. Hand me the calendar.")).toBeInTheDocument();
     expect(screen.getByTestId("journeys-companion-planner-starter-options")).toBeInTheDocument();
 
     for (const starter of COMPANION_PLANNER_STARTER_TEMPLATES) {
