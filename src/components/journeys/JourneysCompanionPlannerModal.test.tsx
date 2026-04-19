@@ -271,7 +271,7 @@ describe("JourneysCompanionPlannerModal", () => {
     });
   });
 
-  it("renders the portrait rail, shared dialogue screen, and inline planning state", async () => {
+  it("renders the messenger header, shared dialogue screen, and inline planning state", async () => {
     render(
       <JourneysCompanionPlannerModal
         open
@@ -281,9 +281,12 @@ describe("JourneysCompanionPlannerModal", () => {
     );
 
     expect(screen.getByTestId("journeys-companion-planner-modal")).toBeInTheDocument();
-    expect(screen.getByTestId("journeys-companion-planner-portrait-rail")).toBeInTheDocument();
+    expect(screen.getByTestId("journeys-companion-planner-chat-header")).toBeInTheDocument();
+    expect(screen.queryByTestId("journeys-companion-planner-portrait-rail")).not.toBeInTheDocument();
     expect(screen.getByTestId("journeys-companion-planner-dialogue-screen")).toBeInTheDocument();
     expect(screen.getByText("The road's open. What are we setting in motion?")).toBeInTheDocument();
+    expect(screen.getByText("Nova")).toBeInTheDocument();
+    expect(screen.getByText("Journeys Thread")).toBeInTheDocument();
     await waitFor(() => {
       expect(screen.getByText("I can help you shape that into something concrete when you're ready.")).toBeInTheDocument();
       expect(screen.getByText("What time of day should this live in your schedule?")).toBeInTheDocument();
@@ -292,7 +295,6 @@ describe("JourneysCompanionPlannerModal", () => {
     expect(screen.getByTestId("journeys-companion-planner-inline-proposal")).toBeInTheDocument();
     expect(screen.getByText("Create Focus quest")).toBeInTheDocument();
     expect(screen.queryByText("Create Backup quest")).not.toBeInTheDocument();
-    expect(screen.queryByText("Nova")).not.toBeInTheDocument();
     expect(screen.queryByText("You")).not.toBeInTheDocument();
     expect(screen.queryByText("Quick reply")).not.toBeInTheDocument();
     expect(screen.queryByText("Schedule")).not.toBeInTheDocument();

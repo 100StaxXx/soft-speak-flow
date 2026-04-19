@@ -227,7 +227,7 @@ const JourneysCompanionOverlayBody = memo(() => {
     if (typeof transcriptEndRef.current?.scrollIntoView === "function") {
       transcriptEndRef.current.scrollIntoView({ behavior: prefersReducedMotion ? "auto" : "smooth" });
     }
-  }, [dialogueEntries, typedAssistantContent, prefersReducedMotion]);
+  }, [dialogueEntries, typedAssistantContent, prefersReducedMotion, assistant.questions, assistant.pendingProposals]);
 
   const handleSubmit = useCallback(() => {
     if (typingMessageId) {
@@ -286,11 +286,11 @@ const JourneysCompanionOverlayBody = memo(() => {
     && assistant.pendingProposals.length === 0;
   const micButtonLabel = assistant.isRecording ? "Stop voice reply" : "Start voice reply";
 
-  const portrait = usesPortraitShell ? (
+  const avatar = usesPortraitShell ? (
     <CompanionPortraitShell
       src={imageUrl}
       element={element}
-      className="h-24 w-24 overflow-hidden rounded-[18px] border border-[#e8d9aa]/35 shadow-[0_18px_32px_-26px_rgba(0,0,0,0.95)] sm:h-32 sm:w-32"
+      className="h-12 w-12 overflow-hidden rounded-full border border-white/[0.15] shadow-[0_18px_32px_-26px_rgba(0,0,0,0.95)]"
     >
       <CompanionImage
         src={imageUrl}
@@ -299,259 +299,284 @@ const JourneysCompanionOverlayBody = memo(() => {
         element={element}
         focalX={focalX}
         focalY={focalY}
-        className="rounded-[18px]"
+        className="rounded-full"
       />
     </CompanionPortraitShell>
   ) : (
-    <div className="h-24 w-24 overflow-hidden rounded-[18px] border border-[#e8d9aa]/35 bg-white/10 shadow-[0_18px_32px_-26px_rgba(0,0,0,0.95)] sm:h-32 sm:w-32">
+    <div className="h-12 w-12 overflow-hidden rounded-full border border-white/[0.15] bg-white/10 shadow-[0_18px_32px_-26px_rgba(0,0,0,0.95)]">
       <CompanionImage
         src={imageUrl}
         alt={companionLabel}
         element={element}
         focalX={focalX}
         focalY={focalY}
-        className="rounded-[18px]"
+        className="rounded-full"
       />
     </div>
   );
 
+  const statusText = assistant.isRecording
+    ? "Listening..."
+    : assistant.isSubmitting || assistant.isClassifying
+      ? "Replying..."
+      : assistant.todayLabel;
+
   return (
     <div
-      className="relative overflow-hidden rounded-[26px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(125,211,252,0.14),transparent_26%),linear-gradient(180deg,rgba(16,20,34,0.97),rgba(8,10,19,0.995))] text-white shadow-[0_34px_90px_-46px_rgba(0,0,0,0.92)]"
+      className="relative overflow-hidden rounded-[28px] border border-white/[0.12] bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.18),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(34,197,94,0.16),transparent_26%),linear-gradient(180deg,rgba(8,15,28,0.82),rgba(6,12,24,0.66))] text-white shadow-[0_34px_90px_-46px_rgba(0,0,0,0.92)] backdrop-blur-2xl"
       data-testid="journeys-companion-planner-modal"
     >
-      <div className="pointer-events-none absolute inset-y-0 left-0 w-24 bg-[radial-gradient(circle_at_top,rgba(250,204,21,0.16),transparent_38%)] sm:w-32" />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),transparent_18%,transparent_82%,rgba(255,255,255,0.04))]" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.14),transparent_62%)]" />
 
-      <div className="grid min-h-[28rem] grid-cols-[96px_minmax(0,1fr)] gap-3 p-4 sm:grid-cols-[132px_minmax(0,1fr)] sm:gap-5 sm:p-5">
-        <aside
-          className="flex flex-col items-center justify-center rounded-[20px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.07),rgba(255,255,255,0.03))] px-2 py-4 sm:px-3"
-          data-testid="journeys-companion-planner-portrait-rail"
+      <div className="relative flex h-[min(82vh,46rem)] min-h-[32rem] flex-col p-4 sm:p-5">
+        <div
+          className="flex items-center gap-3 rounded-[24px] border border-white/[0.12] bg-white/[0.04] px-4 py-3 backdrop-blur-2xl"
+          data-testid="journeys-companion-planner-chat-header"
         >
-          <div className="relative">
-            {portrait}
+          <div className="relative shrink-0">
+            {avatar}
             <span
               aria-hidden="true"
-              className="pointer-events-none absolute inset-[-12%] rounded-[24px] bg-[radial-gradient(circle,rgba(125,211,252,0.24),transparent_72%)] blur-xl"
+              className="pointer-events-none absolute inset-[-18%] rounded-full bg-[radial-gradient(circle,rgba(125,211,252,0.3),transparent_70%)] blur-lg"
             />
           </div>
-        </aside>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold text-white">{companionLabel}</p>
+            <p className="truncate text-xs text-white/[0.58]">{statusText}</p>
+          </div>
+        </div>
 
-        <div className="flex min-h-0 flex-col">
-          <div
-            className={cn(
-              "flex min-h-0 flex-1 flex-col overflow-hidden rounded-[20px] border border-[#8d7b57] bg-[linear-gradient(180deg,rgba(247,235,201,0.98),rgba(233,219,182,0.96))] shadow-[0_24px_60px_-40px_rgba(0,0,0,0.9)]",
-              typingMessageId && "cursor-pointer",
-            )}
-            onClick={() => {
-              if (typingMessageId) {
-                completeCurrentAssistantLine();
-              }
-            }}
-            data-testid="journeys-companion-planner-dialogue-screen"
-          >
-            <ScrollArea className="flex-1">
-              <div className="space-y-3 p-4 sm:p-5" data-testid="journeys-companion-planner-transcript">
-                {dialogueEntries.map((entry) => {
-                  const displayedContent = entry.role === "assistant" && typingMessageId === entry.id
-                    ? typedAssistantContent
-                    : entry.content;
+        <div
+          className={cn(
+            "mt-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-[28px] border border-white/[0.12] bg-white/[0.045] backdrop-blur-2xl shadow-[0_26px_70px_-48px_rgba(0,0,0,0.92)]",
+            typingMessageId && "cursor-pointer",
+          )}
+          onClick={() => {
+            if (typingMessageId) {
+              completeCurrentAssistantLine();
+            }
+          }}
+          data-testid="journeys-companion-planner-dialogue-screen"
+        >
+          <div className="flex items-center justify-between gap-3 border-b border-white/10 bg-white/[0.02] px-4 py-3 text-[11px] uppercase tracking-[0.2em] text-white/[0.45]">
+            <span>Journeys Thread</span>
+            <span>{dialogueEntries.length} messages</span>
+          </div>
 
-                  return (
+          <ScrollArea className="flex-1">
+            <div className="space-y-3 p-4 sm:p-5" data-testid="journeys-companion-planner-transcript">
+              {dialogueEntries.map((entry) => {
+                const displayedContent = entry.role === "assistant" && typingMessageId === entry.id
+                  ? typedAssistantContent
+                  : entry.content;
+
+                return (
+                  <div
+                    key={entry.id}
+                    className={cn(
+                      "flex w-full",
+                      entry.role === "assistant" ? "justify-start" : "justify-end",
+                    )}
+                  >
                     <div
-                      key={entry.id}
                       className={cn(
-                        "max-w-[92%] rounded-[18px] px-4 py-3 shadow-[0_18px_40px_-34px_rgba(0,0,0,0.65)]",
+                        "max-w-[85%] rounded-[22px] border px-4 py-3 shadow-[0_24px_45px_-34px_rgba(0,0,0,0.72)] backdrop-blur-xl sm:max-w-[78%]",
                         entry.role === "assistant"
-                          ? "bg-[#fff6dd] text-left"
-                          : "ml-auto bg-[#dbe9ff] text-right",
+                          ? "rounded-bl-md border-white/[0.12] bg-white/[0.09] text-white/[0.92]"
+                          : "rounded-br-md border-sky-100/[0.15] bg-sky-400/[0.26] text-white",
                       )}
                     >
-                      <p
-                        className={cn(
-                          "whitespace-pre-wrap text-sm leading-6 sm:text-[0.95rem]",
-                          entry.role === "assistant" ? "text-[#2f2415]" : "text-[#26406b]",
-                        )}
-                      >
+                      <p className="whitespace-pre-wrap text-sm leading-6 sm:text-[0.95rem]">
                         {displayedContent || "\u00A0"}
                       </p>
                     </div>
-                  );
-                })}
-                <div ref={transcriptEndRef} />
-              </div>
-            </ScrollArea>
-          </div>
+                  </div>
+                );
+              })}
 
-          {showStarterQuickReplies || activeOptionQuestions.length > 0 ? (
-            <div
-              className="mt-3 rounded-[18px] border border-[#8d7b57]/60 bg-[linear-gradient(180deg,rgba(247,235,201,0.92),rgba(233,219,182,0.9))] px-3 py-3 text-[#2f2415]"
-              data-testid={showStarterQuickReplies ? "journeys-companion-planner-starter-options" : "journeys-companion-planner-inline-options"}
-            >
-              <div className="space-y-3">
-                {showStarterQuickReplies ? (
-                  <div className="flex flex-wrap gap-2">
-                    {STARTER_QUICK_REPLIES.map((starter) => (
+              {activeProposal ? (
+                <div className="flex w-full justify-start">
+                  <div
+                    className="max-w-[88%] rounded-[24px] border border-white/[0.12] bg-white/[0.08] p-4 text-white shadow-[0_24px_45px_-34px_rgba(0,0,0,0.72)] backdrop-blur-xl"
+                    data-testid="journeys-companion-planner-inline-proposal"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/[0.55]">
+                          {proposalKindLabel(activeProposal)}
+                        </p>
+                        <p className="mt-1 text-sm font-semibold text-white">{activeProposal.title}</p>
+                        <p className="mt-1 text-sm text-white/[0.72]">{activeProposal.summary}</p>
+                        {!activeProposal.readyToConfirm && activeProposal.missingFields?.length ? (
+                          <p className="mt-1 text-xs text-amber-100/[0.7]">
+                            Still waiting on: {activeProposal.missingFields.join(", ")}.
+                          </p>
+                        ) : null}
+                      </div>
+                      <Badge variant="outline" className="border-white/[0.15] bg-white/[0.06] text-white/[0.7]">
+                        {activeProposal.status}
+                      </Badge>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
                       <Button
-                        key={starter}
+                        type="button"
+                        size="sm"
+                        className="border-white/10 bg-white/[0.12] text-white hover:bg-white/[0.18]"
+                        onClick={() => assistant.confirmProposal(activeProposal.id)}
+                        disabled={!activeProposal.readyToConfirm}
+                      >
+                        <Check className="mr-2 h-4 w-4" />
+                        Confirm
+                      </Button>
+                      <Button
                         type="button"
                         size="sm"
                         variant="outline"
-                        className="border-[#a58d64] bg-[#f5e6c0] text-[#2f2415] hover:bg-[#f0ddb0]"
-                        onClick={() => handleStarterQuickReply(starter)}
+                        className="border-white/[0.15] bg-white/[0.04] text-white/[0.78] hover:bg-white/[0.08]"
+                        onClick={() => assistant.rejectProposal(activeProposal.id)}
                       >
-                        {starter}
+                        <X className="mr-2 h-4 w-4" />
+                        Reject
                       </Button>
-                    ))}
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      className="border-[#a58d64] bg-[#f5e6c0] text-[#2f2415] hover:bg-[#f0ddb0]"
-                      onClick={handleCustomEntry}
-                    >
-                      {COMPANION_PLANNER_CUSTOM_ENTRY_LABEL}
-                    </Button>
-                  </div>
-                ) : null}
-                {activeOptionQuestions.map((question) => (
-                  <div key={question.id} className="flex flex-wrap gap-2">
-                      {question.options?.map((option) => (
+                      {assistant.readyProposalCount > 1 ? (
                         <Button
-                          key={`${question.id}-${option}`}
                           type="button"
                           size="sm"
                           variant="outline"
-                          className="border-[#a58d64] bg-[#f5e6c0] text-[#2f2415] hover:bg-[#f0ddb0]"
-                          onClick={() => handleQuickReply(option)}
+                          className="border-white/[0.15] bg-white/[0.04] text-white/[0.78] hover:bg-white/[0.08]"
+                          onClick={assistant.confirmAll}
                         >
-                          {option}
+                          Confirm all
                         </Button>
-                      ))}
+                      ) : null}
+                    </div>
                   </div>
-                ))}
-              </div>
-            </div>
-          ) : null}
-
-          {activeProposal ? (
-            <div
-              className="mt-3 rounded-[18px] border border-[#8d7b57]/60 bg-[linear-gradient(180deg,rgba(247,235,201,0.92),rgba(233,219,182,0.9))] px-3 py-3 text-[#2f2415]"
-              data-testid="journeys-companion-planner-inline-proposal"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#6f5738]">
-                    {proposalKindLabel(activeProposal)}
-                  </p>
-                  <p className="mt-1 text-sm font-semibold">{activeProposal.title}</p>
-                  <p className="mt-1 text-sm text-[#5d4a31]">{activeProposal.summary}</p>
-                  {!activeProposal.readyToConfirm && activeProposal.missingFields?.length ? (
-                    <p className="mt-1 text-xs text-[#805b3a]">
-                      Still waiting on: {activeProposal.missingFields.join(", ")}.
-                    </p>
-                  ) : null}
                 </div>
-                <Badge variant="outline" className="border-[#bfa16b] bg-[#f5e6c0] text-[#5d4a31]">
-                  {activeProposal.status}
-                </Badge>
-              </div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={() => assistant.confirmProposal(activeProposal.id)}
-                  disabled={!activeProposal.readyToConfirm}
-                >
-                  <Check className="mr-2 h-4 w-4" />
-                  Confirm
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => assistant.rejectProposal(activeProposal.id)}
-                >
-                  <X className="mr-2 h-4 w-4" />
-                  Reject
-                </Button>
-                {assistant.readyProposalCount > 1 ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={assistant.confirmAll}
-                  >
-                    Confirm all
-                  </Button>
-                ) : null}
-              </div>
-            </div>
-          ) : null}
+              ) : null}
 
-          {assistant.isRecording || assistant.interimText ? (
-            <div
-              className="mt-3 rounded-[18px] border border-[#8d7b57]/60 bg-[linear-gradient(180deg,rgba(247,235,201,0.92),rgba(233,219,182,0.9))] px-3 py-3 text-[#2f2415]"
-              data-testid="journeys-companion-planner-voice-preview"
-            >
-              <AudioReactiveWaveform
-                isActive={assistant.isRecording && !assistant.isAutoStopping}
-                className="justify-start text-[#6f5738]"
+              {showStarterQuickReplies || activeOptionQuestions.length > 0 ? (
+                <div
+                  className="flex w-full justify-start"
+                  data-testid={showStarterQuickReplies ? "journeys-companion-planner-starter-options" : "journeys-companion-planner-inline-options"}
+                >
+                  <div className="max-w-[92%] rounded-[24px] border border-white/[0.12] bg-white/[0.06] p-3 shadow-[0_24px_45px_-34px_rgba(0,0,0,0.72)] backdrop-blur-xl">
+                    <div className="flex flex-wrap gap-2">
+                      {showStarterQuickReplies
+                        ? STARTER_QUICK_REPLIES.map((starter) => (
+                            <Button
+                              key={starter}
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="border-white/[0.12] bg-white/[0.08] text-white hover:bg-white/[0.14]"
+                              onClick={() => handleStarterQuickReply(starter)}
+                            >
+                              {starter}
+                            </Button>
+                          ))
+                        : null}
+                      {showStarterQuickReplies ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="border-white/[0.12] bg-white/[0.08] text-white hover:bg-white/[0.14]"
+                          onClick={handleCustomEntry}
+                        >
+                          {COMPANION_PLANNER_CUSTOM_ENTRY_LABEL}
+                        </Button>
+                      ) : null}
+                      {activeOptionQuestions.flatMap((question) => (
+                        question.options?.map((option) => (
+                          <Button
+                            key={`${question.id}-${option}`}
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="border-white/[0.12] bg-white/[0.08] text-white hover:bg-white/[0.14]"
+                            onClick={() => handleQuickReply(option)}
+                          >
+                            {option}
+                          </Button>
+                        )) ?? []
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
+              <div ref={transcriptEndRef} />
+            </div>
+          </ScrollArea>
+
+          <div className="border-t border-white/10 bg-white/[0.03] p-3 backdrop-blur-2xl">
+            {assistant.isRecording || assistant.interimText ? (
+              <div
+                className="mb-3 rounded-[22px] border border-white/[0.12] bg-white/[0.06] px-3 py-3 text-white/80 shadow-[0_22px_40px_-34px_rgba(0,0,0,0.7)] backdrop-blur-xl"
+                data-testid="journeys-companion-planner-voice-preview"
+              >
+                <AudioReactiveWaveform
+                  isActive={assistant.isRecording && !assistant.isAutoStopping}
+                  className="justify-start text-white/[0.7]"
+                />
+                <p className="mt-2 text-sm text-white/[0.78]">
+                  {assistant.interimText || "Listening for your reply..."}
+                </p>
+              </div>
+            ) : null}
+
+            <div className="flex items-end gap-2 rounded-[24px] border border-white/[0.12] bg-black/10 p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl">
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                className={cn(
+                  "h-11 w-11 shrink-0 rounded-full border border-white/[0.12] bg-white/[0.06] text-white hover:bg-white/[0.12]",
+                  assistant.isRecording && "border-rose-300/[0.35] bg-rose-400/[0.16] text-rose-50",
+                )}
+                onClick={handleVoiceToggle}
+                disabled={!assistant.isVoiceSupported && !assistant.isRecording}
+                aria-label={micButtonLabel}
+                data-testid="journeys-companion-planner-mic-button"
+              >
+                {assistant.isRecording ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+              </Button>
+              <label htmlFor="journeys-companion-chat-input" className="sr-only">
+                Message your companion
+              </label>
+              <Textarea
+                id="journeys-companion-chat-input"
+                ref={composerInputRef}
+                value={assistant.draftInput}
+                onChange={(event) => {
+                  assistant.setDraftInput(event.target.value);
+                }}
+                onKeyDown={handleComposerKeyDown}
+                placeholder={assistant.placeholder}
+                className="min-h-[82px] resize-none rounded-[22px] border-white/10 bg-white/[0.04] text-white placeholder:text-white/[0.38]"
+                data-testid="journeys-companion-planner-text-input"
               />
-              <p className="mt-2 text-sm text-[#5d4a31]">
-                {assistant.interimText || "Listening for your reply..."}
-              </p>
+              <Button
+                type="button"
+                onClick={handleSubmit}
+                disabled={sendDisabled}
+                className="h-11 shrink-0 rounded-full border border-sky-100/10 bg-sky-400/[0.25] px-4 text-white hover:bg-sky-400/[0.35]"
+                data-testid="journeys-companion-planner-send-button"
+              >
+                {assistant.isSubmitting || assistant.isClassifying ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Thinking
+                  </>
+                ) : (
+                  <>
+                    <Send className="mr-2 h-4 w-4" />
+                    Send
+                  </>
+                )}
+              </Button>
             </div>
-          ) : null}
-
-          <div className="mt-3 flex items-center gap-2 rounded-[18px] border border-white/10 bg-black/20 p-2.5">
-            <Button
-              type="button"
-              size="icon"
-              variant="ghost"
-              className={cn(
-                "h-11 w-11 shrink-0 rounded-[14px] border border-white/10 bg-white/5 text-white hover:bg-white/10",
-                assistant.isRecording && "border-rose-300/35 bg-rose-400/15 text-rose-50",
-              )}
-              onClick={handleVoiceToggle}
-              disabled={!assistant.isVoiceSupported && !assistant.isRecording}
-              aria-label={micButtonLabel}
-              data-testid="journeys-companion-planner-mic-button"
-            >
-              {assistant.isRecording ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-            </Button>
-            <label htmlFor="journeys-companion-chat-input" className="sr-only">
-              Message your companion
-            </label>
-            <Textarea
-              id="journeys-companion-chat-input"
-              ref={composerInputRef}
-              value={assistant.draftInput}
-              onChange={(event) => {
-                assistant.setDraftInput(event.target.value);
-              }}
-              onKeyDown={handleComposerKeyDown}
-              placeholder={assistant.placeholder}
-              className="min-h-[88px] resize-none border-white/10 bg-white/5 text-white placeholder:text-white/38"
-              data-testid="journeys-companion-planner-text-input"
-            />
-            <Button
-              type="button"
-              onClick={handleSubmit}
-              disabled={sendDisabled}
-              data-testid="journeys-companion-planner-send-button"
-            >
-              {assistant.isSubmitting || assistant.isClassifying ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Thinking
-                </>
-              ) : (
-                <>
-                  <Send className="mr-2 h-4 w-4" />
-                  Send
-                </>
-              )}
-            </Button>
           </div>
         </div>
       </div>
@@ -579,7 +604,7 @@ export const JourneysCompanionPlannerModal = memo(function JourneysCompanionPlan
   if (presentation === "dialog") {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-4xl border-none bg-transparent p-0 shadow-none">
+        <DialogContent className="max-w-3xl border-none bg-transparent p-0 shadow-none">
           <DialogHeader className="sr-only">
             <DialogTitle>Companion chat</DialogTitle>
             <DialogDescription>
