@@ -1,6 +1,8 @@
 import { useState, type CSSProperties } from "react";
 import { useReducedMotion } from "framer-motion";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   getCompanionElement,
   getCompanionElementAnchorColor,
@@ -12,6 +14,10 @@ import {
   COMPANION_FUTURE_STATE_LABEL,
   isPilotCompanionElement,
 } from "@/config/companionPilotAvailability";
+import {
+  COMPANION_CUSTOM_NAME_MAX_LENGTH,
+  normalizeCompanionCustomName,
+} from "@/lib/companionName";
 import { cn } from "@/lib/utils";
 
 const CHAMBER_ASSET_BASE = "/onboarding/egg-chamber";
@@ -40,6 +46,7 @@ interface OnboardingCompanionSelectionData {
   spiritAnimal: string;
   coreElement: CompanionElementId;
   storyTone: CompanionStoryTone;
+  companionName?: string | null;
 }
 
 export interface OnboardingEggSelectionProps {
@@ -49,6 +56,7 @@ export interface OnboardingEggSelectionProps {
   presetId: CompanionPresetId;
   spiritAnimal: string;
   initialElement?: CompanionElementId | null;
+  initialCompanionName?: string | null;
   onBack?: () => void;
 }
 
@@ -142,10 +150,14 @@ export const OnboardingEggSelection = ({
   presetId,
   spiritAnimal,
   initialElement = null,
+  initialCompanionName = null,
   onBack,
 }: OnboardingEggSelectionProps) => {
   const prefersReducedMotion = useReducedMotion();
   const [selectedElement, setSelectedElement] = useState<CompanionElementId | null>(initialElement);
+  const [customCompanionName, setCustomCompanionName] = useState(initialCompanionName ?? "");
+  const normalizedCustomCompanionName = normalizeCompanionCustomName(customCompanionName);
+  const selectedDisplayName = normalizedCustomCompanionName ?? spiritAnimal;
 
   const handleContinue = () => {
     if (!selectedElement) {
@@ -158,6 +170,7 @@ export const OnboardingEggSelection = ({
       spiritAnimal,
       coreElement: selectedElement,
       storyTone,
+      companionName: normalizedCustomCompanionName,
     });
   };
 
@@ -278,6 +291,36 @@ export const OnboardingEggSelection = ({
               disabled={isLoading || !selectedElement}
               aria-label="Continue"
             />
+          </div>
+        </div>
+        <div className="mx-auto mt-6 w-full max-w-xl px-6">
+          <div className="rounded-3xl border border-white/10 bg-black/25 p-5 backdrop-blur-md">
+            <div className="space-y-2">
+              <Label htmlFor="onboarding-companion-name" className="text-sm font-semibold text-white">
+                Companion Name
+              </Label>
+              <p className="text-sm text-white/70">
+                Optional. Leave blank to keep the generated companion name.
+              </p>
+            </div>
+            <div className="mt-4 space-y-3">
+              <Input
+                id="onboarding-companion-name"
+                value={customCompanionName}
+                onChange={(event) => setCustomCompanionName(event.target.value)}
+                placeholder="Optional custom name"
+                maxLength={COMPANION_CUSTOM_NAME_MAX_LENGTH}
+                className="h-11 border-white/15 bg-black/35 text-white placeholder:text-white/45"
+              />
+              <div className="flex items-center justify-between gap-3 text-xs text-white/60">
+                <span>
+                  {normalizedCustomCompanionName
+                    ? `${selectedDisplayName} will appear right away, even while your companion is still an egg.`
+                    : "Your companion will keep its generated name until you set one."}
+                </span>
+                <span>{customCompanionName.length}/{COMPANION_CUSTOM_NAME_MAX_LENGTH}</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>

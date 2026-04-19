@@ -100,6 +100,63 @@ Deno.test("turns a one-off request into a quest without forcing schedule details
   assertStringIncludes(result.reply, "quest");
 });
 
+Deno.test("uses the cleaned workout title for planner-created quest proposals", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Add workout to today's schedule for 3pm",
+    parsedInput: {
+      text: "workout",
+      scheduledTime: "15:00",
+      scheduledDate: "2026-04-18",
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: "body",
+      newTitle: null,
+    },
+  }));
+
+  assertEquals(result.proposals[0].kind, "create_quest");
+  assertEquals(result.proposals[0].title, "Create workout");
+  assertEquals(
+    (result.proposals[0].payload as { taskText: string }).taskText,
+    "workout",
+  );
+});
+
+Deno.test("asks for a title instead of trusting scaffold-only parsed quest text", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Add workout to today's schedule for 3pm",
+    parsedInput: {
+      text: "Add to 's schedule for",
+      scheduledTime: "15:00",
+      scheduledDate: "2026-04-18",
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: "body",
+      newTitle: null,
+    },
+  }));
+
+  assertEquals(result.proposals[0].kind, "create_quest");
+  assertEquals(result.proposals[0].readyToConfirm, false);
+  assertEquals(result.proposals[0].title, "Create quest");
+  assertEquals(result.followUpQuestions[0]?.field, "details");
+  assertEquals(result.followUpQuestions[0]?.prompt, "What should I call this quest?");
+  assertEquals(
+    (result.proposals[0].payload as { taskText: string }).taskText,
+    "",
+  );
+});
+
 Deno.test("defaults repeated standalone work to a recurring quest", () => {
   const result = buildPlannerResponse(baseInput({
     message: "Write for my newsletter every weekday",

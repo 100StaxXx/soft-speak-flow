@@ -57,6 +57,7 @@ describe("resolveCompanionName", () => {
       companion: {
         id: "comp-1",
         current_stage: 1,
+        companion_name: "Nova",
         cached_creature_name: "Nova",
         spirit_animal: "eagle",
       },
@@ -65,6 +66,23 @@ describe("resolveCompanionName", () => {
     });
 
     expect(value).toBe("Zephyr");
+    expect(mocks.evolutionMaybeSingle).not.toHaveBeenCalled();
+  });
+
+  it("prefers the stored custom companion name before any derived lookup", async () => {
+    const value = await resolveCompanionName({
+      companion: {
+        id: "comp-1a",
+        current_stage: 0,
+        companion_name: "Aster",
+        cached_creature_name: "Mechanical Dragon",
+        spirit_animal: "Mechanical Dragon",
+        preset_id: "mechanicaldragon",
+      },
+      fallback: "companion",
+    });
+
+    expect(value).toBe("Aster");
     expect(mocks.evolutionMaybeSingle).not.toHaveBeenCalled();
   });
 

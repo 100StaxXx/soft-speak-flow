@@ -69,7 +69,7 @@ describe("JourneyBegins", () => {
       expect(screen.getByRole("heading", { name: "Nova" })).toBeInTheDocument();
       expect(screen.queryByRole("heading", { name: "Nova & Kitsune" })).not.toBeInTheDocument();
       expect(
-        screen.getByText(/Your companion egg now carries the spirit of Kitsune, and its true form will awaken as your bond grows\./i),
+        screen.getByText(/Kitsune is already part of your story now\. For a little while longer, they rest inside the shell and wait for the bond that will awaken their form\./i),
       ).toBeInTheDocument();
     } finally {
       vi.useRealTimers();

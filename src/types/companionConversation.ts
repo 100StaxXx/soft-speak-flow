@@ -1,3 +1,11 @@
+import type {
+  PlannerContextCalendarEvent,
+  PlannerContextEpic,
+  PlannerContextTask,
+  PlannerMemoryProfile,
+  PlannerScheduleInsights,
+} from "@/types/companionPlanner";
+
 export type CompanionConversationMode = "talk" | "plan";
 export type CompanionChatSurface = "companion" | "journeys";
 export type CompanionChatSource = "chat" | "plan";
@@ -24,6 +32,21 @@ export interface CompanionConversationProfile {
   lastUpdatedAt: string | null;
 }
 
+export interface CompanionChatJourneysContext {
+  tasks: PlannerContextTask[];
+  inboxTasks: PlannerContextTask[];
+  activeEpics: PlannerContextEpic[];
+  calendarEvents: PlannerContextCalendarEvent[];
+  scheduleInsights?: PlannerScheduleInsights;
+  plannerMemory?: Pick<
+    PlannerMemoryProfile,
+    | "preferredTimeOfDay"
+    | "preferredTimeReason"
+    | "wakeTime"
+    | "windDownTime"
+  >;
+}
+
 export interface CompanionChatRequest {
   message: string;
   conversationHistory: Array<{
@@ -34,6 +57,8 @@ export interface CompanionChatRequest {
   inputMode: CompanionChatInputMode;
   surface?: CompanionChatSurface;
   sessionId?: string;
+  currentDate?: string;
+  journeysContext?: CompanionChatJourneysContext;
 }
 
 export interface CompanionChatResponse {
@@ -41,6 +66,7 @@ export interface CompanionChatResponse {
   speechText: string;
   handoffToPlanner: boolean;
   memoryUpdateApplied: boolean;
+  persistenceReady: boolean;
   sessionId?: string;
 }
 
@@ -53,6 +79,7 @@ export interface CompanionChatThreadSummary {
   createdAt: string;
   lastMessageAt: string;
   archivedAt: string | null;
+  messageCount: number;
 }
 
 export interface CompanionChatThreadMessage {

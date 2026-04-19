@@ -140,6 +140,7 @@ describe("OnboardingEggSelection", () => {
       spiritAnimal: "Kitsune",
       coreElement: "nature",
       storyTone: "epic_adventure",
+      companionName: null,
     });
   });
 
@@ -169,6 +170,35 @@ describe("OnboardingEggSelection", () => {
       spiritAnimal: "Phoenix",
       coreElement: "ice",
       storyTone: "dark_intense",
+      companionName: null,
+    });
+  });
+
+  it("trims and forwards a custom companion name when provided", () => {
+    const onComplete = vi.fn();
+
+    render(
+      <OnboardingEggSelection
+        onComplete={onComplete}
+        storyTone="epic_adventure"
+        presetId="dragon"
+        spiritAnimal="Dragon"
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("Companion Name"), {
+      target: { value: "  Nova  " },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Select Ember element" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    expect(onComplete).toHaveBeenCalledWith({
+      presetId: "dragon",
+      favoriteColor: "#F97316",
+      spiritAnimal: "Dragon",
+      coreElement: "fire",
+      storyTone: "epic_adventure",
+      companionName: "Nova",
     });
   });
 

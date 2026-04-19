@@ -138,7 +138,7 @@ export const JourneyBegins = ({ userName, companionAnimal, onComplete }: Journey
                   transition={{ delay: 0.8 }}
                   className="text-white/60 text-base"
                 >
-                  Your companion egg now carries the spirit of {companionAnimal}, and its true form will awaken as your bond grows.
+                  {companionAnimal} is already part of your story now. For a little while longer, they rest inside the shell and wait for the bond that will awaken their form.
                 </motion.p>
                 
                 <motion.div

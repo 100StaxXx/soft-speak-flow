@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { CompanionCreationLoader } from "./CompanionCreationLoader";
 import { CompanionImage, CompanionPortraitShell } from "./CompanionImage";
 import {
@@ -25,6 +26,10 @@ import {
   getPresetCompanionAssetUrl,
   getUniversalEggAssetUrl,
 } from "@/lib/companionAssetResolver";
+import {
+  COMPANION_CUSTOM_NAME_MAX_LENGTH,
+  normalizeCompanionCustomName,
+} from "@/lib/companionName";
 
 type CompanionPersonalizationMode = "onboarding" | "migration" | "hatch" | "reset";
 
@@ -34,6 +39,7 @@ interface CompanionSelectionData {
   spiritAnimal: string;
   coreElement: CompanionElementId;
   storyTone: CompanionStoryTone;
+  companionName?: string | null;
 }
 
 interface CompanionPersonalizationProps {
@@ -43,6 +49,7 @@ interface CompanionPersonalizationProps {
   layout?: "fullscreen" | "compact";
   initialElement?: CompanionElementId;
   initialStoryTone?: CompanionStoryTone;
+  initialCompanionName?: string | null;
 }
 
 const getPresetPreviewUrl = (presetId: CompanionPresetId, element: CompanionElementId) =>
@@ -63,17 +70,20 @@ export const CompanionPersonalization = ({
   layout = "fullscreen",
   initialElement = "fire",
   initialStoryTone = "epic_adventure",
+  initialCompanionName = null,
 }: CompanionPersonalizationProps) => {
   const [selectedPresetId, setSelectedPresetId] = useState<CompanionPresetId>(getDefaultPilotCompanionPresetId());
   const [selectedElement, setSelectedElement] = useState<CompanionElementId>(
     isPilotCompanionElement(initialElement) ? initialElement : getDefaultPilotCompanionElementId(),
   );
   const [selectedTone, setSelectedTone] = useState<CompanionStoryTone>(initialStoryTone);
+  const [customCompanionName, setCustomCompanionName] = useState(initialCompanionName ?? "");
   const [brokenPreviewKeys, setBrokenPreviewKeys] = useState<Record<string, boolean>>({});
   const isFullscreen = layout === "fullscreen";
   const isResetMode = mode === "reset";
   const isEggSelectionMode = mode === "onboarding" || isResetMode;
   const isHatchMode = mode === "hatch";
+  const normalizedCustomCompanionName = normalizeCompanionCustomName(customCompanionName);
 
   const selectedPreset = useMemo(
     () => COMPANION_PICKER_PRESETS.find((preset) => preset.id === selectedPresetId) ?? COMPANION_PICKER_PRESETS[0],
@@ -91,6 +101,8 @@ export const CompanionPersonalization = ({
     () => getCompanionEggLabel(selectedElement),
     [selectedElement],
   );
+  const selectedDisplayName = normalizedCustomCompanionName
+    ?? (isEggSelectionMode ? selectedEggLabel : selectedPreset.displayName);
 
   if (isLoading) {
     return <CompanionCreationLoader />;
@@ -363,7 +375,7 @@ export const CompanionPersonalization = ({
                         className="h-full w-full"
                       />
                     </div>
-                    <div className="text-sm font-medium text-foreground">{selectedEggLabel}</div>
+                    <div className="text-sm font-medium text-foreground">{selectedDisplayName}</div>
                     <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Creature form revealed at first hatch</div>
                     <p className="text-sm text-foreground/85">{selectedElementMeta.summary}</p>
                     <p className="text-xs text-muted-foreground">
@@ -385,6 +397,35 @@ export const CompanionPersonalization = ({
                     <div className="mt-1 text-xs uppercase tracking-[0.2em] text-muted-foreground">{selectedPreset.role}</div>
                   </>
                 )}
+              </div>
+            </div>
+
+            <div className="rounded-3xl border border-white/10 bg-white/5 p-5 space-y-4">
+              <div className="space-y-1">
+                <Label htmlFor="companion-custom-name" className="text-lg font-semibold text-foreground">
+                  Companion Name
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  Optional. Leave blank to keep the generated companion name.
+                </p>
+              </div>
+              <div className="space-y-3">
+                <Input
+                  id="companion-custom-name"
+                  value={customCompanionName}
+                  onChange={(event) => setCustomCompanionName(event.target.value)}
+                  placeholder="Optional custom name"
+                  maxLength={COMPANION_CUSTOM_NAME_MAX_LENGTH}
+                  className="h-11 border-white/10 bg-black/20 text-foreground placeholder:text-muted-foreground"
+                />
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>
+                    {normalizedCustomCompanionName
+                      ? `${normalizedCustomCompanionName} will appear right away, even before hatch.`
+                      : "Your companion will use its generated name until you set one."}
+                  </span>
+                  <span>{customCompanionName.length}/{COMPANION_CUSTOM_NAME_MAX_LENGTH}</span>
+                </div>
               </div>
             </div>
 
@@ -516,6 +557,7 @@ export const CompanionPersonalization = ({
                 spiritAnimal: isResetMode ? selectedPreset.displayName : isEggSelectionMode ? "Egg" : selectedPreset.displayName,
                 coreElement: selectedElement,
                 storyTone: selectedTone,
+                companionName: normalizedCustomCompanionName,
               })}
               disabled={
                 isLoading

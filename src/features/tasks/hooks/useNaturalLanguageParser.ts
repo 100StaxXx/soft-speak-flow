@@ -123,6 +123,7 @@ const NUMBER_WORD_PATTERN = String.raw`(?:zero|one|two|three|four|five|six|seven
 const DURATION_AMOUNT_PATTERN = String.raw`(?:\d+(?:\.\d+)?|a|an|couple|few|${NUMBER_WORD_PATTERN})`;
 const DURATION_PREFIX_PATTERN = String.raw`(?:for\s+|(?:it(?:'s| is)\s+)?(?:gonna|going\s+to|will|should|can|could)?\s*(?:last|take|run|be)\s+|(?:lasting|taking|running)\s+)?`;
 const DURATION_SUFFIX_GUARD = String.raw`(?!\s*(?:before|early|prior|remind(?:er)?))`;
+const DAY_REFERENCE_PATTERN = String.raw`(?:today|tomorrow)(?:['’]?s)?`;
 
 function parseSpokenNumberToken(value: string): number | null {
   const normalized = value.trim().toLowerCase().replace(/-/g, ' ').replace(/\s+/g, ' ');
@@ -314,8 +315,8 @@ const DATE_PATTERNS = [
   { regex: /\bin\s+(\d+)\s*weeks?\b/i, handler: (m: RegExpMatchArray) => format(addWeeks(new Date(), parseInt(m[1])), 'yyyy-MM-dd') },
   { regex: /\bin\s+(\d+)\s*months?\b/i, handler: (m: RegExpMatchArray) => format(addMonths(new Date(), parseInt(m[1])), 'yyyy-MM-dd') },
   { regex: /\bnext\s+week\b/i, handler: () => format(addWeeks(new Date(), 1), 'yyyy-MM-dd') },
-  { regex: /\btoday\b/i, handler: () => format(new Date(), 'yyyy-MM-dd') },
-  { regex: /\btomorrow\b/i, handler: () => format(addDays(new Date(), 1), 'yyyy-MM-dd') },
+  { regex: /\btoday(?:['’]?s)?\b/i, handler: () => format(new Date(), 'yyyy-MM-dd') },
+  { regex: /\btomorrow(?:['’]?s)?\b/i, handler: () => format(addDays(new Date(), 1), 'yyyy-MM-dd') },
   { regex: /\bday\s*after\s*tomorrow\b/i, handler: () => format(addDays(new Date(), 2), 'yyyy-MM-dd') },
   { regex: /\bthis\s*weekend\b/i, handler: () => format(nextSaturday(new Date()), 'yyyy-MM-dd') },
   { regex: /\b(?:end\s*of\s*week|eow)\b/i, handler: () => format(nextFriday(new Date()), 'yyyy-MM-dd') },
@@ -578,6 +579,12 @@ const CATEGORY_PATTERNS: Array<{ regex: RegExp; category: 'mind' | 'body' | 'sou
   { regex: /\b(?:for\s+)?(?:soul|spirit(?:ual)?|emotional|heart|inner|#soul)\b/i, category: 'soul' },
 ];
 
+const CATEGORY_CLEANUP_PATTERNS = [
+  /#mind\b/i,
+  /#body\b/i,
+  /#soul\b/i,
+];
+
 // Status patterns
 const STATUS_PATTERNS: Array<{ regex: RegExp; paused?: boolean; archived?: boolean }> = [
   { regex: /\b(?:pause|skip|disable|deactivate|turn\s*off|stop)\s*(?:this)?\b/i, paused: true },
@@ -635,8 +642,66 @@ const PLAN_MY_WEEK_PATTERNS = [
   { regex: /\bweek\s*ahead\b/i, trigger: true },
 ];
 
+const PLANNER_WRAPPER_PATTERNS = [
+  new RegExp(
+    String.raw`^\s*(?:please\s+)?(?:add|put|slot)\s+(.+?)\s+(?:to|onto|into|on)\s+(?:(?:my|the)\s+)?(?:(?:${DAY_REFERENCE_PATTERN})\s+)?(?:calendar|schedule)\b`,
+    'i',
+  ),
+];
+
+const TITLE_SCAFFOLD_TOKENS = new Set([
+  'add',
+  'at',
+  'calendar',
+  'for',
+  'in',
+  'into',
+  'my',
+  'on',
+  'onto',
+  'put',
+  's',
+  'schedule',
+  'slot',
+  'the',
+  'to',
+  'today',
+  'todays',
+  'tomorrow',
+  'tomorrows',
+]);
+
+function normalizeTaskTitleCandidate(value: string | null | undefined): string {
+  return (value ?? '')
+    .toLowerCase()
+    .replace(/['’]/g, '')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function isScaffoldOnlyTaskTitle(value: string | null | undefined): boolean {
+  const normalized = normalizeTaskTitleCandidate(value);
+  if (!normalized) return true;
+
+  return normalized
+    .split(' ')
+    .every((token) => TITLE_SCAFFOLD_TOKENS.has(token));
+}
+
+function extractPlannerWrappedTitle(text: string): string | null {
+  for (const pattern of PLANNER_WRAPPER_PATTERNS) {
+    const match = text.match(pattern);
+    const candidate = match?.[1]?.trim();
+    if (candidate) return candidate;
+  }
+
+  return null;
+}
+
 function cleanTaskText(text: string): string {
-  let cleaned = text;
+  const wrappedTitle = extractPlannerWrappedTitle(text);
+  let cleaned = wrappedTitle ?? text;
 
   const patternsToRemove = [
     ...TIME_PATTERNS.map(p => p.regex),
@@ -651,7 +716,7 @@ function cleanTaskText(text: string): string {
     ...REMINDER_PATTERNS.map(p => p.regex),
     ...NOTE_PATTERNS.map(p => p.regex),
     ...CLEAR_PATTERNS.map(p => p.regex),
-    ...CATEGORY_PATTERNS.map(p => p.regex),
+    ...CATEGORY_CLEANUP_PATTERNS,
     ...STATUS_PATTERNS.map(p => p.regex),
     ...BONUS_PATTERNS.map(p => p.regex),
     ...MILESTONE_PATTERNS.map(p => p.regex),
@@ -667,10 +732,15 @@ function cleanTaskText(text: string): string {
   });
 
   cleaned = cleaned
+    .replace(/(^|\s)['’]s\b/gi, ' ')
     .replace(/\s+/g, ' ')
     .replace(/^\s*[-,;:]\s*/, '')
     .replace(/\s*[-,;:]\s*$/, '')
     .trim();
+
+  if (isScaffoldOnlyTaskTitle(cleaned) && wrappedTitle && !isScaffoldOnlyTaskTitle(wrappedTitle)) {
+    return wrappedTitle.replace(/\s+/g, ' ').trim();
+  }
 
   return cleaned;
 }

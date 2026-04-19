@@ -1,9 +1,14 @@
+import type { ReactNode } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   invoke: vi.fn(),
-  invalidateQueries: vi.fn(),
+  historyResponse: {
+    data: [] as unknown[] | null,
+    error: null as unknown,
+  },
   trackInteraction: vi.fn(),
   toggleRecording: vi.fn(),
   requestPermission: vi.fn().mockResolvedValue("granted"),
@@ -12,16 +17,19 @@ const mocks = vi.hoisted(() => ({
   toastError: vi.fn(),
 }));
 
-vi.mock("@tanstack/react-query", () => ({
-  useQuery: () => ({
-    data: [],
-    isSuccess: true,
-    isLoading: false,
-  }),
-  useQueryClient: () => ({
-    invalidateQueries: mocks.invalidateQueries,
-  }),
-}));
+const createHistoryQueryBuilder = () => {
+  const builder = {
+    select: vi.fn(() => builder),
+    eq: vi.fn(() => builder),
+    order: vi.fn(() => builder),
+    limit: vi.fn(async () => ({
+      data: mocks.historyResponse.data,
+      error: mocks.historyResponse.error,
+    })),
+  };
+
+  return builder;
+};
 
 vi.mock("@/components/ui/sonner", () => ({
   toast: {
@@ -74,6 +82,13 @@ vi.mock("@/services/companionSpeech", () => ({
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
+    from: (table: string) => {
+      if (table !== "companion_chats") {
+        throw new Error(`Unexpected table ${table}`);
+      }
+
+      return createHistoryQueryBuilder();
+    },
     functions: {
       invoke: (...args: unknown[]) => mocks.invoke(...args),
     },
@@ -82,9 +97,47 @@ vi.mock("@/integrations/supabase/client", () => ({
 
 import { useCompanionChat } from "./useCompanionChat";
 
+const createWrapper = () => {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+      },
+    },
+  });
+
+  return ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  );
+};
+
 describe("useCompanionChat", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.historyResponse.data = [];
+    mocks.historyResponse.error = null;
+    window.localStorage.removeItem?.("companion-chat-voice-settings-v1");
+    window.localStorage.removeItem?.("companion-chat-spoken-replies-v1");
+  });
+
+  it("seeds the greeting when history bootstrap hits a setup-related schema mismatch", async () => {
+    mocks.historyResponse.data = null;
+    mocks.historyResponse.error = {
+      code: "PGRST204",
+      message: "Could not find the 'surface' column of 'companion_chats' in the schema cache",
+      details: null,
+      hint: null,
+    };
+
+    const { result } = renderHook(() => useCompanionChat(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.messages[0]?.content).toBe("You made it back.");
+    });
+
+    expect(mocks.toastError).not.toHaveBeenCalled();
   });
 
   it("shows a rollout-aware error when the companion chat function is missing", async () => {
@@ -97,7 +150,9 @@ describe("useCompanionChat", () => {
       },
     });
 
-    const { result } = renderHook(() => useCompanionChat());
+    const { result } = renderHook(() => useCompanionChat(), {
+      wrapper: createWrapper(),
+    });
 
     await waitFor(() => {
       expect(result.current.messages[0]?.content).toBe("You made it back.");

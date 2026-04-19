@@ -26,6 +26,7 @@ interface UserCompanion {
   hunger: number | null;
   happiness: number | null;
   spirit_animal: string | null;
+  companion_name: string | null;
   cached_creature_name: string | null;
   core_element: string | null;
   current_stage: number | null;
@@ -1047,7 +1048,8 @@ async function triggerCompanionDeath(supabase: any, companion: UserCompanion, to
   const createdAt = companion.created_at ? new Date(companion.created_at) : new Date();
   const daysTogether = Math.floor((Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
   const companionName =
-    normalizeCompanionName(companion.cached_creature_name)
+    normalizeCompanionName(companion.companion_name)
+    ?? normalizeCompanionName(companion.cached_creature_name)
     ?? normalizeCompanionName(companion.spirit_animal)
     ?? "Companion";
 

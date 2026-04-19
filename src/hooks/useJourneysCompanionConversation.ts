@@ -13,10 +13,12 @@ import {
   getCompanionPlannerOpener,
 } from "@/shared/companionPlannerCopy";
 import type {
+  CompanionChatJourneysContext,
   CompanionChatInputMode,
   CompanionChatRequest,
   CompanionChatResponse,
 } from "@/types/companionConversation";
+import { COMPANION_CHAT_THREAD_HISTORY_DISABLED_REASON } from "@/utils/companionChatSetup";
 import { resolveCompanionChatError } from "@/utils/companionChatErrors";
 
 const MAX_HISTORY_MESSAGES = 8;
@@ -74,6 +76,8 @@ export function useJourneysCompanionConversation() {
   const [isRequestingPermission, setIsRequestingPermission] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pendingPlannerHandoffMessage, setPendingPlannerHandoffMessage] = useState<string | null>(null);
+  const [threadPersistenceReady, setThreadPersistenceReady] = useState(true);
+  const [threadPersistenceUnavailableReason, setThreadPersistenceUnavailableReason] = useState<string | null>(null);
 
   const conversationHistory = useMemo(
     () =>
@@ -128,6 +132,10 @@ export function useJourneysCompanionConversation() {
   const submitMessage = useCallback(async (
     rawMessage: string,
     inputMode: CompanionChatInputMode = "text",
+    options?: {
+      currentDate?: string;
+      journeysContext?: CompanionChatJourneysContext | null;
+    },
   ) => {
     const message = rawMessage.trim();
     if (!message || isSubmitting) return;
@@ -154,6 +162,8 @@ export function useJourneysCompanionConversation() {
           inputMode,
           surface: "journeys",
           sessionId: sessionIdRef.current,
+          currentDate: options?.currentDate,
+          journeysContext: options?.journeysContext ?? undefined,
         } satisfies CompanionChatRequest,
       });
 
@@ -164,11 +174,15 @@ export function useJourneysCompanionConversation() {
         sessionIdRef.current = response.sessionId;
       }
 
+      const nextPersistenceReady = response.persistenceReady !== false;
+      setThreadPersistenceReady(nextPersistenceReady);
+      setThreadPersistenceUnavailableReason(
+        nextPersistenceReady
+          ? null
+          : COMPANION_CHAT_THREAD_HISTORY_DISABLED_REASON,
+      );
+
       if (response.handoffToPlanner) {
-        setMessages((previous) => [
-          ...previous,
-          createMessage("assistant", stripMarkdown(response.reply)),
-        ]);
         setPendingPlannerHandoffMessage(message);
       } else {
         setMessages((previous) => [
@@ -247,6 +261,8 @@ export function useJourneysCompanionConversation() {
     interimText,
     isSubmitting,
     pendingPlannerHandoffMessage,
+    threadPersistenceReady,
+    threadPersistenceUnavailableReason,
     clearPlannerHandoff,
     resetThread,
     hydrateThread,

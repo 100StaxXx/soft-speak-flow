@@ -7,6 +7,7 @@ import {
 
 const createSupabaseMock = (options?: { existingThread?: boolean }) => {
   const companionChatInserts: unknown[] = [];
+  const companionChatCountQueries: Array<{ sessionId: string; surface: string }> = [];
   const threadUpdates: Array<{ sessionId: string; payload: Record<string, unknown> }> = [];
   const threadInserts: unknown[] = [];
 
@@ -17,6 +18,33 @@ const createSupabaseMock = (options?: { existingThread?: boolean }) => {
           insert: async (payload: unknown) => {
             companionChatInserts.push(payload);
             return { error: null };
+          },
+          select: (_selection: string, options: { count?: string; head?: boolean }) => {
+            if (options.count !== "exact" || options.head !== true) {
+              throw new Error("Unexpected companion_chats select options");
+            }
+
+            return {
+              eq: (column: string, sessionId: string) => {
+                if (column !== "session_id") {
+                  throw new Error(`Unexpected companion_chats eq column ${column}`);
+                }
+
+                return {
+                  eq: async (surfaceColumn: string, surface: string) => {
+                    if (surfaceColumn !== "surface") {
+                      throw new Error(`Unexpected companion_chats eq column ${surfaceColumn}`);
+                    }
+
+                    companionChatCountQueries.push({ sessionId, surface });
+                    return {
+                      count: 2,
+                      error: null,
+                    };
+                  },
+                };
+              },
+            };
           },
         };
       }
@@ -50,6 +78,7 @@ const createSupabaseMock = (options?: { existingThread?: boolean }) => {
   return {
     supabase,
     companionChatInserts,
+    companionChatCountQueries,
     threadUpdates,
     threadInserts,
   };
@@ -103,7 +132,14 @@ Deno.test("persistCompanionChatTurn writes journeys chat rows and inserts thread
         preview_text: "Let's take it one step at a time.",
         last_message_at: "2026-04-19T08:30:00.000Z",
         archived_at: null,
+        message_count: 2,
       },
+    },
+  ]);
+  assertEquals(mock.companionChatCountQueries, [
+    {
+      sessionId: "session-1",
+      surface: "journeys",
     },
   ]);
 
@@ -118,6 +154,7 @@ Deno.test("persistCompanionChatTurn writes journeys chat rows and inserts thread
       created_at: "2026-04-19T08:30:00.000Z",
       last_message_at: "2026-04-19T08:30:00.000Z",
       archived_at: null,
+      message_count: 2,
     },
   ]);
 });
@@ -145,6 +182,7 @@ Deno.test("persistCompanionChatTurn updates an existing thread without replacing
         preview_text: "I'm right here.",
         last_message_at: "2026-04-19T08:35:00.000Z",
         archived_at: null,
+        message_count: 2,
       },
     },
   ]);

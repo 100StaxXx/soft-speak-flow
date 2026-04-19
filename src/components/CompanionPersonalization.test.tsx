@@ -120,6 +120,34 @@ describe("CompanionPersonalization", () => {
       spiritAnimal: "Phoenix",
       coreElement: "fire",
       storyTone: "epic_adventure",
+      companionName: null,
+    });
+  });
+
+  it("submits a trimmed custom companion name when provided", () => {
+    const onComplete = vi.fn();
+
+    render(
+      <CompanionPersonalization
+        onComplete={onComplete}
+        mode="hatch"
+        layout="compact"
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("Companion Name"), {
+      target: { value: "  Zephyr  " },
+    });
+    fireEvent.click(screen.getByText("Phoenix").closest("button")!);
+    fireEvent.click(screen.getByRole("button", { name: "Hatch Companion" }));
+
+    expect(onComplete).toHaveBeenCalledWith({
+      presetId: "phoenix",
+      favoriteColor: "#F97316",
+      spiritAnimal: "Phoenix",
+      coreElement: "fire",
+      storyTone: "epic_adventure",
+      companionName: "Zephyr",
     });
   });
 });

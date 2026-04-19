@@ -20,6 +20,7 @@ import {
   getOnboardingGateState,
 } from "@/utils/profileOnboarding";
 import { getCompanionEggLabel, getCompanionPreset } from "@/config/companionCatalog";
+import { getStoredCompanionCustomName } from "@/lib/companionName";
 
 export default function Onboarding() {
   const { user, status, signOut } = useAuth();
@@ -57,6 +58,8 @@ export default function Onboarding() {
       : null;
     const elementalEggLabel = getCompanionEggLabel(companion?.core_element);
     const companionLabel =
+      getStoredCompanionCustomName(companion)
+      || 
       presetName
       || (spiritAnimal.length > 0 && spiritAnimal !== "Egg" ? spiritAnimal : elementalEggLabel);
 

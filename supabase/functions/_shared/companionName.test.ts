@@ -60,6 +60,7 @@ Deno.test("resolveStoredCompanionDisplayName keeps a valid cached proper name", 
   const resolution = resolveStoredCompanionDisplayName({
     id: "comp-1",
     user_id: "user-1",
+    companion_name: null,
     preset_id: "phoenix",
     current_stage: 3,
     cached_creature_name: "Nova",
@@ -73,6 +74,27 @@ Deno.test("resolveStoredCompanionDisplayName keeps a valid cached proper name", 
 
   if (resolution.source !== "cache") {
     throw new Error(`Expected cache source, got ${resolution.source}`);
+  }
+});
+
+Deno.test("resolveStoredCompanionDisplayName prefers a user-owned custom name", () => {
+  const resolution = resolveStoredCompanionDisplayName({
+    id: "comp-1a",
+    user_id: "user-1a",
+    companion_name: "Aster",
+    preset_id: "phoenix",
+    current_stage: 0,
+    cached_creature_name: "Phoenix",
+    spirit_animal: "Phoenix",
+    core_element: "fire",
+  }, []);
+
+  if (resolution.displayName !== "Aster") {
+    throw new Error(`Expected Aster, got ${resolution.displayName}`);
+  }
+
+  if (resolution.source !== "custom") {
+    throw new Error(`Expected custom source, got ${resolution.source}`);
   }
 });
 

@@ -9,6 +9,7 @@ export const NOTIFICATION_COMPANION_FALLBACK_NAME = "Your companion";
 
 export interface NotificationCompanionNameContext {
   displayName?: string | null;
+  customName?: string | null;
   cachedCreatureName?: string | null;
   spiritAnimal?: string | null;
   presetId?: string | null;
@@ -19,6 +20,7 @@ export interface CompanionNameSourceRow {
   user_id: string;
   preset_id?: string | null;
   current_stage: number | null;
+  companion_name?: string | null;
   cached_creature_name: string | null;
   spirit_animal: string | null;
   core_element?: string | null;
@@ -36,7 +38,7 @@ export interface CompanionEvolutionCardNameRow {
 export interface CompanionNameResolution {
   displayName: string;
   recoveredName: string | null;
-  source: "cache" | "current_stage_card" | "earliest_card" | "synthesized";
+  source: "custom" | "cache" | "current_stage_card" | "earliest_card" | "synthesized";
 }
 
 export interface ResolvedCompanionNotificationContext extends NotificationCompanionNameContext {
@@ -77,10 +79,19 @@ export function getNotificationSafeCompanionName(
 export function resolveStoredCompanionDisplayName(
   companion: Pick<
     CompanionNameSourceRow,
-    "id" | "user_id" | "preset_id" | "current_stage" | "cached_creature_name" | "spirit_animal" | "core_element"
+    "id" | "user_id" | "preset_id" | "current_stage" | "companion_name" | "cached_creature_name" | "spirit_animal" | "core_element"
   >,
   evolutionCards: CompanionEvolutionCardNameRow[],
 ): CompanionNameResolution {
+  const customName = normalizeCompanionName(companion.companion_name);
+  if (customName) {
+    return {
+      displayName: customName,
+      recoveredName: null,
+      source: "custom",
+    };
+  }
+
   const companionIdentity = buildCompanionIdentity(companion);
 
   if (isAssignedCompanionName(companion.cached_creature_name, companionIdentity)) {
@@ -204,7 +215,10 @@ export async function resolveNotificationCompanionContext(params: {
   }
 
   let evolutionCards: CompanionEvolutionCardNameRow[] = [];
-  if (!isAssignedCompanionName(companion.cached_creature_name, buildCompanionIdentity(companion))) {
+  if (
+    !normalizeCompanionName(companion.companion_name)
+    && !isAssignedCompanionName(companion.cached_creature_name, buildCompanionIdentity(companion))
+  ) {
     const { data, error } = await supabase
       .from("companion_evolution_cards")
       .select("companion_id, evolution_stage, creature_name")
@@ -229,6 +243,7 @@ export async function resolveNotificationCompanionContext(params: {
 
   return {
     displayName: resolution.displayName,
+    customName: normalizeCompanionName(companion.companion_name),
     cachedCreatureName: resolution.recoveredName ?? companion.cached_creature_name,
     spiritAnimal: companion.spirit_animal,
     presetId: companion.preset_id ?? null,
@@ -251,7 +266,9 @@ export async function resolveNotificationCompanionContextMap(params: {
   }
 
   const unresolvedCompanionIds = latestCompanions
-    .filter((row) => !isAssignedCompanionName(row.cached_creature_name, buildCompanionIdentity(row)))
+    .filter((row) =>
+      !normalizeCompanionName(row.companion_name)
+      && !isAssignedCompanionName(row.cached_creature_name, buildCompanionIdentity(row)))
     .map((row) => row.id);
 
   let evolutionCards: CompanionEvolutionCardNameRow[] = [];
@@ -294,6 +311,7 @@ export async function resolveNotificationCompanionContextMap(params: {
 
     contextMap.set(companion.user_id, {
       displayName: resolution.displayName,
+      customName: normalizeCompanionName(companion.companion_name),
       cachedCreatureName: resolution.recoveredName ?? companion.cached_creature_name,
       spiritAnimal: companion.spirit_animal,
       presetId: companion.preset_id ?? null,

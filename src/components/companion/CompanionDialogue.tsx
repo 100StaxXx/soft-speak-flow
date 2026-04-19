@@ -209,12 +209,14 @@ export const CompanionDialogue = memo(({
       ? health.neglectedImageFocalY ?? companion?.neglected_image_focal_y ?? companion?.current_image_focal_y ?? null
       : bundledCompanionImageFocal?.y ?? companion?.current_image_focal_y ?? null;
   const usesPortraitAvatar = isCompanionPresetImageSource(companionImageUrl);
+  const customCompanionName = normalizeCompanionName(companion?.companion_name);
   const cachedCompanionName =
-    companion && companion.current_stage > 0
+    !customCompanionName && companion && companion.current_stage > 0
       ? normalizeCompanionName(companion.cached_creature_name)
       : null;
   const resolvedCompanionName =
     normalizeCompanionName(companionName)
+    ?? customCompanionName
     ?? cachedCompanionName
     ?? "Companion";
 

@@ -61,6 +61,7 @@ export const ResetCompanionButton = memo(() => {
     spiritAnimal: string;
     coreElement: string;
     storyTone: string;
+    companionName?: string | null;
   }) => {
     await createCompanion.mutateAsync(data);
     setCreateDialogOpen(false);

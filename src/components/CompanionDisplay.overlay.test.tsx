@@ -262,6 +262,7 @@ vi.mock("@/components/CompanionPersonalization", () => ({
 }));
 
 vi.mock("@/lib/companionName", () => ({
+  getStoredCompanionCustomName: vi.fn().mockReturnValue(null),
   resolveCompanionName: vi.fn().mockResolvedValue("Nova"),
 }));
 

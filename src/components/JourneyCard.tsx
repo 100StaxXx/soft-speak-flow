@@ -36,6 +36,7 @@ import { useMilestones } from "@/hooks/useMilestones";
 import { getEpicDaysRemaining, resolveEpicEndDate } from "@/utils/epicDates";
 import { safeClipboardWrite, getClipboardErrorMessage } from "@/utils/clipboard";
 import { buildEpicInviteLink, buildEpicInviteShareText } from "@/utils/epicInviteShare";
+import { getStoredCompanionCustomName } from "@/lib/companionName";
 
 interface Journey {
   id: string;
@@ -133,12 +134,14 @@ export const JourneyCard = memo(function JourneyCard({ journey, onRename, onComp
   const postcardProgress = getProgressToNextPostcard();
   const journeyHealth = getJourneyHealth(journey.start_date, resolvedEndDate ?? undefined);
   const companionDisplayName = useMemo(() => {
+    const customName = getStoredCompanionCustomName(companion);
+    if (customName) return customName;
     if ((companion?.current_stage ?? 0) <= 0) return undefined;
     const rawName = companion?.cached_creature_name;
     if (typeof rawName !== "string") return undefined;
     const trimmed = rawName.trim();
     return trimmed.length > 0 ? trimmed : undefined;
-  }, [companion?.cached_creature_name, companion?.current_stage]);
+  }, [companion]);
   
   const trailMilestones = useMemo(() => {
     if (!milestones || milestones.length === 0) return undefined;

@@ -201,7 +201,7 @@ export function useCompanionWhispers() {
     return () => {
       cancelled = true;
     };
-  }, [companion?.id, companion?.current_stage, companion?.cached_creature_name, companion?.spirit_animal]);
+  }, [companion?.id, companion?.companion_name, companion?.current_stage, companion?.cached_creature_name, companion?.spirit_animal]);
 
   // Check if whisper is allowed based on cooldown and session limit
   const canShowWhisper = useCallback((): boolean => {

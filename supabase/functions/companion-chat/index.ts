@@ -13,7 +13,68 @@ import {
   normalizeCompanionChatSurface,
   surfaceRequiresPremiumAccess,
 } from "./surfaceAccess.ts";
+import { withCompanionChatPersistenceCapability } from "./persistenceCapability.ts";
 import { persistCompanionChatTurn } from "./threadPersistence.ts";
+
+const JourneysTaskSchema = z.object({
+  title: z.string(),
+  taskDate: z.string().nullable(),
+  scheduledTime: z.string().nullable(),
+  completed: z.boolean().nullable().optional(),
+  epicTitle: z.string().nullable().optional(),
+});
+
+const JourneysCalendarEventSchema = z.object({
+  title: z.string(),
+  start: z.string(),
+  end: z.string(),
+  isAllDay: z.boolean(),
+  provider: z.string(),
+});
+
+const JourneysEpicSchema = z.object({
+  title: z.string(),
+  endDate: z.string().nullable(),
+});
+
+const JourneysScheduleInsightsSchema = z.object({
+  horizon: z.enum(["day", "week", "month"]),
+  selectedDate: z.string(),
+  summary: z.string(),
+  dayLoads: z.array(z.object({
+    date: z.string(),
+    totalMinutes: z.number(),
+    taskCount: z.number(),
+    status: z.enum(["open", "balanced", "busy", "overloaded"]),
+  })).default([]),
+  suggestedSlots: z.array(z.object({
+    date: z.string(),
+    time: z.string(),
+    endTime: z.string(),
+    reason: z.string(),
+  })).default([]),
+  moveSuggestions: z.array(z.object({
+    fromDate: z.string(),
+    toDate: z.string(),
+    taskTitle: z.string().nullable().optional(),
+    suggestedTime: z.string().nullable().optional(),
+    reason: z.string(),
+  })).default([]),
+}).optional();
+
+const JourneysContextSchema = z.object({
+  tasks: z.array(JourneysTaskSchema).default([]),
+  inboxTasks: z.array(JourneysTaskSchema).default([]),
+  activeEpics: z.array(JourneysEpicSchema).default([]),
+  calendarEvents: z.array(JourneysCalendarEventSchema).default([]),
+  scheduleInsights: JourneysScheduleInsightsSchema,
+  plannerMemory: z.object({
+    preferredTimeOfDay: z.string().nullable().optional(),
+    preferredTimeReason: z.string().nullable().optional(),
+    wakeTime: z.string().nullable().optional(),
+    windDownTime: z.string().nullable().optional(),
+  }).optional(),
+}).optional();
 
 const RequestSchema = z.object({
   message: z.string().min(1).max(4000).trim(),
@@ -25,9 +86,12 @@ const RequestSchema = z.object({
   inputMode: z.enum(["text", "voice"]),
   surface: z.enum(["companion", "journeys"]).optional().default("companion"),
   sessionId: z.string().min(1).max(200).optional(),
+  currentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  journeysContext: JourneysContextSchema,
 });
 
 type JsonObject = Record<string, unknown>;
+type JourneysContext = z.infer<typeof JourneysContextSchema>;
 
 interface ConversationProfile {
   preferences: string[];
@@ -114,7 +178,18 @@ const startOfTodayUtc = () => {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())).toISOString();
 };
 
-const isPlanningIntent = (message: string) => {
+const SCHEDULE_QUESTION_REGEX =
+  /\b(what do i have scheduled|what(?:'s| is) on my calendar|what do i have today|what do i have tomorrow|when am i free|am i free|where do i have room|what(?:'s| is) open|what openings do i have|show me (?:today|tomorrow|my|this|next|upcoming).*(?:route|schedule)|how does (?:today|tomorrow|my day|my upcoming|this|next|upcoming).*(?:look|feel))\b/i;
+const CHAT_FIRST_DAY_PLANNING_REGEX =
+  /\b(plan(?: my)? (?:day|today|tomorrow|week)|organize(?: my)? (?:day|today|week)|prioritize(?: my)? (?:day|today|week)|help me figure out (?:today|tomorrow|this week)|help me sort out (?:today|tomorrow|this week)|what should i focus on|i feel scattered|i feel overwhelmed|help me break a big goal into steps|help me make room for what matters)\b/i;
+const EXPLICIT_PLANNER_ACTION_REGEX =
+  /\b(schedule|reschedule|move|shift|push|pull|adjust|edit|update|rename|repeat|remind(?: me)?|create|add|set up|turn .+ into|make .+ repeat)\b/i;
+const PLANNER_ENTITY_REGEX =
+  /\b(calendar|campaign|ritual|habit|quest|quests|task|tasks|reminder|reminders)\b/i;
+const CALENDAR_SLOT_REGEX =
+  /\b(today|tomorrow|tonight|this morning|this afternoon|this evening|next week|monday|tuesday|wednesday|thursday|friday|saturday|sunday|morning|afternoon|evening|night|daily|weekly|monthly|weekdays|every day|every week|every month|at \d{1,2}(?::\d{2})?)\b/i;
+
+const isLegacyPlanningIntent = (message: string) => {
   const normalized = message.toLowerCase();
   const strongSignals = [
     "plan my",
@@ -134,6 +209,28 @@ const isPlanningIntent = (message: string) => {
   const matched = strongSignals.filter((signal) => normalized.includes(signal));
   return matched.length >= 2
     || /plan .*day|plan .*week|build .*routine|turn .*into .*campaign|make .*repeat/i.test(message);
+};
+
+const shouldHandoffToPlanner = (
+  message: string,
+  surface: "companion" | "journeys",
+) => {
+  if (surface !== "journeys") {
+    return isLegacyPlanningIntent(message);
+  }
+
+  if (
+    SCHEDULE_QUESTION_REGEX.test(message)
+    || CHAT_FIRST_DAY_PLANNING_REGEX.test(message)
+  ) {
+    return false;
+  }
+
+  return EXPLICIT_PLANNER_ACTION_REGEX.test(message) && (
+    PLANNER_ENTITY_REGEX.test(message)
+    || CALENDAR_SLOT_REGEX.test(message)
+    || /turn .+ into/i.test(message)
+  );
 };
 
 const shouldExtractConversationMemory = (message: string) =>
@@ -252,12 +349,52 @@ async function fetchConversationContext(
   };
 }
 
+const buildJourneysContextSnapshot = (
+  journeysContext: JourneysContext | undefined,
+  currentDate?: string,
+) => {
+  if (!journeysContext) return null;
+
+  return JSON.stringify({
+    currentDate: currentDate ?? null,
+    scheduleSummary: journeysContext.scheduleInsights?.summary ?? null,
+    selectedDate: journeysContext.scheduleInsights?.selectedDate ?? null,
+    tasks: journeysContext.tasks.slice(0, 12).map((task) => ({
+      title: task.title,
+      taskDate: task.taskDate,
+      scheduledTime: task.scheduledTime,
+      completed: task.completed ?? false,
+      epicTitle: task.epicTitle ?? null,
+    })),
+    inboxTasks: journeysContext.inboxTasks.slice(0, 8).map((task) => ({
+      title: task.title,
+      taskDate: task.taskDate,
+      scheduledTime: task.scheduledTime,
+    })),
+    calendarEvents: journeysContext.calendarEvents.slice(0, 10).map((event) => ({
+      title: event.title,
+      start: event.start,
+      end: event.end,
+      isAllDay: event.isAllDay,
+      provider: event.provider,
+    })),
+    activeEpics: journeysContext.activeEpics.slice(0, 8).map((epic) => ({
+      title: epic.title,
+      endDate: epic.endDate,
+    })),
+    plannerMemory: journeysContext.plannerMemory ?? null,
+  }).slice(0, 2400);
+};
+
 const buildSystemPrompt = (context: {
   companion: any;
   learning: any;
   memories: any[];
   voiceTemplate: any;
   enrichedContext: JsonObject | null;
+  surface: "companion" | "journeys";
+  currentDate?: string;
+  journeysContext?: JourneysContext;
 }) => {
   const voiceStyle = typeof context.voiceTemplate?.voice_style === "string"
     ? context.voiceTemplate.voice_style
@@ -272,6 +409,10 @@ const buildSystemPrompt = (context: {
     })
     .join("\n");
   const profile = normalizeProfile(context.learning?.conversation_profile);
+  const journeysSnapshot = buildJourneysContextSnapshot(
+    context.journeysContext,
+    context.currentDate,
+  );
 
   return [
     "You are the user's premium Cosmiq companion.",
@@ -295,6 +436,18 @@ const buildSystemPrompt = (context: {
           commonContexts: context.learning.common_contexts,
           peakProductivityTimes: context.learning.peak_productivity_times,
         }).slice(0, 700)}`
+      : "",
+    context.surface === "journeys"
+      ? "In Journeys, behave like a normal chatbot first. Answer directly and naturally before suggesting any scheduling workflow."
+      : "",
+    context.surface === "journeys"
+      ? "Do not auto-switch into planner mode for schedule reads, day overviews, prioritization, brainstorming, or emotional check-ins."
+      : "",
+    context.surface === "journeys"
+      ? "Only treat it as planner work when the user explicitly wants a concrete saved change, like scheduling, moving, repeating, reminding, renaming, or creating something."
+      : "",
+    journeysSnapshot
+      ? `Journeys schedule context: ${journeysSnapshot}`
       : "",
     "Be concise, emotionally present, and natural.",
     "Keep the performance original. Do not imitate or name any real actor, celebrity, or copyrighted character, even if the user asks.",
@@ -595,7 +748,7 @@ serve(async (req) => {
     }
 
     const existingProfile = normalizeProfile(context.learning?.conversation_profile ?? DEFAULT_PROFILE);
-    const planningIntent = isPlanningIntent(parsed.data.message);
+    const planningIntent = shouldHandoffToPlanner(parsed.data.message, surface);
     const costGuardrails = createCostGuardrailSession({
       supabase: createCostGuardrailSupabaseClient(),
       endpointKey: "companion-chat",
@@ -614,7 +767,9 @@ serve(async (req) => {
     }
 
     let reply = planningIntent
-      ? chooseBridgeReply(parsed.data.message)
+      ? surface === "journeys"
+        ? "Switching into planning for that."
+        : chooseBridgeReply(parsed.data.message)
       : "";
     let profileUpdated = false;
     let memorableMoment: string | null = null;
@@ -623,7 +778,12 @@ serve(async (req) => {
     if (!planningIntent) {
       reply = await generateCompanionReply({
         guardedFetch,
-        systemPrompt: buildSystemPrompt(context),
+        systemPrompt: buildSystemPrompt({
+          ...context,
+          surface,
+          currentDate: parsed.data.currentDate,
+          journeysContext: parsed.data.journeysContext,
+        }),
         conversationHistory: parsed.data.conversationHistory,
         message: parsed.data.message,
       });
@@ -639,20 +799,22 @@ serve(async (req) => {
     shouldRemember = memoryExtraction.shouldRemember
       || /remember this|don't forget/i.test(parsed.data.message.toLowerCase());
 
-    await persistConversation({
-      supabase: protectedRequest.supabase,
-      userId,
-      companionId: parsed.data.companionId,
-      sessionId,
-      surface,
-      message: parsed.data.message,
-      reply,
-      inputMode: parsed.data.inputMode,
-      conversationProfile: memoryExtraction.profile,
-      profileUpdated,
-      memorableMoment,
-      shouldRemember,
-    });
+    const persistenceReady = await withCompanionChatPersistenceCapability(() => (
+      persistConversation({
+        supabase: protectedRequest.supabase,
+        userId,
+        companionId: parsed.data.companionId,
+        sessionId,
+        surface,
+        message: parsed.data.message,
+        reply,
+        inputMode: parsed.data.inputMode,
+        conversationProfile: memoryExtraction.profile,
+        profileUpdated,
+        memorableMoment,
+        shouldRemember,
+      })
+    ));
 
     return new Response(
       JSON.stringify({
@@ -660,6 +822,7 @@ serve(async (req) => {
         speechText: reply,
         handoffToPlanner: planningIntent,
         memoryUpdateApplied: profileUpdated || Boolean(memorableMoment && shouldRemember),
+        persistenceReady,
         sessionId,
       }),
       {

@@ -137,6 +137,10 @@ vi.mock("@/components/DisplayNameSetting", () => ({
   DisplayNameSetting: () => null,
 }));
 
+vi.mock("@/components/CompanionNameSetting", () => ({
+  CompanionNameSetting: () => null,
+}));
+
 vi.mock("@/components/CalendarIntegrationsSettings", () => ({
   CalendarIntegrationsSettings: () => null,
 }));

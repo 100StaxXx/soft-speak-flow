@@ -27,6 +27,7 @@ import { SoundSettings } from "@/components/SoundSettings";
 import { LegalDocumentViewer } from "@/components/LegalDocumentViewer";
 import { QuestBehaviorSettings } from "@/components/QuestBehaviorSettings";
 import { DisplayNameSetting } from "@/components/DisplayNameSetting";
+import { CompanionNameSetting } from "@/components/CompanionNameSetting";
 import { CalendarIntegrationsSettings } from "@/components/CalendarIntegrationsSettings";
 import { CinematicPageBackground } from "@/components/CinematicPageBackground";
 import { PageInfoButton } from "@/components/PageInfoButton";
@@ -454,6 +455,7 @@ const Profile = () => {
 
               {/* Display Name Setting */}
               <DisplayNameSetting />
+              <CompanionNameSetting />
 
               <SubscriptionManagement />
 

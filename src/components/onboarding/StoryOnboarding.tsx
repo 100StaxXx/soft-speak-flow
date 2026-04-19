@@ -37,6 +37,7 @@ import {
   type CompanionStoryTone,
   type CompanionPresetId,
 } from "@/config/companionCatalog";
+import { persistCompanionCustomName } from "@/lib/companionName";
 import {
   filterMentorsByEnergyPreference,
   type EnergyPreference,
@@ -221,6 +222,7 @@ interface StoryOnboardingProps {
     current_stage: number;
     current_xp: number;
     preset_id?: string | null;
+    companion_name?: string | null;
   } | null;
   resumeState?: StoryOnboardingResumeState | null;
   onJourneyCinematicStart?: () => void;
@@ -233,6 +235,7 @@ type CompanionSelectionPreferences = {
   spiritAnimal: string;
   coreElement: string;
   storyTone: string;
+  companionName?: string | null;
 };
 
 type CompanionSetupStatus = "idle" | "pending" | "ready" | "failed";
@@ -668,6 +671,9 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
   }, []);
 
   const getCompanionSelectionDisplayName = useCallback((preferences: CompanionSelectionPreferences) => {
+    if (preferences.companionName?.trim()) {
+      return preferences.companionName.trim();
+    }
     const eggDisplayName = getCompanionEggLabel(preferences.coreElement);
     return preferences.presetId ? preferences.spiritAnimal : eggDisplayName;
   }, []);
@@ -868,6 +874,8 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
           throw companionUpdateError;
         }
 
+        await persistCompanionCustomName(latestCompanion.id, preferences.companionName);
+
         const { data: profile, error: profileError } = await supabase
           .from("profiles")
           .select("onboarding_data")
@@ -916,6 +924,7 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
           spiritAnimal: preferences.spiritAnimal,
           coreElement: preferences.coreElement,
           storyTone: preferences.storyTone,
+          companionName: preferences.companionName,
         });
 
         if (!companionData?.id) {
@@ -970,10 +979,11 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
               companionId: recoveredCompanion.id,
               elapsedMs: Date.now() - startedAt,
             });
+            await persistCompanionCustomName(recoveredCompanion.id, preferences.companionName);
             toast.success("Your companion finished taking shape. Continuing your journey...");
             return await tryFinalizeCompanionOnboarding(
               recoveredCompanion.id,
-              recoveredCompanion.spirit_animal === "Egg"
+              recoveredCompanion.spirit_animal === "Egg" || Boolean(preferences.companionName?.trim())
                 ? selectionDisplayName
                 : recoveredCompanion.spirit_animal || selectionDisplayName,
               true,
@@ -1270,6 +1280,7 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
                 onComplete={handleCompanionComplete}
                 isLoading={isCreatingCompanion}
                 mode="migration"
+                initialCompanionName={existingCompanion?.companion_name ?? null}
               />
             ) : (
               <OnboardingEggSelection

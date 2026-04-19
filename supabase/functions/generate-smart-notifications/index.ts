@@ -35,6 +35,7 @@ interface UserContext {
   zodiac: string | null;
   companion: {
     companionDisplayName: string | null;
+    customName: string | null;
     spiritAnimal: string;
     presetId: string | null;
     currentMood: string;
@@ -167,15 +168,20 @@ const generateNotificationContent = async (
   
   const companionSpecies = context.companion?.spiritAnimal || 'companion';
   const rawCompanionName =
-    typeof context.companion?.companionDisplayName === "string"
-      ? context.companion.companionDisplayName.trim()
+    typeof context.companion?.customName === "string" && context.companion.customName.trim().length > 0
+      ? context.companion.customName.trim()
+      : typeof context.companion?.companionDisplayName === "string"
+        ? context.companion.companionDisplayName.trim()
       : null;
-  const assignedCompanionName = isAssignedCompanionName(rawCompanionName, {
-    spiritAnimal: companionSpecies,
-    presetId: context.companion?.presetId,
-  })
-    ? rawCompanionName
-    : null;
+  const assignedCompanionName =
+    context.companion?.customName
+      ? rawCompanionName
+      : isAssignedCompanionName(rawCompanionName, {
+        spiritAnimal: companionSpecies,
+        presetId: context.companion?.presetId,
+      })
+        ? rawCompanionName
+        : null;
   const hasAssignedCompanionName = Boolean(assignedCompanionName);
   const companionTitleName = assignedCompanionName || NOTIFICATION_COMPANION_FALLBACK_NAME;
   const companionReference = assignedCompanionName || 'your companion';
@@ -545,7 +551,7 @@ serve(async (req) => {
         const [companionRes, mentorRes, checkInRes, horoscopeRes, activityRes] = await Promise.all([
           supabase
             .from('user_companion')
-            .select('id, user_id, preset_id, spirit_animal, core_element, current_mood, current_stage, inactive_days, cached_creature_name')
+            .select('id, user_id, preset_id, spirit_animal, core_element, current_mood, current_stage, inactive_days, companion_name, cached_creature_name')
             .eq('user_id', profile.id)
             .maybeSingle(),
           profile.selected_mentor_id 
@@ -599,6 +605,7 @@ serve(async (req) => {
           zodiac: profile.zodiac,
           companion: companionRes.data ? {
             companionDisplayName: companionContext?.displayName ?? NOTIFICATION_COMPANION_FALLBACK_NAME,
+            customName: companionContext?.customName ?? null,
             spiritAnimal: companionRes.data.spirit_animal,
             presetId: companionRes.data.preset_id ?? null,
             currentMood: companionRes.data.current_mood,

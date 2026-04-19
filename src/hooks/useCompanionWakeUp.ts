@@ -62,7 +62,7 @@ export function useCompanionWakeUp(): WakeUpState {
     return () => {
       cancelled = true;
     };
-  }, [companion?.id, companion?.current_stage, companion?.cached_creature_name, companion?.spirit_animal]);
+  }, [companion?.id, companion?.companion_name, companion?.current_stage, companion?.cached_creature_name, companion?.spirit_animal]);
 
   // Check if we've already shown this celebration
   const getSeenKey = useCallback(() => {

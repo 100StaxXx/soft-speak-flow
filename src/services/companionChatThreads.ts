@@ -48,6 +48,7 @@ const mapThreadSummary = (
   createdAt: row.created_at,
   lastMessageAt: row.last_message_at,
   archivedAt: row.archived_at,
+  messageCount: row.message_count,
 });
 
 const mapThreadMessage = (
@@ -66,6 +67,7 @@ const updateThreadRow = async (
   sessionId: string,
   previewText: string,
   lastMessageAt: string,
+  messageCount: number,
 ) => {
   const { data, error } = await supabase
     .from("companion_chat_threads")
@@ -73,6 +75,7 @@ const updateThreadRow = async (
       preview_text: previewText,
       last_message_at: lastMessageAt,
       archived_at: null,
+      message_count: messageCount,
     })
     .eq("session_id", sessionId)
     .select("session_id")
@@ -91,6 +94,7 @@ const insertThreadRow = async (params: {
   previewText: string;
   createdAt: string;
   lastMessageAt: string;
+  messageCount: number;
 }) => {
   const { error } = await supabase
     .from("companion_chat_threads")
@@ -104,9 +108,24 @@ const insertThreadRow = async (params: {
       created_at: params.createdAt,
       last_message_at: params.lastMessageAt,
       archived_at: null,
+      message_count: params.messageCount,
     });
 
   if (error) throw error;
+};
+
+const loadThreadMessageCount = async (
+  sessionId: string,
+  surface: CompanionChatSurface,
+) => {
+  const { count, error } = await supabase
+    .from("companion_chats")
+    .select("id", { count: "exact", head: true })
+    .eq("session_id", sessionId)
+    .eq("surface", surface);
+
+  if (error) throw error;
+  return count ?? 0;
 };
 
 export const getCompanionChatThreadsQueryKey = (
@@ -135,7 +154,7 @@ export const listCompanionChatThreads = async (
 ) => {
   const { data, error } = await supabase
     .from("companion_chat_threads")
-    .select("session_id, companion_id, surface, title, preview_text, created_at, last_message_at, archived_at")
+    .select("session_id, companion_id, surface, title, preview_text, created_at, last_message_at, archived_at, message_count")
     .eq("companion_id", companionId)
     .eq("surface", surface)
     .order("last_message_at", { ascending: false });
@@ -195,11 +214,16 @@ export const persistCompanionThreadMessages = async (params: {
     ?? lastRow.content;
   const previewText = buildCompanionThreadPreview(lastRow.content);
   const createdAt = normalizedRows[0]?.created_at ?? lastRow.created_at;
+  const messageCount = await loadThreadMessageCount(
+    params.sessionId,
+    params.surface,
+  );
 
   const updatedThread = await updateThreadRow(
     params.sessionId,
     previewText,
     lastRow.created_at,
+    messageCount,
   );
 
   if (updatedThread) return;
@@ -214,6 +238,7 @@ export const persistCompanionThreadMessages = async (params: {
       previewText,
       createdAt,
       lastMessageAt: lastRow.created_at,
+      messageCount,
     });
   } catch (error) {
     const maybePostgrestError = error as { code?: string } | null;
@@ -225,6 +250,7 @@ export const persistCompanionThreadMessages = async (params: {
       params.sessionId,
       previewText,
       lastRow.created_at,
+      messageCount,
     );
   }
 };

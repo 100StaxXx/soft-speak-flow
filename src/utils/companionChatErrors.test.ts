@@ -41,4 +41,30 @@ describe("companionChatErrors", () => {
       }),
     ).toBe("Our servers are temporarily unavailable. Please try again in a moment.");
   });
+
+  it("maps missing thread storage tables to the setup message", () => {
+    expect(
+      toUserFacingCompanionChatError({
+        category: "http",
+        isOffline: false,
+        status: 500,
+        backendMessage: "relation \"companion_chat_threads\" does not exist",
+      }),
+    ).toBe(
+      "Companion Talk is still being set up here. Please try again after the latest database update.",
+    );
+  });
+
+  it("maps missing companion chat rollout columns to the setup message", () => {
+    expect(
+      toUserFacingCompanionChatError({
+        category: "http",
+        isOffline: false,
+        status: 500,
+        backendMessage: "Could not find the 'source' column of 'companion_chats' in the schema cache",
+      }),
+    ).toBe(
+      "Companion Talk is still being set up here. Please try again after the latest database update.",
+    );
+  });
 });

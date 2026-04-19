@@ -9,6 +9,7 @@ export interface CompanionNameSource {
   id: string;
   current_stage: number;
   preset_id?: string | null;
+  companion_name?: string | null;
   cached_creature_name?: string | null;
   spirit_animal?: string | null;
   core_element?: string | null;
@@ -21,6 +22,18 @@ interface ResolveCompanionNameOptions {
   overrideName?: string | null;
   fallback?: CompanionNameFallbackPolicy;
 }
+
+export const COMPANION_CUSTOM_NAME_MAX_LENGTH = 32;
+
+export const normalizeCompanionCustomName = (value: string | null | undefined): string | null => {
+  const trimmed = normalizeCompanionName(value);
+  if (!trimmed) return null;
+  return trimmed.slice(0, COMPANION_CUSTOM_NAME_MAX_LENGTH);
+};
+
+export const getStoredCompanionCustomName = (
+  companion: Pick<CompanionNameSource, "companion_name"> | null | undefined,
+): string | null => normalizeCompanionCustomName(companion?.companion_name);
 
 const resolveFallbackName = (
   fallback: CompanionNameFallbackPolicy,
@@ -44,6 +57,23 @@ const cacheCompanionName = (companionId: string, name: string) => {
     .from("user_companion")
     .update({ cached_creature_name: name })
     .eq("id", companionId);
+};
+
+export const persistCompanionCustomName = async (
+  companionId: string,
+  customName: string | null | undefined,
+) => {
+  const normalizedName = normalizeCompanionCustomName(customName);
+  const { error } = await supabase
+    .from("user_companion")
+    .update({ companion_name: normalizedName })
+    .eq("id", companionId);
+
+  if (error) {
+    throw error;
+  }
+
+  return normalizedName;
 };
 
 const fetchNameForStage = async (companionId: string, stage: number) => {
@@ -82,6 +112,11 @@ export const resolveCompanionName = async ({
 
   if (!companion) {
     return resolveFallbackName(fallback);
+  }
+
+  const customName = getStoredCompanionCustomName(companion);
+  if (customName) {
+    return customName;
   }
 
   const companionIdentity = {

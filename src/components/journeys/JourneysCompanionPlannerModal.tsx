@@ -9,12 +9,12 @@ import {
 } from "react";
 import { formatDistanceToNow } from "date-fns";
 import {
-  Archive,
   Mic,
   MicOff,
   Check,
   ChevronRight,
   Loader2,
+  Plus,
   Send,
   X,
 } from "lucide-react";
@@ -109,8 +109,10 @@ interface JourneysCompanionThreadPickerProps {
   onOpenChange: (open: boolean) => void;
   presentation: JourneysCompanionPlannerModalPresentation;
   activeThread: CompanionChatThreadSummary | null;
-  archivedThreads: CompanionChatThreadSummary[];
+  historyThreads: CompanionChatThreadSummary[];
   isLoading: boolean;
+  canResumeThreads: boolean;
+  emptyStateMessage: string;
   onResumeThread: (sessionId: string) => Promise<void>;
 }
 
@@ -119,8 +121,10 @@ const JourneysCompanionThreadPicker = memo(function JourneysCompanionThreadPicke
   onOpenChange,
   presentation,
   activeThread,
-  archivedThreads,
+  historyThreads,
   isLoading,
+  canResumeThreads,
+  emptyStateMessage,
   onResumeThread,
 }: JourneysCompanionThreadPickerProps) {
   const body = (
@@ -131,7 +135,7 @@ const JourneysCompanionThreadPicker = memo(function JourneysCompanionThreadPicke
       <div className="mb-4 space-y-1">
         <p className="text-sm font-semibold text-white">Thread history</p>
         <p className="text-sm text-white/[0.62]">
-          Archive the current conversation, then jump back into older threads whenever you want.
+          Start a fresh chat anytime, then jump back into past chats whenever you want.
         </p>
       </div>
 
@@ -164,23 +168,29 @@ const JourneysCompanionThreadPicker = memo(function JourneysCompanionThreadPicke
 
         <div className="space-y-2">
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/[0.45]">
-            Archived threads
+            Past chats
           </p>
           {isLoading ? (
             <div className="flex items-center gap-2 rounded-[22px] border border-white/[0.12] bg-white/[0.05] px-4 py-5 text-sm text-white/[0.74]">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Loading thread history...
+              Loading past chats...
             </div>
-          ) : archivedThreads.length > 0 ? (
+          ) : historyThreads.length > 0 ? (
             <div className="space-y-2">
-              {archivedThreads.map((thread) => (
+              {historyThreads.map((thread) => (
                 <button
                   key={thread.sessionId}
                   type="button"
-                  className="flex w-full items-start justify-between gap-3 rounded-[22px] border border-white/[0.12] bg-white/[0.05] px-4 py-4 text-left transition-colors hover:bg-white/[0.09]"
+                  className={cn(
+                    "flex w-full items-start justify-between gap-3 rounded-[22px] border border-white/[0.12] px-4 py-4 text-left transition-colors",
+                    canResumeThreads
+                      ? "bg-white/[0.05] hover:bg-white/[0.09]"
+                      : "cursor-not-allowed bg-white/[0.03] opacity-70",
+                  )}
                   onClick={() => {
                     void onResumeThread(thread.sessionId);
                   }}
+                  disabled={!canResumeThreads}
                   data-testid={`journeys-companion-thread-resume-${thread.sessionId}`}
                 >
                   <div className="min-w-0">
@@ -196,7 +206,7 @@ const JourneysCompanionThreadPicker = memo(function JourneysCompanionThreadPicke
             </div>
           ) : (
             <div className="rounded-[22px] border border-dashed border-white/[0.12] bg-white/[0.03] px-4 py-5 text-sm text-white/[0.62]">
-              Archived threads will show up here after you archive one.
+              {emptyStateMessage}
             </div>
           )}
         </div>
@@ -211,7 +221,7 @@ const JourneysCompanionThreadPicker = memo(function JourneysCompanionThreadPicke
           <DialogHeader className="sr-only">
             <DialogTitle>Companion threads</DialogTitle>
             <DialogDescription>
-              Switch between the current journeys thread and archived companion threads.
+              Switch between the current journeys thread and past chats.
             </DialogDescription>
           </DialogHeader>
           {body}
@@ -226,7 +236,7 @@ const JourneysCompanionThreadPicker = memo(function JourneysCompanionThreadPicke
         <DrawerHeader className="sr-only">
           <DrawerTitle>Companion threads</DrawerTitle>
           <DrawerDescription>
-            Switch between the current journeys thread and archived companion threads.
+            Switch between the current journeys thread and past chats.
           </DrawerDescription>
         </DrawerHeader>
         {body}
@@ -503,22 +513,22 @@ const JourneysCompanionOverlayBody = memo(({
                     variant="outline"
                     className="border-white/[0.15] bg-white/[0.05] text-white/[0.84] hover:bg-white/[0.12]"
                     onClick={() => {
-                      void assistant.archiveCurrentThread();
+                      void assistant.startFreshThread();
                     }}
-                    disabled={!assistant.canArchiveThread || assistant.isLoadingThreads}
-                    data-testid="journeys-companion-archive-button"
+                    disabled={!assistant.canStartFreshThread || assistant.isLoadingThreads}
+                    data-testid="journeys-companion-new-chat-button"
                   >
                     {assistant.isLoadingThreads ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     ) : (
-                      <Archive className="mr-2 h-4 w-4" />
+                      <Plus className="mr-2 h-4 w-4" />
                     )}
-                    Archive
+                    New chat
                   </Button>
                 </span>
               </TooltipTrigger>
               <TooltipContent side="bottom">
-                {assistant.archiveDisabledReason ?? "Archive this thread and start a fresh one."}
+                {assistant.startFreshDisabledReason ?? "Start a fresh chat and keep this one in your past chats."}
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
@@ -537,18 +547,35 @@ const JourneysCompanionOverlayBody = memo(({
           data-testid="journeys-companion-planner-dialogue-screen"
         >
           <div className="flex items-center justify-between gap-3 border-b border-white/10 bg-white/[0.02] px-4 py-3 text-[11px] uppercase tracking-[0.2em] text-white/[0.45]">
-            <button
-              type="button"
-              className="flex min-w-0 items-center gap-2 rounded-full border border-white/[0.12] bg-white/[0.05] px-3 py-1.5 text-left text-[11px] uppercase tracking-[0.2em] text-white/[0.62] transition-colors hover:bg-white/[0.1]"
-              onClick={() => setIsThreadPickerOpen(true)}
-              data-testid="journeys-companion-thread-picker-trigger"
-            >
-              <span className="shrink-0">Journeys Thread</span>
-              <span className="max-w-[10rem] truncate text-white/[0.88] normal-case tracking-normal">
-                {assistant.activeThread?.title ?? "New thread"}
-              </span>
-              <ChevronRight className="h-3.5 w-3.5 shrink-0 text-white/[0.46]" />
-            </button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <button
+                      type="button"
+                      className={cn(
+                        "flex min-w-0 items-center gap-2 rounded-full border border-white/[0.12] px-3 py-1.5 text-left text-[11px] uppercase tracking-[0.2em] text-white/[0.62] transition-colors",
+                        assistant.canOpenThreadPicker
+                          ? "bg-white/[0.05] hover:bg-white/[0.1]"
+                          : "cursor-not-allowed bg-white/[0.03] opacity-70",
+                      )}
+                      onClick={() => setIsThreadPickerOpen(true)}
+                      disabled={!assistant.canOpenThreadPicker || assistant.isLoadingThreads}
+                      data-testid="journeys-companion-thread-picker-trigger"
+                    >
+                      <span className="shrink-0">Journeys Thread</span>
+                      <span className="max-w-[10rem] truncate text-white/[0.88] normal-case tracking-normal">
+                        {assistant.activeThread?.title ?? "New thread"}
+                      </span>
+                      <ChevronRight className="h-3.5 w-3.5 shrink-0 text-white/[0.46]" />
+                    </button>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  {assistant.threadPickerDisabledReason ?? "Switch between the current journeys thread and past chats."}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
             <span>{dialogueEntries.length} messages</span>
           </div>
 
@@ -771,8 +798,10 @@ const JourneysCompanionOverlayBody = memo(({
         onOpenChange={setIsThreadPickerOpen}
         presentation={presentation}
         activeThread={assistant.activeThread}
-        archivedThreads={assistant.archivedThreads}
+        historyThreads={assistant.historyThreads}
         isLoading={assistant.isLoadingThreads}
+        canResumeThreads={assistant.canOpenThreadPicker}
+        emptyStateMessage={assistant.threadHistoryEmptyStateMessage}
         onResumeThread={handleResumeThread}
       />
     </div>

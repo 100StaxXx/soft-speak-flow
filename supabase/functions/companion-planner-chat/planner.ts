@@ -312,11 +312,49 @@ const STOP_WORDS = new Set([
   "an",
 ]);
 
+const TITLE_SCAFFOLD_TOKENS = new Set([
+  "add",
+  "at",
+  "calendar",
+  "for",
+  "in",
+  "into",
+  "my",
+  "on",
+  "onto",
+  "put",
+  "s",
+  "schedule",
+  "slot",
+  "the",
+  "to",
+  "today",
+  "todays",
+  "tomorrow",
+  "tomorrows",
+]);
+
 const normalizeText = (value: string | null | undefined): string =>
   (value ?? "").trim().toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(
     /\s+/g,
     " ",
   ).trim();
+
+const sanitizeProposalTitle = (
+  value: string | null | undefined,
+): string | null => {
+  const trimmed = value?.trim();
+  if (!trimmed) return null;
+
+  const normalized = normalizeText(trimmed);
+  if (!normalized) return null;
+
+  const tokens = normalized.split(" ").filter(Boolean);
+  if (tokens.length === 0) return null;
+  if (tokens.every((token) => TITLE_SCAFFOLD_TOKENS.has(token))) return null;
+
+  return trimmed;
+};
 
 const parseDateKey = (value: string): Date => new Date(`${value}T00:00:00`);
 
@@ -1090,14 +1128,15 @@ const mergeDraft = (
   const cadence = resolveCadence(input.message, parsed).label ?? base.cadence ??
     null;
 
-  const parsedTitle = parsed?.text?.trim() || null;
+  const parsedTitle = sanitizeProposalTitle(parsed?.text);
+  const carriedTitle = sanitizeProposalTitle(base.title);
   const renameTitle = parsed?.newTitle?.trim() ||
     parseRenameTitle(input.message) || null;
 
   const draftTitle = matched.task?.title ??
     matched.ritual?.title ??
-    base.title ??
-    (carryForward ? base.title ?? null : parsedTitle);
+    carriedTitle ??
+    (carryForward ? carriedTitle : parsedTitle);
 
   return {
     ...base,
@@ -1298,9 +1337,9 @@ const buildTimeQuestion = (input: PlannerBuildInput): PlannerQuestion => {
       return question({
         field: "time_of_day",
         prompt:
-          `I found a few open windows: ${slotText}. You usually lean ${preferredTimeOfDay}. Which one fits this best?`,
+          `I found a few open windows: ${slotText}. You usually do well in the ${preferredTimeOfDay}. If you want to place this, pick the one that fits best.`,
         reason: preferredReason
-          ? `You've said ${preferredTimeOfDay} works because ${preferredReason}. I can reuse that rhythm if it still fits.`
+          ? `You've said ${preferredTimeOfDay} tends to work because ${preferredReason}. I can reuse that rhythm if it still fits.`
           : "I want to place this in a real opening instead of guessing.",
         required: true,
         options: slotOptions,
@@ -1310,7 +1349,7 @@ const buildTimeQuestion = (input: PlannerBuildInput): PlannerQuestion => {
     return question({
       field: "time_of_day",
       prompt:
-        `I found a few open windows: ${slotText}. Which one feels right for this?`,
+        `I found a few open windows: ${slotText}. If you want to put this on the calendar, pick the one that fits best.`,
       reason: suggestedSlots[0]?.reason ??
         "I want to place this in a real opening instead of guessing.",
       required: true,
@@ -1322,7 +1361,7 @@ const buildTimeQuestion = (input: PlannerBuildInput): PlannerQuestion => {
     return question({
       field: "time_of_day",
       prompt:
-        `You usually prefer ${preferredTimeOfDay} for this kind of work. Want me to place it there again, or shift it?`,
+        `You usually prefer the ${preferredTimeOfDay} for this kind of work. Want me to place it there again, or use a different part of the day?`,
       reason: preferredReason
         ? `You've told me ${preferredTimeOfDay} works because ${preferredReason}.`
         : "I'll use that pattern unless this one needs a different rhythm.",
@@ -1333,7 +1372,7 @@ const buildTimeQuestion = (input: PlannerBuildInput): PlannerQuestion => {
 
   return question({
     field: "time_of_day",
-    prompt: "What time of day should this live in your schedule?",
+    prompt: "If we're putting this on the calendar, what time of day fits best?",
     reason:
       "I want to place it where you're actually likely to follow through.",
     required: true,
@@ -1369,6 +1408,39 @@ const buildBalanceQuestion = (
   });
 };
 
+const buildTitleClarificationQuestion = (
+  kind: PlannerProposalKind,
+): PlannerQuestion | null => {
+  if (kind === "create_quest") {
+    return question({
+      field: "details",
+      prompt: "What should I call this quest?",
+      reason: "I don't want to save it with a broken or placeholder title.",
+      required: true,
+    });
+  }
+
+  if (kind === "create_ritual") {
+    return question({
+      field: "details",
+      prompt: "What should I call this ritual?",
+      reason: "I don't want to save it with a broken or placeholder title.",
+      required: true,
+    });
+  }
+
+  if (kind === "create_campaign") {
+    return question({
+      field: "details",
+      prompt: "What should I call this campaign?",
+      reason: "I don't want to save it with a broken or placeholder title.",
+      required: true,
+    });
+  }
+
+  return null;
+};
+
 const buildFollowUpQuestions = (
   input: PlannerBuildInput,
   kind: PlannerProposalKind,
@@ -1390,6 +1462,11 @@ const buildFollowUpQuestions = (
     !input.parsedInput?.scheduledTime && !explicitTimeOfDay;
   const shouldConfirmLearnedReason = !carryForwardAnswer && !explicitTimeReason;
   const askTimingQuestions = shouldAskTimingQuestions(input, kind);
+  const titleQuestion = buildTitleClarificationQuestion(kind);
+
+  if (titleQuestion && !sanitizeProposalTitle(draft.title)) {
+    return [titleQuestion];
+  }
 
   if (askTimingQuestions && (!effectiveTime || shouldConfirmLearnedTime)) {
     questions.push(buildTimeQuestion(input));
@@ -1399,8 +1476,8 @@ const buildFollowUpQuestions = (
     questions.push(question({
       field: "time_reason",
       prompt: input.plannerContext.plannerMemory?.preferredTimeReason
-        ? `Why does this timing work today? I know you've previously said ${input.plannerContext.plannerMemory.preferredTimeReason}.`
-        : "Why does that time work for you?",
+        ? `What makes this timing the right fit today? I know you've previously said ${input.plannerContext.plannerMemory.preferredTimeReason}.`
+        : "What makes that timing a good fit?",
       reason:
         "I'll reuse your reasoning when I suggest future timing and reminders.",
       required: true,
@@ -1491,8 +1568,9 @@ const buildQuestProposal = (
     scheduledTime,
     draft.reminderMinutesBefore ?? null,
   );
-  const title = matchedTask?.title ?? draft.title ?? input.parsedInput?.text ??
-    input.message.trim();
+  const title = matchedTask?.title ??
+    sanitizeProposalTitle(draft.title) ??
+    sanitizeProposalTitle(input.parsedInput?.text);
 
   if (kind === "update_quest" && matchedTask) {
     const updates = stripUndefined({
@@ -1538,19 +1616,21 @@ const buildQuestProposal = (
   return {
     id: createId(),
     kind,
-    title: `Create ${title}`,
-    summary: cadence.recurrencePattern
+    title: title ? `Create ${title}` : "Create quest",
+    summary: title
+      ? cadence.recurrencePattern
       ? `Create a recurring quest for "${title}"${
         draft.endDate ? ` until ${draft.endDate}` : ""
       }.`
       : `Create a quest for "${title}"${
         scheduledTime ? ` at ${scheduledTime}` : ""
-      }.`,
+      }.`
+      : "I need the quest title before I can save this.",
     reasoning: cadence.recurrencePattern
       ? "This is repeated work, so I'm treating it as a recurring quest by default."
       : "This looks like a one-off or short-lived action, so it fits best as a quest.",
     payload: {
-      taskText: title,
+      taskText: title ?? "",
       difficulty: input.plannerContext.aiSignals?.preferredDifficulty ??
         "medium",
       taskDate: defaultQuestDate(input, draft),
@@ -1588,7 +1668,8 @@ const buildCampaignProposal = (
   );
   const renamedTitle = input.parsedInput?.newTitle ??
     parseRenameTitle(input.message);
-  const title = draft.title ?? input.parsedInput?.text ?? input.message.trim();
+  const title = sanitizeProposalTitle(draft.title) ??
+    sanitizeProposalTitle(input.parsedInput?.text);
   const targetDays = input.classificationHint?.suggestedDuration ??
     input.plannerContext.aiSignals?.preferredEpicDuration ??
     30;
@@ -1614,17 +1695,18 @@ const buildCampaignProposal = (
   return {
     id: createId(),
     kind: "create_campaign",
-    title: `Create ${title}`,
-    summary:
-      `Create a campaign for "${title}" with a starter ritual so it becomes actionable right away.`,
+    title: title ? `Create ${title}` : "Create campaign",
+    summary: title
+      ? `Create a campaign for "${title}" with a starter ritual so it becomes actionable right away.`
+      : "I need the campaign title before I can save this.",
     reasoning:
       "This feels like a multi-step outcome that belongs in a campaign rather than a single quest.",
     payload: {
-      title,
+      title: title ?? "",
       target_days: targetDays,
       habits: [
         {
-          title: `Work on ${title}`,
+          title: title ? `Work on ${title}` : "Starter ritual",
           difficulty: input.plannerContext.aiSignals?.preferredDifficulty ??
             "medium",
           frequency: cadence.habitFrequency ??
@@ -1658,8 +1740,9 @@ const buildRitualProposal = (
     scheduledTime,
     draft.reminderMinutesBefore ?? null,
   );
-  const title = matchedRitual?.title ?? draft.title ??
-    input.parsedInput?.text ?? input.message.trim();
+  const title = matchedRitual?.title ??
+    sanitizeProposalTitle(draft.title) ??
+    sanitizeProposalTitle(input.parsedInput?.text);
   const epicId = draft.epicId ?? matchedRitual?.epicId ?? null;
   const epicTitle = draft.epicTitle ?? matchedRitual?.epicTitle ??
     "your campaign";
@@ -1697,13 +1780,15 @@ const buildRitualProposal = (
   return {
     id: createId(),
     kind: "create_ritual",
-    title: `Add ${title}`,
-    summary: `Add "${title}" as a ritual inside ${epicTitle}.`,
+    title: title ? `Add ${title}` : "Add ritual",
+    summary: title
+      ? `Add "${title}" as a ritual inside ${epicTitle}.`
+      : `I need the ritual title before I can add it inside ${epicTitle}.`,
     reasoning:
       "This repeat work seems tied to a bigger goal, so it belongs as a campaign ritual.",
     payload: {
       epicId,
-      title,
+      title: title ?? "",
       difficulty: input.plannerContext.aiSignals?.preferredDifficulty ??
         "medium",
       frequency: cadence.habitFrequency ??

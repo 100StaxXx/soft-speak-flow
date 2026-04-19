@@ -291,6 +291,45 @@ describe("Onboarding route guard", () => {
     expect(mocks.profilesUpdateMock).not.toHaveBeenCalled();
   });
 
+  it("prefers a stored custom companion name during journey-begins recovery", () => {
+    mocks.profile = {
+      onboarding_completed: true,
+      selected_mentor_id: "mentor-1",
+      onboarding_step: "journey-begins",
+      onboarding_data: {
+        userName: "Nova",
+      },
+    };
+    mocks.companion = {
+      id: "companion-1",
+      preset_id: "dragon",
+      current_stage: 0,
+      core_element: "ice",
+      spirit_animal: "Dragon",
+      companion_name: "Lyra",
+      cached_creature_name: "Frostbite",
+    } as {
+      id: string;
+      preset_id: string;
+      current_stage: number;
+      core_element: string;
+      spirit_animal: string;
+      companion_name: string;
+      cached_creature_name: string | null;
+    };
+
+    renderOnboarding();
+
+    expect(screen.getByText("StoryOnboarding")).toBeInTheDocument();
+    expect(mocks.storyOnboardingProps).toMatchObject({
+      resumeState: {
+        stage: "journey-begins",
+        userName: "Nova",
+        companionLabel: "Lyra",
+      },
+    });
+  });
+
   it("starts reset mode when progression reset is required", () => {
     mocks.profile = {
       onboarding_completed: true,

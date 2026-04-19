@@ -1203,6 +1203,7 @@ export function useCompanionPlanner({
   return {
     greeting: plannerGreeting,
     sessionId: sessionIdRef.current,
+    currentDate: todayIso,
     tonePack,
     setTonePack,
     horizon,
@@ -1235,6 +1236,7 @@ export function useCompanionPlanner({
     rejectProposal: handleRejectProposal,
     confirmAll: handleConfirmAll,
     sessionState,
+    plannerContext,
     plannerMemory,
     scheduleInsights,
     todayLabel: format(today, "EEEE, MMMM d"),

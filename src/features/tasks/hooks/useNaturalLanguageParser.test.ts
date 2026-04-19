@@ -106,3 +106,56 @@ describe("parseNaturalLanguage duration parsing", () => {
     }));
   });
 });
+
+describe("parseNaturalLanguage title preservation", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-19T09:00:00"));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("extracts the quest title from add-to-schedule phrasing without losing workout", () => {
+    const parsed = parseNaturalLanguage("Add workout to today's schedule for 3pm");
+
+    expect(parsed).toEqual(expect.objectContaining({
+      text: "workout",
+      category: "body",
+      scheduledDate: "2026-04-19",
+      scheduledTime: "15:00",
+    }));
+  });
+
+  it("keeps workout as the visible title for direct scheduling phrases", () => {
+    const parsed = parseNaturalLanguage("workout at 3pm today");
+
+    expect(parsed).toEqual(expect.objectContaining({
+      text: "workout",
+      category: "body",
+      scheduledDate: "2026-04-19",
+      scheduledTime: "15:00",
+    }));
+  });
+
+  it("keeps exercise as the visible title while still inferring body category", () => {
+    const parsed = parseNaturalLanguage("exercise tomorrow");
+
+    expect(parsed).toEqual(expect.objectContaining({
+      text: "exercise",
+      category: "body",
+      scheduledDate: "2026-04-20",
+    }));
+  });
+
+  it("preserves the entered body title words instead of stripping them as category metadata", () => {
+    const parsed = parseNaturalLanguage("body workout at 3pm");
+
+    expect(parsed).toEqual(expect.objectContaining({
+      text: "body workout",
+      category: "body",
+      scheduledTime: "15:00",
+    }));
+  });
+});

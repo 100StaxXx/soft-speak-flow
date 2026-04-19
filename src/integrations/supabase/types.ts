@@ -1701,6 +1701,7 @@ export type Database = {
           companion_id: string
           created_at: string
           last_message_at: string
+          message_count: number
           preview_text: string
           session_id: string
           surface: string
@@ -1712,6 +1713,7 @@ export type Database = {
           companion_id: string
           created_at?: string
           last_message_at?: string
+          message_count?: number
           preview_text: string
           session_id: string
           surface: string
@@ -1723,6 +1725,7 @@ export type Database = {
           companion_id?: string
           created_at?: string
           last_message_at?: string
+          message_count?: number
           preview_text?: string
           session_id?: string
           surface?: string
@@ -7222,6 +7225,7 @@ export type Database = {
           bond_level: number | null
           bond_portrait_urls: Json | null
           cached_creature_name: string | null
+          companion_name: string | null
           care_balance: number | null
           care_consistency: number | null
           care_intent: number | null
@@ -7299,6 +7303,7 @@ export type Database = {
           bond_level?: number | null
           bond_portrait_urls?: Json | null
           cached_creature_name?: string | null
+          companion_name?: string | null
           care_balance?: number | null
           care_consistency?: number | null
           care_intent?: number | null
@@ -7376,6 +7381,7 @@ export type Database = {
           bond_level?: number | null
           bond_portrait_urls?: Json | null
           cached_creature_name?: string | null
+          companion_name?: string | null
           care_balance?: number | null
           care_consistency?: number | null
           care_intent?: number | null

@@ -37,6 +37,7 @@ import {
   getProgressionThreshold,
   resolveProgressionLevelFromXp,
 } from "@/config/progression";
+import { persistCompanionCustomName } from "@/lib/companionName";
 
 export interface Companion {
   id: string;
@@ -59,6 +60,7 @@ export interface Companion {
   dormant_image_focal_y?: number | null;
   eye_color?: string;
   fur_color?: string;
+  companion_name?: string | null;
   cached_creature_name?: string | null;
   // New 6-stat system
   vitality?: number;
@@ -881,6 +883,7 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
       spiritAnimal: string;
       coreElement: string;
       storyTone: string;
+      companionName?: string | null;
     }) => {
       const creationStartedAt = Date.now();
       if (!user) throw new Error("Not authenticated");
@@ -1095,6 +1098,10 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
           });
         }
 
+        if (Object.prototype.hasOwnProperty.call(data, "companionName")) {
+          await persistCompanionCustomName(companionData.id, data.companionName);
+        }
+
         logger.info("Companion creation completed", {
           userId: user.id,
           presetId: data.presetId ?? null,
@@ -1126,13 +1133,16 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
   });
 
   const hatchCompanion = useMutation({
-    mutationFn: async ({
-      presetId,
-      companionSnapshot,
-    }: {
+    mutationFn: async (input: {
       presetId?: string | null;
+      companionName?: string | null;
       companionSnapshot?: Companion | null;
     }): Promise<HatchCompanionMutationResult> => {
+      const {
+        presetId,
+        companionName,
+        companionSnapshot,
+      } = input;
       const companionToUse = companionSnapshot ?? companion;
 
       if (!user || !companionToUse) {
@@ -1194,6 +1204,10 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
       const hatchResult = result.data?.[0] ?? null;
       if (!hatchResult) {
         throw new Error("Hatch completed without returning companion data.");
+      }
+
+      if (Object.prototype.hasOwnProperty.call(input, "companionName")) {
+        await persistCompanionCustomName(companionToUse.id, companionName);
       }
 
       const generateStageOneArtifacts = async () => {

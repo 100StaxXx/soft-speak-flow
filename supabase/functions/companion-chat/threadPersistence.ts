@@ -29,6 +29,7 @@ const updateThreadRow = async (
   sessionId: string,
   previewText: string,
   lastMessageAt: string,
+  messageCount: number,
 ) => {
   const { data, error } = await supabase
     .from("companion_chat_threads")
@@ -36,6 +37,7 @@ const updateThreadRow = async (
       preview_text: previewText,
       last_message_at: lastMessageAt,
       archived_at: null,
+      message_count: messageCount,
     })
     .eq("session_id", sessionId)
     .select("session_id")
@@ -55,6 +57,7 @@ const insertThreadRow = async (params: {
   previewText: string;
   createdAt: string;
   lastMessageAt: string;
+  messageCount: number;
 }) => {
   const { error } = await params.supabase
     .from("companion_chat_threads")
@@ -68,9 +71,25 @@ const insertThreadRow = async (params: {
       created_at: params.createdAt,
       last_message_at: params.lastMessageAt,
       archived_at: null,
+      message_count: params.messageCount,
     });
 
   if (error) throw error;
+};
+
+const loadThreadMessageCount = async (
+  supabase: any,
+  sessionId: string,
+  surface: CompanionChatSurface,
+) => {
+  const { count, error } = await supabase
+    .from("companion_chats")
+    .select("id", { count: "exact", head: true })
+    .eq("session_id", sessionId)
+    .eq("surface", surface);
+
+  if (error) throw error;
+  return count ?? 0;
 };
 
 export async function persistCompanionChatTurn(params: {
@@ -116,11 +135,17 @@ export async function persistCompanionChatTurn(params: {
   if (chatError) throw chatError;
 
   const previewText = buildCompanionChatThreadPreview(params.reply);
+  const messageCount = await loadThreadMessageCount(
+    params.supabase,
+    params.sessionId,
+    params.surface,
+  );
   const updatedThread = await updateThreadRow(
     params.supabase,
     params.sessionId,
     previewText,
     createdAt,
+    messageCount,
   );
 
   if (updatedThread) return;
@@ -136,6 +161,7 @@ export async function persistCompanionChatTurn(params: {
       previewText,
       createdAt,
       lastMessageAt: createdAt,
+      messageCount,
     });
   } catch (error) {
     const maybePostgrestError = error as { code?: string } | null;
@@ -148,6 +174,7 @@ export async function persistCompanionChatTurn(params: {
       params.sessionId,
       previewText,
       createdAt,
+      messageCount,
     );
   }
 }

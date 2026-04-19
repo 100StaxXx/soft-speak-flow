@@ -93,6 +93,7 @@ describe("useJourneysCompanionConversation", () => {
         speechText: "We can talk it through one step at a time.",
         handoffToPlanner: false,
         memoryUpdateApplied: false,
+        persistenceReady: true,
         sessionId: "session-2",
       },
       error: null,
@@ -122,6 +123,55 @@ describe("useJourneysCompanionConversation", () => {
     });
     expect(result.current.messages[2]?.content).toBe("We can talk it through one step at a time.");
     expect(result.current.pendingPlannerHandoffMessage).toBeNull();
+    expect(result.current.threadPersistenceReady).toBe(true);
+  });
+
+  it("passes through journeys schedule context when provided", async () => {
+    mocks.invoke.mockResolvedValue({
+      data: {
+        reply: "Your day has some room in it.",
+        speechText: "Your day has some room in it.",
+        handoffToPlanner: false,
+        memoryUpdateApplied: false,
+        persistenceReady: true,
+        sessionId: "session-ctx",
+      },
+      error: null,
+    });
+
+    const { result } = renderHook(() => useJourneysCompanionConversation());
+
+    await act(async () => {
+      await result.current.submitMessage("How does today look?", "text", {
+        currentDate: "2026-04-19",
+        journeysContext: {
+          tasks: [],
+          inboxTasks: [],
+          activeEpics: [],
+          calendarEvents: [],
+          scheduleInsights: {
+            horizon: "day",
+            selectedDate: "2026-04-19",
+            summary: "The day is light.",
+            dayLoads: [],
+            suggestedSlots: [],
+            moveSuggestions: [],
+          },
+          plannerMemory: null,
+        },
+      });
+    });
+
+    expect(mocks.invoke).toHaveBeenCalledWith("companion-chat", {
+      body: expect.objectContaining({
+        currentDate: "2026-04-19",
+        journeysContext: expect.objectContaining({
+          scheduleInsights: expect.objectContaining({
+            summary: "The day is light.",
+          }),
+        }),
+      }),
+    });
   });
 
   it("holds the transcript in chat mode until planning handoff is requested", async () => {
@@ -131,6 +181,7 @@ describe("useJourneysCompanionConversation", () => {
         speechText: "That sounds like planning work.",
         handoffToPlanner: true,
         memoryUpdateApplied: false,
+        persistenceReady: true,
         sessionId: "session-3",
       },
       error: null,
@@ -150,9 +201,39 @@ describe("useJourneysCompanionConversation", () => {
       expect(result.current.pendingPlannerHandoffMessage).toBe("Help me plan tomorrow");
     });
 
-    expect(result.current.messages).toHaveLength(3);
+    expect(result.current.messages).toHaveLength(2);
     expect(result.current.messages[1]?.content).toBe("Help me plan tomorrow");
-    expect(result.current.messages[2]?.content).toBe("That sounds like planning work.");
+  });
+
+  it("keeps the live reply while marking thread persistence unavailable during rollout", async () => {
+    mocks.invoke.mockResolvedValue({
+      data: {
+        reply: "We can still talk this through right here.",
+        speechText: "We can still talk this through right here.",
+        handoffToPlanner: false,
+        memoryUpdateApplied: false,
+        persistenceReady: false,
+        sessionId: "session-rollout",
+      },
+      error: null,
+    });
+
+    const { result } = renderHook(() => useJourneysCompanionConversation());
+
+    await act(async () => {
+      await result.current.submitMessage("Keep me grounded.", "text");
+    });
+
+    await waitFor(() => {
+      expect(result.current.messages).toHaveLength(3);
+    });
+
+    expect(result.current.messages[2]?.content).toBe("We can still talk this through right here.");
+    expect(result.current.threadPersistenceReady).toBe(false);
+    expect(result.current.threadPersistenceUnavailableReason).toBe(
+      "Thread history will be available after the latest backend update.",
+    );
+    expect(mocks.toastError).not.toHaveBeenCalled();
   });
 
   it("shows a rollout-aware error when the companion chat function is missing", async () => {

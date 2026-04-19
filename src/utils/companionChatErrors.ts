@@ -3,6 +3,7 @@ import {
   toUserFacingFunctionError,
   type ParsedFunctionInvokeError,
 } from "@/utils/supabaseFunctionErrors";
+import { isCompanionChatSetupError } from "@/utils/companionChatSetup";
 
 const normalizeText = (value?: string | null) =>
   typeof value === "string" ? value.trim().toLowerCase() : "";
@@ -37,20 +38,6 @@ const isMissingEdgeFunctionError = (parsed: ParsedFunctionInvokeError) => {
   );
 };
 
-const isMissingCompanionChatSchemaError = (parsed: ParsedFunctionInvokeError) => {
-  const source = getCompanionChatErrorSource(parsed);
-
-  return (
-    source.includes("companion_chats")
-    && (
-      source.includes("does not exist")
-      || source.includes("undefined_table")
-      || source.includes("schema cache")
-      || source.includes("relation")
-    )
-  );
-};
-
 export function toUserFacingCompanionChatError(
   parsed: ParsedFunctionInvokeError,
   opts?: { action?: string },
@@ -70,7 +57,7 @@ export function toUserFacingCompanionChatError(
     return "Companion Talk isn't live in this environment yet. Please try again after the backend is updated.";
   }
 
-  if (isMissingCompanionChatSchemaError(parsed)) {
+  if (isCompanionChatSetupError(parsed)) {
     return "Companion Talk is still being set up here. Please try again after the latest database update.";
   }
 

@@ -15,7 +15,7 @@ const mocks = vi.hoisted(() => ({
     toggleRecording: vi.fn(),
     requestMicrophonePermission: vi.fn(),
     setShowPermissionDialog: vi.fn(),
-    archiveCurrentThread: vi.fn().mockResolvedValue(undefined),
+    startFreshThread: vi.fn().mockResolvedValue(undefined),
     resumeThread: vi.fn().mockResolvedValue(undefined),
   },
   state: {
@@ -97,8 +97,9 @@ const mocks = vi.hoisted(() => ({
       createdAt: "2026-04-18T08:00:00.000Z",
       lastMessageAt: "2026-04-18T08:01:00.000Z",
       archivedAt: null,
+      messageCount: 2,
     },
-    archivedThreads: [
+    historyThreads: [
       {
         sessionId: "archived-session-1",
         companionId: "companion-1",
@@ -108,10 +109,14 @@ const mocks = vi.hoisted(() => ({
         createdAt: "2026-04-17T08:00:00.000Z",
         lastMessageAt: "2026-04-17T08:05:00.000Z",
         archivedAt: "2026-04-17T09:00:00.000Z",
+        messageCount: 4,
       },
     ],
-    canArchiveThread: true,
-    archiveDisabledReason: null as string | null,
+    canOpenThreadPicker: true,
+    threadPickerDisabledReason: null as string | null,
+    threadHistoryEmptyStateMessage: "Past chats will show up here after at least one real exchange.",
+    canStartFreshThread: true,
+    startFreshDisabledReason: null as string | null,
     isLoadingThreads: false,
   },
 }));
@@ -180,10 +185,13 @@ vi.mock("@/hooks/useCompanionAssistant", () => ({
     speechProvider: "none" as const,
     stopSpeaking: vi.fn(),
     activeThread: mocks.state.activeThread,
-    archivedThreads: mocks.state.archivedThreads,
-    canArchiveThread: mocks.state.canArchiveThread,
-    archiveDisabledReason: mocks.state.archiveDisabledReason,
-    archiveCurrentThread: mocks.assistant.archiveCurrentThread,
+    historyThreads: mocks.state.historyThreads,
+    canOpenThreadPicker: mocks.state.canOpenThreadPicker,
+    threadPickerDisabledReason: mocks.state.threadPickerDisabledReason,
+    threadHistoryEmptyStateMessage: mocks.state.threadHistoryEmptyStateMessage,
+    canStartFreshThread: mocks.state.canStartFreshThread,
+    startFreshDisabledReason: mocks.state.startFreshDisabledReason,
+    startFreshThread: mocks.assistant.startFreshThread,
     resumeThread: mocks.assistant.resumeThread,
     isLoadingThreads: mocks.state.isLoadingThreads,
   }),
@@ -298,8 +306,9 @@ describe("JourneysCompanionPlannerModal", () => {
       createdAt: "2026-04-18T08:00:00.000Z",
       lastMessageAt: "2026-04-18T08:01:00.000Z",
       archivedAt: null,
+      messageCount: 2,
     };
-    mocks.state.archivedThreads = [
+    mocks.state.historyThreads = [
       {
         sessionId: "archived-session-1",
         companionId: "companion-1",
@@ -309,10 +318,14 @@ describe("JourneysCompanionPlannerModal", () => {
         createdAt: "2026-04-17T08:00:00.000Z",
         lastMessageAt: "2026-04-17T08:05:00.000Z",
         archivedAt: "2026-04-17T09:00:00.000Z",
+        messageCount: 4,
       },
     ];
-    mocks.state.canArchiveThread = true;
-    mocks.state.archiveDisabledReason = null;
+    mocks.state.canOpenThreadPicker = true;
+    mocks.state.threadPickerDisabledReason = null;
+    mocks.state.threadHistoryEmptyStateMessage = "Past chats will show up here after at least one real exchange.";
+    mocks.state.canStartFreshThread = true;
+    mocks.state.startFreshDisabledReason = null;
     mocks.state.isLoadingThreads = false;
     Object.defineProperty(window, "matchMedia", {
       configurable: true,
@@ -352,6 +365,7 @@ describe("JourneysCompanionPlannerModal", () => {
     expect(screen.getByText("The road's open. What are we setting in motion?")).toBeInTheDocument();
     expect(screen.getByText("Nova")).toBeInTheDocument();
     expect(screen.getByText("Journeys Thread")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "New chat" })).toBeInTheDocument();
     await waitFor(() => {
       expect(screen.getByText("I can help you shape that into something concrete when you're ready.")).toBeInTheDocument();
       expect(screen.getByText("What time of day should this live in your schedule?")).toBeInTheDocument();
@@ -467,9 +481,9 @@ describe("JourneysCompanionPlannerModal", () => {
     expect(mocks.assistant.confirmAll).toHaveBeenCalledTimes(1);
   });
 
-  it("renders the archive control and disables it when the thread cannot be archived", () => {
-    mocks.state.canArchiveThread = false;
-    mocks.state.archiveDisabledReason = "Finish or dismiss the current plan before archiving this thread.";
+  it("renders the new chat control and disables it when a fresh chat cannot start", () => {
+    mocks.state.canStartFreshThread = false;
+    mocks.state.startFreshDisabledReason = "Finish or dismiss the current plan before starting a fresh chat.";
 
     render(
       <JourneysCompanionPlannerModal
@@ -479,11 +493,11 @@ describe("JourneysCompanionPlannerModal", () => {
       />,
     );
 
-    expect(screen.getByTestId("journeys-companion-archive-button")).toBeDisabled();
-    expect(screen.getByText("Finish or dismiss the current plan before archiving this thread.")).toBeInTheDocument();
+    expect(screen.getByTestId("journeys-companion-new-chat-button")).toBeDisabled();
+    expect(screen.getByText("Finish or dismiss the current plan before starting a fresh chat.")).toBeInTheDocument();
   });
 
-  it("opens the thread picker and resumes archived threads from it", async () => {
+  it("opens the thread picker and resumes past chats from it", async () => {
     render(
       <JourneysCompanionPlannerModal
         open
@@ -495,6 +509,7 @@ describe("JourneysCompanionPlannerModal", () => {
     fireEvent.click(screen.getByTestId("journeys-companion-thread-picker-trigger"));
 
     expect(screen.getByTestId("journeys-companion-thread-picker")).toBeInTheDocument();
+    expect(screen.getByText("Past chats")).toBeInTheDocument();
     expect(screen.getByText("Earlier thread")).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId("journeys-companion-thread-resume-archived-session-1"));
@@ -502,6 +517,23 @@ describe("JourneysCompanionPlannerModal", () => {
     await waitFor(() => {
       expect(mocks.assistant.resumeThread).toHaveBeenCalledWith("archived-session-1");
     });
+  });
+
+  it("disables the thread picker when history is unavailable during rollout", () => {
+    mocks.state.canOpenThreadPicker = false;
+    mocks.state.threadPickerDisabledReason = "Thread history will be available after the latest backend update.";
+    mocks.state.threadHistoryEmptyStateMessage = "Past chats will show up after the latest backend update.";
+
+    render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        presentation="dialog"
+      />,
+    );
+
+    expect(screen.getByTestId("journeys-companion-thread-picker-trigger")).toBeDisabled();
+    expect(screen.getByText("Thread history will be available after the latest backend update.")).toBeInTheDocument();
   });
 
   it("reveals assistant text letter-by-letter and lets send finish the current line", () => {

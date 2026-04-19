@@ -39,7 +39,7 @@ import { AnimatePresence } from "framer-motion";
 import { cn, formatDisplayLabel } from "@/lib/utils";
 import { deriveCompanionPalette } from "@/lib/companionPalette";
 import { deriveCompanionDisplayState } from "@/lib/companionDisplayState";
-import { resolveCompanionName } from "@/lib/companionName";
+import { getStoredCompanionCustomName, resolveCompanionName } from "@/lib/companionName";
 import {
   resolveCompanionExpressiveAssetUrl,
   resolveCompanionVisualAssetUrl,
@@ -497,7 +497,10 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
       if (!displayCompanion) return;
 
       if (displayCompanion.current_stage === 0) {
-        setCreatureName(`${formatDisplayLabel(displayCompanion.core_element)} Egg`);
+        setCreatureName(
+          getStoredCompanionCustomName(displayCompanion)
+          ?? getCompanionEggLabel(displayCompanion.core_element),
+        );
         return;
       }
 
@@ -518,6 +521,7 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
     };
   }, [
     displayCompanion?.id,
+    displayCompanion?.companion_name,
     displayCompanion?.current_stage,
     displayCompanion?.cached_creature_name,
     displayCompanion?.spirit_animal,
@@ -559,9 +563,10 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
     && !isDormant
     && !health.isNeglected
     && expressionState.mood === "calm";
-  const displayedCreatureName = isStageZeroEgg
-    ? getCompanionEggLabel(displayCompanion.core_element)
-    : (creatureName || "Companion");
+  const customDisplayName = getStoredCompanionCustomName(displayCompanion);
+  const displayedCreatureName = creatureName
+    || customDisplayName
+    || (isStageZeroEgg ? getCompanionEggLabel(displayCompanion.core_element) : "Companion");
 
   const handleEvolvePress = () => {
     if (displayRequiresHatchSelection) {
@@ -587,10 +592,11 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
     spiritAnimal: string;
     coreElement: string;
     storyTone: string;
+    companionName?: string | null;
   }) => {
     if (!data.presetId) return;
     setHatchDialogOpen(false);
-    await hatchCompanion.mutateAsync({ presetId: data.presetId });
+    await hatchCompanion.mutateAsync({ presetId: data.presetId, companionName: data.companionName });
   };
 
   return (
@@ -1036,6 +1042,7 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
               layout="compact"
               initialElement={companion.core_element as CompanionElementId}
               initialStoryTone={(companion.story_tone ?? "epic_adventure") as CompanionStoryTone}
+              initialCompanionName={companion.companion_name ?? null}
             />
           ) : null}
         </DialogContent>

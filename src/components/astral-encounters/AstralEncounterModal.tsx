@@ -139,7 +139,8 @@ export const AstralEncounterModal = ({
   });
 
   const resolvedCompanionName =
-    normalizeCompanionName(currentCard?.creature_name)
+    normalizeCompanionName(companion?.companion_name)
+    ?? normalizeCompanionName(currentCard?.creature_name)
     ?? ((companion?.current_stage ?? 0) > 0
       ? normalizeCompanionName(companion?.cached_creature_name)
       : null)

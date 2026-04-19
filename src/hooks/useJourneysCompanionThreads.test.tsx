@@ -68,6 +68,8 @@ const renderJourneysThreads = (overrides?: Partial<Parameters<typeof useJourneys
             isSeed: true,
           },
         ],
+        persistenceReady: true,
+        persistenceUnavailableReason: null,
         hasPendingPlannerWork: false,
         isBusy: false,
         conversation: {
@@ -87,7 +89,7 @@ describe("useJourneysCompanionThreads", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.generatedSessionIds = ["fresh-session-1", "fresh-session-2", "fresh-session-3"];
-    mocks.listCompanionChatThreads.mockResolvedValue([
+    const threadRows = [
       {
         sessionId: "active-session-1",
         companionId: "companion-1",
@@ -97,6 +99,7 @@ describe("useJourneysCompanionThreads", () => {
         createdAt: "2026-04-18T08:00:00.000Z",
         lastMessageAt: "2026-04-18T08:05:00.000Z",
         archivedAt: null,
+        messageCount: 2,
       },
       {
         sessionId: "archived-session-1",
@@ -107,8 +110,27 @@ describe("useJourneysCompanionThreads", () => {
         createdAt: "2026-04-17T08:00:00.000Z",
         lastMessageAt: "2026-04-17T08:05:00.000Z",
         archivedAt: "2026-04-17T09:00:00.000Z",
+        messageCount: 4,
       },
-    ]);
+      {
+        sessionId: "seed-only-session-1",
+        companionId: "companion-1",
+        surface: "journeys",
+        title: "Too short",
+        previewText: "Not enough history yet.",
+        createdAt: "2026-04-16T08:00:00.000Z",
+        lastMessageAt: "2026-04-16T08:01:00.000Z",
+        archivedAt: "2026-04-16T08:10:00.000Z",
+        messageCount: 1,
+      },
+    ];
+    mocks.listCompanionChatThreads.mockImplementation(async () => threadRows);
+    mocks.setCompanionChatThreadArchived.mockImplementation(async (sessionId: string, archived: boolean) => {
+      const thread = threadRows.find((entry) => entry.sessionId === sessionId);
+      if (thread) {
+        thread.archivedAt = archived ? "2026-04-19T09:00:00.000Z" : null;
+      }
+    });
     mocks.loadCompanionChatThreadMessages.mockImplementation(async (sessionId: string) => {
       if (sessionId === "archived-session-1") {
         return [
@@ -152,7 +174,7 @@ describe("useJourneysCompanionThreads", () => {
     });
   });
 
-  it("loads the latest active persisted thread and hydrates both chat lanes", async () => {
+  it("loads the latest active persisted thread and only exposes eligible past chats", async () => {
     const { result } = renderJourneysThreads();
 
     await waitFor(() => {
@@ -177,7 +199,11 @@ describe("useJourneysCompanionThreads", () => {
       ],
     });
     expect(result.current.activeThread?.sessionId).toBe("active-session-1");
-    expect(result.current.archivedThreads).toHaveLength(1);
+    expect(result.current.historyThreads).toEqual([
+      expect.objectContaining({
+        sessionId: "archived-session-1",
+      }),
+    ]);
   });
 
   it("keeps a fresh local thread when no persisted active thread exists", async () => {
@@ -191,6 +217,7 @@ describe("useJourneysCompanionThreads", () => {
         createdAt: "2026-04-17T08:00:00.000Z",
         lastMessageAt: "2026-04-17T08:05:00.000Z",
         archivedAt: "2026-04-17T09:00:00.000Z",
+        messageCount: 4,
       },
     ]);
 
@@ -204,7 +231,21 @@ describe("useJourneysCompanionThreads", () => {
     expect(result.current.activeThread?.sessionId).toBe("fresh-session-1");
   });
 
-  it("blocks archiving when the thread only has the seeded opener", async () => {
+  it("allows starting a fresh chat when the thread only has the seeded opener", async () => {
+    mocks.listCompanionChatThreads.mockResolvedValue([
+      {
+        sessionId: "archived-session-1",
+        companionId: "companion-1",
+        surface: "journeys",
+        title: "Old thread",
+        previewText: "We can pick this back up.",
+        createdAt: "2026-04-17T08:00:00.000Z",
+        lastMessageAt: "2026-04-17T08:05:00.000Z",
+        archivedAt: "2026-04-17T09:00:00.000Z",
+        messageCount: 4,
+      },
+    ]);
+
     const { result } = renderJourneysThreads({
       messages: [
         {
@@ -218,13 +259,75 @@ describe("useJourneysCompanionThreads", () => {
     });
 
     await waitFor(() => {
-      expect(result.current.canArchiveThread).toBe(false);
+      expect(result.current.canStartFreshThread).toBe(true);
     });
 
-    expect(result.current.archiveDisabledReason).toContain("Start the conversation");
+    await act(async () => {
+      await result.current.startFreshThread();
+    });
+
+    expect(mocks.setCompanionChatThreadArchived).not.toHaveBeenCalled();
+    expect(mocks.resetConversationThread).toHaveBeenLastCalledWith({
+      sessionId: "fresh-session-2",
+      greetingText: "The road's open.",
+    });
   });
 
-  it("archives the active thread and starts a fresh one", async () => {
+  it("disables thread controls when persistence is unavailable for the session", async () => {
+    const { result } = renderJourneysThreads({
+      persistenceReady: false,
+      persistenceUnavailableReason: "Thread history will be available after the latest backend update.",
+      messages: [
+        {
+          role: "user",
+          content: "Stay with me here.",
+          createdAt: "2026-04-19T08:05:00.000Z",
+          source: "chat",
+        },
+      ],
+    });
+
+    await waitFor(() => {
+      expect(result.current.canOpenThreadPicker).toBe(false);
+    });
+
+    expect(result.current.canStartFreshThread).toBe(true);
+    expect(result.current.threadHistoryEmptyStateMessage).toBe(
+      "Past chats will show up after the latest backend update.",
+    );
+  });
+
+  it("falls back to a local thread when thread history storage is not set up yet", async () => {
+    mocks.listCompanionChatThreads.mockRejectedValueOnce({
+      code: "42P01",
+      message: "relation \"companion_chat_threads\" does not exist",
+      details: null,
+      hint: null,
+    });
+
+    const { result } = renderJourneysThreads({
+      messages: [
+        {
+          role: "user",
+          content: "Keep talking without history.",
+          createdAt: "2026-04-19T08:05:00.000Z",
+          source: "chat",
+        },
+      ],
+    });
+
+    await waitFor(() => {
+      expect(result.current.canOpenThreadPicker).toBe(false);
+    });
+
+    expect(result.current.activeThread?.sessionId).toBe("fresh-session-1");
+    expect(result.current.historyThreads).toHaveLength(0);
+    expect(result.current.threadPickerDisabledReason).toBe(
+      "Thread history will be available after the latest backend update.",
+    );
+  });
+
+  it("starts a fresh chat by archiving the active persisted thread", async () => {
     const { result } = renderJourneysThreads({
       messages: [
         {
@@ -241,7 +344,7 @@ describe("useJourneysCompanionThreads", () => {
     });
 
     await act(async () => {
-      await result.current.archiveCurrentThread();
+      await result.current.startFreshThread();
     });
 
     expect(mocks.setCompanionChatThreadArchived).toHaveBeenCalledWith("active-session-1", true);
@@ -291,6 +394,35 @@ describe("useJourneysCompanionThreads", () => {
           id: "archived-plan-1",
         }),
       ],
+    });
+  });
+
+  it("reopens the resumed thread as the active thread after a reload", async () => {
+    const initial = renderJourneysThreads({
+      messages: [
+        {
+          role: "user",
+          content: "Keep this active for now.",
+          createdAt: "2026-04-19T08:05:00.000Z",
+          source: "chat",
+        },
+      ],
+    });
+
+    await waitFor(() => {
+      expect(initial.result.current.activeThread?.sessionId).toBe("active-session-1");
+    });
+
+    await act(async () => {
+      await initial.result.current.resumeThread("archived-session-1");
+    });
+
+    initial.unmount();
+
+    const reloaded = renderJourneysThreads();
+
+    await waitFor(() => {
+      expect(reloaded.result.current.activeThread?.sessionId).toBe("archived-session-1");
     });
   });
 });

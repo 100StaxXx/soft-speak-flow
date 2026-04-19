@@ -42,12 +42,18 @@ const SCHEDULE_DAY_REFERENCE_REGEX =
 
 const DIRECT_DAY_PLANNING_REGEX =
   /\b(plan(?: my)? (?:day|today|tomorrow|week)|organize(?: my)? (?:day|today|week)|prioritize(?: my)? (?:day|today|week)|build (?:me )?(?:a )?(?:day|week) plan)\b/i;
+const CHAT_FIRST_COACHING_REGEX =
+  /\b(what should i focus on|help me figure out (?:today|tomorrow|this week)|help me sort out (?:today|tomorrow|this week)|i feel scattered|i feel overwhelmed|how should i use (?:today|tomorrow))\b/i;
 
 const PLANNER_ACTION_REGEX =
-  /\b(schedule|scheduled|replan|reschedule|move|shift|push|pull|adjust|edit|update|rename|repeat|remind|create|add|set up|turn .+ into)\b/i;
+  /\b(schedule|reschedule|move|shift|push|pull|adjust|edit|update|rename|repeat|remind|create|add|set up|turn .+ into|make .+ repeat)\b/i;
 
 const PLANNER_ENTITY_REGEX =
   /\b(calendar|campaign|ritual|habit|quest|quests|task|tasks|reminder|reminders)\b/i;
+const CALENDAR_SLOT_REGEX =
+  /\b(today|tomorrow|tonight|this morning|this afternoon|this evening|next week|monday|tuesday|wednesday|thursday|friday|saturday|sunday|morning|afternoon|evening|night|at \d{1,2}(?::\d{2})?)\b/i;
+const CHAT_ESCAPE_REGEX =
+  /\b(talk to me|help me think|i feel|i'm feeling|how do i|can we just chat|just chat)\b/i;
 
 const isScheduleReadMessage = (message: string): boolean => {
   if (SCHEDULE_QUESTION_REGEX.test(message)) return true;
@@ -116,26 +122,48 @@ const sortMessages = (messages: CompanionAssistantMessage[]) =>
     ));
 
 const shouldRouteToPlanner = (
+  surface: CompanionAssistantSurface,
   message: string,
   hasOpenPlannerThread: boolean,
 ): boolean => {
-  if (hasOpenPlannerThread) return true;
+  const isChatFirstJourneysMessage =
+    isScheduleReadMessage(message)
+    || DIRECT_DAY_PLANNING_REGEX.test(message)
+    || CHAT_FIRST_COACHING_REGEX.test(message)
+    || CHAT_ESCAPE_REGEX.test(message)
+    || message.trim().endsWith("?");
 
-  const parsed = parseNaturalLanguage(message);
-  if (
-    parsed.scheduledDate
-    || parsed.scheduledTime
-    || parsed.recurrencePattern
-    || parsed.newTitle
-    || parsed.reminderMinutesBefore
+  if (hasOpenPlannerThread) {
+    if (surface !== "journeys") return true;
+    if (!isChatFirstJourneysMessage) return true;
+  }
+
+  if (surface === "journeys") {
+    if (isChatFirstJourneysMessage) {
+      return false;
+    }
+  } else if (
+    isScheduleReadMessage(message)
+    || DIRECT_DAY_PLANNING_REGEX.test(message)
   ) {
     return true;
   }
 
-  if (isScheduleReadMessage(message)) return true;
-  if (DIRECT_DAY_PLANNING_REGEX.test(message)) return true;
+  const parsed = parseNaturalLanguage(message);
+  const hasExplicitPlannerAction = PLANNER_ACTION_REGEX.test(message) && (
+    PLANNER_ENTITY_REGEX.test(message)
+    || CALENDAR_SLOT_REGEX.test(message)
+    || /turn .+ into/i.test(message)
+  );
 
-  return PLANNER_ACTION_REGEX.test(message) && PLANNER_ENTITY_REGEX.test(message);
+  if (hasExplicitPlannerAction) return true;
+
+  return Boolean(
+    parsed.recurrencePattern
+      || parsed.newTitle
+      || parsed.reminderMinutesBefore
+      || ((parsed.scheduledDate || parsed.scheduledTime) && PLANNER_ACTION_REGEX.test(message)),
+  );
 };
 
 export function useCompanionAssistant({
@@ -190,6 +218,8 @@ export function useCompanionAssistant({
     companionId: companion?.id,
     greeting: journeysConversation.greeting,
     messages: surface === "journeys" ? messages : [],
+    persistenceReady: journeysConversation.threadPersistenceReady,
+    persistenceUnavailableReason: journeysConversation.threadPersistenceUnavailableReason,
     hasPendingPlannerWork: hasOpenPlannerThread,
     isBusy: planner.isSubmitting || planner.isClassifying || conversation.isSubmitting,
     conversation: {
@@ -227,7 +257,11 @@ export function useCompanionAssistant({
     const message = rawMessage.trim();
     if (!message) return;
 
-    const routeToPlanner = shouldRouteToPlanner(message, hasOpenPlannerThread);
+    const routeToPlanner = shouldRouteToPlanner(
+      surface,
+      message,
+      hasOpenPlannerThread,
+    );
     setDraftInput("");
     setInterimText("");
 
@@ -241,11 +275,20 @@ export function useCompanionAssistant({
       return;
     }
 
+    if (surface === "journeys") {
+      await journeysConversation.submitMessage(message, inputMode, {
+        currentDate: planner.currentDate,
+        journeysContext: planner.plannerContext,
+      });
+      return;
+    }
+
     await conversation.submitMessage(message, inputMode);
   }, [
     conversation,
     conversationEnabled,
     hasOpenPlannerThread,
+    journeysConversation,
     planner,
     surface,
   ]);
@@ -406,17 +449,26 @@ export function useCompanionAssistant({
     activeThread: surface === "journeys"
       ? journeysThreads.activeThread
       : null,
-    archivedThreads: surface === "journeys"
-      ? journeysThreads.archivedThreads
+    historyThreads: surface === "journeys"
+      ? journeysThreads.historyThreads
       : [],
-    canArchiveThread: surface === "journeys"
-      ? journeysThreads.canArchiveThread
+    canOpenThreadPicker: surface === "journeys"
+      ? journeysThreads.canOpenThreadPicker
       : false,
-    archiveDisabledReason: surface === "journeys"
-      ? journeysThreads.archiveDisabledReason
+    threadPickerDisabledReason: surface === "journeys"
+      ? journeysThreads.threadPickerDisabledReason
       : null,
-    archiveCurrentThread: surface === "journeys"
-      ? journeysThreads.archiveCurrentThread
+    threadHistoryEmptyStateMessage: surface === "journeys"
+      ? journeysThreads.threadHistoryEmptyStateMessage
+      : "Past chats will show up here after at least one real exchange.",
+    canStartFreshThread: surface === "journeys"
+      ? journeysThreads.canStartFreshThread
+      : false,
+    startFreshDisabledReason: surface === "journeys"
+      ? journeysThreads.startFreshDisabledReason
+      : null,
+    startFreshThread: surface === "journeys"
+      ? journeysThreads.startFreshThread
       : (async () => undefined),
     resumeThread: surface === "journeys"
       ? journeysThreads.resumeThread

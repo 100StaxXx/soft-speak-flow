@@ -19,6 +19,7 @@ import type {
   CompanionChatRequest,
   CompanionChatResponse,
 } from "@/types/companionConversation";
+import { isCompanionChatSetupError } from "@/utils/companionChatSetup";
 import { resolveCompanionChatError } from "@/utils/companionChatErrors";
 import { safeLocalStorage } from "@/utils/storage";
 
@@ -141,21 +142,29 @@ export function useCompanionChat({ enabled = true }: UseCompanionChatOptions = {
     queryFn: async (): Promise<CompanionChatRow[]> => {
       if (!user?.id || !companion?.id) return [];
 
-      const { data, error } = await supabase
-        .from("companion_chats")
-        .select("id, role, content, input_mode, created_at")
-        .eq("user_id", user.id)
-        .eq("companion_id", companion.id)
-        .eq("surface", "companion")
-        .eq("source", "chat")
-        .order("created_at", { ascending: true })
-        .limit(40);
+      try {
+        const { data, error } = await supabase
+          .from("companion_chats")
+          .select("id, role, content, input_mode, created_at")
+          .eq("user_id", user.id)
+          .eq("companion_id", companion.id)
+          .eq("surface", "companion")
+          .eq("source", "chat")
+          .order("created_at", { ascending: true })
+          .limit(40);
 
-      if (error) {
+        if (error) {
+          throw error;
+        }
+
+        return (data ?? []) as CompanionChatRow[];
+      } catch (error) {
+        if (isCompanionChatSetupError(error)) {
+          return [];
+        }
+
         throw error;
       }
-
-      return (data ?? []) as CompanionChatRow[];
     },
   });
 

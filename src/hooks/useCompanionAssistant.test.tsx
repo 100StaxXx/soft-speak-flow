@@ -17,13 +17,13 @@ const mocks = vi.hoisted(() => ({
   rejectProposal: vi.fn(),
   confirmAll: vi.fn(),
   setAutoplayVoice: vi.fn(),
-  setMuteSpokenReplies: vi.fn(),
-  toggleRecording: vi.fn(),
-  requestPermission: vi.fn().mockResolvedValue("granted"),
-  stopCompanionSpeech: vi.fn(),
-  archiveCurrentThread: vi.fn().mockResolvedValue(undefined),
-  resumeThread: vi.fn().mockResolvedValue(undefined),
-  state: {
+    setMuteSpokenReplies: vi.fn(),
+    toggleRecording: vi.fn(),
+    requestPermission: vi.fn().mockResolvedValue("granted"),
+    stopCompanionSpeech: vi.fn(),
+    startFreshThread: vi.fn().mockResolvedValue(undefined),
+    resumeThread: vi.fn().mockResolvedValue(undefined),
+    state: {
     companionMessages: [
       {
         id: "chat-1",
@@ -143,6 +143,8 @@ vi.mock("@/hooks/useJourneysCompanionConversation", () => ({
     setDraftInput: vi.fn(),
     interimText: "",
     pendingPlannerHandoffMessage: mocks.state.pendingPlannerHandoffMessage,
+    threadPersistenceReady: true,
+    threadPersistenceUnavailableReason: null,
     clearPlannerHandoff: mocks.clearPlannerHandoff,
     resetThread: mocks.resetJourneysThread,
     hydrateThread: mocks.hydrateJourneysThread,
@@ -171,6 +173,17 @@ vi.mock("@/hooks/useCompanionPlanner", () => ({
     readyProposalCount: mocks.state.pendingProposals.filter((proposal) => proposal.readyToConfirm).length,
     plannerMemory: null,
     scheduleInsights: null,
+    currentDate: "2026-04-18",
+    plannerContext: {
+      tasks: [],
+      inboxTasks: [],
+      activeEpics: [],
+      rituals: [],
+      calendarEvents: [],
+      scheduleInsights: null,
+      plannerMemory: null,
+      aiSignals: undefined,
+    },
     todayLabel: "Saturday, April 18",
     isLoadingContext: false,
     horizon: "day" as const,
@@ -198,8 +211,9 @@ vi.mock("@/hooks/useJourneysCompanionThreads", () => ({
       createdAt: "2026-04-18T08:00:00.000Z",
       lastMessageAt: "2026-04-18T08:00:00.000Z",
       archivedAt: null,
+      messageCount: 2,
     },
-    archivedThreads: [
+    historyThreads: [
       {
         sessionId: "archived-session-1",
         companionId: "companion-1",
@@ -209,11 +223,15 @@ vi.mock("@/hooks/useJourneysCompanionThreads", () => ({
         createdAt: "2026-04-17T08:00:00.000Z",
         lastMessageAt: "2026-04-17T08:05:00.000Z",
         archivedAt: "2026-04-17T09:00:00.000Z",
+        messageCount: 4,
       },
     ],
-    canArchiveThread: true,
-    archiveDisabledReason: null,
-    archiveCurrentThread: mocks.archiveCurrentThread,
+    canOpenThreadPicker: true,
+    threadPickerDisabledReason: null,
+    threadHistoryEmptyStateMessage: "Past chats will show up here after at least one real exchange.",
+    canStartFreshThread: true,
+    startFreshDisabledReason: null,
+    startFreshThread: mocks.startFreshThread,
     resumeThread: mocks.resumeThread,
     isLoadingThreads: false,
   }),
@@ -298,33 +316,69 @@ describe("useCompanionAssistant", () => {
       await result.current.submitMessage("I just need a pep talk.", "voice");
     });
 
-    expect(mocks.journeysSubmit).toHaveBeenCalledWith("I just need a pep talk.", "voice");
+    expect(mocks.journeysSubmit).toHaveBeenCalledWith(
+      "I just need a pep talk.",
+      "voice",
+      expect.objectContaining({
+        currentDate: "2026-04-18",
+        journeysContext: expect.objectContaining({
+          tasks: [],
+          inboxTasks: [],
+        }),
+      }),
+    );
     expect(mocks.plannerSubmit).not.toHaveBeenCalled();
   });
 
-  it("routes direct schedule reads on journeys into the planner", async () => {
+  it("keeps direct schedule reads on journeys in the chat lane", async () => {
     const { result } = renderHook(() => useCompanionAssistant({ surface: "journeys" }));
 
     await act(async () => {
       await result.current.submitMessage("Show me today's route.", "text");
     });
 
-    expect(mocks.plannerSubmit).toHaveBeenCalledWith("Show me today's route.", "text");
-    expect(mocks.journeysSubmit).not.toHaveBeenCalled();
+    expect(mocks.journeysSubmit).toHaveBeenCalledWith(
+      "Show me today's route.",
+      "text",
+      expect.objectContaining({
+        currentDate: "2026-04-18",
+      }),
+    );
+    expect(mocks.plannerSubmit).not.toHaveBeenCalled();
   });
 
-  it("routes named-day schedule reads on journeys into the planner", async () => {
+  it("keeps named-day schedule reads on journeys in the chat lane", async () => {
     const { result } = renderHook(() => useCompanionAssistant({ surface: "journeys" }));
 
     await act(async () => {
       await result.current.submitMessage("How does my upcoming Saturday look?", "text");
     });
 
-    expect(mocks.plannerSubmit).toHaveBeenCalledWith(
+    expect(mocks.journeysSubmit).toHaveBeenCalledWith(
       "How does my upcoming Saturday look?",
       "text",
+      expect.objectContaining({
+        currentDate: "2026-04-18",
+      }),
     );
-    expect(mocks.journeysSubmit).not.toHaveBeenCalled();
+    expect(mocks.plannerSubmit).not.toHaveBeenCalled();
+  });
+
+  it("keeps broad day-planning prompts on journeys in the chat lane", async () => {
+    const { result } = renderHook(() => useCompanionAssistant({ surface: "journeys" }));
+
+    await act(async () => {
+      await result.current.submitMessage("Help me plan today.", "text");
+    });
+
+    expect(mocks.journeysSubmit).toHaveBeenCalledWith(
+      "Help me plan today.",
+      "text",
+      expect.objectContaining({
+        currentDate: "2026-04-18",
+      }),
+    );
+    expect(mocks.plannerSubmit).not.toHaveBeenCalled();
   });
 
   it("lets planner starter submissions bypass the freeform routing heuristic", async () => {
@@ -386,6 +440,32 @@ describe("useCompanionAssistant", () => {
     expect(mocks.companionSubmit).not.toHaveBeenCalled();
   });
 
+  it("lets journeys break back into chat even when an old planner thread is open", async () => {
+    mocks.state.plannerQuestions = [
+      {
+        id: "time-of-day",
+        prompt: "When should this happen?",
+        required: true,
+        field: "details",
+      },
+    ];
+
+    const { result } = renderHook(() => useCompanionAssistant({ surface: "journeys" }));
+
+    await act(async () => {
+      await result.current.submitMessage("How does today look?", "text");
+    });
+
+    expect(mocks.journeysSubmit).toHaveBeenCalledWith(
+      "How does today look?",
+      "text",
+      expect.objectContaining({
+        currentDate: "2026-04-18",
+      }),
+    );
+    expect(mocks.plannerSubmit).not.toHaveBeenCalled();
+  });
+
   it("blocks premium-gated freeform companion chat while still allowing planning", async () => {
     const { result } = renderHook(() => useCompanionAssistant({
       surface: "companion",
@@ -430,7 +510,7 @@ describe("useCompanionAssistant", () => {
     const { result } = renderHook(() => useCompanionAssistant({ surface: "journeys" }));
 
     expect(result.current.activeThread?.title).toBe("Current thread");
-    expect(result.current.archivedThreads).toHaveLength(1);
-    expect(result.current.canArchiveThread).toBe(true);
+    expect(result.current.historyThreads).toHaveLength(1);
+    expect(result.current.canStartFreshThread).toBe(true);
   });
 });

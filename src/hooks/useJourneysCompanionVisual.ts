@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { resolveCompanionVisualAssetUrl } from "@/lib/companionAssetResolver";
 import { deriveCompanionDisplayState } from "@/lib/companionDisplayState";
 import { isCompanionPresetImageSource } from "@/lib/companionImageFocal";
+import { getStoredCompanionCustomName } from "@/lib/companionName";
 import { formatDisplayLabel } from "@/lib/utils";
 import { useCompanion } from "./useCompanion";
 import { useCompanionCareSignals } from "./useCompanionCareSignals";
@@ -104,6 +105,9 @@ export const useJourneysCompanionVisual = () => {
   ]);
 
   const companionLabel = useMemo(() => {
+    const customName = getStoredCompanionCustomName(companion);
+    if (customName) return customName;
+
     const cachedName = companion?.cached_creature_name?.trim();
     if (cachedName) return cachedName;
 
@@ -111,7 +115,7 @@ export const useJourneysCompanionVisual = () => {
     if (spiritAnimal) return formatDisplayLabel(spiritAnimal);
 
     return "Companion";
-  }, [companion?.cached_creature_name, companion?.spirit_animal]);
+  }, [companion]);
 
   return {
     companionLabel,
