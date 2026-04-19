@@ -1,0 +1,29 @@
+name: Function Manifest Check
+
+on:
+  pull_request:
+    paths:
+      - "src/**"
+      - "supabase/**"
+      - "scripts/check-function-manifest.sh"
+      - "scripts/generate-function-manifest.sh"
+      - "scripts/function-manifest-manual-allowlist.txt"
+      - "supabase/function-manifest.json"
+  push:
+    paths:
+      - "src/**"
+      - "supabase/**"
+      - "scripts/check-function-manifest.sh"
+      - "scripts/generate-function-manifest.sh"
+      - "scripts/function-manifest-manual-allowlist.txt"
+      - "supabase/function-manifest.json"
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify function manifest
+        run: ./scripts/check-function-manifest.sh

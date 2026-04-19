@@ -78,6 +78,7 @@ jobs:
           }
 
           check_unauthorized "mentor-chat" '{"message":"hi","mentorName":"Eli","mentorTone":"supportive"}'
+          check_unauthorized "companion-planner-chat" '{}'
           check_unauthorized "generate-daily-plan" '{"energyLevel":"medium","dayType":"workday","focusArea":"progress"}'
           check_unauthorized "verify-admin-access" '{}'
           check_unauthorized "notifications-enqueue-v2" '{}'

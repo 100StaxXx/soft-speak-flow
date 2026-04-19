@@ -19,6 +19,7 @@ import { useSchedulingLearner } from "@/hooks/useSchedulingLearner";
 import { useAuth } from "@/hooks/useAuth";
 import { parseNaturalLanguage } from "@/features/tasks/hooks/useNaturalLanguageParser";
 import { buildCompanionPlannerScheduleInsights } from "@/utils/companionPlannerSchedule";
+import { resolveCompanionPlannerError } from "@/utils/companionPlannerErrors";
 import type { Json } from "@/integrations/supabase/types";
 import type { EpicRecord } from "@/hooks/epicsQuery";
 import { LOCKED_COMPANION_TONE_PACK } from "@/shared/companionChaosVoice";
@@ -741,10 +742,11 @@ export function useCompanionPlanner({
       });
     } catch (error) {
       console.error("Failed to submit planner message:", error);
-      toast.error("The companion planner hit a snag. Please try again.");
+      const userMessage = await resolveCompanionPlannerError(error);
+      toast.error(userMessage);
       setMessages((previous) => [
         ...previous,
-        createMessage("companion", "I lost the thread for a moment. Ask me again and I'll rebuild the plan with you."),
+        createMessage("companion", userMessage),
       ]);
     } finally {
       setIsSubmitting(false);

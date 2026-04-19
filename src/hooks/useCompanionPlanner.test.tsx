@@ -1,8 +1,12 @@
-import { renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   externalCalendarHorizons: [] as string[],
+  classify: vi.fn(),
+  invoke: vi.fn(),
+  toastError: vi.fn(),
+  trackInteraction: vi.fn(),
 }));
 
 vi.mock("@tanstack/react-query", () => ({
@@ -13,7 +17,11 @@ vi.mock("@tanstack/react-query", () => ({
 }));
 
 vi.mock("@/integrations/supabase/client", () => ({
-  supabase: {},
+  supabase: {
+    functions: {
+      invoke: (...args: unknown[]) => mocks.invoke(...args),
+    },
+  },
 }));
 
 vi.mock("@/hooks/useAuth", () => ({
@@ -30,7 +38,7 @@ vi.mock("@/hooks/useCompanionDialogue", () => ({
 
 vi.mock("@/hooks/useIntentClassifier", () => ({
   useIntentClassifier: () => ({
-    classify: vi.fn(),
+    classify: mocks.classify,
     isClassifying: false,
   }),
 }));
@@ -95,7 +103,7 @@ vi.mock("@/hooks/useUserAIContext", () => ({
 
 vi.mock("@/hooks/useAIInteractionTracker", () => ({
   useAIInteractionTracker: () => ({
-    trackInteraction: vi.fn(),
+    trackInteraction: mocks.trackInteraction,
   }),
 }));
 
@@ -119,7 +127,7 @@ vi.mock("@/hooks/useVoiceInput", () => ({
 
 vi.mock("@/components/ui/sonner", () => ({
   toast: {
-    error: vi.fn(),
+    error: mocks.toastError,
   },
 }));
 
@@ -129,6 +137,7 @@ describe("useCompanionPlanner", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.externalCalendarHorizons.length = 0;
+    mocks.classify.mockResolvedValue(null);
     Object.defineProperty(window, "localStorage", {
       configurable: true,
       writable: true,
@@ -145,5 +154,34 @@ describe("useCompanionPlanner", () => {
 
     expect(result.current.horizon).toBe("day");
     expect(mocks.externalCalendarHorizons).toEqual(["day", "week"]);
+  });
+
+  it("shows a rollout-aware planner error instead of a fake lost-thread message", async () => {
+    mocks.invoke.mockResolvedValue({
+      data: null,
+      error: {
+        name: "FunctionsHttpError",
+        message: "Edge Function returned a non-2xx status code",
+        context: new Response("", { status: 404 }),
+      },
+    });
+
+    const { result } = renderHook(() => useCompanionPlanner({ bootstrapGreeting: false }));
+
+    await act(async () => {
+      await result.current.submitMessage("Help me plan today's quests.", "text");
+    });
+
+    await waitFor(() => {
+      expect(mocks.toastError).toHaveBeenCalledWith(
+        "Companion Planner isn't live in this environment yet. Please try again after the backend is updated.",
+      );
+    });
+
+    expect(result.current.messages).toHaveLength(2);
+    expect(result.current.messages[1]?.content).toBe(
+      "Companion Planner isn't live in this environment yet. Please try again after the backend is updated.",
+    );
+    expect(result.current.messages[1]?.content).not.toContain("lost the thread");
   });
 });
