@@ -167,6 +167,22 @@ const buildUserPrompt = (
       reason: question.reason ?? null,
       options: question.options ?? [],
     })),
+    starterIntent: input.plannerContext.starterIntent ?? null,
+    briefingContext: input.plannerContext.briefingContext
+      ? {
+          focus: input.plannerContext.briefingContext.focus ?? null,
+          actionPrompt: input.plannerContext.briefingContext.actionPrompt ?? null,
+          inferredGoals: input.plannerContext.briefingContext.inferredGoals ?? [],
+        }
+      : null,
+    priorityScores: (input.plannerContext.priorityScores ?? []).slice(0, 6).map((score) => ({
+      kind: score.kind,
+      title: score.title,
+      score: score.score,
+      reasons: score.reasons,
+      targetDate: score.targetDate ?? null,
+      suggestedTime: score.suggestedTime ?? null,
+    })),
     proposals: baseResult.proposals.map((proposal) => ({
       kind: proposal.kind,
       title: proposal.title,

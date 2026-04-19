@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
     archiveCurrentThread: vi.fn().mockResolvedValue(undefined),
     resumeThread: vi.fn().mockResolvedValue(undefined),
   },
+  drawerRootProps: [] as Array<Record<string, unknown>>,
   state: {
     greeting: "The road's open. What are we setting in motion?",
     messages: [
@@ -206,7 +207,17 @@ vi.mock("@/components/ui/dialog", () => ({
 }));
 
 vi.mock("@/components/ui/drawer", () => ({
-  Drawer: ({ open, children }: { open: boolean; children: ReactNode }) => (open ? <div>{children}</div> : null),
+  Drawer: ({
+    open,
+    children,
+    ...props
+  }: {
+    open: boolean;
+    children: ReactNode;
+  } & Record<string, unknown>) => {
+    mocks.drawerRootProps.push({ open, ...props });
+    return open ? <div>{children}</div> : null;
+  },
   DrawerContent: ({ children, className }: { children: ReactNode; className?: string }) => <div className={className}>{children}</div>,
   DrawerHeader: ({ children, className }: { children: ReactNode; className?: string }) => <div className={className}>{children}</div>,
   DrawerTitle: ({ children }: { children: ReactNode }) => <div>{children}</div>,
@@ -224,10 +235,12 @@ import { JourneysCompanionPlannerModal } from "./JourneysCompanionPlannerModal";
 
 describe("JourneysCompanionPlannerModal", () => {
   const originalMatchMedia = window.matchMedia;
+  const originalVisualViewport = window.visualViewport;
 
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useRealTimers();
+    mocks.drawerRootProps.length = 0;
     mocks.state.greeting = "The road's open. What are we setting in motion?";
     mocks.state.messages = [
       {
@@ -346,6 +359,10 @@ describe("JourneysCompanionPlannerModal", () => {
       configurable: true,
       writable: true,
       value: originalMatchMedia,
+    });
+    Object.defineProperty(window, "visualViewport", {
+      configurable: true,
+      value: originalVisualViewport,
     });
   });
 
@@ -481,6 +498,124 @@ describe("JourneysCompanionPlannerModal", () => {
     expect(mocks.assistant.confirmProposal).toHaveBeenCalledWith("proposal-1");
     expect(mocks.assistant.rejectProposal).toHaveBeenCalledWith("proposal-1");
     expect(mocks.assistant.confirmAll).toHaveBeenCalledTimes(1);
+  });
+
+  it("disables Vaul input repositioning for the mobile drawer", () => {
+    render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        presentation="drawer"
+      />,
+    );
+
+    const openDrawerProps = mocks.drawerRootProps.find((props) => props.open === true);
+
+    expect(openDrawerProps?.repositionInputs).toBe(false);
+  });
+
+  it("updates the drawer shell height when visualViewport changes", async () => {
+    const originalInnerHeight = window.innerHeight;
+    const listeners = {
+      resize: [] as Array<() => void>,
+      scroll: [] as Array<() => void>,
+    };
+    const visualViewport = {
+      height: 640,
+      offsetTop: 0,
+      addEventListener: vi.fn((event: "resize" | "scroll", handler: () => void) => {
+        listeners[event].push(handler);
+      }),
+      removeEventListener: vi.fn((event: "resize" | "scroll", handler: () => void) => {
+        listeners[event] = listeners[event].filter((entry) => entry !== handler);
+      }),
+    };
+
+    try {
+      Object.defineProperty(window, "innerHeight", {
+        configurable: true,
+        value: 640,
+      });
+      Object.defineProperty(window, "visualViewport", {
+        configurable: true,
+        value: visualViewport,
+      });
+
+      render(
+        <JourneysCompanionPlannerModal
+          open
+          onOpenChange={vi.fn()}
+          presentation="drawer"
+        />,
+      );
+
+      const shell = screen.getByTestId("journeys-companion-planner-shell");
+      await waitFor(() => {
+        expect(shell).toHaveStyle("height: 616px");
+      });
+
+      act(() => {
+        visualViewport.height = 480;
+        listeners.resize.forEach((handler) => handler());
+      });
+
+      await waitFor(() => {
+        expect(shell).toHaveStyle("height: 456px");
+      });
+    } finally {
+      Object.defineProperty(window, "innerHeight", {
+        configurable: true,
+        value: originalInnerHeight,
+      });
+    }
+  });
+
+  it("keeps textarea focus scroll correction local to the transcript viewport", async () => {
+    const { container } = render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        presentation="drawer"
+      />,
+    );
+
+    const transcriptViewport = container.querySelector("[data-radix-scroll-area-viewport]") as HTMLElement | null;
+    expect(transcriptViewport).not.toBeNull();
+
+    const viewportScrollToSpy = vi.fn();
+    const windowScrollToSpy = vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
+
+    Object.defineProperty(transcriptViewport!, "clientHeight", {
+      configurable: true,
+      value: 240,
+    });
+    Object.defineProperty(transcriptViewport!, "scrollHeight", {
+      configurable: true,
+      value: 920,
+    });
+    Object.defineProperty(transcriptViewport!, "scrollTop", {
+      configurable: true,
+      writable: true,
+      value: 0,
+    });
+    Object.defineProperty(transcriptViewport!, "scrollTo", {
+      configurable: true,
+      writable: true,
+      value: viewportScrollToSpy,
+    });
+
+    try {
+      viewportScrollToSpy.mockClear();
+
+      fireEvent.focus(screen.getByTestId("journeys-companion-planner-text-input"));
+
+      await waitFor(() => {
+        expect(viewportScrollToSpy).toHaveBeenCalledWith({ top: 680, behavior: "auto" });
+      });
+      expect(windowScrollToSpy).not.toHaveBeenCalled();
+    } finally {
+      windowScrollToSpy.mockRestore();
+    }
   });
 
   it("opens past chats even when the current thread cannot be archived yet", async () => {

@@ -381,6 +381,97 @@ describe("useCompanionAssistant", () => {
     expect(mocks.plannerSubmit).not.toHaveBeenCalled();
   });
 
+  it("routes bare scheduled quest phrases on journeys straight to the planner", async () => {
+    mocks.parseNaturalLanguage.mockReturnValue({
+      text: "gym",
+      scheduledDate: "2026-04-19",
+      scheduledTime: "17:00",
+    });
+
+    const { result } = renderHook(() => useCompanionAssistant({ surface: "journeys" }));
+
+    await act(async () => {
+      await result.current.submitMessage("gym at 5pm tomorrow", "text");
+    });
+
+    expect(mocks.plannerSubmit).toHaveBeenCalledWith("gym at 5pm tomorrow", "text");
+    expect(mocks.journeysSubmit).not.toHaveBeenCalled();
+  });
+
+  it("routes question-form scheduling requests on journeys to the planner", async () => {
+    mocks.parseNaturalLanguage.mockReturnValue({
+      text: "gym",
+      scheduledDate: "2026-04-19",
+      scheduledTime: "17:00",
+      recurrencePattern: null,
+      reminderMinutesBefore: null,
+    });
+
+    const { result } = renderHook(() => useCompanionAssistant({ surface: "journeys" }));
+
+    await act(async () => {
+      await result.current.submitMessage("can you put gym at 5pm tomorrow?", "text");
+    });
+
+    expect(mocks.plannerSubmit).toHaveBeenCalledWith("can you put gym at 5pm tomorrow?", "text");
+    expect(mocks.journeysSubmit).not.toHaveBeenCalled();
+  });
+
+  it("routes question-form rescheduling requests on journeys to the planner", async () => {
+    mocks.parseNaturalLanguage.mockReturnValue({
+      text: "workout",
+      scheduledDate: null,
+      scheduledTime: null,
+      recurrencePattern: null,
+      reminderMinutesBefore: null,
+    });
+
+    const { result } = renderHook(() => useCompanionAssistant({ surface: "journeys" }));
+
+    await act(async () => {
+      await result.current.submitMessage("can you move workout to 6?", "text");
+    });
+
+    expect(mocks.plannerSubmit).toHaveBeenCalledWith("can you move workout to 6?", "text");
+    expect(mocks.journeysSubmit).not.toHaveBeenCalled();
+  });
+
+  it("routes reminder requests on journeys to the planner", async () => {
+    mocks.parseNaturalLanguage.mockReturnValue({
+      text: "workout",
+      scheduledDate: null,
+      scheduledTime: null,
+      recurrencePattern: null,
+      reminderMinutesBefore: 30,
+    });
+
+    const { result } = renderHook(() => useCompanionAssistant({ surface: "journeys" }));
+
+    await act(async () => {
+      await result.current.submitMessage("remind me 30 minutes before workout", "text");
+    });
+
+    expect(mocks.plannerSubmit).toHaveBeenCalledWith("remind me 30 minutes before workout", "text");
+    expect(mocks.journeysSubmit).not.toHaveBeenCalled();
+  });
+
+  it("keeps how-does-tomorrow-look prompts in the journeys chat lane", async () => {
+    const { result } = renderHook(() => useCompanionAssistant({ surface: "journeys" }));
+
+    await act(async () => {
+      await result.current.submitMessage("How does tomorrow look?", "text");
+    });
+
+    expect(mocks.journeysSubmit).toHaveBeenCalledWith(
+      "How does tomorrow look?",
+      "text",
+      expect.objectContaining({
+        currentDate: "2026-04-18",
+      }),
+    );
+    expect(mocks.plannerSubmit).not.toHaveBeenCalled();
+  });
+
   it("lets planner starter submissions bypass the freeform routing heuristic", async () => {
     const { result } = renderHook(() => useCompanionAssistant({ surface: "journeys" }));
 
@@ -504,6 +595,43 @@ describe("useCompanionAssistant", () => {
       { skipUserEcho: true },
     );
     expect(mocks.clearPlannerHandoff).toHaveBeenCalledTimes(1);
+  });
+
+  it("submits queued journeys launch intents through the planner with starter context", async () => {
+    const onLaunchIntentConsumed = vi.fn();
+
+    renderHook(() => useCompanionAssistant({
+      surface: "journeys",
+      launchIntent: {
+        id: "launch-1",
+        message: "Free me up after 5",
+        starterIntent: "adjust_today",
+        briefingContext: {
+          content: "Today is crowded after work.",
+          actionPrompt: "Free me up after 5",
+          focus: "Protect the evening",
+        },
+      },
+      onLaunchIntentConsumed,
+    }));
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(mocks.plannerSubmit).toHaveBeenCalledWith(
+      "Free me up after 5",
+      "text",
+      {
+        starterIntent: "adjust_today",
+        briefingContext: {
+          content: "Today is crowded after work.",
+          actionPrompt: "Free me up after 5",
+          focus: "Protect the evening",
+        },
+      },
+    );
+    expect(onLaunchIntentConsumed).toHaveBeenCalledWith("launch-1");
   });
 
   it("surfaces journeys thread controls alongside the merged transcript", () => {

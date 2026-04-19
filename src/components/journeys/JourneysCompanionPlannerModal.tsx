@@ -52,6 +52,7 @@ import { cn, stripMarkdown } from "@/lib/utils";
 import { COMPANION_PLANNER_STARTER_TEMPLATES } from "@/shared/companionPlannerCopy";
 import type { CompanionChatThreadSummary } from "@/types/companionConversation";
 import type {
+  CompanionPlannerLaunchIntent,
   CompanionPlannerProposal,
   CompanionPlannerQuestion,
 } from "@/types/companionPlanner";
@@ -62,6 +63,8 @@ interface JourneysCompanionPlannerModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   presentation: JourneysCompanionPlannerModalPresentation;
+  launchIntent?: CompanionPlannerLaunchIntent | null;
+  onLaunchIntentConsumed?: (intentId: string) => void;
 }
 
 type DialogueEntry = {
@@ -77,6 +80,9 @@ type PlannerQuestionHistoryEntry = {
 };
 
 const STARTER_QUICK_REPLIES = [...COMPANION_PLANNER_STARTER_TEMPLATES];
+const MOBILE_DRAWER_HEIGHT_MIN_PX = 320;
+const MOBILE_DRAWER_HEIGHT_MAX_PX = 736;
+const MOBILE_DRAWER_VIEWPORT_OFFSET_PX = 24;
 
 const questionEntryId = (question: CompanionPlannerQuestion) => `planner-question-${question.id}`;
 
@@ -95,6 +101,20 @@ const getReducedMotionPreference = () =>
   typeof window !== "undefined"
   && typeof window.matchMedia === "function"
   && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+const getDrawerViewportHeight = () => {
+  if (typeof window === "undefined") {
+    return MOBILE_DRAWER_HEIGHT_MIN_PX;
+  }
+
+  const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+  const safeViewportHeight = Number.isFinite(viewportHeight) ? viewportHeight : window.innerHeight;
+
+  return Math.max(
+    MOBILE_DRAWER_HEIGHT_MIN_PX,
+    Math.min(MOBILE_DRAWER_HEIGHT_MAX_PX, safeViewportHeight - MOBILE_DRAWER_VIEWPORT_OFFSET_PX),
+  );
+};
 
 const formatThreadTimestamp = (value: string) => {
   try {
@@ -217,8 +237,12 @@ const JourneysCompanionThreadPicker = memo(function JourneysCompanionThreadPicke
 
 const JourneysCompanionOverlayBody = memo(({
   presentation,
+  launchIntent,
+  onLaunchIntentConsumed,
 }: {
   presentation: JourneysCompanionPlannerModalPresentation;
+  launchIntent?: CompanionPlannerLaunchIntent | null;
+  onLaunchIntentConsumed?: (intentId: string) => void;
 }) => {
   const {
     companionLabel,
@@ -231,18 +255,23 @@ const JourneysCompanionOverlayBody = memo(({
   const assistant = useCompanionAssistant({
     surface: "journeys",
     conversationEnabled: true,
+    launchIntent: launchIntent ?? null,
+    onLaunchIntentConsumed,
   });
   const prefersReducedMotion = getReducedMotionPreference();
+  const isDrawerPresentation = presentation === "drawer";
 
   const [plannerQuestionHistory, setPlannerQuestionHistory] = useState<PlannerQuestionHistoryEntry[]>([]);
   const [isThreadPickerOpen, setIsThreadPickerOpen] = useState(false);
   const [typingMessageId, setTypingMessageId] = useState<string | null>(null);
   const [typedAssistantContent, setTypedAssistantContent] = useState("");
+  const [drawerViewportHeight, setDrawerViewportHeight] = useState<number>(() => getDrawerViewportHeight());
 
   const typingIntervalRef = useRef<number | null>(null);
   const typingTargetRef = useRef<{ id: string; content: string } | null>(null);
   const animatedAssistantIdsRef = useRef<Set<string>>(new Set());
   const transcriptEndRef = useRef<HTMLDivElement | null>(null);
+  const transcriptScrollAreaRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (assistant.questions.length === 0) return;
@@ -353,11 +382,61 @@ const JourneysCompanionOverlayBody = memo(({
     prefersReducedMotion,
   ]);
 
-  useEffect(() => {
-    if (typeof transcriptEndRef.current?.scrollIntoView === "function") {
-      transcriptEndRef.current.scrollIntoView({ behavior: prefersReducedMotion ? "auto" : "smooth" });
+  const keepBottomContentVisible = useCallback((behavior: ScrollBehavior = prefersReducedMotion ? "auto" : "smooth") => {
+    const transcriptViewport = transcriptScrollAreaRef.current?.querySelector<HTMLElement>("[data-radix-scroll-area-viewport]");
+    if (transcriptViewport) {
+      const nextTop = Math.max(0, transcriptViewport.scrollHeight - transcriptViewport.clientHeight);
+      if (typeof transcriptViewport.scrollTo === "function") {
+        transcriptViewport.scrollTo({ top: nextTop, behavior });
+      } else {
+        transcriptViewport.scrollTop = nextTop;
+      }
+      return;
     }
-  }, [dialogueEntries, typedAssistantContent, prefersReducedMotion, assistant.questions, assistant.pendingProposals]);
+
+    if (typeof transcriptEndRef.current?.scrollIntoView === "function") {
+      transcriptEndRef.current.scrollIntoView({ behavior, block: "end" });
+    }
+  }, [prefersReducedMotion]);
+
+  useEffect(() => {
+    keepBottomContentVisible();
+  }, [dialogueEntries, typedAssistantContent, assistant.questions, assistant.pendingProposals, keepBottomContentVisible]);
+
+  useEffect(() => {
+    if (!isDrawerPresentation || typeof window === "undefined") return;
+
+    const syncDrawerViewportLayout = () => {
+      setDrawerViewportHeight(getDrawerViewportHeight());
+      keepBottomContentVisible("auto");
+    };
+
+    syncDrawerViewportLayout();
+
+    const viewport = window.visualViewport;
+    const canListenToViewport = !!viewport
+      && typeof viewport.addEventListener === "function"
+      && typeof viewport.removeEventListener === "function";
+
+    window.addEventListener("resize", syncDrawerViewportLayout);
+    if (canListenToViewport) {
+      viewport.addEventListener("resize", syncDrawerViewportLayout);
+      viewport.addEventListener("scroll", syncDrawerViewportLayout);
+    }
+
+    return () => {
+      window.removeEventListener("resize", syncDrawerViewportLayout);
+      if (canListenToViewport) {
+        viewport.removeEventListener("resize", syncDrawerViewportLayout);
+        viewport.removeEventListener("scroll", syncDrawerViewportLayout);
+      }
+    };
+  }, [isDrawerPresentation, keepBottomContentVisible]);
+
+  useEffect(() => {
+    if (!isDrawerPresentation) return;
+    keepBottomContentVisible("auto");
+  }, [drawerViewportHeight, isDrawerPresentation, keepBottomContentVisible]);
 
   const handleSubmit = useCallback(() => {
     if (typingMessageId) {
@@ -373,6 +452,10 @@ const JourneysCompanionOverlayBody = memo(({
     event.preventDefault();
     handleSubmit();
   }, [handleSubmit]);
+
+  const handleComposerFocus = useCallback(() => {
+    keepBottomContentVisible("auto");
+  }, [keepBottomContentVisible]);
 
   const handleQuickReply = useCallback((option: string) => {
     if (typingMessageId) {
@@ -456,6 +539,7 @@ const JourneysCompanionOverlayBody = memo(({
     : assistant.isSubmitting || assistant.isClassifying
       ? "Replying..."
       : assistant.todayLabel;
+  const plannerShellStyle = isDrawerPresentation ? { height: `${drawerViewportHeight}px` } : undefined;
 
   return (
     <div
@@ -465,7 +549,14 @@ const JourneysCompanionOverlayBody = memo(({
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),transparent_18%,transparent_82%,rgba(255,255,255,0.04))]" />
       <div className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.14),transparent_62%)]" />
 
-      <div className="relative flex h-[min(82vh,46rem)] min-h-[32rem] flex-col p-4 sm:p-5">
+      <div
+        className={cn(
+          "relative flex min-h-0 flex-col p-4 sm:p-5",
+          isDrawerPresentation ? "h-full" : "h-[min(82vh,46rem)] min-h-[32rem]",
+        )}
+        style={plannerShellStyle}
+        data-testid="journeys-companion-planner-shell"
+      >
         <div
           className="flex items-center gap-3 rounded-[24px] border border-white/[0.12] bg-white/[0.04] px-4 py-3 backdrop-blur-2xl"
           data-testid="journeys-companion-planner-chat-header"
@@ -523,8 +614,9 @@ const JourneysCompanionOverlayBody = memo(({
             }
           }}
           data-testid="journeys-companion-planner-dialogue-screen"
+          data-vaul-no-drag
         >
-          <ScrollArea className="flex-1">
+          <ScrollArea ref={transcriptScrollAreaRef} className="flex-1">
             <div className="space-y-3 p-4 sm:p-5" data-testid="journeys-companion-planner-transcript">
               {dialogueEntries.map((entry) => {
                 const displayedContent = stripMarkdown(
@@ -704,6 +796,7 @@ const JourneysCompanionOverlayBody = memo(({
                   assistant.setDraftInput(event.target.value);
                 }}
                 onKeyDown={handleComposerKeyDown}
+                onFocus={handleComposerFocus}
                 placeholder={assistant.placeholder}
                 className="h-12 min-h-[48px] max-h-[48px] flex-1 w-auto resize-none overflow-y-auto rounded-[20px] border-white/10 bg-white/[0.04] px-4 py-3 leading-5 text-white placeholder:text-white/[0.38]"
                 data-testid="journeys-companion-planner-text-input"
@@ -759,8 +852,16 @@ export const JourneysCompanionPlannerModal = memo(function JourneysCompanionPlan
   open,
   onOpenChange,
   presentation,
+  launchIntent,
+  onLaunchIntentConsumed,
 }: JourneysCompanionPlannerModalProps) {
-  const content = open ? <JourneysCompanionOverlayBody presentation={presentation} /> : null;
+  const content = open ? (
+    <JourneysCompanionOverlayBody
+      presentation={presentation}
+      launchIntent={launchIntent}
+      onLaunchIntentConsumed={onLaunchIntentConsumed}
+    />
+  ) : null;
 
   if (presentation === "dialog") {
     return (
@@ -779,7 +880,7 @@ export const JourneysCompanionPlannerModal = memo(function JourneysCompanionPlan
   }
 
   return (
-    <Drawer open={open} onOpenChange={onOpenChange}>
+    <Drawer open={open} onOpenChange={onOpenChange} repositionInputs={false}>
       <DrawerContent className="border-none bg-transparent p-0 shadow-none">
         <DrawerHeader className="sr-only">
           <DrawerTitle>Companion chat</DrawerTitle>

@@ -120,14 +120,356 @@ Deno.test("uses the cleaned workout title for planner-created quest proposals", 
   }));
 
   assertEquals(result.proposals[0].kind, "create_quest");
-  assertEquals(result.proposals[0].title, "Create workout");
+  assertEquals(result.proposals[0].title, "Create Workout");
   assertEquals(
     (result.proposals[0].payload as { taskText: string }).taskText,
-    "workout",
+    "Workout",
   );
 });
 
-Deno.test("asks for a title instead of trusting scaffold-only parsed quest text", () => {
+Deno.test("treats a simple timed utterance as a ready-to-confirm quest draft", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "gym at 5pm tomorrow",
+    currentDate: "2026-04-19",
+    currentDateTime: "2026-04-19T10:30:00-07:00",
+    parsedInput: {
+      text: "gym",
+      scheduledTime: "17:00",
+      scheduledDate: "2026-04-20",
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: "body",
+      newTitle: null,
+    },
+  }));
+
+  assertEquals(result.mode, "proposal");
+  assertEquals(result.proposals[0].kind, "create_quest");
+  assertEquals(result.proposals[0].readyToConfirm, true);
+  assertEquals(result.followUpQuestions.length, 0);
+  assertEquals(result.proposals[0].title, "Create Gym");
+  assertEquals(
+    result.proposals[0].summary,
+    'Create a quest for "Gym" on 2026-04-20 at 17:00.',
+  );
+  assertEquals(
+    (result.proposals[0].payload as {
+      taskText: string;
+      taskDate: string | null;
+      scheduledTime: string | null;
+    }).taskText,
+    "Gym",
+  );
+  assertEquals(
+    (result.proposals[0].payload as {
+      taskText: string;
+      taskDate: string | null;
+      scheduledTime: string | null;
+    }).taskDate,
+    "2026-04-20",
+  );
+  assertEquals(
+    (result.proposals[0].payload as {
+      taskText: string;
+      taskDate: string | null;
+      scheduledTime: string | null;
+    }).scheduledTime,
+    "17:00",
+  );
+});
+
+Deno.test("normalizes parsed input server-side for question-form scheduling requests", () => {
+  const result = buildPlannerResponse({
+    ...baseInput({
+      message: "can you put gym at 5pm tomorrow?",
+      currentDate: "2026-04-19",
+      currentDateTime: "2026-04-19T10:30:00-07:00",
+    }),
+    parsedInput: null,
+  });
+
+  assertEquals(result.proposals[0].kind, "create_quest");
+  assertEquals(result.proposals[0].readyToConfirm, true);
+  assertEquals(result.followUpQuestions.length, 0);
+  assertEquals(
+    (result.proposals[0].payload as {
+      taskText: string;
+      taskDate: string | null;
+      scheduledTime: string | null;
+    }).taskText,
+    "Gym",
+  );
+  assertEquals(
+    (result.proposals[0].payload as {
+      taskText: string;
+      taskDate: string | null;
+      scheduledTime: string | null;
+    }).taskDate,
+    "2026-04-20",
+  );
+  assertEquals(
+    (result.proposals[0].payload as {
+      taskText: string;
+      taskDate: string | null;
+      scheduledTime: string | null;
+    }).scheduledTime,
+    "17:00",
+  );
+});
+
+Deno.test("uses ranked priorities for plan-my-day style reads", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Plan my day",
+    plannerContext: {
+      tasks: [
+        {
+          id: "task-1",
+          title: "Ship landing page copy",
+          taskDate: "2026-04-18",
+          scheduledTime: "09:00",
+          estimatedDuration: 60,
+          difficulty: "hard",
+          recurrencePattern: null,
+          completed: false,
+          priority: "high",
+          epicId: "epic-1",
+          epicTitle: "Website relaunch",
+        },
+      ],
+      activeEpics: [
+        {
+          id: "epic-1",
+          title: "Website relaunch",
+          endDate: "2026-04-20",
+          progressPercentage: 35,
+          daysRemaining: 2,
+          habitCount: 2,
+        },
+      ],
+      priorityScores: [
+        {
+          id: "task:task-1",
+          kind: "task",
+          title: "Ship landing page copy",
+          score: 88,
+          reasons: ["due today", "supports a deadline-sensitive epic"],
+          taskId: "task-1",
+          epicId: "epic-1",
+          targetDate: "2026-04-18",
+          suggestedTime: "09:00",
+        },
+      ],
+    },
+  }));
+
+  assertEquals(result.mode, "schedule_read");
+  assertStringIncludes(result.reply, "Top ranked next moves");
+  assertStringIncludes(result.reply, "Ship landing page copy");
+});
+
+Deno.test("drafts confirmable moves for free-me-up-after requests", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Free me up after 5",
+    currentDate: "2026-04-18",
+    plannerContext: {
+      tasks: [
+        {
+          id: "task-1",
+          title: "Prep investor update",
+          taskDate: "2026-04-18",
+          scheduledTime: "17:30",
+          estimatedDuration: 45,
+          difficulty: "hard",
+          recurrencePattern: null,
+          completed: false,
+          priority: "medium",
+        },
+      ],
+    },
+  }));
+
+  assertEquals(result.mode, "proposal");
+  assertEquals(result.proposals.length, 1);
+  assertEquals(result.proposals[0].kind, "update_quest");
+  assertEquals(
+    (result.proposals[0].payload as {
+      updates: { task_date: string };
+    }).updates.task_date,
+    "2026-04-19",
+  );
+});
+
+Deno.test("drafts a lighter-day adjustment when energy is low", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "I'm tired today, make it light",
+    currentDate: "2026-04-18",
+    plannerContext: {
+      tasks: [
+        {
+          id: "task-1",
+          title: "Deep work block",
+          taskDate: "2026-04-18",
+          scheduledTime: "14:00",
+          estimatedDuration: 90,
+          difficulty: "hard",
+          recurrencePattern: null,
+          completed: false,
+          priority: "medium",
+        },
+        {
+          id: "task-2",
+          title: "Inbox cleanup",
+          taskDate: "2026-04-18",
+          scheduledTime: "16:00",
+          estimatedDuration: 30,
+          difficulty: "easy",
+          recurrencePattern: null,
+          completed: false,
+          priority: "low",
+        },
+      ],
+      priorityScores: [
+        {
+          id: "task:task-1",
+          kind: "task",
+          title: "Deep work block",
+          score: 80,
+          reasons: ["due today"],
+          taskId: "task-1",
+          targetDate: "2026-04-18",
+          suggestedTime: "14:00",
+        },
+        {
+          id: "task:task-2",
+          kind: "task",
+          title: "Inbox cleanup",
+          score: 32,
+          reasons: ["can move cleanly"],
+          taskId: "task-2",
+          targetDate: "2026-04-18",
+          suggestedTime: "16:00",
+        },
+      ],
+    },
+  }));
+
+  assertEquals(result.mode, "proposal");
+  assertEquals(result.proposals[0].kind, "update_quest");
+  assertStringIncludes(result.reply, "lighten today");
+});
+
+Deno.test("creates a relationship touch proposal with contact context", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Relationship touch",
+    plannerContext: {
+      contactsNeedingAttention: [
+        {
+          id: "contact-1",
+          name: "Mom",
+          daysSinceContact: 9,
+          hasOverdueReminder: true,
+          reminderReason: "Call back this week",
+        },
+      ],
+      starterIntent: "relationship_touch",
+      scheduleInsights: {
+        horizon: "day",
+        selectedDate: "2026-04-18",
+        dayLoads: [],
+        overloadedDates: [],
+        emptyDates: [],
+        conflicts: [],
+        suggestedSlots: [
+          {
+            date: "2026-04-18",
+            time: "18:00",
+            endTime: "18:30",
+            score: 88,
+            reason: "Open after work",
+          },
+        ],
+        moveSuggestions: [],
+        summary: "The evening is pretty open.",
+      },
+    },
+  }));
+
+  assertEquals(result.mode, "proposal");
+  assertEquals(result.proposals[0].kind, "create_quest");
+  assertEquals(
+    (result.proposals[0].payload as { contactId: string }).contactId,
+    "contact-1",
+  );
+  assertStringIncludes(result.proposals[0].title, "Mom");
+});
+
+Deno.test("keeps timing follow-ups for vague one-off placement requests without a concrete time", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Schedule gym tomorrow",
+    currentDate: "2026-04-19",
+    currentDateTime: "2026-04-19T10:30:00-07:00",
+    parsedInput: {
+      text: "gym",
+      scheduledTime: null,
+      scheduledDate: "2026-04-20",
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: "body",
+      newTitle: null,
+    },
+  }));
+
+  assertEquals(result.proposals[0].kind, "create_quest");
+  assertEquals(result.proposals[0].readyToConfirm, false);
+  assertEquals(result.followUpQuestions.map((question) => question.field), [
+    "time_of_day",
+    "time_reason",
+  ]);
+});
+
+Deno.test("treats concrete scheduled actions as quests even when the classifier says epic", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "study for the bar at 5 tomorrow",
+    currentDate: "2026-04-19",
+    currentDateTime: "2026-04-19T10:30:00-07:00",
+    parsedInput: {
+      text: "study for the bar",
+      scheduledTime: "17:00",
+      scheduledDate: "2026-04-20",
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+    classificationHint: {
+      type: "epic",
+      confidence: 0.95,
+      reasoning: "Long-term goal",
+      suggestedDeadline: "2026-08-01",
+    },
+  }));
+
+  assertEquals(result.proposals[0].kind, "create_quest");
+  assertEquals(result.proposals[0].readyToConfirm, true);
+  assertEquals(result.followUpQuestions.length, 0);
+});
+
+Deno.test("recovers the quest title from the raw message when parsed text is scaffold-only", () => {
   const result = buildPlannerResponse(baseInput({
     message: "Add workout to today's schedule for 3pm",
     parsedInput: {
@@ -147,13 +489,12 @@ Deno.test("asks for a title instead of trusting scaffold-only parsed quest text"
   }));
 
   assertEquals(result.proposals[0].kind, "create_quest");
-  assertEquals(result.proposals[0].readyToConfirm, false);
-  assertEquals(result.proposals[0].title, "Create quest");
-  assertEquals(result.followUpQuestions[0]?.field, "details");
-  assertEquals(result.followUpQuestions[0]?.prompt, "What should I call this quest?");
+  assertEquals(result.proposals[0].readyToConfirm, true);
+  assertEquals(result.proposals[0].title, "Create Workout");
+  assertEquals(result.followUpQuestions.length, 0);
   assertEquals(
     (result.proposals[0].payload as { taskText: string }).taskText,
-    "",
+    "Workout",
   );
 });
 
@@ -263,6 +604,118 @@ Deno.test("ties repeated campaign work to a ritual when an active campaign is re
   assertStringIncludes(result.proposals[0].summary, "Launch Sprint");
 });
 
+Deno.test("uses suggest_reminder for reminder-only tweaks on existing quests", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "remind me 30 minutes before workout",
+    parsedInput: {
+      text: "workout",
+      scheduledTime: null,
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: "body",
+      newTitle: null,
+    },
+    plannerContext: {
+      tasks: [{
+        id: "task-1",
+        title: "Workout",
+        taskDate: "2026-04-20",
+        scheduledTime: "17:00",
+        estimatedDuration: 45,
+        recurrencePattern: null,
+      }],
+      inboxTasks: [],
+      activeEpics: [],
+      rituals: [],
+      calendarEvents: [],
+    },
+  }));
+
+  assertEquals(result.proposals[0].kind, "suggest_reminder");
+  assertEquals(result.proposals[0].readyToConfirm, true);
+  assertEquals(result.followUpQuestions.length, 0);
+  assertEquals(
+    (result.proposals[0].payload as {
+      updates: {
+        reminder_enabled?: boolean;
+        reminder_minutes_before?: number | null;
+      };
+    }).updates.reminder_enabled,
+    true,
+  );
+  assertEquals(
+    (result.proposals[0].payload as {
+      updates: {
+        reminder_enabled?: boolean;
+        reminder_minutes_before?: number | null;
+      };
+    }).updates.reminder_minutes_before,
+    30,
+  );
+});
+
+Deno.test("uses update_ritual for reminder-only tweaks on existing rituals", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "remind me 10 minutes before morning pages",
+    parsedInput: {
+      text: "morning pages",
+      scheduledTime: null,
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: "mind",
+      newTitle: null,
+    },
+    plannerContext: {
+      tasks: [],
+      inboxTasks: [],
+      activeEpics: [{
+        id: "epic-1",
+        title: "Creative Reset",
+        endDate: "2026-06-15",
+      }],
+      rituals: [{
+        id: "ritual-1",
+        epicId: "epic-1",
+        epicTitle: "Creative Reset",
+        title: "Morning Pages",
+        frequency: "daily",
+        preferredTime: "08:00",
+      }],
+      calendarEvents: [],
+    },
+  }));
+
+  assertEquals(result.proposals[0].kind, "update_ritual");
+  assertEquals(result.proposals[0].readyToConfirm, true);
+  assertEquals(result.followUpQuestions.length, 0);
+  assertEquals(
+    (result.proposals[0].payload as {
+      reminderEnabled?: boolean | null;
+      reminderMinutesBefore?: number | null;
+    }).reminderEnabled,
+    true,
+  );
+  assertEquals(
+    (result.proposals[0].payload as {
+      reminderEnabled?: boolean | null;
+      reminderMinutesBefore?: number | null;
+    }).reminderMinutesBefore,
+    10,
+  );
+});
+
 Deno.test("uses follow-up answers to preserve the existing draft and learn time preferences", () => {
   const result = buildPlannerResponse(baseInput({
     message: "Morning because I'm sharper before email",
@@ -344,9 +797,8 @@ Deno.test("treats a bare clock reply as answering the open time question", () =>
   }));
 
   assertEquals(result.sessionState.draft.scheduledTime, "08:00");
-  assertEquals(result.followUpQuestions.map((question) => question.field), [
-    "time_reason",
-  ]);
+  assertEquals(result.followUpQuestions.map((question) => question.field), []);
+  assertEquals(result.proposals[0].readyToConfirm, true);
   assertEquals(
     result.proposals[0].missingFields?.includes("time of day") ?? false,
     false,
@@ -390,9 +842,8 @@ Deno.test("treats a dated slot reply as answering both the day and time question
 
   assertEquals(result.sessionState.draft.scheduledDate, "2026-04-19");
   assertEquals(result.sessionState.draft.scheduledTime, "08:00");
-  assertEquals(result.followUpQuestions.map((question) => question.field), [
-    "time_reason",
-  ]);
+  assertEquals(result.followUpQuestions.map((question) => question.field), []);
+  assertEquals(result.proposals[0].readyToConfirm, true);
 });
 
 Deno.test("asks what the user wants to get done before checking openings for vague planning prompts", () => {
@@ -923,10 +1374,10 @@ Deno.test("treats the make-room starter like a read-only prioritization view", (
   assertEquals(result.mode, "schedule_read");
   assertEquals(result.proposals.length, 0);
   assertEquals(result.followUpQuestions.length, 0);
-  assertStringIncludes(result.reply, "Here's the room I see right now.");
+  assertStringIncludes(result.reply, "Here's what I would protect first");
   assertStringIncludes(result.reply, "Today:");
-  assertStringIncludes(result.reply, "Week ahead:");
-  assertStringIncludes(result.reply, "Tell me what matters most");
+  assertStringIncludes(result.reply, "Top ranked next moves");
+  assertStringIncludes(result.reply, "Workout");
 });
 
 Deno.test("uses witty_sassy voice for empty-day route reads", () => {
@@ -1024,9 +1475,9 @@ Deno.test("uses witty_sassy voice for make-room reads on light days", () => {
   }));
 
   assertEquals(result.mode, "schedule_read");
-  assertStringIncludes(result.reply, "Today is pretty open.");
-  assertStringIncludes(result.reply, "priorities problem wearing a fake mustache");
-  assertStringIncludes(result.reply, "decorative bullshit");
+  assertStringIncludes(result.reply, "Here's what I would protect first");
+  assertStringIncludes(result.reply, "Top ranked next moves");
+  assertStringIncludes(result.reply, "Workout");
 });
 
 Deno.test("answers the coming-up starter prompt with a schedule summary", () => {

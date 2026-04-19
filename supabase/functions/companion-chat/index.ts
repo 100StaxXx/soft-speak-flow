@@ -15,6 +15,7 @@ import {
 } from "./surfaceAccess.ts";
 import { withCompanionChatPersistenceCapability } from "./persistenceCapability.ts";
 import { persistCompanionChatTurn } from "./threadPersistence.ts";
+import { shouldHandoffToPlanner } from "./handoff.ts";
 
 const JourneysTaskSchema = z.object({
   title: z.string(),
@@ -176,61 +177,6 @@ const mergeConversationProfile = (
 const startOfTodayUtc = () => {
   const now = new Date();
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())).toISOString();
-};
-
-const SCHEDULE_QUESTION_REGEX =
-  /\b(what do i have scheduled|what(?:'s| is) on my calendar|what do i have today|what do i have tomorrow|when am i free|am i free|where do i have room|what(?:'s| is) open|what openings do i have|show me (?:today|tomorrow|my|this|next|upcoming).*(?:route|schedule)|how does (?:today|tomorrow|my day|my upcoming|this|next|upcoming).*(?:look|feel))\b/i;
-const CHAT_FIRST_DAY_PLANNING_REGEX =
-  /\b(plan(?: my)? (?:day|today|tomorrow|week)|organize(?: my)? (?:day|today|week)|prioritize(?: my)? (?:day|today|week)|help me figure out (?:today|tomorrow|this week)|help me sort out (?:today|tomorrow|this week)|what should i focus on|i feel scattered|i feel overwhelmed|help me break a big goal into steps|help me make room for what matters)\b/i;
-const EXPLICIT_PLANNER_ACTION_REGEX =
-  /\b(schedule|reschedule|move|shift|push|pull|adjust|edit|update|rename|repeat|remind(?: me)?|create|add|set up|turn .+ into|make .+ repeat)\b/i;
-const PLANNER_ENTITY_REGEX =
-  /\b(calendar|campaign|ritual|habit|quest|quests|task|tasks|reminder|reminders)\b/i;
-const CALENDAR_SLOT_REGEX =
-  /\b(today|tomorrow|tonight|this morning|this afternoon|this evening|next week|monday|tuesday|wednesday|thursday|friday|saturday|sunday|morning|afternoon|evening|night|daily|weekly|monthly|weekdays|every day|every week|every month|at \d{1,2}(?::\d{2})?)\b/i;
-
-const isLegacyPlanningIntent = (message: string) => {
-  const normalized = message.toLowerCase();
-  const strongSignals = [
-    "plan my",
-    "schedule",
-    "reschedule",
-    "calendar",
-    "set up",
-    "repeat every",
-    "remind me",
-    "campaign",
-    "ritual",
-    "quest",
-    "this week",
-    "tomorrow",
-  ];
-
-  const matched = strongSignals.filter((signal) => normalized.includes(signal));
-  return matched.length >= 2
-    || /plan .*day|plan .*week|build .*routine|turn .*into .*campaign|make .*repeat/i.test(message);
-};
-
-const shouldHandoffToPlanner = (
-  message: string,
-  surface: "companion" | "journeys",
-) => {
-  if (surface !== "journeys") {
-    return isLegacyPlanningIntent(message);
-  }
-
-  if (
-    SCHEDULE_QUESTION_REGEX.test(message)
-    || CHAT_FIRST_DAY_PLANNING_REGEX.test(message)
-  ) {
-    return false;
-  }
-
-  return EXPLICIT_PLANNER_ACTION_REGEX.test(message) && (
-    PLANNER_ENTITY_REGEX.test(message)
-    || CALENDAR_SLOT_REGEX.test(message)
-    || /turn .+ into/i.test(message)
-  );
 };
 
 const shouldExtractConversationMemory = (message: string) =>

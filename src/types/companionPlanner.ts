@@ -6,6 +6,17 @@ export type PlannerTonePack = "soft" | "playful" | "witty_sassy";
 
 export type CompanionPlannerResponseMode = "conversational" | "schedule_read" | "proposal";
 
+export type CompanionPlannerStarterIntent =
+  | "general"
+  | "plan_day"
+  | "make_room"
+  | "what_matters"
+  | "relationship_touch"
+  | "adjust_today"
+  | "low_energy_adjust"
+  | "briefing_followup"
+  | "goal_breakdown";
+
 export type CompanionPlannerProposalKind =
   | "create_quest"
   | "update_quest"
@@ -92,19 +103,25 @@ export interface PlannerContextTask {
   taskDate: string | null;
   scheduledTime: string | null;
   estimatedDuration: number | null;
+  difficulty?: string | null;
   recurrencePattern: string | null;
   recurrenceEndDate?: string | null;
   completed?: boolean | null;
   priority?: string | null;
   source?: string | null;
+  habitSourceId?: string | null;
   epicId?: string | null;
   epicTitle?: string | null;
+  contactId?: string | null;
 }
 
 export interface PlannerContextEpic {
   id: string;
   title: string;
   endDate: string | null;
+  progressPercentage?: number | null;
+  daysRemaining?: number | null;
+  habitCount?: number | null;
 }
 
 export interface PlannerContextRitual {
@@ -114,6 +131,62 @@ export interface PlannerContextRitual {
   title: string;
   frequency: string | null;
   preferredTime: string | null;
+  currentStreak?: number | null;
+}
+
+export interface PlannerContactNeedingAttention {
+  id: string;
+  name: string;
+  avatarUrl?: string | null;
+  daysSinceContact: number;
+  hasOverdueReminder: boolean;
+  reminderReason?: string | null;
+}
+
+export interface PlannerReflectionSignal {
+  date: string;
+  source: "check_in" | "reflection";
+  mood: string;
+  energy?: "low" | "medium" | "high" | null;
+  wins?: string | null;
+  tomorrowAdjustment?: string | null;
+}
+
+export interface PlannerCareState {
+  overallCare: number;
+  hasDormancyWarning: boolean;
+  dialogueTone: "joyful" | "content" | "neutral" | "reserved" | "quiet" | "silent";
+  inactiveDays: number;
+  daysUntilDormancy: number | null;
+}
+
+export interface PlannerBriefingContext {
+  content: string;
+  actionPrompt?: string | null;
+  focus?: string | null;
+  inferredGoals?: string[];
+  dataSnapshot?: Record<string, unknown> | null;
+}
+
+export interface PlannerPriorityScore {
+  id: string;
+  kind: "task" | "ritual" | "epic" | "contact" | "recovery";
+  title: string;
+  score: number;
+  reasons: string[];
+  taskId?: string | null;
+  epicId?: string | null;
+  ritualId?: string | null;
+  contactId?: string | null;
+  targetDate?: string | null;
+  suggestedTime?: string | null;
+}
+
+export interface CompanionPlannerLaunchIntent {
+  id: string;
+  message: string;
+  starterIntent: CompanionPlannerStarterIntent;
+  briefingContext?: PlannerBriefingContext | null;
 }
 
 export interface PlannerContextCalendarEvent {
@@ -186,6 +259,8 @@ export interface PlannerMemoryProfile {
     sourceCount?: number;
   }>;
   cadencePatterns?: Record<string, number>;
+  workloadTolerance?: "light" | "normal" | "heavy" | null;
+  contactCadencePatterns?: Record<string, number>;
   lastConfirmedAt?: string | null;
 }
 
@@ -229,6 +304,12 @@ export interface CompanionPlannerRequest {
     activeEpics: PlannerContextEpic[];
     rituals: PlannerContextRitual[];
     calendarEvents: PlannerContextCalendarEvent[];
+    contactsNeedingAttention?: PlannerContactNeedingAttention[];
+    reflectionSignals?: PlannerReflectionSignal[];
+    careSignals?: PlannerCareState | null;
+    briefingContext?: PlannerBriefingContext | null;
+    starterIntent?: CompanionPlannerStarterIntent;
+    priorityScores?: PlannerPriorityScore[];
     scheduleInsights?: PlannerScheduleInsights;
     plannerMemory?: PlannerMemoryProfile;
     aiSignals?: {

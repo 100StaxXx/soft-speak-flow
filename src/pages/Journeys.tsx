@@ -67,6 +67,11 @@ import { QuestInboxSection } from "@/components/QuestInboxSection";
 import { QUEST_ACTION_TOAST_DURATION_MS } from "@/constants/questToast";
 import { trackResilienceEvent } from "@/utils/resilienceTelemetry";
 import { safeLocalStorage } from "@/utils/storage";
+import type {
+  CompanionPlannerLaunchIntent,
+  CompanionPlannerStarterIntent,
+  PlannerBriefingContext,
+} from "@/types/companionPlanner";
 
 const TIME_24H_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const DATE_INPUT_REGEX = /^\d{4}-\d{2}-\d{2}$/;
@@ -88,6 +93,10 @@ interface CreatedCampaignData {
 type DesktopPlannerMode = "week" | "day";
 const MAC_TIMED_TASK_DURATION_FALLBACK_MINUTES = 30;
 const readPinnedCompanionPlannerPreference = () => safeLocalStorage.getItem(JOURNEYS_COMPANION_PINNED_KEY) === "true";
+const createPlannerLaunchIntentId = () =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
 const Journeys = () => {
   const prefersReducedMotion = useReducedMotion();
@@ -105,6 +114,7 @@ const Journeys = () => {
   const [showPageInfo, setShowPageInfo] = useState(false);
   const [showAddSheet, setShowAddSheet] = useState(false);
   const [isCompanionPlannerPinned, setIsCompanionPlannerPinned] = useState(readPinnedCompanionPlannerPreference);
+  const [plannerLaunchIntent, setPlannerLaunchIntent] = useState<CompanionPlannerLaunchIntent | null>(null);
   const [showMonthView, setShowMonthView] = useState(false);
   const [desktopPlannerMode, setDesktopPlannerMode] = useState<DesktopPlannerMode>("week");
   
@@ -159,7 +169,24 @@ const Journeys = () => {
     setShowAddSheet(true);
   }, []);
 
-  const openCompanionPlanner = useCallback(() => {
+  const openCompanionPlanner = useCallback((intent?: CompanionPlannerLaunchIntent | null) => {
+    if (intent) {
+      setPlannerLaunchIntent(intent);
+    }
+    setIsCompanionPlannerPinned(true);
+  }, []);
+
+  const launchPlannerIntent = useCallback((
+    message: string,
+    starterIntent: CompanionPlannerStarterIntent,
+    options?: { briefingContext?: PlannerBriefingContext | null },
+  ) => {
+    setPlannerLaunchIntent({
+      id: createPlannerLaunchIntentId(),
+      message,
+      starterIntent,
+      briefingContext: options?.briefingContext ?? null,
+    });
     setIsCompanionPlannerPinned(true);
   }, []);
 
@@ -345,6 +372,31 @@ const Journeys = () => {
   useEffect(() => {
     safeLocalStorage.setItem(JOURNEYS_COMPANION_PINNED_KEY, String(isCompanionPlannerPinned));
   }, [isCompanionPlannerPinned]);
+
+  useEffect(() => {
+    const routeState = (location.state as { companionPlannerLaunchIntent?: CompanionPlannerLaunchIntent | null } | null) ?? null;
+    const nextLaunchIntent = routeState?.companionPlannerLaunchIntent ?? null;
+    if (!nextLaunchIntent?.id || !nextLaunchIntent.message) return;
+
+    setPlannerLaunchIntent(nextLaunchIntent);
+    setIsCompanionPlannerPinned(true);
+
+    const nextState = {
+      ...(routeState ?? {}),
+      companionPlannerLaunchIntent: null,
+    };
+
+    navigate(
+      {
+        pathname: location.pathname,
+        search: location.search,
+      },
+      {
+        replace: true,
+        state: nextState,
+      },
+    );
+  }, [location.pathname, location.search, location.state, navigate]);
 
   useEffect(() => {
     if (!isMacHostedIOSApp || location.pathname !== JOURNEYS_ROUTE) return;
@@ -1195,6 +1247,12 @@ const Journeys = () => {
           open={showCompanionPlanner}
           onOpenChange={setIsCompanionPlannerPinned}
           presentation={isDesktopLayout || isMacHostedIOSApp ? "dialog" : "drawer"}
+          launchIntent={plannerLaunchIntent}
+          onLaunchIntentConsumed={(intentId) => {
+            setPlannerLaunchIntent((currentIntent) =>
+              currentIntent?.id === intentId ? null : currentIntent
+            );
+          }}
         />
         
         {/* Edit Quest Dialog (for regular quests) */}
@@ -1291,6 +1349,10 @@ const Journeys = () => {
           onOpenChange={setShowQuickAdjust}
           tasks={dailyTasks}
           selectedDate={selectedDate}
+          onLaunchPlanner={(message, starterIntent) => {
+            setShowQuickAdjust(false);
+            launchPlannerIntent(message, starterIntent);
+          }}
           onComplete={() => {
             setShowQuickAdjust(false);
           }}

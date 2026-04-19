@@ -197,6 +197,8 @@ vi.mock("@/components/journeys/JourneysCompanionPlannerModal", () => ({
     open?: boolean;
     onOpenChange?: (open: boolean) => void;
     presentation?: string;
+    launchIntent?: unknown;
+    onLaunchIntentConsumed?: (intentId: string) => void;
   }) => {
     mocks.lastCompanionPlannerModalProps = props;
 

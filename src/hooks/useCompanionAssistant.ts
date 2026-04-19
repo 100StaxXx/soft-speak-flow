@@ -12,11 +12,16 @@ import { useJourneysCompanionThreads } from "@/hooks/useJourneysCompanionThreads
 import { useVoiceInput } from "@/hooks/useVoiceInput";
 import { stripMarkdown } from "@/lib/utils";
 import {
+  analyzeSchedulingIntent,
+  shouldRouteMessageToPlanner,
+} from "@/shared/schedulingIntent";
+import {
   speakCompanionReply,
   stopCompanionSpeech,
   type CompanionSpeechProvider,
 } from "@/services/companionSpeech";
 import type { CompanionChatInputMode } from "@/types/companionConversation";
+import type { CompanionPlannerLaunchIntent } from "@/types/companionPlanner";
 
 export type CompanionAssistantSurface = "companion" | "journeys";
 
@@ -33,42 +38,9 @@ export interface CompanionAssistantMessage {
 interface UseCompanionAssistantOptions {
   surface: CompanionAssistantSurface;
   conversationEnabled?: boolean;
+  launchIntent?: CompanionPlannerLaunchIntent | null;
+  onLaunchIntentConsumed?: (intentId: string) => void;
 }
-
-const SCHEDULE_QUESTION_REGEX =
-  /\b(what do i have scheduled|what(?:'s| is) on my calendar|when am i free|am i free|what do i have today|what do i have tomorrow|where do i have room|show me today(?:'s)? route|show me tomorrow(?:'s)? route|how does (?:today|tomorrow|my day) look)\b/i;
-const SCHEDULE_DAY_REFERENCE_REGEX =
-  /\b(?:today|tomorrow|my day|(?:my\s+)?(?:this\s+|next\s+|upcoming\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday))\b/i;
-
-const DIRECT_DAY_PLANNING_REGEX =
-  /\b(plan(?: my)? (?:day|today|tomorrow|week)|organize(?: my)? (?:day|today|week)|prioritize(?: my)? (?:day|today|week)|build (?:me )?(?:a )?(?:day|week) plan)\b/i;
-const CHAT_FIRST_COACHING_REGEX =
-  /\b(what should i focus on|help me figure out (?:today|tomorrow|this week)|help me sort out (?:today|tomorrow|this week)|i feel scattered|i feel overwhelmed|how should i use (?:today|tomorrow))\b/i;
-
-const PLANNER_ACTION_REGEX =
-  /\b(schedule|reschedule|move|shift|push|pull|adjust|edit|update|rename|repeat|remind|create|add|set up|turn .+ into|make .+ repeat)\b/i;
-
-const PLANNER_ENTITY_REGEX =
-  /\b(calendar|campaign|ritual|habit|quest|quests|task|tasks|reminder|reminders)\b/i;
-const CALENDAR_SLOT_REGEX =
-  /\b(today|tomorrow|tonight|this morning|this afternoon|this evening|next week|monday|tuesday|wednesday|thursday|friday|saturday|sunday|morning|afternoon|evening|night|at \d{1,2}(?::\d{2})?)\b/i;
-const CHAT_ESCAPE_REGEX =
-  /\b(talk to me|help me think|i feel|i'm feeling|how do i|can we just chat|just chat)\b/i;
-
-const isScheduleReadMessage = (message: string): boolean => {
-  if (SCHEDULE_QUESTION_REGEX.test(message)) return true;
-  if (!SCHEDULE_DAY_REFERENCE_REGEX.test(message)) return false;
-
-  if (
-    /\b(when am i free|am i free|where do i have room|what(?:'s| is) open|what openings do i have|what time do i have free)\b/i
-      .test(message)
-  ) {
-    return true;
-  }
-
-  return /\b(show me|how does|how(?:'s| is)|what does)\b/i.test(message) &&
-    /\b(route|look|looking|schedule)\b/i.test(message);
-};
 
 const normalizeConversationMessages = (
   messages: Array<{
@@ -126,49 +98,21 @@ const shouldRouteToPlanner = (
   message: string,
   hasOpenPlannerThread: boolean,
 ): boolean => {
-  const isChatFirstJourneysMessage =
-    isScheduleReadMessage(message)
-    || DIRECT_DAY_PLANNING_REGEX.test(message)
-    || CHAT_FIRST_COACHING_REGEX.test(message)
-    || CHAT_ESCAPE_REGEX.test(message)
-    || message.trim().endsWith("?");
-
-  if (hasOpenPlannerThread) {
-    if (surface !== "journeys") return true;
-    if (!isChatFirstJourneysMessage) return true;
-  }
-
-  if (surface === "journeys") {
-    if (isChatFirstJourneysMessage) {
-      return false;
-    }
-  } else if (
-    isScheduleReadMessage(message)
-    || DIRECT_DAY_PLANNING_REGEX.test(message)
-  ) {
-    return true;
-  }
-
   const parsed = parseNaturalLanguage(message);
-  const hasExplicitPlannerAction = PLANNER_ACTION_REGEX.test(message) && (
-    PLANNER_ENTITY_REGEX.test(message)
-    || CALENDAR_SLOT_REGEX.test(message)
-    || /turn .+ into/i.test(message)
-  );
+  const analysis = analyzeSchedulingIntent(message, parsed);
 
-  if (hasExplicitPlannerAction) return true;
-
-  return Boolean(
-    parsed.recurrencePattern
-      || parsed.newTitle
-      || parsed.reminderMinutesBefore
-      || ((parsed.scheduledDate || parsed.scheduledTime) && PLANNER_ACTION_REGEX.test(message)),
-  );
+  return shouldRouteMessageToPlanner({
+    surface,
+    analysis,
+    hasOpenPlannerThread,
+  });
 };
 
 export function useCompanionAssistant({
   surface,
   conversationEnabled = true,
+  launchIntent = null,
+  onLaunchIntentConsumed,
 }: UseCompanionAssistantOptions) {
   const { user } = useAuth();
   const { companion } = useCompanion();
@@ -196,6 +140,7 @@ export function useCompanionAssistant({
   const [plannerIsSpeaking, setPlannerIsSpeaking] = useState(false);
   const lastSpokenPlannerMessageIdRef = useRef<string | null>(null);
   const pendingPlannerHandoffRef = useRef<string | null>(null);
+  const lastLaunchIntentIdRef = useRef<string | null>(null);
 
   const messages = useMemo(() => (
     surface === "journeys"
@@ -314,6 +259,30 @@ export function useCompanionAssistant({
   }, [
     journeysConversation.clearPlannerHandoff,
     journeysConversation.pendingPlannerHandoffMessage,
+    planner.submitMessage,
+    surface,
+  ]);
+
+  useEffect(() => {
+    if (surface !== "journeys") return;
+    if (!launchIntent?.id || !launchIntent.message.trim()) return;
+    if (lastLaunchIntentIdRef.current === launchIntent.id) return;
+
+    lastLaunchIntentIdRef.current = launchIntent.id;
+
+    void planner.submitMessage(
+      launchIntent.message,
+      "text",
+      {
+        starterIntent: launchIntent.starterIntent,
+        briefingContext: launchIntent.briefingContext ?? null,
+      },
+    ).finally(() => {
+      onLaunchIntentConsumed?.(launchIntent.id);
+    });
+  }, [
+    launchIntent,
+    onLaunchIntentConsumed,
     planner.submitMessage,
     surface,
   ]);

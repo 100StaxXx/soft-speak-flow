@@ -18,6 +18,7 @@ import { useAIInteractionTracker } from "@/hooks/useAIInteractionTracker";
 import { useSchedulingLearner } from "@/hooks/useSchedulingLearner";
 import { useAuth } from "@/hooks/useAuth";
 import { useCompanion } from "@/hooks/useCompanion";
+import { useCompanionCareSignals } from "@/hooks/useCompanionCareSignals";
 import { parseNaturalLanguage } from "@/features/tasks/hooks/useNaturalLanguageParser";
 import { buildCompanionPlannerScheduleInsights } from "@/utils/companionPlannerSchedule";
 import { resolveCompanionPlannerError } from "@/utils/companionPlannerErrors";
@@ -31,6 +32,7 @@ import {
 } from "@/services/companionChatThreads";
 import { getCompanionPlannerOpener } from "@/shared/companionPlannerCopy";
 import { LOCKED_COMPANION_TONE_PACK } from "@/shared/companionChaosVoice";
+import { computePlannerPriorityScores } from "@/shared/companionPlannerPriority";
 import type {
   CompanionChatSurface,
   CompanionChatThreadMessage,
@@ -41,12 +43,18 @@ import type {
   CompanionPlannerRequest,
   CompanionPlannerResponse,
   CompanionPlannerSessionState,
+  CompanionPlannerStarterIntent,
+  PlannerBriefingContext,
+  PlannerCareState,
   PlannerContextCalendarEvent,
   PlannerContextEpic,
   PlannerContextRitual,
   PlannerContextTask,
   PlannerHorizon,
+  PlannerContactNeedingAttention,
   PlannerMemoryProfile,
+  PlannerPriorityScore,
+  PlannerReflectionSignal,
   PlannerScheduleInsights,
   PlannerTonePack,
 } from "@/types/companionPlanner";
@@ -65,9 +73,17 @@ type PlannerMemoryQueryResult = {
   preferredWorkBlocks: Json | null;
   wakeTime: string | null;
   windDownTime: string | null;
+  coldContactThresholdDays: number | null;
+  defaultEnergyLevel: string | null;
+  includeRelationshipTasks: boolean | null;
   peakProductivityTimes: string[];
   schedulingPatterns: Json | null;
   successfulPatterns: Json | null;
+};
+
+type PlannerSubmissionContext = {
+  starterIntent: CompanionPlannerStarterIntent | null;
+  briefingContext: PlannerBriefingContext | null;
 };
 
 const DEFAULT_SESSION_STATE: CompanionPlannerSessionState = {
@@ -215,6 +231,8 @@ const extractPlannerProfile = (
         sourceCount: asNumber(window.sourceCount) ?? 1,
       })),
     cadencePatterns: asNumberRecord(profile.cadencePatterns),
+    workloadTolerance: (asString(profile.workloadTolerance) as PlannerMemoryProfile["workloadTolerance"]) ?? null,
+    contactCadencePatterns: asNumberRecord(profile.contactCadencePatterns),
     lastConfirmedAt: asString(profile.lastConfirmedAt),
   };
 };
@@ -292,6 +310,48 @@ const inferReminderMinutesFromProposal = (kind: CompanionPlannerProposalKind, pa
   return null;
 };
 
+const mapMoodToEnergy = (
+  mood: string | null | undefined,
+): PlannerReflectionSignal["energy"] => {
+  if (!mood) return null;
+  const normalizedMood = mood.toLowerCase();
+  if (/\b(tired|drained|fried|exhausted|overwhelmed|low)\b/.test(normalizedMood)) {
+    return "low";
+  }
+  if (/\b(great|good|energized|strong|locked in|sharp|high)\b/.test(normalizedMood)) {
+    return "high";
+  }
+  return "medium";
+};
+
+const deriveStarterIntentFromMessage = (message: string): CompanionPlannerStarterIntent => {
+  const normalizedMessage = message.trim().toLowerCase();
+
+  if (/\b(tired|drained|fried|make it light|light day|low energy)\b/.test(normalizedMessage)) {
+    return "low_energy_adjust";
+  }
+  if (/\b(free me up|make room|clear space)\b/.test(normalizedMessage)) {
+    return "make_room";
+  }
+  if (/\b(what matters most|top priority|prioritize|focus on)\b/.test(normalizedMessage)) {
+    return "what_matters";
+  }
+  if (/\b(plan my day|what does today look like|show me today|today look like)\b/.test(normalizedMessage)) {
+    return "plan_day";
+  }
+  if (/\b(relationship touch|who should i (?:text|call|reach out to)|who needs attention|follow up with|reach out to someone)\b/.test(normalizedMessage)) {
+    return "relationship_touch";
+  }
+  if (/\b(adjust today|rework today|reschedule today|move today around)\b/.test(normalizedMessage)) {
+    return "adjust_today";
+  }
+  if (/\b(break this goal down|break a big goal|turn this into steps)\b/.test(normalizedMessage)) {
+    return "goal_breakdown";
+  }
+
+  return "general";
+};
+
 const inferScheduledTimeFromProposal = (kind: CompanionPlannerProposalKind, payload: Record<string, unknown>): string | null => {
   if (kind === "create_campaign" || kind === "update_campaign") {
     const habits = Array.isArray(payload.habits) ? payload.habits : [];
@@ -327,33 +387,50 @@ const serializeTaskContext = (task: {
   task_date: string | null;
   scheduled_time: string | null;
   estimated_duration?: number | null;
+  difficulty?: string | null;
   recurrence_pattern: string | null;
   recurrence_end_date?: string | null;
   completed?: boolean | null;
   priority?: string | null;
   source?: string | null;
+  habit_source_id?: string | null;
   epic_id?: string | null;
   epic_title?: string | null;
+  contact_id?: string | null;
 }): PlannerContextTask => ({
   id: task.id,
   title: task.task_text,
   taskDate: task.task_date,
   scheduledTime: task.scheduled_time,
   estimatedDuration: task.estimated_duration ?? null,
+  difficulty: task.difficulty ?? null,
   recurrencePattern: task.recurrence_pattern,
   recurrenceEndDate: task.recurrence_end_date ?? null,
   completed: task.completed ?? null,
   priority: task.priority ?? null,
   source: task.source ?? null,
+  habitSourceId: task.habit_source_id ?? null,
   epicId: task.epic_id ?? null,
   epicTitle: task.epic_title ?? null,
+  contactId: task.contact_id ?? null,
 });
 
-const mapEpicsToContext = (epics: EpicRecord[]): PlannerContextEpic[] =>
+const mapEpicsToContext = (
+  epics: EpicRecord[],
+  currentDate: string,
+): PlannerContextEpic[] =>
   epics.map((epic) => ({
     id: epic.id,
     title: epic.title,
     endDate: epic.end_date,
+    progressPercentage: epic.progress_percentage ?? null,
+    daysRemaining: epic.end_date
+      ? Math.round(
+          (new Date(`${epic.end_date}T00:00:00`).getTime() - new Date(`${currentDate}T00:00:00`).getTime())
+            / (1000 * 60 * 60 * 24),
+        )
+      : null,
+    habitCount: epic.epic_habits?.length ?? 0,
   }));
 
 const mapRitualsToContext = (epics: EpicRecord[]): PlannerContextRitual[] =>
@@ -367,6 +444,7 @@ const mapRitualsToContext = (epics: EpicRecord[]): PlannerContextRitual[] =>
         title: link.habits?.title ?? "Untitled ritual",
         frequency: link.habits?.frequency ?? null,
         preferredTime: link.habits?.preferred_time ?? null,
+        currentStreak: null,
       })),
   );
 
@@ -423,6 +501,7 @@ export function useCompanionPlanner({
 }: UseCompanionPlannerOptions = {}) {
   const { user } = useAuth();
   const { companion } = useCompanion();
+  const { care } = useCompanionCareSignals();
   const queryClient = useQueryClient();
   const storedPreferences = useMemo(readStoredPreferences, []);
   const [horizon, setHorizon] = useState<PlannerHorizon>("day");
@@ -467,6 +546,10 @@ export function useCompanionPlanner({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [plannerMemoryOverride, setPlannerMemoryOverride] = useState<Partial<PlannerMemoryProfile> | null>(null);
   const bootstrappedGreetingRef = useRef(false);
+  const lastSubmissionContextRef = useRef<PlannerSubmissionContext>({
+    starterIntent: null,
+    briefingContext: null,
+  });
 
   const plannerMemoryQuery = useQuery({
     queryKey: ["companion-planner-memory", user?.id],
@@ -478,7 +561,7 @@ export function useCompanionPlanner({
       const [{ data: preferenceRow, error: preferenceError }, { data: learningRow, error: learningError }] = await Promise.all([
         supabase
           .from("daily_planning_preferences")
-          .select("preferred_work_blocks, wake_time, wind_down_time")
+          .select("preferred_work_blocks, wake_time, wind_down_time, cold_contact_threshold_days, default_energy_level, include_relationship_tasks")
           .eq("user_id", user.id)
           .maybeSingle(),
         supabase
@@ -495,10 +578,130 @@ export function useCompanionPlanner({
         preferredWorkBlocks: preferenceRow?.preferred_work_blocks ?? null,
         wakeTime: preferenceRow?.wake_time ?? null,
         windDownTime: preferenceRow?.wind_down_time ?? null,
+        coldContactThresholdDays: preferenceRow?.cold_contact_threshold_days ?? null,
+        defaultEnergyLevel: preferenceRow?.default_energy_level ?? null,
+        includeRelationshipTasks: preferenceRow?.include_relationship_tasks ?? null,
         peakProductivityTimes: learningRow?.peak_productivity_times ?? [],
         schedulingPatterns: learningRow?.scheduling_patterns ?? null,
         successfulPatterns: learningRow?.successful_patterns ?? null,
       };
+    },
+  });
+
+  const contactsAttentionQuery = useQuery({
+    queryKey: ["companion-planner-contacts", user?.id, plannerMemoryQuery.data?.coldContactThresholdDays ?? 14],
+    enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async (): Promise<PlannerContactNeedingAttention[]> => {
+      if (!user?.id) return [];
+
+      const thresholdDays = plannerMemoryQuery.data?.coldContactThresholdDays ?? 14;
+      const nowIso = new Date().toISOString();
+      const { data: overdueReminders } = await supabase
+        .from("contact_reminders")
+        .select("contact_id, reason")
+        .eq("user_id", user.id)
+        .eq("sent", false)
+        .lt("reminder_at", nowIso);
+
+      const { data: contacts, error: contactsError } = await supabase
+        .from("contacts")
+        .select("id, name, avatar_url")
+        .eq("user_id", user.id);
+
+      const { data: interactions, error: interactionsError } = await supabase
+        .from("contact_interactions")
+        .select("contact_id, occurred_at")
+        .eq("user_id", user.id)
+        .order("occurred_at", { ascending: false });
+
+      if (contactsError) throw contactsError;
+      if (interactionsError) throw interactionsError;
+
+      const lastInteractionMap = new Map<string, string>();
+      (interactions ?? []).forEach((interaction) => {
+        if (!lastInteractionMap.has(interaction.contact_id)) {
+          lastInteractionMap.set(interaction.contact_id, interaction.occurred_at);
+        }
+      });
+
+      const overdueMap = new Map<string, string>();
+      (overdueReminders ?? []).forEach((reminder) => {
+        overdueMap.set(reminder.contact_id, reminder.reason || "Follow-up overdue");
+      });
+
+      return (contacts ?? [])
+        .map((contact) => {
+          const lastInteractionAt = lastInteractionMap.get(contact.id);
+          const hasOverdueReminder = overdueMap.has(contact.id);
+          const daysSinceContact = lastInteractionAt
+            ? Math.floor((Date.now() - new Date(lastInteractionAt).getTime()) / (1000 * 60 * 60 * 24))
+            : 999;
+
+          return {
+            id: contact.id,
+            name: contact.name,
+            avatarUrl: contact.avatar_url,
+            daysSinceContact,
+            hasOverdueReminder,
+            reminderReason: overdueMap.get(contact.id) ?? null,
+          };
+        })
+        .filter((contact) => contact.hasOverdueReminder || contact.daysSinceContact >= thresholdDays)
+        .sort((left, right) => {
+          if (left.hasOverdueReminder && !right.hasOverdueReminder) return -1;
+          if (!left.hasOverdueReminder && right.hasOverdueReminder) return 1;
+          return right.daysSinceContact - left.daysSinceContact;
+        });
+    },
+  });
+
+  const reflectionSignalsQuery = useQuery({
+    queryKey: ["companion-planner-reflections", user?.id],
+    enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async (): Promise<PlannerReflectionSignal[]> => {
+      if (!user?.id) return [];
+
+      const [{ data: checkIns, error: checkInError }, { data: reflections, error: reflectionError }] = await Promise.all([
+        supabase
+          .from("daily_check_ins")
+          .select("check_in_date, mood, reflection")
+          .eq("user_id", user.id)
+          .eq("check_in_type", "morning")
+          .order("check_in_date", { ascending: false })
+          .limit(3),
+        supabase
+          .from("evening_reflections")
+          .select("reflection_date, mood, wins, tomorrow_adjustment")
+          .eq("user_id", user.id)
+          .order("reflection_date", { ascending: false })
+          .limit(2),
+      ]);
+
+      if (checkInError) throw checkInError;
+      if (reflectionError) throw reflectionError;
+
+      const checkInSignals: PlannerReflectionSignal[] = (checkIns ?? []).map((checkIn) => ({
+        date: checkIn.check_in_date,
+        source: "check_in",
+        mood: checkIn.mood ?? "unknown",
+        energy: mapMoodToEnergy(checkIn.mood),
+        wins: checkIn.reflection ?? null,
+        tomorrowAdjustment: null,
+      }));
+      const reflectionSignals: PlannerReflectionSignal[] = (reflections ?? []).map((reflection) => ({
+        date: reflection.reflection_date,
+        source: "reflection",
+        mood: reflection.mood ?? "unknown",
+        energy: mapMoodToEnergy(reflection.mood),
+        wins: reflection.wins ?? null,
+        tomorrowAdjustment: reflection.tomorrow_adjustment ?? null,
+      }));
+
+      return [...checkInSignals, ...reflectionSignals]
+        .sort((left, right) => right.date.localeCompare(left.date))
+        .slice(0, 5);
     },
   });
 
@@ -564,10 +767,21 @@ export function useCompanionPlanner({
         ?? [],
       preferredWindows,
       cadencePatterns,
+      workloadTolerance: plannerMemoryOverride?.workloadTolerance
+        ?? remoteProfile.workloadTolerance
+        ?? (plannerMemoryQuery.data?.defaultEnergyLevel === "low"
+          ? "light"
+          : plannerMemoryQuery.data?.defaultEnergyLevel === "high"
+            ? "heavy"
+            : null),
+      contactCadencePatterns: plannerMemoryOverride?.contactCadencePatterns
+        ?? remoteProfile.contactCadencePatterns
+        ?? {},
       lastConfirmedAt: plannerMemoryOverride?.lastConfirmedAt ?? remoteProfile.lastConfirmedAt ?? null,
     };
   }, [
     plannerMemoryOverride,
+    plannerMemoryQuery.data?.defaultEnergyLevel,
     plannerMemoryQuery.data?.peakProductivityTimes,
     plannerMemoryQuery.data?.preferredWorkBlocks,
     plannerMemoryQuery.data?.schedulingPatterns,
@@ -592,12 +806,64 @@ export function useCompanionPlanner({
       plannerMemory,
     }), [activeEventsQuery.events, activeTasks, horizon, plannerMemory, todayIso]);
 
+  const careSignals = useMemo<PlannerCareState>(() => ({
+    overallCare: care.overallCare,
+    hasDormancyWarning: care.hasDormancyWarning,
+    dialogueTone: care.dialogueTone,
+    inactiveDays: care.dormancy.inactiveDays,
+    daysUntilDormancy: care.dormancy.daysUntilDormancy,
+  }), [
+    care.dialogueTone,
+    care.dormancy.daysUntilDormancy,
+    care.dormancy.inactiveDays,
+    care.hasDormancyWarning,
+    care.overallCare,
+  ]);
+
+  const priorityScores = useMemo<PlannerPriorityScore[]>(() =>
+    computePlannerPriorityScores({
+      currentDate: todayIso,
+      tasks: contextTasks.map(serializeTaskContext),
+      inboxTasks: inboxTasks.map(serializeTaskContext),
+      activeEpics: mapEpicsToContext(activeEpics, todayIso),
+      rituals: mapRitualsToContext(activeEpics),
+      calendarEvents: contextEventsQuery.events as PlannerContextCalendarEvent[],
+      contactsNeedingAttention: contactsAttentionQuery.data ?? [],
+      reflectionSignals: reflectionSignalsQuery.data ?? [],
+      careSignals,
+      scheduleInsights,
+      plannerMemory,
+      aiSignals: enrichedContext
+        ? {
+            suggestedWorkload: enrichedContext.suggestedWorkload,
+          }
+        : undefined,
+      starterIntent: "general",
+    }),
+  [
+    activeEpics,
+    careSignals,
+    contactsAttentionQuery.data,
+    contextEventsQuery.events,
+    contextTasks,
+    enrichedContext,
+    inboxTasks,
+    plannerMemory,
+    reflectionSignalsQuery.data,
+    scheduleInsights,
+    todayIso,
+  ]);
+
   const plannerContext = useMemo<CompanionPlannerRequest["plannerContext"]>(() => ({
     tasks: mapTasksToContext(contextTasks.map(serializeTaskContext)),
     inboxTasks: mapTasksToContext(inboxTasks.map(serializeTaskContext)),
-    activeEpics: mapEpicsToContext(activeEpics),
+    activeEpics: mapEpicsToContext(activeEpics, todayIso),
     rituals: mapRitualsToContext(activeEpics),
     calendarEvents: contextEventsQuery.events as PlannerContextCalendarEvent[],
+    contactsNeedingAttention: contactsAttentionQuery.data ?? [],
+    reflectionSignals: reflectionSignalsQuery.data ?? [],
+    careSignals,
+    priorityScores,
     scheduleInsights,
     plannerMemory,
     aiSignals: enrichedContext
@@ -609,7 +875,20 @@ export function useCompanionPlanner({
           suggestedWorkload: enrichedContext.suggestedWorkload,
         }
       : undefined,
-  }), [activeEpics, contextEventsQuery.events, contextTasks, enrichedContext, inboxTasks, plannerMemory, scheduleInsights]);
+  }), [
+    activeEpics,
+    careSignals,
+    contactsAttentionQuery.data,
+    contextEventsQuery.events,
+    contextTasks,
+    enrichedContext,
+    inboxTasks,
+    plannerMemory,
+    priorityScores,
+    reflectionSignalsQuery.data,
+    scheduleInsights,
+    todayIso,
+  ]);
 
   const conversationHistory = useMemo<CompanionPlannerRequest["conversationHistory"]>(() => (
     messages
@@ -712,6 +991,7 @@ export function useCompanionPlanner({
     if (!user?.id) return;
 
     const remoteProfile = extractPlannerProfile(plannerMemoryQuery.data?.preferredWorkBlocks);
+    const latestSubmission = lastSubmissionContextRef.current;
     const proposalTime = inferScheduledTimeFromProposal(proposal.kind, proposal.payload);
     const preferredTimeOfDay = nextSessionState.preferredTimeOfDay
       ?? parseTimeOfDayFromClock(proposalTime)
@@ -735,6 +1015,36 @@ export function useCompanionPlanner({
       cadencePatterns[cadenceKey] = (cadencePatterns[cadenceKey] ?? 0) + 1;
     }
 
+    const contactCadencePatterns = {
+      ...(plannerMemory.contactCadencePatterns ?? {}),
+      ...(remoteProfile.contactCadencePatterns ?? {}),
+    };
+    const contactId = (
+      typeof proposal.payload.contactId === "string"
+        ? proposal.payload.contactId
+        : proposal.kind === "update_quest"
+          ? (
+            proposal.payload.updates &&
+            typeof proposal.payload.updates === "object" &&
+            !Array.isArray(proposal.payload.updates) &&
+            typeof (proposal.payload.updates as Record<string, unknown>).contact_id === "string"
+              ? (proposal.payload.updates as Record<string, string>).contact_id
+              : null
+          )
+          : null
+    ) ?? null;
+
+    if (contactId) {
+      contactCadencePatterns[contactId] = (contactCadencePatterns[contactId] ?? 0) + 1;
+    }
+
+    const workloadTolerance = latestSubmission.starterIntent === "low_energy_adjust"
+      ? "light"
+      : plannerMemory.workloadTolerance
+        ?? remoteProfile.workloadTolerance
+        ?? plannerContext.aiSignals?.suggestedWorkload
+        ?? null;
+
     const preferredWindows = mergePreferredWindows(
       plannerMemory.preferredWindows ?? [],
       preferredTimeOfDay
@@ -755,6 +1065,8 @@ export function useCompanionPlanner({
       reminderMinutesBefore,
       preferredWindows,
       cadencePatterns,
+      workloadTolerance,
+      contactCadencePatterns,
       lastConfirmedAt: new Date().toISOString(),
     };
 
@@ -772,6 +1084,8 @@ export function useCompanionPlanner({
         peakProductivityTimes: nextMemory.peakProductivityTimes ?? [],
         preferredWindows: nextMemory.preferredWindows ?? [],
         cadencePatterns: nextMemory.cadencePatterns ?? {},
+        workloadTolerance: nextMemory.workloadTolerance ?? null,
+        contactCadencePatterns: nextMemory.contactCadencePatterns ?? {},
         lastConfirmedAt: nextMemory.lastConfirmedAt ?? null,
       },
     } satisfies Record<string, Json>;
@@ -788,12 +1102,16 @@ export function useCompanionPlanner({
     if (error) {
       console.warn("Failed to persist companion planner memory:", error);
     }
-  }, [plannerMemory, plannerMemoryQuery.data?.preferredWorkBlocks, tonePack, user?.id]);
+  }, [plannerContext.aiSignals?.suggestedWorkload, plannerMemory, plannerMemoryQuery.data?.preferredWorkBlocks, tonePack, user?.id]);
 
   const submitMessage = useCallback(async (
     rawMessage: string,
     inputMode: CompanionPlannerMessage["inputMode"],
-    options?: { skipUserEcho?: boolean },
+    options?: {
+      skipUserEcho?: boolean;
+      starterIntent?: CompanionPlannerStarterIntent;
+      briefingContext?: PlannerBriefingContext | null;
+    },
   ) => {
     const message = rawMessage.trim();
     if (!message || isSubmitting) return;
@@ -812,6 +1130,32 @@ export function useCompanionPlanner({
     const parsedInput = parseNaturalLanguage(message);
 
     try {
+      const resolvedStarterIntent = options?.starterIntent ?? deriveStarterIntentFromMessage(message);
+      const resolvedBriefingContext = options?.briefingContext ?? null;
+      const requestPriorityScores = computePlannerPriorityScores({
+        currentDate: todayIso,
+        tasks: contextTasks.map(serializeTaskContext),
+        inboxTasks: inboxTasks.map(serializeTaskContext),
+        activeEpics: mapEpicsToContext(activeEpics, todayIso),
+        rituals: mapRitualsToContext(activeEpics),
+        calendarEvents: contextEventsQuery.events as PlannerContextCalendarEvent[],
+        contactsNeedingAttention: contactsAttentionQuery.data ?? [],
+        reflectionSignals: reflectionSignalsQuery.data ?? [],
+        careSignals,
+        briefingContext: resolvedBriefingContext,
+        starterIntent: resolvedStarterIntent,
+        scheduleInsights,
+        plannerMemory,
+        aiSignals: enrichedContext
+          ? {
+              suggestedWorkload: enrichedContext.suggestedWorkload,
+            }
+          : undefined,
+      });
+      lastSubmissionContextRef.current = {
+        starterIntent: resolvedStarterIntent,
+        briefingContext: resolvedBriefingContext,
+      };
       const classification = await classify(message);
       const classificationHint = normalizeClassificationHint(classification);
       const { data, error } = await supabase.functions.invoke("companion-planner-chat", {
@@ -838,7 +1182,12 @@ export function useCompanionPlanner({
             newTitle: parsedInput.newTitle,
           },
           classificationHint,
-          plannerContext,
+          plannerContext: {
+            ...plannerContext,
+            starterIntent: resolvedStarterIntent,
+            briefingContext: resolvedBriefingContext,
+            priorityScores: requestPriorityScores,
+          },
         } satisfies CompanionPlannerRequest,
       });
 
@@ -891,7 +1240,29 @@ export function useCompanionPlanner({
     } finally {
       setIsSubmitting(false);
     }
-  }, [appendAssistantTurn, classify, conversationHistory, horizon, isSubmitting, persistPlannerThreadRows, plannerContext, sessionState, todayIso, tonePack, trackInteraction]);
+  }, [
+    activeEpics,
+    appendAssistantTurn,
+    careSignals,
+    classify,
+    contactsAttentionQuery.data,
+    contextEventsQuery.events,
+    contextTasks,
+    conversationHistory,
+    enrichedContext,
+    horizon,
+    inboxTasks,
+    isSubmitting,
+    persistPlannerThreadRows,
+    plannerContext,
+    plannerMemory,
+    reflectionSignalsQuery.data,
+    scheduleInsights,
+    sessionState,
+    todayIso,
+    tonePack,
+    trackInteraction,
+  ]);
 
   const handleConfirmProposal = useCallback(async (proposalId: string) => {
     const proposal = findProposalById(proposals, proposalId);
@@ -1246,6 +1617,8 @@ export function useCompanionPlanner({
       || monthTasksQuery.isLoading
       || activeEventsQuery.isLoading
       || contextEventsQuery.isLoading
-      || plannerMemoryQuery.isLoading,
+      || plannerMemoryQuery.isLoading
+      || contactsAttentionQuery.isLoading
+      || reflectionSignalsQuery.isLoading,
   };
 }

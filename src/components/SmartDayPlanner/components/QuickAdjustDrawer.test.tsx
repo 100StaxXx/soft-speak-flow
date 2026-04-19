@@ -84,6 +84,7 @@ describe("QuickAdjustDrawer", () => {
             { id: "task-2", task_text: "Write summary", completed: false },
           ]}
           selectedDate={new Date("2026-03-28T10:00:00Z")}
+          onLaunchPlanner={vi.fn()}
           onComplete={vi.fn()}
         />,
       );
@@ -103,5 +104,32 @@ describe("QuickAdjustDrawer", () => {
         delete (HTMLElement.prototype as HTMLElement & { scrollIntoView?: unknown }).scrollIntoView;
       }
     }
+  });
+
+  it("launches the planner instead of applying changes locally", () => {
+    const onLaunchPlanner = vi.fn();
+    const onComplete = vi.fn();
+
+    render(
+      <QuickAdjustDrawer
+        open
+        onOpenChange={vi.fn()}
+        tasks={[
+          { id: "task-1", task_text: "Plan the day", completed: false },
+          { id: "task-2", task_text: "Write summary", completed: false },
+        ]}
+        selectedDate={new Date("2026-03-28T10:00:00Z")}
+        onLaunchPlanner={onLaunchPlanner}
+        onComplete={onComplete}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /push all by 1 hour/i }));
+
+    expect(onLaunchPlanner).toHaveBeenCalledWith(
+      "Push all remaining tasks back by 1 hour.",
+      "adjust_today",
+    );
+    expect(onComplete).toHaveBeenCalledTimes(1);
   });
 });
