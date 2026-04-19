@@ -245,7 +245,15 @@ vi.mock("@/components/companion/WakeUpCelebration", () => ({
 }));
 
 vi.mock("@/components/CompanionAttributes", () => ({
-  CompanionAttributes: () => <div>Attributes</div>,
+  CompanionAttributes: () => <div data-testid="companion-attributes">Attributes</div>,
+}));
+
+vi.mock("@/components/CompanionStatAnalysisSurface", () => ({
+  CompanionStatAnalysisSurface: ({
+    open,
+  }: {
+    open: boolean;
+  }) => (open ? <div data-testid="companion-stats-analysis-surface">Stats Analysis Surface</div> : null),
 }));
 
 vi.mock("@/components/CompanionPersonalization", () => ({
@@ -353,6 +361,27 @@ describe("CompanionDisplay overlay stack", () => {
     expect(
       screen.getByText("Your companion has fallen into a deep sleep"),
     ).toBeInTheDocument();
+  });
+
+  it("renders the stats analysis trigger directly below the stat grid", async () => {
+    render(<CompanionDisplay />);
+
+    await screen.findByText("Nova");
+
+    const attributes = screen.getByTestId("companion-attributes");
+    const trigger = screen.getByTestId("companion-stats-analysis-trigger");
+
+    expect(attributes.compareDocumentPosition(trigger) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(trigger).toHaveTextContent("Analyze My Stats");
+  });
+
+  it("opens the stats analysis surface from the companion card", async () => {
+    render(<CompanionDisplay />);
+
+    await screen.findByText("Nova");
+    fireEvent.click(screen.getByTestId("companion-stats-analysis-trigger"));
+
+    expect(screen.getByTestId("companion-stats-analysis-surface")).toBeInTheDocument();
   });
 
   it("starts subtle idle drift once the companion art has loaded", async () => {

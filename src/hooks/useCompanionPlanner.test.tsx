@@ -1,5 +1,6 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { getCompanionPlannerOpener } from "@/shared/companionPlannerCopy";
 
 const mocks = vi.hoisted(() => ({
   externalCalendarHorizons: [] as string[],
@@ -154,6 +155,18 @@ describe("useCompanionPlanner", () => {
 
     expect(result.current.horizon).toBe("day");
     expect(mocks.externalCalendarHorizons).toEqual(["day", "week"]);
+  });
+
+  it("bootstraps with planner-specific opener copy", async () => {
+    const { result } = renderHook(() => useCompanionPlanner());
+
+    await waitFor(() => {
+      expect(result.current.messages[0]?.content).toBe(
+        getCompanionPlannerOpener({ userId: null }),
+      );
+    });
+
+    expect(result.current.messages[0]?.content).not.toBe("Let's line things up.");
   });
 
   it("shows a rollout-aware planner error instead of a fake lost-thread message", async () => {

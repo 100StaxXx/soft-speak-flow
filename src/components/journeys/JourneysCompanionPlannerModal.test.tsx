@@ -1,12 +1,14 @@
 import type { ReactNode } from "react";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { COMPANION_PLANNER_STARTER_TEMPLATES } from "@/shared/companionPlannerCopy";
 
 const mocks = vi.hoisted(() => ({
   assistant: {
     setDraftInput: vi.fn(),
     submitTypedMessage: vi.fn(),
     submitMessage: vi.fn().mockResolvedValue(undefined),
+    submitPlannerMessage: vi.fn().mockResolvedValue(undefined),
     confirmProposal: vi.fn(),
     rejectProposal: vi.fn(),
     confirmAll: vi.fn(),
@@ -14,27 +16,13 @@ const mocks = vi.hoisted(() => ({
     requestMicrophonePermission: vi.fn(),
     setShowPermissionDialog: vi.fn(),
   },
-}));
-
-vi.mock("@/hooks/useJourneysCompanionVisual", () => ({
-  useJourneysCompanionVisual: () => ({
-    companionLabel: "Nova",
-    imageUrl: "/placeholder-companion.svg",
-    focalX: null,
-    focalY: null,
-    element: "fire",
-    usesPortraitShell: false,
-  }),
-}));
-
-vi.mock("@/hooks/useCompanionAssistant", () => ({
-  useCompanionAssistant: () => ({
-    greeting: "What would help most with your quests right now?",
+  state: {
+    greeting: "What's gucci, fam. Hand me the calendar.",
     messages: [
       {
         id: "chat-1",
         role: "assistant" as const,
-        content: "What would help most with your quests right now?",
+        content: "What's gucci, fam. Hand me the calendar.",
         createdAt: "2026-04-18T08:00:00.000Z",
         source: "chat" as const,
       },
@@ -96,6 +84,29 @@ vi.mock("@/hooks/useCompanionAssistant", () => ({
       },
     ],
     readyProposalCount: 2,
+    draftInput: "Plan tomorrow for me",
+  },
+}));
+
+vi.mock("@/hooks/useJourneysCompanionVisual", () => ({
+  useJourneysCompanionVisual: () => ({
+    companionLabel: "Nova",
+    imageUrl: "/placeholder-companion.svg",
+    focalX: null,
+    focalY: null,
+    element: "fire",
+    usesPortraitShell: false,
+  }),
+}));
+
+vi.mock("@/hooks/useCompanionAssistant", () => ({
+  useCompanionAssistant: () => ({
+    greeting: mocks.state.greeting,
+    messages: mocks.state.messages,
+    questions: mocks.state.questions,
+    proposals: mocks.state.proposals,
+    pendingProposals: mocks.state.pendingProposals,
+    readyProposalCount: mocks.state.readyProposalCount,
     plannerMemory: null,
     scheduleInsights: {
       horizon: "day" as const,
@@ -112,7 +123,7 @@ vi.mock("@/hooks/useCompanionAssistant", () => ({
     isLoadingContext: false,
     horizon: "day" as const,
     setHorizon: vi.fn(),
-    draftInput: "Plan tomorrow for me",
+    draftInput: mocks.state.draftInput,
     setDraftInput: mocks.assistant.setDraftInput,
     interimText: "",
     placeholder: "Pick a starter or tell me what's stuck...",
@@ -127,6 +138,7 @@ vi.mock("@/hooks/useCompanionAssistant", () => ({
     isRequestingPermission: false,
     submitTypedMessage: mocks.assistant.submitTypedMessage,
     submitMessage: mocks.assistant.submitMessage,
+    submitPlannerMessage: mocks.assistant.submitPlannerMessage,
     toggleRecording: mocks.assistant.toggleRecording,
     requestMicrophonePermission: mocks.assistant.requestMicrophonePermission,
     confirmProposal: mocks.assistant.confirmProposal,
@@ -166,6 +178,74 @@ describe("JourneysCompanionPlannerModal", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useRealTimers();
+    mocks.state.greeting = "What's gucci, fam. Hand me the calendar.";
+    mocks.state.messages = [
+      {
+        id: "chat-1",
+        role: "assistant",
+        content: "What's gucci, fam. Hand me the calendar.",
+        createdAt: "2026-04-18T08:00:00.000Z",
+        source: "chat",
+      },
+      {
+        id: "plan-1",
+        role: "assistant",
+        content: "I can turn that into a clean quest flow.",
+        createdAt: "2026-04-18T08:01:00.000Z",
+        source: "plan",
+      },
+    ];
+    mocks.state.questions = [
+      {
+        id: "time_of_day",
+        prompt: "What time of day should this live in your schedule?",
+        required: true,
+        field: "time_of_day",
+        options: ["Morning", "Afternoon", "Evening"],
+      },
+    ];
+    mocks.state.proposals = [
+      {
+        id: "proposal-1",
+        kind: "create_quest",
+        title: "Create Focus quest",
+        summary: "Reserve a focused block tomorrow afternoon.",
+        payload: {},
+        status: "pending",
+        readyToConfirm: true,
+      },
+      {
+        id: "proposal-2",
+        kind: "create_quest",
+        title: "Create Backup quest",
+        summary: "Keep a second backup focus block.",
+        payload: {},
+        status: "pending",
+        readyToConfirm: true,
+      },
+    ];
+    mocks.state.pendingProposals = [
+      {
+        id: "proposal-1",
+        kind: "create_quest",
+        title: "Create Focus quest",
+        summary: "Reserve a focused block tomorrow afternoon.",
+        payload: {},
+        status: "pending",
+        readyToConfirm: true,
+      },
+      {
+        id: "proposal-2",
+        kind: "create_quest",
+        title: "Create Backup quest",
+        summary: "Keep a second backup focus block.",
+        payload: {},
+        status: "pending",
+        readyToConfirm: true,
+      },
+    ];
+    mocks.state.readyProposalCount = 2;
+    mocks.state.draftInput = "Plan tomorrow for me";
     Object.defineProperty(window, "matchMedia", {
       configurable: true,
       writable: true,
@@ -201,7 +281,7 @@ describe("JourneysCompanionPlannerModal", () => {
     expect(screen.getByTestId("journeys-companion-planner-portrait-rail")).toBeInTheDocument();
     expect(screen.getByTestId("journeys-companion-planner-dialogue-screen")).toBeInTheDocument();
     expect(screen.getAllByText("Nova").length).toBeGreaterThanOrEqual(2);
-    expect(screen.getByText("What would help most with your quests right now?")).toBeInTheDocument();
+    expect(screen.getByText("What's gucci, fam. Hand me the calendar.")).toBeInTheDocument();
     await waitFor(() => {
       expect(screen.getByText("I can turn that into a clean quest flow.")).toBeInTheDocument();
       expect(screen.getByText("What time of day should this live in your schedule?")).toBeInTheDocument();
@@ -212,7 +292,48 @@ describe("JourneysCompanionPlannerModal", () => {
     expect(screen.queryByText("Create Backup quest")).not.toBeInTheDocument();
   });
 
-  it("routes composer, starter replies, quick replies, mic taps, and proposal actions through the assistant hook", async () => {
+  it("shows the seeded opener and starter templates on first load", async () => {
+    mocks.state.messages = [
+      {
+        id: "chat-1",
+        role: "assistant",
+        content: "What's gucci, fam. Hand me the calendar.",
+        createdAt: "2026-04-18T08:00:00.000Z",
+        source: "chat",
+      },
+    ];
+    mocks.state.questions = [];
+    mocks.state.proposals = [];
+    mocks.state.pendingProposals = [];
+    mocks.state.readyProposalCount = 0;
+
+    render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        presentation="dialog"
+      />,
+    );
+
+    expect(screen.getByText("What's gucci, fam. Hand me the calendar.")).toBeInTheDocument();
+    expect(screen.getByTestId("journeys-companion-planner-starter-options")).toBeInTheDocument();
+
+    for (const starter of COMPANION_PLANNER_STARTER_TEMPLATES) {
+      expect(screen.getByRole("button", { name: starter })).toBeInTheDocument();
+    }
+
+    fireEvent.click(screen.getByRole("button", { name: "Help me break down a big goal." }));
+
+    await waitFor(() => {
+      expect(mocks.assistant.submitPlannerMessage).toHaveBeenCalledWith(
+        "Help me break down a big goal.",
+        "text",
+      );
+    });
+    expect(mocks.assistant.submitMessage).not.toHaveBeenCalled();
+  });
+
+  it("routes composer, quick replies, mic taps, and proposal actions through the assistant hook", async () => {
     render(
       <JourneysCompanionPlannerModal
         open

@@ -36,6 +36,8 @@ const markUserActive = async () => {
   }
 };
 
+const getLocalDateStamp = () => new Date().toLocaleDateString("en-CA");
+
 /**
  * Centralized XP reward system
  * Use these helpers instead of hard-coding XP values across components
@@ -48,8 +50,10 @@ export const useXPRewards = () => {
   const { multiplier: streakMultiplier } = useStreakMultiplier();
   const {
     awardDisciplineForHabitCompletion,
+    awardWisdomForHabitLearning,
+    awardAlignmentForMorningCheckIn,
+    awardAlignmentForEveningReflection,
     updateWisdomFromLearning,
-    updateAlignmentFromReflection,
     updateFromStreakMilestone,
   } = useCompanionAttributes();
   // Living companion reaction system - safe hook returns no-op when outside provider
@@ -137,16 +141,24 @@ export const useXPRewards = () => {
       // Update attributes in background without waiting - verify companion exists at call time
       const companionId = companion.id;
       if (companionId) {
-        updateWisdomFromLearning(companionId).catch(err => {
-          logger.error('Wisdom update failed:', err);
-        });
         if (options?.habitId && options.date) {
+          awardWisdomForHabitLearning({
+            companionId,
+            habitId: options.habitId,
+            date: options.date,
+          }).catch(err => {
+            logger.error('Wisdom update failed:', err);
+          });
           awardDisciplineForHabitCompletion({
             companionId,
             habitId: options.habitId,
             date: options.date,
           }).catch(err => {
             logger.error('Discipline update failed:', err);
+          });
+        } else {
+          updateWisdomFromLearning(companionId).catch(err => {
+            logger.error('Wisdom update failed:', err);
           });
         }
       }
@@ -246,7 +258,10 @@ export const useXPRewards = () => {
       // Update attributes in background without waiting - verify companion exists at call time
       const companionId = companion.id;
       if (companionId) {
-        updateAlignmentFromReflection(companionId).catch(err => {
+        awardAlignmentForMorningCheckIn({
+          companionId,
+          date: getLocalDateStamp(),
+        }).catch(err => {
           logger.error('Alignment update failed:', err);
         });
       }
@@ -307,7 +322,10 @@ export const useXPRewards = () => {
       // Update soul in background without waiting - verify companion exists at call time
       const companionId = companion.id;
       if (companionId) {
-        updateAlignmentFromReflection(companionId).catch(err => 
+        awardAlignmentForEveningReflection({
+          companionId,
+          date: getLocalDateStamp(),
+        }).catch(err =>
           logger.error('Alignment update failed:', err)
         );
       }

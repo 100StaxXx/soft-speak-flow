@@ -5,6 +5,10 @@ import { useAuth } from "@/hooks/useAuth";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useVoiceInput } from "@/hooks/useVoiceInput";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  COMPANION_PLANNER_OPENER_TEMPLATES,
+  getCompanionPlannerOpener,
+} from "@/shared/companionPlannerCopy";
 import type {
   CompanionChatInputMode,
   CompanionChatRequest,
@@ -14,7 +18,7 @@ import { resolveCompanionChatError } from "@/utils/companionChatErrors";
 
 const MAX_HISTORY_MESSAGES = 8;
 
-export const JOURNEYS_COMPANION_OPENER = "What would help most with your quests right now?";
+export const JOURNEYS_COMPANION_OPENERS = COMPANION_PLANNER_OPENER_TEMPLATES;
 
 type JourneysCompanionMessage = {
   id: string;
@@ -45,8 +49,8 @@ const createMessage = (
   ...extras,
 });
 
-const createInitialMessages = () => [
-  createMessage("assistant", JOURNEYS_COMPANION_OPENER, { isSeed: true }),
+const createInitialMessages = (greeting: string) => [
+  createMessage("assistant", greeting, { isSeed: true }),
 ];
 
 export function useJourneysCompanionConversation() {
@@ -54,8 +58,12 @@ export function useJourneysCompanionConversation() {
   const { companion } = useCompanion();
   const { trackInteraction } = useAIInteractionTracker();
   const sessionIdRef = useRef<string>(generateId());
+  const greeting = useMemo(
+    () => getCompanionPlannerOpener({ userId: user?.id ?? null }),
+    [user?.id],
+  );
 
-  const [messages, setMessages] = useState<JourneysCompanionMessage[]>(() => createInitialMessages());
+  const [messages, setMessages] = useState<JourneysCompanionMessage[]>(() => createInitialMessages(greeting));
   const [draftInput, setDraftInput] = useState("");
   const [interimText, setInterimText] = useState("");
   const [showPermissionDialog, setShowPermissionDialog] = useState(false);
@@ -65,14 +73,14 @@ export function useJourneysCompanionConversation() {
 
   useEffect(() => {
     sessionIdRef.current = generateId();
-    setMessages(createInitialMessages());
+    setMessages(createInitialMessages(greeting));
     setDraftInput("");
     setInterimText("");
     setShowPermissionDialog(false);
     setIsRequestingPermission(false);
     setIsSubmitting(false);
     setPendingPlannerHandoffMessage(null);
-  }, [companion?.id]);
+  }, [companion?.id, greeting]);
 
   const conversationHistory = useMemo(
     () =>
@@ -195,6 +203,7 @@ export function useJourneysCompanionConversation() {
   }, [requestPermission, toggleRecording]);
 
   return {
+    greeting,
     messages,
     draftInput,
     setDraftInput,

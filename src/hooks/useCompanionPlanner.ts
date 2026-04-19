@@ -3,7 +3,6 @@ import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { useCompanionDialogue } from "@/hooks/useCompanionDialogue";
 import { useIntentClassifier } from "@/hooks/useIntentClassifier";
 import { useVoiceInput } from "@/hooks/useVoiceInput";
 import { useTasksQuery } from "@/hooks/useTasksQuery";
@@ -22,6 +21,7 @@ import { buildCompanionPlannerScheduleInsights } from "@/utils/companionPlannerS
 import { resolveCompanionPlannerError } from "@/utils/companionPlannerErrors";
 import type { Json } from "@/integrations/supabase/types";
 import type { EpicRecord } from "@/hooks/epicsQuery";
+import { getCompanionPlannerOpener } from "@/shared/companionPlannerCopy";
 import { LOCKED_COMPANION_TONE_PACK } from "@/shared/companionChaosVoice";
 import type {
   CompanionPlannerMessage,
@@ -358,13 +358,16 @@ export function useCompanionPlanner({
   const { user } = useAuth();
   const storedPreferences = useMemo(readStoredPreferences, []);
   const [horizon, setHorizon] = useState<PlannerHorizon>("day");
-  const { greeting } = useCompanionDialogue();
   const { classify, isClassifying } = useIntentClassifier({
     minInputLength: 1,
     useOrchestrator: true,
   });
   const today = new Date();
   const todayIso = format(today, "yyyy-MM-dd");
+  const plannerGreeting = useMemo(
+    () => getCompanionPlannerOpener({ userId: user?.id ?? null }),
+    [user?.id],
+  );
   const todayTasksQuery = useTasksQuery(today);
   const weekTasksQuery = useCalendarTasks(today, "week");
   const monthTasksQuery = useCalendarTasks(today, "month");
@@ -545,16 +548,16 @@ export function useCompanionPlanner({
   useEffect(() => {
     if (!bootstrapGreeting) return;
     if (bootstrappedGreetingRef.current) return;
-    if (!greeting) return;
+    if (!plannerGreeting) return;
 
     bootstrappedGreetingRef.current = true;
     setMessages([
-      createMessage("companion", greeting, {
+      createMessage("companion", plannerGreeting, {
         questions: [],
         proposalIds: [],
       }),
     ]);
-  }, [bootstrapGreeting, greeting]);
+  }, [bootstrapGreeting, plannerGreeting]);
 
   useEffect(() => {
     writeStoredPreferences({
@@ -998,7 +1001,7 @@ export function useCompanionPlanner({
   const readyProposalCount = pendingProposals.filter((proposal) => proposal.readyToConfirm).length;
 
   return {
-    greeting,
+    greeting: plannerGreeting,
     tonePack,
     setTonePack,
     horizon,

@@ -15,6 +15,13 @@ type DisciplineSourceEvent =
   | "planned_task_on_time"
   | "streak_milestone";
 
+type WisdomSourceEvent = "habit_complete_learning";
+type AlignmentSourceEvent = "morning_check_in" | "evening_reflection";
+type CompanionAttributeSourceEvent =
+  | DisciplineSourceEvent
+  | WisdomSourceEvent
+  | AlignmentSourceEvent;
+
 interface UpdateAttributeParams {
   companionId: string;
   attribute: AttributeType;
@@ -24,7 +31,7 @@ interface UpdateAttributeParams {
 
 interface AwardCompanionAttributeParams {
   attribute: AttributeType;
-  sourceEvent: DisciplineSourceEvent;
+  sourceEvent: CompanionAttributeSourceEvent;
   sourceKey: string;
   amount: number;
   applyEchoGains?: boolean;
@@ -63,6 +70,17 @@ interface HabitDisciplineAwardParams {
 interface PlannedTaskDisciplineAwardParams {
   companionId: string;
   taskId: string;
+}
+
+interface HabitLearningWisdomAwardParams {
+  companionId: string;
+  habitId: string;
+  date: string;
+}
+
+interface AlignmentAwardParams {
+  companionId: string;
+  date?: string;
 }
 
 interface CompanionBadgeStatSnapshot {
@@ -328,6 +346,45 @@ export const useCompanionAttributes = () => {
     },
   });
 
+  const awardWisdomForHabitLearning = useMutation({
+    mutationFn: async ({ companionId: _companionId, habitId, date }: HabitLearningWisdomAwardParams) => {
+      if (!user) throw new Error("Not authenticated");
+      return awardCompanionAttribute.mutateAsync({
+        attribute: "wisdom",
+        sourceEvent: "habit_complete_learning",
+        sourceKey: `habit_complete_learning:${habitId}:${date}`,
+        amount: 8,
+        applyEchoGains: false,
+      });
+    },
+  });
+
+  const awardAlignmentForMorningCheckIn = useMutation({
+    mutationFn: async ({ companionId: _companionId, date }: AlignmentAwardParams) => {
+      if (!user) throw new Error("Not authenticated");
+      return awardCompanionAttribute.mutateAsync({
+        attribute: "alignment",
+        sourceEvent: "morning_check_in",
+        sourceKey: `morning_check_in:${date ?? getLocalDateStamp()}`,
+        amount: 6,
+        applyEchoGains: false,
+      });
+    },
+  });
+
+  const awardAlignmentForEveningReflection = useMutation({
+    mutationFn: async ({ companionId: _companionId, date }: AlignmentAwardParams) => {
+      if (!user) throw new Error("Not authenticated");
+      return awardCompanionAttribute.mutateAsync({
+        attribute: "alignment",
+        sourceEvent: "evening_reflection",
+        sourceKey: `evening_reflection:${date ?? getLocalDateStamp()}`,
+        amount: 6,
+        applyEchoGains: false,
+      });
+    },
+  });
+
   const updateFromStreakMilestone = useMutation({
     mutationFn: async ({ companionId: _companionId, streakDays, date }: StreakMilestoneParams) => {
       if (!user) throw new Error("Not authenticated");
@@ -409,6 +466,9 @@ export const useCompanionAttributes = () => {
     updateDisciplineFromWork: updateDisciplineFromWork.mutateAsync,
     awardDisciplineForHabitCompletion: awardDisciplineForHabitCompletion.mutateAsync,
     awardDisciplineForPlannedTaskOnTime: awardDisciplineForPlannedTaskOnTime.mutateAsync,
+    awardWisdomForHabitLearning: awardWisdomForHabitLearning.mutateAsync,
+    awardAlignmentForMorningCheckIn: awardAlignmentForMorningCheckIn.mutateAsync,
+    awardAlignmentForEveningReflection: awardAlignmentForEveningReflection.mutateAsync,
     updateResolveFromResist: updateResolveFromResist.mutateAsync,
     updateCreativityFromShipping: updateCreativityFromShipping.mutateAsync,
     updateAlignmentFromReflection: updateAlignmentFromReflection.mutateAsync,
@@ -427,4 +487,11 @@ const ATTRIBUTE_DESCRIPTIONS_SIMPLE: Record<AttributeType, { name: string }> = {
   alignment: { name: "Alignment" },
 };
 
-export type { AttributeType, AwardCompanionAttributeResult, DisciplineSourceEvent };
+export type {
+  AlignmentSourceEvent,
+  AttributeType,
+  AwardCompanionAttributeResult,
+  CompanionAttributeSourceEvent,
+  DisciplineSourceEvent,
+  WisdomSourceEvent,
+};

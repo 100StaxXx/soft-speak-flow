@@ -121,6 +121,7 @@ vi.mock("@/hooks/useCompanionChat", () => ({
 
 vi.mock("@/hooks/useJourneysCompanionConversation", () => ({
   useJourneysCompanionConversation: () => ({
+    greeting: "What's gucci, fam. Hand me the calendar.",
     messages: mocks.state.journeysMessages,
     isSubmitting: false,
     submitMessage: mocks.journeysSubmit,
@@ -244,6 +245,26 @@ describe("useCompanionAssistant", () => {
 
     expect(mocks.journeysSubmit).toHaveBeenCalledWith("I just need a pep talk.", "voice");
     expect(mocks.plannerSubmit).not.toHaveBeenCalled();
+  });
+
+  it("lets planner starter submissions bypass the freeform routing heuristic", async () => {
+    const { result } = renderHook(() => useCompanionAssistant({ surface: "journeys" }));
+
+    await act(async () => {
+      await result.current.submitPlannerMessage("Help me break down a big goal.", "text");
+    });
+
+    expect(mocks.plannerSubmit).toHaveBeenCalledWith("Help me break down a big goal.", "text");
+    expect(mocks.journeysSubmit).not.toHaveBeenCalled();
+    expect(mocks.companionSubmit).not.toHaveBeenCalled();
+  });
+
+  it("keeps the existing companion greeting while exposing the planner greeting on journeys", () => {
+    const companion = renderHook(() => useCompanionAssistant({ surface: "companion" }));
+    const journeys = renderHook(() => useCompanionAssistant({ surface: "journeys" }));
+
+    expect(companion.result.current.greeting).toBe("You made it back.");
+    expect(journeys.result.current.greeting).toBe("What's gucci, fam. Hand me the calendar.");
   });
 
   it("keeps routing follow-up answers to the planner while a planner thread is open", async () => {

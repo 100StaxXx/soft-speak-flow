@@ -25,6 +25,7 @@ import { CompanionDialogue } from "@/components/companion/CompanionDialogue";
 import { CompanionMotionSurface } from "@/components/companion/motion/CompanionMotionSurface";
 import { WakeUpCelebration } from "@/components/companion/WakeUpCelebration";
 import { CompanionAttributes } from "@/components/CompanionAttributes";
+import { CompanionStatAnalysisSurface } from "@/components/CompanionStatAnalysisSurface";
 import { CompanionPersonalization } from "@/components/CompanionPersonalization";
 import { CompanionImage, CompanionPortraitShell } from "@/components/CompanionImage";
 import {
@@ -33,6 +34,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { AnimatePresence } from "framer-motion";
 import { cn, formatDisplayLabel } from "@/lib/utils";
 import { deriveCompanionPalette } from "@/lib/companionPalette";
@@ -183,6 +185,7 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
   const [showWelcomeBack, setShowWelcomeBack] = useState(false);
   const [welcomeBackDismissed, setWelcomeBackDismissed] = useState(false);
   const [showRegenerateDialog, setShowRegenerateDialog] = useState(false);
+  const [showStatsAnalysis, setShowStatsAnalysis] = useState(false);
   const [creatureName, setCreatureName] = useState<string | null>(null);
   const [hatchDialogOpen, setHatchDialogOpen] = useState(false);
   const isDesktop = layoutMode === "desktop";
@@ -932,6 +935,18 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
 
             {/* 7-Stat Companion Attributes Grid */}
             <CompanionAttributes companion={displayCompanion} />
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              data-testid="companion-stats-analysis-trigger"
+              className="mt-3 w-full border-primary/20 bg-primary/5 text-foreground hover:bg-primary/10"
+              onClick={() => setShowStatsAnalysis(true)}
+            >
+              <Sparkles className="h-4 w-4 text-primary" />
+              Analyze My Stats
+            </Button>
           </div>
 
           {/* Evolution Path Badge - visible indicator of care patterns */}
@@ -998,6 +1013,14 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
         generationPhase={generationPhase}
         retryCount={retryCount}
       />
+
+      {showStatsAnalysis ? (
+        <CompanionStatAnalysisSurface
+          open={showStatsAnalysis}
+          onOpenChange={setShowStatsAnalysis}
+          layoutMode={layoutMode}
+        />
+      ) : null}
 
       <Dialog open={hatchDialogOpen} onOpenChange={setHatchDialogOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">

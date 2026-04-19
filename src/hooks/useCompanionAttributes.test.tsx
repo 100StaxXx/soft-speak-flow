@@ -150,6 +150,70 @@ describe("useCompanionAttributes discipline awards", () => {
       p_apply_echo_gains: true,
     });
   });
+
+  it("routes learning-linked habit awards through RPC provenance", async () => {
+    const { result } = renderHook(() => useCompanionAttributes(), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await result.current.awardWisdomForHabitLearning({
+        companionId: "companion-1",
+        habitId: "habit-1",
+        date: "2026-03-28",
+      });
+    });
+
+    expect(mocks.rpcMock).toHaveBeenCalledWith("award_companion_attribute", {
+      p_attribute: "wisdom",
+      p_source_event: "habit_complete_learning",
+      p_source_key: "habit_complete_learning:habit-1:2026-03-28",
+      p_amount: 8,
+      p_apply_echo_gains: false,
+    });
+  });
+
+  it("routes morning check-ins through alignment provenance", async () => {
+    const { result } = renderHook(() => useCompanionAttributes(), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await result.current.awardAlignmentForMorningCheckIn({
+        companionId: "companion-1",
+        date: "2026-03-28",
+      });
+    });
+
+    expect(mocks.rpcMock).toHaveBeenCalledWith("award_companion_attribute", {
+      p_attribute: "alignment",
+      p_source_event: "morning_check_in",
+      p_source_key: "morning_check_in:2026-03-28",
+      p_amount: 6,
+      p_apply_echo_gains: false,
+    });
+  });
+
+  it("routes evening reflections through alignment provenance", async () => {
+    const { result } = renderHook(() => useCompanionAttributes(), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await result.current.awardAlignmentForEveningReflection({
+        companionId: "companion-1",
+        date: "2026-03-28",
+      });
+    });
+
+    expect(mocks.rpcMock).toHaveBeenCalledWith("award_companion_attribute", {
+      p_attribute: "alignment",
+      p_source_event: "evening_reflection",
+      p_source_key: "evening_reflection:2026-03-28",
+      p_amount: 6,
+      p_apply_echo_gains: false,
+    });
+  });
 });
 
 describe("getStreakDisciplineGain", () => {

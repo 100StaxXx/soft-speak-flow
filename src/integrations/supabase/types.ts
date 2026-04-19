@@ -1213,6 +1213,61 @@ export type Database = {
           },
         ]
       }
+      companion_stat_analyses: {
+        Row: {
+          analysis_date: string
+          companion_id: string
+          created_at: string | null
+          id: string
+          mentor_id: string | null
+          payload: Json
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          analysis_date: string
+          companion_id: string
+          created_at?: string | null
+          id?: string
+          mentor_id?: string | null
+          payload: Json
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          analysis_date?: string
+          companion_id?: string
+          created_at?: string | null
+          id?: string
+          mentor_id?: string | null
+          payload?: Json
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "companion_stat_analyses_companion_id_fkey"
+            columns: ["companion_id"]
+            isOneToOne: false
+            referencedRelation: "user_companion"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "companion_stat_analyses_mentor_id_fkey"
+            columns: ["mentor_id"]
+            isOneToOne: false
+            referencedRelation: "mentors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "companion_stat_analyses_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       companion_evolution_cards: {
         Row: {
           bond_level: number | null

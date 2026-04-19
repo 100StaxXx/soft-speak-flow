@@ -136,6 +136,18 @@ export function useCompanionAssistant({
       ? "Pick a starter or tell me what's stuck..."
       : "Talk, ask about your schedule, or tell me what to adjust...";
 
+  const submitPlannerMessage = useCallback(async (
+    rawMessage: string,
+    inputMode: CompanionChatInputMode = "text",
+  ) => {
+    const message = rawMessage.trim();
+    if (!message) return;
+
+    setDraftInput("");
+    setInterimText("");
+    await planner.submitMessage(message, inputMode);
+  }, [planner]);
+
   const submitMessage = useCallback(async (
     rawMessage: string,
     inputMode: CompanionChatInputMode = "text",
@@ -252,7 +264,7 @@ export function useCompanionAssistant({
   }, [companionChat]);
 
   return {
-    greeting: surface === "journeys" ? greeting : companionChat.greeting ?? greeting,
+    greeting: surface === "journeys" ? journeysConversation.greeting : companionChat.greeting ?? greeting,
     messages,
     questions: planner.questions,
     proposals: planner.proposals,
@@ -279,6 +291,7 @@ export function useCompanionAssistant({
     isRequestingPermission,
     submitTypedMessage: () => submitMessage(draftInput, "text"),
     submitMessage,
+    submitPlannerMessage,
     toggleRecording,
     requestMicrophonePermission,
     confirmProposal: planner.confirmProposal,

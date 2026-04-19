@@ -40,6 +40,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useCompanionAssistant } from "@/hooks/useCompanionAssistant";
 import { useJourneysCompanionVisual } from "@/hooks/useJourneysCompanionVisual";
 import { cn } from "@/lib/utils";
+import { COMPANION_PLANNER_STARTER_TEMPLATES } from "@/shared/companionPlannerCopy";
 import type {
   CompanionPlannerProposal,
   CompanionPlannerQuestion,
@@ -65,29 +66,7 @@ type PlannerQuestionHistoryEntry = {
   options: string[];
 };
 
-type StarterQuickReply = {
-  label: string;
-  message: string;
-};
-
-const STARTER_QUICK_REPLIES: StarterQuickReply[] = [
-  {
-    label: "Plan today",
-    message: "Help me plan today's quests.",
-  },
-  {
-    label: "Break one down",
-    message: "Help me break one quest into smaller steps.",
-  },
-  {
-    label: "Rework my schedule",
-    message: "Help me reorganize what's on my plate today.",
-  },
-  {
-    label: "Pep talk",
-    message: "I need a quick pep talk before I start.",
-  },
-];
+const STARTER_QUICK_REPLIES = [...COMPANION_PLANNER_STARTER_TEMPLATES];
 
 const questionEntryId = (question: CompanionPlannerQuestion) => `planner-question-${question.id}`;
 
@@ -270,12 +249,12 @@ const JourneysCompanionOverlayBody = memo(() => {
     void assistant.submitMessage(option, "text");
   }, [assistant, completeCurrentAssistantLine, typingMessageId]);
 
-  const handleStarterQuickReply = useCallback((starter: StarterQuickReply) => {
+  const handleStarterQuickReply = useCallback((starter: string) => {
     if (typingMessageId) {
       completeCurrentAssistantLine();
     }
 
-    void assistant.submitMessage(starter.message, "text");
+    void assistant.submitPlannerMessage(starter, "text");
   }, [assistant, completeCurrentAssistantLine, typingMessageId]);
 
   const handleVoiceToggle = useCallback(() => {
@@ -426,14 +405,14 @@ const JourneysCompanionOverlayBody = memo(() => {
                     <div className="mt-2 flex flex-wrap gap-2">
                       {STARTER_QUICK_REPLIES.map((starter) => (
                         <Button
-                          key={starter.label}
+                          key={starter}
                           type="button"
                           size="sm"
                           variant="outline"
                           className="border-[#a58d64] bg-[#f5e6c0] text-[#2f2415] hover:bg-[#f0ddb0]"
                           onClick={() => handleStarterQuickReply(starter)}
                         >
-                          {starter.label}
+                          {starter}
                         </Button>
                       ))}
                     </div>

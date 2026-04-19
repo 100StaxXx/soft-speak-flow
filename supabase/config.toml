@@ -208,6 +208,9 @@ verify_jwt = true
 [functions.generate-companion-tts]
 verify_jwt = true
 
+[functions.generate-companion-stat-analysis]
+verify_jwt = true
+
 [functions.send-apns-notification]
 verify_jwt = false
 

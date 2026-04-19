@@ -5,11 +5,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   rpcMock: vi.fn(),
+  fromMock: vi.fn(),
   showXPToastMock: vi.fn(),
   awardXPMutateMock: vi.fn(),
   awardXPMutateAsyncMock: vi.fn(),
   updateWisdomFromLearningMock: vi.fn(),
-  updateAlignmentFromReflectionMock: vi.fn(),
+  awardWisdomForHabitLearningMock: vi.fn(),
+  awardAlignmentForMorningCheckInMock: vi.fn(),
+  awardAlignmentForEveningReflectionMock: vi.fn(),
   updateFromStreakMilestoneMock: vi.fn(),
   awardDisciplineForHabitCompletionMock: vi.fn(),
   triggerQuestCompleteMock: vi.fn().mockResolvedValue(undefined),
@@ -20,7 +23,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     rpc: mocks.rpcMock,
-    from: vi.fn(),
+    from: mocks.fromMock,
   },
 }));
 
@@ -60,7 +63,9 @@ vi.mock("@/contexts/XPContext", () => ({
 vi.mock("./useCompanionAttributes", () => ({
   useCompanionAttributes: () => ({
     updateWisdomFromLearning: mocks.updateWisdomFromLearningMock,
-    updateAlignmentFromReflection: mocks.updateAlignmentFromReflectionMock,
+    awardWisdomForHabitLearning: mocks.awardWisdomForHabitLearningMock,
+    awardAlignmentForMorningCheckIn: mocks.awardAlignmentForMorningCheckInMock,
+    awardAlignmentForEveningReflection: mocks.awardAlignmentForEveningReflectionMock,
     updateFromStreakMilestone: mocks.updateFromStreakMilestoneMock,
     awardDisciplineForHabitCompletion: mocks.awardDisciplineForHabitCompletionMock,
   }),
@@ -115,15 +120,34 @@ describe("useXPRewards discipline rebalance", () => {
   beforeEach(() => {
     mocks.rpcMock.mockReset();
     mocks.rpcMock.mockResolvedValue({ error: null });
+    mocks.fromMock.mockReset();
     mocks.showXPToastMock.mockClear();
     mocks.awardXPMutateMock.mockClear();
     mocks.awardXPMutateAsyncMock.mockClear();
     mocks.updateWisdomFromLearningMock.mockClear();
-    mocks.updateAlignmentFromReflectionMock.mockClear();
+    mocks.awardWisdomForHabitLearningMock.mockClear();
+    mocks.awardAlignmentForMorningCheckInMock.mockClear();
+    mocks.awardAlignmentForEveningReflectionMock.mockClear();
     mocks.updateFromStreakMilestoneMock.mockClear();
     mocks.awardDisciplineForHabitCompletionMock.mockClear();
     mocks.invalidateQueriesMock.mockClear();
     mocks.loggerErrorMock.mockClear();
+    mocks.updateWisdomFromLearningMock.mockResolvedValue(undefined);
+    mocks.awardWisdomForHabitLearningMock.mockResolvedValue(undefined);
+    mocks.awardAlignmentForMorningCheckInMock.mockResolvedValue(undefined);
+    mocks.awardAlignmentForEveningReflectionMock.mockResolvedValue(undefined);
+    mocks.updateFromStreakMilestoneMock.mockResolvedValue(undefined);
+    mocks.awardDisciplineForHabitCompletionMock.mockResolvedValue(undefined);
+
+    mocks.fromMock.mockReturnValue({
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            eq: vi.fn(async () => ({ count: 0, error: null })),
+          })),
+        })),
+      })),
+    });
   });
 
   it("keeps check-ins on the alignment path without touching discipline", async () => {
@@ -141,8 +165,51 @@ describe("useXPRewards discipline rebalance", () => {
       eventType: "check_in",
       xpAmount: 4,
     }));
-    expect(mocks.updateAlignmentFromReflectionMock).toHaveBeenCalledWith("companion-1");
+    expect(mocks.awardAlignmentForMorningCheckInMock).toHaveBeenCalledWith({
+      companionId: "companion-1",
+      date: expect.any(String),
+    });
     expect(mocks.awardDisciplineForHabitCompletionMock).not.toHaveBeenCalled();
+  });
+
+  it("routes habit completions through tracked wisdom and discipline awards when context is available", async () => {
+    const { result } = renderHook(() => useXPRewards(), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await result.current.awardHabitCompletion({
+        habitId: "habit-1",
+        date: "2026-03-28",
+      });
+    });
+
+    expect(mocks.awardWisdomForHabitLearningMock).toHaveBeenCalledWith({
+      companionId: "companion-1",
+      habitId: "habit-1",
+      date: "2026-03-28",
+    });
+    expect(mocks.awardDisciplineForHabitCompletionMock).toHaveBeenCalledWith({
+      companionId: "companion-1",
+      habitId: "habit-1",
+      date: "2026-03-28",
+    });
+    expect(mocks.updateWisdomFromLearningMock).not.toHaveBeenCalled();
+  });
+
+  it("routes evening reflections through tracked alignment awards", async () => {
+    const { result } = renderHook(() => useXPRewards(), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await result.current.awardReflectionComplete();
+    });
+
+    expect(mocks.awardAlignmentForEveningReflectionMock).toHaveBeenCalledWith({
+      companionId: "companion-1",
+      date: expect.any(String),
+    });
   });
 
   it("returns pep talk award results and only toasts on successful XP awards", async () => {

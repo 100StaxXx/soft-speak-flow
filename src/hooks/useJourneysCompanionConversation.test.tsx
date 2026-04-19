@@ -1,5 +1,9 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  COMPANION_PLANNER_OPENER_TEMPLATES,
+  getCompanionPlannerOpener,
+} from "@/shared/companionPlannerCopy";
 
 const mocks = vi.hoisted(() => ({
   invoke: vi.fn(),
@@ -55,7 +59,7 @@ vi.mock("@/integrations/supabase/client", () => ({
 }));
 
 import {
-  JOURNEYS_COMPANION_OPENER,
+  JOURNEYS_COMPANION_OPENERS,
   useJourneysCompanionConversation,
 } from "./useJourneysCompanionConversation";
 
@@ -66,10 +70,13 @@ describe("useJourneysCompanionConversation", () => {
 
   it("starts with the seeded opener message", () => {
     const { result } = renderHook(() => useJourneysCompanionConversation());
+    const expectedOpener = getCompanionPlannerOpener({ userId: "user-1" });
 
     expect(result.current.messages).toHaveLength(1);
-    expect(result.current.messages[0]?.content).toBe(JOURNEYS_COMPANION_OPENER);
-    expect(result.current.messages[0]?.content).toBe("What would help most with your quests right now?");
+    expect(result.current.messages[0]?.content).toBe(expectedOpener);
+    expect(result.current.greeting).toBe(expectedOpener);
+    expect(COMPANION_PLANNER_OPENER_TEMPLATES).toContain(expectedOpener);
+    expect(JOURNEYS_COMPANION_OPENERS).toContain(expectedOpener);
   });
 
   it("appends a normal assistant reply and tags the request as journeys", async () => {
