@@ -4,6 +4,7 @@ import { format } from "date-fns";
 import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useIntentClassifier } from "@/hooks/useIntentClassifier";
+import type { IntentClassification } from "@/hooks/useIntentClassifier";
 import { useVoiceInput } from "@/hooks/useVoiceInput";
 import { useTasksQuery } from "@/hooks/useTasksQuery";
 import { useCalendarTasks } from "@/hooks/useCalendarTasks";
@@ -344,6 +345,32 @@ const applyMemoryUpdates = (
   preferredTimeReason: updates.preferredTimeReason ?? previous.preferredTimeReason ?? null,
   reminderPreference: updates.reminderPreference ?? previous.reminderPreference ?? null,
 });
+
+const normalizeClassificationHint = (
+  classification: IntentClassification | null,
+): CompanionPlannerRequest["classificationHint"] => {
+  if (!classification) return null;
+
+  const normalized: NonNullable<CompanionPlannerRequest["classificationHint"]> = {
+    type: classification.type,
+    confidence: classification.confidence,
+    reasoning: classification.reasoning,
+  };
+
+  if (typeof classification.suggestedDeadline === "string") {
+    normalized.suggestedDeadline = classification.suggestedDeadline;
+  }
+
+  if (typeof classification.suggestedDuration === "number") {
+    normalized.suggestedDuration = classification.suggestedDuration;
+  }
+
+  if (classification.timelineAnalysis) {
+    normalized.timelineAnalysis = classification.timelineAnalysis;
+  }
+
+  return normalized;
+};
 
 const findProposalById = (proposals: CompanionPlannerProposal[], proposalId: string) =>
   proposals.find((proposal) => proposal.id === proposalId) ?? null;
@@ -688,6 +715,7 @@ export function useCompanionPlanner({
 
     try {
       const classification = await classify(message);
+      const classificationHint = normalizeClassificationHint(classification);
       const { data, error } = await supabase.functions.invoke("companion-planner-chat", {
         body: {
           message,
@@ -709,16 +737,7 @@ export function useCompanionPlanner({
             category: parsedInput.category,
             newTitle: parsedInput.newTitle,
           },
-          classificationHint: classification
-            ? {
-                type: classification.type,
-                confidence: classification.confidence,
-                reasoning: classification.reasoning,
-                suggestedDeadline: classification.suggestedDeadline,
-                suggestedDuration: classification.suggestedDuration,
-                timelineAnalysis: classification.timelineAnalysis,
-              }
-            : null,
+          classificationHint,
           plannerContext,
         } satisfies CompanionPlannerRequest,
       });

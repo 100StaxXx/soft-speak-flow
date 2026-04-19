@@ -197,4 +197,45 @@ describe("useCompanionPlanner", () => {
     );
     expect(result.current.messages[1]?.content).not.toContain("lost the thread");
   });
+
+  it("omits nullable nested classification fields from the planner request body", async () => {
+    mocks.classify.mockResolvedValue({
+      type: "quest",
+      confidence: 0.91,
+      reasoning: "Schedule question",
+      timelineAnalysis: null,
+    });
+    mocks.invoke.mockResolvedValue({
+      data: {
+        reply: "Here is your schedule for 2026-04-18.",
+        followUpQuestions: [],
+        proposals: [],
+        suggestedReminders: [],
+        memoryUpdates: {},
+        sessionState: {
+          draft: {},
+          openQuestionIds: [],
+          preferredTimeOfDay: null,
+          preferredTimeReason: null,
+          reminderPreference: null,
+          lastClassification: "quest",
+        },
+      },
+      error: null,
+    });
+
+    const { result } = renderHook(() => useCompanionPlanner({ bootstrapGreeting: false }));
+
+    await act(async () => {
+      await result.current.submitMessage("What do I have coming up?", "text");
+    });
+
+    const request = mocks.invoke.mock.calls[0]?.[1];
+    expect(request?.body.classificationHint).toEqual({
+      type: "quest",
+      confidence: 0.91,
+      reasoning: "Schedule question",
+    });
+    expect("timelineAnalysis" in request.body.classificationHint).toBe(false);
+  });
 });

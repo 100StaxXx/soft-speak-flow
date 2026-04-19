@@ -8,7 +8,6 @@ export const COMPANION_PLANNER_OPENER_TEMPLATES = [
 ] as const;
 
 export const COMPANION_PLANNER_STARTER_TEMPLATES = [
-  "Plan my day.",
   "What do I have coming up?",
   "Help me make time for what matters most today.",
   "Help me break down a big goal.",

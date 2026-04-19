@@ -360,7 +360,7 @@ const entityTitleMatches = (haystack: string, title: string): boolean => {
 };
 
 const isScheduleQuestion = (message: string): boolean =>
-  /\b(what do i have scheduled|what(?:'s| is) on my calendar|what do i have today|what do i have tomorrow|when am i free|am i free|where do i have room|what(?:'s| is) my schedule|what(?:'s| is) on my plate)\b/i.test(message);
+  /\b(what do i have coming up|what(?:'s| is) coming up|what do i have scheduled|what(?:'s| is) on my calendar|what do i have today|what do i have tomorrow|when am i free|am i free|where do i have room|what(?:'s| is) my schedule|what(?:'s| is) on my plate)\b/i.test(message);
 
 const isAvailabilityQuestion = (message: string): boolean =>
   /\b(when am i free|am i free|where do i have room|what openings do i have|what time do i have free)\b/i.test(message);

@@ -388,6 +388,43 @@ Deno.test("answers schedule questions with quests and connected calendar events 
   assertStringIncludes(result.reply, "Connected calendar events");
 });
 
+Deno.test("answers the coming-up starter prompt with a schedule summary", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "What do I have coming up?",
+    plannerContext: {
+      tasks: [
+        {
+          id: "task-1",
+          title: "Workout",
+          taskDate: "2026-04-18",
+          scheduledTime: "09:00",
+          estimatedDuration: 45,
+          recurrencePattern: null,
+        },
+      ],
+      inboxTasks: [],
+      activeEpics: [],
+      rituals: [],
+      calendarEvents: [
+        {
+          id: "event-1",
+          title: "Therapy",
+          start: "2026-04-18T14:00:00.000Z",
+          end: "2026-04-18T15:00:00.000Z",
+          isAllDay: false,
+          provider: "google",
+          readOnly: true,
+        },
+      ],
+    },
+  }));
+
+  assertEquals(result.proposals.length, 0);
+  assertEquals(result.followUpQuestions.length, 0);
+  assertStringIncludes(result.reply, "Here is your schedule for 2026-04-18.");
+  assertStringIncludes(result.reply, "Connected calendar events");
+});
+
 Deno.test("answers availability questions using both quests and calendar events", () => {
   const result = buildPlannerResponse(baseInput({
     message: "When am I free tomorrow afternoon?",
