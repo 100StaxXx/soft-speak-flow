@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   externalCalendarHorizons: [] as string[],
   classify: vi.fn(),
   invoke: vi.fn(),
+  invalidateQueries: vi.fn(),
   toastError: vi.fn(),
   trackInteraction: vi.fn(),
 }));
@@ -14,6 +15,9 @@ vi.mock("@tanstack/react-query", () => ({
   useQuery: () => ({
     data: null,
     isLoading: false,
+  }),
+  useQueryClient: () => ({
+    invalidateQueries: mocks.invalidateQueries,
   }),
 }));
 
@@ -28,6 +32,12 @@ vi.mock("@/integrations/supabase/client", () => ({
 vi.mock("@/hooks/useAuth", () => ({
   useAuth: () => ({
     user: null,
+  }),
+}));
+
+vi.mock("@/hooks/useCompanion", () => ({
+  useCompanion: () => ({
+    companion: null,
   }),
 }));
 

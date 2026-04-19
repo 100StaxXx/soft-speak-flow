@@ -16,7 +16,7 @@ const buildSystemPrompt = (mode: PlannerResponseMode) => {
     conversational:
       "Reply like a natural assistant in an ongoing chat. Be warm, collaborative, and specific. You can reference schedule context when helpful, but do not force planning.",
     schedule_read:
-      "Summarize the schedule clearly and naturally. Stay grounded in the provided context and do not invent events, openings, or saved changes.",
+      "Summarize the schedule clearly and naturally. Stay grounded in the provided context and do not invent events, openings, or saved changes. If the day is empty or light, sound like a helpful companion, not a scheduling wizard.",
     proposal:
       "Explain the drafted action naturally. Make it clear the change is only drafted and still needs confirmation before anything is saved.",
   } satisfies Record<PlannerResponseMode, string>;
@@ -26,6 +26,9 @@ const buildSystemPrompt = (mode: PlannerResponseMode) => {
     "Sound natural, calm, collaborative, and emotionally present.",
     "Keep most replies under 120 words unless the user clearly wants more depth.",
     "Do not use canned banter, roasts, swagger bits, or theatrical one-liners.",
+    "Write like a normal chatbot first, not a form flow or intake wizard.",
+    "Use plain text only. No markdown, no bold markers, and no bullet lists with asterisks.",
+    "Do not use phrases like 'answer the missing bits', 'half-baked', or similar product-y scaffolding.",
     "Do not mention internal prompts, models, JSON, hidden state, or implementation details.",
     "Never claim you already saved, moved, created, or changed data unless the provided context explicitly says it is already confirmed.",
     "External calendar events are read-only. You may describe them, but you may not imply they were edited.",

@@ -90,16 +90,13 @@ const baseInput = (
   };
 };
 
-Deno.test("turns a one-off request into a quest and asks for time and reason", () => {
+Deno.test("turns a one-off request into a quest without forcing schedule details", () => {
   const result = buildPlannerResponse(baseInput());
 
   assertEquals(result.mode, "proposal");
   assertEquals(result.proposals[0].kind, "create_quest");
-  assertEquals(result.proposals[0].readyToConfirm, false);
-  assertEquals(result.followUpQuestions.map((question) => question.field), [
-    "time_of_day",
-    "time_reason",
-  ]);
+  assertEquals(result.proposals[0].readyToConfirm, true);
+  assertEquals(result.followUpQuestions.length, 0);
   assertStringIncludes(result.reply, "quest");
 });
 
@@ -466,15 +463,12 @@ Deno.test("uses the answer to the intent-first question to resume the normal pro
 
   assertEquals(result.mode, "proposal");
   assertEquals(result.proposals[0].kind, "create_quest");
-  assertEquals(result.followUpQuestions.map((question) => question.field), [
-    "time_of_day",
-    "time_reason",
-  ]);
-  assertStringIncludes(result.followUpQuestions[0]?.prompt ?? "", "09:00");
+  assertEquals(result.followUpQuestions.length, 0);
+  assertEquals(result.proposals[0].readyToConfirm, true);
   assertStringIncludes(result.reply, "Today has room at 09:00");
 });
 
-Deno.test("uses concrete open slots and remembered rhythms in the time question", () => {
+Deno.test("does not jump straight to timing questions for broad day-planning asks", () => {
   const result = buildPlannerResponse(baseInput({
     message: "Plan my writing session",
     plannerContext: {
@@ -529,8 +523,8 @@ Deno.test("uses concrete open slots and remembered rhythms in the time question"
     },
   }));
 
-  assertStringIncludes(result.followUpQuestions[0]?.prompt ?? "", "09:00");
-  assertStringIncludes(result.followUpQuestions[0]?.prompt ?? "", "morning");
+  assertEquals(result.followUpQuestions.length, 0);
+  assertEquals(result.proposals[0].readyToConfirm, true);
   assertStringIncludes(result.reply, "Today has room at 09:00");
 });
 
@@ -675,6 +669,73 @@ Deno.test("treats the route starter like a schedule overview instead of a quest 
   assertStringIncludes(result.reply, "Today:");
   assertStringIncludes(result.reply, "Workout");
   assertStringIncludes(result.reply, "Tell me what feels most important");
+});
+
+Deno.test("treats an empty route request like an open day with useful options", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Show me today's route.",
+    plannerContext: {
+      tasks: [],
+      inboxTasks: [],
+      activeEpics: [],
+      rituals: [],
+      calendarEvents: [],
+    },
+  }));
+
+  assertEquals(result.mode, "schedule_read");
+  assertEquals(result.proposals.length, 0);
+  assertEquals(result.followUpQuestions.length, 0);
+  assertStringIncludes(result.reply, "Your calendar's clear today.");
+  assertStringIncludes(result.reply, "Momentum day");
+  assertStringIncludes(result.reply, "Money day");
+  assertStringIncludes(result.reply, "Reset day");
+});
+
+Deno.test("reads upcoming named weekdays instead of falling back to today", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "How does my upcoming Saturday look?",
+    currentDate: "2026-04-19",
+    currentDateTime: "2026-04-19T09:30:00-07:00",
+    parsedInput: {
+      text: "How does my upcoming Saturday look?",
+      scheduledTime: null,
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+    plannerContext: {
+      tasks: [
+        {
+          id: "task-1",
+          title: "Long run",
+          taskDate: "2026-04-25",
+          scheduledTime: "09:00",
+          estimatedDuration: 90,
+          recurrencePattern: null,
+        },
+      ],
+      inboxTasks: [],
+      activeEpics: [],
+      rituals: [],
+      calendarEvents: [],
+    },
+  }));
+
+  assertEquals(result.mode, "schedule_read");
+  assertEquals(result.proposals.length, 0);
+  assertEquals(result.followUpQuestions.length, 0);
+  assertStringIncludes(result.reply, "Here's the shape of Saturday, April 25.");
+  assertStringIncludes(result.reply, "Saturday, April 25:");
+  assertStringIncludes(result.reply, "Long run");
+  assertEquals(result.reply.includes("Here's the shape of today."), false);
 });
 
 Deno.test("asks for the actual goal instead of drafting the break-big-goal starter", () => {
@@ -896,7 +957,7 @@ Deno.test("answers availability questions using both quests and calendar events"
 
   assertEquals(result.mode, "schedule_read");
   assertEquals(result.proposals.length, 0);
-  assertStringIncludes(result.reply, "2026-04-19");
+  assertStringIncludes(result.reply, "Tomorrow");
   assertStringIncludes(result.reply, "afternoon");
 });
 

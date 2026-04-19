@@ -15,6 +15,8 @@ const mocks = vi.hoisted(() => ({
     toggleRecording: vi.fn(),
     requestMicrophonePermission: vi.fn(),
     setShowPermissionDialog: vi.fn(),
+    archiveCurrentThread: vi.fn().mockResolvedValue(undefined),
+    resumeThread: vi.fn().mockResolvedValue(undefined),
   },
   state: {
     greeting: "The road's open. What are we setting in motion?",
@@ -25,6 +27,7 @@ const mocks = vi.hoisted(() => ({
         content: "The road's open. What are we setting in motion?",
         createdAt: "2026-04-18T08:00:00.000Z",
         source: "chat" as const,
+        isSeed: true,
       },
       {
         id: "plan-1",
@@ -85,6 +88,31 @@ const mocks = vi.hoisted(() => ({
     ],
     readyProposalCount: 2,
     draftInput: "Plan tomorrow for me",
+    activeThread: {
+      sessionId: "journeys-session-1",
+      companionId: "companion-1",
+      surface: "journeys" as const,
+      title: "Current thread",
+      previewText: "The road's open. What are we setting in motion?",
+      createdAt: "2026-04-18T08:00:00.000Z",
+      lastMessageAt: "2026-04-18T08:01:00.000Z",
+      archivedAt: null,
+    },
+    archivedThreads: [
+      {
+        sessionId: "archived-session-1",
+        companionId: "companion-1",
+        surface: "journeys" as const,
+        title: "Earlier thread",
+        previewText: "Let's pick up yesterday's plan.",
+        createdAt: "2026-04-17T08:00:00.000Z",
+        lastMessageAt: "2026-04-17T08:05:00.000Z",
+        archivedAt: "2026-04-17T09:00:00.000Z",
+      },
+    ],
+    canArchiveThread: true,
+    archiveDisabledReason: null as string | null,
+    isLoadingThreads: false,
   },
 }));
 
@@ -126,7 +154,7 @@ vi.mock("@/hooks/useCompanionAssistant", () => ({
     draftInput: mocks.state.draftInput,
     setDraftInput: mocks.assistant.setDraftInput,
     interimText: "",
-    placeholder: "Tell me the move.",
+    placeholder: "Talk to me, or ask how today looks.",
     isSubmitting: false,
     isClassifying: false,
     isRecording: false,
@@ -151,6 +179,13 @@ vi.mock("@/hooks/useCompanionAssistant", () => ({
     isSpeaking: false,
     speechProvider: "none" as const,
     stopSpeaking: vi.fn(),
+    activeThread: mocks.state.activeThread,
+    archivedThreads: mocks.state.archivedThreads,
+    canArchiveThread: mocks.state.canArchiveThread,
+    archiveDisabledReason: mocks.state.archiveDisabledReason,
+    archiveCurrentThread: mocks.assistant.archiveCurrentThread,
+    resumeThread: mocks.assistant.resumeThread,
+    isLoadingThreads: mocks.state.isLoadingThreads,
   }),
 }));
 
@@ -170,6 +205,13 @@ vi.mock("@/components/ui/drawer", () => ({
   DrawerDescription: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 }));
 
+vi.mock("@/components/ui/tooltip", () => ({
+  TooltipProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
+  Tooltip: ({ children }: { children: ReactNode }) => <>{children}</>,
+  TooltipTrigger: ({ children }: { children: ReactNode }) => <>{children}</>,
+  TooltipContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+}));
+
 import { JourneysCompanionPlannerModal } from "./JourneysCompanionPlannerModal";
 
 describe("JourneysCompanionPlannerModal", () => {
@@ -186,6 +228,7 @@ describe("JourneysCompanionPlannerModal", () => {
         content: "The road's open. What are we setting in motion?",
         createdAt: "2026-04-18T08:00:00.000Z",
         source: "chat",
+        isSeed: true,
       },
       {
         id: "plan-1",
@@ -246,6 +289,31 @@ describe("JourneysCompanionPlannerModal", () => {
     ];
     mocks.state.readyProposalCount = 2;
     mocks.state.draftInput = "Plan tomorrow for me";
+    mocks.state.activeThread = {
+      sessionId: "journeys-session-1",
+      companionId: "companion-1",
+      surface: "journeys",
+      title: "Current thread",
+      previewText: "The road's open. What are we setting in motion?",
+      createdAt: "2026-04-18T08:00:00.000Z",
+      lastMessageAt: "2026-04-18T08:01:00.000Z",
+      archivedAt: null,
+    };
+    mocks.state.archivedThreads = [
+      {
+        sessionId: "archived-session-1",
+        companionId: "companion-1",
+        surface: "journeys",
+        title: "Earlier thread",
+        previewText: "Let's pick up yesterday's plan.",
+        createdAt: "2026-04-17T08:00:00.000Z",
+        lastMessageAt: "2026-04-17T08:05:00.000Z",
+        archivedAt: "2026-04-17T09:00:00.000Z",
+      },
+    ];
+    mocks.state.canArchiveThread = true;
+    mocks.state.archiveDisabledReason = null;
+    mocks.state.isLoadingThreads = false;
     Object.defineProperty(window, "matchMedia", {
       configurable: true,
       writable: true,
@@ -305,6 +373,7 @@ describe("JourneysCompanionPlannerModal", () => {
         content: "The road's open. What are we setting in motion?",
         createdAt: "2026-04-18T08:00:00.000Z",
         source: "chat",
+        isSeed: true,
       },
     ];
     mocks.state.questions = [];
@@ -322,7 +391,7 @@ describe("JourneysCompanionPlannerModal", () => {
 
     expect(screen.getByText("The road's open. What are we setting in motion?")).toBeInTheDocument();
     expect(screen.getByTestId("journeys-companion-planner-starter-options")).toBeInTheDocument();
-    expect(screen.getByTestId("journeys-companion-planner-text-input")).toHaveAttribute("placeholder", "Tell me the move.");
+    expect(screen.getByTestId("journeys-companion-planner-text-input")).toHaveAttribute("placeholder", "Talk to me, or ask how today looks.");
     expect(screen.queryByText("Quick start")).not.toBeInTheDocument();
 
     for (const starter of COMPANION_PLANNER_STARTER_TEMPLATES) {
@@ -333,12 +402,41 @@ describe("JourneysCompanionPlannerModal", () => {
     fireEvent.click(screen.getByRole("button", { name: "Help me break a big goal into steps." }));
 
     await waitFor(() => {
-      expect(mocks.assistant.submitPlannerMessage).toHaveBeenCalledWith(
+      expect(mocks.assistant.submitMessage).toHaveBeenCalledWith(
         "Help me break a big goal into steps.",
         "text",
       );
     });
-    expect(mocks.assistant.submitMessage).not.toHaveBeenCalled();
+    expect(mocks.assistant.submitPlannerMessage).not.toHaveBeenCalled();
+  });
+
+  it("strips raw markdown markers from assistant transcript bubbles", async () => {
+    mocks.state.messages = [
+      {
+        id: "chat-1",
+        role: "assistant",
+        content: "Your **calendar** is clear today.",
+        createdAt: "2026-04-18T08:00:00.000Z",
+        source: "chat",
+      },
+    ];
+    mocks.state.questions = [];
+    mocks.state.proposals = [];
+    mocks.state.pendingProposals = [];
+    mocks.state.readyProposalCount = 0;
+
+    render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        presentation="dialog"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Your calendar is clear today.")).toBeInTheDocument();
+    });
+    expect(screen.queryByText("Your **calendar** is clear today.")).not.toBeInTheDocument();
   });
 
   it("routes composer, quick replies, mic taps, and proposal actions through the assistant hook", async () => {
@@ -367,6 +465,43 @@ describe("JourneysCompanionPlannerModal", () => {
     expect(mocks.assistant.confirmProposal).toHaveBeenCalledWith("proposal-1");
     expect(mocks.assistant.rejectProposal).toHaveBeenCalledWith("proposal-1");
     expect(mocks.assistant.confirmAll).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders the archive control and disables it when the thread cannot be archived", () => {
+    mocks.state.canArchiveThread = false;
+    mocks.state.archiveDisabledReason = "Finish or dismiss the current plan before archiving this thread.";
+
+    render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        presentation="dialog"
+      />,
+    );
+
+    expect(screen.getByTestId("journeys-companion-archive-button")).toBeDisabled();
+    expect(screen.getByText("Finish or dismiss the current plan before archiving this thread.")).toBeInTheDocument();
+  });
+
+  it("opens the thread picker and resumes archived threads from it", async () => {
+    render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        presentation="dialog"
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("journeys-companion-thread-picker-trigger"));
+
+    expect(screen.getByTestId("journeys-companion-thread-picker")).toBeInTheDocument();
+    expect(screen.getByText("Earlier thread")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("journeys-companion-thread-resume-archived-session-1"));
+
+    await waitFor(() => {
+      expect(mocks.assistant.resumeThread).toHaveBeenCalledWith("archived-session-1");
+    });
   });
 
   it("reveals assistant text letter-by-letter and lets send finish the current line", () => {

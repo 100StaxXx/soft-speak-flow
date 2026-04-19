@@ -2,11 +2,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { toast } from "@/components/ui/sonner";
 import { parseNaturalLanguage } from "@/features/tasks/hooks/useNaturalLanguageParser";
+import { useAuth } from "@/hooks/useAuth";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionChat } from "@/hooks/useCompanionChat";
 import { useCompanionDialogue } from "@/hooks/useCompanionDialogue";
 import { useCompanionPlanner } from "@/hooks/useCompanionPlanner";
+import { useJourneysCompanionConversation } from "@/hooks/useJourneysCompanionConversation";
+import { useJourneysCompanionThreads } from "@/hooks/useJourneysCompanionThreads";
 import { useVoiceInput } from "@/hooks/useVoiceInput";
+import { stripMarkdown } from "@/lib/utils";
 import {
   speakCompanionReply,
   stopCompanionSpeech,
@@ -23,6 +27,7 @@ export interface CompanionAssistantMessage {
   createdAt: string;
   inputMode?: CompanionChatInputMode;
   source: "chat" | "plan";
+  isSeed?: boolean;
 }
 
 interface UseCompanionAssistantOptions {
@@ -30,11 +35,34 @@ interface UseCompanionAssistantOptions {
   conversationEnabled?: boolean;
 }
 
-const PLANNING_SIGNAL_REGEX =
-  /\b(schedule|scheduled|calendar|free|availability|openings|plan|replan|reschedule|move|shift|push|pull|adjust|edit|update|rename|campaign|ritual|habit|quest|quests|task|tasks|remind|repeat|tomorrow|today|tonight|this afternoon|this morning|this evening)\b/i;
-
 const SCHEDULE_QUESTION_REGEX =
-  /\b(what do i have scheduled|what(?:'s| is) on my calendar|when am i free|am i free|what do i have today|what do i have tomorrow|where do i have room)\b/i;
+  /\b(what do i have scheduled|what(?:'s| is) on my calendar|when am i free|am i free|what do i have today|what do i have tomorrow|where do i have room|show me today(?:'s)? route|show me tomorrow(?:'s)? route|how does (?:today|tomorrow|my day) look)\b/i;
+const SCHEDULE_DAY_REFERENCE_REGEX =
+  /\b(?:today|tomorrow|my day|(?:my\s+)?(?:this\s+|next\s+|upcoming\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday))\b/i;
+
+const DIRECT_DAY_PLANNING_REGEX =
+  /\b(plan(?: my)? (?:day|today|tomorrow|week)|organize(?: my)? (?:day|today|week)|prioritize(?: my)? (?:day|today|week)|build (?:me )?(?:a )?(?:day|week) plan)\b/i;
+
+const PLANNER_ACTION_REGEX =
+  /\b(schedule|scheduled|replan|reschedule|move|shift|push|pull|adjust|edit|update|rename|repeat|remind|create|add|set up|turn .+ into)\b/i;
+
+const PLANNER_ENTITY_REGEX =
+  /\b(calendar|campaign|ritual|habit|quest|quests|task|tasks|reminder|reminders)\b/i;
+
+const isScheduleReadMessage = (message: string): boolean => {
+  if (SCHEDULE_QUESTION_REGEX.test(message)) return true;
+  if (!SCHEDULE_DAY_REFERENCE_REGEX.test(message)) return false;
+
+  if (
+    /\b(when am i free|am i free|where do i have room|what(?:'s| is) open|what openings do i have|what time do i have free)\b/i
+      .test(message)
+  ) {
+    return true;
+  }
+
+  return /\b(show me|how does|how(?:'s| is)|what does)\b/i.test(message) &&
+    /\b(route|look|looking|schedule)\b/i.test(message);
+};
 
 const normalizeConversationMessages = (
   messages: Array<{
@@ -43,15 +71,19 @@ const normalizeConversationMessages = (
     content: string;
     createdAt: string;
     inputMode?: CompanionChatInputMode;
+    isSeed?: boolean;
   }>,
 ): CompanionAssistantMessage[] =>
   messages.map((message) => ({
     id: message.id,
     role: message.role,
-    content: message.content,
+    content: message.role === "assistant"
+      ? stripMarkdown(message.content)
+      : message.content,
     createdAt: message.createdAt,
     inputMode: message.inputMode,
     source: "chat",
+    isSeed: message.isSeed,
   }));
 
 const normalizePlannerMessages = (
@@ -66,10 +98,13 @@ const normalizePlannerMessages = (
   messages.map((message) => ({
     id: message.id,
     role: message.role === "companion" ? "assistant" : "user",
-    content: message.content,
+    content: message.role === "companion"
+      ? stripMarkdown(message.content)
+      : message.content,
     createdAt: message.createdAt,
     inputMode: message.inputMode,
     source: "plan",
+    isSeed: false,
   }));
 
 const sortMessages = (messages: CompanionAssistantMessage[]) =>
@@ -97,22 +132,33 @@ const shouldRouteToPlanner = (
     return true;
   }
 
-  return SCHEDULE_QUESTION_REGEX.test(message) || PLANNING_SIGNAL_REGEX.test(message);
+  if (isScheduleReadMessage(message)) return true;
+  if (DIRECT_DAY_PLANNING_REGEX.test(message)) return true;
+
+  return PLANNER_ACTION_REGEX.test(message) && PLANNER_ENTITY_REGEX.test(message);
 };
 
 export function useCompanionAssistant({
   surface,
   conversationEnabled = true,
 }: UseCompanionAssistantOptions) {
+  const { user } = useAuth();
   const { companion } = useCompanion();
   const { voiceStyle, greeting } = useCompanionDialogue();
   const companionChat = useCompanionChat({
     enabled: surface === "companion" && conversationEnabled,
   });
+  const journeysConversation = useJourneysCompanionConversation();
   const planner = useCompanionPlanner({
-    bootstrapGreeting: surface === "journeys",
+    bootstrapGreeting: false,
+    threadPersistence: surface === "journeys"
+      ? {
+          enabled: true,
+          surface: "journeys",
+        }
+      : undefined,
   });
-  const conversation = companionChat;
+  const conversation = surface === "journeys" ? journeysConversation : companionChat;
 
   const [draftInput, setDraftInput] = useState("");
   const [interimText, setInterimText] = useState("");
@@ -121,10 +167,14 @@ export function useCompanionAssistant({
   const [plannerSpeechProvider, setPlannerSpeechProvider] = useState<CompanionSpeechProvider>("none");
   const [plannerIsSpeaking, setPlannerIsSpeaking] = useState(false);
   const lastSpokenPlannerMessageIdRef = useRef<string | null>(null);
+  const pendingPlannerHandoffRef = useRef<string | null>(null);
 
   const messages = useMemo(() => (
     surface === "journeys"
-      ? normalizePlannerMessages(planner.messages)
+      ? sortMessages([
+        ...normalizeConversationMessages(conversation.messages),
+        ...normalizePlannerMessages(planner.messages),
+      ])
       : sortMessages([
         ...normalizeConversationMessages(conversation.messages),
         ...normalizePlannerMessages(planner.messages),
@@ -134,11 +184,29 @@ export function useCompanionAssistant({
   const hasOpenPlannerThread = planner.questions.length > 0
     || planner.pendingProposals.some((proposal) => proposal.status === "pending");
 
-  const activePlaceholder = surface === "journeys"
-    ? "Tell me the move."
-    : hasOpenPlannerThread
-      ? "Answer or refine the plan..."
-      : "Talk, ask about your schedule, or tell me what to adjust...";
+  const journeysThreads = useJourneysCompanionThreads({
+    enabled: surface === "journeys",
+    userId: user?.id,
+    companionId: companion?.id,
+    greeting: journeysConversation.greeting,
+    messages: surface === "journeys" ? messages : [],
+    hasPendingPlannerWork: hasOpenPlannerThread,
+    isBusy: planner.isSubmitting || planner.isClassifying || conversation.isSubmitting,
+    conversation: {
+      resetThread: journeysConversation.resetThread,
+      hydrateThread: journeysConversation.hydrateThread,
+    },
+    planner: {
+      resetThread: planner.resetThread,
+      hydrateThread: planner.hydrateThread,
+    },
+  });
+
+  const activePlaceholder = hasOpenPlannerThread
+    ? "Reply here..."
+    : surface === "journeys"
+      ? "Talk to me, or ask how today looks."
+      : "Talk to me, or ask what your day looks like.";
 
   const submitPlannerMessage = useCallback(async (
     rawMessage: string,
@@ -158,13 +226,6 @@ export function useCompanionAssistant({
   ) => {
     const message = rawMessage.trim();
     if (!message) return;
-
-    if (surface === "journeys") {
-      setDraftInput("");
-      setInterimText("");
-      await planner.submitMessage(message, inputMode);
-      return;
-    }
 
     const routeToPlanner = shouldRouteToPlanner(message, hasOpenPlannerThread);
     setDraftInput("");
@@ -186,6 +247,31 @@ export function useCompanionAssistant({
     conversationEnabled,
     hasOpenPlannerThread,
     planner,
+    surface,
+  ]);
+
+  useEffect(() => {
+    if (surface !== "journeys") return;
+    const pendingMessage = journeysConversation.pendingPlannerHandoffMessage;
+    if (!pendingMessage) {
+      pendingPlannerHandoffRef.current = null;
+      return;
+    }
+    if (pendingPlannerHandoffRef.current === pendingMessage) return;
+
+    pendingPlannerHandoffRef.current = pendingMessage;
+
+    void planner.submitMessage(
+      pendingMessage,
+      "text",
+      { skipUserEcho: true },
+    ).finally(() => {
+      journeysConversation.clearPlannerHandoff();
+    });
+  }, [
+    journeysConversation.clearPlannerHandoff,
+    journeysConversation.pendingPlannerHandoffMessage,
+    planner.submitMessage,
     surface,
   ]);
 
@@ -275,7 +361,9 @@ export function useCompanionAssistant({
   }, [companionChat]);
 
   return {
-    greeting: surface === "journeys" ? planner.greeting : companionChat.greeting ?? greeting,
+    greeting: surface === "journeys"
+      ? journeysConversation.greeting
+      : companionChat.greeting ?? greeting,
     messages,
     questions: planner.questions,
     proposals: planner.proposals,
@@ -291,7 +379,7 @@ export function useCompanionAssistant({
     setDraftInput,
     interimText,
     placeholder: activePlaceholder,
-    isSubmitting: surface === "journeys" ? planner.isSubmitting : planner.isSubmitting || conversation.isSubmitting,
+    isSubmitting: planner.isSubmitting || conversation.isSubmitting,
     isClassifying: planner.isClassifying,
     isRecording,
     isAutoStopping,
@@ -315,5 +403,26 @@ export function useCompanionAssistant({
     isSpeaking: plannerIsSpeaking || companionChat.isSpeaking,
     speechProvider: plannerIsSpeaking ? plannerSpeechProvider : companionChat.speechProvider,
     stopSpeaking,
+    activeThread: surface === "journeys"
+      ? journeysThreads.activeThread
+      : null,
+    archivedThreads: surface === "journeys"
+      ? journeysThreads.archivedThreads
+      : [],
+    canArchiveThread: surface === "journeys"
+      ? journeysThreads.canArchiveThread
+      : false,
+    archiveDisabledReason: surface === "journeys"
+      ? journeysThreads.archiveDisabledReason
+      : null,
+    archiveCurrentThread: surface === "journeys"
+      ? journeysThreads.archiveCurrentThread
+      : (async () => undefined),
+    resumeThread: surface === "journeys"
+      ? journeysThreads.resumeThread
+      : (async () => undefined),
+    isLoadingThreads: surface === "journeys"
+      ? journeysThreads.isLoadingThreads
+      : false,
   };
 }

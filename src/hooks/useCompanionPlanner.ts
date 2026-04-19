@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -17,14 +17,23 @@ import { useUserAIContext } from "@/hooks/useUserAIContext";
 import { useAIInteractionTracker } from "@/hooks/useAIInteractionTracker";
 import { useSchedulingLearner } from "@/hooks/useSchedulingLearner";
 import { useAuth } from "@/hooks/useAuth";
+import { useCompanion } from "@/hooks/useCompanion";
 import { parseNaturalLanguage } from "@/features/tasks/hooks/useNaturalLanguageParser";
 import { buildCompanionPlannerScheduleInsights } from "@/utils/companionPlannerSchedule";
 import { resolveCompanionPlannerError } from "@/utils/companionPlannerErrors";
 import type { Json } from "@/integrations/supabase/types";
 import type { EpicRecord } from "@/hooks/epicsQuery";
+import { stripMarkdown } from "@/lib/utils";
+import {
+  getCompanionChatThreadsQueryKey,
+  generateCompanionThreadSessionId,
+  persistCompanionThreadMessages,
+} from "@/services/companionChatThreads";
 import { getCompanionPlannerOpener } from "@/shared/companionPlannerCopy";
 import { LOCKED_COMPANION_TONE_PACK } from "@/shared/companionChaosVoice";
 import type {
+  CompanionChatSurface,
+  CompanionChatThreadMessage,
   CompanionPlannerMessage,
   CompanionPlannerProposalKind,
   CompanionPlannerProposal,
@@ -79,6 +88,15 @@ const generateId = () => {
 
   return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 };
+
+const createInitialSessionState = (
+  storedPreferences: StoredPlannerPreferences,
+): CompanionPlannerSessionState => ({
+  ...DEFAULT_SESSION_STATE,
+  preferredTimeOfDay: storedPreferences.preferredTimeOfDay ?? null,
+  preferredTimeReason: storedPreferences.preferredTimeReason ?? null,
+  reminderPreference: storedPreferences.reminderPreference ?? null,
+});
 
 const createMessage = (
   role: CompanionPlannerMessage["role"],
@@ -393,12 +411,19 @@ const findProposalById = (proposals: CompanionPlannerProposal[], proposalId: str
 
 interface UseCompanionPlannerOptions {
   bootstrapGreeting?: boolean;
+  threadPersistence?: {
+    enabled?: boolean;
+    surface?: CompanionChatSurface;
+  };
 }
 
 export function useCompanionPlanner({
   bootstrapGreeting = true,
+  threadPersistence,
 }: UseCompanionPlannerOptions = {}) {
   const { user } = useAuth();
+  const { companion } = useCompanion();
+  const queryClient = useQueryClient();
   const storedPreferences = useMemo(readStoredPreferences, []);
   const [horizon, setHorizon] = useState<PlannerHorizon>("day");
   const { classify, isClassifying } = useIntentClassifier({
@@ -428,15 +453,13 @@ export function useCompanionPlanner({
   const setTonePack = useCallback((_nextTonePack: PlannerTonePack) => {
     return;
   }, []);
+  const sessionIdRef = useRef<string>(generateCompanionThreadSessionId());
   const [messages, setMessages] = useState<CompanionPlannerMessage[]>([]);
   const [proposals, setProposals] = useState<CompanionPlannerProposal[]>([]);
   const [questions, setQuestions] = useState<CompanionPlannerQuestion[]>([]);
-  const [sessionState, setSessionState] = useState<CompanionPlannerSessionState>({
-    ...DEFAULT_SESSION_STATE,
-    preferredTimeOfDay: storedPreferences.preferredTimeOfDay ?? null,
-    preferredTimeReason: storedPreferences.preferredTimeReason ?? null,
-    reminderPreference: storedPreferences.reminderPreference ?? null,
-  });
+  const [sessionState, setSessionState] = useState<CompanionPlannerSessionState>(() =>
+    createInitialSessionState(storedPreferences),
+  );
   const [draftInput, setDraftInput] = useState("");
   const [interimText, setInterimText] = useState("");
   const [showPermissionDialog, setShowPermissionDialog] = useState(false);
@@ -620,7 +643,46 @@ export function useCompanionPlanner({
     });
   }, [sessionState.preferredTimeOfDay, sessionState.preferredTimeReason, sessionState.reminderPreference, tonePack]);
 
+  const persistPlannerThreadRows = useCallback(async (
+    rows: Array<{
+      role: "assistant" | "user";
+      content: string;
+      createdAt: string;
+      inputMode?: CompanionPlannerMessage["inputMode"];
+    }>,
+  ) => {
+    if (!threadPersistence?.enabled || threadPersistence.surface !== "journeys") return;
+    if (!user?.id || !companion?.id) return;
+    if (rows.length === 0) return;
+
+    try {
+      await persistCompanionThreadMessages({
+        userId: user.id,
+        companionId: companion.id,
+        sessionId: sessionIdRef.current,
+        surface: threadPersistence.surface,
+        source: "plan",
+        rows,
+      });
+
+      await queryClient.invalidateQueries({
+        queryKey: getCompanionChatThreadsQueryKey(
+          user.id,
+          companion.id,
+          threadPersistence.surface,
+        ),
+      });
+    } catch (error) {
+      console.warn("Failed to persist journeys planner thread rows:", error);
+    }
+  }, [companion?.id, queryClient, threadPersistence?.enabled, threadPersistence?.surface, user?.id]);
+
   const appendAssistantTurn = useCallback((response: CompanionPlannerResponse) => {
+    const assistantMessage = createMessage("companion", stripMarkdown(response.reply), {
+      questions: response.followUpQuestions,
+      proposalIds: [...response.proposals, ...response.suggestedReminders].map((proposal) => proposal.id),
+    });
+
     setQuestions(response.followUpQuestions);
     setProposals((previous) => {
       const settled = previous.filter((proposal) => proposal.status !== "pending");
@@ -637,12 +699,10 @@ export function useCompanionPlanner({
     });
     setMessages((previous) => [
       ...previous,
-      createMessage("companion", response.reply, {
-        questions: response.followUpQuestions,
-        proposalIds: [...response.proposals, ...response.suggestedReminders].map((proposal) => proposal.id),
-      }),
+      assistantMessage,
     ]);
     setSessionState(response.sessionState);
+    return assistantMessage;
   }, []);
 
   const persistPlannerMemory = useCallback(async (
@@ -733,6 +793,7 @@ export function useCompanionPlanner({
   const submitMessage = useCallback(async (
     rawMessage: string,
     inputMode: CompanionPlannerMessage["inputMode"],
+    options?: { skipUserEcho?: boolean },
   ) => {
     const message = rawMessage.trim();
     if (!message || isSubmitting) return;
@@ -740,10 +801,13 @@ export function useCompanionPlanner({
     setIsSubmitting(true);
     setDraftInput("");
     setInterimText("");
-    setMessages((previous) => [
-      ...previous,
-      createMessage("user", message, { inputMode }),
-    ]);
+    const userMessage = createMessage("user", message, { inputMode });
+    if (!options?.skipUserEcho) {
+      setMessages((previous) => [
+        ...previous,
+        userMessage,
+      ]);
+    }
 
     const parsedInput = parseNaturalLanguage(message);
 
@@ -782,10 +846,28 @@ export function useCompanionPlanner({
 
       const response = data as CompanionPlannerResponse;
       const nextSession = applyMemoryUpdates(response.sessionState, response.memoryUpdates);
-      appendAssistantTurn({
+      const assistantMessage = appendAssistantTurn({
         ...response,
         sessionState: nextSession,
       });
+
+      await persistPlannerThreadRows([
+        ...(
+          options?.skipUserEcho
+            ? []
+            : [{
+                role: "user" as const,
+                content: userMessage.content,
+                createdAt: userMessage.createdAt,
+                inputMode: userMessage.inputMode,
+              }]
+        ),
+        {
+          role: "assistant",
+          content: assistantMessage.content,
+          createdAt: assistantMessage.createdAt,
+        },
+      ]);
 
       await trackInteraction({
         interactionType: "companion_planner",
@@ -809,7 +891,7 @@ export function useCompanionPlanner({
     } finally {
       setIsSubmitting(false);
     }
-  }, [appendAssistantTurn, classify, conversationHistory, horizon, isSubmitting, plannerContext, sessionState, todayIso, tonePack, trackInteraction]);
+  }, [appendAssistantTurn, classify, conversationHistory, horizon, isSubmitting, persistPlannerThreadRows, plannerContext, sessionState, todayIso, tonePack, trackInteraction]);
 
   const handleConfirmProposal = useCallback(async (proposalId: string) => {
     const proposal = findProposalById(proposals, proposalId);
@@ -947,9 +1029,17 @@ export function useCompanionPlanner({
             : candidate,
         ),
       );
+      const confirmationMessage = createMessage("companion", `Saved: ${proposal.title}.`);
       setMessages((previous) => [
         ...previous,
-        createMessage("companion", `Saved: ${proposal.title}.`),
+        confirmationMessage,
+      ]);
+      await persistPlannerThreadRows([
+        {
+          role: "assistant",
+          content: confirmationMessage.content,
+          createdAt: confirmationMessage.createdAt,
+        },
       ]);
       const nextSessionState = {
         ...sessionState,
@@ -977,6 +1067,7 @@ export function useCompanionPlanner({
     saveRitual,
     sessionState,
     persistPlannerMemory,
+    persistPlannerThreadRows,
     trackInteraction,
     trackScheduleModification,
     trackTaskCreation,
@@ -997,9 +1088,17 @@ export function useCompanionPlanner({
           : candidate,
       ),
     );
+    const rejectionMessage = createMessage("companion", `No problem. I won't save "${proposal.title}" as-is.`);
     setMessages((previous) => [
       ...previous,
-      createMessage("companion", `No problem. I won't save "${proposal.title}" as-is.`),
+      rejectionMessage,
+    ]);
+    await persistPlannerThreadRows([
+      {
+        role: "assistant",
+        content: rejectionMessage.content,
+        createdAt: rejectionMessage.createdAt,
+      },
     ]);
     await trackInteraction({
       interactionType: "companion_planner_confirmation",
@@ -1008,7 +1107,7 @@ export function useCompanionPlanner({
       aiResponse: { proposalKind: proposal.kind },
       userAction: "rejected",
     });
-  }, [proposals, trackInteraction]);
+  }, [persistPlannerThreadRows, proposals, trackInteraction]);
 
   const handleConfirmAll = useCallback(async () => {
     const readyProposals = proposals.filter((proposal) => proposal.status === "pending" && proposal.readyToConfirm);
@@ -1055,13 +1154,61 @@ export function useCompanionPlanner({
 
   const readyProposalCount = pendingProposals.filter((proposal) => proposal.readyToConfirm).length;
 
+  const resetThread = useCallback((options?: { sessionId?: string }) => {
+    sessionIdRef.current = options?.sessionId ?? generateCompanionThreadSessionId();
+    setMessages(
+      bootstrapGreeting && plannerGreeting
+        ? [
+            createMessage("companion", plannerGreeting, {
+              questions: [],
+              proposalIds: [],
+            }),
+          ]
+        : [],
+    );
+    setProposals([]);
+    setQuestions([]);
+    setSessionState(createInitialSessionState(storedPreferences));
+    setDraftInput("");
+    setInterimText("");
+    setShowPermissionDialog(false);
+    setIsRequestingPermission(false);
+    setIsSubmitting(false);
+    setPlannerMemoryOverride(null);
+  }, [bootstrapGreeting, plannerGreeting, storedPreferences]);
+
+  const hydrateThread = useCallback((options: {
+    sessionId: string;
+    messages: CompanionChatThreadMessage[];
+  }) => {
+    sessionIdRef.current = options.sessionId;
+    setMessages(options.messages.map((message) => ({
+      id: message.id,
+      role: message.role === "assistant" ? "companion" : "user",
+      content: message.content,
+      createdAt: message.createdAt,
+      inputMode: message.inputMode,
+    })));
+    setProposals([]);
+    setQuestions([]);
+    setSessionState(createInitialSessionState(storedPreferences));
+    setDraftInput("");
+    setInterimText("");
+    setShowPermissionDialog(false);
+    setIsRequestingPermission(false);
+    setIsSubmitting(false);
+    setPlannerMemoryOverride(null);
+  }, [storedPreferences]);
+
   return {
     greeting: plannerGreeting,
+    sessionId: sessionIdRef.current,
     tonePack,
     setTonePack,
     horizon,
     setHorizon,
     messages,
+    hasRealMessages: messages.length > 0,
     questions,
     proposals,
     pendingProposals,
@@ -1080,6 +1227,8 @@ export function useCompanionPlanner({
     isRequestingPermission,
     submitTypedMessage: () => submitMessage(draftInput, "text"),
     submitMessage,
+    resetThread,
+    hydrateThread,
     toggleRecording,
     requestMicrophonePermission,
     confirmProposal: handleConfirmProposal,

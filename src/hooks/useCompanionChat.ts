@@ -146,6 +146,8 @@ export function useCompanionChat({ enabled = true }: UseCompanionChatOptions = {
         .select("id, role, content, input_mode, created_at")
         .eq("user_id", user.id)
         .eq("companion_id", companion.id)
+        .eq("surface", "companion")
+        .eq("source", "chat")
         .order("created_at", { ascending: true })
         .limit(40);
 

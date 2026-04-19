@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/components/ui/sonner";
 import { useAIInteractionTracker } from "@/hooks/useAIInteractionTracker";
 import { useAuth } from "@/hooks/useAuth";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useVoiceInput } from "@/hooks/useVoiceInput";
 import { supabase } from "@/integrations/supabase/client";
+import { stripMarkdown } from "@/lib/utils";
+import { getCompanionChatThreadsQueryKey } from "@/services/companionChatThreads";
 import {
   COMPANION_PLANNER_OPENER_TEMPLATES,
   getCompanionPlannerOpener,
@@ -57,6 +60,7 @@ export function useJourneysCompanionConversation() {
   const { user } = useAuth();
   const { companion } = useCompanion();
   const { trackInteraction } = useAIInteractionTracker();
+  const queryClient = useQueryClient();
   const sessionIdRef = useRef<string>(generateId());
   const greeting = useMemo(
     () => getCompanionPlannerOpener({ userId: user?.id ?? null }),
@@ -70,17 +74,6 @@ export function useJourneysCompanionConversation() {
   const [isRequestingPermission, setIsRequestingPermission] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pendingPlannerHandoffMessage, setPendingPlannerHandoffMessage] = useState<string | null>(null);
-
-  useEffect(() => {
-    sessionIdRef.current = generateId();
-    setMessages(createInitialMessages(greeting));
-    setDraftInput("");
-    setInterimText("");
-    setShowPermissionDialog(false);
-    setIsRequestingPermission(false);
-    setIsSubmitting(false);
-    setPendingPlannerHandoffMessage(null);
-  }, [companion?.id, greeting]);
 
   const conversationHistory = useMemo(
     () =>
@@ -97,6 +90,40 @@ export function useJourneysCompanionConversation() {
   const clearPlannerHandoff = useCallback(() => {
     setPendingPlannerHandoffMessage(null);
   }, []);
+
+  const resetThread = useCallback((options?: {
+    sessionId?: string;
+    greetingText?: string;
+  }) => {
+    sessionIdRef.current = options?.sessionId ?? generateId();
+    setMessages(createInitialMessages(options?.greetingText ?? greeting));
+    setDraftInput("");
+    setInterimText("");
+    setShowPermissionDialog(false);
+    setIsRequestingPermission(false);
+    setIsSubmitting(false);
+    setPendingPlannerHandoffMessage(null);
+  }, [greeting]);
+
+  const hydrateThread = useCallback((options: {
+    sessionId: string;
+    messages: JourneysCompanionMessage[];
+  }) => {
+    sessionIdRef.current = options.sessionId;
+    setMessages(options.messages.length > 0 ? options.messages : createInitialMessages(greeting));
+    setDraftInput("");
+    setInterimText("");
+    setShowPermissionDialog(false);
+    setIsRequestingPermission(false);
+    setIsSubmitting(false);
+    setPendingPlannerHandoffMessage(null);
+  }, [greeting]);
+
+  useEffect(() => {
+    resetThread({
+      greetingText: greeting,
+    });
+  }, [companion?.id, greeting, resetThread]);
 
   const submitMessage = useCallback(async (
     rawMessage: string,
@@ -138,11 +165,15 @@ export function useJourneysCompanionConversation() {
       }
 
       if (response.handoffToPlanner) {
+        setMessages((previous) => [
+          ...previous,
+          createMessage("assistant", stripMarkdown(response.reply)),
+        ]);
         setPendingPlannerHandoffMessage(message);
       } else {
         setMessages((previous) => [
           ...previous,
-          createMessage("assistant", response.reply),
+          createMessage("assistant", stripMarkdown(response.reply)),
         ]);
       }
 
@@ -157,6 +188,10 @@ export function useJourneysCompanionConversation() {
         },
         userAction: "accepted",
       });
+
+      void queryClient.invalidateQueries({
+        queryKey: getCompanionChatThreadsQueryKey(user.id, companion.id, "journeys"),
+      });
     } catch (error) {
       console.error("Failed to submit journeys companion message:", error);
       toast.error(await resolveCompanionChatError(error));
@@ -170,7 +205,7 @@ export function useJourneysCompanionConversation() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [companion?.id, conversationHistory, isSubmitting, trackInteraction, user?.id]);
+  }, [companion?.id, conversationHistory, isSubmitting, queryClient, trackInteraction, user?.id]);
 
   const { isRecording, isAutoStopping, isSupported, permissionStatus, toggleRecording, requestPermission } = useVoiceInput({
     onInterimResult: (text) => {
@@ -204,13 +239,17 @@ export function useJourneysCompanionConversation() {
 
   return {
     greeting,
+    sessionId: sessionIdRef.current,
     messages,
+    hasRealMessages: messages.some((message) => !message.isSeed),
     draftInput,
     setDraftInput,
     interimText,
     isSubmitting,
     pendingPlannerHandoffMessage,
     clearPlannerHandoff,
+    resetThread,
+    hydrateThread,
     isRecording,
     isAutoStopping,
     isVoiceSupported: isSupported,

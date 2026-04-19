@@ -26,7 +26,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useAccessStatus } from "@/hooks/useAccessStatus";
 import { useCompanionAssistant } from "@/hooks/useCompanionAssistant";
-import { cn } from "@/lib/utils";
+import { cn, stripMarkdown } from "@/lib/utils";
 import type { CompanionPlannerProposal, PlannerHorizon } from "@/types/companionPlanner";
 
 const HORIZON_LABELS: Record<PlannerHorizon, string> = {
@@ -385,7 +385,11 @@ export const CompanionPlannerPanel = memo(() => {
                     : "ml-auto bg-emerald-400/15 text-emerald-50 shadow-[0_20px_50px_-40px_rgba(16,185,129,0.95)]",
                 )}
               >
-                <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                <p className="whitespace-pre-wrap leading-relaxed">
+                  {message.role === "assistant"
+                    ? stripMarkdown(message.content)
+                    : message.content}
+                </p>
                 <div className="mt-2 flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-white/40">
                   {message.inputMode ? <span>{message.inputMode}</span> : null}
                   <span>{message.source}</span>

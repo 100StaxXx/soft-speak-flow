@@ -285,6 +285,12 @@ const DAY_KEYWORDS = [
   ["saturday", 5],
   ["sunday", 6],
 ] as const;
+const WEEKDAY_WORD_PATTERN =
+  "monday|tuesday|wednesday|thursday|friday|saturday|sunday";
+const DAY_REFERENCE_REGEX = new RegExp(
+  `\\b(?:today|tomorrow|my day|(?:my\\s+)?(?:this\\s+|next\\s+|upcoming\\s+)?(?:${WEEKDAY_WORD_PATTERN}))\\b`,
+  "i",
+);
 
 const DEFAULT_TASK_DURATION_MINUTES = 30;
 const DEFAULT_WAKE_TIME = "08:00";
@@ -321,10 +327,82 @@ const formatDateKey = (value: Date): string => {
   return `${year}-${month}-${day}`;
 };
 
+const formatReadableDate = (value: string): string =>
+  parseDateKey(value).toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
+
 const addDaysToDateKey = (value: string, days: number): string => {
   const next = parseDateKey(value);
   next.setDate(next.getDate() + days);
   return formatDateKey(next);
+};
+
+const resolveWeekdayDate = (
+  currentDate: string,
+  weekday: string,
+  qualifier: string | null,
+): string | null => {
+  const weekdayMap: Record<string, number> = {
+    sunday: 0,
+    monday: 1,
+    tuesday: 2,
+    wednesday: 3,
+    thursday: 4,
+    friday: 5,
+    saturday: 6,
+  };
+
+  const targetWeekday = weekdayMap[weekday];
+  if (targetWeekday === undefined) return null;
+
+  const baseDate = parseDateKey(currentDate);
+  const currentWeekday = baseDate.getDay();
+  let dayDelta = (targetWeekday - currentWeekday + 7) % 7;
+
+  if (qualifier === "this") {
+    if (dayDelta === 0) return currentDate;
+  } else if (dayDelta === 0) {
+    dayDelta += 7;
+  }
+
+  baseDate.setDate(baseDate.getDate() + dayDelta);
+  return formatDateKey(baseDate);
+};
+
+const findWeekdayReference = (
+  message: string,
+): { weekday: string; qualifier: string | null } | null => {
+  const match = message.match(
+    new RegExp(
+      `\\b(?:(this|next|upcoming)\\s+)?(${WEEKDAY_WORD_PATTERN})\\b`,
+      "i",
+    ),
+  );
+  if (!match?.[2]) return null;
+
+  return {
+    weekday: match[2].toLowerCase(),
+    qualifier: match[1]?.toLowerCase() ?? null,
+  };
+};
+
+const formatScheduleReference = (
+  currentDate: string,
+  targetDate: string,
+  capitalizeRelative = false,
+): string => {
+  if (targetDate === currentDate) {
+    return capitalizeRelative ? "Today" : "today";
+  }
+
+  if (targetDate === addDaysToDateKey(currentDate, 1)) {
+    return capitalizeRelative ? "Tomorrow" : "tomorrow";
+  }
+
+  return formatReadableDate(targetDate);
 };
 
 const parseTimeToMinutes = (
@@ -414,12 +492,28 @@ const hasExplicitDateReference = (
   /\b(today|tomorrow|day after tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i
     .test(message);
 
-const isScheduleQuestion = (message: string): boolean =>
-  /\b(what do i have coming up|what(?:'s| is) coming up|what do i have scheduled|what(?:'s| is) on my calendar|what do i have today|what do i have tomorrow|when am i free|am i free|where do i have room|what(?:'s| is) my schedule|what(?:'s| is) on my plate|show me today(?:'s)? route|show me tomorrow(?:'s)? route)\b/i
-    .test(message);
+const isScheduleQuestion = (message: string): boolean => {
+  if (
+    /\b(what do i have coming up|what(?:'s| is) coming up|what do i have scheduled|what(?:'s| is) on my calendar|what do i have today|what do i have tomorrow|what(?:'s| is) my schedule|what(?:'s| is) on my plate)\b/i
+      .test(message)
+  ) {
+    return true;
+  }
+
+  const hasDayReference = DAY_REFERENCE_REGEX.test(message);
+  if (
+    hasDayReference &&
+    /\b(show me|how does|how(?:'s| is)|what does)\b/i.test(message) &&
+    /\b(route|look|looking|schedule)\b/i.test(message)
+  ) {
+    return true;
+  }
+
+  return hasDayReference && isAvailabilityQuestion(message);
+};
 
 const isAvailabilityQuestion = (message: string): boolean =>
-  /\b(when am i free|am i free|where do i have room|what openings do i have|what time do i have free)\b/i
+  /\b(when am i free|am i free|where do i have room|what openings do i have|what time do i have free|what(?:'s| is) open)\b/i
     .test(message);
 
 const isUpcomingDigestQuestion = (message: string): boolean =>
@@ -446,10 +540,21 @@ const parseRequestedDate = (
   parsedInput?: ParsedInputHint | null,
 ): string => {
   if (parsedInput?.scheduledDate) return parsedInput.scheduledDate;
+  if (/\btoday\b/i.test(message)) return currentDate;
   if (/\bday after tomorrow\b/i.test(message)) {
     return addDaysToDateKey(currentDate, 2);
   }
   if (/\btomorrow\b/i.test(message)) return addDaysToDateKey(currentDate, 1);
+
+  const weekdayReference = findWeekdayReference(message);
+  if (weekdayReference) {
+    return resolveWeekdayDate(
+      currentDate,
+      weekdayReference.weekday,
+      weekdayReference.qualifier,
+    ) ?? currentDate;
+  }
+
   return currentDate;
 };
 
@@ -1062,6 +1167,30 @@ const defaultQuestDate = (
   return input.currentDate;
 };
 
+const hasExplicitSchedulingIntent = (
+  input: PlannerBuildInput,
+  kind: PlannerProposalKind,
+): boolean => {
+  if (
+    input.parsedInput?.scheduledDate ||
+    input.parsedInput?.scheduledTime ||
+    input.parsedInput?.recurrencePattern
+  ) {
+    return true;
+  }
+
+  if (isRepeatedIntent(input.message, input.parsedInput)) {
+    return true;
+  }
+
+  if (kind === "update_quest" || kind === "update_ritual") {
+    return isEditIntent(input.message);
+  }
+
+  return /\b(schedule|scheduled|calendar|slot|time|when should|put it|place it|remind|today|tomorrow|tonight|this morning|this afternoon|this evening|morning|afternoon|evening|night|at \d)\b/i
+    .test(input.message);
+};
+
 const shouldAskTimingQuestions = (
   input: PlannerBuildInput,
   kind: PlannerProposalKind,
@@ -1091,7 +1220,7 @@ const shouldAskTimingQuestions = (
     }
   }
 
-  return true;
+  return hasExplicitSchedulingIntent(input, kind);
 };
 
 const missingFieldsForKind = (
@@ -1883,6 +2012,52 @@ const buildDayDigest = (
   return `${label}: ${nextItems}.${overflowText} ${openingText}`;
 };
 
+const buildOpenDayRouteOptions = (
+  input: PlannerBuildInput,
+): string[] => {
+  const workload = input.plannerContext.aiSignals?.suggestedWorkload ?? "normal";
+  const options = [
+    "Momentum day: one meaningful work block, some movement, one cleanup or admin win, and one relationship touchpoint.",
+    "Money day: follow up, make something useful, ship one small thing, or do work that compounds.",
+    "Reset day: clean up your space, get clear on priorities, and set the rest of the week up well.",
+  ];
+
+  if (workload === "light") {
+    return [options[2], options[0], options[1]];
+  }
+
+  if (workload === "heavy") {
+    return [options[1], options[0], options[2]];
+  }
+
+  return options;
+};
+
+const buildOpenDayReply = (
+  input: PlannerBuildInput,
+  targetDate: string,
+): string | null => {
+  const items = collectScheduleItemsForDate(input, targetDate, false);
+  if (items.length > 0) return null;
+
+  const scheduleLead = targetDate === input.currentDate
+    ? "Your calendar's clear today."
+    : `Your calendar's pretty open on ${
+      formatScheduleReference(input.currentDate, targetDate, true)
+    }.`;
+  const optionLines = buildOpenDayRouteOptions(input)
+    .map((option) => `- ${option}`)
+    .join("\n");
+
+  return [
+    scheduleLead,
+    "That gives us room to shape the day on purpose.",
+    "A few solid directions we could take:",
+    optionLines,
+    "Tell me which lane fits, and I'll help shape it.",
+  ].join("\n\n");
+};
+
 const buildUpcomingDigestReply = (input: PlannerBuildInput): string => {
   const tomorrow = addDaysToDateKey(input.currentDate, 1);
   const weekSummary = input.plannerContext.scheduleInsights?.summary ??
@@ -1928,8 +2103,8 @@ const describeScheduleTarget = (
   }
 
   return {
-    leadLabel: targetDate,
-    digestLabel: targetDate,
+    leadLabel: formatScheduleReference(currentDate, targetDate),
+    digestLabel: formatScheduleReference(currentDate, targetDate, true),
   };
 };
 
@@ -1937,6 +2112,9 @@ const buildDayOverviewReply = (
   input: PlannerBuildInput,
   targetDate: string,
 ): string => {
+  const openDayReply = buildOpenDayReply(input, targetDate);
+  if (openDayReply) return openDayReply;
+
   const { leadLabel, digestLabel } = describeScheduleTarget(
     input.currentDate,
     targetDate,
@@ -1970,18 +2148,23 @@ const buildReadOnlyScheduleReply = (
     const dayPart = resolveDayPartRange(message);
     const freeWindows = buildFreeWindowsForDate(input, targetDate, dayPart)
       .slice(0, 3);
+    const targetLabel = formatScheduleReference(
+      input.currentDate,
+      targetDate,
+      true,
+    );
     if (freeWindows.length === 0) {
       return dayPart
-        ? `I don't see a clean ${dayPart.label} opening on ${targetDate} yet. I can still help you reshuffle quests around those blocks if you want.`
-        : `I don't see a clear opening on ${targetDate} yet. I can still help you reshuffle quests around those blocks if you want.`;
+        ? `I don't see a clean ${dayPart.label} opening on ${targetLabel} yet. I can still help you reshuffle quests around those blocks if you want.`
+        : `I don't see a clear opening on ${targetLabel} yet. I can still help you reshuffle quests around those blocks if you want.`;
     }
 
     const windowsLabel = freeWindows.map((window) =>
       `${window.start}-${window.end}`
     ).join(", ");
     return dayPart
-      ? `Your best ${dayPart.label} openings on ${targetDate} are ${windowsLabel}. That includes both Cosmiq quests and connected calendar events.`
-      : `Your best openings on ${targetDate} are ${windowsLabel}. That includes both Cosmiq quests and connected calendar events.`;
+      ? `Your best ${dayPart.label} openings on ${targetLabel} are ${windowsLabel}. That includes both Cosmiq quests and connected calendar events.`
+      : `Your best openings on ${targetLabel} are ${windowsLabel}. That includes both Cosmiq quests and connected calendar events.`;
   }
 
   return buildDayOverviewReply(input, targetDate);
@@ -2096,10 +2279,10 @@ const composeReply = (
   const scheduleLead = scheduleSummary ? `${scheduleSummary} ` : "";
 
   if (readyToConfirm) {
-    return `${scheduleLead}I turned this into a ${baseLabel} draft. Review it, and confirm when it looks right.`;
+    return `${scheduleLead}I drafted this as a ${baseLabel}. Take a look, and confirm it if it fits.`;
   }
 
-  return `${scheduleLead}${memoryLead}This looks like a ${baseLabel}. I need a little more detail before I can draft it cleanly.`;
+  return `${scheduleLead}${memoryLead}I can help shape this into a ${baseLabel}. First I need one quick detail.`;
 };
 
 const buildConversationalResponse = (

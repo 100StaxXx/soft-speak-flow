@@ -13,6 +13,7 @@ import {
   normalizeCompanionChatSurface,
   surfaceRequiresPremiumAccess,
 } from "./surfaceAccess.ts";
+import { persistCompanionChatTurn } from "./threadPersistence.ts";
 
 const RequestSchema = z.object({
   message: z.string().min(1).max(4000).trim(),
@@ -297,7 +298,7 @@ const buildSystemPrompt = (context: {
       : "",
     "Be concise, emotionally present, and natural.",
     "Keep the performance original. Do not imitate or name any real actor, celebrity, or copyrighted character, even if the user asks.",
-    "Reply in plain text only. Keep most answers under 120 words unless the user asks for more.",
+    "Reply in plain text only. No markdown, no bold markers, and no bullet lists with asterisks. Keep most answers under 120 words unless the user asks for more.",
     "Do not mention internal context, models, memory extraction, or implementation details.",
     "If the user asks for planning, scheduling, reminders, campaigns, rituals, or saving changes, steer them to the planning surface instead of inventing saved changes yourself.",
   ].filter(Boolean).join("\n");
@@ -447,6 +448,7 @@ async function persistConversation(params: {
   userId: string;
   companionId: string;
   sessionId: string;
+  surface: "companion" | "journeys";
   message: string;
   reply: string;
   inputMode: "text" | "voice";
@@ -457,28 +459,17 @@ async function persistConversation(params: {
 }) {
   const nowIso = new Date().toISOString();
 
-  const { error: chatError } = await params.supabase
-    .from("companion_chats")
-    .insert([
-      {
-        user_id: params.userId,
-        companion_id: params.companionId,
-        role: "user",
-        content: params.message,
-        input_mode: params.inputMode,
-        session_id: params.sessionId,
-      },
-      {
-        user_id: params.userId,
-        companion_id: params.companionId,
-        role: "assistant",
-        content: params.reply,
-        input_mode: null,
-        session_id: params.sessionId,
-      },
-    ]);
-
-  if (chatError) throw chatError;
+  await persistCompanionChatTurn({
+    supabase: params.supabase,
+    userId: params.userId,
+    companionId: params.companionId,
+    sessionId: params.sessionId,
+    surface: params.surface,
+    message: params.message,
+    reply: params.reply,
+    inputMode: params.inputMode,
+    createdAt: nowIso,
+  });
 
   const learningUpdate: JsonObject = {
     user_id: params.userId,
@@ -653,6 +644,7 @@ serve(async (req) => {
       userId,
       companionId: parsed.data.companionId,
       sessionId,
+      surface,
       message: parsed.data.message,
       reply,
       inputMode: parsed.data.inputMode,

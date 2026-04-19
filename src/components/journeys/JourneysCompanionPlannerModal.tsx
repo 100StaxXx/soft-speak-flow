@@ -7,10 +7,13 @@ import {
   useState,
   type KeyboardEvent,
 } from "react";
+import { formatDistanceToNow } from "date-fns";
 import {
+  Archive,
   Mic,
   MicOff,
   Check,
+  ChevronRight,
   Loader2,
   Send,
   X,
@@ -37,10 +40,17 @@ import {
 } from "@/components/ui/drawer";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useCompanionAssistant } from "@/hooks/useCompanionAssistant";
 import { useJourneysCompanionVisual } from "@/hooks/useJourneysCompanionVisual";
-import { cn } from "@/lib/utils";
+import { cn, stripMarkdown } from "@/lib/utils";
 import { COMPANION_PLANNER_STARTER_TEMPLATES } from "@/shared/companionPlannerCopy";
+import type { CompanionChatThreadSummary } from "@/types/companionConversation";
 import type {
   CompanionPlannerProposal,
   CompanionPlannerQuestion,
@@ -86,7 +96,150 @@ const getReducedMotionPreference = () =>
   && typeof window.matchMedia === "function"
   && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-const JourneysCompanionOverlayBody = memo(() => {
+const formatThreadTimestamp = (value: string) => {
+  try {
+    return formatDistanceToNow(new Date(value), { addSuffix: true });
+  } catch {
+    return "Just now";
+  }
+};
+
+interface JourneysCompanionThreadPickerProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  presentation: JourneysCompanionPlannerModalPresentation;
+  activeThread: CompanionChatThreadSummary | null;
+  archivedThreads: CompanionChatThreadSummary[];
+  isLoading: boolean;
+  onResumeThread: (sessionId: string) => Promise<void>;
+}
+
+const JourneysCompanionThreadPicker = memo(function JourneysCompanionThreadPicker({
+  open,
+  onOpenChange,
+  presentation,
+  activeThread,
+  archivedThreads,
+  isLoading,
+  onResumeThread,
+}: JourneysCompanionThreadPickerProps) {
+  const body = (
+    <div
+      className="rounded-[28px] border border-white/[0.12] bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.18),transparent_22%),linear-gradient(180deg,rgba(8,15,28,0.94),rgba(6,12,24,0.9))] p-4 text-white shadow-[0_28px_70px_-40px_rgba(0,0,0,0.92)] backdrop-blur-2xl"
+      data-testid="journeys-companion-thread-picker"
+    >
+      <div className="mb-4 space-y-1">
+        <p className="text-sm font-semibold text-white">Thread history</p>
+        <p className="text-sm text-white/[0.62]">
+          Archive the current conversation, then jump back into older threads whenever you want.
+        </p>
+      </div>
+
+      <div className="space-y-4">
+        {activeThread ? (
+          <div className="space-y-2">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/[0.45]">
+              Current thread
+            </p>
+            <div className="rounded-[22px] border border-sky-200/[0.18] bg-sky-400/[0.12] p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-white">
+                    {activeThread.title}
+                  </p>
+                  <p className="mt-1 line-clamp-2 text-sm text-white/[0.72]">
+                    {activeThread.previewText}
+                  </p>
+                </div>
+                <Badge variant="outline" className="border-white/[0.15] bg-white/[0.06] text-white/[0.74]">
+                  Active
+                </Badge>
+              </div>
+              <p className="mt-3 text-xs text-white/[0.52]">
+                Updated {formatThreadTimestamp(activeThread.lastMessageAt)}
+              </p>
+            </div>
+          </div>
+        ) : null}
+
+        <div className="space-y-2">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/[0.45]">
+            Archived threads
+          </p>
+          {isLoading ? (
+            <div className="flex items-center gap-2 rounded-[22px] border border-white/[0.12] bg-white/[0.05] px-4 py-5 text-sm text-white/[0.74]">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Loading thread history...
+            </div>
+          ) : archivedThreads.length > 0 ? (
+            <div className="space-y-2">
+              {archivedThreads.map((thread) => (
+                <button
+                  key={thread.sessionId}
+                  type="button"
+                  className="flex w-full items-start justify-between gap-3 rounded-[22px] border border-white/[0.12] bg-white/[0.05] px-4 py-4 text-left transition-colors hover:bg-white/[0.09]"
+                  onClick={() => {
+                    void onResumeThread(thread.sessionId);
+                  }}
+                  data-testid={`journeys-companion-thread-resume-${thread.sessionId}`}
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-white">{thread.title}</p>
+                    <p className="mt-1 line-clamp-2 text-sm text-white/[0.68]">{thread.previewText}</p>
+                    <p className="mt-3 text-xs text-white/[0.5]">
+                      Updated {formatThreadTimestamp(thread.lastMessageAt)}
+                    </p>
+                  </div>
+                  <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-white/[0.48]" />
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-[22px] border border-dashed border-white/[0.12] bg-white/[0.03] px-4 py-5 text-sm text-white/[0.62]">
+              Archived threads will show up here after you archive one.
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  if (presentation === "dialog") {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-lg border-none bg-transparent p-0 shadow-none" hideCloseButton>
+          <DialogHeader className="sr-only">
+            <DialogTitle>Companion threads</DialogTitle>
+            <DialogDescription>
+              Switch between the current journeys thread and archived companion threads.
+            </DialogDescription>
+          </DialogHeader>
+          {body}
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  return (
+    <Drawer open={open} onOpenChange={onOpenChange}>
+      <DrawerContent className="border-none bg-transparent p-0 shadow-none">
+        <DrawerHeader className="sr-only">
+          <DrawerTitle>Companion threads</DrawerTitle>
+          <DrawerDescription>
+            Switch between the current journeys thread and archived companion threads.
+          </DrawerDescription>
+        </DrawerHeader>
+        {body}
+      </DrawerContent>
+    </Drawer>
+  );
+});
+
+const JourneysCompanionOverlayBody = memo(({
+  presentation,
+}: {
+  presentation: JourneysCompanionPlannerModalPresentation;
+}) => {
   const {
     companionLabel,
     imageUrl,
@@ -102,6 +255,7 @@ const JourneysCompanionOverlayBody = memo(() => {
   const prefersReducedMotion = getReducedMotionPreference();
 
   const [plannerQuestionHistory, setPlannerQuestionHistory] = useState<PlannerQuestionHistoryEntry[]>([]);
+  const [isThreadPickerOpen, setIsThreadPickerOpen] = useState(false);
   const [typingMessageId, setTypingMessageId] = useState<string | null>(null);
   const [typedAssistantContent, setTypedAssistantContent] = useState("");
 
@@ -254,7 +408,7 @@ const JourneysCompanionOverlayBody = memo(() => {
       completeCurrentAssistantLine();
     }
 
-    void assistant.submitPlannerMessage(starter, "text");
+    void assistant.submitMessage(starter, "text");
   }, [assistant, completeCurrentAssistantLine, typingMessageId]);
 
   const handleVoiceToggle = useCallback(() => {
@@ -265,11 +419,17 @@ const JourneysCompanionOverlayBody = memo(() => {
     assistant.toggleRecording();
   }, [assistant, completeCurrentAssistantLine, typingMessageId]);
 
+  const handleResumeThread = useCallback(async (sessionId: string) => {
+    await assistant.resumeThread(sessionId);
+    setIsThreadPickerOpen(false);
+  }, [assistant]);
+
   const sendDisabled = assistant.isSubmitting || assistant.isClassifying || (!typingMessageId && !assistant.draftInput.trim());
   const activeProposal = assistant.pendingProposals[0] ?? null;
   const activeOptionQuestions = assistant.questions.filter((question) => (question.options?.length ?? 0) > 0);
   const showStarterQuickReplies = assistant.messages.length === 1
     && assistant.messages[0]?.role === "assistant"
+    && assistant.messages[0]?.isSeed === true
     && plannerQuestionHistory.length === 0
     && assistant.pendingProposals.length === 0;
   const micButtonLabel = assistant.isRecording ? "Stop voice reply" : "Start voice reply";
@@ -333,6 +493,35 @@ const JourneysCompanionOverlayBody = memo(() => {
             <p className="truncate text-sm font-semibold text-white">{companionLabel}</p>
             <p className="truncate text-xs text-white/[0.58]">{statusText}</p>
           </div>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="border-white/[0.15] bg-white/[0.05] text-white/[0.84] hover:bg-white/[0.12]"
+                    onClick={() => {
+                      void assistant.archiveCurrentThread();
+                    }}
+                    disabled={!assistant.canArchiveThread || assistant.isLoadingThreads}
+                    data-testid="journeys-companion-archive-button"
+                  >
+                    {assistant.isLoadingThreads ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Archive className="mr-2 h-4 w-4" />
+                    )}
+                    Archive
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                {assistant.archiveDisabledReason ?? "Archive this thread and start a fresh one."}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
 
         <div
@@ -348,16 +537,29 @@ const JourneysCompanionOverlayBody = memo(() => {
           data-testid="journeys-companion-planner-dialogue-screen"
         >
           <div className="flex items-center justify-between gap-3 border-b border-white/10 bg-white/[0.02] px-4 py-3 text-[11px] uppercase tracking-[0.2em] text-white/[0.45]">
-            <span>Journeys Thread</span>
+            <button
+              type="button"
+              className="flex min-w-0 items-center gap-2 rounded-full border border-white/[0.12] bg-white/[0.05] px-3 py-1.5 text-left text-[11px] uppercase tracking-[0.2em] text-white/[0.62] transition-colors hover:bg-white/[0.1]"
+              onClick={() => setIsThreadPickerOpen(true)}
+              data-testid="journeys-companion-thread-picker-trigger"
+            >
+              <span className="shrink-0">Journeys Thread</span>
+              <span className="max-w-[10rem] truncate text-white/[0.88] normal-case tracking-normal">
+                {assistant.activeThread?.title ?? "New thread"}
+              </span>
+              <ChevronRight className="h-3.5 w-3.5 shrink-0 text-white/[0.46]" />
+            </button>
             <span>{dialogueEntries.length} messages</span>
           </div>
 
           <ScrollArea className="flex-1">
             <div className="space-y-3 p-4 sm:p-5" data-testid="journeys-companion-planner-transcript">
               {dialogueEntries.map((entry) => {
-                const displayedContent = entry.role === "assistant" && typingMessageId === entry.id
-                  ? typedAssistantContent
-                  : entry.content;
+                const displayedContent = stripMarkdown(
+                  entry.role === "assistant" && typingMessageId === entry.id
+                    ? typedAssistantContent
+                    : entry.content,
+                );
 
                 return (
                   <div
@@ -564,6 +766,15 @@ const JourneysCompanionOverlayBody = memo(() => {
         permissionStatus={assistant.permissionStatus}
         isRequesting={assistant.isRequestingPermission}
       />
+      <JourneysCompanionThreadPicker
+        open={isThreadPickerOpen}
+        onOpenChange={setIsThreadPickerOpen}
+        presentation={presentation}
+        activeThread={assistant.activeThread}
+        archivedThreads={assistant.archivedThreads}
+        isLoading={assistant.isLoadingThreads}
+        onResumeThread={handleResumeThread}
+      />
     </div>
   );
 });
@@ -575,7 +786,7 @@ export const JourneysCompanionPlannerModal = memo(function JourneysCompanionPlan
   onOpenChange,
   presentation,
 }: JourneysCompanionPlannerModalProps) {
-  const content = open ? <JourneysCompanionOverlayBody /> : null;
+  const content = open ? <JourneysCompanionOverlayBody presentation={presentation} /> : null;
 
   if (presentation === "dialog") {
     return (

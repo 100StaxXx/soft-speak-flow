@@ -7,10 +7,17 @@ import {
 
 const mocks = vi.hoisted(() => ({
   invoke: vi.fn(),
+  invalidateQueries: vi.fn(),
   trackInteraction: vi.fn(),
   toggleRecording: vi.fn(),
   requestPermission: vi.fn().mockResolvedValue("granted"),
   toastError: vi.fn(),
+}));
+
+vi.mock("@tanstack/react-query", () => ({
+  useQueryClient: () => ({
+    invalidateQueries: mocks.invalidateQueries,
+  }),
 }));
 
 vi.mock("@/hooks/useAuth", () => ({
@@ -143,8 +150,9 @@ describe("useJourneysCompanionConversation", () => {
       expect(result.current.pendingPlannerHandoffMessage).toBe("Help me plan tomorrow");
     });
 
-    expect(result.current.messages).toHaveLength(2);
+    expect(result.current.messages).toHaveLength(3);
     expect(result.current.messages[1]?.content).toBe("Help me plan tomorrow");
+    expect(result.current.messages[2]?.content).toBe("That sounds like planning work.");
   });
 
   it("shows a rollout-aware error when the companion chat function is missing", async () => {

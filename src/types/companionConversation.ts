@@ -1,5 +1,6 @@
 export type CompanionConversationMode = "talk" | "plan";
 export type CompanionChatSurface = "companion" | "journeys";
+export type CompanionChatSource = "chat" | "plan";
 
 export type CompanionChatRole = "assistant" | "user";
 
@@ -41,4 +42,25 @@ export interface CompanionChatResponse {
   handoffToPlanner: boolean;
   memoryUpdateApplied: boolean;
   sessionId?: string;
+}
+
+export interface CompanionChatThreadSummary {
+  sessionId: string;
+  companionId: string;
+  surface: CompanionChatSurface;
+  title: string;
+  previewText: string;
+  createdAt: string;
+  lastMessageAt: string;
+  archivedAt: string | null;
+}
+
+export interface CompanionChatThreadMessage {
+  id: string;
+  sessionId: string;
+  role: CompanionChatRole;
+  content: string;
+  createdAt: string;
+  inputMode?: CompanionChatInputMode;
+  source: CompanionChatSource;
 }

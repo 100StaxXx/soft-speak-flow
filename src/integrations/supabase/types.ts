@@ -1657,6 +1657,8 @@ export type Database = {
           input_mode: string | null
           role: "assistant" | "user"
           session_id: string
+          source: string
+          surface: string
           user_id: string
         }
         Insert: {
@@ -1667,6 +1669,8 @@ export type Database = {
           input_mode?: string | null
           role: "assistant" | "user"
           session_id: string
+          source?: string
+          surface?: string
           user_id: string
         }
         Update: {
@@ -1677,11 +1681,57 @@ export type Database = {
           input_mode?: string | null
           role?: "assistant" | "user"
           session_id?: string
+          source?: string
+          surface?: string
           user_id?: string
         }
         Relationships: [
           {
             foreignKeyName: "companion_chats_companion_id_fkey"
+            columns: ["companion_id"]
+            isOneToOne: false
+            referencedRelation: "user_companion"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      companion_chat_threads: {
+        Row: {
+          archived_at: string | null
+          companion_id: string
+          created_at: string
+          last_message_at: string
+          preview_text: string
+          session_id: string
+          surface: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          archived_at?: string | null
+          companion_id: string
+          created_at?: string
+          last_message_at?: string
+          preview_text: string
+          session_id: string
+          surface: string
+          title: string
+          user_id: string
+        }
+        Update: {
+          archived_at?: string | null
+          companion_id?: string
+          created_at?: string
+          last_message_at?: string
+          preview_text?: string
+          session_id?: string
+          surface?: string
+          title?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "companion_chat_threads_companion_id_fkey"
             columns: ["companion_id"]
             isOneToOne: false
             referencedRelation: "user_companion"
