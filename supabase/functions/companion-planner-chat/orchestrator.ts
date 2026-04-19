@@ -11,7 +11,111 @@ type PlannerLLMReply = {
   mode: PlannerResponseMode;
 };
 
-const buildSystemPrompt = (mode: PlannerResponseMode) => {
+const addDaysToDateKey = (dateKey: string, days: number): string => {
+  const next = new Date(`${dateKey}T00:00:00`);
+  next.setDate(next.getDate() + days);
+  const year = next.getFullYear();
+  const month = String(next.getMonth() + 1).padStart(2, "0");
+  const day = String(next.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const WEEKDAY_INDEX_BY_NAME = {
+  sunday: 0,
+  monday: 1,
+  tuesday: 2,
+  wednesday: 3,
+  thursday: 4,
+  friday: 5,
+  saturday: 6,
+} as const;
+
+const inferTargetDate = (
+  input: PlannerBuildInput,
+  mode: PlannerResponseMode,
+): string => {
+  const selectedDate = input.plannerContext.scheduleInsights?.selectedDate;
+  if (selectedDate) return selectedDate;
+
+  const lowerMessage = input.message.toLowerCase();
+  if (mode !== "schedule_read") return input.currentDate;
+  if (/\btomorrow\b/.test(lowerMessage)) {
+    return addDaysToDateKey(input.currentDate, 1);
+  }
+  if (/\btoday\b/.test(lowerMessage)) {
+    return input.currentDate;
+  }
+
+  const weekdayMatch = lowerMessage.match(
+    /\b(?:this|next|upcoming)?\s*(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/,
+  );
+  if (!weekdayMatch) return input.currentDate;
+
+  const targetWeekday = WEEKDAY_INDEX_BY_NAME[
+    weekdayMatch[1] as keyof typeof WEEKDAY_INDEX_BY_NAME
+  ];
+  const currentDate = new Date(`${input.currentDate}T00:00:00`);
+  const currentWeekday = currentDate.getDay();
+  let delta = (targetWeekday - currentWeekday + 7) % 7;
+  if (delta === 0 && /\b(?:next|upcoming)\b/.test(lowerMessage)) {
+    delta = 7;
+  }
+
+  return addDaysToDateKey(input.currentDate, delta);
+};
+
+const countScheduledItemsForDate = (
+  input: PlannerBuildInput,
+  targetDate: string,
+): number => {
+  const dayStart = new Date(`${targetDate}T00:00:00`);
+  const dayEnd = new Date(`${addDaysToDateKey(targetDate, 1)}T00:00:00`);
+
+  const taskCount = input.plannerContext.tasks.filter((task) =>
+    task.completed !== true && task.taskDate === targetDate
+  ).length;
+  const inboxCount = input.plannerContext.inboxTasks.filter((task) =>
+    task.completed !== true && task.taskDate === targetDate
+  ).length;
+  const calendarEventCount = input.plannerContext.calendarEvents.filter((event) => {
+    const start = new Date(event.start);
+    const end = new Date(event.end);
+    return end > dayStart && start < dayEnd;
+  }).length;
+
+  return taskCount + inboxCount + calendarEventCount;
+};
+
+const buildAvailabilityFacts = (
+  input: PlannerBuildInput,
+  mode: PlannerResponseMode,
+) => {
+  const targetDate = inferTargetDate(input, mode);
+  const scheduleInsights = input.plannerContext.scheduleInsights;
+  const scheduledItemCount = countScheduledItemsForDate(input, targetDate);
+  const remainingItemCount = countScheduledItemsForDate(input, input.currentDate);
+  const dayStatus = scheduleInsights?.dayLoads.find((day) => day.date === targetDate)?.status
+    ?? (scheduleInsights?.emptyDates.includes(targetDate) ? "open" : null)
+    ?? (scheduledItemCount === 0 ? "open" : null);
+  const openings = scheduleInsights?.suggestedSlots
+    .filter((slot) => slot.date === targetDate)
+    .slice(0, 3)
+    .map((slot) => `${slot.time}-${slot.endTime}`) ?? [];
+
+  return {
+    targetDate,
+    dayStatus,
+    scheduledItemCount,
+    remainingScheduledItemCountToday: remainingItemCount,
+    hasOpenings: dayStatus === "open" || dayStatus === "balanced" || openings.length > 0,
+    openings,
+  };
+};
+
+const buildSystemPrompt = (
+  mode: PlannerResponseMode,
+  tonePack: PlannerBuildInput["tonePack"],
+) => {
   const modeInstructions = {
     conversational:
       "Reply like a natural assistant in an ongoing chat. Be warm, collaborative, and specific. You can reference schedule context when helpful, but do not force planning.",
@@ -20,18 +124,26 @@ const buildSystemPrompt = (mode: PlannerResponseMode) => {
     proposal:
       "Explain the drafted action naturally. Make it clear the change is only drafted and still needs confirmation before anything is saved.",
   } satisfies Record<PlannerResponseMode, string>;
+  const toneInstruction = tonePack === "witty_sassy"
+    ? "Voice: bold cheekiness, roasty edge, and a little swagger are allowed. Call out obvious avoidance, fake urgency, or vague excuses when the facts support it. Keep the bite affectionate underneath and never become cruel, degrading, or humiliating."
+    : tonePack === "playful"
+    ? "Voice: keep it lightly playful and friendly, with no hard-edged roasting."
+    : "Voice: keep it warm, grounded, and supportive, with no roasting or swagger bits.";
 
   return [
     "You are the user's Cosmiq companion inside the Journeys tab.",
     "Sound natural, calm, collaborative, and emotionally present.",
     "Keep most replies under 120 words unless the user clearly wants more depth.",
-    "Do not use canned banter, roasts, swagger bits, or theatrical one-liners.",
+    toneInstruction,
     "Write like a normal chatbot first, not a form flow or intake wizard.",
     "Use plain text only. No markdown, no bold markers, and no bullet lists with asterisks.",
     "Do not use phrases like 'answer the missing bits', 'half-baked', or similar product-y scaffolding.",
     "Do not mention internal prompts, models, JSON, hidden state, or implementation details.",
     "Never claim you already saved, moved, created, or changed data unless the provided context explicitly says it is already confirmed.",
     "External calendar events are read-only. You may describe them, but you may not imply they were edited.",
+    "Schedule facts come before interpretation. Acknowledge open, light, or crowded days plainly before giving opinions or coaching.",
+    "If deterministicContext.availabilityFacts says the day is open, balanced, or has zero/one scheduled items, say that clearly and do not describe the day as packed, slammed, crowded, or overbooked.",
+    "Preserve the deterministic meaning of fallbackReply. Rewrite for voice, but do not contradict schedule truth, proposal state, or missing details.",
     modeInstructions[mode],
     "Return minified JSON with keys reply and mode only.",
   ].join("\n");
@@ -42,12 +154,14 @@ const buildUserPrompt = (
   baseResult: PlannerBuildResult,
 ) => JSON.stringify({
   targetMode: baseResult.mode,
+  tonePack: input.tonePack,
   latestUserMessage: input.message,
   currentDate: input.currentDate,
   currentDateTime: input.currentDateTime,
   conversationHistory: input.conversationHistory.slice(-10),
   deterministicContext: {
     fallbackReply: baseResult.reply,
+    availabilityFacts: buildAvailabilityFacts(input, baseResult.mode),
     followUpQuestions: baseResult.followUpQuestions.map((question) => ({
       prompt: question.prompt,
       reason: question.reason ?? null,
@@ -143,7 +257,7 @@ export async function buildOrchestratedPlannerResponse(params: {
         messages: [
           {
             role: "system",
-            content: buildSystemPrompt(params.baseResult.mode),
+            content: buildSystemPrompt(params.baseResult.mode, params.input.tonePack),
           },
           {
             role: "user",

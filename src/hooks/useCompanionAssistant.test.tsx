@@ -21,7 +21,7 @@ const mocks = vi.hoisted(() => ({
     toggleRecording: vi.fn(),
     requestPermission: vi.fn().mockResolvedValue("granted"),
     stopCompanionSpeech: vi.fn(),
-    startFreshThread: vi.fn().mockResolvedValue(undefined),
+    archiveCurrentThread: vi.fn().mockResolvedValue(undefined),
     resumeThread: vi.fn().mockResolvedValue(undefined),
     state: {
     companionMessages: [
@@ -229,9 +229,9 @@ vi.mock("@/hooks/useJourneysCompanionThreads", () => ({
     canOpenThreadPicker: true,
     threadPickerDisabledReason: null,
     threadHistoryEmptyStateMessage: "Past chats will show up here after at least one real exchange.",
-    canStartFreshThread: true,
-    startFreshDisabledReason: null,
-    startFreshThread: mocks.startFreshThread,
+    canArchiveThread: true,
+    archiveDisabledReason: null,
+    archiveCurrentThread: mocks.archiveCurrentThread,
     resumeThread: mocks.resumeThread,
     isLoadingThreads: false,
   }),
@@ -511,6 +511,6 @@ describe("useCompanionAssistant", () => {
 
     expect(result.current.activeThread?.title).toBe("Current thread");
     expect(result.current.historyThreads).toHaveLength(1);
-    expect(result.current.canStartFreshThread).toBe(true);
+    expect(result.current.canArchiveThread).toBe(true);
   });
 });

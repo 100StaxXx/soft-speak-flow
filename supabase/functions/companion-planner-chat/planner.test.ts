@@ -747,6 +747,8 @@ Deno.test("treats an empty route request like an open day with useful options", 
   assertStringIncludes(result.reply, "Momentum day");
   assertStringIncludes(result.reply, "Money day");
   assertStringIncludes(result.reply, "Reset day");
+  assertEquals(result.reply.includes("time is all you got"), false);
+  assertEquals(result.reply.includes("bullshit"), false);
 });
 
 Deno.test("reads upcoming named weekdays instead of falling back to today", () => {
@@ -925,6 +927,106 @@ Deno.test("treats the make-room starter like a read-only prioritization view", (
   assertStringIncludes(result.reply, "Today:");
   assertStringIncludes(result.reply, "Week ahead:");
   assertStringIncludes(result.reply, "Tell me what matters most");
+});
+
+Deno.test("uses witty_sassy voice for empty-day route reads", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Show me today's route.",
+    tonePack: "witty_sassy",
+    plannerContext: {
+      tasks: [],
+      inboxTasks: [],
+      activeEpics: [],
+      rituals: [],
+      calendarEvents: [],
+      scheduleInsights: {
+        horizon: "day",
+        selectedDate: "2026-04-18",
+        dayLoads: [{
+          date: "2026-04-18",
+          totalMinutes: 0,
+          taskCount: 0,
+          status: "open",
+        }],
+        overloadedDates: [],
+        emptyDates: ["2026-04-18"],
+        conflicts: [],
+        suggestedSlots: [],
+        moveSuggestions: [],
+        summary: "Today is open.",
+      },
+    },
+  }));
+
+  assertEquals(result.mode, "schedule_read");
+  assertEquals(result.proposals.length, 0);
+  assertStringIncludes(result.reply, "Your calendar is wide open today.");
+  assertStringIncludes(result.reply, "time is all you got");
+  assertStringIncludes(result.reply, "fake-busy performance");
+});
+
+Deno.test("uses witty_sassy voice for make-room reads on light days", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Help me make room for what matters.",
+    tonePack: "witty_sassy",
+    parsedInput: {
+      text: "Help me make room for what matters.",
+      scheduledTime: null,
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+    plannerContext: {
+      tasks: [
+        {
+          id: "task-1",
+          title: "Workout",
+          taskDate: "2026-04-18",
+          scheduledTime: "12:00",
+          estimatedDuration: 45,
+          recurrencePattern: null,
+        },
+      ],
+      inboxTasks: [],
+      activeEpics: [],
+      rituals: [],
+      calendarEvents: [],
+      scheduleInsights: {
+        horizon: "day",
+        selectedDate: "2026-04-18",
+        dayLoads: [{
+          date: "2026-04-18",
+          totalMinutes: 45,
+          taskCount: 1,
+          status: "balanced",
+        }],
+        overloadedDates: [],
+        emptyDates: [],
+        conflicts: [],
+        suggestedSlots: [{
+          date: "2026-04-18",
+          time: "09:00",
+          endTime: "11:00",
+          score: 90,
+          reason: "Plenty of room left.",
+        }],
+        moveSuggestions: [],
+        summary: "Today still has room to flex.",
+      },
+    },
+  }));
+
+  assertEquals(result.mode, "schedule_read");
+  assertStringIncludes(result.reply, "Today is pretty open.");
+  assertStringIncludes(result.reply, "priorities problem wearing a fake mustache");
+  assertStringIncludes(result.reply, "decorative bullshit");
 });
 
 Deno.test("answers the coming-up starter prompt with a schedule summary", () => {
@@ -1190,4 +1292,51 @@ Deno.test("handles non-planning conversation without creating proposals", () => 
   assertEquals(result.proposals.length, 0);
   assertEquals(result.followUpQuestions.length, 0);
   assertStringIncludes(result.reply, "I'm here with you");
+});
+
+Deno.test("uses witty_sassy voice for conversational planner replies", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "I'm feeling behind and I need help thinking clearly.",
+    tonePack: "witty_sassy",
+    classificationHint: {
+      type: "brain-dump",
+      confidence: 0.9,
+      reasoning: "User is processing emotions, not asking for a saved action.",
+    },
+  }));
+
+  assertEquals(result.mode, "conversational");
+  assertEquals(result.proposals.length, 0);
+  assertStringIncludes(result.reply, "I'm with you");
+  assertStringIncludes(result.reply, "point at the bullshit");
+});
+
+Deno.test("uses witty_sassy voice for proposal replies without implying the draft is already saved", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Call mom",
+    tonePack: "witty_sassy",
+    plannerContext: {
+      tasks: [],
+      inboxTasks: [],
+      activeEpics: [],
+      rituals: [],
+      calendarEvents: [],
+      scheduleInsights: {
+        horizon: "day",
+        selectedDate: "2026-04-18",
+        dayLoads: [],
+        overloadedDates: [],
+        emptyDates: [],
+        conflicts: [],
+        suggestedSlots: [],
+        moveSuggestions: [],
+        summary: "Today still has room to flex.",
+      },
+    },
+  }));
+
+  assertEquals(result.mode, "proposal");
+  assertEquals(result.proposals[0].readyToConfirm, true);
+  assertStringIncludes(result.reply, "spare me the fake ceremony");
+  assertEquals(result.reply.includes("already saved"), false);
 });

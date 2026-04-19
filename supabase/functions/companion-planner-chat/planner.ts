@@ -2097,6 +2097,47 @@ const buildDayDigest = (
   return `${label}: ${nextItems}.${overflowText} ${openingText}`;
 };
 
+const isWittySassyTone = (tonePack: PlannerTonePack): boolean =>
+  tonePack === "witty_sassy";
+
+const buildWittyAvailabilityCallout = (
+  input: PlannerBuildInput,
+  targetDate: string,
+  remainingOnly = false,
+): string | null => {
+  if (!isWittySassyTone(input.tonePack)) return null;
+
+  const items = collectScheduleItemsForDate(input, targetDate, remainingOnly);
+  const scheduleInsights = input.plannerContext.scheduleInsights;
+  const dayLoadStatus = scheduleInsights?.dayLoads.find((day) => day.date === targetDate)?.status ?? null;
+  const isExplicitlyEmpty = scheduleInsights?.emptyDates.includes(targetDate) ?? false;
+  const isOpen = items.length === 0 || isExplicitlyEmpty || dayLoadStatus === "open";
+  const isLight = !isOpen && (items.length <= 1 || dayLoadStatus === "balanced");
+  const targetLabel = formatScheduleReference(input.currentDate, targetDate, true);
+
+  if (targetDate === input.currentDate) {
+    if (isOpen) {
+      return "Your calendar is wide open today. According to what I see, time is all you got, so let's stop letting random nonsense cosplay as a packed life.";
+    }
+
+    if (isLight) {
+      return "Today is pretty open. This is not a 'too much on my plate' emergency; this is a priorities problem wearing a fake mustache.";
+    }
+
+    return null;
+  }
+
+  if (isOpen) {
+    return `Your calendar is wide open on ${targetLabel}. According to what I see, time is all you got there too, so the fake 'I'm slammed' storyline can take the day off.`;
+  }
+
+  if (isLight) {
+    return `${targetLabel} is pretty open. The calendar is not exactly suffocating, so let's not let fake urgency write the script.`;
+  }
+
+  return null;
+};
+
 const buildOpenDayRouteOptions = (
   input: PlannerBuildInput,
 ): string[] => {
@@ -2125,21 +2166,29 @@ const buildOpenDayReply = (
   const items = collectScheduleItemsForDate(input, targetDate, false);
   if (items.length > 0) return null;
 
-  const scheduleLead = targetDate === input.currentDate
-    ? "Your calendar's clear today."
-    : `Your calendar's pretty open on ${
-      formatScheduleReference(input.currentDate, targetDate, true)
-    }.`;
+  const scheduleLead = buildWittyAvailabilityCallout(input, targetDate) ?? (
+    targetDate === input.currentDate
+      ? "Your calendar's clear today."
+      : `Your calendar's pretty open on ${
+        formatScheduleReference(input.currentDate, targetDate, true)
+      }.`
+  );
   const optionLines = buildOpenDayRouteOptions(input)
     .map((option) => `- ${option}`)
     .join("\n");
+  const purposeLead = isWittySassyTone(input.tonePack)
+    ? "That gives us room to do something deliberate instead of free-styling chaos."
+    : "That gives us room to shape the day on purpose.";
+  const closer = isWittySassyTone(input.tonePack)
+    ? "Pick a lane and I'll help you move without the fake-busy performance."
+    : "Tell me which lane fits, and I'll help shape it.";
 
   return [
     scheduleLead,
-    "That gives us room to shape the day on purpose.",
+    purposeLead,
     "A few solid directions we could take:",
     optionLines,
-    "Tell me which lane fits, and I'll help shape it.",
+    closer,
   ].join("\n\n");
 };
 
@@ -2147,25 +2196,38 @@ const buildUpcomingDigestReply = (input: PlannerBuildInput): string => {
   const tomorrow = addDaysToDateKey(input.currentDate, 1);
   const weekSummary = input.plannerContext.scheduleInsights?.summary ??
     "The week still has room to flex.";
+  const lead = isWittySassyTone(input.tonePack)
+    ? `${buildWittyAvailabilityCallout(input, input.currentDate, true) ?? "Here's what's coming up, minus the dramatic retelling."}`
+    : "Here's the shape of what's coming up.";
+  const closer = isWittySassyTone(input.tonePack)
+    ? "Tell me what actually matters, and I'll help cut the bullshit out of the schedule."
+    : "Tell me what feels most important, and I'll help from there.";
 
   return [
-    "Here's the shape of what's coming up.",
+    lead,
     buildDayDigest(input, input.currentDate, "Today", true),
     buildDayDigest(input, tomorrow, "Tomorrow"),
     `Week ahead: ${weekSummary}`,
-    "Tell me what feels most important, and I'll help from there.",
+    closer,
   ].join("\n\n");
 };
 
 const buildMakeRoomStarterReply = (input: PlannerBuildInput): string => {
   const weekSummary = input.plannerContext.scheduleInsights?.summary ??
     "The week still has room to flex.";
+  const lead = isWittySassyTone(input.tonePack)
+    ? buildWittyAvailabilityCallout(input, input.currentDate, true)
+      ?? "Here's the room I see right now, minus the decorative chaos."
+    : "Here's the room I see right now.";
+  const closer = isWittySassyTone(input.tonePack)
+    ? "Tell me what actually matters, and I'll help make room for it without the decorative bullshit."
+    : "Tell me what matters most, and I'll help make room for it.";
 
   return [
-    "Here's the room I see right now.",
+    lead,
     buildDayDigest(input, input.currentDate, "Today", true),
     `Week ahead: ${weekSummary}`,
-    "Tell me what matters most, and I'll help make room for it.",
+    closer,
   ].join("\n\n");
 };
 
@@ -2204,11 +2266,17 @@ const buildDayOverviewReply = (
     input.currentDate,
     targetDate,
   );
+  const lead = isWittySassyTone(input.tonePack)
+    ? `Here's the shape of ${leadLabel}, without the self-serving mythology.`
+    : `Here's the shape of ${leadLabel}.`;
+  const closer = isWittySassyTone(input.tonePack)
+    ? "Tell me what actually matters, and I'll help strip the bullshit out of the plan."
+    : "Tell me what feels most important, and I'll help from there.";
 
   return [
-    `Here's the shape of ${leadLabel}.`,
+    lead,
     buildDayDigest(input, targetDate, digestLabel),
-    "Tell me what feels most important, and I'll help from there.",
+    closer,
   ].join("\n\n");
 };
 
@@ -2239,6 +2307,12 @@ const buildReadOnlyScheduleReply = (
       true,
     );
     if (freeWindows.length === 0) {
+      if (isWittySassyTone(input.tonePack)) {
+        return dayPart
+          ? `I don't see a clean ${dayPart.label} opening on ${targetLabel} yet. The calendar is being difficult, not mystical. If you want, I'll help drag the bullshit out of the schedule and make room.`
+          : `I don't see a clear opening on ${targetLabel} yet. The calendar is being difficult, not mystical. If you want, I'll help drag the bullshit out of the schedule and make room.`;
+      }
+
       return dayPart
         ? `I don't see a clean ${dayPart.label} opening on ${targetLabel} yet. I can still help you reshuffle quests around those blocks if you want.`
         : `I don't see a clear opening on ${targetLabel} yet. I can still help you reshuffle quests around those blocks if you want.`;
@@ -2247,6 +2321,12 @@ const buildReadOnlyScheduleReply = (
     const windowsLabel = freeWindows.map((window) =>
       `${window.start}-${window.end}`
     ).join(", ");
+    if (isWittySassyTone(input.tonePack)) {
+      return dayPart
+        ? `Your best ${dayPart.label} openings on ${targetLabel} are ${windowsLabel}. That's the actual room, not the dramatic retelling.`
+        : `Your best openings on ${targetLabel} are ${windowsLabel}. That's the actual room, not the dramatic retelling.`;
+    }
+
     return dayPart
       ? `Your best ${dayPart.label} openings on ${targetLabel} are ${windowsLabel}. That includes both Cosmiq quests and connected calendar events.`
       : `Your best openings on ${targetLabel} are ${windowsLabel}. That includes both Cosmiq quests and connected calendar events.`;
@@ -2341,7 +2421,7 @@ const buildBatchQuestProposals = (
 
 const composeReply = (
   input: PlannerBuildInput,
-  _tonePack: PlannerTonePack,
+  tonePack: PlannerTonePack,
   kind: PlannerProposalKind,
   readyToConfirm: boolean,
 ): string => {
@@ -2362,6 +2442,14 @@ const composeReply = (
     ? `You usually land work like this in the ${preferredTimeOfDay}. `
     : "";
   const scheduleLead = scheduleSummary ? `${scheduleSummary} ` : "";
+
+  if (isWittySassyTone(tonePack)) {
+    if (readyToConfirm) {
+      return `${scheduleLead}I drafted this as a ${baseLabel}. Review it, confirm it if it holds up, and spare me the fake ceremony.`;
+    }
+
+    return `${scheduleLead}${memoryLead}I can shape this into a ${baseLabel}, but I need one real detail before we dress vague intentions up like a finished plan.`;
+  }
 
   if (readyToConfirm) {
     return `${scheduleLead}I drafted this as a ${baseLabel}. Take a look, and confirm it if it fits.`;
@@ -2386,7 +2474,9 @@ const buildConversationalResponse = (
   return {
     mode: "conversational",
     reply:
-      `${scheduleLead}I'm here with you. Tell me what feels most important, or ask me to turn it into a draft quest or campaign when you're ready.`,
+      isWittySassyTone(input.tonePack)
+        ? `${scheduleLead}I'm with you. Tell me what actually matters, or point at the bullshit and I'll help turn it into a draft quest or campaign.`
+        : `${scheduleLead}I'm here with you. Tell me what feels most important, or ask me to turn it into a draft quest or campaign when you're ready.`,
     followUpQuestions: [],
     proposals: [],
     suggestedReminders: [],
@@ -2415,7 +2505,9 @@ const buildGoalBreakdownStarterResponse = (
 ): PlannerBuildResult => ({
   mode: "conversational",
   reply:
-    "Name the goal you want to break down, and I'll help turn it into concrete steps.",
+    isWittySassyTone(input.tonePack)
+      ? "Name the goal. The real one, not the cinematic fog machine version, and I'll break it into steps that can survive contact with reality."
+      : "Name the goal you want to break down, and I'll help turn it into concrete steps.",
   followUpQuestions: [question({
     field: "details",
     prompt: "What's the goal you want to break down?",
@@ -2450,7 +2542,9 @@ const buildIntentFirstResponse = (
 ): PlannerBuildResult => ({
   mode: "conversational",
   reply:
-    "Let's start with what you want to get done. Once I have that, I'll look at what's open.",
+    isWittySassyTone(input.tonePack)
+      ? "Tell me what you actually want done. Once we stop flirting with vagueness, I'll look at what's open."
+      : "Let's start with what you want to get done. Once I have that, I'll look at what's open.",
   followUpQuestions: [question({
     field: "details",
     prompt: "What do you want to get done?",

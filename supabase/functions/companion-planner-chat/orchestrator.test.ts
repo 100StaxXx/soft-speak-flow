@@ -1,4 +1,7 @@
-import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
+import {
+  assertEquals,
+  assertStringIncludes,
+} from "https://deno.land/std@0.224.0/assert/mod.ts";
 import { buildOrchestratedPlannerResponse } from "./orchestrator.ts";
 import type { PlannerBuildInput, PlannerBuildResult } from "./planner.ts";
 
@@ -117,4 +120,87 @@ Deno.test("preserves deterministic proposal state while rewriting the copy", asy
   assertEquals(response.mode, "proposal");
   assertEquals(response.proposals.length, 1);
   assertEquals(response.reply, "I drafted this as a quest update. Review it and confirm when it looks right.");
+});
+
+Deno.test("sends tone and availability grounding to the model for witty_sassy planner replies", async () => {
+  const captured = {
+    body: null as {
+      messages?: Array<Record<string, string>>;
+    } | null,
+  };
+
+  const response = await buildOrchestratedPlannerResponse({
+    guardedFetch: async (_input: RequestInfo | URL, init?: RequestInit) => {
+      captured.body = JSON.parse(String(init?.body ?? "{}")) as {
+        messages?: Array<Record<string, string>>;
+      };
+      return new Response(JSON.stringify({
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              reply: "Your calendar is wide open today. According to what I see, time is all you got.",
+              mode: "schedule_read",
+            }),
+          },
+        }],
+      }));
+    },
+    input: {
+      ...baseInput(),
+      message: "Show me today's route.",
+      tonePack: "witty_sassy",
+      plannerContext: {
+        ...baseInput().plannerContext,
+        scheduleInsights: {
+          horizon: "day",
+          selectedDate: "2026-04-18",
+          dayLoads: [{
+            date: "2026-04-18",
+            totalMinutes: 0,
+            taskCount: 0,
+            status: "open",
+          }],
+          overloadedDates: [],
+          emptyDates: ["2026-04-18"],
+          conflicts: [],
+          suggestedSlots: [],
+          moveSuggestions: [],
+          summary: "Today is open.",
+        },
+      },
+    },
+    baseResult: {
+      ...baseResult("schedule_read"),
+      reply: "Your calendar is wide open today. According to what I see, time is all you got.",
+    },
+    openAIApiKey: "test-openai-key",
+    model: "test-model",
+  });
+
+  assertEquals(response.mode, "schedule_read");
+  assertEquals(response.reply, "Your calendar is wide open today. According to what I see, time is all you got.");
+
+  const messages = captured.body?.messages ?? [];
+  const systemMessage = messages[0]?.content ?? "";
+  const userMessage = messages[1]?.content ?? "";
+  const promptPayload = JSON.parse(userMessage) as {
+    tonePack: string;
+    deterministicContext: {
+      availabilityFacts: {
+        targetDate: string;
+        dayStatus: string | null;
+        scheduledItemCount: number;
+        hasOpenings: boolean;
+      };
+    };
+  };
+
+  assertStringIncludes(systemMessage, "Voice: bold cheekiness, roasty edge, and a little swagger are allowed.");
+  assertStringIncludes(systemMessage, "Schedule facts come before interpretation.");
+  assertStringIncludes(systemMessage, "If deterministicContext.availabilityFacts says the day is open");
+  assertEquals(promptPayload.tonePack, "witty_sassy");
+  assertEquals(promptPayload.deterministicContext.availabilityFacts.targetDate, "2026-04-18");
+  assertEquals(promptPayload.deterministicContext.availabilityFacts.dayStatus, "open");
+  assertEquals(promptPayload.deterministicContext.availabilityFacts.scheduledItemCount, 0);
+  assertEquals(promptPayload.deterministicContext.availabilityFacts.hasOpenings, true);
 });

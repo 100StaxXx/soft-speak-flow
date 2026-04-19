@@ -9,12 +9,12 @@ import {
 } from "react";
 import { formatDistanceToNow } from "date-fns";
 import {
+  Archive,
   Mic,
   MicOff,
   Check,
   ChevronRight,
   Loader2,
-  Plus,
   Send,
   X,
 } from "lucide-react";
@@ -108,7 +108,6 @@ interface JourneysCompanionThreadPickerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   presentation: JourneysCompanionPlannerModalPresentation;
-  activeThread: CompanionChatThreadSummary | null;
   historyThreads: CompanionChatThreadSummary[];
   isLoading: boolean;
   canResumeThreads: boolean;
@@ -120,7 +119,6 @@ const JourneysCompanionThreadPicker = memo(function JourneysCompanionThreadPicke
   open,
   onOpenChange,
   presentation,
-  activeThread,
   historyThreads,
   isLoading,
   canResumeThreads,
@@ -135,81 +133,53 @@ const JourneysCompanionThreadPicker = memo(function JourneysCompanionThreadPicke
       <div className="mb-4 space-y-1">
         <p className="text-sm font-semibold text-white">Thread history</p>
         <p className="text-sm text-white/[0.62]">
-          Start a fresh chat anytime, then jump back into past chats whenever you want.
+          Browse old conversations here and jump back in whenever you want.
         </p>
       </div>
 
-      <div className="space-y-4">
-        {activeThread ? (
+      <div className="space-y-2">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/[0.45]">
+          Past chats
+        </p>
+        {isLoading ? (
+          <div className="flex items-center gap-2 rounded-[22px] border border-white/[0.12] bg-white/[0.05] px-4 py-5 text-sm text-white/[0.74]">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Loading past chats...
+          </div>
+        ) : historyThreads.length > 0 ? (
           <div className="space-y-2">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/[0.45]">
-              Current thread
-            </p>
-            <div className="rounded-[22px] border border-sky-200/[0.18] bg-sky-400/[0.12] p-4">
-              <div className="flex items-start justify-between gap-3">
+            {historyThreads.map((thread) => (
+              <button
+                key={thread.sessionId}
+                type="button"
+                className={cn(
+                  "flex w-full items-start justify-between gap-3 rounded-[22px] border border-white/[0.12] px-4 py-4 text-left transition-colors",
+                  canResumeThreads
+                    ? "bg-white/[0.05] hover:bg-white/[0.09]"
+                    : "cursor-not-allowed bg-white/[0.03] opacity-70",
+                )}
+                onClick={() => {
+                  void onResumeThread(thread.sessionId);
+                }}
+                disabled={!canResumeThreads}
+                data-testid={`journeys-companion-thread-resume-${thread.sessionId}`}
+              >
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-white">
-                    {activeThread.title}
-                  </p>
-                  <p className="mt-1 line-clamp-2 text-sm text-white/[0.72]">
-                    {activeThread.previewText}
+                  <p className="truncate text-sm font-semibold text-white">{thread.title}</p>
+                  <p className="mt-1 line-clamp-2 text-sm text-white/[0.68]">{thread.previewText}</p>
+                  <p className="mt-3 text-xs text-white/[0.5]">
+                    Updated {formatThreadTimestamp(thread.lastMessageAt)}
                   </p>
                 </div>
-                <Badge variant="outline" className="border-white/[0.15] bg-white/[0.06] text-white/[0.74]">
-                  Active
-                </Badge>
-              </div>
-              <p className="mt-3 text-xs text-white/[0.52]">
-                Updated {formatThreadTimestamp(activeThread.lastMessageAt)}
-              </p>
-            </div>
+                <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-white/[0.48]" />
+              </button>
+            ))}
           </div>
-        ) : null}
-
-        <div className="space-y-2">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/[0.45]">
-            Past chats
-          </p>
-          {isLoading ? (
-            <div className="flex items-center gap-2 rounded-[22px] border border-white/[0.12] bg-white/[0.05] px-4 py-5 text-sm text-white/[0.74]">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Loading past chats...
-            </div>
-          ) : historyThreads.length > 0 ? (
-            <div className="space-y-2">
-              {historyThreads.map((thread) => (
-                <button
-                  key={thread.sessionId}
-                  type="button"
-                  className={cn(
-                    "flex w-full items-start justify-between gap-3 rounded-[22px] border border-white/[0.12] px-4 py-4 text-left transition-colors",
-                    canResumeThreads
-                      ? "bg-white/[0.05] hover:bg-white/[0.09]"
-                      : "cursor-not-allowed bg-white/[0.03] opacity-70",
-                  )}
-                  onClick={() => {
-                    void onResumeThread(thread.sessionId);
-                  }}
-                  disabled={!canResumeThreads}
-                  data-testid={`journeys-companion-thread-resume-${thread.sessionId}`}
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-white">{thread.title}</p>
-                    <p className="mt-1 line-clamp-2 text-sm text-white/[0.68]">{thread.previewText}</p>
-                    <p className="mt-3 text-xs text-white/[0.5]">
-                      Updated {formatThreadTimestamp(thread.lastMessageAt)}
-                    </p>
-                  </div>
-                  <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-white/[0.48]" />
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="rounded-[22px] border border-dashed border-white/[0.12] bg-white/[0.03] px-4 py-5 text-sm text-white/[0.62]">
-              {emptyStateMessage}
-            </div>
-          )}
-        </div>
+        ) : (
+          <div className="rounded-[22px] border border-dashed border-white/[0.12] bg-white/[0.03] px-4 py-5 text-sm text-white/[0.62]">
+            {emptyStateMessage}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -221,7 +191,7 @@ const JourneysCompanionThreadPicker = memo(function JourneysCompanionThreadPicke
           <DialogHeader className="sr-only">
             <DialogTitle>Companion threads</DialogTitle>
             <DialogDescription>
-              Switch between the current journeys thread and past chats.
+              Browse archived journeys conversations.
             </DialogDescription>
           </DialogHeader>
           {body}
@@ -236,7 +206,7 @@ const JourneysCompanionThreadPicker = memo(function JourneysCompanionThreadPicke
         <DrawerHeader className="sr-only">
           <DrawerTitle>Companion threads</DrawerTitle>
           <DrawerDescription>
-            Switch between the current journeys thread and past chats.
+            Browse archived journeys conversations.
           </DrawerDescription>
         </DrawerHeader>
         {body}
@@ -434,6 +404,14 @@ const JourneysCompanionOverlayBody = memo(({
     setIsThreadPickerOpen(false);
   }, [assistant]);
 
+  const handleArchiveAction = useCallback(async () => {
+    if (assistant.canArchiveThread) {
+      await assistant.archiveCurrentThread();
+    }
+
+    setIsThreadPickerOpen(true);
+  }, [assistant]);
+
   const sendDisabled = assistant.isSubmitting || assistant.isClassifying || (!typingMessageId && !assistant.draftInput.trim());
   const activeProposal = assistant.pendingProposals[0] ?? null;
   const activeOptionQuestions = assistant.questions.filter((question) => (question.options?.length ?? 0) > 0);
@@ -513,22 +491,22 @@ const JourneysCompanionOverlayBody = memo(({
                     variant="outline"
                     className="border-white/[0.15] bg-white/[0.05] text-white/[0.84] hover:bg-white/[0.12]"
                     onClick={() => {
-                      void assistant.startFreshThread();
+                      void handleArchiveAction();
                     }}
-                    disabled={!assistant.canStartFreshThread || assistant.isLoadingThreads}
-                    data-testid="journeys-companion-new-chat-button"
+                    disabled={assistant.isLoadingThreads}
+                    data-testid="journeys-companion-archive-button"
                   >
                     {assistant.isLoadingThreads ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     ) : (
-                      <Plus className="mr-2 h-4 w-4" />
+                      <Archive className="mr-2 h-4 w-4" />
                     )}
-                    New chat
+                    Archive
                   </Button>
                 </span>
               </TooltipTrigger>
               <TooltipContent side="bottom">
-                {assistant.startFreshDisabledReason ?? "Start a fresh chat and keep this one in your past chats."}
+                {assistant.archiveDisabledReason ?? "Archive this chat and browse past chats."}
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
@@ -546,39 +524,6 @@ const JourneysCompanionOverlayBody = memo(({
           }}
           data-testid="journeys-companion-planner-dialogue-screen"
         >
-          <div className="flex items-center justify-between gap-3 border-b border-white/10 bg-white/[0.02] px-4 py-3 text-[11px] uppercase tracking-[0.2em] text-white/[0.45]">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span>
-                    <button
-                      type="button"
-                      className={cn(
-                        "flex min-w-0 items-center gap-2 rounded-full border border-white/[0.12] px-3 py-1.5 text-left text-[11px] uppercase tracking-[0.2em] text-white/[0.62] transition-colors",
-                        assistant.canOpenThreadPicker
-                          ? "bg-white/[0.05] hover:bg-white/[0.1]"
-                          : "cursor-not-allowed bg-white/[0.03] opacity-70",
-                      )}
-                      onClick={() => setIsThreadPickerOpen(true)}
-                      disabled={!assistant.canOpenThreadPicker || assistant.isLoadingThreads}
-                      data-testid="journeys-companion-thread-picker-trigger"
-                    >
-                      <span className="shrink-0">Journeys Thread</span>
-                      <span className="max-w-[10rem] truncate text-white/[0.88] normal-case tracking-normal">
-                        {assistant.activeThread?.title ?? "New thread"}
-                      </span>
-                      <ChevronRight className="h-3.5 w-3.5 shrink-0 text-white/[0.46]" />
-                    </button>
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">
-                  {assistant.threadPickerDisabledReason ?? "Switch between the current journeys thread and past chats."}
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-            <span>{dialogueEntries.length} messages</span>
-          </div>
-
           <ScrollArea className="flex-1">
             <div className="space-y-3 p-4 sm:p-5" data-testid="journeys-companion-planner-transcript">
               {dialogueEntries.map((entry) => {
@@ -732,7 +677,7 @@ const JourneysCompanionOverlayBody = memo(({
               </div>
             ) : null}
 
-            <div className="flex items-end gap-2 rounded-[24px] border border-white/[0.12] bg-black/10 p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl">
+            <div className="flex items-center gap-2 rounded-[24px] border border-white/[0.12] bg-black/10 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl">
               <Button
                 type="button"
                 size="icon"
@@ -753,13 +698,14 @@ const JourneysCompanionOverlayBody = memo(({
               </label>
               <Textarea
                 id="journeys-companion-chat-input"
+                rows={1}
                 value={assistant.draftInput}
                 onChange={(event) => {
                   assistant.setDraftInput(event.target.value);
                 }}
                 onKeyDown={handleComposerKeyDown}
                 placeholder={assistant.placeholder}
-                className="min-h-[82px] resize-none rounded-[22px] border-white/10 bg-white/[0.04] text-white placeholder:text-white/[0.38]"
+                className="h-12 min-h-[48px] max-h-[48px] flex-1 w-auto resize-none overflow-y-auto rounded-[20px] border-white/10 bg-white/[0.04] px-4 py-3 leading-5 text-white placeholder:text-white/[0.38]"
                 data-testid="journeys-companion-planner-text-input"
               />
               <Button
@@ -797,7 +743,6 @@ const JourneysCompanionOverlayBody = memo(({
         open={isThreadPickerOpen}
         onOpenChange={setIsThreadPickerOpen}
         presentation={presentation}
-        activeThread={assistant.activeThread}
         historyThreads={assistant.historyThreads}
         isLoading={assistant.isLoadingThreads}
         canResumeThreads={assistant.canOpenThreadPicker}

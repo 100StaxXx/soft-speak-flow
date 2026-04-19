@@ -99,6 +99,7 @@ export function useJourneysCompanionThreads({
   const { resetThread: resetPlannerThread, hydrateThread: hydratePlannerThread } = planner;
   const [activeSessionId, setActiveSessionId] = useState("");
   const [isHydratingThread, setIsHydratingThread] = useState(false);
+  const [locallyArchivedSessionId, setLocallyArchivedSessionId] = useState<string | null>(null);
   const localThreadCreatedAtRef = useRef(new Date().toISOString());
   const scopeKeyRef = useRef<string | null>(null);
   const bootstrappedScopeKeyRef = useRef<string | null>(null);
@@ -143,6 +144,7 @@ export function useJourneysCompanionThreads({
   const openFreshThread = useCallback((sessionId?: string) => {
     const nextSessionId = sessionId ?? generateCompanionThreadSessionId();
     localThreadCreatedAtRef.current = new Date().toISOString();
+    setLocallyArchivedSessionId(null);
     setActiveSessionId(nextSessionId);
     resetConversationThread({
       sessionId: nextSessionId,
@@ -190,6 +192,7 @@ export function useJourneysCompanionThreads({
         localThreadCreatedAtRef.current =
           threadMessages[0]?.createdAt
           ?? activePersistedThread.createdAt;
+        setLocallyArchivedSessionId(null);
         setActiveSessionId(activePersistedThread.sessionId);
         hydrateConversationThread({
           sessionId: activePersistedThread.sessionId,
@@ -237,9 +240,12 @@ export function useJourneysCompanionThreads({
   const persistedActiveThread = useMemo(
     () =>
       threadsQuery.data?.threads.find(
-        (thread) => thread.sessionId === activeSessionId && thread.archivedAt === null,
+        (thread) =>
+          thread.sessionId === activeSessionId
+          && thread.archivedAt === null
+          && thread.sessionId !== locallyArchivedSessionId,
       ) ?? null,
-    [activeSessionId, threadsQuery.data],
+    [activeSessionId, locallyArchivedSessionId, threadsQuery.data],
   );
 
   const localActiveThread = useMemo<CompanionChatThreadSummary>(() => {
@@ -264,9 +270,11 @@ export function useJourneysCompanionThreads({
   const historyThreads = useMemo(
     () =>
       (threadsQuery.data?.threads ?? []).filter(
-        (thread) => thread.sessionId !== activeSessionId && thread.messageCount >= 2,
+        (thread) =>
+          thread.sessionId !== persistedActiveThread?.sessionId
+          && thread.messageCount >= 2,
       ),
-    [activeSessionId, threadsQuery.data],
+    [persistedActiveThread?.sessionId, threadsQuery.data],
   );
 
   const threadPickerDisabledReason = useMemo(() => {
@@ -287,38 +295,39 @@ export function useJourneysCompanionThreads({
     threadsQuery.data?.setupUnavailable,
   ]);
 
-  const startFreshDisabledReason = useMemo(() => {
-    if (isHydratingThread) {
-      return "Loading thread history.";
+  const archiveDisabledReason = useMemo(() => {
+    if (threadPickerDisabledReason) {
+      return threadPickerDisabledReason;
+    }
+    if (!persistedActiveThread) {
+      return "Start the conversation before archiving this thread.";
     }
     if (isBusy) {
       return "Wait for the current reply to finish.";
     }
     if (hasPendingPlannerWork) {
-      return "Finish or dismiss the current plan before starting a fresh chat.";
+      return "Finish or dismiss the current plan before archiving this thread.";
     }
     return null;
-  }, [hasPendingPlannerWork, isBusy, isHydratingThread]);
+  }, [hasPendingPlannerWork, isBusy, persistedActiveThread, threadPickerDisabledReason]);
 
-  const startFreshThread = useCallback(async () => {
-    if (startFreshDisabledReason) return;
+  const archiveCurrentThread = useCallback(async () => {
+    if (archiveDisabledReason || !persistedActiveThread) return;
 
     try {
-      if (persistedActiveThread) {
-        await setCompanionChatThreadArchived(persistedActiveThread.sessionId, true);
-      }
-
-      openFreshThread();
+      setLocallyArchivedSessionId(persistedActiveThread.sessionId);
+      await setCompanionChatThreadArchived(persistedActiveThread.sessionId, true);
       await queryClient.invalidateQueries({ queryKey: threadsQueryKey });
     } catch (error) {
-      console.error("Failed to start a fresh journeys companion thread:", error);
+      setLocallyArchivedSessionId(null);
+      console.error("Failed to archive journeys companion thread:", error);
       toast.error(
         isCompanionChatSetupError(error)
           ? COMPANION_CHAT_THREAD_HISTORY_DISABLED_REASON
-          : "I couldn't start a fresh chat yet.",
+          : "I couldn't archive that thread yet.",
       );
     }
-  }, [openFreshThread, persistedActiveThread, queryClient, startFreshDisabledReason, threadsQueryKey]);
+  }, [archiveDisabledReason, persistedActiveThread, queryClient, threadsQueryKey]);
 
   const resumeThread = useCallback(async (sessionId: string) => {
     if (threadPickerDisabledReason) return;
@@ -336,6 +345,7 @@ export function useJourneysCompanionThreads({
       localThreadCreatedAtRef.current =
         threadMessages[0]?.createdAt
         ?? new Date().toISOString();
+      setLocallyArchivedSessionId(null);
       setActiveSessionId(sessionId);
       hydrateConversationThread({
         sessionId,
@@ -371,15 +381,15 @@ export function useJourneysCompanionThreads({
     activeSessionId,
     activeThread,
     historyThreads,
-    canStartFreshThread: startFreshDisabledReason === null,
-    startFreshDisabledReason,
+    canArchiveThread: archiveDisabledReason === null,
+    archiveDisabledReason,
     canOpenThreadPicker: threadPickerDisabledReason === null,
     threadPickerDisabledReason,
     threadHistoryEmptyStateMessage:
       threadPickerDisabledReason
         ? COMPANION_CHAT_THREAD_HISTORY_EMPTY_STATE
         : "Past chats will show up here after at least one real exchange.",
-    startFreshThread,
+    archiveCurrentThread,
     resumeThread,
     isLoadingThreads: threadsQuery.isLoading || isHydratingThread,
   };

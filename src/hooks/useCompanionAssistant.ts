@@ -461,14 +461,14 @@ export function useCompanionAssistant({
     threadHistoryEmptyStateMessage: surface === "journeys"
       ? journeysThreads.threadHistoryEmptyStateMessage
       : "Past chats will show up here after at least one real exchange.",
-    canStartFreshThread: surface === "journeys"
-      ? journeysThreads.canStartFreshThread
+    canArchiveThread: surface === "journeys"
+      ? journeysThreads.canArchiveThread
       : false,
-    startFreshDisabledReason: surface === "journeys"
-      ? journeysThreads.startFreshDisabledReason
+    archiveDisabledReason: surface === "journeys"
+      ? journeysThreads.archiveDisabledReason
       : null,
-    startFreshThread: surface === "journeys"
-      ? journeysThreads.startFreshThread
+    archiveCurrentThread: surface === "journeys"
+      ? journeysThreads.archiveCurrentThread
       : (async () => undefined),
     resumeThread: surface === "journeys"
       ? journeysThreads.resumeThread
