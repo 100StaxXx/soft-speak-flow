@@ -260,6 +260,8 @@ export const serializeTaskToPlannerContext = (task: {
   task_date: string | null;
   scheduled_time: string | null;
   estimated_duration?: number | null;
+  notes?: string | null;
+  subtasks?: Array<{ title: string | null } | null> | null;
   recurrence_pattern: string | null;
   recurrence_end_date?: string | null;
   completed?: boolean | null;
@@ -273,6 +275,10 @@ export const serializeTaskToPlannerContext = (task: {
   taskDate: task.task_date,
   scheduledTime: task.scheduled_time,
   estimatedDuration: task.estimated_duration ?? null,
+  notes: task.notes ?? null,
+  subtaskTitles: (task.subtasks ?? [])
+    .map((subtask) => subtask?.title?.trim() ?? "")
+    .filter((title) => title.length > 0),
   recurrencePattern: task.recurrence_pattern,
   recurrenceEndDate: task.recurrence_end_date ?? null,
   completed: task.completed ?? null,

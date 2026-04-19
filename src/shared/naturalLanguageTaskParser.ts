@@ -1,4 +1,5 @@
 import type { QuestAttachmentInput } from '../types/questAttachments';
+import { cleanGeneratedTaskTitle } from './taskTitleNormalization';
 
 export interface ParseNaturalLanguageOptions {
   referenceDateTime?: Date | string | number | null;
@@ -382,6 +383,10 @@ const TIME_PATTERNS = [
   { regex: /\blate\s*night\b/i, handler: () => '23:00' },
   { regex: /\bmidnight\b/i, handler: () => '00:00' },
 ];
+
+const TIME_PATTERNS_FOR_TITLE_CLEANUP = TIME_PATTERNS
+  .map((pattern) => pattern.regex)
+  .filter((pattern) => !/lunch/.test(pattern.source));
 
 const RELATIVE_TIME_PATTERNS: Array<{
   regex: RegExp;
@@ -824,7 +829,7 @@ function cleanTaskText(text: string): string {
   let cleaned = wrappedTitle ?? text;
 
   const patternsToRemove = [
-    ...TIME_PATTERNS.map(p => p.regex),
+    ...TIME_PATTERNS_FOR_TITLE_CLEANUP,
     ...RELATIVE_TIME_PATTERNS.map(p => p.regex),
     ...DATE_PATTERNS.map(p => p.regex),
     ...DURATION_PATTERNS.map(p => p.regex),
@@ -866,8 +871,10 @@ function cleanTaskText(text: string): string {
     .replace(/\b(?:on|for|at|to|into|onto|in)\b\s*$/i, '')
     .trim();
 
+  cleaned = cleanGeneratedTaskTitle(cleaned);
+
   if (isScaffoldOnlyTaskTitle(cleaned) && wrappedTitle && !isScaffoldOnlyTaskTitle(wrappedTitle)) {
-    return wrappedTitle.replace(/\s+/g, ' ').trim();
+    return cleanGeneratedTaskTitle(wrappedTitle);
   }
 
   return cleaned;

@@ -127,6 +127,62 @@ Deno.test("uses the cleaned workout title for planner-created quest proposals", 
   );
 });
 
+Deno.test("normalizes conversational scheduled quest titles before building planner proposals", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "I'm going to grab lunch with Zach today at 1",
+    currentDate: "2026-04-19",
+    currentDateTime: "2026-04-19T12:34:00-07:00",
+    parsedInput: {
+      text: "I'm going to grab lunch with Zach",
+      scheduledTime: "13:00",
+      scheduledDate: "2026-04-19",
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+  }));
+
+  assertEquals(result.mode, "proposal");
+  assertEquals(result.proposals[0].kind, "create_quest");
+  assertEquals(result.proposals[0].readyToConfirm, true);
+  assertEquals(result.followUpQuestions.length, 0);
+  assertEquals(result.proposals[0].title, "Create Grab Lunch With Zach");
+  assertEquals(
+    result.proposals[0].summary,
+    'Create a quest for "Grab Lunch With Zach" on 2026-04-19 at 13:00.',
+  );
+  assertEquals(
+    (result.proposals[0].payload as {
+      taskText: string;
+      taskDate: string | null;
+      scheduledTime: string | null;
+    }).taskText,
+    "Grab Lunch With Zach",
+  );
+  assertEquals(
+    (result.proposals[0].payload as {
+      taskText: string;
+      taskDate: string | null;
+      scheduledTime: string | null;
+    }).taskDate,
+    "2026-04-19",
+  );
+  assertEquals(
+    (result.proposals[0].payload as {
+      taskText: string;
+      taskDate: string | null;
+      scheduledTime: string | null;
+    }).scheduledTime,
+    "13:00",
+  );
+});
+
 Deno.test("treats a simple timed utterance as a ready-to-confirm quest draft", () => {
   const result = buildPlannerResponse(baseInput({
     message: "gym at 5pm tomorrow",

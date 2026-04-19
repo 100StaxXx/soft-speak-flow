@@ -28,6 +28,7 @@ import { useAccessStatus } from "@/hooks/useAccessStatus";
 import { useCompanionAssistant } from "@/hooks/useCompanionAssistant";
 import { cn, stripMarkdown } from "@/lib/utils";
 import type { CompanionPlannerProposal, PlannerHorizon } from "@/types/companionPlanner";
+import { getCompanionPlannerQuestProposalPreview } from "@/utils/companionPlannerProposalPreview";
 
 const HORIZON_LABELS: Record<PlannerHorizon, string> = {
   day: "Day",
@@ -60,59 +61,98 @@ const ProposalCard = memo(({
   proposal: CompanionPlannerProposal;
   onConfirm: (proposalId: string) => void;
   onReject: (proposalId: string) => void;
-}) => (
-  <div
-    className="rounded-2xl border border-white/10 bg-black/20 p-4 shadow-[0_20px_45px_-30px_rgba(0,0,0,0.8)]"
-    data-testid={`assistant-proposal-${proposal.id}`}
-  >
-    <div className="flex flex-wrap items-center gap-2">
-      <Badge variant="outline" className="border-sky-300/30 bg-sky-400/10 text-sky-100">
-        {PROPOSAL_KIND_LABELS[proposal.kind]}
-      </Badge>
-      <Badge variant="outline" className={STATUS_BADGE_CLASSNAME[proposal.status]}>
-        {proposal.status}
-      </Badge>
-      {!proposal.readyToConfirm && proposal.status === "pending" ? (
-        <Badge variant="outline" className="border-rose-300/30 bg-rose-400/10 text-rose-100">
-          needs detail
+}) => {
+  const questPreview = getCompanionPlannerQuestProposalPreview(proposal);
+
+  return (
+    <div
+      className="rounded-2xl border border-white/10 bg-black/20 p-4 shadow-[0_20px_45px_-30px_rgba(0,0,0,0.8)]"
+      data-testid={`assistant-proposal-${proposal.id}`}
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge variant="outline" className="border-sky-300/30 bg-sky-400/10 text-sky-100">
+          {PROPOSAL_KIND_LABELS[proposal.kind]}
         </Badge>
-      ) : null}
-    </div>
+        <Badge variant="outline" className={STATUS_BADGE_CLASSNAME[proposal.status]}>
+          {proposal.status}
+        </Badge>
+        {!proposal.readyToConfirm && proposal.status === "pending" ? (
+          <Badge variant="outline" className="border-rose-300/30 bg-rose-400/10 text-rose-100">
+            needs detail
+          </Badge>
+        ) : null}
+      </div>
 
-    <div className="mt-3 space-y-1">
-      <h4 className="text-sm font-semibold text-white">{proposal.title}</h4>
-      <p className="text-sm text-white/80">{proposal.summary}</p>
-      {proposal.reasoning ? (
-        <p className="text-xs text-white/55">{proposal.reasoning}</p>
-      ) : null}
-      {!proposal.readyToConfirm && proposal.missingFields?.length ? (
-        <p className="text-xs text-rose-100/90">
-          Still waiting on: {proposal.missingFields.join(", ")}.
-        </p>
-      ) : null}
-    </div>
+      <div className="mt-3 space-y-1">
+        <h4 className="text-sm font-semibold text-white">{proposal.title}</h4>
+        <p className="text-sm text-white/80">{proposal.summary}</p>
+        {proposal.reasoning ? (
+          <p className="text-xs text-white/55">{proposal.reasoning}</p>
+        ) : null}
+        {!proposal.readyToConfirm && proposal.missingFields?.length ? (
+          <p className="text-xs text-rose-100/90">
+            Still waiting on: {proposal.missingFields.join(", ")}.
+          </p>
+        ) : null}
+      </div>
 
-    <div className="mt-4 flex flex-wrap gap-2">
-      <Button
-        size="sm"
-        onClick={() => onConfirm(proposal.id)}
-        disabled={proposal.status !== "pending" || !proposal.readyToConfirm}
-      >
-        <Check className="mr-2 h-4 w-4" />
-        Confirm
-      </Button>
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={() => onReject(proposal.id)}
-        disabled={proposal.status !== "pending"}
-      >
-        <X className="mr-2 h-4 w-4" />
-        Reject
-      </Button>
+      {questPreview?.notes ? (
+        <div
+          className="mt-3 rounded-2xl border border-white/8 bg-white/5 p-3"
+          data-testid={`assistant-proposal-notes-${proposal.id}`}
+        >
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/45">Stored note</p>
+          <p className="mt-1 text-sm text-white/78">{questPreview.notes}</p>
+        </div>
+      ) : null}
+
+      {questPreview?.subtasks.length ? (
+        <div
+          className="mt-3 rounded-2xl border border-white/8 bg-white/5 p-3"
+          data-testid={`assistant-proposal-subtasks-${proposal.id}`}
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/45">
+              {questPreview.subtasks.length} step{questPreview.subtasks.length === 1 ? "" : "s"}
+            </p>
+            {proposal.kind === "update_quest" && questPreview.subtaskPlanMode ? (
+              <Badge variant="outline" className="border-emerald-300/20 bg-emerald-400/10 text-emerald-50">
+                {questPreview.subtaskPlanMode === "replace" ? "Replace steps" : "Append steps"}
+              </Badge>
+            ) : null}
+          </div>
+          <div className="mt-2 space-y-1">
+            {questPreview.subtasks.map((subtask) => (
+              <p key={subtask} className="text-sm text-white/78">
+                - {subtask}
+              </p>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Button
+          size="sm"
+          onClick={() => onConfirm(proposal.id)}
+          disabled={proposal.status !== "pending" || !proposal.readyToConfirm}
+        >
+          <Check className="mr-2 h-4 w-4" />
+          Confirm
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => onReject(proposal.id)}
+          disabled={proposal.status !== "pending"}
+        >
+          <X className="mr-2 h-4 w-4" />
+          Reject
+        </Button>
+      </div>
     </div>
-  </div>
-));
+  );
+});
 
 ProposalCard.displayName = "ProposalCard";
 

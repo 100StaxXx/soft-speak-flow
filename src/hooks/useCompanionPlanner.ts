@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { toast } from "@/components/ui/sonner";
+import { useResilience } from "@/contexts/ResilienceContext";
+import { applySubtaskTitlePlan } from "@/features/tasks/lib/subtaskWrites";
 import { supabase } from "@/integrations/supabase/client";
 import { useIntentClassifier } from "@/hooks/useIntentClassifier";
 import type { IntentClassification } from "@/hooks/useIntentClassifier";
@@ -33,6 +35,7 @@ import {
 import { getCompanionPlannerOpener } from "@/shared/companionPlannerCopy";
 import { LOCKED_COMPANION_TONE_PACK } from "@/shared/companionChaosVoice";
 import { computePlannerPriorityScores } from "@/shared/companionPlannerPriority";
+import { normalizeUuidLikeId } from "@/utils/offlineId";
 import type {
   CompanionChatSurface,
   CompanionChatThreadMessage,
@@ -84,6 +87,11 @@ type PlannerMemoryQueryResult = {
 type PlannerSubmissionContext = {
   starterIntent: CompanionPlannerStarterIntent | null;
   briefingContext: PlannerBriefingContext | null;
+};
+
+type CompanionPlannerQuestSubtaskPlan = {
+  mode: "append" | "replace";
+  titles: string[];
 };
 
 const DEFAULT_SESSION_STATE: CompanionPlannerSessionState = {
@@ -310,6 +318,34 @@ const inferReminderMinutesFromProposal = (kind: CompanionPlannerProposalKind, pa
   return null;
 };
 
+const asUnknownRecord = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+
+const asUnknownStringArray = (value: unknown): string[] =>
+  Array.isArray(value)
+    ? value
+      .filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
+      .map((entry) => entry.trim())
+    : [];
+
+const extractQuestSubtaskPlan = (
+  payload: Record<string, unknown>,
+): CompanionPlannerQuestSubtaskPlan | null => {
+  const subtaskPlan = asUnknownRecord(payload.subtaskPlan);
+  const mode = subtaskPlan?.mode === "append" || subtaskPlan?.mode === "replace"
+    ? subtaskPlan.mode
+    : null;
+
+  if (!mode) return null;
+
+  return {
+    mode,
+    titles: asUnknownStringArray(subtaskPlan.titles),
+  };
+};
+
 const mapMoodToEnergy = (
   mood: string | null | undefined,
 ): PlannerReflectionSignal["energy"] => {
@@ -387,6 +423,8 @@ const serializeTaskContext = (task: {
   task_date: string | null;
   scheduled_time: string | null;
   estimated_duration?: number | null;
+  notes?: string | null;
+  subtasks?: Array<{ title: string | null } | null> | null;
   difficulty?: string | null;
   recurrence_pattern: string | null;
   recurrence_end_date?: string | null;
@@ -403,6 +441,10 @@ const serializeTaskContext = (task: {
   taskDate: task.task_date,
   scheduledTime: task.scheduled_time,
   estimatedDuration: task.estimated_duration ?? null,
+  notes: task.notes ?? null,
+  subtaskTitles: (task.subtasks ?? [])
+    .map((subtask) => subtask?.title?.trim() ?? "")
+    .filter((title) => title.length > 0),
   difficulty: task.difficulty ?? null,
   recurrencePattern: task.recurrence_pattern,
   recurrenceEndDate: task.recurrence_end_date ?? null,
@@ -527,6 +569,7 @@ export function useCompanionPlanner({
   const { enrichedContext } = useUserAIContext();
   const { trackInteraction } = useAIInteractionTracker();
   const { trackTaskCreation, trackScheduleModification } = useSchedulingLearner();
+  const { queueAction, shouldQueueWrites, retryNow } = useResilience();
 
   const tonePack: PlannerTonePack = DEFAULT_TONE_PACK;
   const setTonePack = useCallback((_nextTonePack: PlannerTonePack) => {
@@ -1273,6 +1316,8 @@ export function useCompanionPlanner({
     }
 
     try {
+      let confirmationContent = `Saved: ${proposal.title}.`;
+
       switch (proposal.kind) {
         case "create_quest": {
           const payload = proposal.payload as Parameters<typeof addTask>[0];
@@ -1286,15 +1331,61 @@ export function useCompanionPlanner({
           break;
         }
         case "update_quest": {
-          const payload = proposal.payload as Parameters<typeof updateTask>[0];
-          const previousTask = activeTasks.find((task) => task.id === payload.taskId)
-            ?? inboxTasks.find((task) => task.id === payload.taskId);
-          await updateTask(payload);
-          const nextScheduledTime = typeof payload.updates?.scheduled_time === "string"
-            ? payload.updates.scheduled_time
+          const payload = proposal.payload as {
+            taskId?: unknown;
+            updates?: unknown;
+            subtaskPlan?: unknown;
+          };
+          const taskId = typeof payload.taskId === "string" ? payload.taskId : null;
+          if (!taskId) {
+            throw new Error("Missing quest id for update proposal");
+          }
+
+          const updates = asUnknownRecord(payload.updates) as Parameters<typeof updateTask>[0]["updates"] | null;
+          const taskUpdatePayload = {
+            taskId,
+            updates: updates ?? {},
+          } satisfies Parameters<typeof updateTask>[0];
+          const subtaskPlan = extractQuestSubtaskPlan(proposal.payload);
+          const previousTask = activeTasks.find((task) => task.id === taskId)
+            ?? inboxTasks.find((task) => task.id === taskId);
+
+          await updateTask(taskUpdatePayload);
+
+          const nextScheduledTime = typeof updates?.scheduled_time === "string"
+            ? updates.scheduled_time
             : null;
           if (previousTask?.scheduled_time && nextScheduledTime && previousTask.scheduled_time !== nextScheduledTime) {
             await trackScheduleModification(previousTask.scheduled_time, nextScheduledTime, previousTask.difficulty ?? "medium");
+          }
+
+          if (subtaskPlan) {
+            if (!user?.id) {
+              throw new Error("User not authenticated");
+            }
+
+            try {
+              await applySubtaskTitlePlan({
+                mode: subtaskPlan.mode,
+                taskId,
+                userId: user.id,
+                titles: subtaskPlan.titles,
+                shouldQueueWrites,
+                queueAction,
+                retryNow,
+              });
+
+              await Promise.all([
+                queryClient.invalidateQueries({ queryKey: ["subtasks", normalizeUuidLikeId(taskId)] }),
+                queryClient.invalidateQueries({ queryKey: ["daily-tasks"] }),
+                queryClient.invalidateQueries({ queryKey: ["calendar-tasks"] }),
+                queryClient.invalidateQueries({ queryKey: ["inbox-tasks"] }),
+              ]);
+            } catch (subtaskError) {
+              console.error("Failed to apply quest subtask plan:", subtaskError);
+              confirmationContent = `Saved: ${proposal.title}. I couldn't finish the step breakdown yet.`;
+              toast("Quest updated, but I couldn't finish the step breakdown yet.");
+            }
           }
           break;
         }
@@ -1400,7 +1491,7 @@ export function useCompanionPlanner({
             : candidate,
         ),
       );
-      const confirmationMessage = createMessage("companion", `Saved: ${proposal.title}.`);
+      const confirmationMessage = createMessage("companion", confirmationContent);
       setMessages((previous) => [
         ...previous,
         confirmationMessage,
@@ -1433,16 +1524,21 @@ export function useCompanionPlanner({
     createCampaignRitual,
     createEpic,
     inboxTasks,
+    queryClient,
     proposals,
+    queueAction,
     renameEpic,
+    retryNow,
     saveRitual,
     sessionState,
     persistPlannerMemory,
     persistPlannerThreadRows,
+    shouldQueueWrites,
     trackInteraction,
     trackScheduleModification,
     trackTaskCreation,
     updateTask,
+    user?.id,
   ]);
 
   const handleRejectProposal = useCallback(async (proposalId: string) => {

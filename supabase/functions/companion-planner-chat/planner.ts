@@ -1,4 +1,8 @@
 import { parseNaturalLanguage } from "../../../src/shared/naturalLanguageTaskParser.ts";
+import {
+  cleanGeneratedTaskTitle,
+  formatGeneratedTaskTitle,
+} from "../../../src/shared/taskTitleNormalization.ts";
 import { analyzeSchedulingIntent } from "../../../src/shared/schedulingIntent.ts";
 import { computePlannerPriorityScores } from "../../../src/shared/companionPlannerPriority.ts";
 
@@ -72,6 +76,9 @@ export interface PlannerDraftState {
   endDate?: string | null;
   durationMinutes?: number | null;
   reminderMinutesBefore?: number | null;
+  questNotes?: string | null;
+  questSubtasks?: string[];
+  questSubtaskPlanMode?: "append" | "replace" | null;
 }
 
 export interface PlannerSessionState {
@@ -89,6 +96,8 @@ export interface PlannerContextTask {
   taskDate: string | null;
   scheduledTime: string | null;
   estimatedDuration: number | null;
+  notes?: string | null;
+  subtaskTitles?: string[];
   difficulty?: string | null;
   recurrencePattern: string | null;
   recurrenceEndDate?: string | null;
@@ -241,6 +250,11 @@ export interface PlannerMemoryProfile {
   workloadTolerance?: "light" | "normal" | "heavy" | null;
   contactCadencePatterns?: Record<string, number>;
   lastConfirmedAt?: string | null;
+}
+
+export interface PlannerQuestSubtaskPlan {
+  mode: "append" | "replace";
+  titles: string[];
 }
 
 export interface ClassificationHint {
@@ -420,7 +434,7 @@ const normalizeText = (value: string | null | undefined): string =>
 const sanitizeProposalTitle = (
   value: string | null | undefined,
 ): string | null => {
-  const trimmed = value?.trim();
+  const trimmed = cleanGeneratedTaskTitle(value);
   if (!trimmed) return null;
 
   const normalized = normalizeText(trimmed);
@@ -461,11 +475,14 @@ const normalizeParsedInput = (
     input,
     schedulingIntent,
   );
+  const cleanedClientText = cleanGeneratedTaskTitle(clientParsed?.text);
+  const cleanedServerText = cleanGeneratedTaskTitle(serverParsed.text);
+  const fallbackText = cleanedClientText || cleanedServerText ||
+    clientParsed?.text || serverParsed.text;
 
-  const text = sanitizeProposalTitle(clientParsed?.text) ??
-    sanitizeProposalTitle(serverParsed.text) ??
-    clientParsed?.text ??
-    serverParsed.text;
+  const text = sanitizeProposalTitle(cleanedClientText) ??
+    sanitizeProposalTitle(cleanedServerText) ??
+    fallbackText;
 
   return {
     text,
@@ -492,11 +509,6 @@ const normalizeParsedInput = (
     newTitle: clientParsed?.newTitle ?? serverParsed.newTitle,
   };
 };
-
-const toTitleCase = (value: string): string =>
-  value
-    .toLowerCase()
-    .replace(/\b\w/g, (character) => character.toUpperCase());
 
 const parseDateKey = (value: string): Date => new Date(`${value}T00:00:00`);
 
@@ -1914,7 +1926,7 @@ const buildQuestProposal = (
       rawTitle &&
       Boolean(input.parsedInput?.scheduledTime) &&
       !cadence.recurrencePattern
-    ? toTitleCase(rawTitle)
+    ? formatGeneratedTaskTitle(rawTitle)
     : rawTitle;
   const summarySchedule = input.parsedInput?.scheduledDate && scheduledTime
     ? ` on ${input.parsedInput.scheduledDate} at ${scheduledTime}`

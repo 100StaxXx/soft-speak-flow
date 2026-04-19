@@ -1,6 +1,7 @@
 import type { ParsedTask } from "@/features/tasks/hooks";
 import { parseNaturalLanguage } from "@/features/tasks/hooks";
 import type { QuestComposerPrefillDraft } from "@/features/quests/types";
+import { formatGeneratedTaskTitle } from "@/shared/taskTitleNormalization";
 import { format, startOfDay } from "date-fns";
 
 const QUEST_WEEKDAYS = [0, 1, 2, 3, 4] as const;
@@ -95,7 +96,8 @@ const resolvePrefillTitle = (parsed: ParsedTask, transcript: string) => {
   };
 
   const candidateTitle = parsed.text.trim() || transcript.trim();
-  return stripVoiceMetadata(candidateTitle) || sanitizeTitle(transcript);
+  return formatGeneratedTaskTitle(stripVoiceMetadata(candidateTitle)) ||
+    formatGeneratedTaskTitle(sanitizeTitle(transcript));
 };
 
 const toQuestDayIndex = (parserDayIndex: number) => (parserDayIndex === 0 ? 6 : parserDayIndex - 1);

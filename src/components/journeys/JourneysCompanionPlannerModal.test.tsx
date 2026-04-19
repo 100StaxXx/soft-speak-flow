@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
     archiveCurrentThread: vi.fn().mockResolvedValue(undefined),
     resumeThread: vi.fn().mockResolvedValue(undefined),
   },
+  openCampaignBuilder: vi.fn(),
   drawerRootProps: [] as Array<Record<string, unknown>>,
   state: {
     greeting: "The road's open. What are we setting in motion?",
@@ -53,7 +54,11 @@ const mocks = vi.hoisted(() => ({
         kind: "create_quest" as const,
         title: "Create Focus quest",
         summary: "Reserve a focused block tomorrow afternoon.",
-        payload: {},
+        payload: {
+          taskText: "Focus quest",
+          notes: "Protect this block for the one thing that matters most.",
+          subtasks: ["Choose the target", "Silence notifications"],
+        },
         status: "pending" as const,
         readyToConfirm: true,
       },
@@ -73,7 +78,11 @@ const mocks = vi.hoisted(() => ({
         kind: "create_quest" as const,
         title: "Create Focus quest",
         summary: "Reserve a focused block tomorrow afternoon.",
-        payload: {},
+        payload: {
+          taskText: "Focus quest",
+          notes: "Protect this block for the one thing that matters most.",
+          subtasks: ["Choose the target", "Silence notifications"],
+        },
         status: "pending" as const,
         readyToConfirm: true,
       },
@@ -134,7 +143,7 @@ vi.mock("@/hooks/useJourneysCompanionVisual", () => ({
 }));
 
 vi.mock("@/hooks/useCompanionAssistant", () => ({
-  useCompanionAssistant: () => ({
+  useCompanionAssistant: (options?: { onOpenCampaignBuilder?: (message: string) => void }) => ({
     greeting: mocks.state.greeting,
     messages: mocks.state.messages,
     questions: mocks.state.questions,
@@ -171,7 +180,12 @@ vi.mock("@/hooks/useCompanionAssistant", () => ({
     setShowPermissionDialog: mocks.assistant.setShowPermissionDialog,
     isRequestingPermission: false,
     submitTypedMessage: mocks.assistant.submitTypedMessage,
-    submitMessage: mocks.assistant.submitMessage,
+    submitMessage: async (message: string, inputMode: "text" | "voice") => {
+      await mocks.assistant.submitMessage(message, inputMode);
+      if (message === "Help me break a big goal into steps.") {
+        options?.onOpenCampaignBuilder?.(message);
+      }
+    },
     submitPlannerMessage: mocks.assistant.submitPlannerMessage,
     toggleRecording: mocks.assistant.toggleRecording,
     requestMicrophonePermission: mocks.assistant.requestMicrophonePermission,
@@ -274,7 +288,11 @@ describe("JourneysCompanionPlannerModal", () => {
         kind: "create_quest",
         title: "Create Focus quest",
         summary: "Reserve a focused block tomorrow afternoon.",
-        payload: {},
+        payload: {
+          taskText: "Focus quest",
+          notes: "Protect this block for the one thing that matters most.",
+          subtasks: ["Choose the target", "Silence notifications"],
+        },
         status: "pending",
         readyToConfirm: true,
       },
@@ -294,7 +312,11 @@ describe("JourneysCompanionPlannerModal", () => {
         kind: "create_quest",
         title: "Create Focus quest",
         summary: "Reserve a focused block tomorrow afternoon.",
-        payload: {},
+        payload: {
+          taskText: "Focus quest",
+          notes: "Protect this block for the one thing that matters most.",
+          subtasks: ["Choose the target", "Silence notifications"],
+        },
         status: "pending",
         readyToConfirm: true,
       },
@@ -340,6 +362,7 @@ describe("JourneysCompanionPlannerModal", () => {
     mocks.state.canArchiveThread = true;
     mocks.state.archiveDisabledReason = null;
     mocks.state.isLoadingThreads = false;
+    mocks.openCampaignBuilder.mockReset();
     Object.defineProperty(window, "matchMedia", {
       configurable: true,
       writable: true,
@@ -392,13 +415,17 @@ describe("JourneysCompanionPlannerModal", () => {
     expect(screen.getByTestId("journeys-companion-planner-inline-options")).toBeInTheDocument();
     expect(screen.getByTestId("journeys-companion-planner-inline-proposal")).toBeInTheDocument();
     expect(screen.getByText("Create Focus quest")).toBeInTheDocument();
+    expect(screen.getByTestId("journeys-companion-planner-inline-proposal-notes-proposal-1")).toHaveTextContent("Stored note");
+    expect(screen.getByTestId("journeys-companion-planner-inline-proposal-notes-proposal-1")).toHaveTextContent("Protect this block for the one thing that matters most.");
+    expect(screen.getByTestId("journeys-companion-planner-inline-proposal-subtasks-proposal-1")).toHaveTextContent("Choose the target");
+    expect(screen.getByTestId("journeys-companion-planner-inline-proposal-subtasks-proposal-1")).toHaveTextContent("Silence notifications");
     expect(screen.queryByText("Create Backup quest")).not.toBeInTheDocument();
     expect(screen.queryByText("You")).not.toBeInTheDocument();
     expect(screen.queryByText("Quick reply")).not.toBeInTheDocument();
     expect(screen.queryByText("Schedule")).not.toBeInTheDocument();
   });
 
-  it("shows the seeded opener and starter templates on first load", async () => {
+  it("opens the campaign builder from the big-goal starter quick reply", async () => {
     mocks.state.messages = [
       {
         id: "chat-1",
@@ -419,6 +446,7 @@ describe("JourneysCompanionPlannerModal", () => {
         open
         onOpenChange={vi.fn()}
         presentation="dialog"
+        onOpenCampaignBuilder={mocks.openCampaignBuilder}
       />,
     );
 
@@ -435,9 +463,8 @@ describe("JourneysCompanionPlannerModal", () => {
     fireEvent.click(screen.getByRole("button", { name: "Help me break a big goal into steps." }));
 
     await waitFor(() => {
-      expect(mocks.assistant.submitMessage).toHaveBeenCalledWith(
+      expect(mocks.openCampaignBuilder).toHaveBeenCalledWith(
         "Help me break a big goal into steps.",
-        "text",
       );
     });
     expect(mocks.assistant.submitPlannerMessage).not.toHaveBeenCalled();

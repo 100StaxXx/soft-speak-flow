@@ -74,4 +74,32 @@ describe("shared natural-language task parser scheduling coverage", () => {
       reminderMinutesBefore: 30,
     }));
   });
+
+  it("strips first-person lead-ins while preserving lunch in scheduled quest titles", () => {
+    const parsed = parseNaturalLanguage("I'm going to grab lunch with Zach today at 1");
+
+    expect(parsed).toEqual(expect.objectContaining({
+      text: "grab lunch with Zach",
+      scheduledDate: "2026-04-19",
+      scheduledTime: "13:00",
+    }));
+  });
+
+  it("keeps lunch in the visible title when lunch implies noon", () => {
+    const parsed = parseNaturalLanguage("grab lunch with Zach");
+
+    expect(parsed).toEqual(expect.objectContaining({
+      text: "grab lunch with Zach",
+      scheduledTime: "12:00",
+    }));
+  });
+
+  it("keeps lunch in the title while explicit times win over implied noon", () => {
+    const parsed = parseNaturalLanguage("lunch with Zach at 1");
+
+    expect(parsed).toEqual(expect.objectContaining({
+      text: "lunch with Zach",
+      scheduledTime: "13:00",
+    }));
+  });
 });

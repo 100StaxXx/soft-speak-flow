@@ -15,6 +15,7 @@ import {
   type PlannerSessionState,
 } from "./planner.ts";
 import { buildOrchestratedPlannerResponse } from "./orchestrator.ts";
+import { enrichQuestPlannerResult } from "./questEnrichment.ts";
 import {
   normalizePlannerClassificationHint,
   PlannerRequestSchema,
@@ -95,7 +96,7 @@ serve(async (req) => {
       normalizePlannerClassificationHint(parsed.data.classificationHint),
     );
 
-    const result = buildPlannerResponse({
+    const plannerInput = {
       message: parsed.data.message,
       currentDate: parsed.data.currentDate,
       currentDateTime: parsed.data.currentDateTime,
@@ -106,7 +107,9 @@ serve(async (req) => {
       parsedInput: (parsed.data.parsedInput as ParsedInputHint | undefined) ?? null,
       classificationHint,
       plannerContext: parsed.data.plannerContext,
-    } satisfies PlannerBuildInput);
+    } satisfies PlannerBuildInput;
+
+    const result = buildPlannerResponse(plannerInput);
 
     const costGuardrails = createCostGuardrailSession({
       supabase: createCostGuardrailSupabaseClient(),
@@ -121,21 +124,16 @@ serve(async (req) => {
       providers: ["openai"],
     });
 
+    const enrichedResult = await enrichQuestPlannerResult({
+      fetchImpl: guardedFetch,
+      input: plannerInput,
+      baseResult: result,
+    });
+
     const orchestratedResult = await buildOrchestratedPlannerResponse({
       guardedFetch,
-      input: {
-        message: parsed.data.message,
-        currentDate: parsed.data.currentDate,
-        currentDateTime: parsed.data.currentDateTime,
-        horizon: parsed.data.horizon,
-        tonePack: parsed.data.tonePack,
-        conversationHistory: parsed.data.conversationHistory,
-        sessionState: parsed.data.sessionState as PlannerSessionState,
-        parsedInput: (parsed.data.parsedInput as ParsedInputHint | undefined) ?? null,
-        classificationHint,
-        plannerContext: parsed.data.plannerContext,
-      } satisfies PlannerBuildInput,
-      baseResult: result,
+      input: plannerInput,
+      baseResult: enrichedResult,
     });
 
     return new Response(JSON.stringify(orchestratedResult), {

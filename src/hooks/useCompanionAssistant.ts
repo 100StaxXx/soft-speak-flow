@@ -16,6 +16,10 @@ import {
   shouldRouteMessageToPlanner,
 } from "@/shared/schedulingIntent";
 import {
+  isGoalBreakdownStarterMessage,
+  looksLikeBigGoal,
+} from "@/shared/bigGoalIntent";
+import {
   speakCompanionReply,
   stopCompanionSpeech,
   type CompanionSpeechProvider,
@@ -40,6 +44,7 @@ interface UseCompanionAssistantOptions {
   conversationEnabled?: boolean;
   launchIntent?: CompanionPlannerLaunchIntent | null;
   onLaunchIntentConsumed?: (intentId: string) => void;
+  onOpenCampaignBuilder?: (message: string) => void;
 }
 
 const normalizeConversationMessages = (
@@ -113,6 +118,7 @@ export function useCompanionAssistant({
   conversationEnabled = true,
   launchIntent = null,
   onLaunchIntentConsumed,
+  onOpenCampaignBuilder,
 }: UseCompanionAssistantOptions) {
   const { user } = useAuth();
   const { companion } = useCompanion();
@@ -202,6 +208,17 @@ export function useCompanionAssistant({
     const message = rawMessage.trim();
     if (!message) return;
 
+    const parsed = parseNaturalLanguage(message);
+    const shouldOpenCampaignBuilder = surface === "journeys" &&
+      !!onOpenCampaignBuilder &&
+      (
+        isGoalBreakdownStarterMessage(message) ||
+        looksLikeBigGoal(
+          parsed.text || message,
+          parsed.estimatedDuration,
+          parsed.scheduledDate,
+        )
+      );
     const routeToPlanner = shouldRouteToPlanner(
       surface,
       message,
@@ -212,6 +229,11 @@ export function useCompanionAssistant({
 
     if (!routeToPlanner && surface === "companion" && !conversationEnabled) {
       toast.error("Companion Talk is a Premium feature. Planning and scheduling still work here.");
+      return;
+    }
+
+    if (shouldOpenCampaignBuilder) {
+      onOpenCampaignBuilder(message);
       return;
     }
 
@@ -234,6 +256,7 @@ export function useCompanionAssistant({
     conversationEnabled,
     hasOpenPlannerThread,
     journeysConversation,
+    onOpenCampaignBuilder,
     planner,
     surface,
   ]);
@@ -270,6 +293,12 @@ export function useCompanionAssistant({
 
     lastLaunchIntentIdRef.current = launchIntent.id;
 
+    if (launchIntent.starterIntent === "goal_breakdown" && onOpenCampaignBuilder) {
+      onOpenCampaignBuilder(launchIntent.message);
+      onLaunchIntentConsumed?.(launchIntent.id);
+      return;
+    }
+
     void planner.submitMessage(
       launchIntent.message,
       "text",
@@ -282,6 +311,7 @@ export function useCompanionAssistant({
     });
   }, [
     launchIntent,
+    onOpenCampaignBuilder,
     onLaunchIntentConsumed,
     planner.submitMessage,
     surface,

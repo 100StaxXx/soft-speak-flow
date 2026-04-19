@@ -55,3 +55,26 @@ Deno.test("accepts nullable timelineAnalysis and normalizes it away", () => {
     reasoning: "Schedule question",
   });
 });
+
+Deno.test("accepts quest notes and subtask titles in planner task context", () => {
+  const parsed = PlannerRequestSchema.parse({
+    ...baseRequest(),
+    plannerContext: {
+      ...baseRequest().plannerContext,
+      tasks: [{
+        id: "task-1",
+        title: "Workout",
+        taskDate: "2026-04-18",
+        scheduledTime: "18:00",
+        estimatedDuration: 45,
+        notes: "Leg day with extra stretching.",
+        subtaskTitles: ["Warm up", "Cooldown walk"],
+        difficulty: "medium",
+        recurrencePattern: null,
+      }],
+    },
+  });
+
+  assertEquals(parsed.plannerContext.tasks[0]?.notes, "Leg day with extra stretching.");
+  assertEquals(parsed.plannerContext.tasks[0]?.subtaskTitles, ["Warm up", "Cooldown walk"]);
+});

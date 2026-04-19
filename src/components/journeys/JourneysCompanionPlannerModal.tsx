@@ -56,6 +56,7 @@ import type {
   CompanionPlannerProposal,
   CompanionPlannerQuestion,
 } from "@/types/companionPlanner";
+import { getCompanionPlannerQuestProposalPreview } from "@/utils/companionPlannerProposalPreview";
 
 type JourneysCompanionPlannerModalPresentation = "dialog" | "drawer";
 
@@ -65,6 +66,7 @@ interface JourneysCompanionPlannerModalProps {
   presentation: JourneysCompanionPlannerModalPresentation;
   launchIntent?: CompanionPlannerLaunchIntent | null;
   onLaunchIntentConsumed?: (intentId: string) => void;
+  onOpenCampaignBuilder?: (message: string) => void;
 }
 
 type DialogueEntry = {
@@ -239,10 +241,12 @@ const JourneysCompanionOverlayBody = memo(({
   presentation,
   launchIntent,
   onLaunchIntentConsumed,
+  onOpenCampaignBuilder,
 }: {
   presentation: JourneysCompanionPlannerModalPresentation;
   launchIntent?: CompanionPlannerLaunchIntent | null;
   onLaunchIntentConsumed?: (intentId: string) => void;
+  onOpenCampaignBuilder?: (message: string) => void;
 }) => {
   const {
     companionLabel,
@@ -257,6 +261,7 @@ const JourneysCompanionOverlayBody = memo(({
     conversationEnabled: true,
     launchIntent: launchIntent ?? null,
     onLaunchIntentConsumed,
+    onOpenCampaignBuilder,
   });
   const prefersReducedMotion = getReducedMotionPreference();
   const isDrawerPresentation = presentation === "drawer";
@@ -497,6 +502,9 @@ const JourneysCompanionOverlayBody = memo(({
 
   const sendDisabled = assistant.isSubmitting || assistant.isClassifying || (!typingMessageId && !assistant.draftInput.trim());
   const activeProposal = assistant.pendingProposals[0] ?? null;
+  const activeQuestPreview = activeProposal
+    ? getCompanionPlannerQuestProposalPreview(activeProposal)
+    : null;
   const activeOptionQuestions = assistant.questions.filter((question) => (question.options?.length ?? 0) > 0);
   const showStarterQuickReplies = assistant.messages.length === 1
     && assistant.messages[0]?.role === "assistant"
@@ -672,6 +680,41 @@ const JourneysCompanionOverlayBody = memo(({
                         {activeProposal.status}
                       </Badge>
                     </div>
+                    {activeQuestPreview?.notes ? (
+                      <div
+                        className="mt-3 rounded-[20px] border border-white/[0.12] bg-white/[0.05] p-3"
+                        data-testid={`journeys-companion-planner-inline-proposal-notes-${activeProposal.id}`}
+                      >
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/[0.46]">
+                          Stored note
+                        </p>
+                        <p className="mt-1 text-sm text-white/[0.78]">{activeQuestPreview.notes}</p>
+                      </div>
+                    ) : null}
+                    {activeQuestPreview?.subtasks.length ? (
+                      <div
+                        className="mt-3 rounded-[20px] border border-white/[0.12] bg-white/[0.05] p-3"
+                        data-testid={`journeys-companion-planner-inline-proposal-subtasks-${activeProposal.id}`}
+                      >
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/[0.46]">
+                            {activeQuestPreview.subtasks.length} step{activeQuestPreview.subtasks.length === 1 ? "" : "s"}
+                          </p>
+                          {activeProposal.kind === "update_quest" && activeQuestPreview.subtaskPlanMode ? (
+                            <Badge variant="outline" className="border-emerald-300/20 bg-emerald-400/10 text-emerald-50">
+                              {activeQuestPreview.subtaskPlanMode === "replace" ? "Replace steps" : "Append steps"}
+                            </Badge>
+                          ) : null}
+                        </div>
+                        <div className="mt-2 space-y-1">
+                          {activeQuestPreview.subtasks.map((subtask) => (
+                            <p key={subtask} className="text-sm text-white/[0.78]">
+                              - {subtask}
+                            </p>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
                     <div className="mt-3 flex flex-wrap gap-2">
                       <Button
                         type="button"
@@ -854,12 +897,14 @@ export const JourneysCompanionPlannerModal = memo(function JourneysCompanionPlan
   presentation,
   launchIntent,
   onLaunchIntentConsumed,
+  onOpenCampaignBuilder,
 }: JourneysCompanionPlannerModalProps) {
   const content = open ? (
     <JourneysCompanionOverlayBody
       presentation={presentation}
       launchIntent={launchIntent}
       onLaunchIntentConsumed={onLaunchIntentConsumed}
+      onOpenCampaignBuilder={onOpenCampaignBuilder}
     />
   ) : null;
 

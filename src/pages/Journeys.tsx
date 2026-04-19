@@ -67,6 +67,8 @@ import { QuestInboxSection } from "@/components/QuestInboxSection";
 import { QUEST_ACTION_TOAST_DURATION_MS } from "@/constants/questToast";
 import { trackResilienceEvent } from "@/utils/resilienceTelemetry";
 import { safeLocalStorage } from "@/utils/storage";
+import { parseNaturalLanguage } from "@/features/tasks/hooks/useNaturalLanguageParser";
+import { resolveCampaignBuilderInitialGoal } from "@/shared/bigGoalIntent";
 import type {
   CompanionPlannerLaunchIntent,
   CompanionPlannerStarterIntent,
@@ -123,6 +125,8 @@ const Journeys = () => {
   
   // Campaign creation state
   const [showPathfinder, setShowPathfinder] = useState(false);
+  const [pathfinderInitialGoal, setPathfinderInitialGoal] = useState("");
+  const [pathfinderSessionKey, setPathfinderSessionKey] = useState(0);
   const [showCreatedAnimation, setShowCreatedAnimation] = useState(false);
   const [createdCampaignData, setCreatedCampaignData] = useState<CreatedCampaignData | null>(null);
   const [isInboxExpanded, setIsInboxExpanded] = useState(false);
@@ -188,6 +192,28 @@ const Journeys = () => {
       briefingContext: options?.briefingContext ?? null,
     });
     setIsCompanionPlannerPinned(true);
+  }, []);
+
+  const openCampaignBuilder = useCallback((initialGoal?: string | null) => {
+    setPathfinderInitialGoal(initialGoal?.trim() ?? "");
+    setPathfinderSessionKey((currentKey) => currentKey + 1);
+    setShowPathfinder(true);
+  }, []);
+
+  const openCampaignBuilderFromAssistant = useCallback((message: string) => {
+    const parsed = parseNaturalLanguage(message);
+    const initialGoal = resolveCampaignBuilderInitialGoal(message, parsed.text);
+
+    setPlannerLaunchIntent(null);
+    setIsCompanionPlannerPinned(false);
+    openCampaignBuilder(initialGoal);
+  }, [openCampaignBuilder]);
+
+  const handlePathfinderOpenChange = useCallback((nextOpen: boolean) => {
+    setShowPathfinder(nextOpen);
+    if (!nextOpen) {
+      setPathfinderInitialGoal("");
+    }
   }, []);
 
   const syncSelectedDateToTodayIfStale = useCallback(() => {
@@ -1066,6 +1092,7 @@ const Journeys = () => {
   const handleCreateCampaign = useCallback(async (data: Parameters<typeof createEpic>[0]) => {
     try {
       await createEpic(data);
+      setPathfinderInitialGoal("");
       setShowPathfinder(false);
       setCreatedCampaignData({
         title: data.title,
@@ -1240,7 +1267,7 @@ const Journeys = () => {
           prefilledTime={prefilledTime}
           autoFillTimeOnFirstTap={shouldAutoFillTutorialTime}
           presentation={isMacHostedIOSApp ? "desktop-panel" : "mobile-sheet"}
-          onCreateCampaign={() => setShowPathfinder(true)}
+          onCreateCampaign={() => openCampaignBuilder()}
         />
 
         <JourneysCompanionPlannerModal
@@ -1253,6 +1280,7 @@ const Journeys = () => {
               currentIntent?.id === intentId ? null : currentIntent
             );
           }}
+          onOpenCampaignBuilder={openCampaignBuilderFromAssistant}
         />
         
         {/* Edit Quest Dialog (for regular quests) */}
@@ -1360,10 +1388,12 @@ const Journeys = () => {
 
         {/* Pathfinder - Campaign Creation Wizard */}
         <Pathfinder
+          key={pathfinderSessionKey}
           open={showPathfinder}
-          onOpenChange={setShowPathfinder}
+          onOpenChange={handlePathfinderOpenChange}
           onCreateEpic={handleCreateCampaign}
           isCreating={isCreatingCampaign}
+          initialGoal={pathfinderInitialGoal}
           showTemplatesFirst={false}
         />
 

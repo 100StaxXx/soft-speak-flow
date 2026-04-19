@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   companionSubmit: vi.fn().mockResolvedValue(undefined),
   journeysSubmit: vi.fn().mockResolvedValue(undefined),
   plannerSubmit: vi.fn().mockResolvedValue(undefined),
+  openCampaignBuilder: vi.fn(),
   clearPlannerHandoff: vi.fn(),
   resetJourneysThread: vi.fn(),
   hydrateJourneysThread: vi.fn(),
@@ -246,6 +247,7 @@ describe("useCompanionAssistant", () => {
     mocks.companionSubmit.mockResolvedValue(undefined);
     mocks.journeysSubmit.mockResolvedValue(undefined);
     mocks.plannerSubmit.mockResolvedValue(undefined);
+    mocks.openCampaignBuilder.mockReset();
     mocks.state.companionMessages = [
       {
         id: "chat-1",
@@ -472,6 +474,32 @@ describe("useCompanionAssistant", () => {
     expect(mocks.plannerSubmit).not.toHaveBeenCalled();
   });
 
+  it("opens the campaign builder for journeys big-goal requests", async () => {
+    mocks.parseNaturalLanguage.mockReturnValue({
+      text: "getting my real estate license by August",
+      scheduledDate: null,
+      scheduledTime: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      reminderMinutesBefore: null,
+    });
+
+    const { result } = renderHook(() => useCompanionAssistant({
+      surface: "journeys",
+      onOpenCampaignBuilder: mocks.openCampaignBuilder,
+    }));
+
+    await act(async () => {
+      await result.current.submitMessage("I need help getting my real estate license by August", "text");
+    });
+
+    expect(mocks.openCampaignBuilder).toHaveBeenCalledWith(
+      "I need help getting my real estate license by August",
+    );
+    expect(mocks.journeysSubmit).not.toHaveBeenCalled();
+    expect(mocks.plannerSubmit).not.toHaveBeenCalled();
+  });
+
   it("lets planner starter submissions bypass the freeform routing heuristic", async () => {
     const { result } = renderHook(() => useCompanionAssistant({ surface: "journeys" }));
 
@@ -632,6 +660,32 @@ describe("useCompanionAssistant", () => {
       },
     );
     expect(onLaunchIntentConsumed).toHaveBeenCalledWith("launch-1");
+  });
+
+  it("opens the campaign builder for goal-breakdown launch intents on journeys", async () => {
+    const onLaunchIntentConsumed = vi.fn();
+
+    renderHook(() => useCompanionAssistant({
+      surface: "journeys",
+      launchIntent: {
+        id: "launch-2",
+        message: "Help me break a big goal into steps.",
+        starterIntent: "goal_breakdown",
+        briefingContext: null,
+      },
+      onLaunchIntentConsumed,
+      onOpenCampaignBuilder: mocks.openCampaignBuilder,
+    }));
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(mocks.openCampaignBuilder).toHaveBeenCalledWith(
+      "Help me break a big goal into steps.",
+    );
+    expect(mocks.plannerSubmit).not.toHaveBeenCalled();
+    expect(onLaunchIntentConsumed).toHaveBeenCalledWith("launch-2");
   });
 
   it("surfaces journeys thread controls alongside the merged transcript", () => {

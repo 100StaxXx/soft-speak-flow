@@ -86,6 +86,9 @@ export interface CompanionPlannerDraftState {
   endDate?: string | null;
   durationMinutes?: number | null;
   reminderMinutesBefore?: number | null;
+  questNotes?: string | null;
+  questSubtasks?: string[];
+  questSubtaskPlanMode?: "append" | "replace" | null;
 }
 
 export interface CompanionPlannerSessionState {
@@ -103,6 +106,8 @@ export interface PlannerContextTask {
   taskDate: string | null;
   scheduledTime: string | null;
   estimatedDuration: number | null;
+  notes?: string | null;
+  subtaskTitles?: string[];
   difficulty?: string | null;
   recurrencePattern: string | null;
   recurrenceEndDate?: string | null;
@@ -262,6 +267,11 @@ export interface PlannerMemoryProfile {
   workloadTolerance?: "light" | "normal" | "heavy" | null;
   contactCadencePatterns?: Record<string, number>;
   lastConfirmedAt?: string | null;
+}
+
+export interface CompanionPlannerQuestSubtaskPlan {
+  mode: "append" | "replace";
+  titles: string[];
 }
 
 export interface CompanionPlannerRequest {

@@ -68,7 +68,16 @@ vi.mock("@/hooks/useCompanionAssistant", () => ({
         title: "Move Workout",
         summary: "Move Workout to 2026-04-19 at 18:00.",
         reasoning: "This is a direct quest adjustment.",
-        payload: {},
+        payload: {
+          taskId: "task-1",
+          updates: {
+            notes: "Leg day with a cooldown walk at the end.",
+          },
+          subtaskPlan: {
+            mode: "append" as const,
+            titles: ["Warm up", "Cooldown walk"],
+          },
+        },
         status: "pending" as const,
         readyToConfirm: true,
         missingFields: [],
@@ -91,7 +100,16 @@ vi.mock("@/hooks/useCompanionAssistant", () => ({
         kind: "update_quest" as const,
         title: "Move Workout",
         summary: "Move Workout to 2026-04-19 at 18:00.",
-        payload: {},
+        payload: {
+          taskId: "task-1",
+          updates: {
+            notes: "Leg day with a cooldown walk at the end.",
+          },
+          subtaskPlan: {
+            mode: "append" as const,
+            titles: ["Warm up", "Cooldown walk"],
+          },
+        },
         status: "pending" as const,
         readyToConfirm: true,
       },
@@ -187,6 +205,11 @@ describe("CompanionPlannerPanel", () => {
     expect(screen.getByText("Today has room at 09:00.")).toBeInTheDocument();
     expect(screen.getByText("Move Workout")).toBeInTheDocument();
     expect(screen.getByText("Adjust Campaign Aurora")).toBeInTheDocument();
+    expect(screen.getByTestId("assistant-proposal-notes-proposal-1")).toHaveTextContent("Stored note");
+    expect(screen.getByTestId("assistant-proposal-notes-proposal-1")).toHaveTextContent("Leg day with a cooldown walk at the end.");
+    expect(screen.getByTestId("assistant-proposal-subtasks-proposal-1")).toHaveTextContent("Append steps");
+    expect(screen.getByTestId("assistant-proposal-subtasks-proposal-1")).toHaveTextContent("Warm up");
+    expect(screen.getByTestId("assistant-proposal-subtasks-proposal-1")).toHaveTextContent("Cooldown walk");
     expect(screen.getByRole("button", { name: "Confirm all" })).toBeInTheDocument();
   });
 

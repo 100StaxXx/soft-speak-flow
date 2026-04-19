@@ -5,13 +5,13 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/components/ui/sonner";
 import { useResilience } from "@/contexts/ResilienceContext";
 import {
-  createOfflinePlannerId,
   getLocalSubtasksForTask,
   removePlannerRecord,
   upsertPlannerRecord,
 } from "@/utils/plannerLocalStore";
 import { normalizeUuidLikeId } from "@/utils/offlineId";
 import { PLANNER_SYNC_EVENT } from "@/utils/plannerSync";
+import { applySubtaskTitlePlan } from "@/features/tasks/lib/subtaskWrites";
 
 export interface Subtask {
   id: string;
@@ -294,50 +294,15 @@ export const useSubtasks = (parentTaskId: string | null) => {
   const bulkAddSubtasks = useMutation({
     mutationFn: async (titles: string[]) => {
       if (!user?.id || !normalizedParentTaskId) throw new Error("Missing required data");
-
-      const maxOrder = subtasks.length > 0
-        ? Math.max(...subtasks.map((subtask) => subtask.sort_order)) + 1
-        : 0;
-
-      const rows = titles.map((title, index) => ({
-        id: normalizeUuidLikeId(createOfflinePlannerId("subtask")),
-        task_id: normalizedParentTaskId,
-        user_id: user.id,
-        title,
-        completed: false,
-        completed_at: null,
-        sort_order: maxOrder + index,
-        created_at: new Date().toISOString(),
-      })) satisfies Subtask[];
-
-      for (const row of rows) {
-        await upsertPlannerRecord("subtasks", row);
-      }
-
-      if (shouldQueueWrites) {
-        await Promise.all(rows.map((row) =>
-          queueAction({
-            actionKind: "SUBTASK_CREATE",
-            entityType: "subtask",
-            entityId: row.id,
-            payload: row,
-          }),
-        ));
-        return;
-      }
-
-      const { error } = await supabase.from("subtasks").insert(rows);
-      if (error) {
-        await Promise.all(rows.map((row) =>
-          queueAction({
-            actionKind: "SUBTASK_CREATE",
-            entityType: "subtask",
-            entityId: row.id,
-            payload: row,
-          }),
-        ));
-        void retryNow();
-      }
+      await applySubtaskTitlePlan({
+        mode: "append",
+        taskId: normalizedParentTaskId,
+        userId: user.id,
+        titles,
+        shouldQueueWrites,
+        queueAction,
+        retryNow,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: subtasksQueryKey });
