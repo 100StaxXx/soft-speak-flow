@@ -4,6 +4,8 @@ export type PlannerHorizon = "day" | "week" | "month";
 
 export type PlannerTonePack = "soft" | "playful" | "witty_sassy";
 
+export type CompanionPlannerResponseMode = "conversational" | "schedule_read" | "proposal";
+
 export type CompanionPlannerProposalKind =
   | "create_quest"
   | "update_quest"
@@ -190,8 +192,13 @@ export interface PlannerMemoryProfile {
 export interface CompanionPlannerRequest {
   message: string;
   currentDate: string;
+  currentDateTime: string;
   horizon: PlannerHorizon;
   tonePack: PlannerTonePack;
+  conversationHistory: Array<{
+    role: "assistant" | "user";
+    content: string;
+  }>;
   sessionState: CompanionPlannerSessionState;
   parsedInput?: {
     text: string;
@@ -240,6 +247,7 @@ export interface CompanionPlannerRequest {
 }
 
 export interface CompanionPlannerResponse {
+  mode: CompanionPlannerResponseMode;
   reply: string;
   followUpQuestions: CompanionPlannerQuestion[];
   proposals: CompanionPlannerProposal[];

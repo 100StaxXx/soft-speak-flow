@@ -4,8 +4,10 @@ import { normalizePlannerClassificationHint, PlannerRequestSchema } from "./requ
 const baseRequest = () => ({
   message: "What do I have coming up?",
   currentDate: "2026-04-18",
+  currentDateTime: "2026-04-18T10:30:00-07:00",
   horizon: "day" as const,
   tonePack: "soft" as const,
+  conversationHistory: [],
   sessionState: {
     draft: {},
     openQuestionIds: [],

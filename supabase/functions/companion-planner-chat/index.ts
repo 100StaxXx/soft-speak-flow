@@ -2,12 +2,19 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { createSafeErrorResponse, requireProtectedRequest } from "../_shared/abuseProtection.ts";
 import {
+  buildCostGuardrailBlockedResponse,
+  createCostGuardrailSession,
+  createCostGuardrailSupabaseClient,
+  isCostGuardrailBlockedError,
+} from "../_shared/costGuardrails.ts";
+import {
   buildPlannerResponse,
   type ClassificationHint,
   type ParsedInputHint,
   type PlannerBuildInput,
   type PlannerSessionState,
 } from "./planner.ts";
+import { buildOrchestratedPlannerResponse } from "./orchestrator.ts";
 import {
   normalizePlannerClassificationHint,
   PlannerRequestSchema,
@@ -91,15 +98,47 @@ serve(async (req) => {
     const result = buildPlannerResponse({
       message: parsed.data.message,
       currentDate: parsed.data.currentDate,
+      currentDateTime: parsed.data.currentDateTime,
       horizon: parsed.data.horizon,
       tonePack: parsed.data.tonePack,
+      conversationHistory: parsed.data.conversationHistory,
       sessionState: parsed.data.sessionState as PlannerSessionState,
       parsedInput: (parsed.data.parsedInput as ParsedInputHint | undefined) ?? null,
       classificationHint,
       plannerContext: parsed.data.plannerContext,
     } satisfies PlannerBuildInput);
 
-    return new Response(JSON.stringify(result), {
+    const costGuardrails = createCostGuardrailSession({
+      supabase: createCostGuardrailSupabaseClient(),
+      endpointKey: "companion-planner-chat",
+      featureKey: "ai_companion_planner",
+      userId: protectedRequest.auth.userId,
+      requestId,
+    });
+    const guardedFetch = costGuardrails.wrapFetch(fetch);
+    await costGuardrails.enforceAccess({
+      capabilities: ["text"],
+      providers: ["openai"],
+    });
+
+    const orchestratedResult = await buildOrchestratedPlannerResponse({
+      guardedFetch,
+      input: {
+        message: parsed.data.message,
+        currentDate: parsed.data.currentDate,
+        currentDateTime: parsed.data.currentDateTime,
+        horizon: parsed.data.horizon,
+        tonePack: parsed.data.tonePack,
+        conversationHistory: parsed.data.conversationHistory,
+        sessionState: parsed.data.sessionState as PlannerSessionState,
+        parsedInput: (parsed.data.parsedInput as ParsedInputHint | undefined) ?? null,
+        classificationHint,
+        plannerContext: parsed.data.plannerContext,
+      } satisfies PlannerBuildInput,
+      baseResult: result,
+    });
+
+    return new Response(JSON.stringify(orchestratedResult), {
       headers: {
         ...corsHeaders,
         "Content-Type": "application/json",
@@ -107,6 +146,10 @@ serve(async (req) => {
       },
     });
   } catch (error) {
+    if (isCostGuardrailBlockedError(error)) {
+      return buildCostGuardrailBlockedResponse(error, corsHeaders);
+    }
+
     console.error("[companion-planner-chat] unhandled error", error);
     return createSafeErrorResponse(req, {
       status: 500,

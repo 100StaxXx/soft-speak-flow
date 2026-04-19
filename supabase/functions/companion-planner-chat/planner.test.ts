@@ -51,8 +51,10 @@ const baseInput = (overrides: PlannerBuildInputOverrides = {}): PlannerBuildInpu
   return {
     message: overrides.message ?? "Call mom",
     currentDate: overrides.currentDate ?? "2026-04-18",
+    currentDateTime: overrides.currentDateTime ?? "2026-04-18T10:30:00-07:00",
     horizon: overrides.horizon ?? "day",
     tonePack: overrides.tonePack ?? "soft",
+    conversationHistory: overrides.conversationHistory ?? [],
     sessionState: {
       ...defaultSessionState,
       ...(overrides.sessionState ?? {}),
@@ -77,6 +79,7 @@ const baseInput = (overrides: PlannerBuildInputOverrides = {}): PlannerBuildInpu
 Deno.test("turns a one-off request into a quest and asks for time and reason", () => {
   const result = buildPlannerResponse(baseInput());
 
+  assertEquals(result.mode, "proposal");
   assertEquals(result.proposals[0].kind, "create_quest");
   assertEquals(result.proposals[0].readyToConfirm, false);
   assertEquals(result.followUpQuestions.map((question) => question.field), ["time_of_day", "time_reason"]);
@@ -372,8 +375,8 @@ Deno.test("answers schedule questions with quests and connected calendar events 
         {
           id: "event-1",
           title: "Therapy",
-          start: "2026-04-18T14:00:00.000Z",
-          end: "2026-04-18T15:00:00.000Z",
+          start: "2026-04-18T21:00:00.000Z",
+          end: "2026-04-18T22:00:00.000Z",
           isAllDay: false,
           provider: "google",
           readOnly: true,
@@ -382,23 +385,33 @@ Deno.test("answers schedule questions with quests and connected calendar events 
     },
   }));
 
+  assertEquals(result.mode, "schedule_read");
   assertEquals(result.proposals.length, 0);
   assertEquals(result.followUpQuestions.length, 0);
-  assertStringIncludes(result.reply, "Cosmiq quests");
-  assertStringIncludes(result.reply, "Connected calendar events");
+  assertStringIncludes(result.reply, "2026-04-18");
+  assertStringIncludes(result.reply, "Calendar:");
 });
 
 Deno.test("answers the coming-up starter prompt with a schedule summary", () => {
   const result = buildPlannerResponse(baseInput({
     message: "What do I have coming up?",
+    currentDateTime: "2026-04-18T12:30:00-07:00",
     plannerContext: {
       tasks: [
         {
           id: "task-1",
           title: "Workout",
           taskDate: "2026-04-18",
-          scheduledTime: "09:00",
+          scheduledTime: "15:00",
           estimatedDuration: 45,
+          recurrencePattern: null,
+        },
+        {
+          id: "task-2",
+          title: "Inbox cleanup",
+          taskDate: "2026-04-19",
+          scheduledTime: "09:30",
+          estimatedDuration: 30,
           recurrencePattern: null,
         },
       ],
@@ -419,10 +432,13 @@ Deno.test("answers the coming-up starter prompt with a schedule summary", () => 
     },
   }));
 
+  assertEquals(result.mode, "schedule_read");
   assertEquals(result.proposals.length, 0);
   assertEquals(result.followUpQuestions.length, 0);
-  assertStringIncludes(result.reply, "Here is your schedule for 2026-04-18.");
-  assertStringIncludes(result.reply, "Connected calendar events");
+  assertStringIncludes(result.reply, "Here's the shape of what's coming up.");
+  assertStringIncludes(result.reply, "Today:");
+  assertStringIncludes(result.reply, "Tomorrow:");
+  assertStringIncludes(result.reply, "Week ahead:");
 });
 
 Deno.test("answers availability questions using both quests and calendar events", () => {
@@ -460,6 +476,7 @@ Deno.test("answers availability questions using both quests and calendar events"
     },
   }));
 
+  assertEquals(result.mode, "schedule_read");
   assertEquals(result.proposals.length, 0);
   assertStringIncludes(result.reply, "2026-04-19");
   assertStringIncludes(result.reply, "afternoon");
@@ -534,6 +551,7 @@ Deno.test("creates one proposal per quest for batch rescheduling", () => {
     },
   }));
 
+  assertEquals(result.mode, "proposal");
   assertEquals(result.proposals.length, 2);
   assertEquals(result.proposals.every((proposal) => proposal.kind === "update_quest"), true);
   assertEquals(result.proposals.every((proposal) => proposal.readyToConfirm), true);
@@ -606,6 +624,23 @@ Deno.test("explains that external calendar events are read-only when asked to ed
     },
   }));
 
+  assertEquals(result.mode, "conversational");
   assertEquals(result.proposals.length, 0);
   assertStringIncludes(result.reply, "read-only");
+});
+
+Deno.test("handles non-planning conversation without creating proposals", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "I'm feeling behind and I need help thinking clearly.",
+    classificationHint: {
+      type: "brain-dump",
+      confidence: 0.9,
+      reasoning: "User is processing emotions, not asking for a saved action.",
+    },
+  }));
+
+  assertEquals(result.mode, "conversational");
+  assertEquals(result.proposals.length, 0);
+  assertEquals(result.followUpQuestions.length, 0);
+  assertStringIncludes(result.reply, "I'm here with you");
 });

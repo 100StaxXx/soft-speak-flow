@@ -207,6 +207,7 @@ describe("useCompanionPlanner", () => {
     });
     mocks.invoke.mockResolvedValue({
       data: {
+        mode: "schedule_read",
         reply: "Here is your schedule for 2026-04-18.",
         followUpQuestions: [],
         proposals: [],
@@ -236,6 +237,8 @@ describe("useCompanionPlanner", () => {
       confidence: 0.91,
       reasoning: "Schedule question",
     });
+    expect(request?.body.currentDateTime).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(request?.body.conversationHistory).toEqual([]);
     expect("timelineAnalysis" in request.body.classificationHint).toBe(false);
   });
 });

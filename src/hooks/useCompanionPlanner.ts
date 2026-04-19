@@ -92,6 +92,22 @@ const createMessage = (
   ...extras,
 });
 
+const formatCurrentDateTimeWithOffset = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  const seconds = String(date.getSeconds()).padStart(2, "0");
+  const offsetMinutes = -date.getTimezoneOffset();
+  const sign = offsetMinutes >= 0 ? "+" : "-";
+  const absoluteOffsetMinutes = Math.abs(offsetMinutes);
+  const offsetHours = String(Math.floor(absoluteOffsetMinutes / 60)).padStart(2, "0");
+  const offsetRemainderMinutes = String(absoluteOffsetMinutes % 60).padStart(2, "0");
+
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}${sign}${offsetHours}:${offsetRemainderMinutes}`;
+};
+
 const readStoredPreferences = (): StoredPlannerPreferences => {
   if (typeof window === "undefined") return {};
 
@@ -572,6 +588,15 @@ export function useCompanionPlanner({
       : undefined,
   }), [activeEpics, contextEventsQuery.events, contextTasks, enrichedContext, inboxTasks, plannerMemory, scheduleInsights]);
 
+  const conversationHistory = useMemo<CompanionPlannerRequest["conversationHistory"]>(() => (
+    messages
+      .slice(-16)
+      .map((message) => ({
+        role: message.role === "companion" ? "assistant" : "user",
+        content: message.content,
+      }))
+  ), [messages]);
+
   useEffect(() => {
     if (!bootstrapGreeting) return;
     if (bootstrappedGreetingRef.current) return;
@@ -598,8 +623,13 @@ export function useCompanionPlanner({
   const appendAssistantTurn = useCallback((response: CompanionPlannerResponse) => {
     setQuestions(response.followUpQuestions);
     setProposals((previous) => {
-      const preserved = previous.filter((proposal) => proposal.status !== "pending");
-      return [...preserved, ...response.proposals, ...response.suggestedReminders];
+      const settled = previous.filter((proposal) => proposal.status !== "pending");
+      const incoming = [...response.proposals, ...response.suggestedReminders];
+      if (incoming.length > 0) {
+        return [...settled, ...incoming];
+      }
+
+      return [...settled, ...previous.filter((proposal) => proposal.status === "pending")];
     });
     setMessages((previous) => [
       ...previous,
@@ -720,8 +750,10 @@ export function useCompanionPlanner({
         body: {
           message,
           currentDate: todayIso,
+          currentDateTime: formatCurrentDateTimeWithOffset(new Date()),
           horizon,
           tonePack,
+          conversationHistory,
           sessionState,
           parsedInput: {
             text: parsedInput.text,
@@ -773,7 +805,7 @@ export function useCompanionPlanner({
     } finally {
       setIsSubmitting(false);
     }
-  }, [appendAssistantTurn, classify, horizon, isSubmitting, plannerContext, sessionState, todayIso, tonePack, trackInteraction]);
+  }, [appendAssistantTurn, classify, conversationHistory, horizon, isSubmitting, plannerContext, sessionState, todayIso, tonePack, trackInteraction]);
 
   const handleConfirmProposal = useCallback(async (proposalId: string) => {
     const proposal = findProposalById(proposals, proposalId);

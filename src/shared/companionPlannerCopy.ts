@@ -1,10 +1,10 @@
 export const COMPANION_PLANNER_OPENER_TEMPLATES = [
-  "What's gucci, fam. Hand me the calendar.",
-  "Let's see what's coming up before the day starts freelancing.",
-  "Show me the board. We're making room for what actually matters.",
-  "Calendar check. We protect the priorities and cut the noise.",
-  "All right, let's sort this day out before it gets disrespectful.",
-  "You bring the goals. I'll help make the time.",
+  "I'm here. Ask what's coming up, talk through the day, or tell me what you want to change.",
+  "Let's look at what's ahead and make the day feel more manageable.",
+  "We can sort through your schedule, talk it out, or turn something into a concrete plan.",
+  "Tell me what's on your mind, and I'll help you shape the next move.",
+  "Ask about today, tomorrow, or the week ahead, and we'll work from there.",
+  "Bring me the messy version. I'll help you make sense of it.",
 ] as const;
 
 export const COMPANION_PLANNER_STARTER_TEMPLATES = [

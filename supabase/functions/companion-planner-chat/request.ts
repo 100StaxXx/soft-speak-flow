@@ -20,8 +20,13 @@ const PlannerClassificationHintSchema = z.object({
 export const PlannerRequestSchema = z.object({
   message: z.string().min(1).max(4000).trim(),
   currentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  currentDateTime: z.string().min(1).max(64),
   horizon: z.enum(["day", "week", "month"]),
   tonePack: z.enum(["soft", "playful", "witty_sassy"]),
+  conversationHistory: z.array(z.object({
+    role: z.enum(["assistant", "user"]),
+    content: z.string().min(1).max(4000),
+  })).max(24).default([]),
   sessionState: z.object({
     draft: z.record(z.unknown()),
     openQuestionIds: z.array(z.string()),

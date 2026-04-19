@@ -1,5 +1,6 @@
 export type PlannerHorizon = "day" | "week" | "month";
 export type PlannerTonePack = "soft" | "playful" | "witty_sassy";
+export type PlannerResponseMode = "conversational" | "schedule_read" | "proposal";
 export type PlannerProposalKind =
   | "create_quest"
   | "update_quest"
@@ -201,6 +202,10 @@ export interface PlannerBuildInput {
   message: string;
   horizon: PlannerHorizon;
   tonePack: PlannerTonePack;
+  conversationHistory: Array<{
+    role: "assistant" | "user";
+    content: string;
+  }>;
   sessionState: PlannerSessionState;
   parsedInput?: ParsedInputHint | null;
   classificationHint?: ClassificationHint | null;
@@ -221,9 +226,11 @@ export interface PlannerBuildInput {
     };
   };
   currentDate: string;
+  currentDateTime: string;
 }
 
 export interface PlannerBuildResult {
+  mode: PlannerResponseMode;
   reply: string;
   followUpQuestions: PlannerQuestion[];
   proposals: PlannerProposal[];
@@ -330,6 +337,22 @@ const formatMinutes = (minutes: number): string => {
   return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
 };
 
+const getLocalDateFromDateTime = (value: string): string | null => {
+  const match = value.match(/^(\d{4}-\d{2}-\d{2})T/);
+  return match?.[1] ?? null;
+};
+
+const getLocalMinutesFromDateTime = (value: string): number | null => {
+  const match = value.match(/T(\d{2}):(\d{2})/);
+  if (!match) return null;
+
+  const hour = Number.parseInt(match[1] ?? "", 10);
+  const minute = Number.parseInt(match[2] ?? "", 10);
+  if (Number.isNaN(hour) || Number.isNaN(minute)) return null;
+
+  return (hour * 60) + minute;
+};
+
 const getWakeMinutes = (plannerMemory?: PlannerMemoryProfile | null) =>
   parseTimeToMinutes(plannerMemory?.wakeTime ?? DEFAULT_WAKE_TIME) ?? (8 * 60);
 
@@ -359,11 +382,18 @@ const entityTitleMatches = (haystack: string, title: string): boolean => {
   return matchedTokenCount >= Math.min(2, titleTokens.length);
 };
 
+const hasExplicitDateReference = (message: string, parsedInput?: ParsedInputHint | null): boolean =>
+  Boolean(parsedInput?.scheduledDate)
+  || /\b(today|tomorrow|day after tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i.test(message);
+
 const isScheduleQuestion = (message: string): boolean =>
   /\b(what do i have coming up|what(?:'s| is) coming up|what do i have scheduled|what(?:'s| is) on my calendar|what do i have today|what do i have tomorrow|when am i free|am i free|where do i have room|what(?:'s| is) my schedule|what(?:'s| is) on my plate)\b/i.test(message);
 
 const isAvailabilityQuestion = (message: string): boolean =>
   /\b(when am i free|am i free|where do i have room|what openings do i have|what time do i have free)\b/i.test(message);
+
+const isUpcomingDigestQuestion = (message: string): boolean =>
+  /\b(what do i have coming up|what(?:'s| is) coming up|what(?:'s| is) on my plate)\b/i.test(message);
 
 const isQuestCollectionIntent = (message: string): boolean =>
   /\b(rest|all)\b.+\b(quests|tasks)\b/i.test(message);
@@ -404,6 +434,53 @@ const isEditIntent = (message: string): boolean =>
 
 const isReminderIntent = (message: string): boolean =>
   /\b(remind|reminder|alert|ping me|nudge me)\b/i.test(message);
+
+const hasPlanningVerb = (message: string): boolean =>
+  /\b(plan|schedule|reschedule|move|shift|push|pull|adjust|update|edit|rename|create|add|set up|break down|make time|organize|prioritize|fit|repeat|remind|turn .+ into)\b/i.test(message);
+
+const looksLikeActionableTitle = (message: string, parsedInput?: ParsedInputHint | null): boolean => {
+  const normalized = message.trim().toLowerCase();
+  if (normalized.endsWith("?")) return false;
+  if (/\b(i('| a)m|i feel|i'm feeling|help me think|pep talk|talk it through|talk to me|how do i|what should i|can you|could you|should i)\b/i.test(normalized)) {
+    return false;
+  }
+  if (hasPlanningVerb(normalized)) return true;
+  if (/^(call|write|get|finish|book|send|draft|review|plan|move|practice|prep|clean|organize|outline|work on)\b/i.test(normalized)) {
+    return true;
+  }
+
+  return Boolean(parsedInput?.text?.trim()) && normalized.split(/\s+/).length <= 10;
+};
+
+const looksConversational = (
+  input: PlannerBuildInput,
+  matched: MatchedEntities,
+  repeated: boolean,
+  classificationHint: ClassificationHint,
+): boolean => {
+  if (input.sessionState.openQuestionIds.length > 0) return false;
+  if (isScheduleQuestion(input.message)) return false;
+  if (isEditIntent(input.message) || isReminderIntent(input.message) || isCampaignAdjustmentIntent(input.message)) {
+    return false;
+  }
+  if (repeated) return false;
+  if (classificationHint.type === "epic" || classificationHint.type === "habit") return false;
+  if (input.parsedInput?.scheduledDate || input.parsedInput?.scheduledTime || input.parsedInput?.newTitle) {
+    return false;
+  }
+  if (matched.task || matched.ritual || matched.epic) {
+    return false;
+  }
+  if (looksLikeActionableTitle(input.message, input.parsedInput)) {
+    return false;
+  }
+  if (hasPlanningVerb(input.message)) {
+    return false;
+  }
+
+  return classificationHint.type === "brain-dump"
+    || !/\b(quest|tasks?|campaign|ritual|calendar|today|tomorrow|week)\b/i.test(input.message);
+};
 
 const isLikelyAnswerOnly = (message: string, sessionState: PlannerSessionState): boolean => {
   if (!sessionState.draft.title || sessionState.openQuestionIds.length === 0) return false;
@@ -1310,8 +1387,13 @@ const buildFreeWindowsForDate = (
   const wakeMinutes = dayPart?.start ?? getWakeMinutes(input.plannerContext.plannerMemory);
   const windDownMinutes = dayPart?.end ?? getWindDownMinutes(input.plannerContext.plannerMemory);
   const windows: Array<{ start: string; end: string }> = [];
+  const currentDateKey = getLocalDateFromDateTime(input.currentDateTime);
+  const currentMinutes = getLocalMinutesFromDateTime(input.currentDateTime);
 
   let cursor = wakeMinutes;
+  if (date === currentDateKey && currentMinutes !== null) {
+    cursor = Math.max(cursor, currentMinutes);
+  }
   for (const interval of intervals) {
     if (interval.endMinutes <= wakeMinutes || interval.startMinutes >= windDownMinutes) continue;
     if (interval.startMinutes > cursor) {
@@ -1333,13 +1415,116 @@ const buildFreeWindowsForDate = (
   return windows.filter((window) => parseTimeToMinutes(window.end)! - parseTimeToMinutes(window.start)! >= 30);
 };
 
+const formatEventTimeLabel = (event: PlannerContextCalendarEvent): string => {
+  if (event.isAllDay) return "All day";
+
+  const start = new Date(event.start);
+  const end = new Date(event.end);
+  const startLabel = `${String(start.getHours()).padStart(2, "0")}:${String(start.getMinutes()).padStart(2, "0")}`;
+  const endLabel = `${String(end.getHours()).padStart(2, "0")}:${String(end.getMinutes()).padStart(2, "0")}`;
+  return `${startLabel}-${endLabel}`;
+};
+
+const collectScheduleItemsForDate = (
+  input: PlannerBuildInput,
+  date: string,
+  remainingOnly: boolean,
+) => {
+  const now = new Date(input.currentDateTime);
+  const currentDateKey = getLocalDateFromDateTime(input.currentDateTime);
+  const currentMinutes = getLocalMinutesFromDateTime(input.currentDateTime);
+  const tasks = [...input.plannerContext.tasks, ...input.plannerContext.inboxTasks]
+    .filter((task) => task.completed !== true && task.taskDate === date)
+    .filter((task) => {
+      if (!remainingOnly || date !== currentDateKey) return true;
+      const scheduledMinutes = parseTimeToMinutes(task.scheduledTime);
+      if (scheduledMinutes === null || currentMinutes === null) return true;
+      return scheduledMinutes >= currentMinutes;
+    })
+    .map((task) => ({
+      label: `${task.scheduledTime ?? "Unscheduled"} ${task.title}`,
+      sortMinutes: parseTimeToMinutes(task.scheduledTime),
+    }));
+
+  const events = input.plannerContext.calendarEvents
+    .filter((event) => {
+      const start = new Date(event.start);
+      const end = new Date(event.end);
+      const dayStart = new Date(`${date}T00:00:00`);
+      const dayEnd = new Date(`${addDaysToDateKey(date, 1)}T00:00:00`);
+      if (!(end > dayStart && start < dayEnd)) return false;
+      if (!remainingOnly || date !== currentDateKey) return true;
+      return end > now;
+    })
+    .map((event) => ({
+      label: `${formatEventTimeLabel(event)} ${event.title}`,
+      sortMinutes: event.isAllDay ? -1 : parseTimeToMinutes(formatEventTimeLabel(event)),
+    }));
+
+  return [...tasks, ...events].sort((left, right) => (
+    (left.sortMinutes ?? 9999) - (right.sortMinutes ?? 9999)
+  ));
+};
+
+const buildDayDigest = (
+  input: PlannerBuildInput,
+  date: string,
+  label: string,
+  remainingOnly = false,
+): string => {
+  const items = collectScheduleItemsForDate(input, date, remainingOnly);
+  const openings = buildFreeWindowsForDate(input, date, null).slice(0, 2);
+
+  if (items.length === 0 && openings.length === 0) {
+    return `${label}: wide open right now.`;
+  }
+
+  const nextItems = items.slice(0, 3).map((item) => item.label).join("; ");
+  const openingText = openings.length > 0
+    ? `Best opening${openings.length === 1 ? "" : "s"}: ${openings.map((window) => `${window.start}-${window.end}`).join(", ")}.`
+    : "No obvious open window yet without reshuffling something.";
+
+  if (items.length === 0) {
+    return `${label}: no scheduled items. ${openingText}`;
+  }
+
+  const overflowCount = items.length - 3;
+  const overflowText = overflowCount > 0 ? ` Plus ${overflowCount} more item${overflowCount === 1 ? "" : "s"}.` : "";
+  return `${label}: ${nextItems}.${overflowText} ${openingText}`;
+};
+
+const buildUpcomingDigestReply = (input: PlannerBuildInput): string => {
+  const tomorrow = addDaysToDateKey(input.currentDate, 1);
+  const weekSummary = input.plannerContext.scheduleInsights?.summary ?? "The week still has room to flex.";
+
+  return [
+    "Here's the shape of what's coming up.",
+    buildDayDigest(input, input.currentDate, "Today", true),
+    buildDayDigest(input, tomorrow, "Tomorrow"),
+    `Week ahead: ${weekSummary}`,
+  ].join("\n\n");
+};
+
 const buildReadOnlyScheduleReply = (
   input: PlannerBuildInput,
   message: string,
 ): string => {
+  if (isUpcomingDigestQuestion(message) && !hasExplicitDateReference(message, input.parsedInput)) {
+    return buildUpcomingDigestReply(input);
+  }
+
   const targetDate = parseRequestedDate(message, input.currentDate, input.parsedInput);
+  const currentDateKey = getLocalDateFromDateTime(input.currentDateTime);
+  const currentMinutes = getLocalMinutesFromDateTime(input.currentDateTime);
+  const now = new Date(input.currentDateTime);
   const targetTasks = [...input.plannerContext.tasks, ...input.plannerContext.inboxTasks]
     .filter((task) => task.completed !== true && task.taskDate === targetDate)
+    .filter((task) => {
+      if (targetDate !== currentDateKey) return true;
+      const scheduledMinutes = parseTimeToMinutes(task.scheduledTime);
+      if (scheduledMinutes === null || currentMinutes === null) return true;
+      return scheduledMinutes >= currentMinutes;
+    })
     .sort((left, right) => (parseTimeToMinutes(left.scheduledTime) ?? 9999) - (parseTimeToMinutes(right.scheduledTime) ?? 9999));
   const targetEvents = input.plannerContext.calendarEvents
     .filter((event) => {
@@ -1347,7 +1532,9 @@ const buildReadOnlyScheduleReply = (
       const end = new Date(event.end);
       const dayStart = new Date(`${targetDate}T00:00:00`);
       const dayEnd = new Date(`${addDaysToDateKey(targetDate, 1)}T00:00:00`);
-      return end > dayStart && start < dayEnd;
+      if (!(end > dayStart && start < dayEnd)) return false;
+      if (targetDate !== currentDateKey) return true;
+      return end > now;
     })
     .sort((left, right) => left.start.localeCompare(right.start));
 
@@ -1356,37 +1543,34 @@ const buildReadOnlyScheduleReply = (
     const freeWindows = buildFreeWindowsForDate(input, targetDate, dayPart).slice(0, 3);
     if (freeWindows.length === 0) {
       return dayPart
-        ? `You do not have a clean ${dayPart.label} opening on ${targetDate}. I can still help move your Cosmiq quests around those calendar blocks if you want.`
-        : `You do not have a clear opening on ${targetDate}. I can still help move your Cosmiq quests around those calendar blocks if you want.`;
+        ? `I don't see a clean ${dayPart.label} opening on ${targetDate} yet. I can still help you reshuffle quests around those blocks if you want.`
+        : `I don't see a clear opening on ${targetDate} yet. I can still help you reshuffle quests around those blocks if you want.`;
     }
 
     const windowsLabel = freeWindows.map((window) => `${window.start}-${window.end}`).join(", ");
     return dayPart
-      ? `Your best ${dayPart.label} openings on ${targetDate} are ${windowsLabel}. Cosmiq quests and connected calendar events both factored into that read.`
-      : `Your best openings on ${targetDate} are ${windowsLabel}. Cosmiq quests and connected calendar events both factored into that read.`;
+      ? `Your best ${dayPart.label} openings on ${targetDate} are ${windowsLabel}. That includes both Cosmiq quests and connected calendar events.`
+      : `Your best openings on ${targetDate} are ${windowsLabel}. That includes both Cosmiq quests and connected calendar events.`;
   }
 
-  const questLines = targetTasks.length > 0
-    ? targetTasks
-      .slice(0, 5)
-      .map((task) => `- ${task.scheduledTime ?? "Unscheduled"}: ${task.title}`)
-      .join("\n")
-    : "- No scheduled Cosmiq quests";
-  const calendarLines = targetEvents.length > 0
-    ? targetEvents
-      .slice(0, 5)
-      .map((event) => {
-        if (event.isAllDay) return `- All day: ${event.title}`;
-        const start = new Date(event.start);
-        const end = new Date(event.end);
-        const startLabel = `${String(start.getHours()).padStart(2, "0")}:${String(start.getMinutes()).padStart(2, "0")}`;
-        const endLabel = `${String(end.getHours()).padStart(2, "0")}:${String(end.getMinutes()).padStart(2, "0")}`;
-        return `- ${startLabel}-${endLabel}: ${event.title}`;
-      })
-      .join("\n")
-    : "- No connected calendar events";
+  if (targetTasks.length === 0 && targetEvents.length === 0) {
+    return `${targetDate} looks open right now. I don't see any scheduled Cosmiq quests or connected calendar events on it yet.`;
+  }
 
-  return `Here is your schedule for ${targetDate}.\n\nCosmiq quests\n${questLines}\n\nConnected calendar events\n${calendarLines}`;
+  const questSummary = targetTasks.length > 0
+    ? targetTasks
+      .slice(0, 3)
+      .map((task) => `${task.scheduledTime ?? "Unscheduled"} ${task.title}`)
+      .join("; ")
+    : "no scheduled Cosmiq quests";
+  const calendarSummary = targetEvents.length > 0
+    ? targetEvents
+      .slice(0, 3)
+      .map((event) => `${formatEventTimeLabel(event)} ${event.title}`)
+      .join("; ")
+    : "no connected calendar events";
+
+  return `${targetDate} looks like this right now: ${questSummary}. Calendar: ${calendarSummary}.`;
 };
 
 const buildAmbiguousEntityResponse = (
@@ -1394,7 +1578,8 @@ const buildAmbiguousEntityResponse = (
   choices: string[],
   sessionState: PlannerSessionState,
 ): PlannerBuildResult => ({
-  reply: `I found a few ${label}s that could fit. Pick one and I’ll keep the change scoped correctly.`,
+  mode: "conversational",
+  reply: `I found a few ${label}s that could fit. Pick one and I'll keep the change scoped correctly.`,
   followUpQuestions: [question({
     field: "details",
     prompt: `Which ${label} did you mean?`,
@@ -1418,7 +1603,9 @@ const buildAmbiguousEntityResponse = (
 const buildReadOnlyResponse = (
   reply: string,
   sessionState: PlannerSessionState,
+  mode: PlannerResponseMode = "conversational",
 ): PlannerBuildResult => ({
+  mode,
   reply,
   followUpQuestions: [],
   proposals: [],
@@ -1465,7 +1652,6 @@ const composeReply = (
   input: PlannerBuildInput,
   _tonePack: PlannerTonePack,
   kind: PlannerProposalKind,
-  questions: PlannerQuestion[],
   readyToConfirm: boolean,
 ): string => {
   const baseLabel = ({
@@ -1486,10 +1672,43 @@ const composeReply = (
   const scheduleLead = scheduleSummary ? `${scheduleSummary} ` : "";
 
   if (readyToConfirm) {
-    return `${scheduleLead}Chaos report from your shoulder: this cleanly fits as a ${baseLabel}. Against the odds, you handed me something usable. I have a sharp draft ready for your approval.`;
+    return `${scheduleLead}I turned this into a ${baseLabel} draft. Review it, and confirm when it looks right.`;
   }
 
-  return `${scheduleLead}${memoryLead}Hot take from the side of your face: this wants to be a ${baseLabel}, but right now it looks like a hostage note from your executive function. Answer the missing bits and I'll tighten it up.`;
+  return `${scheduleLead}${memoryLead}This looks like a ${baseLabel}. I need a little more detail before I can draft it cleanly.`;
+};
+
+const buildConversationalResponse = (
+  input: PlannerBuildInput,
+  sessionState: PlannerSessionState,
+  classificationHint: ClassificationHint,
+): PlannerBuildResult => {
+  const message = input.message.toLowerCase();
+  const scheduleSummary = input.plannerContext.scheduleInsights?.summary;
+  const scheduleLead = /\b(today|tomorrow|week|calendar|schedule)\b/i.test(message) && scheduleSummary
+    ? `${scheduleSummary} `
+    : "";
+
+  return {
+    mode: "conversational",
+    reply: `${scheduleLead}I'm here with you. Tell me what feels most important, or ask me to turn it into a draft quest or campaign when you're ready.`,
+    followUpQuestions: [],
+    proposals: [],
+    suggestedReminders: [],
+    memoryUpdates: {
+      preferredTimeOfDay: sessionState.preferredTimeOfDay ?? input.plannerContext.plannerMemory?.preferredTimeOfDay ?? null,
+      preferredTimeReason: sessionState.preferredTimeReason ?? input.plannerContext.plannerMemory?.preferredTimeReason ?? null,
+      reminderPreference: sessionState.reminderPreference
+        ?? (input.plannerContext.plannerMemory?.reminderMinutesBefore
+          ? `${input.plannerContext.plannerMemory.reminderMinutesBefore} minutes`
+          : null),
+    },
+    sessionState: {
+      ...sessionState,
+      openQuestionIds: [],
+      lastClassification: classificationHint.type,
+    },
+  };
 };
 
 const inferClassification = (message: string, repeated: boolean): ClassificationHint => {
@@ -1528,7 +1747,12 @@ export function buildPlannerResponse(input: PlannerBuildInput): PlannerBuildResu
         ...input.sessionState,
         lastClassification: classificationHint.type,
       },
+      "schedule_read",
     );
+  }
+
+  if (looksConversational(input, matched, repeated, classificationHint)) {
+    return buildConversationalResponse(input, input.sessionState, classificationHint);
   }
 
   if (isEditIntent(input.message) && matched.tasks.length > 1 && !isQuestCollectionIntent(input.message)) {
@@ -1583,6 +1807,7 @@ export function buildPlannerResponse(input: PlannerBuildInput): PlannerBuildResu
     }
 
     return {
+      mode: "proposal",
       reply: `I pulled together ${proposals.length} quest move${proposals.length === 1 ? "" : "s"} for ${targetDate}. Review them and use confirm all when you're ready.`,
       followUpQuestions: [],
       proposals,
@@ -1654,7 +1879,8 @@ export function buildPlannerResponse(input: PlannerBuildInput): PlannerBuildResu
   };
 
   return {
-    reply: composeReply(input, input.tonePack, proposal.kind, followUpQuestions, proposal.readyToConfirm),
+    mode: "proposal",
+    reply: composeReply(input, input.tonePack, proposal.kind, proposal.readyToConfirm),
     followUpQuestions,
     proposals: [proposal],
     suggestedReminders: [],

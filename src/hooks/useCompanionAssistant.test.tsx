@@ -121,7 +121,7 @@ vi.mock("@/hooks/useCompanionChat", () => ({
 
 vi.mock("@/hooks/useJourneysCompanionConversation", () => ({
   useJourneysCompanionConversation: () => ({
-    greeting: "What's gucci, fam. Hand me the calendar.",
+    greeting: "I'm here. Ask what's coming up, talk through the day, or tell me what you want to change.",
     messages: mocks.state.journeysMessages,
     isSubmitting: false,
     submitMessage: mocks.journeysSubmit,
@@ -145,6 +145,7 @@ vi.mock("@/hooks/useJourneysCompanionConversation", () => ({
 
 vi.mock("@/hooks/useCompanionPlanner", () => ({
   useCompanionPlanner: () => ({
+    greeting: "I'm here. Ask what's coming up, talk through the day, or tell me what you want to change.",
     messages: mocks.state.plannerMessages,
     questions: mocks.state.plannerQuestions,
     proposals: mocks.state.pendingProposals,
@@ -236,15 +237,15 @@ describe("useCompanionAssistant", () => {
     expect(mocks.companionSubmit).not.toHaveBeenCalled();
   });
 
-  it("routes regular conversation to the journeys conversation hook on the journeys surface", async () => {
+  it("routes all journeys conversation through the planner-backed assistant", async () => {
     const { result } = renderHook(() => useCompanionAssistant({ surface: "journeys" }));
 
     await act(async () => {
       await result.current.submitMessage("I just need a pep talk.", "voice");
     });
 
-    expect(mocks.journeysSubmit).toHaveBeenCalledWith("I just need a pep talk.", "voice");
-    expect(mocks.plannerSubmit).not.toHaveBeenCalled();
+    expect(mocks.plannerSubmit).toHaveBeenCalledWith("I just need a pep talk.", "voice");
+    expect(mocks.journeysSubmit).not.toHaveBeenCalled();
   });
 
   it("lets planner starter submissions bypass the freeform routing heuristic", async () => {
@@ -264,7 +265,9 @@ describe("useCompanionAssistant", () => {
     const journeys = renderHook(() => useCompanionAssistant({ surface: "journeys" }));
 
     expect(companion.result.current.greeting).toBe("You made it back.");
-    expect(journeys.result.current.greeting).toBe("What's gucci, fam. Hand me the calendar.");
+    expect(journeys.result.current.greeting).toBe(
+      "I'm here. Ask what's coming up, talk through the day, or tell me what you want to change.",
+    );
   });
 
   it("keeps routing follow-up answers to the planner while a planner thread is open", async () => {

@@ -6,7 +6,6 @@ import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionChat } from "@/hooks/useCompanionChat";
 import { useCompanionDialogue } from "@/hooks/useCompanionDialogue";
 import { useCompanionPlanner } from "@/hooks/useCompanionPlanner";
-import { useJourneysCompanionConversation } from "@/hooks/useJourneysCompanionConversation";
 import { useVoiceInput } from "@/hooks/useVoiceInput";
 import {
   speakCompanionReply,
@@ -110,9 +109,8 @@ export function useCompanionAssistant({
   const companionChat = useCompanionChat({
     enabled: surface === "companion" && conversationEnabled,
   });
-  const journeysConversation = useJourneysCompanionConversation();
   const planner = useCompanionPlanner({ bootstrapGreeting: false });
-  const conversation = surface === "journeys" ? journeysConversation : companionChat;
+  const conversation = companionChat;
 
   const [draftInput, setDraftInput] = useState("");
   const [interimText, setInterimText] = useState("");
@@ -122,10 +120,14 @@ export function useCompanionAssistant({
   const [plannerIsSpeaking, setPlannerIsSpeaking] = useState(false);
   const lastSpokenPlannerMessageIdRef = useRef<string | null>(null);
 
-  const messages = useMemo(() => sortMessages([
-    ...normalizeConversationMessages(conversation.messages),
-    ...normalizePlannerMessages(planner.messages),
-  ]), [conversation.messages, planner.messages]);
+  const messages = useMemo(() => (
+    surface === "journeys"
+      ? normalizePlannerMessages(planner.messages)
+      : sortMessages([
+        ...normalizeConversationMessages(conversation.messages),
+        ...normalizePlannerMessages(planner.messages),
+      ])
+  ), [conversation.messages, planner.messages, surface]);
 
   const hasOpenPlannerThread = planner.questions.length > 0
     || planner.pendingProposals.some((proposal) => proposal.status === "pending");
@@ -133,7 +135,7 @@ export function useCompanionAssistant({
   const activePlaceholder = hasOpenPlannerThread
     ? "Answer or refine the plan..."
     : surface === "journeys"
-      ? "Pick a starter or tell me what's stuck..."
+      ? "Ask what's coming up, talk it through, or tell me what you want to change..."
       : "Talk, ask about your schedule, or tell me what to adjust...";
 
   const submitPlannerMessage = useCallback(async (
@@ -154,6 +156,13 @@ export function useCompanionAssistant({
   ) => {
     const message = rawMessage.trim();
     if (!message) return;
+
+    if (surface === "journeys") {
+      setDraftInput("");
+      setInterimText("");
+      await planner.submitMessage(message, inputMode);
+      return;
+    }
 
     const routeToPlanner = shouldRouteToPlanner(message, hasOpenPlannerThread);
     setDraftInput("");
@@ -264,7 +273,7 @@ export function useCompanionAssistant({
   }, [companionChat]);
 
   return {
-    greeting: surface === "journeys" ? journeysConversation.greeting : companionChat.greeting ?? greeting,
+    greeting: surface === "journeys" ? planner.greeting : companionChat.greeting ?? greeting,
     messages,
     questions: planner.questions,
     proposals: planner.proposals,
@@ -280,7 +289,7 @@ export function useCompanionAssistant({
     setDraftInput,
     interimText,
     placeholder: activePlaceholder,
-    isSubmitting: planner.isSubmitting || conversation.isSubmitting,
+    isSubmitting: surface === "journeys" ? planner.isSubmitting : planner.isSubmitting || conversation.isSubmitting,
     isClassifying: planner.isClassifying,
     isRecording,
     isAutoStopping,

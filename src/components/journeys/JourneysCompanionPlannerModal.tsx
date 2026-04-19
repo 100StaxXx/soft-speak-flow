@@ -35,8 +35,8 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer";
-import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
 import { useCompanionAssistant } from "@/hooks/useCompanionAssistant";
 import { useJourneysCompanionVisual } from "@/hooks/useJourneysCompanionVisual";
 import { cn } from "@/lib/utils";
@@ -234,7 +234,7 @@ const JourneysCompanionOverlayBody = memo(() => {
     assistant.submitTypedMessage();
   }, [assistant, completeCurrentAssistantLine, typingMessageId]);
 
-  const handleComposerKeyDown = useCallback((event: KeyboardEvent<HTMLInputElement>) => {
+  const handleComposerKeyDown = useCallback((event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key !== "Enter" || event.shiftKey) return;
     event.preventDefault();
     handleSubmit();
@@ -363,8 +363,10 @@ const JourneysCompanionOverlayBody = memo(() => {
                     <div
                       key={entry.id}
                       className={cn(
-                        "border-b border-[#baa87f]/35 pb-3 last:border-b-0 last:pb-0",
-                        entry.role === "user" && "ml-auto max-w-[88%] text-right",
+                        "max-w-[92%] rounded-[18px] px-4 py-3 shadow-[0_18px_40px_-34px_rgba(0,0,0,0.65)]",
+                        entry.role === "assistant"
+                          ? "bg-[#fff6dd] text-left"
+                          : "ml-auto bg-[#dbe9ff] text-right",
                       )}
                     >
                       <p
@@ -532,7 +534,7 @@ const JourneysCompanionOverlayBody = memo(() => {
             <label htmlFor="journeys-companion-chat-input" className="sr-only">
               Message your companion
             </label>
-            <Input
+            <Textarea
               id="journeys-companion-chat-input"
               value={assistant.draftInput}
               onChange={(event) => {
@@ -540,7 +542,7 @@ const JourneysCompanionOverlayBody = memo(() => {
               }}
               onKeyDown={handleComposerKeyDown}
               placeholder={assistant.placeholder}
-              className="h-11 border-white/10 bg-white/5 text-white placeholder:text-white/38"
+              className="min-h-[88px] resize-none border-white/10 bg-white/5 text-white placeholder:text-white/38"
               data-testid="journeys-companion-planner-text-input"
             />
             <Button
