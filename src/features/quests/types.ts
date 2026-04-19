@@ -5,7 +5,7 @@
 import type { QuestAttachmentInput } from "@/types/questAttachments";
 
 export type QuestDifficulty = "easy" | "medium" | "hard";
-export type QuestCreationSource = "manual" | "inbox" | "voice" | "nlp";
+export type QuestCreationSource = "manual" | "inbox" | "voice" | "nlp" | "outlook_sync";
 export type QuestTemplateCategory = "work" | "health" | "home" | "admin" | "personal";
 export type QuestTemplateBrowserTab = "common" | "yours";
 export type QuestTemplateOrigin = "common" | "personal_explicit" | "personal_derived";

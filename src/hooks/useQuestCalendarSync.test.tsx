@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => {
   const dailyTaskSingleMock = vi.fn();
   const functionsInvokeMock = vi.fn();
   const useCalendarIntegrationsMock = vi.fn();
+  const dispatchPlannerSyncFinishedMock = vi.fn();
 
   return {
     questLinksEqMock,
@@ -16,6 +17,7 @@ const mocks = vi.hoisted(() => {
     dailyTaskSingleMock,
     functionsInvokeMock,
     useCalendarIntegrationsMock,
+    dispatchPlannerSyncFinishedMock,
   };
 });
 
@@ -86,6 +88,10 @@ vi.mock("@/integrations/supabase/client", () => ({
       invoke: mocks.functionsInvokeMock,
     },
   },
+}));
+
+vi.mock("@/utils/plannerSync", () => ({
+  dispatchPlannerSyncFinished: (...args: unknown[]) => mocks.dispatchPlannerSyncFinishedMock(...args),
 }));
 
 import { useQuestCalendarSync } from "./useQuestCalendarSync";
@@ -478,9 +484,35 @@ describe("useQuestCalendarSync", () => {
         action: "syncLinkedChanges",
       },
     });
+    expect(mocks.functionsInvokeMock).toHaveBeenNthCalledWith(3, "outlook-calendar-events", {
+      body: {
+        action: "syncPlannerWindow",
+      },
+    });
+    expect(mocks.functionsInvokeMock).toHaveBeenNthCalledWith(4, "outlook-todo-tasks", {
+      body: {
+        action: "syncPlannerTasks",
+      },
+    });
   });
 
   it("full sync update pushes linked Outlook To Do tasks", async () => {
+    mocks.useCalendarIntegrationsMock.mockReturnValue({
+      connections: [
+        {
+          id: "conn-outlook-3",
+          provider: "outlook",
+          calendar_email: "user@example.com",
+          primary_calendar_id: "calendar-3",
+          primary_calendar_name: "Calendar",
+          sync_mode: "full_sync",
+          sync_enabled: true,
+          platform: "web",
+          last_synced_at: null,
+        },
+      ],
+      defaultProvider: "outlook",
+    });
     mocks.outlookTaskLinksEqMock.mockResolvedValue({
       data: [
         {
@@ -527,6 +559,7 @@ describe("useQuestCalendarSync", () => {
       body: {
         action: "updateLinkedTask",
         taskId: "task-7",
+        syncMode: "full_sync",
       },
     });
   });
@@ -568,5 +601,189 @@ describe("useQuestCalendarSync", () => {
         taskId: "task-8",
       },
     });
+  });
+
+  it("migrates a timed Outlook quest from To Do to Calendar", async () => {
+    mocks.useCalendarIntegrationsMock.mockReturnValue({
+      connections: [
+        {
+          id: "conn-outlook-5",
+          provider: "outlook",
+          calendar_email: "user@example.com",
+          primary_calendar_id: "calendar-5",
+          primary_calendar_name: "Calendar",
+          sync_mode: "full_sync",
+          sync_enabled: true,
+          platform: "web",
+          last_synced_at: null,
+        },
+      ],
+      defaultProvider: "outlook",
+    });
+    mocks.outlookTaskLinksEqMock.mockResolvedValue({
+      data: [
+        {
+          id: "otl-3",
+          task_id: "task-9",
+          user_id: "user-1",
+          connection_id: "conn-outlook-5",
+          provider: "outlook",
+          external_task_list_id: "list-5",
+          external_task_id: "todo-5",
+          sync_mode: "full_sync",
+          last_app_sync_at: null,
+          last_provider_sync_at: null,
+        },
+      ],
+      error: null,
+    });
+    mocks.dailyTaskSingleMock.mockResolvedValueOnce({
+      data: {
+        id: "task-9",
+        task_text: "Now time-blocked",
+        task_date: "2026-02-12",
+        scheduled_time: "10:00",
+        estimated_duration: 30,
+        recurrence_pattern: null,
+        recurrence_days: [],
+        recurrence_month_days: [],
+        recurrence_custom_period: null,
+        location: null,
+        notes: null,
+      },
+      error: null,
+    });
+
+    const { result } = renderHook(() => useQuestCalendarSync(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.outlookTaskLinks).toHaveLength(1);
+    });
+
+    await act(async () => {
+      await result.current.syncTaskUpdate.mutateAsync({ taskId: "task-9" });
+    });
+
+    expect(mocks.functionsInvokeMock).toHaveBeenNthCalledWith(1, "outlook-todo-tasks", {
+      body: {
+        action: "deleteLinkedTask",
+        taskId: "task-9",
+      },
+    });
+    expect(mocks.functionsInvokeMock).toHaveBeenNthCalledWith(2, "outlook-calendar-events", {
+      body: {
+        action: "createLinkedEvent",
+        taskId: "task-9",
+        syncMode: "full_sync",
+      },
+    });
+  });
+
+  it("syncs Outlook planner context and notifies planner listeners", async () => {
+    mocks.useCalendarIntegrationsMock.mockReturnValue({
+      connections: [
+        {
+          id: "conn-outlook-6",
+          provider: "outlook",
+          calendar_email: "user@example.com",
+          primary_calendar_id: "calendar-6",
+          primary_calendar_name: "Calendar",
+          sync_mode: "full_sync",
+          sync_enabled: true,
+          platform: "web",
+          last_synced_at: null,
+        },
+      ],
+      defaultProvider: "outlook",
+    });
+    mocks.functionsInvokeMock
+      .mockResolvedValueOnce({
+        data: {
+          events: [
+            {
+              id: "evt-1",
+              title: "Focus block",
+              start: "2026-04-19T10:00:00.000Z",
+              end: "2026-04-19T11:00:00.000Z",
+              isAllDay: false,
+              provider: "outlook",
+              readOnly: true,
+            },
+          ],
+        },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: {
+          tasks: [
+            {
+              id: "task-10",
+              task_text: "Inbox follow-up",
+              task_date: null,
+              scheduled_time: null,
+              estimated_duration: null,
+              recurrence_pattern: null,
+              source: "outlook_sync",
+              subtasks: [],
+            },
+          ],
+          removedTaskIds: ["task-old"],
+        },
+        error: null,
+      });
+
+    const { result } = renderHook(() => useQuestCalendarSync(), {
+      wrapper: createWrapper(),
+    });
+
+    let syncResult: Awaited<ReturnType<typeof result.current.syncPlanningContext.mutateAsync>> | null = null;
+    await act(async () => {
+      syncResult = await result.current.syncPlanningContext.mutateAsync({
+        startDate: "2026-04-19",
+        endDate: "2026-04-25",
+      });
+    });
+
+    expect(mocks.functionsInvokeMock).toHaveBeenNthCalledWith(1, "outlook-calendar-events", {
+      body: {
+        action: "syncPlannerWindow",
+        startDate: "2026-04-19",
+        endDate: "2026-04-25",
+      },
+    });
+    expect(mocks.functionsInvokeMock).toHaveBeenNthCalledWith(2, "outlook-todo-tasks", {
+      body: {
+        action: "syncPlannerTasks",
+      },
+    });
+    expect(syncResult).toEqual({
+      calendarEvents: [
+        {
+          id: "evt-1",
+          title: "Focus block",
+          start: "2026-04-19T10:00:00.000Z",
+          end: "2026-04-19T11:00:00.000Z",
+          isAllDay: false,
+          provider: "outlook",
+          readOnly: true,
+        },
+      ],
+      tasks: [
+        {
+          id: "task-10",
+          task_text: "Inbox follow-up",
+          task_date: null,
+          scheduled_time: null,
+          estimated_duration: null,
+          recurrence_pattern: null,
+          source: "outlook_sync",
+          subtasks: [],
+        },
+      ],
+      removedTaskIds: ["task-old"],
+    });
+    expect(mocks.dispatchPlannerSyncFinishedMock).toHaveBeenCalledTimes(1);
   });
 });

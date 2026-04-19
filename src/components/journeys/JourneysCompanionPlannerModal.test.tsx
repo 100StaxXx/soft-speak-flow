@@ -15,6 +15,10 @@ const mocks = vi.hoisted(() => ({
     toggleRecording: vi.fn(),
     requestMicrophonePermission: vi.fn(),
     setShowPermissionDialog: vi.fn(),
+    setAutoplayVoice: vi.fn(),
+    setMuteSpokenReplies: vi.fn(),
+    stopSpeaking: vi.fn(),
+    startNewChat: vi.fn().mockResolvedValue(undefined),
     archiveCurrentThread: vi.fn().mockResolvedValue(undefined),
     resumeThread: vi.fn().mockResolvedValue(undefined),
   },
@@ -125,9 +129,16 @@ const mocks = vi.hoisted(() => ({
     canOpenThreadPicker: true,
     threadPickerDisabledReason: null as string | null,
     threadHistoryEmptyStateMessage: "Past chats will show up here after at least one real exchange.",
+    hasPersistedActiveThread: true,
+    canStartNewChat: true,
+    newChatDisabledReason: null as string | null,
     canArchiveThread: true,
     archiveDisabledReason: null as string | null,
     isLoadingThreads: false,
+    autoplayVoice: true,
+    muteSpokenReplies: false,
+    isSpeaking: false,
+    speechProvider: "none" as "none" | "device" | "cloud",
   },
 }));
 
@@ -169,7 +180,7 @@ vi.mock("@/hooks/useCompanionAssistant", () => ({
     draftInput: mocks.state.draftInput,
     setDraftInput: mocks.assistant.setDraftInput,
     interimText: "",
-    placeholder: "Talk to me, or ask how today looks.",
+    placeholder: "Chat",
     isSubmitting: false,
     isClassifying: false,
     isRecording: false,
@@ -192,18 +203,22 @@ vi.mock("@/hooks/useCompanionAssistant", () => ({
     confirmProposal: mocks.assistant.confirmProposal,
     rejectProposal: mocks.assistant.rejectProposal,
     confirmAll: mocks.assistant.confirmAll,
-    autoplayVoice: false,
-    setAutoplayVoice: vi.fn(),
-    muteSpokenReplies: false,
-    setMuteSpokenReplies: vi.fn(),
-    isSpeaking: false,
-    speechProvider: "none" as const,
-    stopSpeaking: vi.fn(),
+    autoplayVoice: mocks.state.autoplayVoice,
+    setAutoplayVoice: mocks.assistant.setAutoplayVoice,
+    muteSpokenReplies: mocks.state.muteSpokenReplies,
+    setMuteSpokenReplies: mocks.assistant.setMuteSpokenReplies,
+    isSpeaking: mocks.state.isSpeaking,
+    speechProvider: mocks.state.speechProvider,
+    stopSpeaking: mocks.assistant.stopSpeaking,
     activeThread: mocks.state.activeThread,
     historyThreads: mocks.state.historyThreads,
     canOpenThreadPicker: mocks.state.canOpenThreadPicker,
     threadPickerDisabledReason: mocks.state.threadPickerDisabledReason,
     threadHistoryEmptyStateMessage: mocks.state.threadHistoryEmptyStateMessage,
+    hasPersistedActiveThread: mocks.state.hasPersistedActiveThread,
+    canStartNewChat: mocks.state.canStartNewChat,
+    newChatDisabledReason: mocks.state.newChatDisabledReason,
+    startNewChat: mocks.assistant.startNewChat,
     canArchiveThread: mocks.state.canArchiveThread,
     archiveDisabledReason: mocks.state.archiveDisabledReason,
     archiveCurrentThread: mocks.assistant.archiveCurrentThread,
@@ -359,9 +374,16 @@ describe("JourneysCompanionPlannerModal", () => {
     mocks.state.canOpenThreadPicker = true;
     mocks.state.threadPickerDisabledReason = null;
     mocks.state.threadHistoryEmptyStateMessage = "Past chats will show up here after at least one real exchange.";
+    mocks.state.hasPersistedActiveThread = true;
+    mocks.state.canStartNewChat = true;
+    mocks.state.newChatDisabledReason = null;
     mocks.state.canArchiveThread = true;
     mocks.state.archiveDisabledReason = null;
     mocks.state.isLoadingThreads = false;
+    mocks.state.autoplayVoice = true;
+    mocks.state.muteSpokenReplies = false;
+    mocks.state.isSpeaking = false;
+    mocks.state.speechProvider = "none";
     mocks.openCampaignBuilder.mockReset();
     Object.defineProperty(window, "matchMedia", {
       configurable: true,
@@ -405,6 +427,7 @@ describe("JourneysCompanionPlannerModal", () => {
     expect(screen.getByText("The road's open. What are we setting in motion?")).toBeInTheDocument();
     expect(screen.getByText("Nova")).toBeInTheDocument();
     expect(screen.queryByText("Journeys Thread")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "New chat" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Archive" })).toBeInTheDocument();
     expect(screen.getByTestId("journeys-companion-planner-text-input")).toHaveAttribute("rows", "1");
     expect(screen.getByTestId("journeys-companion-planner-text-input")).toHaveClass("h-12");
@@ -452,7 +475,7 @@ describe("JourneysCompanionPlannerModal", () => {
 
     expect(screen.getByText("The road's open. What are we setting in motion?")).toBeInTheDocument();
     expect(screen.getByTestId("journeys-companion-planner-starter-options")).toBeInTheDocument();
-    expect(screen.getByTestId("journeys-companion-planner-text-input")).toHaveAttribute("placeholder", "Talk to me, or ask how today looks.");
+    expect(screen.getByTestId("journeys-companion-planner-text-input")).toHaveAttribute("placeholder", "Chat");
     expect(screen.queryByText("Quick start")).not.toBeInTheDocument();
 
     for (const starter of COMPANION_PLANNER_STARTER_TEMPLATES) {
@@ -525,6 +548,62 @@ describe("JourneysCompanionPlannerModal", () => {
     expect(mocks.assistant.confirmProposal).toHaveBeenCalledWith("proposal-1");
     expect(mocks.assistant.rejectProposal).toHaveBeenCalledWith("proposal-1");
     expect(mocks.assistant.confirmAll).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders shared voice controls and wires them through the assistant hook", () => {
+    render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        presentation="dialog"
+      />,
+    );
+
+    const autoplayToggle = screen.getByTestId("journeys-companion-planner-autoplay-toggle");
+    const muteToggle = screen.getByTestId("journeys-companion-planner-mute-toggle");
+
+    fireEvent.click(autoplayToggle);
+    fireEvent.click(muteToggle);
+
+    expect(mocks.assistant.setAutoplayVoice).toHaveBeenCalledWith(false);
+    expect(mocks.assistant.setMuteSpokenReplies).toHaveBeenCalledWith(true);
+  });
+
+  it("shows the speaking status row and lets the user stop playback", () => {
+    mocks.state.isSpeaking = true;
+    mocks.state.speechProvider = "cloud";
+
+    render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        presentation="dialog"
+      />,
+    );
+
+    expect(screen.getByTestId("journeys-companion-planner-speaking-status")).toHaveTextContent(
+      "Speaking with fallback audio.",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Stop" }));
+
+    expect(mocks.assistant.stopSpeaking).toHaveBeenCalledTimes(1);
+  });
+
+  it("starts a new chat from the header action", async () => {
+    render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        presentation="dialog"
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("journeys-companion-new-chat-button"));
+
+    await waitFor(() => {
+      expect(mocks.assistant.startNewChat).toHaveBeenCalledTimes(1);
+    });
   });
 
   it("disables Vaul input repositioning for the mobile drawer", () => {

@@ -122,6 +122,7 @@ describe("useJourneysCompanionConversation", () => {
       }),
     });
     expect(result.current.messages[2]?.content).toBe("We can talk it through one step at a time.");
+    expect(result.current.messages[2]?.speechText).toBe("We can talk it through one step at a time.");
     expect(result.current.pendingPlannerHandoffMessage).toBeNull();
     expect(result.current.threadPersistenceReady).toBe(true);
   });

@@ -15,6 +15,7 @@ export interface NormalizedTaskSchedulingState extends TaskSchedulingState {
 }
 
 const isRegularQuest = (habitSourceId: string | null | undefined) => !habitSourceId;
+const allowsDateWithoutTime = (source: string | null | undefined) => source === "outlook_sync";
 
 export const normalizeTaskSchedulingState = (
   state: TaskSchedulingState,
@@ -34,7 +35,12 @@ export const normalizeTaskSchedulingState = (
     movedFromInboxToScheduled = true;
   }
 
-  if (isRegularQuest(state.habit_source_id) && taskDate !== null && scheduledTime === null) {
+  if (
+    isRegularQuest(state.habit_source_id)
+    && taskDate !== null
+    && scheduledTime === null
+    && !allowsDateWithoutTime(source)
+  ) {
     taskDate = null;
     source = "inbox";
     normalizedToInbox = true;

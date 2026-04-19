@@ -294,6 +294,7 @@ export function useJourneysCompanionThreads({
     persistenceUnavailableReason,
     threadsQuery.data?.setupUnavailable,
   ]);
+  const isLoadingThreads = threadsQuery.isLoading || isHydratingThread;
 
   const archiveDisabledReason = useMemo(() => {
     if (threadPickerDisabledReason) {
@@ -310,6 +311,19 @@ export function useJourneysCompanionThreads({
     }
     return null;
   }, [hasPendingPlannerWork, isBusy, persistedActiveThread, threadPickerDisabledReason]);
+
+  const newChatDisabledReason = useMemo(() => {
+    if (isLoadingThreads) {
+      return "Loading thread history.";
+    }
+    if (isBusy) {
+      return "Wait for the current reply to finish.";
+    }
+    if (hasPendingPlannerWork) {
+      return "Finish or dismiss the current plan before starting a new chat.";
+    }
+    return null;
+  }, [hasPendingPlannerWork, isBusy, isLoadingThreads]);
 
   const archiveCurrentThread = useCallback(async () => {
     if (archiveDisabledReason || !persistedActiveThread) return;
@@ -328,6 +342,28 @@ export function useJourneysCompanionThreads({
       );
     }
   }, [archiveDisabledReason, persistedActiveThread, queryClient, threadsQueryKey]);
+
+  const startNewChat = useCallback(async () => {
+    if (newChatDisabledReason) return;
+
+    try {
+      if (persistedActiveThread) {
+        setLocallyArchivedSessionId(persistedActiveThread.sessionId);
+        await setCompanionChatThreadArchived(persistedActiveThread.sessionId, true);
+      }
+
+      openFreshThread();
+      await queryClient.invalidateQueries({ queryKey: threadsQueryKey });
+    } catch (error) {
+      setLocallyArchivedSessionId(null);
+      console.error("Failed to start a fresh journeys companion thread:", error);
+      toast.error(
+        isCompanionChatSetupError(error)
+          ? COMPANION_CHAT_THREAD_HISTORY_DISABLED_REASON
+          : "I couldn't start a new chat yet.",
+      );
+    }
+  }, [newChatDisabledReason, openFreshThread, persistedActiveThread, queryClient, threadsQueryKey]);
 
   const resumeThread = useCallback(async (sessionId: string) => {
     if (threadPickerDisabledReason) return;
@@ -381,6 +417,9 @@ export function useJourneysCompanionThreads({
     activeSessionId,
     activeThread,
     historyThreads,
+    hasPersistedActiveThread: persistedActiveThread !== null,
+    canStartNewChat: newChatDisabledReason === null,
+    newChatDisabledReason,
     canArchiveThread: archiveDisabledReason === null,
     archiveDisabledReason,
     canOpenThreadPicker: threadPickerDisabledReason === null,
@@ -389,8 +428,9 @@ export function useJourneysCompanionThreads({
       threadPickerDisabledReason
         ? COMPANION_CHAT_THREAD_HISTORY_EMPTY_STATE
         : "Past chats will show up here after at least one real exchange.",
+    startNewChat,
     archiveCurrentThread,
     resumeThread,
-    isLoadingThreads: threadsQuery.isLoading || isHydratingThread,
+    isLoadingThreads,
   };
 }

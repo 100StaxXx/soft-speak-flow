@@ -15,7 +15,27 @@ type Action =
   | "createLinkedEvent"
   | "updateLinkedEvent"
   | "deleteLinkedEvent"
-  | "syncLinkedChanges";
+  | "syncLinkedChanges"
+  | "syncPlannerWindow";
+
+export interface TaskRecurrenceFields {
+  recurrence_pattern: "daily" | "weekdays" | "weekly" | "biweekly" | "monthly" | "custom" | null;
+  recurrence_days: number[] | null;
+  recurrence_month_days: number[] | null;
+  recurrence_custom_period: "week" | "month" | null;
+  recurrence_end_date: string | null;
+  is_recurring: boolean;
+}
+
+export interface PlannerCalendarEvent {
+  id: string;
+  title: string;
+  start: string;
+  end: string;
+  isAllDay: boolean;
+  provider: "outlook";
+  readOnly: true;
+}
 
 interface CalendarConnection {
   id: string;
@@ -64,6 +84,8 @@ function normalizeAction(raw: string | undefined): Action | null {
     delete_linked_event: "deleteLinkedEvent",
     syncLinkedChanges: "syncLinkedChanges",
     sync_linked_changes: "syncLinkedChanges",
+    syncPlannerWindow: "syncPlannerWindow",
+    sync_planner_window: "syncPlannerWindow",
   };
   return map[raw] ?? null;
 }
@@ -322,9 +344,9 @@ function toOutlookRecurrence(task: DailyTask): Record<string, unknown> | undefin
   };
 }
 
-function toTaskRecurrenceFields(event: Record<string, any>) {
+export function toTaskRecurrenceFields(event: Record<string, any>): TaskRecurrenceFields {
   const recurrence = event.recurrence as Record<string, any> | undefined;
-  const empty = {
+  const empty: TaskRecurrenceFields = {
     recurrence_pattern: null,
     recurrence_days: null,
     recurrence_month_days: null,
@@ -354,7 +376,7 @@ function toTaskRecurrenceFields(event: Record<string, any>) {
 
   if (patternType === "weekly") {
     const sortedDays = appDays.slice().sort((a, b) => a - b);
-    const mappedPattern =
+    const mappedPattern: TaskRecurrenceFields["recurrence_pattern"] =
       interval === 2
         ? "biweekly"
         : interval === 1 && sameDaySet(sortedDays, WEEKDAY_APP_DAYS)
@@ -362,12 +384,14 @@ function toTaskRecurrenceFields(event: Record<string, any>) {
           : interval === 1 && sortedDays.length === 1
             ? "weekly"
             : "custom";
+    const recurrenceCustomPeriod: TaskRecurrenceFields["recurrence_custom_period"] =
+      mappedPattern === "custom" ? "week" : null;
 
     return {
       recurrence_pattern: mappedPattern,
       recurrence_days: sortedDays,
       recurrence_month_days: [],
-      recurrence_custom_period: mappedPattern === "custom" ? "week" : null,
+      recurrence_custom_period: recurrenceCustomPeriod,
       recurrence_end_date: range.type === "endDate" ? String(range.endDate || "").slice(0, 10) || null : null,
       is_recurring: true,
     };
@@ -474,7 +498,11 @@ async function outlookApi(
   method = "GET",
   body?: unknown,
 ): Promise<any> {
-  const resp = await fetch(`${GRAPH_BASE}${path}`, {
+  const url = path.startsWith("http://") || path.startsWith("https://")
+    ? path
+    : `${GRAPH_BASE}${path}`;
+
+  const resp = await fetch(url, {
     method,
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -490,6 +518,97 @@ async function outlookApi(
 
   if (resp.status === 204) return null;
   return await resp.json();
+}
+
+export function parseGraphDateTime(dateTimeObj: Record<string, any> | undefined): string | null {
+  if (!dateTimeObj?.dateTime) return null;
+  const raw = String(dateTimeObj.dateTime);
+  const normalized = /[zZ]|[+-]\d{2}:\d{2}$/.test(raw) ? raw : `${raw}Z`;
+  const parsed = new Date(normalized);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+}
+
+async function listOutlookCalendarWindow(
+  accessToken: string,
+  calendarId: string,
+  startDate: string,
+  endDate: string,
+): Promise<Record<string, any>[]> {
+  let path =
+    `/me/calendars/${encodeURIComponent(calendarId)}/calendarView`
+    + `?startDateTime=${encodeURIComponent(new Date(`${startDate}T00:00:00.000Z`).toISOString())}`
+    + `&endDateTime=${encodeURIComponent(new Date(`${endDate}T23:59:59.999Z`).toISOString())}`
+    + "&$top=250"
+    + "&$select=id,subject,body,start,end,isAllDay,location,lastModifiedDateTime,isCancelled";
+
+  const events: Record<string, any>[] = [];
+
+  while (path) {
+    const payload = await outlookApi(accessToken, path, "GET");
+    events.push(...(Array.isArray(payload?.value) ? payload.value : []));
+    path = typeof payload?.["@odata.nextLink"] === "string" ? payload["@odata.nextLink"] : "";
+  }
+
+  return events;
+}
+
+export function buildPlannerEventCacheRows(args: {
+  events: Record<string, any>[];
+  linkedEventIds: Set<string>;
+  userId: string;
+  connectionId: string;
+  syncedAt: string;
+}): {
+  rows: Array<Record<string, unknown>>;
+  plannerEvents: PlannerCalendarEvent[];
+} {
+  const rows: Array<Record<string, unknown>> = [];
+  const plannerEvents: PlannerCalendarEvent[] = [];
+
+  for (const event of args.events) {
+    const externalEventId = typeof event.id === "string" ? event.id : null;
+    if (!externalEventId || args.linkedEventIds.has(externalEventId) || event.isCancelled === true) {
+      continue;
+    }
+
+    const startTime = parseGraphDateTime(event.start as Record<string, any> | undefined);
+    const endTime = parseGraphDateTime(event.end as Record<string, any> | undefined);
+    if (!startTime || !endTime) continue;
+
+    const title = typeof event.subject === "string" && event.subject.trim().length > 0
+      ? event.subject
+      : "(No title)";
+    const description = typeof event.body?.content === "string" ? event.body.content : null;
+    const location = typeof event.location?.displayName === "string" ? event.location.displayName : null;
+    const isAllDay = Boolean(event.isAllDay);
+
+    rows.push({
+      user_id: args.userId,
+      connection_id: args.connectionId,
+      external_event_id: externalEventId,
+      title,
+      description,
+      start_time: startTime,
+      end_time: endTime,
+      is_all_day: isAllDay,
+      location,
+      source: "outlook",
+      raw_data: event,
+      synced_at: args.syncedAt,
+    });
+
+    plannerEvents.push({
+      id: externalEventId,
+      title,
+      start: startTime,
+      end: endTime,
+      isAllDay,
+      provider: "outlook",
+      readOnly: true,
+    });
+  }
+
+  return { rows, plannerEvents };
 }
 
 async function getTaskById(
@@ -531,7 +650,7 @@ async function getOutlookConnection(
   return data as CalendarConnection;
 }
 
-Deno.serve(async (req) => {
+async function handleOutlookCalendarEvents(req: Request) {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -809,6 +928,91 @@ Deno.serve(async (req) => {
       });
     }
 
+    if (action === "syncPlannerWindow") {
+      const externalCalendarId =
+        ((body?.calendarId || body?.calendar_id) as string | undefined) ||
+        connection.primary_calendar_id ||
+        connection.calendar_id;
+
+      if (!externalCalendarId) {
+        return jsonResponse({ error: "No primary Outlook calendar selected" }, 400);
+      }
+
+      const now = new Date();
+      const startDate = typeof body?.startDate === "string" && body.startDate.length > 0
+        ? body.startDate
+        : now.toISOString().slice(0, 10);
+      const endDate = typeof body?.endDate === "string" && body.endDate.length > 0
+        ? body.endDate
+        : new Date(now.getTime() + 29 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      const syncedAt = new Date().toISOString();
+
+      const [events, linkedEventResponse] = await Promise.all([
+        listOutlookCalendarWindow(accessToken, externalCalendarId, startDate, endDate),
+        supabase
+          .from("quest_calendar_links")
+          .select("external_event_id")
+          .eq("user_id", userId)
+          .eq("connection_id", connection.id)
+          .eq("provider", "outlook"),
+      ]);
+
+      if (linkedEventResponse.error) {
+        return jsonResponse({ error: "Failed to fetch linked Outlook events", details: linkedEventResponse.error.message }, 500);
+      }
+
+      const linkedEventIds = new Set(
+        ((linkedEventResponse.data ?? []) as Array<{ external_event_id: string | null }>)
+          .map((row) => row.external_event_id)
+          .filter((value): value is string => typeof value === "string" && value.length > 0),
+      );
+
+      const { rows, plannerEvents } = buildPlannerEventCacheRows({
+        events,
+        linkedEventIds,
+        userId,
+        connectionId: connection.id,
+        syncedAt,
+      });
+
+      const { error: clearError } = await supabase
+        .from("external_calendar_events")
+        .delete()
+        .eq("user_id", userId)
+        .eq("connection_id", connection.id)
+        .eq("source", "outlook");
+
+      if (clearError) {
+        return jsonResponse({ error: "Failed to refresh Outlook event cache", details: clearError.message }, 500);
+      }
+
+      if (rows.length > 0) {
+        const { error: insertError } = await supabase
+          .from("external_calendar_events")
+          .insert(rows);
+
+        if (insertError) {
+          return jsonResponse({ error: "Failed to cache Outlook planner events", details: insertError.message }, 500);
+        }
+      }
+
+      await supabase
+        .from("user_calendar_connections")
+        .update({
+          last_synced_at: syncedAt,
+          updated_at: syncedAt,
+        })
+        .eq("id", connection.id);
+
+      return jsonResponse({
+        success: true,
+        startDate,
+        endDate,
+        events: plannerEvents,
+        cachedCount: rows.length,
+      });
+    }
+
     return jsonResponse({ error: "Unsupported action" }, 400);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Internal server error";
@@ -819,4 +1023,10 @@ Deno.serve(async (req) => {
         : 500;
     return jsonResponse({ error: message }, status);
   }
-});
+}
+
+if (import.meta.main) {
+  Deno.serve(handleOutlookCalendarEvents);
+}
+
+export { handleOutlookCalendarEvents };

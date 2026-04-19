@@ -15,7 +15,38 @@ type Action =
   | "createLinkedTask"
   | "updateLinkedTask"
   | "deleteLinkedTask"
-  | "syncLinkedChanges";
+  | "syncLinkedChanges"
+  | "syncPlannerTasks";
+
+export interface TaskRecurrenceFields {
+  recurrence_pattern: "daily" | "weekdays" | "weekly" | "biweekly" | "monthly" | "custom" | null;
+  recurrence_days: number[] | null;
+  recurrence_month_days: number[] | null;
+  recurrence_custom_period: "week" | "month" | null;
+  recurrence_end_date: string | null;
+  is_recurring: boolean;
+}
+
+export interface PlannerSyncedTaskSnapshot {
+  id: string;
+  task_text: string;
+  task_date: string | null;
+  scheduled_time: string | null;
+  estimated_duration: number | null;
+  notes: string | null;
+  difficulty: string | null;
+  recurrence_pattern: TaskRecurrenceFields["recurrence_pattern"];
+  recurrence_end_date: string | null;
+  completed: boolean;
+  completed_at: string | null;
+  source: string | null;
+  priority: string | null;
+  habit_source_id: string | null;
+  epic_id: string | null;
+  epic_title: string | null;
+  contact_id: string | null;
+  subtasks: Array<{ title: string | null }>;
+}
 
 interface CalendarConnection {
   id: string;
@@ -64,6 +95,7 @@ interface OutlookTaskLink {
   external_task_id: string;
   sync_mode: SyncMode;
   last_app_sync_at: string | null;
+  last_provider_sync_at?: string | null;
 }
 
 const APP_DAY_TO_GRAPH_DAY = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"] as const;
@@ -95,6 +127,8 @@ function normalizeAction(raw: string | undefined): Action | null {
     delete_linked_task: "deleteLinkedTask",
     syncLinkedChanges: "syncLinkedChanges",
     sync_linked_changes: "syncLinkedChanges",
+    syncPlannerTasks: "syncPlannerTasks",
+    sync_planner_tasks: "syncPlannerTasks",
   };
   return map[raw] ?? null;
 }
@@ -327,9 +361,9 @@ function toOutlookRecurrence(task: DailyTask): Record<string, unknown> | undefin
   };
 }
 
-function toTaskRecurrenceFields(remoteTask: Record<string, any>) {
+export function toTaskRecurrenceFields(remoteTask: Record<string, any>): TaskRecurrenceFields {
   const recurrence = remoteTask.recurrence as Record<string, any> | undefined;
-  const empty = {
+  const empty: TaskRecurrenceFields = {
     recurrence_pattern: null,
     recurrence_days: null,
     recurrence_month_days: null,
@@ -359,7 +393,7 @@ function toTaskRecurrenceFields(remoteTask: Record<string, any>) {
 
   if (patternType === "weekly") {
     const sortedDays = appDays.slice().sort((a, b) => a - b);
-    const mappedPattern =
+    const mappedPattern: TaskRecurrenceFields["recurrence_pattern"] =
       interval === 2
         ? "biweekly"
         : interval === 1 && sameDaySet(sortedDays, WEEKDAY_APP_DAYS)
@@ -367,12 +401,14 @@ function toTaskRecurrenceFields(remoteTask: Record<string, any>) {
           : interval === 1 && sortedDays.length === 1
             ? "weekly"
             : "custom";
+    const recurrenceCustomPeriod: TaskRecurrenceFields["recurrence_custom_period"] =
+      mappedPattern === "custom" ? "week" : null;
 
     return {
       recurrence_pattern: mappedPattern,
       recurrence_days: sortedDays,
       recurrence_month_days: [],
-      recurrence_custom_period: mappedPattern === "custom" ? "week" : null,
+      recurrence_custom_period: recurrenceCustomPeriod,
       recurrence_end_date: range.type === "endDate" ? String(range.endDate || "").slice(0, 10) || null : null,
       is_recurring: true,
     };
@@ -466,7 +502,33 @@ function parseDateTime(dateTimeObj: Record<string, any> | undefined): Date | nul
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
-function mapOutlookTaskToTaskUpdate(remoteTask: Record<string, any>): Partial<DailyTask> {
+function parseDateTimeIso(dateTimeObj: Record<string, any> | undefined): string | null {
+  const parsed = parseDateTime(dateTimeObj);
+  return parsed ? parsed.toISOString() : null;
+}
+
+export function shouldProviderWin(
+  providerUpdatedAtRaw: string | null | undefined,
+  lastAppSyncAtRaw: string | null | undefined,
+): boolean {
+  const providerUpdatedAt = providerUpdatedAtRaw ? new Date(providerUpdatedAtRaw) : null;
+  const lastAppSyncAt = lastAppSyncAtRaw ? new Date(lastAppSyncAtRaw) : null;
+
+  if (!lastAppSyncAt) return true;
+  if (!providerUpdatedAt || Number.isNaN(providerUpdatedAt.getTime())) return true;
+
+  return providerUpdatedAt.getTime() >= lastAppSyncAt.getTime();
+}
+
+function isOutlookTaskCompleted(remoteTask: Record<string, any>): boolean {
+  return String(remoteTask.status || "").toLowerCase() === "completed";
+}
+
+function getOutlookTaskCompletedAt(remoteTask: Record<string, any>): string | null {
+  return parseDateTimeIso(remoteTask.completedDateTime as Record<string, any> | undefined);
+}
+
+export function mapOutlookTaskToTaskUpdate(remoteTask: Record<string, any>): Partial<DailyTask> {
   const title = (remoteTask.title as string | undefined) ?? "(No title)";
   const notes = (remoteTask.body?.content as string | undefined) ?? null;
   const difficulty = importanceToDifficulty(remoteTask.importance as string | undefined);
@@ -518,13 +580,47 @@ function mapOutlookTaskToTaskUpdate(remoteTask: Record<string, any>): Partial<Da
   };
 }
 
+export function buildImportedTaskInsert(
+  userId: string,
+  remoteTask: Record<string, any>,
+): Record<string, unknown> {
+  const taskPatch = mapOutlookTaskToTaskUpdate(remoteTask);
+  const completed = isOutlookTaskCompleted(remoteTask);
+
+  return {
+    user_id: userId,
+    task_text: taskPatch.task_text ?? "(No title)",
+    task_date: taskPatch.task_date ?? null,
+    scheduled_time: taskPatch.scheduled_time ?? null,
+    estimated_duration: taskPatch.estimated_duration ?? null,
+    difficulty: taskPatch.difficulty ?? "medium",
+    recurrence_pattern: taskPatch.recurrence_pattern ?? null,
+    recurrence_days: taskPatch.recurrence_days ?? null,
+    recurrence_month_days: taskPatch.recurrence_month_days ?? null,
+    recurrence_custom_period: taskPatch.recurrence_custom_period ?? null,
+    recurrence_end_date: taskPatch.recurrence_end_date ?? null,
+    is_recurring: Boolean(taskPatch.recurrence_pattern),
+    reminder_enabled: taskPatch.reminder_enabled ?? false,
+    reminder_minutes_before: taskPatch.reminder_minutes_before ?? null,
+    notes: taskPatch.notes ?? null,
+    completed,
+    completed_at: completed ? getOutlookTaskCompletedAt(remoteTask) : null,
+    source: "outlook_sync",
+    xp_reward: 10,
+  };
+}
+
 async function outlookApi(
   accessToken: string,
   path: string,
   method = "GET",
   body?: unknown,
 ): Promise<any> {
-  const resp = await fetch(`${GRAPH_BASE}${path}`, {
+  const url = path.startsWith("http://") || path.startsWith("https://")
+    ? path
+    : `${GRAPH_BASE}${path}`;
+
+  const resp = await fetch(url, {
     method,
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -709,7 +805,94 @@ async function syncChecklistItemsFromSubtasks(
   }
 }
 
-Deno.serve(async (req) => {
+async function listOutlookTasks(
+  accessToken: string,
+  taskListId: string,
+): Promise<Record<string, any>[]> {
+  let path =
+    `/me/todo/lists/${encodeURIComponent(taskListId)}/tasks`
+    + "?$top=200"
+    + "&$select=id,title,body,importance,status,startDateTime,dueDateTime,completedDateTime,isReminderOn,reminderDateTime,recurrence,lastModifiedDateTime";
+  const tasks: Record<string, any>[] = [];
+
+  while (path) {
+    const payload = await outlookApi(accessToken, path, "GET");
+    tasks.push(...(Array.isArray(payload?.value) ? payload.value : []));
+    path = typeof payload?.["@odata.nextLink"] === "string" ? payload["@odata.nextLink"] : "";
+  }
+
+  return tasks;
+}
+
+function toPlannerSyncedTaskSnapshot(args: {
+  taskId: string;
+  source: string | null;
+  remoteTask: Record<string, any>;
+  checklistItems: Array<{ displayName: string; isChecked: boolean }>;
+  localTask?: {
+    priority?: string | null;
+    habit_source_id?: string | null;
+    epic_id?: string | null;
+    contact_id?: string | null;
+  } | null;
+}): PlannerSyncedTaskSnapshot {
+  const taskPatch = mapOutlookTaskToTaskUpdate(args.remoteTask);
+  const completed = isOutlookTaskCompleted(args.remoteTask);
+
+  return {
+    id: args.taskId,
+    task_text: taskPatch.task_text ?? "(No title)",
+    task_date: taskPatch.task_date ?? null,
+    scheduled_time: taskPatch.scheduled_time ?? null,
+    estimated_duration: taskPatch.estimated_duration ?? null,
+    notes: taskPatch.notes ?? null,
+    difficulty: taskPatch.difficulty ?? null,
+    recurrence_pattern: (taskPatch.recurrence_pattern as TaskRecurrenceFields["recurrence_pattern"] | undefined) ?? null,
+    recurrence_end_date: taskPatch.recurrence_end_date ?? null,
+    completed,
+    completed_at: completed ? getOutlookTaskCompletedAt(args.remoteTask) : null,
+    source: args.source,
+    priority: args.localTask?.priority ?? null,
+    habit_source_id: args.localTask?.habit_source_id ?? null,
+    epic_id: args.localTask?.epic_id ?? null,
+    epic_title: null,
+    contact_id: args.localTask?.contact_id ?? null,
+    subtasks: args.checklistItems.map((item) => ({ title: item.displayName || null })),
+  };
+}
+
+async function getPlannerLocalTasks(
+  supabase: any,
+  userId: string,
+  taskIds: string[],
+): Promise<Array<{
+  id: string;
+  source: string | null;
+  priority: string | null;
+  habit_source_id: string | null;
+  epic_id: string | null;
+  contact_id: string | null;
+}>> {
+  if (taskIds.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from("daily_tasks")
+    .select("id, source, priority, habit_source_id, epic_id, contact_id")
+    .eq("user_id", userId)
+    .in("id", taskIds);
+
+  if (error) throw error;
+  return (data ?? []) as Array<{
+    id: string;
+    source: string | null;
+    priority: string | null;
+    habit_source_id: string | null;
+    epic_id: string | null;
+    contact_id: string | null;
+  }>;
+}
+
+async function handleOutlookTodoTasks(req: Request) {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -935,6 +1118,7 @@ Deno.serve(async (req) => {
 
           if (normalizeSyncMode(link.sync_mode) === "full_sync" && providerWins) {
             const taskPatch = mapOutlookTaskToTaskUpdate(remoteTask);
+            const completed = isOutlookTaskCompleted(remoteTask);
             await supabase
               .from("daily_tasks")
               .update({
@@ -952,6 +1136,8 @@ Deno.serve(async (req) => {
                 recurrence_end_date: taskPatch.recurrence_end_date,
                 is_recurring: Boolean(taskPatch.recurrence_pattern),
                 notes: taskPatch.notes,
+                completed,
+                completed_at: completed ? getOutlookTaskCompletedAt(remoteTask) : null,
               })
               .eq("id", link.task_id)
               .eq("user_id", userId);
@@ -998,6 +1184,214 @@ Deno.serve(async (req) => {
       });
     }
 
+    if (action === "syncPlannerTasks") {
+      const externalTaskListId = connection.primary_task_list_id || await getDefaultTaskListId(accessToken);
+      if (!externalTaskListId) {
+        return jsonResponse({ error: "No Outlook task list selected" }, 400);
+      }
+
+      const syncedAt = new Date().toISOString();
+      const remoteTasks = await listOutlookTasks(accessToken, externalTaskListId);
+      const { data: links, error: linksError } = await supabase
+        .from("quest_outlook_task_links")
+        .select("*")
+        .eq("user_id", userId)
+        .eq("connection_id", connection.id)
+        .eq("provider", "outlook");
+
+      if (linksError) {
+        return jsonResponse({ error: "Failed to fetch Outlook task links", details: linksError.message }, 500);
+      }
+
+      const typedLinks = (links ?? []) as OutlookTaskLink[];
+      const localTasks = await getPlannerLocalTasks(
+        supabase,
+        userId,
+        typedLinks.map((link) => link.task_id),
+      );
+      const localTaskById = new Map(localTasks.map((task) => [task.id, task]));
+      const linkByExternalTaskId = new Map(
+        typedLinks
+          .filter((link) => link.external_task_list_id === externalTaskListId)
+          .map((link) => [link.external_task_id, link]),
+      );
+
+      const syncedTasks: PlannerSyncedTaskSnapshot[] = [];
+      const removedTaskIds: string[] = [];
+      const seenExternalTaskIds = new Set<string>();
+      let importedCount = 0;
+      let updatedCount = 0;
+      let removedMissing = 0;
+
+      for (const remoteTask of remoteTasks) {
+        const externalTaskId = typeof remoteTask.id === "string" ? remoteTask.id : "";
+        if (!externalTaskId) continue;
+
+        seenExternalTaskIds.add(externalTaskId);
+        const checklistItems = await listChecklistItems(accessToken, externalTaskListId, externalTaskId)
+          .then((items) => items.map((item) => ({ displayName: item.displayName, isChecked: item.isChecked })))
+          .catch(() => []);
+
+        let link = linkByExternalTaskId.get(externalTaskId) ?? null;
+        let localTask = link ? localTaskById.get(link.task_id) ?? null : null;
+
+        if (link && !localTask) {
+          await supabase.from("quest_outlook_task_links").delete().eq("id", link.id);
+          linkByExternalTaskId.delete(externalTaskId);
+          link = null;
+        }
+
+        if (!link) {
+          const { data: createdTask, error: createError } = await supabase
+            .from("daily_tasks")
+            .insert(buildImportedTaskInsert(userId, remoteTask))
+            .select("id, source, priority, habit_source_id, epic_id, contact_id")
+            .single();
+
+          if (createError || !createdTask) {
+            return jsonResponse({ error: "Failed to import Outlook To Do task", details: createError?.message }, 500);
+          }
+
+          await replaceSubtasksFromChecklist(supabase, userId, createdTask.id, checklistItems);
+
+          const providerSyncAt = typeof remoteTask.lastModifiedDateTime === "string" && remoteTask.lastModifiedDateTime.length > 0
+            ? remoteTask.lastModifiedDateTime
+            : syncedAt;
+          const { error: linkError } = await supabase
+            .from("quest_outlook_task_links")
+            .upsert(
+              {
+                user_id: userId,
+                task_id: createdTask.id,
+                connection_id: connection.id,
+                provider: "outlook",
+                external_task_list_id: externalTaskListId,
+                external_task_id: externalTaskId,
+                sync_mode: connection.sync_mode,
+                last_app_sync_at: providerSyncAt,
+                last_provider_sync_at: providerSyncAt,
+                updated_at: syncedAt,
+              },
+              { onConflict: "task_id,connection_id" },
+            );
+
+          if (linkError) {
+            return jsonResponse({ error: "Failed to persist imported Outlook task link", details: linkError.message }, 500);
+          }
+
+          localTaskById.set(createdTask.id, createdTask);
+          syncedTasks.push(toPlannerSyncedTaskSnapshot({
+            taskId: createdTask.id,
+            source: "outlook_sync",
+            remoteTask,
+            checklistItems,
+            localTask: createdTask,
+          }));
+          importedCount += 1;
+          continue;
+        }
+
+        localTask = localTaskById.get(link.task_id) ?? null;
+        const shouldPullProviderChanges =
+          localTask?.source === "outlook_sync" || normalizeSyncMode(link.sync_mode) === "full_sync";
+
+        if (localTask && shouldPullProviderChanges && shouldProviderWin(remoteTask.lastModifiedDateTime, link.last_app_sync_at)) {
+          const taskPatch = mapOutlookTaskToTaskUpdate(remoteTask);
+          const completed = isOutlookTaskCompleted(remoteTask);
+          const updatePayload: Record<string, unknown> = {
+            task_text: taskPatch.task_text,
+            task_date: taskPatch.task_date,
+            scheduled_time: taskPatch.scheduled_time,
+            estimated_duration: taskPatch.estimated_duration,
+            difficulty: taskPatch.difficulty,
+            reminder_enabled: taskPatch.reminder_enabled,
+            reminder_minutes_before: taskPatch.reminder_minutes_before,
+            recurrence_pattern: taskPatch.recurrence_pattern,
+            recurrence_days: taskPatch.recurrence_days,
+            recurrence_month_days: taskPatch.recurrence_month_days,
+            recurrence_custom_period: taskPatch.recurrence_custom_period,
+            recurrence_end_date: taskPatch.recurrence_end_date,
+            is_recurring: Boolean(taskPatch.recurrence_pattern),
+            notes: taskPatch.notes,
+            completed,
+            completed_at: completed ? getOutlookTaskCompletedAt(remoteTask) : null,
+          };
+
+          if (localTask.source === "outlook_sync") {
+            updatePayload.source = "outlook_sync";
+          }
+
+          const { error: updateError } = await supabase
+            .from("daily_tasks")
+            .update(updatePayload)
+            .eq("id", link.task_id)
+            .eq("user_id", userId);
+
+          if (updateError) {
+            return jsonResponse({ error: "Failed to refresh Outlook task in planner cache", details: updateError.message }, 500);
+          }
+
+          await replaceSubtasksFromChecklist(supabase, userId, link.task_id, checklistItems);
+          syncedTasks.push(toPlannerSyncedTaskSnapshot({
+            taskId: link.task_id,
+            source: localTask.source,
+            remoteTask,
+            checklistItems,
+            localTask,
+          }));
+          updatedCount += 1;
+        }
+
+        await supabase
+          .from("quest_outlook_task_links")
+          .update({
+            last_provider_sync_at: typeof remoteTask.lastModifiedDateTime === "string" && remoteTask.lastModifiedDateTime.length > 0
+              ? remoteTask.lastModifiedDateTime
+              : syncedAt,
+            updated_at: syncedAt,
+          })
+          .eq("id", link.id);
+      }
+
+      for (const link of typedLinks.filter((candidate) => candidate.external_task_list_id === externalTaskListId)) {
+        if (seenExternalTaskIds.has(link.external_task_id)) continue;
+
+        const localTask = localTaskById.get(link.task_id) ?? null;
+        const shouldDeleteLocalTask =
+          localTask?.source === "outlook_sync" || normalizeSyncMode(link.sync_mode) === "full_sync";
+
+        if (shouldDeleteLocalTask && localTask) {
+          await supabase
+            .from("daily_tasks")
+            .delete()
+            .eq("id", link.task_id)
+            .eq("user_id", userId);
+          removedTaskIds.push(link.task_id);
+        }
+
+        await supabase.from("quest_outlook_task_links").delete().eq("id", link.id);
+        removedMissing += 1;
+      }
+
+      await supabase
+        .from("user_calendar_connections")
+        .update({
+          last_synced_at: syncedAt,
+          updated_at: syncedAt,
+        })
+        .eq("id", connection.id);
+
+      return jsonResponse({
+        success: true,
+        taskListId: externalTaskListId,
+        tasks: syncedTasks,
+        removedTaskIds,
+        importedCount,
+        updatedCount,
+        removedMissing,
+      });
+    }
+
     return jsonResponse({ error: "Unsupported action" }, 400);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Internal server error";
@@ -1008,4 +1402,10 @@ Deno.serve(async (req) => {
         : 500;
     return jsonResponse({ error: message }, status);
   }
-});
+}
+
+if (import.meta.main) {
+  Deno.serve(handleOutlookTodoTasks);
+}
+
+export { handleOutlookTodoTasks };

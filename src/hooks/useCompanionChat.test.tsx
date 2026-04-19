@@ -170,4 +170,31 @@ describe("useCompanionChat", () => {
 
     expect(result.current.messages).toHaveLength(3);
   });
+
+  it("syncs shared voice settings across companion chat hook instances", async () => {
+    const wrapper = createWrapper();
+    const journeys = renderHook(() => useCompanionChat({ enabled: false }), { wrapper });
+    const companion = renderHook(() => useCompanionChat({ enabled: false }), { wrapper });
+
+    expect(journeys.result.current.autoplayVoice).toBe(true);
+    expect(companion.result.current.autoplayVoice).toBe(true);
+
+    await act(async () => {
+      journeys.result.current.setAutoplayVoice(false);
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(companion.result.current.autoplayVoice).toBe(false);
+    });
+
+    await act(async () => {
+      journeys.result.current.setMuteSpokenReplies(true);
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(companion.result.current.muteSpokenReplies).toBe(true);
+    });
+  });
 });

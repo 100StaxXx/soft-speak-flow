@@ -1,4 +1,4 @@
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -18,13 +18,16 @@ const mocks = vi.hoisted(() => ({
   rejectProposal: vi.fn(),
   confirmAll: vi.fn(),
   setAutoplayVoice: vi.fn(),
-    setMuteSpokenReplies: vi.fn(),
-    toggleRecording: vi.fn(),
-    requestPermission: vi.fn().mockResolvedValue("granted"),
-    stopCompanionSpeech: vi.fn(),
-    archiveCurrentThread: vi.fn().mockResolvedValue(undefined),
-    resumeThread: vi.fn().mockResolvedValue(undefined),
-    state: {
+  setMuteSpokenReplies: vi.fn(),
+  toggleRecording: vi.fn(),
+  requestPermission: vi.fn().mockResolvedValue("granted"),
+  speakCompanionReply: vi.fn().mockResolvedValue("device"),
+  stopCompanionSpeech: vi.fn(),
+  stopSpeaking: vi.fn(),
+  startNewChat: vi.fn().mockResolvedValue(undefined),
+  archiveCurrentThread: vi.fn().mockResolvedValue(undefined),
+  resumeThread: vi.fn().mockResolvedValue(undefined),
+  state: {
     companionMessages: [
       {
         id: "chat-1",
@@ -39,10 +42,20 @@ const mocks = vi.hoisted(() => ({
         id: "journeys-1",
         role: "assistant" as const,
         content: "What's the next move?",
+        speechText: "What's the next move?",
         createdAt: "2026-04-18T08:00:00.000Z",
         inputMode: "text" as const,
       },
-    ],
+    ] as Array<{
+      id: string;
+      role: "assistant" | "user";
+      content: string;
+      speechText?: string;
+      createdAt: string;
+      inputMode?: "text" | "voice";
+    }>,
+    journeysSessionId: "journeys-session-1",
+    plannerSessionId: "planner-session-1",
     plannerMessages: [] as Array<{
       id: string;
       role: "companion" | "user";
@@ -67,6 +80,13 @@ const mocks = vi.hoisted(() => ({
     }>,
     pendingPlannerHandoffMessage: null as string | null,
     companionChatEnabled: true,
+    autoplayVoice: false,
+    muteSpokenReplies: false,
+    companionIsSpeaking: false,
+    companionSpeechProvider: "none" as "none" | "device" | "cloud",
+    hasPersistedActiveThread: true,
+    canStartNewChat: true,
+    newChatDisabledReason: null as string | null,
   },
 }));
 
@@ -111,7 +131,7 @@ vi.mock("@/hooks/useVoiceInput", () => ({
 }));
 
 vi.mock("@/services/companionSpeech", () => ({
-  speakCompanionReply: vi.fn(),
+  speakCompanionReply: mocks.speakCompanionReply,
   stopCompanionSpeech: mocks.stopCompanionSpeech,
 }));
 
@@ -123,13 +143,13 @@ vi.mock("@/hooks/useCompanionChat", () => ({
       messages: mocks.state.companionMessages,
       isSubmitting: false,
       submitMessage: mocks.companionSubmit,
-      autoplayVoice: false,
+      autoplayVoice: mocks.state.autoplayVoice,
       setAutoplayVoice: mocks.setAutoplayVoice,
-      muteSpokenReplies: false,
+      muteSpokenReplies: mocks.state.muteSpokenReplies,
       setMuteSpokenReplies: mocks.setMuteSpokenReplies,
-      isSpeaking: false,
-      speechProvider: "none" as const,
-      stopSpeaking: vi.fn(),
+      isSpeaking: mocks.state.companionIsSpeaking,
+      speechProvider: mocks.state.companionSpeechProvider,
+      stopSpeaking: mocks.stopSpeaking,
     };
   },
 }));
@@ -137,6 +157,7 @@ vi.mock("@/hooks/useCompanionChat", () => ({
 vi.mock("@/hooks/useJourneysCompanionConversation", () => ({
   useJourneysCompanionConversation: () => ({
     greeting: "The road's open. What are we setting in motion?",
+    sessionId: mocks.state.journeysSessionId,
     messages: mocks.state.journeysMessages,
     isSubmitting: false,
     submitMessage: mocks.journeysSubmit,
@@ -165,7 +186,7 @@ vi.mock("@/hooks/useJourneysCompanionConversation", () => ({
 vi.mock("@/hooks/useCompanionPlanner", () => ({
   useCompanionPlanner: () => ({
     greeting: "The road's open. What are we setting in motion?",
-    sessionId: "planner-session-1",
+    sessionId: mocks.state.plannerSessionId,
     messages: mocks.state.plannerMessages,
     hasRealMessages: mocks.state.plannerMessages.length > 0,
     questions: mocks.state.plannerQuestions,
@@ -230,6 +251,10 @@ vi.mock("@/hooks/useJourneysCompanionThreads", () => ({
     canOpenThreadPicker: true,
     threadPickerDisabledReason: null,
     threadHistoryEmptyStateMessage: "Past chats will show up here after at least one real exchange.",
+    hasPersistedActiveThread: mocks.state.hasPersistedActiveThread,
+    canStartNewChat: mocks.state.canStartNewChat,
+    newChatDisabledReason: mocks.state.newChatDisabledReason,
+    startNewChat: mocks.startNewChat,
     canArchiveThread: true,
     archiveDisabledReason: null,
     archiveCurrentThread: mocks.archiveCurrentThread,
@@ -247,6 +272,7 @@ describe("useCompanionAssistant", () => {
     mocks.companionSubmit.mockResolvedValue(undefined);
     mocks.journeysSubmit.mockResolvedValue(undefined);
     mocks.plannerSubmit.mockResolvedValue(undefined);
+    mocks.speakCompanionReply.mockResolvedValue("device");
     mocks.openCampaignBuilder.mockReset();
     mocks.state.companionMessages = [
       {
@@ -262,15 +288,25 @@ describe("useCompanionAssistant", () => {
         id: "journeys-1",
         role: "assistant",
         content: "What's the next move?",
+        speechText: "What's the next move?",
         createdAt: "2026-04-18T08:00:00.000Z",
         inputMode: "text",
       },
     ];
+    mocks.state.journeysSessionId = "journeys-session-1";
+    mocks.state.plannerSessionId = "planner-session-1";
     mocks.state.plannerMessages = [];
     mocks.state.plannerQuestions = [];
     mocks.state.pendingProposals = [];
     mocks.state.pendingPlannerHandoffMessage = null;
     mocks.state.companionChatEnabled = true;
+    mocks.state.autoplayVoice = false;
+    mocks.state.muteSpokenReplies = false;
+    mocks.state.companionIsSpeaking = false;
+    mocks.state.companionSpeechProvider = "none";
+    mocks.state.hasPersistedActiveThread = true;
+    mocks.state.canStartNewChat = true;
+    mocks.state.newChatDisabledReason = null;
   });
 
   it("merges chat and planner messages into one sorted transcript with sources", () => {
@@ -524,7 +560,7 @@ describe("useCompanionAssistant", () => {
 
   it("uses the journeys-specific placeholder copy across planner states", () => {
     const journeys = renderHook(() => useCompanionAssistant({ surface: "journeys" }));
-    expect(journeys.result.current.placeholder).toBe("Talk to me, or ask how today looks.");
+    expect(journeys.result.current.placeholder).toBe("Chat");
 
     mocks.state.plannerQuestions = [
       {
@@ -537,6 +573,175 @@ describe("useCompanionAssistant", () => {
 
     const withOpenThread = renderHook(() => useCompanionAssistant({ surface: "journeys" }));
     expect(withOpenThread.result.current.placeholder).toBe("Reply here...");
+  });
+
+  it("exposes shared voice settings and setters on the journeys surface", () => {
+    mocks.state.autoplayVoice = true;
+    mocks.state.muteSpokenReplies = false;
+
+    const { result } = renderHook(() => useCompanionAssistant({ surface: "journeys" }));
+
+    expect(result.current.autoplayVoice).toBe(true);
+    expect(result.current.muteSpokenReplies).toBe(false);
+    expect(result.current.setAutoplayVoice).toBe(mocks.setAutoplayVoice);
+    expect(result.current.setMuteSpokenReplies).toBe(mocks.setMuteSpokenReplies);
+  });
+
+  it("autoplays fresh journeys chat replies with speechText when voice is enabled", async () => {
+    mocks.state.autoplayVoice = true;
+    const { rerender } = renderHook(() => useCompanionAssistant({ surface: "journeys" }));
+
+    mocks.speakCompanionReply.mockClear();
+    mocks.state.journeysMessages = [
+      ...mocks.state.journeysMessages,
+      {
+        id: "journeys-2",
+        role: "assistant",
+        content: "Displayed reply",
+        speechText: "Spoken reply",
+        createdAt: "2026-04-18T08:02:00.000Z",
+        inputMode: "text",
+      },
+    ];
+
+    await act(async () => {
+      rerender();
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(mocks.speakCompanionReply).toHaveBeenCalledWith({
+        text: "Spoken reply",
+        companionId: "companion-1",
+        voiceStyle: "steady",
+        sessionId: "journeys-session-1",
+      });
+    });
+  });
+
+  it("autoplays fresh journeys planner replies with planner content when voice is enabled", async () => {
+    mocks.state.autoplayVoice = true;
+    const { rerender } = renderHook(() => useCompanionAssistant({ surface: "journeys" }));
+
+    mocks.speakCompanionReply.mockClear();
+    mocks.state.plannerMessages = [
+      {
+        id: "plan-1",
+        role: "companion",
+        content: "Lock in that 4 pm focus block.",
+        createdAt: "2026-04-18T08:03:00.000Z",
+        inputMode: "text",
+      },
+    ];
+
+    await act(async () => {
+      rerender();
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(mocks.speakCompanionReply).toHaveBeenCalledWith({
+        text: "Lock in that 4 pm focus block.",
+        companionId: "companion-1",
+        voiceStyle: "steady",
+        sessionId: "planner-session-1",
+      });
+    });
+  });
+
+  it("does not autoplay journeys replies when autoplay is off or spoken replies are muted", async () => {
+    mocks.state.autoplayVoice = false;
+    const { rerender } = renderHook(() => useCompanionAssistant({ surface: "journeys" }));
+
+    mocks.speakCompanionReply.mockClear();
+    mocks.state.journeysMessages = [
+      ...mocks.state.journeysMessages,
+      {
+        id: "journeys-2",
+        role: "assistant",
+        content: "Displayed reply",
+        speechText: "Spoken reply",
+        createdAt: "2026-04-18T08:02:00.000Z",
+        inputMode: "text",
+      },
+    ];
+
+    await act(async () => {
+      rerender();
+      await Promise.resolve();
+    });
+
+    expect(mocks.speakCompanionReply).not.toHaveBeenCalled();
+
+    mocks.state.autoplayVoice = true;
+    mocks.state.muteSpokenReplies = true;
+    mocks.state.journeysMessages = [
+      ...mocks.state.journeysMessages,
+      {
+        id: "journeys-3",
+        role: "assistant",
+        content: "Still quiet",
+        speechText: "Still quiet",
+        createdAt: "2026-04-18T08:03:00.000Z",
+        inputMode: "text",
+      },
+    ];
+
+    await act(async () => {
+      rerender();
+      await Promise.resolve();
+    });
+
+    expect(mocks.speakCompanionReply).not.toHaveBeenCalled();
+  });
+
+  it("stops active journeys speech when the shared voice settings are turned off", async () => {
+    mocks.state.autoplayVoice = true;
+    const { rerender } = renderHook(() => useCompanionAssistant({ surface: "journeys" }));
+
+    mocks.stopCompanionSpeech.mockClear();
+    mocks.state.autoplayVoice = false;
+
+    await act(async () => {
+      rerender();
+      await Promise.resolve();
+    });
+
+    expect(mocks.stopCompanionSpeech).toHaveBeenCalled();
+  });
+
+  it("does not replay historical assistant turns when a journeys thread is hydrated", async () => {
+    const { rerender } = renderHook(() => useCompanionAssistant({ surface: "journeys" }));
+
+    mocks.speakCompanionReply.mockClear();
+    mocks.state.journeysSessionId = "journeys-session-2";
+    mocks.state.plannerSessionId = "planner-session-2";
+    mocks.state.journeysMessages = [
+      {
+        id: "journeys-history-1",
+        role: "assistant",
+        content: "Yesterday had a softer pace.",
+        speechText: "Yesterday had a softer pace.",
+        createdAt: "2026-04-17T08:00:00.000Z",
+        inputMode: "text",
+      },
+    ];
+    mocks.state.plannerMessages = [
+      {
+        id: "plan-history-1",
+        role: "companion",
+        content: "I also drafted a focus block there.",
+        createdAt: "2026-04-17T08:05:00.000Z",
+        inputMode: "text",
+      },
+    ];
+
+    await act(async () => {
+      rerender();
+      await Promise.resolve();
+    });
+
+    expect(mocks.speakCompanionReply).not.toHaveBeenCalled();
   });
 
   it("keeps routing follow-up answers to the planner while a planner thread is open", async () => {
@@ -693,6 +898,10 @@ describe("useCompanionAssistant", () => {
 
     expect(result.current.activeThread?.title).toBe("Current thread");
     expect(result.current.historyThreads).toHaveLength(1);
+    expect(result.current.hasPersistedActiveThread).toBe(true);
+    expect(result.current.canStartNewChat).toBe(true);
+    expect(result.current.newChatDisabledReason).toBeNull();
+    expect(result.current.startNewChat).toBe(mocks.startNewChat);
     expect(result.current.canArchiveThread).toBe(true);
   });
 });

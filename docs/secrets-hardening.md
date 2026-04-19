@@ -24,10 +24,14 @@ Use non-`VITE_*` names for privileged credentials. Common examples in this repo:
 - `OPENAI_API_KEY`
 - `ELEVENLABS_API_KEY`
 - `PAYPAL_SECRET`
+- `GOOGLE_CALENDAR_CLIENT_ID`
 - `GOOGLE_CALENDAR_CLIENT_SECRET`
+- `OUTLOOK_CLIENT_ID`
 - `OUTLOOK_CLIENT_SECRET`
 - `APPLE_PRIVATE_KEY`
 - `APNS_AUTH_KEY`
+
+OAuth client IDs are less sensitive than client secrets, but in this repo they still belong in server-side Supabase project secrets because the edge functions own the provider token exchange.
 
 ## Local setup
 

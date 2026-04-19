@@ -34,6 +34,7 @@ export interface CompanionAssistantMessage {
   role: "assistant" | "user";
   content: string;
   createdAt: string;
+  speechText?: string;
   inputMode?: CompanionChatInputMode;
   source: "chat" | "plan";
   isSeed?: boolean;
@@ -53,6 +54,7 @@ const normalizeConversationMessages = (
     role: "assistant" | "user";
     content: string;
     createdAt: string;
+    speechText?: string;
     inputMode?: CompanionChatInputMode;
     isSeed?: boolean;
   }>,
@@ -64,6 +66,7 @@ const normalizeConversationMessages = (
       ? stripMarkdown(message.content)
       : message.content,
     createdAt: message.createdAt,
+    speechText: message.role === "assistant" ? message.speechText : undefined,
     inputMode: message.inputMode,
     source: "chat",
     isSeed: message.isSeed,
@@ -142,9 +145,11 @@ export function useCompanionAssistant({
   const [interimText, setInterimText] = useState("");
   const [showPermissionDialog, setShowPermissionDialog] = useState(false);
   const [isRequestingPermission, setIsRequestingPermission] = useState(false);
-  const [plannerSpeechProvider, setPlannerSpeechProvider] = useState<CompanionSpeechProvider>("none");
-  const [plannerIsSpeaking, setPlannerIsSpeaking] = useState(false);
+  const [assistantSpeechProvider, setAssistantSpeechProvider] = useState<CompanionSpeechProvider>("none");
+  const [assistantIsSpeaking, setAssistantIsSpeaking] = useState(false);
   const lastSpokenPlannerMessageIdRef = useRef<string | null>(null);
+  const latestJourneysMessagesRef = useRef<CompanionAssistantMessage[]>([]);
+  const knownJourneysAssistantMessageIdsRef = useRef<Set<string> | null>(null);
   const pendingPlannerHandoffRef = useRef<string | null>(null);
   const lastLaunchIntentIdRef = useRef<string | null>(null);
 
@@ -186,8 +191,35 @@ export function useCompanionAssistant({
   const activePlaceholder = hasOpenPlannerThread
     ? "Reply here..."
     : surface === "journeys"
-      ? "Talk to me, or ask how today looks."
+      ? "Chat"
       : "Talk to me, or ask what your day looks like.";
+
+  const speakAssistantTurn = useCallback(async ({
+    text,
+    sessionId,
+  }: {
+    text: string;
+    sessionId?: string | null;
+  }) => {
+    const trimmedText = text.trim();
+    if (!companion?.id || !trimmedText) return;
+
+    setAssistantIsSpeaking(true);
+    try {
+      const provider = await speakCompanionReply({
+        text: trimmedText,
+        companionId: companion.id,
+        voiceStyle,
+        sessionId: sessionId ?? undefined,
+      });
+      setAssistantSpeechProvider(provider);
+    } catch (error) {
+      console.error("Failed to speak assistant reply:", error);
+      setAssistantSpeechProvider("none");
+    } finally {
+      setAssistantIsSpeaking(false);
+    }
+  }, [companion?.id, voiceStyle]);
 
   const submitPlannerMessage = useCallback(async (
     rawMessage: string,
@@ -200,6 +232,10 @@ export function useCompanionAssistant({
     setInterimText("");
     await planner.submitMessage(message, inputMode);
   }, [planner]);
+
+  useEffect(() => {
+    latestJourneysMessagesRef.current = messages;
+  }, [messages]);
 
   const submitMessage = useCallback(async (
     rawMessage: string,
@@ -258,6 +294,54 @@ export function useCompanionAssistant({
     journeysConversation,
     onOpenCampaignBuilder,
     planner,
+    surface,
+  ]);
+
+  useEffect(() => {
+    if (surface !== "journeys") return;
+    knownJourneysAssistantMessageIdsRef.current = new Set(
+      latestJourneysMessagesRef.current
+        .filter((message) => message.role === "assistant")
+        .map((message) => message.id),
+    );
+  }, [planner.sessionId, journeysConversation.sessionId, surface]);
+
+  useEffect(() => {
+    if (surface !== "journeys") return;
+
+    const knownIds = knownJourneysAssistantMessageIdsRef.current;
+    if (!knownIds) return;
+
+    const assistantMessages = messages.filter((message) => message.role === "assistant");
+    const newAssistantMessages = assistantMessages.filter((message) => !knownIds.has(message.id));
+
+    if (newAssistantMessages.length === 0) return;
+
+    for (const message of newAssistantMessages) {
+      knownIds.add(message.id);
+    }
+
+    if (!companionChat.autoplayVoice || companionChat.muteSpokenReplies) return;
+
+    const newestSpokenMessage = [...newAssistantMessages]
+      .reverse()
+      .find((message) => !message.isSeed);
+
+    if (!newestSpokenMessage) return;
+
+    void speakAssistantTurn({
+      text: newestSpokenMessage.speechText?.trim() || newestSpokenMessage.content,
+      sessionId: newestSpokenMessage.source === "chat"
+        ? journeysConversation.sessionId
+        : planner.sessionId,
+    });
+  }, [
+    companionChat.autoplayVoice,
+    companionChat.muteSpokenReplies,
+    messages,
+    planner.sessionId,
+    journeysConversation.sessionId,
+    speakAssistantTurn,
     surface,
   ]);
 
@@ -329,41 +413,26 @@ export function useCompanionAssistant({
     if (lastSpokenPlannerMessageIdRef.current === latestPlannerAssistantMessage.id) return;
 
     lastSpokenPlannerMessageIdRef.current = latestPlannerAssistantMessage.id;
-    setPlannerIsSpeaking(true);
-
-    void speakCompanionReply({
+    void speakAssistantTurn({
       text: latestPlannerAssistantMessage.content,
-      companionId: companion.id,
-      voiceStyle,
-    })
-      .then((provider) => {
-        setPlannerSpeechProvider(provider);
-      })
-      .catch((error) => {
-        console.error("Failed to speak planner reply:", error);
-        setPlannerSpeechProvider("none");
-      })
-      .finally(() => {
-        setPlannerIsSpeaking(false);
-      });
+    });
   }, [
     companion?.id,
     companionChat.autoplayVoice,
     companionChat.muteSpokenReplies,
     conversationEnabled,
     latestPlannerAssistantMessage,
+    speakAssistantTurn,
     surface,
-    voiceStyle,
   ]);
 
   useEffect(() => {
-    if (surface !== "companion") return;
     if (!companionChat.autoplayVoice || companionChat.muteSpokenReplies) {
       stopCompanionSpeech();
-      setPlannerIsSpeaking(false);
-      setPlannerSpeechProvider("none");
+      setAssistantIsSpeaking(false);
+      setAssistantSpeechProvider("none");
     }
-  }, [companionChat.autoplayVoice, companionChat.muteSpokenReplies, surface]);
+  }, [companionChat.autoplayVoice, companionChat.muteSpokenReplies]);
 
   const { isRecording, isAutoStopping, isSupported, permissionStatus, toggleRecording, requestPermission } = useVoiceInput({
     onInterimResult: (text) => {
@@ -398,8 +467,8 @@ export function useCompanionAssistant({
   const stopSpeaking = useCallback(() => {
     stopCompanionSpeech();
     companionChat.stopSpeaking?.();
-    setPlannerIsSpeaking(false);
-    setPlannerSpeechProvider("none");
+    setAssistantIsSpeaking(false);
+    setAssistantSpeechProvider("none");
   }, [companionChat]);
 
   return {
@@ -438,12 +507,12 @@ export function useCompanionAssistant({
     confirmProposal: planner.confirmProposal,
     rejectProposal: planner.rejectProposal,
     confirmAll: planner.confirmAll,
-    autoplayVoice: surface === "companion" ? companionChat.autoplayVoice : false,
-    setAutoplayVoice: surface === "companion" ? companionChat.setAutoplayVoice : (() => undefined),
-    muteSpokenReplies: surface === "companion" ? companionChat.muteSpokenReplies : false,
-    setMuteSpokenReplies: surface === "companion" ? companionChat.setMuteSpokenReplies : (() => undefined),
-    isSpeaking: plannerIsSpeaking || companionChat.isSpeaking,
-    speechProvider: plannerIsSpeaking ? plannerSpeechProvider : companionChat.speechProvider,
+    autoplayVoice: companionChat.autoplayVoice,
+    setAutoplayVoice: companionChat.setAutoplayVoice,
+    muteSpokenReplies: companionChat.muteSpokenReplies,
+    setMuteSpokenReplies: companionChat.setMuteSpokenReplies,
+    isSpeaking: assistantIsSpeaking || companionChat.isSpeaking,
+    speechProvider: assistantIsSpeaking ? assistantSpeechProvider : companionChat.speechProvider,
     stopSpeaking,
     activeThread: surface === "journeys"
       ? journeysThreads.activeThread
@@ -460,6 +529,18 @@ export function useCompanionAssistant({
     threadHistoryEmptyStateMessage: surface === "journeys"
       ? journeysThreads.threadHistoryEmptyStateMessage
       : "Past chats will show up here after at least one real exchange.",
+    hasPersistedActiveThread: surface === "journeys"
+      ? journeysThreads.hasPersistedActiveThread
+      : false,
+    canStartNewChat: surface === "journeys"
+      ? journeysThreads.canStartNewChat
+      : false,
+    newChatDisabledReason: surface === "journeys"
+      ? journeysThreads.newChatDisabledReason
+      : null,
+    startNewChat: surface === "journeys"
+      ? journeysThreads.startNewChat
+      : (async () => undefined),
     canArchiveThread: surface === "journeys"
       ? journeysThreads.canArchiveThread
       : false,

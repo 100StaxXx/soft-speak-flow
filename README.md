@@ -103,8 +103,14 @@ Required Supabase project secrets (minimum):
 - `INFLUENCER_DASHBOARD_SECRET`
 - `OPENAI_API_KEY`
 - `ELEVENLABS_API_KEY`
+- `GOOGLE_CALENDAR_CLIENT_ID`
+- `GOOGLE_CALENDAR_CLIENT_SECRET`
+- `OUTLOOK_CLIENT_ID`
+- `OUTLOOK_CLIENT_SECRET`
 - `COST_ALERT_WEBHOOK_URL`
 - `COST_ALERT_WEBHOOK_BEARER_TOKEN`
+
+Outlook planner sync also depends on selecting a primary Outlook calendar and a primary Microsoft To Do list from `/profile`.
 
 Optional Supabase project secrets for emergency guardrails:
 

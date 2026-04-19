@@ -258,6 +258,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup Deno
+        uses: denoland/setup-deno@v1
+        with:
+          deno-version: v2.x
+
       - name: Verify function manifest
         run: ./scripts/check-function-manifest.sh
 
@@ -282,6 +287,8 @@ jobs:
             APNS_ENVIRONMENT
             OPENAI_API_KEY
             ELEVENLABS_API_KEY
+            OUTLOOK_CLIENT_ID
+            OUTLOOK_CLIENT_SECRET
             COST_ALERT_WEBHOOK_URL
             COST_ALERT_WEBHOOK_BEARER_TOKEN
           )
@@ -313,6 +320,19 @@ jobs:
 
       - name: Push database migrations
         run: supabase db push --linked --password "$SUPABASE_DB_PASSWORD" --yes --include-all
+
+      - name: Deno check Outlook functions
+        run: |
+          set -euo pipefail
+          deno check supabase/functions/outlook-calendar-auth/index.ts
+          deno check supabase/functions/outlook-calendar-events/index.ts
+          deno check supabase/functions/outlook-todo-tasks/index.ts
+
+      - name: Deno test Outlook sync helpers
+        run: |
+          set -euo pipefail
+          deno test supabase/functions/outlook-calendar-events/index.test.ts
+          deno test supabase/functions/outlook-todo-tasks/index.test.ts
 
       - name: Deploy allow-listed Edge Functions
         run: |

@@ -30,6 +30,7 @@ const isNativeIOS = () => Capacitor.isNativePlatform() && Capacitor.getPlatform(
 export function CalendarIntegrationsSettings() {
   const { toast } = useToast();
   const {
+    connections,
     integrationVisible,
     defaultProvider,
     connectedByProvider,
@@ -57,8 +58,21 @@ export function CalendarIntegrationsSettings() {
     Partial<Record<CalendarProvider, Array<{ id: string; name: string }>>>
   >({});
   const [connectingProvider, setConnectingProvider] = useState<CalendarProvider | null>(null);
+  const [isAutoLoadingOutlookOptions, setIsAutoLoadingOutlookOptions] = useState(false);
+  const [isActivatingOutlookPlanning, setIsActivatingOutlookPlanning] = useState(false);
+  const [autoLoadedOutlookConnectionId, setAutoLoadedOutlookConnectionId] = useState<string | null>(null);
 
   const canUseApple = isNativeIOS();
+  const hasConnectedProviders = connections.length > 0;
+  const isEffectivelyVisible = integrationVisible || !hasConnectedProviders;
+  const outlookConnection = connectedByProvider.outlook;
+  const isOutlookPlannerReady = Boolean(
+    outlookConnection
+    && outlookConnection.sync_mode === 'full_sync'
+    && defaultProvider === 'outlook'
+    && outlookConnection.primary_calendar_id
+    && outlookConnection.primary_task_list_id,
+  );
 
   const clearOauthParams = useCallback((params: URLSearchParams, keys: string[]) => {
     keys.forEach((key) => params.delete(key));
@@ -99,6 +113,81 @@ export function CalendarIntegrationsSettings() {
     [canUseApple],
   );
 
+  const loadCalendarsForProvider = useCallback(async (
+    provider: CalendarProvider,
+    options?: {
+      autoSelectIfMissing?: boolean;
+      silent?: boolean;
+    },
+  ) => {
+    const calendars = await listProviderCalendars.mutateAsync(provider);
+    setCalendarOptionsByProvider((prev) => ({
+      ...prev,
+      [provider]: calendars.map((calendar) => ({ id: calendar.id, name: calendar.name })),
+    }));
+
+    const connection = connectedByProvider[provider];
+    if (!options?.autoSelectIfMissing || connection?.primary_calendar_id || calendars.length === 0) {
+      return calendars;
+    }
+
+    const preferred = calendars.find((calendar) => calendar.isPrimary) ?? calendars[0];
+    if (!preferred) return calendars;
+
+    try {
+      await setPrimaryCalendar.mutateAsync({
+        provider,
+        calendarId: preferred.id,
+        calendarName: preferred.name,
+      });
+    } catch (err) {
+      if (!options?.silent) {
+        toast({
+          title: 'Failed setting primary calendar',
+          description: err instanceof Error ? err.message : 'Unknown error',
+          variant: 'destructive',
+        });
+      }
+    }
+
+    return calendars;
+  }, [connectedByProvider, listProviderCalendars, setPrimaryCalendar, toast]);
+
+  const loadOutlookTaskLists = useCallback(async (options?: {
+    autoSelectIfMissing?: boolean;
+    silent?: boolean;
+  }) => {
+    const taskLists = await listProviderTaskLists.mutateAsync('outlook');
+    setTaskListOptionsByProvider((prev) => ({
+      ...prev,
+      outlook: taskLists.map((taskList) => ({ id: taskList.id, name: taskList.name })),
+    }));
+
+    if (!options?.autoSelectIfMissing || outlookConnection?.primary_task_list_id || taskLists.length === 0) {
+      return taskLists;
+    }
+
+    const preferred = taskLists.find((taskList) => taskList.isPrimary) ?? taskLists[0];
+    if (!preferred) return taskLists;
+
+    try {
+      await setPrimaryTaskList.mutateAsync({
+        taskListId: preferred.id,
+        taskListName: preferred.name,
+      });
+    } catch (err) {
+      if (!options?.silent) {
+        toast({
+          title: 'Failed setting primary task list',
+          description: err instanceof Error ? err.message : 'Unknown error',
+          variant: 'destructive',
+        });
+      }
+    }
+
+    return taskLists;
+  }, [listProviderTaskLists, outlookConnection?.primary_task_list_id, setPrimaryTaskList, toast]);
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const provider = params.get('calendar_provider') as CalendarProvider | null;
@@ -134,6 +223,60 @@ export function CalendarIntegrationsSettings() {
         clearOauthParams(params, ['calendar_provider', 'code', 'scope', 'state']);
       });
   }, [clearOauthParams, completeOAuthConnection, toast]);
+
+  useEffect(() => {
+    if (!outlookConnection) return;
+    if (isAutoLoadingOutlookOptions) return;
+    if (autoLoadedOutlookConnectionId === outlookConnection.id) return;
+
+    const hasLoadedCalendars = (calendarOptionsByProvider.outlook?.length ?? 0) > 0;
+    const hasLoadedTaskLists = (taskListOptionsByProvider.outlook?.length ?? 0) > 0;
+    if (hasLoadedCalendars && hasLoadedTaskLists) return;
+
+    let cancelled = false;
+
+    const run = async () => {
+      setIsAutoLoadingOutlookOptions(true);
+      try {
+        if (!hasLoadedCalendars) {
+          await loadCalendarsForProvider('outlook', {
+            autoSelectIfMissing: true,
+            silent: true,
+          });
+        }
+
+        if (!hasLoadedTaskLists) {
+          await loadOutlookTaskLists({
+            autoSelectIfMissing: true,
+            silent: true,
+          });
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.warn('Failed to auto-load Outlook destinations:', error);
+        }
+      } finally {
+        if (!cancelled) {
+          setAutoLoadedOutlookConnectionId(outlookConnection.id);
+          setIsAutoLoadingOutlookOptions(false);
+        }
+      }
+    };
+
+    void run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    calendarOptionsByProvider.outlook?.length,
+    loadCalendarsForProvider,
+    loadOutlookTaskLists,
+    autoLoadedOutlookConnectionId,
+    outlookConnection?.id,
+    taskListOptionsByProvider.outlook?.length,
+    isAutoLoadingOutlookOptions,
+  ]);
 
   const handleConnect = async (provider: CalendarProvider) => {
     try {
@@ -176,11 +319,7 @@ export function CalendarIntegrationsSettings() {
 
   const handleLoadCalendars = async (provider: CalendarProvider) => {
     try {
-      const calendars = await listProviderCalendars.mutateAsync(provider);
-      setCalendarOptionsByProvider((prev) => ({
-        ...prev,
-        [provider]: calendars.map((calendar) => ({ id: calendar.id, name: calendar.name })),
-      }));
+      await loadCalendarsForProvider(provider);
     } catch (err) {
       toast({
         title: `Failed loading ${provider} calendars`,
@@ -192,17 +331,62 @@ export function CalendarIntegrationsSettings() {
 
   const handleLoadTaskLists = async () => {
     try {
-      const taskLists = await listProviderTaskLists.mutateAsync('outlook');
-      setTaskListOptionsByProvider((prev) => ({
-        ...prev,
-        outlook: taskLists.map((taskList) => ({ id: taskList.id, name: taskList.name })),
-      }));
+      await loadOutlookTaskLists();
     } catch (err) {
       toast({
         title: 'Failed loading Outlook task lists',
         description: err instanceof Error ? err.message : 'Unknown error',
         variant: 'destructive',
       });
+    }
+  };
+
+  const handleEnableOutlookPlanning = async () => {
+    if (!outlookConnection) return;
+
+    setIsActivatingOutlookPlanning(true);
+    try {
+      const calendars = await loadCalendarsForProvider('outlook', {
+        autoSelectIfMissing: true,
+      });
+      const taskLists = await loadOutlookTaskLists({
+        autoSelectIfMissing: true,
+      });
+
+      if (!outlookConnection.primary_calendar_id && calendars.length === 0) {
+        throw new Error('No Outlook calendars are available for this account.');
+      }
+
+      if (!outlookConnection.primary_task_list_id && taskLists.length === 0) {
+        throw new Error('No Microsoft To Do lists are available for this account.');
+      }
+
+      if (outlookConnection.sync_mode !== 'full_sync') {
+        await setProviderSyncMode.mutateAsync({
+          provider: 'outlook',
+          syncMode: 'full_sync',
+        });
+      }
+
+      if (defaultProvider !== 'outlook' || !integrationVisible) {
+        await upsertSettings.mutateAsync({
+          default_provider: 'outlook',
+          integration_visible: true,
+        });
+      }
+
+      toast({
+        title: 'Outlook ready for planning',
+        description: 'Planner changes will now read from and sync back to Outlook.',
+      });
+    } catch (err) {
+      toast({
+        title: 'Failed to enable Outlook planning',
+        description: err instanceof Error ? err.message : 'Unknown error',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsActivatingOutlookPlanning(false);
     }
   };
 
@@ -229,7 +413,7 @@ export function CalendarIntegrationsSettings() {
     );
   }
 
-  if (!integrationVisible) {
+  if (!isEffectivelyVisible) {
     return (
       <Card className="border-border/50">
         <CardHeader className="pb-3">
@@ -264,13 +448,15 @@ export function CalendarIntegrationsSettings() {
       </CardHeader>
 
       <CardContent className="space-y-4">
-        <div className="flex items-center justify-between rounded-md border border-border/50 px-3 py-2">
-          <div className="text-xs text-muted-foreground">Hide this section from everyday view</div>
-          <Button onClick={toggleVisibility} variant="ghost" size="sm">
-            <EyeOff className="h-4 w-4 mr-2" />
-            Hide
-          </Button>
-        </div>
+        {hasConnectedProviders && (
+          <div className="flex items-center justify-between rounded-md border border-border/50 px-3 py-2">
+            <div className="text-xs text-muted-foreground">Hide this section from everyday view</div>
+            <Button onClick={toggleVisibility} variant="ghost" size="sm">
+              <EyeOff className="h-4 w-4 mr-2" />
+              Hide
+            </Button>
+          </div>
+        )}
 
         {visibleProviders.map((provider) => {
           const connection = connectedByProvider[provider.key];
@@ -321,6 +507,27 @@ export function CalendarIntegrationsSettings() {
                 </Button>
               ) : (
                 <div className="space-y-3">
+                  {provider.key === 'outlook' && (
+                    <div className="flex flex-wrap items-center gap-2 rounded-md border border-border/50 px-3 py-2">
+                      <div className="text-xs text-muted-foreground">
+                        {isOutlookPlannerReady
+                          ? 'Outlook is the active planning source.'
+                          : 'Finish setup once to make Outlook the planner source.'}
+                      </div>
+                      {isOutlookPlannerReady ? (
+                        <Badge variant="secondary">Planner active</Badge>
+                      ) : (
+                        <Button
+                          size="sm"
+                          onClick={() => void handleEnableOutlookPlanning()}
+                          disabled={isActivatingOutlookPlanning}
+                        >
+                          {isActivatingOutlookPlanning ? 'Activating Outlook...' : 'Use Outlook for Planning'}
+                        </Button>
+                      )}
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <Select
                       value={connection.sync_mode}
@@ -349,7 +556,10 @@ export function CalendarIntegrationsSettings() {
                       value={defaultProvider || undefined}
                       onValueChange={(value) => {
                         void upsertSettings
-                          .mutateAsync({ default_provider: value as CalendarProvider })
+                          .mutateAsync({
+                            default_provider: value as CalendarProvider,
+                            integration_visible: true,
+                          })
                           .catch((err) => {
                             toast({
                               title: 'Failed to set default provider',

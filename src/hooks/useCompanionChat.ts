@@ -25,6 +25,7 @@ import { safeLocalStorage } from "@/utils/storage";
 
 const STORAGE_KEY = "companion-chat-voice-settings-v1";
 const SPOKEN_REPLY_COUNT_KEY = "companion-chat-spoken-replies-v1";
+const SETTINGS_CHANGE_EVENT = "companion-chat-voice-settings-change";
 const MAX_HISTORY_MESSAGES = 18;
 const DEFAULT_SPOKEN_REPLY_LIMIT = Number(import.meta.env.VITE_COMPANION_SPOKEN_REPLY_LIMIT ?? 60);
 
@@ -77,6 +78,11 @@ const readStoredSettings = (): StoredVoiceSettings => {
 
 const writeStoredSettings = (settings: StoredVoiceSettings) => {
   safeLocalStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent<StoredVoiceSettings>(SETTINGS_CHANGE_EVENT, {
+      detail: settings,
+    }));
+  }
 };
 
 const getTodayKey = () => new Date().toISOString().slice(0, 10);
@@ -134,6 +140,42 @@ export function useCompanionChat({ enabled = true }: UseCompanionChatOptions = {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [speechProvider, setSpeechProvider] = useState<CompanionSpeechProvider>("none");
   const [handoffToPlanner, setHandoffToPlanner] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const applyStoredSettings = (settings: StoredVoiceSettings) => {
+      const nextAutoplayVoice = settings.autoplayVoice ?? true;
+      const nextMuteSpokenReplies = settings.muteSpokenReplies ?? false;
+
+      setAutoplayVoiceState((current) => (
+        current === nextAutoplayVoice ? current : nextAutoplayVoice
+      ));
+      setMuteSpokenRepliesState((current) => (
+        current === nextMuteSpokenReplies ? current : nextMuteSpokenReplies
+      ));
+    };
+
+    const handleSettingsChange = (event: Event) => {
+      const detail = event instanceof CustomEvent
+        ? event.detail as StoredVoiceSettings | undefined
+        : undefined;
+      applyStoredSettings(detail ?? readStoredSettings());
+    };
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key !== STORAGE_KEY) return;
+      applyStoredSettings(readStoredSettings());
+    };
+
+    window.addEventListener(SETTINGS_CHANGE_EVENT, handleSettingsChange);
+    window.addEventListener("storage", handleStorage);
+
+    return () => {
+      window.removeEventListener(SETTINGS_CHANGE_EVENT, handleSettingsChange);
+      window.removeEventListener("storage", handleStorage);
+    };
+  }, []);
 
   const historyQuery = useQuery({
     queryKey: ["companion-chat-history", user?.id, companion?.id],
@@ -198,6 +240,17 @@ export function useCompanionChat({ enabled = true }: UseCompanionChatOptions = {
   }, [enabled, greeting, historyQuery.data, historyQuery.isSuccess]);
 
   useEffect(() => {
+    const storedSettings = readStoredSettings();
+    const storedAutoplayVoice = storedSettings.autoplayVoice ?? true;
+    const storedMuteSpokenReplies = storedSettings.muteSpokenReplies ?? false;
+
+    if (
+      storedAutoplayVoice === autoplayVoice
+      && storedMuteSpokenReplies === muteSpokenReplies
+    ) {
+      return;
+    }
+
     writeStoredSettings({
       autoplayVoice,
       muteSpokenReplies,

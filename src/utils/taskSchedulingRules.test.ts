@@ -34,6 +34,20 @@ describe("taskSchedulingRules", () => {
     expect(normalized.normalizedToInbox).toBe(false);
   });
 
+  it("keeps synced Outlook dated/no-time tasks as planner-visible quests", () => {
+    const normalized = normalizeTaskSchedulingState({
+      task_date: "2026-02-13",
+      scheduled_time: null,
+      habit_source_id: null,
+      source: "outlook_sync",
+    });
+
+    expect(normalized.task_date).toBe("2026-02-13");
+    expect(normalized.scheduled_time).toBeNull();
+    expect(normalized.source).toBe("outlook_sync");
+    expect(normalized.normalizedToInbox).toBe(false);
+  });
+
   it("promotes timed inbox tasks to today's scheduled quests", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-02-24T10:15:00"));
@@ -68,5 +82,24 @@ describe("taskSchedulingRules", () => {
     expect(normalized.task_date).toBeNull();
     expect(normalized.source).toBe("inbox");
     expect(normalized.normalizedToInbox).toBe(true);
+  });
+
+  it("preserves synced Outlook date-only updates", () => {
+    const normalized = normalizeTaskSchedulingUpdate(
+      {
+        task_date: null,
+        scheduled_time: null,
+        habit_source_id: null,
+        source: "outlook_sync",
+      },
+      {
+        task_date: "2026-02-13",
+      },
+    );
+
+    expect(normalized.task_date).toBe("2026-02-13");
+    expect(normalized.scheduled_time).toBeNull();
+    expect(normalized.source).toBe("outlook_sync");
+    expect(normalized.normalizedToInbox).toBe(false);
   });
 });

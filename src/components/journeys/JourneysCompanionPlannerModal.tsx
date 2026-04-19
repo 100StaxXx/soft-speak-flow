@@ -15,7 +15,9 @@ import {
   Check,
   ChevronRight,
   Loader2,
+  Plus,
   Send,
+  Waves,
   X,
 } from "lucide-react";
 
@@ -39,6 +41,7 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Tooltip,
@@ -500,6 +503,11 @@ const JourneysCompanionOverlayBody = memo(({
     setIsThreadPickerOpen(true);
   }, [assistant]);
 
+  const handleNewChatAction = useCallback(async () => {
+    if (!assistant.canStartNewChat) return;
+    await assistant.startNewChat();
+  }, [assistant]);
+
   const sendDisabled = assistant.isSubmitting || assistant.isClassifying || (!typingMessageId && !assistant.draftInput.trim());
   const activeProposal = assistant.pendingProposals[0] ?? null;
   const activeQuestPreview = activeProposal
@@ -512,6 +520,10 @@ const JourneysCompanionOverlayBody = memo(({
     && plannerQuestionHistory.length === 0
     && assistant.pendingProposals.length === 0;
   const micButtonLabel = assistant.isRecording ? "Stop voice reply" : "Start voice reply";
+  const newChatTooltip = assistant.newChatDisabledReason
+    ?? (assistant.hasPersistedActiveThread
+      ? "Archive this chat and start a new one."
+      : "Start a fresh chat.");
 
   const avatar = usesPortraitShell ? (
     <CompanionPortraitShell
@@ -581,33 +593,58 @@ const JourneysCompanionOverlayBody = memo(({
             <p className="truncate text-xs text-white/[0.58]">{statusText}</p>
           </div>
           <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="border-white/[0.15] bg-white/[0.05] text-white/[0.84] hover:bg-white/[0.12]"
-                    onClick={() => {
-                      void handleArchiveAction();
-                    }}
-                    disabled={assistant.isLoadingThreads}
-                    data-testid="journeys-companion-archive-button"
-                  >
-                    {assistant.isLoadingThreads ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Archive className="mr-2 h-4 w-4" />
-                    )}
-                    Archive
-                  </Button>
-                </span>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">
-                {assistant.archiveDisabledReason ?? "Archive this chat and browse past chats."}
-              </TooltipContent>
-            </Tooltip>
+            <div className="flex items-center gap-2">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="outline"
+                      className="h-10 w-10 border-white/[0.15] bg-white/[0.05] text-white/[0.84] hover:bg-white/[0.12]"
+                      onClick={() => {
+                        void handleNewChatAction();
+                      }}
+                      disabled={!assistant.canStartNewChat}
+                      aria-label="New chat"
+                      data-testid="journeys-companion-new-chat-button"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  {newChatTooltip}
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="outline"
+                      className="h-10 w-10 border-white/[0.15] bg-white/[0.05] text-white/[0.84] hover:bg-white/[0.12]"
+                      onClick={() => {
+                        void handleArchiveAction();
+                      }}
+                      disabled={assistant.isLoadingThreads}
+                      aria-label="Archive"
+                      data-testid="journeys-companion-archive-button"
+                    >
+                      {assistant.isLoadingThreads ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Archive className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  {assistant.archiveDisabledReason ?? "Archive this chat and browse past chats."}
+                </TooltipContent>
+              </Tooltip>
+            </div>
           </TooltipProvider>
         </div>
 
@@ -809,6 +846,69 @@ const JourneysCompanionOverlayBody = memo(({
                 <p className="mt-2 text-sm text-white/[0.78]">
                   {assistant.interimText || "Listening for your reply..."}
                 </p>
+              </div>
+            ) : null}
+
+            <div className="mb-3 rounded-[22px] border border-white/[0.12] bg-white/[0.06] px-3 py-3 shadow-[0_22px_40px_-34px_rgba(0,0,0,0.7)] backdrop-blur-xl">
+              <div className="flex items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <label
+                    htmlFor="journeys-companion-autoplay-voice"
+                    className="text-sm font-medium text-white"
+                  >
+                    Autoplay voice
+                  </label>
+                  <p className="text-xs text-white/[0.6]">
+                    Speak new companion replies aloud when they arrive.
+                  </p>
+                </div>
+                <Switch
+                  id="journeys-companion-autoplay-voice"
+                  checked={assistant.autoplayVoice}
+                  onCheckedChange={assistant.setAutoplayVoice}
+                  data-testid="journeys-companion-planner-autoplay-toggle"
+                />
+              </div>
+
+              <div className="mt-3 flex items-center justify-between gap-3 border-t border-white/[0.08] pt-3">
+                <div className="space-y-1">
+                  <label
+                    htmlFor="journeys-companion-mute-spoken-replies"
+                    className="text-sm font-medium text-white"
+                  >
+                    Mute spoken replies
+                  </label>
+                  <p className="text-xs text-white/[0.6]">
+                    Keep the transcript active without reading replies aloud.
+                  </p>
+                </div>
+                <Switch
+                  id="journeys-companion-mute-spoken-replies"
+                  checked={assistant.muteSpokenReplies}
+                  onCheckedChange={assistant.setMuteSpokenReplies}
+                  data-testid="journeys-companion-planner-mute-toggle"
+                />
+              </div>
+            </div>
+
+            {assistant.isSpeaking ? (
+              <div
+                className="mb-3 flex items-center justify-between gap-3 rounded-[22px] border border-emerald-300/20 bg-emerald-400/10 px-3 py-3 shadow-[0_22px_40px_-34px_rgba(0,0,0,0.7)] backdrop-blur-xl"
+                data-testid="journeys-companion-planner-speaking-status"
+              >
+                <div className="flex items-center gap-2 text-sm text-emerald-50">
+                  <Waves className="h-4 w-4" />
+                  Speaking {assistant.speechProvider === "cloud" ? "with fallback audio" : "on-device"}.
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="text-emerald-50 hover:bg-emerald-300/10 hover:text-emerald-50"
+                  onClick={assistant.stopSpeaking}
+                >
+                  Stop
+                </Button>
               </div>
             ) : null}
 

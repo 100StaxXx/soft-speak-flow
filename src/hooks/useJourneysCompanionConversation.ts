@@ -30,6 +30,7 @@ type JourneysCompanionMessage = {
   role: "assistant" | "user";
   content: string;
   createdAt: string;
+  speechText?: string;
   isSeed?: boolean;
   inputMode?: CompanionChatInputMode;
 };
@@ -187,7 +188,9 @@ export function useJourneysCompanionConversation() {
       } else {
         setMessages((previous) => [
           ...previous,
-          createMessage("assistant", stripMarkdown(response.reply)),
+          createMessage("assistant", stripMarkdown(response.reply), {
+            speechText: response.speechText.trim() || undefined,
+          }),
         ]);
       }
 
@@ -197,6 +200,7 @@ export function useJourneysCompanionConversation() {
         detectedIntent: response.handoffToPlanner ? "planning_handoff" : "conversation",
         aiResponse: {
           reply: response.reply,
+          speechText: response.speechText,
           handoffToPlanner: response.handoffToPlanner,
           surface: "journeys",
         },

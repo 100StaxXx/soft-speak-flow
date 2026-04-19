@@ -199,6 +199,9 @@ describe("useJourneysCompanionThreads", () => {
       ],
     });
     expect(result.current.activeThread?.sessionId).toBe("active-session-1");
+    expect(result.current.hasPersistedActiveThread).toBe(true);
+    expect(result.current.canStartNewChat).toBe(true);
+    expect(result.current.newChatDisabledReason).toBeNull();
     expect(result.current.historyThreads).toEqual([
       expect.objectContaining({
         sessionId: "archived-session-1",
@@ -366,6 +369,140 @@ describe("useJourneysCompanionThreads", () => {
         }),
       ]));
     });
+  });
+
+  it("archives the active persisted thread before starting a fresh chat", async () => {
+    const { result } = renderJourneysThreads({
+      messages: [
+        {
+          role: "user",
+          content: "Help me shape today.",
+          createdAt: "2026-04-19T08:05:00.000Z",
+          source: "chat",
+        },
+      ],
+    });
+
+    await waitFor(() => {
+      expect(result.current.activeThread?.sessionId).toBe("active-session-1");
+    });
+
+    await act(async () => {
+      await result.current.startNewChat();
+    });
+
+    expect(mocks.setCompanionChatThreadArchived).toHaveBeenCalledWith("active-session-1", true);
+    expect(mocks.resetConversationThread).toHaveBeenLastCalledWith({
+      sessionId: "fresh-session-2",
+      greetingText: "The road's open.",
+    });
+    expect(mocks.resetPlannerThread).toHaveBeenLastCalledWith({
+      sessionId: "fresh-session-2",
+    });
+    await waitFor(() => {
+      expect(result.current.activeThread?.sessionId).toBe("fresh-session-2");
+    });
+    expect(result.current.hasPersistedActiveThread).toBe(false);
+  });
+
+  it("starts a fresh local chat without archiving when no persisted active thread exists", async () => {
+    mocks.listCompanionChatThreads.mockResolvedValue([
+      {
+        sessionId: "archived-session-1",
+        companionId: "companion-1",
+        surface: "journeys",
+        title: "Old thread",
+        previewText: "We can pick this back up.",
+        createdAt: "2026-04-17T08:00:00.000Z",
+        lastMessageAt: "2026-04-17T08:05:00.000Z",
+        archivedAt: "2026-04-17T09:00:00.000Z",
+        messageCount: 4,
+      },
+    ]);
+
+    const { result } = renderJourneysThreads({
+      messages: [
+        {
+          role: "assistant",
+          content: "The road's open.",
+          createdAt: "2026-04-19T08:00:00.000Z",
+          source: "chat",
+          isSeed: true,
+        },
+      ],
+    });
+
+    await waitFor(() => {
+      expect(result.current.activeThread?.sessionId).toBe("fresh-session-1");
+    });
+    await waitFor(() => {
+      expect(result.current.canStartNewChat).toBe(true);
+    });
+
+    await act(async () => {
+      await result.current.startNewChat();
+    });
+
+    expect(mocks.setCompanionChatThreadArchived).not.toHaveBeenCalled();
+    expect(mocks.resetConversationThread).toHaveBeenLastCalledWith({
+      sessionId: "fresh-session-2",
+      greetingText: "The road's open.",
+    });
+    expect(mocks.resetPlannerThread).toHaveBeenLastCalledWith({
+      sessionId: "fresh-session-2",
+    });
+    expect(result.current.activeThread?.sessionId).toBe("fresh-session-2");
+  });
+
+  it("disables new chat while thread history is still loading", () => {
+    const { result } = renderJourneysThreads();
+
+    expect(result.current.canStartNewChat).toBe(false);
+    expect(result.current.newChatDisabledReason).toBe("Loading thread history.");
+  });
+
+  it("disables new chat while the assistant is busy", async () => {
+    const { result } = renderJourneysThreads({
+      isBusy: true,
+      messages: [
+        {
+          role: "user",
+          content: "Keep this active for now.",
+          createdAt: "2026-04-19T08:05:00.000Z",
+          source: "chat",
+        },
+      ],
+    });
+
+    await waitFor(() => {
+      expect(result.current.isLoadingThreads).toBe(false);
+    });
+
+    expect(result.current.canStartNewChat).toBe(false);
+    expect(result.current.newChatDisabledReason).toBe("Wait for the current reply to finish.");
+  });
+
+  it("disables new chat while planner work is still pending", async () => {
+    const { result } = renderJourneysThreads({
+      hasPendingPlannerWork: true,
+      messages: [
+        {
+          role: "user",
+          content: "Keep this active for now.",
+          createdAt: "2026-04-19T08:05:00.000Z",
+          source: "chat",
+        },
+      ],
+    });
+
+    await waitFor(() => {
+      expect(result.current.isLoadingThreads).toBe(false);
+    });
+
+    expect(result.current.canStartNewChat).toBe(false);
+    expect(result.current.newChatDisabledReason).toBe(
+      "Finish or dismiss the current plan before starting a new chat.",
+    );
   });
 
   it("archives the current active thread before resuming an archived one", async () => {
