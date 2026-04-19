@@ -41,7 +41,6 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Tooltip,
@@ -848,48 +847,6 @@ const JourneysCompanionOverlayBody = memo(({
                 </p>
               </div>
             ) : null}
-
-            <div className="mb-3 rounded-[22px] border border-white/[0.12] bg-white/[0.06] px-3 py-3 shadow-[0_22px_40px_-34px_rgba(0,0,0,0.7)] backdrop-blur-xl">
-              <div className="flex items-center justify-between gap-3">
-                <div className="space-y-1">
-                  <label
-                    htmlFor="journeys-companion-autoplay-voice"
-                    className="text-sm font-medium text-white"
-                  >
-                    Autoplay voice
-                  </label>
-                  <p className="text-xs text-white/[0.6]">
-                    Speak new companion replies aloud when they arrive.
-                  </p>
-                </div>
-                <Switch
-                  id="journeys-companion-autoplay-voice"
-                  checked={assistant.autoplayVoice}
-                  onCheckedChange={assistant.setAutoplayVoice}
-                  data-testid="journeys-companion-planner-autoplay-toggle"
-                />
-              </div>
-
-              <div className="mt-3 flex items-center justify-between gap-3 border-t border-white/[0.08] pt-3">
-                <div className="space-y-1">
-                  <label
-                    htmlFor="journeys-companion-mute-spoken-replies"
-                    className="text-sm font-medium text-white"
-                  >
-                    Mute spoken replies
-                  </label>
-                  <p className="text-xs text-white/[0.6]">
-                    Keep the transcript active without reading replies aloud.
-                  </p>
-                </div>
-                <Switch
-                  id="journeys-companion-mute-spoken-replies"
-                  checked={assistant.muteSpokenReplies}
-                  onCheckedChange={assistant.setMuteSpokenReplies}
-                  data-testid="journeys-companion-planner-mute-toggle"
-                />
-              </div>
-            </div>
 
             {assistant.isSpeaking ? (
               <div

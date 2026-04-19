@@ -23,8 +23,6 @@ const mocks = vi.hoisted(() => ({
     confirmProposal: vi.fn(),
     rejectProposal: vi.fn(),
     confirmAll: vi.fn(),
-    setAutoplayVoice: vi.fn(),
-    setMuteSpokenReplies: vi.fn(),
   },
 }));
 
@@ -178,10 +176,6 @@ vi.mock("@/hooks/useCompanionAssistant", () => ({
     confirmProposal: mocks.assistant.confirmProposal,
     rejectProposal: mocks.assistant.rejectProposal,
     confirmAll: mocks.assistant.confirmAll,
-    autoplayVoice: true,
-    setAutoplayVoice: mocks.assistant.setAutoplayVoice,
-    muteSpokenReplies: false,
-    setMuteSpokenReplies: mocks.assistant.setMuteSpokenReplies,
     isSpeaking: false,
     speechProvider: "device" as const,
     stopSpeaking: vi.fn(),
@@ -240,7 +234,7 @@ describe("CompanionPlannerPanel", () => {
 
     render(<CompanionPlannerPanel />);
 
-    expect(screen.getByText(/conversation voice is premium/i)).toBeInTheDocument();
+    expect(screen.getByText(/conversation mode is premium/i)).toBeInTheDocument();
     expect(screen.getByTestId("companion-assistant-text-input")).toBeInTheDocument();
   });
 });

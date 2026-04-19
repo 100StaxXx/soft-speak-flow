@@ -9,8 +9,6 @@ import {
   MicOff,
   Send,
   Sparkles,
-  Volume2,
-  VolumeX,
   Waves,
   X,
 } from "lucide-react";
@@ -19,9 +17,7 @@ import { AudioReactiveWaveform } from "@/components/AudioReactiveWaveform";
 import { PermissionRequestDialog } from "@/components/PermissionRequestDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useAccessStatus } from "@/hooks/useAccessStatus";
@@ -194,18 +190,6 @@ export const CompanionPlannerPanel = memo(() => {
               <CalendarDays className="mr-1.5 h-3.5 w-3.5" />
               {assistant.todayLabel}
             </Badge>
-            {assistant.speechProvider !== "none" ? (
-              <Badge
-                variant="outline"
-                className={cn(
-                  "border-white/10 bg-white/5 text-white/70",
-                  assistant.speechProvider === "cloud" && "border-amber-300/20 bg-amber-400/10 text-amber-50",
-                  assistant.speechProvider === "device" && "border-emerald-300/20 bg-emerald-400/10 text-emerald-50",
-                )}
-              >
-                {assistant.speechProvider === "device" ? "On-device voice" : "Cloud fallback"}
-              </Badge>
-            ) : null}
           </div>
         </div>
       </div>
@@ -219,55 +203,21 @@ export const CompanionPlannerPanel = memo(() => {
               </div>
               <div className="space-y-2">
                 <div className="flex flex-wrap items-center gap-2">
-                  <p className="text-sm font-semibold text-white">Conversation voice is Premium</p>
+                  <p className="text-sm font-semibold text-white">Conversation mode is Premium</p>
                   <Badge variant="outline" className="border-amber-300/25 bg-amber-400/10 text-amber-50">
                     Premium
                   </Badge>
                 </div>
                 <p className="text-sm text-white/75">
-                  Scheduling questions, quest moves, and campaign adjustments still work here. Premium unlocks the full freeform talk lane with spoken replies.
+                  Scheduling questions, quest moves, and campaign adjustments still work here. Premium unlocks the full freeform talk lane.
                 </p>
               </div>
             </div>
           </div>
         ) : (
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3">
               <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <Label htmlFor="companion-assistant-autoplay-voice" className="text-sm text-white">
-                      Autoplay voice
-                    </Label>
-                    <p className="mt-1 text-xs text-white/55">Speak new assistant replies aloud after they arrive.</p>
-                  </div>
-                  <Switch
-                    id="companion-assistant-autoplay-voice"
-                    checked={assistant.autoplayVoice}
-                    onCheckedChange={assistant.setAutoplayVoice}
-                    data-testid="companion-assistant-autoplay-toggle"
-                  />
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <Label htmlFor="companion-assistant-mute-voice" className="text-sm text-white">
-                      Mute spoken replies
-                    </Label>
-                    <p className="mt-1 text-xs text-white/55">Keep the transcript active without reading replies aloud.</p>
-                  </div>
-                  <Switch
-                    id="companion-assistant-mute-voice"
-                    checked={assistant.muteSpokenReplies}
-                    onCheckedChange={assistant.setMuteSpokenReplies}
-                    data-testid="companion-assistant-mute-toggle"
-                  />
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-white/10 bg-black/20 p-3 sm:col-span-2">
                 <div className="space-y-1.5">
                   <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-white/45">Horizon</p>
                   <ToggleGroup
@@ -479,11 +429,8 @@ export const CompanionPlannerPanel = memo(() => {
             data-testid="companion-assistant-text-input"
           />
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2 text-xs text-white/50">
-              {assistant.muteSpokenReplies ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
-              <span>
-                Ask for support, schedule answers, or confirmable quest and campaign changes in the same thread.
-              </span>
+            <div className="text-xs text-white/50">
+              Ask for support, schedule answers, or confirmable quest and campaign changes in the same thread.
             </div>
             <Button
               type="button"

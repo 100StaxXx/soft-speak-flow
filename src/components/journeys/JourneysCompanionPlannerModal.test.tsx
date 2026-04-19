@@ -15,8 +15,6 @@ const mocks = vi.hoisted(() => ({
     toggleRecording: vi.fn(),
     requestMicrophonePermission: vi.fn(),
     setShowPermissionDialog: vi.fn(),
-    setAutoplayVoice: vi.fn(),
-    setMuteSpokenReplies: vi.fn(),
     stopSpeaking: vi.fn(),
     startNewChat: vi.fn().mockResolvedValue(undefined),
     archiveCurrentThread: vi.fn().mockResolvedValue(undefined),
@@ -135,8 +133,6 @@ const mocks = vi.hoisted(() => ({
     canArchiveThread: true,
     archiveDisabledReason: null as string | null,
     isLoadingThreads: false,
-    autoplayVoice: true,
-    muteSpokenReplies: false,
     isSpeaking: false,
     speechProvider: "none" as "none" | "device" | "cloud",
   },
@@ -203,10 +199,6 @@ vi.mock("@/hooks/useCompanionAssistant", () => ({
     confirmProposal: mocks.assistant.confirmProposal,
     rejectProposal: mocks.assistant.rejectProposal,
     confirmAll: mocks.assistant.confirmAll,
-    autoplayVoice: mocks.state.autoplayVoice,
-    setAutoplayVoice: mocks.assistant.setAutoplayVoice,
-    muteSpokenReplies: mocks.state.muteSpokenReplies,
-    setMuteSpokenReplies: mocks.assistant.setMuteSpokenReplies,
     isSpeaking: mocks.state.isSpeaking,
     speechProvider: mocks.state.speechProvider,
     stopSpeaking: mocks.assistant.stopSpeaking,
@@ -380,8 +372,6 @@ describe("JourneysCompanionPlannerModal", () => {
     mocks.state.canArchiveThread = true;
     mocks.state.archiveDisabledReason = null;
     mocks.state.isLoadingThreads = false;
-    mocks.state.autoplayVoice = true;
-    mocks.state.muteSpokenReplies = false;
     mocks.state.isSpeaking = false;
     mocks.state.speechProvider = "none";
     mocks.openCampaignBuilder.mockReset();
@@ -548,25 +538,6 @@ describe("JourneysCompanionPlannerModal", () => {
     expect(mocks.assistant.confirmProposal).toHaveBeenCalledWith("proposal-1");
     expect(mocks.assistant.rejectProposal).toHaveBeenCalledWith("proposal-1");
     expect(mocks.assistant.confirmAll).toHaveBeenCalledTimes(1);
-  });
-
-  it("renders shared voice controls and wires them through the assistant hook", () => {
-    render(
-      <JourneysCompanionPlannerModal
-        open
-        onOpenChange={vi.fn()}
-        presentation="dialog"
-      />,
-    );
-
-    const autoplayToggle = screen.getByTestId("journeys-companion-planner-autoplay-toggle");
-    const muteToggle = screen.getByTestId("journeys-companion-planner-mute-toggle");
-
-    fireEvent.click(autoplayToggle);
-    fireEvent.click(muteToggle);
-
-    expect(mocks.assistant.setAutoplayVoice).toHaveBeenCalledWith(false);
-    expect(mocks.assistant.setMuteSpokenReplies).toHaveBeenCalledWith(true);
   });
 
   it("shows the speaking status row and lets the user stop playback", () => {

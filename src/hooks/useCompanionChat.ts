@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -6,6 +6,7 @@ import { useAIInteractionTracker } from "@/hooks/useAIInteractionTracker";
 import { useAuth } from "@/hooks/useAuth";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionDialogue } from "@/hooks/useCompanionDialogue";
+import { useCompanionVoiceSettings } from "@/hooks/useCompanionVoiceSettings";
 import { useVoiceInput } from "@/hooks/useVoiceInput";
 import {
   type CompanionSpeechProvider,
@@ -23,16 +24,9 @@ import { isCompanionChatSetupError } from "@/utils/companionChatSetup";
 import { resolveCompanionChatError } from "@/utils/companionChatErrors";
 import { safeLocalStorage } from "@/utils/storage";
 
-const STORAGE_KEY = "companion-chat-voice-settings-v1";
 const SPOKEN_REPLY_COUNT_KEY = "companion-chat-spoken-replies-v1";
-const SETTINGS_CHANGE_EVENT = "companion-chat-voice-settings-change";
 const MAX_HISTORY_MESSAGES = 18;
 const DEFAULT_SPOKEN_REPLY_LIMIT = Number(import.meta.env.VITE_COMPANION_SPOKEN_REPLY_LIMIT ?? 60);
-
-type StoredVoiceSettings = {
-  autoplayVoice?: boolean;
-  muteSpokenReplies?: boolean;
-};
 
 type CompanionChatRow = Tables<"companion_chats">;
 
@@ -64,26 +58,6 @@ const mapChatHistory = (rows: CompanionChatRow[]): CompanionChatMessage[] =>
     createdAt: row.created_at,
     inputMode: row.input_mode ?? undefined,
   }));
-
-const readStoredSettings = (): StoredVoiceSettings => {
-  const raw = safeLocalStorage.getItem(STORAGE_KEY);
-  if (!raw) return {};
-
-  try {
-    return JSON.parse(raw) as StoredVoiceSettings;
-  } catch {
-    return {};
-  }
-};
-
-const writeStoredSettings = (settings: StoredVoiceSettings) => {
-  safeLocalStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(new CustomEvent<StoredVoiceSettings>(SETTINGS_CHANGE_EVENT, {
-      detail: settings,
-    }));
-  }
-};
 
 const getTodayKey = () => new Date().toISOString().slice(0, 10);
 
@@ -127,55 +101,22 @@ export function useCompanionChat({ enabled = true }: UseCompanionChatOptions = {
   const queryClient = useQueryClient();
   const initialisedRef = useRef(false);
   const sessionIdRef = useRef<string>(generateId());
+  const {
+    autoplayVoice,
+    setAutoplayVoice,
+    muteSpokenReplies,
+    setMuteSpokenReplies,
+  } = useCompanionVoiceSettings();
 
-  const storedSettings = useMemo(readStoredSettings, []);
   const [messages, setMessages] = useState<CompanionChatMessage[]>([]);
   const [draftInput, setDraftInput] = useState("");
   const [interimText, setInterimText] = useState("");
   const [showPermissionDialog, setShowPermissionDialog] = useState(false);
   const [isRequestingPermission, setIsRequestingPermission] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [autoplayVoice, setAutoplayVoiceState] = useState(storedSettings.autoplayVoice ?? true);
-  const [muteSpokenReplies, setMuteSpokenRepliesState] = useState(storedSettings.muteSpokenReplies ?? false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [speechProvider, setSpeechProvider] = useState<CompanionSpeechProvider>("none");
   const [handoffToPlanner, setHandoffToPlanner] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const applyStoredSettings = (settings: StoredVoiceSettings) => {
-      const nextAutoplayVoice = settings.autoplayVoice ?? true;
-      const nextMuteSpokenReplies = settings.muteSpokenReplies ?? false;
-
-      setAutoplayVoiceState((current) => (
-        current === nextAutoplayVoice ? current : nextAutoplayVoice
-      ));
-      setMuteSpokenRepliesState((current) => (
-        current === nextMuteSpokenReplies ? current : nextMuteSpokenReplies
-      ));
-    };
-
-    const handleSettingsChange = (event: Event) => {
-      const detail = event instanceof CustomEvent
-        ? event.detail as StoredVoiceSettings | undefined
-        : undefined;
-      applyStoredSettings(detail ?? readStoredSettings());
-    };
-
-    const handleStorage = (event: StorageEvent) => {
-      if (event.key !== STORAGE_KEY) return;
-      applyStoredSettings(readStoredSettings());
-    };
-
-    window.addEventListener(SETTINGS_CHANGE_EVENT, handleSettingsChange);
-    window.addEventListener("storage", handleStorage);
-
-    return () => {
-      window.removeEventListener(SETTINGS_CHANGE_EVENT, handleSettingsChange);
-      window.removeEventListener("storage", handleStorage);
-    };
-  }, []);
 
   const historyQuery = useQuery({
     queryKey: ["companion-chat-history", user?.id, companion?.id],
@@ -238,24 +179,6 @@ export function useCompanionChat({ enabled = true }: UseCompanionChatOptions = {
       initialisedRef.current = true;
     }
   }, [enabled, greeting, historyQuery.data, historyQuery.isSuccess]);
-
-  useEffect(() => {
-    const storedSettings = readStoredSettings();
-    const storedAutoplayVoice = storedSettings.autoplayVoice ?? true;
-    const storedMuteSpokenReplies = storedSettings.muteSpokenReplies ?? false;
-
-    if (
-      storedAutoplayVoice === autoplayVoice
-      && storedMuteSpokenReplies === muteSpokenReplies
-    ) {
-      return;
-    }
-
-    writeStoredSettings({
-      autoplayVoice,
-      muteSpokenReplies,
-    });
-  }, [autoplayVoice, muteSpokenReplies]);
 
   useEffect(() => {
     if (!muteSpokenReplies && autoplayVoice) return;
@@ -434,9 +357,9 @@ export function useCompanionChat({ enabled = true }: UseCompanionChatOptions = {
     isSubmitting,
     isLoadingHistory: historyQuery.isLoading,
     autoplayVoice,
-    setAutoplayVoice: setAutoplayVoiceState,
+    setAutoplayVoice,
     muteSpokenReplies,
-    setMuteSpokenReplies: setMuteSpokenRepliesState,
+    setMuteSpokenReplies,
     isSpeaking,
     speechProvider,
     handoffToPlanner,

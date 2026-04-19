@@ -24,6 +24,7 @@ import { PageTransition } from "@/components/PageTransition";
 import { ResetCompanionButton } from "@/components/ResetCompanionButton";
 import { SubscriptionManagement } from "@/components/SubscriptionManagement";
 import { SoundSettings } from "@/components/SoundSettings";
+import { CompanionAccessibilitySettings } from "@/components/CompanionAccessibilitySettings";
 import { LegalDocumentViewer } from "@/components/LegalDocumentViewer";
 import { QuestBehaviorSettings } from "@/components/QuestBehaviorSettings";
 import { DisplayNameSetting } from "@/components/DisplayNameSetting";
@@ -638,6 +639,7 @@ const Profile = () => {
             <TabsContent value="preferences" className="space-y-4">
               <QuestBehaviorSettings />
               <CalendarIntegrationsSettings />
+              <CompanionAccessibilitySettings />
               <SoundSettings />
             </TabsContent>
           </Tabs>

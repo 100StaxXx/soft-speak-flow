@@ -125,6 +125,10 @@ vi.mock("@/components/SoundSettings", () => ({
   SoundSettings: () => null,
 }));
 
+vi.mock("@/components/CompanionAccessibilitySettings", () => ({
+  CompanionAccessibilitySettings: () => null,
+}));
+
 vi.mock("@/components/LegalDocumentViewer", () => ({
   LegalDocumentViewer: () => null,
 }));

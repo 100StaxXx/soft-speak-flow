@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { COMPANION_VOICE_SETTINGS_STORAGE_KEY } from "@/hooks/useCompanionVoiceSettings";
 
 const mocks = vi.hoisted(() => ({
   invoke: vi.fn(),
@@ -116,7 +117,7 @@ describe("useCompanionChat", () => {
     vi.clearAllMocks();
     mocks.historyResponse.data = [];
     mocks.historyResponse.error = null;
-    window.localStorage.removeItem?.("companion-chat-voice-settings-v1");
+    window.localStorage.removeItem?.(COMPANION_VOICE_SETTINGS_STORAGE_KEY);
     window.localStorage.removeItem?.("companion-chat-spoken-replies-v1");
   });
 
@@ -176,8 +177,8 @@ describe("useCompanionChat", () => {
     const journeys = renderHook(() => useCompanionChat({ enabled: false }), { wrapper });
     const companion = renderHook(() => useCompanionChat({ enabled: false }), { wrapper });
 
-    expect(journeys.result.current.autoplayVoice).toBe(true);
-    expect(companion.result.current.autoplayVoice).toBe(true);
+    expect(journeys.result.current.autoplayVoice).toBe(false);
+    expect(companion.result.current.autoplayVoice).toBe(false);
 
     await act(async () => {
       journeys.result.current.setAutoplayVoice(false);
