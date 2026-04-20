@@ -58,7 +58,14 @@ export const DraggableFAB = ({ onOpenCompanionPlanner }: DraggableFABProps) => {
     popupAlignment,
     isDragging,
     isLongPressing,
+    drag,
     dragControls,
+    dragListener,
+    dragConstraints,
+    dragElastic,
+    dragMomentum,
+    onDragStart,
+    onDragEnd,
     longPressHandlers,
     positionStyles,
   } = useDraggableFAB({
@@ -186,7 +193,14 @@ export const DraggableFAB = ({ onOpenCompanionPlanner }: DraggableFABProps) => {
         ...positionStyles,
       }}
       className={cn("flex touch-none select-none flex-col gap-2")}
-      {...dragControls}
+      drag={drag}
+      dragControls={dragControls}
+      dragListener={dragListener}
+      dragConstraints={dragConstraints}
+      dragElastic={dragElastic}
+      dragMomentum={dragMomentum}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
       {...longPressHandlers}
     >
       <JourneysCompanionLauncherPopup

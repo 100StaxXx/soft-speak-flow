@@ -1,74 +1,58 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DraggableFAB } from "./DraggableFAB";
+import { DRAGGABLE_FAB_STORAGE_KEY_V2 } from "@/hooks/useDraggableFAB";
+
+const storage = vi.hoisted(() => {
+  const values = new Map<string, string>();
+
+  return {
+    safeLocalStorage: {
+      getItem: vi.fn((key: string) => values.get(key) ?? null),
+      setItem: vi.fn((key: string, value: string) => {
+        values.set(key, value);
+        return true;
+      }),
+      removeItem: vi.fn((key: string) => {
+        values.delete(key);
+        return true;
+      }),
+      clear: vi.fn(() => {
+        values.clear();
+        return true;
+      }),
+    },
+  };
+});
+
+const motion = vi.hoisted(() => ({
+  dragControls: {
+    start: vi.fn(),
+    subscribe: vi.fn(() => () => {}),
+    cancel: vi.fn(),
+  },
+}));
+
+vi.mock("@/utils/storage", () => ({
+  safeLocalStorage: storage.safeLocalStorage,
+}));
+
+vi.mock("framer-motion", async () => {
+  const actual = await vi.importActual<typeof import("framer-motion")>("framer-motion");
+  return {
+    ...actual,
+    useDragControls: () => motion.dragControls,
+  };
+});
 
 const mocks = vi.hoisted(() => ({
   onOpenCompanionPlanner: vi.fn(),
-  lastHookOptions: null as null | {
-    onDragStart?: () => void;
-    onDragEnd?: (position: { x: number; y: number }) => void;
-  },
-  draggableFabState: {
-    position: { x: 216, y: 520 },
-    popupAlignment: {
-      horizontal: "right" as const,
-      vertical: "bottom" as const,
-    },
-    isDragging: false,
-    isLongPressing: false,
-    positionStyles: {
-      left: 216,
-      top: 520,
-      right: "auto",
-      bottom: "auto",
-    },
-  } as {
-    position: { x: number; y: number };
-    popupAlignment: {
-      horizontal: "left" | "right";
-      vertical: "top" | "bottom";
-    };
-    isDragging: boolean;
-    isLongPressing: boolean;
-    positionStyles: {
-      left: number;
-      top: number;
-      right: string;
-      bottom: string;
-    };
-  },
 }));
 
 vi.mock("@/hooks/useAuth", () => ({
   useAuth: () => ({
     user: { id: "user-1" },
   }),
-}));
-
-vi.mock("@/hooks/useDraggableFAB", () => ({
-  useDraggableFAB: (options?: {
-    onDragStart?: () => void;
-    onDragEnd?: (position: { x: number; y: number }) => void;
-  }) => {
-    mocks.lastHookOptions = options ?? null;
-    return {
-      ...mocks.draggableFabState,
-      dragControls: {
-        drag: false as const,
-        dragConstraints: { top: -500, left: -500, right: 500, bottom: 500 },
-        dragElastic: 0.1,
-        dragMomentum: false,
-        onDragStart: vi.fn(),
-        onDragEnd: vi.fn(),
-      },
-      longPressHandlers: {
-        onPointerDown: vi.fn(),
-        onPointerUp: vi.fn(),
-        onPointerCancel: vi.fn(),
-      },
-      dragOffset: { x: 0, y: 0 },
-    };
-  },
 }));
 
 vi.mock("@/hooks/useJourneysCompanionVisual", () => ({
@@ -87,28 +71,52 @@ vi.mock("@/hooks/useJourneysCompanionVisual", () => ({
   }),
 }));
 
+const setViewport = ({ width, height }: { width: number; height: number }) => {
+  Object.defineProperty(window, "innerWidth", {
+    configurable: true,
+    writable: true,
+    value: width,
+  });
+  Object.defineProperty(window, "innerHeight", {
+    configurable: true,
+    writable: true,
+    value: height,
+  });
+};
+
+const setSafeAreaVars = ({
+  top = 0,
+  right = 0,
+  bottom = 0,
+  left = 0,
+}: {
+  top?: number;
+  right?: number;
+  bottom?: number;
+  left?: number;
+}) => {
+  document.documentElement.style.setProperty("--safe-area-inset-top", `${top}px`);
+  document.documentElement.style.setProperty("--safe-area-inset-right", `${right}px`);
+  document.documentElement.style.setProperty("--safe-area-inset-bottom", `${bottom}px`);
+  document.documentElement.style.setProperty("--safe-area-inset-left", `${left}px`);
+  document.documentElement.style.setProperty("--sat", `${top}px`);
+  document.documentElement.style.setProperty("--sar", `${right}px`);
+  document.documentElement.style.setProperty("--sab", `${bottom}px`);
+  document.documentElement.style.setProperty("--sal", `${left}px`);
+};
+
 describe("DraggableFAB", () => {
   beforeEach(() => {
+    storage.safeLocalStorage.clear();
     vi.clearAllMocks();
-    mocks.lastHookOptions = null;
-    mocks.draggableFabState = {
-      position: { x: 216, y: 520 },
-      popupAlignment: {
-        horizontal: "right",
-        vertical: "bottom",
-      },
-      isDragging: false,
-      isLongPressing: false,
-      positionStyles: {
-        left: 216,
-        top: 520,
-        right: "auto",
-        bottom: "auto",
-      },
-    };
+    vi.useRealTimers();
+    setViewport({ width: 400, height: 800 });
+    setSafeAreaVars({ top: 0, right: 0, bottom: 0, left: 0 });
+    document.documentElement.style.setProperty("--bottom-nav-runtime-offset", "96px");
+    document.documentElement.style.setProperty("--bottom-nav-safe-offset", "96px");
   });
 
-  it("opens the popup menu and flips the launcher to face forward", () => {
+  it("opens the popup menu and flips the launcher to face forward on tap", () => {
     render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
 
     const launcher = screen.getByTestId("journeys-companion-launcher-floating");
@@ -119,13 +127,36 @@ describe("DraggableFAB", () => {
     expect(launcher.querySelectorAll('[aria-hidden="true"]')).toHaveLength(0);
     expect(image.parentElement).toHaveClass("h-[7.75rem]", "w-[7.75rem]");
     expect(launcher).toHaveAttribute("data-face-direction", "away");
-    expect(screen.queryByTestId("journeys-companion-launcher-popup")).not.toBeInTheDocument();
 
     fireEvent.click(launcher);
 
     expect(screen.getByTestId("journeys-companion-launcher-popup")).toBeInTheDocument();
     expect(launcher).toHaveAttribute("data-face-direction", "front");
     expect(mocks.onOpenCompanionPlanner).not.toHaveBeenCalled();
+  });
+
+  it("starts drag controls after a long press and does not open the popup from that same press", () => {
+    vi.useFakeTimers();
+    render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
+
+    const launcher = screen.getByTestId("journeys-companion-launcher-floating");
+
+    act(() => {
+      fireEvent.pointerDown(launcher, {
+        pointerId: 7,
+        pointerType: "touch",
+        button: 0,
+        clientX: 240,
+        clientY: 536,
+      });
+      vi.advanceTimersByTime(500);
+    });
+
+    expect(motion.dragControls.start).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(launcher);
+
+    expect(screen.queryByTestId("journeys-companion-launcher-popup")).not.toBeInTheDocument();
   });
 
   it("launches free talk from the popup into the conversation lane", async () => {
@@ -189,33 +220,8 @@ describe("DraggableFAB", () => {
     }));
   });
 
-  it("does not open the popup from the click that follows a completed drag", () => {
-    render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
-
-    act(() => {
-      mocks.lastHookOptions?.onDragEnd?.({ x: 120, y: 240 });
-    });
-
-    fireEvent.click(screen.getByTestId("journeys-companion-launcher-floating"));
-
-    expect(screen.queryByTestId("journeys-companion-launcher-popup")).not.toBeInTheDocument();
-  });
-
   it("reports top-left popup placement when the launcher sits in the upper-left half", () => {
-    mocks.draggableFabState = {
-      ...mocks.draggableFabState,
-      position: { x: 16, y: 120 },
-      popupAlignment: {
-        horizontal: "left",
-        vertical: "top",
-      },
-      positionStyles: {
-        left: 16,
-        top: 120,
-        right: "auto",
-        bottom: "auto",
-      },
-    };
+    storage.safeLocalStorage.setItem(DRAGGABLE_FAB_STORAGE_KEY_V2, JSON.stringify({ x: 16, y: 120 }));
 
     render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
     fireEvent.click(screen.getByTestId("journeys-companion-launcher-floating"));
@@ -226,6 +232,8 @@ describe("DraggableFAB", () => {
   });
 
   it("reports bottom-right popup placement when the launcher sits in the lower-right half", () => {
+    storage.safeLocalStorage.setItem(DRAGGABLE_FAB_STORAGE_KEY_V2, JSON.stringify({ x: 216, y: 520 }));
+
     render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
     fireEvent.click(screen.getByTestId("journeys-companion-launcher-floating"));
 

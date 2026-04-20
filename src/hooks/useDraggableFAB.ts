@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
-import { type PanInfo } from "framer-motion";
+import { useDragControls, type DragControls, type PanInfo } from "framer-motion";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
 import { Capacitor } from "@capacitor/core";
 import { safeLocalStorage } from "@/utils/storage";
@@ -23,6 +23,7 @@ export const DRAGGABLE_FAB_LEGACY_STORAGE_KEY = "add-quest-fab-position";
 export const DRAGGABLE_FAB_STORAGE_KEY_V2 = "add-quest-fab-position-v2";
 
 const LONG_PRESS_DURATION = 500;
+const LONG_PRESS_MOVE_THRESHOLD_PX = 12;
 const FALLBACK_ROOT_FONT_SIZE_PX = 16;
 const DEFAULT_BOTTOM_NAV_SAFE_OFFSET_REM = 6.5;
 const FLOATING_HERO_SIZE_PX = 144;
@@ -45,16 +46,17 @@ interface UseDraggableFABReturn {
   popupAlignment: FABPopupAlignment;
   isDragging: boolean;
   isLongPressing: boolean;
-  dragControls: {
-    drag: boolean | "x" | "y";
-    dragConstraints: { top: number; left: number; right: number; bottom: number };
-    dragElastic: number;
-    dragMomentum: boolean;
-    onDragStart: () => void;
-    onDragEnd: (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => void;
-  };
+  drag: true;
+  dragControls: DragControls;
+  dragListener: false;
+  dragConstraints: { top: number; left: number; right: number; bottom: number };
+  dragElastic: number;
+  dragMomentum: boolean;
+  onDragStart: () => void;
+  onDragEnd: (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => void;
   longPressHandlers: {
     onPointerDown: (e: React.PointerEvent) => void;
+    onPointerMove: (e: React.PointerEvent) => void;
     onPointerUp: () => void;
     onPointerCancel: () => void;
   };
@@ -306,6 +308,7 @@ export const useDraggableFAB = ({
   onDragStart,
   onDragEnd,
 }: UseDraggableFABOptions = {}): UseDraggableFABReturn => {
+  const dragControls = useDragControls();
   const [bounds, setBounds] = useState<FABViewportBounds>(() => getViewportBounds());
   const [position, setPosition] = useState<FABCoordinates>(() => getInitialPosition(getViewportBounds(), defaultPosition));
   const [isDragging, setIsDragging] = useState(false);
@@ -313,9 +316,15 @@ export const useDraggableFAB = ({
 
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dragStartPositionRef = useRef<FABCoordinates>(position);
+  const currentPositionRef = useRef(position);
+  const pointerStartRef = useRef<{ x: number; y: number } | null>(null);
+  const pointerEventRef = useRef<PointerEvent | null>(null);
+  const pointerIdRef = useRef<number | null>(null);
+  const targetElementRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     dragStartPositionRef.current = position;
+    currentPositionRef.current = position;
   }, [position]);
 
   useEffect(() => {
@@ -356,33 +365,93 @@ export const useDraggableFAB = ({
     }
   }, []);
 
-  const handlePointerDown = useCallback((event: React.PointerEvent) => {
-    event.preventDefault();
-
-    longPressTimerRef.current = setTimeout(() => {
-      setIsLongPressing(true);
-      void triggerHaptic(ImpactStyle.Medium);
-    }, LONG_PRESS_DURATION);
+  const releasePointerCapture = useCallback(() => {
+    if (pointerIdRef.current !== null && targetElementRef.current) {
+      try {
+        targetElementRef.current.releasePointerCapture?.(pointerIdRef.current);
+      } catch {
+        // Pointer capture is already released or unavailable.
+      }
+    }
   }, []);
 
-  const handlePointerUp = useCallback(() => {
+  const resetPointerState = useCallback(() => {
+    releasePointerCapture();
+    pointerStartRef.current = null;
+    pointerEventRef.current = null;
+    pointerIdRef.current = null;
+    targetElementRef.current = null;
+  }, [releasePointerCapture]);
+
+  const cancelLongPress = useCallback(() => {
     clearLongPressTimer();
     if (!isDragging) {
       setIsLongPressing(false);
     }
-  }, [clearLongPressTimer, isDragging]);
+    resetPointerState();
+  }, [clearLongPressTimer, isDragging, resetPointerState]);
 
-  const handlePointerCancel = useCallback(() => {
+  const handlePointerDown = useCallback((event: React.PointerEvent) => {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+
+    event.preventDefault();
     clearLongPressTimer();
     setIsLongPressing(false);
-  }, [clearLongPressTimer]);
+
+    pointerStartRef.current = {
+      x: event.clientX,
+      y: event.clientY,
+    };
+    pointerEventRef.current = event.nativeEvent;
+    pointerIdRef.current = event.pointerId;
+    targetElementRef.current = event.currentTarget as HTMLElement;
+
+    try {
+      targetElementRef.current.setPointerCapture?.(event.pointerId);
+    } catch {
+      // Pointer capture is optional in this environment.
+    }
+
+    longPressTimerRef.current = setTimeout(() => {
+      const activePointerEvent = pointerEventRef.current;
+      if (!activePointerEvent) {
+        return;
+      }
+
+      dragStartPositionRef.current = currentPositionRef.current;
+      setIsLongPressing(true);
+      releasePointerCapture();
+      dragControls.start(activePointerEvent, { snapToCursor: false });
+      void triggerHaptic(ImpactStyle.Medium);
+    }, LONG_PRESS_DURATION);
+  }, [clearLongPressTimer, dragControls, releasePointerCapture]);
+
+  const handlePointerMove = useCallback((event: React.PointerEvent) => {
+    if (isDragging || isLongPressing || !pointerStartRef.current || !longPressTimerRef.current) {
+      return;
+    }
+
+    pointerEventRef.current = event.nativeEvent;
+
+    const deltaX = event.clientX - pointerStartRef.current.x;
+    const deltaY = event.clientY - pointerStartRef.current.y;
+    if (Math.hypot(deltaX, deltaY) > LONG_PRESS_MOVE_THRESHOLD_PX) {
+      cancelLongPress();
+    }
+  }, [cancelLongPress, isDragging, isLongPressing]);
+
+  const handlePointerUp = useCallback(() => {
+    cancelLongPress();
+  }, [cancelLongPress]);
+
+  const handlePointerCancel = useCallback(() => {
+    cancelLongPress();
+  }, [cancelLongPress]);
 
   const handleDragStart = useCallback(() => {
-    if (!isLongPressing) return;
-    dragStartPositionRef.current = position;
     setIsDragging(true);
     onDragStart?.();
-  }, [isLongPressing, onDragStart, position]);
+  }, [onDragStart]);
 
   const handleDragEnd = useCallback((
     _event: MouseEvent | TouchEvent | PointerEvent,
@@ -401,32 +470,20 @@ export const useDraggableFAB = ({
     setPosition(nextPosition);
     setIsDragging(false);
     setIsLongPressing(false);
+    resetPointerState();
 
     void triggerHaptic(ImpactStyle.Light);
     onDragEnd?.(nextPosition);
-  }, [isDragging, onDragEnd]);
+  }, [isDragging, onDragEnd, resetPointerState]);
 
   const popupAlignment = useMemo(() => derivePopupAlignment(position), [position]);
 
-  const dragControls = useMemo(() => ({
-    drag: isLongPressing as boolean | "x" | "y",
-    dragConstraints: {
-      top: bounds.minY - position.y,
-      left: bounds.minX - position.x,
-      right: bounds.maxX - position.x,
-      bottom: bounds.maxY - position.y,
-    },
-    dragElastic: 0.08,
-    dragMomentum: false,
-    onDragStart: handleDragStart,
-    onDragEnd: handleDragEnd,
-  }), [bounds, handleDragEnd, handleDragStart, isLongPressing, position.x, position.y]);
-
   const longPressHandlers = useMemo(() => ({
     onPointerDown: handlePointerDown,
+    onPointerMove: handlePointerMove,
     onPointerUp: handlePointerUp,
     onPointerCancel: handlePointerCancel,
-  }), [handlePointerCancel, handlePointerDown, handlePointerUp]);
+  }), [handlePointerCancel, handlePointerDown, handlePointerMove, handlePointerUp]);
 
   const positionStyles = useMemo<React.CSSProperties>(() => ({
     top: position.y,
@@ -440,7 +497,19 @@ export const useDraggableFAB = ({
     popupAlignment,
     isDragging,
     isLongPressing,
+    drag: true,
     dragControls,
+    dragListener: false,
+    dragConstraints: {
+      top: bounds.minY - position.y,
+      left: bounds.minX - position.x,
+      right: bounds.maxX - position.x,
+      bottom: bounds.maxY - position.y,
+    },
+    dragElastic: 0.08,
+    dragMomentum: false,
+    onDragStart: handleDragStart,
+    onDragEnd: handleDragEnd,
     longPressHandlers,
     positionStyles,
     dragOffset: { x: 0, y: 0 },
