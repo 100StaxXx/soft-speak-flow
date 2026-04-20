@@ -385,6 +385,7 @@ describe("useCompanionAssistant", () => {
       "voice",
       expect.objectContaining({
         currentDate: "2026-04-18",
+        currentDateTime: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/),
         journeysContext: expect.objectContaining({
           tasks: [],
           inboxTasks: [],
@@ -406,6 +407,7 @@ describe("useCompanionAssistant", () => {
       "text",
       expect.objectContaining({
         currentDate: "2026-04-18",
+        currentDateTime: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/),
       }),
     );
     expect(mocks.plannerSubmit).not.toHaveBeenCalled();
@@ -423,6 +425,7 @@ describe("useCompanionAssistant", () => {
       "text",
       expect.objectContaining({
         currentDate: "2026-04-18",
+        currentDateTime: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/),
       }),
     );
     expect(mocks.plannerSubmit).not.toHaveBeenCalled();
@@ -440,6 +443,7 @@ describe("useCompanionAssistant", () => {
       "text",
       expect.objectContaining({
         currentDate: "2026-04-18",
+        currentDateTime: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/),
       }),
     );
     expect(mocks.plannerSubmit).not.toHaveBeenCalled();
@@ -811,6 +815,7 @@ describe("useCompanionAssistant", () => {
       "text",
       expect.objectContaining({
         currentDate: "2026-04-18",
+        currentDateTime: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/),
       }),
     );
     expect(mocks.plannerSubmit).not.toHaveBeenCalled();

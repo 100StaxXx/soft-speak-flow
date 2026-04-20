@@ -108,6 +108,7 @@ describe("useAppResumeRefresh", () => {
     expect(mocks.invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: ["current-evolution-card"] });
     expect(mocks.invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: ["evolution-cards"] });
     expect(mocks.invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: ["wallpapers"] });
+    expect(mocks.invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: ["user-ai-context"] });
     expect(mocks.warmEpicsQueryFromRemoteMock).toHaveBeenCalledWith(expect.any(Object), "user-1");
     expect(mocks.warmDailyTasksQueryFromRemoteMock).toHaveBeenCalledWith(expect.any(Object), "user-1", expect.any(String));
     expect(mocks.dispatchPlannerSyncFinishedMock).toHaveBeenCalledTimes(1);
@@ -124,6 +125,7 @@ describe("useAppResumeRefresh", () => {
     });
 
     expect(mocks.invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: ["today-pep-talk"] });
+    expect(mocks.invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: ["user-ai-context"] });
     expect(mocks.dispatchPlannerSyncFinishedMock).toHaveBeenCalledTimes(1);
   });
 });

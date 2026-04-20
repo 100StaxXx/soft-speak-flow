@@ -78,6 +78,7 @@ export const useAppResumeRefresh = ({ enabled = true }: UseAppResumeRefreshOptio
       queryClient.invalidateQueries({ queryKey: ['habits'] }),
       queryClient.invalidateQueries({ queryKey: ['habit-surfacing'] }),
       queryClient.invalidateQueries({ queryKey: ['epic-progress'] }),
+      queryClient.invalidateQueries({ queryKey: ['user-ai-context'] }),
     ]);
 
     dispatchPlannerSyncFinished();

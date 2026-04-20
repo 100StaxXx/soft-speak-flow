@@ -33,6 +33,7 @@ import { cn } from '@/lib/utils';
 import { useEpicSuggestions, type EpicSuggestion, type ClarificationAnswers } from '@/hooks/useEpicSuggestions';
 import { useEpicTemplates, EpicTemplate } from '@/hooks/useEpicTemplates';
 import { useUserAIContext } from '@/hooks/useUserAIContext';
+import { useEpics } from '@/hooks/useEpics';
 import { useAIInteractionTracker } from '@/hooks/useAIInteractionTracker';
 import { useHapticFeedback } from '@/hooks/useHapticFeedback';
 import { useJourneySchedule, type JourneyRitual } from '@/hooks/useJourneySchedule';
@@ -48,6 +49,7 @@ import { AdjustmentInput } from '@/components/JourneyWizard/AdjustmentInput';
 import { useVoiceInput } from '@/hooks/useVoiceInput';
 import { useJourneysCompanionVisual } from '@/hooks/useJourneysCompanionVisual';
 import { EPIC_XP_REWARDS } from '@/config/xpRewards';
+import { hasReachedActiveCampaignLimit } from '@/features/epics/constants';
 import type { StoryTypeSlug } from '@/types/narrativeTypes';
 import type { ClarifyingQuestion } from '@/hooks/useIntentClassifier';
 import { getDefaultMonthDaysForFrequency, getDefaultWeekdaysForFrequency } from '@/utils/habitSchedule';
@@ -144,7 +146,9 @@ export function Pathfinder({
   // Timeline context state
   const [timelineContext, setTimelineContext] = useState('');
   
-  const { preferences, isAtEpicLimit } = useUserAIContext();
+  const { preferences } = useUserAIContext();
+  const { activeEpics } = useEpics({ enabled: open });
+  const hasReachedCampaignLimit = hasReachedActiveCampaignLimit(activeEpics.length);
   const {
     companionLabel,
     imageUrl,
@@ -628,10 +632,10 @@ export function Pathfinder({
               </Button>
             </div>
 
-            {isAtEpicLimit && (
+            {hasReachedCampaignLimit && (
               <div className="mt-3">
                 <CapacityWarningBanner
-                  isAtEpicLimit={isAtEpicLimit}
+                  isAtEpicLimit={hasReachedCampaignLimit}
                   isLoading={false}
                   className="rounded-[1.5rem] border-[3px] border-[#9a4718] bg-[#ffd9bf] px-4 py-3 text-[#8a2716] shadow-[0_8px_0_rgba(154,71,24,0.18)]"
                 />
@@ -972,7 +976,7 @@ export function Pathfinder({
                     <div className={cn(plannerPathfinderTheme.footerBar, "space-y-3")} data-testid="pathfinder-footer">
                       <Button
                         onClick={handleCreateEpic}
-                        disabled={isAtEpicLimit || isCreating || isSubmittingCreate || selectedHabits.length === 0 || epicWhy.trim().length === 0 || epicTitle.trim().length === 0}
+                        disabled={hasReachedCampaignLimit || isCreating || isSubmittingCreate || selectedHabits.length === 0 || epicWhy.trim().length === 0 || epicTitle.trim().length === 0}
                         className={cn(plannerPathfinderTheme.primaryButton, "w-full")}
                       >
                         {isCreating || isSubmittingCreate ? (

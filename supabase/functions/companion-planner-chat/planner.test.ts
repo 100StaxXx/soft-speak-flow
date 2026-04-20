@@ -1101,7 +1101,7 @@ Deno.test("uses the answer to the intent-first question to resume the normal pro
   assertEquals(result.proposals[0].kind, "create_quest");
   assertEquals(result.followUpQuestions.length, 0);
   assertEquals(result.proposals[0].readyToConfirm, true);
-  assertStringIncludes(result.reply, "Today has room at 09:00");
+  assertStringIncludes(result.reply, "Today has room at 9:00 am");
 });
 
 Deno.test("does not jump straight to timing questions for broad day-planning asks", () => {
@@ -1161,7 +1161,7 @@ Deno.test("does not jump straight to timing questions for broad day-planning ask
 
   assertEquals(result.followUpQuestions.length, 0);
   assertEquals(result.proposals[0].readyToConfirm, true);
-  assertStringIncludes(result.reply, "Today has room at 09:00");
+  assertStringIncludes(result.reply, "Today has room at 9:00 am");
 });
 
 Deno.test("adds a balancing question when the selected window is overloaded", () => {
@@ -1271,7 +1271,7 @@ Deno.test("answers schedule questions with quests and connected calendar events 
   assertEquals(result.proposals.length, 0);
   assertEquals(result.followUpQuestions.length, 0);
   assertStringIncludes(result.reply, "Today:");
-  assertStringIncludes(result.reply, "Workout");
+  assertStringIncludes(result.reply, "Workout (was at 9:00 am)");
   assertStringIncludes(result.reply, "Therapy");
   assertEquals(result.reply.includes("Tell me what feels most important"), false);
 });
@@ -1301,7 +1301,7 @@ Deno.test("treats the route starter like a schedule overview instead of a quest 
   assertEquals(result.proposals.length, 0);
   assertEquals(result.followUpQuestions.length, 0);
   assertStringIncludes(result.reply, "Today:");
-  assertStringIncludes(result.reply, "Workout");
+  assertStringIncludes(result.reply, "Workout (at 12:00 pm)");
   assertEquals(result.reply.includes("Tell me what feels most important"), false);
 });
 
@@ -1366,7 +1366,7 @@ Deno.test("reads upcoming named weekdays instead of falling back to today", () =
   assertEquals(result.proposals.length, 0);
   assertEquals(result.followUpQuestions.length, 0);
   assertStringIncludes(result.reply, "Saturday, April 25:");
-  assertStringIncludes(result.reply, "Long run");
+  assertStringIncludes(result.reply, "Long run (at 9:00 am)");
   assertEquals(result.reply.includes("Here's the shape of today."), false);
 });
 
@@ -1718,7 +1718,7 @@ Deno.test("upcoming_start returns the today-and-tomorrow digest immediately", ()
   assertStringIncludes(result.reply, "Today:");
   assertStringIncludes(result.reply, "Therapy");
   assertStringIncludes(result.reply, "Tomorrow:");
-  assertStringIncludes(result.reply, "Inbox cleanup");
+  assertStringIncludes(result.reply, "Inbox cleanup (at 9:30 am)");
 });
 
 Deno.test("treats the make-room starter like a read-only prioritization view", () => {
@@ -1962,6 +1962,7 @@ Deno.test("answers availability questions using both quests and calendar events"
   assertEquals(result.proposals.length, 0);
   assertStringIncludes(result.reply, "Tomorrow");
   assertStringIncludes(result.reply, "afternoon");
+  assertStringIncludes(result.reply, "pm");
 });
 
 Deno.test("prepares a direct quest move without asking for a time reason when the time is explicit", () => {

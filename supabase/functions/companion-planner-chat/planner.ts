@@ -5,6 +5,13 @@ import {
 } from "../../../src/shared/taskTitleNormalization.ts";
 import { analyzeSchedulingIntent } from "../../../src/shared/schedulingIntent.ts";
 import { computePlannerPriorityScores } from "../../../src/shared/companionPlannerPriority.ts";
+import {
+  buildAssistantEventScheduleLabel,
+  buildAssistantTaskScheduleLabel,
+  formatAssistantTime,
+  formatAssistantTimeRange,
+  normalizeAssistantTimeText,
+} from "../_shared/assistantScheduleCopy.ts";
 
 export type PlannerHorizon = "day" | "week" | "month";
 export type PlannerTonePack = "soft" | "playful" | "witty_sassy";
@@ -1762,8 +1769,10 @@ const question = (
   options: input.options,
 });
 
-const formatSlotLabel = (slot: PlannerOpenSlot, selectedDate: string): string =>
-  slot.date === selectedDate ? slot.time : `${slot.date} ${slot.time}`;
+const formatSlotLabel = (slot: PlannerOpenSlot, selectedDate: string): string => {
+  const startLabel = formatAssistantTime(slot.time) ?? slot.time;
+  return slot.date === selectedDate ? startLabel : `${slot.date} ${startLabel}`;
+};
 
 const buildTimeQuestion = (input: PlannerBuildInput): PlannerQuestion => {
   const insights = input.plannerContext.scheduleInsights;
@@ -2512,20 +2521,6 @@ const buildFreeWindowsForDate = (
   );
 };
 
-const formatEventTimeLabel = (event: PlannerContextCalendarEvent): string => {
-  if (event.isAllDay) return "All day";
-
-  const start = new Date(event.start);
-  const end = new Date(event.end);
-  const startLabel = `${String(start.getHours()).padStart(2, "0")}:${
-    String(start.getMinutes()).padStart(2, "0")
-  }`;
-  const endLabel = `${String(end.getHours()).padStart(2, "0")}:${
-    String(end.getMinutes()).padStart(2, "0")
-  }`;
-  return `${startLabel}-${endLabel}`;
-};
-
 const collectScheduleItemsForDate = (
   input: PlannerBuildInput,
   date: string,
@@ -2546,7 +2541,14 @@ const collectScheduleItemsForDate = (
       return scheduledMinutes >= currentMinutes;
     })
     .map((task) => ({
-      label: `${task.scheduledTime ?? "Unscheduled"} ${task.title}`,
+      label: buildAssistantTaskScheduleLabel({
+        title: task.title,
+        taskDate: task.taskDate,
+        scheduledTime: task.scheduledTime,
+        estimatedDuration: task.estimatedDuration,
+        currentDate: input.currentDate,
+        currentDateTime: input.currentDateTime,
+      }),
       sortMinutes: parseTimeToMinutes(task.scheduledTime),
     }));
 
@@ -2561,10 +2563,17 @@ const collectScheduleItemsForDate = (
       return end > now;
     })
     .map((event) => ({
-      label: `${formatEventTimeLabel(event)} ${event.title}`,
+      label: buildAssistantEventScheduleLabel({
+        title: event.title,
+        start: event.start,
+        end: event.end,
+        isAllDay: event.isAllDay,
+        currentDate: input.currentDate,
+        currentDateTime: input.currentDateTime,
+      }),
       sortMinutes: event.isAllDay
         ? -1
-        : parseTimeToMinutes(formatEventTimeLabel(event)),
+        : parseTimeToMinutes(`${new Date(event.start).getHours()}:${String(new Date(event.start).getMinutes()).padStart(2, "0")}`),
     }));
 
   return [...tasks, ...events].sort((left, right) => (
@@ -2651,7 +2660,9 @@ const buildUpcomingDigestReply = (input: PlannerBuildInput): string => {
 };
 
 const buildMakeRoomStarterReply = (input: PlannerBuildInput): string => {
-  const weekSummary = input.plannerContext.scheduleInsights?.summary ??
+  const weekSummary = input.plannerContext.scheduleInsights?.summary
+    ? normalizeAssistantTimeText(input.plannerContext.scheduleInsights.summary)
+    :
     "The week still has room to flex.";
   const lead = isWittySassyTone(input.tonePack)
     ? buildWittyAvailabilityCallout(input, input.currentDate, true)
@@ -2742,7 +2753,8 @@ const buildReadOnlyScheduleReply = (
     }
 
     const windowsLabel = freeWindows.map((window) =>
-      `${window.start}-${window.end}`
+      formatAssistantTimeRange(window.start, window.end) ??
+        `${window.start}-${window.end}`
     ).join(", ");
     if (isWittySassyTone(input.tonePack)) {
       return dayPart
@@ -3281,7 +3293,9 @@ const composeReply = (
     update_ritual: "ritual edit",
     suggest_reminder: "reminder tweak",
   })[kind];
-  const scheduleSummary = input.plannerContext.scheduleInsights?.summary;
+  const scheduleSummary = input.plannerContext.scheduleInsights?.summary
+    ? normalizeAssistantTimeText(input.plannerContext.scheduleInsights.summary)
+    : null;
   const interpretationLead = getCompanionInterpretationLead(input);
   const preferredTimeOfDay = input.plannerContext.plannerMemory
     ?.preferredTimeOfDay;
@@ -3311,7 +3325,9 @@ const buildConversationalResponse = (
   classificationHint: ClassificationHint,
 ): PlannerBuildResult => {
   const message = input.message.toLowerCase();
-  const scheduleSummary = input.plannerContext.scheduleInsights?.summary;
+  const scheduleSummary = input.plannerContext.scheduleInsights?.summary
+    ? normalizeAssistantTimeText(input.plannerContext.scheduleInsights.summary)
+    : null;
   const scheduleLead =
     /\b(today|tomorrow|week|calendar|schedule)\b/i.test(message) &&
       scheduleSummary

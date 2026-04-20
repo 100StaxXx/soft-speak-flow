@@ -58,6 +58,7 @@ export interface CompanionChatRequest {
   surface?: CompanionChatSurface;
   sessionId?: string;
   currentDate?: string;
+  currentDateTime?: string;
   journeysContext?: CompanionChatJourneysContext;
 }
 

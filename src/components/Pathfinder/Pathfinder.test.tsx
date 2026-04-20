@@ -2,6 +2,7 @@ import React from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { ACTIVE_CAMPAIGN_LIMIT_WARNING } from "@/features/epics/constants";
 import { Pathfinder } from "./Pathfinder";
 
 const mocks = vi.hoisted(() => ({
@@ -21,12 +22,20 @@ const mocks = vi.hoisted(() => ({
   setRituals: vi.fn(),
   resetClassification: vi.fn(),
   resetSuggestions: vi.fn(),
+  activeEpics: [] as Array<{ id: string; status: string }>,
+  aiAtEpicLimit: false,
 }));
 
 vi.mock("@/hooks/useUserAIContext", () => ({
   useUserAIContext: () => ({
     preferences: { epicDuration: 30 },
-    isAtEpicLimit: false,
+    isAtEpicLimit: mocks.aiAtEpicLimit,
+  }),
+}));
+
+vi.mock("@/hooks/useEpics", () => ({
+  useEpics: () => ({
+    activeEpics: mocks.activeEpics,
   }),
 }));
 
@@ -152,6 +161,8 @@ vi.mock("@/features/tasks/components/EpicClarificationFlow", () => ({
 describe("Pathfinder", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.activeEpics = [];
+    mocks.aiAtEpicLimit = false;
     mocks.classify.mockResolvedValue({ type: "habit" });
     mocks.clarifyEpic.mockResolvedValue({ epicContext: null });
     mocks.generateSchedule.mockResolvedValue({
@@ -193,6 +204,58 @@ describe("Pathfinder", () => {
     expect(screen.getByTestId("pathfinder-progress")).toBeInTheDocument();
     expect(screen.getByTestId("pathfinder-footer")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Build My Plan/i })).toBeInTheDocument();
+  });
+
+  it("does not show the campaign-limit warning when only AI context says the user is at capacity", () => {
+    mocks.aiAtEpicLimit = true;
+
+    render(
+      <Pathfinder
+        open
+        onOpenChange={vi.fn()}
+        onCreateEpic={(...args) => mocks.onCreateEpic(...args)}
+        isCreating={false}
+      />,
+    );
+
+    expect(screen.queryByText(ACTIVE_CAMPAIGN_LIMIT_WARNING)).not.toBeInTheDocument();
+  });
+
+  it("shows the campaign-limit warning and disables creation when planner state has five active campaigns", async () => {
+    mocks.activeEpics = Array.from({ length: 5 }, (_, index) => ({
+      id: `epic-${index + 1}`,
+      status: "active",
+    }));
+
+    render(
+      <Pathfinder
+        open
+        onOpenChange={vi.fn()}
+        onCreateEpic={(...args) => mocks.onCreateEpic(...args)}
+        isCreating={false}
+      />,
+    );
+
+    expect(screen.getByText(ACTIVE_CAMPAIGN_LIMIT_WARNING)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("What's your goal?"), {
+      target: { value: "Pass the bar exam" },
+    });
+    fireEvent.click(screen.getByText("Pick Deadline"));
+    fireEvent.click(screen.getByRole("button", { name: "Build My Plan" }));
+
+    await screen.findByRole("button", { name: /Continue with this plan/i });
+    fireEvent.click(screen.getByRole("button", { name: /Continue with this plan/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /Continue to Review/i }));
+
+    fireEvent.change(await screen.findByLabelText("Your Why"), {
+      target: { value: "Get licensed and start practicing." },
+    });
+    fireEvent.change(screen.getByLabelText("Campaign Name"), {
+      target: { value: "Bar Exam Sprint" },
+    });
+
+    expect(screen.getByRole("button", { name: /Create Campaign/i })).toBeDisabled();
   });
 
   it("latches campaign creation immediately so rapid double taps only submit once", async () => {

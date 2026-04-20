@@ -16,11 +16,20 @@ import {
 import { withCompanionChatPersistenceCapability } from "./persistenceCapability.ts";
 import { persistCompanionChatTurn } from "./threadPersistence.ts";
 import { shouldHandoffToPlanner } from "./handoff.ts";
+import {
+  buildAssistantEventScheduleLabel,
+  buildAssistantTaskScheduleLabel,
+  classifyEventTemporalStatus,
+  classifyTaskTemporalStatus,
+  formatAssistantTime,
+  normalizeAssistantTimeText,
+} from "../_shared/assistantScheduleCopy.ts";
 
 const JourneysTaskSchema = z.object({
   title: z.string(),
   taskDate: z.string().nullable(),
   scheduledTime: z.string().nullable(),
+  estimatedDuration: z.number().nullable().optional(),
   completed: z.boolean().nullable().optional(),
   epicTitle: z.string().nullable().optional(),
 });
@@ -88,6 +97,7 @@ const RequestSchema = z.object({
   surface: z.enum(["companion", "journeys"]).optional().default("companion"),
   sessionId: z.string().min(1).max(200).optional(),
   currentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  currentDateTime: z.string().datetime({ offset: true }).optional(),
   journeysContext: JourneysContextSchema,
 });
 
@@ -298,29 +308,75 @@ async function fetchConversationContext(
 const buildJourneysContextSnapshot = (
   journeysContext: JourneysContext | undefined,
   currentDate?: string,
+  currentDateTime?: string,
 ) => {
   if (!journeysContext) return null;
 
   return JSON.stringify({
     currentDate: currentDate ?? null,
-    scheduleSummary: journeysContext.scheduleInsights?.summary ?? null,
+    currentDateTime: currentDateTime ?? null,
+    scheduleSummary: journeysContext.scheduleInsights?.summary
+      ? normalizeAssistantTimeText(journeysContext.scheduleInsights.summary)
+      : null,
     selectedDate: journeysContext.scheduleInsights?.selectedDate ?? null,
     tasks: journeysContext.tasks.slice(0, 12).map((task) => ({
       title: task.title,
       taskDate: task.taskDate,
-      scheduledTime: task.scheduledTime,
+      displayTime: formatAssistantTime(task.scheduledTime),
+      temporalStatus: classifyTaskTemporalStatus({
+        taskDate: task.taskDate,
+        scheduledTime: task.scheduledTime,
+        estimatedDuration: task.estimatedDuration,
+        currentDate,
+        currentDateTime,
+      }),
+      scheduleLabel: buildAssistantTaskScheduleLabel({
+        title: task.title,
+        taskDate: task.taskDate,
+        scheduledTime: task.scheduledTime,
+        estimatedDuration: task.estimatedDuration,
+        currentDate,
+        currentDateTime,
+      }),
       completed: task.completed ?? false,
       epicTitle: task.epicTitle ?? null,
     })),
     inboxTasks: journeysContext.inboxTasks.slice(0, 8).map((task) => ({
       title: task.title,
       taskDate: task.taskDate,
-      scheduledTime: task.scheduledTime,
+      displayTime: formatAssistantTime(task.scheduledTime),
+      temporalStatus: classifyTaskTemporalStatus({
+        taskDate: task.taskDate,
+        scheduledTime: task.scheduledTime,
+        estimatedDuration: task.estimatedDuration,
+        currentDate,
+        currentDateTime,
+      }),
+      scheduleLabel: buildAssistantTaskScheduleLabel({
+        title: task.title,
+        taskDate: task.taskDate,
+        scheduledTime: task.scheduledTime,
+        estimatedDuration: task.estimatedDuration,
+        currentDate,
+        currentDateTime,
+      }),
     })),
     calendarEvents: journeysContext.calendarEvents.slice(0, 10).map((event) => ({
       title: event.title,
-      start: event.start,
-      end: event.end,
+      temporalStatus: classifyEventTemporalStatus({
+        start: event.start,
+        end: event.end,
+        currentDate,
+        currentDateTime,
+      }),
+      scheduleLabel: buildAssistantEventScheduleLabel({
+        title: event.title,
+        start: event.start,
+        end: event.end,
+        isAllDay: event.isAllDay,
+        currentDate,
+        currentDateTime,
+      }),
       isAllDay: event.isAllDay,
       provider: event.provider,
     })),
@@ -340,6 +396,7 @@ const buildSystemPrompt = (context: {
   enrichedContext: JsonObject | null;
   surface: "companion" | "journeys";
   currentDate?: string;
+  currentDateTime?: string;
   journeysContext?: JourneysContext;
 }) => {
   const voiceStyle = typeof context.voiceTemplate?.voice_style === "string"
@@ -358,6 +415,7 @@ const buildSystemPrompt = (context: {
   const journeysSnapshot = buildJourneysContextSnapshot(
     context.journeysContext,
     context.currentDate,
+    context.currentDateTime,
   );
 
   return [
@@ -391,6 +449,15 @@ const buildSystemPrompt = (context: {
       : "",
     context.surface === "journeys"
       ? "Only treat it as planner work when the user explicitly wants a concrete saved change, like scheduling, moving, repeating, reminding, renaming, or creating something."
+      : "",
+    context.surface === "journeys"
+      ? "For Journeys schedule reads, use past tense for items marked past, present tense for items marked in_progress, and future tense for items marked upcoming."
+      : "",
+    context.surface === "journeys"
+      ? "Prefer the provided scheduleLabel/displayTime wording and keep time mentions in lowercase am/pm."
+      : "",
+    context.surface === "journeys"
+      ? "If an item already passed today, it can still be mentioned, but do not describe it like it is still ahead."
       : "",
     journeysSnapshot
       ? `Journeys schedule context: ${journeysSnapshot}`
@@ -728,6 +795,7 @@ serve(async (req) => {
           ...context,
           surface,
           currentDate: parsed.data.currentDate,
+          currentDateTime: parsed.data.currentDateTime,
           journeysContext: parsed.data.journeysContext,
         }),
         conversationHistory: parsed.data.conversationHistory,

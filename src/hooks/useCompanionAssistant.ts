@@ -29,6 +29,7 @@ import type {
   CompanionPlannerLaunchIntent,
   CompanionPlannerLaunchTarget,
 } from "@/types/companionPlanner";
+import { formatCurrentDateTimeWithOffset } from "@/utils/currentDateTime";
 
 export type CompanionAssistantSurface = "companion" | "journeys";
 
@@ -291,6 +292,7 @@ export function useCompanionAssistant({
     if (surface === "journeys") {
       await journeysConversation.submitMessage(message, inputMode, {
         currentDate: planner.currentDate,
+        currentDateTime: formatCurrentDateTimeWithOffset(new Date()),
         journeysContext: planner.plannerContext,
       });
       return;

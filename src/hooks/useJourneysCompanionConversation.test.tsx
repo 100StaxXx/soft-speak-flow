@@ -158,6 +158,7 @@ describe("useJourneysCompanionConversation", () => {
     await act(async () => {
       await result.current.submitMessage("How does today look?", "text", {
         currentDate: "2026-04-19",
+        currentDateTime: "2026-04-19T10:28:00-07:00",
         journeysContext: {
           tasks: [],
           inboxTasks: [],
@@ -179,6 +180,7 @@ describe("useJourneysCompanionConversation", () => {
     expect(mocks.invoke).toHaveBeenCalledWith("companion-chat", {
       body: expect.objectContaining({
         currentDate: "2026-04-19",
+        currentDateTime: "2026-04-19T10:28:00-07:00",
         journeysContext: expect.objectContaining({
           scheduleInsights: expect.objectContaining({
             summary: "The day is light.",

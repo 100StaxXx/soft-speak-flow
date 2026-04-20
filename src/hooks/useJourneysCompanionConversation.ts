@@ -147,6 +147,7 @@ export function useJourneysCompanionConversation() {
     inputMode: CompanionChatInputMode = "text",
     options?: {
       currentDate?: string;
+      currentDateTime?: string;
       journeysContext?: CompanionChatJourneysContext | null;
     },
   ) => {
@@ -176,6 +177,7 @@ export function useJourneysCompanionConversation() {
           surface: "journeys",
           sessionId: sessionIdRef.current,
           currentDate: options?.currentDate,
+          currentDateTime: options?.currentDateTime,
           journeysContext: options?.journeysContext ?? undefined,
         } satisfies CompanionChatRequest,
       });
