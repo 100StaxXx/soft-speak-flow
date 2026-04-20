@@ -490,7 +490,7 @@ Deno.test("does not rewrite the quest-capture starter prompt", async () => {
   assertEquals(captured.called, false);
 });
 
-Deno.test("does not rewrite the plan-day starter prompt", async () => {
+Deno.test("does not rewrite deterministic plan-day starter proposals", async () => {
   const captured = {
     called: false,
   };
@@ -509,30 +509,38 @@ Deno.test("does not rewrite the plan-day starter prompt", async () => {
       },
     },
     baseResult: {
-      ...baseResult("conversational"),
-      reply: [
-        "To help you build a great day, can you tell me:",
-        "- Which of your goals or tasks matters most today?",
-        "- Are there any time constraints or outside commitments?",
-        "- How's your energy this morning, and when do you usually feel your best?",
-        "",
-        "Once I know those, I can suggest the best flow for your day.",
-      ].join("\n"),
+      ...baseResult("proposal"),
+      reply:
+        "Today still has room around your fixed commitments. I drafted 3 quests for today to build the day out without crowding your fixed blocks. Review them and confirm what fits.",
+      proposals: [{
+        id: "proposal-1",
+        kind: "create_quest",
+        title: "Create Keep Morning review",
+        summary:
+          'Create a quest for "Keep Morning review" on 2026-04-18 at 10:30 am.',
+        payload: {
+          taskText: "Keep Morning review",
+          taskDate: "2026-04-18",
+          scheduledTime: "10:30",
+        },
+        status: "pending",
+        readyToConfirm: true,
+        missingFields: [],
+      }],
       sessionState: {
-        ...baseResult("conversational").sessionState,
-        pendingStarterIntent: "plan_day",
+        ...baseResult("proposal").sessionState,
       },
     },
     openAIApiKey: "test-openai-key",
     model: "test-model",
   });
 
-  assertEquals(response.mode, "conversational");
-  assertStringIncludes(response.reply, "To help you build a great day");
+  assertEquals(response.mode, "proposal");
+  assertStringIncludes(response.reply, "I drafted 3 quests for today");
   assertEquals(captured.called, false);
 });
 
-Deno.test("does not rewrite the immediate plan-day anchor proposal response", async () => {
+Deno.test("does not rewrite deterministic no-room plan-day replies", async () => {
   const captured = {
     called: false,
   };
@@ -544,42 +552,29 @@ Deno.test("does not rewrite the immediate plan-day anchor proposal response", as
     },
     input: {
       ...baseInput(),
-      message: "I have a meeting at 3 pm and want to work out later.",
+      message: "Plan my day",
       sessionState: {
         ...baseInput().sessionState,
         pendingStarterIntent: "plan_day",
       },
     },
     baseResult: {
-      ...baseResult("proposal"),
+      ...baseResult("conversational"),
       reply:
-        "Today still has room around your fixed commitments. I drafted this as a quest. Take a look, and confirm it if it fits.",
-      proposals: [{
-        id: "proposal-1",
-        kind: "create_quest",
-        title: "Create Sales Meeting",
-        summary: 'Create a quest for "Sales Meeting" at 3:00 pm.',
-        payload: {
-          taskText: "Sales Meeting",
-          taskDate: "2026-04-18",
-          scheduledTime: "15:00",
-        },
-        status: "pending",
-        readyToConfirm: true,
-        missingFields: [],
-      }],
+        "Today is already carrying about as much quest load as I want to give it.",
       sessionState: {
-        ...baseResult("proposal").sessionState,
-        pendingStarterIntent: "plan_day",
+        ...baseResult("conversational").sessionState,
       },
     },
     openAIApiKey: "test-openai-key",
     model: "test-model",
   });
 
-  assertEquals(response.mode, "proposal");
-  assertEquals(response.reply, "Today still has room around your fixed commitments. I drafted this as a quest. Take a look, and confirm it if it fits.");
-  assertEquals(response.proposals.length, 1);
-  assertEquals(response.proposals[0]?.title, "Create Sales Meeting");
+  assertEquals(response.mode, "conversational");
+  assertEquals(
+    response.reply,
+    "Today is already carrying about as much quest load as I want to give it.",
+  );
+  assertEquals(response.proposals.length, 0);
   assertEquals(captured.called, false);
 });

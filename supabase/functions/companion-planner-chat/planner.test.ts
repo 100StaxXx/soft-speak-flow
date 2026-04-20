@@ -466,15 +466,28 @@ Deno.test("normalizes parsed input server-side for question-form scheduling requ
   );
 });
 
-Deno.test("returns the deterministic plan-day starter opener", () => {
+Deno.test("returns confirmable quest proposals for the plan-day starter", () => {
   const result = buildPlannerResponse(baseInput({
-    message:
-      "Help me plan my day. Ask me follow-up questions about my goals, tasks, timing, and energy so we can build the best schedule.",
+    message: "Plan my day",
+    parsedInput: {
+      text: "Plan my day",
+      scheduledTime: null,
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
     plannerContext: {
       starterIntent: "plan_day",
       tasks: [
         {
-          id: "task-1",
+          id: "task-scheduled-1",
           title: "Ship landing page copy",
           taskDate: "2026-04-18",
           scheduledTime: "09:00",
@@ -497,65 +510,96 @@ Deno.test("returns the deterministic plan-day starter opener", () => {
           habitCount: 2,
         },
       ],
-      priorityScores: [
+      rituals: [
         {
-          id: "task:task-1",
-          kind: "task",
-          title: "Ship landing page copy",
-          score: 88,
-          reasons: ["due today", "supports a deadline-sensitive epic"],
-          taskId: "task-1",
+          id: "ritual-1",
           epicId: "epic-1",
-          targetDate: "2026-04-18",
-          suggestedTime: "09:00",
+          epicTitle: "Website relaunch",
+          title: "Morning review",
+          frequency: "daily",
+          preferredTime: "10:30",
+          currentStreak: 3,
         },
       ],
-    },
-  }));
-
-  assertEquals(result.mode, "conversational");
-  assertEquals(result.followUpQuestions.length, 0);
-  assertEquals(result.proposals.length, 0);
-  assertEquals(result.sessionState.pendingStarterIntent, "plan_day");
-  assertStringIncludes(result.reply, "To help you build a great day");
-  assertStringIncludes(result.reply, "Which of your goals or tasks matters most today?");
-});
-
-Deno.test("drafts the next plan-day reply as an anchor quest while keeping day-planning context", () => {
-  const result = buildPlannerResponse(baseInput({
-    message:
-      "I have a sales meeting at 3 pm. I want sales work before that, a workout later, and some app work tonight.",
-    sessionState: {
-      pendingStarterIntent: "plan_day",
-    },
-    parsedInput: {
-      text:
-        "I have a sales meeting . I want sales work before that, a workout later, and some app work tonight",
-      scheduledTime: "15:00",
-    },
-    plannerContext: {
-      plannerMemory: {
-        tonePack: "soft",
-        preferredTimeOfDay: "afternoon",
-        preferredTimeReason: "that's the time of the meeting each week",
-        reminderMinutesBefore: null,
-        preferredWindows: [],
-        cadencePatterns: {},
-        wakeTime: "08:00",
-        windDownTime: "21:00",
-        peakProductivityTimes: [],
-        workloadTolerance: "normal",
-        contactCadencePatterns: {},
-        lastConfirmedAt: null,
-      },
+      contactsNeedingAttention: [
+        {
+          id: "contact-1",
+          name: "Mom",
+          daysSinceContact: 9,
+          hasOverdueReminder: true,
+          reminderReason: "Check in this week",
+        },
+      ],
+      priorityScores: [
+        {
+          id: "ritual:ritual-1",
+          kind: "ritual",
+          title: "Morning review",
+          score: 88,
+          reasons: ["Keeps the relaunch moving early."],
+          ritualId: "ritual-1",
+          epicId: "epic-1",
+          targetDate: "2026-04-18",
+          suggestedTime: "10:30",
+        },
+        {
+          id: "epic:epic-1",
+          kind: "epic",
+          title: "Website relaunch",
+          score: 84,
+          reasons: ["Deadline-sensitive progress still matters today."],
+          epicId: "epic-1",
+          targetDate: "2026-04-18",
+          suggestedTime: "13:00",
+        },
+        {
+          id: "contact:contact-1",
+          kind: "contact",
+          title: "Mom",
+          score: 68,
+          reasons: ["A quick touch keeps an overdue relationship warm."],
+          contactId: "contact-1",
+          targetDate: "2026-04-18",
+          suggestedTime: "17:00",
+        },
+      ],
       scheduleInsights: {
         horizon: "day",
         selectedDate: "2026-04-18",
-        dayLoads: [],
+        dayLoads: [
+          {
+            date: "2026-04-18",
+            totalMinutes: 120,
+            taskCount: 1,
+            status: "balanced",
+          },
+        ],
         overloadedDates: [],
         emptyDates: [],
         conflicts: [],
-        suggestedSlots: [],
+        suggestedSlots: [
+          {
+            date: "2026-04-18",
+            time: "10:30",
+            endTime: "11:00",
+            score: 86,
+            reason: "Open mid-morning slot",
+          },
+          {
+            date: "2026-04-18",
+            time: "13:00",
+            endTime: "13:45",
+            score: 82,
+            reason: "Open early afternoon slot",
+          },
+          {
+            date: "2026-04-18",
+            time: "17:00",
+            endTime: "17:15",
+            score: 76,
+            reason: "Quick open check-in window",
+          },
+        ],
         moveSuggestions: [],
         summary: "Today still has room around your fixed commitments.",
       },
@@ -564,86 +608,688 @@ Deno.test("drafts the next plan-day reply as an anchor quest while keeping day-p
 
   assertEquals(result.mode, "proposal");
   assertEquals(result.followUpQuestions.length, 0);
-  assertEquals(result.proposals.length, 1);
-  assertEquals(result.proposals[0].kind, "create_quest");
-  assertEquals(result.proposals[0].readyToConfirm, true);
-  assertEquals(result.proposals[0].title, "Create Sales Meeting");
+  assertEquals(result.proposals.length, 3);
   assertEquals(
-    (result.proposals[0].payload as {
-      taskText: string;
-      taskDate: string | null;
-      scheduledTime: string | null;
-    }).taskText,
-    "Sales Meeting",
+    result.proposals.every((proposal) =>
+      proposal.kind === "create_quest" && proposal.readyToConfirm
+    ),
+    true,
   );
-  assertEquals(
-    (result.proposals[0].payload as {
-      taskText: string;
-      taskDate: string | null;
-      scheduledTime: string | null;
-    }).taskDate,
-    "2026-04-18",
-  );
-  assertEquals(
-    (result.proposals[0].payload as {
-      taskText: string;
-      taskDate: string | null;
-      scheduledTime: string | null;
-    }).scheduledTime,
-    "15:00",
-  );
-  assertEquals(result.sessionState.pendingStarterIntent, "plan_day");
+  assertEquals(result.sessionState.pendingStarterIntent, null);
   assertStringIncludes(result.reply, "Today still has room around your fixed commitments.");
-  assertEquals(result.reply.includes("I drafted this as a quest"), true);
-  assertEquals(result.reply.includes("fixed anchor"), false);
-  assertEquals(result.reply.includes("previously said"), false);
-  assertEquals(result.reply.includes("What makes this timing the right fit"), false);
-  assertEquals(result.reply.includes("you usually"), false);
-  assertEquals(result.reply.includes("you've told me"), false);
+  assertStringIncludes(result.reply, "I drafted 3 quests for today");
 });
 
-Deno.test("keeps non-anchor plan-day follow-ups conversational", () => {
+Deno.test("raises the plan-day target for coasting users on a normal day", () => {
   const result = buildPlannerResponse(baseInput({
-    message:
-      "I want to front-load sales work, get a workout in later, and spend some time coding the app.",
-    sessionState: {
-      pendingStarterIntent: "plan_day",
+    message: "Plan my day",
+    parsedInput: {
+      text: "Plan my day",
+      scheduledTime: null,
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
     },
+    currentDateTime: "2026-04-18T08:15:00-07:00",
     plannerContext: {
+      starterIntent: "plan_day",
+      tasks: [
+        {
+          id: "task-scheduled-1",
+          title: "Investor review",
+          taskDate: "2026-04-18",
+          scheduledTime: "09:00",
+          estimatedDuration: 60,
+          difficulty: "hard",
+          recurrencePattern: null,
+          completed: false,
+          priority: "high",
+        },
+        {
+          id: "task-scheduled-2",
+          title: "Team sync prep",
+          taskDate: "2026-04-18",
+          scheduledTime: "11:00",
+          estimatedDuration: 30,
+          difficulty: "medium",
+          recurrencePattern: null,
+          completed: false,
+          priority: "medium",
+        },
+      ],
+      activeEpics: [
+        {
+          id: "epic-1",
+          title: "Website relaunch",
+          endDate: "2026-04-20",
+        },
+      ],
+      rituals: [
+        {
+          id: "ritual-1",
+          epicId: "epic-1",
+          epicTitle: "Website relaunch",
+          title: "Morning review",
+          frequency: "daily",
+          preferredTime: "12:30",
+        },
+      ],
+      contactsNeedingAttention: [
+        {
+          id: "contact-1",
+          name: "Mom",
+          daysSinceContact: 9,
+          hasOverdueReminder: true,
+        },
+      ],
       scheduleInsights: {
         horizon: "day",
         selectedDate: "2026-04-18",
-        dayLoads: [],
+        dayLoads: [
+          {
+            date: "2026-04-18",
+            totalMinutes: 150,
+            taskCount: 2,
+            status: "balanced",
+          },
+        ],
         overloadedDates: [],
         emptyDates: [],
         conflicts: [],
-        suggestedSlots: [],
+        suggestedSlots: [
+          {
+            date: "2026-04-18",
+            time: "12:30",
+            endTime: "13:00",
+            score: 80,
+            reason: "Open lunch edge",
+          },
+          {
+            date: "2026-04-18",
+            time: "14:00",
+            endTime: "14:45",
+            score: 84,
+            reason: "Clear afternoon block",
+          },
+          {
+            date: "2026-04-18",
+            time: "17:30",
+            endTime: "18:00",
+            score: 77,
+            reason: "Open evening check-in slot",
+          },
+        ],
         moveSuggestions: [],
         summary: "Today still has room around your fixed commitments.",
       },
+      statInterpretation: {
+        statProfile: {
+          scores: {
+            vitality: 450,
+            wisdom: 480,
+            discipline: 520,
+            resolve: 470,
+            creativity: 410,
+            alignment: 465,
+          },
+          dominantStat: "discipline",
+          secondaryStat: "wisdom",
+        },
+        statNeeds: {
+          vitality: { level: "low", reasons: [] },
+          wisdom: { level: "low", reasons: [] },
+          discipline: { level: "low", reasons: [] },
+          resolve: { level: "low", reasons: [] },
+          creativity: { level: "low", reasons: [] },
+          alignment: { level: "low", reasons: [] },
+        },
+        momentumState: "coasting",
+        recentMissInterpretation: "normal_variance",
+        narrativeBrief: "You're holding the line.",
+        dailyNarrative: "Steady day",
+      },
+      priorityScores: [
+        {
+          id: "ritual:ritual-1",
+          kind: "ritual",
+          title: "Morning review",
+          score: 88,
+          reasons: ["Keeps the relaunch moving."],
+          ritualId: "ritual-1",
+          epicId: "epic-1",
+          targetDate: "2026-04-18",
+          suggestedTime: "12:30",
+        },
+        {
+          id: "epic:epic-1",
+          kind: "epic",
+          title: "Website relaunch",
+          score: 82,
+          reasons: ["A progress block will keep momentum steady."],
+          epicId: "epic-1",
+          targetDate: "2026-04-18",
+          suggestedTime: "14:00",
+        },
+        {
+          id: "contact:contact-1",
+          kind: "contact",
+          title: "Mom",
+          score: 70,
+          reasons: ["Quick relationship maintenance fits today."],
+          contactId: "contact-1",
+          targetDate: "2026-04-18",
+          suggestedTime: "17:30",
+        },
+      ],
     },
   }));
 
-  assertEquals(result.mode, "conversational");
-  assertEquals(result.followUpQuestions.length, 0);
-  assertEquals(result.proposals.length, 0);
-  assertEquals(result.sessionState.pendingStarterIntent, null);
-  assertStringIncludes(result.reply, "Today still has room around your fixed commitments.");
-  assertEquals(result.reply.includes("I drafted this as a quest"), false);
+  assertEquals(result.mode, "proposal");
+  assertEquals(result.proposals.length, 3);
 });
 
-Deno.test("keeps calendar conflict notes on anchor quests drafted from the plan-day follow-up", () => {
+Deno.test("raises the plan-day target to six for locked-in users without exceeding four new quests", () => {
   const result = buildPlannerResponse(baseInput({
-    message: "I have a sales meeting at 4 today. Then I want to work out later.",
+    message: "Plan my day",
+    parsedInput: {
+      text: "Plan my day",
+      scheduledTime: null,
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+    plannerContext: {
+      starterIntent: "plan_day",
+      tasks: [
+        {
+          id: "task-scheduled-1",
+          title: "Investor review",
+          taskDate: "2026-04-18",
+          scheduledTime: "09:00",
+          estimatedDuration: 60,
+          difficulty: "hard",
+          recurrencePattern: null,
+          completed: false,
+          priority: "high",
+        },
+        {
+          id: "task-scheduled-2",
+          title: "Team sync prep",
+          taskDate: "2026-04-18",
+          scheduledTime: "11:00",
+          estimatedDuration: 30,
+          difficulty: "medium",
+          recurrencePattern: null,
+          completed: false,
+          priority: "medium",
+        },
+      ],
+      activeEpics: [
+        {
+          id: "epic-1",
+          title: "Website relaunch",
+          endDate: "2026-04-20",
+        },
+      ],
+      rituals: [
+        {
+          id: "ritual-1",
+          epicId: "epic-1",
+          epicTitle: "Website relaunch",
+          title: "Morning review",
+          frequency: "daily",
+          preferredTime: "12:30",
+        },
+      ],
+      contactsNeedingAttention: [
+        {
+          id: "contact-1",
+          name: "Mom",
+          daysSinceContact: 9,
+          hasOverdueReminder: true,
+        },
+      ],
+      scheduleInsights: {
+        horizon: "day",
+        selectedDate: "2026-04-18",
+        dayLoads: [
+          {
+            date: "2026-04-18",
+            totalMinutes: 150,
+            taskCount: 2,
+            status: "balanced",
+          },
+        ],
+        overloadedDates: [],
+        emptyDates: [],
+        conflicts: [],
+        suggestedSlots: [
+          {
+            date: "2026-04-18",
+            time: "12:30",
+            endTime: "13:00",
+            score: 80,
+            reason: "Open lunch edge",
+          },
+          {
+            date: "2026-04-18",
+            time: "14:00",
+            endTime: "14:45",
+            score: 84,
+            reason: "Clear afternoon block",
+          },
+          {
+            date: "2026-04-18",
+            time: "17:30",
+            endTime: "18:00",
+            score: 77,
+            reason: "Open evening check-in slot",
+          },
+          {
+            date: "2026-04-18",
+            time: "19:00",
+            endTime: "19:30",
+            score: 72,
+            reason: "Open evening reset block",
+          },
+        ],
+        moveSuggestions: [],
+        summary: "Today still has room around your fixed commitments.",
+      },
+      statInterpretation: {
+        statProfile: {
+          scores: {
+            vitality: 450,
+            wisdom: 480,
+            discipline: 520,
+            resolve: 470,
+            creativity: 410,
+            alignment: 465,
+          },
+          dominantStat: "discipline",
+          secondaryStat: "wisdom",
+        },
+        statNeeds: {
+          vitality: { level: "low", reasons: [] },
+          wisdom: { level: "low", reasons: [] },
+          discipline: { level: "low", reasons: [] },
+          resolve: { level: "low", reasons: [] },
+          creativity: { level: "low", reasons: [] },
+          alignment: { level: "low", reasons: [] },
+        },
+        momentumState: "locked_in",
+        recentMissInterpretation: "normal_variance",
+        narrativeBrief: "You're in a solid rhythm.",
+        dailyNarrative: "Locked-in day",
+      },
+      priorityScores: [
+        {
+          id: "ritual:ritual-1",
+          kind: "ritual",
+          title: "Morning review",
+          score: 88,
+          reasons: ["Keeps the relaunch moving."],
+          ritualId: "ritual-1",
+          epicId: "epic-1",
+          targetDate: "2026-04-18",
+          suggestedTime: "12:30",
+        },
+        {
+          id: "epic:epic-1",
+          kind: "epic",
+          title: "Website relaunch",
+          score: 82,
+          reasons: ["A progress block will keep momentum steady."],
+          epicId: "epic-1",
+          targetDate: "2026-04-18",
+          suggestedTime: "14:00",
+        },
+        {
+          id: "contact:contact-1",
+          kind: "contact",
+          title: "Mom",
+          score: 70,
+          reasons: ["Quick relationship maintenance fits today."],
+          contactId: "contact-1",
+          targetDate: "2026-04-18",
+          suggestedTime: "17:30",
+        },
+        {
+          id: "recovery:reset",
+          kind: "recovery",
+          title: "Recovery reset",
+          score: 64,
+          reasons: ["A recovery block keeps the streak sustainable."],
+          targetDate: "2026-04-18",
+          suggestedTime: "19:00",
+        },
+      ],
+    },
+  }));
+
+  assertEquals(result.mode, "proposal");
+  assertEquals(result.proposals.length, 4);
+});
+
+Deno.test("does not ramp the plan-day target on overloaded days", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Plan my day",
+    parsedInput: {
+      text: "Plan my day",
+      scheduledTime: null,
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+    plannerContext: {
+      starterIntent: "plan_day",
+      tasks: [
+        {
+          id: "task-scheduled-1",
+          title: "Investor review",
+          taskDate: "2026-04-18",
+          scheduledTime: "09:00",
+          estimatedDuration: 60,
+          difficulty: "hard",
+          recurrencePattern: null,
+          completed: false,
+          priority: "high",
+        },
+        {
+          id: "task-scheduled-2",
+          title: "Team sync prep",
+          taskDate: "2026-04-18",
+          scheduledTime: "11:00",
+          estimatedDuration: 30,
+          difficulty: "medium",
+          recurrencePattern: null,
+          completed: false,
+          priority: "medium",
+        },
+      ],
+      activeEpics: [
+        {
+          id: "epic-1",
+          title: "Website relaunch",
+          endDate: "2026-04-20",
+        },
+      ],
+      rituals: [
+        {
+          id: "ritual-1",
+          epicId: "epic-1",
+          epicTitle: "Website relaunch",
+          title: "Morning review",
+          frequency: "daily",
+          preferredTime: "12:30",
+        },
+      ],
+      contactsNeedingAttention: [
+        {
+          id: "contact-1",
+          name: "Mom",
+          daysSinceContact: 9,
+          hasOverdueReminder: true,
+        },
+      ],
+      scheduleInsights: {
+        horizon: "day",
+        selectedDate: "2026-04-18",
+        dayLoads: [
+          {
+            date: "2026-04-18",
+            totalMinutes: 330,
+            taskCount: 6,
+            status: "overloaded",
+          },
+        ],
+        overloadedDates: ["2026-04-18"],
+        emptyDates: [],
+        conflicts: [],
+        suggestedSlots: [
+          {
+            date: "2026-04-18",
+            time: "12:30",
+            endTime: "13:00",
+            score: 80,
+            reason: "One narrow lunch edge",
+          },
+          {
+            date: "2026-04-18",
+            time: "17:30",
+            endTime: "18:00",
+            score: 77,
+            reason: "One evening slot",
+          },
+          {
+            date: "2026-04-18",
+            time: "19:00",
+            endTime: "19:30",
+            score: 72,
+            reason: "Short recovery slot",
+          },
+          {
+            date: "2026-04-18",
+            time: "20:00",
+            endTime: "20:30",
+            score: 68,
+            reason: "Late catch-up slot",
+          },
+        ],
+        moveSuggestions: [],
+        summary: "Today is already pretty packed.",
+      },
+      statInterpretation: {
+        statProfile: {
+          scores: {
+            vitality: 450,
+            wisdom: 480,
+            discipline: 520,
+            resolve: 470,
+            creativity: 410,
+            alignment: 465,
+          },
+          dominantStat: "discipline",
+          secondaryStat: "wisdom",
+        },
+        statNeeds: {
+          vitality: { level: "low", reasons: [] },
+          wisdom: { level: "low", reasons: [] },
+          discipline: { level: "low", reasons: [] },
+          resolve: { level: "low", reasons: [] },
+          creativity: { level: "low", reasons: [] },
+          alignment: { level: "low", reasons: [] },
+        },
+        momentumState: "locked_in",
+        recentMissInterpretation: "normal_variance",
+        narrativeBrief: "You're in a solid rhythm.",
+        dailyNarrative: "Locked-in day",
+      },
+      priorityScores: [
+        {
+          id: "ritual:ritual-1",
+          kind: "ritual",
+          title: "Morning review",
+          score: 88,
+          reasons: ["Keeps the relaunch moving."],
+          ritualId: "ritual-1",
+          epicId: "epic-1",
+          targetDate: "2026-04-18",
+          suggestedTime: "12:30",
+        },
+        {
+          id: "epic:epic-1",
+          kind: "epic",
+          title: "Website relaunch",
+          score: 82,
+          reasons: ["A progress block will keep momentum steady."],
+          epicId: "epic-1",
+          targetDate: "2026-04-18",
+          suggestedTime: "17:30",
+        },
+        {
+          id: "contact:contact-1",
+          kind: "contact",
+          title: "Mom",
+          score: 70,
+          reasons: ["Quick relationship maintenance fits today."],
+          contactId: "contact-1",
+          targetDate: "2026-04-18",
+          suggestedTime: "19:00",
+        },
+        {
+          id: "recovery:reset",
+          kind: "recovery",
+          title: "Recovery reset",
+          score: 64,
+          reasons: ["A recovery block keeps the streak sustainable."],
+          targetDate: "2026-04-18",
+          suggestedTime: "20:00",
+        },
+      ],
+    },
+  }));
+
+  assertEquals(result.mode, "proposal");
+  assertEquals(result.proposals.length, 2);
+});
+
+Deno.test("drafts fewer plan-day quests when clean slots run out", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Write newsletter",
+    sessionState: {
+      pendingStarterIntent: "plan_day",
+    },
+    parsedInput: {
+      text: "Write newsletter",
+      scheduledTime: null,
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+    plannerContext: {
+      activeEpics: [
+        {
+          id: "epic-1",
+          title: "Website relaunch",
+          endDate: "2026-04-20",
+        },
+      ],
+      contactsNeedingAttention: [
+        {
+          id: "contact-1",
+          name: "Mom",
+          daysSinceContact: 9,
+          hasOverdueReminder: true,
+        },
+      ],
+      scheduleInsights: {
+        horizon: "day",
+        selectedDate: "2026-04-18",
+        dayLoads: [
+          {
+            date: "2026-04-18",
+            totalMinutes: 30,
+            taskCount: 0,
+            status: "open",
+          },
+        ],
+        overloadedDates: [],
+        emptyDates: ["2026-04-18"],
+        conflicts: [],
+        suggestedSlots: [
+          {
+            date: "2026-04-18",
+            time: "11:00",
+            endTime: "11:30",
+            score: 86,
+            reason: "One clean opening before noon",
+          },
+        ],
+        moveSuggestions: [],
+        summary: "Today has one clean opening before noon.",
+      },
+      priorityScores: [
+        {
+          id: "epic:epic-1",
+          kind: "epic",
+          title: "Website relaunch",
+          score: 82,
+          reasons: ["A progress block would help."],
+          epicId: "epic-1",
+          targetDate: "2026-04-18",
+          suggestedTime: "13:00",
+        },
+        {
+          id: "contact:contact-1",
+          kind: "contact",
+          title: "Mom",
+          score: 70,
+          reasons: ["A quick relationship touch fits later."],
+          contactId: "contact-1",
+          targetDate: "2026-04-18",
+          suggestedTime: "17:00",
+        },
+      ],
+    },
+  }));
+
+  assertEquals(result.mode, "proposal");
+  assertEquals(result.proposals.length, 1);
+  assertEquals(result.proposals[0].title, "Create Write Newsletter");
+  assertEquals(result.sessionState.pendingStarterIntent, null);
+  assertStringIncludes(result.reply, "That's all the clean room I found without crowding the day.");
+});
+
+Deno.test("keeps calendar conflict notes on plan-day quest drafts", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Sales meeting at 4 today",
     currentDate: "2026-04-20",
     currentDateTime: "2026-04-20T08:37:00-07:00",
     sessionState: {
       pendingStarterIntent: "plan_day",
     },
     parsedInput: {
-      text: "I have a sales meeting . Then I want to work out later",
+      text: "sales meeting",
       scheduledTime: "16:00",
       scheduledDate: "2026-04-20",
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
     },
     plannerContext: {
       calendarEvents: [{
@@ -655,13 +1301,24 @@ Deno.test("keeps calendar conflict notes on anchor quests drafted from the plan-
         provider: "google",
         readOnly: true,
       }],
+      scheduleInsights: {
+        horizon: "day",
+        selectedDate: "2026-04-20",
+        dayLoads: [],
+        overloadedDates: [],
+        emptyDates: [],
+        conflicts: [],
+        suggestedSlots: [],
+        moveSuggestions: [],
+        summary: "Today still has room around your fixed commitments.",
+      },
     },
   }));
 
   assertEquals(result.mode, "proposal");
   assertEquals(result.proposals.length, 1);
   assertEquals(result.proposals[0].title, "Create Sales Meeting");
-  assertEquals(result.sessionState.pendingStarterIntent, "plan_day");
+  assertEquals(result.sessionState.pendingStarterIntent, null);
   assertStringIncludes(result.reply, 'saved calendar event "Client Call"');
   assertStringIncludes(result.reply, "4:00 pm");
 });
@@ -2066,6 +2723,175 @@ Deno.test("quest_capture turns a bare quest title into a ready inbox draft", () 
       source: string | null;
     }).source,
     "inbox",
+  );
+});
+
+Deno.test("quest_capture uses the selected day's best open slot for a bare quest title", () => {
+  const intake = buildPlannerResponse(baseInput({
+    message: "Quest?",
+    parsedInput: {
+      text: "Quest?",
+      scheduledTime: null,
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+    plannerContext: {
+      starterIntent: "quest_capture",
+    },
+  }));
+
+  const result = buildPlannerResponse(baseInput({
+    currentDate: "2026-04-20",
+    currentDateTime: "2026-04-20T10:30:00-07:00",
+    message: "Write my newsletter",
+    sessionState: intake.sessionState,
+    parsedInput: {
+      text: "Write my newsletter",
+      scheduledTime: null,
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+    plannerContext: {
+      scheduleInsights: {
+        horizon: "day",
+        selectedDate: "2026-04-20",
+        dayLoads: [],
+        overloadedDates: [],
+        emptyDates: [],
+        conflicts: [],
+        suggestedSlots: [
+          {
+            date: "2026-04-20",
+            time: "18:00",
+            endTime: "18:30",
+            score: 92,
+            reason: "Open evening window",
+          },
+        ],
+        moveSuggestions: [],
+        summary: "Today has room in the evening.",
+      },
+    },
+  }));
+
+  assertEquals(result.proposals[0].kind, "create_quest");
+  assertEquals(result.proposals[0].readyToConfirm, true);
+  assertEquals(result.followUpQuestions.length, 0);
+  assertEquals(
+    (result.proposals[0].payload as {
+      taskDate: string | null;
+      scheduledTime: string | null;
+    }).taskDate,
+    "2026-04-20",
+  );
+  assertEquals(
+    (result.proposals[0].payload as {
+      taskDate: string | null;
+      scheduledTime: string | null;
+    }).scheduledTime,
+    "18:00",
+  );
+  assertStringIncludes(
+    result.proposals[0].summary,
+    "assuming that slot based on your open window",
+  );
+});
+
+Deno.test("quest_capture uses the preferred time window for a bare quest title when no slot is available", () => {
+  const intake = buildPlannerResponse(baseInput({
+    message: "Quest?",
+    parsedInput: {
+      text: "Quest?",
+      scheduledTime: null,
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+    plannerContext: {
+      starterIntent: "quest_capture",
+    },
+  }));
+
+  const result = buildPlannerResponse(baseInput({
+    currentDate: "2026-04-20",
+    currentDateTime: "2026-04-20T10:30:00-07:00",
+    message: "Write my newsletter",
+    sessionState: intake.sessionState,
+    parsedInput: {
+      text: "Write my newsletter",
+      scheduledTime: null,
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+    plannerContext: {
+      plannerMemory: {
+        preferredTimeOfDay: "evening",
+      },
+      scheduleInsights: {
+        horizon: "day",
+        selectedDate: "2026-04-20",
+        dayLoads: [],
+        overloadedDates: [],
+        emptyDates: [],
+        conflicts: [],
+        suggestedSlots: [],
+        moveSuggestions: [],
+        summary: "Today still has flexibility.",
+      },
+    },
+  }));
+
+  assertEquals(result.proposals[0].kind, "create_quest");
+  assertEquals(result.proposals[0].readyToConfirm, true);
+  assertEquals(result.followUpQuestions.length, 0);
+  assertEquals(
+    (result.proposals[0].payload as {
+      taskDate: string | null;
+      scheduledTime: string | null;
+    }).taskDate,
+    "2026-04-20",
+  );
+  assertEquals(
+    (result.proposals[0].payload as {
+      taskDate: string | null;
+      scheduledTime: string | null;
+    }).scheduledTime,
+    "18:00",
+  );
+  assertStringIncludes(
+    result.proposals[0].summary,
+    "assuming your usual evening pattern",
   );
 });
 

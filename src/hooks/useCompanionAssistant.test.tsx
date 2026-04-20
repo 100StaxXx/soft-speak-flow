@@ -965,8 +965,7 @@ describe("useCompanionAssistant", () => {
 
   it("submits plan-day launcher intents as normal user starters", async () => {
     const onLaunchIntentConsumed = vi.fn();
-    const planDayMessage =
-      "Help me plan my day. Ask me follow-up questions about my goals, tasks, timing, and energy so we can build the best schedule.";
+    const planDayMessage = "Plan my day";
 
     renderHook(() => useCompanionAssistant({
       surface: "journeys",
@@ -997,6 +996,29 @@ describe("useCompanionAssistant", () => {
       mocks.plannerSubmit.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
     );
     expect(onLaunchIntentConsumed).toHaveBeenCalledWith("launch-plan-day");
+  });
+
+  it("treats an exact typed quest starter like the quest quick action", async () => {
+    const { result } = renderHook(() => useCompanionAssistant({ surface: "journeys" }));
+
+    await act(async () => {
+      await result.current.submitMessage("Quest?", "text");
+    });
+
+    expect(mocks.primeQuestCapture).toHaveBeenCalledWith("Quest?");
+    expect(mocks.plannerSubmit).not.toHaveBeenCalled();
+    expect(mocks.journeysSubmit).not.toHaveBeenCalled();
+  });
+
+  it("routes an exact typed plan-day starter into the planner lane", async () => {
+    const { result } = renderHook(() => useCompanionAssistant({ surface: "journeys" }));
+
+    await act(async () => {
+      await result.current.submitMessage("Plan my day", "text");
+    });
+
+    expect(mocks.plannerSubmit).toHaveBeenCalledWith("Plan my day", "text");
+    expect(mocks.journeysSubmit).not.toHaveBeenCalled();
   });
 
   it("seeds assistant-led quest launcher intents locally without a fake user echo", async () => {

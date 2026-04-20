@@ -405,6 +405,9 @@ const mapMoodToEnergy = (
 const deriveStarterIntentFromMessage = (message: string): CompanionPlannerStarterIntent => {
   const normalizedMessage = message.trim().toLowerCase();
 
+  if (normalizedMessage === "quest?") {
+    return "quest_capture";
+  }
   if (/\b(tired|drained|fried|make it light|light day|low energy)\b/.test(normalizedMessage)) {
     return "low_energy_adjust";
   }
@@ -1521,6 +1524,12 @@ export function useCompanionPlanner({
     const message = rawMessage.trim();
     if (!message || isSubmitting) return;
 
+    const resolvedStarterIntent = options?.starterIntent ?? deriveStarterIntentFromMessage(message);
+    if (resolvedStarterIntent === "quest_capture" && !options?.skipUserEcho) {
+      primeQuestCapture(message);
+      return;
+    }
+
     setIsSubmitting(true);
     setDraftInput("");
     setInterimText("");
@@ -1535,7 +1544,6 @@ export function useCompanionPlanner({
     const parsedInput = parseNaturalLanguage(message);
 
     try {
-      const resolvedStarterIntent = options?.starterIntent ?? deriveStarterIntentFromMessage(message);
       const resolvedBriefingContext = options?.briefingContext ?? null;
       const syncedPlannerContext = mergePlannerContextWithOutlookSync(
         plannerContext,

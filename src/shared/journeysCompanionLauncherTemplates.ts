@@ -80,7 +80,7 @@ export const getJourneysCompanionLauncherTemplates = ({
     {
       id: "plan-day",
       label: "Plan my day",
-      message: "Help me plan my day. Ask me follow-up questions about my goals, tasks, timing, and energy so we can build the best schedule.",
+      message: "Plan my day",
       target: "planner",
       starterIntent: "plan_day",
     },

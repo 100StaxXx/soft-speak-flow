@@ -126,6 +126,12 @@ const shouldRouteToPlanner = (
   });
 };
 
+const isExactQuestCaptureStarterMessage = (message: string): boolean =>
+  message.trim().toLowerCase() === "quest?";
+
+const isExactPlanDayStarterMessage = (message: string): boolean =>
+  message.trim().toLowerCase() === "plan my day";
+
 export function useCompanionAssistant({
   surface,
   conversationEnabled = true,
@@ -272,6 +278,16 @@ export function useCompanionAssistant({
     );
     setDraftInput("");
     setInterimText("");
+
+    if (isExactQuestCaptureStarterMessage(message)) {
+      planner.primeQuestCapture(message);
+      return;
+    }
+
+    if (isExactPlanDayStarterMessage(message)) {
+      await planner.submitMessage(message, inputMode);
+      return;
+    }
 
     if (!routeToPlanner && surface === "companion" && !conversationEnabled) {
       toast.error("Companion Talk is a Premium feature. Planning and scheduling still work here.");

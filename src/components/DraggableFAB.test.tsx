@@ -230,7 +230,9 @@ describe("DraggableFAB", () => {
     render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
 
     fireEvent.click(screen.getByTestId("journeys-companion-launcher-floating"));
-    fireEvent.click(screen.getByTestId("journeys-companion-launcher-option-upcoming"));
+    const upcomingButton = screen.getByTestId("journeys-companion-launcher-option-upcoming");
+    expect(upcomingButton.className).toContain("border-[#315114]");
+    fireEvent.click(upcomingButton);
 
     expect(mocks.onOpenCompanionPlanner).toHaveBeenCalledWith(expect.objectContaining({
       target: "planner",
@@ -239,7 +241,7 @@ describe("DraggableFAB", () => {
     }));
   });
 
-  it("routes the plan-day option through the planner and primes a question-led daily schedule flow", () => {
+  it("routes the plan-day option through the planner as the exact daily planning starter", () => {
     render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
 
     fireEvent.click(screen.getByTestId("journeys-companion-launcher-floating"));
@@ -248,7 +250,7 @@ describe("DraggableFAB", () => {
     expect(mocks.onOpenCompanionPlanner).toHaveBeenCalledWith(expect.objectContaining({
       target: "planner",
       starterIntent: "plan_day",
-      message: expect.stringContaining("Ask me follow-up questions"),
+      message: "Plan my day",
     }));
   });
 

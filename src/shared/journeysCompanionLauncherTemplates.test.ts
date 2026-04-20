@@ -63,9 +63,9 @@ describe("journeys companion launcher greetings", () => {
     expect(templates[1]).toMatchObject({
       id: "plan-day",
       label: "Plan my day",
+      message: "Plan my day",
       target: "planner",
       starterIntent: "plan_day",
     });
-    expect(templates[1]?.message).toContain("Ask me follow-up questions");
   });
 });

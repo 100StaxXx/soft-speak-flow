@@ -348,6 +348,21 @@ describe("useCompanionPlanner", () => {
     ]);
   });
 
+  it("treats an exact typed quest starter like a local quest-capture seed", async () => {
+    const { result } = renderHook(() => useCompanionPlanner({ bootstrapGreeting: false }));
+
+    await act(async () => {
+      await result.current.submitMessage("Quest?", "text");
+    });
+
+    expect(result.current.messages).toHaveLength(1);
+    expect(result.current.messages[0]?.role).toBe("companion");
+    expect(result.current.messages[0]?.content).toBe("Quest?");
+    expect(result.current.sessionState.pendingStarterIntent).toBe("quest_capture");
+    expect(result.current.sessionState.draft.draftKind).toBe("create_quest");
+    expect(mocks.invoke).not.toHaveBeenCalled();
+  });
+
   it("shows a rollout-aware planner error instead of a fake lost-thread message", async () => {
     mocks.invoke.mockResolvedValue({
       data: null,
