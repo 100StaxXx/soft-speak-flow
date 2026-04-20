@@ -38,14 +38,17 @@ describe("JourneysCompanionLauncher", () => {
 
     const launcher = screen.getByTestId("launcher");
     const image = screen.getByRole("img", { name: "Nova" });
+    const heroWrapper = launcher.firstElementChild as HTMLElement;
 
-    expect(launcher).toHaveClass("h-36", "w-36", "overflow-visible", "bg-transparent");
+    expect(launcher).toHaveClass("h-36", "w-36", "overflow-visible", "bg-transparent", "p-0");
     expect(launcher.className).not.toContain("backdrop-blur-xl");
     expect(launcher.className).not.toContain("border-[#4d2811]");
     expect(launcher.querySelectorAll('[aria-hidden="true"]')).toHaveLength(0);
     expect(image).toHaveAttribute("data-companion-image-fit", "portrait");
     expect(image.parentElement).toHaveClass("h-[7.75rem]", "w-[7.75rem]");
     expect(image.parentElement?.className).not.toContain("rounded");
+    expect(heroWrapper).not.toHaveClass("h-full", "w-full");
+    expect(image.parentElement).toHaveStyle("filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.24))");
   });
 
   it("uses contain framing for non-preset hero art", () => {

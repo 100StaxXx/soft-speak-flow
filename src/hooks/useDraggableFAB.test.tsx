@@ -23,20 +23,8 @@ const storage = vi.hoisted(() => {
   };
 });
 
-const motion = vi.hoisted(() => ({
-  dragControls: {
-    start: vi.fn(),
-    subscribe: vi.fn(() => () => {}),
-    cancel: vi.fn(),
-  },
-}));
-
 vi.mock("@/utils/storage", () => ({
   safeLocalStorage: storage.safeLocalStorage,
-}));
-
-vi.mock("framer-motion", () => ({
-  useDragControls: () => motion.dragControls,
 }));
 
 vi.mock("@capacitor/core", () => ({
@@ -60,6 +48,35 @@ import {
   DRAGGABLE_FAB_STORAGE_KEY_V2,
   useDraggableFAB,
 } from "./useDraggableFAB";
+
+const createPointerTarget = () => ({
+  setPointerCapture: vi.fn(),
+  releasePointerCapture: vi.fn(),
+});
+
+const createPointerEvent = ({
+  pointerId = 1,
+  clientX = 0,
+  clientY = 0,
+  pointerType = "touch",
+  button = 0,
+  currentTarget = createPointerTarget(),
+}: {
+  pointerId?: number;
+  clientX?: number;
+  clientY?: number;
+  pointerType?: string;
+  button?: number;
+  currentTarget?: ReturnType<typeof createPointerTarget>;
+} = {}) => ({
+  pointerId,
+  clientX,
+  clientY,
+  pointerType,
+  button,
+  preventDefault: vi.fn(),
+  currentTarget,
+}) as unknown as React.PointerEvent;
 
 const setViewport = ({ width, height }: { width: number; height: number }) => {
   Object.defineProperty(window, "innerWidth", {
@@ -144,19 +161,13 @@ describe("useDraggableFAB", () => {
   it("starts dragging from the same sustained press after the long-press threshold", () => {
     vi.useFakeTimers();
     const { result } = renderHook(() => useDraggableFAB());
-    const pointerEvent = {
+    const currentTarget = createPointerTarget();
+    const pointerEvent = createPointerEvent({
       pointerId: 7,
       clientX: 250,
       clientY: 540,
-      pointerType: "touch",
-      button: 0,
-      preventDefault: vi.fn(),
-      nativeEvent: { pointerId: 7, clientX: 250, clientY: 540 } as unknown as PointerEvent,
-      currentTarget: {
-        setPointerCapture: vi.fn(),
-        releasePointerCapture: vi.fn(),
-      },
-    } as unknown as React.PointerEvent;
+      currentTarget,
+    });
 
     act(() => {
       result.current.longPressHandlers.onPointerDown(pointerEvent);
@@ -164,109 +175,124 @@ describe("useDraggableFAB", () => {
     });
 
     expect(result.current.isLongPressing).toBe(true);
-    expect(pointerEvent.currentTarget.releasePointerCapture).toHaveBeenCalledWith(7);
-    expect(motion.dragControls.start).toHaveBeenCalledWith(pointerEvent.nativeEvent, { snapToCursor: false });
+    expect(result.current.isDragging).toBe(true);
+    expect(currentTarget.setPointerCapture).toHaveBeenCalledWith(7);
   });
 
   it("cancels drag activation when the pointer moves beyond the threshold before long press completes", () => {
     vi.useFakeTimers();
     const { result } = renderHook(() => useDraggableFAB());
+    const currentTarget = createPointerTarget();
 
     act(() => {
-      result.current.longPressHandlers.onPointerDown({
+      result.current.longPressHandlers.onPointerDown(createPointerEvent({
         pointerId: 8,
         clientX: 240,
         clientY: 536,
-        pointerType: "touch",
-        button: 0,
-        preventDefault: vi.fn(),
-        nativeEvent: { pointerId: 8, clientX: 240, clientY: 536 } as unknown as PointerEvent,
-        currentTarget: {
-          setPointerCapture: vi.fn(),
-          releasePointerCapture: vi.fn(),
-        },
-      } as unknown as React.PointerEvent);
-      result.current.longPressHandlers.onPointerMove({
+        currentTarget,
+      }));
+      result.current.longPressHandlers.onPointerMove(createPointerEvent({
+        pointerId: 8,
         clientX: 270,
         clientY: 536,
-        nativeEvent: { pointerId: 8, clientX: 270, clientY: 536 } as unknown as PointerEvent,
-      } as unknown as React.PointerEvent);
+      }));
       vi.advanceTimersByTime(500);
     });
 
     expect(result.current.isLongPressing).toBe(false);
-    expect(motion.dragControls.start).not.toHaveBeenCalled();
+    expect(result.current.isDragging).toBe(false);
+    expect(currentTarget.releasePointerCapture).toHaveBeenCalledWith(8);
   });
 
   it("does not activate drag when the pointer is released before the threshold", () => {
     vi.useFakeTimers();
     const { result } = renderHook(() => useDraggableFAB());
+    const currentTarget = createPointerTarget();
 
     act(() => {
-      result.current.longPressHandlers.onPointerDown({
+      result.current.longPressHandlers.onPointerDown(createPointerEvent({
         pointerId: 9,
         clientX: 240,
         clientY: 536,
         pointerType: "mouse",
-        button: 0,
-        preventDefault: vi.fn(),
-        nativeEvent: { pointerId: 9, clientX: 240, clientY: 536 } as unknown as PointerEvent,
-        currentTarget: {
-          setPointerCapture: vi.fn(),
-          releasePointerCapture: vi.fn(),
-        },
-      } as unknown as React.PointerEvent);
-      result.current.longPressHandlers.onPointerUp();
+        currentTarget,
+      }));
+      result.current.longPressHandlers.onPointerUp(createPointerEvent({
+        pointerId: 9,
+        clientX: 240,
+        clientY: 536,
+        pointerType: "mouse",
+        currentTarget,
+      }));
       vi.advanceTimersByTime(500);
     });
 
     expect(result.current.isLongPressing).toBe(false);
-    expect(motion.dragControls.start).not.toHaveBeenCalled();
+    expect(result.current.isDragging).toBe(false);
   });
 
-  it("clamps a dragged drop to the safe viewport bounds and persists the new coordinates", async () => {
+  it("updates the launcher position live while the active drag follows the pointer", () => {
     vi.useFakeTimers();
     const { result } = renderHook(() => useDraggableFAB());
+    const currentTarget = createPointerTarget();
 
     act(() => {
-      result.current.longPressHandlers.onPointerDown({
+      result.current.longPressHandlers.onPointerDown(createPointerEvent({
         pointerId: 10,
-        clientX: 240,
-        clientY: 536,
-        pointerType: "touch",
-        button: 0,
-        preventDefault: vi.fn(),
-        nativeEvent: { pointerId: 10, clientX: 240, clientY: 536 } as unknown as PointerEvent,
-        currentTarget: {
-          setPointerCapture: vi.fn(),
-          releasePointerCapture: vi.fn(),
-        },
-      } as unknown as React.PointerEvent);
+        clientX: 300,
+        clientY: 596,
+        currentTarget,
+      }));
       vi.advanceTimersByTime(500);
     });
 
     act(() => {
-      result.current.onDragStart();
+      result.current.longPressHandlers.onPointerMove(createPointerEvent({
+        pointerId: 10,
+        clientX: 180,
+        clientY: 220,
+        currentTarget,
+      }));
     });
 
+    expect(result.current.position).toEqual({ x: 120, y: 160 });
     expect(result.current.isDragging).toBe(true);
+  });
+
+  it("persists the exact release point from the active drag session", async () => {
+    vi.useFakeTimers();
+    const { result } = renderHook(() => useDraggableFAB());
+    const currentTarget = createPointerTarget();
 
     act(() => {
-      result.current.onDragEnd(
-        {} as MouseEvent,
-        {
-          offset: { x: 500, y: -1000 },
-        } as never,
-      );
+      result.current.longPressHandlers.onPointerDown(createPointerEvent({
+        pointerId: 11,
+        clientX: 300,
+        clientY: 596,
+        currentTarget,
+      }));
+      vi.advanceTimersByTime(500);
+      result.current.longPressHandlers.onPointerMove(createPointerEvent({
+        pointerId: 11,
+        clientX: 180,
+        clientY: 220,
+        currentTarget,
+      }));
+      result.current.longPressHandlers.onPointerUp(createPointerEvent({
+        pointerId: 11,
+        clientX: 210,
+        clientY: 270,
+        currentTarget,
+      }));
     });
 
-    expect(result.current.position).toEqual({ x: 240, y: 80 });
+    expect(result.current.position).toEqual({ x: 150, y: 210 });
     expect(result.current.isDragging).toBe(false);
     expect(result.current.isLongPressing).toBe(false);
 
     expect(storage.safeLocalStorage.setItem).toHaveBeenLastCalledWith(
       DRAGGABLE_FAB_STORAGE_KEY_V2,
-      JSON.stringify({ x: 240, y: 80 }),
+      JSON.stringify({ x: 150, y: 210 }),
     );
   });
 

@@ -58,14 +58,6 @@ export const DraggableFAB = ({ onOpenCompanionPlanner }: DraggableFABProps) => {
     popupAlignment,
     isDragging,
     isLongPressing,
-    drag,
-    dragControls,
-    dragListener,
-    dragConstraints,
-    dragElastic,
-    dragMomentum,
-    onDragStart,
-    onDragEnd,
     longPressHandlers,
     positionStyles,
   } = useDraggableFAB({
@@ -117,10 +109,6 @@ export const DraggableFAB = ({ onOpenCompanionPlanner }: DraggableFABProps) => {
       },
     };
   })();
-
-  const handleTouchStart = (event: React.TouchEvent) => {
-    event.preventDefault();
-  };
 
   const closeMenu = useCallback(() => {
     setIsMenuOpen(false);
@@ -179,11 +167,8 @@ export const DraggableFAB = ({ onOpenCompanionPlanner }: DraggableFABProps) => {
   return (
     <motion.div
       ref={rootRef}
-      initial={{ scale: 0, opacity: 0 }}
-      animate={{
-        scale: isDragging ? 1.15 : 1,
-        opacity: 1,
-      }}
+      initial={{ scale: 0.94, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
       style={{
         position: "fixed",
         zIndex: 50,
@@ -193,14 +178,6 @@ export const DraggableFAB = ({ onOpenCompanionPlanner }: DraggableFABProps) => {
         ...positionStyles,
       }}
       className={cn("flex touch-none select-none flex-col gap-2")}
-      drag={drag}
-      dragControls={dragControls}
-      dragListener={dragListener}
-      dragConstraints={dragConstraints}
-      dragElastic={dragElastic}
-      dragMomentum={dragMomentum}
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
       {...longPressHandlers}
     >
       <JourneysCompanionLauncherPopup
@@ -231,13 +208,7 @@ export const DraggableFAB = ({ onOpenCompanionPlanner }: DraggableFABProps) => {
             setIsMenuOpen((previous) => !previous);
           }
         }}
-        onTouchStart={handleTouchStart}
         className="touch-none select-none"
-        style={{
-          boxShadow: isDragging
-            ? "0 8px 30px rgba(0,0,0,0.3)"
-            : "0 2px 8px rgba(0,0,0,0.1)",
-        }}
       />
     </motion.div>
   );

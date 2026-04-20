@@ -25,25 +25,9 @@ const storage = vi.hoisted(() => {
   };
 });
 
-const motion = vi.hoisted(() => ({
-  dragControls: {
-    start: vi.fn(),
-    subscribe: vi.fn(() => () => {}),
-    cancel: vi.fn(),
-  },
-}));
-
 vi.mock("@/utils/storage", () => ({
   safeLocalStorage: storage.safeLocalStorage,
 }));
-
-vi.mock("framer-motion", async () => {
-  const actual = await vi.importActual<typeof import("framer-motion")>("framer-motion");
-  return {
-    ...actual,
-    useDragControls: () => motion.dragControls,
-  };
-});
 
 const mocks = vi.hoisted(() => ({
   onOpenCompanionPlanner: vi.fn(),
@@ -126,6 +110,7 @@ describe("DraggableFAB", () => {
     expect(launcher.className).not.toContain("backdrop-blur-xl");
     expect(launcher.querySelectorAll('[aria-hidden="true"]')).toHaveLength(0);
     expect(image.parentElement).toHaveClass("h-[7.75rem]", "w-[7.75rem]");
+    expect(launcher.style.boxShadow).toBe("");
     expect(launcher).toHaveAttribute("data-face-direction", "away");
 
     fireEvent.click(launcher);
@@ -135,24 +120,35 @@ describe("DraggableFAB", () => {
     expect(mocks.onOpenCompanionPlanner).not.toHaveBeenCalled();
   });
 
-  it("starts drag controls after a long press and does not open the popup from that same press", () => {
+  it("suppresses popup open after a completed long-press drag interaction", async () => {
     vi.useFakeTimers();
     render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
 
     const launcher = screen.getByTestId("journeys-companion-launcher-floating");
+    const root = launcher.parentElement as HTMLElement;
 
     act(() => {
-      fireEvent.pointerDown(launcher, {
+      fireEvent.pointerDown(root, {
         pointerId: 7,
         pointerType: "touch",
         button: 0,
-        clientX: 240,
-        clientY: 536,
+        clientX: 300,
+        clientY: 596,
       });
       vi.advanceTimersByTime(500);
+      fireEvent.pointerMove(root, {
+        pointerId: 7,
+        pointerType: "touch",
+        clientX: 180,
+        clientY: 220,
+      });
+      fireEvent.pointerUp(root, {
+        pointerId: 7,
+        pointerType: "touch",
+        clientX: 210,
+        clientY: 270,
+      });
     });
-
-    expect(motion.dragControls.start).toHaveBeenCalledTimes(1);
 
     fireEvent.click(launcher);
 
@@ -170,7 +166,7 @@ describe("DraggableFAB", () => {
       starterIntent: "general",
     }));
     await waitFor(() => {
-      expect(screen.queryByTestId("journeys-companion-launcher-popup")).not.toBeInTheDocument();
+      expect(screen.getByTestId("journeys-companion-launcher-popup")).toHaveStyle("opacity: 0");
     });
   });
 
@@ -190,7 +186,7 @@ describe("DraggableFAB", () => {
     fireEvent.pointerDown(screen.getByTestId("outside"));
 
     await waitFor(() => {
-      expect(screen.queryByTestId("journeys-companion-launcher-popup")).not.toBeInTheDocument();
+      expect(screen.getByTestId("journeys-companion-launcher-popup")).toHaveStyle("opacity: 0");
     });
   });
 
