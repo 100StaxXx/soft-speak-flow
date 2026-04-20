@@ -489,6 +489,37 @@ describe("JourneysCompanionPlannerModal", () => {
     expect(mocks.assistant.submitPlannerMessage).not.toHaveBeenCalled();
   });
 
+  it("does not show planner starter templates for custom free-chat openers", () => {
+    mocks.state.messages = [
+      {
+        id: "chat-1",
+        role: "assistant",
+        content: "What's good homie?",
+        createdAt: "2026-04-18T08:00:00.000Z",
+        source: "chat",
+        isSeed: true,
+      },
+    ];
+    mocks.state.questions = [];
+    mocks.state.proposals = [];
+    mocks.state.pendingProposals = [];
+    mocks.state.readyProposalCount = 0;
+
+    render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        presentation="dialog"
+      />,
+    );
+
+    expect(screen.getByText("What's good homie?")).toBeInTheDocument();
+    expect(screen.queryByTestId("journeys-companion-planner-starter-options")).not.toBeInTheDocument();
+    for (const starter of COMPANION_PLANNER_STARTER_TEMPLATES) {
+      expect(screen.queryByRole("button", { name: starter })).not.toBeInTheDocument();
+    }
+  });
+
   it("strips raw markdown markers from assistant transcript bubbles", async () => {
     mocks.state.messages = [
       {

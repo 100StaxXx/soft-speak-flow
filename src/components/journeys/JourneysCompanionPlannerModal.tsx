@@ -483,9 +483,12 @@ const JourneysCompanionOverlayBody = memo(({
     ? getCompanionPlannerQuestProposalPreview(activeProposal)
     : null;
   const activeOptionQuestions = assistant.questions.filter((question) => (question.options?.length ?? 0) > 0);
-  const showStarterQuickReplies = assistant.messages.length === 1
-    && assistant.messages[0]?.role === "assistant"
-    && assistant.messages[0]?.isSeed === true
+  const seededOpenerMessage = assistant.messages.length === 1
+    ? assistant.messages[0]
+    : null;
+  const showStarterQuickReplies = seededOpenerMessage?.role === "assistant"
+    && seededOpenerMessage.isSeed === true
+    && seededOpenerMessage.content === assistant.greeting
     && plannerQuestionHistory.length === 0
     && assistant.pendingProposals.length === 0;
   const micButtonLabel = assistant.isRecording ? "Stop voice reply" : "Start voice reply";
