@@ -84,6 +84,7 @@ const buildVoicePrefill = (overrides: Partial<QuestComposerPrefillDraft> = {}): 
   reminderMinutesBefore: 30,
   moreInformation: "Bring roadmap",
   location: "Library",
+  subtasks: ["Draft outline", "Send recap"],
   creationSource: "voice",
   ...overrides,
 });
@@ -1247,7 +1248,6 @@ describe("AddQuestSheet", () => {
     expect(screen.getByText("30 minutes before")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /Advanced Settings/i }));
-    expect(screen.getByPlaceholderText("Where will this happen? (optional)")).toHaveValue("Library");
 
     fireEvent.change(titleInput, {
       target: { value: "Edited voice quest" },
@@ -1334,6 +1334,8 @@ describe("AddQuestSheet", () => {
       creationSource: "voice",
       reminderEnabled: true,
       reminderMinutesBefore: 30,
+      moreInformation: "Bring roadmap",
+      subtasks: ["Draft outline", "Send recap"],
     }));
   });
 

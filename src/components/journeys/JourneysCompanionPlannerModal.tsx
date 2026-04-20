@@ -69,6 +69,9 @@ interface JourneysCompanionPlannerModalProps {
   launchIntent?: CompanionPlannerLaunchIntent | null;
   onLaunchIntentConsumed?: (intentId: string) => void;
   onOpenCampaignBuilder?: (message: string) => void;
+  onQuestProposalEditHandoff?: (
+    proposal: CompanionPlannerProposal,
+  ) => Promise<{ saved: boolean; savedTitle?: string | null }>;
 }
 
 type DialogueEntry = {
@@ -132,6 +135,11 @@ const formatThreadTimestamp = (value: string) => {
     return "Just now";
   }
 };
+
+const isQuestProposalEditable = (proposal: CompanionPlannerProposal): boolean =>
+  proposal.kind === "create_quest"
+  || proposal.kind === "update_quest"
+  || proposal.kind === "suggest_reminder";
 
 interface JourneysCompanionThreadPickerProps {
   open: boolean;
@@ -249,12 +257,16 @@ const JourneysCompanionOverlayBody = memo(({
   launchIntent,
   onLaunchIntentConsumed,
   onOpenCampaignBuilder,
+  onQuestProposalEditHandoff,
   drawerLayout,
 }: {
   presentation: JourneysCompanionPlannerModalPresentation;
   launchIntent?: CompanionPlannerLaunchIntent | null;
   onLaunchIntentConsumed?: (intentId: string) => void;
   onOpenCampaignBuilder?: (message: string) => void;
+  onQuestProposalEditHandoff?: (
+    proposal: CompanionPlannerProposal,
+  ) => Promise<{ saved: boolean; savedTitle?: string | null }>;
   drawerLayout?: JourneysCompanionDrawerLayout;
 }) => {
   const {
@@ -276,12 +288,14 @@ const JourneysCompanionOverlayBody = memo(({
   const isDrawerPresentation = presentation === "drawer";
 
   const [isThreadPickerOpen, setIsThreadPickerOpen] = useState(false);
+  const [proposalActionId, setProposalActionId] = useState<string | null>(null);
   const [typingMessageId, setTypingMessageId] = useState<string | null>(null);
   const [typedAssistantContent, setTypedAssistantContent] = useState("");
 
   const typingIntervalRef = useRef<number | null>(null);
   const typingTargetRef = useRef<{ id: string; content: string } | null>(null);
   const hasSettledInitialTranscriptRef = useRef(false);
+  const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const transcriptEndRef = useRef<HTMLDivElement | null>(null);
   const transcriptScrollAreaRef = useRef<HTMLDivElement | null>(null);
   const activeThreadSessionId = assistant.activeThread?.sessionId ?? null;
@@ -393,6 +407,20 @@ const JourneysCompanionOverlayBody = memo(({
     keepBottomContentVisible("auto");
   }, [drawerLayout, isDrawerPresentation, keepBottomContentVisible]);
 
+  const syncComposerHeight = useCallback(() => {
+    const composer = composerRef.current;
+    if (!composer) return;
+
+    composer.style.height = "0px";
+    const nextHeight = Math.max(48, Math.min(140, composer.scrollHeight));
+    composer.style.height = `${nextHeight}px`;
+    composer.style.overflowY = composer.scrollHeight > 140 ? "auto" : "hidden";
+  }, []);
+
+  useLayoutEffect(() => {
+    syncComposerHeight();
+  }, [assistant.draftInput, syncComposerHeight]);
+
   const handleSubmit = useCallback(() => {
     if (typingMessageId) {
       completeCurrentAssistantLine();
@@ -447,11 +475,23 @@ const JourneysCompanionOverlayBody = memo(({
     await assistant.startNewChat();
   }, [assistant]);
 
+  const handleQuestProposalEdit = useCallback(async (proposal: CompanionPlannerProposal) => {
+    if (!onQuestProposalEditHandoff) return;
+
+    setProposalActionId(proposal.id);
+    try {
+      const result = await onQuestProposalEditHandoff(proposal);
+      if (result.saved) {
+        await assistant.completeProposalEdit(proposal.id, {
+          savedTitle: result.savedTitle ?? proposal.title,
+        });
+      }
+    } finally {
+      setProposalActionId((currentId) => (currentId === proposal.id ? null : currentId));
+    }
+  }, [assistant, onQuestProposalEditHandoff]);
+
   const sendDisabled = assistant.isSubmitting || assistant.isClassifying || (!typingMessageId && !assistant.draftInput.trim());
-  const activeProposal = assistant.pendingProposals[0] ?? null;
-  const activeQuestPreview = activeProposal
-    ? getCompanionPlannerQuestProposalPreview(activeProposal)
-    : null;
   const activeOptionQuestions = hasReadyProposal
     ? []
     : assistant.questions.filter((question) => (question.options?.length ?? 0) > 0);
@@ -632,98 +672,138 @@ const JourneysCompanionOverlayBody = memo(({
                 );
               })}
 
-              {activeProposal ? (
-                <div className="flex w-full justify-start">
-                  <div
-                    className={cn(plannerPathfinderTheme.raisedPanel, "max-w-[88%] p-4")}
-                    data-testid="journeys-companion-planner-inline-proposal"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/[0.55]">
-                          {proposalKindLabel(activeProposal)}
-                        </p>
-                        <p className="mt-1 text-sm font-semibold text-white">{activeProposal.title}</p>
-                        <p className="mt-1 text-sm text-white/[0.72]">{activeProposal.summary}</p>
-                        {!activeProposal.readyToConfirm && activeProposal.missingFields?.length ? (
-                          <p className="mt-1 text-xs text-amber-100/[0.7]">
-                            Still waiting on: {activeProposal.missingFields.join(", ")}.
-                          </p>
-                        ) : null}
-                      </div>
-                      <Badge variant="outline" className={plannerPathfinderTheme.chip}>
-                        {activeProposal.status}
-                      </Badge>
-                    </div>
-                    {activeQuestPreview?.notes ? (
-                      <div
-                        className={cn(plannerPathfinderTheme.mutedPanel, "mt-3 p-3")}
-                        data-testid={`journeys-companion-planner-inline-proposal-notes-${activeProposal.id}`}
-                      >
-                        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/[0.46]">
-                          Stored note
-                        </p>
-                        <p className="mt-1 text-sm text-white/[0.78]">{activeQuestPreview.notes}</p>
-                      </div>
-                    ) : null}
-                    {activeQuestPreview?.subtasks.length ? (
-                      <div
-                        className={cn(plannerPathfinderTheme.mutedPanel, "mt-3 p-3")}
-                        data-testid={`journeys-companion-planner-inline-proposal-subtasks-${activeProposal.id}`}
-                      >
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/[0.46]">
-                            {activeQuestPreview.subtasks.length} step{activeQuestPreview.subtasks.length === 1 ? "" : "s"}
-                          </p>
-                          {activeProposal.kind === "update_quest" && activeQuestPreview.subtaskPlanMode ? (
-                            <Badge variant="outline" className="border-emerald-300/20 bg-emerald-400/10 text-emerald-50">
-                              {activeQuestPreview.subtaskPlanMode === "replace" ? "Replace steps" : "Append steps"}
+              {assistant.pendingProposals.length > 0 ? (
+                <div
+                  className="space-y-3"
+                  data-testid="journeys-companion-planner-inline-proposals"
+                >
+                  {assistant.pendingProposals.map((proposal) => {
+                    const proposalPreview = getCompanionPlannerQuestProposalPreview(proposal);
+                    const proposalIsEditable = isQuestProposalEditable(proposal) && !!onQuestProposalEditHandoff;
+                    const isProposalBusy = proposalActionId === proposal.id;
+
+                    return (
+                      <div key={proposal.id} className="flex w-full justify-start">
+                        <div
+                          className={cn(plannerPathfinderTheme.raisedPanel, "max-w-[88%] p-4")}
+                          data-testid={`journeys-companion-planner-inline-proposal-${proposal.id}`}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/[0.55]">
+                                {proposalKindLabel(proposal)}
+                              </p>
+                              <p className="mt-1 text-sm font-semibold text-white">{proposal.title}</p>
+                              <p className="mt-1 text-sm text-white/[0.72]">{proposal.summary}</p>
+                              {!proposal.readyToConfirm && proposal.missingFields?.length ? (
+                                <p className="mt-1 text-xs text-amber-100/[0.7]">
+                                  Still waiting on: {proposal.missingFields.join(", ")}.
+                                </p>
+                              ) : null}
+                            </div>
+                            <Badge variant="outline" className={plannerPathfinderTheme.chip}>
+                              {proposal.status}
                             </Badge>
+                          </div>
+                          {proposalPreview?.notes ? (
+                            <div
+                              className={cn(plannerPathfinderTheme.mutedPanel, "mt-3 p-3")}
+                              data-testid={`journeys-companion-planner-inline-proposal-notes-${proposal.id}`}
+                            >
+                              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/[0.46]">
+                                Stored note
+                              </p>
+                              <p className="mt-1 text-sm text-white/[0.78]">{proposalPreview.notes}</p>
+                            </div>
                           ) : null}
-                        </div>
-                        <div className="mt-2 space-y-1">
-                          {activeQuestPreview.subtasks.map((subtask) => (
-                            <p key={subtask} className="text-sm text-white/[0.78]">
-                              - {subtask}
-                            </p>
-                          ))}
+                          {proposalPreview?.subtasks.length ? (
+                            <div
+                              className={cn(plannerPathfinderTheme.mutedPanel, "mt-3 p-3")}
+                              data-testid={`journeys-companion-planner-inline-proposal-subtasks-${proposal.id}`}
+                            >
+                              <div className="flex flex-wrap items-center gap-2">
+                                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/[0.46]">
+                                  {proposalPreview.subtasks.length} step{proposalPreview.subtasks.length === 1 ? "" : "s"}
+                                </p>
+                                {proposal.kind === "update_quest" && proposalPreview.subtaskPlanMode ? (
+                                  <Badge variant="outline" className="border-emerald-300/20 bg-emerald-400/10 text-emerald-50">
+                                    {proposalPreview.subtaskPlanMode === "replace" ? "Replace steps" : "Append steps"}
+                                  </Badge>
+                                ) : null}
+                              </div>
+                              <div className="mt-2 space-y-1">
+                                {proposalPreview.subtasks.map((subtask) => (
+                                  <p key={subtask} className="text-sm text-white/[0.78]">
+                                    - {subtask}
+                                  </p>
+                                ))}
+                              </div>
+                            </div>
+                          ) : null}
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <Button
+                              type="button"
+                              size="sm"
+                              className={plannerPathfinderTheme.primaryButton}
+                              onClick={() => assistant.confirmProposal(proposal.id)}
+                              disabled={!proposal.readyToConfirm || isProposalBusy}
+                            >
+                              <Check className="mr-2 h-4 w-4" />
+                              Confirm
+                            </Button>
+                            {proposalIsEditable ? (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className={plannerPathfinderTheme.outlineButton}
+                                onClick={() => {
+                                  void handleQuestProposalEdit(proposal);
+                                }}
+                                disabled={isProposalBusy}
+                              >
+                                {isProposalBusy ? (
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                ) : (
+                                  <ChevronRight className="mr-2 h-4 w-4" />
+                                )}
+                                Edit
+                              </Button>
+                            ) : (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className={plannerPathfinderTheme.outlineButton}
+                                onClick={() => assistant.rejectProposal(proposal.id)}
+                                disabled={isProposalBusy}
+                              >
+                                <X className="mr-2 h-4 w-4" />
+                                Reject
+                              </Button>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    ) : null}
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        className={plannerPathfinderTheme.primaryButton}
-                        onClick={() => assistant.confirmProposal(activeProposal.id)}
-                        disabled={!activeProposal.readyToConfirm}
-                      >
-                        <Check className="mr-2 h-4 w-4" />
-                        Confirm
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className={plannerPathfinderTheme.outlineButton}
-                        onClick={() => assistant.rejectProposal(activeProposal.id)}
-                      >
-                        <X className="mr-2 h-4 w-4" />
-                        Reject
-                      </Button>
-                      {assistant.readyProposalCount > 1 ? (
+                    );
+                  })}
+
+                  {assistant.readyProposalCount > 1 ? (
+                    <div className="flex w-full justify-start">
+                      <div className={cn(plannerPathfinderTheme.raisedPanel, "max-w-[88%] p-3")}>
                         <Button
                           type="button"
                           size="sm"
                           variant="outline"
                           className={plannerPathfinderTheme.outlineButton}
                           onClick={assistant.confirmAll}
+                          disabled={proposalActionId !== null}
                         >
                           Confirm all
                         </Button>
-                      ) : null}
+                      </div>
                     </div>
-                  </div>
+                  ) : null}
                 </div>
               ) : null}
 
@@ -814,6 +894,7 @@ const JourneysCompanionOverlayBody = memo(({
                 Message your companion
               </label>
               <Textarea
+                ref={composerRef}
                 id="journeys-companion-chat-input"
                 rows={1}
                 value={assistant.draftInput}
@@ -825,8 +906,9 @@ const JourneysCompanionOverlayBody = memo(({
                 placeholder={assistant.placeholder}
                 className={cn(
                   plannerPathfinderTheme.textField,
-                  "h-12 min-h-[48px] max-h-[48px] flex-1 w-auto resize-none overflow-y-auto leading-5",
+                  "min-h-[48px] max-h-[140px] flex-1 w-auto resize-none leading-5",
                 )}
+                style={{ height: "48px", overflowY: "hidden" }}
                 data-testid="journeys-companion-planner-text-input"
               />
               <Button
@@ -883,6 +965,7 @@ export const JourneysCompanionPlannerModal = memo(function JourneysCompanionPlan
   launchIntent,
   onLaunchIntentConsumed,
   onOpenCampaignBuilder,
+  onQuestProposalEditHandoff,
 }: JourneysCompanionPlannerModalProps) {
   const isDrawerPresentation = presentation === "drawer";
   const [drawerLayout, setDrawerLayout] = useState<JourneysCompanionDrawerLayout>(() => getDrawerLayout());
@@ -928,6 +1011,7 @@ export const JourneysCompanionPlannerModal = memo(function JourneysCompanionPlan
       launchIntent={launchIntent}
       onLaunchIntentConsumed={onLaunchIntentConsumed}
       onOpenCampaignBuilder={onOpenCampaignBuilder}
+      onQuestProposalEditHandoff={onQuestProposalEditHandoff}
       drawerLayout={isDrawerPresentation ? drawerLayout : undefined}
     />
   ) : null;

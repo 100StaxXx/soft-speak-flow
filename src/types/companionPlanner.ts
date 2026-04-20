@@ -48,7 +48,7 @@ export type CompanionPlannerMessageRole = "companion" | "user";
 
 export type CompanionPlannerInputMode = "text" | "voice";
 
-export type CompanionPlannerProposalStatus = "pending" | "confirmed" | "rejected";
+export type CompanionPlannerProposalStatus = "pending" | "confirmed" | "modified" | "rejected";
 
 export interface CompanionPlannerQuestion {
   id: string;

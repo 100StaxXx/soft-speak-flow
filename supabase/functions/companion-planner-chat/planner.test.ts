@@ -785,7 +785,7 @@ Deno.test("turns high vitality need into a confirmable recovery block", () => {
   );
 });
 
-Deno.test("keeps timing follow-ups for vague one-off placement requests without a concrete time", () => {
+Deno.test("keeps vague one-off placement requests confirmable without a concrete time", () => {
   const result = buildPlannerResponse(baseInput({
     message: "Schedule gym tomorrow",
     currentDate: "2026-04-19",
@@ -807,10 +807,22 @@ Deno.test("keeps timing follow-ups for vague one-off placement requests without 
   }));
 
   assertEquals(result.proposals[0].kind, "create_quest");
-  assertEquals(result.proposals[0].readyToConfirm, false);
-  assertEquals(result.followUpQuestions.map((question) => question.field), [
-    "time_of_day",
-  ]);
+  assertEquals(result.proposals[0].readyToConfirm, true);
+  assertEquals(result.followUpQuestions.length, 0);
+  assertEquals(
+    (result.proposals[0].payload as {
+      taskDate: string | null;
+      scheduledTime: string | null;
+    }).taskDate,
+    "2026-04-20",
+  );
+  assertEquals(
+    (result.proposals[0].payload as {
+      taskDate: string | null;
+      scheduledTime: string | null;
+    }).scheduledTime,
+    null,
+  );
 });
 
 Deno.test("treats concrete scheduled actions as quests even when the classifier says epic", () => {
@@ -900,10 +912,8 @@ Deno.test("defaults repeated standalone work to a recurring quest", () => {
 
   assertEquals(result.proposals[0].kind, "create_quest");
   assertStringIncludes(result.proposals[0].summary, "recurring quest");
-  assertEquals(
-    result.followUpQuestions.map((question) => question.field),
-    ["time_of_day", "end_date"],
-  );
+  assertEquals(result.proposals[0].readyToConfirm, true);
+  assertEquals(result.followUpQuestions.length, 0);
 });
 
 Deno.test("promotes multi-step goals to campaigns", () => {
@@ -1412,7 +1422,7 @@ Deno.test("does not jump straight to timing questions for broad day-planning ask
   assertStringIncludes(result.reply, "Today has room at 9:00 am");
 });
 
-Deno.test("adds a balancing question when the selected window is overloaded", () => {
+Deno.test("keeps overloaded-day guidance in the reply without blocking confirmation", () => {
   const result = buildPlannerResponse(baseInput({
     message: "Write my launch notes",
     horizon: "week",
@@ -1473,25 +1483,10 @@ Deno.test("adds a balancing question when the selected window is overloaded", ()
     },
   }));
 
-  assertEquals(
-    result.followUpQuestions.some((question) => question.field === "details"),
-    true,
-  );
-  assertStringIncludes(
-    result.followUpQuestions.find((question) => question.field === "details")
-      ?.prompt ?? "",
-    "2026-04-19",
-  );
-  assertStringIncludes(
-    result.followUpQuestions.find((question) => question.field === "details")
-      ?.prompt ?? "",
-    "10:00 am",
-  );
-  assertStringIncludes(
-    result.followUpQuestions.find((question) => question.field === "details")
-      ?.reason ?? "",
-    "10:00 am",
-  );
+  assertEquals(result.proposals[0].readyToConfirm, true);
+  assertEquals(result.followUpQuestions.length, 0);
+  assertStringIncludes(result.reply, "2026-04-19");
+  assertStringIncludes(result.reply, "10:00 am");
 });
 
 Deno.test("answers schedule questions with quests and connected calendar events without creating proposals", () => {
@@ -2049,7 +2044,7 @@ Deno.test("quest_capture uses planner memory when a date-only reply has no match
   );
 });
 
-Deno.test("quest_capture asks one timing question when a date-only reply has no safe time assumption", () => {
+Deno.test("quest_capture keeps a date-only reply confirmable when no safe time assumption exists", () => {
   const intake = buildPlannerResponse(baseInput({
     message: "Quest?",
     parsedInput: {
@@ -2106,15 +2101,21 @@ Deno.test("quest_capture asks one timing question when a date-only reply has no 
   }));
 
   assertEquals(result.proposals[0].kind, "create_quest");
-  assertEquals(result.proposals[0].readyToConfirm, false);
-  assertEquals(result.followUpQuestions.map((question) => question.field), [
-    "time_of_day",
-  ]);
+  assertEquals(result.proposals[0].readyToConfirm, true);
+  assertEquals(result.followUpQuestions.length, 0);
   assertEquals(
-    result.followUpQuestions.some((question) =>
-      question.field === "time_reason"
-    ),
-    false,
+    (result.proposals[0].payload as {
+      taskDate: string | null;
+      scheduledTime: string | null;
+    }).taskDate,
+    "2026-04-19",
+  );
+  assertEquals(
+    (result.proposals[0].payload as {
+      taskDate: string | null;
+      scheduledTime: string | null;
+    }).scheduledTime,
+    null,
   );
 });
 

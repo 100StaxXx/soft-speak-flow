@@ -537,6 +537,7 @@ export function useCompanionAssistant({
     requestMicrophonePermission,
     confirmProposal: planner.confirmProposal,
     rejectProposal: planner.rejectProposal,
+    completeProposalEdit: planner.completeProposalEdit,
     confirmAll: planner.confirmAll,
     autoplayVoice: companionChat.autoplayVoice,
     setAutoplayVoice: companionChat.setAutoplayVoice,

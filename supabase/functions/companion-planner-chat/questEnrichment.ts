@@ -15,8 +15,6 @@ const KEEP_SIMPLE_OPTION = "Keep it simple";
 const ADD_NOTES_OPTION = "Add notes";
 const BREAK_IT_DOWN_OPTION = "Break it into steps";
 
-const MULTI_STEP_QUEST_REGEX =
-  /\b(workout|gym|exercise|training|meal prep|errands|deep clean|cleaning|packing|trip prep|prep|meeting prep|study plan|reset|routine)\b/i;
 const DETAIL_REQUEST_REGEX =
   /\b(add|save|include|capture|put)\b.*\b(details?|info|information|notes?|description)\b|\b(details?|info|information|notes?|description)\b/i;
 const BREAKDOWN_REQUEST_REGEX =
@@ -199,14 +197,6 @@ const isRenameOnlyUpdate = (
   return Object.keys(updates).length === 1 && typeof updates.task_text === "string";
 };
 
-const hasExplicitTiming = (input: PlannerBuildInput): boolean =>
-  Boolean(input.parsedInput?.scheduledTime);
-
-const hasInlineQuestDetails = (input: PlannerBuildInput): boolean =>
-  Boolean(input.parsedInput?.notes) ||
-  /:\s*.+$/.test(input.message) ||
-  /\b(?:with|including|for)\b\s+.+/i.test(input.message);
-
 const extractInlineQuestDetails = (
   input: PlannerBuildInput,
 ): string | null => {
@@ -252,13 +242,10 @@ const shouldOfferQuestEnrichment = (
   }
 
   if (proposal.kind !== "create_quest") return false;
-  if (hasExplicitTiming(input)) return false;
-  if (hasInlineQuestDetails(input)) return false;
 
-  const questTitle = getQuestTitle(proposal, input);
-  const wordCount = questTitle.split(/\s+/).filter(Boolean).length;
-
-  return MULTI_STEP_QUEST_REGEX.test(questTitle) && wordCount <= 4;
+  // Default quest creation should go straight to confirm instead of asking
+  // whether to add notes or a breakdown.
+  return false;
 };
 
 const buildQuestEnrichmentSummary = (

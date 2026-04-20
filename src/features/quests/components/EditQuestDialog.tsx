@@ -85,6 +85,7 @@ interface EditQuestDialogProps {
     image_url: string | null;
     location: string | null;
     attachments?: QuestAttachmentInput[];
+    subtasks?: string[];
   }) => Promise<void>;
   isSaving: boolean;
   onDelete?: (taskId: string) => Promise<void>;
@@ -93,6 +94,7 @@ interface EditQuestDialogProps {
   hasCalendarLink?: boolean;
   isSendingToCalendar?: boolean;
   presentation?: QuestComposerPresentation;
+  plannerSubtaskDraft?: string[] | null;
 }
 
 export function EditQuestDialog({
@@ -107,6 +109,7 @@ export function EditQuestDialog({
   hasCalendarLink = false,
   isSendingToCalendar = false,
   presentation = "mobile-sheet",
+  plannerSubtaskDraft = null,
 }: EditQuestDialogProps) {
   const [taskText, setTaskText] = useState("");
   const [taskDate, setTaskDate] = useState<string | null>(null);
@@ -125,8 +128,38 @@ export function EditQuestDialog({
   const [attachments, setAttachments] = useState<QuestAttachmentInput[]>([]);
   const [location, setLocation] = useState<string | null>(null);
   const [newSubtaskText, setNewSubtaskText] = useState("");
+  const [localPlannerSubtasks, setLocalPlannerSubtasks] = useState<string[]>([]);
 
   const { subtasks, addSubtask, toggleSubtask, deleteSubtask } = useSubtasks(task?.id ?? null);
+  const hasPlannerSubtaskDraft = Array.isArray(plannerSubtaskDraft);
+
+  useEffect(() => {
+    if (!open || !hasPlannerSubtaskDraft) {
+      setLocalPlannerSubtasks([]);
+      return;
+    }
+
+    setLocalPlannerSubtasks(
+      plannerSubtaskDraft
+        .map((subtask) => subtask.trim())
+        .filter((subtask, index, collection) => (
+          subtask.length > 0 && collection.indexOf(subtask) === index
+        )),
+    );
+  }, [hasPlannerSubtaskDraft, open, plannerSubtaskDraft]);
+
+  const displayedSubtasks = useMemo(
+    () => (
+      hasPlannerSubtaskDraft
+        ? localPlannerSubtasks.map((title, index) => ({
+            id: `planner-subtask-${index}-${title}`,
+            title,
+            completed: false,
+          }))
+        : subtasks
+    ),
+    [hasPlannerSubtaskDraft, localPlannerSubtasks, subtasks],
+  );
 
   // Initialize state from task
   useEffect(() => {
@@ -248,9 +281,33 @@ export function EditQuestDialog({
       image_url: attachments.find((attachment) => attachment.isImage)?.fileUrl ?? null,
       location,
       attachments,
+      subtasks: hasPlannerSubtaskDraft
+        ? localPlannerSubtasks.filter((subtask) => subtask.trim().length > 0)
+        : undefined,
     });
     onOpenChange(false);
-  }, [task, taskText, taskDate, difficulty, scheduledTime, estimatedDuration, recurrencePattern, recurrenceDays, recurrenceMonthDays, recurrenceCustomPeriod, reminderEnabled, reminderMinutesBefore, moreInformation, attachments, location, hasRecurrenceWithoutTime, onSave, onOpenChange]);
+  }, [
+    task,
+    taskText,
+    taskDate,
+    difficulty,
+    scheduledTime,
+    estimatedDuration,
+    recurrencePattern,
+    recurrenceDays,
+    recurrenceMonthDays,
+    recurrenceCustomPeriod,
+    reminderEnabled,
+    reminderMinutesBefore,
+    moreInformation,
+    attachments,
+    location,
+    hasPlannerSubtaskDraft,
+    hasRecurrenceWithoutTime,
+    localPlannerSubtasks,
+    onOpenChange,
+    onSave,
+  ]);
 
   const handleDelete = async () => {
     if (!task || !onDelete) return;
@@ -261,10 +318,14 @@ export function EditQuestDialog({
 
   const handleAddSubtask = useCallback(() => {
     if (newSubtaskText.trim()) {
-      addSubtask(newSubtaskText.trim());
+      if (hasPlannerSubtaskDraft) {
+        setLocalPlannerSubtasks((current) => [...current, newSubtaskText.trim()]);
+      } else {
+        addSubtask(newSubtaskText.trim());
+      }
       setNewSubtaskText("");
     }
-  }, [newSubtaskText, addSubtask]);
+  }, [addSubtask, hasPlannerSubtaskDraft, newSubtaskText]);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -458,16 +519,26 @@ export function EditQuestDialog({
 
             {/* Subtasks + Notes Card */}
             <div className={cn(QUEST_FORM_STYLES.sectionCard, "overflow-hidden")}>
-              {subtasks.map((st) => (
+              {displayedSubtasks.map((st, index) => (
                 <div key={st.id} className={cn("group flex items-center gap-2 px-4 py-3", `border-b ${QUEST_FORM_STYLES.divider}`)}>
                   <Checkbox
                     checked={st.completed}
-                    onCheckedChange={(checked) => toggleSubtask({ subtaskId: st.id, completed: !!checked })}
+                    disabled={hasPlannerSubtaskDraft}
+                    onCheckedChange={(checked) => {
+                      if (hasPlannerSubtaskDraft) return;
+                      toggleSubtask({ subtaskId: st.id, completed: !!checked });
+                    }}
                     className="h-4 w-4 border-white/18"
                   />
                   <span className={cn("flex-1 text-sm text-white", st.completed && "line-through text-white/42")}>{st.title}</span>
                   <button
-                    onClick={() => deleteSubtask(st.id)}
+                    onClick={() => {
+                      if (hasPlannerSubtaskDraft) {
+                        setLocalPlannerSubtasks((current) => current.filter((_, currentIndex) => currentIndex !== index));
+                        return;
+                      }
+                      deleteSubtask(st.id);
+                    }}
                     className="rounded-full p-1 opacity-0 transition-all hover:bg-white/[0.08] text-white/44 hover:text-white group-hover:opacity-100"
                   >
                     <Trash2 className="h-3.5 w-3.5" />

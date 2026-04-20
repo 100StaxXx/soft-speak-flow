@@ -32,6 +32,9 @@ const mocks = vi.hoisted(() => ({
   syncProviderPullMutate: vi.fn(),
   hasLinkedEvent: vi.fn(() => false),
   createEpic: vi.fn(),
+  queueAction: vi.fn().mockResolvedValue(undefined),
+  retryNow: vi.fn().mockResolvedValue(undefined),
+  shouldQueueWrites: false,
   trackDailyPlanOutcome: vi.fn(),
   surfaceAllEpicHabits: vi.fn(),
   spawnRecurringTasks: vi.fn(),
@@ -71,14 +74,58 @@ const mocks = vi.hoisted(() => ({
       reminderEnabled?: boolean;
       reminderMinutesBefore?: number;
       moreInformation?: string | null;
+      location?: string | null;
+      subtasks?: string[];
       creationSource?: string;
     } | null;
+    onAdd?: (data: {
+      text: string;
+      taskDate: string | null;
+      difficulty: "easy" | "medium" | "hard";
+      scheduledTime: string | null;
+      estimatedDuration: number | null;
+      recurrencePattern: string | null;
+      recurrenceDays: number[];
+      recurrenceMonthDays: number[];
+      recurrenceCustomPeriod: "week" | "month" | null;
+      reminderEnabled: boolean;
+      reminderMinutesBefore: number;
+      moreInformation: string | null;
+      location: string | null;
+      contactId: string | null;
+      autoLogInteraction: boolean;
+      sendToInbox: boolean;
+      sendToCalendar: boolean;
+      subtasks: string[];
+      imageUrl: string | null;
+      attachments: [];
+      creationSource: string;
+    }) => Promise<void>;
   },
   lastCompanionPlannerModalProps: null as null | {
     open?: boolean;
     onOpenChange?: (open: boolean) => void;
     presentation?: string;
     launchIntent?: unknown;
+    onQuestProposalEditHandoff?: (proposal: {
+      id: string;
+      kind: "create_quest" | "update_quest" | "suggest_reminder";
+      title: string;
+      summary: string;
+      payload: Record<string, unknown>;
+      status: "pending";
+      readyToConfirm: boolean;
+    }) => Promise<{ saved: boolean; savedTitle?: string | null }>;
+  },
+  lastEditQuestDialogProps: null as null | {
+    open?: boolean;
+    task?: {
+      id: string;
+      task_text: string;
+      scheduled_time?: string | null;
+    } | null;
+    plannerSubtaskDraft?: string[] | null;
+    onSave?: (taskId: string, updates: Record<string, unknown>) => Promise<void>;
   },
   lastDraggableFabOnOpenCompanionPlanner: null as null | ((intent?: unknown) => void),
   lastPathfinderProps: null as null | {
@@ -190,8 +237,33 @@ vi.mock("@/components/AddQuestSheet", () => ({
       reminderEnabled?: boolean;
       reminderMinutesBefore?: number;
       moreInformation?: string | null;
+      location?: string | null;
+      subtasks?: string[];
       creationSource?: string;
     } | null;
+    onAdd?: (data: {
+      text: string;
+      taskDate: string | null;
+      difficulty: "easy" | "medium" | "hard";
+      scheduledTime: string | null;
+      estimatedDuration: number | null;
+      recurrencePattern: string | null;
+      recurrenceDays: number[];
+      recurrenceMonthDays: number[];
+      recurrenceCustomPeriod: "week" | "month" | null;
+      reminderEnabled: boolean;
+      reminderMinutesBefore: number;
+      moreInformation: string | null;
+      location: string | null;
+      contactId: string | null;
+      autoLogInteraction: boolean;
+      sendToInbox: boolean;
+      sendToCalendar: boolean;
+      subtasks: string[];
+      imageUrl: string | null;
+      attachments: [];
+      creationSource: string;
+    }) => Promise<void>;
   }) => {
     mocks.lastAddQuestSheetProps = props;
     return null;
@@ -205,6 +277,15 @@ vi.mock("@/components/journeys/JourneysCompanionPlannerModal", () => ({
     presentation?: string;
     launchIntent?: unknown;
     onLaunchIntentConsumed?: (intentId: string) => void;
+    onQuestProposalEditHandoff?: (proposal: {
+      id: string;
+      kind: "create_quest" | "update_quest" | "suggest_reminder";
+      title: string;
+      summary: string;
+      payload: Record<string, unknown>;
+      status: "pending";
+      readyToConfirm: boolean;
+    }) => Promise<{ saved: boolean; savedTitle?: string | null }>;
   }) => {
     mocks.lastCompanionPlannerModalProps = props;
 
@@ -249,7 +330,19 @@ vi.mock("@/components/StreakFreezePromptModal", () => ({
 }));
 
 vi.mock("@/features/quests/components/EditQuestDialog", () => ({
-  EditQuestDialog: () => null,
+  EditQuestDialog: (props: {
+    open?: boolean;
+    task?: {
+      id: string;
+      task_text: string;
+      scheduled_time?: string | null;
+    } | null;
+    plannerSubtaskDraft?: string[] | null;
+    onSave?: (taskId: string, updates: Record<string, unknown>) => Promise<void>;
+  }) => {
+    mocks.lastEditQuestDialogProps = props;
+    return null;
+  },
 }));
 
 vi.mock("@/components/EditRitualSheet", () => ({
@@ -465,6 +558,14 @@ vi.mock("@/hooks/useRecurringTaskSpawner", () => ({
   }),
 }));
 
+vi.mock("@/contexts/ResilienceContext", () => ({
+  useResilience: () => ({
+    queueAction: mocks.queueAction,
+    shouldQueueWrites: mocks.shouldQueueWrites,
+    retryNow: mocks.retryNow,
+  }),
+}));
+
 vi.mock("@/contexts/MainTabVisibilityContext", () => ({
   useMainTabVisibility: () => ({
     isTabActive: mocks.isTabActive,
@@ -597,6 +698,7 @@ describe("Journeys row drag integration", () => {
     mocks.lastDatePillSelectedDate = null;
     mocks.lastAddQuestSheetProps = null;
     mocks.lastCompanionPlannerModalProps = null;
+    mocks.lastEditQuestDialogProps = null;
     mocks.lastDraggableFabOnOpenCompanionPlanner = null;
     mocks.lastPathfinderProps = null;
     mocks.tutorialGuidance = {
@@ -761,6 +863,102 @@ describe("Journeys row drag integration", () => {
       expect(mocks.lastCompanionPlannerModalProps?.open).toBe(true);
     });
     expect(screen.getByTestId("journeys-companion-planner-modal")).toBeInTheDocument();
+  });
+
+  it("keeps the planner open while a planner quest edit handoff is active and resolves back after save", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/journeys"]}>
+          <Journeys />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    fireEvent.click(await screen.findByTestId("journeys-companion-launcher-floating"));
+
+    await waitFor(() => {
+      expect(mocks.lastCompanionPlannerModalProps?.open).toBe(true);
+    });
+
+    let handoffPromise:
+      | Promise<{ saved: boolean; savedTitle?: string | null }>
+      | undefined;
+
+    await act(async () => {
+      handoffPromise = mocks.lastCompanionPlannerModalProps?.onQuestProposalEditHandoff?.({
+        id: "proposal-create-1",
+        kind: "create_quest",
+        title: "Respond to emails",
+        summary: "Carve out a short inbox block first thing.",
+        payload: {
+          taskText: "Respond to emails",
+          taskDate: "2026-02-13",
+          scheduledTime: "09:00",
+          estimatedDuration: 30,
+          notes: "Start with urgent threads.",
+          location: "Desk",
+          subtasks: ["Reply to founders", "Clear urgent threads"],
+        },
+        status: "pending",
+        readyToConfirm: true,
+      });
+    });
+
+    await waitFor(() => {
+      expect(mocks.lastAddQuestSheetProps?.open).toBe(true);
+    });
+    expect(mocks.lastCompanionPlannerModalProps?.open).toBe(true);
+    expect(mocks.lastAddQuestSheetProps?.prefillDraft).toEqual(expect.objectContaining({
+      text: "Respond to emails",
+      taskDate: "2026-02-13",
+      scheduledTime: "09:00",
+      estimatedDuration: 30,
+      moreInformation: "Start with urgent threads.",
+      location: "Desk",
+      subtasks: ["Reply to founders", "Clear urgent threads"],
+    }));
+
+    await act(async () => {
+      await mocks.lastAddQuestSheetProps?.onAdd?.({
+        text: "Respond to emails",
+        taskDate: "2026-02-13",
+        difficulty: "medium",
+        scheduledTime: "09:00",
+        estimatedDuration: 30,
+        recurrencePattern: null,
+        recurrenceDays: [],
+        recurrenceMonthDays: [],
+        recurrenceCustomPeriod: null,
+        reminderEnabled: false,
+        reminderMinutesBefore: 15,
+        moreInformation: "Start with urgent threads.",
+        location: "Desk",
+        contactId: null,
+        autoLogInteraction: false,
+        sendToInbox: false,
+        sendToCalendar: false,
+        subtasks: ["Reply to founders", "Clear urgent threads"],
+        imageUrl: null,
+        attachments: [],
+        creationSource: "nlp",
+      });
+    });
+
+    await expect(handoffPromise).resolves.toEqual({
+      saved: true,
+      savedTitle: "Respond to emails",
+    });
+    await waitFor(() => {
+      expect(mocks.lastAddQuestSheetProps?.open).toBe(false);
+    });
+    expect(mocks.lastCompanionPlannerModalProps?.open).toBe(true);
   });
 
   it("opens Pathfinder immediately for campaign-builder launcher intents without opening companion chat", async () => {

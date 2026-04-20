@@ -63,6 +63,7 @@ export interface QuestComposerPrefillDraft {
   reminderMinutesBefore?: number;
   moreInformation?: string | null;
   location?: string | null;
+  subtasks?: string[];
   creationSource?: QuestCreationSource;
 }
 

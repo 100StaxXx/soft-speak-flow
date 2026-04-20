@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
     submitMessage: vi.fn().mockResolvedValue(undefined),
     submitPlannerMessage: vi.fn().mockResolvedValue(undefined),
     confirmProposal: vi.fn(),
+    completeProposalEdit: vi.fn().mockResolvedValue(undefined),
     rejectProposal: vi.fn(),
     confirmAll: vi.fn(),
     toggleRecording: vi.fn(),
@@ -188,6 +189,7 @@ vi.mock("@/hooks/useCompanionAssistant", () => ({
     toggleRecording: mocks.assistant.toggleRecording,
     requestMicrophonePermission: mocks.assistant.requestMicrophonePermission,
     confirmProposal: mocks.assistant.confirmProposal,
+    completeProposalEdit: mocks.assistant.completeProposalEdit,
     rejectProposal: mocks.assistant.rejectProposal,
     confirmAll: mocks.assistant.confirmAll,
     isSpeaking: mocks.state.isSpeaking,
@@ -396,6 +398,7 @@ describe("JourneysCompanionPlannerModal", () => {
         open
         onOpenChange={vi.fn()}
         presentation="dialog"
+        onQuestProposalEditHandoff={vi.fn().mockResolvedValue({ saved: false })}
       />,
     );
 
@@ -408,11 +411,13 @@ describe("JourneysCompanionPlannerModal", () => {
     expect(screen.getByRole("button", { name: "New chat" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Archive" })).toBeInTheDocument();
     expect(screen.getByTestId("journeys-companion-planner-text-input")).toHaveAttribute("rows", "1");
-    expect(screen.getByTestId("journeys-companion-planner-text-input")).toHaveClass("h-12");
+    expect(screen.getByTestId("journeys-companion-planner-text-input")).toHaveStyle("height: 48px");
     await waitFor(() => {
       expect(screen.getByText("I can help you shape that into something concrete when you're ready.")).toBeInTheDocument();
     });
-    expect(screen.getByTestId("journeys-companion-planner-inline-proposal")).toBeInTheDocument();
+    expect(screen.getByTestId("journeys-companion-planner-inline-proposals")).toBeInTheDocument();
+    expect(screen.getByTestId("journeys-companion-planner-inline-proposal-proposal-1")).toBeInTheDocument();
+    expect(screen.getByTestId("journeys-companion-planner-inline-proposal-proposal-2")).toBeInTheDocument();
     expect(screen.getByText("Create Focus quest")).toBeInTheDocument();
     expect(screen.queryByText("What time of day should this live in your schedule?")).not.toBeInTheDocument();
     expect(screen.queryByTestId("journeys-companion-planner-inline-options")).not.toBeInTheDocument();
@@ -420,7 +425,7 @@ describe("JourneysCompanionPlannerModal", () => {
     expect(screen.getByTestId("journeys-companion-planner-inline-proposal-notes-proposal-1")).toHaveTextContent("Protect this block for the one thing that matters most.");
     expect(screen.getByTestId("journeys-companion-planner-inline-proposal-subtasks-proposal-1")).toHaveTextContent("Choose the target");
     expect(screen.getByTestId("journeys-companion-planner-inline-proposal-subtasks-proposal-1")).toHaveTextContent("Silence notifications");
-    expect(screen.queryByText("Create Backup quest")).not.toBeInTheDocument();
+    expect(screen.getByText("Create Backup quest")).toBeInTheDocument();
     expect(screen.queryByText("You")).not.toBeInTheDocument();
     expect(screen.queryByText("Quick reply")).not.toBeInTheDocument();
     expect(screen.queryByText("Schedule")).not.toBeInTheDocument();
@@ -490,7 +495,7 @@ describe("JourneysCompanionPlannerModal", () => {
     expect(screen.getByTestId("journeys-companion-planner-dialogue-screen")).toHaveTextContent(
       "To help you build a great day, can you tell me:",
     );
-    expect(screen.queryByTestId("journeys-companion-planner-inline-proposal")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("journeys-companion-planner-inline-proposals")).not.toBeInTheDocument();
     expect(screen.queryByText("Create Focus quest")).not.toBeInTheDocument();
   });
 
@@ -642,10 +647,11 @@ describe("JourneysCompanionPlannerModal", () => {
         open
         onOpenChange={vi.fn()}
         presentation="dialog"
+        onQuestProposalEditHandoff={vi.fn().mockResolvedValue({ saved: false })}
       />,
     );
 
-    expect(screen.getByTestId("journeys-companion-planner-inline-proposal")).toBeInTheDocument();
+    expect(screen.getByTestId("journeys-companion-planner-inline-proposals")).toBeInTheDocument();
     expect(screen.queryByText("What time of day should this live in your schedule?")).not.toBeInTheDocument();
     expect(screen.queryByTestId("journeys-companion-planner-inline-options")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Morning" })).not.toBeInTheDocument();
@@ -677,22 +683,72 @@ describe("JourneysCompanionPlannerModal", () => {
     expect(mocks.assistant.toggleRecording).toHaveBeenCalledTimes(1);
   });
 
-  it("routes proposal actions through the assistant hook", () => {
+  it("routes proposal actions through the assistant hook", async () => {
+    const onQuestProposalEditHandoff = vi.fn().mockResolvedValue({
+      saved: true,
+      savedTitle: "Edited Focus quest",
+    });
+
     render(
       <JourneysCompanionPlannerModal
         open
         onOpenChange={vi.fn()}
         presentation="drawer"
+        onQuestProposalEditHandoff={onQuestProposalEditHandoff}
       />,
     );
 
     fireEvent.click(screen.getAllByRole("button", { name: "Confirm" })[0]);
-    fireEvent.click(screen.getByRole("button", { name: "Reject" }));
     fireEvent.click(screen.getByRole("button", { name: "Confirm all" }));
+    await act(async () => {
+      fireEvent.click(screen.getAllByRole("button", { name: "Edit" })[0]);
+    });
 
     expect(mocks.assistant.confirmProposal).toHaveBeenCalledWith("proposal-1");
-    expect(mocks.assistant.rejectProposal).toHaveBeenCalledWith("proposal-1");
     expect(mocks.assistant.confirmAll).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(onQuestProposalEditHandoff).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "proposal-1" }),
+      );
+    });
+    await waitFor(() => {
+      expect(mocks.assistant.completeProposalEdit).toHaveBeenCalledWith("proposal-1", {
+        savedTitle: "Edited Focus quest",
+      });
+    });
+    expect(mocks.assistant.rejectProposal).not.toHaveBeenCalled();
+  });
+
+  it("auto-grows the composer and starts scrolling after the max height", async () => {
+    const originalScrollHeight = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "scrollHeight");
+
+    Object.defineProperty(HTMLTextAreaElement.prototype, "scrollHeight", {
+      configurable: true,
+      get() {
+        return 220;
+      },
+    });
+
+    try {
+      render(
+        <JourneysCompanionPlannerModal
+          open
+          onOpenChange={vi.fn()}
+          presentation="dialog"
+        />,
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId("journeys-companion-planner-text-input")).toHaveStyle("height: 140px");
+      });
+      expect(screen.getByTestId("journeys-companion-planner-text-input")).toHaveStyle("overflow-y: auto");
+    } finally {
+      if (originalScrollHeight) {
+        Object.defineProperty(HTMLTextAreaElement.prototype, "scrollHeight", originalScrollHeight);
+      } else {
+        delete (HTMLTextAreaElement.prototype as HTMLTextAreaElement & { scrollHeight?: unknown }).scrollHeight;
+      }
+    }
   });
 
   it("shows the speaking status row and lets the user stop playback", () => {

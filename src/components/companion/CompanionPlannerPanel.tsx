@@ -46,6 +46,7 @@ const PROPOSAL_KIND_LABELS: Record<CompanionPlannerProposal["kind"], string> = {
 const STATUS_BADGE_CLASSNAME: Record<CompanionPlannerProposal["status"], string> = {
   pending: "border-amber-400/30 bg-amber-400/10 text-amber-100",
   confirmed: "border-emerald-400/30 bg-emerald-400/10 text-emerald-100",
+  modified: "border-sky-400/30 bg-sky-400/10 text-sky-100",
   rejected: "border-slate-400/30 bg-slate-400/10 text-slate-100",
 };
 

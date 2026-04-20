@@ -83,7 +83,7 @@ const mocks = vi.hoisted(() => ({
     },
     pendingProposals: [] as Array<{
       id: string;
-      status: "pending" | "confirmed" | "rejected";
+      status: "pending" | "confirmed" | "modified" | "rejected";
       kind: "update_quest";
       title: string;
       summary: string;

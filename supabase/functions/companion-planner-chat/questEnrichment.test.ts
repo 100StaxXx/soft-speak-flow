@@ -167,6 +167,18 @@ Deno.test("keeps simple timed quests ready to confirm without extra enrichment q
   assertEquals(result.proposals[0]?.payload, proposal.payload);
 });
 
+Deno.test("keeps plain quest drafts ready to confirm without proactive enrichment questions", async () => {
+  const input = baseInput();
+  const result = await enrichQuestPlannerResult({
+    fetchImpl: async () => new Response("unused"),
+    input,
+    baseResult: baseResult(baseProposal(), input.sessionState),
+  });
+
+  assertEquals(result.followUpQuestions.length, 0);
+  assertEquals(result.proposals[0]?.readyToConfirm, true);
+});
+
 Deno.test("turns a note-focused follow-up reply into quest notes", async () => {
   const input = baseInput({
     message: "Add notes: upper body focus and 10 minutes of cardio",

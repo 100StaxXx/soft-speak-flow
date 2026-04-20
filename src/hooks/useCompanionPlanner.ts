@@ -1884,6 +1884,58 @@ export function useCompanionPlanner({
     });
   }, [persistPlannerThreadRows, proposals, strongestPlannerNeed, trackInteraction]);
 
+  const handleCompleteProposalEdit = useCallback(async (
+    proposalId: string,
+    options?: { savedTitle?: string | null },
+  ) => {
+    const proposal = findProposalById(proposals, proposalId);
+    if (!proposal) return;
+
+    const resolvedTitle = options?.savedTitle?.trim() || proposal.title;
+
+    setProposals((previous) =>
+      previous.map((candidate) =>
+        candidate.id === proposalId
+          ? {
+              ...candidate,
+              status: "modified",
+              title: resolvedTitle,
+            }
+          : candidate,
+      ),
+    );
+    setQuestions([]);
+    const confirmationMessage = createMessage(
+      "companion",
+      `Saved your edits for "${resolvedTitle}".`,
+    );
+    setMessages((previous) => [
+      ...previous,
+      confirmationMessage,
+    ]);
+    await persistPlannerThreadRows([
+      {
+        role: "assistant",
+        content: confirmationMessage.content,
+        createdAt: confirmationMessage.createdAt,
+      },
+    ]);
+    await trackInteraction({
+      interactionType: "companion_planner_confirmation",
+      inputText: proposal.title,
+      detectedIntent: proposal.kind,
+      aiResponse: { proposalKind: proposal.kind },
+      userAction: "modified",
+      modifications: {
+        proposalId: proposal.id,
+        proposalKind: proposal.kind,
+        statDrivenNeed: strongestPlannerNeed,
+        savedTitle: resolvedTitle,
+        editedExternally: true,
+      },
+    });
+  }, [persistPlannerThreadRows, proposals, strongestPlannerNeed, trackInteraction]);
+
   const handleConfirmAll = useCallback(async () => {
     const readyProposals = proposals.filter((proposal) => proposal.status === "pending" && proposal.readyToConfirm);
     for (const proposal of readyProposals) {
@@ -2011,6 +2063,7 @@ export function useCompanionPlanner({
     requestMicrophonePermission,
     confirmProposal: handleConfirmProposal,
     rejectProposal: handleRejectProposal,
+    completeProposalEdit: handleCompleteProposalEdit,
     confirmAll: handleConfirmAll,
     sessionState,
     plannerContext,

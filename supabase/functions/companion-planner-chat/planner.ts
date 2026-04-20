@@ -2208,6 +2208,7 @@ const missingFieldsForKind = (
 
   const missing = new Set<string>();
   const effectiveTime = preferredTime(draft);
+  const keepCreateQuestConfirmable = kind === "create_quest";
   const questCaptureNeedsTime = isQuestCaptureCreateQuest(input, kind) &&
     questCaptureAssumption?.kind === "needs_time";
   const bypassQuestCaptureTimingQuestions =
@@ -2218,7 +2219,7 @@ const missingFieldsForKind = (
     (shouldAskTimingQuestions(input, kind) ||
       (questCaptureNeedsTime && !effectiveTime));
 
-  if (askTimingQuestions) {
+  if (!keepCreateQuestConfirmable && askTimingQuestions) {
     if (!effectiveTime) missing.add("time of day");
     if (!questCaptureNeedsTime && !draft.timeReason) {
       missing.add("why that time works");
@@ -2226,7 +2227,7 @@ const missingFieldsForKind = (
   }
 
   if (
-    (kind === "create_quest" || kind === "update_quest") &&
+    kind === "update_quest" &&
     (draft.draftKind === "create_quest" || draft.draftKind === "update_quest")
   ) {
     if (draft.cadence && !cadence.recurrencePattern) {
@@ -2234,10 +2235,7 @@ const missingFieldsForKind = (
     }
   }
 
-  if (
-    (kind === "create_quest" || kind === "update_quest") && draft.cadence &&
-    !draft.endDate
-  ) {
+  if (kind === "update_quest" && draft.cadence && !draft.endDate) {
     missing.add("end date");
   }
 
@@ -2433,13 +2431,18 @@ const buildFollowUpQuestions = (
   if (titleQuestion && !sanitizeProposalTitle(draft.title)) {
     return [titleQuestion];
   }
+  const keepCreateQuestConfirmable = kind === "create_quest";
 
-  if (askTimingQuestions && (!effectiveTime || shouldConfirmLearnedTime)) {
+  if (
+    !keepCreateQuestConfirmable &&
+    askTimingQuestions &&
+    (!effectiveTime || shouldConfirmLearnedTime)
+  ) {
     questions.push(buildTimeQuestion(input));
   }
 
   if (
-    (kind === "create_quest" || kind === "update_quest" ||
+    (kind === "update_quest" ||
       kind === "create_ritual" || kind === "update_ritual") &&
     isRepeatedIntent(input.message, input.parsedInput)
   ) {
@@ -2453,9 +2456,7 @@ const buildFollowUpQuestions = (
       }));
     }
 
-    if (
-      (kind === "create_quest" || kind === "update_quest") && !draft.endDate
-    ) {
+    if (kind === "update_quest" && !draft.endDate) {
       questions.push(question({
         field: "end_date",
         prompt: "When should this repetition stop?",
@@ -2467,8 +2468,9 @@ const buildFollowUpQuestions = (
   }
 
   if (
-    (kind === "create_quest" || kind === "create_ritual") &&
-    input.plannerContext.activeEpics.length > 0 && !draft.epicId &&
+    kind === "create_ritual" &&
+    input.plannerContext.activeEpics.length > 0 &&
+    !draft.epicId &&
     isRepeatedIntent(input.message, input.parsedInput)
   ) {
     questions.push(question({
@@ -2493,7 +2495,8 @@ const buildFollowUpQuestions = (
     }));
   }
 
-  const balanceQuestion = isQuestCaptureCreateQuest(input, kind)
+  const balanceQuestion = keepCreateQuestConfirmable ||
+      isQuestCaptureCreateQuest(input, kind)
     ? null
     : buildBalanceQuestion(input);
   if (

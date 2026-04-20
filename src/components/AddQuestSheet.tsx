@@ -287,6 +287,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
     setReminderMinutesBefore(prefillDraft.reminderMinutesBefore ?? 15);
     setMoreInformation(prefillDraft.moreInformation ?? null);
     setLocation(prefillDraft.location ?? null);
+    setSubtasks(prefillDraft.subtasks ?? []);
     setTaskDate(prefillDraft.taskDate ?? format(selectedDate, "yyyy-MM-dd"));
     setCreationSource(prefillDraft.creationSource ?? "manual");
     setSelectedTemplate(null);
