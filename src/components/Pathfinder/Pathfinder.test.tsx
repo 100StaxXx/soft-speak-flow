@@ -167,6 +167,23 @@ describe("Pathfinder", () => {
     });
   });
 
+  it("renders the themed shell chrome when open", () => {
+    render(
+      <Pathfinder
+        open
+        onOpenChange={vi.fn()}
+        onCreateEpic={(...args) => mocks.onCreateEpic(...args)}
+        isCreating={false}
+      />,
+    );
+
+    expect(screen.getByTestId("pathfinder-shell")).toBeInTheDocument();
+    expect(screen.getByTestId("pathfinder-header")).toBeInTheDocument();
+    expect(screen.getByTestId("pathfinder-progress")).toBeInTheDocument();
+    expect(screen.getByTestId("pathfinder-footer")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Build My Plan/i })).toBeInTheDocument();
+  });
+
   it("latches campaign creation immediately so rapid double taps only submit once", async () => {
     let resolveCreate: (() => void) | null = null;
     mocks.onCreateEpic.mockImplementation(
@@ -184,6 +201,9 @@ describe("Pathfinder", () => {
         isCreating={false}
       />,
     );
+
+    expect(screen.getByTestId("pathfinder-shell")).toBeInTheDocument();
+    expect(screen.getByTestId("pathfinder-footer")).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("What's your goal?"), {
       target: { value: "Pass the bar exam" },

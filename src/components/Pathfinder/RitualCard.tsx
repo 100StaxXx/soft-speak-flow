@@ -8,6 +8,7 @@ import {
   Check,
   X,
 } from 'lucide-react';
+import { plannerPathfinderTheme } from '@/components/companion/plannerPathfinderTheme';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -75,20 +76,20 @@ export const RitualCard = memo(function RitualCard({ ritual, onUpdate, onDelete,
     return (
       <motion.div
         layout
-        className="p-3 rounded-lg border bg-muted/30 space-y-3"
+        className={`${plannerPathfinderTheme.raisedPanel} space-y-3 p-4`}
       >
         <div className="space-y-2">
           <Input
             value={editedRitual.title}
             onChange={(e) => setEditedRitual({ ...editedRitual, title: e.target.value })}
             placeholder="Ritual name"
-            className="font-medium"
+            className={cn(plannerPathfinderTheme.textField, "font-medium")}
           />
           <Input
             value={editedRitual.description}
             onChange={(e) => setEditedRitual({ ...editedRitual, description: e.target.value })}
             placeholder="Description (optional)"
-            className="text-sm"
+            className={cn(plannerPathfinderTheme.textField, "text-sm")}
           />
         </div>
 
@@ -103,18 +104,19 @@ export const RitualCard = memo(function RitualCard({ ritual, onUpdate, onDelete,
             custom_month_days: editedRitual.customMonthDays,
           })}
           onFrequencyChange={handleFrequencyChange}
+          variant="planner"
         />
 
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <label className="text-[10px] text-muted-foreground mb-1 block">Difficulty</label>
+            <label className={cn("mb-1 block text-[10px]", plannerPathfinderTheme.sectionEyebrow)}>Difficulty</label>
             <Select
               value={editedRitual.difficulty}
               onValueChange={(value: 'easy' | 'medium' | 'hard') => 
                 setEditedRitual({ ...editedRitual, difficulty: value })
               }
             >
-              <SelectTrigger className="h-8 text-xs">
+              <SelectTrigger className={cn(plannerPathfinderTheme.textField, "h-10 text-xs")}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -138,11 +140,16 @@ export const RitualCard = memo(function RitualCard({ ritual, onUpdate, onDelete,
         </div>
 
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" className="flex-1" onClick={handleCancel}>
+          <Button
+            size="sm"
+            variant="outline"
+            className={cn(plannerPathfinderTheme.outlineButton, "flex-1")}
+            onClick={handleCancel}
+          >
             <X className="w-3 h-3 mr-1" />
             Cancel
           </Button>
-          <Button size="sm" className="flex-1" onClick={handleSave}>
+          <Button size="sm" className={cn(plannerPathfinderTheme.primaryButton, "flex-1")} onClick={handleSave}>
             <Check className="w-3 h-3 mr-1" />
             Save
           </Button>
@@ -162,21 +169,21 @@ export const RitualCard = memo(function RitualCard({ ritual, onUpdate, onDelete,
   return (
     <motion.div
       layout
-      className="group flex items-center gap-2 p-3 rounded-lg border bg-background hover:bg-muted/30 transition-colors"
+      className={`${plannerPathfinderTheme.mutedPanel} group flex items-center gap-2 p-3 transition-colors hover:bg-white/75`}
     >
-      <GripVertical className="w-4 h-4 text-muted-foreground/50 cursor-grab" />
+      <GripVertical className="w-4 h-4 cursor-grab text-[#8d481c]/45" />
       
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <span className="font-medium text-sm truncate">{ritual.title}</span>
           <Badge 
             variant="outline" 
-            className={cn('text-[10px] px-1.5 py-0', difficultyColors[ritual.difficulty])}
+            className={cn(plannerPathfinderTheme.chip, 'text-[10px] px-1.5 py-0', difficultyColors[ritual.difficulty])}
           >
             {ritual.difficulty}
           </Badge>
         </div>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <div className="flex items-center gap-2 text-xs text-[#7f4a1d]/80">
           <span>{formatScheduleLabel({
             frequency: ritual.frequency,
             custom_days: ritual.customDays,
@@ -202,7 +209,7 @@ export const RitualCard = memo(function RitualCard({ ritual, onUpdate, onDelete,
         <Button
           size="icon"
           variant="ghost"
-          className="h-7 w-7"
+          className={cn(plannerPathfinderTheme.outlineButton, "h-8 w-8 p-0")}
           onClick={() => setIsEditing(true)}
         >
           <Edit2 className="w-3.5 h-3.5" />
@@ -210,7 +217,7 @@ export const RitualCard = memo(function RitualCard({ ritual, onUpdate, onDelete,
         <Button
           size="icon"
           variant="ghost"
-          className="h-7 w-7 text-destructive hover:text-destructive"
+          className="h-8 w-8 rounded-full border-[3px] border-[#8a2716] bg-white/60 p-0 text-[#8a2716] shadow-[0_6px_0_rgba(138,39,22,0.18)] hover:bg-white/75 hover:text-[#8a2716]"
           onClick={() => onDelete(ritual.id)}
         >
           <Trash2 className="w-3.5 h-3.5" />

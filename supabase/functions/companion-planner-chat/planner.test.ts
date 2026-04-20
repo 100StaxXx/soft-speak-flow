@@ -1653,8 +1653,8 @@ Deno.test("answers the coming-up starter prompt with a schedule summary", () => 
   assertStringIncludes(result.reply, "Here's the shape of what's coming up.");
   assertStringIncludes(result.reply, "Today:");
   assertStringIncludes(result.reply, "Tomorrow:");
-  assertStringIncludes(result.reply, "Week ahead:");
   assertStringIncludes(result.reply, "Tell me what feels most important");
+  assertEquals(result.reply.includes("Week ahead:"), false);
 });
 
 Deno.test("answers availability questions using both quests and calendar events", () => {

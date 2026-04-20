@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import { type CSSProperties, useState } from "react";
 import {
   Brain,
   Compass,
@@ -28,6 +28,7 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SectionErrorBoundary } from "@/components/SectionErrorBoundary";
 import type { CompanionLayoutMode } from "@/hooks/useCompanionLayoutMode";
 import {
   type CompanionStatAnalysis,
@@ -108,8 +109,8 @@ const formatSnakeLabel = (value: string) =>
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
 
-const mentorAccentStyle = (analysis: CompanionStatAnalysis | null): CSSProperties | undefined => {
-  const color = analysis?.mentor.primaryColor;
+const mentorAccentStyle = (analysis: CompanionStatAnalysis): CSSProperties | undefined => {
+  const color = analysis.mentor.primaryColor;
   if (!color) return undefined;
 
   return {
@@ -215,43 +216,48 @@ function BreakdownCard({ breakdown }: { breakdown: CompanionStatBreakdown }) {
   );
 }
 
-function AnalysisContent() {
-  const {
-    analysis,
-    cached,
-    error,
-    isLoading,
-    isRefreshing,
-    refreshAnalysis,
-  } = useCompanionStatAnalysis({ enabled: true });
+function AnalysisUnavailableCard({
+  message,
+  isRefreshing,
+  onRetry,
+}: {
+  message: string;
+  isRefreshing: boolean;
+  onRetry: () => void;
+}) {
+  return (
+    <Card className="border-destructive/30 bg-destructive/5">
+      <CardContent className="space-y-4 pt-6">
+        <div className="space-y-1">
+          <p className="text-sm font-semibold text-foreground">Stats analysis is unavailable right now.</p>
+          <p className="text-sm text-muted-foreground">{message}</p>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onRetry}
+          disabled={isRefreshing}
+          className="w-full sm:w-auto"
+        >
+          <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
+          Retry analysis
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
 
-  if (isLoading && !analysis) {
-    return <LoadingState />;
-  }
-
-  if (!analysis) {
-    return (
-      <Card className="border-destructive/30 bg-destructive/5">
-        <CardContent className="space-y-4 pt-6">
-          <div className="space-y-1">
-            <p className="text-sm font-semibold text-foreground">Stats analysis is unavailable right now.</p>
-            <p className="text-sm text-muted-foreground">{error ?? "Try again in a moment."}</p>
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => void refreshAnalysis()}
-            disabled={isRefreshing}
-            className="w-full sm:w-auto"
-          >
-            <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
-            Retry analysis
-          </Button>
-        </CardContent>
-      </Card>
-    );
-  }
-
+function CompanionStatAnalysisView({
+  analysis,
+  cached,
+  isRefreshing,
+  onRefresh,
+}: {
+  analysis: CompanionStatAnalysis;
+  cached: boolean;
+  isRefreshing: boolean;
+  onRefresh: () => void;
+}) {
   return (
     <div className="space-y-4">
       <Card style={mentorAccentStyle(analysis)}>
@@ -402,7 +408,7 @@ function AnalysisContent() {
         <Button
           type="button"
           variant="outline"
-          onClick={() => void refreshAnalysis()}
+          onClick={onRefresh}
           disabled={isRefreshing}
         >
           <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
@@ -410,6 +416,65 @@ function AnalysisContent() {
         </Button>
       </div>
     </div>
+  );
+}
+
+function AnalysisContent() {
+  const {
+    analysis,
+    cached,
+    error,
+    isLoading,
+    isRefreshing,
+    refreshAnalysis,
+  } = useCompanionStatAnalysis({ enabled: true });
+  const [renderBoundaryKey, setRenderBoundaryKey] = useState(0);
+
+  const handleRefresh = () => {
+    void refreshAnalysis().catch(() => undefined);
+  };
+
+  const handleRenderRecovery = () => {
+    void refreshAnalysis()
+      .catch(() => undefined)
+      .finally(() => {
+        setRenderBoundaryKey((current) => current + 1);
+      });
+  };
+
+  if (isLoading && !analysis) {
+    return <LoadingState />;
+  }
+
+  if (!analysis) {
+    return (
+      <AnalysisUnavailableCard
+        message={error ?? "Try again in a moment."}
+        isRefreshing={isRefreshing}
+        onRetry={handleRefresh}
+      />
+    );
+  }
+
+  return (
+    <SectionErrorBoundary
+      key={renderBoundaryKey}
+      section="companion-stat-analysis"
+      fallback={
+        <AnalysisUnavailableCard
+          message="We couldn't render this analysis right now. Try refreshing it."
+          isRefreshing={isRefreshing}
+          onRetry={handleRenderRecovery}
+        />
+      }
+    >
+      <CompanionStatAnalysisView
+        analysis={analysis}
+        cached={cached}
+        isRefreshing={isRefreshing}
+        onRefresh={handleRefresh}
+      />
+    </SectionErrorBoundary>
   );
 }
 

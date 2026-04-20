@@ -204,3 +204,86 @@ Deno.test("sends tone and availability grounding to the model for witty_sassy pl
   assertEquals(promptPayload.deterministicContext.availabilityFacts.scheduledItemCount, 0);
   assertEquals(promptPayload.deterministicContext.availabilityFacts.hasOpenings, true);
 });
+
+Deno.test("keeps upcoming-digest orchestration scoped to today and tomorrow", async () => {
+  const captured = {
+    body: null as {
+      messages?: Array<Record<string, string>>;
+    } | null,
+  };
+
+  const response = await buildOrchestratedPlannerResponse({
+    guardedFetch: async (_input: RequestInfo | URL, init?: RequestInit) => {
+      captured.body = JSON.parse(String(init?.body ?? "{}")) as {
+        messages?: Array<Record<string, string>>;
+      };
+      return new Response(JSON.stringify({
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              reply: "Today: Therapy at 14:00 and Workout at 15:00. Tomorrow: Inbox cleanup at 09:30. Tell me what feels most important, and I'll help from there.",
+              mode: "schedule_read",
+            }),
+          },
+        }],
+      }));
+    },
+    input: {
+      ...baseInput(),
+      plannerContext: {
+        ...baseInput().plannerContext,
+        tasks: [
+          {
+            id: "task-1",
+            title: "Workout",
+            taskDate: "2026-04-18",
+            scheduledTime: "15:00",
+            estimatedDuration: 45,
+            recurrencePattern: null,
+          },
+          {
+            id: "task-2",
+            title: "Inbox cleanup",
+            taskDate: "2026-04-19",
+            scheduledTime: "09:30",
+            estimatedDuration: 30,
+            recurrencePattern: null,
+          },
+        ],
+        calendarEvents: [
+          {
+            id: "event-1",
+            title: "Therapy",
+            start: "2026-04-18T14:00:00.000Z",
+            end: "2026-04-18T15:00:00.000Z",
+            isAllDay: false,
+            provider: "google",
+            readOnly: true,
+          },
+        ],
+      },
+    },
+    baseResult: {
+      ...baseResult("schedule_read"),
+      reply: "Here's the shape of what's coming up.\n\nToday: 14:00-15:00 Therapy; 15:00 Workout.\n\nTomorrow: 09:30 Inbox cleanup.\n\nTell me what feels most important, and I'll help from there.",
+    },
+    openAIApiKey: "test-openai-key",
+    model: "test-model",
+  });
+
+  assertEquals(response.mode, "schedule_read");
+  assertEquals(response.reply.includes("Week ahead:"), false);
+
+  const promptPayload = JSON.parse(captured.body?.messages?.[1]?.content ?? "{}") as {
+    deterministicContext?: {
+      fallbackReply?: string;
+    };
+  };
+
+  assertStringIncludes(promptPayload.deterministicContext?.fallbackReply ?? "", "Today:");
+  assertStringIncludes(promptPayload.deterministicContext?.fallbackReply ?? "", "Tomorrow:");
+  assertEquals(
+    (promptPayload.deterministicContext?.fallbackReply ?? "").includes("Week ahead:"),
+    false,
+  );
+});

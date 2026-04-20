@@ -211,4 +211,62 @@ describe("CompanionStatAnalysisSurface", () => {
     fireEvent.click(screen.getByRole("button", { name: "Refresh analysis" }));
     expect(mocks.refreshAnalysisMock).toHaveBeenCalledTimes(1);
   });
+
+  it("shows the inline unavailable card when validated analysis is missing", () => {
+    mocks.useCompanionStatAnalysisMock.mockReturnValue({
+      analysis: null,
+      cached: false,
+      error: "Received malformed stat analysis data: analysis.summary must be a non-empty string",
+      isLoading: false,
+      isRefreshing: false,
+      refreshAnalysis: mocks.refreshAnalysisMock,
+    });
+
+    render(
+      <CompanionStatAnalysisSurface
+        open={true}
+        onOpenChange={vi.fn()}
+        layoutMode="mobile"
+      />,
+    );
+
+    expect(screen.getByText("Stats analysis is unavailable right now.")).toBeInTheDocument();
+    expect(
+      screen.getByText("Received malformed stat analysis data: analysis.summary must be a non-empty string"),
+    ).toBeInTheDocument();
+  });
+
+  it("contains render errors inside the stats surface boundary", () => {
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    mocks.useCompanionStatAnalysisMock.mockReturnValue({
+      analysis: {
+        ...analysis,
+        statProfile: {
+          ...analysis.statProfile,
+          dominantStat: undefined,
+        },
+      },
+      cached: true,
+      error: null,
+      isLoading: false,
+      isRefreshing: false,
+      refreshAnalysis: mocks.refreshAnalysisMock,
+    });
+
+    render(
+      <CompanionStatAnalysisSurface
+        open={true}
+        onOpenChange={vi.fn()}
+        layoutMode="desktop"
+      />,
+    );
+
+    expect(screen.getByText("Stats analysis is unavailable right now.")).toBeInTheDocument();
+    expect(
+      screen.getByText("We couldn't render this analysis right now. Try refreshing it."),
+    ).toBeInTheDocument();
+
+    consoleErrorSpy.mockRestore();
+  });
 });

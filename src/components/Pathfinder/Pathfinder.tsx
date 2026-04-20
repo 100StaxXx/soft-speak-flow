@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { plannerPathfinderTheme } from '@/components/companion/plannerPathfinderTheme';
 import { toast } from "@/components/ui/sonner";
 import { motion, AnimatePresence } from 'framer-motion';
 import { differenceInDays, parseISO, format, addDays } from 'date-fns';
@@ -27,6 +28,7 @@ import {
   Calendar,
   Zap,
   Flag,
+  X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useEpicSuggestions, type EpicSuggestion, type ClarificationAnswers } from '@/hooks/useEpicSuggestions';
@@ -548,354 +550,416 @@ export function Pathfinder({
 
   const steps: WizardStep[] = ['goal', 'timeline', 'suggestions', 'review'];
   const currentStepIndex = steps.indexOf(step);
+  const stepDescriptions: Record<WizardStep, string> = {
+    goal: 'Set your goal and deadline',
+    timeline: 'Review your personalized timeline',
+    suggestions: 'Confirm your rituals and milestones',
+    review: 'Review and create your campaign',
+  };
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col p-0">
-        <DialogHeader className="p-6 pb-4">
-          <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-primary" />
-            Pathfinder
-          </DialogTitle>
-          <DialogDescription>
-            {step === 'goal' && 'Set your goal and deadline'}
-            {step === 'timeline' && 'Review your personalized timeline'}
-            {step === 'suggestions' && 'Confirm your rituals and milestones'}
-            {step === 'review' && 'Review and create your campaign'}
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContent className="max-w-3xl border-none bg-transparent p-0 shadow-none" hideCloseButton>
+        <div className={plannerPathfinderTheme.shell} data-testid="pathfinder-shell">
+          <div className={plannerPathfinderTheme.shellGloss} />
+          <div className={plannerPathfinderTheme.shellGlow} />
 
-        {isAtEpicLimit && (
-          <div className="px-6 pb-2">
-            <CapacityWarningBanner isAtEpicLimit={isAtEpicLimit} isLoading={false} />
-          </div>
-        )}
-
-        {/* Progress indicator */}
-        <div className="px-6 pb-4">
-          <div className="flex items-center justify-center gap-2">
-            {steps.map((s, i) => (
-              <div key={s} className="flex items-center">
-                <div
-                  className={cn(
-                    'w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all',
-                    step === s
-                      ? 'bg-primary text-primary-foreground'
-                      : currentStepIndex > i
-                      ? 'bg-primary/20 text-primary'
-                      : 'bg-muted text-muted-foreground'
-                  )}
-                >
-                  {currentStepIndex > i ? <Check className="w-4 h-4" /> : i + 1}
-                </div>
-                {i < steps.length - 1 && (
-                  <div className={cn('w-4 h-0.5 mx-1', currentStepIndex > i ? 'bg-primary' : 'bg-muted')} />
-                )}
+          <div className={cn(plannerPathfinderTheme.shellBody, "h-[min(86vh,52rem)] min-h-[34rem]")}>
+            <div className={plannerPathfinderTheme.headerBar} data-testid="pathfinder-header">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[1rem] border-[3px] border-[#4d2811] bg-[linear-gradient(180deg,#fff8e8_0%,#ffcf6e_100%)] text-[#7f3b12] shadow-[0_6px_0_rgba(77,40,17,0.55)]">
+                <Sparkles className="h-5 w-5" />
               </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Step Content */}
-        <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto overscroll-contain" style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
-          <AnimatePresence mode="wait">
-            {/* Step 1: Goal & Deadline */}
-            {step === 'goal' && (
-              <motion.div
-                key="goal"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="px-6 pb-6 space-y-4"
+              <DialogHeader className="min-w-0 flex-1 space-y-1 text-left">
+                <DialogTitle className="text-xl text-white">Pathfinder</DialogTitle>
+                <DialogDescription className="text-sm text-white/[0.68]">
+                  {stepDescriptions[step]}
+                </DialogDescription>
+              </DialogHeader>
+              <Button
+                type="button"
+                size="icon"
+                variant="outline"
+                className={cn("h-10 w-10 shrink-0", plannerPathfinderTheme.headerIconButton)}
+                onClick={handleClose}
+                aria-label="Close Pathfinder"
               >
-                <div className="space-y-2">
-                  <Label htmlFor="goal-input" className="text-base font-semibold">
-                    What's your goal?
-                  </Label>
-                  <div className="relative">
-                    <Textarea
-                      id="goal-input"
-                      placeholder="e.g., Pass the bar exam, Run a marathon, Learn Spanish"
-                      value={isRecording ? goalInput + (interimText ? ' ' + interimText : '') : goalInput}
-                      onChange={(e) => setGoalInput(e.target.value)}
-                      rows={3}
-                      className="pr-12 text-base"
-                    />
-                    <Button
-                      size="icon"
-                      variant={isRecording ? 'default' : 'ghost'}
-                      className={cn(
-                        'absolute right-2 top-2 h-8 w-8',
-                        isRecording && 'animate-pulse bg-red-500 hover:bg-red-600'
-                      )}
-                      onClick={handleVoiceToggle}
-                      disabled={isAutoStopping}
-                    >
-                      <Mic className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
 
-                {/* Timeline Context - Optional */}
-                <div className="space-y-2">
-                  <Label htmlFor="context-input" className="text-base font-semibold flex items-center gap-2">
-                    List current experience
-                    <span className="text-sm font-normal text-muted-foreground">(optional)</span>
-                  </Label>
-                  <Textarea
-                    id="context-input"
-                    placeholder="e.g., Already know basics, studying for 2 weeks, starting from scratch"
-                    value={timelineContext}
-                    onChange={(e) => setTimelineContext(e.target.value)}
-                    rows={2}
-                    className="text-base"
-                  />
-                </div>
-
-                {/* Deadline picker */}
-                <div className="space-y-2">
-                  <Label className="text-base font-semibold flex items-center gap-2">
-                    <Calendar className="w-4 h-4" />
-                    When do you need to achieve this?
-                  </Label>
-                  <DeadlinePicker value={deadline} onChange={setDeadline} />
-                </div>
-
-                {/* AI Clarification Flow */}
-                <AnimatePresence>
-                  {showClarification && clarificationQuestions.length > 0 && (
-                    <EpicClarificationFlow
-                      goal={goalInput}
-                      questions={clarificationQuestions}
-                      onSubmit={handleClarificationSubmit}
-                      onSkip={handleSkipClarification}
-                      isLoading={isClassifying}
-                    />
-                  )}
-                </AnimatePresence>
-
-                {/* Continue button - hide when showing clarification */}
-                {!showClarification && (
-                  <Button
-                    onClick={handleProceedToTimeline}
-                    disabled={!goalInput.trim() || !deadline || isClassifying || isScheduleLoading}
-                    className="w-full h-12 text-base"
-                    size="lg"
-                  >
-                    {isClassifying ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Analyzing your goal...
-                      </>
-                    ) : isScheduleLoading ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Building your plan...
-                      </>
-                    ) : (
-                      <>
-                        <Wand2 className="w-5 h-5 mr-2" />
-                        Build My Plan
-                      </>
-                    )}
-                  </Button>
-                )}
-
-                {error && (
-                  <p className="text-sm text-destructive text-center">{error}</p>
-                )}
-              </motion.div>
+            {isAtEpicLimit && (
+              <div className="mt-3">
+                <CapacityWarningBanner
+                  isAtEpicLimit={isAtEpicLimit}
+                  isLoading={false}
+                  className="rounded-[1.5rem] border-[3px] border-[#9a4718] bg-[#ffd9bf] px-4 py-3 text-[#8a2716] shadow-[0_8px_0_rgba(154,71,24,0.18)]"
+                />
+              </div>
             )}
 
-            {/* Step 2: Timeline Review */}
-            {step === 'timeline' && schedule && deadline && (
-              <motion.div
-                key="timeline"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="flex flex-col h-full min-h-0"
-              >
-                <div className="flex-1 overflow-y-auto px-4 overscroll-contain" style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
-                  <div className="space-y-4 pb-4">
-                    <TimelineView
-                      feasibilityAssessment={schedule.feasibilityAssessment}
-                      phases={schedule.phases}
-                      milestones={schedule.milestones}
-                      rituals={schedule.rituals}
-                      weeklyHoursEstimate={schedule.weeklyHoursEstimate}
-                      executionModel={schedule.executionModel}
-                      deadline={format(deadline!, 'yyyy-MM-dd')}
-                      onMilestoneToggle={toggleMilestone}
-                      onMilestoneDateChange={updateMilestoneDate}
-                      postcardCount={postcardCount}
-                      maxPostcards={maxPostcards}
-                    />
+            <div
+              className={cn(plannerPathfinderTheme.mutedPanel, "mt-3 px-4 py-3")}
+              data-testid="pathfinder-progress"
+            >
+              <div className="flex items-center justify-center gap-2 sm:gap-3">
+                {steps.map((s, i) => {
+                  const isComplete = currentStepIndex > i;
+                  const isActive = step === s;
 
-                    {/* Adjustment input */}
-                    <div className="pt-4 border-t">
-                      <AdjustmentInput onSubmit={handleAdjustSchedule} isLoading={isScheduleLoading} />
+                  return (
+                    <div key={s} className="flex items-center">
+                      <div
+                        className={cn(
+                          "flex h-9 w-9 items-center justify-center rounded-full border-[3px] text-sm font-semibold transition-all",
+                          isActive
+                            ? "border-[#6b3416] bg-[linear-gradient(180deg,#fff8e8_0%,#ffcf6e_100%)] text-[#5d2a0f] shadow-[0_5px_0_rgba(77,40,17,0.35)]"
+                            : isComplete
+                              ? "border-[#315114] bg-[linear-gradient(180deg,#d7ff86_0%,#9fda3f_100%)] text-[#183304] shadow-[0_5px_0_rgba(49,81,20,0.28)]"
+                              : "border-[#8d481c]/30 bg-white/55 text-[#8d481c]/65",
+                        )}
+                      >
+                        {isComplete ? <Check className="h-4 w-4" /> : i + 1}
+                      </div>
+                      {i < steps.length - 1 && (
+                        <div
+                          className={cn(
+                            "mx-1.5 h-1 w-6 rounded-full sm:w-8",
+                            isComplete ? "bg-[#a6de45]" : "bg-[#8d481c]/20",
+                          )}
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className={plannerPathfinderTheme.contentWell}>
+              <AnimatePresence mode="wait">
+                {step === 'goal' && (
+                  <motion.div
+                    key="goal"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    className="flex h-full min-h-0 flex-col"
+                  >
+                    <div
+                      ref={scrollContainerRef}
+                      className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 sm:px-5"
+                      style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+                    >
+                      <div className="space-y-4 py-4 text-[#4f240c]">
+                        <div className={cn(plannerPathfinderTheme.raisedPanel, "space-y-3 p-4")}>
+                          <Label htmlFor="goal-input" className="text-base font-semibold text-[#5d2a0f]">
+                            What's your goal?
+                          </Label>
+                          <div className="relative">
+                            <Textarea
+                              id="goal-input"
+                              placeholder="e.g., Pass the bar exam, Run a marathon, Learn Spanish"
+                              value={isRecording ? goalInput + (interimText ? ' ' + interimText : '') : goalInput}
+                              onChange={(e) => setGoalInput(e.target.value)}
+                              rows={3}
+                              className={cn(plannerPathfinderTheme.textField, "min-h-[132px] pr-14 text-base")}
+                            />
+                            <Button
+                              size="icon"
+                              variant={isRecording ? 'default' : 'ghost'}
+                              className={cn(
+                                "absolute right-3 top-3 h-10 w-10 rounded-full border-[3px] border-[#4d2811] bg-white/65 text-[#7f3b12] hover:bg-white/80",
+                                isRecording && "animate-pulse border-[#7f1616] bg-[linear-gradient(180deg,#ffb8a7_0%,#ff7a59_100%)] text-[#4c0f0f]",
+                              )}
+                              onClick={handleVoiceToggle}
+                              disabled={isAutoStopping}
+                              aria-label={isRecording ? "Stop voice input" : "Start voice input"}
+                            >
+                              <Mic className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+
+                        <div className={cn(plannerPathfinderTheme.mutedPanel, "space-y-3 p-4")}>
+                          <Label htmlFor="context-input" className="flex items-center gap-2 text-base font-semibold text-[#5d2a0f]">
+                            List current experience
+                            <span className="text-sm font-normal text-[#7f4a1d]/80">(optional)</span>
+                          </Label>
+                          <Textarea
+                            id="context-input"
+                            placeholder="e.g., Already know basics, studying for 2 weeks, starting from scratch"
+                            value={timelineContext}
+                            onChange={(e) => setTimelineContext(e.target.value)}
+                            rows={2}
+                            className={cn(plannerPathfinderTheme.textField, "min-h-[108px] text-base")}
+                          />
+                        </div>
+
+                        <div className={cn(plannerPathfinderTheme.raisedPanel, "space-y-3 p-4")}>
+                          <Label className="flex items-center gap-2 text-base font-semibold text-[#5d2a0f]">
+                            <Calendar className="w-4 h-4 text-[#8d481c]" />
+                            When do you need to achieve this?
+                          </Label>
+                          <DeadlinePicker value={deadline} onChange={setDeadline} />
+                        </div>
+
+                        <AnimatePresence>
+                          {showClarification && clarificationQuestions.length > 0 && (
+                            <EpicClarificationFlow
+                              goal={goalInput}
+                              questions={clarificationQuestions}
+                              onSubmit={handleClarificationSubmit}
+                              onSkip={handleSkipClarification}
+                              isLoading={isClassifying}
+                              variant="planner"
+                            />
+                          )}
+                        </AnimatePresence>
+                      </div>
                     </div>
 
-                    {/* Actions */}
-                    <div className="space-y-3 pt-2">
-                      <Button onClick={handleProceedToSuggestions} className="w-full">
+                    {!showClarification && (
+                      <div className={cn(plannerPathfinderTheme.footerBar, "space-y-3")} data-testid="pathfinder-footer">
+                        <Button
+                          onClick={handleProceedToTimeline}
+                          disabled={!goalInput.trim() || !deadline || isClassifying || isScheduleLoading}
+                          className={cn(plannerPathfinderTheme.primaryButton, "h-12 w-full text-base")}
+                          size="lg"
+                        >
+                          {isClassifying ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Analyzing your goal...
+                            </>
+                          ) : isScheduleLoading ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Building your plan...
+                            </>
+                          ) : (
+                            <>
+                              <Wand2 className="mr-2 h-5 w-5" />
+                              Build My Plan
+                            </>
+                          )}
+                        </Button>
+                        {error ? (
+                          <p className="text-center text-sm text-[#8a2716]">{error}</p>
+                        ) : null}
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+
+                {step === 'timeline' && schedule && deadline && (
+                  <motion.div
+                    key="timeline"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    className="flex h-full min-h-0 flex-col"
+                  >
+                    <div
+                      ref={scrollContainerRef}
+                      className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 sm:px-5"
+                      style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+                    >
+                      <div className="space-y-4 py-4 text-[#4f240c]">
+                        <TimelineView
+                          feasibilityAssessment={schedule.feasibilityAssessment}
+                          phases={schedule.phases}
+                          milestones={schedule.milestones}
+                          rituals={schedule.rituals}
+                          weeklyHoursEstimate={schedule.weeklyHoursEstimate}
+                          executionModel={schedule.executionModel}
+                          deadline={format(deadline!, 'yyyy-MM-dd')}
+                          onMilestoneToggle={toggleMilestone}
+                          onMilestoneDateChange={updateMilestoneDate}
+                          postcardCount={postcardCount}
+                          maxPostcards={maxPostcards}
+                        />
+                        <AdjustmentInput onSubmit={handleAdjustSchedule} isLoading={isScheduleLoading} />
+                      </div>
+                    </div>
+
+                    <div className={cn(plannerPathfinderTheme.footerBar, "space-y-3")} data-testid="pathfinder-footer">
+                      <Button
+                        onClick={handleProceedToSuggestions}
+                        className={cn(plannerPathfinderTheme.primaryButton, "w-full")}
+                      >
                         Continue with this plan
-                        <ChevronRight className="w-4 h-4 ml-1" />
+                        <ChevronRight className="ml-1 h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" onClick={handleBack} className="w-full">
-                        <ChevronLeft className="w-4 h-4 mr-1" />
+                      <Button
+                        variant="outline"
+                        onClick={handleBack}
+                        className={cn(plannerPathfinderTheme.outlineButton, "w-full")}
+                      >
+                        <ChevronLeft className="mr-1 h-4 w-4" />
                         Back
                       </Button>
                     </div>
-                  </div>
-                </div>
-              </motion.div>
-            )}
+                  </motion.div>
+                )}
 
-            {/* Step 3: Suggestions Confirmation (was Step 4) */}
-            {step === 'suggestions' && (
-              <motion.div
-                key="suggestions"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="flex flex-col h-full min-h-0"
-              >
-                <div className="flex-1 overflow-y-auto px-6 overscroll-contain" style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
-                  <div className="space-y-4 pb-4">
-                    {/* Editable Rituals */}
-                    {schedule?.rituals && (
-                      <RitualEditor
-                        rituals={schedule.rituals}
-                        originalRituals={originalRituals}
-                        onRitualsChange={setRituals}
-                      />
-                    )}
-
-                    {/* Milestones */}
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-sm font-medium">
-                        <Flag className="w-4 h-4" />
-                        Milestones ({selectedMilestones.length})
-                      </div>
-                      {selectedMilestones.map((m: any) => (
-                        <div key={m.id} className="p-3 bg-amber-500/10 rounded-lg">
-                          <div className="flex items-center justify-between">
-                            <span className="font-medium">{m.title}</span>
-                            <Badge variant="outline">
-                              {m.targetDate ? format(parseISO(m.targetDate), 'MMM d') : `Week ${m.suggestedWeek}`}
-                            </Badge>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Postcard Preview */}
-                    {schedule?.milestones && (
-                      <PostcardPreview 
-                        milestones={schedule.milestones} 
-                        storyType={storyType}
-                      />
-                    )}
-                  </div>
-                </div>
-
-                <div className="p-6 pt-4 border-t bg-background space-y-3">
-                  <Button onClick={handleProceedToReview} className="w-full">
-                    Continue to Review
-                    <ChevronRight className="w-4 h-4 ml-1" />
-                  </Button>
-                  <Button variant="ghost" onClick={handleBack} className="w-full">
-                    <ChevronLeft className="w-4 h-4 mr-1" />
-                    Back to Timeline
-                  </Button>
-                </div>
-              </motion.div>
-            )}
-
-            {/* Step 4: Review (was Step 5) */}
-            {step === 'review' && (
-              <motion.div
-                key="review"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="flex flex-col h-full min-h-0"
-              >
-                <div className="flex-1 overflow-y-auto px-6 overscroll-contain" style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
-                  <div className="space-y-4 pb-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="epic-why">Your Why</Label>
-                      <Textarea
-                        id="epic-why"
-                        value={epicWhy}
-                        onChange={(e) => setEpicWhy(e.target.value)}
-                        placeholder="Why are you embarking on this campaign? What's your purpose?"
-                        rows={3}
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Define your purpose - this will fuel your motivation
-                      </p>
-                    </div>
-
-                    {epicWhy.trim().length > 0 && (
-                      <motion.div 
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="space-y-2"
-                      >
-                        <Label htmlFor="epic-title">Campaign Name</Label>
-                        <Input
-                          id="epic-title"
-                          value={epicTitle}
-                          onChange={(e) => setEpicTitle(e.target.value)}
-                          placeholder="Name your campaign"
-                        />
-                      </motion.div>
-                    )}
-
-                    <div className="p-4 bg-gradient-to-r from-primary/10 to-purple-500/10 rounded-xl border border-primary/20">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Zap className="w-5 h-5 text-primary" />
-                          <span className="font-medium">Completion Reward</span>
-                        </div>
-                        <span className="text-xl font-bold text-primary">+{calculateXP} XP</span>
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {targetDays} days • {selectedHabits.length} rituals • {selectedMilestones.length} milestones
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-6 pt-4 border-t bg-background space-y-3">
-                  <Button
-                    onClick={handleCreateEpic}
-                    disabled={isAtEpicLimit || isCreating || isSubmittingCreate || selectedHabits.length === 0 || epicWhy.trim().length === 0 || epicTitle.trim().length === 0}
-                    className="w-full bg-gradient-to-r from-primary to-purple-600"
+                {step === 'suggestions' && (
+                  <motion.div
+                    key="suggestions"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    className="flex h-full min-h-0 flex-col"
                   >
-                    {isCreating || isSubmittingCreate ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Creating...
-                      </>
-                    ) : (
-                      <>
-                        <Target className="w-4 h-4 mr-2" />
-                        Create Campaign
-                      </>
-                    )}
-                  </Button>
-                  <Button variant="ghost" onClick={handleBack} className="w-full">
-                    <ChevronLeft className="w-4 h-4 mr-1" />
-                    Back
-                  </Button>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+                    <div
+                      ref={scrollContainerRef}
+                      className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 sm:px-5"
+                      style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+                    >
+                      <div className="space-y-4 py-4 text-[#4f240c]">
+                        {schedule?.rituals && (
+                          <RitualEditor
+                            rituals={schedule.rituals}
+                            originalRituals={originalRituals}
+                            onRitualsChange={setRituals}
+                          />
+                        )}
+
+                        <div className={cn(plannerPathfinderTheme.raisedPanel, "space-y-3 p-4")}>
+                          <div className="flex items-center gap-2 text-sm font-semibold text-[#5d2a0f]">
+                            <Flag className="h-4 w-4 text-[#8d481c]" />
+                            Milestones ({selectedMilestones.length})
+                          </div>
+                          {selectedMilestones.map((m: any) => (
+                            <div key={m.id} className={cn(plannerPathfinderTheme.mutedPanel, "flex items-center justify-between gap-3 p-3")}>
+                              <span className="font-medium">{m.title}</span>
+                              <Badge variant="outline" className={plannerPathfinderTheme.chip}>
+                                {m.targetDate ? format(parseISO(m.targetDate), 'MMM d') : `Week ${m.suggestedWeek}`}
+                              </Badge>
+                            </div>
+                          ))}
+                        </div>
+
+                        {schedule?.milestones && (
+                          <PostcardPreview
+                            milestones={schedule.milestones}
+                            storyType={storyType}
+                          />
+                        )}
+                      </div>
+                    </div>
+
+                    <div className={cn(plannerPathfinderTheme.footerBar, "space-y-3")} data-testid="pathfinder-footer">
+                      <Button
+                        onClick={handleProceedToReview}
+                        className={cn(plannerPathfinderTheme.primaryButton, "w-full")}
+                      >
+                        Continue to Review
+                        <ChevronRight className="ml-1 h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={handleBack}
+                        className={cn(plannerPathfinderTheme.outlineButton, "w-full")}
+                      >
+                        <ChevronLeft className="mr-1 h-4 w-4" />
+                        Back to Timeline
+                      </Button>
+                    </div>
+                  </motion.div>
+                )}
+
+                {step === 'review' && (
+                  <motion.div
+                    key="review"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    className="flex h-full min-h-0 flex-col"
+                  >
+                    <div
+                      ref={scrollContainerRef}
+                      className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 sm:px-5"
+                      style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+                    >
+                      <div className="space-y-4 py-4 text-[#4f240c]">
+                        <div className={cn(plannerPathfinderTheme.raisedPanel, "space-y-3 p-4")}>
+                          <Label htmlFor="epic-why" className="text-[#5d2a0f]">Your Why</Label>
+                          <Textarea
+                            id="epic-why"
+                            value={epicWhy}
+                            onChange={(e) => setEpicWhy(e.target.value)}
+                            placeholder="Why are you embarking on this campaign? What's your purpose?"
+                            rows={3}
+                            className={cn(plannerPathfinderTheme.textField, "min-h-[132px]")}
+                          />
+                          <p className="text-xs text-[#7f4a1d]/80">
+                            Define your purpose - this will fuel your motivation
+                          </p>
+                        </div>
+
+                        {epicWhy.trim().length > 0 && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className={cn(plannerPathfinderTheme.mutedPanel, "space-y-3 p-4")}
+                          >
+                            <Label htmlFor="epic-title" className="text-[#5d2a0f]">Campaign Name</Label>
+                            <Input
+                              id="epic-title"
+                              value={epicTitle}
+                              onChange={(e) => setEpicTitle(e.target.value)}
+                              placeholder="Name your campaign"
+                              className={plannerPathfinderTheme.textField}
+                            />
+                          </motion.div>
+                        )}
+
+                        <div className={cn(plannerPathfinderTheme.successCard, "p-4")}>
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2">
+                              <Zap className="h-5 w-5 text-[#315114]" />
+                              <span className="font-medium">Completion Reward</span>
+                            </div>
+                            <span className="text-xl font-bold">+{calculateXP} XP</span>
+                          </div>
+                          <p className="mt-1 text-xs text-[#315114]/80">
+                            {targetDays} days • {selectedHabits.length} rituals • {selectedMilestones.length} milestones
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className={cn(plannerPathfinderTheme.footerBar, "space-y-3")} data-testid="pathfinder-footer">
+                      <Button
+                        onClick={handleCreateEpic}
+                        disabled={isAtEpicLimit || isCreating || isSubmittingCreate || selectedHabits.length === 0 || epicWhy.trim().length === 0 || epicTitle.trim().length === 0}
+                        className={cn(plannerPathfinderTheme.primaryButton, "w-full")}
+                      >
+                        {isCreating || isSubmittingCreate ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Creating...
+                          </>
+                        ) : (
+                          <>
+                            <Target className="mr-2 h-4 w-4" />
+                            Create Campaign
+                          </>
+                        )}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={handleBack}
+                        className={cn(plannerPathfinderTheme.outlineButton, "w-full")}
+                      >
+                        <ChevronLeft className="mr-1 h-4 w-4" />
+                        Back
+                      </Button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

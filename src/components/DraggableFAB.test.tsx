@@ -1,9 +1,42 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DraggableFAB } from "./DraggableFAB";
 
 const mocks = vi.hoisted(() => ({
   onOpenCompanionPlanner: vi.fn(),
+  lastHookOptions: null as null | {
+    onDragStart?: () => void;
+    onDragEnd?: (position: { x: number; y: number }) => void;
+  },
+  draggableFabState: {
+    position: { x: 216, y: 520 },
+    popupAlignment: {
+      horizontal: "right" as const,
+      vertical: "bottom" as const,
+    },
+    isDragging: false,
+    isLongPressing: false,
+    positionStyles: {
+      left: 216,
+      top: 520,
+      right: "auto",
+      bottom: "auto",
+    },
+  } as {
+    position: { x: number; y: number };
+    popupAlignment: {
+      horizontal: "left" | "right";
+      vertical: "top" | "bottom";
+    };
+    isDragging: boolean;
+    isLongPressing: boolean;
+    positionStyles: {
+      left: number;
+      top: number;
+      right: string;
+      bottom: string;
+    };
+  },
 }));
 
 vi.mock("@/hooks/useAuth", () => ({
@@ -13,31 +46,29 @@ vi.mock("@/hooks/useAuth", () => ({
 }));
 
 vi.mock("@/hooks/useDraggableFAB", () => ({
-  useDraggableFAB: () => ({
-    position: "bottom-right" as const,
-    isDragging: false,
-    isLongPressing: false,
-    dragControls: {
-      drag: false,
-      dragConstraints: { top: -500, left: -500, right: 500, bottom: 500 },
-      dragElastic: 0.1,
-      dragMomentum: false,
-      onDragStart: vi.fn(),
-      onDragEnd: vi.fn(),
-    },
-    longPressHandlers: {
-      onPointerDown: vi.fn(),
-      onPointerUp: vi.fn(),
-      onPointerCancel: vi.fn(),
-    },
-    positionStyles: {
-      right: "12px",
-      bottom: "12px",
-      left: "auto",
-      top: "auto",
-    },
-    dragOffset: { x: 0, y: 0 },
-  }),
+  useDraggableFAB: (options?: {
+    onDragStart?: () => void;
+    onDragEnd?: (position: { x: number; y: number }) => void;
+  }) => {
+    mocks.lastHookOptions = options ?? null;
+    return {
+      ...mocks.draggableFabState,
+      dragControls: {
+        drag: false as const,
+        dragConstraints: { top: -500, left: -500, right: 500, bottom: 500 },
+        dragElastic: 0.1,
+        dragMomentum: false,
+        onDragStart: vi.fn(),
+        onDragEnd: vi.fn(),
+      },
+      longPressHandlers: {
+        onPointerDown: vi.fn(),
+        onPointerUp: vi.fn(),
+        onPointerCancel: vi.fn(),
+      },
+      dragOffset: { x: 0, y: 0 },
+    };
+  },
 }));
 
 vi.mock("@/hooks/useJourneysCompanionVisual", () => ({
@@ -59,12 +90,34 @@ vi.mock("@/hooks/useJourneysCompanionVisual", () => ({
 describe("DraggableFAB", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.lastHookOptions = null;
+    mocks.draggableFabState = {
+      position: { x: 216, y: 520 },
+      popupAlignment: {
+        horizontal: "right",
+        vertical: "bottom",
+      },
+      isDragging: false,
+      isLongPressing: false,
+      positionStyles: {
+        left: 216,
+        top: 520,
+        right: "auto",
+        bottom: "auto",
+      },
+    };
   });
 
   it("opens the popup menu and flips the launcher to face forward", () => {
     render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
 
     const launcher = screen.getByTestId("journeys-companion-launcher-floating");
+    const image = screen.getByRole("img", { name: "Nova" });
+
+    expect(launcher).toHaveClass("h-36", "w-36", "overflow-visible", "bg-transparent");
+    expect(launcher.className).not.toContain("backdrop-blur-xl");
+    expect(launcher.querySelectorAll('[aria-hidden="true"]')).toHaveLength(0);
+    expect(image.parentElement).toHaveClass("h-[7.75rem]", "w-[7.75rem]");
     expect(launcher).toHaveAttribute("data-face-direction", "away");
     expect(screen.queryByTestId("journeys-companion-launcher-popup")).not.toBeInTheDocument();
 
@@ -134,5 +187,50 @@ describe("DraggableFAB", () => {
       starterIntent: "plan_day",
       message: "What do I have coming up for the rest of today and tomorrow?",
     }));
+  });
+
+  it("does not open the popup from the click that follows a completed drag", () => {
+    render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
+
+    act(() => {
+      mocks.lastHookOptions?.onDragEnd?.({ x: 120, y: 240 });
+    });
+
+    fireEvent.click(screen.getByTestId("journeys-companion-launcher-floating"));
+
+    expect(screen.queryByTestId("journeys-companion-launcher-popup")).not.toBeInTheDocument();
+  });
+
+  it("reports top-left popup placement when the launcher sits in the upper-left half", () => {
+    mocks.draggableFabState = {
+      ...mocks.draggableFabState,
+      position: { x: 16, y: 120 },
+      popupAlignment: {
+        horizontal: "left",
+        vertical: "top",
+      },
+      positionStyles: {
+        left: 16,
+        top: 120,
+        right: "auto",
+        bottom: "auto",
+      },
+    };
+
+    render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
+    fireEvent.click(screen.getByTestId("journeys-companion-launcher-floating"));
+
+    const popup = screen.getByTestId("journeys-companion-launcher-popup");
+    expect(popup).toHaveAttribute("data-popup-horizontal", "left");
+    expect(popup).toHaveAttribute("data-popup-vertical", "top");
+  });
+
+  it("reports bottom-right popup placement when the launcher sits in the lower-right half", () => {
+    render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
+    fireEvent.click(screen.getByTestId("journeys-companion-launcher-floating"));
+
+    const popup = screen.getByTestId("journeys-companion-launcher-popup");
+    expect(popup).toHaveAttribute("data-popup-horizontal", "right");
+    expect(popup).toHaveAttribute("data-popup-vertical", "bottom");
   });
 });

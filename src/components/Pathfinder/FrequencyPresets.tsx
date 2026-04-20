@@ -1,3 +1,4 @@
+import { plannerPathfinderTheme } from "@/components/companion/plannerPathfinderTheme";
 import { cn } from "@/lib/utils";
 import {
   formatScheduleSelectionShort,
@@ -26,6 +27,7 @@ interface FrequencyPresetsProps {
   customMonthDays?: number[];
   customPeriod?: HabitCustomPeriod;
   onFrequencyChange: (selection: FrequencySelection) => void;
+  variant?: "default" | "planner";
 }
 
 const presets: { value: FrequencyType; label: string }[] = [
@@ -42,6 +44,7 @@ export function FrequencyPresets({
   customMonthDays = [],
   customPeriod,
   onFrequencyChange,
+  variant = "default",
 }: FrequencyPresetsProps) {
   const resolvedCustomPeriod = customPeriod ?? inferCustomPeriod({
     frequency,
@@ -50,6 +53,7 @@ export function FrequencyPresets({
   });
   const showWeekPicker = frequency === 'weekly' || (frequency === 'custom' && resolvedCustomPeriod === 'week');
   const showMonthPicker = frequency === 'monthly' || (frequency === 'custom' && resolvedCustomPeriod === 'month');
+  const isPlannerVariant = variant === "planner";
 
   const emitChange = (next: Partial<FrequencySelection>) => {
     const nextFrequency = next.frequency ?? frequency;
@@ -145,7 +149,9 @@ export function FrequencyPresets({
 
   return (
     <div className="space-y-2">
-      <label className="text-[10px] text-muted-foreground block">Frequency</label>
+      <label className={cn("block text-[10px]", isPlannerVariant ? plannerPathfinderTheme.sectionEyebrow : "text-muted-foreground")}>
+        Frequency
+      </label>
 
       <div className="flex flex-wrap gap-1">
         {presets.map((preset) => (
@@ -155,9 +161,13 @@ export function FrequencyPresets({
             onClick={() => handlePresetClick(preset)}
             className={cn(
               "px-2 py-1 text-xs rounded-full border transition-all",
-              frequency === preset.value
-                ? "bg-primary text-primary-foreground border-primary"
-                : "bg-background border-border text-muted-foreground hover:border-primary/50"
+              isPlannerVariant
+                ? frequency === preset.value
+                  ? plannerPathfinderTheme.primaryButton
+                  : plannerPathfinderTheme.outlineButton
+                : frequency === preset.value
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-background border-border text-muted-foreground hover:border-primary/50"
             )}
           >
             {preset.label}
@@ -174,9 +184,13 @@ export function FrequencyPresets({
               onClick={() => handleCustomPeriodChange(period)}
               className={cn(
                 "px-2 py-1 text-[11px] rounded-full border transition-all",
-                resolvedCustomPeriod === period
-                  ? "bg-primary/15 border-primary text-primary"
-                  : "border-border bg-background text-muted-foreground hover:border-primary/50"
+                isPlannerVariant
+                  ? resolvedCustomPeriod === period
+                    ? plannerPathfinderTheme.primaryButton
+                    : plannerPathfinderTheme.outlineButton
+                  : resolvedCustomPeriod === period
+                    ? "bg-primary/15 border-primary text-primary"
+                    : "border-border bg-background text-muted-foreground hover:border-primary/50"
               )}
             >
               {period === 'week' ? 'Week' : 'Month'}
@@ -195,9 +209,13 @@ export function FrequencyPresets({
               title={DAY_FULL[index]}
               className={cn(
                 "w-7 h-7 rounded-full text-[10px] font-bold transition-all border",
-                customDays.includes(index)
-                  ? "bg-primary border-primary text-primary-foreground"
-                  : "border-border bg-background text-muted-foreground hover:border-primary/50"
+                isPlannerVariant
+                  ? customDays.includes(index)
+                    ? plannerPathfinderTheme.primaryButton
+                    : plannerPathfinderTheme.outlineButton
+                  : customDays.includes(index)
+                    ? "bg-primary border-primary text-primary-foreground"
+                    : "border-border bg-background text-muted-foreground hover:border-primary/50"
               )}
             >
               {day}
@@ -216,16 +234,20 @@ export function FrequencyPresets({
                 onClick={() => toggleMonthDay(dayOfMonth)}
                 className={cn(
                   "h-8 rounded-md text-[11px] font-medium transition-all border",
-                  customMonthDays.includes(dayOfMonth)
-                    ? "bg-primary border-primary text-primary-foreground"
-                    : "border-border bg-background text-muted-foreground hover:border-primary/50"
+                  isPlannerVariant
+                    ? customMonthDays.includes(dayOfMonth)
+                      ? plannerPathfinderTheme.primaryButton
+                      : plannerPathfinderTheme.outlineButton
+                    : customMonthDays.includes(dayOfMonth)
+                      ? "bg-primary border-primary text-primary-foreground"
+                      : "border-border bg-background text-muted-foreground hover:border-primary/50"
                 )}
               >
                 {dayOfMonth}
               </button>
             ))}
           </div>
-          <p className="text-[10px] text-muted-foreground">
+          <p className={cn("text-[10px]", isPlannerVariant ? "text-[#7f4a1d]/80" : "text-muted-foreground")}>
             Short months automatically run on the last valid day. {formatScheduleSelectionShort({
               frequency,
               custom_days: customDays,

@@ -25,6 +25,7 @@ import {
 import { AudioReactiveWaveform } from "@/components/AudioReactiveWaveform";
 import { CompanionImage, CompanionPortraitShell } from "@/components/CompanionImage";
 import { PermissionRequestDialog } from "@/components/PermissionRequestDialog";
+import { plannerPathfinderTheme } from "@/components/companion/plannerPathfinderTheme";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -166,7 +167,7 @@ const JourneysCompanionThreadPicker = memo(function JourneysCompanionThreadPicke
 }: JourneysCompanionThreadPickerProps) {
   const body = (
     <div
-      className="rounded-[2rem] border-[3px] border-[#4d2811] bg-[radial-gradient(circle_at_top_left,rgba(255,245,194,0.22),transparent_26%),radial-gradient(circle_at_bottom_right,rgba(254,138,44,0.18),transparent_30%),linear-gradient(180deg,#8f2f15_0%,#5f180b_100%)] p-4 text-white shadow-[0_16px_0_#3f1308,0_28px_70px_-36px_rgba(43,14,4,0.7)]"
+      className={plannerPathfinderTheme.threadPickerShell}
       data-testid="journeys-companion-thread-picker"
     >
       <div className="mb-4 space-y-1">
@@ -181,7 +182,7 @@ const JourneysCompanionThreadPicker = memo(function JourneysCompanionThreadPicke
           Past chats
         </p>
         {isLoading ? (
-          <div className="flex items-center gap-2 rounded-[1.5rem] border-[3px] border-[#4d2811] bg-[linear-gradient(180deg,rgba(255,247,227,0.14),rgba(255,201,110,0.14))] px-4 py-5 text-sm text-white/[0.82] shadow-[0_8px_0_rgba(77,40,17,0.8)]">
+          <div className={cn(plannerPathfinderTheme.headerBar, "px-4 py-5 text-sm text-white/[0.82]")}>
             <Loader2 className="h-4 w-4 animate-spin" />
             Loading past chats...
           </div>
@@ -537,22 +538,22 @@ const JourneysCompanionOverlayBody = memo(({
 
   return (
     <div
-      className="relative overflow-hidden rounded-[2.25rem] border-[4px] border-[#4d2811] bg-[radial-gradient(circle_at_top_left,rgba(255,247,199,0.24),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(254,151,54,0.18),transparent_28%),linear-gradient(180deg,#a23518_0%,#701d0d_62%,#4a1209_100%)] text-white shadow-[0_18px_0_#4d2811,0_34px_90px_-36px_rgba(38,12,5,0.62)]"
+      className={plannerPathfinderTheme.shell}
       data-testid="journeys-companion-planner-modal"
     >
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.16),transparent_18%,transparent_78%,rgba(74,18,9,0.1))]" />
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-[radial-gradient(circle_at_top,rgba(255,248,212,0.36),transparent_62%)]" />
+      <div className={plannerPathfinderTheme.shellGloss} />
+      <div className={plannerPathfinderTheme.shellGlow} />
 
       <div
         className={cn(
-          "relative flex min-h-0 flex-col p-4 sm:p-5",
+          plannerPathfinderTheme.shellBody,
           isDrawerPresentation ? "h-full" : "h-[min(82vh,46rem)] min-h-[32rem]",
         )}
         style={plannerShellStyle}
         data-testid="journeys-companion-planner-shell"
       >
         <div
-          className="flex items-center gap-3 rounded-[1.8rem] border-[3px] border-[#4d2811] bg-[linear-gradient(180deg,rgba(255,251,239,0.2),rgba(255,206,105,0.14))] px-4 py-3 shadow-[0_8px_0_rgba(77,40,17,0.85)]"
+          className={plannerPathfinderTheme.headerBar}
           data-testid="journeys-companion-planner-chat-header"
         >
           <div className="relative shrink-0">
@@ -575,7 +576,7 @@ const JourneysCompanionOverlayBody = memo(({
                       type="button"
                       size="icon"
                       variant="outline"
-                      className="h-10 w-10 rounded-[1rem] border-[3px] border-[#4d2811] bg-[linear-gradient(180deg,rgba(255,246,221,0.2),rgba(255,191,89,0.16))] text-white hover:bg-[linear-gradient(180deg,rgba(255,250,236,0.24),rgba(255,191,89,0.2))]"
+                      className={cn("h-10 w-10", plannerPathfinderTheme.headerIconButton)}
                       onClick={() => {
                         void handleNewChatAction();
                       }}
@@ -598,7 +599,7 @@ const JourneysCompanionOverlayBody = memo(({
                       type="button"
                       size="icon"
                       variant="outline"
-                      className="h-10 w-10 rounded-[1rem] border-[3px] border-[#4d2811] bg-[linear-gradient(180deg,rgba(255,246,221,0.2),rgba(255,191,89,0.16))] text-white hover:bg-[linear-gradient(180deg,rgba(255,250,236,0.24),rgba(255,191,89,0.2))]"
+                      className={cn("h-10 w-10", plannerPathfinderTheme.headerIconButton)}
                       onClick={() => {
                         void handleArchiveAction();
                       }}
@@ -624,7 +625,7 @@ const JourneysCompanionOverlayBody = memo(({
 
         <div
           className={cn(
-            "mt-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-[2rem] border-[4px] border-[#4d2811] bg-[linear-gradient(180deg,rgba(255,248,225,0.14),rgba(255,187,88,0.1))] shadow-[0_12px_0_rgba(77,40,17,0.84),0_26px_50px_-36px_rgba(34,11,4,0.6)]",
+            plannerPathfinderTheme.contentWell,
             typingMessageId && "cursor-pointer",
           )}
           onClick={() => {
@@ -656,8 +657,8 @@ const JourneysCompanionOverlayBody = memo(({
                       className={cn(
                         "max-w-[85%] rounded-[1.7rem] border-[3px] px-4 py-3 shadow-[0_8px_0_rgba(77,40,17,0.8),0_18px_34px_-28px_rgba(36,12,4,0.52)] sm:max-w-[78%]",
                         entry.role === "assistant"
-                          ? "rounded-bl-[0.7rem] border-[#4d2811] bg-[linear-gradient(180deg,#fff8e9_0%,#ffd579_100%)] text-[#4f240c]"
-                          : "rounded-br-[0.7rem] border-[#3b4f0d] bg-[linear-gradient(180deg,#d7ff86_0%,#98d83b_100%)] text-[#183304]",
+                          ? plannerPathfinderTheme.assistantBubble
+                          : plannerPathfinderTheme.userBubble,
                       )}
                     >
                       <p className="whitespace-pre-wrap text-sm leading-6 sm:text-[0.95rem]">
@@ -671,7 +672,7 @@ const JourneysCompanionOverlayBody = memo(({
               {activeProposal ? (
                 <div className="flex w-full justify-start">
                   <div
-                    className="max-w-[88%] rounded-[1.8rem] border-[3px] border-[#4d2811] bg-[linear-gradient(180deg,#fff8e8_0%,#ffcf6e_100%)] p-4 text-[#4f240c] shadow-[0_8px_0_rgba(77,40,17,0.8),0_18px_34px_-28px_rgba(36,12,4,0.5)]"
+                    className={cn(plannerPathfinderTheme.raisedPanel, "max-w-[88%] p-4")}
                     data-testid="journeys-companion-planner-inline-proposal"
                   >
                     <div className="flex items-start justify-between gap-3">
@@ -687,13 +688,13 @@ const JourneysCompanionOverlayBody = memo(({
                           </p>
                         ) : null}
                       </div>
-                      <Badge variant="outline" className="border-[#6b3416] bg-white/60 text-[#7f3b12]">
+                      <Badge variant="outline" className={plannerPathfinderTheme.chip}>
                         {activeProposal.status}
                       </Badge>
                     </div>
                     {activeQuestPreview?.notes ? (
                       <div
-                        className="mt-3 rounded-[1.4rem] border-[3px] border-[#6b3416] bg-white/55 p-3"
+                        className={cn(plannerPathfinderTheme.mutedPanel, "mt-3 p-3")}
                         data-testid={`journeys-companion-planner-inline-proposal-notes-${activeProposal.id}`}
                       >
                         <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/[0.46]">
@@ -704,7 +705,7 @@ const JourneysCompanionOverlayBody = memo(({
                     ) : null}
                     {activeQuestPreview?.subtasks.length ? (
                       <div
-                        className="mt-3 rounded-[1.4rem] border-[3px] border-[#6b3416] bg-white/55 p-3"
+                        className={cn(plannerPathfinderTheme.mutedPanel, "mt-3 p-3")}
                         data-testid={`journeys-companion-planner-inline-proposal-subtasks-${activeProposal.id}`}
                       >
                         <div className="flex flex-wrap items-center gap-2">
@@ -730,7 +731,7 @@ const JourneysCompanionOverlayBody = memo(({
                       <Button
                         type="button"
                         size="sm"
-                        className="rounded-full border-[3px] border-[#315114] bg-[linear-gradient(180deg,#d7ff86_0%,#9fda3f_100%)] text-[#183304] hover:bg-[linear-gradient(180deg,#e3ff9e_0%,#a6e145_100%)]"
+                        className={plannerPathfinderTheme.primaryButton}
                         onClick={() => assistant.confirmProposal(activeProposal.id)}
                         disabled={!activeProposal.readyToConfirm}
                       >
@@ -741,7 +742,7 @@ const JourneysCompanionOverlayBody = memo(({
                         type="button"
                         size="sm"
                         variant="outline"
-                        className="rounded-full border-[3px] border-[#6b3416] bg-white/60 text-[#6b3416] hover:bg-white/75"
+                        className={plannerPathfinderTheme.outlineButton}
                         onClick={() => assistant.rejectProposal(activeProposal.id)}
                       >
                         <X className="mr-2 h-4 w-4" />
@@ -752,7 +753,7 @@ const JourneysCompanionOverlayBody = memo(({
                           type="button"
                           size="sm"
                           variant="outline"
-                          className="rounded-full border-[3px] border-[#6b3416] bg-white/60 text-[#6b3416] hover:bg-white/75"
+                          className={plannerPathfinderTheme.outlineButton}
                           onClick={assistant.confirmAll}
                         >
                           Confirm all
@@ -768,7 +769,7 @@ const JourneysCompanionOverlayBody = memo(({
                   className="flex w-full justify-start"
                   data-testid={showStarterQuickReplies ? "journeys-companion-planner-starter-options" : "journeys-companion-planner-inline-options"}
                 >
-                  <div className="max-w-[92%] rounded-[1.8rem] border-[3px] border-[#4d2811] bg-[linear-gradient(180deg,#fff8e8_0%,#ffcf6e_100%)] p-3 shadow-[0_8px_0_rgba(77,40,17,0.8),0_18px_34px_-28px_rgba(36,12,4,0.5)]">
+                  <div className={cn(plannerPathfinderTheme.raisedPanel, "max-w-[92%] p-3")}>
                     <div className="flex flex-wrap gap-2">
                       {showStarterQuickReplies
                         ? STARTER_QUICK_REPLIES.map((starter) => (
@@ -777,7 +778,7 @@ const JourneysCompanionOverlayBody = memo(({
                               type="button"
                               size="sm"
                               variant="outline"
-                              className="rounded-full border-[3px] border-[#6b3416] bg-white/60 text-[#5d2a0f] hover:bg-white/80"
+                              className={plannerPathfinderTheme.outlineButton}
                               onClick={() => handleStarterQuickReply(starter)}
                             >
                               {starter}
@@ -791,7 +792,7 @@ const JourneysCompanionOverlayBody = memo(({
                             type="button"
                             size="sm"
                             variant="outline"
-                            className="rounded-full border-[3px] border-[#6b3416] bg-white/60 text-[#5d2a0f] hover:bg-white/80"
+                            className={plannerPathfinderTheme.outlineButton}
                             onClick={() => handleQuickReply(option)}
                           >
                             {option}
@@ -807,10 +808,10 @@ const JourneysCompanionOverlayBody = memo(({
             </div>
           </ScrollArea>
 
-          <div className="border-t-[3px] border-[#4d2811] bg-[linear-gradient(180deg,rgba(255,248,225,0.18),rgba(255,193,90,0.14))] p-3">
+          <div className={cn(plannerPathfinderTheme.footerBar, "p-3")}>
             {assistant.isRecording || assistant.interimText ? (
               <div
-                className="mb-3 rounded-[1.5rem] border-[3px] border-[#4d2811] bg-[linear-gradient(180deg,#fff8e8_0%,#ffcf6e_100%)] px-3 py-3 text-[#5d2a0f] shadow-[0_8px_0_rgba(77,40,17,0.8)]"
+                className={cn(plannerPathfinderTheme.raisedPanel, "mb-3 px-3 py-3 text-[#5d2a0f]")}
                 data-testid="journeys-companion-planner-voice-preview"
               >
                 <AudioReactiveWaveform
@@ -825,7 +826,7 @@ const JourneysCompanionOverlayBody = memo(({
 
             {assistant.isSpeaking ? (
               <div
-                className="mb-3 flex items-center justify-between gap-3 rounded-[1.5rem] border-[3px] border-[#315114] bg-[linear-gradient(180deg,#e0ff9d_0%,#a9df46_100%)] px-3 py-3 shadow-[0_8px_0_rgba(49,81,20,0.75)]"
+                className={cn(plannerPathfinderTheme.successCard, "mb-3 flex items-center justify-between gap-3 px-3 py-3")}
                 data-testid="journeys-companion-planner-speaking-status"
               >
                 <div className="flex items-center gap-2 text-sm text-[#183304]">
@@ -844,7 +845,7 @@ const JourneysCompanionOverlayBody = memo(({
               </div>
             ) : null}
 
-            <div className="flex items-center gap-2 rounded-[1.7rem] border-[3px] border-[#4d2811] bg-[linear-gradient(180deg,#fff8e8_0%,#ffc861_100%)] p-2 shadow-[0_8px_0_rgba(77,40,17,0.8)]">
+            <div className={plannerPathfinderTheme.composerBar}>
               <Button
                 type="button"
                 size="icon"
@@ -873,14 +874,17 @@ const JourneysCompanionOverlayBody = memo(({
                 onKeyDown={handleComposerKeyDown}
                 onFocus={handleComposerFocus}
                 placeholder={assistant.placeholder}
-                className="h-12 min-h-[48px] max-h-[48px] flex-1 w-auto resize-none overflow-y-auto rounded-[1.4rem] border-[3px] border-[#6b3416] bg-white/80 px-4 py-3 leading-5 text-[#4d2811] placeholder:text-[#9a6d47]"
+                className={cn(
+                  plannerPathfinderTheme.textField,
+                  "h-12 min-h-[48px] max-h-[48px] flex-1 w-auto resize-none overflow-y-auto leading-5",
+                )}
                 data-testid="journeys-companion-planner-text-input"
               />
               <Button
                 type="button"
                 onClick={handleSubmit}
                 disabled={sendDisabled}
-                className="h-11 shrink-0 rounded-full border-[3px] border-[#315114] bg-[linear-gradient(180deg,#d7ff86_0%,#9fda3f_100%)] px-4 text-[#183304] hover:bg-[linear-gradient(180deg,#e3ff9e_0%,#a6e145_100%)]"
+                className={cn(plannerPathfinderTheme.primaryButton, "h-11 shrink-0 px-4")}
                 data-testid="journeys-companion-planner-send-button"
               >
                 {assistant.isSubmitting || assistant.isClassifying ? (

@@ -26,6 +26,7 @@ const mocks = vi.hoisted(() => ({
   stopCompanionSpeech: vi.fn(),
   stopSpeaking: vi.fn(),
   startNewChat: vi.fn().mockResolvedValue(undefined),
+  startTemplateThread: vi.fn().mockReturnValue("fresh-template-session"),
   archiveCurrentThread: vi.fn().mockResolvedValue(undefined),
   resumeThread: vi.fn().mockResolvedValue(undefined),
   state: {
@@ -257,6 +258,7 @@ vi.mock("@/hooks/useJourneysCompanionThreads", () => ({
     canStartNewChat: mocks.state.canStartNewChat,
     newChatDisabledReason: mocks.state.newChatDisabledReason,
     startNewChat: mocks.startNewChat,
+    startTemplateThread: mocks.startTemplateThread,
     canArchiveThread: true,
     archiveDisabledReason: null,
     archiveCurrentThread: mocks.archiveCurrentThread,
@@ -277,6 +279,8 @@ describe("useCompanionAssistant", () => {
     mocks.speakCompanionReply.mockResolvedValue("device");
     mocks.openCampaignBuilder.mockReset();
     mocks.injectAssistantOpening.mockReset();
+    mocks.startTemplateThread.mockReset();
+    mocks.startTemplateThread.mockReturnValue("fresh-template-session");
     mocks.state.companionMessages = [
       {
         id: "chat-1",
@@ -855,6 +859,7 @@ describe("useCompanionAssistant", () => {
       await Promise.resolve();
     });
 
+    expect(mocks.startTemplateThread).toHaveBeenCalledTimes(1);
     expect(mocks.plannerSubmit).toHaveBeenCalledWith(
       "Free me up after 5",
       "text",
@@ -866,6 +871,9 @@ describe("useCompanionAssistant", () => {
           focus: "Protect the evening",
         },
       },
+    );
+    expect(mocks.startTemplateThread.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.plannerSubmit.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
     );
     expect(onLaunchIntentConsumed).toHaveBeenCalledWith("launch-1");
   });
@@ -915,8 +923,11 @@ describe("useCompanionAssistant", () => {
       await Promise.resolve();
     });
 
+    expect(mocks.startTemplateThread).toHaveBeenCalledTimes(1);
     expect(mocks.injectAssistantOpening).toHaveBeenCalledWith("What's good boss?");
-    expect(mocks.resetPlannerThread).toHaveBeenCalledTimes(1);
+    expect(mocks.startTemplateThread.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.injectAssistantOpening.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
+    );
     expect(mocks.plannerSubmit).not.toHaveBeenCalled();
     expect(onLaunchIntentConsumed).toHaveBeenCalledWith("launch-3");
   });

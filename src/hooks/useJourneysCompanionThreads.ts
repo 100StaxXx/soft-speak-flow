@@ -65,6 +65,11 @@ type JourneysThreadsQueryResult = {
   setupUnavailable: boolean;
 };
 
+const getActivePersistedThread = (
+  threads: CompanionChatThreadSummary[] | undefined,
+) =>
+  threads?.find((thread) => thread.archivedAt === null) ?? null;
+
 const isRealThreadMessage = (message: JourneysAssistantMessage) => !message.isSeed;
 
 const mapChatMessages = (messages: CompanionChatThreadMessage[]) =>
@@ -103,6 +108,7 @@ export function useJourneysCompanionThreads({
   const localThreadCreatedAtRef = useRef(new Date().toISOString());
   const scopeKeyRef = useRef<string | null>(null);
   const bootstrappedScopeKeyRef = useRef<string | null>(null);
+  const threadMutationVersionRef = useRef(0);
 
   const scopeKey = `${userId ?? "anon"}:${companionId ?? "none"}`;
   const threadsQueryKey = getCompanionChatThreadsQueryKey(
@@ -141,11 +147,19 @@ export function useJourneysCompanionThreads({
     },
   });
 
-  const openFreshThread = useCallback((sessionId?: string) => {
+  const openFreshThread = useCallback((
+    sessionId?: string,
+    options?: { markBootstrapped?: boolean },
+  ) => {
     const nextSessionId = sessionId ?? generateCompanionThreadSessionId();
+    threadMutationVersionRef.current += 1;
     localThreadCreatedAtRef.current = new Date().toISOString();
+    setIsHydratingThread(false);
     setLocallyArchivedSessionId(null);
     setActiveSessionId(nextSessionId);
+    if (options?.markBootstrapped) {
+      bootstrappedScopeKeyRef.current = scopeKey;
+    }
     resetConversationThread({
       sessionId: nextSessionId,
       greetingText: greeting,
@@ -154,7 +168,7 @@ export function useJourneysCompanionThreads({
       sessionId: nextSessionId,
     });
     return nextSessionId;
-  }, [greeting, resetConversationThread, resetPlannerThread]);
+  }, [greeting, resetConversationThread, resetPlannerThread, scopeKey]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -174,8 +188,7 @@ export function useJourneysCompanionThreads({
     if (!threadsQuery.isSuccess) return;
     if (bootstrappedScopeKeyRef.current === scopeKey) return;
 
-    const activePersistedThread =
-      threadsQuery.data.threads.find((thread) => thread.archivedAt === null) ?? null;
+    const activePersistedThread = getActivePersistedThread(threadsQuery.data.threads);
 
     if (!activePersistedThread) {
       bootstrappedScopeKeyRef.current = scopeKey;
@@ -183,11 +196,12 @@ export function useJourneysCompanionThreads({
     }
 
     let cancelled = false;
+    const hydrationVersion = threadMutationVersionRef.current;
     setIsHydratingThread(true);
 
     void loadCompanionChatThreadMessages(activePersistedThread.sessionId, "journeys")
       .then((threadMessages) => {
-        if (cancelled) return;
+        if (cancelled || threadMutationVersionRef.current !== hydrationVersion) return;
 
         localThreadCreatedAtRef.current =
           threadMessages[0]?.createdAt
@@ -206,7 +220,7 @@ export function useJourneysCompanionThreads({
       })
       .catch((error) => {
         console.error("Failed to load journeys companion thread:", error);
-        if (!cancelled) {
+        if (!cancelled && threadMutationVersionRef.current === hydrationVersion) {
           toast.error(
             isCompanionChatSetupError(error)
               ? COMPANION_CHAT_THREAD_HISTORY_DISABLED_REASON
@@ -217,7 +231,7 @@ export function useJourneysCompanionThreads({
         }
       })
       .finally(() => {
-        if (!cancelled) {
+        if (!cancelled && threadMutationVersionRef.current === hydrationVersion) {
           setIsHydratingThread(false);
         }
       });
@@ -365,10 +379,49 @@ export function useJourneysCompanionThreads({
     }
   }, [newChatDisabledReason, openFreshThread, persistedActiveThread, queryClient, threadsQueryKey]);
 
+  const startTemplateThread = useCallback(() => {
+    const nextSessionId = openFreshThread(undefined, { markBootstrapped: true });
+
+    void (async () => {
+      try {
+        const threadToArchive =
+          persistedActiveThread
+          ?? getActivePersistedThread(threadsQuery.data?.threads)
+          ?? (
+            companionId
+              ? getActivePersistedThread(
+                await listCompanionChatThreads(companionId, "journeys"),
+              )
+              : null
+          );
+
+        if (!threadToArchive) return;
+
+        setLocallyArchivedSessionId(threadToArchive.sessionId);
+        await setCompanionChatThreadArchived(threadToArchive.sessionId, true);
+        await queryClient.invalidateQueries({ queryKey: threadsQueryKey });
+      } catch (error) {
+        setLocallyArchivedSessionId(null);
+        console.warn("Failed to archive the previous journeys template thread:", error);
+      }
+    })();
+
+    return nextSessionId;
+  }, [
+    companionId,
+    openFreshThread,
+    persistedActiveThread,
+    queryClient,
+    threadsQuery.data?.threads,
+    threadsQueryKey,
+  ]);
+
   const resumeThread = useCallback(async (sessionId: string) => {
     if (threadPickerDisabledReason) return;
     if (sessionId === activeSessionId) return;
 
+    const hydrationVersion = threadMutationVersionRef.current + 1;
+    threadMutationVersionRef.current = hydrationVersion;
     setIsHydratingThread(true);
     try {
       if (persistedActiveThread) {
@@ -377,6 +430,7 @@ export function useJourneysCompanionThreads({
 
       await setCompanionChatThreadArchived(sessionId, false);
       const threadMessages = await loadCompanionChatThreadMessages(sessionId, "journeys");
+      if (threadMutationVersionRef.current !== hydrationVersion) return;
 
       localThreadCreatedAtRef.current =
         threadMessages[0]?.createdAt
@@ -394,6 +448,7 @@ export function useJourneysCompanionThreads({
 
       await queryClient.invalidateQueries({ queryKey: threadsQueryKey });
     } catch (error) {
+      if (threadMutationVersionRef.current !== hydrationVersion) return;
       console.error("Failed to resume journeys companion thread:", error);
       toast.error(
         isCompanionChatSetupError(error)
@@ -401,7 +456,9 @@ export function useJourneysCompanionThreads({
           : "I couldn't reopen that thread yet.",
       );
     } finally {
-      setIsHydratingThread(false);
+      if (threadMutationVersionRef.current === hydrationVersion) {
+        setIsHydratingThread(false);
+      }
     }
   }, [
     activeSessionId,
@@ -429,6 +486,7 @@ export function useJourneysCompanionThreads({
         ? COMPANION_CHAT_THREAD_HISTORY_EMPTY_STATE
         : "Past chats will show up here after at least one real exchange.",
     startNewChat,
+    startTemplateThread,
     archiveCurrentThread,
     resumeThread,
     isLoadingThreads,

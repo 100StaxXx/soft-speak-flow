@@ -2586,8 +2586,6 @@ const buildOpenDayReply = (
 
 const buildUpcomingDigestReply = (input: PlannerBuildInput): string => {
   const tomorrow = addDaysToDateKey(input.currentDate, 1);
-  const weekSummary = input.plannerContext.scheduleInsights?.summary ??
-    "The week still has room to flex.";
   const lead = isWittySassyTone(input.tonePack)
     ? `${buildWittyAvailabilityCallout(input, input.currentDate, true) ?? "Here's what's coming up, minus the dramatic retelling."}`
     : "Here's the shape of what's coming up.";
@@ -2599,7 +2597,6 @@ const buildUpcomingDigestReply = (input: PlannerBuildInput): string => {
     lead,
     buildDayDigest(input, input.currentDate, "Today", true),
     buildDayDigest(input, tomorrow, "Tomorrow"),
-    `Week ahead: ${weekSummary}`,
     closer,
   ].join("\n\n");
 };

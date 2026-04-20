@@ -145,45 +145,9 @@ const baseAnalysis = {
   suggestedAction: "Keep the rhythm steady.",
 };
 
-Deno.test("generate-companion-stat-analysis returns same-day cached analysis", async () => {
-  const supabase = createMockSupabase({
+function createFreshAnalysisResponseMap(): Record<string, MockResponse[]> {
+  return {
     profiles: [{ data: { selected_mentor_id: "mentor-1", timezone: "America/Los_Angeles" }, error: null }],
-    companion_stat_analyses: [{ data: { payload: baseAnalysis }, error: null }],
-  });
-
-  const response = await module.handleGenerateCompanionStatAnalysis(
-    new Request("http://localhost", { method: "POST", body: JSON.stringify({}) }),
-    {
-      authenticate: async () => ({ userId: "user-1", isServiceRole: false }),
-      createSupabaseClient: () => supabase,
-      fetchImpl: async () => {
-        throw new Error("fetchImpl should not be called for cached responses");
-      },
-      now: () => new Date("2026-04-19T06:30:00.000Z"),
-    },
-  );
-
-  assertEquals(response.status, 200, "Cached response should succeed");
-
-  const payload = await response.json();
-  assertEquals(payload.cached, true, "Cached flag should be true");
-  assertEquals(payload.analysis.summary, "Cached mentor read", "Cached payload should be returned");
-  assertEquals(supabase.upserts.length, 0, "Cached path should not upsert");
-
-  const cacheLookup = supabase.calls.find((call) => call.table === "companion_stat_analyses");
-  assert(Boolean(cacheLookup), "Cache lookup should be recorded");
-  assert(
-    cacheLookup!.operations.some(
-      ([operation, column, value]) => operation === "eq" && column === "analysis_date" && value === "2026-04-18",
-    ),
-    "Cache lookup should use the user's local analysis date",
-  );
-});
-
-Deno.test("generate-companion-stat-analysis force refresh regenerates and overwrites the daily record", async () => {
-  const supabase = createMockSupabase({
-    profiles: [{ data: { selected_mentor_id: "mentor-1", timezone: "America/Los_Angeles" }, error: null }],
-    companion_stat_analyses: [{ data: { payload: baseAnalysis }, error: null }],
     user_companion: [{
       data: {
         id: "companion-1",
@@ -254,6 +218,84 @@ Deno.test("generate-companion-stat-analysis force refresh regenerates and overwr
       ],
       error: null,
     }],
+  };
+}
+
+Deno.test("generate-companion-stat-analysis returns same-day cached analysis", async () => {
+  const supabase = createMockSupabase({
+    profiles: [{ data: { selected_mentor_id: "mentor-1", timezone: "America/Los_Angeles" }, error: null }],
+    companion_stat_analyses: [{ data: { payload: baseAnalysis }, error: null }],
+  });
+
+  const response = await module.handleGenerateCompanionStatAnalysis(
+    new Request("http://localhost", { method: "POST", body: JSON.stringify({}) }),
+    {
+      authenticate: async () => ({ userId: "user-1", isServiceRole: false }),
+      createSupabaseClient: () => supabase,
+      fetchImpl: async () => {
+        throw new Error("fetchImpl should not be called for cached responses");
+      },
+      now: () => new Date("2026-04-19T06:30:00.000Z"),
+    },
+  );
+
+  assertEquals(response.status, 200, "Cached response should succeed");
+
+  const payload = await response.json();
+  assertEquals(payload.cached, true, "Cached flag should be true");
+  assertEquals(payload.analysis.summary, "Cached mentor read", "Cached payload should be returned");
+  assertEquals(supabase.upserts.length, 0, "Cached path should not upsert");
+
+  const cacheLookup = supabase.calls.find((call) => call.table === "companion_stat_analyses");
+  assert(Boolean(cacheLookup), "Cache lookup should be recorded");
+  assert(
+    cacheLookup!.operations.some(
+      ([operation, column, value]) => operation === "eq" && column === "analysis_date" && value === "2026-04-18",
+    ),
+    "Cache lookup should use the user's local analysis date",
+  );
+});
+
+Deno.test("generate-companion-stat-analysis regenerates malformed same-day cached analysis rows", async () => {
+  const supabase = createMockSupabase({
+    companion_stat_analyses: [{
+      data: {
+        payload: {
+          ...baseAnalysis,
+          summary: "",
+        },
+      },
+      error: null,
+    }],
+    ...createFreshAnalysisResponseMap(),
+  });
+
+  const response = await module.handleGenerateCompanionStatAnalysis(
+    new Request("http://localhost", { method: "POST", body: JSON.stringify({}) }),
+    {
+      authenticate: async () => ({ userId: "user-1", isServiceRole: false }),
+      createSupabaseClient: () => supabase,
+      fetchImpl: fetch,
+      now: () => new Date("2026-04-18T18:30:00.000Z"),
+    },
+  );
+
+  assertEquals(response.status, 200, "Malformed cached payload should fall through to regeneration");
+
+  const payload = await response.json();
+  assertEquals(payload.cached, false, "Malformed cached payload should not be returned as cached");
+  assertEquals(payload.analysis.analysisDate, "2026-04-18", "Regenerated payload should target the current analysis date");
+  assertEquals(supabase.upserts.length, 1, "Regenerated analysis should repair the cached row");
+  assert(
+    typeof payload.analysis.summary === "string" && payload.analysis.summary.length > 0,
+    "Regenerated payload should include a non-empty summary",
+  );
+});
+
+Deno.test("generate-companion-stat-analysis force refresh regenerates and overwrites the daily record", async () => {
+  const supabase = createMockSupabase({
+    companion_stat_analyses: [{ data: { payload: baseAnalysis }, error: null }],
+    ...createFreshAnalysisResponseMap(),
   });
 
   const response = await module.handleGenerateCompanionStatAnalysis(

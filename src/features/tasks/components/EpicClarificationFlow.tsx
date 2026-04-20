@@ -11,6 +11,7 @@ import {
   Check
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { plannerPathfinderTheme } from '@/components/companion/plannerPathfinderTheme';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -29,6 +30,7 @@ interface EpicClarificationFlowProps {
   onSubmit: (answers: Record<string, string | number>) => void;
   onSkip: () => void;
   isLoading?: boolean;
+  variant?: 'default' | 'planner';
 }
 
 export function EpicClarificationFlow({
@@ -37,8 +39,10 @@ export function EpicClarificationFlow({
   onSubmit,
   onSkip,
   isLoading = false,
+  variant = 'default',
 }: EpicClarificationFlowProps) {
   const [answers, setAnswers] = useState<Record<string, string | number | string[]>>({});
+  const isPlannerVariant = variant === 'planner';
 
   const handleChange = (questionId: string, value: string | number) => {
     setAnswers(prev => ({ ...prev, [questionId]: value }));
@@ -94,16 +98,21 @@ export function EpicClarificationFlow({
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -10 }}
-      className="bg-gradient-to-br from-primary/5 via-background to-primary/5 rounded-xl border border-primary/20 p-4 space-y-4"
+      className={cn(
+        "space-y-4",
+        isPlannerVariant
+          ? `${plannerPathfinderTheme.raisedPanel} p-4`
+          : "rounded-xl border border-primary/20 bg-gradient-to-br from-primary/5 via-background to-primary/5 p-4",
+      )}
     >
       {/* Header */}
       <div className="flex items-start gap-3">
-        <div className="p-2 rounded-lg bg-primary/10">
-          <Sparkles className="w-5 h-5 text-primary" />
+        <div className={cn("rounded-lg p-2", isPlannerVariant ? "bg-[#f3b349]/25 text-[#7f3b12]" : "bg-primary/10")}>
+          <Sparkles className={cn("w-5 h-5", isPlannerVariant ? "text-[#7f3b12]" : "text-primary")} />
         </div>
         <div className="flex-1">
           <h4 className="font-semibold text-sm">Let's personalize your epic</h4>
-          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
+          <p className={cn("mt-0.5 line-clamp-1 text-xs", isPlannerVariant ? "text-[#7f4a1d]/80" : "text-muted-foreground")}>
             {goal}
           </p>
         </div>
@@ -122,8 +131,8 @@ export function EpicClarificationFlow({
               transition={{ delay: index * 0.1 }}
               className="space-y-2"
             >
-              <Label className="text-sm flex items-center gap-2">
-                <Icon className="w-4 h-4 text-muted-foreground" />
+              <Label className={cn("flex items-center gap-2 text-sm", isPlannerVariant && "text-[#5d2a0f]")}>
+                <Icon className={cn("w-4 h-4", isPlannerVariant ? "text-[#8d481c]" : "text-muted-foreground")} />
                 {question.question}
                 {question.required && <span className="text-destructive">*</span>}
               </Label>
@@ -140,9 +149,13 @@ export function EpicClarificationFlow({
                         onClick={() => handleMultiSelectToggle(question.id, option)}
                         className={cn(
                           "px-3 py-1.5 rounded-full text-sm border transition-all flex items-center gap-1",
-                          selected 
-                            ? "bg-primary text-primary-foreground border-primary" 
-                            : "bg-background border-border hover:border-primary/50"
+                          isPlannerVariant
+                            ? selected
+                              ? plannerPathfinderTheme.primaryButton
+                              : plannerPathfinderTheme.outlineButton
+                            : selected
+                              ? "bg-primary text-primary-foreground border-primary"
+                              : "bg-background border-border hover:border-primary/50"
                         )}
                       >
                         {selected && <Check className="w-3 h-3" />}
@@ -157,7 +170,7 @@ export function EpicClarificationFlow({
                   value={answers[question.id]?.toString() || ''}
                   onValueChange={(value) => handleChange(question.id, value)}
                 >
-                  <SelectTrigger className="h-9">
+                  <SelectTrigger className={cn("h-9", isPlannerVariant && plannerPathfinderTheme.textField)}>
                     <SelectValue placeholder="Select an option..." />
                   </SelectTrigger>
                   <SelectContent>
@@ -175,7 +188,7 @@ export function EpicClarificationFlow({
                   type="date"
                   value={answers[question.id]?.toString() || ''}
                   onChange={(e) => handleChange(question.id, e.target.value)}
-                  className="h-9"
+                  className={cn("h-9", isPlannerVariant && plannerPathfinderTheme.textField)}
                   min={new Date().toISOString().split('T')[0]}
                 />
               )}
@@ -186,7 +199,7 @@ export function EpicClarificationFlow({
                   value={answers[question.id]?.toString() || ''}
                   onChange={(e) => handleChange(question.id, parseInt(e.target.value) || '')}
                   placeholder={question.placeholder || 'Enter a number...'}
-                  className="h-9"
+                  className={cn("h-9", isPlannerVariant && plannerPathfinderTheme.textField)}
                   min={1}
                   max={24}
                 />
@@ -198,7 +211,7 @@ export function EpicClarificationFlow({
                   value={answers[question.id]?.toString() || ''}
                   onChange={(e) => handleChange(question.id, e.target.value)}
                   placeholder={question.placeholder || 'Type your answer...'}
-                  className="h-9"
+                  className={cn("h-9", isPlannerVariant && plannerPathfinderTheme.textField)}
                 />
               )}
             </motion.div>
@@ -211,7 +224,7 @@ export function EpicClarificationFlow({
         <Button
           onClick={handleSubmit}
           disabled={!allRequiredAnswered || isLoading}
-          className="flex-1 h-10"
+          className={cn("flex-1 h-10", isPlannerVariant && plannerPathfinderTheme.primaryButton)}
         >
           {isLoading ? (
             <>
@@ -231,14 +244,16 @@ export function EpicClarificationFlow({
           size="sm"
           onClick={onSkip}
           disabled={isLoading}
-          className="text-muted-foreground hover:text-foreground"
+          className={cn(
+            isPlannerVariant ? plannerPathfinderTheme.outlineButton : "text-muted-foreground hover:text-foreground",
+          )}
         >
           Skip
         </Button>
       </div>
 
       {/* Helper text */}
-      <p className="text-xs text-muted-foreground text-center">
+      <p className={cn("text-center text-xs", isPlannerVariant ? "text-[#7f4a1d]/80" : "text-muted-foreground")}>
         This helps create a personalized study plan just for you
       </p>
     </motion.div>

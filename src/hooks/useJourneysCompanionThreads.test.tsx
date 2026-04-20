@@ -85,6 +85,15 @@ const renderJourneysThreads = (overrides?: Partial<Parameters<typeof useJourneys
     { wrapper: createWrapper() },
   );
 
+const createDeferred = <T,>() => {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  const promise = new Promise<T>((nextResolve) => {
+    resolve = nextResolve;
+  });
+
+  return { promise, resolve };
+};
+
 describe("useJourneysCompanionThreads", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -403,6 +412,73 @@ describe("useJourneysCompanionThreads", () => {
       expect(result.current.activeThread?.sessionId).toBe("fresh-session-2");
     });
     expect(result.current.hasPersistedActiveThread).toBe(false);
+  });
+
+  it("keeps a template-started fresh thread when bootstrap hydration resolves late", async () => {
+    const deferredMessages = createDeferred<Array<{
+      id: string;
+      sessionId: string;
+      role: "assistant";
+      content: string;
+      createdAt: string;
+      source: "chat" | "plan";
+    }>>();
+
+    mocks.loadCompanionChatThreadMessages.mockImplementationOnce(async () => deferredMessages.promise);
+
+    const { result } = renderJourneysThreads();
+
+    await waitFor(() => {
+      expect(mocks.loadCompanionChatThreadMessages).toHaveBeenCalledWith("active-session-1", "journeys");
+    });
+
+    act(() => {
+      result.current.startTemplateThread();
+    });
+
+    expect(mocks.resetConversationThread).toHaveBeenLastCalledWith({
+      sessionId: "fresh-session-2",
+      greetingText: "The road's open.",
+    });
+    expect(mocks.resetPlannerThread).toHaveBeenLastCalledWith({
+      sessionId: "fresh-session-2",
+    });
+
+    await waitFor(() => {
+      expect(mocks.setCompanionChatThreadArchived).toHaveBeenCalledWith("active-session-1", true);
+    });
+
+    deferredMessages.resolve([
+      {
+        id: "late-chat-1",
+        sessionId: "active-session-1",
+        role: "assistant",
+        content: "This old thread should stay archived.",
+        createdAt: "2026-04-18T08:00:00.000Z",
+        source: "chat",
+      },
+      {
+        id: "late-plan-1",
+        sessionId: "active-session-1",
+        role: "assistant",
+        content: "And this old planner draft should not hydrate.",
+        createdAt: "2026-04-18T08:02:00.000Z",
+        source: "plan",
+      },
+    ]);
+
+    await waitFor(() => {
+      expect(result.current.activeThread?.sessionId).toBe("fresh-session-2");
+    });
+
+    expect(mocks.hydrateConversationThread).not.toHaveBeenCalledWith({
+      sessionId: "active-session-1",
+      messages: expect.anything(),
+    });
+    expect(mocks.hydratePlannerThread).not.toHaveBeenCalledWith({
+      sessionId: "active-session-1",
+      messages: expect.anything(),
+    });
   });
 
   it("starts a fresh local chat without archiving when no persisted active thread exists", async () => {

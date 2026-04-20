@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Clock, RotateCcw, Sparkles } from 'lucide-react';
+import { plannerPathfinderTheme } from '@/components/companion/plannerPathfinderTheme';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -77,13 +78,13 @@ export function RitualEditor({
   return (
     <div className={cn('space-y-4', className)}>
       {/* Header with stats */}
-      <div className="flex items-center justify-between">
+      <div className={cn(plannerPathfinderTheme.raisedPanel, "flex items-center justify-between gap-3 p-4")}>
         <div className="flex items-center gap-3">
-          <Badge variant="secondary" className="gap-1">
+          <Badge variant="outline" className={cn(plannerPathfinderTheme.chip, "gap-1")}>
             <Sparkles className="w-3 h-3" />
             {rituals.length} Rituals
           </Badge>
-          <Badge variant="outline" className="gap-1">
+          <Badge variant="outline" className={cn(plannerPathfinderTheme.chip, "gap-1")}>
             <Clock className="w-3 h-3" />
             ~{weeklyHours} hrs/week
           </Badge>
@@ -94,7 +95,7 @@ export function RitualEditor({
             variant="ghost"
             size="sm"
             onClick={handleReset}
-            className="text-xs gap-1"
+            className={plannerPathfinderTheme.outlineButton}
           >
             <RotateCcw className="w-3 h-3" />
             Reset
@@ -135,17 +136,27 @@ export function RitualEditor({
                   value={newRitualTitle}
                   onChange={(e) => setNewRitualTitle(e.target.value)}
                   placeholder="New ritual name..."
-                  className="flex-1"
+                  className={cn(plannerPathfinderTheme.textField, "flex-1")}
                   autoFocus
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') handleAddRitual();
                     if (e.key === 'Escape') setIsAddingNew(false);
                   }}
                 />
-                <Button size="sm" onClick={handleAddRitual} disabled={!newRitualTitle.trim()}>
+                <Button
+                  size="sm"
+                  onClick={handleAddRitual}
+                  disabled={!newRitualTitle.trim()}
+                  className={plannerPathfinderTheme.primaryButton}
+                >
                   Add
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => setIsAddingNew(false)}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setIsAddingNew(false)}
+                  className={plannerPathfinderTheme.outlineButton}
+                >
                   Cancel
                 </Button>
               </motion.div>
@@ -154,7 +165,7 @@ export function RitualEditor({
                 <Button
                   variant="outline"
                   size="sm"
-                  className="w-full border-dashed gap-2"
+                  className={cn(plannerPathfinderTheme.outlineButton, "w-full border-dashed")}
                   onClick={() => setIsAddingNew(true)}
                 >
                   <Plus className="w-4 h-4" />
@@ -166,17 +177,17 @@ export function RitualEditor({
       </div>
 
       {/* Difficulty breakdown */}
-      <div className="flex gap-2 text-xs text-muted-foreground">
+      <div className={`${plannerPathfinderTheme.mutedPanel} flex flex-wrap gap-3 px-4 py-3 text-xs text-[#7f4a1d]/80`}>
         <span className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-green-500" />
+          <span className="h-2 w-2 rounded-full bg-[#7ab72b]" />
           {rituals.filter(r => r.difficulty === 'easy').length} easy
         </span>
         <span className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-amber-500" />
+          <span className="h-2 w-2 rounded-full bg-[#d38b22]" />
           {rituals.filter(r => r.difficulty === 'medium').length} medium
         </span>
         <span className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-red-500" />
+          <span className="h-2 w-2 rounded-full bg-[#c45435]" />
           {rituals.filter(r => r.difficulty === 'hard').length} hard
         </span>
       </div>

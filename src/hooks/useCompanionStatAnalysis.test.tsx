@@ -243,4 +243,72 @@ describe("useCompanionStatAnalysis", () => {
     });
     expect(result.current.cached).toBe(false);
   });
+
+  it("force-refreshes once when the cached analysis payload is malformed", async () => {
+    mocks.invokeMock
+      .mockResolvedValueOnce({
+        data: {
+          analysis: {
+            ...baseAnalysis,
+            summary: "",
+          },
+          cached: true,
+        },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: { analysis: baseAnalysis, cached: false },
+        error: null,
+      });
+
+    const { result } = renderHook(() => useCompanionStatAnalysis({ enabled: true }), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.analysis).toEqual(baseAnalysis);
+    });
+
+    expect(mocks.invokeMock).toHaveBeenNthCalledWith(1, "generate-companion-stat-analysis", {
+      body: { forceRefresh: false },
+    });
+    expect(mocks.invokeMock).toHaveBeenNthCalledWith(2, "generate-companion-stat-analysis", {
+      body: { forceRefresh: true },
+    });
+    expect(result.current.cached).toBe(false);
+  });
+
+  it("surfaces an error when cached and refreshed payloads are both malformed", async () => {
+    mocks.invokeMock
+      .mockResolvedValueOnce({
+        data: {
+          analysis: {
+            ...baseAnalysis,
+            summary: "",
+          },
+          cached: true,
+        },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: {
+          analysis: {
+            ...baseAnalysis,
+            suggestedAction: "",
+          },
+          cached: false,
+        },
+        error: null,
+      });
+
+    const { result } = renderHook(() => useCompanionStatAnalysis({ enabled: true }), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.error).toContain("Received malformed refreshed stat analysis data");
+    });
+
+    expect(result.current.analysis).toBeNull();
+  });
 });

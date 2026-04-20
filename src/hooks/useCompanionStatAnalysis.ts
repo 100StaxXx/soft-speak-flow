@@ -4,92 +4,24 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
-import type {
-  CompanionMissInterpretation,
-  CompanionMomentumState,
-  CompanionStatAttribute,
-  CompanionStatNeed,
-  CompanionStatProfileSummary,
-} from "@/shared/companionStatSignals";
+import {
+  type CompanionStatAnalysis,
+  type CompanionStatAnalysisResponse,
+  type CompanionStatBand,
+  type CompanionStatBreakdown,
+  type CompanionStatDriver,
+  validateCompanionStatAnalysisResponse,
+} from "@/shared/companionStatAnalysis";
+import type { CompanionStatAttribute } from "@/shared/companionStatSignals";
 
-export type CompanionStatBand = "Emerging" | "Building" | "Strong" | "Exceptional";
-export type CompanionStatDriverSource = "attribute_event" | "activity" | "echo";
-export type CompanionStatDriverWindow = "7d" | "30d";
-
-export interface CompanionStatDriver {
-  key: string;
-  label: string;
-  detail: string;
-  sourceType: CompanionStatDriverSource;
-  window: CompanionStatDriverWindow;
-  count: number | null;
-  amount: number | null;
-}
-
-export interface CompanionStatBreakdown {
-  attribute: CompanionStatAttribute;
-  score: number;
-  band: CompanionStatBand;
-  status: string;
-  primaryReasons: string[];
-  recentDrivers: CompanionStatDriver[];
-}
-
-export interface CompanionStatActivitySnapshot {
-  activityStartDate: string;
-  activityEndDate: string;
-  provenanceStartDate: string;
-  provenanceEndDate: string;
-  morningCheckIns: number;
-  eveningReflections: number;
-  habitCompletions: number;
-  onTimeTasks: number;
-  trackedAttributeEvents: number;
-  streakMilestones: number;
-  hardTaskWins: number;
-  recoveryActions: number;
-  healthActions: number;
-  creativeActions: number;
-  relationshipActions: number;
-  epicLinkedCompletions: number;
-  bounceBackDays: number;
-}
-
-export interface CompanionStatAnalysis {
-  analysisDate: string;
-  timezone: string;
-  generatedAt: string;
-  mentor: {
-    id: string | null;
-    name: string;
-    tone: string | null;
-    avatarUrl: string | null;
-    primaryColor: string | null;
-  };
-  companion: {
-    id: string;
-    currentStage: number;
-    currentXp: number;
-  };
-  activitySnapshot: CompanionStatActivitySnapshot;
-  statProfile: CompanionStatProfileSummary;
-  statNeeds: Record<CompanionStatAttribute, CompanionStatNeed>;
-  momentumState: CompanionMomentumState;
-  recentMissInterpretation: CompanionMissInterpretation;
-  narrativeBrief: string;
-  dailyNarrative: string;
-  weeklyNarrative: string;
-  identityBootstrap: string;
-  strongestRecentDrivers: CompanionStatDriver[];
-  statBreakdowns: CompanionStatBreakdown[];
-  summary: string;
-  suggestedAction: string;
-}
-
-export interface CompanionStatAnalysisResponse {
-  analysis: CompanionStatAnalysis;
-  cached: boolean;
-}
+export type {
+  CompanionStatAnalysis,
+  CompanionStatAnalysisResponse,
+  CompanionStatBand,
+  CompanionStatBreakdown,
+  CompanionStatDriver,
+};
+export type { CompanionStatAttribute };
 
 export function formatDateInTimezone(date: Date, timezone: string): string {
   try {
@@ -113,6 +45,17 @@ interface UseCompanionStatAnalysisOptions {
   enabled?: boolean;
 }
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+const isCachedMalformedAnalysisResponse = (value: unknown) =>
+  isRecord(value) && value.cached === true;
+
+const getMalformedAnalysisMessage = (error: string, refreshed: boolean) =>
+  refreshed
+    ? `Received malformed refreshed stat analysis data: ${error}`
+    : `Received malformed stat analysis data: ${error}`;
+
 export const useCompanionStatAnalysis = ({ enabled = true }: UseCompanionStatAnalysisOptions = {}) => {
   const { user } = useAuth();
   const { profile } = useProfile();
@@ -124,33 +67,52 @@ export const useCompanionStatAnalysis = ({ enabled = true }: UseCompanionStatAna
 
   const queryKey = ["companion-stat-analysis", user?.id, analysisDateKey] as const;
 
+  const invokeAnalysis = async (forceRefresh: boolean) => {
+    const { data, error } = await supabase.functions.invoke("generate-companion-stat-analysis", {
+      body: { forceRefresh },
+    });
+
+    if (error) throw error;
+    if (data?.error) throw new Error(data.error);
+
+    return data;
+  };
+
+  const loadAnalysis = async ({
+    forceRefresh,
+    allowMalformedCacheRecovery,
+  }: {
+    forceRefresh: boolean;
+    allowMalformedCacheRecovery: boolean;
+  }): Promise<CompanionStatAnalysisResponse> => {
+    const rawResponse = await invokeAnalysis(forceRefresh);
+    const validation = validateCompanionStatAnalysisResponse(rawResponse);
+    if (validation.ok) {
+      return validation.data;
+    }
+
+    if (!forceRefresh && allowMalformedCacheRecovery && isCachedMalformedAnalysisResponse(rawResponse)) {
+      const refreshedResponse = await invokeAnalysis(true);
+      const refreshedValidation = validateCompanionStatAnalysisResponse(refreshedResponse);
+      if (refreshedValidation.ok) {
+        return refreshedValidation.data;
+      }
+
+      throw new Error(getMalformedAnalysisMessage(refreshedValidation.error, true));
+    }
+
+    throw new Error(getMalformedAnalysisMessage(validation.error, forceRefresh));
+  };
+
   const query = useQuery({
     queryKey,
     enabled: enabled && !!user?.id,
     staleTime: 5 * 60 * 1000,
-    queryFn: async () => {
-      const { data, error } = await supabase.functions.invoke("generate-companion-stat-analysis", {
-        body: { forceRefresh: false },
-      });
-
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-
-      return data as CompanionStatAnalysisResponse;
-    },
+    queryFn: () => loadAnalysis({ forceRefresh: false, allowMalformedCacheRecovery: true }),
   });
 
   const refreshMutation = useMutation({
-    mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke("generate-companion-stat-analysis", {
-        body: { forceRefresh: true },
-      });
-
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-
-      return data as CompanionStatAnalysisResponse;
-    },
+    mutationFn: () => loadAnalysis({ forceRefresh: true, allowMalformedCacheRecovery: false }),
     onSuccess: (data) => {
       queryClient.setQueryData(queryKey, data);
     },

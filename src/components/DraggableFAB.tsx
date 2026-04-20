@@ -13,8 +13,29 @@ interface DraggableFABProps {
   onOpenCompanionPlanner: (intent?: CompanionPlannerLaunchIntent | null) => void;
 }
 
+const FLOATING_LAUNCHER_SIZE_PX = 144;
+const POPUP_VIEWPORT_GUTTER_PX = 16;
+const POPUP_TAIL_SIZE_PX = 24;
+const POPUP_TAIL_EDGE_INSET_PX = 28;
+
+const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+
+const getPopupWidthPx = () => {
+  if (typeof window === "undefined" || typeof document === "undefined") {
+    return 0;
+  }
+
+  const rootFontSize = Number.parseFloat(
+    window.getComputedStyle(document.documentElement).fontSize || "16",
+  );
+  const safeRootFontSize = Number.isFinite(rootFontSize) && rootFontSize > 0 ? rootFontSize : 16;
+  return Math.max(0, Math.min(21 * safeRootFontSize, window.innerWidth - (POPUP_VIEWPORT_GUTTER_PX * 2)));
+};
+
 export const DraggableFAB = ({ onOpenCompanionPlanner }: DraggableFABProps) => {
   const { user } = useAuth();
+  const suppressTapRef = useRef(false);
+  const suppressTapResetRef = useRef<number | null>(null);
   const {
     companionLabel,
     launcherAwayImageUrl,
@@ -22,23 +43,73 @@ export const DraggableFAB = ({ onOpenCompanionPlanner }: DraggableFABProps) => {
     launcherAwayFocalY,
     launcherAwayUsesPortraitShell,
   } = useJourneysCompanionVisual();
+  const handleDragCompleted = useCallback(() => {
+    suppressTapRef.current = true;
+    if (suppressTapResetRef.current !== null) {
+      window.clearTimeout(suppressTapResetRef.current);
+    }
+    suppressTapResetRef.current = window.setTimeout(() => {
+      suppressTapRef.current = false;
+      suppressTapResetRef.current = null;
+    }, 0);
+  }, []);
   const {
     position,
+    popupAlignment,
     isDragging,
     isLongPressing,
     dragControls,
     longPressHandlers,
     positionStyles,
-  } = useDraggableFAB();
+  } = useDraggableFAB({
+    onDragEnd: handleDragCompleted,
+  });
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   const canTriggerTap = !isDragging && !isLongPressing;
-  const isLeftAligned = position === "top-left" || position === "bottom-left";
   const launcherTemplates = useMemo(
     () => getJourneysCompanionLauncherTemplates({ userId: user?.id ?? null }),
     [user?.id],
   );
+
+  const popupPlacement = (() => {
+    if (typeof window === "undefined") {
+      return {
+        popupStyle: undefined,
+        tailStyle: undefined,
+      };
+    }
+
+    const popupWidth = getPopupWidthPx();
+    const minLeft = POPUP_VIEWPORT_GUTTER_PX - position.x;
+    const maxLeft = window.innerWidth - POPUP_VIEWPORT_GUTTER_PX - popupWidth - position.x;
+    const idealLeft = popupAlignment.horizontal === "left"
+      ? 0
+      : FLOATING_LAUNCHER_SIZE_PX - popupWidth;
+    const offsetLeft = clamp(idealLeft, minLeft, maxLeft);
+    const popupViewportLeft = position.x + offsetLeft;
+    const launcherCenterX = position.x + (FLOATING_LAUNCHER_SIZE_PX / 2);
+    const minTailOffset = POPUP_TAIL_EDGE_INSET_PX;
+    const maxTailOffset = Math.max(
+      minTailOffset,
+      popupWidth - POPUP_TAIL_EDGE_INSET_PX - POPUP_TAIL_SIZE_PX,
+    );
+    const tailLeft = clamp(
+      launcherCenterX - popupViewportLeft - (POPUP_TAIL_SIZE_PX / 2),
+      minTailOffset,
+      maxTailOffset,
+    );
+
+    return {
+      popupStyle: {
+        left: `${offsetLeft}px`,
+      },
+      tailStyle: {
+        left: `${tailLeft}px`,
+      },
+    };
+  })();
 
   const handleTouchStart = (event: React.TouchEvent) => {
     event.preventDefault();
@@ -52,6 +123,14 @@ export const DraggableFAB = ({ onOpenCompanionPlanner }: DraggableFABProps) => {
     if (!isDragging && !isLongPressing) return;
     setIsMenuOpen(false);
   }, [isDragging, isLongPressing]);
+
+  useEffect(() => {
+    return () => {
+      if (suppressTapResetRef.current !== null) {
+        window.clearTimeout(suppressTapResetRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!isMenuOpen) return;
@@ -106,19 +185,18 @@ export const DraggableFAB = ({ onOpenCompanionPlanner }: DraggableFABProps) => {
         userSelect: "none",
         ...positionStyles,
       }}
-      className={cn(
-        "flex touch-none select-none flex-col gap-2",
-        isLeftAligned ? "items-start" : "items-end",
-      )}
+      className={cn("flex touch-none select-none flex-col gap-2")}
       {...dragControls}
       {...longPressHandlers}
     >
       <JourneysCompanionLauncherPopup
         open={isMenuOpen}
-        position={position}
+        alignment={popupAlignment}
         companionLabel={companionLabel}
         options={launcherTemplates}
         onSelect={handleOptionSelect}
+        popupStyle={popupPlacement.popupStyle}
+        tailStyle={popupPlacement.tailStyle}
       />
       <JourneysCompanionLauncher
         variant="floating"
@@ -132,6 +210,9 @@ export const DraggableFAB = ({ onOpenCompanionPlanner }: DraggableFABProps) => {
         data-tour="add-quest-fab"
         data-testid="journeys-companion-launcher-floating"
         onClick={() => {
+          if (suppressTapRef.current) {
+            return;
+          }
           if (canTriggerTap) {
             setIsMenuOpen((previous) => !previous);
           }

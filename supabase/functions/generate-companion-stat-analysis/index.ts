@@ -8,89 +8,20 @@ import {
   buildCompanionStatInterpretation,
   COMPANION_ECHO_TARGETS,
   getCompanionBehaviorAwardIntent,
-  type CompanionMissInterpretation,
-  type CompanionMomentumState,
   type CompanionStatAttribute,
-  type CompanionStatNeed,
-  type CompanionStatProfileSummary,
   type CompanionStatReflectionInput,
   type CompanionStatTaskInput,
 } from "../../../src/shared/companionStatSignals.ts";
+import {
+  type CompanionStatAnalysis,
+  type CompanionStatBand,
+  type CompanionStatBreakdown,
+  type CompanionStatDriver,
+  validateCompanionStatAnalysis,
+} from "../../../src/shared/companionStatAnalysis.ts";
 import { getTaskCompletionDisciplineAward } from "../../../src/shared/taskCompletionTiming.ts";
 
 type AttributeType = CompanionStatAttribute;
-
-type CompanionStatBand = "Emerging" | "Building" | "Strong" | "Exceptional";
-type CompanionStatDriverSource = "attribute_event" | "activity" | "echo";
-type CompanionStatDriverWindow = "7d" | "30d";
-
-export interface CompanionStatDriver {
-  key: string;
-  label: string;
-  detail: string;
-  sourceType: CompanionStatDriverSource;
-  window: CompanionStatDriverWindow;
-  count: number | null;
-  amount: number | null;
-}
-
-export interface CompanionStatBreakdown {
-  attribute: AttributeType;
-  score: number;
-  band: CompanionStatBand;
-  status: string;
-  primaryReasons: string[];
-  recentDrivers: CompanionStatDriver[];
-}
-
-export interface CompanionStatAnalysis {
-  analysisDate: string;
-  timezone: string;
-  generatedAt: string;
-  mentor: {
-    id: string | null;
-    name: string;
-    tone: string | null;
-    avatarUrl: string | null;
-    primaryColor: string | null;
-  };
-  companion: {
-    id: string;
-    currentStage: number;
-    currentXp: number;
-  };
-  activitySnapshot: {
-    activityStartDate: string;
-    activityEndDate: string;
-    provenanceStartDate: string;
-    provenanceEndDate: string;
-    morningCheckIns: number;
-    eveningReflections: number;
-    habitCompletions: number;
-    onTimeTasks: number;
-    trackedAttributeEvents: number;
-    streakMilestones: number;
-    hardTaskWins: number;
-    recoveryActions: number;
-    healthActions: number;
-    creativeActions: number;
-    relationshipActions: number;
-    epicLinkedCompletions: number;
-    bounceBackDays: number;
-  };
-  statProfile: CompanionStatProfileSummary;
-  statNeeds: Record<AttributeType, CompanionStatNeed>;
-  momentumState: CompanionMomentumState;
-  recentMissInterpretation: CompanionMissInterpretation;
-  narrativeBrief: string;
-  dailyNarrative: string;
-  weeklyNarrative: string;
-  identityBootstrap: string;
-  strongestRecentDrivers: CompanionStatDriver[];
-  statBreakdowns: CompanionStatBreakdown[];
-  summary: string;
-  suggestedAction: string;
-}
 
 interface ProfileRow {
   selected_mentor_id: string | null;
@@ -800,15 +731,27 @@ export async function handleGenerateCompanionStatAnalysis(
     if (existingAnalysisError) throw existingAnalysisError;
 
     if (existingAnalysis && !forceRefresh) {
-      return new Response(
-        JSON.stringify({
-          analysis: (existingAnalysis as CachedAnalysisRow).payload,
-          cached: true,
-        }),
-        {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
+      const cachedAnalysisValidation = validateCompanionStatAnalysis(
+        (existingAnalysis as CachedAnalysisRow).payload,
       );
+
+      if (cachedAnalysisValidation.ok) {
+        return new Response(
+          JSON.stringify({
+            analysis: cachedAnalysisValidation.data,
+            cached: true,
+          }),
+          {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+
+      console.warn("Ignoring malformed cached companion stat analysis payload", {
+        userId,
+        analysisDate,
+        error: cachedAnalysisValidation.error,
+      });
     }
 
     const { data: companion, error: companionError } = await supabase
@@ -925,12 +868,17 @@ export async function handleGenerateCompanionStatAnalysis(
       suggestedAction: mentorCopy.suggestedAction,
     };
 
+    const analysisValidation = validateCompanionStatAnalysis(analysis);
+    if (!analysisValidation.ok) {
+      throw new Error(`Generated malformed stat analysis payload: ${analysisValidation.error}`);
+    }
+
     const upsertPayload = {
       user_id: userId,
       companion_id: (companion as CompanionRow).id,
       mentor_id: mentor?.id ?? null,
       analysis_date: analysisDate,
-      payload: analysis,
+      payload: analysisValidation.data,
       updated_at: now.toISOString(),
     };
 
@@ -941,7 +889,7 @@ export async function handleGenerateCompanionStatAnalysis(
     if (upsertError) throw upsertError;
 
     return new Response(
-      JSON.stringify({ analysis, cached: false }),
+      JSON.stringify({ analysis: analysisValidation.data, cached: false }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       },

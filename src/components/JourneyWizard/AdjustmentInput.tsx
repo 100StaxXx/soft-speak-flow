@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { MessageSquare, Loader2, Sparkles } from 'lucide-react';
+import { plannerPathfinderTheme } from '@/components/companion/plannerPathfinderTheme';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
@@ -32,17 +33,17 @@ export function AdjustmentInput({ onSubmit, isLoading }: AdjustmentInputProps) {
 
   if (isLoading) {
     return (
-      <div className="p-4 bg-muted/50 rounded-xl border border-dashed flex items-center justify-center gap-2">
-        <Loader2 className="w-4 h-4 animate-spin text-primary" />
-        <span className="text-sm text-muted-foreground">Adjusting your plan...</span>
+      <div className={`${plannerPathfinderTheme.mutedPanel} flex items-center justify-center gap-2 p-4`}>
+        <Loader2 className="w-4 h-4 animate-spin text-[#8d481c]" />
+        <span className="text-sm text-[#7f4a1d]/80">Adjusting your plan...</span>
       </div>
     );
   }
 
   return (
-    <div className="space-y-3">
-      <p className="text-sm font-medium flex items-center gap-2">
-        <MessageSquare className="w-4 h-4" />
+    <div className={`${plannerPathfinderTheme.raisedPanel} space-y-4 p-4`}>
+      <p className="flex items-center gap-2 text-sm font-medium">
+        <MessageSquare className="w-4 h-4 text-[#8d481c]" />
         Want to adjust the plan?
       </p>
 
@@ -54,7 +55,7 @@ export function AdjustmentInput({ onSubmit, isLoading }: AdjustmentInputProps) {
             variant="outline"
             size="sm"
             onClick={() => handleQuickAdjust(adj.value)}
-            className="text-xs"
+            className={plannerPathfinderTheme.outlineButton}
           >
             {adj.label}
           </Button>
@@ -63,7 +64,7 @@ export function AdjustmentInput({ onSubmit, isLoading }: AdjustmentInputProps) {
           variant="ghost"
           size="sm"
           onClick={() => setShowCustom(!showCustom)}
-          className="text-xs"
+          className={plannerPathfinderTheme.outlineButton}
         >
           <Sparkles className="w-3 h-3 mr-1" />
           Custom request
@@ -78,12 +79,13 @@ export function AdjustmentInput({ onSubmit, isLoading }: AdjustmentInputProps) {
             value={customInput}
             onChange={(e) => setCustomInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleCustomSubmit()}
-            className="flex-1"
+            className={`${plannerPathfinderTheme.textField} flex-1`}
           />
           <Button 
             onClick={handleCustomSubmit}
             disabled={!customInput.trim()}
             size="sm"
+            className={plannerPathfinderTheme.primaryButton}
           >
             Adjust
           </Button>

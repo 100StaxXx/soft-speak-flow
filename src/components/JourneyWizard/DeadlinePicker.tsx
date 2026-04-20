@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { format, addDays, addWeeks, addMonths, addYears, differenceInDays } from 'date-fns';
 import { Calendar as CalendarIcon, Clock, Zap } from 'lucide-react';
+import { plannerPathfinderTheme } from '@/components/companion/plannerPathfinderTheme';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -45,7 +46,10 @@ export function DeadlinePicker({ value, onChange, minDate }: DeadlinePickerProps
               variant={isSelected ? 'default' : 'outline'}
               size="sm"
               onClick={() => onChange(optionDate)}
-              className="flex-1 min-w-[80px]"
+              className={cn(
+                "min-w-[80px] flex-1",
+                isSelected ? plannerPathfinderTheme.primaryButton : plannerPathfinderTheme.outlineButton,
+              )}
             >
               {option.label}
             </Button>
@@ -59,8 +63,9 @@ export function DeadlinePicker({ value, onChange, minDate }: DeadlinePickerProps
           <Button
             variant="outline"
             className={cn(
-              'w-full justify-start text-left font-normal h-12',
-              !value && 'text-muted-foreground'
+              plannerPathfinderTheme.textField,
+              'h-12 w-full justify-start text-left font-normal',
+              !value && 'text-[#9a6d47]'
             )}
           >
             <CalendarIcon className="mr-2 h-4 w-4" />
@@ -102,8 +107,8 @@ export function DeadlinePicker({ value, onChange, minDate }: DeadlinePickerProps
 
       {/* Time estimate display */}
       {value && daysUntilDeadline && (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Clock className="w-4 h-4" />
+        <div className="flex items-center gap-2 text-sm text-[#7f4a1d]/80">
+          <Clock className="w-4 h-4 text-[#8d481c]" />
           <span>
             {daysUntilDeadline} days until deadline
             {daysUntilDeadline <= 14 && (

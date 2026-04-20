@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { format, parseISO } from 'date-fns';
+import { plannerPathfinderTheme } from '@/components/companion/plannerPathfinderTheme';
 import { 
   Flag, 
   Calendar, 
@@ -56,10 +57,10 @@ export function TimelineView({
   }, [milestones]);
 
   const feasibilityColors: Record<string, { bg: string; text: string; border: string }> = {
-    comfortable: { bg: 'bg-green-500/10', text: 'text-green-500', border: 'border-green-500/30' },
-    achievable: { bg: 'bg-blue-500/10', text: 'text-blue-500', border: 'border-blue-500/30' },
-    aggressive: { bg: 'bg-amber-500/10', text: 'text-amber-500', border: 'border-amber-500/30' },
-    very_aggressive: { bg: 'bg-red-500/10', text: 'text-red-500', border: 'border-red-500/30' },
+    comfortable: { bg: 'bg-[#dff5a7]', text: 'text-[#315114]', border: 'border-[#315114]' },
+    achievable: { bg: 'bg-[#fff0bb]', text: 'text-[#8d481c]', border: 'border-[#8d481c]' },
+    aggressive: { bg: 'bg-[#ffdba3]', text: 'text-[#9a4718]', border: 'border-[#9a4718]' },
+    very_aggressive: { bg: 'bg-[#ffcab2]', text: 'text-[#8a2716]', border: 'border-[#8a2716]' },
   };
 
   const colors = feasibilityColors[feasibilityAssessment.feasibility] || feasibilityColors.achievable;
@@ -67,9 +68,9 @@ export function TimelineView({
   return (
     <div className="space-y-4">
       {/* Feasibility Assessment Header */}
-      <div className={cn('p-4 rounded-xl border', colors.bg, colors.border)}>
+      <div className={cn(plannerPathfinderTheme.raisedPanel, 'p-4')}>
         <div className="flex items-start gap-3">
-          <div className={cn('p-2 rounded-lg', colors.bg)}>
+          <div className={cn('rounded-xl border-[3px] p-2', colors.bg, colors.border)}>
             <Calendar className={cn('w-5 h-5', colors.text)} />
           </div>
           <div className="flex-1">
@@ -77,11 +78,11 @@ export function TimelineView({
               <span className="font-semibold text-sm">
                 {feasibilityAssessment.daysAvailable} days available
               </span>
-              <Badge variant="outline" className={cn('text-xs', colors.text, colors.border)}>
+              <Badge variant="outline" className={cn(plannerPathfinderTheme.chip, 'text-xs', colors.text, colors.border)}>
                 {formatDisplayLabel(feasibilityAssessment.feasibility)}
               </Badge>
             </div>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-[#7f4a1d]/80">
               {feasibilityAssessment.message}
             </p>
           </div>
@@ -89,19 +90,19 @@ export function TimelineView({
       </div>
 
       {/* Time Commitment */}
-      <div className="flex items-center gap-4 text-sm text-muted-foreground">
+      <div className={`${plannerPathfinderTheme.mutedPanel} flex flex-wrap items-center gap-4 px-4 py-3 text-sm text-[#7f4a1d]/80`}>
         <div className="flex items-center gap-1.5">
-          <Clock className="w-4 h-4" />
+          <Clock className="w-4 h-4 text-[#8d481c]" />
           <span>~{weeklyHoursEstimate} hrs/week</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <Star className="w-4 h-4 text-amber-500" />
+          <Star className="w-4 h-4 text-[#d38b22]" />
           <span>{postcardCount}/{maxPostcards} celebration milestones</span>
         </div>
       </div>
 
       {executionModel === 'overlap_early' && (
-        <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-sm text-muted-foreground">
+        <div className={`${plannerPathfinderTheme.mutedPanel} px-3 py-3 text-sm text-[#7f4a1d]/80`}>
           This plan starts the real work early and keeps momentum going throughout.
         </div>
       )}
@@ -133,40 +134,40 @@ export function TimelineView({
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: sortedPhases.length * 0.1 }}
-          className="p-4 bg-gradient-to-r from-primary/10 to-purple-500/10 rounded-xl border border-primary/30"
+          className={`${plannerPathfinderTheme.successCard} p-4`}
         >
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-full bg-primary/20">
-              <Flag className="w-5 h-5 text-primary" />
+            <div className="rounded-full border-[3px] border-[#315114] bg-white/35 p-2">
+              <Flag className="w-5 h-5 text-[#315114]" />
             </div>
             <div>
               <p className="font-semibold">Goal Complete!</p>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-[#315114]/80">
                 {format(parseISO(deadline), 'EEEE, MMMM d, yyyy')}
               </p>
             </div>
-            <Sparkles className="w-5 h-5 text-primary ml-auto animate-pulse" />
+            <Sparkles className="w-5 h-5 text-[#315114] ml-auto animate-pulse" />
           </div>
         </motion.div>
       </div>
 
       {/* Rituals Summary */}
-      <div className="p-4 rounded-lg bg-muted/30 border">
-        <p className="text-xs font-medium text-muted-foreground mb-2">
+      <div className={`${plannerPathfinderTheme.mutedPanel} p-4`}>
+        <p className="mb-2 text-xs font-medium text-[#7f4a1d]/80">
           Daily & Weekly Rituals ({rituals.length})
         </p>
         <div className="flex flex-wrap gap-2">
           {rituals.slice(0, 4).map(ritual => (
             <Badge 
               key={ritual.id} 
-              variant="secondary" 
-              className="text-xs"
+              variant="outline" 
+              className={cn(plannerPathfinderTheme.chip, 'text-xs')}
             >
               {ritual.title}
             </Badge>
           ))}
           {rituals.length > 4 && (
-            <Badge variant="outline" className="text-xs">
+            <Badge variant="outline" className={cn(plannerPathfinderTheme.chip, 'text-xs')}>
               +{rituals.length - 4} more
             </Badge>
           )}

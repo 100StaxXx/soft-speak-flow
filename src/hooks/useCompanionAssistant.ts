@@ -390,12 +390,13 @@ export function useCompanionAssistant({
     }
 
     if (resolvedTarget === "conversation") {
-      planner.resetThread();
+      journeysThreads.startTemplateThread();
       journeysConversation.injectAssistantOpening(launchIntent.message);
       onLaunchIntentConsumed?.(launchIntent.id);
       return;
     }
 
+    journeysThreads.startTemplateThread();
     void planner.submitMessage(
       launchIntent.message,
       "text",
@@ -408,11 +409,11 @@ export function useCompanionAssistant({
     });
   }, [
     journeysConversation,
+    journeysThreads,
     launchIntent,
     onOpenCampaignBuilder,
     onLaunchIntentConsumed,
     planner,
-    planner.submitMessage,
     surface,
   ]);
 
