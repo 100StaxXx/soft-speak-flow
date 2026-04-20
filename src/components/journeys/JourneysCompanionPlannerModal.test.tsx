@@ -478,7 +478,7 @@ describe("JourneysCompanionPlannerModal", () => {
     expect(screen.queryByRole("button", { name: "Help me break a big goal into steps." })).not.toBeInTheDocument();
   });
 
-  it("renders assistant-led launcher starters without showing the old template copy as a user bubble", async () => {
+  it("renders launcher starters with the expected transcript roles", async () => {
     mocks.state.messages = [
       {
         id: "plan-quest-starter",
@@ -507,6 +507,13 @@ describe("JourneysCompanionPlannerModal", () => {
 
     mocks.state.messages = [
       {
+        id: "plan-upcoming-user",
+        role: "user",
+        content: "What do I have coming up?",
+        createdAt: "2026-04-18T07:59:00.000Z",
+        source: "plan",
+      },
+      {
         id: "plan-upcoming-starter",
         role: "assistant",
         content: "Today: 14:00-15:00 Therapy; 15:00 Workout.\nTomorrow: 09:30 Inbox cleanup.",
@@ -525,6 +532,7 @@ describe("JourneysCompanionPlannerModal", () => {
     await waitFor(() => {
       expect(screen.getByText(/Today: 14:00-15:00 Therapy; 15:00 Workout\./i)).toBeInTheDocument();
     });
+    expect(screen.getByText("What do I have coming up?")).toBeInTheDocument();
     expect(screen.queryByText("What do I have coming up for the rest of today and tomorrow?")).not.toBeInTheDocument();
     upcomingRender.unmount();
 

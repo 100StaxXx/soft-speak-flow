@@ -65,7 +65,56 @@ const baseResponse = {
     weeklyNarrative: "Discipline is leading lately, with Alignment close behind. Vitality is the clearest rebalance need next.",
     identityBootstrap: "Here's who you've been lately: Discipline has been your clearest trait.",
     strongestRecentDrivers: [],
-    statBreakdowns: [],
+    statBreakdowns: [
+      {
+        attribute: "vitality",
+        score: 420,
+        band: "Building",
+        status: "Building score with no recent tracked boosts yet",
+        primaryReasons: ["No recent tracked boosts were found for Vitality, so this score is mostly a long-run snapshot right now."],
+        recentDrivers: [],
+      },
+      {
+        attribute: "wisdom",
+        score: 510,
+        band: "Strong",
+        status: "Strong score with recent tracked momentum",
+        primaryReasons: ["2 learning awards contributed 16 Wisdom in the last 30 days."],
+        recentDrivers: [],
+      },
+      {
+        attribute: "discipline",
+        score: 560,
+        band: "Strong",
+        status: "Strong score with recent tracked momentum",
+        primaryReasons: ["3 habit completions awarded 12 Discipline in the last 30 days."],
+        recentDrivers: [],
+      },
+      {
+        attribute: "resolve",
+        score: 480,
+        band: "Building",
+        status: "Building score with recent tracked momentum",
+        primaryReasons: ["Resolve picked up recent echo gains."],
+        recentDrivers: [],
+      },
+      {
+        attribute: "creativity",
+        score: 360,
+        band: "Building",
+        status: "Building score with no recent tracked boosts yet",
+        primaryReasons: ["No recent tracked boosts were found for Creativity, so this score is mostly a long-run snapshot right now."],
+        recentDrivers: [],
+      },
+      {
+        attribute: "alignment",
+        score: 530,
+        band: "Strong",
+        status: "Strong score with recent tracked momentum",
+        primaryReasons: ["4 morning check-ins contributed 24 Alignment in the last 30 days."],
+        recentDrivers: [],
+      },
+    ],
     summary: "Eli sees consistent momentum in your daily rhythm.",
     suggestedAction: "Pair one morning check-in with one on-time task today.",
   },
@@ -73,6 +122,32 @@ const baseResponse = {
 };
 
 describe("companionStatAnalysis", () => {
+  it("rebuilds a missing statProfile from stat breakdown scores", () => {
+    const legacyAnalysis = { ...baseResponse.analysis } as Record<string, unknown>;
+    delete legacyAnalysis.statProfile;
+
+    const validation = validateCompanionStatAnalysisResponse({
+      ...baseResponse,
+      analysis: legacyAnalysis,
+    });
+
+    expect(validation.ok).toBe(true);
+    if (!validation.ok) return;
+
+    expect(validation.data.analysis.statProfile).toEqual({
+      scores: {
+        vitality: 420,
+        wisdom: 510,
+        discipline: 560,
+        resolve: 480,
+        creativity: 360,
+        alignment: 530,
+      },
+      dominantStat: "discipline",
+      secondaryStat: "alignment",
+    });
+  });
+
   it("fills missing legacy activity counters with zero", () => {
     const legacyActivitySnapshot = { ...baseResponse.analysis.activitySnapshot } as Record<string, unknown>;
     delete legacyActivitySnapshot.hardTaskWins;

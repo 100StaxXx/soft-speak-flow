@@ -406,6 +406,12 @@ export function useCompanionAssistant({
     }
 
     journeysThreads.startTemplateThread();
+    if (launchIntent.starterIntent === "quest_capture") {
+      planner.primeQuestCapture(launchIntent.message);
+      onLaunchIntentConsumed?.(launchIntent.id);
+      return;
+    }
+
     void planner.submitMessage(
       launchIntent.message,
       "text",

@@ -262,6 +262,16 @@ function validateDriverArray(value: unknown, path: string): ValidationResult<Com
   return success(value as CompanionStatDriver[]);
 }
 
+function sortAttributesByScore(
+  scores: Record<CompanionStatAttribute, number>,
+): CompanionStatAttribute[] {
+  return [...ATTRIBUTE_KEYS].sort((left, right) => {
+    const diff = scores[right] - scores[left];
+    if (diff !== 0) return diff;
+    return ATTRIBUTE_KEYS.indexOf(left) - ATTRIBUTE_KEYS.indexOf(right);
+  });
+}
+
 function validateBreakdown(value: unknown, path: string): ValidationResult<CompanionStatBreakdown> {
   if (!isRecord(value)) {
     return failure(`${path} must be an object`);
@@ -290,6 +300,32 @@ function validateBreakdown(value: unknown, path: string): ValidationResult<Compa
   if (!driversValidation.ok) return driversValidation;
 
   return success(value as unknown as CompanionStatBreakdown);
+}
+
+function deriveStatProfileFromBreakdowns(
+  breakdowns: CompanionStatBreakdown[],
+  path: string,
+): ValidationResult<CompanionStatProfileSummary> {
+  const scores = {} as Record<CompanionStatAttribute, number>;
+
+  for (const attribute of ATTRIBUTE_KEYS) {
+    const breakdown = breakdowns.find((entry) => entry.attribute === attribute);
+    if (!breakdown) {
+      return failure(`${path} must be an object`);
+    }
+
+    scores[attribute] = breakdown.score;
+  }
+
+  const sortedAttributes = sortAttributesByScore(scores);
+  const dominantStat = sortedAttributes[0] ?? "discipline";
+  const secondaryStat = sortedAttributes[1] ?? dominantStat;
+
+  return success({
+    scores,
+    dominantStat,
+    secondaryStat,
+  });
 }
 
 function validateStatNeeds(
@@ -362,31 +398,47 @@ function validateActivitySnapshot(
 
 function validateStatProfile(
   value: unknown,
+  breakdowns: CompanionStatBreakdown[],
   path: string,
 ): ValidationResult<CompanionStatProfileSummary> {
+  const fallback = deriveStatProfileFromBreakdowns(breakdowns, path);
+
   if (!isRecord(value)) {
-    return failure(`${path} must be an object`);
+    return fallback;
   }
 
-  if (!isRecord(value.scores)) {
+  const normalizedScores = {} as Record<CompanionStatAttribute, number>;
+  if (isRecord(value.scores)) {
+    for (const attribute of ATTRIBUTE_KEYS) {
+      if (!isFiniteNumber(value.scores[attribute])) {
+        return fallback;
+      }
+
+      normalizedScores[attribute] = value.scores[attribute];
+    }
+  } else if (fallback.ok) {
+    Object.assign(normalizedScores, fallback.data.scores);
+  } else {
     return failure(`${path}.scores must be an object`);
   }
 
-  for (const attribute of ATTRIBUTE_KEYS) {
-    if (!isFiniteNumber(value.scores[attribute])) {
-      return failure(`${path}.scores.${attribute} must be a number`);
-    }
-  }
+  const sortedAttributes = sortAttributesByScore(normalizedScores);
+  const dominantFallback = fallback.ok ? fallback.data.dominantStat : sortedAttributes[0] ?? "discipline";
+  const secondaryFallback = fallback.ok ? fallback.data.secondaryStat : sortedAttributes[1] ?? dominantFallback;
 
-  if (!isString(value.dominantStat) || !ATTRIBUTE_KEYS.includes(value.dominantStat as CompanionStatAttribute)) {
-    return failure(`${path}.dominantStat must be a valid companion stat attribute`);
-  }
+  const dominantStat = isString(value.dominantStat) && ATTRIBUTE_KEYS.includes(value.dominantStat as CompanionStatAttribute)
+    ? value.dominantStat as CompanionStatAttribute
+    : dominantFallback;
 
-  if (!isString(value.secondaryStat) || !ATTRIBUTE_KEYS.includes(value.secondaryStat as CompanionStatAttribute)) {
-    return failure(`${path}.secondaryStat must be a valid companion stat attribute`);
-  }
+  const secondaryStat = isString(value.secondaryStat) && ATTRIBUTE_KEYS.includes(value.secondaryStat as CompanionStatAttribute)
+    ? value.secondaryStat as CompanionStatAttribute
+    : secondaryFallback;
 
-  return success(value as unknown as CompanionStatProfileSummary);
+  return success({
+    scores: normalizedScores,
+    dominantStat,
+    secondaryStat,
+  });
 }
 
 export function validateCompanionStatAnalysis(value: unknown): ValidationResult<CompanionStatAnalysis> {
@@ -449,7 +501,18 @@ export function validateCompanionStatAnalysis(value: unknown): ValidationResult<
   const activitySnapshotValidation = validateActivitySnapshot(value.activitySnapshot, "activitySnapshot");
   if (!activitySnapshotValidation.ok) return activitySnapshotValidation;
 
-  const statProfileValidation = validateStatProfile(value.statProfile, "statProfile");
+  if (!Array.isArray(value.statBreakdowns)) {
+    return failure(`statBreakdowns must be an array`);
+  }
+
+  const normalizedBreakdowns: CompanionStatBreakdown[] = [];
+  for (const [index, breakdown] of value.statBreakdowns.entries()) {
+    const validation = validateBreakdown(breakdown, `statBreakdowns[${index}]`);
+    if (!validation.ok) return validation;
+    normalizedBreakdowns.push(validation.data);
+  }
+
+  const statProfileValidation = validateStatProfile(value.statProfile, normalizedBreakdowns, "statProfile");
   if (!statProfileValidation.ok) return statProfileValidation;
 
   const statNeedsValidation = validateStatNeeds(value.statNeeds, "statNeeds");
@@ -488,15 +551,6 @@ export function validateCompanionStatAnalysis(value: unknown): ValidationResult<
   );
   if (!strongestRecentDriversValidation.ok) return strongestRecentDriversValidation;
 
-  if (!Array.isArray(value.statBreakdowns)) {
-    return failure(`statBreakdowns must be an array`);
-  }
-
-  for (const [index, breakdown] of value.statBreakdowns.entries()) {
-    const validation = validateBreakdown(breakdown, `statBreakdowns[${index}]`);
-    if (!validation.ok) return validation;
-  }
-
   if (!isNonEmptyString(value.summary)) {
     return failure(`summary must be a non-empty string`);
   }
@@ -508,6 +562,8 @@ export function validateCompanionStatAnalysis(value: unknown): ValidationResult<
   return success({
     ...(value as CompanionStatAnalysis),
     activitySnapshot: activitySnapshotValidation.data,
+    statProfile: statProfileValidation.data,
+    statBreakdowns: normalizedBreakdowns,
   });
 }
 

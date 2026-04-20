@@ -244,6 +244,108 @@ describe("useCompanionPlanner", () => {
     expect(result.current.messages[0]?.content).not.toBe("Let's line things up.");
   });
 
+  it("primes quest capture locally and keeps the planner idle", async () => {
+    Object.defineProperty(window, "localStorage", {
+      configurable: true,
+      writable: true,
+      value: {
+        getItem: vi.fn(() => JSON.stringify({
+          preferredTimeOfDay: "evening",
+          preferredTimeReason: "After work I can focus better.",
+          reminderPreference: "15 minutes",
+        })),
+        setItem: vi.fn(),
+        removeItem: vi.fn(),
+      },
+    });
+
+    const { result } = renderHook(() => useCompanionPlanner({ bootstrapGreeting: false }));
+
+    act(() => {
+      result.current.setDraftInput("Old draft");
+      result.current.primeQuestCapture();
+    });
+
+    expect(result.current.messages).toHaveLength(1);
+    expect(result.current.messages[0]?.role).toBe("companion");
+    expect(result.current.messages[0]?.content).toBe("Quest?");
+    expect(result.current.questions).toEqual([]);
+    expect(result.current.pendingProposals).toEqual([]);
+    expect(result.current.draftInput).toBe("");
+    expect(result.current.isSubmitting).toBe(false);
+    expect(result.current.sessionState.pendingStarterIntent).toBe("quest_capture");
+    expect(result.current.sessionState.draft.draftKind).toBe("create_quest");
+    expect(result.current.sessionState.preferredTimeOfDay).toBe("evening");
+    expect(result.current.sessionState.preferredTimeReason).toBe("After work I can focus better.");
+    expect(result.current.sessionState.reminderPreference).toBe("15 minutes");
+    expect(mocks.invoke).not.toHaveBeenCalled();
+  });
+
+  it("continues quest capture follow-ups through the normal planner request", async () => {
+    mocks.invoke.mockResolvedValue({
+      data: {
+        mode: "proposal",
+        reply: "I drafted your quest.",
+        followUpQuestions: [],
+        proposals: [
+          {
+            id: "proposal-quest-capture-1",
+            kind: "create_quest",
+            title: "Create Write my newsletter",
+            summary: "Create a scheduled quest for Write my newsletter.",
+            payload: {
+              taskText: "Write my newsletter",
+              taskDate: "2026-04-19",
+              scheduledTime: "18:00",
+            },
+            status: "pending",
+            readyToConfirm: true,
+            missingFields: [],
+          },
+        ],
+        suggestedReminders: [],
+        memoryUpdates: {},
+        sessionState: {
+          draft: {
+            title: "Write my newsletter",
+            draftKind: "create_quest",
+          },
+          openQuestionIds: [],
+          preferredTimeOfDay: null,
+          preferredTimeReason: null,
+          reminderPreference: null,
+          pendingStarterIntent: null,
+          lastClassification: "quest",
+        },
+      },
+      error: null,
+    });
+
+    const { result } = renderHook(() => useCompanionPlanner({ bootstrapGreeting: false }));
+
+    act(() => {
+      result.current.primeQuestCapture();
+    });
+
+    await act(async () => {
+      await result.current.submitMessage("Write my newsletter tomorrow at 18:00", "text");
+    });
+
+    await waitFor(() => {
+      expect(result.current.pendingProposals).toHaveLength(1);
+    });
+
+    const request = mocks.invoke.mock.calls.at(-1)?.[1];
+    expect(request?.body.sessionState.pendingStarterIntent).toBe("quest_capture");
+    expect(request?.body.sessionState.draft.draftKind).toBe("create_quest");
+    expect(request?.body.conversationHistory).toEqual([
+      {
+        role: "assistant",
+        content: "Quest?",
+      },
+    ]);
+  });
+
   it("shows a rollout-aware planner error instead of a fake lost-thread message", async () => {
     mocks.invoke.mockResolvedValue({
       data: null,

@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   companionSubmit: vi.fn().mockResolvedValue(undefined),
   journeysSubmit: vi.fn().mockResolvedValue(undefined),
   plannerSubmit: vi.fn().mockResolvedValue(undefined),
+  primeQuestCapture: vi.fn(),
   openCampaignBuilder: vi.fn(),
   clearPlannerHandoff: vi.fn(),
   injectAssistantOpening: vi.fn(),
@@ -225,6 +226,7 @@ vi.mock("@/hooks/useCompanionPlanner", () => ({
     isSubmitting: false,
     isClassifying: false,
     submitMessage: mocks.plannerSubmit,
+    primeQuestCapture: mocks.primeQuestCapture,
     resetThread: mocks.resetPlannerThread,
     hydrateThread: mocks.hydratePlannerThread,
     confirmProposal: mocks.confirmProposal,
@@ -927,7 +929,7 @@ describe("useCompanionAssistant", () => {
     expect(onLaunchIntentConsumed).toHaveBeenCalledWith("launch-1");
   });
 
-  it("submits assistant-led journeys launcher intents through the planner without a fake user echo", async () => {
+  it("seeds assistant-led quest launcher intents locally without a fake user echo", async () => {
     const onLaunchIntentConsumed = vi.fn();
 
     renderHook(() => useCompanionAssistant({
@@ -946,15 +948,9 @@ describe("useCompanionAssistant", () => {
       await Promise.resolve();
     });
 
-    expect(mocks.plannerSubmit).toHaveBeenCalledWith(
-      "Quest?",
-      "text",
-      {
-        skipUserEcho: true,
-        starterIntent: "quest_capture",
-        briefingContext: null,
-      },
-    );
+    expect(mocks.startTemplateThread).toHaveBeenCalledTimes(1);
+    expect(mocks.primeQuestCapture).toHaveBeenCalledWith("Quest?");
+    expect(mocks.plannerSubmit).not.toHaveBeenCalled();
     expect(mocks.openCampaignBuilder).not.toHaveBeenCalled();
     expect(onLaunchIntentConsumed).toHaveBeenCalledWith("launch-2");
   });

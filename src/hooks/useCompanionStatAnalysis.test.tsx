@@ -304,6 +304,40 @@ describe("useCompanionStatAnalysis", () => {
     expect(result.current.error).toBeNull();
   });
 
+  it("accepts legacy analysis payloads that omit statProfile", async () => {
+    const legacyAnalysis = { ...baseAnalysis } as Record<string, unknown>;
+    delete legacyAnalysis.statProfile;
+
+    mocks.invokeMock.mockResolvedValue({
+      data: {
+        analysis: legacyAnalysis,
+        cached: false,
+      },
+      error: null,
+    });
+
+    const { result } = renderHook(() => useCompanionStatAnalysis({ enabled: true }), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.analysis?.statProfile).toEqual({
+        scores: {
+          vitality: 420,
+          wisdom: 510,
+          discipline: 560,
+          resolve: 480,
+          creativity: 360,
+          alignment: 530,
+        },
+        dominantStat: "discipline",
+        secondaryStat: "alignment",
+      });
+    });
+
+    expect(result.current.error).toBeNull();
+  });
+
   it("surfaces an error when cached and refreshed payloads are both malformed", async () => {
     mocks.invokeMock
       .mockResolvedValueOnce({

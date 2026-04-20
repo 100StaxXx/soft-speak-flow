@@ -1248,6 +1248,32 @@ export function useCompanionPlanner({
     return assistantMessage;
   }, []);
 
+  const primeQuestCapture = useCallback((prompt = "Quest?") => {
+    const trimmedPrompt = stripMarkdown(prompt).trim();
+    if (!trimmedPrompt) return;
+
+    setMessages((previous) => [
+      ...previous,
+      createMessage("companion", trimmedPrompt, {
+        questions: [],
+        proposalIds: [],
+      }),
+    ]);
+    setProposals([]);
+    setQuestions([]);
+    setSessionState((previous) => ({
+      ...previous,
+      draft: {
+        draftKind: "create_quest",
+      },
+      openQuestionIds: [],
+      pendingStarterIntent: "quest_capture",
+    }));
+    setDraftInput("");
+    setInterimText("");
+    setIsSubmitting(false);
+  }, []);
+
   const persistPlannerMemory = useCallback(async (
     proposal: CompanionPlannerProposal,
     nextSessionState: CompanionPlannerSessionState,
@@ -1973,6 +1999,7 @@ export function useCompanionPlanner({
     isRequestingPermission,
     submitTypedMessage: () => submitMessage(draftInput, "text"),
     submitMessage,
+    primeQuestCapture,
     resetThread,
     hydrateThread,
     toggleRecording,

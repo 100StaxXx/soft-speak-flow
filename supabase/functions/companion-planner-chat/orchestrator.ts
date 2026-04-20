@@ -245,6 +245,14 @@ const normalizeReply = (value: unknown): PlannerLLMReply | null => {
   };
 };
 
+const isQuestCaptureStarterResponse = (baseResult: PlannerBuildResult) =>
+  baseResult.mode === "conversational"
+  && baseResult.reply.trim() === "Quest?"
+  && baseResult.sessionState.pendingStarterIntent === "quest_capture"
+  && baseResult.followUpQuestions.length === 0
+  && baseResult.proposals.length === 0
+  && baseResult.suggestedReminders.length === 0;
+
 export async function buildOrchestratedPlannerResponse(params: {
   guardedFetch: typeof fetch;
   input: PlannerBuildInput;
@@ -256,6 +264,10 @@ export async function buildOrchestratedPlannerResponse(params: {
     params.input.plannerContext.starterIntent === "upcoming_start" &&
     params.baseResult.mode === "schedule_read"
   ) {
+    return params.baseResult;
+  }
+
+  if (isQuestCaptureStarterResponse(params.baseResult)) {
     return params.baseResult;
   }
 

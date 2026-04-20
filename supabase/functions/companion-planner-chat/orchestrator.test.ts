@@ -279,3 +279,41 @@ Deno.test("keeps upcoming-digest orchestration scoped to today and tomorrow", as
   );
   assertEquals(captured.body, null);
 });
+
+Deno.test("does not rewrite the quest-capture starter prompt", async () => {
+  const captured = {
+    called: false,
+  };
+
+  const response = await buildOrchestratedPlannerResponse({
+    guardedFetch: async (_input: RequestInfo | URL, _init?: RequestInit) => {
+      captured.called = true;
+      return new Response("unexpected");
+    },
+    input: {
+      ...baseInput(),
+      message: "Quest?",
+      plannerContext: {
+        ...baseInput().plannerContext,
+        starterIntent: "quest_capture",
+      },
+    },
+    baseResult: {
+      ...baseResult("conversational"),
+      reply: "Quest?",
+      sessionState: {
+        ...baseResult("conversational").sessionState,
+        draft: {
+          draftKind: "create_quest",
+        },
+        pendingStarterIntent: "quest_capture",
+      },
+    },
+    openAIApiKey: "test-openai-key",
+    model: "test-model",
+  });
+
+  assertEquals(response.mode, "conversational");
+  assertEquals(response.reply, "Quest?");
+  assertEquals(captured.called, false);
+});
