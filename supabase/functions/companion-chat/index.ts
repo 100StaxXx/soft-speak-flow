@@ -399,7 +399,10 @@ const buildSystemPrompt = (context: {
   currentDateTime?: string;
   journeysContext?: JourneysContext;
 }) => {
-  const voiceStyle = typeof context.voiceTemplate?.voice_style === "string"
+  const isJourneysSurface = context.surface === "journeys";
+  const voiceStyle = isJourneysSurface
+    ? "Calm, direct, low-drama companion. Plainspoken, concise, grounded, and helpful."
+    : typeof context.voiceTemplate?.voice_style === "string"
     ? context.voiceTemplate.voice_style
     : "Original gritty chaos sidekick. Deep-voiced, streetwise shoulder commentator. Fast-talking, irreverent, dryly funny, fearless, secretly loyal, and always pushing the human toward action.";
   const traits = asStringArray(context.voiceTemplate?.personality_traits).join(", ");
@@ -441,22 +444,28 @@ const buildSystemPrompt = (context: {
           peakProductivityTimes: context.learning.peak_productivity_times,
         }).slice(0, 700)}`
       : "",
-    context.surface === "journeys"
+    isJourneysSurface
       ? "In Journeys, behave like a normal chatbot first. Answer directly and naturally before suggesting any scheduling workflow."
       : "",
-    context.surface === "journeys"
+    isJourneysSurface
+      ? "In Journeys, keep the tone plain and restrained. No roasting, swagger, teasing, bits, pop-quiz framing, or rhetorical challenges."
+      : "",
+    isJourneysSurface
+      ? "If the user makes a clear request, confirm it directly instead of asking them to justify why it matters."
+      : "",
+    isJourneysSurface
       ? "Do not auto-switch into planner mode for schedule reads, day overviews, prioritization, brainstorming, or emotional check-ins."
       : "",
-    context.surface === "journeys"
+    isJourneysSurface
       ? "Only treat it as planner work when the user explicitly wants a concrete saved change, like scheduling, moving, repeating, reminding, renaming, or creating something."
       : "",
-    context.surface === "journeys"
+    isJourneysSurface
       ? "For Journeys schedule reads, use past tense for items marked past, present tense for items marked in_progress, and future tense for items marked upcoming."
       : "",
-    context.surface === "journeys"
+    isJourneysSurface
       ? "Prefer the provided scheduleLabel/displayTime wording and keep time mentions in lowercase am/pm."
       : "",
-    context.surface === "journeys"
+    isJourneysSurface
       ? "If an item already passed today, it can still be mentioned, but do not describe it like it is still ahead."
       : "",
     journeysSnapshot
@@ -475,6 +484,7 @@ async function generateCompanionReply(params: {
   systemPrompt: string;
   conversationHistory: Array<{ role: "assistant" | "user"; content: string }>;
   message: string;
+  surface: "companion" | "journeys";
 }) {
   const openAIApiKey = Deno.env.get("OPENAI_API_KEY");
   if (!openAIApiKey) {
@@ -490,7 +500,7 @@ async function generateCompanionReply(params: {
     },
     body: JSON.stringify({
       model,
-      temperature: 0.9,
+      temperature: params.surface === "journeys" ? 0.35 : 0.9,
       max_tokens: 260,
       messages: [
         { role: "system", content: params.systemPrompt },
@@ -800,6 +810,7 @@ serve(async (req) => {
         }),
         conversationHistory: parsed.data.conversationHistory,
         message: parsed.data.message,
+        surface,
       });
     }
 

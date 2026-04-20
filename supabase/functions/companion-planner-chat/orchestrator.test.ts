@@ -67,16 +67,17 @@ const baseResult = (mode: PlannerBuildResult["mode"]): PlannerBuildResult => ({
 
 Deno.test("uses the model-authored conversational reply when orchestration succeeds", async () => {
   const response = await buildOrchestratedPlannerResponse({
-    guardedFetch: async (_input: RequestInfo | URL, _init?: RequestInit) => new Response(JSON.stringify({
-      choices: [{
-        message: {
-          content: JSON.stringify({
-            reply: "Let's look at the day together and keep it simple.",
-            mode: "conversational",
-          }),
-        },
-      }],
-    })),
+    guardedFetch: async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      new Response(JSON.stringify({
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              reply: "Let's look at the day together and keep it simple.",
+              mode: "conversational",
+            }),
+          },
+        }],
+      })),
     input: baseInput(),
     baseResult: baseResult("conversational"),
     openAIApiKey: "test-openai-key",
@@ -84,21 +85,53 @@ Deno.test("uses the model-authored conversational reply when orchestration succe
   });
 
   assertEquals(response.mode, "conversational");
-  assertEquals(response.reply, "Let's look at the day together and keep it simple.");
+  assertEquals(
+    response.reply,
+    "Let's look at the day together and keep it simple.",
+  );
+});
+
+Deno.test("normalizes 24-hour times in model-authored planner replies", async () => {
+  const response = await buildOrchestratedPlannerResponse({
+    guardedFetch: async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      new Response(JSON.stringify({
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              reply:
+                "Today stays open until 18:00, and your cleanest backup window is 21:15.",
+              mode: "conversational",
+            }),
+          },
+        }],
+      })),
+    input: baseInput(),
+    baseResult: baseResult("conversational"),
+    openAIApiKey: "test-openai-key",
+    model: "test-model",
+  });
+
+  assertEquals(response.mode, "conversational");
+  assertEquals(
+    response.reply,
+    "Today stays open until 6:00 pm, and your cleanest backup window is 9:15 pm.",
+  );
 });
 
 Deno.test("preserves deterministic proposal state while rewriting the copy", async () => {
   const response = await buildOrchestratedPlannerResponse({
-    guardedFetch: async (_input: RequestInfo | URL, _init?: RequestInit) => new Response(JSON.stringify({
-      choices: [{
-        message: {
-          content: JSON.stringify({
-            reply: "I drafted this as a quest update. Review it and confirm when it looks right.",
-            mode: "proposal",
-          }),
-        },
-      }],
-    })),
+    guardedFetch: async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      new Response(JSON.stringify({
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              reply:
+                "I drafted this as a quest update. Review it and confirm when it looks right.",
+              mode: "proposal",
+            }),
+          },
+        }],
+      })),
     input: baseInput(),
     baseResult: {
       ...baseResult("proposal"),
@@ -119,7 +152,10 @@ Deno.test("preserves deterministic proposal state while rewriting the copy", asy
 
   assertEquals(response.mode, "proposal");
   assertEquals(response.proposals.length, 1);
-  assertEquals(response.reply, "I drafted this as a quest update. Review it and confirm when it looks right.");
+  assertEquals(
+    response.reply,
+    "I drafted this as a quest update. Review it and confirm when it looks right.",
+  );
 });
 
 Deno.test("sends tone and availability grounding to the model for witty_sassy planner replies", async () => {
@@ -138,7 +174,8 @@ Deno.test("sends tone and availability grounding to the model for witty_sassy pl
         choices: [{
           message: {
             content: JSON.stringify({
-              reply: "Your calendar is wide open today. According to what I see, time is all you got.",
+              reply:
+                "Your calendar is wide open today. According to what I see, time is all you got.",
               mode: "schedule_read",
             }),
           },
@@ -171,14 +208,18 @@ Deno.test("sends tone and availability grounding to the model for witty_sassy pl
     },
     baseResult: {
       ...baseResult("schedule_read"),
-      reply: "Your calendar is wide open today. According to what I see, time is all you got.",
+      reply:
+        "Your calendar is wide open today. According to what I see, time is all you got.",
     },
     openAIApiKey: "test-openai-key",
     model: "test-model",
   });
 
   assertEquals(response.mode, "schedule_read");
-  assertEquals(response.reply, "Your calendar is wide open today. According to what I see, time is all you got.");
+  assertEquals(
+    response.reply,
+    "Your calendar is wide open today. According to what I see, time is all you got.",
+  );
 
   const messages = captured.body?.messages ?? [];
   const systemMessage = messages[0]?.content ?? "";
@@ -195,14 +236,35 @@ Deno.test("sends tone and availability grounding to the model for witty_sassy pl
     };
   };
 
-  assertStringIncludes(systemMessage, "Voice: bold cheekiness, roasty edge, and a little swagger are allowed.");
-  assertStringIncludes(systemMessage, "Schedule facts come before interpretation.");
-  assertStringIncludes(systemMessage, "If deterministicContext.availabilityFacts says the day is open");
+  assertStringIncludes(
+    systemMessage,
+    "Voice: bold cheekiness, roasty edge, and a little swagger are allowed.",
+  );
+  assertStringIncludes(
+    systemMessage,
+    "Schedule facts come before interpretation.",
+  );
+  assertStringIncludes(
+    systemMessage,
+    "If deterministicContext.availabilityFacts says the day is open",
+  );
   assertEquals(promptPayload.tonePack, "witty_sassy");
-  assertEquals(promptPayload.deterministicContext.availabilityFacts.targetDate, "2026-04-18");
-  assertEquals(promptPayload.deterministicContext.availabilityFacts.dayStatus, "open");
-  assertEquals(promptPayload.deterministicContext.availabilityFacts.scheduledItemCount, 0);
-  assertEquals(promptPayload.deterministicContext.availabilityFacts.hasOpenings, true);
+  assertEquals(
+    promptPayload.deterministicContext.availabilityFacts.targetDate,
+    "2026-04-18",
+  );
+  assertEquals(
+    promptPayload.deterministicContext.availabilityFacts.dayStatus,
+    "open",
+  );
+  assertEquals(
+    promptPayload.deterministicContext.availabilityFacts.scheduledItemCount,
+    0,
+  );
+  assertEquals(
+    promptPayload.deterministicContext.availabilityFacts.hasOpenings,
+    true,
+  );
 });
 
 Deno.test("keeps upcoming-digest orchestration scoped to today and tomorrow", async () => {
@@ -221,7 +283,8 @@ Deno.test("keeps upcoming-digest orchestration scoped to today and tomorrow", as
         choices: [{
           message: {
             content: JSON.stringify({
-              reply: "Today: Therapy at 14:00 and Workout at 15:00. Tomorrow: Inbox cleanup at 09:30. Tell me what feels most important, and I'll help from there.",
+              reply:
+                "Today: Therapy at 14:00 and Workout at 15:00. Tomorrow: Inbox cleanup at 09:30. Tell me what feels most important, and I'll help from there.",
               mode: "schedule_read",
             }),
           },
@@ -266,7 +329,8 @@ Deno.test("keeps upcoming-digest orchestration scoped to today and tomorrow", as
     },
     baseResult: {
       ...baseResult("schedule_read"),
-      reply: "Today: 14:00-15:00 Therapy; 15:00 Workout.\nTomorrow: 09:30 Inbox cleanup.",
+      reply:
+        "Today: 14:00-15:00 Therapy; 15:00 Workout.\nTomorrow: 09:30 Inbox cleanup.",
     },
     openAIApiKey: "test-openai-key",
     model: "test-model",
@@ -275,7 +339,7 @@ Deno.test("keeps upcoming-digest orchestration scoped to today and tomorrow", as
   assertEquals(response.mode, "schedule_read");
   assertEquals(
     response.reply,
-    "Today: 14:00-15:00 Therapy; 15:00 Workout.\nTomorrow: 09:30 Inbox cleanup.",
+    "Today: 2:00 pm-3:00 pm Therapy; 3:00 pm Workout.\nTomorrow: 9:30 am Inbox cleanup.",
   );
   assertEquals(captured.body, null);
 });

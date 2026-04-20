@@ -156,7 +156,7 @@ Deno.test("normalizes conversational scheduled quest titles before building plan
   assertEquals(result.proposals[0].title, "Create Grab Lunch With Zach");
   assertEquals(
     result.proposals[0].summary,
-    'Create a quest for "Grab Lunch With Zach" on 2026-04-19 at 13:00.',
+    'Create a quest for "Grab Lunch With Zach" on 2026-04-19 at 1:00 pm.',
   );
   assertEquals(
     (result.proposals[0].payload as {
@@ -212,7 +212,7 @@ Deno.test("treats a simple timed utterance as a ready-to-confirm quest draft", (
   assertEquals(result.proposals[0].title, "Create Gym");
   assertEquals(
     result.proposals[0].summary,
-    'Create a quest for "Gym" on 2026-04-20 at 17:00.',
+    'Create a quest for "Gym" on 2026-04-20 at 5:00 pm.',
   );
   assertEquals(
     (result.proposals[0].payload as {
@@ -484,7 +484,10 @@ Deno.test("turns high vitality need into a confirmable recovery block", () => {
           secondaryStat: "wisdom",
         },
         statNeeds: {
-          vitality: { level: "high", reasons: ["You've been pushing output harder than recovery."] },
+          vitality: {
+            level: "high",
+            reasons: ["You've been pushing output harder than recovery."],
+          },
           wisdom: { level: "low", reasons: [] },
           discipline: { level: "low", reasons: [] },
           resolve: { level: "low", reasons: [] },
@@ -493,7 +496,8 @@ Deno.test("turns high vitality need into a confirmable recovery block", () => {
         },
         momentumState: "slipping",
         recentMissInterpretation: "low_energy",
-        narrativeBrief: "This looks more strained than lazy. I'm protecting the essentials and rebuilding vitality first.",
+        narrativeBrief:
+          "This looks more strained than lazy. I'm protecting the essentials and rebuilding vitality first.",
         dailyNarrative: "Vitality protection day",
       },
       scheduleInsights: {
@@ -530,6 +534,10 @@ Deno.test("turns high vitality need into a confirmable recovery block", () => {
   assertEquals(result.mode, "proposal");
   assertEquals(result.proposals[0].kind, "create_quest");
   assertStringIncludes(result.reply, "rebuilding vitality first");
+  assertStringIncludes(
+    result.proposals[0]?.summary ?? "",
+    "Create a 30-minute recovery reset at 3:00 pm.",
+  );
   assertEquals(
     (result.proposals[0].payload as { taskText: string }).taskText,
     "Recovery reset",
@@ -561,7 +569,6 @@ Deno.test("keeps timing follow-ups for vague one-off placement requests without 
   assertEquals(result.proposals[0].readyToConfirm, false);
   assertEquals(result.followUpQuestions.map((question) => question.field), [
     "time_of_day",
-    "time_reason",
   ]);
 });
 
@@ -654,7 +661,7 @@ Deno.test("defaults repeated standalone work to a recurring quest", () => {
   assertStringIncludes(result.proposals[0].summary, "recurring quest");
   assertEquals(
     result.followUpQuestions.map((question) => question.field),
-    ["time_of_day", "time_reason", "end_date"],
+    ["time_of_day", "end_date"],
   );
 });
 
@@ -1234,6 +1241,16 @@ Deno.test("adds a balancing question when the selected window is overloaded", ()
       ?.prompt ?? "",
     "2026-04-19",
   );
+  assertStringIncludes(
+    result.followUpQuestions.find((question) => question.field === "details")
+      ?.prompt ?? "",
+    "10:00 am",
+  );
+  assertStringIncludes(
+    result.followUpQuestions.find((question) => question.field === "details")
+      ?.reason ?? "",
+    "10:00 am",
+  );
 });
 
 Deno.test("answers schedule questions with quests and connected calendar events without creating proposals", () => {
@@ -1273,7 +1290,10 @@ Deno.test("answers schedule questions with quests and connected calendar events 
   assertStringIncludes(result.reply, "Today:");
   assertStringIncludes(result.reply, "Workout (was at 9:00 am)");
   assertStringIncludes(result.reply, "Therapy");
-  assertEquals(result.reply.includes("Tell me what feels most important"), false);
+  assertEquals(
+    result.reply.includes("Tell me what feels most important"),
+    false,
+  );
 });
 
 Deno.test("treats the route starter like a schedule overview instead of a quest draft", () => {
@@ -1302,7 +1322,10 @@ Deno.test("treats the route starter like a schedule overview instead of a quest 
   assertEquals(result.followUpQuestions.length, 0);
   assertStringIncludes(result.reply, "Today:");
   assertStringIncludes(result.reply, "Workout (at 12:00 pm)");
-  assertEquals(result.reply.includes("Tell me what feels most important"), false);
+  assertEquals(
+    result.reply.includes("Tell me what feels most important"),
+    false,
+  );
 });
 
 Deno.test("treats an empty route request like a short empty schedule summary", () => {
@@ -1396,7 +1419,10 @@ Deno.test("goal_breakdown_start opens with one assistant-led goal prompt", () =>
   assertEquals(result.proposals.length, 0);
   assertEquals(result.followUpQuestions.length, 0);
   assertEquals(result.sessionState.draft.title ?? null, null);
-  assertEquals(result.sessionState.pendingStarterIntent, "goal_breakdown_start");
+  assertEquals(
+    result.sessionState.pendingStarterIntent,
+    "goal_breakdown_start",
+  );
   assertStringIncludes(result.reply, "goal");
 });
 
@@ -1532,7 +1558,8 @@ Deno.test("quest_capture turns a complete follow-up answer into a ready quest dr
     "Write My Newsletter",
   );
   assertEquals(
-    (result.proposals[0].payload as { scheduledTime: string | null }).scheduledTime,
+    (result.proposals[0].payload as { scheduledTime: string | null })
+      .scheduledTime,
     "18:00",
   );
   assertEquals(result.sessionState.pendingStarterIntent ?? null, null);
@@ -1582,7 +1609,10 @@ Deno.test("quest_capture turns a bare quest title into a ready inbox draft", () 
   assertEquals(result.proposals[0].kind, "create_quest");
   assertEquals(result.proposals[0].readyToConfirm, true);
   assertEquals(result.followUpQuestions.length, 0);
-  assertEquals(result.proposals[0].summary, 'Capture "Write my newsletter" in Inbox so you can schedule it later.');
+  assertEquals(
+    result.proposals[0].summary,
+    'Capture "Write my newsletter" in Inbox so you can schedule it later.',
+  );
   assertEquals(
     (result.proposals[0].payload as {
       taskDate: string | null;
@@ -1676,7 +1706,10 @@ Deno.test("quest_capture uses a matching suggested slot for date-only replies", 
   assertEquals(result.proposals[0].kind, "create_quest");
   assertEquals(result.proposals[0].readyToConfirm, true);
   assertEquals(result.followUpQuestions.length, 0);
-  assertStringIncludes(result.proposals[0].summary, "assuming that slot based on your open window");
+  assertStringIncludes(
+    result.proposals[0].summary,
+    "assuming that slot based on your open window",
+  );
   assertEquals(
     (result.proposals[0].payload as {
       taskDate: string | null;
@@ -1755,7 +1788,10 @@ Deno.test("quest_capture uses planner memory when a date-only reply has no match
   assertEquals(result.proposals[0].kind, "create_quest");
   assertEquals(result.proposals[0].readyToConfirm, true);
   assertEquals(result.followUpQuestions.length, 0);
-  assertStringIncludes(result.proposals[0].summary, "assuming your usual evening pattern");
+  assertStringIncludes(
+    result.proposals[0].summary,
+    "assuming your usual evening pattern",
+  );
   assertEquals(
     (result.proposals[0].payload as {
       taskDate: string | null;
@@ -1834,7 +1870,9 @@ Deno.test("quest_capture asks one timing question when a date-only reply has no 
     "time_of_day",
   ]);
   assertEquals(
-    result.followUpQuestions.some((question) => question.field === "time_reason"),
+    result.followUpQuestions.some((question) =>
+      question.field === "time_reason"
+    ),
     false,
   );
 });
@@ -1906,7 +1944,8 @@ Deno.test("quest_capture asks only for the quest details when the user replies w
   assertEquals(result.proposals[0].kind, "create_quest");
   assertEquals(result.proposals[0].readyToConfirm, true);
   assertEquals(
-    (result.proposals[0].payload as { scheduledTime: string | null }).scheduledTime,
+    (result.proposals[0].payload as { scheduledTime: string | null })
+      .scheduledTime,
     "18:00",
   );
 });
@@ -2170,7 +2209,10 @@ Deno.test("answers the coming-up starter prompt with a schedule summary", () => 
   assertEquals(result.followUpQuestions.length, 0);
   assertStringIncludes(result.reply, "Today:");
   assertStringIncludes(result.reply, "Tomorrow:");
-  assertEquals(result.reply.includes("Tell me what feels most important"), false);
+  assertEquals(
+    result.reply.includes("Tell me what feels most important"),
+    false,
+  );
   assertEquals(result.reply.includes("Week ahead:"), false);
 });
 

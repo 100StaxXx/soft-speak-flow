@@ -1,6 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
-import { createSafeErrorResponse, requireProtectedRequest } from "../_shared/abuseProtection.ts";
+import {
+  createSafeErrorResponse,
+  requireProtectedRequest,
+} from "../_shared/abuseProtection.ts";
 import {
   buildCostGuardrailBlockedResponse,
   createCostGuardrailSession,
@@ -10,6 +13,7 @@ import {
 import {
   buildPlannerResponse,
   type ClassificationHint,
+  normalizePlannerBuildResultText,
   type ParsedInputHint,
   type PlannerBuildInput,
   type PlannerSessionState,
@@ -35,21 +39,29 @@ const getClassificationHint = async (
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) return null;
 
-    const response = await fetch(`${supabaseUrl}/functions/v1/classify-task-intent`, {
-      method: "POST",
-      headers: {
-        Authorization: authHeader,
-        "Content-Type": "application/json",
+    const response = await fetch(
+      `${supabaseUrl}/functions/v1/classify-task-intent`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: authHeader,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ input: message }),
       },
-      body: JSON.stringify({ input: message }),
-    });
+    );
 
     if (!response.ok) return null;
 
     const data = await response.json();
-    return normalizePlannerClassificationHint(data as ClassificationHint | null | undefined);
+    return normalizePlannerClassificationHint(
+      data as ClassificationHint | null | undefined,
+    );
   } catch (error) {
-    console.warn("[companion-planner-chat] classify-task-intent fallback failed", error);
+    console.warn(
+      "[companion-planner-chat] classify-task-intent fallback failed",
+      error,
+    );
     return null;
   }
 };
@@ -67,7 +79,8 @@ serve(async (req) => {
     const protectedRequest = await requireProtectedRequest(req, {
       profileKey: "ai.standard",
       endpointName: "companion-planner-chat",
-      blockedMessage: "Too many companion planner requests. Please try again shortly.",
+      blockedMessage:
+        "Too many companion planner requests. Please try again shortly.",
       metadata: {
         flow: "companion_planner",
       },
@@ -104,7 +117,8 @@ serve(async (req) => {
       tonePack: parsed.data.tonePack,
       conversationHistory: parsed.data.conversationHistory,
       sessionState: parsed.data.sessionState as PlannerSessionState,
-      parsedInput: (parsed.data.parsedInput as ParsedInputHint | undefined) ?? null,
+      parsedInput: (parsed.data.parsedInput as ParsedInputHint | undefined) ??
+        null,
       classificationHint,
       plannerContext: parsed.data.plannerContext,
     } satisfies PlannerBuildInput;
@@ -135,8 +149,9 @@ serve(async (req) => {
       input: plannerInput,
       baseResult: enrichedResult,
     });
+    const responseResult = normalizePlannerBuildResultText(orchestratedResult);
 
-    return new Response(JSON.stringify(orchestratedResult), {
+    return new Response(JSON.stringify(responseResult), {
       headers: {
         ...corsHeaders,
         "Content-Type": "application/json",

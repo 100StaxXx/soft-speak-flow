@@ -1,3 +1,4 @@
+import { normalizePlannerBuildResultText } from "./planner.ts";
 import type {
   PlannerBuildInput,
   PlannerBuildResult,
@@ -71,17 +72,20 @@ const countScheduledItemsForDate = (
   const dayStart = new Date(`${targetDate}T00:00:00`);
   const dayEnd = new Date(`${addDaysToDateKey(targetDate, 1)}T00:00:00`);
 
-  const taskCount = input.plannerContext.tasks.filter((task) =>
-    task.completed !== true && task.taskDate === targetDate
-  ).length;
-  const inboxCount = input.plannerContext.inboxTasks.filter((task) =>
-    task.completed !== true && task.taskDate === targetDate
-  ).length;
-  const calendarEventCount = input.plannerContext.calendarEvents.filter((event) => {
-    const start = new Date(event.start);
-    const end = new Date(event.end);
-    return end > dayStart && start < dayEnd;
-  }).length;
+  const taskCount =
+    input.plannerContext.tasks.filter((task) =>
+      task.completed !== true && task.taskDate === targetDate
+    ).length;
+  const inboxCount =
+    input.plannerContext.inboxTasks.filter((task) =>
+      task.completed !== true && task.taskDate === targetDate
+    ).length;
+  const calendarEventCount =
+    input.plannerContext.calendarEvents.filter((event) => {
+      const start = new Date(event.start);
+      const end = new Date(event.end);
+      return end > dayStart && start < dayEnd;
+    }).length;
 
   return taskCount + inboxCount + calendarEventCount;
 };
@@ -93,10 +97,14 @@ const buildAvailabilityFacts = (
   const targetDate = inferTargetDate(input, mode);
   const scheduleInsights = input.plannerContext.scheduleInsights;
   const scheduledItemCount = countScheduledItemsForDate(input, targetDate);
-  const remainingItemCount = countScheduledItemsForDate(input, input.currentDate);
-  const dayStatus = scheduleInsights?.dayLoads.find((day) => day.date === targetDate)?.status
-    ?? (scheduleInsights?.emptyDates.includes(targetDate) ? "open" : null)
-    ?? (scheduledItemCount === 0 ? "open" : null);
+  const remainingItemCount = countScheduledItemsForDate(
+    input,
+    input.currentDate,
+  );
+  const dayStatus =
+    scheduleInsights?.dayLoads.find((day) => day.date === targetDate)?.status ??
+      (scheduleInsights?.emptyDates.includes(targetDate) ? "open" : null) ??
+      (scheduledItemCount === 0 ? "open" : null);
   const openings = scheduleInsights?.suggestedSlots
     .filter((slot) => slot.date === targetDate)
     .slice(0, 3)
@@ -107,7 +115,8 @@ const buildAvailabilityFacts = (
     dayStatus,
     scheduledItemCount,
     remainingScheduledItemCountToday: remainingItemCount,
-    hasOpenings: dayStatus === "open" || dayStatus === "balanced" || openings.length > 0,
+    hasOpenings: dayStatus === "open" || dayStatus === "balanced" ||
+      openings.length > 0,
     openings,
   };
 };
@@ -153,77 +162,85 @@ const buildSystemPrompt = (
 const buildUserPrompt = (
   input: PlannerBuildInput,
   baseResult: PlannerBuildResult,
-) => JSON.stringify({
-  targetMode: baseResult.mode,
-  tonePack: input.tonePack,
-  latestUserMessage: input.message,
-  currentDate: input.currentDate,
-  currentDateTime: input.currentDateTime,
-  conversationHistory: input.conversationHistory.slice(-10),
-  deterministicContext: {
-    fallbackReply: baseResult.reply,
-    availabilityFacts: buildAvailabilityFacts(input, baseResult.mode),
-    followUpQuestions: baseResult.followUpQuestions.map((question) => ({
-      prompt: question.prompt,
-      reason: question.reason ?? null,
-      options: question.options ?? [],
-    })),
-    starterIntent: input.plannerContext.starterIntent ?? null,
-    briefingContext: input.plannerContext.briefingContext
-      ? {
+) =>
+  JSON.stringify({
+    targetMode: baseResult.mode,
+    tonePack: input.tonePack,
+    latestUserMessage: input.message,
+    currentDate: input.currentDate,
+    currentDateTime: input.currentDateTime,
+    conversationHistory: input.conversationHistory.slice(-10),
+    deterministicContext: {
+      fallbackReply: baseResult.reply,
+      availabilityFacts: buildAvailabilityFacts(input, baseResult.mode),
+      followUpQuestions: baseResult.followUpQuestions.map((question) => ({
+        prompt: question.prompt,
+        reason: question.reason ?? null,
+        options: question.options ?? [],
+      })),
+      starterIntent: input.plannerContext.starterIntent ?? null,
+      briefingContext: input.plannerContext.briefingContext
+        ? {
           focus: input.plannerContext.briefingContext.focus ?? null,
-          actionPrompt: input.plannerContext.briefingContext.actionPrompt ?? null,
-          inferredGoals: input.plannerContext.briefingContext.inferredGoals ?? [],
+          actionPrompt: input.plannerContext.briefingContext.actionPrompt ??
+            null,
+          inferredGoals: input.plannerContext.briefingContext.inferredGoals ??
+            [],
         }
-      : null,
-    priorityScores: (input.plannerContext.priorityScores ?? []).slice(0, 6).map((score) => ({
-      kind: score.kind,
-      title: score.title,
-      score: score.score,
-      reasons: score.reasons,
-      targetDate: score.targetDate ?? null,
-      suggestedTime: score.suggestedTime ?? null,
-    })),
-    proposals: baseResult.proposals.map((proposal) => ({
-      kind: proposal.kind,
-      title: proposal.title,
-      summary: proposal.summary,
-      status: proposal.status,
-      readyToConfirm: proposal.readyToConfirm,
-      missingFields: proposal.missingFields ?? [],
-    })),
-    scheduleSummary: input.plannerContext.scheduleInsights?.summary ?? null,
-    tasks: input.plannerContext.tasks.slice(0, 12).map((task) => ({
-      title: task.title,
-      taskDate: task.taskDate,
-      scheduledTime: task.scheduledTime,
-      completed: task.completed ?? false,
-      epicTitle: task.epicTitle ?? null,
-    })),
-    inboxTasks: input.plannerContext.inboxTasks.slice(0, 8).map((task) => ({
-      title: task.title,
-      taskDate: task.taskDate,
-      scheduledTime: task.scheduledTime,
-    })),
-    calendarEvents: input.plannerContext.calendarEvents.slice(0, 10).map((event) => ({
-      title: event.title,
-      start: event.start,
-      end: event.end,
-      isAllDay: event.isAllDay,
-      provider: event.provider,
-    })),
-    activeEpics: input.plannerContext.activeEpics.slice(0, 8).map((epic) => ({
-      title: epic.title,
-      endDate: epic.endDate,
-    })),
-    plannerMemory: input.plannerContext.plannerMemory
-      ? {
-          preferredTimeOfDay: input.plannerContext.plannerMemory.preferredTimeOfDay ?? null,
-          preferredTimeReason: input.plannerContext.plannerMemory.preferredTimeReason ?? null,
+        : null,
+      priorityScores: (input.plannerContext.priorityScores ?? []).slice(0, 6)
+        .map((score) => ({
+          kind: score.kind,
+          title: score.title,
+          score: score.score,
+          reasons: score.reasons,
+          targetDate: score.targetDate ?? null,
+          suggestedTime: score.suggestedTime ?? null,
+        })),
+      proposals: baseResult.proposals.map((proposal) => ({
+        kind: proposal.kind,
+        title: proposal.title,
+        summary: proposal.summary,
+        status: proposal.status,
+        readyToConfirm: proposal.readyToConfirm,
+        missingFields: proposal.missingFields ?? [],
+      })),
+      scheduleSummary: input.plannerContext.scheduleInsights?.summary ?? null,
+      tasks: input.plannerContext.tasks.slice(0, 12).map((task) => ({
+        title: task.title,
+        taskDate: task.taskDate,
+        scheduledTime: task.scheduledTime,
+        completed: task.completed ?? false,
+        epicTitle: task.epicTitle ?? null,
+      })),
+      inboxTasks: input.plannerContext.inboxTasks.slice(0, 8).map((task) => ({
+        title: task.title,
+        taskDate: task.taskDate,
+        scheduledTime: task.scheduledTime,
+      })),
+      calendarEvents: input.plannerContext.calendarEvents.slice(0, 10).map((
+        event,
+      ) => ({
+        title: event.title,
+        start: event.start,
+        end: event.end,
+        isAllDay: event.isAllDay,
+        provider: event.provider,
+      })),
+      activeEpics: input.plannerContext.activeEpics.slice(0, 8).map((epic) => ({
+        title: epic.title,
+        endDate: epic.endDate,
+      })),
+      plannerMemory: input.plannerContext.plannerMemory
+        ? {
+          preferredTimeOfDay:
+            input.plannerContext.plannerMemory.preferredTimeOfDay ?? null,
+          preferredTimeReason:
+            input.plannerContext.plannerMemory.preferredTimeReason ?? null,
         }
-      : null,
-  },
-});
+        : null,
+    },
+  });
 
 const normalizeReply = (value: unknown): PlannerLLMReply | null => {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
@@ -235,7 +252,10 @@ const normalizeReply = (value: unknown): PlannerLLMReply | null => {
     return null;
   }
 
-  if (rawMode !== "conversational" && rawMode !== "schedule_read" && rawMode !== "proposal") {
+  if (
+    rawMode !== "conversational" && rawMode !== "schedule_read" &&
+    rawMode !== "proposal"
+  ) {
     return null;
   }
 
@@ -246,12 +266,12 @@ const normalizeReply = (value: unknown): PlannerLLMReply | null => {
 };
 
 const isQuestCaptureStarterResponse = (baseResult: PlannerBuildResult) =>
-  baseResult.mode === "conversational"
-  && baseResult.reply.trim() === "Quest?"
-  && baseResult.sessionState.pendingStarterIntent === "quest_capture"
-  && baseResult.followUpQuestions.length === 0
-  && baseResult.proposals.length === 0
-  && baseResult.suggestedReminders.length === 0;
+  baseResult.mode === "conversational" &&
+  baseResult.reply.trim() === "Quest?" &&
+  baseResult.sessionState.pendingStarterIntent === "quest_capture" &&
+  baseResult.followUpQuestions.length === 0 &&
+  baseResult.proposals.length === 0 &&
+  baseResult.suggestedReminders.length === 0;
 
 export async function buildOrchestratedPlannerResponse(params: {
   guardedFetch: typeof fetch;
@@ -260,23 +280,28 @@ export async function buildOrchestratedPlannerResponse(params: {
   openAIApiKey?: string;
   model?: string;
 }): Promise<PlannerBuildResult> {
+  const normalizedBaseResult = normalizePlannerBuildResultText(
+    params.baseResult,
+  );
+
   if (
     params.input.plannerContext.starterIntent === "upcoming_start" &&
     params.baseResult.mode === "schedule_read"
   ) {
-    return params.baseResult;
+    return normalizedBaseResult;
   }
 
   if (isQuestCaptureStarterResponse(params.baseResult)) {
-    return params.baseResult;
+    return normalizedBaseResult;
   }
 
   const openAIApiKey = params.openAIApiKey ?? Deno.env.get("OPENAI_API_KEY");
   if (!openAIApiKey) {
-    return params.baseResult;
+    return normalizedBaseResult;
   }
 
-  const model = params.model ?? Deno.env.get("OPENAI_COMPANION_PLANNER_MODEL") ?? "gpt-4.1";
+  const model = params.model ??
+    Deno.env.get("OPENAI_COMPANION_PLANNER_MODEL") ?? "gpt-4.1";
 
   try {
     const response = await params.guardedFetch(OPENAI_API_URL, {
@@ -293,7 +318,10 @@ export async function buildOrchestratedPlannerResponse(params: {
         messages: [
           {
             role: "system",
-            content: buildSystemPrompt(params.baseResult.mode, params.input.tonePack),
+            content: buildSystemPrompt(
+              params.baseResult.mode,
+              params.input.tonePack,
+            ),
           },
           {
             role: "user",
@@ -304,28 +332,33 @@ export async function buildOrchestratedPlannerResponse(params: {
     });
 
     if (!response.ok) {
-      console.warn("[companion-planner-chat] OpenAI error", await response.text());
-      return params.baseResult;
+      console.warn(
+        "[companion-planner-chat] OpenAI error",
+        await response.text(),
+      );
+      return normalizedBaseResult;
     }
 
     const data = await response.json();
     const rawContent = data?.choices?.[0]?.message?.content?.trim() ?? "";
     if (!rawContent) {
-      return params.baseResult;
+      return normalizedBaseResult;
     }
 
     const parsed = normalizeReply(JSON.parse(rawContent));
     if (!parsed) {
-      return params.baseResult;
+      return normalizedBaseResult;
     }
 
-    return {
-      ...params.baseResult,
-      mode: parsed.mode === params.baseResult.mode ? parsed.mode : params.baseResult.mode,
+    return normalizePlannerBuildResultText({
+      ...normalizedBaseResult,
+      mode: parsed.mode === params.baseResult.mode
+        ? parsed.mode
+        : params.baseResult.mode,
       reply: parsed.reply,
-    };
+    });
   } catch (error) {
     console.warn("[companion-planner-chat] reply orchestration failed", error);
-    return params.baseResult;
+    return normalizedBaseResult;
   }
 }

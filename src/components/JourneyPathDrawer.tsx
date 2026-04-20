@@ -1,6 +1,6 @@
 import { memo, useState, useMemo } from "react";
 import { motion } from "framer-motion";
-import { Target, Flame, Star, Map, Calendar } from "lucide-react";
+import { Target, Flame, Star, Map, Calendar, Pencil } from "lucide-react";
 import {
   Drawer,
   DrawerContent,
@@ -10,9 +10,9 @@ import {
 } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { cn } from "@/lib/utils";
 import { ConstellationTrail } from "@/components/ConstellationTrail";
 import { JourneyDetailDrawer } from "@/components/JourneyDetailDrawer";
+import { EditCampaignSheet } from "@/components/EditCampaignSheet";
 import { useJourneyPathImage } from "@/hooks/useJourneyPathImage";
 import { usePreloadedImageUrl } from "@/hooks/usePreloadedImageUrl";
 import { useMilestones } from "@/hooks/useMilestones";
@@ -52,6 +52,7 @@ export const JourneyPathDrawer = memo(function JourneyPathDrawer({
   children,
 }: JourneyPathDrawerProps) {
   const [open, setOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   
   const { pathImageUrl } = useJourneyPathImage(epic.id);
   const drawerImageUrl = useMemo(() => getJourneyPathDrawerImageUrl(pathImageUrl), [pathImageUrl]);
@@ -90,10 +91,22 @@ export const JourneyPathDrawer = memo(function JourneyPathDrawer({
       </DrawerTrigger>
       <DrawerContent className="max-h-[85vh]">
         <DrawerHeader className="pb-2">
-          <DrawerTitle className="flex items-center gap-2">
-            <Target className="w-5 h-5 text-primary" />
-            {epic.title}
-          </DrawerTitle>
+          <div className="flex items-start justify-between gap-3">
+            <DrawerTitle className="flex items-center gap-2">
+              <Target className="w-5 h-5 text-primary" />
+              {epic.title}
+            </DrawerTitle>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => setEditOpen(true)}
+            >
+              <Pencil className="h-4 w-4" />
+              Edit
+            </Button>
+          </div>
           
           {/* Progress bar with stats */}
           <div className="mt-3 space-y-2">
@@ -187,6 +200,15 @@ export const JourneyPathDrawer = memo(function JourneyPathDrawer({
           </div>
         </div>
       </DrawerContent>
+      <EditCampaignSheet
+        epic={epic}
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        onDeleted={() => {
+          setEditOpen(false);
+          setOpen(false);
+        }}
+      />
     </Drawer>
   );
 });

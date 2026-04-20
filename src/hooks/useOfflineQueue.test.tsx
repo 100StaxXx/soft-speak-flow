@@ -379,4 +379,147 @@ describe("useOfflineQueue", () => {
       expect(result.current.syncStatus).toBe("success");
     });
   });
+
+  it("replays queued EPIC_DELETE actions by cleaning up linked records before deleting the epic", async () => {
+    await initOfflineDB();
+    await enqueueAction({
+      userId: "user-1",
+      actionKind: "EPIC_DELETE",
+      entityType: "epic",
+      entityId: "epic-1",
+      payload: {
+        epicId: "epic-1",
+      },
+    });
+
+    const epicHabitsEqMock = vi.fn().mockResolvedValue({
+      data: [
+        { id: "link-1", habit_id: "habit-1" },
+      ],
+      error: null,
+    });
+    const epicHabitsSelectMock = vi.fn().mockReturnValue({
+      eq: epicHabitsEqMock,
+    });
+    const dailyTasksCompletedEqMock = vi.fn().mockResolvedValue({ error: null });
+    const dailyTasksEpicIdEqMock = vi.fn().mockReturnValue({
+      eq: dailyTasksCompletedEqMock,
+    });
+    const dailyTasksUserEqMock = vi.fn().mockReturnValue({
+      eq: dailyTasksEpicIdEqMock,
+    });
+    const dailyTasksHabitCompletedEqMock = vi.fn().mockResolvedValue({ error: null });
+    const dailyTasksHabitInMock = vi.fn().mockReturnValue({
+      eq: dailyTasksHabitCompletedEqMock,
+    });
+    const dailyTasksHabitUserEqMock = vi.fn().mockReturnValue({
+      in: dailyTasksHabitInMock,
+    });
+    const dailyTasksDeleteCompletedEqMock = vi.fn().mockResolvedValue({ error: null });
+    const dailyTasksDeleteInMock = vi.fn().mockReturnValue({
+      eq: dailyTasksDeleteCompletedEqMock,
+    });
+    const dailyTasksDeleteUserEqMock = vi.fn().mockReturnValue({
+      in: dailyTasksDeleteInMock,
+    });
+    const dailyTasksUpdateMock = vi.fn()
+      .mockReturnValueOnce({ eq: dailyTasksUserEqMock })
+      .mockReturnValueOnce({ eq: dailyTasksHabitUserEqMock });
+    const dailyTasksDeleteMock = vi.fn().mockReturnValue({
+      eq: dailyTasksDeleteUserEqMock,
+    });
+    const habitsInMock = vi.fn().mockResolvedValue({ error: null });
+    const habitsUserEqMock = vi.fn().mockReturnValue({
+      in: habitsInMock,
+    });
+    const milestonesUserEqMock = vi.fn().mockResolvedValue({ error: null });
+    const milestonesEqMock = vi.fn().mockReturnValue({
+      eq: milestonesUserEqMock,
+    });
+    const phasesUserEqMock = vi.fn().mockResolvedValue({ error: null });
+    const phasesEqMock = vi.fn().mockReturnValue({
+      eq: phasesUserEqMock,
+    });
+    const linksInMock = vi.fn().mockResolvedValue({ error: null });
+    const epicDeleteUserEqMock = vi.fn().mockResolvedValue({ error: null });
+    const epicDeleteEqMock = vi.fn().mockReturnValue({
+      eq: epicDeleteUserEqMock,
+    });
+
+    mocks.from.mockImplementation((table: string) => {
+      if (table === "epic_habits") {
+        return {
+          select: epicHabitsSelectMock,
+          delete: vi.fn().mockReturnValue({
+            in: linksInMock,
+          }),
+        };
+      }
+
+      if (table === "daily_tasks") {
+        return {
+          update: dailyTasksUpdateMock,
+          delete: dailyTasksDeleteMock,
+        };
+      }
+
+      if (table === "habits") {
+        return {
+          delete: vi.fn().mockReturnValue({
+            eq: habitsUserEqMock,
+          }),
+        };
+      }
+
+      if (table === "epic_milestones") {
+        return {
+          delete: vi.fn().mockReturnValue({
+            eq: milestonesEqMock,
+          }),
+        };
+      }
+
+      if (table === "journey_phases") {
+        return {
+          delete: vi.fn().mockReturnValue({
+            eq: phasesEqMock,
+          }),
+        };
+      }
+
+      if (table === "epics") {
+        return {
+          delete: vi.fn().mockReturnValue({
+            eq: epicDeleteEqMock,
+          }),
+        };
+      }
+
+      return {};
+    });
+
+    const { result } = renderHook(() => useOfflineQueue());
+
+    await waitFor(() => {
+      expect(epicHabitsSelectMock).toHaveBeenCalledWith("id, habit_id");
+    });
+
+    expect(dailyTasksUpdateMock).toHaveBeenNthCalledWith(1, {
+      epic_id: null,
+      habit_source_id: null,
+    });
+    expect(dailyTasksUpdateMock).toHaveBeenNthCalledWith(2, {
+      epic_id: null,
+      habit_source_id: null,
+    });
+    expect(dailyTasksDeleteMock).toHaveBeenCalled();
+    expect(habitsInMock).toHaveBeenCalledWith("id", ["habit-1"]);
+    expect(linksInMock).toHaveBeenCalledWith("id", ["link-1"]);
+    expect(epicDeleteEqMock).toHaveBeenCalledWith("id", "epic-1");
+
+    await waitFor(() => {
+      expect(result.current.pendingCount).toBe(0);
+      expect(result.current.syncStatus).toBe("success");
+    });
+  });
 });

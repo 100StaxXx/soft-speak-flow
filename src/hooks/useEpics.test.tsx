@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => {
   const getLocalEpicHabitsMock = vi.fn();
   const getLocalHabitCompletionsMock = vi.fn();
   const getLocalHabitsMock = vi.fn();
+  const getLocalJourneyPathsMock = vi.fn();
   const getLocalJourneyPhasesMock = vi.fn();
   const getLocalEpicMilestonesMock = vi.fn();
   const removePlannerRecordMock = vi.fn();
@@ -48,6 +49,7 @@ const mocks = vi.hoisted(() => {
     getLocalEpicHabitsMock,
     getLocalHabitCompletionsMock,
     getLocalHabitsMock,
+    getLocalJourneyPathsMock,
     getLocalJourneyPhasesMock,
     getLocalEpicMilestonesMock,
     removePlannerRecordMock,
@@ -142,6 +144,7 @@ vi.mock("@/utils/plannerLocalStore", async () => {
     getLocalEpicHabits: (...args: unknown[]) => mocks.getLocalEpicHabitsMock(...args),
     getLocalHabitCompletions: (...args: unknown[]) => mocks.getLocalHabitCompletionsMock(...args),
     getLocalHabits: (...args: unknown[]) => mocks.getLocalHabitsMock(...args),
+    getLocalJourneyPaths: (...args: unknown[]) => mocks.getLocalJourneyPathsMock(...args),
     getLocalJourneyPhases: (...args: unknown[]) => mocks.getLocalJourneyPhasesMock(...args),
     getLocalEpicMilestones: (...args: unknown[]) => mocks.getLocalEpicMilestonesMock(...args),
     removePlannerRecord: (...args: unknown[]) => mocks.removePlannerRecordMock(...args),
@@ -201,6 +204,7 @@ describe("useEpics", () => {
     mocks.getLocalEpicHabitsMock.mockResolvedValue([]);
     mocks.getLocalHabitCompletionsMock.mockResolvedValue([]);
     mocks.getLocalHabitsMock.mockResolvedValue([]);
+    mocks.getLocalJourneyPathsMock.mockResolvedValue([]);
     mocks.getLocalJourneyPhasesMock.mockResolvedValue([]);
     mocks.getLocalEpicMilestonesMock.mockResolvedValue([]);
     mocks.removePlannerRecordMock.mockResolvedValue(undefined);
@@ -1366,6 +1370,255 @@ describe("useEpics", () => {
       },
     });
     expect(mocks.retryNowMock).toHaveBeenCalled();
+  });
+
+  it("updates campaign metadata and keeps local task campaign titles in sync", async () => {
+    let localEpics = [
+      {
+        id: "epic-1",
+        user_id: "user-1",
+        title: "Campaign Alpha",
+        description: "Old description",
+        status: "active",
+        progress_percentage: 40,
+        target_days: 14,
+        start_date: "2026-02-10",
+        end_date: null,
+        created_at: "2026-02-10T00:00:00.000Z",
+        epic_habits: [],
+      },
+    ];
+    let localTasks = [
+      {
+        id: "task-1",
+        user_id: "user-1",
+        epic_id: "epic-1",
+        epic_title: "Campaign Alpha",
+      },
+    ];
+
+    mocks.loadLocalEpicsMock.mockImplementation(async () => localEpics);
+    mocks.getAllLocalTasksForUserMock.mockImplementation(async () => localTasks);
+    mocks.upsertPlannerRecordMock.mockImplementation(async (storeName: string, record: typeof localEpics[number]) => {
+      if (storeName === "epics") {
+        localEpics = localEpics.map((epic) => (epic.id === record.id ? record : epic));
+      }
+    });
+    mocks.upsertPlannerRecordsMock.mockImplementation(async (storeName: string, records: typeof localTasks) => {
+      if (storeName === "daily_tasks") {
+        const updatesById = new Map(records.map((record) => [record.id, record]));
+        localTasks = localTasks.map((task) => updatesById.get(task.id) ?? task);
+      }
+    });
+    mocks.warmEpicsQueryFromRemoteMock.mockImplementationOnce(async (queryClient: QueryClient, userId: string) => {
+      queryClient.setQueryData(["epics", userId], localEpics);
+      return localEpics;
+    });
+
+    const eqUserIdUpdateMock = vi.fn().mockResolvedValue({ error: null });
+    const eqIdUpdateMock = vi.fn().mockReturnValue({ eq: eqUserIdUpdateMock });
+    const updateMock = vi.fn().mockReturnValue({ eq: eqIdUpdateMock });
+
+    mocks.fromMock.mockImplementation((table: string) => {
+      if (table === "epics") {
+        return {
+          update: updateMock,
+          select: mocks.selectMock,
+        };
+      }
+
+      return {
+        select: mocks.selectMock,
+      };
+    });
+
+    const { result } = renderHook(() => useEpics(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.activeEpics[0]?.title).toBe("Campaign Alpha");
+    });
+
+    await act(async () => {
+      await result.current.updateEpic({
+        epicId: "epic-1",
+        updates: {
+          title: "Campaign Nova",
+          description: "New description",
+        },
+      });
+    });
+
+    expect(updateMock).toHaveBeenCalledWith({
+      title: "Campaign Nova",
+      description: "New description",
+    });
+    expect(localEpics[0]).toMatchObject({
+      title: "Campaign Nova",
+      description: "New description",
+    });
+    expect(localTasks[0]?.epic_title).toBe("Campaign Nova");
+  });
+
+  it("hard deletes a campaign locally, preserves completed history, and queues EPIC_DELETE offline", async () => {
+    let localEpics = [
+      {
+        id: "epic-1",
+        user_id: "user-1",
+        title: "Campaign Alpha",
+        description: "Old description",
+        status: "active",
+        progress_percentage: 40,
+        target_days: 14,
+        start_date: "2026-02-10",
+        end_date: null,
+        created_at: "2026-02-10T00:00:00.000Z",
+        epic_habits: [],
+      },
+    ];
+    let localTasks = [
+      {
+        id: "task-open",
+        user_id: "user-1",
+        habit_source_id: "habit-1",
+        epic_id: "epic-1",
+        epic_title: "Campaign Alpha",
+        task_date: "2026-02-14",
+        completed: false,
+        completed_at: null,
+      },
+      {
+        id: "task-complete",
+        user_id: "user-1",
+        habit_source_id: "habit-1",
+        epic_id: "epic-1",
+        epic_title: "Campaign Alpha",
+        task_date: "2026-02-10",
+        completed: true,
+        completed_at: "2026-02-10T12:00:00.000Z",
+      },
+    ];
+    let localHabits = [
+      {
+        id: "habit-1",
+        user_id: "user-1",
+        title: "Morning focus",
+        description: null,
+        difficulty: "easy",
+        frequency: "daily",
+        custom_days: [],
+        custom_month_days: null,
+        preferred_time: null,
+        reminder_enabled: false,
+        reminder_minutes_before: 15,
+        estimated_minutes: 15,
+        category: null,
+        is_active: true,
+        current_streak: 0,
+        longest_streak: 0,
+        created_at: "2026-02-01T00:00:00.000Z",
+      },
+    ];
+    let localEpicHabits = [
+      {
+        id: "link-1",
+        epic_id: "epic-1",
+        habit_id: "habit-1",
+      },
+    ];
+    let localJourneyPaths = [
+      {
+        id: "path-1",
+        epic_id: "epic-1",
+        user_id: "user-1",
+      },
+    ];
+    let localCompletions = [
+      {
+        id: "completion-1",
+        habit_id: "habit-1",
+        user_id: "user-1",
+        date: "2026-02-10",
+      },
+    ];
+
+    mocks.shouldQueueWrites = true;
+    mocks.loadLocalEpicsMock.mockImplementation(async () => localEpics);
+    mocks.getAllLocalTasksForUserMock.mockImplementation(async () => localTasks);
+    mocks.getLocalHabitsMock.mockImplementation(async () => localHabits);
+    mocks.getLocalEpicHabitsMock.mockImplementation(async () => localEpicHabits);
+    mocks.getLocalJourneyPathsMock.mockImplementation(async () => localJourneyPaths);
+    mocks.getLocalHabitCompletionsMock.mockImplementation(async () => localCompletions);
+    mocks.warmEpicsQueryFromRemoteMock.mockImplementationOnce(async (queryClient: QueryClient, userId: string) => {
+      queryClient.setQueryData(["epics", userId], localEpics);
+      return localEpics;
+    });
+    mocks.removePlannerRecordMock.mockImplementation(async (storeName: string, recordId: string) => {
+      if (storeName === "epics") {
+        localEpics = localEpics.filter((epic) => epic.id !== recordId);
+      }
+    });
+    mocks.removePlannerRecordsMock.mockImplementation(async (storeName: string, recordIds: string[]) => {
+      if (storeName === "daily_tasks") {
+        localTasks = localTasks.filter((task) => !recordIds.includes(task.id));
+      }
+      if (storeName === "habits") {
+        localHabits = localHabits.filter((habit) => !recordIds.includes(habit.id));
+      }
+      if (storeName === "epic_habits") {
+        localEpicHabits = localEpicHabits.filter((link) => !recordIds.includes(link.id));
+      }
+      if (storeName === "epic_journey_paths") {
+        localJourneyPaths = localJourneyPaths.filter((path) => !recordIds.includes(path.id));
+      }
+      if (storeName === "habit_completions") {
+        localCompletions = localCompletions.filter((completion) => !recordIds.includes(completion.id));
+      }
+    });
+    mocks.upsertPlannerRecordsMock.mockImplementation(async (storeName: string, records: typeof localTasks) => {
+      if (storeName === "daily_tasks") {
+        const updatesById = new Map(records.map((record) => [record.id, record]));
+        localTasks = localTasks.map((task) => updatesById.get(task.id) ?? task);
+      }
+    });
+
+    const { result } = renderHook(() => useEpics(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.activeEpics[0]?.id).toBe("epic-1");
+    });
+
+    await act(async () => {
+      await result.current.deleteEpic({ epicId: "epic-1" });
+    });
+
+    await waitFor(() => {
+      expect(result.current.activeEpics).toHaveLength(0);
+    });
+
+    expect(localTasks).toEqual([
+      expect.objectContaining({
+        id: "task-complete",
+        epic_id: null,
+        epic_title: null,
+        habit_source_id: null,
+      }),
+    ]);
+    expect(localHabits).toHaveLength(0);
+    expect(localEpicHabits).toHaveLength(0);
+    expect(localJourneyPaths).toHaveLength(0);
+    expect(localCompletions).toHaveLength(0);
+    expect(mocks.queueActionMock).toHaveBeenCalledWith({
+      actionKind: "EPIC_DELETE",
+      entityType: "epic",
+      entityId: "epic-1",
+      payload: {
+        epicId: "epic-1",
+      },
+    });
   });
 
   it("creates a campaign ritual locally, syncs it remotely, and updates the cached epics immediately", async () => {

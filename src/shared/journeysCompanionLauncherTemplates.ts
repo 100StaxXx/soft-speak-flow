@@ -12,20 +12,22 @@ export interface JourneysCompanionLauncherTemplate {
 }
 
 const FREE_TALK_GREETINGS = [
-  "What's good friend?",
-  "What's good buddy?",
-  "What's good dude?",
-  "What's good boss?",
-  "What's good fam?",
-  "What's good chief?",
-  "What's good captain?",
-  "What's good homie?",
-  "What's good legend?",
-  "What's good amigo?",
+  "What's good, friend?",
+  "What's good, buddy?",
+  "What's good, guy?",
+  "What's good, dude?",
   "What's good, amigo?",
-  "What's good, compa?",
-  "What's good, hermano?",
+  "What's good, boss?",
+  "What's good, fam?",
+  "What's good, chief?",
+  "What's good, captain?",
+  "What's good, partner?",
+  "What's good, legend?",
   "What's good, mon ami?",
+  "What's good, pal?",
+  "What's good, champ?",
+  "What's good, homie?",
+  "What's good today?",
 ] as const;
 
 const getPlannerDayKey = (date: Date) => {

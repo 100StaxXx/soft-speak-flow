@@ -629,7 +629,9 @@ export function useCompanionPlanner({
   const outlookConnection = connectedByProvider.outlook ?? null;
   const shouldAutoPublishToOutlook = defaultProvider === "outlook" && outlookConnection?.sync_mode === "full_sync";
 
-  const tonePack: PlannerTonePack = DEFAULT_TONE_PACK;
+  const tonePack: PlannerTonePack = threadPersistence?.surface === "journeys"
+    ? "soft"
+    : DEFAULT_TONE_PACK;
   const setTonePack = useCallback((_nextTonePack: PlannerTonePack) => {
     return;
   }, []);

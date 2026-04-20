@@ -706,6 +706,51 @@ describe("TodaysAgenda campaign visibility", () => {
     });
   });
 
+  it("renders hydrated campaign names as clickable buttons that open the campaign drawer flow", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "ritual-1",
+            task_text: "Morning journal",
+            completed: false,
+            xp_reward: 15,
+            habit_source_id: "habit-1",
+            epic_id: "epic-1",
+            epic_title: "Fallback Campaign",
+          },
+        ]}
+        selectedDate={new Date("2026-02-14T16:34:00")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+        activeEpics={[
+          {
+            id: "epic-1",
+            title: "Fallback Campaign",
+            description: null,
+            progress_percentage: 42,
+            target_days: 30,
+            start_date: "2026-02-01",
+            end_date: "2026-03-02",
+            epic_habits: [],
+          },
+        ]}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    expect(screen.getByRole("button", { name: /Fallback Campaign/i })).toBeInTheDocument();
+  });
+
   it("shows linked habit descriptions inside expanded campaign ritual rows", async () => {
     const queryClient = new QueryClient({
       defaultOptions: {

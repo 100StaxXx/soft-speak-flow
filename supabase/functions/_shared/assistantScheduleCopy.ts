@@ -1,4 +1,7 @@
-export type AssistantScheduleTemporalStatus = "past" | "in_progress" | "upcoming";
+export type AssistantScheduleTemporalStatus =
+  | "past"
+  | "in_progress"
+  | "upcoming";
 
 const DEFAULT_TASK_DURATION_MINUTES = 30;
 
@@ -43,8 +46,9 @@ export const formatAssistantTimeRange = (
 };
 
 export const normalizeAssistantTimeText = (value: string): string =>
-  value.replace(/\b([01]?\d|2[0-3]):([0-5]\d)\b/g, (match) =>
-    formatAssistantTime(match) ?? match
+  value.replace(
+    /\b([01]?\d|2[0-3]):([0-5]\d)\b(?!\s?(?:am|pm)\b)/gi,
+    (match) => formatAssistantTime(match) ?? match,
   );
 
 export const getLocalDateFromDateTime = (
@@ -91,8 +95,8 @@ export const classifyTaskTemporalStatus = (input: {
   const currentMinutes = getLocalMinutesFromDateTime(input.currentDateTime);
   if (scheduledMinutes === null || currentMinutes === null) return "upcoming";
 
-  const estimatedDuration = Number.isFinite(input.estimatedDuration)
-    && (input.estimatedDuration ?? 0) > 0
+  const estimatedDuration = Number.isFinite(input.estimatedDuration) &&
+      (input.estimatedDuration ?? 0) > 0
     ? Number(input.estimatedDuration)
     : DEFAULT_TASK_DURATION_MINUTES;
   const endMinutes = scheduledMinutes + estimatedDuration;
@@ -120,7 +124,8 @@ export const classifyEventTemporalStatus = (input: {
     }
   }
 
-  const referenceDate = input.currentDate ?? getLocalDateFromDateTime(input.currentDateTime);
+  const referenceDate = input.currentDate ??
+    getLocalDateFromDateTime(input.currentDateTime);
   if (!referenceDate) return "upcoming";
 
   const startDate = input.start.slice(0, 10);
@@ -148,7 +153,9 @@ export const buildAssistantTaskScheduleLabel = (input: {
   }
 
   if (status === "past") return `${input.title} (was at ${displayTime})`;
-  if (status === "in_progress") return `${input.title} (started at ${displayTime})`;
+  if (status === "in_progress") {
+    return `${input.title} (started at ${displayTime})`;
+  }
   return `${input.title} (at ${displayTime})`;
 };
 
@@ -164,18 +171,26 @@ export const buildAssistantEventScheduleLabel = (input: {
 
   if (input.isAllDay) {
     if (status === "past") return `${input.title} (was all day)`;
-    if (status === "in_progress") return `${input.title} (all day, in progress)`;
+    if (status === "in_progress") {
+      return `${input.title} (all day, in progress)`;
+    }
     return `${input.title} (all day)`;
   }
 
   const startDate = new Date(input.start);
   const endDate = new Date(input.end);
   const rangeLabel = formatAssistantTimeRange(
-    `${String(startDate.getHours()).padStart(2, "0")}:${String(startDate.getMinutes()).padStart(2, "0")}`,
-    `${String(endDate.getHours()).padStart(2, "0")}:${String(endDate.getMinutes()).padStart(2, "0")}`,
+    `${String(startDate.getHours()).padStart(2, "0")}:${
+      String(startDate.getMinutes()).padStart(2, "0")
+    }`,
+    `${String(endDate.getHours()).padStart(2, "0")}:${
+      String(endDate.getMinutes()).padStart(2, "0")
+    }`,
   ) ?? "scheduled";
 
   if (status === "past") return `${input.title} (was ${rangeLabel})`;
-  if (status === "in_progress") return `${input.title} (${rangeLabel}, in progress)`;
+  if (status === "in_progress") {
+    return `${input.title} (${rangeLabel}, in progress)`;
+  }
   return `${input.title} (${rangeLabel})`;
 };

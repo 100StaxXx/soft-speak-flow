@@ -483,6 +483,89 @@ async function executeQueuedAction(userId: string, action: QueuedAction): Promis
       return;
     }
 
+    case "EPIC_DELETE": {
+      const { epicId } = action.payload as { epicId: string };
+
+      const { data: epicHabits, error: epicHabitsError } = await supabase
+        .from("epic_habits")
+        .select("id, habit_id")
+        .eq("epic_id", epicId);
+      if (epicHabitsError) throw epicHabitsError;
+
+      const habitIds = epicHabits?.map((row) => row.habit_id) ?? [];
+      const linkIds = epicHabits?.map((row) => row.id) ?? [];
+
+      const { error: detachCompletedEpicTasksError } = await supabase
+        .from("daily_tasks")
+        .update({
+          epic_id: null,
+          habit_source_id: null,
+        })
+        .eq("user_id", userId)
+        .eq("epic_id", epicId)
+        .eq("completed", true);
+      if (detachCompletedEpicTasksError) throw detachCompletedEpicTasksError;
+
+      if (habitIds.length > 0) {
+        const { error: detachCompletedHabitTasksError } = await supabase
+          .from("daily_tasks")
+          .update({
+            epic_id: null,
+            habit_source_id: null,
+          })
+          .eq("user_id", userId)
+          .in("habit_source_id", habitIds)
+          .eq("completed", true);
+        if (detachCompletedHabitTasksError) throw detachCompletedHabitTasksError;
+
+        const { error: deleteIncompleteTasksError } = await supabase
+          .from("daily_tasks")
+          .delete()
+          .eq("user_id", userId)
+          .in("habit_source_id", habitIds)
+          .eq("completed", false);
+        if (deleteIncompleteTasksError) throw deleteIncompleteTasksError;
+
+        const { error: deleteHabitsError } = await supabase
+          .from("habits")
+          .delete()
+          .eq("user_id", userId)
+          .in("id", habitIds);
+        if (deleteHabitsError) throw deleteHabitsError;
+      }
+
+      const { error: milestonesError } = await supabase
+        .from("epic_milestones")
+        .delete()
+        .eq("epic_id", epicId)
+        .eq("user_id", userId);
+      if (milestonesError) throw milestonesError;
+
+      const { error: phasesError } = await supabase
+        .from("journey_phases")
+        .delete()
+        .eq("epic_id", epicId)
+        .eq("user_id", userId);
+      if (phasesError) throw phasesError;
+
+      if (linkIds.length > 0) {
+        const { error: linksError } = await supabase
+          .from("epic_habits")
+          .delete()
+          .in("id", linkIds);
+        if (linksError) throw linksError;
+      }
+
+      const { error: epicError } = await supabase
+        .from("epics")
+        .delete()
+        .eq("id", epicId)
+        .eq("user_id", userId);
+      if (epicError) throw epicError;
+
+      return;
+    }
+
     case "EPIC_STATUS_UPDATE": {
       const { epicId, status } = action.payload as {
         epicId: string;

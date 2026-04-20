@@ -1,9 +1,10 @@
 import type { HTMLAttributes, ReactNode } from "react";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   constellationTrailProps: [] as Array<Record<string, unknown>>,
+  editCampaignSheetMock: vi.fn(),
   useCompanionMock: vi.fn(),
   useJourneyPathImageMock: vi.fn(),
   useMilestonesMock: vi.fn(),
@@ -46,6 +47,15 @@ vi.mock("@/components/ConstellationTrail", () => ({
 
 vi.mock("@/components/JourneyDetailDrawer", () => ({
   JourneyDetailDrawer: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+}));
+
+vi.mock("@/components/EditCampaignSheet", () => ({
+  EditCampaignSheet: (props: Record<string, unknown>) => {
+    mocks.editCampaignSheetMock(props);
+    return (props.open as boolean)
+      ? <div data-testid="edit-campaign-sheet">Edit campaign sheet</div>
+      : null;
+  },
 }));
 
 vi.mock("@/hooks/useJourneyPathImage", () => ({
@@ -102,5 +112,21 @@ describe("JourneyPathDrawer", () => {
       transparentBackground: false,
     });
     expect(screen.getByTestId("constellation-trail")).toBeInTheDocument();
+  });
+
+  it("renders an edit button and opens the campaign edit sheet", () => {
+    render(
+      <JourneyPathDrawer epic={baseEpic}>
+        <button type="button">Open</button>
+      </JourneyPathDrawer>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+
+    expect(screen.getByTestId("edit-campaign-sheet")).toBeInTheDocument();
+    expect(mocks.editCampaignSheetMock).toHaveBeenLastCalledWith(expect.objectContaining({
+      epic: expect.objectContaining({ id: "epic-1", title: "Campaign Aurora" }),
+      open: true,
+    }));
   });
 });
