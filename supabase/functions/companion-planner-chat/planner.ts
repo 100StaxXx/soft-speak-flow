@@ -441,6 +441,17 @@ type MatchedEntities = {
   calendarEvent: PlannerContextCalendarEvent | null;
 };
 
+const EMPTY_MATCHED_ENTITIES: MatchedEntities = {
+  tasks: [],
+  task: null,
+  rituals: [],
+  ritual: null,
+  epics: [],
+  epic: null,
+  calendarEvents: [],
+  calendarEvent: null,
+};
+
 type ResolvedCadence = {
   label: string | null;
   recurrencePattern: string | null;
@@ -1549,6 +1560,43 @@ const parseTimeOfDayFromClock = (
   return "night";
 };
 
+const normalizeTimeReason = (
+  value: string | null | undefined,
+): string | null => {
+  if (typeof value !== "string") return null;
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+};
+
+const resolveTimeReasonFromSources = (input: {
+  resolvedTimeOfDay: string | null | undefined;
+  explicitTimeReason?: string | null | undefined;
+  sources: Array<{
+    timeOfDay: string | null | undefined;
+    timeReason: string | null | undefined;
+  }>;
+}): string | null => {
+  const explicitTimeReason = normalizeTimeReason(input.explicitTimeReason);
+  if (explicitTimeReason) return explicitTimeReason;
+
+  for (const source of input.sources) {
+    const timeReason = normalizeTimeReason(source.timeReason);
+    if (!timeReason) continue;
+
+    const sourceTimeOfDay = source.timeOfDay ?? null;
+    if (
+      !input.resolvedTimeOfDay ||
+      !sourceTimeOfDay ||
+      sourceTimeOfDay === input.resolvedTimeOfDay
+    ) {
+      return timeReason;
+    }
+  }
+
+  return null;
+};
+
 const preferredTime = (draft: PlannerDraftState): string | null =>
   draft.scheduledTime ?? timeOfDayToClock(draft.timeOfDay);
 
@@ -1558,6 +1606,13 @@ const isQuestCaptureCreateQuest = (
 ): boolean =>
   kind === "create_quest" &&
   input.sessionState.pendingStarterIntent === "quest_capture";
+
+const hasExplicitQuestCaptureTiming = (
+  input: PlannerBuildInput,
+  kind: PlannerProposalKind,
+): boolean =>
+  isQuestCaptureCreateQuest(input, kind) &&
+  Boolean(input.parsedInput?.scheduledTime);
 
 const getPreferredQuestCaptureTimeOfDay = (
   input: PlannerBuildInput,
@@ -1880,11 +1935,25 @@ const mergeDraft = (
     input.sessionState.preferredTimeOfDay ??
     plannerMemory?.preferredTimeOfDay ??
     null;
-  const timeReason = extractTimeReason(input.message, input.sessionState) ??
-    base.timeReason ??
-    input.sessionState.preferredTimeReason ??
-    plannerMemory?.preferredTimeReason ??
-    null;
+  const explicitTimeReason = extractTimeReason(input.message, input.sessionState);
+  const timeReason = resolveTimeReasonFromSources({
+    resolvedTimeOfDay: timeOfDay,
+    explicitTimeReason,
+    sources: [
+      {
+        timeOfDay: base.timeOfDay ?? null,
+        timeReason: base.timeReason ?? null,
+      },
+      {
+        timeOfDay: input.sessionState.preferredTimeOfDay ?? null,
+        timeReason: input.sessionState.preferredTimeReason ?? null,
+      },
+      {
+        timeOfDay: plannerMemory?.preferredTimeOfDay ?? null,
+        timeReason: plannerMemory?.preferredTimeReason ?? null,
+      },
+    ],
+  });
   const cadence = resolveCadence(input.message, parsed).label ?? base.cadence ??
     null;
 
@@ -1967,6 +2036,32 @@ const isReminderOnlyIntent = (
   if (hasScheduleMoveIntent(input.message)) return false;
   if (input.parsedInput?.scheduledTime) return false;
   if (input.parsedInput?.recurrencePattern) return false;
+
+  return true;
+};
+
+const shouldPromotePlanDayAnchorFollowUp = (
+  input: PlannerBuildInput,
+  repeated: boolean,
+): boolean => {
+  if (input.sessionState.pendingStarterIntent !== "plan_day") return false;
+  if (isScheduleQuestion(input.message)) return false;
+  if (!input.parsedInput?.scheduledTime) return false;
+  if (input.parsedInput?.recurrencePattern || input.parsedInput?.recurrenceEndDate) {
+    return false;
+  }
+  if (repeated) return false;
+  if (isTimingOnlyReply(input.message, input.parsedInput)) return false;
+  if (parseRenameTitle(input.message) || input.parsedInput?.newTitle) {
+    return false;
+  }
+  if (isEditIntent(input.message) || isReminderOnlyIntent(input, repeated)) {
+    return false;
+  }
+
+  const title = sanitizeProposalTitle(input.parsedInput?.text);
+  if (!title) return false;
+  if (looksLikeMultiClauseScheduledTitle(title)) return false;
 
   return true;
 };
@@ -3837,6 +3932,7 @@ const composeReply = (
   tonePack: PlannerTonePack,
   kind: PlannerProposalKind,
   readyToConfirm: boolean,
+  draft: PlannerDraftState,
   questCaptureAssumption: QuestCaptureAssumption | null,
 ): string => {
   const baseLabel = ({
@@ -3849,17 +3945,33 @@ const composeReply = (
     update_ritual: "ritual edit",
     suggest_reminder: "reminder tweak",
   })[kind];
+  const explicitQuestCaptureTiming = hasExplicitQuestCaptureTiming(input, kind);
   const scheduleSummary = input.plannerContext.scheduleInsights?.summary
     ? normalizeAssistantTimeText(input.plannerContext.scheduleInsights.summary)
     : null;
   const interpretationLead = getCompanionInterpretationLead(input);
-  const preferredTimeOfDay = shouldSuppressLearnedTimingLanguage(input)
+  const preferredTimeOfDay = shouldSuppressLearnedTimingLanguage(input) ||
+      explicitQuestCaptureTiming
     ? null
     : input.plannerContext.plannerMemory?.preferredTimeOfDay;
   const memoryLead = preferredTimeOfDay
     ? `You usually land work like this in the ${preferredTimeOfDay}. `
     : "";
-  const scheduleLead = scheduleSummary ? `${scheduleSummary} ` : "";
+  const scheduleLead = explicitQuestCaptureTiming || !scheduleSummary
+    ? ""
+    : `${scheduleSummary} `;
+  const explicitQuestCaptureTime = preferredTime(draft);
+  const explicitQuestCaptureTimeLabel = explicitQuestCaptureTime
+    ? formatAssistantTime(explicitQuestCaptureTime) ?? explicitQuestCaptureTime
+    : null;
+  const explicitQuestCaptureDate = defaultQuestDate(input, draft);
+  const explicitQuestCaptureDateLabel = explicitQuestCaptureDate === input.currentDate
+    ? "today"
+    : explicitQuestCaptureDate === addDaysToDateKey(input.currentDate, 1)
+    ? "tomorrow"
+    : explicitQuestCaptureDate
+    ? formatReadableDate(explicitQuestCaptureDate)
+    : null;
   const questCaptureReplyLead = readyToConfirm && kind === "create_quest"
     ? questCaptureAssumption?.kind === "inbox"
       ? "I captured this as a quest in Inbox so you can schedule it later. "
@@ -3867,6 +3979,10 @@ const composeReply = (
       ? `I drafted this as a quest, assuming ${questCaptureAssumption.date} at ${questCaptureAssumption.time} based on your open slot. `
       : questCaptureAssumption?.kind === "preferred_time"
       ? `I drafted this as a quest, assuming ${questCaptureAssumption.date} at ${questCaptureAssumption.time} based on your usual ${questCaptureAssumption.timeOfDay} pattern. `
+      : explicitQuestCaptureTiming && explicitQuestCaptureTimeLabel
+      ? explicitQuestCaptureDateLabel
+        ? `I drafted this as a quest for ${explicitQuestCaptureDateLabel} at ${explicitQuestCaptureTimeLabel}. `
+        : `I drafted this as a quest for ${explicitQuestCaptureTimeLabel}. `
       : ""
     : "";
 
@@ -4202,8 +4318,15 @@ export function buildPlannerResponse(
     const starterIntent = getResolvedStarterIntent(resolvedInput);
     const pendingStarterIntent =
       resolvedInput.sessionState.pendingStarterIntent ?? null;
+    const planDayAnchorCapture = shouldPromotePlanDayAnchorFollowUp(
+      resolvedInput,
+      repeated,
+    );
+    const effectiveMatched = planDayAnchorCapture
+      ? EMPTY_MATCHED_ENTITIES
+      : matched;
 
-    if (pendingStarterIntent === "plan_day") {
+    if (pendingStarterIntent === "plan_day" && !planDayAnchorCapture) {
       return buildPlanDayFollowUpResponse(
         resolvedInput,
         resolvedInput.sessionState,
@@ -4333,7 +4456,7 @@ export function buildPlannerResponse(
       );
     }
 
-    if (isVaguePlanningPrompt(resolvedInput, matched, repeated)) {
+    if (isVaguePlanningPrompt(resolvedInput, effectiveMatched, repeated)) {
       return buildIntentFirstResponse(
         resolvedInput,
         resolvedInput.sessionState,
@@ -4342,7 +4465,12 @@ export function buildPlannerResponse(
     }
 
     if (
-      looksConversational(resolvedInput, matched, repeated, classificationHint)
+      looksConversational(
+        resolvedInput,
+        effectiveMatched,
+        repeated,
+        classificationHint,
+      )
     ) {
       return buildConversationalResponse(
         resolvedInput,
@@ -4352,12 +4480,12 @@ export function buildPlannerResponse(
     }
 
     if (
-      isEditIntent(resolvedInput.message) && matched.tasks.length > 1 &&
+      isEditIntent(resolvedInput.message) && effectiveMatched.tasks.length > 1 &&
       !isQuestCollectionIntent(resolvedInput.message)
     ) {
       return buildAmbiguousEntityResponse(
         "quest",
-        matched.tasks.map((task) => task.title),
+        effectiveMatched.tasks.map((task) => task.title),
         {
           ...resolvedInput.sessionState,
           lastClassification: classificationHint.type,
@@ -4368,11 +4496,11 @@ export function buildPlannerResponse(
     if (
       (parseRenameTitle(resolvedInput.message) ||
         isCampaignAdjustmentIntent(resolvedInput.message)) &&
-      matched.epics.length > 1
+      effectiveMatched.epics.length > 1
     ) {
       return buildAmbiguousEntityResponse(
         "campaign",
-        matched.epics.map((epic) => epic.title),
+        effectiveMatched.epics.map((epic) => epic.title),
         {
           ...resolvedInput.sessionState,
           lastClassification: classificationHint.type,
@@ -4382,13 +4510,13 @@ export function buildPlannerResponse(
 
     if (
       isEditIntent(resolvedInput.message) &&
-      matched.tasks.length === 0 &&
-      matched.calendarEvents.length > 0 &&
+      effectiveMatched.tasks.length === 0 &&
+      effectiveMatched.calendarEvents.length > 0 &&
       !isQuestCollectionIntent(resolvedInput.message)
     ) {
       return buildReadOnlyResponse(
         `I found the connected calendar event "${
-          matched.calendarEvents[0]?.title ?? "that event"
+          effectiveMatched.calendarEvents[0]?.title ?? "that event"
         }", but external calendar events are read-only here for now. I can still move your Cosmiq quests around it if you want.`,
         {
           ...resolvedInput.sessionState,
@@ -4457,7 +4585,10 @@ export function buildPlannerResponse(
       };
     }
 
-    const draft = mergeDraft({ ...resolvedInput, classificationHint }, matched);
+    const draft = mergeDraft(
+      { ...resolvedInput, classificationHint },
+      effectiveMatched,
+    );
     const cadence = resolveCadence(
       resolvedInput.message,
       resolvedInput.parsedInput,
@@ -4476,7 +4607,7 @@ export function buildPlannerResponse(
     const kind = resolveKind(
       { ...resolvedInput, classificationHint },
       draft,
-      matched,
+      effectiveMatched,
       repeated,
     );
     draft.draftKind = kind;
@@ -4490,17 +4621,17 @@ export function buildPlannerResponse(
       draftKind: kind,
     };
 
-    const proposal = kind === "adjust_campaign_plan" && matched.epic
+    const proposal = kind === "adjust_campaign_plan" && effectiveMatched.epic
       ? buildCampaignAdjustmentProposal(
         { ...resolvedInput, classificationHint },
         resolvedDraft,
-        matched.epic,
+        effectiveMatched.epic,
       )
-      : kind === "suggest_reminder" && matched.task
+      : kind === "suggest_reminder" && effectiveMatched.task
       ? buildReminderProposal(
         { ...resolvedInput, classificationHint },
         resolvedDraft,
-        matched.task,
+        effectiveMatched.task,
       )
       : kind === "create_campaign" || kind === "update_campaign"
       ? buildCampaignProposal(
@@ -4508,7 +4639,7 @@ export function buildPlannerResponse(
         resolvedDraft,
         cadence,
         kind,
-        matched.epic,
+        effectiveMatched.epic,
       )
       : kind === "create_ritual" || kind === "update_ritual"
       ? buildRitualProposal(
@@ -4516,14 +4647,14 @@ export function buildPlannerResponse(
         resolvedDraft,
         cadence,
         kind,
-        matched.ritual,
+        effectiveMatched.ritual,
       )
       : buildQuestProposal(
         { ...resolvedInput, classificationHint },
         resolvedDraft,
         cadence,
         kind as "create_quest" | "update_quest",
-        matched.task,
+        effectiveMatched.task,
         questCaptureResolution.assumption,
       );
 
@@ -4550,19 +4681,42 @@ export function buildPlannerResponse(
         resolvedInput,
         resolvedDraft,
         kind,
-        matched.task,
+        effectiveMatched.task,
       ),
     );
 
+    const preferredTimeOfDay = resolvedDraft.timeOfDay ??
+      resolvedInput.sessionState.preferredTimeOfDay ??
+      resolvedInput.plannerContext.plannerMemory?.preferredTimeOfDay ??
+      null;
+    const preferredTimeReason = resolveTimeReasonFromSources({
+      resolvedTimeOfDay: preferredTimeOfDay,
+      explicitTimeReason: extractTimeReason(
+        resolvedInput.message,
+        resolvedInput.sessionState,
+      ),
+      sources: [
+        {
+          timeOfDay: resolvedDraft.timeOfDay ?? null,
+          timeReason: resolvedDraft.timeReason ?? null,
+        },
+        {
+          timeOfDay: resolvedInput.sessionState.preferredTimeOfDay ?? null,
+          timeReason: resolvedInput.sessionState.preferredTimeReason ?? null,
+        },
+        {
+          timeOfDay:
+            resolvedInput.plannerContext.plannerMemory?.preferredTimeOfDay ??
+            null,
+          timeReason:
+            resolvedInput.plannerContext.plannerMemory?.preferredTimeReason ??
+            null,
+        },
+      ],
+    });
     const memoryUpdates = {
-      preferredTimeOfDay: resolvedDraft.timeOfDay ??
-        resolvedInput.sessionState.preferredTimeOfDay ??
-        resolvedInput.plannerContext.plannerMemory?.preferredTimeOfDay ??
-        null,
-      preferredTimeReason: resolvedDraft.timeReason ??
-        resolvedInput.sessionState.preferredTimeReason ??
-        resolvedInput.plannerContext.plannerMemory?.preferredTimeReason ??
-        null,
+      preferredTimeOfDay,
+      preferredTimeReason,
       reminderPreference: resolvedDraft.reminderMinutesBefore !== null
         ? `${resolvedDraft.reminderMinutesBefore} minutes`
         : resolvedInput.sessionState.reminderPreference ??
@@ -4579,6 +4733,7 @@ export function buildPlannerResponse(
           resolvedInput.tonePack,
           proposal.kind,
           proposal.readyToConfirm,
+          resolvedDraft,
           questCaptureResolution.assumption,
         ),
         calendarConflictNote,
@@ -4591,7 +4746,7 @@ export function buildPlannerResponse(
         ...resolvedInput.sessionState,
         draft: resolvedDraft,
         openQuestionIds: followUpQuestions.map((question) => question.id),
-        pendingStarterIntent: null,
+        pendingStarterIntent: planDayAnchorCapture ? "plan_day" : null,
         preferredTimeOfDay: memoryUpdates.preferredTimeOfDay,
         preferredTimeReason: memoryUpdates.preferredTimeReason,
         reminderPreference: memoryUpdates.reminderPreference,

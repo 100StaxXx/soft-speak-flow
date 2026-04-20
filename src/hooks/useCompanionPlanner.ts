@@ -219,6 +219,36 @@ const parseTimeOfDayFromClock = (time: string | null | undefined): PlannerMemory
   return "night";
 };
 
+const normalizeTimeReason = (value: string | null | undefined): string | null => {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+};
+
+const resolveTimeReasonFromSources = (input: {
+  resolvedTimeOfDay: PlannerMemoryProfile["preferredTimeOfDay"];
+  sources: Array<{
+    timeOfDay: string | null | undefined;
+    timeReason: string | null | undefined;
+  }>;
+}): string | null => {
+  for (const source of input.sources) {
+    const timeReason = normalizeTimeReason(source.timeReason);
+    if (!timeReason) continue;
+
+    const sourceTimeOfDay = source.timeOfDay ?? null;
+    if (
+      !input.resolvedTimeOfDay ||
+      !sourceTimeOfDay ||
+      sourceTimeOfDay === input.resolvedTimeOfDay
+    ) {
+      return timeReason;
+    }
+  }
+
+  return null;
+};
+
 const extractPlannerProfile = (
   preferredWorkBlocks: Json | null | undefined,
 ): Partial<PlannerMemoryProfile> & { preferredWorkBlocksRecord: Record<string, Json> } => {
@@ -549,14 +579,25 @@ const mapRitualsToContext = (epics: EpicRecord[]): PlannerContextRitual[] =>
       })),
   );
 
+const hasOwnMemoryUpdate = (
+  updates: CompanionPlannerResponse["memoryUpdates"],
+  key: keyof CompanionPlannerResponse["memoryUpdates"],
+): boolean => Object.prototype.hasOwnProperty.call(updates, key);
+
 const applyMemoryUpdates = (
   previous: CompanionPlannerSessionState,
   updates: CompanionPlannerResponse["memoryUpdates"],
 ): CompanionPlannerSessionState => ({
   ...previous,
-  preferredTimeOfDay: updates.preferredTimeOfDay ?? previous.preferredTimeOfDay ?? null,
-  preferredTimeReason: updates.preferredTimeReason ?? previous.preferredTimeReason ?? null,
-  reminderPreference: updates.reminderPreference ?? previous.reminderPreference ?? null,
+  preferredTimeOfDay: hasOwnMemoryUpdate(updates, "preferredTimeOfDay")
+    ? updates.preferredTimeOfDay ?? null
+    : previous.preferredTimeOfDay ?? null,
+  preferredTimeReason: hasOwnMemoryUpdate(updates, "preferredTimeReason")
+    ? updates.preferredTimeReason ?? null
+    : previous.preferredTimeReason ?? null,
+  reminderPreference: hasOwnMemoryUpdate(updates, "reminderPreference")
+    ? updates.reminderPreference ?? null
+    : previous.reminderPreference ?? null,
 });
 
 const normalizeClassificationHint = (
@@ -903,11 +944,27 @@ export function useCompanionPlanner({
       ?? remoteProfile.preferredTimeOfDay
       ?? storedPreferences.preferredTimeOfDay
       ?? null;
-    const preferredTimeReason = plannerMemoryOverride?.preferredTimeReason
-      ?? sessionState.preferredTimeReason
-      ?? remoteProfile.preferredTimeReason
-      ?? storedPreferences.preferredTimeReason
-      ?? null;
+    const preferredTimeReason = resolveTimeReasonFromSources({
+      resolvedTimeOfDay: preferredTimeOfDay,
+      sources: [
+        {
+          timeOfDay: plannerMemoryOverride?.preferredTimeOfDay ?? null,
+          timeReason: plannerMemoryOverride?.preferredTimeReason ?? null,
+        },
+        {
+          timeOfDay: sessionState.preferredTimeOfDay ?? null,
+          timeReason: sessionState.preferredTimeReason ?? null,
+        },
+        {
+          timeOfDay: remoteProfile.preferredTimeOfDay ?? null,
+          timeReason: remoteProfile.preferredTimeReason ?? null,
+        },
+        {
+          timeOfDay: storedPreferences.preferredTimeOfDay ?? null,
+          timeReason: storedPreferences.preferredTimeReason ?? null,
+        },
+      ],
+    });
     const reminderMinutesBefore = plannerMemoryOverride?.reminderMinutesBefore
       ?? remoteProfile.reminderMinutesBefore
       ?? parseReminderPreferenceMinutes(sessionState.reminderPreference)
@@ -1327,11 +1384,29 @@ export function useCompanionPlanner({
       ?? parseTimeOfDayFromClock(proposalTime)
       ?? plannerMemory.preferredTimeOfDay
       ?? remoteProfile.preferredTimeOfDay
+      ?? storedPreferences.preferredTimeOfDay
       ?? null;
-    const preferredTimeReason = nextSessionState.preferredTimeReason
-      ?? plannerMemory.preferredTimeReason
-      ?? remoteProfile.preferredTimeReason
-      ?? null;
+    const preferredTimeReason = resolveTimeReasonFromSources({
+      resolvedTimeOfDay: preferredTimeOfDay,
+      sources: [
+        {
+          timeOfDay: nextSessionState.preferredTimeOfDay ?? null,
+          timeReason: nextSessionState.preferredTimeReason ?? null,
+        },
+        {
+          timeOfDay: plannerMemoryOverride?.preferredTimeOfDay ?? null,
+          timeReason: plannerMemoryOverride?.preferredTimeReason ?? null,
+        },
+        {
+          timeOfDay: remoteProfile.preferredTimeOfDay ?? null,
+          timeReason: remoteProfile.preferredTimeReason ?? null,
+        },
+        {
+          timeOfDay: storedPreferences.preferredTimeOfDay ?? null,
+          timeReason: storedPreferences.preferredTimeReason ?? null,
+        },
+      ],
+    });
     const reminderMinutesBefore = inferReminderMinutesFromProposal(proposal.kind, proposal.payload)
       ?? plannerMemory.reminderMinutesBefore
       ?? remoteProfile.reminderMinutesBefore
@@ -1432,7 +1507,7 @@ export function useCompanionPlanner({
     if (error) {
       console.warn("Failed to persist companion planner memory:", error);
     }
-  }, [plannerContext.aiSignals?.suggestedWorkload, plannerMemory, plannerMemoryQuery.data?.preferredWorkBlocks, tonePack, user?.id]);
+  }, [plannerContext.aiSignals?.suggestedWorkload, plannerMemory, plannerMemoryOverride?.preferredTimeOfDay, plannerMemoryOverride?.preferredTimeReason, plannerMemoryQuery.data?.preferredWorkBlocks, storedPreferences.preferredTimeOfDay, storedPreferences.preferredTimeReason, tonePack, user?.id]);
 
   const submitMessage = useCallback(async (
     rawMessage: string,

@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   externalCalendarHorizons: [] as string[],
   classify: vi.fn(),
   invoke: vi.fn(),
+  upsertPlannerPreferences: vi.fn(),
   invalidateQueries: vi.fn(),
   addTask: vi.fn(),
   updateTask: vi.fn(),
@@ -41,7 +42,7 @@ vi.mock("@/integrations/supabase/client", () => ({
       invoke: (...args: unknown[]) => mocks.invoke(...args),
     },
     from: () => ({
-      upsert: vi.fn().mockResolvedValue({ error: null }),
+      upsert: (...args: unknown[]) => mocks.upsertPlannerPreferences(...args),
     }),
   },
 }));
@@ -201,6 +202,7 @@ describe("useCompanionPlanner", () => {
     mocks.externalCalendarHorizons.length = 0;
     mocks.classify.mockResolvedValue(null);
     mocks.user = { id: "user-1" };
+    mocks.upsertPlannerPreferences.mockResolvedValue({ error: null });
     mocks.addTask.mockResolvedValue(undefined);
     mocks.updateTask.mockResolvedValue(undefined);
     mocks.applySubtaskTitlePlan.mockResolvedValue([]);
@@ -540,6 +542,114 @@ describe("useCompanionPlanner", () => {
       notes: "Upper body focus with 10 minutes of cardio to finish.",
       subtasks: ["Warm up", "Finish with cardio"],
     });
+  });
+
+  it("clears stale preferred time reasons before persisting explicit quest timing", async () => {
+    Object.defineProperty(window, "localStorage", {
+      configurable: true,
+      writable: true,
+      value: {
+        getItem: vi.fn(() => JSON.stringify({
+          preferredTimeOfDay: "afternoon",
+          preferredTimeReason: "usual afternoon rhythm",
+          reminderPreference: "15 minutes",
+        })),
+        setItem: vi.fn(),
+        removeItem: vi.fn(),
+      },
+    });
+
+    mocks.invoke.mockResolvedValue({
+      data: {
+        mode: "proposal",
+        reply: "I drafted this as a quest for today at 5:00 pm. Take a look, and confirm it if it fits.",
+        followUpQuestions: [],
+        proposals: [
+          {
+            id: "proposal-1",
+            kind: "create_quest",
+            title: "Create Workout",
+            summary: 'Create a quest for "Workout" at 5:00 pm.',
+            payload: {
+              taskText: "Workout",
+              difficulty: "medium",
+              taskDate: "2026-04-18",
+              scheduledTime: "17:00",
+              reminderMinutesBefore: 15,
+            },
+            status: "pending",
+            readyToConfirm: true,
+            missingFields: [],
+          },
+        ],
+        suggestedReminders: [],
+        memoryUpdates: {
+          preferredTimeOfDay: "evening",
+          preferredTimeReason: null,
+          reminderPreference: "15 minutes",
+        },
+        sessionState: {
+          draft: {
+            title: "Workout",
+            draftKind: "create_quest",
+            scheduledDate: "2026-04-18",
+            scheduledTime: "17:00",
+            timeOfDay: "evening",
+            timeReason: null,
+          },
+          openQuestionIds: [],
+          preferredTimeOfDay: "evening",
+          preferredTimeReason: null,
+          reminderPreference: "15 minutes",
+          pendingStarterIntent: null,
+          lastClassification: "quest",
+        },
+      },
+      error: null,
+    });
+
+    const { result } = renderHook(() => useCompanionPlanner({ bootstrapGreeting: false }));
+
+    act(() => {
+      result.current.primeQuestCapture();
+    });
+
+    await act(async () => {
+      await result.current.submitMessage("Workout at 5", "text");
+    });
+
+    await waitFor(() => {
+      expect(result.current.pendingProposals).toHaveLength(1);
+    });
+
+    expect(result.current.sessionState.preferredTimeOfDay).toBe("evening");
+    expect(result.current.sessionState.preferredTimeReason).toBeNull();
+
+    await act(async () => {
+      await result.current.confirmProposal("proposal-1");
+    });
+
+    expect(mocks.addTask).toHaveBeenCalledWith(expect.objectContaining({
+      taskText: "Workout",
+      scheduledTime: "17:00",
+    }));
+    expect(mocks.upsertPlannerPreferences).toHaveBeenCalled();
+
+    const [payload] = mocks.upsertPlannerPreferences.mock.calls.at(-1) ?? [];
+    expect(payload).toEqual(expect.objectContaining({
+      user_id: "user-1",
+    }));
+    expect(payload.preferred_work_blocks.planner_profile.preferredTimeOfDay).toBe("evening");
+    expect(payload.preferred_work_blocks.planner_profile.preferredTimeReason).toBeNull();
+    expect(payload.preferred_work_blocks.planner_profile.preferredWindows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          timeOfDay: "evening",
+          time: "17:00",
+          reason: null,
+        }),
+      ]),
+    );
   });
 
   it("normalizes confirm-ready quest drafts so follow-up questions never block confirmation", async () => {

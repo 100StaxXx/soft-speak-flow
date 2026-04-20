@@ -532,7 +532,7 @@ Deno.test("does not rewrite the plan-day starter prompt", async () => {
   assertEquals(captured.called, false);
 });
 
-Deno.test("does not rewrite the immediate plan-day follow-up reply", async () => {
+Deno.test("does not rewrite the immediate plan-day anchor proposal response", async () => {
   const captured = {
     called: false,
   };
@@ -551,15 +551,35 @@ Deno.test("does not rewrite the immediate plan-day follow-up reply", async () =>
       },
     },
     baseResult: {
-      ...baseResult("conversational"),
+      ...baseResult("proposal"),
       reply:
-        "Got it. I'm treating 3:00 pm as a fixed anchor for the day. Based on what you shared, I'd front-load the highest-focus work before those fixed commitments, leave a little buffer around them, and save the more flexible or lower-pressure work for the later open window. If you want, I can help tighten that into a cleaner block-by-block plan next.",
+        "Today still has room around your fixed commitments. I drafted this as a quest. Take a look, and confirm it if it fits.",
+      proposals: [{
+        id: "proposal-1",
+        kind: "create_quest",
+        title: "Create Sales Meeting",
+        summary: 'Create a quest for "Sales Meeting" at 3:00 pm.',
+        payload: {
+          taskText: "Sales Meeting",
+          taskDate: "2026-04-18",
+          scheduledTime: "15:00",
+        },
+        status: "pending",
+        readyToConfirm: true,
+        missingFields: [],
+      }],
+      sessionState: {
+        ...baseResult("proposal").sessionState,
+        pendingStarterIntent: "plan_day",
+      },
     },
     openAIApiKey: "test-openai-key",
     model: "test-model",
   });
 
-  assertEquals(response.mode, "conversational");
-  assertStringIncludes(response.reply, "fixed anchor");
+  assertEquals(response.mode, "proposal");
+  assertEquals(response.reply, "Today still has room around your fixed commitments. I drafted this as a quest. Take a look, and confirm it if it fits.");
+  assertEquals(response.proposals.length, 1);
+  assertEquals(response.proposals[0]?.title, "Create Sales Meeting");
   assertEquals(captured.called, false);
 });

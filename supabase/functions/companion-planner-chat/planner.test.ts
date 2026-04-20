@@ -521,12 +521,17 @@ Deno.test("returns the deterministic plan-day starter opener", () => {
   assertStringIncludes(result.reply, "Which of your goals or tasks matters most today?");
 });
 
-Deno.test("handles the next plan-day reply as conversational intake without proposals or stale timing callbacks", () => {
+Deno.test("drafts the next plan-day reply as an anchor quest while keeping day-planning context", () => {
   const result = buildPlannerResponse(baseInput({
     message:
       "I have a sales meeting at 3 pm. I want sales work before that, a workout later, and some app work tonight.",
     sessionState: {
       pendingStarterIntent: "plan_day",
+    },
+    parsedInput: {
+      text:
+        "I have a sales meeting . I want sales work before that, a workout later, and some app work tonight",
+      scheduledTime: "15:00",
     },
     plannerContext: {
       plannerMemory: {
@@ -557,17 +562,108 @@ Deno.test("handles the next plan-day reply as conversational intake without prop
     },
   }));
 
-  assertEquals(result.mode, "conversational");
+  assertEquals(result.mode, "proposal");
   assertEquals(result.followUpQuestions.length, 0);
-  assertEquals(result.proposals.length, 0);
-  assertEquals(result.sessionState.pendingStarterIntent, null);
-  assertStringIncludes(result.reply, "3:00 pm");
-  assertStringIncludes(result.reply, "fixed anchor");
+  assertEquals(result.proposals.length, 1);
+  assertEquals(result.proposals[0].kind, "create_quest");
+  assertEquals(result.proposals[0].readyToConfirm, true);
+  assertEquals(result.proposals[0].title, "Create Sales Meeting");
+  assertEquals(
+    (result.proposals[0].payload as {
+      taskText: string;
+      taskDate: string | null;
+      scheduledTime: string | null;
+    }).taskText,
+    "Sales Meeting",
+  );
+  assertEquals(
+    (result.proposals[0].payload as {
+      taskText: string;
+      taskDate: string | null;
+      scheduledTime: string | null;
+    }).taskDate,
+    "2026-04-18",
+  );
+  assertEquals(
+    (result.proposals[0].payload as {
+      taskText: string;
+      taskDate: string | null;
+      scheduledTime: string | null;
+    }).scheduledTime,
+    "15:00",
+  );
+  assertEquals(result.sessionState.pendingStarterIntent, "plan_day");
   assertStringIncludes(result.reply, "Today still has room around your fixed commitments.");
+  assertEquals(result.reply.includes("I drafted this as a quest"), true);
+  assertEquals(result.reply.includes("fixed anchor"), false);
   assertEquals(result.reply.includes("previously said"), false);
   assertEquals(result.reply.includes("What makes this timing the right fit"), false);
   assertEquals(result.reply.includes("you usually"), false);
   assertEquals(result.reply.includes("you've told me"), false);
+});
+
+Deno.test("keeps non-anchor plan-day follow-ups conversational", () => {
+  const result = buildPlannerResponse(baseInput({
+    message:
+      "I want to front-load sales work, get a workout in later, and spend some time coding the app.",
+    sessionState: {
+      pendingStarterIntent: "plan_day",
+    },
+    plannerContext: {
+      scheduleInsights: {
+        horizon: "day",
+        selectedDate: "2026-04-18",
+        dayLoads: [],
+        overloadedDates: [],
+        emptyDates: [],
+        conflicts: [],
+        suggestedSlots: [],
+        moveSuggestions: [],
+        summary: "Today still has room around your fixed commitments.",
+      },
+    },
+  }));
+
+  assertEquals(result.mode, "conversational");
+  assertEquals(result.followUpQuestions.length, 0);
+  assertEquals(result.proposals.length, 0);
+  assertEquals(result.sessionState.pendingStarterIntent, null);
+  assertStringIncludes(result.reply, "Today still has room around your fixed commitments.");
+  assertEquals(result.reply.includes("I drafted this as a quest"), false);
+});
+
+Deno.test("keeps calendar conflict notes on anchor quests drafted from the plan-day follow-up", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "I have a sales meeting at 4 today. Then I want to work out later.",
+    currentDate: "2026-04-20",
+    currentDateTime: "2026-04-20T08:37:00-07:00",
+    sessionState: {
+      pendingStarterIntent: "plan_day",
+    },
+    parsedInput: {
+      text: "I have a sales meeting . Then I want to work out later",
+      scheduledTime: "16:00",
+      scheduledDate: "2026-04-20",
+    },
+    plannerContext: {
+      calendarEvents: [{
+        id: "event-1",
+        title: "Client Call",
+        start: "2026-04-20T16:00:00-07:00",
+        end: "2026-04-20T17:00:00-07:00",
+        isAllDay: false,
+        provider: "google",
+        readOnly: true,
+      }],
+    },
+  }));
+
+  assertEquals(result.mode, "proposal");
+  assertEquals(result.proposals.length, 1);
+  assertEquals(result.proposals[0].title, "Create Sales Meeting");
+  assertEquals(result.sessionState.pendingStarterIntent, "plan_day");
+  assertStringIncludes(result.reply, 'saved calendar event "Client Call"');
+  assertStringIncludes(result.reply, "4:00 pm");
 });
 
 Deno.test("drafts confirmable moves for free-me-up-after requests", () => {
@@ -1801,6 +1897,104 @@ Deno.test("quest_capture turns a complete follow-up answer into a ready quest dr
   assertEquals(result.sessionState.pendingStarterIntent ?? null, null);
 });
 
+Deno.test("quest_capture gives explicit follow-up timing precedence over schedule summaries and learned patterns", () => {
+  const intake = buildPlannerResponse(baseInput({
+    message: "Quest?",
+    parsedInput: {
+      text: "Quest?",
+      scheduledTime: null,
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+    plannerContext: {
+      starterIntent: "quest_capture",
+    },
+  }));
+
+  const result = buildPlannerResponse(baseInput({
+    message: "Workout at 5",
+    currentDate: "2026-04-20",
+    currentDateTime: "2026-04-20T11:33:00-07:00",
+    sessionState: {
+      ...intake.sessionState,
+      preferredTimeOfDay: "afternoon",
+      preferredTimeReason: "usual afternoon rhythm",
+    },
+    parsedInput: {
+      text: "workout",
+      scheduledTime: "17:00",
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: "body",
+      newTitle: null,
+    },
+    plannerContext: {
+      plannerMemory: {
+        preferredTimeOfDay: "afternoon",
+        preferredTimeReason: "usual afternoon rhythm",
+      },
+      scheduleInsights: {
+        horizon: "day",
+        selectedDate: "2026-04-20",
+        dayLoads: [],
+        overloadedDates: [],
+        emptyDates: [],
+        conflicts: [],
+        suggestedSlots: [{
+          date: "2026-04-20",
+          time: "13:00",
+          endTime: "13:30",
+          score: 92,
+          reason: "Matches your usual afternoon rhythm",
+        }],
+        moveSuggestions: [],
+        summary: "Today has room at 13:00. Matches your usual afternoon rhythm.",
+      },
+    },
+  }));
+
+  assertEquals(result.proposals[0].kind, "create_quest");
+  assertEquals(result.proposals[0].readyToConfirm, true);
+  assertEquals(
+    (result.proposals[0].payload as {
+      scheduledTime: string | null;
+      taskDate: string | null;
+    }).scheduledTime,
+    "17:00",
+  );
+  assertEquals(
+    (result.proposals[0].payload as {
+      scheduledTime: string | null;
+      taskDate: string | null;
+    }).taskDate,
+    "2026-04-20",
+  );
+  assertStringIncludes(result.proposals[0].summary, 'Create a quest for "Workout" at 5:00 pm.');
+  assertStringIncludes(result.reply, "today at 5:00 pm");
+  assertEquals(result.reply.includes("1:00 pm"), false);
+  assertEquals(result.reply.includes("usual afternoon rhythm"), false);
+  assertEquals(result.reply.includes("assuming"), false);
+  assertEquals(result.memoryUpdates.preferredTimeOfDay, "evening");
+  assertEquals(result.memoryUpdates.preferredTimeReason ?? null, null);
+  assertEquals(result.sessionState.preferredTimeOfDay, "evening");
+  assertEquals(result.sessionState.preferredTimeReason ?? null, null);
+  assertEquals(result.sessionState.draft.timeReason ?? null, null);
+});
+
 Deno.test("quest_capture turns a bare quest title into a ready inbox draft", () => {
   const intake = buildPlannerResponse(baseInput({
     message: "Quest?",
@@ -1946,6 +2140,10 @@ Deno.test("quest_capture uses a matching suggested slot for date-only replies", 
     result.proposals[0].summary,
     "assuming that slot based on your open window",
   );
+  assertStringIncludes(
+    result.reply,
+    "assuming 2026-04-19 at 6:00 pm based on your open slot",
+  );
   assertEquals(
     (result.proposals[0].payload as {
       taskDate: string | null;
@@ -2027,6 +2225,10 @@ Deno.test("quest_capture uses planner memory when a date-only reply has no match
   assertStringIncludes(
     result.proposals[0].summary,
     "assuming your usual evening pattern",
+  );
+  assertStringIncludes(
+    result.reply,
+    "assuming 2026-04-19 at 6:00 pm based on your usual evening pattern",
   );
   assertEquals(
     (result.proposals[0].payload as {
