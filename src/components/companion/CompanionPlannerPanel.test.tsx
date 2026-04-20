@@ -199,6 +199,8 @@ describe("CompanionPlannerPanel", () => {
     expect(screen.getByText("Today has room at 09:00.")).toBeInTheDocument();
     expect(screen.getByText("Move Workout")).toBeInTheDocument();
     expect(screen.getByText("Adjust Campaign Aurora")).toBeInTheDocument();
+    expect(screen.queryByTestId("assistant-question-list")).not.toBeInTheDocument();
+    expect(screen.queryByText("Which quest did you mean?")).not.toBeInTheDocument();
     expect(screen.getByTestId("assistant-proposal-notes-proposal-1")).toHaveTextContent("Stored note");
     expect(screen.getByTestId("assistant-proposal-notes-proposal-1")).toHaveTextContent("Leg day with a cooldown walk at the end.");
     expect(screen.getByTestId("assistant-proposal-subtasks-proposal-1")).toHaveTextContent("Append steps");

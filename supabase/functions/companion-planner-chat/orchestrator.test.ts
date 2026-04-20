@@ -118,23 +118,27 @@ Deno.test("normalizes 24-hour times in model-authored planner replies", async ()
   );
 });
 
-Deno.test("preserves deterministic proposal state while rewriting the copy", async () => {
+Deno.test("skips orchestration for confirm-ready proposal responses", async () => {
+  let fetchCalled = false;
   const response = await buildOrchestratedPlannerResponse({
-    guardedFetch: async (_input: RequestInfo | URL, _init?: RequestInit) =>
-      new Response(JSON.stringify({
+    guardedFetch: async (_input: RequestInfo | URL, _init?: RequestInit) => {
+      fetchCalled = true;
+      return new Response(JSON.stringify({
         choices: [{
           message: {
             content: JSON.stringify({
               reply:
-                "I drafted this as a quest update. Review it and confirm when it looks right.",
+                "What makes this timing the right fit today?",
               mode: "proposal",
             }),
           },
         }],
-      })),
+      }));
+    },
     input: baseInput(),
     baseResult: {
       ...baseResult("proposal"),
+      reply: "I drafted this as a quest update. Review it and confirm when it looks right.",
       proposals: [{
         id: "proposal-1",
         kind: "update_quest",
@@ -152,6 +156,7 @@ Deno.test("preserves deterministic proposal state while rewriting the copy", asy
 
   assertEquals(response.mode, "proposal");
   assertEquals(response.proposals.length, 1);
+  assertEquals(fetchCalled, false);
   assertEquals(
     response.reply,
     "I drafted this as a quest update. Review it and confirm when it looks right.",

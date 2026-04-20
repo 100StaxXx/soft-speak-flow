@@ -173,6 +173,26 @@ describe("DraggableFAB", () => {
     });
   });
 
+  it("shows a history button in the popup and routes it through a thread-history launch intent", async () => {
+    render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
+
+    fireEvent.click(screen.getByTestId("journeys-companion-launcher-floating"));
+
+    expect(screen.getByTestId("journeys-companion-launcher-history-button")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("journeys-companion-launcher-history-button"));
+
+    expect(mocks.onOpenCompanionPlanner).toHaveBeenCalledWith(expect.objectContaining({
+      message: "",
+      starterIntent: "thread_history",
+      target: "planner",
+    }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("journeys-companion-launcher-popup")).toHaveStyle("opacity: 0");
+    });
+  });
+
   it("closes the popup on outside press", async () => {
     render(
       <div>

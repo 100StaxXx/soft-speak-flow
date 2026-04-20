@@ -583,6 +583,72 @@ const normalizeClassificationHint = (
 const findProposalById = (proposals: CompanionPlannerProposal[], proposalId: string) =>
   proposals.find((proposal) => proposal.id === proposalId) ?? null;
 
+const getPendingPlannerProposals = (
+  response: Pick<CompanionPlannerResponse, "proposals" | "suggestedReminders">,
+): CompanionPlannerProposal[] => [
+  ...response.proposals,
+  ...response.suggestedReminders,
+].filter((proposal) => proposal.status === "pending");
+
+const isQuestionLikePlannerReply = (reply: string): boolean => {
+  const normalized = stripMarkdown(reply).trim().toLowerCase();
+  if (!normalized) return true;
+
+  return normalized.includes("?") ||
+    /\b(before you confirm|let me know|tell me|what makes this timing|fine[- ]tune|which .* fits|which .* matters|want me to)\b/.test(normalized);
+};
+
+const buildConfirmReadyPlannerReply = (
+  proposal: CompanionPlannerProposal,
+): string => {
+  switch (proposal.kind) {
+    case "create_quest":
+      return "I drafted this quest for you. Review it and confirm if it fits.";
+    case "update_quest":
+      return "I drafted this quest update for you. Review it and confirm if it fits.";
+    case "create_campaign":
+      return "I drafted this campaign for you. Review it and confirm if it fits.";
+    case "update_campaign":
+      return "I drafted this campaign update for you. Review it and confirm if it fits.";
+    case "adjust_campaign_plan":
+      return "I drafted this campaign adjustment for you. Review it and confirm if it fits.";
+    case "create_ritual":
+      return "I drafted this ritual for you. Review it and confirm if it fits.";
+    case "update_ritual":
+      return "I drafted this ritual update for you. Review it and confirm if it fits.";
+    case "suggest_reminder":
+      return "I drafted this reminder change for you. Review it and confirm if it fits.";
+    default:
+      return "I drafted this for you. Review it and confirm if it fits.";
+  }
+};
+
+const normalizePlannerResponse = (
+  response: CompanionPlannerResponse,
+): CompanionPlannerResponse => {
+  const pendingProposals = getPendingPlannerProposals(response);
+  if (pendingProposals.length === 0) return response;
+
+  const allPendingReady = pendingProposals.every((proposal) => proposal.readyToConfirm);
+  if (!allPendingReady) return response;
+
+  const shouldReplaceReply = response.followUpQuestions.length > 0 ||
+    response.sessionState.openQuestionIds.length > 0 ||
+    isQuestionLikePlannerReply(response.reply);
+
+  return {
+    ...response,
+    reply: shouldReplaceReply
+      ? buildConfirmReadyPlannerReply(pendingProposals[0])
+      : response.reply,
+    followUpQuestions: [],
+    sessionState: {
+      ...response.sessionState,
+      openQuestionIds: [],
+    },
+  };
+};
+
 interface UseCompanionPlannerOptions {
   bootstrapGreeting?: boolean;
   threadPersistence?: {
@@ -1489,7 +1555,7 @@ export function useCompanionPlanner({
 
       if (error) throw error;
 
-      const response = data as CompanionPlannerResponse;
+      const response = normalizePlannerResponse(data as CompanionPlannerResponse);
       const nextSession = applyMemoryUpdates(response.sessionState, response.memoryUpdates);
       const assistantMessage = appendAssistantTurn({
         ...response,

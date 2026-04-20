@@ -542,11 +542,11 @@ describe("useCompanionPlanner", () => {
     });
   });
 
-  it("clears lingering planner questions after confirming a ready proposal", async () => {
+  it("normalizes confirm-ready quest drafts so follow-up questions never block confirmation", async () => {
     mocks.invoke.mockResolvedValue({
       data: {
         mode: "proposal",
-        reply: "I drafted your workout quest.",
+        reply: "What makes this timing right?",
         followUpQuestions: [
           {
             id: "details",
@@ -595,7 +595,11 @@ describe("useCompanionPlanner", () => {
       await result.current.submitMessage("Make me a workout quest", "text");
     });
 
-    expect(result.current.questions.map((question) => question.field)).toEqual(["details"]);
+    expect(result.current.questions).toEqual([]);
+    expect(result.current.sessionState.openQuestionIds).toEqual([]);
+    expect(result.current.messages.at(-1)?.content).toBe(
+      "I drafted this quest for you. Review it and confirm if it fits.",
+    );
 
     await act(async () => {
       await result.current.confirmProposal("proposal-1");
@@ -654,7 +658,7 @@ describe("useCompanionPlanner", () => {
       await result.current.submitMessage("Make me a workout quest", "text");
     });
 
-    expect(result.current.questions.map((question) => question.field)).toEqual(["details"]);
+    expect(result.current.questions).toEqual([]);
 
     await act(async () => {
       await result.current.rejectProposal("proposal-1");
@@ -726,7 +730,7 @@ describe("useCompanionPlanner", () => {
       await result.current.submitMessage("Make me two movement quests", "text");
     });
 
-    expect(result.current.questions.map((question) => question.field)).toEqual(["details"]);
+    expect(result.current.questions).toEqual([]);
 
     await act(async () => {
       await result.current.confirmAll();

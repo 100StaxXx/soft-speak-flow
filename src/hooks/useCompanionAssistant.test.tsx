@@ -1053,6 +1053,32 @@ describe("useCompanionAssistant", () => {
     expect(onLaunchIntentConsumed).toHaveBeenCalledWith("launch-3");
   });
 
+  it("ignores blank thread-history launch intents so the modal can handle them locally", async () => {
+    const onLaunchIntentConsumed = vi.fn();
+
+    renderHook(() => useCompanionAssistant({
+      surface: "journeys",
+      launchIntent: {
+        id: "launch-history",
+        message: "",
+        starterIntent: "thread_history",
+        target: "planner",
+        briefingContext: null,
+      },
+      onLaunchIntentConsumed,
+    }));
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(mocks.startTemplateThread).not.toHaveBeenCalled();
+    expect(mocks.plannerSubmit).not.toHaveBeenCalled();
+    expect(mocks.injectAssistantOpening).not.toHaveBeenCalled();
+    expect(mocks.primeQuestCapture).not.toHaveBeenCalled();
+    expect(onLaunchIntentConsumed).not.toHaveBeenCalled();
+  });
+
   it("surfaces journeys thread controls alongside the merged transcript", () => {
     const { result } = renderHook(() => useCompanionAssistant({ surface: "journeys" }));
 

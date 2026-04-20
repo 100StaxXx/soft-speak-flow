@@ -1042,6 +1042,33 @@ describe("JourneysCompanionPlannerModal", () => {
     expect(screen.getByTestId("journeys-companion-thread-picker")).toBeInTheDocument();
   });
 
+  it("opens past chats from a thread-history launch intent without archiving", async () => {
+    const onLaunchIntentConsumed = vi.fn();
+
+    render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        presentation="dialog"
+        launchIntent={{
+          id: "launch-history",
+          message: "",
+          starterIntent: "thread_history",
+          target: "planner",
+          briefingContext: null,
+        }}
+        onLaunchIntentConsumed={onLaunchIntentConsumed}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("journeys-companion-thread-picker")).toBeInTheDocument();
+    });
+
+    expect(mocks.assistant.archiveCurrentThread).not.toHaveBeenCalled();
+    expect(onLaunchIntentConsumed).toHaveBeenCalledWith("launch-history");
+  });
+
   it("archives the current chat and opens past chats", async () => {
     render(
       <JourneysCompanionPlannerModal

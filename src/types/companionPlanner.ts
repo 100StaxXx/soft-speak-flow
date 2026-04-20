@@ -26,7 +26,8 @@ export type CompanionPlannerStarterIntent =
   | "free_talk_start"
   | "upcoming_start"
   | "quest_capture"
-  | "goal_breakdown_start";
+  | "goal_breakdown_start"
+  | "thread_history";
 
 export type CompanionPlannerLaunchTarget =
   | "auto"

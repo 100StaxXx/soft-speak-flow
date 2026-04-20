@@ -294,6 +294,7 @@ const JourneysCompanionOverlayBody = memo(({
 
   const typingIntervalRef = useRef<number | null>(null);
   const typingTargetRef = useRef<{ id: string; content: string } | null>(null);
+  const handledThreadHistoryLaunchIntentIdRef = useRef<string | null>(null);
   const hasSettledInitialTranscriptRef = useRef(false);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const transcriptEndRef = useRef<HTMLDivElement | null>(null);
@@ -353,6 +354,15 @@ const JourneysCompanionOverlayBody = memo(({
     setTypingMessageId(null);
     setTypedAssistantContent("");
   }, [activeThreadSessionId, clearTypingTimer]);
+
+  useEffect(() => {
+    if (!launchIntent?.id || launchIntent.starterIntent !== "thread_history") return;
+    if (handledThreadHistoryLaunchIntentIdRef.current === launchIntent.id) return;
+
+    handledThreadHistoryLaunchIntentIdRef.current = launchIntent.id;
+    setIsThreadPickerOpen(true);
+    onLaunchIntentConsumed?.(launchIntent.id);
+  }, [launchIntent, onLaunchIntentConsumed]);
 
   useEffect(() => {
     if (!latestAssistantEntry) return;

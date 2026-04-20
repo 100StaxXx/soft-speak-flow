@@ -159,6 +159,7 @@ export const CompanionPlannerPanel = memo(() => {
     surface: "companion",
     conversationEnabled: isSubscribed,
   });
+  const hasReadyProposal = assistant.pendingProposals.some((proposal) => proposal.readyToConfirm);
 
   const handleComposerKeyDown = useCallback((event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key !== "Enter" || event.shiftKey) return;
@@ -296,7 +297,7 @@ export const CompanionPlannerPanel = memo(() => {
           </div>
         ) : null}
 
-        {assistant.questions.length > 0 ? (
+        {assistant.questions.length > 0 && !hasReadyProposal ? (
           <div className="grid gap-2" data-testid="assistant-question-list">
             {assistant.questions.map((question) => (
               <div key={question.id} className="rounded-2xl border border-amber-300/20 bg-amber-400/10 p-3">

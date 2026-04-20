@@ -292,6 +292,20 @@ const isPlanDayDeterministicResponse = (
     baseResult.suggestedReminders.length === 0
   );
 
+const isConfirmReadyProposalResponse = (
+  baseResult: PlannerBuildResult,
+) => {
+  if (baseResult.mode !== "proposal") return false;
+
+  const pendingProposals = [
+    ...baseResult.proposals,
+    ...baseResult.suggestedReminders,
+  ].filter((proposal) => proposal.status === "pending");
+
+  return pendingProposals.length > 0 &&
+    pendingProposals.every((proposal) => proposal.readyToConfirm);
+};
+
 export async function buildOrchestratedPlannerResponse(params: {
   guardedFetch: typeof fetch;
   input: PlannerBuildInput;
@@ -315,6 +329,10 @@ export async function buildOrchestratedPlannerResponse(params: {
   }
 
   if (isPlanDayDeterministicResponse(params.input, params.baseResult)) {
+    return normalizedBaseResult;
+  }
+
+  if (isConfirmReadyProposalResponse(params.baseResult)) {
     return normalizedBaseResult;
   }
 
