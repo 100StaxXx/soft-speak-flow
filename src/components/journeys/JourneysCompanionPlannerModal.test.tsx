@@ -520,6 +520,80 @@ describe("JourneysCompanionPlannerModal", () => {
     }
   });
 
+  it("renders assistant-led launcher starters without showing the old template copy as a user bubble", async () => {
+    mocks.state.messages = [
+      {
+        id: "plan-quest-starter",
+        role: "assistant",
+        content: "Tell me the quest you want to create and when you want it scheduled.",
+        createdAt: "2026-04-18T08:00:00.000Z",
+        source: "plan",
+      },
+    ];
+    mocks.state.questions = [];
+    mocks.state.proposals = [];
+    mocks.state.pendingProposals = [];
+    const questRender = render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        presentation="dialog"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/quest you want to create/i)).toBeInTheDocument();
+    });
+    expect(screen.queryByText("Help me create a new quest.")).not.toBeInTheDocument();
+    questRender.unmount();
+
+    mocks.state.messages = [
+      {
+        id: "plan-upcoming-starter",
+        role: "assistant",
+        content: "What should I review: the rest of today, tomorrow, or both?",
+        createdAt: "2026-04-18T08:00:00.000Z",
+        source: "plan",
+      },
+    ];
+    const upcomingRender = render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        presentation="dialog"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/today, tomorrow, or both/i)).toBeInTheDocument();
+    });
+    expect(screen.queryByText("What do I have coming up for the rest of today and tomorrow?")).not.toBeInTheDocument();
+    upcomingRender.unmount();
+
+    mocks.state.messages = [
+      {
+        id: "plan-goal-starter",
+        role: "assistant",
+        content: "Name the goal you want to break down, and I'll help turn it into concrete steps.",
+        createdAt: "2026-04-18T08:00:00.000Z",
+        source: "plan",
+      },
+    ];
+    const goalRender = render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        presentation="dialog"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/goal you want to break down/i)).toBeInTheDocument();
+    });
+    expect(screen.queryByText("Help me break a big goal into steps.")).not.toBeInTheDocument();
+    goalRender.unmount();
+  });
+
   it("strips raw markdown markers from assistant transcript bubbles", async () => {
     mocks.state.messages = [
       {
@@ -1006,5 +1080,80 @@ describe("JourneysCompanionPlannerModal", () => {
     await act(async () => {});
 
     expect(mocks.assistant.submitTypedMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it("clears question history when the active journeys thread changes", async () => {
+    mocks.state.messages = [
+      {
+        id: "chat-1",
+        role: "assistant",
+        content: "The road's open. What are we setting in motion?",
+        createdAt: "2026-04-18T08:00:00.000Z",
+        source: "chat",
+        isSeed: true,
+      },
+    ];
+    mocks.state.questions = [
+      {
+        id: "time_of_day",
+        prompt: "What time of day should this live in your schedule?",
+        required: true,
+        field: "time_of_day",
+        options: ["Morning", "Afternoon", "Evening"],
+      },
+    ];
+    mocks.state.proposals = [];
+    mocks.state.pendingProposals = [];
+    mocks.state.readyProposalCount = 0;
+
+    const { rerender } = render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        presentation="dialog"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("What time of day should this live in your schedule?")).toBeInTheDocument();
+    });
+
+    mocks.state.activeThread = {
+      sessionId: "journeys-session-2",
+      companionId: "companion-1",
+      surface: "journeys",
+      title: "Fresh thread",
+      previewText: "A new chat just started.",
+      createdAt: "2026-04-18T09:00:00.000Z",
+      lastMessageAt: "2026-04-18T09:00:00.000Z",
+      archivedAt: null,
+      messageCount: 1,
+    };
+    mocks.state.messages = [
+      {
+        id: "chat-2",
+        role: "assistant",
+        content: "Fresh start. What's the move?",
+        createdAt: "2026-04-18T09:00:00.000Z",
+        source: "chat",
+        isSeed: true,
+      },
+    ];
+    mocks.state.questions = [];
+
+    await act(async () => {
+      rerender(
+        <JourneysCompanionPlannerModal
+          open
+          onOpenChange={vi.fn()}
+          presentation="drawer"
+        />,
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByText("What time of day should this live in your schedule?")).not.toBeInTheDocument();
+    });
+    expect(screen.getByText("Fresh start. What's the move?")).toBeInTheDocument();
   });
 });

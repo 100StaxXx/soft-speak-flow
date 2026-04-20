@@ -31,7 +31,11 @@ export type PlannerStarterIntent =
   | "adjust_today"
   | "low_energy_adjust"
   | "briefing_followup"
-  | "goal_breakdown";
+  | "goal_breakdown"
+  | "free_talk_start"
+  | "upcoming_start"
+  | "quest_capture"
+  | "goal_breakdown_start";
 
 export interface PlannerQuestion {
   id: string;
@@ -87,6 +91,7 @@ export interface PlannerSessionState {
   preferredTimeOfDay?: string | null;
   preferredTimeReason?: string | null;
   reminderPreference?: string | null;
+  pendingStarterIntent?: PlannerStarterIntent | null;
   lastClassification?: IntentType | null;
 }
 
@@ -418,6 +423,7 @@ const DEFAULT_WAKE_TIME = "08:00";
 const DEFAULT_WIND_DOWN_TIME = "21:00";
 const BREAK_BIG_GOAL_STARTER_INTENT = "help me break a big goal into steps";
 const MAKE_ROOM_STARTER_INTENT = "help me make room for what matters";
+const UPCOMING_STARTER_WINDOW_PROMPT = "What should I review: the rest of today, tomorrow, or both?";
 const STOP_WORDS = new Set([
   "the",
   "and",
@@ -431,6 +437,35 @@ const STOP_WORDS = new Set([
   "that",
   "a",
   "an",
+]);
+
+const TIMING_ONLY_REPLY_TOKENS = new Set([
+  "am",
+  "at",
+  "afternoon",
+  "after",
+  "before",
+  "both",
+  "day",
+  "days",
+  "evening",
+  "friday",
+  "later",
+  "monday",
+  "morning",
+  "next",
+  "night",
+  "rest",
+  "saturday",
+  "sunday",
+  "thursday",
+  "today",
+  "tomorrow",
+  "tonight",
+  "tuesday",
+  "wednesday",
+  "week",
+  "weeks",
 ]);
 
 const TITLE_SCAFFOLD_TOKENS = new Set([
@@ -475,6 +510,36 @@ const sanitizeProposalTitle = (
   if (tokens.every((token) => TITLE_SCAFFOLD_TOKENS.has(token))) return null;
 
   return trimmed;
+};
+
+const isTimingOnlyReply = (
+  message: string,
+  parsed?: ParsedInputHint | null,
+): boolean => {
+  if (
+    !parsed?.scheduledTime &&
+    !parsed?.scheduledDate &&
+    !parsed?.recurrencePattern
+  ) {
+    return false;
+  }
+
+  const normalized = normalizeText(message);
+  if (!normalized) return false;
+  if (hasPlanningVerb(normalized)) return false;
+  if (
+    /^(call|write|get|finish|book|send|draft|review|plan|move|practice|prep|clean|organize|outline|work on)\b/i
+      .test(normalized)
+  ) {
+    return false;
+  }
+
+  const tokens = normalized.split(" ").filter(Boolean);
+  if (tokens.length === 0) return false;
+
+  return tokens.every((token) =>
+    /^\d+$/.test(token) || TIMING_ONLY_REPLY_TOKENS.has(token)
+  );
 };
 
 const hasExplicitSlotSignal = (message: string): boolean =>
@@ -753,6 +818,32 @@ const isBreakBigGoalStarterIntent = (message: string): boolean =>
 const isMakeRoomStarterIntent = (message: string): boolean =>
   normalizeText(message) === MAKE_ROOM_STARTER_INTENT;
 
+const resolveUpcomingStarterFollowUpMessage = (message: string): string => {
+  const normalized = normalizeText(message);
+
+  if (
+    normalized === "both" ||
+    normalized.includes("today and tomorrow") ||
+    normalized.includes("rest of today and tomorrow")
+  ) {
+    return "What do I have coming up for the rest of today and tomorrow?";
+  }
+
+  if (normalized.includes("tomorrow")) {
+    return "What do I have coming up tomorrow?";
+  }
+
+  if (
+    normalized.includes("today") ||
+    normalized.includes("later today") ||
+    normalized.includes("rest of today")
+  ) {
+    return "What do I have coming up for the rest of today?";
+  }
+
+  return message;
+};
+
 const inferPlannerStarterIntentFromMessage = (
   message: string,
 ): PlannerStarterIntent => {
@@ -1002,7 +1093,17 @@ const isLikelyAnswerOnly = (
   message: string,
   sessionState: PlannerSessionState,
 ): boolean => {
-  if (!sessionState.draft.title || sessionState.openQuestionIds.length === 0) {
+  if (sessionState.openQuestionIds.length === 0) {
+    return false;
+  }
+
+  if (
+    !sessionState.draft.title &&
+    !sessionState.draft.scheduledTime &&
+    !sessionState.draft.timeOfDay &&
+    !sessionState.draft.scheduledDate &&
+    !sessionState.draft.draftKind
+  ) {
     return false;
   }
 
@@ -1397,7 +1498,10 @@ const mergeDraft = (
   const cadence = resolveCadence(input.message, parsed).label ?? base.cadence ??
     null;
 
-  const parsedTitle = sanitizeProposalTitle(parsed?.text);
+  const parsedTitle = input.sessionState.pendingStarterIntent === "quest_capture" &&
+      isTimingOnlyReply(input.message, parsed)
+    ? null
+    : sanitizeProposalTitle(parsed?.text);
   const carriedTitle = sanitizeProposalTitle(base.title);
   const renameTitle = parsed?.newTitle?.trim() ||
     parseRenameTitle(input.message) || null;
@@ -1405,7 +1509,7 @@ const mergeDraft = (
   const draftTitle = matched.task?.title ??
     matched.ritual?.title ??
     carriedTitle ??
-    (carryForward ? carriedTitle : parsedTitle);
+    parsedTitle;
 
   return {
     ...base,
@@ -1609,10 +1713,14 @@ const missingFieldsForKind = (
 
   const missing = new Set<string>();
   const effectiveTime = preferredTime(draft);
+  const forceQuestCaptureTiming = kind === "create_quest" &&
+    input.sessionState.pendingStarterIntent === "quest_capture";
 
-  if (shouldAskTimingQuestions(input, kind)) {
+  if (shouldAskTimingQuestions(input, kind) || (forceQuestCaptureTiming && !effectiveTime)) {
     if (!effectiveTime) missing.add("time of day");
-    if (!draft.timeReason) missing.add("why that time works");
+    if (!forceQuestCaptureTiming && !draft.timeReason) {
+      missing.add("why that time works");
+    }
   }
 
   if (
@@ -1802,7 +1910,10 @@ const buildFollowUpQuestions = (
   const shouldConfirmLearnedTime = !carryForwardAnswer &&
     !input.parsedInput?.scheduledTime && !explicitTimeOfDay;
   const shouldConfirmLearnedReason = !carryForwardAnswer && !explicitTimeReason;
-  const askTimingQuestions = shouldAskTimingQuestions(input, kind);
+  const forceQuestCaptureTiming = kind === "create_quest" &&
+    input.sessionState.pendingStarterIntent === "quest_capture";
+  const askTimingQuestions = shouldAskTimingQuestions(input, kind) ||
+    (forceQuestCaptureTiming && !effectiveTime);
   const titleQuestion = buildTitleClarificationQuestion(kind);
 
   if (titleQuestion && !sanitizeProposalTitle(draft.title)) {
@@ -1813,7 +1924,11 @@ const buildFollowUpQuestions = (
     questions.push(buildTimeQuestion(input));
   }
 
-  if (askTimingQuestions && (!draft.timeReason || shouldConfirmLearnedReason)) {
+  if (
+    askTimingQuestions &&
+    !forceQuestCaptureTiming &&
+    (!draft.timeReason || shouldConfirmLearnedReason)
+  ) {
     questions.push(question({
       field: "time_reason",
       prompt: input.plannerContext.plannerMemory?.preferredTimeReason
@@ -2749,6 +2864,7 @@ const buildAmbiguousEntityResponse = (
   sessionState: {
     ...sessionState,
     openQuestionIds: ["details"],
+    pendingStarterIntent: null,
   },
 });
 
@@ -2770,6 +2886,7 @@ const buildReadOnlyResponse = (
   sessionState: {
     ...sessionState,
     openQuestionIds: [],
+    pendingStarterIntent: null,
   },
 });
 
@@ -2916,6 +3033,7 @@ const buildRecoveryProposal = (
     sessionState: {
       ...sessionState,
       openQuestionIds: [],
+      pendingStarterIntent: null,
       lastClassification: classificationHint.type,
     },
   };
@@ -3042,6 +3160,7 @@ const buildRelationshipTouchResponse = (
     sessionState: {
       ...sessionState,
       openQuestionIds: [],
+      pendingStarterIntent: null,
       lastClassification: classificationHint.type,
     },
   };
@@ -3122,6 +3241,7 @@ const buildFreeUpAfterResponse = (
         scheduledDate: nextDate,
       },
       openQuestionIds: [],
+      pendingStarterIntent: null,
       lastClassification: classificationHint.type,
     },
   };
@@ -3220,6 +3340,7 @@ const buildLowEnergyAdjustmentResponse = (
         scheduledDate: nextDate,
       },
       openQuestionIds: [],
+      pendingStarterIntent: null,
       lastClassification: classificationHint.type,
     },
   };
@@ -3300,6 +3421,7 @@ const buildConversationalResponse = (
     sessionState: {
       ...sessionState,
       openQuestionIds: [],
+      pendingStarterIntent: null,
       lastClassification: classificationHint.type,
     },
   };
@@ -3315,13 +3437,7 @@ const buildGoalBreakdownStarterResponse = (
     isWittySassyTone(input.tonePack)
       ? "Name the goal. The real one, not the cinematic fog machine version, and I'll break it into steps that can survive contact with reality."
       : "Name the goal you want to break down, and I'll help turn it into concrete steps.",
-  followUpQuestions: [question({
-    field: "details",
-    prompt: "What's the goal you want to break down?",
-    reason:
-      "Once I have the real goal, I can shape it into a campaign or first steps instead of guessing.",
-    required: true,
-  })],
+  followUpQuestions: [],
   proposals: [],
   suggestedReminders: [],
   memoryUpdates: {
@@ -3337,7 +3453,71 @@ const buildGoalBreakdownStarterResponse = (
   sessionState: {
     ...sessionState,
     draft: {},
-    openQuestionIds: ["details"],
+    openQuestionIds: [],
+    pendingStarterIntent: "goal_breakdown_start",
+    lastClassification: classificationHint.type,
+  },
+});
+
+const buildUpcomingStarterResponse = (
+  input: PlannerBuildInput,
+  sessionState: PlannerSessionState,
+  classificationHint: ClassificationHint,
+): PlannerBuildResult => ({
+  mode: "conversational",
+  reply: UPCOMING_STARTER_WINDOW_PROMPT,
+  followUpQuestions: [],
+  proposals: [],
+  suggestedReminders: [],
+  memoryUpdates: {
+    preferredTimeOfDay: sessionState.preferredTimeOfDay ??
+      input.plannerContext.plannerMemory?.preferredTimeOfDay ?? null,
+    preferredTimeReason: sessionState.preferredTimeReason ??
+      input.plannerContext.plannerMemory?.preferredTimeReason ?? null,
+    reminderPreference: sessionState.reminderPreference ??
+      (input.plannerContext.plannerMemory?.reminderMinutesBefore
+        ? `${input.plannerContext.plannerMemory.reminderMinutesBefore} minutes`
+        : null),
+  },
+  sessionState: {
+    ...sessionState,
+    draft: {},
+    openQuestionIds: [],
+    pendingStarterIntent: "upcoming_start",
+    lastClassification: classificationHint.type,
+  },
+});
+
+const buildQuestCaptureStarterResponse = (
+  input: PlannerBuildInput,
+  sessionState: PlannerSessionState,
+  classificationHint: ClassificationHint,
+): PlannerBuildResult => ({
+  mode: "conversational",
+  reply:
+    isWittySassyTone(input.tonePack)
+      ? "Tell me the quest and when you want it to happen. Give me both, and I won't waste your time pretending that counts as complexity."
+      : "Tell me the quest you want to create and when you want it scheduled.",
+  followUpQuestions: [],
+  proposals: [],
+  suggestedReminders: [],
+  memoryUpdates: {
+    preferredTimeOfDay: sessionState.preferredTimeOfDay ??
+      input.plannerContext.plannerMemory?.preferredTimeOfDay ?? null,
+    preferredTimeReason: sessionState.preferredTimeReason ??
+      input.plannerContext.plannerMemory?.preferredTimeReason ?? null,
+    reminderPreference: sessionState.reminderPreference ??
+      (input.plannerContext.plannerMemory?.reminderMinutesBefore
+        ? `${input.plannerContext.plannerMemory.reminderMinutesBefore} minutes`
+        : null),
+  },
+  sessionState: {
+    ...sessionState,
+    draft: {
+      draftKind: "create_quest",
+    },
+    openQuestionIds: [],
+    pendingStarterIntent: "quest_capture",
     lastClassification: classificationHint.type,
   },
 });
@@ -3375,6 +3555,7 @@ const buildIntentFirstResponse = (
     ...sessionState,
     draft: {},
     openQuestionIds: ["details"],
+    pendingStarterIntent: null,
     lastClassification: classificationHint.type,
   },
 });
@@ -3428,6 +3609,7 @@ export function buildPlannerResponse(
     resolvedInput.plannerContext,
   );
   const starterIntent = getResolvedStarterIntent(resolvedInput);
+  const pendingStarterIntent = resolvedInput.sessionState.pendingStarterIntent ?? null;
 
   const freeUpAfterResponse = buildFreeUpAfterResponse(
     resolvedInput,
@@ -3436,6 +3618,50 @@ export function buildPlannerResponse(
   );
   if (freeUpAfterResponse) {
     return freeUpAfterResponse;
+  }
+
+  if (starterIntent === "upcoming_start") {
+    return buildUpcomingStarterResponse(
+      resolvedInput,
+      resolvedInput.sessionState,
+      classificationHint,
+    );
+  }
+
+  if (starterIntent === "quest_capture") {
+    return buildQuestCaptureStarterResponse(
+      resolvedInput,
+      resolvedInput.sessionState,
+      classificationHint,
+    );
+  }
+
+  if (starterIntent === "goal_breakdown_start") {
+    return buildGoalBreakdownStarterResponse(
+      resolvedInput,
+      resolvedInput.sessionState,
+      classificationHint,
+    );
+  }
+
+  if (pendingStarterIntent === "upcoming_start") {
+    const followUpMessage = resolveUpcomingStarterFollowUpMessage(
+      resolvedInput.message,
+    );
+    const followUpInput = {
+      ...resolvedInput,
+      message: followUpMessage,
+    };
+
+    return buildReadOnlyResponse(
+      buildReadOnlyScheduleReply(followUpInput, followUpMessage),
+      {
+        ...resolvedInput.sessionState,
+        pendingStarterIntent: null,
+        lastClassification: classificationHint.type,
+      },
+      "schedule_read",
+    );
   }
 
   if (starterIntent === "low_energy_adjust") {
@@ -3615,6 +3841,7 @@ export function buildPlannerResponse(
           scheduledTime: resolvedInput.parsedInput?.scheduledTime ?? null,
         },
         openQuestionIds: [],
+        pendingStarterIntent: null,
         lastClassification: classificationHint.type,
       },
     };
@@ -3729,6 +3956,7 @@ export function buildPlannerResponse(
       ...resolvedInput.sessionState,
       draft,
       openQuestionIds: followUpQuestions.map((question) => question.id),
+      pendingStarterIntent: null,
       preferredTimeOfDay: memoryUpdates.preferredTimeOfDay,
       preferredTimeReason: memoryUpdates.preferredTimeReason,
       reminderPreference: memoryUpdates.reminderPreference,

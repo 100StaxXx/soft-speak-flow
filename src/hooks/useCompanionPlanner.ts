@@ -108,6 +108,7 @@ const DEFAULT_SESSION_STATE: CompanionPlannerSessionState = {
   preferredTimeOfDay: null,
   preferredTimeReason: null,
   reminderPreference: null,
+  pendingStarterIntent: null,
   lastClassification: null,
 };
 
@@ -1252,15 +1253,7 @@ export function useCompanionPlanner({
     setProposals((previous) => {
       const settled = previous.filter((proposal) => proposal.status !== "pending");
       const incoming = [...response.proposals, ...response.suggestedReminders];
-      if (incoming.length > 0) {
-        return [...settled, ...incoming];
-      }
-
-      if (response.followUpQuestions.length > 0) {
-        return settled;
-      }
-
-      return [...settled, ...previous.filter((proposal) => proposal.status === "pending")];
+      return [...settled, ...incoming];
     });
     setMessages((previous) => [
       ...previous,

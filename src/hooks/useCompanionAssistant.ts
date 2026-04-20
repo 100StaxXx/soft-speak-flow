@@ -51,6 +51,13 @@ interface UseCompanionAssistantOptions {
   onOpenCampaignBuilder?: (message: string) => void;
 }
 
+const ASSISTANT_LED_LAUNCHER_STARTER_INTENTS = new Set<CompanionPlannerLaunchIntent["starterIntent"]>([
+  "free_talk_start",
+  "upcoming_start",
+  "quest_capture",
+  "goal_breakdown_start",
+]);
+
 const normalizeConversationMessages = (
   messages: Array<{
     id: string;
@@ -401,6 +408,7 @@ export function useCompanionAssistant({
       launchIntent.message,
       "text",
       {
+        skipUserEcho: ASSISTANT_LED_LAUNCHER_STARTER_INTENTS.has(launchIntent.starterIntent),
         starterIntent: launchIntent.starterIntent,
         briefingContext: launchIntent.briefingContext ?? null,
       },

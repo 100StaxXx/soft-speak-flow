@@ -29,6 +29,7 @@ const baseInput = (
     preferredTimeOfDay: null,
     preferredTimeReason: null,
     reminderPreference: null,
+    pendingStarterIntent: null,
     lastClassification: null,
   };
 
@@ -1375,11 +1376,11 @@ Deno.test("reads upcoming named weekdays instead of falling back to today", () =
   assertEquals(result.reply.includes("Here's the shape of today."), false);
 });
 
-Deno.test("asks for the actual goal instead of drafting the break-big-goal starter", () => {
+Deno.test("goal_breakdown_start opens with one assistant-led goal prompt", () => {
   const result = buildPlannerResponse(baseInput({
-    message: "Help me break a big goal into steps.",
+    message: "What goal do you want to break down?",
     parsedInput: {
-      text: "Help me break a big goal into steps.",
+      text: "What goal do you want to break down?",
       scheduledTime: null,
       scheduledDate: null,
       estimatedDuration: null,
@@ -1392,22 +1393,24 @@ Deno.test("asks for the actual goal instead of drafting the break-big-goal start
       category: null,
       newTitle: null,
     },
+    plannerContext: {
+      starterIntent: "goal_breakdown_start",
+    },
   }));
 
   assertEquals(result.mode, "conversational");
   assertEquals(result.proposals.length, 0);
-  assertEquals(result.followUpQuestions.map((question) => question.field), [
-    "details",
-  ]);
+  assertEquals(result.followUpQuestions.length, 0);
   assertEquals(result.sessionState.draft.title ?? null, null);
+  assertEquals(result.sessionState.pendingStarterIntent, "goal_breakdown_start");
   assertStringIncludes(result.reply, "goal");
 });
 
-Deno.test("uses the follow-up goal after the starter instead of reusing starter copy as the title", () => {
+Deno.test("uses the follow-up goal after the launcher starter instead of reusing starter copy as the title", () => {
   const intake = buildPlannerResponse(baseInput({
-    message: "Help me break a big goal into steps.",
+    message: "What goal do you want to break down?",
     parsedInput: {
-      text: "Help me break a big goal into steps.",
+      text: "What goal do you want to break down?",
       scheduledTime: null,
       scheduledDate: null,
       estimatedDuration: null,
@@ -1419,6 +1422,9 @@ Deno.test("uses the follow-up goal after the starter instead of reusing starter 
       notes: null,
       category: null,
       newTitle: null,
+    },
+    plannerContext: {
+      starterIntent: "goal_breakdown_start",
     },
   }));
 
@@ -1450,6 +1456,243 @@ Deno.test("uses the follow-up goal after the starter instead of reusing starter 
   assertEquals(result.proposals[0].kind, "create_campaign");
   assertEquals(result.proposals[0].title, "Create Get my real estate license");
   assertEquals(result.sessionState.draft.title, "Get my real estate license");
+  assertEquals(result.sessionState.pendingStarterIntent ?? null, null);
+});
+
+Deno.test("quest_capture asks for the quest and timing before drafting", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "What quest should I create, and when should I schedule it?",
+    parsedInput: {
+      text: "What quest should I create, and when should I schedule it?",
+      scheduledTime: null,
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+    plannerContext: {
+      starterIntent: "quest_capture",
+    },
+  }));
+
+  assertEquals(result.mode, "conversational");
+  assertEquals(result.proposals.length, 0);
+  assertEquals(result.followUpQuestions.length, 0);
+  assertEquals(result.sessionState.pendingStarterIntent, "quest_capture");
+  assertEquals(result.sessionState.draft.draftKind, "create_quest");
+  assertStringIncludes(result.reply, "when");
+});
+
+Deno.test("quest_capture turns a complete follow-up answer into a ready quest draft", () => {
+  const intake = buildPlannerResponse(baseInput({
+    message: "What quest should I create, and when should I schedule it?",
+    parsedInput: {
+      text: "What quest should I create, and when should I schedule it?",
+      scheduledTime: null,
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+    plannerContext: {
+      starterIntent: "quest_capture",
+    },
+  }));
+
+  const result = buildPlannerResponse(baseInput({
+    message: "Write my newsletter tomorrow at 18:00",
+    sessionState: intake.sessionState,
+    parsedInput: {
+      text: "Write my newsletter",
+      scheduledTime: "18:00",
+      scheduledDate: "2026-04-19",
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+  }));
+
+  assertEquals(result.proposals[0].kind, "create_quest");
+  assertEquals(result.proposals[0].readyToConfirm, true);
+  assertEquals(result.followUpQuestions.length, 0);
+  assertEquals(
+    (result.proposals[0].payload as { taskText: string }).taskText,
+    "Write My Newsletter",
+  );
+  assertEquals(
+    (result.proposals[0].payload as { scheduledTime: string | null }).scheduledTime,
+    "18:00",
+  );
+  assertEquals(result.sessionState.pendingStarterIntent ?? null, null);
+});
+
+Deno.test("quest_capture asks only for timing when the user replies with the quest but not the schedule", () => {
+  const intake = buildPlannerResponse(baseInput({
+    message: "What quest should I create, and when should I schedule it?",
+    parsedInput: {
+      text: "What quest should I create, and when should I schedule it?",
+      scheduledTime: null,
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+    plannerContext: {
+      starterIntent: "quest_capture",
+    },
+  }));
+
+  const result = buildPlannerResponse(baseInput({
+    message: "Write my newsletter",
+    sessionState: intake.sessionState,
+    parsedInput: {
+      text: "Write my newsletter",
+      scheduledTime: null,
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+  }));
+
+  assertEquals(result.followUpQuestions.map((question) => question.field), [
+    "time_of_day",
+  ]);
+  assertEquals(
+    result.followUpQuestions.some((question) => question.field === "time_reason"),
+    false,
+  );
+});
+
+Deno.test("quest_capture asks only for the quest details when the user replies with timing first", () => {
+  const intake = buildPlannerResponse(baseInput({
+    message: "What quest should I create, and when should I schedule it?",
+    parsedInput: {
+      text: "What quest should I create, and when should I schedule it?",
+      scheduledTime: null,
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+    plannerContext: {
+      starterIntent: "quest_capture",
+    },
+  }));
+
+  const timingOnly = buildPlannerResponse(baseInput({
+    message: "Tomorrow at 18:00",
+    sessionState: intake.sessionState,
+    parsedInput: {
+      text: "Tomorrow at 18:00",
+      scheduledTime: "18:00",
+      scheduledDate: "2026-04-19",
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+  }));
+
+  assertEquals(timingOnly.followUpQuestions.map((question) => question.field), [
+    "details",
+  ]);
+
+  const result = buildPlannerResponse(baseInput({
+    message: "Write my newsletter",
+    sessionState: timingOnly.sessionState,
+    parsedInput: {
+      text: "Write my newsletter",
+      scheduledTime: null,
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+  }));
+
+  assertEquals(result.proposals[0].kind, "create_quest");
+  assertEquals(result.proposals[0].readyToConfirm, true);
+  assertEquals(
+    (result.proposals[0].payload as { scheduledTime: string | null }).scheduledTime,
+    "18:00",
+  );
+});
+
+Deno.test("upcoming_start opens with one assistant-led schedule prompt", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "What should I review: the rest of today, tomorrow, or both?",
+    parsedInput: {
+      text: "What should I review: the rest of today, tomorrow, or both?",
+      scheduledTime: null,
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+    plannerContext: {
+      starterIntent: "upcoming_start",
+    },
+  }));
+
+  assertEquals(result.mode, "conversational");
+  assertEquals(result.proposals.length, 0);
+  assertEquals(result.followUpQuestions.length, 0);
+  assertEquals(result.sessionState.pendingStarterIntent, "upcoming_start");
+  assertStringIncludes(result.reply, "today, tomorrow, or both");
 });
 
 Deno.test("treats the make-room starter like a read-only prioritization view", () => {

@@ -110,6 +110,17 @@ vi.mock("@/hooks/useVoiceInput", () => ({
   }),
 }));
 
+vi.mock("@/hooks/useJourneysCompanionVisual", () => ({
+  useJourneysCompanionVisual: () => ({
+    companionLabel: "Glacieron",
+    imageUrl: "/companion-presets/dragon/t1_youth/normal/dragon__t1_youth__normal__ice.png",
+    focalX: null,
+    focalY: null,
+    element: "ice",
+    usesPortraitShell: true,
+  }),
+}));
+
 vi.mock("@/components/JourneyWizard/DeadlinePicker", () => ({
   DeadlinePicker: ({ onChange }: { onChange: (date: Date) => void }) => (
     <button type="button" onClick={() => onChange(new Date("2026-10-01T00:00:00.000Z"))}>

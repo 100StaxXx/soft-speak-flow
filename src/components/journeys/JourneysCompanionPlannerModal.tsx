@@ -84,6 +84,7 @@ type PlannerQuestionHistoryEntry = {
   id: string;
   prompt: string;
   options: string[];
+  threadSessionId: string | null;
 };
 
 type JourneysCompanionDrawerLayout = {
@@ -293,26 +294,33 @@ const JourneysCompanionOverlayBody = memo(({
 
   const typingIntervalRef = useRef<number | null>(null);
   const typingTargetRef = useRef<{ id: string; content: string } | null>(null);
+  const lastThreadSessionIdRef = useRef<string | null>(null);
   const hasSettledInitialTranscriptRef = useRef(false);
   const transcriptEndRef = useRef<HTMLDivElement | null>(null);
   const transcriptScrollAreaRef = useRef<HTMLDivElement | null>(null);
+  const activeThreadSessionId = assistant.activeThread?.sessionId ?? null;
 
   useLayoutEffect(() => {
     if (assistant.questions.length === 0) return;
 
     setPlannerQuestionHistory((previous) => {
-      const knownIds = new Set(previous.map((entry) => entry.id));
+      const knownIds = new Set(
+        previous
+          .filter((entry) => entry.threadSessionId === activeThreadSessionId)
+          .map((entry) => entry.id),
+      );
       const nextEntries = assistant.questions
         .filter((question) => !knownIds.has(questionEntryId(question)))
         .map((question) => ({
           id: questionEntryId(question),
           prompt: question.prompt,
           options: question.options ?? [],
+          threadSessionId: activeThreadSessionId,
         }));
 
       return nextEntries.length > 0 ? [...previous, ...nextEntries] : previous;
     });
-  }, [assistant.questions]);
+  }, [activeThreadSessionId, assistant.questions]);
 
   const dialogueEntries = useMemo<DialogueEntry[]>(() => [
     ...assistant.messages.map((message) => ({
@@ -321,12 +329,14 @@ const JourneysCompanionOverlayBody = memo(({
       content: message.content,
       isSeed: message.isSeed,
     })),
-    ...plannerQuestionHistory.map((question) => ({
+    ...plannerQuestionHistory
+      .filter((question) => question.threadSessionId === activeThreadSessionId)
+      .map((question) => ({
       id: question.id,
       role: "assistant" as const,
       content: question.prompt,
     })),
-  ], [assistant.messages, plannerQuestionHistory]);
+  ], [activeThreadSessionId, assistant.messages, plannerQuestionHistory]);
 
   const latestAssistantEntry = useMemo(
     () => [...dialogueEntries].reverse().find((entry) => entry.role === "assistant") ?? null,
@@ -356,12 +366,18 @@ const JourneysCompanionOverlayBody = memo(({
   }, [clearTypingTimer]);
 
   useEffect(() => {
+    const nextThreadSessionId = activeThreadSessionId;
+    const previousThreadSessionId = lastThreadSessionIdRef.current;
+    if (previousThreadSessionId !== null && previousThreadSessionId !== nextThreadSessionId) {
+      setPlannerQuestionHistory([]);
+    }
+    lastThreadSessionIdRef.current = nextThreadSessionId;
     hasSettledInitialTranscriptRef.current = false;
     clearTypingTimer();
     typingTargetRef.current = null;
     setTypingMessageId(null);
     setTypedAssistantContent("");
-  }, [assistant.activeThread?.sessionId, clearTypingTimer]);
+  }, [activeThreadSessionId, clearTypingTimer]);
 
   useEffect(() => {
     if (!latestAssistantEntry) return;

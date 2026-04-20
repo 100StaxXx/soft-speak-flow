@@ -22,10 +22,10 @@ const FREE_TALK_GREETINGS = [
   "What's good homie?",
   "What's good legend?",
   "What's good amigo?",
-  "Que onda, amigo?",
-  "Como va, compa?",
-  "Todo bien, hermano?",
-  "Salut, mon ami?",
+  "What's good, amigo?",
+  "What's good, compa?",
+  "What's good, hermano?",
+  "What's good, mon ami?",
 ] as const;
 
 const getPlannerDayKey = (date: Date) => {
@@ -71,30 +71,30 @@ export const getJourneysCompanionLauncherTemplates = ({
     {
       id: "free-talk",
       label: greeting,
-      message: greeting,
+      message: "What's on your mind?",
       target: "conversation",
-      starterIntent: "general",
+      starterIntent: "free_talk_start",
     },
     {
       id: "upcoming",
       label: "What do I have coming up?",
-      message: "What do I have coming up for the rest of today and tomorrow?",
+      message: "What should I review: the rest of today, tomorrow, or both?",
       target: "planner",
-      starterIntent: "plan_day",
+      starterIntent: "upcoming_start",
     },
     {
       id: "quest",
       label: "Quest?",
-      message: "Help me create a new quest.",
+      message: "What quest should I create, and when should I schedule it?",
       target: "planner",
-      starterIntent: "general",
+      starterIntent: "quest_capture",
     },
     {
       id: "goal",
       label: "Let's lock in a new goal",
-      message: "Help me break a big goal into steps.",
-      target: "campaign_builder",
-      starterIntent: "goal_breakdown",
+      message: "What goal do you want to break down?",
+      target: "planner",
+      starterIntent: "goal_breakdown_start",
     },
   ];
 };

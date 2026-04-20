@@ -17,7 +17,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 
 import {
-  Sparkles,
   Wand2,
   ChevronRight,
   ChevronLeft,
@@ -47,10 +46,12 @@ import { DeadlinePicker } from '@/components/JourneyWizard/DeadlinePicker';
 import { TimelineView } from '@/components/JourneyWizard/TimelineView';
 import { AdjustmentInput } from '@/components/JourneyWizard/AdjustmentInput';
 import { useVoiceInput } from '@/hooks/useVoiceInput';
+import { useJourneysCompanionVisual } from '@/hooks/useJourneysCompanionVisual';
 import { EPIC_XP_REWARDS } from '@/config/xpRewards';
 import type { StoryTypeSlug } from '@/types/narrativeTypes';
 import type { ClarifyingQuestion } from '@/hooks/useIntentClassifier';
 import { getDefaultMonthDaysForFrequency, getDefaultWeekdaysForFrequency } from '@/utils/habitSchedule';
+import { CompanionImage, CompanionPortraitShell } from '@/components/CompanionImage';
 
 // Default clarification questions when AI doesn't provide any
 const DEFAULT_CLARIFICATION_QUESTIONS: ClarifyingQuestion[] = [
@@ -144,6 +145,14 @@ export function Pathfinder({
   const [timelineContext, setTimelineContext] = useState('');
   
   const { preferences, isAtEpicLimit } = useUserAIContext();
+  const {
+    companionLabel,
+    imageUrl,
+    focalX,
+    focalY,
+    element,
+    usesPortraitShell,
+  } = useJourneysCompanionVisual();
   const { trackInteraction } = useAIInteractionTracker();
   const { schedule, isLoading: isScheduleLoading, generateSchedule, adjustSchedule, toggleMilestone, updateMilestoneDate, reset: resetSchedule, setRituals, postcardCount, maxPostcards } = useJourneySchedule();
   const [originalRituals, setOriginalRituals] = useState<JourneyRitual[]>([]);
@@ -556,6 +565,34 @@ export function Pathfinder({
     suggestions: 'Confirm your rituals and milestones',
     review: 'Review and create your campaign',
   };
+  const headerAvatar = usesPortraitShell ? (
+    <CompanionPortraitShell
+      src={imageUrl}
+      element={element}
+      className="h-12 w-12 overflow-hidden rounded-full border border-white/[0.15] shadow-[0_18px_32px_-26px_rgba(0,0,0,0.95)]"
+    >
+      <CompanionImage
+        src={imageUrl}
+        alt={companionLabel}
+        fit="portrait"
+        element={element}
+        focalX={focalX}
+        focalY={focalY}
+        className="rounded-full"
+      />
+    </CompanionPortraitShell>
+  ) : (
+    <div className="h-12 w-12 overflow-hidden rounded-full border border-white/[0.15] bg-white/10 shadow-[0_18px_32px_-26px_rgba(0,0,0,0.95)]">
+      <CompanionImage
+        src={imageUrl}
+        alt={companionLabel}
+        element={element}
+        focalX={focalX}
+        focalY={focalY}
+        className="rounded-full"
+      />
+    </div>
+  );
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -566,8 +603,12 @@ export function Pathfinder({
 
           <div className={cn(plannerPathfinderTheme.shellBody, "h-[min(86vh,52rem)] min-h-[34rem]")}>
             <div className={plannerPathfinderTheme.headerBar} data-testid="pathfinder-header">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[1rem] border-[3px] border-[#4d2811] bg-[linear-gradient(180deg,#fff8e8_0%,#ffcf6e_100%)] text-[#7f3b12] shadow-[0_6px_0_rgba(77,40,17,0.55)]">
-                <Sparkles className="h-5 w-5" />
+              <div className="relative shrink-0">
+                {headerAvatar}
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-[-18%] rounded-full bg-[radial-gradient(circle,rgba(125,211,252,0.3),transparent_70%)] blur-lg"
+                />
               </div>
               <DialogHeader className="min-w-0 flex-1 space-y-1 text-left">
                 <DialogTitle className="text-xl text-white">Pathfinder</DialogTitle>

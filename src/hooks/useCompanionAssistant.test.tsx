@@ -864,6 +864,7 @@ describe("useCompanionAssistant", () => {
       "Free me up after 5",
       "text",
       {
+        skipUserEcho: false,
         starterIntent: "adjust_today",
         briefingContext: {
           content: "Today is crowded after work.",
@@ -878,15 +879,15 @@ describe("useCompanionAssistant", () => {
     expect(onLaunchIntentConsumed).toHaveBeenCalledWith("launch-1");
   });
 
-  it("opens the campaign builder for goal-breakdown launch intents on journeys", async () => {
+  it("submits assistant-led journeys launcher intents through the planner without a fake user echo", async () => {
     const onLaunchIntentConsumed = vi.fn();
 
     renderHook(() => useCompanionAssistant({
       surface: "journeys",
       launchIntent: {
         id: "launch-2",
-        message: "Help me break a big goal into steps.",
-        starterIntent: "goal_breakdown",
+        message: "What goal do you want to break down?",
+        starterIntent: "goal_breakdown_start",
         briefingContext: null,
       },
       onLaunchIntentConsumed,
@@ -897,10 +898,16 @@ describe("useCompanionAssistant", () => {
       await Promise.resolve();
     });
 
-    expect(mocks.openCampaignBuilder).toHaveBeenCalledWith(
-      "Help me break a big goal into steps.",
+    expect(mocks.plannerSubmit).toHaveBeenCalledWith(
+      "What goal do you want to break down?",
+      "text",
+      {
+        skipUserEcho: true,
+        starterIntent: "goal_breakdown_start",
+        briefingContext: null,
+      },
     );
-    expect(mocks.plannerSubmit).not.toHaveBeenCalled();
+    expect(mocks.openCampaignBuilder).not.toHaveBeenCalled();
     expect(onLaunchIntentConsumed).toHaveBeenCalledWith("launch-2");
   });
 
@@ -911,8 +918,8 @@ describe("useCompanionAssistant", () => {
       surface: "journeys",
       launchIntent: {
         id: "launch-3",
-        message: "What's good boss?",
-        starterIntent: "general",
+        message: "What's on your mind?",
+        starterIntent: "free_talk_start",
         target: "conversation",
         briefingContext: null,
       },
@@ -924,7 +931,7 @@ describe("useCompanionAssistant", () => {
     });
 
     expect(mocks.startTemplateThread).toHaveBeenCalledTimes(1);
-    expect(mocks.injectAssistantOpening).toHaveBeenCalledWith("What's good boss?");
+    expect(mocks.injectAssistantOpening).toHaveBeenCalledWith("What's on your mind?");
     expect(mocks.startTemplateThread.mock.invocationCallOrder[0]).toBeLessThan(
       mocks.injectAssistantOpening.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
     );

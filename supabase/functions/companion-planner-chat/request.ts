@@ -27,6 +27,10 @@ const PlannerStarterIntentSchema = z.enum([
   "low_energy_adjust",
   "briefing_followup",
   "goal_breakdown",
+  "free_talk_start",
+  "upcoming_start",
+  "quest_capture",
+  "goal_breakdown_start",
 ]);
 
 const CompanionStatAttributeSchema = z.enum([
@@ -59,6 +63,7 @@ export const PlannerRequestSchema = z.object({
     preferredTimeOfDay: z.string().nullable().optional(),
     preferredTimeReason: z.string().nullable().optional(),
     reminderPreference: z.string().nullable().optional(),
+    pendingStarterIntent: PlannerStarterIntentSchema.nullable().optional(),
     lastClassification: z.enum(["quest", "epic", "habit", "brain-dump"]).nullable().optional(),
   }),
   parsedInput: z.object({

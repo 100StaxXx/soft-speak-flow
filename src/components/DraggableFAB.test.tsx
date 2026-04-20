@@ -163,7 +163,8 @@ describe("DraggableFAB", () => {
 
     expect(mocks.onOpenCompanionPlanner).toHaveBeenCalledWith(expect.objectContaining({
       target: "conversation",
-      starterIntent: "general",
+      starterIntent: "free_talk_start",
+      message: "What's on your mind?",
     }));
     await waitFor(() => {
       expect(screen.getByTestId("journeys-companion-launcher-popup")).toHaveStyle("opacity: 0");
@@ -190,16 +191,16 @@ describe("DraggableFAB", () => {
     });
   });
 
-  it("routes the goal option through the campaign-builder launch target", () => {
+  it("routes the goal option through the planner as an assistant-led starter", () => {
     render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
 
     fireEvent.click(screen.getByTestId("journeys-companion-launcher-floating"));
     fireEvent.click(screen.getByTestId("journeys-companion-launcher-option-goal"));
 
     expect(mocks.onOpenCompanionPlanner).toHaveBeenCalledWith(expect.objectContaining({
-      target: "campaign_builder",
-      starterIntent: "goal_breakdown",
-      message: "Help me break a big goal into steps.",
+      target: "planner",
+      starterIntent: "goal_breakdown_start",
+      message: "What goal do you want to break down?",
     }));
   });
 
@@ -211,8 +212,21 @@ describe("DraggableFAB", () => {
 
     expect(mocks.onOpenCompanionPlanner).toHaveBeenCalledWith(expect.objectContaining({
       target: "planner",
-      starterIntent: "plan_day",
-      message: "What do I have coming up for the rest of today and tomorrow?",
+      starterIntent: "upcoming_start",
+      message: "What should I review: the rest of today, tomorrow, or both?",
+    }));
+  });
+
+  it("routes the quest option through the planner as a one-prompt quest capture starter", () => {
+    render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
+
+    fireEvent.click(screen.getByTestId("journeys-companion-launcher-floating"));
+    fireEvent.click(screen.getByTestId("journeys-companion-launcher-option-quest"));
+
+    expect(mocks.onOpenCompanionPlanner).toHaveBeenCalledWith(expect.objectContaining({
+      target: "planner",
+      starterIntent: "quest_capture",
+      message: "What quest should I create, and when should I schedule it?",
     }));
   });
 

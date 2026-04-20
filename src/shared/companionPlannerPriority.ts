@@ -14,7 +14,11 @@ export type PlannerPriorityStarterIntent =
   | "adjust_today"
   | "low_energy_adjust"
   | "briefing_followup"
-  | "goal_breakdown";
+  | "goal_breakdown"
+  | "free_talk_start"
+  | "upcoming_start"
+  | "quest_capture"
+  | "goal_breakdown_start";
 
 export interface PlannerPriorityTaskInput {
   id: string;

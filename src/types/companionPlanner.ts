@@ -22,7 +22,11 @@ export type CompanionPlannerStarterIntent =
   | "adjust_today"
   | "low_energy_adjust"
   | "briefing_followup"
-  | "goal_breakdown";
+  | "goal_breakdown"
+  | "free_talk_start"
+  | "upcoming_start"
+  | "quest_capture"
+  | "goal_breakdown_start";
 
 export type CompanionPlannerLaunchTarget =
   | "auto"
@@ -110,6 +114,7 @@ export interface CompanionPlannerSessionState {
   preferredTimeOfDay?: string | null;
   preferredTimeReason?: string | null;
   reminderPreference?: string | null;
+  pendingStarterIntent?: CompanionPlannerStarterIntent | null;
   lastClassification?: IntentClassification["type"] | null;
 }
 
