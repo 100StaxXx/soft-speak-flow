@@ -55,6 +55,9 @@ const createMessage = (
   ...extras,
 });
 
+const createSeedAssistantMessage = (content: string) =>
+  createMessage("assistant", content, { isSeed: true });
+
 export function useJourneysCompanionConversation() {
   const { user } = useAuth();
   const { companion } = useCompanion();
@@ -100,7 +103,7 @@ export function useJourneysCompanionConversation() {
       const hasRealMessages = previous.some((message) => !message.isSeed);
 
       if (!hasRealMessages) {
-        return [createMessage("assistant", trimmedContent)];
+        return [createSeedAssistantMessage(trimmedContent)];
       }
 
       return [...previous, createMessage("assistant", trimmedContent)];
@@ -114,8 +117,9 @@ export function useJourneysCompanionConversation() {
     sessionId?: string;
     greetingText?: string;
   }) => {
+    const greetingText = options?.greetingText?.trim();
     sessionIdRef.current = options?.sessionId ?? generateId();
-    setMessages([]);
+    setMessages(greetingText ? [createSeedAssistantMessage(greetingText)] : []);
     setDraftInput("");
     setInterimText("");
     setShowPermissionDialog(false);

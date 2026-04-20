@@ -431,8 +431,17 @@ describe("JourneysCompanionPlannerModal", () => {
     expect(screen.queryByText("Schedule")).not.toBeInTheDocument();
   });
 
-  it("renders a blank transcript for a fresh journeys thread without legacy starter chips", () => {
-    mocks.state.messages = [];
+  it("renders the seeded opener for a fresh journeys thread without legacy starter chips", () => {
+    mocks.state.messages = [
+      {
+        id: "chat-seed-1",
+        role: "assistant",
+        content: mocks.state.greeting,
+        createdAt: "2026-04-18T08:00:00.000Z",
+        source: "chat",
+        isSeed: true,
+      },
+    ];
     mocks.state.questions = [];
     mocks.state.proposals = [];
     mocks.state.pendingProposals = [];
@@ -446,7 +455,7 @@ describe("JourneysCompanionPlannerModal", () => {
       />,
     );
 
-    expect(screen.queryByText("The road's open. What are we setting in motion?")).not.toBeInTheDocument();
+    expect(screen.getByText("The road's open. What are we setting in motion?")).toBeInTheDocument();
     expect(screen.queryByTestId("journeys-companion-planner-inline-options")).not.toBeInTheDocument();
     expect(screen.getByTestId("journeys-companion-planner-text-input")).toHaveAttribute("placeholder", "Chat");
     expect(screen.queryByText("Quick start")).not.toBeInTheDocument();
@@ -655,6 +664,33 @@ describe("JourneysCompanionPlannerModal", () => {
     expect(screen.queryByText("What time of day should this live in your schedule?")).not.toBeInTheDocument();
     expect(screen.queryByTestId("journeys-companion-planner-inline-options")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Morning" })).not.toBeInTheDocument();
+  });
+
+  it("hides a same-turn question-like assistant bubble when a ready quest proposal exists", async () => {
+    mocks.state.messages = [
+      {
+        id: "plan-1",
+        role: "assistant",
+        content: "Just to check: Do you prefer to work out right after your workday?",
+        createdAt: "2026-04-18T08:01:00.000Z",
+        source: "plan",
+      },
+    ];
+
+    render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        presentation="dialog"
+        onQuestProposalEditHandoff={vi.fn().mockResolvedValue({ saved: false })}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Create Focus quest")).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/do you prefer to work out right after your workday/i)).not.toBeInTheDocument();
+    expect(screen.queryByText("What time of day should this live in your schedule?")).not.toBeInTheDocument();
   });
 
   it("routes composer, quick replies, and mic taps through the assistant hook", async () => {

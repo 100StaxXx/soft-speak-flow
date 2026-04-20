@@ -1,5 +1,5 @@
-import type { QuestAttachmentInput } from '../types/questAttachments';
-import { cleanGeneratedTaskTitle } from './taskTitleNormalization';
+import type { QuestAttachmentInput } from "../types/questAttachments.ts";
+import { cleanGeneratedTaskTitle } from "./taskTitleNormalization.ts";
 
 export interface ParseNaturalLanguageOptions {
   referenceDateTime?: Date | string | number | null;

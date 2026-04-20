@@ -608,6 +608,77 @@ describe("useCompanionPlanner", () => {
     expect(result.current.questions).toEqual([]);
   });
 
+  it("normalizes mixed proposal turns when a ready quest draft is present", async () => {
+    mocks.invoke.mockResolvedValue({
+      data: {
+        mode: "proposal",
+        reply: "What makes this timing right?",
+        followUpQuestions: [
+          {
+            id: "details",
+            prompt: "What makes this timing right?",
+            required: true,
+            field: "details",
+          },
+        ],
+        proposals: [
+          {
+            id: "proposal-1",
+            kind: "create_quest",
+            title: "Create Workout",
+            summary: "Create a quest for Workout.",
+            payload: {
+              taskText: "Workout",
+              difficulty: "medium",
+              taskDate: null,
+              scheduledTime: null,
+            },
+            status: "pending",
+            readyToConfirm: true,
+            missingFields: [],
+          },
+          {
+            id: "proposal-2",
+            kind: "update_campaign",
+            title: "Update Campaign",
+            summary: "Update Campaign Aurora.",
+            payload: {},
+            status: "pending",
+            readyToConfirm: false,
+            missingFields: ["campaign details"],
+          },
+        ],
+        suggestedReminders: [],
+        memoryUpdates: {},
+        sessionState: {
+          draft: {
+            title: "Workout",
+            draftKind: "create_quest",
+          },
+          openQuestionIds: ["details"],
+          preferredTimeOfDay: null,
+          preferredTimeReason: null,
+          reminderPreference: null,
+          lastClassification: "quest",
+        },
+      },
+      error: null,
+    });
+
+    const { result } = renderHook(() => useCompanionPlanner({ bootstrapGreeting: false }));
+
+    await act(async () => {
+      await result.current.submitMessage("Make me a workout quest", "text");
+    });
+
+    expect(result.current.pendingProposals).toHaveLength(2);
+    expect(result.current.questions).toEqual([]);
+    expect(result.current.sessionState.openQuestionIds).toEqual([]);
+    expect(result.current.messages.at(-1)?.content).toBe(
+      "I drafted this quest for you. Review it and confirm if it fits.",
+    );
+  });
+
   it("clears lingering planner questions after rejecting a ready proposal", async () => {
     mocks.invoke.mockResolvedValue({
       data: {

@@ -18,7 +18,10 @@ import {
   type PlannerBuildInput,
   type PlannerSessionState,
 } from "./planner.ts";
-import { buildOrchestratedPlannerResponse } from "./orchestrator.ts";
+import {
+  buildOrchestratedPlannerResponse,
+  sanitizeReadyQuestProposalResponse,
+} from "./orchestrator.ts";
 import { enrichQuestPlannerResult } from "./questEnrichment.ts";
 import {
   normalizePlannerClassificationHint,
@@ -149,7 +152,9 @@ serve(async (req) => {
       input: plannerInput,
       baseResult: enrichedResult,
     });
-    const responseResult = normalizePlannerBuildResultText(orchestratedResult);
+    const responseResult = sanitizeReadyQuestProposalResponse(
+      normalizePlannerBuildResultText(orchestratedResult),
+    );
 
     return new Response(JSON.stringify(responseResult), {
       headers: {

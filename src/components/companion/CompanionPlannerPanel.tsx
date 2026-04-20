@@ -1,4 +1,4 @@
-import { memo, useCallback, type KeyboardEvent } from "react";
+import { memo, useCallback, useMemo, type KeyboardEvent } from "react";
 import {
   CalendarDays,
   Check,
@@ -23,6 +23,10 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useAccessStatus } from "@/hooks/useAccessStatus";
 import { useCompanionAssistant } from "@/hooks/useCompanionAssistant";
 import { cn, stripMarkdown } from "@/lib/utils";
+import {
+  hasReadyQuestPlannerProposal,
+  isQuestionLikePlannerReply,
+} from "@/shared/companionPlannerReadyProposal";
 import type { CompanionPlannerProposal, PlannerHorizon } from "@/types/companionPlanner";
 import { getCompanionPlannerQuestProposalPreview } from "@/utils/companionPlannerProposalPreview";
 
@@ -159,7 +163,26 @@ export const CompanionPlannerPanel = memo(() => {
     surface: "companion",
     conversationEnabled: isSubscribed,
   });
-  const hasReadyProposal = assistant.pendingProposals.some((proposal) => proposal.readyToConfirm);
+  const hasReadyQuestProposal = hasReadyQuestPlannerProposal(
+    assistant.pendingProposals,
+  );
+  const transcriptMessages = useMemo(() => {
+    if (!hasReadyQuestProposal) return assistant.messages;
+
+    for (let index = assistant.messages.length - 1; index >= 0; index -= 1) {
+      const message = assistant.messages[index];
+      if (message?.role !== "assistant") continue;
+      if (!isQuestionLikePlannerReply(message.content)) {
+        return assistant.messages;
+      }
+
+      return assistant.messages.filter((_, messageIndex) =>
+        messageIndex !== index
+      );
+    }
+
+    return assistant.messages;
+  }, [assistant.messages, hasReadyQuestProposal]);
 
   const handleComposerKeyDown = useCallback((event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key !== "Enter" || event.shiftKey) return;
@@ -297,7 +320,7 @@ export const CompanionPlannerPanel = memo(() => {
           </div>
         ) : null}
 
-        {assistant.questions.length > 0 && !hasReadyProposal ? (
+        {assistant.questions.length > 0 && !hasReadyQuestProposal ? (
           <div className="grid gap-2" data-testid="assistant-question-list">
             {assistant.questions.map((question) => (
               <div key={question.id} className="rounded-2xl border border-amber-300/20 bg-amber-400/10 p-3">
@@ -367,7 +390,7 @@ export const CompanionPlannerPanel = memo(() => {
 
         <ScrollArea className="max-h-[24rem] pr-3" data-testid="companion-assistant-transcript">
           <div className="space-y-3">
-            {assistant.messages.map((message) => (
+            {transcriptMessages.map((message) => (
               <div
                 key={message.id}
                 className={cn(

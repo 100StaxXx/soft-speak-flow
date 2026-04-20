@@ -2,7 +2,10 @@ import {
   assertEquals,
   assertStringIncludes,
 } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { buildOrchestratedPlannerResponse } from "./orchestrator.ts";
+import {
+  buildOrchestratedPlannerResponse,
+  sanitizeReadyQuestProposalResponse,
+} from "./orchestrator.ts";
 import type { PlannerBuildInput, PlannerBuildResult } from "./planner.ts";
 
 const baseInput = (): PlannerBuildInput => ({
@@ -160,6 +163,106 @@ Deno.test("skips orchestration for confirm-ready proposal responses", async () =
   assertEquals(
     response.reply,
     "I drafted this as a quest update. Review it and confirm when it looks right.",
+  );
+});
+
+Deno.test("skips orchestration when a ready quest proposal is present in a mixed proposal turn", async () => {
+  let fetchCalled = false;
+  const response = await buildOrchestratedPlannerResponse({
+    guardedFetch: async (_input: RequestInfo | URL, _init?: RequestInit) => {
+      fetchCalled = true;
+      return new Response(JSON.stringify({
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              reply: "What makes this timing the right fit today?",
+              mode: "proposal",
+            }),
+          },
+        }],
+      }));
+    },
+    input: baseInput(),
+    baseResult: {
+      ...baseResult("proposal"),
+      reply: "I drafted this quest for you. Review it and confirm if it fits.",
+      followUpQuestions: [{
+        id: "time_reason",
+        prompt: "What makes this timing the right fit today?",
+        required: true,
+        field: "time_reason",
+      }],
+      proposals: [
+        {
+          id: "proposal-1",
+          kind: "create_quest",
+          title: "Create Workout",
+          summary: "Create Workout at 15:00.",
+          payload: { taskText: "Workout" },
+          status: "pending",
+          readyToConfirm: true,
+          missingFields: [],
+        },
+        {
+          id: "proposal-2",
+          kind: "update_campaign",
+          title: "Update Campaign",
+          summary: "Update Campaign Aurora.",
+          payload: {},
+          status: "pending",
+          readyToConfirm: false,
+          missingFields: ["campaign details"],
+        },
+      ],
+      sessionState: {
+        ...baseResult("proposal").sessionState,
+        openQuestionIds: ["time_reason"],
+      },
+    },
+    openAIApiKey: "test-openai-key",
+    model: "test-model",
+  });
+
+  assertEquals(fetchCalled, false);
+  assertEquals(response.followUpQuestions, []);
+  assertEquals(response.sessionState.openQuestionIds, []);
+  assertEquals(
+    response.reply,
+    "I drafted this quest for you. Review it and confirm if it fits.",
+  );
+});
+
+Deno.test("sanitizes leaked follow-up state when a ready quest proposal already exists", () => {
+  const response = sanitizeReadyQuestProposalResponse({
+    ...baseResult("proposal"),
+    reply: "Just to check: Do you prefer to work out right after your workday?",
+    followUpQuestions: [{
+      id: "time_of_day",
+      prompt: "Do you prefer to work out right after your workday?",
+      required: true,
+      field: "time_of_day",
+    }],
+    proposals: [{
+      id: "proposal-1",
+      kind: "create_quest",
+      title: "Create Workout",
+      summary: "Create Workout at 15:00.",
+      payload: { taskText: "Workout" },
+      status: "pending",
+      readyToConfirm: true,
+      missingFields: [],
+    }],
+    sessionState: {
+      ...baseResult("proposal").sessionState,
+      openQuestionIds: ["time_of_day"],
+    },
+  });
+
+  assertEquals(response.followUpQuestions, []);
+  assertEquals(response.sessionState.openQuestionIds, []);
+  assertEquals(
+    response.reply,
+    "I drafted this quest for you. Review it and confirm if it fits.",
   );
 });
 

@@ -3,7 +3,7 @@ import {
   shouldAwardHardTaskResolve,
   type CompanionStatAttribute,
   type CompanionStatNeed,
-} from "./companionStatSignals";
+} from "./companionStatSignals.ts";
 
 export type PlannerPriorityStarterIntent =
   | "general"

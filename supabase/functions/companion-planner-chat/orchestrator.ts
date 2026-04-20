@@ -4,6 +4,11 @@ import type {
   PlannerBuildResult,
   PlannerResponseMode,
 } from "./planner.ts";
+import {
+  buildConfirmReadyPlannerReply,
+  getReadyQuestPlannerProposals,
+  isQuestionLikePlannerReply,
+} from "../../../src/shared/companionPlannerReadyProposal.ts";
 
 const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
 
@@ -292,18 +297,41 @@ const isPlanDayDeterministicResponse = (
     baseResult.suggestedReminders.length === 0
   );
 
-const isConfirmReadyProposalResponse = (
+const getReadyQuestProposalDrafts = (
   baseResult: PlannerBuildResult,
-) => {
-  if (baseResult.mode !== "proposal") return false;
-
-  const pendingProposals = [
+) =>
+  getReadyQuestPlannerProposals([
     ...baseResult.proposals,
     ...baseResult.suggestedReminders,
-  ].filter((proposal) => proposal.status === "pending");
+  ]);
 
-  return pendingProposals.length > 0 &&
-    pendingProposals.every((proposal) => proposal.readyToConfirm);
+const hasReadyQuestProposalResponse = (
+  baseResult: PlannerBuildResult,
+) => baseResult.mode === "proposal" && getReadyQuestProposalDrafts(baseResult).length > 0;
+
+export const sanitizeReadyQuestProposalResponse = (
+  baseResult: PlannerBuildResult,
+): PlannerBuildResult => {
+  const readyQuestProposals = getReadyQuestProposalDrafts(baseResult);
+  if (readyQuestProposals.length === 0) {
+    return normalizePlannerBuildResultText(baseResult);
+  }
+
+  const shouldReplaceReply = baseResult.followUpQuestions.length > 0 ||
+    baseResult.sessionState.openQuestionIds.length > 0 ||
+    isQuestionLikePlannerReply(baseResult.reply);
+
+  return normalizePlannerBuildResultText({
+    ...baseResult,
+    reply: shouldReplaceReply
+      ? buildConfirmReadyPlannerReply(readyQuestProposals[0]?.kind ?? "")
+      : baseResult.reply,
+    followUpQuestions: [],
+    sessionState: {
+      ...baseResult.sessionState,
+      openQuestionIds: [],
+    },
+  });
 };
 
 export async function buildOrchestratedPlannerResponse(params: {
@@ -313,7 +341,7 @@ export async function buildOrchestratedPlannerResponse(params: {
   openAIApiKey?: string;
   model?: string;
 }): Promise<PlannerBuildResult> {
-  const normalizedBaseResult = normalizePlannerBuildResultText(
+  const normalizedBaseResult = sanitizeReadyQuestProposalResponse(
     params.baseResult,
   );
 
@@ -332,7 +360,7 @@ export async function buildOrchestratedPlannerResponse(params: {
     return normalizedBaseResult;
   }
 
-  if (isConfirmReadyProposalResponse(params.baseResult)) {
+  if (hasReadyQuestProposalResponse(params.baseResult)) {
     return normalizedBaseResult;
   }
 
@@ -391,7 +419,7 @@ export async function buildOrchestratedPlannerResponse(params: {
       return normalizedBaseResult;
     }
 
-    return normalizePlannerBuildResultText({
+    return sanitizeReadyQuestProposalResponse({
       ...normalizedBaseResult,
       mode: parsed.mode === params.baseResult.mode
         ? parsed.mode

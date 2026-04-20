@@ -19,6 +19,7 @@ import {
   COMPANION_CHAT_THREAD_HISTORY_EMPTY_STATE,
   isCompanionChatSetupError,
 } from "@/utils/companionChatSetup";
+import { getCompanionPlannerOpener } from "@/shared/companionPlannerCopy";
 
 type JourneysAssistantMessage = {
   role: "assistant" | "user";
@@ -107,6 +108,14 @@ export function useJourneysCompanionThreads({
   const scopeKeyRef = useRef<string | null>(null);
   const bootstrappedScopeKeyRef = useRef<string | null>(null);
   const threadMutationVersionRef = useRef(0);
+  const freshThreadGreeting = useMemo(
+    () => getCompanionPlannerOpener({ userId: userId ?? null }),
+    [userId],
+  );
+  const hasRealThreadMessages = useMemo(
+    () => messages.some(isRealThreadMessage),
+    [messages],
+  );
 
   const scopeKey = `${userId ?? "anon"}:${companionId ?? "none"}`;
   const threadsQueryKey = getCompanionChatThreadsQueryKey(
@@ -145,11 +154,12 @@ export function useJourneysCompanionThreads({
     },
   });
 
-  const openFreshThread = useCallback((
-    sessionId?: string,
-    options?: { markBootstrapped?: boolean },
-  ) => {
-    const nextSessionId = sessionId ?? generateCompanionThreadSessionId();
+  const openFreshThread = useCallback((options?: {
+    sessionId?: string;
+    markBootstrapped?: boolean;
+    greetingText?: string;
+  }) => {
+    const nextSessionId = options?.sessionId ?? generateCompanionThreadSessionId();
     threadMutationVersionRef.current += 1;
     localThreadCreatedAtRef.current = new Date().toISOString();
     setIsHydratingThread(false);
@@ -158,9 +168,16 @@ export function useJourneysCompanionThreads({
     if (options?.markBootstrapped) {
       bootstrappedScopeKeyRef.current = scopeKey;
     }
-    resetConversationThread({
-      sessionId: nextSessionId,
-    });
+    resetConversationThread(
+      options?.greetingText
+        ? {
+            sessionId: nextSessionId,
+            greetingText: options.greetingText,
+          }
+        : {
+            sessionId: nextSessionId,
+          },
+    );
     resetPlannerThread({
       sessionId: nextSessionId,
     });
@@ -188,7 +205,15 @@ export function useJourneysCompanionThreads({
     const activePersistedThread = getActivePersistedThread(threadsQuery.data.threads);
 
     if (!activePersistedThread) {
-      bootstrappedScopeKeyRef.current = scopeKey;
+      if (!hasRealThreadMessages) {
+        openFreshThread({
+          sessionId: activeSessionId || undefined,
+          markBootstrapped: true,
+          greetingText: freshThreadGreeting,
+        });
+      } else {
+        bootstrappedScopeKeyRef.current = scopeKey;
+      }
       return;
     }
 
@@ -223,7 +248,9 @@ export function useJourneysCompanionThreads({
               ? COMPANION_CHAT_THREAD_HISTORY_DISABLED_REASON
               : "I couldn't reopen the latest thread, so I started a fresh one.",
           );
-          openFreshThread();
+          openFreshThread({
+            greetingText: freshThreadGreeting,
+          });
           bootstrappedScopeKeyRef.current = scopeKey;
         }
       })
@@ -237,8 +264,11 @@ export function useJourneysCompanionThreads({
       cancelled = true;
     };
   }, [
+    activeSessionId,
     companionId,
     enabled,
+    freshThreadGreeting,
+    hasRealThreadMessages,
     hydrateConversationThread,
     hydratePlannerThread,
     openFreshThread,
@@ -363,7 +393,9 @@ export function useJourneysCompanionThreads({
         await setCompanionChatThreadArchived(persistedActiveThread.sessionId, true);
       }
 
-      openFreshThread();
+      openFreshThread({
+        greetingText: freshThreadGreeting,
+      });
       await queryClient.invalidateQueries({ queryKey: threadsQueryKey });
     } catch (error) {
       setLocallyArchivedSessionId(null);
@@ -374,10 +406,17 @@ export function useJourneysCompanionThreads({
           : "I couldn't start a new chat yet.",
       );
     }
-  }, [newChatDisabledReason, openFreshThread, persistedActiveThread, queryClient, threadsQueryKey]);
+  }, [
+    freshThreadGreeting,
+    newChatDisabledReason,
+    openFreshThread,
+    persistedActiveThread,
+    queryClient,
+    threadsQueryKey,
+  ]);
 
   const startTemplateThread = useCallback(() => {
-    const nextSessionId = openFreshThread(undefined, { markBootstrapped: true });
+    const nextSessionId = openFreshThread({ markBootstrapped: true });
 
     void (async () => {
       try {

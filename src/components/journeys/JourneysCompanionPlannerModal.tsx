@@ -53,6 +53,10 @@ import {
 import { useCompanionAssistant } from "@/hooks/useCompanionAssistant";
 import { useJourneysCompanionVisual } from "@/hooks/useJourneysCompanionVisual";
 import { cn, stripMarkdown } from "@/lib/utils";
+import {
+  hasReadyQuestPlannerProposal,
+  isQuestionLikePlannerReply,
+} from "@/shared/companionPlannerReadyProposal";
 import type { CompanionChatThreadSummary } from "@/types/companionConversation";
 import type {
   CompanionPlannerLaunchIntent,
@@ -300,17 +304,36 @@ const JourneysCompanionOverlayBody = memo(({
   const transcriptEndRef = useRef<HTMLDivElement | null>(null);
   const transcriptScrollAreaRef = useRef<HTMLDivElement | null>(null);
   const activeThreadSessionId = assistant.activeThread?.sessionId ?? null;
-  const hasReadyProposal = assistant.pendingProposals.some((proposal) => proposal.readyToConfirm);
+  const hasReadyQuestProposal = hasReadyQuestPlannerProposal(
+    assistant.pendingProposals,
+  );
+  const transcriptMessages = useMemo(() => {
+    if (!hasReadyQuestProposal) return assistant.messages;
+
+    for (let index = assistant.messages.length - 1; index >= 0; index -= 1) {
+      const message = assistant.messages[index];
+      if (message?.role !== "assistant") continue;
+      if (!isQuestionLikePlannerReply(message.content)) {
+        return assistant.messages;
+      }
+
+      return assistant.messages.filter((_, messageIndex) =>
+        messageIndex !== index
+      );
+    }
+
+    return assistant.messages;
+  }, [assistant.messages, hasReadyQuestProposal]);
 
   const dialogueEntries = useMemo<DialogueEntry[]>(() => [
-    ...assistant.messages.map((message) => ({
+    ...transcriptMessages.map((message) => ({
       id: message.id,
       role: message.role,
       content: message.content,
       isSeed: message.isSeed,
     })),
     ...(
-      hasReadyProposal
+      hasReadyQuestProposal
         ? []
         : assistant.questions.map((question) => ({
           id: `planner-question-${question.id}`,
@@ -318,7 +341,7 @@ const JourneysCompanionOverlayBody = memo(({
           content: question.prompt,
         }))
     ),
-  ], [assistant.messages, assistant.questions, hasReadyProposal]);
+  ], [assistant.questions, hasReadyQuestProposal, transcriptMessages]);
 
   const latestAssistantEntry = useMemo(
     () => [...dialogueEntries].reverse().find((entry) => entry.role === "assistant") ?? null,
@@ -502,7 +525,7 @@ const JourneysCompanionOverlayBody = memo(({
   }, [assistant, onQuestProposalEditHandoff]);
 
   const sendDisabled = assistant.isSubmitting || assistant.isClassifying || (!typingMessageId && !assistant.draftInput.trim());
-  const activeOptionQuestions = hasReadyProposal
+  const activeOptionQuestions = hasReadyQuestProposal
     ? []
     : assistant.questions.filter((question) => (question.options?.length ?? 0) > 0);
   const micButtonLabel = assistant.isRecording ? "Stop voice reply" : "Start voice reply";

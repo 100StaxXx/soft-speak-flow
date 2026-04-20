@@ -268,7 +268,7 @@ Deno.test("turns an explicit breakdown request into quest subtasks without a pro
   assertEquals(result.proposals[0]?.readyToConfirm, true);
 });
 
-Deno.test("asks for note details when the user requests notes without usable detail", async () => {
+Deno.test("keeps a ready quest confirmable when the user requests notes without usable detail", async () => {
   const input = baseInput({
     message: "Add notes",
     sessionState: baseSessionState({
@@ -281,12 +281,12 @@ Deno.test("asks for note details when the user requests notes without usable det
     baseResult: baseResult(baseProposal(), input.sessionState),
   });
 
-  assertEquals(result.followUpQuestions.length, 1);
-  assertEquals(result.followUpQuestions[0]?.id, "quest_enrichment_details");
-  assertEquals(result.proposals[0]?.readyToConfirm, false);
+  assertEquals(result.followUpQuestions.length, 0);
+  assertEquals(result.proposals[0]?.readyToConfirm, true);
+  assertEquals(result.reply, "I drafted a quest for you.");
 });
 
-Deno.test("asks for step details when the user requests a breakdown without usable detail", async () => {
+Deno.test("keeps a ready quest confirmable when the user requests a breakdown without usable detail", async () => {
   const input = baseInput({
     message: "Break it into steps",
     sessionState: baseSessionState({
@@ -299,9 +299,9 @@ Deno.test("asks for step details when the user requests a breakdown without usab
     baseResult: baseResult(baseProposal(), input.sessionState),
   });
 
-  assertEquals(result.followUpQuestions.length, 1);
-  assertEquals(result.followUpQuestions[0]?.id, "quest_enrichment_breakdown");
-  assertEquals(result.proposals[0]?.readyToConfirm, false);
+  assertEquals(result.followUpQuestions.length, 0);
+  assertEquals(result.proposals[0]?.readyToConfirm, true);
+  assertEquals(result.reply, "I drafted a quest for you.");
 });
 
 Deno.test("defaults existing quest breakdown edits to append mode", async () => {

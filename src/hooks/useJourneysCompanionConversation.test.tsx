@@ -96,6 +96,85 @@ describe("useJourneysCompanionConversation", () => {
     expect(result.current.messages[0]).toMatchObject({
       role: "assistant",
       content: "What's on your mind?",
+      isSeed: true,
+    });
+    expect(result.current.hasRealMessages).toBe(false);
+  });
+
+  it("seeds resetThread greeting text without counting it as a real exchange", async () => {
+    const { result } = renderHook(() => useJourneysCompanionConversation());
+
+    await act(async () => {
+      result.current.resetThread({
+        sessionId: "fresh-seeded-session",
+        greetingText: "Fresh start. What's the move?",
+      });
+    });
+
+    expect(result.current.sessionId).toBe("fresh-seeded-session");
+    expect(result.current.messages).toEqual([
+      expect.objectContaining({
+        role: "assistant",
+        content: "Fresh start. What's the move?",
+        isSeed: true,
+      }),
+    ]);
+    expect(result.current.hasRealMessages).toBe(false);
+  });
+
+  it("clears the transcript when resetThread is called without a greeting", async () => {
+    const { result } = renderHook(() => useJourneysCompanionConversation());
+
+    await act(async () => {
+      result.current.resetThread({
+        sessionId: "fresh-seeded-session",
+        greetingText: "Fresh start. What's the move?",
+      });
+    });
+
+    await act(async () => {
+      result.current.resetThread({
+        sessionId: "fresh-empty-session",
+      });
+    });
+
+    expect(result.current.sessionId).toBe("fresh-empty-session");
+    expect(result.current.messages).toEqual([]);
+    expect(result.current.hasRealMessages).toBe(false);
+  });
+
+  it("omits seeded assistant openers from the submitted conversation history", async () => {
+    mocks.invoke.mockResolvedValue({
+      data: {
+        reply: "We can talk it through one step at a time.",
+        speechText: "We can talk it through one step at a time.",
+        handoffToPlanner: false,
+        memoryUpdateApplied: false,
+        persistenceReady: true,
+        sessionId: "session-seeded-history",
+      },
+      error: null,
+    });
+
+    const { result } = renderHook(() => useJourneysCompanionConversation());
+
+    await act(async () => {
+      result.current.resetThread({
+        sessionId: "fresh-seeded-session",
+        greetingText: "Fresh start. What's the move?",
+      });
+      result.current.setDraftInput("I need a little momentum");
+    });
+
+    await act(async () => {
+      await result.current.submitTypedMessage();
+    });
+
+    expect(mocks.invoke).toHaveBeenCalledWith("companion-chat", {
+      body: expect.objectContaining({
+        message: "I need a little momentum",
+        conversationHistory: [],
+      }),
     });
   });
 

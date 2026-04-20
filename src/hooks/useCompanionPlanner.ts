@@ -41,6 +41,11 @@ import {
 } from "@/services/companionChatThreads";
 import { getCompanionPlannerOpener } from "@/shared/companionPlannerCopy";
 import { LOCKED_COMPANION_TONE_PACK } from "@/shared/companionChaosVoice";
+import {
+  buildConfirmReadyPlannerReply,
+  getReadyQuestPlannerProposals,
+  isQuestionLikePlannerReply,
+} from "@/shared/companionPlannerReadyProposal";
 import { computePlannerPriorityScores } from "@/shared/companionPlannerPriority";
 import { buildCompanionStatInterpretation } from "@/shared/companionStatSignals";
 import { normalizeUuidLikeId } from "@/utils/offlineId";
@@ -590,47 +595,14 @@ const getPendingPlannerProposals = (
   ...response.suggestedReminders,
 ].filter((proposal) => proposal.status === "pending");
 
-const isQuestionLikePlannerReply = (reply: string): boolean => {
-  const normalized = stripMarkdown(reply).trim().toLowerCase();
-  if (!normalized) return true;
-
-  return normalized.includes("?") ||
-    /\b(before you confirm|let me know|tell me|what makes this timing|fine[- ]tune|which .* fits|which .* matters|want me to)\b/.test(normalized);
-};
-
-const buildConfirmReadyPlannerReply = (
-  proposal: CompanionPlannerProposal,
-): string => {
-  switch (proposal.kind) {
-    case "create_quest":
-      return "I drafted this quest for you. Review it and confirm if it fits.";
-    case "update_quest":
-      return "I drafted this quest update for you. Review it and confirm if it fits.";
-    case "create_campaign":
-      return "I drafted this campaign for you. Review it and confirm if it fits.";
-    case "update_campaign":
-      return "I drafted this campaign update for you. Review it and confirm if it fits.";
-    case "adjust_campaign_plan":
-      return "I drafted this campaign adjustment for you. Review it and confirm if it fits.";
-    case "create_ritual":
-      return "I drafted this ritual for you. Review it and confirm if it fits.";
-    case "update_ritual":
-      return "I drafted this ritual update for you. Review it and confirm if it fits.";
-    case "suggest_reminder":
-      return "I drafted this reminder change for you. Review it and confirm if it fits.";
-    default:
-      return "I drafted this for you. Review it and confirm if it fits.";
-  }
-};
-
 const normalizePlannerResponse = (
   response: CompanionPlannerResponse,
 ): CompanionPlannerResponse => {
   const pendingProposals = getPendingPlannerProposals(response);
   if (pendingProposals.length === 0) return response;
 
-  const allPendingReady = pendingProposals.every((proposal) => proposal.readyToConfirm);
-  if (!allPendingReady) return response;
+  const readyQuestProposals = getReadyQuestPlannerProposals(pendingProposals);
+  if (readyQuestProposals.length === 0) return response;
 
   const shouldReplaceReply = response.followUpQuestions.length > 0 ||
     response.sessionState.openQuestionIds.length > 0 ||
@@ -639,7 +611,7 @@ const normalizePlannerResponse = (
   return {
     ...response,
     reply: shouldReplaceReply
-      ? buildConfirmReadyPlannerReply(pendingProposals[0])
+      ? buildConfirmReadyPlannerReply(readyQuestProposals[0]?.kind ?? "")
       : response.reply,
     followUpQuestions: [],
     sessionState: {

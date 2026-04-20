@@ -1,4 +1,4 @@
-import type { ParsedTask } from './naturalLanguageTaskParser';
+import type { ParsedTask } from "./naturalLanguageTaskParser.ts";
 
 export type SchedulingIntentDisposition =
   | 'read_only'

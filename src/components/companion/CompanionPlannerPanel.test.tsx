@@ -24,15 +24,7 @@ const mocks = vi.hoisted(() => ({
     rejectProposal: vi.fn(),
     confirmAll: vi.fn(),
   },
-}));
-
-vi.mock("@/hooks/useAccessStatus", () => ({
-  useAccessStatus: () => mocks.accessState,
-}));
-
-vi.mock("@/hooks/useCompanionAssistant", () => ({
-  useCompanionAssistant: () => ({
-    greeting: "I’m right here with you.",
+  state: {
     messages: [
       {
         id: "a1",
@@ -153,10 +145,29 @@ vi.mock("@/hooks/useCompanionAssistant", () => ({
       summary: "Today has room at 09:00.",
     },
     todayLabel: "Saturday, April 18",
+    draftInput: "What do I have scheduled today?",
+  },
+}));
+
+vi.mock("@/hooks/useAccessStatus", () => ({
+  useAccessStatus: () => mocks.accessState,
+}));
+
+vi.mock("@/hooks/useCompanionAssistant", () => ({
+  useCompanionAssistant: () => ({
+    greeting: "I’m right here with you.",
+    messages: mocks.state.messages,
+    questions: mocks.state.questions,
+    proposals: mocks.state.proposals,
+    pendingProposals: mocks.state.pendingProposals,
+    readyProposalCount: mocks.state.readyProposalCount,
+    plannerMemory: mocks.state.plannerMemory,
+    scheduleInsights: mocks.state.scheduleInsights,
+    todayLabel: mocks.state.todayLabel,
     isLoadingContext: false,
     horizon: "day" as const,
     setHorizon: mocks.assistant.setHorizon,
-    draftInput: "What do I have scheduled today?",
+    draftInput: mocks.state.draftInput,
     setDraftInput: mocks.assistant.setDraftInput,
     interimText: "",
     placeholder: "Talk, ask about your schedule, or tell me what to adjust...",
@@ -188,6 +199,127 @@ describe("CompanionPlannerPanel", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.accessState.isSubscribed = true;
+    mocks.state.messages = [
+      {
+        id: "a1",
+        role: "assistant",
+        content: "Here is your schedule for 2026-04-18.",
+        createdAt: "2026-04-18T08:00:00.000Z",
+        source: "plan",
+      },
+      {
+        id: "a2",
+        role: "user",
+        content: "Move my workout quest to 6 pm",
+        createdAt: "2026-04-18T08:01:00.000Z",
+        source: "plan",
+      },
+    ];
+    mocks.state.questions = [
+      {
+        id: "details",
+        prompt: "Which quest did you mean?",
+        reason: "I do not want to move the wrong thing.",
+        required: true,
+        field: "details",
+        options: ["Workout", "Workout follow-up"],
+      },
+    ];
+    mocks.state.proposals = [
+      {
+        id: "proposal-1",
+        kind: "update_quest",
+        title: "Move Workout",
+        summary: "Move Workout to 2026-04-19 at 18:00.",
+        reasoning: "This is a direct quest adjustment.",
+        payload: {
+          taskId: "task-1",
+          updates: {
+            notes: "Leg day with a cooldown walk at the end.",
+          },
+          subtaskPlan: {
+            mode: "append",
+            titles: ["Warm up", "Cooldown walk"],
+          },
+        },
+        status: "pending",
+        readyToConfirm: true,
+        missingFields: [],
+      },
+      {
+        id: "proposal-2",
+        kind: "adjust_campaign_plan",
+        title: "Adjust Campaign Aurora",
+        summary: "Generate a revised plan for Campaign Aurora.",
+        reasoning: "This is a campaign restructure request.",
+        payload: {},
+        status: "pending",
+        readyToConfirm: true,
+        missingFields: [],
+      },
+    ];
+    mocks.state.pendingProposals = [
+      {
+        id: "proposal-1",
+        kind: "update_quest",
+        title: "Move Workout",
+        summary: "Move Workout to 2026-04-19 at 18:00.",
+        payload: {
+          taskId: "task-1",
+          updates: {
+            notes: "Leg day with a cooldown walk at the end.",
+          },
+          subtaskPlan: {
+            mode: "append",
+            titles: ["Warm up", "Cooldown walk"],
+          },
+        },
+        status: "pending",
+        readyToConfirm: true,
+      },
+      {
+        id: "proposal-2",
+        kind: "adjust_campaign_plan",
+        title: "Adjust Campaign Aurora",
+        summary: "Generate a revised plan for Campaign Aurora.",
+        payload: {},
+        status: "pending",
+        readyToConfirm: true,
+      },
+    ];
+    mocks.state.readyProposalCount = 2;
+    mocks.state.plannerMemory = {
+      preferredTimeOfDay: "morning",
+      preferredTimeReason: "I have the most energy before email.",
+    };
+    mocks.state.scheduleInsights = {
+      horizon: "day",
+      selectedDate: "2026-04-18",
+      dayLoads: [
+        {
+          date: "2026-04-18",
+          totalMinutes: 180,
+          taskCount: 3,
+          status: "balanced",
+        },
+      ],
+      overloadedDates: [],
+      emptyDates: [],
+      conflicts: [],
+      suggestedSlots: [
+        {
+          date: "2026-04-18",
+          time: "09:00",
+          endTime: "10:00",
+          score: 88,
+          reason: "Fits your usual morning rhythm.",
+        },
+      ],
+      moveSuggestions: [],
+      summary: "Today has room at 09:00.",
+    };
+    mocks.state.todayLabel = "Saturday, April 18";
+    mocks.state.draftInput = "What do I have scheduled today?";
   });
 
   it("renders a unified assistant transcript with schedule insight and proposals", () => {
@@ -238,5 +370,23 @@ describe("CompanionPlannerPanel", () => {
 
     expect(screen.getByText(/conversation mode is premium/i)).toBeInTheDocument();
     expect(screen.getByTestId("companion-assistant-text-input")).toBeInTheDocument();
+  });
+
+  it("hides a question-like assistant bubble when a ready quest is already confirmable", () => {
+    mocks.state.messages = [
+      {
+        id: "a1",
+        role: "assistant",
+        content: "Just to check: Do you prefer to work out right after your workday?",
+        createdAt: "2026-04-18T08:00:00.000Z",
+        source: "plan",
+      },
+    ];
+
+    render(<CompanionPlannerPanel />);
+
+    expect(screen.queryByText(/do you prefer to work out right after your workday/i)).not.toBeInTheDocument();
+    expect(screen.queryByTestId("assistant-question-list")).not.toBeInTheDocument();
+    expect(screen.getByText("Move Workout")).toBeInTheDocument();
   });
 });
