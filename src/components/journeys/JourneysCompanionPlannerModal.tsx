@@ -53,7 +53,6 @@ import {
 import { useCompanionAssistant } from "@/hooks/useCompanionAssistant";
 import { useJourneysCompanionVisual } from "@/hooks/useJourneysCompanionVisual";
 import { cn, stripMarkdown } from "@/lib/utils";
-import { COMPANION_PLANNER_STARTER_TEMPLATES } from "@/shared/companionPlannerCopy";
 import type { CompanionChatThreadSummary } from "@/types/companionConversation";
 import type {
   CompanionPlannerLaunchIntent,
@@ -92,7 +91,6 @@ type JourneysCompanionDrawerLayout = {
   keyboardInset: number;
 };
 
-const STARTER_QUICK_REPLIES = [...COMPANION_PLANNER_STARTER_TEMPLATES];
 const MOBILE_DRAWER_HEIGHT_MIN_PX = 320;
 const MOBILE_DRAWER_HEIGHT_MAX_PX = 736;
 const MOBILE_DRAWER_VIEWPORT_OFFSET_PX = 24;
@@ -460,14 +458,6 @@ const JourneysCompanionOverlayBody = memo(({
     void assistant.submitMessage(option, "text");
   }, [assistant, completeCurrentAssistantLine, typingMessageId]);
 
-  const handleStarterQuickReply = useCallback((starter: string) => {
-    if (typingMessageId) {
-      completeCurrentAssistantLine();
-    }
-
-    void assistant.submitMessage(starter, "text");
-  }, [assistant, completeCurrentAssistantLine, typingMessageId]);
-
   const handleVoiceToggle = useCallback(() => {
     if (typingMessageId) {
       completeCurrentAssistantLine();
@@ -500,14 +490,6 @@ const JourneysCompanionOverlayBody = memo(({
     ? getCompanionPlannerQuestProposalPreview(activeProposal)
     : null;
   const activeOptionQuestions = assistant.questions.filter((question) => (question.options?.length ?? 0) > 0);
-  const seededOpenerMessage = assistant.messages.length === 1
-    ? assistant.messages[0]
-    : null;
-  const showStarterQuickReplies = seededOpenerMessage?.role === "assistant"
-    && seededOpenerMessage.isSeed === true
-    && seededOpenerMessage.content === assistant.greeting
-    && plannerQuestionHistory.length === 0
-    && assistant.pendingProposals.length === 0;
   const micButtonLabel = assistant.isRecording ? "Stop voice reply" : "Start voice reply";
   const newChatTooltip = assistant.newChatDisabledReason
     ?? (assistant.hasPersistedActiveThread
@@ -780,27 +762,13 @@ const JourneysCompanionOverlayBody = memo(({
                 </div>
               ) : null}
 
-              {showStarterQuickReplies || activeOptionQuestions.length > 0 ? (
+              {activeOptionQuestions.length > 0 ? (
                 <div
                   className="flex w-full justify-start"
-                  data-testid={showStarterQuickReplies ? "journeys-companion-planner-starter-options" : "journeys-companion-planner-inline-options"}
+                  data-testid="journeys-companion-planner-inline-options"
                 >
                   <div className={cn(plannerPathfinderTheme.raisedPanel, "max-w-[92%] p-3")}>
                     <div className="flex flex-wrap gap-2">
-                      {showStarterQuickReplies
-                        ? STARTER_QUICK_REPLIES.map((starter) => (
-                            <Button
-                              key={starter}
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              className={plannerPathfinderTheme.outlineButton}
-                              onClick={() => handleStarterQuickReply(starter)}
-                            >
-                              {starter}
-                            </Button>
-                          ))
-                        : null}
                       {activeOptionQuestions.flatMap((question) => (
                         question.options?.map((option) => (
                           <Button

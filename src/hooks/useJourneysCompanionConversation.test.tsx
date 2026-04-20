@@ -75,15 +75,28 @@ describe("useJourneysCompanionConversation", () => {
     vi.clearAllMocks();
   });
 
-  it("starts with the seeded opener message", () => {
+  it("starts with a blank transcript while still exposing the journeys greeting", () => {
     const { result } = renderHook(() => useJourneysCompanionConversation());
     const expectedOpener = getCompanionPlannerOpener({ userId: "user-1" });
 
-    expect(result.current.messages).toHaveLength(1);
-    expect(result.current.messages[0]?.content).toBe(expectedOpener);
+    expect(result.current.messages).toEqual([]);
     expect(result.current.greeting).toBe(expectedOpener);
     expect(COMPANION_PLANNER_OPENER_TEMPLATES).toContain(expectedOpener);
     expect(JOURNEYS_COMPANION_OPENERS).toContain(expectedOpener);
+  });
+
+  it("injects an explicit assistant opening into a blank thread", async () => {
+    const { result } = renderHook(() => useJourneysCompanionConversation());
+
+    await act(async () => {
+      result.current.injectAssistantOpening("What's on your mind?");
+    });
+
+    expect(result.current.messages).toHaveLength(1);
+    expect(result.current.messages[0]).toMatchObject({
+      role: "assistant",
+      content: "What's on your mind?",
+    });
   });
 
   it("appends a normal assistant reply and tags the request as journeys", async () => {
@@ -110,7 +123,7 @@ describe("useJourneysCompanionConversation", () => {
     });
 
     await waitFor(() => {
-      expect(result.current.messages).toHaveLength(3);
+      expect(result.current.messages).toHaveLength(2);
     });
 
     expect(mocks.invoke).toHaveBeenCalledWith("companion-chat", {
@@ -121,8 +134,8 @@ describe("useJourneysCompanionConversation", () => {
         inputMode: "text",
       }),
     });
-    expect(result.current.messages[2]?.content).toBe("We can talk it through one step at a time.");
-    expect(result.current.messages[2]?.speechText).toBe("We can talk it through one step at a time.");
+    expect(result.current.messages[1]?.content).toBe("We can talk it through one step at a time.");
+    expect(result.current.messages[1]?.speechText).toBe("We can talk it through one step at a time.");
     expect(result.current.pendingPlannerHandoffMessage).toBeNull();
     expect(result.current.threadPersistenceReady).toBe(true);
   });
@@ -202,8 +215,8 @@ describe("useJourneysCompanionConversation", () => {
       expect(result.current.pendingPlannerHandoffMessage).toBe("Help me plan tomorrow");
     });
 
-    expect(result.current.messages).toHaveLength(2);
-    expect(result.current.messages[1]?.content).toBe("Help me plan tomorrow");
+    expect(result.current.messages).toHaveLength(1);
+    expect(result.current.messages[0]?.content).toBe("Help me plan tomorrow");
   });
 
   it("keeps the live reply while marking thread persistence unavailable during rollout", async () => {
@@ -226,10 +239,10 @@ describe("useJourneysCompanionConversation", () => {
     });
 
     await waitFor(() => {
-      expect(result.current.messages).toHaveLength(3);
+      expect(result.current.messages).toHaveLength(2);
     });
 
-    expect(result.current.messages[2]?.content).toBe("We can still talk this through right here.");
+    expect(result.current.messages[1]?.content).toBe("We can still talk this through right here.");
     expect(result.current.threadPersistenceReady).toBe(false);
     expect(result.current.threadPersistenceUnavailableReason).toBe(
       "Thread history will be available after the latest backend update.",
@@ -259,7 +272,7 @@ describe("useJourneysCompanionConversation", () => {
       );
     });
 
-    expect(result.current.messages).toHaveLength(3);
-    expect(result.current.messages[2]?.content).toContain("Cosmic static.");
+    expect(result.current.messages).toHaveLength(2);
+    expect(result.current.messages[1]?.content).toContain("Cosmic static.");
   });
 });

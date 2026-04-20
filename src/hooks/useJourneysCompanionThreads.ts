@@ -32,7 +32,6 @@ interface UseJourneysCompanionThreadsOptions {
   enabled: boolean;
   userId: string | null | undefined;
   companionId: string | null | undefined;
-  greeting: string;
   messages: JourneysAssistantMessage[];
   persistenceReady: boolean;
   persistenceUnavailableReason: string | null;
@@ -90,7 +89,6 @@ export function useJourneysCompanionThreads({
   enabled,
   userId,
   companionId,
-  greeting,
   messages,
   persistenceReady,
   persistenceUnavailableReason,
@@ -162,13 +160,12 @@ export function useJourneysCompanionThreads({
     }
     resetConversationThread({
       sessionId: nextSessionId,
-      greetingText: greeting,
     });
     resetPlannerThread({
       sessionId: nextSessionId,
     });
     return nextSessionId;
-  }, [greeting, resetConversationThread, resetPlannerThread, scopeKey]);
+  }, [resetConversationThread, resetPlannerThread, scopeKey]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -272,13 +269,13 @@ export function useJourneysCompanionThreads({
       companionId: companionId ?? "",
       surface: "journeys",
       title: buildCompanionThreadTitle(firstUserMessage?.content ?? "New thread"),
-      previewText: buildCompanionThreadPreview(latestMessage?.content ?? greeting),
+      previewText: buildCompanionThreadPreview(latestMessage?.content ?? ""),
       createdAt: realMessages[0]?.createdAt ?? localThreadCreatedAtRef.current,
       lastMessageAt: latestMessage?.createdAt ?? localThreadCreatedAtRef.current,
       archivedAt: null,
       messageCount: realMessages.length,
     };
-  }, [activeSessionId, companionId, greeting, messages]);
+  }, [activeSessionId, companionId, messages]);
 
   const activeThread = persistedActiveThread ?? localActiveThread;
   const historyThreads = useMemo(

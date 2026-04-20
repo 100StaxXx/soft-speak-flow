@@ -1,7 +1,6 @@
 import type { HTMLAttributes, ReactNode } from "react";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { COMPANION_PLANNER_STARTER_TEMPLATES } from "@/shared/companionPlannerCopy";
 
 const mocks = vi.hoisted(() => ({
   assistant: {
@@ -25,14 +24,6 @@ const mocks = vi.hoisted(() => ({
   state: {
     greeting: "The road's open. What are we setting in motion?",
     messages: [
-      {
-        id: "chat-1",
-        role: "assistant" as const,
-        content: "The road's open. What are we setting in motion?",
-        createdAt: "2026-04-18T08:00:00.000Z",
-        source: "chat" as const,
-        isSeed: true,
-      },
       {
         id: "plan-1",
         role: "assistant" as const,
@@ -105,7 +96,7 @@ const mocks = vi.hoisted(() => ({
       companionId: "companion-1",
       surface: "journeys" as const,
       title: "Current thread",
-      previewText: "The road's open. What are we setting in motion?",
+      previewText: "I can help you shape that into something concrete when you're ready.",
       createdAt: "2026-04-18T08:00:00.000Z",
       lastMessageAt: "2026-04-18T08:01:00.000Z",
       archivedAt: null,
@@ -271,14 +262,6 @@ describe("JourneysCompanionPlannerModal", () => {
     mocks.state.greeting = "The road's open. What are we setting in motion?";
     mocks.state.messages = [
       {
-        id: "chat-1",
-        role: "assistant",
-        content: "The road's open. What are we setting in motion?",
-        createdAt: "2026-04-18T08:00:00.000Z",
-        source: "chat",
-        isSeed: true,
-      },
-      {
         id: "plan-1",
         role: "assistant",
         content: "I can help you shape that into something concrete when you're ready.",
@@ -350,7 +333,7 @@ describe("JourneysCompanionPlannerModal", () => {
       companionId: "companion-1",
       surface: "journeys",
       title: "Current thread",
-      previewText: "The road's open. What are we setting in motion?",
+      previewText: "I can help you shape that into something concrete when you're ready.",
       createdAt: "2026-04-18T08:00:00.000Z",
       lastMessageAt: "2026-04-18T08:01:00.000Z",
       archivedAt: null,
@@ -420,7 +403,6 @@ describe("JourneysCompanionPlannerModal", () => {
     expect(screen.getByTestId("journeys-companion-planner-chat-header")).toBeInTheDocument();
     expect(screen.queryByTestId("journeys-companion-planner-portrait-rail")).not.toBeInTheDocument();
     expect(screen.getByTestId("journeys-companion-planner-dialogue-screen")).toBeInTheDocument();
-    expect(screen.getByText("The road's open. What are we setting in motion?")).toBeInTheDocument();
     expect(screen.getByText("Nova")).toBeInTheDocument();
     expect(screen.queryByText("Journeys Thread")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "New chat" })).toBeInTheDocument();
@@ -444,17 +426,8 @@ describe("JourneysCompanionPlannerModal", () => {
     expect(screen.queryByText("Schedule")).not.toBeInTheDocument();
   });
 
-  it("opens the campaign builder from the big-goal starter quick reply", async () => {
-    mocks.state.messages = [
-      {
-        id: "chat-1",
-        role: "assistant",
-        content: "The road's open. What are we setting in motion?",
-        createdAt: "2026-04-18T08:00:00.000Z",
-        source: "chat",
-        isSeed: true,
-      },
-    ];
+  it("renders a blank transcript for a fresh journeys thread without legacy starter chips", () => {
+    mocks.state.messages = [];
     mocks.state.questions = [];
     mocks.state.proposals = [];
     mocks.state.pendingProposals = [];
@@ -465,31 +438,16 @@ describe("JourneysCompanionPlannerModal", () => {
         open
         onOpenChange={vi.fn()}
         presentation="dialog"
-        onOpenCampaignBuilder={mocks.openCampaignBuilder}
       />,
     );
 
-    expect(screen.getByText("The road's open. What are we setting in motion?")).toBeInTheDocument();
-    expect(screen.getByTestId("journeys-companion-planner-starter-options")).toBeInTheDocument();
+    expect(screen.queryByText("The road's open. What are we setting in motion?")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("journeys-companion-planner-inline-options")).not.toBeInTheDocument();
     expect(screen.getByTestId("journeys-companion-planner-text-input")).toHaveAttribute("placeholder", "Chat");
     expect(screen.queryByText("Quick start")).not.toBeInTheDocument();
-
-    for (const starter of COMPANION_PLANNER_STARTER_TEMPLATES) {
-      expect(screen.getByRole("button", { name: starter })).toBeInTheDocument();
-    }
-    expect(screen.queryByRole("button", { name: "I'll type my own." })).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Help me break a big goal into steps." }));
-
-    await waitFor(() => {
-      expect(mocks.openCampaignBuilder).toHaveBeenCalledWith(
-        "Help me break a big goal into steps.",
-      );
-    });
-    expect(mocks.assistant.submitPlannerMessage).not.toHaveBeenCalled();
   });
 
-  it("does not show planner starter templates for custom free-chat openers", () => {
+  it("does not show legacy starter template UI for custom assistant openers", () => {
     mocks.state.messages = [
       {
         id: "chat-1",
@@ -514,10 +472,10 @@ describe("JourneysCompanionPlannerModal", () => {
     );
 
     expect(screen.getByText("What's good homie?")).toBeInTheDocument();
-    expect(screen.queryByTestId("journeys-companion-planner-starter-options")).not.toBeInTheDocument();
-    for (const starter of COMPANION_PLANNER_STARTER_TEMPLATES) {
-      expect(screen.queryByRole("button", { name: starter })).not.toBeInTheDocument();
-    }
+    expect(screen.queryByTestId("journeys-companion-planner-inline-options")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Show me today's route." })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Help me make room for what matters." })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Help me break a big goal into steps." })).not.toBeInTheDocument();
   });
 
   it("renders assistant-led launcher starters without showing the old template copy as a user bubble", async () => {
@@ -1032,16 +990,7 @@ describe("JourneysCompanionPlannerModal", () => {
       }),
     });
 
-    mocks.state.messages = [
-      {
-        id: "chat-1",
-        role: "assistant",
-        content: "The road's open. What are we setting in motion?",
-        createdAt: "2026-04-18T08:00:00.000Z",
-        source: "chat",
-        isSeed: true,
-      },
-    ];
+    mocks.state.messages = [];
     mocks.state.questions = [];
     mocks.state.proposals = [];
     mocks.state.pendingProposals = [];
@@ -1083,16 +1032,7 @@ describe("JourneysCompanionPlannerModal", () => {
   });
 
   it("clears question history when the active journeys thread changes", async () => {
-    mocks.state.messages = [
-      {
-        id: "chat-1",
-        role: "assistant",
-        content: "The road's open. What are we setting in motion?",
-        createdAt: "2026-04-18T08:00:00.000Z",
-        source: "chat",
-        isSeed: true,
-      },
-    ];
+    mocks.state.messages = [];
     mocks.state.questions = [
       {
         id: "time_of_day",

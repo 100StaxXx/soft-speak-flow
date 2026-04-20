@@ -182,7 +182,6 @@ export function useCompanionAssistant({
     enabled: surface === "journeys",
     userId: user?.id,
     companionId: companion?.id,
-    greeting: journeysConversation.greeting,
     messages: surface === "journeys" ? messages : [],
     persistenceReady: journeysConversation.threadPersistenceReady,
     persistenceUnavailableReason: journeysConversation.threadPersistenceUnavailableReason,

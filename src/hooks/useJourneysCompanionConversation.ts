@@ -55,10 +55,6 @@ const createMessage = (
   ...extras,
 });
 
-const createInitialMessages = (greeting: string) => [
-  createMessage("assistant", greeting, { isSeed: true }),
-];
-
 export function useJourneysCompanionConversation() {
   const { user } = useAuth();
   const { companion } = useCompanion();
@@ -70,7 +66,7 @@ export function useJourneysCompanionConversation() {
     [user?.id],
   );
 
-  const [messages, setMessages] = useState<JourneysCompanionMessage[]>(() => createInitialMessages(greeting));
+  const [messages, setMessages] = useState<JourneysCompanionMessage[]>([]);
   const [draftInput, setDraftInput] = useState("");
   const [interimText, setInterimText] = useState("");
   const [showPermissionDialog, setShowPermissionDialog] = useState(false);
@@ -104,7 +100,7 @@ export function useJourneysCompanionConversation() {
       const hasRealMessages = previous.some((message) => !message.isSeed);
 
       if (!hasRealMessages) {
-        return createInitialMessages(trimmedContent);
+        return [createMessage("assistant", trimmedContent)];
       }
 
       return [...previous, createMessage("assistant", trimmedContent)];
@@ -119,34 +115,32 @@ export function useJourneysCompanionConversation() {
     greetingText?: string;
   }) => {
     sessionIdRef.current = options?.sessionId ?? generateId();
-    setMessages(createInitialMessages(options?.greetingText ?? greeting));
+    setMessages([]);
     setDraftInput("");
     setInterimText("");
     setShowPermissionDialog(false);
     setIsRequestingPermission(false);
     setIsSubmitting(false);
     setPendingPlannerHandoffMessage(null);
-  }, [greeting]);
+  }, []);
 
   const hydrateThread = useCallback((options: {
     sessionId: string;
     messages: JourneysCompanionMessage[];
   }) => {
     sessionIdRef.current = options.sessionId;
-    setMessages(options.messages.length > 0 ? options.messages : createInitialMessages(greeting));
+    setMessages(options.messages);
     setDraftInput("");
     setInterimText("");
     setShowPermissionDialog(false);
     setIsRequestingPermission(false);
     setIsSubmitting(false);
     setPendingPlannerHandoffMessage(null);
-  }, [greeting]);
+  }, []);
 
   useEffect(() => {
-    resetThread({
-      greetingText: greeting,
-    });
-  }, [companion?.id, greeting, resetThread]);
+    resetThread();
+  }, [companion?.id, resetThread]);
 
   const submitMessage = useCallback(async (
     rawMessage: string,

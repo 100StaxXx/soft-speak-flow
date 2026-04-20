@@ -23,8 +23,8 @@ vi.mock("@/components/ui/sonner", () => ({
 }));
 
 vi.mock("@/services/companionChatThreads", () => ({
-  buildCompanionThreadPreview: (value: string) => value,
-  buildCompanionThreadTitle: (value: string) => value,
+  buildCompanionThreadPreview: (value: string) => value || "No messages yet.",
+  buildCompanionThreadTitle: (value: string) => value || "New thread",
   generateCompanionThreadSessionId: () => mocks.generatedSessionIds.shift() ?? "fallback-session",
   getCompanionChatThreadsQueryKey: (userId: string | null | undefined, companionId: string | null | undefined, surface: string) => [
     "companion-chat-threads",
@@ -58,16 +58,7 @@ const renderJourneysThreads = (overrides?: Partial<Parameters<typeof useJourneys
         enabled: true,
         userId: "user-1",
         companionId: "companion-1",
-        greeting: "The road's open.",
-        messages: [
-          {
-            role: "assistant",
-            content: "The road's open.",
-            createdAt: "2026-04-19T08:00:00.000Z",
-            source: "chat",
-            isSeed: true,
-          },
-        ],
+        messages: [],
         persistenceReady: true,
         persistenceUnavailableReason: null,
         hasPendingPlannerWork: false,
@@ -241,9 +232,11 @@ describe("useJourneysCompanionThreads", () => {
 
     expect(mocks.hydrateConversationThread).not.toHaveBeenCalled();
     expect(result.current.activeThread?.sessionId).toBe("fresh-session-1");
+    expect(result.current.activeThread?.title).toBe("New thread");
+    expect(result.current.activeThread?.previewText).toBe("No messages yet.");
   });
 
-  it("does not archive when the thread only has the seeded opener", async () => {
+  it("does not archive when the thread is still blank", async () => {
     mocks.listCompanionChatThreads.mockResolvedValue([
       {
         sessionId: "archived-session-1",
@@ -259,15 +252,7 @@ describe("useJourneysCompanionThreads", () => {
     ]);
 
     const { result } = renderJourneysThreads({
-      messages: [
-        {
-          role: "assistant",
-          content: "The road's open.",
-          createdAt: "2026-04-19T08:00:00.000Z",
-          source: "chat",
-          isSeed: true,
-        },
-      ],
+      messages: [],
     });
 
     await waitFor(() => {
@@ -284,7 +269,6 @@ describe("useJourneysCompanionThreads", () => {
     expect(mocks.setCompanionChatThreadArchived).not.toHaveBeenCalled();
     expect(mocks.resetConversationThread).not.toHaveBeenCalledWith({
       sessionId: "fresh-session-2",
-      greetingText: "The road's open.",
     });
   });
 
@@ -365,7 +349,6 @@ describe("useJourneysCompanionThreads", () => {
     expect(mocks.setCompanionChatThreadArchived).toHaveBeenCalledWith("active-session-1", true);
     expect(mocks.resetConversationThread).not.toHaveBeenCalledWith({
       sessionId: "fresh-session-2",
-      greetingText: "The road's open.",
     });
     expect(mocks.resetPlannerThread).not.toHaveBeenCalledWith({
       sessionId: "fresh-session-2",
@@ -403,7 +386,6 @@ describe("useJourneysCompanionThreads", () => {
     expect(mocks.setCompanionChatThreadArchived).toHaveBeenCalledWith("active-session-1", true);
     expect(mocks.resetConversationThread).toHaveBeenLastCalledWith({
       sessionId: "fresh-session-2",
-      greetingText: "The road's open.",
     });
     expect(mocks.resetPlannerThread).toHaveBeenLastCalledWith({
       sessionId: "fresh-session-2",
@@ -438,7 +420,6 @@ describe("useJourneysCompanionThreads", () => {
 
     expect(mocks.resetConversationThread).toHaveBeenLastCalledWith({
       sessionId: "fresh-session-2",
-      greetingText: "The road's open.",
     });
     expect(mocks.resetPlannerThread).toHaveBeenLastCalledWith({
       sessionId: "fresh-session-2",
@@ -497,15 +478,7 @@ describe("useJourneysCompanionThreads", () => {
     ]);
 
     const { result } = renderJourneysThreads({
-      messages: [
-        {
-          role: "assistant",
-          content: "The road's open.",
-          createdAt: "2026-04-19T08:00:00.000Z",
-          source: "chat",
-          isSeed: true,
-        },
-      ],
+      messages: [],
     });
 
     await waitFor(() => {
@@ -522,7 +495,6 @@ describe("useJourneysCompanionThreads", () => {
     expect(mocks.setCompanionChatThreadArchived).not.toHaveBeenCalled();
     expect(mocks.resetConversationThread).toHaveBeenLastCalledWith({
       sessionId: "fresh-session-2",
-      greetingText: "The road's open.",
     });
     expect(mocks.resetPlannerThread).toHaveBeenLastCalledWith({
       sessionId: "fresh-session-2",
