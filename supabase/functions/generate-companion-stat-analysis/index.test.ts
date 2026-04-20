@@ -105,7 +105,41 @@ const baseAnalysis = {
     onTimeTasks: 2,
     trackedAttributeEvents: 6,
     streakMilestones: 1,
+    hardTaskWins: 1,
+    recoveryActions: 1,
+    healthActions: 2,
+    creativeActions: 1,
+    relationshipActions: 1,
+    epicLinkedCompletions: 1,
+    bounceBackDays: 1,
   },
+  statProfile: {
+    scores: {
+      vitality: 420,
+      wisdom: 540,
+      discipline: 580,
+      resolve: 490,
+      creativity: 360,
+      alignment: 530,
+    },
+    dominantStat: "discipline",
+    secondaryStat: "alignment",
+  },
+  statNeeds: {
+    vitality: { level: "medium", reasons: ["You've been pushing output harder than recovery."] },
+    wisdom: { level: "low", reasons: [] },
+    discipline: { level: "low", reasons: [] },
+    resolve: { level: "low", reasons: [] },
+    creativity: { level: "medium", reasons: ["The week could use a little more originality and play."] },
+    alignment: { level: "low", reasons: [] },
+  },
+  momentumState: "coasting",
+  recentMissInterpretation: "normal_variance",
+  narrativeBrief: "You've kept Discipline online, but Vitality wants a little more intentional support.",
+  dailyNarrative: "Discipline-heavy day",
+  weeklyNarrative: "Discipline is leading lately, with Alignment close behind. Vitality is the clearest rebalance need next.",
+  identityBootstrap: "Here's who you've been lately: Discipline has been your clearest trait.",
+  strongestRecentDrivers: [],
   statBreakdowns: [],
   summary: "Cached mentor read",
   suggestedAction: "Keep the rhythm steady.",
@@ -180,10 +214,17 @@ Deno.test("generate-companion-stat-analysis force refresh regenerates and overwr
     daily_tasks: [{
       data: [{
         id: "task-1",
+        task_text: "Morning workout",
         task_date: "2026-04-18",
+        category: "body",
+        difficulty: "hard",
+        priority: "high",
+        completed: true,
         habit_source_id: null,
         scheduled_time: "09:00:00",
         completed_at: "2026-04-18T09:15:00",
+        contact_id: null,
+        epic_id: null,
       }],
       error: null,
     }],
@@ -199,14 +240,14 @@ Deno.test("generate-companion-stat-analysis force refresh regenerates and overwr
         {
           attribute: "wisdom",
           source_event: "habit_complete_learning",
-          amount_awarded: 8,
+          amount_awarded: 6,
           echo_amount: 0,
           created_at: "2026-04-18T12:00:00.000Z",
         },
         {
           attribute: "alignment",
           source_event: "morning_check_in",
-          amount_awarded: 6,
+          amount_awarded: 4,
           echo_amount: 0,
           created_at: "2026-04-18T12:00:00.000Z",
         },
@@ -270,10 +311,17 @@ Deno.test("buildCompanionStatAnalysisPayload maps drivers deterministically and 
     habitCompletions: [{ date: "2026-04-18", habit_id: "habit-1" }],
     completedTasks: [{
       id: "task-1",
+      task_text: "Morning workout",
       task_date: "2026-04-18",
+      category: "body",
+      difficulty: "hard",
+      priority: "high",
+      completed: true,
       habit_source_id: null,
       scheduled_time: "09:00:00",
       completed_at: "2026-04-18T09:15:00",
+      contact_id: null,
+      epic_id: null,
     }],
     attributeEvents: [
       {
@@ -286,14 +334,14 @@ Deno.test("buildCompanionStatAnalysisPayload maps drivers deterministically and 
       {
         attribute: "wisdom",
         source_event: "habit_complete_learning",
-        amount_awarded: 8,
+        amount_awarded: 6,
         echo_amount: 0,
         created_at: "2026-04-18T12:00:00.000Z",
       },
       {
         attribute: "alignment",
         source_event: "morning_check_in",
-        amount_awarded: 6,
+        amount_awarded: 4,
         echo_amount: 0,
         created_at: "2026-04-18T12:00:00.000Z",
       },
@@ -305,22 +353,24 @@ Deno.test("buildCompanionStatAnalysisPayload maps drivers deterministically and 
   const discipline = analysis.statBreakdowns.find((breakdown: { attribute: string }) => breakdown.attribute === "discipline");
   const wisdom = analysis.statBreakdowns.find((breakdown: { attribute: string }) => breakdown.attribute === "wisdom");
   const vitality = analysis.statBreakdowns.find((breakdown: { attribute: string }) => breakdown.attribute === "vitality");
-  const creativity = analysis.statBreakdowns.find((breakdown: { attribute: string }) => breakdown.attribute === "creativity");
+  const resolve = analysis.statBreakdowns.find((breakdown: { attribute: string }) => breakdown.attribute === "resolve");
 
   assert(Boolean(discipline), "Discipline breakdown should exist");
   assert(Boolean(wisdom), "Wisdom breakdown should exist");
   assert(Boolean(vitality), "Vitality breakdown should exist");
-  assert(Boolean(creativity), "Creativity breakdown should exist");
+  assert(Boolean(resolve), "Resolve breakdown should exist");
 
   assertEquals(discipline!.recentDrivers[0].key, "discipline:habit_complete", "Discipline should map habit provenance");
   assertEquals(wisdom!.recentDrivers[0].key, "wisdom:habit_complete_learning", "Wisdom should map learning provenance");
   assertEquals(analysis.activitySnapshot.onTimeTasks, 1, "On-time tasks should reuse the shared discipline timing logic");
+  assertEquals(analysis.activitySnapshot.healthActions, 1, "Health actions should be counted from completed body tasks");
+  assertEquals(analysis.statProfile.dominantStat, "wisdom", "Recent expression should surface the dominant stat");
   assert(
-    vitality!.primaryReasons[0].includes("No recent tracked boosts"),
-    "Sparse vitality data should stay honest about missing tracked evidence",
+    vitality!.recentDrivers.some((driver: { key: string }) => driver.key === "vitality:activity"),
+    "Vitality should reflect recent body activity even when direct vitality events are sparse",
   );
   assert(
-    creativity!.status.includes("no recent tracked boosts yet"),
-    "Sparse creativity data should not invent recent drivers",
+    resolve!.recentDrivers.some((driver: { key: string }) => driver.key === "resolve:echo" || driver.key === "resolve:activity"),
+    "Resolve should include echo or hard-task context instead of staying empty",
   );
 });

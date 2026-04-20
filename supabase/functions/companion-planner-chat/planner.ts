@@ -94,6 +94,7 @@ export interface PlannerContextTask {
   id: string;
   title: string;
   taskDate: string | null;
+  category?: string | null;
   scheduledTime: string | null;
   estimatedDuration: number | null;
   notes?: string | null;
@@ -252,6 +253,34 @@ export interface PlannerMemoryProfile {
   lastConfirmedAt?: string | null;
 }
 
+export interface PlannerStatInterpretation {
+  statProfile: {
+    scores: {
+      vitality: number;
+      wisdom: number;
+      discipline: number;
+      resolve: number;
+      creativity: number;
+      alignment: number;
+    };
+    dominantStat: "vitality" | "wisdom" | "discipline" | "resolve" | "creativity" | "alignment";
+    secondaryStat: "vitality" | "wisdom" | "discipline" | "resolve" | "creativity" | "alignment";
+  };
+  statNeeds: Record<
+    "vitality" | "wisdom" | "discipline" | "resolve" | "creativity" | "alignment",
+    {
+      level: "low" | "medium" | "high";
+      reasons: string[];
+    }
+  >;
+  momentumState: "locked_in" | "coasting" | "slipping" | "rebuilding";
+  recentMissInterpretation: "overload" | "low_energy" | "avoidance" | "interruption" | "normal_variance";
+  narrativeBrief: string;
+  dailyNarrative: string;
+  weeklyNarrative?: string;
+  identityBootstrap?: string;
+}
+
 export interface PlannerQuestSubtaskPlan {
   mode: "append" | "replace";
   titles: string[];
@@ -311,6 +340,7 @@ export interface PlannerBuildInput {
     priorityScores?: PlannerPriorityScore[];
     scheduleInsights?: PlannerScheduleInsights;
     plannerMemory?: PlannerMemoryProfile;
+    statInterpretation?: PlannerStatInterpretation;
     aiSignals?: {
       preferredDifficulty?: string;
       preferredHabitFrequency?: string;
@@ -2787,6 +2817,113 @@ const summarizePriorityScore = (score: PlannerPriorityScore): string => {
   return `${score.title} because ${score.reasons[0]} and ${score.reasons[1]}.`;
 };
 
+const STAT_LABELS: Record<NonNullable<PlannerStatInterpretation["statProfile"]>["dominantStat"], string> = {
+  vitality: "Vitality",
+  wisdom: "Wisdom",
+  discipline: "Discipline",
+  resolve: "Resolve",
+  creativity: "Creativity",
+  alignment: "Alignment",
+};
+
+const getHighestStatNeed = (
+  statInterpretation: PlannerStatInterpretation | undefined,
+) => {
+  if (!statInterpretation) return null;
+
+  return Object.entries(statInterpretation.statNeeds)
+    .sort((left, right) => {
+      const weight = (level: string) => level === "high" ? 3 : level === "medium" ? 2 : 1;
+      const diff = weight(right[1].level) - weight(left[1].level);
+      if (diff !== 0) return diff;
+      return right[1].reasons.length - left[1].reasons.length;
+    })[0] ?? null;
+};
+
+const getCompanionInterpretationLead = (
+  input: PlannerBuildInput,
+): string | null => {
+  const interpretation = input.plannerContext.statInterpretation;
+  if (!interpretation) return null;
+
+  const highestNeed = getHighestStatNeed(interpretation);
+  const needLine = highestNeed && highestNeed[1].level !== "low"
+    ? `${STAT_LABELS[highestNeed[0] as keyof typeof STAT_LABELS]} is the clearest rebalance need right now.`
+    : null;
+
+  return [interpretation.narrativeBrief, needLine].filter(Boolean).join(" ");
+};
+
+const buildRecoveryProposal = (
+  input: PlannerBuildInput,
+  sessionState: PlannerSessionState,
+  classificationHint: ClassificationHint,
+): PlannerBuildResult | null => {
+  const vitalityNeed = input.plannerContext.statInterpretation?.statNeeds?.vitality;
+  if (!vitalityNeed || vitalityNeed.level !== "high") return null;
+
+  const alreadyHasRecoveryWork = [...input.plannerContext.tasks, ...input.plannerContext.inboxTasks]
+    .some((task) =>
+      task.taskDate === input.currentDate
+      && /\b(recovery|reset|rest|walk|breath|breathe|pause|break)\b/i.test(task.title)
+    );
+
+  if (alreadyHasRecoveryWork) return null;
+
+  const suggestedSlot = input.plannerContext.scheduleInsights?.suggestedSlots.find((slot) =>
+    slot.date === input.currentDate
+  ) ?? null;
+  const interpretationLead = getCompanionInterpretationLead(input);
+  const proposal: PlannerProposal = {
+    id: createId(),
+    kind: "create_quest",
+    title: "Create Recovery reset block",
+    summary: `Create a 30-minute recovery reset${suggestedSlot?.time ? ` at ${suggestedSlot.time}` : " today"}.`,
+    reasoning: "Vitality is under pressure, so I'm turning recovery into a confirmable block instead of hoping it happens by accident.",
+    payload: {
+      taskText: "Recovery reset",
+      difficulty: "easy",
+      taskDate: input.currentDate,
+      scheduledTime: suggestedSlot?.time ?? null,
+      estimatedDuration: 30,
+      source: "manual",
+      category: "body",
+      notes: vitalityNeed.reasons[0] ?? "Protect your energy before the rest of the day asks for more.",
+    },
+    status: "pending",
+    readyToConfirm: true,
+    missingFields: [],
+  };
+
+  return {
+    mode: "proposal",
+    reply: [
+      interpretationLead,
+      "You've been carrying a lot of load. I'm protecting your energy with a 30-minute reset block you can confirm if it feels right.",
+    ].filter(Boolean).join(" "),
+    followUpQuestions: [],
+    proposals: [proposal],
+    suggestedReminders: [],
+    memoryUpdates: {
+      preferredTimeOfDay: sessionState.preferredTimeOfDay ??
+        input.plannerContext.plannerMemory?.preferredTimeOfDay ??
+        null,
+      preferredTimeReason: sessionState.preferredTimeReason ??
+        input.plannerContext.plannerMemory?.preferredTimeReason ??
+        null,
+      reminderPreference: sessionState.reminderPreference ??
+        (input.plannerContext.plannerMemory?.reminderMinutesBefore
+          ? `${input.plannerContext.plannerMemory.reminderMinutesBefore} minutes`
+          : null),
+    },
+    sessionState: {
+      ...sessionState,
+      openQuestionIds: [],
+      lastClassification: classificationHint.type,
+    },
+  };
+};
+
 const buildPriorityOverviewResponse = (
   input: PlannerBuildInput,
   sessionState: PlannerSessionState,
@@ -2806,6 +2943,7 @@ const buildPriorityOverviewResponse = (
 
   const starterIntent = getResolvedStarterIntent(input);
   const briefingFocus = input.plannerContext.briefingContext?.focus;
+  const interpretationLead = getCompanionInterpretationLead(input);
   const lead = starterIntent === "what_matters"
     ? "If we strip the noise out, here's what matters most."
     : starterIntent === "make_room"
@@ -2823,6 +2961,7 @@ const buildPriorityOverviewResponse = (
 
   return buildReadOnlyResponse(
     [
+      interpretationLead,
       lead,
       focusLead,
       buildDayDigest(input, input.currentDate, "Today", true),
@@ -2857,6 +2996,7 @@ const buildRelationshipTouchResponse = (
   const suggestedSlot = input.plannerContext.scheduleInsights?.suggestedSlots.find((slot) =>
     slot.date === input.currentDate
   ) ?? null;
+  const interpretationLead = getCompanionInterpretationLead(input);
   const proposal: PlannerProposal = {
     id: createId(),
     kind: "create_quest",
@@ -2883,7 +3023,10 @@ const buildRelationshipTouchResponse = (
 
   return {
     mode: "proposal",
-    reply: `${targetContact.name} is the clearest relationship touch right now. I drafted a confirmable quest so you can follow through without overthinking it.`,
+    reply: [
+      interpretationLead,
+      `${targetContact.name} is the clearest relationship touch right now. I drafted a confirmable quest so you can follow through without overthinking it.`,
+    ].filter(Boolean).join(" "),
     followUpQuestions: [],
     proposals: [proposal],
     suggestedReminders: [],
@@ -3014,8 +3157,16 @@ const buildLowEnergyAdjustmentResponse = (
     .slice(0, 4);
 
   if (moveCandidates.length === 0) {
+    const recoveryProposal = buildRecoveryProposal(input, sessionState, classificationHint);
+    if (recoveryProposal) {
+      return recoveryProposal;
+    }
+
     return buildReadOnlyResponse(
-      "Today is already pretty lean from the Cosmiq side. I would keep the current plan and just protect the top one or two moves.",
+      [
+        getCompanionInterpretationLead(input),
+        "Today is already pretty lean from the Cosmiq side. I would keep the current plan and just protect the top one or two moves.",
+      ].filter(Boolean).join(" "),
       {
         ...sessionState,
         lastClassification: classificationHint.type,
@@ -3045,7 +3196,10 @@ const buildLowEnergyAdjustmentResponse = (
 
   return {
     mode: "proposal",
-    reply: `I drafted ${proposals.length} move${proposals.length === 1 ? "" : "s"} to lighten today while protecting the strongest priorities. Review them and confirm what you want to keep.`,
+    reply: [
+      getCompanionInterpretationLead(input),
+      `I drafted ${proposals.length} move${proposals.length === 1 ? "" : "s"} to lighten today while protecting the strongest priorities. Review them and confirm what you want to keep.`,
+    ].filter(Boolean).join(" "),
     followUpQuestions: [],
     proposals,
     suggestedReminders: [],
@@ -3091,6 +3245,7 @@ const composeReply = (
     suggest_reminder: "reminder tweak",
   })[kind];
   const scheduleSummary = input.plannerContext.scheduleInsights?.summary;
+  const interpretationLead = getCompanionInterpretationLead(input);
   const preferredTimeOfDay = input.plannerContext.plannerMemory
     ?.preferredTimeOfDay;
   const memoryLead = preferredTimeOfDay
@@ -3100,17 +3255,17 @@ const composeReply = (
 
   if (isWittySassyTone(tonePack)) {
     if (readyToConfirm) {
-      return `${scheduleLead}I drafted this as a ${baseLabel}. Review it, confirm it if it holds up, and spare me the fake ceremony.`;
+      return `${interpretationLead ? `${interpretationLead} ` : ""}${scheduleLead}I drafted this as a ${baseLabel}. Review it, confirm it if it holds up, and spare me the fake ceremony.`;
     }
 
-    return `${scheduleLead}${memoryLead}I can shape this into a ${baseLabel}, but I need one real detail before we dress vague intentions up like a finished plan.`;
+    return `${interpretationLead ? `${interpretationLead} ` : ""}${scheduleLead}${memoryLead}I can shape this into a ${baseLabel}, but I need one real detail before we dress vague intentions up like a finished plan.`;
   }
 
   if (readyToConfirm) {
-    return `${scheduleLead}I drafted this as a ${baseLabel}. Take a look, and confirm it if it fits.`;
+    return `${interpretationLead ? `${interpretationLead} ` : ""}${scheduleLead}I drafted this as a ${baseLabel}. Take a look, and confirm it if it fits.`;
   }
 
-  return `${scheduleLead}${memoryLead}I can help shape this into a ${baseLabel}. First I need one quick detail.`;
+  return `${interpretationLead ? `${interpretationLead} ` : ""}${scheduleLead}${memoryLead}I can help shape this into a ${baseLabel}. First I need one quick detail.`;
 };
 
 const buildConversationalResponse = (

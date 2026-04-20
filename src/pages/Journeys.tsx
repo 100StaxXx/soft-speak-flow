@@ -189,6 +189,7 @@ const Journeys = () => {
       id: createPlannerLaunchIntentId(),
       message,
       starterIntent,
+      target: "planner",
       briefingContext: options?.briefingContext ?? null,
     });
     setIsCompanionPlannerPinned(true);

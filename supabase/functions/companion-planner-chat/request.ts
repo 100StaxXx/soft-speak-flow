@@ -29,6 +29,20 @@ const PlannerStarterIntentSchema = z.enum([
   "goal_breakdown",
 ]);
 
+const CompanionStatAttributeSchema = z.enum([
+  "vitality",
+  "wisdom",
+  "discipline",
+  "resolve",
+  "creativity",
+  "alignment",
+]);
+
+const CompanionStatNeedSchema = z.object({
+  level: z.enum(["low", "medium", "high"]),
+  reasons: z.array(z.string()),
+});
+
 export const PlannerRequestSchema = z.object({
   message: z.string().min(1).max(4000).trim(),
   currentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -67,6 +81,7 @@ export const PlannerRequestSchema = z.object({
       id: z.string(),
       title: z.string(),
       taskDate: z.string().nullable(),
+      category: z.string().nullable().optional(),
       scheduledTime: z.string().nullable(),
       estimatedDuration: z.number().nullable(),
       notes: z.string().nullable().optional(),
@@ -86,6 +101,7 @@ export const PlannerRequestSchema = z.object({
       id: z.string(),
       title: z.string(),
       taskDate: z.string().nullable(),
+      category: z.string().nullable().optional(),
       scheduledTime: z.string().nullable(),
       estimatedDuration: z.number().nullable(),
       notes: z.string().nullable().optional(),
@@ -225,6 +241,34 @@ export const PlannerRequestSchema = z.object({
       workloadTolerance: z.enum(["light", "normal", "heavy"]).nullable().optional(),
       contactCadencePatterns: z.record(z.number()).optional(),
       lastConfirmedAt: z.string().nullable().optional(),
+    }).optional(),
+    statInterpretation: z.object({
+      statProfile: z.object({
+        scores: z.object({
+          vitality: z.number(),
+          wisdom: z.number(),
+          discipline: z.number(),
+          resolve: z.number(),
+          creativity: z.number(),
+          alignment: z.number(),
+        }),
+        dominantStat: CompanionStatAttributeSchema,
+        secondaryStat: CompanionStatAttributeSchema,
+      }),
+      statNeeds: z.object({
+        vitality: CompanionStatNeedSchema,
+        wisdom: CompanionStatNeedSchema,
+        discipline: CompanionStatNeedSchema,
+        resolve: CompanionStatNeedSchema,
+        creativity: CompanionStatNeedSchema,
+        alignment: CompanionStatNeedSchema,
+      }),
+      momentumState: z.enum(["locked_in", "coasting", "slipping", "rebuilding"]),
+      recentMissInterpretation: z.enum(["overload", "low_energy", "avoidance", "interruption", "normal_variance"]),
+      narrativeBrief: z.string(),
+      dailyNarrative: z.string(),
+      weeklyNarrative: z.string().optional(),
+      identityBootstrap: z.string().optional(),
     }).optional(),
     aiSignals: z.object({
       preferredDifficulty: z.string().optional(),

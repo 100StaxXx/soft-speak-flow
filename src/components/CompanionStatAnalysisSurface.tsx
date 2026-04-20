@@ -89,12 +89,24 @@ const ACTIVITY_FIELDS: Array<{
   { key: "onTimeTasks", label: "On-time tasks" },
   { key: "trackedAttributeEvents", label: "Tracked boosts" },
   { key: "streakMilestones", label: "Streak milestones" },
+  { key: "hardTaskWins", label: "Hard task wins" },
+  { key: "recoveryActions", label: "Recovery actions" },
+  { key: "healthActions", label: "Health actions" },
+  { key: "creativeActions", label: "Creative actions" },
+  { key: "relationshipActions", label: "Relationship actions" },
+  { key: "bounceBackDays", label: "Bounce-back days" },
 ];
 
 const formatRange = (startDate: string, endDate: string) => {
   if (startDate === endDate) return startDate;
   return `${startDate} to ${endDate}`;
 };
+
+const formatSnakeLabel = (value: string) =>
+  value
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 
 const mentorAccentStyle = (analysis: CompanionStatAnalysis | null): CSSProperties | undefined => {
   const color = analysis?.mentor.primaryColor;
@@ -263,9 +275,65 @@ function AnalysisContent() {
               {analysis.mentor.name} says your stats make sense.
             </CardTitle>
             <p className="text-sm leading-6 text-muted-foreground">{analysis.summary}</p>
+            <p className="text-sm leading-6 text-foreground/88">{analysis.narrativeBrief}</p>
           </div>
         </CardHeader>
       </Card>
+
+      <div className="grid gap-3 md:grid-cols-3">
+        <Card className="border-border/60 bg-background/55">
+          <CardHeader className="space-y-2">
+            <CardTitle className="text-base">Current identity</CardTitle>
+            <p className="text-sm text-muted-foreground">{analysis.identityBootstrap}</p>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex flex-wrap gap-2">
+              <Badge variant="secondary">Dominant: {ATTRIBUTE_META[analysis.statProfile.dominantStat].label}</Badge>
+              <Badge variant="outline">Growing: {ATTRIBUTE_META[analysis.statProfile.secondaryStat].label}</Badge>
+            </div>
+            <Badge variant="outline" className="bg-background/70 text-foreground">
+              Momentum: {formatSnakeLabel(analysis.momentumState)}
+            </Badge>
+          </CardContent>
+        </Card>
+
+        <Card className="border-border/60 bg-background/55">
+          <CardHeader className="space-y-2">
+            <CardTitle className="text-base">Daily narrative</CardTitle>
+            <p className="text-sm text-muted-foreground">{analysis.dailyNarrative}</p>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm leading-6 text-foreground/88">{analysis.weeklyNarrative}</p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-border/60 bg-background/55">
+          <CardHeader className="space-y-2">
+            <CardTitle className="text-base">Miss read</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Recent misses read most like <span className="font-medium text-foreground">{formatSnakeLabel(analysis.recentMissInterpretation)}</span>.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {Object.entries(analysis.statNeeds)
+              .filter(([, need]) => need.level !== "low" || need.reasons.length > 0)
+              .slice(0, 2)
+              .map(([attribute, need]) => (
+                <div key={attribute} className="rounded-xl border border-white/5 bg-background/40 px-3 py-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-medium">{ATTRIBUTE_META[attribute as keyof typeof ATTRIBUTE_META].label}</span>
+                    <Badge variant="secondary" className="bg-white/10 text-[10px] uppercase tracking-wide">
+                      {need.level}
+                    </Badge>
+                  </div>
+                  {need.reasons[0] ? (
+                    <p className="mt-2 text-xs leading-5 text-muted-foreground">{need.reasons[0]}</p>
+                  ) : null}
+                </div>
+              ))}
+          </CardContent>
+        </Card>
+      </div>
 
       <Card>
         <CardHeader className="space-y-2">
@@ -301,6 +369,27 @@ function AnalysisContent() {
           <BreakdownCard key={breakdown.attribute} breakdown={breakdown} />
         ))}
       </div>
+
+      {analysis.strongestRecentDrivers.length > 0 ? (
+        <Card className="border-border/60 bg-background/55">
+          <CardHeader className="space-y-2">
+            <CardTitle className="text-lg">Strongest recent drivers</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {analysis.strongestRecentDrivers.map((driver) => (
+              <div key={driver.key} className="rounded-xl border border-white/5 bg-background/40 px-3 py-2">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm font-medium">{driver.label}</span>
+                  <Badge variant="outline" className="bg-background/60">
+                    {driver.window}
+                  </Badge>
+                </div>
+                <p className="mt-2 text-xs leading-5 text-muted-foreground">{driver.detail}</p>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Card className="border-primary/20 bg-primary/5">
         <CardHeader className="space-y-2">

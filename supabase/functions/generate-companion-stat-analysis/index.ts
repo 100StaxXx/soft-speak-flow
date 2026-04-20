@@ -4,15 +4,21 @@ import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 import { errorResponse, type RequestAuth, requireRequestAuth } from "../_shared/auth.ts";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
+import {
+  buildCompanionStatInterpretation,
+  COMPANION_ECHO_TARGETS,
+  getCompanionBehaviorAwardIntent,
+  type CompanionMissInterpretation,
+  type CompanionMomentumState,
+  type CompanionStatAttribute,
+  type CompanionStatNeed,
+  type CompanionStatProfileSummary,
+  type CompanionStatReflectionInput,
+  type CompanionStatTaskInput,
+} from "../../../src/shared/companionStatSignals.ts";
 import { getTaskCompletionDisciplineAward } from "../../../src/shared/taskCompletionTiming.ts";
 
-type AttributeType =
-  | "vitality"
-  | "wisdom"
-  | "discipline"
-  | "resolve"
-  | "creativity"
-  | "alignment";
+type AttributeType = CompanionStatAttribute;
 
 type CompanionStatBand = "Emerging" | "Building" | "Strong" | "Exceptional";
 type CompanionStatDriverSource = "attribute_event" | "activity" | "echo";
@@ -64,7 +70,23 @@ export interface CompanionStatAnalysis {
     onTimeTasks: number;
     trackedAttributeEvents: number;
     streakMilestones: number;
+    hardTaskWins: number;
+    recoveryActions: number;
+    healthActions: number;
+    creativeActions: number;
+    relationshipActions: number;
+    epicLinkedCompletions: number;
+    bounceBackDays: number;
   };
+  statProfile: CompanionStatProfileSummary;
+  statNeeds: Record<AttributeType, CompanionStatNeed>;
+  momentumState: CompanionMomentumState;
+  recentMissInterpretation: CompanionMissInterpretation;
+  narrativeBrief: string;
+  dailyNarrative: string;
+  weeklyNarrative: string;
+  identityBootstrap: string;
+  strongestRecentDrivers: CompanionStatDriver[];
   statBreakdowns: CompanionStatBreakdown[];
   summary: string;
   suggestedAction: string;
@@ -117,10 +139,17 @@ interface HabitCompletionRow {
 
 interface DailyTaskRow {
   id: string;
+  task_text: string;
   task_date: string | null;
+  category: string | null;
+  difficulty: string | null;
+  priority: string | null;
+  completed: boolean | null;
   habit_source_id: string | null;
   scheduled_time: string | null;
   completed_at: string | null;
+  contact_id: string | null;
+  epic_id: string | null;
 }
 
 interface CompanionAttributeEventRow {
@@ -263,50 +292,171 @@ function createFallbackReasons(attribute: AttributeType): string[] {
   ];
 }
 
-function buildGenericTrackedBreakdown(
-  attribute: AttributeType,
-  score: number,
-  events: CompanionAttributeEventRow[],
-): CompanionStatBreakdown {
-  const band = getCompanionStatBand(score);
-  const trackedEvents = events.filter((event) => event.amount_awarded > 0);
+const SOURCE_EVENT_LABELS: Record<string, string> = {
+  habit_complete: "Habit completions",
+  planned_task_on_time: "On-time task wins",
+  streak_milestone: "Streak milestones",
+  habit_complete_learning: "Learning-linked completions",
+  morning_check_in: "Morning check-ins",
+  evening_reflection: "Evening reflections",
+  health_task_complete: "Health and body wins",
+  recovery_block_kept: "Recovery blocks kept",
+  hard_task_complete: "Hard task wins",
+  bounce_back_day: "Bounce-back days",
+  creative_block_complete: "Creative blocks",
+  epic_progress_complete: "Epic-linked progress",
+  relationship_maintenance_complete: "Relationship maintenance",
+  urge_resist: "Urge resist wins",
+};
 
-  if (!trackedEvents.length) {
-    return {
-      attribute,
-      score,
-      band,
-      status: createStatus(band, []),
-      primaryReasons: createFallbackReasons(attribute),
-      recentDrivers: [],
-    };
+const ATTRIBUTE_ACTIVITY_LABELS: Record<AttributeType, string> = {
+  vitality: "Body and recovery activity",
+  wisdom: "Learning activity",
+  discipline: "Follow-through activity",
+  resolve: "Hard task activity",
+  creativity: "Creative activity",
+  alignment: "Alignment activity",
+};
+
+const mapTaskToStatInput = (task: DailyTaskRow): CompanionStatTaskInput => ({
+  id: task.id,
+  title: task.task_text,
+  taskDate: task.task_date,
+  category: task.category,
+  difficulty: task.difficulty,
+  priority: task.priority,
+  completed: task.completed,
+  scheduledTime: task.scheduled_time,
+  completedAt: task.completed_at,
+  contactId: task.contact_id,
+  habitSourceId: task.habit_source_id,
+});
+
+const buildRecentReflectionSignals = (
+  checkIns: DailyCheckInRow[],
+  reflections: EveningReflectionRow[],
+): CompanionStatReflectionInput[] => {
+  const checkInSignals = checkIns.map((checkIn) => ({
+    date: checkIn.check_in_date,
+    source: "check_in" as const,
+    mood: checkIn.mood ?? "unknown",
+    energy: checkIn.mood?.toLowerCase().includes("tired")
+      || checkIn.mood?.toLowerCase().includes("low")
+      ? "low" as const
+      : "medium" as const,
+    wins: checkIn.intention ?? null,
+    tomorrowAdjustment: null,
+  }));
+
+  const reflectionSignals = reflections.map((reflection) => ({
+    date: reflection.reflection_date,
+    source: "reflection" as const,
+    mood: reflection.mood ?? "unknown",
+    energy: reflection.mood?.toLowerCase().includes("tired")
+      || reflection.mood?.toLowerCase().includes("drained")
+      ? "low" as const
+      : "medium" as const,
+    wins: null,
+    tomorrowAdjustment: null,
+  }));
+
+  return [...checkInSignals, ...reflectionSignals]
+    .sort((left, right) => right.date.localeCompare(left.date))
+    .slice(0, 10);
+};
+
+const buildActivityCountMap = (
+  tasks: DailyTaskRow[],
+): Record<AttributeType, number> => {
+  const counts = Object.fromEntries(
+    ATTRIBUTE_ORDER.map((attribute) => [attribute, 0]),
+  ) as Record<AttributeType, number>;
+
+  for (const task of tasks.filter((candidate) => candidate.completed === true)) {
+    const intent = getCompanionBehaviorAwardIntent({
+      title: task.task_text,
+      category: task.category,
+      difficulty: task.difficulty,
+      priority: task.priority,
+      contactId: task.contact_id,
+    });
+
+    if (intent) {
+      counts[intent.attribute] += 1;
+    }
+
+    if (task.difficulty === "hard") {
+      counts.resolve += 1;
+    }
   }
 
-  const totalAwarded = sumAwardedAmount(trackedEvents);
-  const drivers = [
-    createDriver({
-      key: `${attribute}:tracked`,
-      label: `${ATTRIBUTE_LABELS[attribute]} gains`,
-      detail: `${trackedEvents.length} tracked ${ATTRIBUTE_LABELS[attribute].toLowerCase()} ${pluralize(
-        trackedEvents.length,
-        "award",
-      )} contributed ${totalAwarded} total points in the last 30 days.`,
+  return counts;
+};
+
+const buildDriversForAttribute = (
+  attribute: AttributeType,
+  attributeEvents: CompanionAttributeEventRow[],
+  activityCount: number,
+): CompanionStatDriver[] => {
+  const drivers: CompanionStatDriver[] = [];
+  const trackedEvents = attributeEvents.filter((event) => event.amount_awarded > 0);
+  const groupedBySource = new Map<string, CompanionAttributeEventRow[]>();
+
+  for (const event of trackedEvents) {
+    const existing = groupedBySource.get(event.source_event) ?? [];
+    existing.push(event);
+    groupedBySource.set(event.source_event, existing);
+  }
+
+  for (const [sourceEvent, events] of groupedBySource.entries()) {
+    const totalAwarded = sumAwardedAmount(events);
+    const label = SOURCE_EVENT_LABELS[sourceEvent] ?? `${ATTRIBUTE_LABELS[attribute]} gains`;
+    drivers.push(createDriver({
+      key: `${attribute}:${sourceEvent}`,
+      label,
+      detail: `${events.length} ${label.toLowerCase()} ${pluralize(events.length, "event")} contributed ${totalAwarded} ${ATTRIBUTE_LABELS[attribute]} in the last 30 days.`,
       sourceType: "attribute_event",
       window: "30d",
-      count: trackedEvents.length,
+      count: events.length,
       amount: totalAwarded,
-    }),
-  ];
+    }));
+  }
 
-  return {
-    attribute,
-    score,
-    band,
-    status: createStatus(band, drivers),
-    primaryReasons: drivers.map((driver) => driver.detail),
-    recentDrivers: drivers,
-  };
-}
+  if (drivers.length === 0 && activityCount > 0) {
+    drivers.push(createDriver({
+      key: `${attribute}:activity`,
+      label: ATTRIBUTE_ACTIVITY_LABELS[attribute],
+      detail: `${activityCount} ${ATTRIBUTE_ACTIVITY_LABELS[attribute].toLowerCase()} ${pluralize(activityCount, "signal")} showed up in the last 7 days, even though no tracked ${ATTRIBUTE_LABELS[attribute]} award was written yet.`,
+      sourceType: "activity",
+      window: "7d",
+      count: activityCount,
+      amount: null,
+    }));
+  }
+
+  const echoEvents = attributeEvents
+    .filter((event) => event.echo_amount > 0)
+    .filter((event) =>
+      (COMPANION_ECHO_TARGETS[event.attribute as AttributeType] ?? []).includes(attribute)
+    );
+
+  if (echoEvents.length > 0) {
+    const totalEchoAmount = sumEchoAmount(echoEvents);
+    drivers.push(createDriver({
+      key: `${attribute}:echo`,
+      label: "Echo gains",
+      detail: `${echoEvents.length} related stat ${pluralize(echoEvents.length, "award")} added ${totalEchoAmount} ${ATTRIBUTE_LABELS[attribute]} through echo gains in the last 30 days.`,
+      sourceType: "echo",
+      window: "30d",
+      count: echoEvents.length,
+      amount: totalEchoAmount,
+    }));
+  }
+
+  return drivers
+    .sort((left, right) => (right.amount ?? 0) - (left.amount ?? 0) || (right.count ?? 0) - (left.count ?? 0))
+    .slice(0, 4);
+};
 
 export function buildCompanionStatAnalysisPayload({
   analysisDate,
@@ -331,6 +481,24 @@ export function buildCompanionStatAnalysisPayload({
     alignment: clampScore(companion.alignment),
   } satisfies Record<AttributeType, number>;
 
+  const recentTasks = completedTasks.map(mapTaskToStatInput);
+  const reflectionSignals = buildRecentReflectionSignals(checkIns, reflections);
+  const positiveAttributeEvents = attributeEvents.filter((event) => event.amount_awarded > 0);
+  const activityCountMap = buildActivityCountMap(completedTasks);
+  const interpretation = buildCompanionStatInterpretation({
+    scores: scoredCompanion,
+    currentDate: analysisDate,
+    recentEvents: attributeEvents.map((event) => ({
+      attribute: event.attribute as AttributeType,
+      sourceEvent: event.source_event,
+      amountAwarded: event.amount_awarded,
+      echoAmount: event.echo_amount,
+      createdAt: event.created_at,
+    })),
+    recentTasks,
+    reflectionSignals,
+  });
+
   const onTimeTasks = completedTasks.filter((task) => {
     if (!task.completed_at) return false;
     const award = getTaskCompletionDisciplineAward({
@@ -344,298 +512,76 @@ export function buildCompanionStatAnalysisPayload({
     return award?.kind === "planned_task_on_time";
   });
 
-  const disciplineEvents = attributeEvents.filter((event) => event.attribute === "discipline");
-  const wisdomEvents = attributeEvents.filter((event) => event.attribute === "wisdom");
-  const alignmentEvents = attributeEvents.filter((event) => event.attribute === "alignment");
-  const resolveEvents = attributeEvents.filter((event) => event.attribute === "resolve");
-  const vitalityEvents = attributeEvents.filter((event) => event.attribute === "vitality");
-  const creativityEvents = attributeEvents.filter((event) => event.attribute === "creativity");
-
-  const habitDisciplineEvents = disciplineEvents.filter(
-    (event) => event.source_event === "habit_complete" && event.amount_awarded > 0,
+  const hardTaskWins = completedTasks.filter((task) => task.completed === true && task.difficulty === "hard");
+  const relationshipActions = completedTasks.filter((task) =>
+    task.completed === true && Boolean(task.contact_id)
   );
-  const onTimeDisciplineEvents = disciplineEvents.filter(
-    (event) => event.source_event === "planned_task_on_time" && event.amount_awarded > 0,
+  const creativeActions = completedTasks.filter((task) => {
+    if (task.completed !== true) return false;
+    const intent = getCompanionBehaviorAwardIntent({
+      title: task.task_text,
+      category: task.category,
+      difficulty: task.difficulty,
+      priority: task.priority,
+      contactId: task.contact_id,
+    });
+    return intent?.attribute === "creativity";
+  });
+  const healthActions = completedTasks.filter((task) => {
+    if (task.completed !== true) return false;
+    const intent = getCompanionBehaviorAwardIntent({
+      title: task.task_text,
+      category: task.category,
+      difficulty: task.difficulty,
+      priority: task.priority,
+      contactId: task.contact_id,
+    });
+    return intent?.sourceEvent === "health_task_complete";
+  });
+  const recoveryActions = completedTasks.filter((task) => {
+    if (task.completed !== true) return false;
+    const intent = getCompanionBehaviorAwardIntent({
+      title: task.task_text,
+      category: task.category,
+      difficulty: task.difficulty,
+      priority: task.priority,
+      contactId: task.contact_id,
+    });
+    return intent?.sourceEvent === "recovery_block_kept";
+  });
+  const streakMilestones = attributeEvents.filter((event) =>
+    event.source_event === "streak_milestone" && event.amount_awarded > 0
   );
-  const streakDisciplineEvents = disciplineEvents.filter(
-    (event) => event.source_event === "streak_milestone" && event.amount_awarded > 0,
+  const bounceBackDays = attributeEvents.filter((event) =>
+    event.source_event === "bounce_back_day" && event.amount_awarded > 0
   );
-  const wisdomLearningEvents = wisdomEvents.filter(
-    (event) => event.source_event === "habit_complete_learning" && event.amount_awarded > 0,
-  );
-  const morningAlignmentEvents = alignmentEvents.filter(
-    (event) => event.source_event === "morning_check_in" && event.amount_awarded > 0,
-  );
-  const eveningAlignmentEvents = alignmentEvents.filter(
-    (event) => event.source_event === "evening_reflection" && event.amount_awarded > 0,
+  const epicLinkedCompletions = attributeEvents.filter((event) =>
+    event.source_event === "epic_progress_complete" && event.amount_awarded > 0
   );
 
-  const disciplineDrivers: CompanionStatDriver[] = [];
-  if (habitDisciplineEvents.length > 0) {
-    const totalAwarded = sumAwardedAmount(habitDisciplineEvents);
-    disciplineDrivers.push(
-      createDriver({
-        key: "discipline:habit_complete",
-        label: "Habit completions",
-        detail: `${habitDisciplineEvents.length} habit ${pluralize(
-          habitDisciplineEvents.length,
-          "completion",
-        )} awarded ${totalAwarded} Discipline in the last 30 days.`,
-        sourceType: "attribute_event",
-        window: "30d",
-        count: habitDisciplineEvents.length,
-        amount: totalAwarded,
-      }),
+  const statBreakdowns: CompanionStatBreakdown[] = ATTRIBUTE_ORDER.map((attribute) => {
+    const drivers = buildDriversForAttribute(
+      attribute,
+      attributeEvents.filter((event) => event.attribute === attribute),
+      activityCountMap[attribute],
     );
-  }
-  if (onTimeDisciplineEvents.length > 0) {
-    const totalAwarded = sumAwardedAmount(onTimeDisciplineEvents);
-    disciplineDrivers.push(
-      createDriver({
-        key: "discipline:planned_task_on_time",
-        label: "On-time task wins",
-        detail: `${onTimeDisciplineEvents.length} planned task ${pluralize(
-          onTimeDisciplineEvents.length,
-          "win",
-        )} awarded ${totalAwarded} Discipline in the last 30 days.`,
-        sourceType: "attribute_event",
-        window: "30d",
-        count: onTimeDisciplineEvents.length,
-        amount: totalAwarded,
-      }),
-    );
-  }
-  if (streakDisciplineEvents.length > 0) {
-    const totalAwarded = sumAwardedAmount(streakDisciplineEvents);
-    disciplineDrivers.push(
-      createDriver({
-        key: "discipline:streak_milestone",
-        label: "Streak milestones",
-        detail: `${streakDisciplineEvents.length} streak ${pluralize(
-          streakDisciplineEvents.length,
-          "milestone",
-        )} awarded ${totalAwarded} Discipline in the last 30 days.`,
-        sourceType: "attribute_event",
-        window: "30d",
-        count: streakDisciplineEvents.length,
-        amount: totalAwarded,
-      }),
-    );
-  }
-  if (!disciplineDrivers.length) {
-    if (habitCompletions.length > 0) {
-      disciplineDrivers.push(
-        createDriver({
-          key: "discipline:habit_activity",
-          label: "Habit activity",
-          detail: `${habitCompletions.length} habit ${pluralize(
-            habitCompletions.length,
-            "completion",
-          )} were logged in the last 7 days, but no recent tracked Discipline boosts were recorded yet.`,
-          sourceType: "activity",
-          window: "7d",
-          count: habitCompletions.length,
-          amount: null,
-        }),
-      );
-    }
-    if (onTimeTasks.length > 0) {
-      disciplineDrivers.push(
-        createDriver({
-          key: "discipline:on_time_activity",
-          label: "Scheduled follow-through",
-          detail: `${onTimeTasks.length} planned task ${pluralize(
-            onTimeTasks.length,
-            "was",
-            "were",
-          )} finished on time in the last 7 days, but no recent tracked Discipline boosts were recorded yet.`,
-          sourceType: "activity",
-          window: "7d",
-          count: onTimeTasks.length,
-          amount: null,
-        }),
-      );
-    }
-  }
+    const band = getCompanionStatBand(scoredCompanion[attribute]);
+    return {
+      attribute,
+      score: scoredCompanion[attribute],
+      band,
+      status: createStatus(band, drivers),
+      primaryReasons: drivers.length
+        ? drivers.map((driver) => driver.detail)
+        : createFallbackReasons(attribute),
+      recentDrivers: drivers,
+    };
+  });
 
-  const wisdomDrivers: CompanionStatDriver[] = [];
-  if (wisdomLearningEvents.length > 0) {
-    const totalAwarded = sumAwardedAmount(wisdomLearningEvents);
-    wisdomDrivers.push(
-      createDriver({
-        key: "wisdom:habit_complete_learning",
-        label: "Learning-linked habits",
-        detail: `${wisdomLearningEvents.length} learning ${pluralize(
-          wisdomLearningEvents.length,
-          "award",
-        )} contributed ${totalAwarded} Wisdom in the last 30 days.`,
-        sourceType: "attribute_event",
-        window: "30d",
-        count: wisdomLearningEvents.length,
-        amount: totalAwarded,
-      }),
-    );
-  } else if (habitCompletions.length > 0) {
-    wisdomDrivers.push(
-      createDriver({
-        key: "wisdom:habit_activity",
-        label: "Learning activity",
-        detail: `${habitCompletions.length} habit ${pluralize(
-          habitCompletions.length,
-          "completion",
-        )} were logged in the last 7 days, but no recent tracked Wisdom boosts were recorded yet.`,
-        sourceType: "activity",
-        window: "7d",
-        count: habitCompletions.length,
-        amount: null,
-      }),
-    );
-  }
-
-  const alignmentDrivers: CompanionStatDriver[] = [];
-  if (morningAlignmentEvents.length > 0) {
-    const totalAwarded = sumAwardedAmount(morningAlignmentEvents);
-    alignmentDrivers.push(
-      createDriver({
-        key: "alignment:morning_check_in",
-        label: "Morning check-ins",
-        detail: `${morningAlignmentEvents.length} morning ${pluralize(
-          morningAlignmentEvents.length,
-          "check-in",
-        )} contributed ${totalAwarded} Alignment in the last 30 days.`,
-        sourceType: "attribute_event",
-        window: "30d",
-        count: morningAlignmentEvents.length,
-        amount: totalAwarded,
-      }),
-    );
-  } else if (checkIns.length > 0) {
-    alignmentDrivers.push(
-      createDriver({
-        key: "alignment:check_in_activity",
-        label: "Morning check-ins",
-        detail: `${checkIns.length} morning ${pluralize(
-          checkIns.length,
-          "check-in",
-        )} were logged in the last 7 days, but no recent tracked Alignment boosts were recorded yet.`,
-        sourceType: "activity",
-        window: "7d",
-        count: checkIns.length,
-        amount: null,
-      }),
-    );
-  }
-  if (eveningAlignmentEvents.length > 0) {
-    const totalAwarded = sumAwardedAmount(eveningAlignmentEvents);
-    alignmentDrivers.push(
-      createDriver({
-        key: "alignment:evening_reflection",
-        label: "Evening reflections",
-        detail: `${eveningAlignmentEvents.length} evening ${pluralize(
-          eveningAlignmentEvents.length,
-          "reflection",
-        )} contributed ${totalAwarded} Alignment in the last 30 days.`,
-        sourceType: "attribute_event",
-        window: "30d",
-        count: eveningAlignmentEvents.length,
-        amount: totalAwarded,
-      }),
-    );
-  } else if (reflections.length > 0) {
-    alignmentDrivers.push(
-      createDriver({
-        key: "alignment:reflection_activity",
-        label: "Evening reflections",
-        detail: `${reflections.length} evening ${pluralize(
-          reflections.length,
-          "reflection",
-        )} were logged in the last 7 days, but no recent tracked Alignment boosts were recorded yet.`,
-        sourceType: "activity",
-        window: "7d",
-        count: reflections.length,
-        amount: null,
-      }),
-    );
-  }
-
-  const resolveDrivers: CompanionStatDriver[] = [];
-  if (resolveEvents.filter((event) => event.amount_awarded > 0).length > 0) {
-    const trackedResolveEvents = resolveEvents.filter((event) => event.amount_awarded > 0);
-    const totalAwarded = sumAwardedAmount(trackedResolveEvents);
-    resolveDrivers.push(
-      createDriver({
-        key: "resolve:direct",
-        label: "Tracked resolve gains",
-        detail: `${trackedResolveEvents.length} tracked ${pluralize(
-          trackedResolveEvents.length,
-          "event",
-        )} contributed ${totalAwarded} Resolve in the last 30 days.`,
-        sourceType: "attribute_event",
-        window: "30d",
-        count: trackedResolveEvents.length,
-        amount: totalAwarded,
-      }),
-    );
-  }
-
-  const disciplineEchoEvents = disciplineEvents.filter((event) => event.echo_amount > 0);
-  if (disciplineEchoEvents.length > 0) {
-    const totalEchoAmount = sumEchoAmount(disciplineEchoEvents);
-    resolveDrivers.push(
-      createDriver({
-        key: "resolve:discipline_echo",
-        label: "Discipline echo gains",
-        detail: `${disciplineEchoEvents.length} Discipline ${pluralize(
-          disciplineEchoEvents.length,
-          "award",
-        )} added ${totalEchoAmount} Resolve through echo gains in the last 30 days.`,
-        sourceType: "echo",
-        window: "30d",
-        count: disciplineEchoEvents.length,
-        amount: totalEchoAmount,
-      }),
-    );
-  }
-
-  const vitalityBreakdown = buildGenericTrackedBreakdown("vitality", scoredCompanion.vitality, vitalityEvents);
-  const creativityBreakdown = buildGenericTrackedBreakdown("creativity", scoredCompanion.creativity, creativityEvents);
-
-  const statBreakdowns: CompanionStatBreakdown[] = [
-    vitalityBreakdown,
-    {
-      attribute: "wisdom",
-      score: scoredCompanion.wisdom,
-      band: getCompanionStatBand(scoredCompanion.wisdom),
-      status: createStatus(getCompanionStatBand(scoredCompanion.wisdom), wisdomDrivers),
-      primaryReasons: wisdomDrivers.length ? wisdomDrivers.map((driver) => driver.detail) : createFallbackReasons("wisdom"),
-      recentDrivers: wisdomDrivers,
-    },
-    {
-      attribute: "discipline",
-      score: scoredCompanion.discipline,
-      band: getCompanionStatBand(scoredCompanion.discipline),
-      status: createStatus(getCompanionStatBand(scoredCompanion.discipline), disciplineDrivers),
-      primaryReasons: disciplineDrivers.length ? disciplineDrivers.map((driver) => driver.detail) : createFallbackReasons("discipline"),
-      recentDrivers: disciplineDrivers,
-    },
-    {
-      attribute: "resolve",
-      score: scoredCompanion.resolve,
-      band: getCompanionStatBand(scoredCompanion.resolve),
-      status: createStatus(getCompanionStatBand(scoredCompanion.resolve), resolveDrivers),
-      primaryReasons: resolveDrivers.length ? resolveDrivers.map((driver) => driver.detail) : createFallbackReasons("resolve"),
-      recentDrivers: resolveDrivers,
-    },
-    creativityBreakdown,
-    {
-      attribute: "alignment",
-      score: scoredCompanion.alignment,
-      band: getCompanionStatBand(scoredCompanion.alignment),
-      status: createStatus(getCompanionStatBand(scoredCompanion.alignment), alignmentDrivers),
-      primaryReasons: alignmentDrivers.length ? alignmentDrivers.map((driver) => driver.detail) : createFallbackReasons("alignment"),
-      recentDrivers: alignmentDrivers,
-    },
-  ];
+  const strongestRecentDrivers = [...statBreakdowns]
+    .flatMap((breakdown) => breakdown.recentDrivers)
+    .sort((left, right) => (right.amount ?? 0) - (left.amount ?? 0) || (right.count ?? 0) - (left.count ?? 0))
+    .slice(0, 4);
 
   return {
     analysisDate,
@@ -656,9 +602,25 @@ export function buildCompanionStatAnalysisPayload({
       eveningReflections: reflections.length,
       habitCompletions: habitCompletions.length,
       onTimeTasks: onTimeTasks.length,
-      trackedAttributeEvents: attributeEvents.filter((event) => event.amount_awarded > 0).length,
-      streakMilestones: streakDisciplineEvents.length,
+      trackedAttributeEvents: positiveAttributeEvents.length,
+      streakMilestones: streakMilestones.length,
+      hardTaskWins: hardTaskWins.length,
+      recoveryActions: recoveryActions.length,
+      healthActions: healthActions.length,
+      creativeActions: creativeActions.length,
+      relationshipActions: relationshipActions.length,
+      epicLinkedCompletions: epicLinkedCompletions.length,
+      bounceBackDays: bounceBackDays.length,
     },
+    statProfile: interpretation.statProfile,
+    statNeeds: interpretation.statNeeds,
+    momentumState: interpretation.momentumState,
+    recentMissInterpretation: interpretation.recentMissInterpretation,
+    narrativeBrief: interpretation.narrativeBrief,
+    dailyNarrative: interpretation.dailyNarrative,
+    weeklyNarrative: interpretation.weeklyNarrative,
+    identityBootstrap: interpretation.identityBootstrap,
+    strongestRecentDrivers,
     statBreakdowns,
     summary: "",
     suggestedAction: "",
@@ -678,16 +640,16 @@ export function buildFallbackMentorCopy(analysis: CompanionStatAnalysis): Genera
   const strongestActivity = [...activityEntries].sort((left, right) => right[1] - left[1])[0];
 
   const summary = strongestActivity[1] > 0
-    ? `${analysis.mentor.name} sees your clearest recent momentum in ${ATTRIBUTE_LABELS[strongest.attribute]}. The most visible recent behavior is ${strongestActivity[1]} ${strongestActivity[0]}, while ${ATTRIBUTE_LABELS[weakest.attribute]} has the thinnest recent evidence behind it.`
-    : `${analysis.mentor.name} sees a long-run stat picture here, but not much recent tracked activity yet. ${ATTRIBUTE_LABELS[strongest.attribute]} is currently your strongest base, and ${ATTRIBUTE_LABELS[weakest.attribute]} is the clearest place to rebuild momentum.`;
+    ? `${analysis.mentor.name} sees you trending ${ATTRIBUTE_LABELS[analysis.statProfile.dominantStat]} with ${ATTRIBUTE_LABELS[analysis.statProfile.secondaryStat]} close behind. ${analysis.dailyNarrative} fits the recent activity, and ${ATTRIBUTE_LABELS[weakest.attribute]} is the clearest place to rebalance next.`
+    : `${analysis.mentor.name} sees a long-run stat picture here, but not much recent tracked activity yet. ${ATTRIBUTE_LABELS[strongest.attribute]} is currently your strongest base, ${analysis.momentumState.replace("_", " ")} is the current momentum state, and ${ATTRIBUTE_LABELS[weakest.attribute]} is the clearest place to rebuild momentum.`;
 
   const suggestedActionByAttribute: Record<AttributeType, string> = {
-    vitality: "Log one body-focused habit or quest today so your next stat read has a clearer physical signal to work from.",
-    wisdom: "Complete one learning-focused habit today so Wisdom gets a fresh, trackable push.",
-    discipline: "Finish one planned task on time or close one habit streak today to give Discipline a clean win.",
-    resolve: "Use one discipline win as your anchor today; Resolve reads best when follow-through stays visible.",
-    creativity: "Route one small creative or shipping action through the app today so Creativity can start building a real trail.",
-    alignment: "Pair a morning check-in with an evening reflection today so Alignment gets a full-day signal.",
+    vitality: "Protect your energy with one real recovery block or body-first task today so Vitality gets a clearer signal.",
+    wisdom: "Complete one learning-focused task today so Wisdom gets a fresh, trackable push.",
+    discipline: "Finish one planned task on time today so Discipline gets a clean, visible win.",
+    resolve: "Choose one uncomfortable but bounded task today so Resolve can rebuild through follow-through.",
+    creativity: "Ship one small creative block today so Creativity has a real trail to point to.",
+    alignment: "Pair one reflection, check-in, or relationship touch with today's plan so Alignment catches back up.",
   };
 
   return {
@@ -715,12 +677,18 @@ Rules:
 - "suggestedAction" must be one sentence
 - Do not invent causes for stats that say "no recent tracked boosts yet"
 - Do not mention hidden systems, probabilities, or anything outside the payload
+- Use the momentum state, dominant stat, and miss interpretation only if the payload supports them
 - Keep the tone aligned with: ${analysis.mentor.tone ?? "supportive, specific, and accountable"}`;
 
   const userPrompt = `Use this deterministic analysis snapshot:
 
 ${JSON.stringify({
     analysisDate: analysis.analysisDate,
+    statProfile: analysis.statProfile,
+    momentumState: analysis.momentumState,
+    recentMissInterpretation: analysis.recentMissInterpretation,
+    dailyNarrative: analysis.dailyNarrative,
+    weeklyNarrative: analysis.weeklyNarrative,
     activitySnapshot: analysis.activitySnapshot,
     statBreakdowns: analysis.statBreakdowns.map((breakdown) => ({
       attribute: breakdown.attribute,
@@ -911,9 +879,8 @@ export async function handleGenerateCompanionStatAnalysis(
         .lte("date", analysisDate),
       supabase
         .from("daily_tasks")
-        .select("id, task_date, habit_source_id, scheduled_time, completed_at")
+        .select("id, task_text, task_date, category, difficulty, priority, completed, habit_source_id, scheduled_time, completed_at, contact_id, epic_id")
         .eq("user_id", userId)
-        .eq("completed", true)
         .gte("task_date", activityStartDate)
         .lte("task_date", analysisDate),
       supabase

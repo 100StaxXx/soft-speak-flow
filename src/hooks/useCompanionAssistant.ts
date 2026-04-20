@@ -25,7 +25,10 @@ import {
   type CompanionSpeechProvider,
 } from "@/services/companionSpeech";
 import type { CompanionChatInputMode } from "@/types/companionConversation";
-import type { CompanionPlannerLaunchIntent } from "@/types/companionPlanner";
+import type {
+  CompanionPlannerLaunchIntent,
+  CompanionPlannerLaunchTarget,
+} from "@/types/companionPlanner";
 
 export type CompanionAssistantSurface = "companion" | "journeys";
 
@@ -376,9 +379,19 @@ export function useCompanionAssistant({
     if (lastLaunchIntentIdRef.current === launchIntent.id) return;
 
     lastLaunchIntentIdRef.current = launchIntent.id;
+    const resolvedTarget: CompanionPlannerLaunchTarget = launchIntent.target ?? "auto";
 
-    if (launchIntent.starterIntent === "goal_breakdown" && onOpenCampaignBuilder) {
+    if ((resolvedTarget === "campaign_builder"
+      || (resolvedTarget === "auto" && launchIntent.starterIntent === "goal_breakdown"))
+      && onOpenCampaignBuilder) {
       onOpenCampaignBuilder(launchIntent.message);
+      onLaunchIntentConsumed?.(launchIntent.id);
+      return;
+    }
+
+    if (resolvedTarget === "conversation") {
+      planner.resetThread();
+      journeysConversation.injectAssistantOpening(launchIntent.message);
       onLaunchIntentConsumed?.(launchIntent.id);
       return;
     }
@@ -394,9 +407,11 @@ export function useCompanionAssistant({
       onLaunchIntentConsumed?.(launchIntent.id);
     });
   }, [
+    journeysConversation,
     launchIntent,
     onOpenCampaignBuilder,
     onLaunchIntentConsumed,
+    planner,
     planner.submitMessage,
     surface,
   ]);

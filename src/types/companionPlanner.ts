@@ -1,4 +1,11 @@
 import type { IntentClassification } from "@/hooks/useIntentClassifier";
+import type {
+  CompanionMissInterpretation,
+  CompanionMomentumState,
+  CompanionStatAttribute,
+  CompanionStatNeed,
+  CompanionStatProfileSummary,
+} from "@/shared/companionStatSignals";
 
 export type PlannerHorizon = "day" | "week" | "month";
 
@@ -16,6 +23,12 @@ export type CompanionPlannerStarterIntent =
   | "low_energy_adjust"
   | "briefing_followup"
   | "goal_breakdown";
+
+export type CompanionPlannerLaunchTarget =
+  | "auto"
+  | "conversation"
+  | "planner"
+  | "campaign_builder";
 
 export type CompanionPlannerProposalKind =
   | "create_quest"
@@ -104,6 +117,7 @@ export interface PlannerContextTask {
   id: string;
   title: string;
   taskDate: string | null;
+  category?: string | null;
   scheduledTime: string | null;
   estimatedDuration: number | null;
   notes?: string | null;
@@ -191,6 +205,7 @@ export interface CompanionPlannerLaunchIntent {
   id: string;
   message: string;
   starterIntent: CompanionPlannerStarterIntent;
+  target?: CompanionPlannerLaunchTarget;
   briefingContext?: PlannerBriefingContext | null;
 }
 
@@ -269,6 +284,17 @@ export interface PlannerMemoryProfile {
   lastConfirmedAt?: string | null;
 }
 
+export interface PlannerStatInterpretation {
+  statProfile: CompanionStatProfileSummary;
+  statNeeds: Record<CompanionStatAttribute, CompanionStatNeed>;
+  momentumState: CompanionMomentumState;
+  recentMissInterpretation: CompanionMissInterpretation;
+  narrativeBrief: string;
+  dailyNarrative: string;
+  weeklyNarrative?: string;
+  identityBootstrap?: string;
+}
+
 export interface CompanionPlannerQuestSubtaskPlan {
   mode: "append" | "replace";
   titles: string[];
@@ -322,6 +348,7 @@ export interface CompanionPlannerRequest {
     priorityScores?: PlannerPriorityScore[];
     scheduleInsights?: PlannerScheduleInsights;
     plannerMemory?: PlannerMemoryProfile;
+    statInterpretation?: PlannerStatInterpretation;
     aiSignals?: {
       preferredDifficulty?: string;
       preferredHabitFrequency?: string;

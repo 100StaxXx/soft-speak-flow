@@ -96,6 +96,24 @@ export function useJourneysCompanionConversation() {
     setPendingPlannerHandoffMessage(null);
   }, []);
 
+  const injectAssistantOpening = useCallback((content: string) => {
+    const trimmedContent = content.trim();
+    if (!trimmedContent) return;
+
+    setMessages((previous) => {
+      const hasRealMessages = previous.some((message) => !message.isSeed);
+
+      if (!hasRealMessages) {
+        return createInitialMessages(trimmedContent);
+      }
+
+      return [...previous, createMessage("assistant", trimmedContent)];
+    });
+    setPendingPlannerHandoffMessage(null);
+    setDraftInput("");
+    setInterimText("");
+  }, []);
+
   const resetThread = useCallback((options?: {
     sessionId?: string;
     greetingText?: string;
@@ -268,6 +286,7 @@ export function useJourneysCompanionConversation() {
     threadPersistenceReady,
     threadPersistenceUnavailableReason,
     clearPlannerHandoff,
+    injectAssistantOpening,
     resetThread,
     hydrateThread,
     isRecording,

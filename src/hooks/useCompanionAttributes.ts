@@ -5,22 +5,16 @@ import { useAuth } from "./useAuth";
 import { toast } from "@/components/ui/sonner";
 import { ECHO_MAP, AttributeType } from "@/config/attributeDescriptions";
 import { useAchievements } from "./useAchievements";
+import {
+  COMPANION_ATTRIBUTE_EVENT_CONFIG,
+  type CompanionAttributeSourceEvent,
+  getCompanionBehaviorAwardIntent,
+  shouldAwardHardTaskResolve,
+} from "@/shared/companionStatSignals";
 
 const STAT_MIN = 100;
 const STAT_MAX = 1000;
 const STAT_DEFAULT = 300;
-
-type DisciplineSourceEvent =
-  | "habit_complete"
-  | "planned_task_on_time"
-  | "streak_milestone";
-
-type WisdomSourceEvent = "habit_complete_learning";
-type AlignmentSourceEvent = "morning_check_in" | "evening_reflection";
-type CompanionAttributeSourceEvent =
-  | DisciplineSourceEvent
-  | WisdomSourceEvent
-  | AlignmentSourceEvent;
 
 interface UpdateAttributeParams {
   companionId: string;
@@ -83,6 +77,19 @@ interface AlignmentAwardParams {
   date?: string;
 }
 
+interface BehaviorStatAwardParams {
+  companionId: string;
+  source: "task" | "habit";
+  sourceId: string;
+  title: string;
+  date?: string | null;
+  category?: string | null;
+  difficulty?: string | null;
+  priority?: string | null;
+  epicTitle?: string | null;
+  contactId?: string | null;
+}
+
 interface CompanionBadgeStatSnapshot {
   vitality: number | null;
   wisdom: number | null;
@@ -93,6 +100,26 @@ interface CompanionBadgeStatSnapshot {
 }
 
 const getLocalDateStamp = () => new Date().toLocaleDateString("en-CA");
+
+const buildCompanionSourceKey = (
+  sourceEvent: CompanionAttributeSourceEvent,
+  sourceId: string,
+  date?: string | null,
+) => {
+  if (sourceEvent === "morning_check_in" || sourceEvent === "evening_reflection") {
+    return `${sourceEvent}:${date ?? getLocalDateStamp()}`;
+  }
+
+  if (
+    sourceEvent === "habit_complete"
+    || sourceEvent === "habit_complete_learning"
+    || sourceEvent === "streak_milestone"
+  ) {
+    return `${sourceEvent}:${sourceId}:${date ?? getLocalDateStamp()}`;
+  }
+
+  return `${sourceEvent}:${sourceId}`;
+};
 
 const normalizeDetailedStat = (value: number | null | undefined) => {
   return Math.max(STAT_MIN, value ?? STAT_DEFAULT);
@@ -274,17 +301,85 @@ export const useCompanionAttributes = () => {
     },
   });
 
-  const updateVitalityFromFitness = useMutation({
-    mutationFn: async (companionId: string) => {
+  const awardBehaviorStat = useMutation({
+    mutationFn: async ({
+      companionId: _companionId,
+      source,
+      sourceId,
+      title,
+      date,
+      category,
+      difficulty,
+      priority,
+      epicTitle,
+      contactId,
+    }: BehaviorStatAwardParams) => {
       if (!user) throw new Error("Not authenticated");
-      await updateAttribute.mutateAsync({ companionId, attribute: "vitality", amount: 12 });
+
+      const results: AwardCompanionAttributeResult[] = [];
+      const intent = getCompanionBehaviorAwardIntent({
+        title,
+        category,
+        difficulty,
+        priority,
+        epicTitle,
+        contactId,
+      });
+
+      if (intent) {
+        results.push(await awardCompanionAttribute.mutateAsync({
+          attribute: intent.attribute as AttributeType,
+          sourceEvent: intent.sourceEvent,
+          sourceKey: buildCompanionSourceKey(intent.sourceEvent, sourceId, date),
+          amount: intent.amount,
+          applyEchoGains: intent.applyEchoGains,
+        }));
+      }
+
+      if (
+        source === "task"
+        && shouldAwardHardTaskResolve({ difficulty, priority })
+        && intent?.sourceEvent !== "hard_task_complete"
+      ) {
+        const hardTaskIntent = COMPANION_ATTRIBUTE_EVENT_CONFIG.hard_task_complete;
+        results.push(await awardCompanionAttribute.mutateAsync({
+          attribute: hardTaskIntent.attribute,
+          sourceEvent: hardTaskIntent.sourceEvent,
+          sourceKey: buildCompanionSourceKey(hardTaskIntent.sourceEvent, sourceId, date),
+          amount: hardTaskIntent.amount,
+          applyEchoGains: hardTaskIntent.applyEchoGains,
+        }));
+      }
+
+      return results;
+    },
+  });
+
+  const updateVitalityFromFitness = useMutation({
+    mutationFn: async (_companionId: string) => {
+      if (!user) throw new Error("Not authenticated");
+      const config = COMPANION_ATTRIBUTE_EVENT_CONFIG.health_task_complete;
+      await awardCompanionAttribute.mutateAsync({
+        attribute: config.attribute,
+        sourceEvent: config.sourceEvent,
+        sourceKey: buildCompanionSourceKey(config.sourceEvent, "manual_fitness", getLocalDateStamp()),
+        amount: config.amount,
+        applyEchoGains: config.applyEchoGains,
+      });
     },
   });
 
   const updateWisdomFromLearning = useMutation({
-    mutationFn: async (companionId: string) => {
+    mutationFn: async (_companionId: string) => {
       if (!user) throw new Error("Not authenticated");
-      await updateAttribute.mutateAsync({ companionId, attribute: "wisdom", amount: 8 });
+      const config = COMPANION_ATTRIBUTE_EVENT_CONFIG.habit_complete_learning;
+      await awardCompanionAttribute.mutateAsync({
+        attribute: config.attribute,
+        sourceEvent: config.sourceEvent,
+        sourceKey: buildCompanionSourceKey(config.sourceEvent, "manual_learning", getLocalDateStamp()),
+        amount: config.amount,
+        applyEchoGains: config.applyEchoGains,
+      });
     },
   });
 
@@ -296,26 +391,43 @@ export const useCompanionAttributes = () => {
   });
 
   const updateResolveFromResist = useMutation({
-    mutationFn: async (companionId: string) => {
+    mutationFn: async (_companionId: string) => {
       if (!user) throw new Error("Not authenticated");
-      await updateAttribute.mutateAsync({ companionId, attribute: "resolve", amount: 20 });
+      const config = COMPANION_ATTRIBUTE_EVENT_CONFIG.urge_resist;
+      await awardCompanionAttribute.mutateAsync({
+        attribute: config.attribute,
+        sourceEvent: config.sourceEvent,
+        sourceKey: buildCompanionSourceKey(config.sourceEvent, "manual_resist", getLocalDateStamp()),
+        amount: config.amount,
+        applyEchoGains: config.applyEchoGains,
+      });
     },
   });
 
   const updateCreativityFromShipping = useMutation({
-    mutationFn: async (companionId: string) => {
+    mutationFn: async (_companionId: string) => {
       if (!user) throw new Error("Not authenticated");
-      await updateAttribute.mutateAsync({ companionId, attribute: "creativity", amount: 10 });
+      const config = COMPANION_ATTRIBUTE_EVENT_CONFIG.creative_block_complete;
+      await awardCompanionAttribute.mutateAsync({
+        attribute: config.attribute,
+        sourceEvent: config.sourceEvent,
+        sourceKey: buildCompanionSourceKey(config.sourceEvent, "manual_creative", getLocalDateStamp()),
+        amount: config.amount,
+        applyEchoGains: config.applyEchoGains,
+      });
     },
   });
 
   const updateAlignmentFromReflection = useMutation({
-    mutationFn: async (companionId: string) => {
+    mutationFn: async (_companionId: string) => {
       if (!user) throw new Error("Not authenticated");
-      await updateAttribute.mutateAsync({
-        companionId,
-        attribute: "alignment",
-        amount: 6,
+      const config = COMPANION_ATTRIBUTE_EVENT_CONFIG.evening_reflection;
+      await awardCompanionAttribute.mutateAsync({
+        attribute: config.attribute,
+        sourceEvent: config.sourceEvent,
+        sourceKey: buildCompanionSourceKey(config.sourceEvent, "manual_reflection", getLocalDateStamp()),
+        amount: config.amount,
+        applyEchoGains: config.applyEchoGains,
       });
     },
   });
@@ -323,12 +435,13 @@ export const useCompanionAttributes = () => {
   const awardDisciplineForHabitCompletion = useMutation({
     mutationFn: async ({ companionId: _companionId, habitId, date }: HabitDisciplineAwardParams) => {
       if (!user) throw new Error("Not authenticated");
+      const config = COMPANION_ATTRIBUTE_EVENT_CONFIG.habit_complete;
       return awardCompanionAttribute.mutateAsync({
-        attribute: "discipline",
-        sourceEvent: "habit_complete",
-        sourceKey: `habit_complete:${habitId}:${date}`,
-        amount: 4,
-        applyEchoGains: true,
+        attribute: config.attribute,
+        sourceEvent: config.sourceEvent,
+        sourceKey: buildCompanionSourceKey(config.sourceEvent, habitId, date),
+        amount: config.amount,
+        applyEchoGains: config.applyEchoGains,
       });
     },
   });
@@ -336,12 +449,13 @@ export const useCompanionAttributes = () => {
   const awardDisciplineForPlannedTaskOnTime = useMutation({
     mutationFn: async ({ companionId: _companionId, taskId }: PlannedTaskDisciplineAwardParams) => {
       if (!user) throw new Error("Not authenticated");
+      const config = COMPANION_ATTRIBUTE_EVENT_CONFIG.planned_task_on_time;
       return awardCompanionAttribute.mutateAsync({
-        attribute: "discipline",
-        sourceEvent: "planned_task_on_time",
-        sourceKey: `planned_task_on_time:${taskId}`,
-        amount: 2,
-        applyEchoGains: true,
+        attribute: config.attribute,
+        sourceEvent: config.sourceEvent,
+        sourceKey: buildCompanionSourceKey(config.sourceEvent, taskId),
+        amount: config.amount,
+        applyEchoGains: config.applyEchoGains,
       });
     },
   });
@@ -349,12 +463,13 @@ export const useCompanionAttributes = () => {
   const awardWisdomForHabitLearning = useMutation({
     mutationFn: async ({ companionId: _companionId, habitId, date }: HabitLearningWisdomAwardParams) => {
       if (!user) throw new Error("Not authenticated");
+      const config = COMPANION_ATTRIBUTE_EVENT_CONFIG.habit_complete_learning;
       return awardCompanionAttribute.mutateAsync({
-        attribute: "wisdom",
-        sourceEvent: "habit_complete_learning",
-        sourceKey: `habit_complete_learning:${habitId}:${date}`,
-        amount: 8,
-        applyEchoGains: false,
+        attribute: config.attribute,
+        sourceEvent: config.sourceEvent,
+        sourceKey: buildCompanionSourceKey(config.sourceEvent, habitId, date),
+        amount: config.amount,
+        applyEchoGains: config.applyEchoGains,
       });
     },
   });
@@ -362,12 +477,13 @@ export const useCompanionAttributes = () => {
   const awardAlignmentForMorningCheckIn = useMutation({
     mutationFn: async ({ companionId: _companionId, date }: AlignmentAwardParams) => {
       if (!user) throw new Error("Not authenticated");
+      const config = COMPANION_ATTRIBUTE_EVENT_CONFIG.morning_check_in;
       return awardCompanionAttribute.mutateAsync({
-        attribute: "alignment",
-        sourceEvent: "morning_check_in",
-        sourceKey: `morning_check_in:${date ?? getLocalDateStamp()}`,
-        amount: 6,
-        applyEchoGains: false,
+        attribute: config.attribute,
+        sourceEvent: config.sourceEvent,
+        sourceKey: buildCompanionSourceKey(config.sourceEvent, "morning", date ?? getLocalDateStamp()),
+        amount: config.amount,
+        applyEchoGains: config.applyEchoGains,
       });
     },
   });
@@ -375,12 +491,125 @@ export const useCompanionAttributes = () => {
   const awardAlignmentForEveningReflection = useMutation({
     mutationFn: async ({ companionId: _companionId, date }: AlignmentAwardParams) => {
       if (!user) throw new Error("Not authenticated");
+      const config = COMPANION_ATTRIBUTE_EVENT_CONFIG.evening_reflection;
       return awardCompanionAttribute.mutateAsync({
-        attribute: "alignment",
-        sourceEvent: "evening_reflection",
-        sourceKey: `evening_reflection:${date ?? getLocalDateStamp()}`,
-        amount: 6,
-        applyEchoGains: false,
+        attribute: config.attribute,
+        sourceEvent: config.sourceEvent,
+        sourceKey: buildCompanionSourceKey(config.sourceEvent, "evening", date ?? getLocalDateStamp()),
+        amount: config.amount,
+        applyEchoGains: config.applyEchoGains,
+      });
+    },
+  });
+
+  const awardVitalityForHealthTask = useMutation({
+    mutationFn: async ({ companionId: _companionId, taskId }: PlannedTaskDisciplineAwardParams) => {
+      if (!user) throw new Error("Not authenticated");
+      const config = COMPANION_ATTRIBUTE_EVENT_CONFIG.health_task_complete;
+      return awardCompanionAttribute.mutateAsync({
+        attribute: config.attribute,
+        sourceEvent: config.sourceEvent,
+        sourceKey: buildCompanionSourceKey(config.sourceEvent, taskId),
+        amount: config.amount,
+        applyEchoGains: config.applyEchoGains,
+      });
+    },
+  });
+
+  const awardVitalityForRecoveryBlock = useMutation({
+    mutationFn: async ({ companionId: _companionId, taskId }: PlannedTaskDisciplineAwardParams) => {
+      if (!user) throw new Error("Not authenticated");
+      const config = COMPANION_ATTRIBUTE_EVENT_CONFIG.recovery_block_kept;
+      return awardCompanionAttribute.mutateAsync({
+        attribute: config.attribute,
+        sourceEvent: config.sourceEvent,
+        sourceKey: buildCompanionSourceKey(config.sourceEvent, taskId),
+        amount: config.amount,
+        applyEchoGains: config.applyEchoGains,
+      });
+    },
+  });
+
+  const awardResolveForHardTask = useMutation({
+    mutationFn: async ({ companionId: _companionId, taskId }: PlannedTaskDisciplineAwardParams) => {
+      if (!user) throw new Error("Not authenticated");
+      const config = COMPANION_ATTRIBUTE_EVENT_CONFIG.hard_task_complete;
+      return awardCompanionAttribute.mutateAsync({
+        attribute: config.attribute,
+        sourceEvent: config.sourceEvent,
+        sourceKey: buildCompanionSourceKey(config.sourceEvent, taskId),
+        amount: config.amount,
+        applyEchoGains: config.applyEchoGains,
+      });
+    },
+  });
+
+  const awardResolveForBounceBackDay = useMutation({
+    mutationFn: async ({ companionId: _companionId, date }: AlignmentAwardParams) => {
+      if (!user) throw new Error("Not authenticated");
+      const config = COMPANION_ATTRIBUTE_EVENT_CONFIG.bounce_back_day;
+      return awardCompanionAttribute.mutateAsync({
+        attribute: config.attribute,
+        sourceEvent: config.sourceEvent,
+        sourceKey: buildCompanionSourceKey(config.sourceEvent, "bounce_back", date ?? getLocalDateStamp()),
+        amount: config.amount,
+        applyEchoGains: config.applyEchoGains,
+      });
+    },
+  });
+
+  const awardResolveForUrgeResist = useMutation({
+    mutationFn: async ({ companionId: _companionId, taskId }: PlannedTaskDisciplineAwardParams) => {
+      if (!user) throw new Error("Not authenticated");
+      const config = COMPANION_ATTRIBUTE_EVENT_CONFIG.urge_resist;
+      return awardCompanionAttribute.mutateAsync({
+        attribute: config.attribute,
+        sourceEvent: config.sourceEvent,
+        sourceKey: buildCompanionSourceKey(config.sourceEvent, taskId),
+        amount: config.amount,
+        applyEchoGains: config.applyEchoGains,
+      });
+    },
+  });
+
+  const awardCreativityForCreativeBlock = useMutation({
+    mutationFn: async ({ companionId: _companionId, taskId }: PlannedTaskDisciplineAwardParams) => {
+      if (!user) throw new Error("Not authenticated");
+      const config = COMPANION_ATTRIBUTE_EVENT_CONFIG.creative_block_complete;
+      return awardCompanionAttribute.mutateAsync({
+        attribute: config.attribute,
+        sourceEvent: config.sourceEvent,
+        sourceKey: buildCompanionSourceKey(config.sourceEvent, taskId),
+        amount: config.amount,
+        applyEchoGains: config.applyEchoGains,
+      });
+    },
+  });
+
+  const awardAlignmentForEpicProgress = useMutation({
+    mutationFn: async ({ companionId: _companionId, taskId }: PlannedTaskDisciplineAwardParams) => {
+      if (!user) throw new Error("Not authenticated");
+      const config = COMPANION_ATTRIBUTE_EVENT_CONFIG.epic_progress_complete;
+      return awardCompanionAttribute.mutateAsync({
+        attribute: config.attribute,
+        sourceEvent: config.sourceEvent,
+        sourceKey: buildCompanionSourceKey(config.sourceEvent, taskId),
+        amount: config.amount,
+        applyEchoGains: config.applyEchoGains,
+      });
+    },
+  });
+
+  const awardAlignmentForRelationshipMaintenance = useMutation({
+    mutationFn: async ({ companionId: _companionId, taskId }: PlannedTaskDisciplineAwardParams) => {
+      if (!user) throw new Error("Not authenticated");
+      const config = COMPANION_ATTRIBUTE_EVENT_CONFIG.relationship_maintenance_complete;
+      return awardCompanionAttribute.mutateAsync({
+        attribute: config.attribute,
+        sourceEvent: config.sourceEvent,
+        sourceKey: buildCompanionSourceKey(config.sourceEvent, taskId),
+        amount: config.amount,
+        applyEchoGains: config.applyEchoGains,
       });
     },
   });
@@ -397,7 +626,7 @@ export const useCompanionAttributes = () => {
       return awardCompanionAttribute.mutateAsync({
         attribute: "discipline",
         sourceEvent: "streak_milestone",
-        sourceKey: `streak_milestone:${streakDays}:${date ?? getLocalDateStamp()}`,
+        sourceKey: buildCompanionSourceKey("streak_milestone", String(streakDays), date ?? getLocalDateStamp()),
         amount: disciplineGain,
         applyEchoGains: true,
       });
@@ -467,8 +696,17 @@ export const useCompanionAttributes = () => {
     awardDisciplineForHabitCompletion: awardDisciplineForHabitCompletion.mutateAsync,
     awardDisciplineForPlannedTaskOnTime: awardDisciplineForPlannedTaskOnTime.mutateAsync,
     awardWisdomForHabitLearning: awardWisdomForHabitLearning.mutateAsync,
+    awardBehaviorStat: awardBehaviorStat.mutateAsync,
     awardAlignmentForMorningCheckIn: awardAlignmentForMorningCheckIn.mutateAsync,
     awardAlignmentForEveningReflection: awardAlignmentForEveningReflection.mutateAsync,
+    awardVitalityForHealthTask: awardVitalityForHealthTask.mutateAsync,
+    awardVitalityForRecoveryBlock: awardVitalityForRecoveryBlock.mutateAsync,
+    awardResolveForHardTask: awardResolveForHardTask.mutateAsync,
+    awardResolveForBounceBackDay: awardResolveForBounceBackDay.mutateAsync,
+    awardResolveForUrgeResist: awardResolveForUrgeResist.mutateAsync,
+    awardCreativityForCreativeBlock: awardCreativityForCreativeBlock.mutateAsync,
+    awardAlignmentForEpicProgress: awardAlignmentForEpicProgress.mutateAsync,
+    awardAlignmentForRelationshipMaintenance: awardAlignmentForRelationshipMaintenance.mutateAsync,
     updateResolveFromResist: updateResolveFromResist.mutateAsync,
     updateCreativityFromShipping: updateCreativityFromShipping.mutateAsync,
     updateAlignmentFromReflection: updateAlignmentFromReflection.mutateAsync,
@@ -488,10 +726,7 @@ const ATTRIBUTE_DESCRIPTIONS_SIMPLE: Record<AttributeType, { name: string }> = {
 };
 
 export type {
-  AlignmentSourceEvent,
   AttributeType,
   AwardCompanionAttributeResult,
   CompanionAttributeSourceEvent,
-  DisciplineSourceEvent,
-  WisdomSourceEvent,
 };

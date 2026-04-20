@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => {
   const toastMock = vi.fn();
   const showXPToastMock = vi.fn();
   const awardCustomXPMock = vi.fn();
+  const awardBehaviorStatMock = vi.fn();
   const awardDisciplineForHabitCompletionMock = vi.fn();
   const awardDisciplineForPlannedTaskOnTimeMock = vi.fn();
   const calculateGuildBonusMock = vi.fn();
@@ -51,6 +52,7 @@ const mocks = vi.hoisted(() => {
     toastMock,
     showXPToastMock,
     awardCustomXPMock,
+    awardBehaviorStatMock,
     awardDisciplineForHabitCompletionMock,
     awardDisciplineForPlannedTaskOnTimeMock,
     calculateGuildBonusMock,
@@ -112,6 +114,7 @@ vi.mock("@/hooks/useCompanion", () => ({
 
 vi.mock("@/hooks/useCompanionAttributes", () => ({
   useCompanionAttributes: () => ({
+    awardBehaviorStat: mocks.awardBehaviorStatMock,
     awardDisciplineForHabitCompletion: mocks.awardDisciplineForHabitCompletionMock,
     awardDisciplineForPlannedTaskOnTime: mocks.awardDisciplineForPlannedTaskOnTimeMock,
   }),
@@ -473,6 +476,7 @@ describe("useTaskMutations attachment handling", () => {
     vi.clearAllMocks();
     mocks.resilienceState.shouldQueueWrites = false;
     mocks.resilienceState.state = "healthy";
+    mocks.awardBehaviorStatMock.mockResolvedValue(undefined);
     mocks.awardDisciplineForHabitCompletionMock.mockResolvedValue(undefined);
     mocks.awardDisciplineForPlannedTaskOnTimeMock.mockResolvedValue(undefined);
     mocks.calculateGuildBonusMock.mockResolvedValue({ bonusXP: 0, toastReason: "Task Complete!" });

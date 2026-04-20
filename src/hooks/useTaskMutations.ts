@@ -474,6 +474,7 @@ export const useTaskMutations = (taskDate: string) => {
   const queryClient = useQueryClient();
   const { companion } = useCompanion();
   const {
+    awardBehaviorStat,
     awardDisciplineForHabitCompletion,
     awardDisciplineForPlannedTaskOnTime,
   } = useCompanionAttributes();
@@ -1578,6 +1579,7 @@ export const useTaskMutations = (taskDate: string) => {
         taskDifficulty,
         taskScheduledTime,
         taskCategory,
+        contactId,
       } = result ?? {};
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
@@ -1633,6 +1635,19 @@ export const useTaskMutations = (taskDate: string) => {
               taskId: disciplineAward.taskId,
             }).catch(console.error);
           }
+        }
+
+        if (companion?.id) {
+          awardBehaviorStat({
+            companionId: companion.id,
+            source: "task",
+            sourceId: taskId,
+            title: taskText,
+            date: taskDate ?? null,
+            category: taskCategory ?? null,
+            difficulty: taskDifficulty ?? null,
+            contactId: contactId ?? null,
+          }).catch(console.error);
         }
 
         window.dispatchEvent(new CustomEvent('mission-completed'));

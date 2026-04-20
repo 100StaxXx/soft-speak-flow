@@ -464,6 +464,77 @@ Deno.test("creates a relationship touch proposal with contact context", () => {
   assertStringIncludes(result.proposals[0].title, "Mom");
 });
 
+Deno.test("turns high vitality need into a confirmable recovery block", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Please lighten today",
+    plannerContext: {
+      starterIntent: "low_energy_adjust",
+      statInterpretation: {
+        statProfile: {
+          scores: {
+            vitality: 320,
+            wisdom: 510,
+            discipline: 560,
+            resolve: 430,
+            creativity: 380,
+            alignment: 470,
+          },
+          dominantStat: "discipline",
+          secondaryStat: "wisdom",
+        },
+        statNeeds: {
+          vitality: { level: "high", reasons: ["You've been pushing output harder than recovery."] },
+          wisdom: { level: "low", reasons: [] },
+          discipline: { level: "low", reasons: [] },
+          resolve: { level: "low", reasons: [] },
+          creativity: { level: "low", reasons: [] },
+          alignment: { level: "low", reasons: [] },
+        },
+        momentumState: "slipping",
+        recentMissInterpretation: "low_energy",
+        narrativeBrief: "This looks more strained than lazy. I'm protecting the essentials and rebuilding vitality first.",
+        dailyNarrative: "Vitality protection day",
+      },
+      scheduleInsights: {
+        horizon: "day",
+        selectedDate: "2026-04-18",
+        dayLoads: [
+          {
+            date: "2026-04-18",
+            totalMinutes: 240,
+            taskCount: 4,
+            status: "overloaded",
+          },
+        ],
+        overloadedDates: ["2026-04-18"],
+        emptyDates: [],
+        conflicts: [],
+        suggestedSlots: [
+          {
+            date: "2026-04-18",
+            time: "15:00",
+            endTime: "15:30",
+            score: 82,
+            reason: "Open afternoon space",
+          },
+        ],
+        moveSuggestions: [],
+        summary: "Today is overloaded.",
+      },
+      tasks: [],
+      inboxTasks: [],
+    },
+  }));
+
+  assertEquals(result.mode, "proposal");
+  assertEquals(result.proposals[0].kind, "create_quest");
+  assertStringIncludes(result.reply, "rebuilding vitality first");
+  assertEquals(
+    (result.proposals[0].payload as { taskText: string }).taskText,
+    "Recovery reset",
+  );
+});
+
 Deno.test("keeps timing follow-ups for vague one-off placement requests without a concrete time", () => {
   const result = buildPlannerResponse(baseInput({
     message: "Schedule gym tomorrow",

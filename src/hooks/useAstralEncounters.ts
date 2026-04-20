@@ -25,6 +25,7 @@ import {
 import { isMacSession } from '@/utils/platformTargets';
 import { toast } from "@/components/ui/sonner";
 import { useLivingCompanionSafe } from '@/hooks/useLivingCompanion';
+import { useCompanionAttributes } from "@/hooks/useCompanionAttributes";
 
 export type EncounterTriggerReason =
   | 'not_authenticated'
@@ -83,6 +84,7 @@ const isUnsupportedPlatformError = (error: unknown): error is EncounterUnsupport
 export const useAstralEncounters = () => {
   const { user } = useAuth();
   const { companion } = useCompanion();
+  const { awardResolveForUrgeResist } = useCompanionAttributes();
   const { awardCustomXP } = useXPRewards();
   const { checkAdversaryDefeatAchievements } = useAchievements();
   const queryClient = useQueryClient();
@@ -401,37 +403,6 @@ export const useAstralEncounters = () => {
           }
         }
 
-        // Update companion stats - validate statType is a valid field
-        // Map old stat types to new 6-stat system
-        const statTypeMapping: Record<'mind' | 'body' | 'soul', 'wisdom' | 'vitality' | 'resolve'> = {
-          'mind': 'wisdom',
-          'body': 'vitality', 
-          'soul': 'resolve',
-        };
-        const oldStatField = activeEncounter.adversary.statType as 'mind' | 'body' | 'soul';
-        const newStatField = statTypeMapping[oldStatField];
-        if (!newStatField) {
-          console.error('Invalid stat type:', oldStatField);
-          return { result, xpAwarded, xpCapApplied };
-        }
-        // Type-safe stat access using new 6-stat system
-        const companionStatsNew = {
-          vitality: companion?.vitality ?? 300,
-          wisdom: companion?.wisdom ?? 300,
-          discipline: companion?.discipline ?? 300,
-          resolve: companion?.resolve ?? 300,
-          creativity: companion?.creativity ?? 300,
-          alignment: companion?.alignment ?? 300,
-        };
-        const currentStat = companionStatsNew[newStatField];
-        const newStat = Math.min(1000, currentStat + activeEncounter.adversary.statBoost * 3);
-
-        const { error: companionUpdateError } = await supabase
-          .from('user_companion')
-          .update({ [newStatField]: newStat })
-          .eq('id', companion.id);
-        throwIfSupabaseError(companionUpdateError, 'Failed to update companion stats');
-
         // Award XP
         if (rawXpEarned > 0) {
           const awardResult = await awardCustomXP(rawXpEarned, 'astral_encounter');
@@ -521,6 +492,15 @@ export const useAstralEncounters = () => {
             }
 
             if (isSuccess) {
+              if (companion?.id) {
+                awardResolveForUrgeResist({
+                  companionId: companion.id,
+                  taskId: params.encounterId,
+                }).catch((error) => {
+                  console.error("Failed to award resolve for urge resist:", error);
+                });
+              }
+
               if (xpAwarded > 0) {
                 toast.success('You resisted! Your companion grows stronger.', {
                   description: `+${xpAwarded} XP • Streak: ${newStreak}`,

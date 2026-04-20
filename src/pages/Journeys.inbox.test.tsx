@@ -116,17 +116,22 @@ vi.mock("@/components/TodaysAgenda", () => ({
     selectedDate,
     desktopPlannerMode,
     onDesktopPlannerModeChange,
+    onAddQuest,
   }: {
     tasks: Array<{ id: string; task_text: string; habit_source_id?: string | null }>;
     activeEpics: Array<{ id: string; title: string }>;
     selectedDate: Date;
     desktopPlannerMode?: "week" | "day";
     onDesktopPlannerModeChange?: (mode: "week" | "day") => void;
+    onAddQuest?: () => void;
   }) => (
     <div data-testid="todays-agenda">
       <div>agenda</div>
       <div data-testid="todays-agenda-selected-date">{selectedDate.toISOString()}</div>
       <div data-testid="todays-agenda-mode">{desktopPlannerMode ?? "unset"}</div>
+      <button type="button" onClick={() => onAddQuest?.()}>
+        open-add-quest
+      </button>
       <button type="button" onClick={() => onDesktopPlannerModeChange?.("week")}>
         set-week-mode
       </button>
@@ -257,11 +262,31 @@ vi.mock("@/components/CampaignCreatedAnimation", () => ({
 }));
 
 vi.mock("@/components/DraggableFAB", () => ({
-  DraggableFAB: ({ onTap }: { onTap: () => void }) => (
-    <button type="button" onClick={onTap}>
-      open-add-quest
+  DraggableFAB: ({ onOpenCompanionPlanner }: { onOpenCompanionPlanner?: () => void }) => (
+    <button type="button" onClick={() => onOpenCompanionPlanner?.()}>
+      open-companion-fab
     </button>
   ),
+}));
+
+vi.mock("@/components/journeys/JourneysCompanionPlannerModal", () => ({
+  JourneysCompanionPlannerModal: () => null,
+}));
+
+vi.mock("@/hooks/useJourneysCompanionVisual", () => ({
+  useJourneysCompanionVisual: () => ({
+    companionLabel: "Nova",
+    presetId: "dragon",
+    imageUrl: "/placeholder-companion.svg",
+    focalX: null,
+    focalY: null,
+    element: "fire",
+    usesPortraitShell: false,
+    launcherAwayImageUrl: "/placeholder-companion.svg",
+    launcherAwayFocalX: null,
+    launcherAwayFocalY: null,
+    launcherAwayUsesPortraitShell: false,
+  }),
 }));
 
 vi.mock("@/components/SectionErrorBoundary", () => ({

@@ -266,7 +266,7 @@ vi.mock("@/components/DraggableFAB", () => ({
   DraggableFAB: ({
     onOpenCompanionPlanner,
   }: {
-    onOpenCompanionPlanner?: () => void;
+    onOpenCompanionPlanner?: (intent?: unknown) => void;
   }) => {
     mocks.draggableFabRenderCount += 1;
     return (
@@ -275,7 +275,7 @@ vi.mock("@/components/DraggableFAB", () => ({
           type="button"
           data-testid="journeys-companion-launcher-floating"
           data-tour="add-quest-fab"
-          aria-label="Open companion chat"
+          aria-label="Open companion quick actions"
           onClick={() => onOpenCompanionPlanner?.()}
         >
           fab

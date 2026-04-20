@@ -18,6 +18,10 @@ const TARGET_DIRS = [
     resolveAssetKey: (filePath) => path.relative(PUBLIC_ROOT, filePath).split(path.sep).join("/"),
   },
   {
+    dirPath: path.join(PUBLIC_ROOT, "companion-launcher-away"),
+    resolveAssetKey: (filePath) => path.relative(PUBLIC_ROOT, filePath).split(path.sep).join("/"),
+  },
+  {
     dirPath: INITIATE_OUTPUT_ROOT,
     resolveAssetKey: (filePath) => {
       const relativePath = path.relative(INITIATE_OUTPUT_ROOT, filePath).split(path.sep).join("/");

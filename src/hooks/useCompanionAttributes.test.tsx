@@ -124,7 +124,7 @@ describe("useCompanionAttributes discipline awards", () => {
       p_attribute: "discipline",
       p_source_event: "planned_task_on_time",
       p_source_key: "planned_task_on_time:task-1",
-      p_amount: 2,
+      p_amount: 3,
       p_apply_echo_gains: true,
     });
   });
@@ -168,7 +168,7 @@ describe("useCompanionAttributes discipline awards", () => {
       p_attribute: "wisdom",
       p_source_event: "habit_complete_learning",
       p_source_key: "habit_complete_learning:habit-1:2026-03-28",
-      p_amount: 8,
+      p_amount: 6,
       p_apply_echo_gains: false,
     });
   });
@@ -189,7 +189,7 @@ describe("useCompanionAttributes discipline awards", () => {
       p_attribute: "alignment",
       p_source_event: "morning_check_in",
       p_source_key: "morning_check_in:2026-03-28",
-      p_amount: 6,
+      p_amount: 4,
       p_apply_echo_gains: false,
     });
   });
@@ -210,8 +210,59 @@ describe("useCompanionAttributes discipline awards", () => {
       p_attribute: "alignment",
       p_source_event: "evening_reflection",
       p_source_key: "evening_reflection:2026-03-28",
-      p_amount: 6,
+      p_amount: 4,
       p_apply_echo_gains: false,
+    });
+  });
+
+  it("classifies body-first behavior into vitality provenance", async () => {
+    const { result } = renderHook(() => useCompanionAttributes(), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await result.current.awardBehaviorStat({
+        companionId: "companion-1",
+        source: "habit",
+        sourceId: "habit-1",
+        title: "Gym session",
+        date: "2026-03-28",
+        category: "body",
+        difficulty: "medium",
+      });
+    });
+
+    expect(mocks.rpcMock).toHaveBeenCalledWith("award_companion_attribute", {
+      p_attribute: "vitality",
+      p_source_event: "health_task_complete",
+      p_source_key: "health_task_complete:habit-1",
+      p_amount: 8,
+      p_apply_echo_gains: true,
+    });
+  });
+
+  it("adds a resolve award when a hard task is completed", async () => {
+    const { result } = renderHook(() => useCompanionAttributes(), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await result.current.awardBehaviorStat({
+        companionId: "companion-1",
+        source: "task",
+        sourceId: "task-1",
+        title: "Prep investor deck",
+        date: "2026-03-28",
+        difficulty: "hard",
+      });
+    });
+
+    expect(mocks.rpcMock).toHaveBeenNthCalledWith(1, "award_companion_attribute", {
+      p_attribute: "resolve",
+      p_source_event: "hard_task_complete",
+      p_source_key: "hard_task_complete:task-1",
+      p_amount: 5,
+      p_apply_echo_gains: true,
     });
   });
 });

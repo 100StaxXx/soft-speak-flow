@@ -1,7 +1,11 @@
 import { useMemo } from "react";
 import { resolveCompanionVisualAssetUrl } from "@/lib/companionAssetResolver";
 import { deriveCompanionDisplayState } from "@/lib/companionDisplayState";
-import { isCompanionPresetImageSource } from "@/lib/companionImageFocal";
+import {
+  getBundledCompanionImageAssetKey,
+  isCompanionPresetImageSource,
+} from "@/lib/companionImageFocal";
+import { resolveJourneysCompanionLauncherAwayAssetUrl } from "@/lib/journeysCompanionLauncherArt";
 import { getStoredCompanionCustomName } from "@/lib/companionName";
 import { formatDisplayLabel } from "@/lib/utils";
 import { useCompanion } from "./useCompanion";
@@ -117,12 +121,29 @@ export const useJourneysCompanionVisual = () => {
     return "Companion";
   }, [companion]);
 
+  const presetId = displayCompanion?.preset_id ?? companion?.preset_id ?? null;
+  const element = displayCompanion?.core_element ?? companion?.core_element ?? null;
+  const launcherAwayImageUrl = useMemo(() => resolveJourneysCompanionLauncherAwayAssetUrl({
+    presetId,
+    element,
+    fallbackUrl: imageUrl,
+  }), [element, imageUrl, presetId]);
+  const launcherAwayUsesPortraitShell = useMemo(
+    () => getBundledCompanionImageAssetKey(launcherAwayImageUrl) !== null,
+    [launcherAwayImageUrl],
+  );
+
   return {
     companionLabel,
+    presetId,
     imageUrl,
     focalX: focalPoint.x,
     focalY: focalPoint.y,
-    element: displayCompanion?.core_element ?? companion?.core_element ?? null,
+    element,
     usesPortraitShell: isCompanionPresetImageSource(imageUrl),
+    launcherAwayImageUrl,
+    launcherAwayFocalX: null,
+    launcherAwayFocalY: null,
+    launcherAwayUsesPortraitShell,
   };
 };

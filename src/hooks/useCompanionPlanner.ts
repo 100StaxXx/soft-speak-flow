@@ -41,6 +41,7 @@ import {
 import { getCompanionPlannerOpener } from "@/shared/companionPlannerCopy";
 import { LOCKED_COMPANION_TONE_PACK } from "@/shared/companionChaosVoice";
 import { computePlannerPriorityScores } from "@/shared/companionPlannerPriority";
+import { buildCompanionStatInterpretation } from "@/shared/companionStatSignals";
 import { normalizeUuidLikeId } from "@/utils/offlineId";
 import type {
   CompanionChatSurface,
@@ -441,6 +442,7 @@ const serializeTaskContext = (task: {
   id: string;
   task_text: string;
   task_date: string | null;
+  category?: string | null;
   scheduled_time: string | null;
   estimated_duration?: number | null;
   notes?: string | null;
@@ -459,6 +461,7 @@ const serializeTaskContext = (task: {
   id: task.id,
   title: task.task_text,
   taskDate: task.task_date,
+  category: task.category ?? null,
   scheduledTime: task.scheduled_time,
   estimatedDuration: task.estimated_duration ?? null,
   notes: task.notes ?? null,
@@ -818,6 +821,45 @@ export function useCompanionPlanner({
     },
   });
 
+  const recentStatSignalsQuery = useQuery({
+    queryKey: ["companion-planner-stat-signals", user?.id, todayIso],
+    enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      if (!user?.id) {
+        return {
+          recentEvents: [],
+          recentTasks: [],
+        };
+      }
+
+      const eventsStartDate = format(addDays(today, -13), "yyyy-MM-dd");
+      const tasksStartDate = format(addDays(today, -6), "yyyy-MM-dd");
+      const [{ data: recentEvents, error: recentEventsError }, { data: recentTasks, error: recentTasksError }] = await Promise.all([
+        supabase
+          .from("companion_attribute_events")
+          .select("attribute, source_event, amount_awarded, echo_amount, created_at")
+          .eq("user_id", user.id)
+          .gte("created_at", `${eventsStartDate}T00:00:00.000Z`)
+          .lte("created_at", `${todayIso}T23:59:59.999Z`),
+        supabase
+          .from("daily_tasks")
+          .select("id, task_text, task_date, category, difficulty, priority, completed, scheduled_time, completed_at, contact_id, habit_source_id")
+          .eq("user_id", user.id)
+          .gte("task_date", tasksStartDate)
+          .lte("task_date", todayIso),
+      ]);
+
+      if (recentEventsError) throw recentEventsError;
+      if (recentTasksError) throw recentTasksError;
+
+      return {
+        recentEvents: recentEvents ?? [],
+        recentTasks: recentTasks ?? [],
+      };
+    },
+  });
+
   const activeTasks = useMemo(() => {
     if (horizon === "month") return monthTasksQuery.tasks;
     if (horizon === "week") return weekTasksQuery.tasks;
@@ -933,6 +975,69 @@ export function useCompanionPlanner({
     care.overallCare,
   ]);
 
+  const statInterpretation = useMemo(() =>
+    buildCompanionStatInterpretation({
+      currentDate: todayIso,
+      scores: {
+        vitality: companion?.vitality,
+        wisdom: companion?.wisdom,
+        discipline: companion?.discipline,
+        resolve: companion?.resolve,
+        creativity: companion?.creativity,
+        alignment: companion?.alignment,
+      },
+      recentEvents: (recentStatSignalsQuery.data?.recentEvents ?? []).map((event) => ({
+        attribute: event.attribute,
+        sourceEvent: event.source_event,
+        amountAwarded: event.amount_awarded,
+        echoAmount: event.echo_amount,
+        createdAt: event.created_at,
+      })),
+      recentTasks: (recentStatSignalsQuery.data?.recentTasks ?? []).map((task) => ({
+        id: task.id,
+        title: task.task_text,
+        taskDate: task.task_date,
+        category: task.category,
+        difficulty: task.difficulty,
+        priority: task.priority,
+        completed: task.completed,
+        scheduledTime: task.scheduled_time,
+        completedAt: task.completed_at,
+        contactId: task.contact_id,
+        habitSourceId: task.habit_source_id,
+      })),
+      reflectionSignals: reflectionSignalsQuery.data ?? [],
+      scheduleSummary: {
+        selectedDateStatus: scheduleInsights.dayLoads.find((entry) => entry.date === todayIso)?.status ?? null,
+        overloadedDates: scheduleInsights.overloadedDates,
+      },
+    }), [
+      companion?.alignment,
+      companion?.creativity,
+      companion?.discipline,
+      companion?.resolve,
+      companion?.vitality,
+      companion?.wisdom,
+      recentStatSignalsQuery.data?.recentEvents,
+      recentStatSignalsQuery.data?.recentTasks,
+      reflectionSignalsQuery.data,
+      scheduleInsights.dayLoads,
+      scheduleInsights.overloadedDates,
+      todayIso,
+    ]);
+
+  const strongestPlannerNeed = useMemo(() => {
+    const rankedNeed = Object.entries(statInterpretation.statNeeds)
+      .sort((left, right) => {
+        const weight = (level: string) => level === "high" ? 3 : level === "medium" ? 2 : 1;
+        const diff = weight(right[1].level) - weight(left[1].level);
+        if (diff !== 0) return diff;
+        return right[1].reasons.length - left[1].reasons.length;
+      })[0];
+
+    return rankedNeed?.[1].level === "low" ? null : rankedNeed?.[0] ?? null;
+  }, [statInterpretation]);
+
   const priorityScores = useMemo<PlannerPriorityScore[]>(() =>
     computePlannerPriorityScores({
       currentDate: todayIso,
@@ -946,6 +1051,7 @@ export function useCompanionPlanner({
       careSignals,
       scheduleInsights,
       plannerMemory,
+      statInterpretation,
       aiSignals: enrichedContext
         ? {
             suggestedWorkload: enrichedContext.suggestedWorkload,
@@ -962,6 +1068,7 @@ export function useCompanionPlanner({
     enrichedContext,
     inboxTasks,
     plannerMemory,
+    statInterpretation,
     reflectionSignalsQuery.data,
     scheduleInsights,
     todayIso,
@@ -979,6 +1086,7 @@ export function useCompanionPlanner({
     priorityScores,
     scheduleInsights,
     plannerMemory,
+    statInterpretation,
     aiSignals: enrichedContext
       ? {
           preferredDifficulty: enrichedContext.preferredDifficulty,
@@ -998,6 +1106,7 @@ export function useCompanionPlanner({
     inboxTasks,
     plannerMemory,
     priorityScores,
+    statInterpretation,
     reflectionSignalsQuery.data,
     scheduleInsights,
     todayIso,
@@ -1691,6 +1800,11 @@ export function useCompanionPlanner({
         detectedIntent: proposal.kind,
         aiResponse: { proposalKind: proposal.kind },
         userAction: "accepted",
+        modifications: {
+          proposalId: proposal.id,
+          proposalKind: proposal.kind,
+          statDrivenNeed: strongestPlannerNeed,
+        },
       });
     } catch (error) {
       console.error("Failed to confirm planner proposal:", error);
@@ -1713,6 +1827,7 @@ export function useCompanionPlanner({
     persistPlannerThreadRows,
     shouldQueueWrites,
     autoPublishConfirmedQuestToOutlook,
+    strongestPlannerNeed,
     trackInteraction,
     trackScheduleModification,
     trackTaskCreation,
@@ -1752,8 +1867,14 @@ export function useCompanionPlanner({
       detectedIntent: proposal.kind,
       aiResponse: { proposalKind: proposal.kind },
       userAction: "rejected",
+      modifications: {
+        proposalId: proposal.id,
+        proposalKind: proposal.kind,
+        statDrivenNeed: strongestPlannerNeed,
+        decisionOverride: true,
+      },
     });
-  }, [persistPlannerThreadRows, proposals, trackInteraction]);
+  }, [persistPlannerThreadRows, proposals, strongestPlannerNeed, trackInteraction]);
 
   const handleConfirmAll = useCallback(async () => {
     const readyProposals = proposals.filter((proposal) => proposal.status === "pending" && proposal.readyToConfirm);
@@ -1884,6 +2005,7 @@ export function useCompanionPlanner({
     sessionState,
     plannerContext,
     plannerMemory,
+    statInterpretation,
     scheduleInsights,
     todayLabel: format(today, "EEEE, MMMM d"),
     isLoadingContext:
@@ -1894,6 +2016,7 @@ export function useCompanionPlanner({
       || contextEventsQuery.isLoading
       || plannerMemoryQuery.isLoading
       || contactsAttentionQuery.isLoading
-      || reflectionSignalsQuery.isLoading,
+      || reflectionSignalsQuery.isLoading
+      || recentStatSignalsQuery.isLoading,
   };
 }

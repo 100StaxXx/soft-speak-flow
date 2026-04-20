@@ -1,3 +1,10 @@
+import {
+  getCompanionBehaviorAwardIntent,
+  shouldAwardHardTaskResolve,
+  type CompanionStatAttribute,
+  type CompanionStatNeed,
+} from "./companionStatSignals";
+
 export type PlannerPriorityStarterIntent =
   | "general"
   | "plan_day"
@@ -13,6 +20,7 @@ export interface PlannerPriorityTaskInput {
   id: string;
   title: string;
   taskDate: string | null;
+  category?: string | null;
   scheduledTime: string | null;
   estimatedDuration: number | null;
   difficulty?: string | null;
@@ -104,6 +112,17 @@ export interface PlannerPriorityAISignalsInput {
   suggestedWorkload?: "light" | "normal" | "heavy";
 }
 
+export interface PlannerPriorityStatInterpretationInput {
+  statProfile: {
+    dominantStat: CompanionStatAttribute;
+    secondaryStat: CompanionStatAttribute;
+  };
+  statNeeds: Record<CompanionStatAttribute, CompanionStatNeed>;
+  momentumState: string;
+  recentMissInterpretation: string;
+  narrativeBrief: string;
+}
+
 export interface PlannerPriorityReflectionSignalInput {
   date: string;
   source: "check_in" | "reflection";
@@ -154,6 +173,7 @@ export interface ComputePlannerPriorityScoresInput {
   starterIntent?: PlannerPriorityStarterIntent | null;
   scheduleInsights?: PlannerPriorityScheduleInsightsInput;
   plannerMemory?: PlannerPriorityMemoryInput;
+  statInterpretation?: PlannerPriorityStatInterpretationInput;
   aiSignals?: PlannerPriorityAISignalsInput;
 }
 
@@ -271,6 +291,27 @@ const pushReason = (reasons: string[], condition: boolean, reason: string) => {
   if (condition) reasons.push(reason);
 };
 
+const getNeedWeight = (level: CompanionStatNeed["level"]) =>
+  level === "high" ? 18 : level === "medium" ? 10 : 0;
+
+const getTaskStatMatch = (task: PlannerPriorityTaskInput): CompanionStatAttribute | null => {
+  const intent = getCompanionBehaviorAwardIntent({
+    title: task.title,
+    category: task.category,
+    difficulty: task.difficulty,
+    priority: task.priority,
+    epicTitle: task.epicTitle,
+    contactId: task.contactId,
+  });
+
+  if (intent) return intent.attribute;
+  if (shouldAwardHardTaskResolve({ difficulty: task.difficulty, priority: task.priority })) {
+    return "resolve";
+  }
+
+  return null;
+};
+
 const scoreTask = (
   input: ComputePlannerPriorityScoresInput,
   task: PlannerPriorityTaskInput,
@@ -290,6 +331,7 @@ const scoreTask = (
   const hasConflict = input.scheduleInsights?.conflicts.some((conflict) =>
     conflict.taskAId === task.id || conflict.taskBId === task.id
   ) ?? false;
+  const statMatch = getTaskStatMatch(task);
 
   if (daysUntil !== null) {
     if (daysUntil < 0) {
@@ -389,6 +431,26 @@ const scoreTask = (
     }
   }
 
+  if (statMatch) {
+    const statNeed = input.statInterpretation?.statNeeds?.[statMatch];
+    const statNeedWeight = statNeed ? getNeedWeight(statNeed.level) : 0;
+    if (statNeedWeight > 0) {
+      score += statNeedWeight;
+      reasons.push(`supports ${statMatch} rebalancing right now`);
+    }
+  }
+
+  if (
+    input.statInterpretation?.statNeeds?.resolve
+    && shouldAwardHardTaskResolve({ difficulty: task.difficulty, priority: task.priority })
+  ) {
+    const resolveWeight = getNeedWeight(input.statInterpretation.statNeeds.resolve.level);
+    if (resolveWeight > 0) {
+      score += Math.max(4, Math.round(resolveWeight / 2));
+      reasons.push("helps rebuild resolve through a bounded hard move");
+    }
+  }
+
   return {
     id: `task:${task.id}`,
     kind: "task",
@@ -410,6 +472,10 @@ const scoreRitual = (
 ): PlannerPriorityScore => {
   let score = 12;
   const reasons: string[] = [];
+  const ritualIntent = getCompanionBehaviorAwardIntent({
+    title: ritual.title,
+    epicTitle: ritual.epicTitle,
+  });
 
   const streak = ritual.currentStreak ?? 0;
   if (streak > 0) {
@@ -431,6 +497,15 @@ const scoreRitual = (
     if (daysRemaining !== null && daysRemaining <= 7) {
       score += 6;
       reasons.push("supports an epic with a close horizon");
+    }
+  }
+
+  if (ritualIntent) {
+    const statNeed = input.statInterpretation?.statNeeds?.[ritualIntent.attribute];
+    const statNeedWeight = statNeed ? getNeedWeight(statNeed.level) : 0;
+    if (statNeedWeight > 0) {
+      score += statNeedWeight;
+      reasons.push(`supports ${ritualIntent.attribute} rebalancing right now`);
     }
   }
 
@@ -536,12 +611,14 @@ const buildRecoveryScore = (
   pushReason(recoveryReasons, inferredEnergy === "low", "energy looks low today");
   pushReason(recoveryReasons, load?.status === "overloaded", "the selected day is overloaded");
   pushReason(recoveryReasons, Boolean(input.careSignals?.hasDormancyWarning), "your companion care state suggests keeping the day realistic");
+  pushReason(recoveryReasons, input.statInterpretation?.statNeeds?.vitality?.level === "high", "Vitality needs active protection right now");
 
   if (input.starterIntent === "low_energy_adjust") score += 28;
   if (input.starterIntent === "make_room" || input.starterIntent === "adjust_today") score += 18;
   if (inferredEnergy === "low") score += 12;
   if (load?.status === "overloaded") score += 16;
   if (input.careSignals?.hasDormancyWarning) score += 8;
+  score += getNeedWeight(input.statInterpretation?.statNeeds?.vitality?.level ?? "low");
 
   if (score === 0) return null;
 

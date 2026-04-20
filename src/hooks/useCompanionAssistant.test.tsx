@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   plannerSubmit: vi.fn().mockResolvedValue(undefined),
   openCampaignBuilder: vi.fn(),
   clearPlannerHandoff: vi.fn(),
+  injectAssistantOpening: vi.fn(),
   resetJourneysThread: vi.fn(),
   hydrateJourneysThread: vi.fn(),
   resetPlannerThread: vi.fn(),
@@ -168,6 +169,7 @@ vi.mock("@/hooks/useJourneysCompanionConversation", () => ({
     threadPersistenceReady: true,
     threadPersistenceUnavailableReason: null,
     clearPlannerHandoff: mocks.clearPlannerHandoff,
+    injectAssistantOpening: mocks.injectAssistantOpening,
     resetThread: mocks.resetJourneysThread,
     hydrateThread: mocks.hydrateJourneysThread,
     isRecording: false,
@@ -274,6 +276,7 @@ describe("useCompanionAssistant", () => {
     mocks.plannerSubmit.mockResolvedValue(undefined);
     mocks.speakCompanionReply.mockResolvedValue("device");
     mocks.openCampaignBuilder.mockReset();
+    mocks.injectAssistantOpening.mockReset();
     mocks.state.companionMessages = [
       {
         id: "chat-1",
@@ -891,6 +894,31 @@ describe("useCompanionAssistant", () => {
     );
     expect(mocks.plannerSubmit).not.toHaveBeenCalled();
     expect(onLaunchIntentConsumed).toHaveBeenCalledWith("launch-2");
+  });
+
+  it("routes conversation launch intents into the journeys conversation lane", async () => {
+    const onLaunchIntentConsumed = vi.fn();
+
+    renderHook(() => useCompanionAssistant({
+      surface: "journeys",
+      launchIntent: {
+        id: "launch-3",
+        message: "What's good boss?",
+        starterIntent: "general",
+        target: "conversation",
+        briefingContext: null,
+      },
+      onLaunchIntentConsumed,
+    }));
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(mocks.injectAssistantOpening).toHaveBeenCalledWith("What's good boss?");
+    expect(mocks.resetPlannerThread).toHaveBeenCalledTimes(1);
+    expect(mocks.plannerSubmit).not.toHaveBeenCalled();
+    expect(onLaunchIntentConsumed).toHaveBeenCalledWith("launch-3");
   });
 
   it("surfaces journeys thread controls alongside the merged transcript", () => {

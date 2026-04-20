@@ -24,7 +24,11 @@ export interface CompanionImagePresentation {
   assetKey: string | null;
 }
 
-const BUNDLED_COMPANION_PREFIXES = ["companion-eggs/", "companion-presets/"] as const;
+const BUNDLED_COMPANION_PREFIXES = [
+  "companion-eggs/",
+  "companion-presets/",
+  "companion-launcher-away/",
+] as const;
 const DEFAULT_PRESENTATION: CompanionImagePresentation = {
   style: {},
   focalPoint: null,

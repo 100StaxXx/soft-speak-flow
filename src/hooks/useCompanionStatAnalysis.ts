@@ -4,14 +4,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
-
-export type CompanionStatAttribute =
-  | "vitality"
-  | "wisdom"
-  | "discipline"
-  | "resolve"
-  | "creativity"
-  | "alignment";
+import type {
+  CompanionMissInterpretation,
+  CompanionMomentumState,
+  CompanionStatAttribute,
+  CompanionStatNeed,
+  CompanionStatProfileSummary,
+} from "@/shared/companionStatSignals";
 
 export type CompanionStatBand = "Emerging" | "Building" | "Strong" | "Exceptional";
 export type CompanionStatDriverSource = "attribute_event" | "activity" | "echo";
@@ -47,6 +46,13 @@ export interface CompanionStatActivitySnapshot {
   onTimeTasks: number;
   trackedAttributeEvents: number;
   streakMilestones: number;
+  hardTaskWins: number;
+  recoveryActions: number;
+  healthActions: number;
+  creativeActions: number;
+  relationshipActions: number;
+  epicLinkedCompletions: number;
+  bounceBackDays: number;
 }
 
 export interface CompanionStatAnalysis {
@@ -66,6 +72,15 @@ export interface CompanionStatAnalysis {
     currentXp: number;
   };
   activitySnapshot: CompanionStatActivitySnapshot;
+  statProfile: CompanionStatProfileSummary;
+  statNeeds: Record<CompanionStatAttribute, CompanionStatNeed>;
+  momentumState: CompanionMomentumState;
+  recentMissInterpretation: CompanionMissInterpretation;
+  narrativeBrief: string;
+  dailyNarrative: string;
+  weeklyNarrative: string;
+  identityBootstrap: string;
+  strongestRecentDrivers: CompanionStatDriver[];
   statBreakdowns: CompanionStatBreakdown[];
   summary: string;
   suggestedAction: string;

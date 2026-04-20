@@ -166,7 +166,7 @@ const JourneysCompanionThreadPicker = memo(function JourneysCompanionThreadPicke
 }: JourneysCompanionThreadPickerProps) {
   const body = (
     <div
-      className="rounded-[28px] border border-white/[0.12] bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.18),transparent_22%),linear-gradient(180deg,rgba(8,15,28,0.94),rgba(6,12,24,0.9))] p-4 text-white shadow-[0_28px_70px_-40px_rgba(0,0,0,0.92)] backdrop-blur-2xl"
+      className="rounded-[2rem] border-[3px] border-[#4d2811] bg-[radial-gradient(circle_at_top_left,rgba(255,245,194,0.22),transparent_26%),radial-gradient(circle_at_bottom_right,rgba(254,138,44,0.18),transparent_30%),linear-gradient(180deg,#8f2f15_0%,#5f180b_100%)] p-4 text-white shadow-[0_16px_0_#3f1308,0_28px_70px_-36px_rgba(43,14,4,0.7)]"
       data-testid="journeys-companion-thread-picker"
     >
       <div className="mb-4 space-y-1">
@@ -181,7 +181,7 @@ const JourneysCompanionThreadPicker = memo(function JourneysCompanionThreadPicke
           Past chats
         </p>
         {isLoading ? (
-          <div className="flex items-center gap-2 rounded-[22px] border border-white/[0.12] bg-white/[0.05] px-4 py-5 text-sm text-white/[0.74]">
+          <div className="flex items-center gap-2 rounded-[1.5rem] border-[3px] border-[#4d2811] bg-[linear-gradient(180deg,rgba(255,247,227,0.14),rgba(255,201,110,0.14))] px-4 py-5 text-sm text-white/[0.82] shadow-[0_8px_0_rgba(77,40,17,0.8)]">
             <Loader2 className="h-4 w-4 animate-spin" />
             Loading past chats...
           </div>
@@ -192,10 +192,10 @@ const JourneysCompanionThreadPicker = memo(function JourneysCompanionThreadPicke
                 key={thread.sessionId}
                 type="button"
                 className={cn(
-                  "flex w-full items-start justify-between gap-3 rounded-[22px] border border-white/[0.12] px-4 py-4 text-left transition-colors",
+                  "flex w-full items-start justify-between gap-3 rounded-[1.5rem] border-[3px] px-4 py-4 text-left transition-colors shadow-[0_8px_0_rgba(77,40,17,0.8)]",
                   canResumeThreads
-                    ? "bg-white/[0.05] hover:bg-white/[0.09]"
-                    : "cursor-not-allowed bg-white/[0.03] opacity-70",
+                    ? "border-[#4d2811] bg-[linear-gradient(180deg,rgba(255,246,221,0.16),rgba(255,192,86,0.14))] hover:bg-[linear-gradient(180deg,rgba(255,249,231,0.2),rgba(255,192,86,0.18))]"
+                    : "cursor-not-allowed border-[#4d2811] bg-white/[0.03] opacity-70",
                 )}
                 onClick={() => {
                   void onResumeThread(thread.sessionId);
@@ -215,7 +215,7 @@ const JourneysCompanionThreadPicker = memo(function JourneysCompanionThreadPicke
             ))}
           </div>
         ) : (
-          <div className="rounded-[22px] border border-dashed border-white/[0.12] bg-white/[0.03] px-4 py-5 text-sm text-white/[0.62]">
+          <div className="rounded-[1.5rem] border-[3px] border-dashed border-[#e1a54f] bg-white/[0.05] px-4 py-5 text-sm text-white/[0.72]">
             {emptyStateMessage}
           </div>
         )}
@@ -534,11 +534,11 @@ const JourneysCompanionOverlayBody = memo(({
 
   return (
     <div
-      className="relative overflow-hidden rounded-[28px] border border-white/[0.12] bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.18),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(34,197,94,0.16),transparent_26%),linear-gradient(180deg,rgba(8,15,28,0.82),rgba(6,12,24,0.66))] text-white shadow-[0_34px_90px_-46px_rgba(0,0,0,0.92)] backdrop-blur-2xl"
+      className="relative overflow-hidden rounded-[2.25rem] border-[4px] border-[#4d2811] bg-[radial-gradient(circle_at_top_left,rgba(255,247,199,0.24),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(254,151,54,0.18),transparent_28%),linear-gradient(180deg,#a23518_0%,#701d0d_62%,#4a1209_100%)] text-white shadow-[0_18px_0_#4d2811,0_34px_90px_-36px_rgba(38,12,5,0.62)]"
       data-testid="journeys-companion-planner-modal"
     >
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),transparent_18%,transparent_82%,rgba(255,255,255,0.04))]" />
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.14),transparent_62%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.16),transparent_18%,transparent_78%,rgba(74,18,9,0.1))]" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-[radial-gradient(circle_at_top,rgba(255,248,212,0.36),transparent_62%)]" />
 
       <div
         className={cn(
@@ -549,7 +549,7 @@ const JourneysCompanionOverlayBody = memo(({
         data-testid="journeys-companion-planner-shell"
       >
         <div
-          className="flex items-center gap-3 rounded-[24px] border border-white/[0.12] bg-white/[0.04] px-4 py-3 backdrop-blur-2xl"
+          className="flex items-center gap-3 rounded-[1.8rem] border-[3px] border-[#4d2811] bg-[linear-gradient(180deg,rgba(255,251,239,0.2),rgba(255,206,105,0.14))] px-4 py-3 shadow-[0_8px_0_rgba(77,40,17,0.85)]"
           data-testid="journeys-companion-planner-chat-header"
         >
           <div className="relative shrink-0">
@@ -572,7 +572,7 @@ const JourneysCompanionOverlayBody = memo(({
                       type="button"
                       size="icon"
                       variant="outline"
-                      className="h-10 w-10 border-white/[0.15] bg-white/[0.05] text-white/[0.84] hover:bg-white/[0.12]"
+                      className="h-10 w-10 rounded-[1rem] border-[3px] border-[#4d2811] bg-[linear-gradient(180deg,rgba(255,246,221,0.2),rgba(255,191,89,0.16))] text-white hover:bg-[linear-gradient(180deg,rgba(255,250,236,0.24),rgba(255,191,89,0.2))]"
                       onClick={() => {
                         void handleNewChatAction();
                       }}
@@ -595,7 +595,7 @@ const JourneysCompanionOverlayBody = memo(({
                       type="button"
                       size="icon"
                       variant="outline"
-                      className="h-10 w-10 border-white/[0.15] bg-white/[0.05] text-white/[0.84] hover:bg-white/[0.12]"
+                      className="h-10 w-10 rounded-[1rem] border-[3px] border-[#4d2811] bg-[linear-gradient(180deg,rgba(255,246,221,0.2),rgba(255,191,89,0.16))] text-white hover:bg-[linear-gradient(180deg,rgba(255,250,236,0.24),rgba(255,191,89,0.2))]"
                       onClick={() => {
                         void handleArchiveAction();
                       }}
@@ -621,7 +621,7 @@ const JourneysCompanionOverlayBody = memo(({
 
         <div
           className={cn(
-            "mt-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-[28px] border border-white/[0.12] bg-white/[0.045] backdrop-blur-2xl shadow-[0_26px_70px_-48px_rgba(0,0,0,0.92)]",
+            "mt-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-[2rem] border-[4px] border-[#4d2811] bg-[linear-gradient(180deg,rgba(255,248,225,0.14),rgba(255,187,88,0.1))] shadow-[0_12px_0_rgba(77,40,17,0.84),0_26px_50px_-36px_rgba(34,11,4,0.6)]",
             typingMessageId && "cursor-pointer",
           )}
           onClick={() => {
@@ -651,10 +651,10 @@ const JourneysCompanionOverlayBody = memo(({
                   >
                     <div
                       className={cn(
-                        "max-w-[85%] rounded-[22px] border px-4 py-3 shadow-[0_24px_45px_-34px_rgba(0,0,0,0.72)] backdrop-blur-xl sm:max-w-[78%]",
+                        "max-w-[85%] rounded-[1.7rem] border-[3px] px-4 py-3 shadow-[0_8px_0_rgba(77,40,17,0.8),0_18px_34px_-28px_rgba(36,12,4,0.52)] sm:max-w-[78%]",
                         entry.role === "assistant"
-                          ? "rounded-bl-md border-white/[0.12] bg-white/[0.09] text-white/[0.92]"
-                          : "rounded-br-md border-sky-100/[0.15] bg-sky-400/[0.26] text-white",
+                          ? "rounded-bl-[0.7rem] border-[#4d2811] bg-[linear-gradient(180deg,#fff8e9_0%,#ffd579_100%)] text-[#4f240c]"
+                          : "rounded-br-[0.7rem] border-[#3b4f0d] bg-[linear-gradient(180deg,#d7ff86_0%,#98d83b_100%)] text-[#183304]",
                       )}
                     >
                       <p className="whitespace-pre-wrap text-sm leading-6 sm:text-[0.95rem]">
@@ -668,7 +668,7 @@ const JourneysCompanionOverlayBody = memo(({
               {activeProposal ? (
                 <div className="flex w-full justify-start">
                   <div
-                    className="max-w-[88%] rounded-[24px] border border-white/[0.12] bg-white/[0.08] p-4 text-white shadow-[0_24px_45px_-34px_rgba(0,0,0,0.72)] backdrop-blur-xl"
+                    className="max-w-[88%] rounded-[1.8rem] border-[3px] border-[#4d2811] bg-[linear-gradient(180deg,#fff8e8_0%,#ffcf6e_100%)] p-4 text-[#4f240c] shadow-[0_8px_0_rgba(77,40,17,0.8),0_18px_34px_-28px_rgba(36,12,4,0.5)]"
                     data-testid="journeys-companion-planner-inline-proposal"
                   >
                     <div className="flex items-start justify-between gap-3">
@@ -684,13 +684,13 @@ const JourneysCompanionOverlayBody = memo(({
                           </p>
                         ) : null}
                       </div>
-                      <Badge variant="outline" className="border-white/[0.15] bg-white/[0.06] text-white/[0.7]">
+                      <Badge variant="outline" className="border-[#6b3416] bg-white/60 text-[#7f3b12]">
                         {activeProposal.status}
                       </Badge>
                     </div>
                     {activeQuestPreview?.notes ? (
                       <div
-                        className="mt-3 rounded-[20px] border border-white/[0.12] bg-white/[0.05] p-3"
+                        className="mt-3 rounded-[1.4rem] border-[3px] border-[#6b3416] bg-white/55 p-3"
                         data-testid={`journeys-companion-planner-inline-proposal-notes-${activeProposal.id}`}
                       >
                         <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/[0.46]">
@@ -701,7 +701,7 @@ const JourneysCompanionOverlayBody = memo(({
                     ) : null}
                     {activeQuestPreview?.subtasks.length ? (
                       <div
-                        className="mt-3 rounded-[20px] border border-white/[0.12] bg-white/[0.05] p-3"
+                        className="mt-3 rounded-[1.4rem] border-[3px] border-[#6b3416] bg-white/55 p-3"
                         data-testid={`journeys-companion-planner-inline-proposal-subtasks-${activeProposal.id}`}
                       >
                         <div className="flex flex-wrap items-center gap-2">
@@ -727,7 +727,7 @@ const JourneysCompanionOverlayBody = memo(({
                       <Button
                         type="button"
                         size="sm"
-                        className="border-white/10 bg-white/[0.12] text-white hover:bg-white/[0.18]"
+                        className="rounded-full border-[3px] border-[#315114] bg-[linear-gradient(180deg,#d7ff86_0%,#9fda3f_100%)] text-[#183304] hover:bg-[linear-gradient(180deg,#e3ff9e_0%,#a6e145_100%)]"
                         onClick={() => assistant.confirmProposal(activeProposal.id)}
                         disabled={!activeProposal.readyToConfirm}
                       >
@@ -738,7 +738,7 @@ const JourneysCompanionOverlayBody = memo(({
                         type="button"
                         size="sm"
                         variant="outline"
-                        className="border-white/[0.15] bg-white/[0.04] text-white/[0.78] hover:bg-white/[0.08]"
+                        className="rounded-full border-[3px] border-[#6b3416] bg-white/60 text-[#6b3416] hover:bg-white/75"
                         onClick={() => assistant.rejectProposal(activeProposal.id)}
                       >
                         <X className="mr-2 h-4 w-4" />
@@ -749,7 +749,7 @@ const JourneysCompanionOverlayBody = memo(({
                           type="button"
                           size="sm"
                           variant="outline"
-                          className="border-white/[0.15] bg-white/[0.04] text-white/[0.78] hover:bg-white/[0.08]"
+                          className="rounded-full border-[3px] border-[#6b3416] bg-white/60 text-[#6b3416] hover:bg-white/75"
                           onClick={assistant.confirmAll}
                         >
                           Confirm all
@@ -765,7 +765,7 @@ const JourneysCompanionOverlayBody = memo(({
                   className="flex w-full justify-start"
                   data-testid={showStarterQuickReplies ? "journeys-companion-planner-starter-options" : "journeys-companion-planner-inline-options"}
                 >
-                  <div className="max-w-[92%] rounded-[24px] border border-white/[0.12] bg-white/[0.06] p-3 shadow-[0_24px_45px_-34px_rgba(0,0,0,0.72)] backdrop-blur-xl">
+                  <div className="max-w-[92%] rounded-[1.8rem] border-[3px] border-[#4d2811] bg-[linear-gradient(180deg,#fff8e8_0%,#ffcf6e_100%)] p-3 shadow-[0_8px_0_rgba(77,40,17,0.8),0_18px_34px_-28px_rgba(36,12,4,0.5)]">
                     <div className="flex flex-wrap gap-2">
                       {showStarterQuickReplies
                         ? STARTER_QUICK_REPLIES.map((starter) => (
@@ -774,7 +774,7 @@ const JourneysCompanionOverlayBody = memo(({
                               type="button"
                               size="sm"
                               variant="outline"
-                              className="border-white/[0.12] bg-white/[0.08] text-white hover:bg-white/[0.14]"
+                              className="rounded-full border-[3px] border-[#6b3416] bg-white/60 text-[#5d2a0f] hover:bg-white/80"
                               onClick={() => handleStarterQuickReply(starter)}
                             >
                               {starter}
@@ -788,7 +788,7 @@ const JourneysCompanionOverlayBody = memo(({
                             type="button"
                             size="sm"
                             variant="outline"
-                            className="border-white/[0.12] bg-white/[0.08] text-white hover:bg-white/[0.14]"
+                            className="rounded-full border-[3px] border-[#6b3416] bg-white/60 text-[#5d2a0f] hover:bg-white/80"
                             onClick={() => handleQuickReply(option)}
                           >
                             {option}
@@ -804,17 +804,17 @@ const JourneysCompanionOverlayBody = memo(({
             </div>
           </ScrollArea>
 
-          <div className="border-t border-white/10 bg-white/[0.03] p-3 backdrop-blur-2xl">
+          <div className="border-t-[3px] border-[#4d2811] bg-[linear-gradient(180deg,rgba(255,248,225,0.18),rgba(255,193,90,0.14))] p-3">
             {assistant.isRecording || assistant.interimText ? (
               <div
-                className="mb-3 rounded-[22px] border border-white/[0.12] bg-white/[0.06] px-3 py-3 text-white/80 shadow-[0_22px_40px_-34px_rgba(0,0,0,0.7)] backdrop-blur-xl"
+                className="mb-3 rounded-[1.5rem] border-[3px] border-[#4d2811] bg-[linear-gradient(180deg,#fff8e8_0%,#ffcf6e_100%)] px-3 py-3 text-[#5d2a0f] shadow-[0_8px_0_rgba(77,40,17,0.8)]"
                 data-testid="journeys-companion-planner-voice-preview"
               >
                 <AudioReactiveWaveform
                   isActive={assistant.isRecording && !assistant.isAutoStopping}
-                  className="justify-start text-white/[0.7]"
+                  className="justify-start text-[#b04b12]"
                 />
-                <p className="mt-2 text-sm text-white/[0.78]">
+                <p className="mt-2 text-sm text-[#5d2a0f]">
                   {assistant.interimText || "Listening for your reply..."}
                 </p>
               </div>
@@ -822,10 +822,10 @@ const JourneysCompanionOverlayBody = memo(({
 
             {assistant.isSpeaking ? (
               <div
-                className="mb-3 flex items-center justify-between gap-3 rounded-[22px] border border-emerald-300/20 bg-emerald-400/10 px-3 py-3 shadow-[0_22px_40px_-34px_rgba(0,0,0,0.7)] backdrop-blur-xl"
+                className="mb-3 flex items-center justify-between gap-3 rounded-[1.5rem] border-[3px] border-[#315114] bg-[linear-gradient(180deg,#e0ff9d_0%,#a9df46_100%)] px-3 py-3 shadow-[0_8px_0_rgba(49,81,20,0.75)]"
                 data-testid="journeys-companion-planner-speaking-status"
               >
-                <div className="flex items-center gap-2 text-sm text-emerald-50">
+                <div className="flex items-center gap-2 text-sm text-[#183304]">
                   <Waves className="h-4 w-4" />
                   Speaking {assistant.speechProvider === "cloud" ? "with fallback audio" : "on-device"}.
                 </div>
@@ -833,7 +833,7 @@ const JourneysCompanionOverlayBody = memo(({
                   type="button"
                   size="sm"
                   variant="ghost"
-                  className="text-emerald-50 hover:bg-emerald-300/10 hover:text-emerald-50"
+                  className="text-[#183304] hover:bg-[#d2f38e] hover:text-[#183304]"
                   onClick={assistant.stopSpeaking}
                 >
                   Stop
@@ -841,14 +841,14 @@ const JourneysCompanionOverlayBody = memo(({
               </div>
             ) : null}
 
-            <div className="flex items-center gap-2 rounded-[24px] border border-white/[0.12] bg-black/10 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl">
+            <div className="flex items-center gap-2 rounded-[1.7rem] border-[3px] border-[#4d2811] bg-[linear-gradient(180deg,#fff8e8_0%,#ffc861_100%)] p-2 shadow-[0_8px_0_rgba(77,40,17,0.8)]">
               <Button
                 type="button"
                 size="icon"
                 variant="ghost"
                 className={cn(
-                  "h-11 w-11 shrink-0 rounded-full border border-white/[0.12] bg-white/[0.06] text-white hover:bg-white/[0.12]",
-                  assistant.isRecording && "border-rose-300/[0.35] bg-rose-400/[0.16] text-rose-50",
+                  "h-11 w-11 shrink-0 rounded-full border-[3px] border-[#4d2811] bg-white/65 text-[#7f3b12] hover:bg-white/80",
+                  assistant.isRecording && "border-[#7f1616] bg-[linear-gradient(180deg,#ffb8a7_0%,#ff7a59_100%)] text-[#4c0f0f]",
                 )}
                 onClick={handleVoiceToggle}
                 disabled={!assistant.isVoiceSupported && !assistant.isRecording}
@@ -870,14 +870,14 @@ const JourneysCompanionOverlayBody = memo(({
                 onKeyDown={handleComposerKeyDown}
                 onFocus={handleComposerFocus}
                 placeholder={assistant.placeholder}
-                className="h-12 min-h-[48px] max-h-[48px] flex-1 w-auto resize-none overflow-y-auto rounded-[20px] border-white/10 bg-white/[0.04] px-4 py-3 leading-5 text-white placeholder:text-white/[0.38]"
+                className="h-12 min-h-[48px] max-h-[48px] flex-1 w-auto resize-none overflow-y-auto rounded-[1.4rem] border-[3px] border-[#6b3416] bg-white/80 px-4 py-3 leading-5 text-[#4d2811] placeholder:text-[#9a6d47]"
                 data-testid="journeys-companion-planner-text-input"
               />
               <Button
                 type="button"
                 onClick={handleSubmit}
                 disabled={sendDisabled}
-                className="h-11 shrink-0 rounded-full border border-sky-100/10 bg-sky-400/[0.25] px-4 text-white hover:bg-sky-400/[0.35]"
+                className="h-11 shrink-0 rounded-full border-[3px] border-[#315114] bg-[linear-gradient(180deg,#d7ff86_0%,#9fda3f_100%)] px-4 text-[#183304] hover:bg-[linear-gradient(180deg,#e3ff9e_0%,#a6e145_100%)]"
                 data-testid="journeys-companion-planner-send-button"
               >
                 {assistant.isSubmitting || assistant.isClassifying ? (

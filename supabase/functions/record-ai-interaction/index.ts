@@ -83,6 +83,53 @@ async function updateLearningFromAction(
     });
 }
 
+async function trackPlannerPatternFeedback(
+  supabase: any,
+  userId: string,
+  action: UserAction,
+  modifications: unknown,
+) {
+  const payload = asObject(modifications);
+  const proposalKind = typeof payload.proposalKind === "string" ? payload.proposalKind : null;
+  const statDrivenNeed = typeof payload.statDrivenNeed === "string" ? payload.statDrivenNeed : null;
+  const decisionOverride = payload.decisionOverride === true;
+
+  if (!proposalKind && !statDrivenNeed && !decisionOverride) {
+    return;
+  }
+
+  const learning = await getLearningProfile(supabase, userId);
+  const successfulPatterns = asNumberRecord(learning?.successful_patterns);
+  const failedPatterns = asNumberRecord(learning?.failed_patterns);
+  const targetPatterns = action === "rejected" ? failedPatterns : successfulPatterns;
+
+  if (proposalKind) {
+    const proposalKey = `planner_proposal:${proposalKind}`;
+    targetPatterns[proposalKey] = (targetPatterns[proposalKey] || 0) + 1;
+  }
+
+  if (statDrivenNeed) {
+    const rebalanceKey = `stat_rebalance:${statDrivenNeed}`;
+    targetPatterns[rebalanceKey] = (targetPatterns[rebalanceKey] || 0) + 1;
+  }
+
+  if (decisionOverride && proposalKind) {
+    const overrideKey = `decision_override:${proposalKind}`;
+    failedPatterns[overrideKey] = (failedPatterns[overrideKey] || 0) + 1;
+  }
+
+  await supabase
+    .from("user_ai_learning")
+    .upsert({
+      user_id: userId,
+      successful_patterns: successfulPatterns,
+      failed_patterns: failedPatterns,
+      updated_at: new Date().toISOString(),
+    }, {
+      onConflict: "user_id",
+    });
+}
+
 async function updatePreferenceWeights(
   supabase: any,
   userId: string,
@@ -255,6 +302,7 @@ serve(async (req) => {
           });
 
         await updateLearningFromAction(supabase, requestAuth.userId, userAction);
+        await trackPlannerPatternFeedback(supabase, requestAuth.userId, userAction, body.modifications);
         break;
       }
 
