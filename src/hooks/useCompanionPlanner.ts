@@ -49,6 +49,7 @@ import type {
   CompanionChatThreadMessage,
   CompanionPlannerMessage,
   CompanionPlannerProposalKind,
+  CompanionPlannerQuestProposalEdits,
   CompanionPlannerProposal,
   CompanionPlannerQuestion,
   CompanionPlannerRequest,
@@ -1893,6 +1894,86 @@ export function useCompanionPlanner({
     setQuestions([]);
   }, [handleConfirmProposal, proposals]);
 
+  const updateQuestProposalDraft = useCallback((
+    proposalId: string,
+    edits: CompanionPlannerQuestProposalEdits,
+  ) => {
+    const normalizedTaskText = edits.taskText.trim();
+    const normalizedTaskDate = edits.taskDate?.trim() ? edits.taskDate : null;
+    const normalizedScheduledTime = edits.scheduledTime?.trim() ? edits.scheduledTime : null;
+    const normalizedDuration = typeof edits.estimatedDuration === "number" && Number.isFinite(edits.estimatedDuration)
+      ? Math.max(5, Math.round(edits.estimatedDuration))
+      : null;
+    const normalizedNotes = edits.notes?.trim() ? edits.notes.trim() : null;
+    const normalizedSubtasks = edits.subtasks
+      .map((subtask) => subtask.trim())
+      .filter((subtask) => subtask.length > 0);
+
+    if (!normalizedTaskText) {
+      toast("Quest title can't be empty.");
+      return;
+    }
+
+    setProposals((previous) => previous.map((proposal) => {
+      if (proposal.id !== proposalId || proposal.status !== "pending") return proposal;
+
+      if (proposal.kind === "create_quest") {
+        const payload = asUnknownRecord(proposal.payload) ?? {};
+        const nextPayload: Record<string, unknown> = {
+          ...payload,
+          taskText: normalizedTaskText,
+          taskDate: normalizedTaskDate,
+          scheduledTime: normalizedScheduledTime,
+          estimatedDuration: normalizedDuration,
+          notes: normalizedNotes,
+          subtasks: normalizedSubtasks,
+        };
+
+        return {
+          ...proposal,
+          title: normalizedTaskText,
+          summary: normalizedNotes ?? proposal.summary,
+          payload: nextPayload,
+          readyToConfirm: true,
+          missingFields: [],
+        };
+      }
+
+      if (proposal.kind === "update_quest") {
+        const payload = asUnknownRecord(proposal.payload) ?? {};
+        const existingUpdates = asUnknownRecord(payload.updates) ?? {};
+        const existingSubtaskPlan = asUnknownRecord(payload.subtaskPlan) ?? {};
+        const nextPayload: Record<string, unknown> = {
+          ...payload,
+          updates: {
+            ...existingUpdates,
+            task_text: normalizedTaskText,
+            task_date: normalizedTaskDate,
+            scheduled_time: normalizedScheduledTime,
+            estimated_duration: normalizedDuration,
+            notes: normalizedNotes,
+          },
+          subtaskPlan: {
+            ...existingSubtaskPlan,
+            mode: edits.subtaskPlanMode,
+            titles: normalizedSubtasks,
+          },
+        };
+
+        return {
+          ...proposal,
+          title: normalizedTaskText,
+          summary: normalizedNotes ?? proposal.summary,
+          payload: nextPayload,
+          readyToConfirm: true,
+          missingFields: [],
+        };
+      }
+
+      return proposal;
+    }));
+  }, []);
+
   const { isRecording, isAutoStopping, isSupported, permissionStatus, toggleRecording, requestPermission } = useVoiceInput({
     onInterimResult: (text) => {
       setInterimText(text);
@@ -2012,6 +2093,7 @@ export function useCompanionPlanner({
     confirmProposal: handleConfirmProposal,
     rejectProposal: handleRejectProposal,
     confirmAll: handleConfirmAll,
+    updateQuestProposalDraft,
     sessionState,
     plannerContext,
     plannerMemory,

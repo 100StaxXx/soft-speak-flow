@@ -305,6 +305,16 @@ export interface CompanionPlannerQuestSubtaskPlan {
   titles: string[];
 }
 
+export interface CompanionPlannerQuestProposalEdits {
+  taskText: string;
+  taskDate: string | null;
+  scheduledTime: string | null;
+  estimatedDuration: number | null;
+  notes: string | null;
+  subtasks: string[];
+  subtaskPlanMode: "append" | "replace";
+}
+
 export interface CompanionPlannerRequest {
   message: string;
   currentDate: string;

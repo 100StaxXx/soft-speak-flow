@@ -28,6 +28,7 @@ import type { CompanionChatInputMode } from "@/types/companionConversation";
 import type {
   CompanionPlannerLaunchIntent,
   CompanionPlannerLaunchTarget,
+  CompanionPlannerQuestProposalEdits,
 } from "@/types/companionPlanner";
 import { formatCurrentDateTimeWithOffset } from "@/utils/currentDateTime";
 
@@ -538,6 +539,8 @@ export function useCompanionAssistant({
     confirmProposal: planner.confirmProposal,
     rejectProposal: planner.rejectProposal,
     confirmAll: planner.confirmAll,
+    updateQuestProposalDraft: (proposalId: string, edits: CompanionPlannerQuestProposalEdits) =>
+      planner.updateQuestProposalDraft(proposalId, edits),
     autoplayVoice: companionChat.autoplayVoice,
     setAutoplayVoice: companionChat.setAutoplayVoice,
     muteSpokenReplies: companionChat.muteSpokenReplies,
