@@ -1538,7 +1538,7 @@ Deno.test("quest_capture turns a complete follow-up answer into a ready quest dr
   assertEquals(result.sessionState.pendingStarterIntent ?? null, null);
 });
 
-Deno.test("quest_capture asks only for timing when the user replies with the quest but not the schedule", () => {
+Deno.test("quest_capture turns a bare quest title into a ready inbox draft", () => {
   const intake = buildPlannerResponse(baseInput({
     message: "Quest?",
     parsedInput: {
@@ -1579,6 +1579,257 @@ Deno.test("quest_capture asks only for timing when the user replies with the que
     },
   }));
 
+  assertEquals(result.proposals[0].kind, "create_quest");
+  assertEquals(result.proposals[0].readyToConfirm, true);
+  assertEquals(result.followUpQuestions.length, 0);
+  assertEquals(result.proposals[0].summary, 'Capture "Write my newsletter" in Inbox so you can schedule it later.');
+  assertEquals(
+    (result.proposals[0].payload as {
+      taskDate: string | null;
+      scheduledTime: string | null;
+      source: string | null;
+    }).taskDate,
+    null,
+  );
+  assertEquals(
+    (result.proposals[0].payload as {
+      taskDate: string | null;
+      scheduledTime: string | null;
+      source: string | null;
+    }).scheduledTime,
+    null,
+  );
+  assertEquals(
+    (result.proposals[0].payload as {
+      taskDate: string | null;
+      scheduledTime: string | null;
+      source: string | null;
+    }).source,
+    "inbox",
+  );
+});
+
+Deno.test("quest_capture uses a matching suggested slot for date-only replies", () => {
+  const intake = buildPlannerResponse(baseInput({
+    message: "Quest?",
+    parsedInput: {
+      text: "Quest?",
+      scheduledTime: null,
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+    plannerContext: {
+      starterIntent: "quest_capture",
+    },
+  }));
+
+  const result = buildPlannerResponse(baseInput({
+    currentDate: "2026-04-18",
+    currentDateTime: "2026-04-18T10:30:00-07:00",
+    message: "Write my newsletter tomorrow",
+    sessionState: intake.sessionState,
+    parsedInput: {
+      text: "Write my newsletter",
+      scheduledTime: null,
+      scheduledDate: "2026-04-19",
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+    plannerContext: {
+      scheduleInsights: {
+        horizon: "day",
+        selectedDate: "2026-04-19",
+        dayLoads: [],
+        overloadedDates: [],
+        emptyDates: [],
+        conflicts: [],
+        suggestedSlots: [
+          {
+            date: "2026-04-19",
+            time: "18:00",
+            endTime: "18:30",
+            score: 92,
+            reason: "Open evening window",
+          },
+        ],
+        moveSuggestions: [],
+        summary: "Tomorrow has room in the evening.",
+      },
+    },
+  }));
+
+  assertEquals(result.proposals[0].kind, "create_quest");
+  assertEquals(result.proposals[0].readyToConfirm, true);
+  assertEquals(result.followUpQuestions.length, 0);
+  assertStringIncludes(result.proposals[0].summary, "assuming that slot based on your open window");
+  assertEquals(
+    (result.proposals[0].payload as {
+      taskDate: string | null;
+      scheduledTime: string | null;
+    }).taskDate,
+    "2026-04-19",
+  );
+  assertEquals(
+    (result.proposals[0].payload as {
+      taskDate: string | null;
+      scheduledTime: string | null;
+    }).scheduledTime,
+    "18:00",
+  );
+});
+
+Deno.test("quest_capture uses planner memory when a date-only reply has no matching slot", () => {
+  const intake = buildPlannerResponse(baseInput({
+    message: "Quest?",
+    parsedInput: {
+      text: "Quest?",
+      scheduledTime: null,
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+    plannerContext: {
+      starterIntent: "quest_capture",
+    },
+  }));
+
+  const result = buildPlannerResponse(baseInput({
+    currentDate: "2026-04-18",
+    currentDateTime: "2026-04-18T10:30:00-07:00",
+    message: "Write my newsletter tomorrow",
+    sessionState: intake.sessionState,
+    parsedInput: {
+      text: "Write my newsletter",
+      scheduledTime: null,
+      scheduledDate: "2026-04-19",
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+    plannerContext: {
+      plannerMemory: {
+        preferredTimeOfDay: "evening",
+      },
+      scheduleInsights: {
+        horizon: "day",
+        selectedDate: "2026-04-19",
+        dayLoads: [],
+        overloadedDates: [],
+        emptyDates: [],
+        conflicts: [],
+        suggestedSlots: [],
+        moveSuggestions: [],
+        summary: "Tomorrow still has some flexibility.",
+      },
+    },
+  }));
+
+  assertEquals(result.proposals[0].kind, "create_quest");
+  assertEquals(result.proposals[0].readyToConfirm, true);
+  assertEquals(result.followUpQuestions.length, 0);
+  assertStringIncludes(result.proposals[0].summary, "assuming your usual evening pattern");
+  assertEquals(
+    (result.proposals[0].payload as {
+      taskDate: string | null;
+      scheduledTime: string | null;
+    }).taskDate,
+    "2026-04-19",
+  );
+  assertEquals(
+    (result.proposals[0].payload as {
+      taskDate: string | null;
+      scheduledTime: string | null;
+    }).scheduledTime,
+    "18:00",
+  );
+});
+
+Deno.test("quest_capture asks one timing question when a date-only reply has no safe time assumption", () => {
+  const intake = buildPlannerResponse(baseInput({
+    message: "Quest?",
+    parsedInput: {
+      text: "Quest?",
+      scheduledTime: null,
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+    plannerContext: {
+      starterIntent: "quest_capture",
+    },
+  }));
+
+  const result = buildPlannerResponse(baseInput({
+    currentDate: "2026-04-18",
+    currentDateTime: "2026-04-18T10:30:00-07:00",
+    message: "Write my newsletter tomorrow",
+    sessionState: intake.sessionState,
+    parsedInput: {
+      text: "Write my newsletter",
+      scheduledTime: null,
+      scheduledDate: "2026-04-19",
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+    plannerContext: {
+      scheduleInsights: {
+        horizon: "day",
+        selectedDate: "2026-04-19",
+        dayLoads: [],
+        overloadedDates: [],
+        emptyDates: [],
+        conflicts: [],
+        suggestedSlots: [],
+        moveSuggestions: [],
+        summary: "Tomorrow is unscheduled so far.",
+      },
+    },
+  }));
+
+  assertEquals(result.proposals[0].kind, "create_quest");
+  assertEquals(result.proposals[0].readyToConfirm, false);
   assertEquals(result.followUpQuestions.map((question) => question.field), [
     "time_of_day",
   ]);

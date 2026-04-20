@@ -162,6 +162,8 @@ const ACTIVITY_SNAPSHOT_COUNT_KEYS = [
   "bounceBackDays",
 ] as const satisfies readonly (keyof CompanionStatActivitySnapshot)[];
 
+const STAT_NEEDS_COMPATIBILITY_ERROR_PATTERN = /^analysis\.statNeeds(?:\.[a-z]+)? must be an object$/;
+
 function failure(error: string): ValidationFailure {
   return { ok: false, error };
 }
@@ -560,7 +562,7 @@ export function validateCompanionStatAnalysis(value: unknown): ValidationResult<
   }
 
   return success({
-    ...(value as CompanionStatAnalysis),
+    ...(value as unknown as CompanionStatAnalysis),
     activitySnapshot: activitySnapshotValidation.data,
     statProfile: statProfileValidation.data,
     statBreakdowns: normalizedBreakdowns,
@@ -587,4 +589,73 @@ export function validateCompanionStatAnalysisResponse(
     analysis: analysisValidation.data,
     cached: value.cached,
   });
+}
+
+function createDefaultStatNeed(): CompanionStatNeed {
+  return {
+    level: "low",
+    reasons: [],
+  };
+}
+
+function createDefaultStatNeeds(): Record<CompanionStatAttribute, CompanionStatNeed> {
+  return Object.fromEntries(
+    ATTRIBUTE_KEYS.map((attribute) => [attribute, createDefaultStatNeed()]),
+  ) as Record<CompanionStatAttribute, CompanionStatNeed>;
+}
+
+function normalizeCompanionStatNeedsForClient(value: unknown): unknown {
+  if (!isRecord(value) || !isRecord(value.analysis)) {
+    return value;
+  }
+
+  const analysis = value.analysis;
+  if (!isRecord(analysis.statNeeds)) {
+    return {
+      ...value,
+      analysis: {
+        ...analysis,
+        statNeeds: createDefaultStatNeeds(),
+      },
+    };
+  }
+
+  let didChange = false;
+  const normalizedStatNeeds = {
+    ...analysis.statNeeds,
+  } as Record<string, unknown>;
+
+  for (const attribute of ATTRIBUTE_KEYS) {
+    if (!isRecord(analysis.statNeeds[attribute])) {
+      normalizedStatNeeds[attribute] = createDefaultStatNeed();
+      didChange = true;
+    }
+  }
+
+  if (!didChange) {
+    return value;
+  }
+
+  return {
+    ...value,
+    analysis: {
+      ...analysis,
+      statNeeds: normalizedStatNeeds,
+    },
+  };
+}
+
+export function validateCompanionStatAnalysisResponseForClient(
+  value: unknown,
+): ValidationResult<CompanionStatAnalysisResponse> {
+  const validation = validateCompanionStatAnalysisResponse(value);
+  if (validation.ok) {
+    return validation;
+  }
+
+  if (!STAT_NEEDS_COMPATIBILITY_ERROR_PATTERN.test(validation.error)) {
+    return validation;
+  }
+
+  return validateCompanionStatAnalysisResponse(normalizeCompanionStatNeedsForClient(value));
 }

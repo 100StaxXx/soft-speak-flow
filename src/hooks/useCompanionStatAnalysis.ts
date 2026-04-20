@@ -10,7 +10,7 @@ import {
   type CompanionStatBand,
   type CompanionStatBreakdown,
   type CompanionStatDriver,
-  validateCompanionStatAnalysisResponse,
+  validateCompanionStatAnalysisResponseForClient,
 } from "@/shared/companionStatAnalysis";
 import type { CompanionStatAttribute } from "@/shared/companionStatSignals";
 
@@ -86,14 +86,14 @@ export const useCompanionStatAnalysis = ({ enabled = true }: UseCompanionStatAna
     allowMalformedCacheRecovery: boolean;
   }): Promise<CompanionStatAnalysisResponse> => {
     const rawResponse = await invokeAnalysis(forceRefresh);
-    const validation = validateCompanionStatAnalysisResponse(rawResponse);
+    const validation = validateCompanionStatAnalysisResponseForClient(rawResponse);
     if (validation.ok) {
       return validation.data;
     }
 
     if (!forceRefresh && allowMalformedCacheRecovery && isCachedMalformedAnalysisResponse(rawResponse)) {
       const refreshedResponse = await invokeAnalysis(true);
-      const refreshedValidation = validateCompanionStatAnalysisResponse(refreshedResponse);
+      const refreshedValidation = validateCompanionStatAnalysisResponseForClient(refreshedResponse);
       if (refreshedValidation.ok) {
         return refreshedValidation.data;
       }

@@ -233,6 +233,9 @@ const wantsKeepSimple = (message: string): boolean => KEEP_SIMPLE_REGEX.test(mes
 
 const wantsReplaceBreakdown = (message: string): boolean => REPLACE_BREAKDOWN_REGEX.test(message);
 
+const isQuestCaptureFlow = (input: PlannerBuildInput): boolean =>
+  input.sessionState.pendingStarterIntent === "quest_capture";
+
 const shouldOfferQuestEnrichment = (
   input: PlannerBuildInput,
   baseResult: PlannerBuildResult,
@@ -242,6 +245,7 @@ const shouldOfferQuestEnrichment = (
   if (!proposal.readyToConfirm) return false;
   if (input.sessionState.openQuestionIds.length > 0) return false;
   if (isPureScheduleOrReminderUpdate(proposal) || isRenameOnlyUpdate(proposal)) return false;
+  if (isQuestCaptureFlow(input)) return false;
 
   if (wantsBreakdown(input.message) || wantsNotes(input.message)) {
     return true;
@@ -651,11 +655,18 @@ export async function enrichQuestPlannerResult(params: {
     });
   }
 
-  if (!shouldOfferQuestEnrichment(params.input, params.baseResult, proposal)) {
-    return params.baseResult;
-  }
+  if (wantsBreakdown(params.input.message)) {
+    if (!inlineDetails) {
+      return buildQuestResponse(params.input, params.baseResult, proposal, {
+        reply: `Nice. Give me a little context for "${questTitle}" and I'll turn it into usable steps.`,
+        followUpQuestions: [buildDetailsQuestion(questTitle, true)],
+        missingFields: ["step details"],
+        draftUpdates: {
+          questSubtaskPlanMode: defaultSubtaskMode,
+        },
+      });
+    }
 
-  if (wantsBreakdown(params.input.message) && (inlineDetails || openAIApiKey)) {
     const enrichedProposal = await buildQuestEnrichmentProposal(
       params.input,
       proposal,
@@ -683,7 +694,18 @@ export async function enrichQuestPlannerResult(params: {
     });
   }
 
-  if (wantsNotes(params.input.message) && inlineDetails) {
+  if (wantsNotes(params.input.message)) {
+    if (!inlineDetails) {
+      return buildQuestResponse(params.input, params.baseResult, proposal, {
+        reply: `Perfect. Tell me what details you want saved with "${questTitle}".`,
+        followUpQuestions: [buildDetailsQuestion(questTitle, false)],
+        missingFields: ["quest details"],
+        draftUpdates: {
+          questSubtaskPlanMode: defaultSubtaskMode,
+        },
+      });
+    }
+
     const enrichedProposal = await buildQuestEnrichmentProposal(
       params.input,
       proposal,
@@ -704,6 +726,10 @@ export async function enrichQuestPlannerResult(params: {
         questSubtaskPlanMode: defaultSubtaskMode,
       },
     });
+  }
+
+  if (!shouldOfferQuestEnrichment(params.input, params.baseResult, proposal)) {
+    return params.baseResult;
   }
 
   return buildQuestResponse(params.input, params.baseResult, proposal, {

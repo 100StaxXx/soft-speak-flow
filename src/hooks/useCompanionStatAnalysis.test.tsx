@@ -278,6 +278,54 @@ describe("useCompanionStatAnalysis", () => {
     expect(result.current.cached).toBe(false);
   });
 
+  it("accepts a refreshed payload that omits statNeeds after a malformed cached response", async () => {
+    const refreshedAnalysis = { ...baseAnalysis } as Record<string, unknown>;
+    delete refreshedAnalysis.statNeeds;
+
+    mocks.invokeMock
+      .mockResolvedValueOnce({
+        data: {
+          analysis: {
+            ...baseAnalysis,
+            summary: "",
+          },
+          cached: true,
+        },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: {
+          analysis: refreshedAnalysis,
+          cached: false,
+        },
+        error: null,
+      });
+
+    const { result } = renderHook(() => useCompanionStatAnalysis({ enabled: true }), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.analysis?.statNeeds).toEqual({
+        vitality: { level: "low", reasons: [] },
+        wisdom: { level: "low", reasons: [] },
+        discipline: { level: "low", reasons: [] },
+        resolve: { level: "low", reasons: [] },
+        creativity: { level: "low", reasons: [] },
+        alignment: { level: "low", reasons: [] },
+      });
+    });
+
+    expect(mocks.invokeMock).toHaveBeenNthCalledWith(1, "generate-companion-stat-analysis", {
+      body: { forceRefresh: false },
+    });
+    expect(mocks.invokeMock).toHaveBeenNthCalledWith(2, "generate-companion-stat-analysis", {
+      body: { forceRefresh: true },
+    });
+    expect(result.current.error).toBeNull();
+    expect(result.current.cached).toBe(false);
+  });
+
   it("accepts legacy analysis payloads that omit newer activity counters", async () => {
     const legacyActivitySnapshot = { ...baseAnalysis.activitySnapshot } as Record<string, unknown>;
     delete legacyActivitySnapshot.hardTaskWins;

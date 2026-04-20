@@ -54,7 +54,6 @@ interface UseCompanionAssistantOptions {
 
 const ASSISTANT_LED_LAUNCHER_STARTER_INTENTS = new Set<CompanionPlannerLaunchIntent["starterIntent"]>([
   "free_talk_start",
-  "upcoming_start",
   "quest_capture",
   "goal_breakdown_start",
 ]);

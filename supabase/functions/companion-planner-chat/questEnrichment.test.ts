@@ -111,17 +111,20 @@ const buildBreakdownFetch = (titles: string[]) =>
       }],
     }));
 
-Deno.test("asks a follow-up before saving an under-specified workout quest", async () => {
-  const input = baseInput();
+Deno.test("keeps an under-specified quest_capture quest ready to confirm by default", async () => {
+  const input = baseInput({
+    sessionState: baseSessionState({
+      pendingStarterIntent: "quest_capture",
+    }),
+  });
   const result = await enrichQuestPlannerResult({
     fetchImpl: async () => new Response("unused"),
     input,
     baseResult: baseResult(baseProposal(), input.sessionState),
   });
 
-  assertEquals(result.followUpQuestions.length, 1);
-  assertEquals(result.followUpQuestions[0]?.id, "quest_enrichment_preference");
-  assertEquals(result.proposals[0]?.readyToConfirm, false);
+  assertEquals(result.followUpQuestions.length, 0);
+  assertEquals(result.proposals[0]?.readyToConfirm, true);
 });
 
 Deno.test("keeps simple timed quests ready to confirm without extra enrichment questions", async () => {
@@ -185,6 +188,27 @@ Deno.test("turns a note-focused follow-up reply into quest notes", async () => {
   assertEquals(result.sessionState.draft.questNotes, "upper body focus and 10 minutes of cardio");
 });
 
+Deno.test("turns an explicit add-notes request into quest notes without a proactive preference question", async () => {
+  const input = baseInput({
+    message: "Add notes: upper body focus and 10 minutes of cardio",
+    sessionState: baseSessionState({
+      pendingStarterIntent: "quest_capture",
+    }),
+  });
+  const result = await enrichQuestPlannerResult({
+    fetchImpl: async () => new Response("unused"),
+    input,
+    baseResult: baseResult(baseProposal(), input.sessionState),
+  });
+
+  assertEquals(
+    (result.proposals[0]?.payload as { notes?: string }).notes,
+    "upper body focus and 10 minutes of cardio",
+  );
+  assertEquals(result.followUpQuestions.length, 0);
+  assertEquals(result.proposals[0]?.readyToConfirm, true);
+});
+
 Deno.test("turns a breakdown follow-up reply into create quest subtasks", async () => {
   const input = baseInput({
     message: "Break it into steps: upper body with a cooldown walk",
@@ -208,6 +232,64 @@ Deno.test("turns a breakdown follow-up reply into create quest subtasks", async 
     "Lift upper body",
     "Cooldown walk",
   ]);
+});
+
+Deno.test("turns an explicit breakdown request into quest subtasks without a proactive preference question", async () => {
+  const input = baseInput({
+    message: "Break it into steps: upper body with a cooldown walk",
+    sessionState: baseSessionState({
+      pendingStarterIntent: "quest_capture",
+    }),
+  });
+  const result = await enrichQuestPlannerResult({
+    fetchImpl: buildBreakdownFetch(["Warm up", "Lift upper body", "Cooldown walk"]),
+    input,
+    baseResult: baseResult(baseProposal(), input.sessionState),
+    openAIApiKey: "test-key",
+  });
+
+  assertEquals(
+    (result.proposals[0]?.payload as { subtasks?: string[] }).subtasks,
+    ["Warm up", "Lift upper body", "Cooldown walk"],
+  );
+  assertEquals(result.followUpQuestions.length, 0);
+  assertEquals(result.proposals[0]?.readyToConfirm, true);
+});
+
+Deno.test("asks for note details when the user requests notes without usable detail", async () => {
+  const input = baseInput({
+    message: "Add notes",
+    sessionState: baseSessionState({
+      pendingStarterIntent: "quest_capture",
+    }),
+  });
+  const result = await enrichQuestPlannerResult({
+    fetchImpl: async () => new Response("unused"),
+    input,
+    baseResult: baseResult(baseProposal(), input.sessionState),
+  });
+
+  assertEquals(result.followUpQuestions.length, 1);
+  assertEquals(result.followUpQuestions[0]?.id, "quest_enrichment_details");
+  assertEquals(result.proposals[0]?.readyToConfirm, false);
+});
+
+Deno.test("asks for step details when the user requests a breakdown without usable detail", async () => {
+  const input = baseInput({
+    message: "Break it into steps",
+    sessionState: baseSessionState({
+      pendingStarterIntent: "quest_capture",
+    }),
+  });
+  const result = await enrichQuestPlannerResult({
+    fetchImpl: async () => new Response("unused"),
+    input,
+    baseResult: baseResult(baseProposal(), input.sessionState),
+  });
+
+  assertEquals(result.followUpQuestions.length, 1);
+  assertEquals(result.followUpQuestions[0]?.id, "quest_enrichment_breakdown");
+  assertEquals(result.proposals[0]?.readyToConfirm, false);
 });
 
 Deno.test("defaults existing quest breakdown edits to append mode", async () => {

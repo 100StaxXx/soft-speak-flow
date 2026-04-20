@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { validateCompanionStatAnalysisResponse } from "./companionStatAnalysis";
+import {
+  validateCompanionStatAnalysisResponse,
+  validateCompanionStatAnalysisResponseForClient,
+} from "./companionStatAnalysis";
 
 const baseResponse = {
   analysis: {
@@ -182,5 +185,95 @@ describe("companionStatAnalysis", () => {
     if (!validation.ok) return;
 
     expect(validation.data.analysis.activitySnapshot.hardTaskWins).toBe(2);
+  });
+
+  it("keeps the strict validator strict when statNeeds is missing", () => {
+    const legacyAnalysis = { ...baseResponse.analysis } as Record<string, unknown>;
+    delete legacyAnalysis.statNeeds;
+
+    const validation = validateCompanionStatAnalysisResponse({
+      ...baseResponse,
+      analysis: legacyAnalysis,
+    });
+
+    expect(validation.ok).toBe(false);
+    if (validation.ok) return;
+
+    expect(validation.error).toBe("analysis.statNeeds must be an object");
+  });
+
+  it("client compatibility fills a missing statNeeds block with defaults", () => {
+    const legacyAnalysis = { ...baseResponse.analysis } as Record<string, unknown>;
+    delete legacyAnalysis.statNeeds;
+
+    const validation = validateCompanionStatAnalysisResponseForClient({
+      ...baseResponse,
+      analysis: legacyAnalysis,
+    });
+
+    expect(validation.ok).toBe(true);
+    if (!validation.ok) return;
+
+    expect(validation.data.analysis.statNeeds).toEqual({
+      vitality: { level: "low", reasons: [] },
+      wisdom: { level: "low", reasons: [] },
+      discipline: { level: "low", reasons: [] },
+      resolve: { level: "low", reasons: [] },
+      creativity: { level: "low", reasons: [] },
+      alignment: { level: "low", reasons: [] },
+    });
+  });
+
+  it("client compatibility replaces a null statNeeds block with defaults", () => {
+    const validation = validateCompanionStatAnalysisResponseForClient({
+      ...baseResponse,
+      analysis: {
+        ...baseResponse.analysis,
+        statNeeds: null,
+      },
+    });
+
+    expect(validation.ok).toBe(true);
+    if (!validation.ok) return;
+
+    expect(validation.data.analysis.statNeeds.resolve).toEqual({ level: "low", reasons: [] });
+  });
+
+  it("client compatibility replaces a non-object statNeeds block with defaults", () => {
+    const validation = validateCompanionStatAnalysisResponseForClient({
+      ...baseResponse,
+      analysis: {
+        ...baseResponse.analysis,
+        statNeeds: "legacy",
+      },
+    });
+
+    expect(validation.ok).toBe(true);
+    if (!validation.ok) return;
+
+    expect(validation.data.analysis.statNeeds.creativity).toEqual({ level: "low", reasons: [] });
+  });
+
+  it("client compatibility fills missing statNeeds attributes and preserves valid ones", () => {
+    const partialStatNeeds = {
+      ...baseResponse.analysis.statNeeds,
+    } as Record<string, unknown>;
+    delete partialStatNeeds.resolve;
+
+    const validation = validateCompanionStatAnalysisResponseForClient({
+      ...baseResponse,
+      analysis: {
+        ...baseResponse.analysis,
+        statNeeds: partialStatNeeds,
+      },
+    });
+
+    expect(validation.ok).toBe(true);
+    if (!validation.ok) return;
+
+    expect(validation.data.analysis.statNeeds.vitality).toEqual(
+      baseResponse.analysis.statNeeds.vitality,
+    );
+    expect(validation.data.analysis.statNeeds.resolve).toEqual({ level: "low", reasons: [] });
   });
 });

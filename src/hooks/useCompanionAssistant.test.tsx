@@ -929,6 +929,40 @@ describe("useCompanionAssistant", () => {
     expect(onLaunchIntentConsumed).toHaveBeenCalledWith("launch-1");
   });
 
+  it("submits upcoming launcher intents as normal user starters", async () => {
+    const onLaunchIntentConsumed = vi.fn();
+
+    renderHook(() => useCompanionAssistant({
+      surface: "journeys",
+      launchIntent: {
+        id: "launch-upcoming",
+        message: "What do I have coming up?",
+        starterIntent: "upcoming_start",
+        briefingContext: null,
+      },
+      onLaunchIntentConsumed,
+    }));
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(mocks.startTemplateThread).toHaveBeenCalledTimes(1);
+    expect(mocks.plannerSubmit).toHaveBeenCalledWith(
+      "What do I have coming up?",
+      "text",
+      {
+        skipUserEcho: false,
+        starterIntent: "upcoming_start",
+        briefingContext: null,
+      },
+    );
+    expect(mocks.startTemplateThread.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.plannerSubmit.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
+    );
+    expect(onLaunchIntentConsumed).toHaveBeenCalledWith("launch-upcoming");
+  });
+
   it("seeds assistant-led quest launcher intents locally without a fake user echo", async () => {
     const onLaunchIntentConsumed = vi.fn();
 
