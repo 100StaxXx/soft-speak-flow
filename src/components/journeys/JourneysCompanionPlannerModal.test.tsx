@@ -411,11 +411,11 @@ describe("JourneysCompanionPlannerModal", () => {
     expect(screen.getByTestId("journeys-companion-planner-text-input")).toHaveClass("h-12");
     await waitFor(() => {
       expect(screen.getByText("I can help you shape that into something concrete when you're ready.")).toBeInTheDocument();
-      expect(screen.getByText("What time of day should this live in your schedule?")).toBeInTheDocument();
     });
-    expect(screen.getByTestId("journeys-companion-planner-inline-options")).toBeInTheDocument();
     expect(screen.getByTestId("journeys-companion-planner-inline-proposal")).toBeInTheDocument();
     expect(screen.getByText("Create Focus quest")).toBeInTheDocument();
+    expect(screen.queryByText("What time of day should this live in your schedule?")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("journeys-companion-planner-inline-options")).not.toBeInTheDocument();
     expect(screen.getByTestId("journeys-companion-planner-inline-proposal-notes-proposal-1")).toHaveTextContent("Stored note");
     expect(screen.getByTestId("journeys-companion-planner-inline-proposal-notes-proposal-1")).toHaveTextContent("Protect this block for the one thing that matters most.");
     expect(screen.getByTestId("journeys-companion-planner-inline-proposal-subtasks-proposal-1")).toHaveTextContent("Choose the target");
@@ -589,7 +589,26 @@ describe("JourneysCompanionPlannerModal", () => {
     expect(screen.queryByText("Your **calendar** is clear today.")).not.toBeInTheDocument();
   });
 
-  it("routes composer, quick replies, mic taps, and proposal actions through the assistant hook", async () => {
+  it("suppresses clarification prompts and quick replies when a proposal is ready to confirm", () => {
+    render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        presentation="dialog"
+      />,
+    );
+
+    expect(screen.getByTestId("journeys-companion-planner-inline-proposal")).toBeInTheDocument();
+    expect(screen.queryByText("What time of day should this live in your schedule?")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("journeys-companion-planner-inline-options")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Morning" })).not.toBeInTheDocument();
+  });
+
+  it("routes composer, quick replies, and mic taps through the assistant hook", async () => {
+    mocks.state.proposals = [];
+    mocks.state.pendingProposals = [];
+    mocks.state.readyProposalCount = 0;
+
     render(
       <JourneysCompanionPlannerModal
         open
@@ -604,14 +623,26 @@ describe("JourneysCompanionPlannerModal", () => {
     fireEvent.click(screen.getByTestId("journeys-companion-planner-send-button"));
     fireEvent.click(screen.getByRole("button", { name: "Morning" }));
     fireEvent.click(screen.getByTestId("journeys-companion-planner-mic-button"));
-    fireEvent.click(screen.getAllByRole("button", { name: "Confirm" })[0]);
-    fireEvent.click(screen.getByRole("button", { name: "Reject" }));
-    fireEvent.click(screen.getByRole("button", { name: "Confirm all" }));
 
     expect(mocks.assistant.setDraftInput).toHaveBeenCalledWith("Rework my afternoon");
     expect(mocks.assistant.submitTypedMessage).toHaveBeenCalledTimes(1);
     expect(mocks.assistant.submitMessage).toHaveBeenCalledWith("Morning", "text");
     expect(mocks.assistant.toggleRecording).toHaveBeenCalledTimes(1);
+  });
+
+  it("routes proposal actions through the assistant hook", () => {
+    render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        presentation="drawer"
+      />,
+    );
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Confirm" })[0]);
+    fireEvent.click(screen.getByRole("button", { name: "Reject" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm all" }));
+
     expect(mocks.assistant.confirmProposal).toHaveBeenCalledWith("proposal-1");
     expect(mocks.assistant.rejectProposal).toHaveBeenCalledWith("proposal-1");
     expect(mocks.assistant.confirmAll).toHaveBeenCalledTimes(1);

@@ -542,6 +542,200 @@ describe("useCompanionPlanner", () => {
     });
   });
 
+  it("clears lingering planner questions after confirming a ready proposal", async () => {
+    mocks.invoke.mockResolvedValue({
+      data: {
+        mode: "proposal",
+        reply: "I drafted your workout quest.",
+        followUpQuestions: [
+          {
+            id: "details",
+            prompt: "What makes this timing right?",
+            required: true,
+            field: "details",
+          },
+        ],
+        proposals: [
+          {
+            id: "proposal-1",
+            kind: "create_quest",
+            title: "Create Workout",
+            summary: "Create a quest for Workout.",
+            payload: {
+              taskText: "Workout",
+              difficulty: "medium",
+              taskDate: null,
+              scheduledTime: null,
+            },
+            status: "pending",
+            readyToConfirm: true,
+            missingFields: [],
+          },
+        ],
+        suggestedReminders: [],
+        memoryUpdates: {},
+        sessionState: {
+          draft: {
+            title: "Workout",
+            draftKind: "create_quest",
+          },
+          openQuestionIds: ["details"],
+          preferredTimeOfDay: null,
+          preferredTimeReason: null,
+          reminderPreference: null,
+          lastClassification: "quest",
+        },
+      },
+      error: null,
+    });
+
+    const { result } = renderHook(() => useCompanionPlanner({ bootstrapGreeting: false }));
+
+    await act(async () => {
+      await result.current.submitMessage("Make me a workout quest", "text");
+    });
+
+    expect(result.current.questions.map((question) => question.field)).toEqual(["details"]);
+
+    await act(async () => {
+      await result.current.confirmProposal("proposal-1");
+    });
+
+    expect(result.current.questions).toEqual([]);
+  });
+
+  it("clears lingering planner questions after rejecting a ready proposal", async () => {
+    mocks.invoke.mockResolvedValue({
+      data: {
+        mode: "proposal",
+        reply: "I drafted your workout quest.",
+        followUpQuestions: [
+          {
+            id: "details",
+            prompt: "What makes this timing right?",
+            required: true,
+            field: "details",
+          },
+        ],
+        proposals: [
+          {
+            id: "proposal-1",
+            kind: "create_quest",
+            title: "Create Workout",
+            summary: "Create a quest for Workout.",
+            payload: {
+              taskText: "Workout",
+            },
+            status: "pending",
+            readyToConfirm: true,
+            missingFields: [],
+          },
+        ],
+        suggestedReminders: [],
+        memoryUpdates: {},
+        sessionState: {
+          draft: {
+            title: "Workout",
+            draftKind: "create_quest",
+          },
+          openQuestionIds: ["details"],
+          preferredTimeOfDay: null,
+          preferredTimeReason: null,
+          reminderPreference: null,
+          lastClassification: "quest",
+        },
+      },
+      error: null,
+    });
+
+    const { result } = renderHook(() => useCompanionPlanner({ bootstrapGreeting: false }));
+
+    await act(async () => {
+      await result.current.submitMessage("Make me a workout quest", "text");
+    });
+
+    expect(result.current.questions.map((question) => question.field)).toEqual(["details"]);
+
+    await act(async () => {
+      await result.current.rejectProposal("proposal-1");
+    });
+
+    expect(result.current.questions).toEqual([]);
+    expect(mocks.addTask).not.toHaveBeenCalled();
+  });
+
+  it("clears lingering planner questions after confirming all ready proposals", async () => {
+    mocks.invoke.mockResolvedValue({
+      data: {
+        mode: "proposal",
+        reply: "I drafted both quest options.",
+        followUpQuestions: [
+          {
+            id: "details",
+            prompt: "What makes this timing right?",
+            required: true,
+            field: "details",
+          },
+        ],
+        proposals: [
+          {
+            id: "proposal-1",
+            kind: "create_quest",
+            title: "Create Workout",
+            summary: "Create a quest for Workout.",
+            payload: {
+              taskText: "Workout",
+            },
+            status: "pending",
+            readyToConfirm: true,
+            missingFields: [],
+          },
+          {
+            id: "proposal-2",
+            kind: "create_quest",
+            title: "Create Stretch",
+            summary: "Create a quest for Stretch.",
+            payload: {
+              taskText: "Stretch",
+            },
+            status: "pending",
+            readyToConfirm: true,
+            missingFields: [],
+          },
+        ],
+        suggestedReminders: [],
+        memoryUpdates: {},
+        sessionState: {
+          draft: {
+            title: "Workout",
+            draftKind: "create_quest",
+          },
+          openQuestionIds: ["details"],
+          preferredTimeOfDay: null,
+          preferredTimeReason: null,
+          reminderPreference: null,
+          lastClassification: "quest",
+        },
+      },
+      error: null,
+    });
+
+    const { result } = renderHook(() => useCompanionPlanner({ bootstrapGreeting: false }));
+
+    await act(async () => {
+      await result.current.submitMessage("Make me two movement quests", "text");
+    });
+
+    expect(result.current.questions.map((question) => question.field)).toEqual(["details"]);
+
+    await act(async () => {
+      await result.current.confirmAll();
+    });
+
+    expect(result.current.questions).toEqual([]);
+    expect(mocks.addTask).toHaveBeenCalledTimes(2);
+  });
+
   it("auto-publishes confirmed quest creations to Outlook when Outlook is the full-sync default", async () => {
     mocks.useCalendarIntegrations.mockReturnValue({
       connectedByProvider: {

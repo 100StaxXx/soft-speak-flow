@@ -1782,6 +1782,7 @@ export function useCompanionPlanner({
             : candidate,
         ),
       );
+      setQuestions([]);
       const confirmationMessage = createMessage("companion", confirmationContent);
       setMessages((previous) => [
         ...previous,
@@ -1853,6 +1854,7 @@ export function useCompanionPlanner({
           : candidate,
       ),
     );
+    setQuestions([]);
     const rejectionMessage = createMessage("companion", `No problem. I won't save "${proposal.title}" as-is.`);
     setMessages((previous) => [
       ...previous,
@@ -1886,6 +1888,7 @@ export function useCompanionPlanner({
       // Sequential saves keep the confirmation flow predictable and mutation-safe.
       await handleConfirmProposal(proposal.id);
     }
+    setQuestions([]);
   }, [handleConfirmProposal, proposals]);
 
   const { isRecording, isAutoStopping, isSupported, permissionStatus, toggleRecording, requestPermission } = useVoiceInput({

@@ -57,7 +57,6 @@ import type { CompanionChatThreadSummary } from "@/types/companionConversation";
 import type {
   CompanionPlannerLaunchIntent,
   CompanionPlannerProposal,
-  CompanionPlannerQuestion,
 } from "@/types/companionPlanner";
 import { getCompanionPlannerQuestProposalPreview } from "@/utils/companionPlannerProposalPreview";
 
@@ -79,13 +78,6 @@ type DialogueEntry = {
   isSeed?: boolean;
 };
 
-type PlannerQuestionHistoryEntry = {
-  id: string;
-  prompt: string;
-  options: string[];
-  threadSessionId: string | null;
-};
-
 type JourneysCompanionDrawerLayout = {
   shellHeight: number;
   keyboardInset: number;
@@ -94,8 +86,6 @@ type JourneysCompanionDrawerLayout = {
 const MOBILE_DRAWER_HEIGHT_MIN_PX = 320;
 const MOBILE_DRAWER_HEIGHT_MAX_PX = 736;
 const MOBILE_DRAWER_VIEWPORT_OFFSET_PX = 24;
-
-const questionEntryId = (question: CompanionPlannerQuestion) => `planner-question-${question.id}`;
 
 const proposalKindLabel = (proposal: CompanionPlannerProposal) => ({
   create_quest: "Quest",
@@ -285,40 +275,17 @@ const JourneysCompanionOverlayBody = memo(({
   const prefersReducedMotion = getReducedMotionPreference();
   const isDrawerPresentation = presentation === "drawer";
 
-  const [plannerQuestionHistory, setPlannerQuestionHistory] = useState<PlannerQuestionHistoryEntry[]>([]);
   const [isThreadPickerOpen, setIsThreadPickerOpen] = useState(false);
   const [typingMessageId, setTypingMessageId] = useState<string | null>(null);
   const [typedAssistantContent, setTypedAssistantContent] = useState("");
 
   const typingIntervalRef = useRef<number | null>(null);
   const typingTargetRef = useRef<{ id: string; content: string } | null>(null);
-  const lastThreadSessionIdRef = useRef<string | null>(null);
   const hasSettledInitialTranscriptRef = useRef(false);
   const transcriptEndRef = useRef<HTMLDivElement | null>(null);
   const transcriptScrollAreaRef = useRef<HTMLDivElement | null>(null);
   const activeThreadSessionId = assistant.activeThread?.sessionId ?? null;
-
-  useLayoutEffect(() => {
-    if (assistant.questions.length === 0) return;
-
-    setPlannerQuestionHistory((previous) => {
-      const knownIds = new Set(
-        previous
-          .filter((entry) => entry.threadSessionId === activeThreadSessionId)
-          .map((entry) => entry.id),
-      );
-      const nextEntries = assistant.questions
-        .filter((question) => !knownIds.has(questionEntryId(question)))
-        .map((question) => ({
-          id: questionEntryId(question),
-          prompt: question.prompt,
-          options: question.options ?? [],
-          threadSessionId: activeThreadSessionId,
-        }));
-
-      return nextEntries.length > 0 ? [...previous, ...nextEntries] : previous;
-    });
-  }, [activeThreadSessionId, assistant.questions]);
+  const hasReadyProposal = assistant.pendingProposals.some((proposal) => proposal.readyToConfirm);
 
   const dialogueEntries = useMemo<DialogueEntry[]>(() => [
     ...assistant.messages.map((message) => ({
@@ -327,14 +294,16 @@ const JourneysCompanionOverlayBody = memo(({
       content: message.content,
       isSeed: message.isSeed,
     })),
-    ...plannerQuestionHistory
-      .filter((question) => question.threadSessionId === activeThreadSessionId)
-      .map((question) => ({
-      id: question.id,
-      role: "assistant" as const,
-      content: question.prompt,
-    })),
-  ], [activeThreadSessionId, assistant.messages, plannerQuestionHistory]);
+    ...(
+      hasReadyProposal
+        ? []
+        : assistant.questions.map((question) => ({
+          id: `planner-question-${question.id}`,
+          role: "assistant" as const,
+          content: question.prompt,
+        }))
+    ),
+  ], [assistant.messages, assistant.questions, hasReadyProposal]);
 
   const latestAssistantEntry = useMemo(
     () => [...dialogueEntries].reverse().find((entry) => entry.role === "assistant") ?? null,
@@ -364,12 +333,6 @@ const JourneysCompanionOverlayBody = memo(({
   }, [clearTypingTimer]);
 
   useEffect(() => {
-    const nextThreadSessionId = activeThreadSessionId;
-    const previousThreadSessionId = lastThreadSessionIdRef.current;
-    if (previousThreadSessionId !== null && previousThreadSessionId !== nextThreadSessionId) {
-      setPlannerQuestionHistory([]);
-    }
-    lastThreadSessionIdRef.current = nextThreadSessionId;
     hasSettledInitialTranscriptRef.current = false;
     clearTypingTimer();
     typingTargetRef.current = null;
@@ -489,7 +452,9 @@ const JourneysCompanionOverlayBody = memo(({
   const activeQuestPreview = activeProposal
     ? getCompanionPlannerQuestProposalPreview(activeProposal)
     : null;
-  const activeOptionQuestions = assistant.questions.filter((question) => (question.options?.length ?? 0) > 0);
+  const activeOptionQuestions = hasReadyProposal
+    ? []
+    : assistant.questions.filter((question) => (question.options?.length ?? 0) > 0);
   const micButtonLabel = assistant.isRecording ? "Stop voice reply" : "Start voice reply";
   const newChatTooltip = assistant.newChatDisabledReason
     ?? (assistant.hasPersistedActiveThread
