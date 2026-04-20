@@ -4,7 +4,7 @@ import type {
 } from "@/types/companionPlanner";
 
 export interface JourneysCompanionLauncherTemplate {
-  id: "free-talk" | "upcoming" | "quest" | "goal";
+  id: "free-talk" | "plan-day" | "upcoming" | "quest" | "goal";
   label: string;
   message: string;
   target: CompanionPlannerLaunchTarget;
@@ -76,6 +76,13 @@ export const getJourneysCompanionLauncherTemplates = ({
       message: greeting,
       target: "conversation",
       starterIntent: "free_talk_start",
+    },
+    {
+      id: "plan-day",
+      label: "Plan my day",
+      message: "Help me plan my day. Ask me follow-up questions about my goals, tasks, timing, and energy so we can build the best schedule.",
+      target: "planner",
+      starterIntent: "plan_day",
     },
     {
       id: "upcoming",
