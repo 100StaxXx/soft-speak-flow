@@ -1021,6 +1021,23 @@ describe("useCompanionAssistant", () => {
     expect(mocks.journeysSubmit).not.toHaveBeenCalled();
   });
 
+  it("routes aggressive multi-action bundles into the planner lane", async () => {
+    const { result } = renderHook(() => useCompanionAssistant({ surface: "journeys" }));
+
+    await act(async () => {
+      await result.current.submitMessage(
+        "I want to clean my house, work on building the app, and workout later",
+        "text",
+      );
+    });
+
+    expect(mocks.plannerSubmit).toHaveBeenCalledWith(
+      "I want to clean my house, work on building the app, and workout later",
+      "text",
+    );
+    expect(mocks.journeysSubmit).not.toHaveBeenCalled();
+  });
+
   it("seeds assistant-led quest launcher intents locally without a fake user echo", async () => {
     const onLaunchIntentConsumed = vi.fn();
 

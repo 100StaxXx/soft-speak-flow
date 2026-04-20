@@ -23,6 +23,7 @@ import {
   sanitizeReadyQuestProposalResponse,
 } from "./orchestrator.ts";
 import { enrichQuestPlannerResult } from "./questEnrichment.ts";
+import { maybeApplyRemotePlannerOptimizer } from "./schedulerOptimizer.ts";
 import {
   normalizePlannerClassificationHint,
   PlannerRequestSchema,
@@ -116,6 +117,7 @@ serve(async (req) => {
       message: parsed.data.message,
       currentDate: parsed.data.currentDate,
       currentDateTime: parsed.data.currentDateTime,
+      timezone: parsed.data.timezone,
       horizon: parsed.data.horizon,
       tonePack: parsed.data.tonePack,
       conversationHistory: parsed.data.conversationHistory,
@@ -141,10 +143,16 @@ serve(async (req) => {
       providers: ["openai"],
     });
 
+    const optimizerBackedResult = await maybeApplyRemotePlannerOptimizer({
+      input: plannerInput,
+      result,
+      fetchImpl: guardedFetch,
+    });
+
     const enrichedResult = await enrichQuestPlannerResult({
       fetchImpl: guardedFetch,
       input: plannerInput,
-      baseResult: result,
+      baseResult: optimizerBackedResult,
     });
 
     const orchestratedResult = await buildOrchestratedPlannerResponse({

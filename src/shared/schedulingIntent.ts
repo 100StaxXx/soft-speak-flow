@@ -1,4 +1,8 @@
 import type { ParsedTask } from "./naturalLanguageTaskParser.ts";
+import {
+  extractActionBundleCandidates,
+  hasDayShapingLanguage,
+} from "./actionBundleScheduling.ts";
 
 export type SchedulingIntentDisposition =
   | 'read_only'
@@ -16,6 +20,8 @@ export interface SchedulingIntentAnalysis {
   hasExplicitPlannerAction: boolean;
   hasConcreteSchedulingPayload: boolean;
   hasMeaningfulTitle: boolean;
+  isAggressiveBundle: boolean;
+  isOpportunisticSingle: boolean;
 }
 
 const SCHEDULE_QUESTION_REGEX =
@@ -99,11 +105,15 @@ export const analyzeSchedulingIntent = (
   message: string,
   parsed: ParsedTask,
 ): SchedulingIntentAnalysis => {
+  const actionBundleCandidates = extractActionBundleCandidates(message);
   const isScheduleRead = isScheduleReadMessage(message);
   const isDirectDayPlanning = DIRECT_DAY_PLANNING_REGEX.test(message);
   const isChatFirstCoaching = CHAT_FIRST_COACHING_REGEX.test(message);
   const isChatEscape = CHAT_ESCAPE_REGEX.test(message);
   const hasMeaningfulTitle = hasMeaningfulParsedSchedulingTitle(parsed.text);
+  const isAggressiveBundle = actionBundleCandidates.length >= 2;
+  const isOpportunisticSingle = actionBundleCandidates.length === 1 &&
+    hasDayShapingLanguage(message);
   const hasConcreteSchedulingPayload = Boolean(
     parsed.scheduledDate ||
     parsed.scheduledTime ||
@@ -133,10 +143,17 @@ export const analyzeSchedulingIntent = (
       hasExplicitPlannerAction,
       hasConcreteSchedulingPayload,
       hasMeaningfulTitle,
+      isAggressiveBundle,
+      isOpportunisticSingle,
     };
   }
 
-  if (hasExplicitPlannerAction || (hasMeaningfulTitle && hasConcreteSchedulingPayload)) {
+  if (
+    hasExplicitPlannerAction ||
+    (hasMeaningfulTitle && hasConcreteSchedulingPayload) ||
+    isAggressiveBundle ||
+    isOpportunisticSingle
+  ) {
     return {
       disposition: 'schedule_action',
       isScheduleRead,
@@ -146,6 +163,8 @@ export const analyzeSchedulingIntent = (
       hasExplicitPlannerAction,
       hasConcreteSchedulingPayload,
       hasMeaningfulTitle,
+      isAggressiveBundle,
+      isOpportunisticSingle,
     };
   }
 
@@ -158,6 +177,8 @@ export const analyzeSchedulingIntent = (
     hasExplicitPlannerAction,
     hasConcreteSchedulingPayload,
     hasMeaningfulTitle,
+    isAggressiveBundle,
+    isOpportunisticSingle,
   };
 };
 
@@ -178,7 +199,9 @@ export const shouldRouteMessageToPlanner = ({
   }
 
   if (surface === 'journeys') {
-    return analysis.disposition === 'schedule_action';
+    return analysis.disposition === 'schedule_action'
+      || analysis.isAggressiveBundle
+      || analysis.isOpportunisticSingle;
   }
 
   if (analysis.disposition === 'schedule_action') return true;

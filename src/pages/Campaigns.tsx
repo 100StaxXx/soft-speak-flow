@@ -5,7 +5,7 @@ import { PageTransition } from "@/components/PageTransition";
 import { CinematicPageBackground } from "@/components/CinematicPageBackground";
 import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
-import { JourneyCard } from "@/components/JourneyCard";
+import { CampaignCard } from "@/components/CampaignCard";
 import { Pathfinder } from "@/components/Pathfinder";
 import { CampaignCreatedAnimation } from "@/components/CampaignCreatedAnimation";
 import { Button } from "@/components/ui/button";
@@ -161,9 +161,9 @@ const Campaigns = () => {
                   <div className="space-y-4">
                     {activeEpics.length > 0 ? (
                       activeEpics.map((epic) => (
-                        <JourneyCard
+                        <CampaignCard
                           key={epic.id}
-                          journey={epic}
+                          campaign={epic}
                           onRename={(title) => renameEpic({ epicId: epic.id, title })}
                           onComplete={() => updateEpicStatus({ epicId: epic.id, status: "completed" })}
                           onAbandon={() => updateEpicStatus({ epicId: epic.id, status: "abandoned" })}
@@ -185,7 +185,7 @@ const Campaigns = () => {
                   <div className="space-y-4">
                     {completedEpics.length > 0 ? (
                       completedEpics.map((epic) => (
-                        <JourneyCard key={epic.id} journey={epic} />
+                        <CampaignCard key={epic.id} campaign={epic} />
                       ))
                     ) : (
                       <div className="rounded-[24px] border border-celestial-blue/18 bg-celestial-blue/[0.08] px-4 py-6 text-sm text-muted-foreground backdrop-blur-xl">

@@ -326,19 +326,87 @@ describe("CompanionPlannerPanel", () => {
     render(<CompanionPlannerPanel />);
 
     expect(screen.getByTestId("companion-planner-panel")).toBeInTheDocument();
-    expect(screen.getByTestId("companion-assistant-transcript")).toBeInTheDocument();
-    expect(screen.getByTestId("assistant-schedule-insights")).toBeInTheDocument();
+    expect(screen.getByTestId("companion-assistant-transcript"))
+      .toBeInTheDocument();
+    expect(screen.getByTestId("assistant-schedule-insights"))
+      .toBeInTheDocument();
     expect(screen.getByText("Today has room at 09:00.")).toBeInTheDocument();
     expect(screen.getByText("Move Workout")).toBeInTheDocument();
     expect(screen.getByText("Adjust Campaign Aurora")).toBeInTheDocument();
-    expect(screen.queryByTestId("assistant-question-list")).not.toBeInTheDocument();
-    expect(screen.queryByText("Which quest did you mean?")).not.toBeInTheDocument();
-    expect(screen.getByTestId("assistant-proposal-notes-proposal-1")).toHaveTextContent("Stored note");
-    expect(screen.getByTestId("assistant-proposal-notes-proposal-1")).toHaveTextContent("Leg day with a cooldown walk at the end.");
-    expect(screen.getByTestId("assistant-proposal-subtasks-proposal-1")).toHaveTextContent("Append steps");
-    expect(screen.getByTestId("assistant-proposal-subtasks-proposal-1")).toHaveTextContent("Warm up");
-    expect(screen.getByTestId("assistant-proposal-subtasks-proposal-1")).toHaveTextContent("Cooldown walk");
-    expect(screen.getByRole("button", { name: "Confirm all" })).toBeInTheDocument();
+    expect(screen.queryByTestId("assistant-question-list")).not
+      .toBeInTheDocument();
+    expect(screen.queryByText("Which quest did you mean?")).not
+      .toBeInTheDocument();
+    expect(screen.getByTestId("assistant-proposal-notes-proposal-1"))
+      .toHaveTextContent("Stored note");
+    expect(screen.getByTestId("assistant-proposal-notes-proposal-1"))
+      .toHaveTextContent("Leg day with a cooldown walk at the end.");
+    expect(screen.getByTestId("assistant-proposal-subtasks-proposal-1"))
+      .toHaveTextContent("Append steps");
+    expect(screen.getByTestId("assistant-proposal-subtasks-proposal-1"))
+      .toHaveTextContent("Warm up");
+    expect(screen.getByTestId("assistant-proposal-subtasks-proposal-1"))
+      .toHaveTextContent("Cooldown walk");
+    expect(screen.getByRole("button", { name: "Confirm all" }))
+      .toBeInTheDocument();
+  });
+
+  it("shows optimizer status and why-this-plan-works copy for quest drafts", () => {
+    mocks.state.proposals = [
+      {
+        id: "proposal-quest-1",
+        kind: "create_quest",
+        title: "Create Workout",
+        summary: 'Create a quest for "Workout" on 2026-04-18 at 5:30 pm.',
+        reasoning: "Extracted directly from what you said.",
+        payload: {
+          taskText: "Workout",
+          taskDate: "2026-04-18",
+          scheduledTime: "17:30",
+          draftStatus: "tentative_time",
+          reasonSummary:
+            "Scheduled after work to match your availability. Placed where it best matches your energy rhythm. consider moving it earlier if the day tightens.",
+        },
+        status: "pending",
+        readyToConfirm: true,
+        missingFields: [],
+      },
+      {
+        id: "proposal-quest-2",
+        kind: "create_quest",
+        title: "Create Clean House",
+        summary: 'Create an inbox quest for "Clean House".',
+        reasoning: null,
+        payload: {
+          taskText: "Clean House",
+          draftStatus: "needs_scheduling",
+          reasonSummary:
+            "I kept this as a draft because I couldn't find a clean slot yet. approve it later or place it manually.",
+        },
+        status: "pending",
+        readyToConfirm: true,
+        missingFields: [],
+      },
+    ];
+    mocks.state.pendingProposals = [...mocks.state.proposals];
+    mocks.state.readyProposalCount = 2;
+
+    render(<CompanionPlannerPanel />);
+
+    expect(screen.getByText("tentative")).toBeInTheDocument();
+    expect(screen.getByText("needs scheduling")).toBeInTheDocument();
+    expect(screen.getByTestId("assistant-proposal-why-proposal-quest-1"))
+      .toHaveTextContent(
+        "Why this plan works",
+      );
+    expect(screen.getByTestId("assistant-proposal-why-proposal-quest-1"))
+      .toHaveTextContent(
+        "Scheduled after work to match your availability.",
+      );
+    expect(screen.getByTestId("assistant-proposal-why-proposal-quest-2"))
+      .toHaveTextContent(
+        "I kept this as a draft because I couldn't find a clean slot yet.",
+      );
   });
 
   it("routes composer, mic, horizon, and proposal actions through the assistant hook", () => {
@@ -354,7 +422,9 @@ describe("CompanionPlannerPanel", () => {
     fireEvent.click(screen.getAllByRole("button", { name: "Reject" })[0]);
     fireEvent.click(screen.getByRole("button", { name: "Confirm all" }));
 
-    expect(mocks.assistant.setDraftInput).toHaveBeenCalledWith("Move the rest of my quests to tomorrow");
+    expect(mocks.assistant.setDraftInput).toHaveBeenCalledWith(
+      "Move the rest of my quests to tomorrow",
+    );
     expect(mocks.assistant.submitTypedMessage).toHaveBeenCalledTimes(1);
     expect(mocks.assistant.toggleRecording).toHaveBeenCalledTimes(1);
     expect(mocks.assistant.setHorizon).toHaveBeenCalledWith("week");
@@ -368,8 +438,10 @@ describe("CompanionPlannerPanel", () => {
 
     render(<CompanionPlannerPanel />);
 
-    expect(screen.getByText(/conversation mode is premium/i)).toBeInTheDocument();
-    expect(screen.getByTestId("companion-assistant-text-input")).toBeInTheDocument();
+    expect(screen.getByText(/conversation mode is premium/i))
+      .toBeInTheDocument();
+    expect(screen.getByTestId("companion-assistant-text-input"))
+      .toBeInTheDocument();
   });
 
   it("hides a question-like assistant bubble when a ready quest is already confirmable", () => {
@@ -377,7 +449,8 @@ describe("CompanionPlannerPanel", () => {
       {
         id: "a1",
         role: "assistant",
-        content: "Just to check: Do you prefer to work out right after your workday?",
+        content:
+          "Just to check: Do you prefer to work out right after your workday?",
         createdAt: "2026-04-18T08:00:00.000Z",
         source: "plan",
       },
@@ -385,8 +458,11 @@ describe("CompanionPlannerPanel", () => {
 
     render(<CompanionPlannerPanel />);
 
-    expect(screen.queryByText(/do you prefer to work out right after your workday/i)).not.toBeInTheDocument();
-    expect(screen.queryByTestId("assistant-question-list")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/do you prefer to work out right after your workday/i),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("assistant-question-list")).not
+      .toBeInTheDocument();
     expect(screen.getByText("Move Workout")).toBeInTheDocument();
   });
 });

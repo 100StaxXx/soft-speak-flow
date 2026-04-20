@@ -310,6 +310,7 @@ export interface CompanionPlannerRequest {
   message: string;
   currentDate: string;
   currentDateTime: string;
+  timezone?: string;
   horizon: PlannerHorizon;
   tonePack: PlannerTonePack;
   conversationHistory: Array<{

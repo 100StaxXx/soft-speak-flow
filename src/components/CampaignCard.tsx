@@ -38,7 +38,7 @@ import { safeClipboardWrite, getClipboardErrorMessage } from "@/utils/clipboard"
 import { buildEpicInviteLink, buildEpicInviteShareText } from "@/utils/epicInviteShare";
 import { getStoredCompanionCustomName } from "@/lib/companionName";
 
-interface Journey {
+interface Campaign {
   id: string;
   user_id: string;
   title: string;
@@ -71,19 +71,19 @@ interface Journey {
   }>;
 }
 
-interface JourneyCardProps {
-  journey: Journey;
+interface CampaignCardProps {
+  campaign: Campaign;
   onRename?: (nextTitle: string) => Promise<void> | void;
   onComplete?: () => void;
   onAbandon?: () => void;
 }
 
-export const JourneyCard = memo(function JourneyCard({ journey, onRename, onComplete, onAbandon }: JourneyCardProps) {
+export const CampaignCard = memo(function CampaignCard({ campaign, onRename, onComplete, onAbandon }: CampaignCardProps) {
   const [copied, setCopied] = useState(false);
   const [showAbandonDialog, setShowAbandonDialog] = useState(false);
   const [showAdjustDialog, setShowAdjustDialog] = useState(false);
   const [showRenameDialog, setShowRenameDialog] = useState(false);
-  const [renameTitle, setRenameTitle] = useState(journey.title);
+  const [renameTitle, setRenameTitle] = useState(campaign.title);
   const [isRenaming, setIsRenaming] = useState(false);
   
   const { companion } = useCompanion();
@@ -95,19 +95,19 @@ export const JourneyCard = memo(function JourneyCard({ journey, onRename, onComp
     getJourneyHealth,
     backfillLegacyMilestones,
     isBackfilling,
-  } = useMilestones(journey.id);
+  } = useMilestones(campaign.id);
   
-  const resolvedEndDate = useMemo(() => resolveEpicEndDate(journey), [journey]);
+  const resolvedEndDate = useMemo(() => resolveEpicEndDate(campaign), [campaign]);
   const daysRemaining = useMemo(
     () => getEpicDaysRemaining({
-      start_date: journey.start_date,
-      target_days: journey.target_days,
+      start_date: campaign.start_date,
+      target_days: campaign.target_days,
       end_date: resolvedEndDate,
     }),
-    [resolvedEndDate, journey.start_date, journey.target_days],
+    [resolvedEndDate, campaign.start_date, campaign.target_days],
   );
-  const isCompleted = journey.status === "completed";
-  const isActive = journey.status === "active";
+  const isCompleted = campaign.status === "completed";
+  const isActive = campaign.status === "active";
   
   // Track if we've attempted backfill to prevent duplicate calls
   const backfillAttempted = useRef(false);
@@ -116,7 +116,7 @@ export const JourneyCard = memo(function JourneyCard({ journey, onRename, onComp
   useEffect(() => {
     if (
       isActive && 
-      journey.story_type_slug && 
+      campaign.story_type_slug && 
       milestones?.length === 0 && 
       !milestonesLoading &&
       !isBackfilling &&
@@ -124,15 +124,15 @@ export const JourneyCard = memo(function JourneyCard({ journey, onRename, onComp
     ) {
       backfillAttempted.current = true;
       backfillLegacyMilestones.mutate({
-        epicId: journey.id,
-        targetDays: journey.target_days,
-        startDate: journey.start_date,
+        epicId: campaign.id,
+        targetDays: campaign.target_days,
+        startDate: campaign.start_date,
       });
     }
-  }, [journey.id, journey.story_type_slug, journey.target_days, journey.start_date, milestones?.length, isActive, milestonesLoading, isBackfilling, backfillLegacyMilestones]);
+  }, [campaign.id, campaign.story_type_slug, campaign.target_days, campaign.start_date, milestones?.length, isActive, milestonesLoading, isBackfilling, backfillLegacyMilestones]);
   
   const postcardProgress = getProgressToNextPostcard();
-  const journeyHealth = getJourneyHealth(journey.start_date, resolvedEndDate ?? undefined);
+  const campaignHealth = getJourneyHealth(campaign.start_date, resolvedEndDate ?? undefined);
   const companionDisplayName = useMemo(() => {
     const customName = getStoredCompanionCustomName(companion);
     if (customName) return customName;
@@ -158,16 +158,16 @@ export const JourneyCard = memo(function JourneyCard({ journey, onRename, onComp
     }));
   }, [milestones]);
 
-  const handleShareJourney = useCallback(async () => {
-    if (!journey.invite_code || !journey.is_public) return;
+  const handleShareCampaign = useCallback(async () => {
+    if (!campaign.invite_code || !campaign.is_public) return;
 
-    const inviteLink = buildEpicInviteLink(journey.invite_code);
-    const shareText = buildEpicInviteShareText(journey.title, journey.invite_code);
+    const inviteLink = buildEpicInviteLink(campaign.invite_code);
+    const shareText = buildEpicInviteShareText(campaign.title, campaign.invite_code);
 
     try {
       if (navigator.share) {
         await navigator.share({
-          title: `Join ${journey.title}`,
+          title: `Join ${campaign.title}`,
           text: shareText,
           url: inviteLink,
         });
@@ -191,18 +191,18 @@ export const JourneyCard = memo(function JourneyCard({ journey, onRename, onComp
 
       toast.error(getClipboardErrorMessage(error));
     }
-  }, [journey.invite_code, journey.title]);
+  }, [campaign.invite_code, campaign.title]);
 
   const openRenameDialog = useCallback(() => {
-    setRenameTitle(journey.title);
+    setRenameTitle(campaign.title);
     setShowRenameDialog(true);
-  }, [journey.title]);
+  }, [campaign.title]);
 
   const handleRenameSubmit = useCallback(async () => {
     if (!onRename) return;
 
     const trimmedTitle = renameTitle.trim();
-    if (!trimmedTitle || trimmedTitle === journey.title) return;
+    if (!trimmedTitle || trimmedTitle === campaign.title) return;
 
     setIsRenaming(true);
     try {
@@ -213,12 +213,12 @@ export const JourneyCard = memo(function JourneyCard({ journey, onRename, onComp
     } finally {
       setIsRenaming(false);
     }
-  }, [journey.title, onRename, renameTitle]);
+  }, [campaign.title, onRename, renameTitle]);
 
-  // Count valid rituals (habits linked to journey)
-  const ritualCount = journey.epic_habits?.filter(eh => eh.habits)?.length || 0;
+  // Count valid rituals linked to this campaign
+  const ritualCount = campaign.epic_habits?.filter(eh => eh.habits)?.length || 0;
   const trimmedRenameTitle = renameTitle.trim();
-  const isRenameSaveDisabled = isRenaming || trimmedRenameTitle.length === 0 || trimmedRenameTitle === journey.title;
+  const isRenameSaveDisabled = isRenaming || trimmedRenameTitle.length === 0 || trimmedRenameTitle === campaign.title;
 
   return (
     <>
@@ -237,13 +237,13 @@ export const JourneyCard = memo(function JourneyCard({ journey, onRename, onComp
                 ) : (
                   <Target className="w-5 h-5 text-primary" />
                 )}
-                <h3 className="text-lg font-bold">{journey.title}</h3>
-                {journey.invite_code && journey.is_public && (
+                <h3 className="text-lg font-bold">{campaign.title}</h3>
+                {campaign.invite_code && campaign.is_public && (
                   <Button
                     variant="ghost"
                     size="sm"
                     className="h-6 px-2 text-primary hover:text-primary hover:bg-primary/10"
-                    onClick={handleShareJourney}
+                    onClick={handleShareCampaign}
                     aria-label="Share campaign invite"
                   >
                     {copied ? (
@@ -254,9 +254,9 @@ export const JourneyCard = memo(function JourneyCard({ journey, onRename, onComp
                   </Button>
                 )}
               </div>
-              {journey.description && (
+              {campaign.description && (
                 <p className="text-xs text-muted-foreground line-clamp-2">
-                  {journey.description}
+                  {campaign.description}
                 </p>
               )}
             </div>
@@ -280,7 +280,7 @@ export const JourneyCard = memo(function JourneyCard({ journey, onRename, onComp
                   type="button"
                   onClick={() => setShowAbandonDialog(true)}
                   className="h-5 w-5 rounded-full hover:bg-destructive/10 flex items-center justify-center text-muted-foreground/40 hover:text-destructive transition-colors"
-                  title="Abandon journey"
+                  title="Abandon campaign"
                 >
                   <X className="h-3 w-3" />
                 </button>
@@ -290,8 +290,8 @@ export const JourneyCard = memo(function JourneyCard({ journey, onRename, onComp
 
           {/* Constellation Trail Progress */}
           <ConstellationTrail 
-            progress={journey.progress_percentage} 
-            targetDays={journey.target_days}
+            progress={campaign.progress_percentage} 
+            targetDays={campaign.target_days}
             className="mb-3"
             companionImageUrl={health?.imageUrl || companion?.current_image_url}
             companionImageFocalX={health?.imageFocalX ?? companion?.current_image_focal_x ?? null}
@@ -299,7 +299,7 @@ export const JourneyCard = memo(function JourneyCard({ journey, onRename, onComp
             companionMood={health?.moodState}
             showCompanion={true}
             milestones={trailMilestones}
-            epicId={journey.id}
+            epicId={campaign.id}
           />
 
 
@@ -307,7 +307,7 @@ export const JourneyCard = memo(function JourneyCard({ journey, onRename, onComp
           <div className="flex items-center gap-3 text-xs text-muted-foreground mb-3 px-1">
           <span className="flex items-center gap-1">
             <Calendar className="w-3 h-3" />
-            {journey.target_days}d total
+            {campaign.target_days}d total
           </span>
           <span className="text-muted-foreground/30">•</span>
           <span className="flex items-center gap-1">
@@ -315,24 +315,24 @@ export const JourneyCard = memo(function JourneyCard({ journey, onRename, onComp
             {isCompleted ? "Done!" : daysRemaining === null ? "Timeline pending" : `${daysRemaining}d left`}
           </span>
           <span className="text-muted-foreground/30">•</span>
-          {journeyHealth ? (
+          {campaignHealth ? (
             <span className="flex items-center gap-1">
               <span className={cn(
                 "text-xs font-bold",
-                journeyHealth.score === 'A' && "text-green-500",
-                journeyHealth.score === 'B' && "text-celestial-blue",
-                journeyHealth.score === 'C' && "text-amber-500",
-                journeyHealth.score === 'D' && "text-orange-500",
-                journeyHealth.score === 'F' && "text-red-500",
+                campaignHealth.score === 'A' && "text-green-500",
+                campaignHealth.score === 'B' && "text-celestial-blue",
+                campaignHealth.score === 'C' && "text-amber-500",
+                campaignHealth.score === 'D' && "text-orange-500",
+                campaignHealth.score === 'F' && "text-red-500",
               )}>
-                {journeyHealth.score}
+                {campaignHealth.score}
               </span>
-              <span>({journeyHealth.progressDelta > 0 ? '+' : ''}{Math.round(journeyHealth.progressDelta)}%)</span>
+              <span>({campaignHealth.progressDelta > 0 ? '+' : ''}{Math.round(campaignHealth.progressDelta)}%)</span>
             </span>
           ) : (
             <span className="flex items-center gap-1">
               <Zap className="w-3 h-3 text-stardust-gold" />
-              <span className="text-stardust-gold font-medium">{journey.xp_reward} XP</span>
+              <span className="text-stardust-gold font-medium">{campaign.xp_reward} XP</span>
             </span>
           )}
           </div>
@@ -347,12 +347,12 @@ export const JourneyCard = memo(function JourneyCard({ journey, onRename, onComp
               className="col-span-2"
             >
               <MilestonePostcardPreview
-                currentProgress={journey.progress_percentage}
+                currentProgress={campaign.progress_percentage}
                 targetPercent={postcardProgress.target}
                 milestoneTitle={postcardProgress.milestone.title}
                 chapterNumber={postcardProgress.milestone.chapter_number || 1}
-                storySeed={journey.story_seed as StorySeed | null}
-                totalChapters={journey.total_chapters}
+                storySeed={campaign.story_seed as StorySeed | null}
+                totalChapters={campaign.total_chapters}
                 companionDisplayName={companionDisplayName}
                 isExpanded={true}
               />
@@ -361,9 +361,9 @@ export const JourneyCard = memo(function JourneyCard({ journey, onRename, onComp
           
           {/* Milestones Tile - Cool and adventurous */}
           <JourneyDetailDrawer 
-            epicId={journey.id} 
-            epicTitle={journey.title}
-            epicGoal={journey.description}
+            epicId={campaign.id} 
+            epicTitle={campaign.title}
+            epicGoal={campaign.description}
             currentDeadline={resolvedEndDate ?? undefined}
           >
             <motion.button 
@@ -388,10 +388,10 @@ export const JourneyCard = memo(function JourneyCard({ journey, onRename, onComp
           </JourneyDetailDrawer>
           
           {/* Rituals Tile - Magical and special */}
-          {journey.epic_habits && ritualCount > 0 && (
+          {campaign.epic_habits && ritualCount > 0 && (
             <EpicCheckInDrawer
-              epicId={journey.id}
-              habits={journey.epic_habits
+              epicId={campaign.id}
+              habits={campaign.epic_habits
                 .filter(eh => eh.habits)
                 .map(eh => ({
                   id: eh.habit_id,
@@ -432,13 +432,13 @@ export const JourneyCard = memo(function JourneyCard({ journey, onRename, onComp
           </div>
 
           {/* Complete Button (only at 100%) */}
-          {isActive && journey.progress_percentage >= 100 && onComplete && (
+          {isActive && campaign.progress_percentage >= 100 && onComplete && (
             <Button
               onClick={onComplete}
               className="w-full bg-gradient-to-r from-stardust-gold to-amber-500 hover:from-stardust-gold/90 hover:to-amber-500/90 text-black font-bold"
             >
               <Trophy className="w-4 h-4 mr-2" />
-              Complete Journey
+              Complete Campaign
             </Button>
           )}
 
@@ -446,9 +446,9 @@ export const JourneyCard = memo(function JourneyCard({ journey, onRename, onComp
           <AlertDialog open={showAbandonDialog} onOpenChange={setShowAbandonDialog}>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Abandon this journey?</AlertDialogTitle>
+                <AlertDialogTitle>Abandon this campaign?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  You'll lose progress on "{journey.title}". This cannot be undone.
+                  You'll lose progress on "{campaign.title}". This cannot be undone.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -470,9 +470,9 @@ export const JourneyCard = memo(function JourneyCard({ journey, onRename, onComp
           <SmartAdjustPlanDrawer
             open={showAdjustDialog}
             onOpenChange={setShowAdjustDialog}
-            epicId={journey.id}
-            epicTitle={journey.title}
-            habits={journey.epic_habits
+            epicId={campaign.id}
+            epicTitle={campaign.title}
+            habits={campaign.epic_habits
               ?.filter(eh => eh.habits)
               .map(eh => ({
                 id: eh.habit_id,
@@ -501,11 +501,11 @@ export const JourneyCard = memo(function JourneyCard({ journey, onRename, onComp
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
-            <label htmlFor={`rename-campaign-${journey.id}`} className="text-sm font-medium">
+            <label htmlFor={`rename-campaign-${campaign.id}`} className="text-sm font-medium">
               Campaign name
             </label>
             <Input
-              id={`rename-campaign-${journey.id}`}
+              id={`rename-campaign-${campaign.id}`}
               value={renameTitle}
               onChange={(event) => setRenameTitle(event.target.value)}
               disabled={isRenaming}

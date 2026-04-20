@@ -3,7 +3,7 @@ import { render } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  journeyCardMock: vi.fn(() => <div data-testid="journey-card" />),
+  campaignCardMock: vi.fn(() => <div data-testid="campaign-card" />),
   renameEpicMock: vi.fn(),
 }));
 
@@ -30,8 +30,8 @@ vi.mock("@/components/PageInfoModal", () => ({
   PageInfoModal: () => null,
 }));
 
-vi.mock("@/components/JourneyCard", () => ({
-  JourneyCard: (props: unknown) => mocks.journeyCardMock(props),
+vi.mock("@/components/CampaignCard", () => ({
+  CampaignCard: (props: unknown) => mocks.campaignCardMock(props),
 }));
 
 vi.mock("@/components/Pathfinder", () => ({
@@ -94,10 +94,10 @@ describe("Campaigns rename wiring", () => {
   it("passes onRename only to active campaign cards", () => {
     render(<Campaigns />);
 
-    expect(mocks.journeyCardMock).toHaveBeenCalledTimes(2);
+    expect(mocks.campaignCardMock).toHaveBeenCalledTimes(2);
 
-    const activeCallProps = mocks.journeyCardMock.mock.calls[0]?.[0] as { onRename?: unknown };
-    const completedCallProps = mocks.journeyCardMock.mock.calls[1]?.[0] as { onRename?: unknown };
+    const activeCallProps = mocks.campaignCardMock.mock.calls[0]?.[0] as { onRename?: unknown };
+    const completedCallProps = mocks.campaignCardMock.mock.calls[1]?.[0] as { onRename?: unknown };
 
     expect(typeof activeCallProps.onRename).toBe("function");
     expect(completedCallProps.onRename).toBeUndefined();

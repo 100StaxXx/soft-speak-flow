@@ -92,7 +92,7 @@ vi.mock("@/hooks/useMilestones", () => ({
   }),
 }));
 
-import { JourneyCard } from "./JourneyCard";
+import { CampaignCard } from "./CampaignCard";
 
 const baseJourney = {
   id: "epic-1",
@@ -113,17 +113,17 @@ afterEach(() => {
   Reflect.deleteProperty(navigator, "share");
 });
 
-describe("JourneyCard rename", () => {
+describe("CampaignCard rename", () => {
   it("renders the rename affordance for active campaigns when onRename is provided", () => {
-    render(<JourneyCard journey={baseJourney} onRename={vi.fn()} />);
+    render(<CampaignCard campaign={baseJourney} onRename={vi.fn()} />);
 
     expect(screen.getByLabelText("Rename campaign")).toBeInTheDocument();
   });
 
   it("does not render the rename affordance for completed campaigns", () => {
     render(
-      <JourneyCard
-        journey={{
+      <CampaignCard
+        campaign={{
           ...baseJourney,
           status: "completed",
         }}
@@ -135,7 +135,7 @@ describe("JourneyCard rename", () => {
   });
 
   it("prefills the rename dialog and disables save for unchanged or blank values", () => {
-    render(<JourneyCard journey={baseJourney} onRename={vi.fn()} />);
+    render(<CampaignCard campaign={baseJourney} onRename={vi.fn()} />);
 
     fireEvent.click(screen.getByLabelText("Rename campaign"));
 
@@ -152,7 +152,7 @@ describe("JourneyCard rename", () => {
   it("submits the trimmed campaign title and closes the dialog on success", async () => {
     const onRename = vi.fn().mockResolvedValue(undefined);
 
-    render(<JourneyCard journey={baseJourney} onRename={onRename} />);
+    render(<CampaignCard campaign={baseJourney} onRename={onRename} />);
 
     fireEvent.click(screen.getByLabelText("Rename campaign"));
 
@@ -174,8 +174,8 @@ describe("JourneyCard rename", () => {
     Object.assign(navigator, { share: shareMock });
 
     render(
-      <JourneyCard
-        journey={{
+      <CampaignCard
+        campaign={{
           ...baseJourney,
           invite_code: "EPIC-QUEST-1234",
           is_public: true,

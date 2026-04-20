@@ -87,7 +87,7 @@ const JoinEpic = () => {
       toast.success("Epic Joined! ⚔️", {
         description: "You're now part of this legendary quest!",
       });
-      navigate("/epics");
+      navigate("/campaigns");
     },
     onError: (error: Error) => {
       toast.error(error.message || "Failed to join epic");
@@ -133,8 +133,8 @@ const JoinEpic = () => {
             <p className="text-muted-foreground mb-6">
               This invite code is invalid or the epic is no longer available.
             </p>
-            <Button onClick={() => navigate("/epics")} variant="outline">
-              View Your Epics
+            <Button onClick={() => navigate("/campaigns")} variant="outline">
+              View Your Campaigns
             </Button>
           </Card>
         </div>

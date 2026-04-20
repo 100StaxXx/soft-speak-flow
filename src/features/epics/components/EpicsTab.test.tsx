@@ -17,8 +17,8 @@ vi.mock("@/hooks/useFirstTimeModal", () => ({
   }),
 }));
 
-vi.mock("@/components/JourneyCard", () => ({
-  JourneyCard: ({ journey }: { journey: { title: string } }) => <div>{journey.title}</div>,
+vi.mock("@/components/CampaignCard", () => ({
+  CampaignCard: ({ campaign }: { campaign: { title: string } }) => <div>{campaign.title}</div>,
 }));
 
 vi.mock("@/components/Pathfinder", () => ({

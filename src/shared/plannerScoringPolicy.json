@@ -1,0 +1,23 @@
+{
+  "base_score": 45,
+  "preferred_window_bonus": 22,
+  "energy_match_bonus": 14,
+  "physical_bonus": 8,
+  "deep_work_bonus": 8,
+  "daily_load_bonus": 10,
+  "daily_load_penalty": -16,
+  "fragmentation_penalty": -6,
+  "late_day_penalty": -4,
+  "outside_window_penalty": -8,
+  "missed_energy_penalty": -6,
+  "deep_block_penalty": -18,
+  "suggested_slot_bonus": 10,
+  "unscheduled_penalty_base": -40,
+  "early_bias_multiplier": 0.05,
+  "day_index_penalty": 8,
+  "confidence_decay_per_day": 0.05,
+  "confidence_floor": 0.35,
+  "scheduled_threshold": 58,
+  "tentative_threshold_aggressive": 40,
+  "tentative_threshold_default": 46
+}

@@ -66,8 +66,8 @@ vi.mock("@/components/PageInfoModal", () => ({
   PageInfoModal: () => null,
 }));
 
-vi.mock("@/components/JourneyCard", () => ({
-  JourneyCard: () => <div data-testid="journey-card" />,
+vi.mock("@/components/CampaignCard", () => ({
+  CampaignCard: () => <div data-testid="campaign-card" />,
 }));
 
 vi.mock("@/components/Pathfinder", () => ({
@@ -115,7 +115,7 @@ describe("Campaigns populated layout", () => {
 
     const existingSection = screen.getByTestId("campaigns-existing-section");
     const createButton = within(existingSection).getByTestId("campaigns-create-button");
-    const firstCampaignCard = within(existingSection).getAllByTestId("journey-card")[0];
+    const firstCampaignCard = within(existingSection).getAllByTestId("campaign-card")[0];
 
     expect(within(existingSection).getByText("Existing campaigns")).toBeInTheDocument();
     expect(

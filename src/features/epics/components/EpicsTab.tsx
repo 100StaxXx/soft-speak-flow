@@ -1,5 +1,5 @@
 import { memo, useState, useCallback } from "react";
-import { JourneyCard } from "@/components/JourneyCard";
+import { CampaignCard } from "@/components/CampaignCard";
 import { Pathfinder } from "@/components/Pathfinder";
 import { JoinEpicDialog } from "@/components/JoinEpicDialog";
 import { EpicsTutorialModal } from "@/components/EpicsTutorialModal";
@@ -101,8 +101,8 @@ export const EpicsTab = memo(function EpicsTab() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
               >
-                <JourneyCard
-                  journey={epic}
+                <CampaignCard
+                  campaign={epic}
                   onComplete={() => updateEpicStatus({ epicId: epic.id, status: "completed" })}
                   onAbandon={() => updateEpicStatus({ epicId: epic.id, status: "abandoned" })}
                 />
@@ -117,7 +117,7 @@ export const EpicsTab = memo(function EpicsTab() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: (activeEpics.length + index) * 0.05 }}
               >
-                <JourneyCard journey={epic} />
+                <CampaignCard campaign={epic} />
               </motion.div>
             ))}
 

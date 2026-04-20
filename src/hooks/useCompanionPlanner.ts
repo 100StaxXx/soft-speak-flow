@@ -14,6 +14,7 @@ import { useExternalCalendarEvents } from "@/hooks/useExternalCalendarEvents";
 import { useInboxTasks } from "@/hooks/useInboxTasks";
 import { useEpics } from "@/hooks/useEpics";
 import { useTaskMutations } from "@/hooks/useTaskMutations";
+import type { AddTaskParams } from "@/hooks/useTaskMutations";
 import { useRitualUpdate } from "@/hooks/useRitualUpdate";
 import { useUserAIContext } from "@/hooks/useUserAIContext";
 import { useAIInteractionTracker } from "@/hooks/useAIInteractionTracker";
@@ -460,6 +461,42 @@ const inferScheduledTimeFromProposal = (kind: CompanionPlannerProposalKind, payl
   }
 
   return null;
+};
+
+const sanitizeCreateQuestProposalPayload = (
+  payload: Record<string, unknown>,
+): AddTaskParams => {
+  const reminderMinutesBefore = typeof payload.reminderMinutesBefore === "number"
+    ? payload.reminderMinutesBefore
+    : 15;
+
+  return {
+    taskText: typeof payload.taskText === "string" ? payload.taskText : "Quest",
+    difficulty: payload.difficulty === "easy" || payload.difficulty === "hard"
+      ? payload.difficulty
+      : "medium",
+    source: typeof payload.questSource === "string"
+      ? payload.questSource
+      : typeof payload.taskDate === "string"
+      ? "manual"
+      : "inbox",
+    taskDate: typeof payload.taskDate === "string" ? payload.taskDate : null,
+    scheduledTime: typeof payload.scheduledTime === "string" ? payload.scheduledTime : null,
+    estimatedDuration: typeof payload.estimatedDuration === "number" ? payload.estimatedDuration : null,
+    reminderEnabled: Boolean(payload.reminderEnabled),
+    reminderMinutesBefore,
+    category: typeof payload.category === "string" ? payload.category : undefined,
+    notes: typeof payload.notes === "string" ? payload.notes : null,
+    contactId: typeof payload.contactId === "string" ? payload.contactId : null,
+    autoLogInteraction: typeof payload.autoLogInteraction === "boolean"
+      ? payload.autoLogInteraction
+      : true,
+    imageUrl: typeof payload.imageUrl === "string" ? payload.imageUrl : null,
+    location: typeof payload.location === "string" ? payload.location : null,
+    subtasks: Array.isArray(payload.subtasks)
+      ? payload.subtasks.filter((entry): entry is string => typeof entry === "string")
+      : [],
+  };
 };
 
 const serializeTaskContext = (task: {
@@ -1580,6 +1617,7 @@ export function useCompanionPlanner({
           message,
           currentDate: todayIso,
           currentDateTime: formatCurrentDateTimeWithOffset(new Date()),
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
           horizon,
           tonePack,
           conversationHistory,
@@ -1721,7 +1759,7 @@ export function useCompanionPlanner({
 
       switch (proposal.kind) {
         case "create_quest": {
-          const payload = proposal.payload as Parameters<typeof addTask>[0];
+          const payload = sanitizeCreateQuestProposalPayload(proposal.payload);
           const createResult = await addTask(payload);
           localTaskId = typeof createResult?.id === "string" ? createResult.id : null;
           mutationResult = createResult as { queued?: boolean } | null;

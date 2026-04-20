@@ -616,7 +616,10 @@ Deno.test("returns confirmable quest proposals for the plan-day starter", () => 
     true,
   );
   assertEquals(result.sessionState.pendingStarterIntent, null);
-  assertStringIncludes(result.reply, "Today still has room around your fixed commitments.");
+  assertStringIncludes(
+    result.reply,
+    "Today still has room around your fixed commitments.",
+  );
   assertStringIncludes(result.reply, "I drafted 3 quests for today");
 });
 
@@ -1263,10 +1266,109 @@ Deno.test("drafts fewer plan-day quests when clean slots run out", () => {
   }));
 
   assertEquals(result.mode, "proposal");
-  assertEquals(result.proposals.length, 1);
+  assertEquals(result.proposals.length, 3);
   assertEquals(result.proposals[0].title, "Create Write Newsletter");
+  assertEquals(
+    (result.proposals[1]?.payload as {
+      fallbackToInbox?: boolean;
+      taskDate?: string | null;
+    }).fallbackToInbox,
+    false,
+  );
+  assertEquals(
+    (result.proposals[2]?.payload as {
+      fallbackToInbox?: boolean;
+      taskDate?: string | null;
+    }).fallbackToInbox,
+    false,
+  );
+  assertEquals(
+    [
+      (result.proposals[1]?.payload as { taskDate?: string | null }).taskDate,
+      (result.proposals[2]?.payload as { taskDate?: string | null }).taskDate,
+    ].sort(),
+    ["2026-04-18", "2026-04-18"],
+  );
   assertEquals(result.sessionState.pendingStarterIntent, null);
-  assertStringIncludes(result.reply, "That's all the clean room I found without crowding the day.");
+  assertStringIncludes(result.reply, "I drafted 3 quests");
+});
+
+Deno.test("drafts one proposal per extracted action in aggressive bundle mode", () => {
+  const result = buildPlannerResponse(baseInput({
+    message:
+      "I want to clean my house, work on building the app, and workout later",
+    parsedInput: {
+      text:
+        "I want to clean my house, work on building the app, and workout later",
+      scheduledTime: null,
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+    plannerContext: {
+      scheduleInsights: {
+        horizon: "day",
+        selectedDate: "2026-04-18",
+        dayLoads: [{
+          date: "2026-04-18",
+          totalMinutes: 60,
+          taskCount: 1,
+          status: "balanced",
+        }],
+        overloadedDates: [],
+        emptyDates: [],
+        conflicts: [],
+        suggestedSlots: [
+          {
+            date: "2026-04-18",
+            time: "17:30",
+            endTime: "18:30",
+            score: 80,
+            reason: "Open after-work slot",
+          },
+          {
+            date: "2026-04-18",
+            time: "18:45",
+            endTime: "20:15",
+            score: 78,
+            reason: "Focus block after dinner",
+          },
+          {
+            date: "2026-04-18",
+            time: "20:15",
+            endTime: "21:15",
+            score: 72,
+            reason: "Late workout window",
+          },
+        ],
+        moveSuggestions: [],
+        summary: "Today still has room around your fixed commitments.",
+      },
+    },
+  }));
+
+  assertEquals(result.mode, "proposal");
+  assertEquals(result.proposals.length, 3);
+  assertEquals(
+    result.proposals.every((proposal) => proposal.kind === "create_quest"),
+    true,
+  );
+  assertStringIncludes(result.reply, "I drafted 3 quests");
+  assertEquals(
+    result.proposals.map((proposal) => proposal.title),
+    [
+      "Create Clean My House",
+      "Create Work On Building The App",
+      "Create Workout",
+    ],
+  );
 });
 
 Deno.test("keeps calendar conflict notes on plan-day quest drafts", () => {
@@ -2619,7 +2721,8 @@ Deno.test("quest_capture gives explicit follow-up timing precedence over schedul
           reason: "Matches your usual afternoon rhythm",
         }],
         moveSuggestions: [],
-        summary: "Today has room at 13:00. Matches your usual afternoon rhythm.",
+        summary:
+          "Today has room at 13:00. Matches your usual afternoon rhythm.",
       },
     },
   }));
@@ -2640,7 +2743,10 @@ Deno.test("quest_capture gives explicit follow-up timing precedence over schedul
     }).taskDate,
     "2026-04-20",
   );
-  assertStringIncludes(result.proposals[0].summary, 'Create a quest for "Workout" at 5:00 pm.');
+  assertStringIncludes(
+    result.proposals[0].summary,
+    'Create a quest for "Workout" at 5:00 pm.',
+  );
   assertStringIncludes(result.reply, "today at 5:00 pm");
   assertEquals(result.reply.includes("1:00 pm"), false);
   assertEquals(result.reply.includes("usual afternoon rhythm"), false);

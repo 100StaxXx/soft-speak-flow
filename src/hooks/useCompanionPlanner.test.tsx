@@ -125,7 +125,8 @@ vi.mock("@/hooks/useRitualUpdate", () => ({
 }));
 
 vi.mock("@/hooks/useCalendarIntegrations", () => ({
-  useCalendarIntegrations: (...args: unknown[]) => mocks.useCalendarIntegrations(...args),
+  useCalendarIntegrations: (...args: unknown[]) =>
+    mocks.useCalendarIntegrations(...args),
 }));
 
 vi.mock("@/hooks/useQuestCalendarSync", () => ({
@@ -167,7 +168,8 @@ vi.mock("@/contexts/ResilienceContext", () => ({
 }));
 
 vi.mock("@/features/tasks/lib/subtaskWrites", () => ({
-  applySubtaskTitlePlan: (...args: unknown[]) => mocks.applySubtaskTitlePlan(...args),
+  applySubtaskTitlePlan: (...args: unknown[]) =>
+    mocks.applySubtaskTitlePlan(...args),
 }));
 
 vi.mock("@/hooks/useVoiceInput", () => ({
@@ -228,7 +230,9 @@ describe("useCompanionPlanner", () => {
   });
 
   it("initializes the default horizon before dependent event queries run", () => {
-    const { result } = renderHook(() => useCompanionPlanner({ bootstrapGreeting: false }));
+    const { result } = renderHook(() =>
+      useCompanionPlanner({ bootstrapGreeting: false })
+    );
 
     expect(result.current.horizon).toBe("day");
     expect(mocks.externalCalendarHorizons).toEqual(["day", "week"]);
@@ -243,7 +247,9 @@ describe("useCompanionPlanner", () => {
       );
     });
 
-    expect(result.current.messages[0]?.content).not.toBe("Let's line things up.");
+    expect(result.current.messages[0]?.content).not.toBe(
+      "Let's line things up.",
+    );
   });
 
   it("primes quest capture locally and keeps the planner idle", async () => {
@@ -251,17 +257,21 @@ describe("useCompanionPlanner", () => {
       configurable: true,
       writable: true,
       value: {
-        getItem: vi.fn(() => JSON.stringify({
-          preferredTimeOfDay: "evening",
-          preferredTimeReason: "After work I can focus better.",
-          reminderPreference: "15 minutes",
-        })),
+        getItem: vi.fn(() =>
+          JSON.stringify({
+            preferredTimeOfDay: "evening",
+            preferredTimeReason: "After work I can focus better.",
+            reminderPreference: "15 minutes",
+          })
+        ),
         setItem: vi.fn(),
         removeItem: vi.fn(),
       },
     });
 
-    const { result } = renderHook(() => useCompanionPlanner({ bootstrapGreeting: false }));
+    const { result } = renderHook(() =>
+      useCompanionPlanner({ bootstrapGreeting: false })
+    );
 
     act(() => {
       result.current.setDraftInput("Old draft");
@@ -275,10 +285,14 @@ describe("useCompanionPlanner", () => {
     expect(result.current.pendingProposals).toEqual([]);
     expect(result.current.draftInput).toBe("");
     expect(result.current.isSubmitting).toBe(false);
-    expect(result.current.sessionState.pendingStarterIntent).toBe("quest_capture");
+    expect(result.current.sessionState.pendingStarterIntent).toBe(
+      "quest_capture",
+    );
     expect(result.current.sessionState.draft.draftKind).toBe("create_quest");
     expect(result.current.sessionState.preferredTimeOfDay).toBe("evening");
-    expect(result.current.sessionState.preferredTimeReason).toBe("After work I can focus better.");
+    expect(result.current.sessionState.preferredTimeReason).toBe(
+      "After work I can focus better.",
+    );
     expect(result.current.sessionState.reminderPreference).toBe("15 minutes");
     expect(mocks.invoke).not.toHaveBeenCalled();
   });
@@ -323,14 +337,19 @@ describe("useCompanionPlanner", () => {
       error: null,
     });
 
-    const { result } = renderHook(() => useCompanionPlanner({ bootstrapGreeting: false }));
+    const { result } = renderHook(() =>
+      useCompanionPlanner({ bootstrapGreeting: false })
+    );
 
     act(() => {
       result.current.primeQuestCapture();
     });
 
     await act(async () => {
-      await result.current.submitMessage("Write my newsletter tomorrow at 18:00", "text");
+      await result.current.submitMessage(
+        "Write my newsletter tomorrow at 18:00",
+        "text",
+      );
     });
 
     await waitFor(() => {
@@ -338,7 +357,9 @@ describe("useCompanionPlanner", () => {
     });
 
     const request = mocks.invoke.mock.calls.at(-1)?.[1];
-    expect(request?.body.sessionState.pendingStarterIntent).toBe("quest_capture");
+    expect(request?.body.sessionState.pendingStarterIntent).toBe(
+      "quest_capture",
+    );
     expect(request?.body.sessionState.draft.draftKind).toBe("create_quest");
     expect(request?.body.conversationHistory).toEqual([
       {
@@ -349,7 +370,9 @@ describe("useCompanionPlanner", () => {
   });
 
   it("treats an exact typed quest starter like a local quest-capture seed", async () => {
-    const { result } = renderHook(() => useCompanionPlanner({ bootstrapGreeting: false }));
+    const { result } = renderHook(() =>
+      useCompanionPlanner({ bootstrapGreeting: false })
+    );
 
     await act(async () => {
       await result.current.submitMessage("Quest?", "text");
@@ -358,7 +381,9 @@ describe("useCompanionPlanner", () => {
     expect(result.current.messages).toHaveLength(1);
     expect(result.current.messages[0]?.role).toBe("companion");
     expect(result.current.messages[0]?.content).toBe("Quest?");
-    expect(result.current.sessionState.pendingStarterIntent).toBe("quest_capture");
+    expect(result.current.sessionState.pendingStarterIntent).toBe(
+      "quest_capture",
+    );
     expect(result.current.sessionState.draft.draftKind).toBe("create_quest");
     expect(mocks.invoke).not.toHaveBeenCalled();
   });
@@ -373,10 +398,15 @@ describe("useCompanionPlanner", () => {
       },
     });
 
-    const { result } = renderHook(() => useCompanionPlanner({ bootstrapGreeting: false }));
+    const { result } = renderHook(() =>
+      useCompanionPlanner({ bootstrapGreeting: false })
+    );
 
     await act(async () => {
-      await result.current.submitMessage("Help me plan today's quests.", "text");
+      await result.current.submitMessage(
+        "Help me plan today's quests.",
+        "text",
+      );
     });
 
     await waitFor(() => {
@@ -389,7 +419,9 @@ describe("useCompanionPlanner", () => {
     expect(result.current.messages[1]?.content).toBe(
       "Companion Planner isn't live in this environment yet. Please try again after the backend is updated.",
     );
-    expect(result.current.messages[1]?.content).not.toContain("lost the thread");
+    expect(result.current.messages[1]?.content).not.toContain(
+      "lost the thread",
+    );
   });
 
   it("refreshes Outlook planner context before submitting to companion-planner-chat", async () => {
@@ -460,10 +492,15 @@ describe("useCompanionPlanner", () => {
       error: null,
     });
 
-    const { result } = renderHook(() => useCompanionPlanner({ bootstrapGreeting: false }));
+    const { result } = renderHook(() =>
+      useCompanionPlanner({ bootstrapGreeting: false })
+    );
 
     await act(async () => {
-      await result.current.submitMessage("Plan my day with Outlook in mind.", "text");
+      await result.current.submitMessage(
+        "Plan my day with Outlook in mind.",
+        "text",
+      );
     });
 
     expect(mocks.syncPlanningContext).toHaveBeenCalledWith({
@@ -502,7 +539,8 @@ describe("useCompanionPlanner", () => {
             id: "proposal-1",
             kind: "create_quest",
             title: "Create Workout",
-            summary: "Create a quest for Workout with a short note and 2 subtasks.",
+            summary:
+              "Create a quest for Workout with a short note and 2 subtasks.",
             payload: {
               taskText: "Workout",
               difficulty: "medium",
@@ -535,10 +573,15 @@ describe("useCompanionPlanner", () => {
       error: null,
     });
 
-    const { result } = renderHook(() => useCompanionPlanner({ bootstrapGreeting: false }));
+    const { result } = renderHook(() =>
+      useCompanionPlanner({ bootstrapGreeting: false })
+    );
 
     await act(async () => {
-      await result.current.submitMessage("Set up a workout quest with details", "text");
+      await result.current.submitMessage(
+        "Set up a workout quest with details",
+        "text",
+      );
     });
 
     await waitFor(() => {
@@ -549,14 +592,14 @@ describe("useCompanionPlanner", () => {
       await result.current.confirmProposal("proposal-1");
     });
 
-    expect(mocks.addTask).toHaveBeenCalledWith({
+    expect(mocks.addTask).toHaveBeenCalledWith(expect.objectContaining({
       taskText: "Workout",
       difficulty: "medium",
       taskDate: null,
       scheduledTime: null,
       notes: "Upper body focus with 10 minutes of cardio to finish.",
       subtasks: ["Warm up", "Finish with cardio"],
-    });
+    }));
   });
 
   it("clears stale preferred time reasons before persisting explicit quest timing", async () => {
@@ -564,11 +607,13 @@ describe("useCompanionPlanner", () => {
       configurable: true,
       writable: true,
       value: {
-        getItem: vi.fn(() => JSON.stringify({
-          preferredTimeOfDay: "afternoon",
-          preferredTimeReason: "usual afternoon rhythm",
-          reminderPreference: "15 minutes",
-        })),
+        getItem: vi.fn(() =>
+          JSON.stringify({
+            preferredTimeOfDay: "afternoon",
+            preferredTimeReason: "usual afternoon rhythm",
+            reminderPreference: "15 minutes",
+          })
+        ),
         setItem: vi.fn(),
         removeItem: vi.fn(),
       },
@@ -577,7 +622,8 @@ describe("useCompanionPlanner", () => {
     mocks.invoke.mockResolvedValue({
       data: {
         mode: "proposal",
-        reply: "I drafted this as a quest for today at 5:00 pm. Take a look, and confirm it if it fits.",
+        reply:
+          "I drafted this as a quest for today at 5:00 pm. Take a look, and confirm it if it fits.",
         followUpQuestions: [],
         proposals: [
           {
@@ -623,7 +669,9 @@ describe("useCompanionPlanner", () => {
       error: null,
     });
 
-    const { result } = renderHook(() => useCompanionPlanner({ bootstrapGreeting: false }));
+    const { result } = renderHook(() =>
+      useCompanionPlanner({ bootstrapGreeting: false })
+    );
 
     act(() => {
       result.current.primeQuestCapture();
@@ -654,17 +702,20 @@ describe("useCompanionPlanner", () => {
     expect(payload).toEqual(expect.objectContaining({
       user_id: "user-1",
     }));
-    expect(payload.preferred_work_blocks.planner_profile.preferredTimeOfDay).toBe("evening");
-    expect(payload.preferred_work_blocks.planner_profile.preferredTimeReason).toBeNull();
-    expect(payload.preferred_work_blocks.planner_profile.preferredWindows).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          timeOfDay: "evening",
-          time: "17:00",
-          reason: null,
-        }),
-      ]),
-    );
+    expect(payload.preferred_work_blocks.planner_profile.preferredTimeOfDay)
+      .toBe("evening");
+    expect(payload.preferred_work_blocks.planner_profile.preferredTimeReason)
+      .toBeNull();
+    expect(payload.preferred_work_blocks.planner_profile.preferredWindows)
+      .toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            timeOfDay: "evening",
+            time: "17:00",
+            reason: null,
+          }),
+        ]),
+      );
   });
 
   it("normalizes confirm-ready quest drafts so follow-up questions never block confirmation", async () => {
@@ -714,7 +765,9 @@ describe("useCompanionPlanner", () => {
       error: null,
     });
 
-    const { result } = renderHook(() => useCompanionPlanner({ bootstrapGreeting: false }));
+    const { result } = renderHook(() =>
+      useCompanionPlanner({ bootstrapGreeting: false })
+    );
 
     await act(async () => {
       await result.current.submitMessage("Make me a workout quest", "text");
@@ -790,7 +843,9 @@ describe("useCompanionPlanner", () => {
       error: null,
     });
 
-    const { result } = renderHook(() => useCompanionPlanner({ bootstrapGreeting: false }));
+    const { result } = renderHook(() =>
+      useCompanionPlanner({ bootstrapGreeting: false })
+    );
 
     await act(async () => {
       await result.current.submitMessage("Make me a workout quest", "text");
@@ -848,7 +903,9 @@ describe("useCompanionPlanner", () => {
       error: null,
     });
 
-    const { result } = renderHook(() => useCompanionPlanner({ bootstrapGreeting: false }));
+    const { result } = renderHook(() =>
+      useCompanionPlanner({ bootstrapGreeting: false })
+    );
 
     await act(async () => {
       await result.current.submitMessage("Make me a workout quest", "text");
@@ -920,7 +977,9 @@ describe("useCompanionPlanner", () => {
       error: null,
     });
 
-    const { result } = renderHook(() => useCompanionPlanner({ bootstrapGreeting: false }));
+    const { result } = renderHook(() =>
+      useCompanionPlanner({ bootstrapGreeting: false })
+    );
 
     await act(async () => {
       await result.current.submitMessage("Make me two movement quests", "text");
@@ -990,7 +1049,9 @@ describe("useCompanionPlanner", () => {
       error: null,
     });
 
-    const { result } = renderHook(() => useCompanionPlanner({ bootstrapGreeting: false }));
+    const { result } = renderHook(() =>
+      useCompanionPlanner({ bootstrapGreeting: false })
+    );
 
     await act(async () => {
       await result.current.submitMessage("Block deep work at 9.", "text");
@@ -1059,7 +1120,9 @@ describe("useCompanionPlanner", () => {
       error: null,
     });
 
-    const { result } = renderHook(() => useCompanionPlanner({ bootstrapGreeting: false }));
+    const { result } = renderHook(() =>
+      useCompanionPlanner({ bootstrapGreeting: false })
+    );
 
     await act(async () => {
       await result.current.submitMessage("Update my workout quest", "text");
@@ -1088,14 +1151,24 @@ describe("useCompanionPlanner", () => {
       queueAction: mocks.queueAction,
       retryNow: mocks.retryNow,
     });
-    expect(mocks.invalidateQueries).toHaveBeenCalledWith({ queryKey: ["subtasks", "task-1"] });
-    expect(mocks.invalidateQueries).toHaveBeenCalledWith({ queryKey: ["daily-tasks"] });
-    expect(mocks.invalidateQueries).toHaveBeenCalledWith({ queryKey: ["calendar-tasks"] });
-    expect(mocks.invalidateQueries).toHaveBeenCalledWith({ queryKey: ["inbox-tasks"] });
+    expect(mocks.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ["subtasks", "task-1"],
+    });
+    expect(mocks.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ["daily-tasks"],
+    });
+    expect(mocks.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ["calendar-tasks"],
+    });
+    expect(mocks.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ["inbox-tasks"],
+    });
   });
 
   it("keeps the quest update confirmed when subtask writes fail after the main update succeeds", async () => {
-    mocks.applySubtaskTitlePlan.mockRejectedValue(new Error("subtask write failed"));
+    mocks.applySubtaskTitlePlan.mockRejectedValue(
+      new Error("subtask write failed"),
+    );
     mocks.invoke.mockResolvedValue({
       data: {
         mode: "proposal",
@@ -1142,7 +1215,9 @@ describe("useCompanionPlanner", () => {
       error: null,
     });
 
-    const { result } = renderHook(() => useCompanionPlanner({ bootstrapGreeting: false }));
+    const { result } = renderHook(() =>
+      useCompanionPlanner({ bootstrapGreeting: false })
+    );
 
     await act(async () => {
       await result.current.submitMessage("Refresh my workout quest", "text");
@@ -1201,7 +1276,9 @@ describe("useCompanionPlanner", () => {
       error: null,
     });
 
-    const { result } = renderHook(() => useCompanionPlanner({ bootstrapGreeting: false }));
+    const { result } = renderHook(() =>
+      useCompanionPlanner({ bootstrapGreeting: false })
+    );
 
     await act(async () => {
       await result.current.submitMessage("Show me today's route.", "text");
@@ -1261,7 +1338,8 @@ describe("useCompanionPlanner", () => {
             {
               id: "details",
               prompt: "What do you want to get done?",
-              reason: "Once you name the goal, I'll look at what's open and shape the plan around it.",
+              reason:
+                "Once you name the goal, I'll look at what's open and shape the plan around it.",
               required: true,
               field: "details",
             },
@@ -1281,7 +1359,9 @@ describe("useCompanionPlanner", () => {
         error: null,
       });
 
-    const { result } = renderHook(() => useCompanionPlanner({ bootstrapGreeting: false }));
+    const { result } = renderHook(() =>
+      useCompanionPlanner({ bootstrapGreeting: false })
+    );
 
     await act(async () => {
       await result.current.submitMessage("Write my launch notes", "text");
@@ -1292,14 +1372,19 @@ describe("useCompanionPlanner", () => {
     });
 
     await act(async () => {
-      await result.current.submitMessage("Help me make room for what matters.", "text");
+      await result.current.submitMessage(
+        "Help me make room for what matters.",
+        "text",
+      );
     });
 
     await waitFor(() => {
       expect(result.current.pendingProposals).toHaveLength(0);
     });
 
-    expect(result.current.questions.map((question) => question.field)).toEqual(["details"]);
+    expect(result.current.questions.map((question) => question.field)).toEqual([
+      "details",
+    ]);
   });
 
   it("clears stale pending proposals when the planner responds with a schedule read", async () => {
@@ -1357,7 +1442,9 @@ describe("useCompanionPlanner", () => {
         error: null,
       });
 
-    const { result } = renderHook(() => useCompanionPlanner({ bootstrapGreeting: false }));
+    const { result } = renderHook(() =>
+      useCompanionPlanner({ bootstrapGreeting: false })
+    );
 
     await act(async () => {
       await result.current.submitMessage("Write my launch notes", "text");
@@ -1414,7 +1501,8 @@ describe("useCompanionPlanner", () => {
       .mockResolvedValueOnce({
         data: {
           mode: "conversational",
-          reply: "That works. We can talk through the tradeoffs before I draft anything else.",
+          reply:
+            "That works. We can talk through the tradeoffs before I draft anything else.",
           followUpQuestions: [],
           proposals: [],
           suggestedReminders: [],
@@ -1431,7 +1519,9 @@ describe("useCompanionPlanner", () => {
         error: null,
       });
 
-    const { result } = renderHook(() => useCompanionPlanner({ bootstrapGreeting: false }));
+    const { result } = renderHook(() =>
+      useCompanionPlanner({ bootstrapGreeting: false })
+    );
 
     await act(async () => {
       await result.current.submitMessage("Write my launch notes", "text");
@@ -1448,5 +1538,198 @@ describe("useCompanionPlanner", () => {
     await waitFor(() => {
       expect(result.current.pendingProposals).toHaveLength(0);
     });
+  });
+
+  it("tracks accepted proposal analytics with proposal identifiers", async () => {
+    mocks.invoke.mockResolvedValue({
+      data: {
+        mode: "proposal",
+        reply:
+          "I drafted this quest for you. Review it and confirm if it fits.",
+        followUpQuestions: [],
+        proposals: [
+          {
+            id: "proposal-1",
+            kind: "create_quest",
+            title: "Create Workout",
+            summary: "Create a quest for Workout.",
+            payload: {
+              taskText: "Workout",
+              taskDate: "2026-04-18",
+              scheduledTime: "17:30",
+              draftStatus: "scheduled_draft",
+              reasonSummary:
+                "Scheduled after work to match your availability. and keeps this moving today.",
+            },
+            status: "pending",
+            readyToConfirm: true,
+            missingFields: [],
+          },
+        ],
+        suggestedReminders: [],
+        memoryUpdates: {},
+        sessionState: {
+          draft: {
+            title: "Workout",
+            draftKind: "create_quest",
+          },
+          openQuestionIds: [],
+          preferredTimeOfDay: null,
+          preferredTimeReason: null,
+          reminderPreference: null,
+          lastClassification: "quest",
+        },
+      },
+      error: null,
+    });
+
+    const { result } = renderHook(() =>
+      useCompanionPlanner({ bootstrapGreeting: false })
+    );
+
+    await act(async () => {
+      await result.current.submitMessage("Make me a workout quest", "text");
+    });
+
+    await act(async () => {
+      await result.current.confirmProposal("proposal-1");
+    });
+
+    expect(mocks.trackInteraction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userAction: "accepted",
+        modifications: expect.objectContaining({
+          proposalId: "proposal-1",
+          proposalKind: "create_quest",
+        }),
+      }),
+    );
+  });
+
+  it("tracks rejected proposal analytics with decision overrides", async () => {
+    mocks.invoke.mockResolvedValue({
+      data: {
+        mode: "proposal",
+        reply:
+          "I drafted this quest for you. Review it and confirm if it fits.",
+        followUpQuestions: [],
+        proposals: [
+          {
+            id: "proposal-1",
+            kind: "create_quest",
+            title: "Create Workout",
+            summary: "Create a quest for Workout.",
+            payload: {
+              taskText: "Workout",
+            },
+            status: "pending",
+            readyToConfirm: true,
+            missingFields: [],
+          },
+        ],
+        suggestedReminders: [],
+        memoryUpdates: {},
+        sessionState: {
+          draft: {
+            title: "Workout",
+            draftKind: "create_quest",
+          },
+          openQuestionIds: [],
+          preferredTimeOfDay: null,
+          preferredTimeReason: null,
+          reminderPreference: null,
+          lastClassification: "quest",
+        },
+      },
+      error: null,
+    });
+
+    const { result } = renderHook(() =>
+      useCompanionPlanner({ bootstrapGreeting: false })
+    );
+
+    await act(async () => {
+      await result.current.submitMessage("Make me a workout quest", "text");
+    });
+
+    await act(async () => {
+      await result.current.rejectProposal("proposal-1");
+    });
+
+    expect(mocks.trackInteraction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userAction: "rejected",
+        modifications: expect.objectContaining({
+          proposalId: "proposal-1",
+          proposalKind: "create_quest",
+          decisionOverride: true,
+        }),
+      }),
+    );
+  });
+
+  it("tracks modified proposal analytics for edited quest drafts", async () => {
+    mocks.invoke.mockResolvedValue({
+      data: {
+        mode: "proposal",
+        reply:
+          "I drafted this quest for you. Review it and confirm if it fits.",
+        followUpQuestions: [],
+        proposals: [
+          {
+            id: "proposal-1",
+            kind: "create_quest",
+            title: "Create Workout",
+            summary: "Create a quest for Workout.",
+            payload: {
+              taskText: "Workout",
+            },
+            status: "pending",
+            readyToConfirm: true,
+            missingFields: [],
+          },
+        ],
+        suggestedReminders: [],
+        memoryUpdates: {},
+        sessionState: {
+          draft: {
+            title: "Workout",
+            draftKind: "create_quest",
+          },
+          openQuestionIds: [],
+          preferredTimeOfDay: null,
+          preferredTimeReason: null,
+          reminderPreference: null,
+          lastClassification: "quest",
+        },
+      },
+      error: null,
+    });
+
+    const { result } = renderHook(() =>
+      useCompanionPlanner({ bootstrapGreeting: false })
+    );
+
+    await act(async () => {
+      await result.current.submitMessage("Make me a workout quest", "text");
+    });
+
+    await act(async () => {
+      await result.current.completeProposalEdit("proposal-1", {
+        savedTitle: "Workout moved to tomorrow",
+      });
+    });
+
+    expect(mocks.trackInteraction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userAction: "modified",
+        modifications: expect.objectContaining({
+          proposalId: "proposal-1",
+          proposalKind: "create_quest",
+          savedTitle: "Workout moved to tomorrow",
+          editedExternally: true,
+        }),
+      }),
+    );
   });
 });

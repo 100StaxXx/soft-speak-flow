@@ -72,7 +72,6 @@ const PepTalks = lazy(() => import("./pages/PepTalks"));
 const TermsOfService = lazy(() => import("./pages/TermsOfService"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const PremiumSuccess = lazy(() => import("./pages/PremiumSuccess"));
-const Epics = lazy(() => import("./pages/Epics"));
 const SharedEpics = lazy(() => import("./pages/SharedEpics"));
 const Partners = lazy(() => import("./pages/Partners"));
 const JoinEpic = lazy(() => import("./pages/JoinEpic"));
@@ -351,7 +350,7 @@ const AppContent = memo(() => {
                   <Route path="/mentor-selection" element={<ProtectedRoute><MentorSelection /></ProtectedRoute>} />
                   <Route path="/admin" element={<ProtectedRoute requireMentor={false}><Admin /></ProtectedRoute>} />
                   <Route path="/tasks" element={<Navigate to="/journeys" replace />} />
-                  <Route path="/epics" element={<ProtectedRoute><Epics /></ProtectedRoute>} />
+                  <Route path="/epics" element={<Navigate to="/campaigns" replace />} />
                   <Route path="/join/:code" element={<JoinEpic />} />
                   <Route path="/shared-epics" element={<ProtectedRoute><SharedEpics /></ProtectedRoute>} />
                   <Route path="/mentor-chat" element={<ProtectedRoute><MentorChat /></ProtectedRoute>} />

@@ -27,8 +27,8 @@ vi.mock("@/components/PageInfoModal", () => ({
   PageInfoModal: () => null,
 }));
 
-vi.mock("@/components/JourneyCard", () => ({
-  JourneyCard: () => <div data-testid="journey-card" />,
+vi.mock("@/components/CampaignCard", () => ({
+  CampaignCard: () => <div data-testid="campaign-card" />,
 }));
 
 vi.mock("@/components/Pathfinder", () => ({

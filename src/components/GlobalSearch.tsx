@@ -258,10 +258,10 @@ export const GlobalSearch = ({
                         <Card
                           key={epic.id}
                           className="p-4 cursor-pointer sm:hover:border-primary/50 transition-colors select-none active:scale-[0.98]"
-                          onClick={() => navigate("/epics")}
+                          onClick={() => navigate("/campaigns")}
                           onTouchEnd={(e) => {
                             e.preventDefault();
-                            navigate("/epics");
+                            navigate("/campaigns");
                           }}
                           role="button"
                           tabIndex={0}
@@ -407,10 +407,10 @@ export const GlobalSearch = ({
                 <Card
                   key={epic.id}
                   className="p-4 cursor-pointer sm:hover:border-primary/50 transition-colors select-none active:scale-[0.98]"
-                  onClick={() => navigate("/epics")}
+                  onClick={() => navigate("/campaigns")}
                   onTouchEnd={(e) => {
                     e.preventDefault();
-                    navigate("/epics");
+                    navigate("/campaigns");
                   }}
                   role="button"
                   tabIndex={0}
