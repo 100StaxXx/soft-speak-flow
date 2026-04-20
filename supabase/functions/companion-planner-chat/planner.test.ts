@@ -1455,9 +1455,9 @@ Deno.test("uses the follow-up goal after the launcher starter instead of reusing
 
 Deno.test("quest_capture asks for the quest and timing before drafting", () => {
   const result = buildPlannerResponse(baseInput({
-    message: "What quest should I create, and when should I schedule it?",
+    message: "Quest?",
     parsedInput: {
-      text: "What quest should I create, and when should I schedule it?",
+      text: "Quest?",
       scheduledTime: null,
       scheduledDate: null,
       estimatedDuration: null,
@@ -1480,14 +1480,14 @@ Deno.test("quest_capture asks for the quest and timing before drafting", () => {
   assertEquals(result.followUpQuestions.length, 0);
   assertEquals(result.sessionState.pendingStarterIntent, "quest_capture");
   assertEquals(result.sessionState.draft.draftKind, "create_quest");
-  assertStringIncludes(result.reply, "when");
+  assertEquals(result.reply, "Quest?");
 });
 
 Deno.test("quest_capture turns a complete follow-up answer into a ready quest draft", () => {
   const intake = buildPlannerResponse(baseInput({
-    message: "What quest should I create, and when should I schedule it?",
+    message: "Quest?",
     parsedInput: {
-      text: "What quest should I create, and when should I schedule it?",
+      text: "Quest?",
       scheduledTime: null,
       scheduledDate: null,
       estimatedDuration: null,
@@ -1540,9 +1540,9 @@ Deno.test("quest_capture turns a complete follow-up answer into a ready quest dr
 
 Deno.test("quest_capture asks only for timing when the user replies with the quest but not the schedule", () => {
   const intake = buildPlannerResponse(baseInput({
-    message: "What quest should I create, and when should I schedule it?",
+    message: "Quest?",
     parsedInput: {
-      text: "What quest should I create, and when should I schedule it?",
+      text: "Quest?",
       scheduledTime: null,
       scheduledDate: null,
       estimatedDuration: null,
@@ -1590,9 +1590,9 @@ Deno.test("quest_capture asks only for timing when the user replies with the que
 
 Deno.test("quest_capture asks only for the quest details when the user replies with timing first", () => {
   const intake = buildPlannerResponse(baseInput({
-    message: "What quest should I create, and when should I schedule it?",
+    message: "Quest?",
     parsedInput: {
-      text: "What quest should I create, and when should I schedule it?",
+      text: "Quest?",
       scheduledTime: null,
       scheduledDate: null,
       estimatedDuration: null,
@@ -1660,11 +1660,11 @@ Deno.test("quest_capture asks only for the quest details when the user replies w
   );
 });
 
-Deno.test("upcoming_start opens with one assistant-led schedule prompt", () => {
+Deno.test("upcoming_start returns the today-and-tomorrow digest immediately", () => {
   const result = buildPlannerResponse(baseInput({
-    message: "What should I review: the rest of today, tomorrow, or both?",
+    message: "What do I have coming up?",
     parsedInput: {
-      text: "What should I review: the rest of today, tomorrow, or both?",
+      text: "What do I have coming up?",
       scheduledTime: null,
       scheduledDate: null,
       estimatedDuration: null,
@@ -1678,15 +1678,47 @@ Deno.test("upcoming_start opens with one assistant-led schedule prompt", () => {
       newTitle: null,
     },
     plannerContext: {
+      tasks: [
+        {
+          id: "task-1",
+          title: "Workout",
+          taskDate: "2026-04-18",
+          scheduledTime: "15:00",
+          estimatedDuration: 45,
+          recurrencePattern: null,
+        },
+        {
+          id: "task-2",
+          title: "Inbox cleanup",
+          taskDate: "2026-04-19",
+          scheduledTime: "09:30",
+          estimatedDuration: 30,
+          recurrencePattern: null,
+        },
+      ],
+      calendarEvents: [
+        {
+          id: "event-1",
+          title: "Therapy",
+          start: "2026-04-18T21:00:00.000Z",
+          end: "2026-04-18T22:00:00.000Z",
+          isAllDay: false,
+          provider: "google",
+          readOnly: true,
+        },
+      ],
       starterIntent: "upcoming_start",
     },
   }));
 
-  assertEquals(result.mode, "conversational");
+  assertEquals(result.mode, "schedule_read");
   assertEquals(result.proposals.length, 0);
   assertEquals(result.followUpQuestions.length, 0);
-  assertEquals(result.sessionState.pendingStarterIntent, "upcoming_start");
-  assertStringIncludes(result.reply, "today, tomorrow, or both");
+  assertEquals(result.sessionState.pendingStarterIntent ?? null, null);
+  assertStringIncludes(result.reply, "Today:");
+  assertStringIncludes(result.reply, "Therapy");
+  assertStringIncludes(result.reply, "Tomorrow:");
+  assertStringIncludes(result.reply, "Inbox cleanup");
 });
 
 Deno.test("treats the make-room starter like a read-only prioritization view", () => {

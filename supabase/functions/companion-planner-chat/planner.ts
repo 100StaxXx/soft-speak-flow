@@ -423,7 +423,6 @@ const DEFAULT_WAKE_TIME = "08:00";
 const DEFAULT_WIND_DOWN_TIME = "21:00";
 const BREAK_BIG_GOAL_STARTER_INTENT = "help me break a big goal into steps";
 const MAKE_ROOM_STARTER_INTENT = "help me make room for what matters";
-const UPCOMING_STARTER_WINDOW_PROMPT = "What should I review: the rest of today, tomorrow, or both?";
 const STOP_WORDS = new Set([
   "the",
   "and",
@@ -3383,30 +3382,18 @@ const buildUpcomingStarterResponse = (
   input: PlannerBuildInput,
   sessionState: PlannerSessionState,
   classificationHint: ClassificationHint,
-): PlannerBuildResult => ({
-  mode: "conversational",
-  reply: UPCOMING_STARTER_WINDOW_PROMPT,
-  followUpQuestions: [],
-  proposals: [],
-  suggestedReminders: [],
-  memoryUpdates: {
-    preferredTimeOfDay: sessionState.preferredTimeOfDay ??
-      input.plannerContext.plannerMemory?.preferredTimeOfDay ?? null,
-    preferredTimeReason: sessionState.preferredTimeReason ??
-      input.plannerContext.plannerMemory?.preferredTimeReason ?? null,
-    reminderPreference: sessionState.reminderPreference ??
-      (input.plannerContext.plannerMemory?.reminderMinutesBefore
-        ? `${input.plannerContext.plannerMemory.reminderMinutesBefore} minutes`
-        : null),
-  },
-  sessionState: {
-    ...sessionState,
-    draft: {},
-    openQuestionIds: [],
-    pendingStarterIntent: "upcoming_start",
-    lastClassification: classificationHint.type,
-  },
-});
+): PlannerBuildResult =>
+  buildReadOnlyResponse(
+    buildUpcomingDigestReply(input),
+    {
+      ...sessionState,
+      draft: {},
+      openQuestionIds: [],
+      pendingStarterIntent: null,
+      lastClassification: classificationHint.type,
+    },
+    "schedule_read",
+  );
 
 const buildQuestCaptureStarterResponse = (
   input: PlannerBuildInput,
@@ -3414,10 +3401,7 @@ const buildQuestCaptureStarterResponse = (
   classificationHint: ClassificationHint,
 ): PlannerBuildResult => ({
   mode: "conversational",
-  reply:
-    isWittySassyTone(input.tonePack)
-      ? "Tell me the quest and when you want it to happen. Give me both, and I won't waste your time pretending that counts as complexity."
-      : "Tell me the quest you want to create and when you want it scheduled.",
+  reply: "Quest?",
   followUpQuestions: [],
   proposals: [],
   suggestedReminders: [],

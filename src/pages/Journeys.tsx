@@ -173,12 +173,22 @@ const Journeys = () => {
     setShowAddSheet(true);
   }, []);
 
+  const openCampaignBuilder = useCallback((initialGoal?: string | null) => {
+    setPathfinderInitialGoal(initialGoal?.trim() ?? "");
+    setPathfinderSessionKey((currentKey) => currentKey + 1);
+    setShowPathfinder(true);
+  }, []);
+
   const openCompanionPlanner = useCallback((intent?: CompanionPlannerLaunchIntent | null) => {
     if (intent) {
+      if (intent.target === "campaign_builder") {
+        openCampaignBuilder();
+        return;
+      }
       setPlannerLaunchIntent(intent);
     }
     setIsCompanionPlannerPinned(true);
-  }, []);
+  }, [openCampaignBuilder]);
 
   const launchPlannerIntent = useCallback((
     message: string,
@@ -193,12 +203,6 @@ const Journeys = () => {
       briefingContext: options?.briefingContext ?? null,
     });
     setIsCompanionPlannerPinned(true);
-  }, []);
-
-  const openCampaignBuilder = useCallback((initialGoal?: string | null) => {
-    setPathfinderInitialGoal(initialGoal?.trim() ?? "");
-    setPathfinderSessionKey((currentKey) => currentKey + 1);
-    setShowPathfinder(true);
   }, []);
 
   const openCampaignBuilderFromAssistant = useCallback((message: string) => {

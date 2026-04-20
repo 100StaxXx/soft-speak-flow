@@ -176,7 +176,8 @@ export function useCompanionAssistant({
   ), [conversation.messages, planner.messages, surface]);
 
   const hasOpenPlannerThread = planner.questions.length > 0
-    || planner.pendingProposals.some((proposal) => proposal.status === "pending");
+    || planner.pendingProposals.some((proposal) => proposal.status === "pending")
+    || !!planner.sessionState.pendingStarterIntent;
 
   const journeysThreads = useJourneysCompanionThreads({
     enabled: surface === "journeys",
@@ -277,13 +278,13 @@ export function useCompanionAssistant({
       return;
     }
 
-    if (shouldOpenCampaignBuilder) {
-      onOpenCampaignBuilder(message);
+    if (routeToPlanner) {
+      await planner.submitMessage(message, inputMode);
       return;
     }
 
-    if (routeToPlanner) {
-      await planner.submitMessage(message, inputMode);
+    if (shouldOpenCampaignBuilder) {
+      onOpenCampaignBuilder(message);
       return;
     }
 

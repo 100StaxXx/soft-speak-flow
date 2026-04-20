@@ -232,6 +232,7 @@ Deno.test("keeps upcoming-digest orchestration scoped to today and tomorrow", as
       ...baseInput(),
       plannerContext: {
         ...baseInput().plannerContext,
+        starterIntent: "upcoming_start",
         tasks: [
           {
             id: "task-1",
@@ -265,25 +266,16 @@ Deno.test("keeps upcoming-digest orchestration scoped to today and tomorrow", as
     },
     baseResult: {
       ...baseResult("schedule_read"),
-      reply: "Here's the shape of what's coming up.\n\nToday: 14:00-15:00 Therapy; 15:00 Workout.\n\nTomorrow: 09:30 Inbox cleanup.\n\nTell me what feels most important, and I'll help from there.",
+      reply: "Today: 14:00-15:00 Therapy; 15:00 Workout.\nTomorrow: 09:30 Inbox cleanup.",
     },
     openAIApiKey: "test-openai-key",
     model: "test-model",
   });
 
   assertEquals(response.mode, "schedule_read");
-  assertEquals(response.reply.includes("Week ahead:"), false);
-
-  const promptPayload = JSON.parse(captured.body?.messages?.[1]?.content ?? "{}") as {
-    deterministicContext?: {
-      fallbackReply?: string;
-    };
-  };
-
-  assertStringIncludes(promptPayload.deterministicContext?.fallbackReply ?? "", "Today:");
-  assertStringIncludes(promptPayload.deterministicContext?.fallbackReply ?? "", "Tomorrow:");
   assertEquals(
-    (promptPayload.deterministicContext?.fallbackReply ?? "").includes("Week ahead:"),
-    false,
+    response.reply,
+    "Today: 14:00-15:00 Therapy; 15:00 Workout.\nTomorrow: 09:30 Inbox cleanup.",
   );
+  assertEquals(captured.body, null);
 });

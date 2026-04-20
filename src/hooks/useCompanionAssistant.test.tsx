@@ -71,6 +71,15 @@ const mocks = vi.hoisted(() => ({
       required: boolean;
       field: string;
     }>,
+    plannerSessionState: {
+      draft: {},
+      openQuestionIds: [],
+      preferredTimeOfDay: null,
+      preferredTimeReason: null,
+      reminderPreference: null,
+      pendingStarterIntent: null as null | "quest_capture" | "upcoming_start" | "goal_breakdown_start",
+      lastClassification: null as null | "quest" | "epic" | "habit" | "brain-dump",
+    },
     pendingProposals: [] as Array<{
       id: string;
       status: "pending" | "confirmed" | "rejected";
@@ -221,6 +230,7 @@ vi.mock("@/hooks/useCompanionPlanner", () => ({
     confirmProposal: mocks.confirmProposal,
     rejectProposal: mocks.rejectProposal,
     confirmAll: mocks.confirmAll,
+    sessionState: mocks.state.plannerSessionState,
   }),
 }));
 
@@ -304,6 +314,15 @@ describe("useCompanionAssistant", () => {
     mocks.state.plannerSessionId = "planner-session-1";
     mocks.state.plannerMessages = [];
     mocks.state.plannerQuestions = [];
+    mocks.state.plannerSessionState = {
+      draft: {},
+      openQuestionIds: [],
+      preferredTimeOfDay: null,
+      preferredTimeReason: null,
+      reminderPreference: null,
+      pendingStarterIntent: null,
+      lastClassification: null,
+    };
     mocks.state.pendingProposals = [];
     mocks.state.pendingPlannerHandoffMessage = null;
     mocks.state.companionChatEnabled = true;
@@ -797,6 +816,30 @@ describe("useCompanionAssistant", () => {
     expect(mocks.plannerSubmit).not.toHaveBeenCalled();
   });
 
+  it("keeps quest-capture follow-up replies on the planner lane while the starter intent is pending", async () => {
+    mocks.state.plannerSessionState = {
+      draft: {
+        draftKind: "create_quest",
+      },
+      openQuestionIds: [],
+      preferredTimeOfDay: null,
+      preferredTimeReason: null,
+      reminderPreference: null,
+      pendingStarterIntent: "quest_capture",
+      lastClassification: "quest",
+    };
+
+    const { result } = renderHook(() => useCompanionAssistant({ surface: "journeys" }));
+
+    await act(async () => {
+      await result.current.submitMessage("Write my newsletter", "text");
+    });
+
+    expect(mocks.plannerSubmit).toHaveBeenCalledWith("Write my newsletter", "text");
+    expect(mocks.journeysSubmit).not.toHaveBeenCalled();
+    expect(mocks.openCampaignBuilder).not.toHaveBeenCalled();
+  });
+
   it("blocks premium-gated freeform companion chat while still allowing planning", async () => {
     const { result } = renderHook(() => useCompanionAssistant({
       surface: "companion",
@@ -886,8 +929,8 @@ describe("useCompanionAssistant", () => {
       surface: "journeys",
       launchIntent: {
         id: "launch-2",
-        message: "What goal do you want to break down?",
-        starterIntent: "goal_breakdown_start",
+        message: "Quest?",
+        starterIntent: "quest_capture",
         briefingContext: null,
       },
       onLaunchIntentConsumed,
@@ -899,11 +942,11 @@ describe("useCompanionAssistant", () => {
     });
 
     expect(mocks.plannerSubmit).toHaveBeenCalledWith(
-      "What goal do you want to break down?",
+      "Quest?",
       "text",
       {
         skipUserEcho: true,
-        starterIntent: "goal_breakdown_start",
+        starterIntent: "quest_capture",
         briefingContext: null,
       },
     );
@@ -918,7 +961,7 @@ describe("useCompanionAssistant", () => {
       surface: "journeys",
       launchIntent: {
         id: "launch-3",
-        message: "What's on your mind?",
+        message: "What's good legend?",
         starterIntent: "free_talk_start",
         target: "conversation",
         briefingContext: null,
@@ -931,7 +974,7 @@ describe("useCompanionAssistant", () => {
     });
 
     expect(mocks.startTemplateThread).toHaveBeenCalledTimes(1);
-    expect(mocks.injectAssistantOpening).toHaveBeenCalledWith("What's on your mind?");
+    expect(mocks.injectAssistantOpening).toHaveBeenCalledWith("What's good legend?");
     expect(mocks.startTemplateThread.mock.invocationCallOrder[0]).toBeLessThan(
       mocks.injectAssistantOpening.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
     );

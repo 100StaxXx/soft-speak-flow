@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DraggableFAB } from "./DraggableFAB";
 import { DRAGGABLE_FAB_STORAGE_KEY_V2 } from "@/hooks/useDraggableFAB";
+import { getJourneysCompanionLauncherGreeting } from "@/shared/journeysCompanionLauncherTemplates";
 
 const storage = vi.hoisted(() => {
   const values = new Map<string, string>();
@@ -157,6 +158,7 @@ describe("DraggableFAB", () => {
 
   it("launches free talk from the popup into the conversation lane", async () => {
     render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
+    const expectedGreeting = getJourneysCompanionLauncherGreeting({ userId: "user-1" });
 
     fireEvent.click(screen.getByTestId("journeys-companion-launcher-floating"));
     fireEvent.click(screen.getByTestId("journeys-companion-launcher-option-free-talk"));
@@ -164,7 +166,7 @@ describe("DraggableFAB", () => {
     expect(mocks.onOpenCompanionPlanner).toHaveBeenCalledWith(expect.objectContaining({
       target: "conversation",
       starterIntent: "free_talk_start",
-      message: "What's on your mind?",
+      message: expectedGreeting,
     }));
     await waitFor(() => {
       expect(screen.getByTestId("journeys-companion-launcher-popup")).toHaveStyle("opacity: 0");
@@ -191,16 +193,16 @@ describe("DraggableFAB", () => {
     });
   });
 
-  it("routes the goal option through the planner as an assistant-led starter", () => {
+  it("routes the goal option straight to the campaign builder target", () => {
     render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
 
     fireEvent.click(screen.getByTestId("journeys-companion-launcher-floating"));
     fireEvent.click(screen.getByTestId("journeys-companion-launcher-option-goal"));
 
     expect(mocks.onOpenCompanionPlanner).toHaveBeenCalledWith(expect.objectContaining({
-      target: "planner",
+      target: "campaign_builder",
       starterIntent: "goal_breakdown_start",
-      message: "What goal do you want to break down?",
+      message: "Let's lock in a new goal",
     }));
   });
 
@@ -213,7 +215,7 @@ describe("DraggableFAB", () => {
     expect(mocks.onOpenCompanionPlanner).toHaveBeenCalledWith(expect.objectContaining({
       target: "planner",
       starterIntent: "upcoming_start",
-      message: "What should I review: the rest of today, tomorrow, or both?",
+      message: "What do I have coming up?",
     }));
   });
 
@@ -226,7 +228,7 @@ describe("DraggableFAB", () => {
     expect(mocks.onOpenCompanionPlanner).toHaveBeenCalledWith(expect.objectContaining({
       target: "planner",
       starterIntent: "quest_capture",
-      message: "What quest should I create, and when should I schedule it?",
+      message: "Quest?",
     }));
   });
 

@@ -483,7 +483,7 @@ describe("JourneysCompanionPlannerModal", () => {
       {
         id: "plan-quest-starter",
         role: "assistant",
-        content: "Tell me the quest you want to create and when you want it scheduled.",
+        content: "Quest?",
         createdAt: "2026-04-18T08:00:00.000Z",
         source: "plan",
       },
@@ -500,7 +500,7 @@ describe("JourneysCompanionPlannerModal", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText(/quest you want to create/i)).toBeInTheDocument();
+      expect(screen.getByText("Quest?")).toBeInTheDocument();
     });
     expect(screen.queryByText("Help me create a new quest.")).not.toBeInTheDocument();
     questRender.unmount();
@@ -509,7 +509,7 @@ describe("JourneysCompanionPlannerModal", () => {
       {
         id: "plan-upcoming-starter",
         role: "assistant",
-        content: "What should I review: the rest of today, tomorrow, or both?",
+        content: "Today: 14:00-15:00 Therapy; 15:00 Workout.\nTomorrow: 09:30 Inbox cleanup.",
         createdAt: "2026-04-18T08:00:00.000Z",
         source: "plan",
       },
@@ -523,7 +523,7 @@ describe("JourneysCompanionPlannerModal", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText(/today, tomorrow, or both/i)).toBeInTheDocument();
+      expect(screen.getByText(/Today: 14:00-15:00 Therapy; 15:00 Workout\./i)).toBeInTheDocument();
     });
     expect(screen.queryByText("What do I have coming up for the rest of today and tomorrow?")).not.toBeInTheDocument();
     upcomingRender.unmount();

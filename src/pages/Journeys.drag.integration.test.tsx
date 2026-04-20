@@ -78,6 +78,12 @@ const mocks = vi.hoisted(() => ({
     open?: boolean;
     onOpenChange?: (open: boolean) => void;
     presentation?: string;
+    launchIntent?: unknown;
+  },
+  lastDraggableFabOnOpenCompanionPlanner: null as null | ((intent?: unknown) => void),
+  lastPathfinderProps: null as null | {
+    open?: boolean;
+    initialGoal?: string;
   },
   tutorialGuidance: {
     isActive: false,
@@ -255,7 +261,10 @@ vi.mock("@/components/SmartDayPlanner/components/QuickAdjustDrawer", () => ({
 }));
 
 vi.mock("@/components/Pathfinder", () => ({
-  Pathfinder: () => null,
+  Pathfinder: (props: { open?: boolean; initialGoal?: string }) => {
+    mocks.lastPathfinderProps = props;
+    return null;
+  },
 }));
 
 vi.mock("@/components/CampaignCreatedAnimation", () => ({
@@ -269,6 +278,7 @@ vi.mock("@/components/DraggableFAB", () => ({
     onOpenCompanionPlanner?: (intent?: unknown) => void;
   }) => {
     mocks.draggableFabRenderCount += 1;
+    mocks.lastDraggableFabOnOpenCompanionPlanner = onOpenCompanionPlanner ?? null;
     return (
       <div data-testid="draggable-fab">
         <button
@@ -587,6 +597,8 @@ describe("Journeys row drag integration", () => {
     mocks.lastDatePillSelectedDate = null;
     mocks.lastAddQuestSheetProps = null;
     mocks.lastCompanionPlannerModalProps = null;
+    mocks.lastDraggableFabOnOpenCompanionPlanner = null;
+    mocks.lastPathfinderProps = null;
     mocks.tutorialGuidance = {
       isActive: false,
       currentStep: null,
@@ -749,6 +761,39 @@ describe("Journeys row drag integration", () => {
       expect(mocks.lastCompanionPlannerModalProps?.open).toBe(true);
     });
     expect(screen.getByTestId("journeys-companion-planner-modal")).toBeInTheDocument();
+  });
+
+  it("opens Pathfinder immediately for campaign-builder launcher intents without opening companion chat", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/journeys"]}>
+          <Journeys />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    act(() => {
+      mocks.lastDraggableFabOnOpenCompanionPlanner?.({
+        id: "launch-goal",
+        message: "Let's lock in a new goal",
+        starterIntent: "goal_breakdown_start",
+        target: "campaign_builder",
+        briefingContext: null,
+      });
+    });
+
+    await waitFor(() => {
+      expect(mocks.lastPathfinderProps?.open).toBe(true);
+    });
+    expect(mocks.lastPathfinderProps?.initialGoal ?? "").toBe("");
+    expect(mocks.lastCompanionPlannerModalProps?.open).not.toBe(true);
   });
 
   it("opens the add flow with meta+n on Mac-hosted iOS", async () => {

@@ -252,6 +252,13 @@ export async function buildOrchestratedPlannerResponse(params: {
   openAIApiKey?: string;
   model?: string;
 }): Promise<PlannerBuildResult> {
+  if (
+    params.input.plannerContext.starterIntent === "upcoming_start" &&
+    params.baseResult.mode === "schedule_read"
+  ) {
+    return params.baseResult;
+  }
+
   const openAIApiKey = params.openAIApiKey ?? Deno.env.get("OPENAI_API_KEY");
   if (!openAIApiKey) {
     return params.baseResult;

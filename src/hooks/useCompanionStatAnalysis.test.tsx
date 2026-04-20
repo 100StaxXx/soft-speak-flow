@@ -278,6 +278,32 @@ describe("useCompanionStatAnalysis", () => {
     expect(result.current.cached).toBe(false);
   });
 
+  it("accepts legacy analysis payloads that omit newer activity counters", async () => {
+    const legacyActivitySnapshot = { ...baseAnalysis.activitySnapshot } as Record<string, unknown>;
+    delete legacyActivitySnapshot.hardTaskWins;
+
+    mocks.invokeMock.mockResolvedValue({
+      data: {
+        analysis: {
+          ...baseAnalysis,
+          activitySnapshot: legacyActivitySnapshot,
+        },
+        cached: false,
+      },
+      error: null,
+    });
+
+    const { result } = renderHook(() => useCompanionStatAnalysis({ enabled: true }), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.analysis?.activitySnapshot.hardTaskWins).toBe(0);
+    });
+
+    expect(result.current.error).toBeNull();
+  });
+
   it("surfaces an error when cached and refreshed payloads are both malformed", async () => {
     mocks.invokeMock
       .mockResolvedValueOnce({

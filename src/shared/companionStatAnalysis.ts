@@ -139,6 +139,29 @@ const ACTIVITY_SNAPSHOT_KEYS: ReadonlyArray<keyof CompanionStatActivitySnapshot>
   "bounceBackDays",
 ];
 
+const ACTIVITY_SNAPSHOT_DATE_KEYS = [
+  "activityStartDate",
+  "activityEndDate",
+  "provenanceStartDate",
+  "provenanceEndDate",
+] as const satisfies readonly (keyof CompanionStatActivitySnapshot)[];
+
+const ACTIVITY_SNAPSHOT_COUNT_KEYS = [
+  "morningCheckIns",
+  "eveningReflections",
+  "habitCompletions",
+  "onTimeTasks",
+  "trackedAttributeEvents",
+  "streakMilestones",
+  "hardTaskWins",
+  "recoveryActions",
+  "healthActions",
+  "creativeActions",
+  "relationshipActions",
+  "epicLinkedCompletions",
+  "bounceBackDays",
+] as const satisfies readonly (keyof CompanionStatActivitySnapshot)[];
+
 function failure(error: string): ValidationFailure {
   return { ok: false, error };
 }
@@ -153,6 +176,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
+}
+
+function toFiniteNumber(value: unknown): number | null {
+  if (isFiniteNumber(value)) return value;
+  if (!isString(value)) return null;
+
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return null;
+
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function isString(value: unknown): value is string {
@@ -291,26 +325,39 @@ function validateActivitySnapshot(
     return failure(`${path} must be an object`);
   }
 
-  for (const key of ACTIVITY_SNAPSHOT_KEYS) {
+  const normalizedSnapshot = {} as CompanionStatActivitySnapshot;
+
+  for (const key of ACTIVITY_SNAPSHOT_DATE_KEYS) {
     const field = value[key];
-    if (
-      key === "activityStartDate"
-      || key === "activityEndDate"
-      || key === "provenanceStartDate"
-      || key === "provenanceEndDate"
-    ) {
-      if (!isNonEmptyString(field)) {
-        return failure(`${path}.${key} must be a non-empty string`);
-      }
+    if (!isNonEmptyString(field)) {
+      return failure(`${path}.${key} must be a non-empty string`);
+    }
+
+    normalizedSnapshot[key] = field;
+  }
+
+  for (const key of ACTIVITY_SNAPSHOT_COUNT_KEYS) {
+    const field = value[key];
+    if (field === null || field === undefined) {
+      normalizedSnapshot[key] = 0;
       continue;
     }
 
-    if (!isFiniteNumber(field)) {
+    const parsed = toFiniteNumber(field);
+    if (parsed === null) {
       return failure(`${path}.${key} must be a number`);
+    }
+
+    normalizedSnapshot[key] = parsed;
+  }
+
+  for (const key of ACTIVITY_SNAPSHOT_KEYS) {
+    if (!(key in normalizedSnapshot)) {
+      return failure(`${path}.${key} is missing`);
     }
   }
 
-  return success(value as unknown as CompanionStatActivitySnapshot);
+  return success(normalizedSnapshot);
 }
 
 function validateStatProfile(
@@ -458,7 +505,10 @@ export function validateCompanionStatAnalysis(value: unknown): ValidationResult<
     return failure(`suggestedAction must be a non-empty string`);
   }
 
-  return success(value as unknown as CompanionStatAnalysis);
+  return success({
+    ...(value as CompanionStatAnalysis),
+    activitySnapshot: activitySnapshotValidation.data,
+  });
 }
 
 export function validateCompanionStatAnalysisResponse(
