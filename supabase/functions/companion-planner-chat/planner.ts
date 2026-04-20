@@ -2580,28 +2580,16 @@ const buildDayDigest = (
   remainingOnly = false,
 ): string => {
   const items = collectScheduleItemsForDate(input, date, remainingOnly);
-  const openings = buildFreeWindowsForDate(input, date, null).slice(0, 2);
-
-  if (items.length === 0 && openings.length === 0) {
-    return `${label}: wide open right now.`;
-  }
-
-  const nextItems = items.slice(0, 3).map((item) => item.label).join("; ");
-  const openingText = openings.length > 0
-    ? `Best opening${openings.length === 1 ? "" : "s"}: ${
-      openings.map((window) => `${window.start}-${window.end}`).join(", ")
-    }.`
-    : "No obvious open window yet without reshuffling something.";
-
   if (items.length === 0) {
-    return `${label}: no scheduled items. ${openingText}`;
+    return `${label}: nothing scheduled.`;
   }
 
-  const overflowCount = items.length - 3;
+  const nextItems = items.slice(0, 2).map((item) => item.label).join("; ");
+  const overflowCount = items.length - 2;
   const overflowText = overflowCount > 0
-    ? ` Plus ${overflowCount} more item${overflowCount === 1 ? "" : "s"}.`
+    ? `; +${overflowCount} more`
     : "";
-  return `${label}: ${nextItems}.${overflowText} ${openingText}`;
+  return `${label}: ${nextItems}${overflowText}.`;
 };
 
 const isWittySassyTone = (tonePack: PlannerTonePack): boolean =>
@@ -2645,75 +2633,22 @@ const buildWittyAvailabilityCallout = (
   return null;
 };
 
-const buildOpenDayRouteOptions = (
-  input: PlannerBuildInput,
-): string[] => {
-  const workload = input.plannerContext.aiSignals?.suggestedWorkload ?? "normal";
-  const options = [
-    "Momentum day: one meaningful work block, some movement, one cleanup or admin win, and one relationship touchpoint.",
-    "Money day: follow up, make something useful, ship one small thing, or do work that compounds.",
-    "Reset day: clean up your space, get clear on priorities, and set the rest of the week up well.",
-  ];
-
-  if (workload === "light") {
-    return [options[2], options[0], options[1]];
-  }
-
-  if (workload === "heavy") {
-    return [options[1], options[0], options[2]];
-  }
-
-  return options;
-};
-
 const buildOpenDayReply = (
   input: PlannerBuildInput,
   targetDate: string,
 ): string | null => {
   const items = collectScheduleItemsForDate(input, targetDate, false);
   if (items.length > 0) return null;
-
-  const scheduleLead = buildWittyAvailabilityCallout(input, targetDate) ?? (
-    targetDate === input.currentDate
-      ? "Your calendar's clear today."
-      : `Your calendar's pretty open on ${
-        formatScheduleReference(input.currentDate, targetDate, true)
-      }.`
-  );
-  const optionLines = buildOpenDayRouteOptions(input)
-    .map((option) => `- ${option}`)
-    .join("\n");
-  const purposeLead = isWittySassyTone(input.tonePack)
-    ? "That gives us room to do something deliberate instead of free-styling chaos."
-    : "That gives us room to shape the day on purpose.";
-  const closer = isWittySassyTone(input.tonePack)
-    ? "Pick a lane and I'll help you move without the fake-busy performance."
-    : "Tell me which lane fits, and I'll help shape it.";
-
-  return [
-    scheduleLead,
-    purposeLead,
-    "A few solid directions we could take:",
-    optionLines,
-    closer,
-  ].join("\n\n");
+  const label = formatScheduleReference(input.currentDate, targetDate, true);
+  return `${label}: nothing scheduled.`;
 };
 
 const buildUpcomingDigestReply = (input: PlannerBuildInput): string => {
   const tomorrow = addDaysToDateKey(input.currentDate, 1);
-  const lead = isWittySassyTone(input.tonePack)
-    ? `${buildWittyAvailabilityCallout(input, input.currentDate, true) ?? "Here's what's coming up, minus the dramatic retelling."}`
-    : "Here's the shape of what's coming up.";
-  const closer = isWittySassyTone(input.tonePack)
-    ? "Tell me what actually matters, and I'll help cut the bullshit out of the schedule."
-    : "Tell me what feels most important, and I'll help from there.";
-
   return [
-    lead,
     buildDayDigest(input, input.currentDate, "Today", true),
     buildDayDigest(input, tomorrow, "Tomorrow"),
-    closer,
-  ].join("\n\n");
+  ].join("\n");
 };
 
 const buildMakeRoomStarterReply = (input: PlannerBuildInput): string => {
@@ -2765,23 +2700,8 @@ const buildDayOverviewReply = (
 ): string => {
   const openDayReply = buildOpenDayReply(input, targetDate);
   if (openDayReply) return openDayReply;
-
-  const { leadLabel, digestLabel } = describeScheduleTarget(
-    input.currentDate,
-    targetDate,
-  );
-  const lead = isWittySassyTone(input.tonePack)
-    ? `Here's the shape of ${leadLabel}, without the self-serving mythology.`
-    : `Here's the shape of ${leadLabel}.`;
-  const closer = isWittySassyTone(input.tonePack)
-    ? "Tell me what actually matters, and I'll help strip the bullshit out of the plan."
-    : "Tell me what feels most important, and I'll help from there.";
-
-  return [
-    lead,
-    buildDayDigest(input, targetDate, digestLabel),
-    closer,
-  ].join("\n\n");
+  const { digestLabel } = describeScheduleTarget(input.currentDate, targetDate);
+  return buildDayDigest(input, targetDate, digestLabel);
 };
 
 const buildReadOnlyScheduleReply = (

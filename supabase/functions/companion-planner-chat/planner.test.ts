@@ -1270,11 +1270,10 @@ Deno.test("answers schedule questions with quests and connected calendar events 
   assertEquals(result.mode, "schedule_read");
   assertEquals(result.proposals.length, 0);
   assertEquals(result.followUpQuestions.length, 0);
-  assertStringIncludes(result.reply, "Here's the shape of today.");
   assertStringIncludes(result.reply, "Today:");
   assertStringIncludes(result.reply, "Workout");
   assertStringIncludes(result.reply, "Therapy");
-  assertStringIncludes(result.reply, "Tell me what feels most important");
+  assertEquals(result.reply.includes("Tell me what feels most important"), false);
 });
 
 Deno.test("treats the route starter like a schedule overview instead of a quest draft", () => {
@@ -1301,13 +1300,12 @@ Deno.test("treats the route starter like a schedule overview instead of a quest 
   assertEquals(result.mode, "schedule_read");
   assertEquals(result.proposals.length, 0);
   assertEquals(result.followUpQuestions.length, 0);
-  assertStringIncludes(result.reply, "Here's the shape of today.");
   assertStringIncludes(result.reply, "Today:");
   assertStringIncludes(result.reply, "Workout");
-  assertStringIncludes(result.reply, "Tell me what feels most important");
+  assertEquals(result.reply.includes("Tell me what feels most important"), false);
 });
 
-Deno.test("treats an empty route request like an open day with useful options", () => {
+Deno.test("treats an empty route request like a short empty schedule summary", () => {
   const result = buildPlannerResponse(baseInput({
     message: "Show me today's route.",
     plannerContext: {
@@ -1322,10 +1320,7 @@ Deno.test("treats an empty route request like an open day with useful options", 
   assertEquals(result.mode, "schedule_read");
   assertEquals(result.proposals.length, 0);
   assertEquals(result.followUpQuestions.length, 0);
-  assertStringIncludes(result.reply, "Your calendar's clear today.");
-  assertStringIncludes(result.reply, "Momentum day");
-  assertStringIncludes(result.reply, "Money day");
-  assertStringIncludes(result.reply, "Reset day");
+  assertEquals(result.reply, "Today: nothing scheduled.");
   assertEquals(result.reply.includes("time is all you got"), false);
   assertEquals(result.reply.includes("bullshit"), false);
 });
@@ -1370,7 +1365,6 @@ Deno.test("reads upcoming named weekdays instead of falling back to today", () =
   assertEquals(result.mode, "schedule_read");
   assertEquals(result.proposals.length, 0);
   assertEquals(result.followUpQuestions.length, 0);
-  assertStringIncludes(result.reply, "Here's the shape of Saturday, April 25.");
   assertStringIncludes(result.reply, "Saturday, April 25:");
   assertStringIncludes(result.reply, "Long run");
   assertEquals(result.reply.includes("Here's the shape of today."), false);
@@ -1781,9 +1775,7 @@ Deno.test("uses witty_sassy voice for empty-day route reads", () => {
 
   assertEquals(result.mode, "schedule_read");
   assertEquals(result.proposals.length, 0);
-  assertStringIncludes(result.reply, "Your calendar is wide open today.");
-  assertStringIncludes(result.reply, "time is all you got");
-  assertStringIncludes(result.reply, "fake-busy performance");
+  assertEquals(result.reply, "Today: nothing scheduled.");
 });
 
 Deno.test("uses witty_sassy voice for make-room reads on light days", () => {
@@ -1893,10 +1885,9 @@ Deno.test("answers the coming-up starter prompt with a schedule summary", () => 
   assertEquals(result.mode, "schedule_read");
   assertEquals(result.proposals.length, 0);
   assertEquals(result.followUpQuestions.length, 0);
-  assertStringIncludes(result.reply, "Here's the shape of what's coming up.");
   assertStringIncludes(result.reply, "Today:");
   assertStringIncludes(result.reply, "Tomorrow:");
-  assertStringIncludes(result.reply, "Tell me what feels most important");
+  assertEquals(result.reply.includes("Tell me what feels most important"), false);
   assertEquals(result.reply.includes("Week ahead:"), false);
 });
 
