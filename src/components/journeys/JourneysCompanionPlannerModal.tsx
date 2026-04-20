@@ -43,6 +43,7 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Tooltip,
@@ -57,6 +58,7 @@ import type { CompanionChatThreadSummary } from "@/types/companionConversation";
 import type {
   CompanionPlannerLaunchIntent,
   CompanionPlannerProposal,
+  CompanionPlannerQuestProposalEdits,
 } from "@/types/companionPlanner";
 import { getCompanionPlannerQuestProposalPreview } from "@/utils/companionPlannerProposalPreview";
 
@@ -77,6 +79,8 @@ type DialogueEntry = {
   content: string;
   isSeed?: boolean;
 };
+
+type QuestProposalEditorDraft = CompanionPlannerQuestProposalEdits;
 
 type JourneysCompanionDrawerLayout = {
   shellHeight: number;
@@ -131,6 +135,60 @@ const formatThreadTimestamp = (value: string) => {
   } catch {
     return "Just now";
   }
+};
+
+const asRecord = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+
+const asString = (value: unknown): string | null =>
+  typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+
+const asNumber = (value: unknown): number | null =>
+  typeof value === "number" && Number.isFinite(value) ? value : null;
+
+const asStringArray = (value: unknown): string[] =>
+  Array.isArray(value)
+    ? value
+      .filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
+      .map((entry) => entry.trim())
+    : [];
+
+const getQuestProposalEditorDraft = (proposal: CompanionPlannerProposal): QuestProposalEditorDraft | null => {
+  if (proposal.kind === "create_quest") {
+    const payload = asRecord(proposal.payload);
+    if (!payload) return null;
+
+    return {
+      taskText: asString(payload.taskText) ?? proposal.title,
+      taskDate: asString(payload.taskDate),
+      scheduledTime: asString(payload.scheduledTime),
+      estimatedDuration: asNumber(payload.estimatedDuration),
+      notes: asString(payload.notes),
+      subtasks: asStringArray(payload.subtasks),
+      subtaskPlanMode: "append",
+    };
+  }
+
+  if (proposal.kind === "update_quest") {
+    const payload = asRecord(proposal.payload);
+    const updates = asRecord(payload?.updates);
+    const subtaskPlan = asRecord(payload?.subtaskPlan);
+    const mode = subtaskPlan?.mode === "replace" ? "replace" : "append";
+
+    return {
+      taskText: asString(updates?.task_text) ?? proposal.title,
+      taskDate: asString(updates?.task_date),
+      scheduledTime: asString(updates?.scheduled_time),
+      estimatedDuration: asNumber(updates?.estimated_duration),
+      notes: asString(updates?.notes),
+      subtasks: asStringArray(subtaskPlan?.titles),
+      subtaskPlanMode: mode,
+    };
+  }
+
+  return null;
 };
 
 interface JourneysCompanionThreadPickerProps {
@@ -276,6 +334,9 @@ const JourneysCompanionOverlayBody = memo(({
   const isDrawerPresentation = presentation === "drawer";
 
   const [isThreadPickerOpen, setIsThreadPickerOpen] = useState(false);
+  const [selectedProposalId, setSelectedProposalId] = useState<string | null>(null);
+  const [isQuestEditorOpen, setIsQuestEditorOpen] = useState(false);
+  const [questEditorDraft, setQuestEditorDraft] = useState<QuestProposalEditorDraft | null>(null);
   const [typingMessageId, setTypingMessageId] = useState<string | null>(null);
   const [typedAssistantContent, setTypedAssistantContent] = useState("");
 
@@ -448,7 +509,17 @@ const JourneysCompanionOverlayBody = memo(({
   }, [assistant]);
 
   const sendDisabled = assistant.isSubmitting || assistant.isClassifying || (!typingMessageId && !assistant.draftInput.trim());
-  const activeProposal = assistant.pendingProposals[0] ?? null;
+  const activeProposal = useMemo(() => {
+    if (assistant.pendingProposals.length === 0) return null;
+    if (!selectedProposalId) return assistant.pendingProposals[0] ?? null;
+    return assistant.pendingProposals.find((proposal) => proposal.id === selectedProposalId)
+      ?? assistant.pendingProposals[0]
+      ?? null;
+  }, [assistant.pendingProposals, selectedProposalId]);
+  const pendingQuestProposals = useMemo(
+    () => assistant.pendingProposals.filter((proposal) => proposal.kind === "create_quest" || proposal.kind === "update_quest"),
+    [assistant.pendingProposals],
+  );
   const activeQuestPreview = activeProposal
     ? getCompanionPlannerQuestProposalPreview(activeProposal)
     : null;
@@ -460,6 +531,32 @@ const JourneysCompanionOverlayBody = memo(({
     ?? (assistant.hasPersistedActiveThread
       ? "Archive this chat and start a new one."
       : "Start a fresh chat.");
+
+  useEffect(() => {
+    if (assistant.pendingProposals.length === 0) {
+      setSelectedProposalId(null);
+      setIsQuestEditorOpen(false);
+      setQuestEditorDraft(null);
+      return;
+    }
+
+    if (!selectedProposalId || !assistant.pendingProposals.some((proposal) => proposal.id === selectedProposalId)) {
+      setSelectedProposalId(assistant.pendingProposals[0]?.id ?? null);
+    }
+  }, [assistant.pendingProposals, selectedProposalId]);
+
+  const openQuestEditor = useCallback((proposal: CompanionPlannerProposal) => {
+    const draft = getQuestProposalEditorDraft(proposal);
+    if (!draft) return;
+    setQuestEditorDraft(draft);
+    setIsQuestEditorOpen(true);
+  }, []);
+
+  const handleQuestEditorSave = useCallback(() => {
+    if (!activeProposal || !questEditorDraft) return;
+    assistant.updateQuestProposalDraft(activeProposal.id, questEditorDraft);
+    setIsQuestEditorOpen(false);
+  }, [activeProposal, assistant, questEditorDraft]);
 
   const avatar = usesPortraitShell ? (
     <CompanionPortraitShell
@@ -638,6 +735,26 @@ const JourneysCompanionOverlayBody = memo(({
                     className={cn(plannerPathfinderTheme.raisedPanel, "max-w-[88%] p-4")}
                     data-testid="journeys-companion-planner-inline-proposal"
                   >
+                    {assistant.pendingProposals.length > 1 ? (
+                      <div className="mb-3 flex flex-wrap gap-2">
+                        {assistant.pendingProposals.map((proposal, index) => (
+                          <Button
+                            key={proposal.id}
+                            type="button"
+                            size="sm"
+                            variant={proposal.id === activeProposal.id ? "default" : "outline"}
+                            className={proposal.id === activeProposal.id
+                              ? plannerPathfinderTheme.primaryButton
+                              : plannerPathfinderTheme.outlineButton}
+                            onClick={() => setSelectedProposalId(proposal.id)}
+                          >
+                            {proposal.kind === "create_quest" || proposal.kind === "update_quest"
+                              ? `Quest ${index + 1}`
+                              : `Proposal ${index + 1}`}
+                          </Button>
+                        ))}
+                      </div>
+                    ) : null}
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/[0.55]">
@@ -691,6 +808,17 @@ const JourneysCompanionOverlayBody = memo(({
                       </div>
                     ) : null}
                     <div className="mt-3 flex flex-wrap gap-2">
+                      {(activeProposal.kind === "create_quest" || activeProposal.kind === "update_quest") ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className={plannerPathfinderTheme.outlineButton}
+                          onClick={() => openQuestEditor(activeProposal)}
+                        >
+                          Edit details
+                        </Button>
+                      ) : null}
                       <Button
                         type="button"
                         size="sm"
@@ -860,6 +988,127 @@ const JourneysCompanionOverlayBody = memo(({
         permissionStatus={assistant.permissionStatus}
         isRequesting={assistant.isRequestingPermission}
       />
+      <Dialog
+        open={isQuestEditorOpen}
+        onOpenChange={(nextOpen) => {
+          setIsQuestEditorOpen(nextOpen);
+          if (!nextOpen) {
+            setQuestEditorDraft(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit quest details</DialogTitle>
+            <DialogDescription>
+              Fine-tune this quest before you confirm it.
+            </DialogDescription>
+          </DialogHeader>
+          {questEditorDraft ? (
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-muted-foreground">Quest title</p>
+                <Input
+                  value={questEditorDraft.taskText}
+                  onChange={(event) => {
+                    setQuestEditorDraft((previous) => previous
+                      ? { ...previous, taskText: event.target.value }
+                      : previous);
+                  }}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">Date</p>
+                  <Input
+                    type="date"
+                    value={questEditorDraft.taskDate ?? ""}
+                    onChange={(event) => {
+                      setQuestEditorDraft((previous) => previous
+                        ? { ...previous, taskDate: event.target.value || null }
+                        : previous);
+                    }}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">Time</p>
+                  <Input
+                    type="time"
+                    value={questEditorDraft.scheduledTime ?? ""}
+                    onChange={(event) => {
+                      setQuestEditorDraft((previous) => previous
+                        ? { ...previous, scheduledTime: event.target.value || null }
+                        : previous);
+                    }}
+                  />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-muted-foreground">Duration (minutes)</p>
+                <Input
+                  type="number"
+                  min={5}
+                  step={5}
+                  value={questEditorDraft.estimatedDuration ?? ""}
+                  onChange={(event) => {
+                    const nextValue = event.target.value.trim();
+                    setQuestEditorDraft((previous) => previous
+                      ? { ...previous, estimatedDuration: nextValue.length > 0 ? Number(nextValue) : null }
+                      : previous);
+                  }}
+                />
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-muted-foreground">Notes</p>
+                <Textarea
+                  rows={3}
+                  value={questEditorDraft.notes ?? ""}
+                  onChange={(event) => {
+                    setQuestEditorDraft((previous) => previous
+                      ? { ...previous, notes: event.target.value || null }
+                      : previous);
+                  }}
+                />
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-muted-foreground">Steps (one per line)</p>
+                <Textarea
+                  rows={4}
+                  value={questEditorDraft.subtasks.join("\n")}
+                  onChange={(event) => {
+                    const lines = event.target.value
+                      .split("\n")
+                      .map((line) => line.trim())
+                      .filter((line) => line.length > 0);
+                    setQuestEditorDraft((previous) => previous
+                      ? { ...previous, subtasks: lines }
+                      : previous);
+                  }}
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setIsQuestEditorOpen(false);
+                    setQuestEditorDraft(null);
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleQuestEditorSave}
+                  disabled={!questEditorDraft.taskText.trim()}
+                >
+                  Save changes
+                </Button>
+              </div>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
       <JourneysCompanionThreadPicker
         open={isThreadPickerOpen}
         onOpenChange={setIsThreadPickerOpen}

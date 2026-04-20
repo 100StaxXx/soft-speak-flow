@@ -219,6 +219,19 @@ describe("DraggableFAB", () => {
     }));
   });
 
+  it("routes the plan-day option through the planner and primes a question-led daily schedule flow", () => {
+    render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
+
+    fireEvent.click(screen.getByTestId("journeys-companion-launcher-floating"));
+    fireEvent.click(screen.getByTestId("journeys-companion-launcher-option-plan-day"));
+
+    expect(mocks.onOpenCompanionPlanner).toHaveBeenCalledWith(expect.objectContaining({
+      target: "planner",
+      starterIntent: "plan_day",
+      message: expect.stringContaining("Ask me follow-up questions"),
+    }));
+  });
+
   it("routes the quest option through the planner as a one-prompt quest capture starter", () => {
     render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
 

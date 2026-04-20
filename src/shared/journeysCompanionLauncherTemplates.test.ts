@@ -59,5 +59,13 @@ describe("journeys companion launcher greetings", () => {
       starterIntent: "free_talk_start",
     });
     expect(templates[0]?.label).toBe(templates[0]?.message);
+
+    expect(templates[1]).toMatchObject({
+      id: "plan-day",
+      label: "Plan my day",
+      target: "planner",
+      starterIntent: "plan_day",
+    });
+    expect(templates[1]?.message).toContain("Ask me follow-up questions");
   });
 });
