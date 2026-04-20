@@ -273,6 +273,25 @@ const isQuestCaptureStarterResponse = (baseResult: PlannerBuildResult) =>
   baseResult.proposals.length === 0 &&
   baseResult.suggestedReminders.length === 0;
 
+const isPlanDayDeterministicResponse = (
+  input: PlannerBuildInput,
+  baseResult: PlannerBuildResult,
+) =>
+  (
+    input.plannerContext.starterIntent === "plan_day" &&
+    baseResult.mode === "conversational" &&
+    baseResult.sessionState.pendingStarterIntent === "plan_day" &&
+    baseResult.followUpQuestions.length === 0 &&
+    baseResult.proposals.length === 0 &&
+    baseResult.suggestedReminders.length === 0
+  ) || (
+    input.sessionState.pendingStarterIntent === "plan_day" &&
+    baseResult.mode === "conversational" &&
+    baseResult.followUpQuestions.length === 0 &&
+    baseResult.proposals.length === 0 &&
+    baseResult.suggestedReminders.length === 0
+  );
+
 export async function buildOrchestratedPlannerResponse(params: {
   guardedFetch: typeof fetch;
   input: PlannerBuildInput;
@@ -292,6 +311,10 @@ export async function buildOrchestratedPlannerResponse(params: {
   }
 
   if (isQuestCaptureStarterResponse(params.baseResult)) {
+    return normalizedBaseResult;
+  }
+
+  if (isPlanDayDeterministicResponse(params.input, params.baseResult)) {
     return normalizedBaseResult;
   }
 

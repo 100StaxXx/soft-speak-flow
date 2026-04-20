@@ -501,6 +501,14 @@ const DEFAULT_WAKE_TIME = "08:00";
 const DEFAULT_WIND_DOWN_TIME = "21:00";
 const BREAK_BIG_GOAL_STARTER_INTENT = "help me break a big goal into steps";
 const MAKE_ROOM_STARTER_INTENT = "help me make room for what matters";
+const PLAN_DAY_STARTER_REPLY = [
+  "To help you build a great day, can you tell me:",
+  "- Which of your goals or tasks matters most today?",
+  "- Are there any time constraints or outside commitments?",
+  "- How's your energy this morning, and when do you usually feel your best?",
+  "",
+  "Once I know those, I can suggest the best flow for your day.",
+].join("\n");
 const STOP_WORDS = new Set([
   "the",
   "and",
@@ -543,6 +551,37 @@ const TIMING_ONLY_REPLY_TOKENS = new Set([
   "wednesday",
   "week",
   "weeks",
+  "weekdays",
+  "weekend",
+  "weekends",
+  "pm",
+  "on",
+  "until",
+  "by",
+  "january",
+  "february",
+  "march",
+  "april",
+  "may",
+  "june",
+  "july",
+  "august",
+  "september",
+  "october",
+  "november",
+  "december",
+  "jan",
+  "feb",
+  "mar",
+  "apr",
+  "jun",
+  "jul",
+  "aug",
+  "sep",
+  "sept",
+  "oct",
+  "nov",
+  "dec",
 ]);
 
 const TITLE_SCAFFOLD_TOKENS = new Set([
@@ -596,7 +635,8 @@ const isTimingOnlyReply = (
   if (
     !parsed?.scheduledTime &&
     !parsed?.scheduledDate &&
-    !parsed?.recurrencePattern
+    !parsed?.recurrencePattern &&
+    !parsed?.recurrenceEndDate
   ) {
     return false;
   }
@@ -615,13 +655,56 @@ const isTimingOnlyReply = (
   if (tokens.length === 0) return false;
 
   return tokens.every((token) =>
-    /^\d+$/.test(token) || TIMING_ONLY_REPLY_TOKENS.has(token)
+    /^\d+$/.test(token) || /^\d+(?:am|pm)$/.test(token) ||
+    TIMING_ONLY_REPLY_TOKENS.has(token)
   );
 };
+
+const isCadenceOnlyReply = (
+  message: string,
+  parsed?: ParsedInputHint | null,
+): boolean => {
+  if (!parsed?.recurrencePattern) return false;
+
+  const normalized = normalizeText(message);
+  if (!normalized) return false;
+  if (hasPlanningVerb(normalized)) return false;
+
+  const tokens = normalized.split(" ").filter(Boolean);
+  if (tokens.length === 0) return false;
+
+  return tokens.every((token) =>
+    TIMING_ONLY_REPLY_TOKENS.has(token) ||
+    token === "daily" ||
+    token === "weekly" ||
+    token === "monthly" ||
+    token === "every" ||
+    token === "custom"
+  );
+};
+
+const isCampaignLinkOnlyReply = (message: string): boolean =>
+  /^(?:keep it standalone|standalone|link it to .+|tie it to .+|connect it to .+)$/i
+    .test(message.trim());
 
 const hasExplicitSlotSignal = (message: string): boolean =>
   /\b(at\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)?|\d{1,2}:\d{2}\b|today|tomorrow|day after tomorrow|tonight|this morning|this afternoon|this evening|this weekend|next week|next month|weekdays?|weekends?|every day|every week|every month|monday|tuesday|wednesday|thursday|friday|saturday|sunday|in \d+\s+(?:minutes?|hours?|days?|weeks?|months?)|\d{4}-\d{2}-\d{2}|\d{1,2}[/-]\d{1,2}(?:[/-]\d{4})?|jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b/i
     .test(message);
+
+const looksLikeMultiClauseScheduledTitle = (
+  value: string | null | undefined,
+): boolean => {
+  const normalized = cleanGeneratedTaskTitle(value);
+  if (!normalized) return false;
+
+  const wordCount = normalized.split(/\s+/).filter(Boolean).length;
+  if (wordCount > 10) return true;
+  if (/[.!?;]/.test(normalized)) return true;
+  if (/,/.test(normalized)) return true;
+  if (/\s[-–—]\s/.test(normalized)) return true;
+
+  return /\b(?:and|but|then|also|later)\b/i.test(normalized) && wordCount > 6;
+};
 
 const shouldUseServerSchedulePayload = (
   input: PlannerBuildInput,
@@ -651,19 +734,33 @@ const normalizeParsedInput = (
   );
   const cleanedClientText = cleanGeneratedTaskTitle(clientParsed?.text);
   const cleanedServerText = cleanGeneratedTaskTitle(serverParsed.text);
+  const sanitizedClientText = sanitizeProposalTitle(cleanedClientText);
+  const sanitizedServerText = sanitizeProposalTitle(cleanedServerText);
   const fallbackText = cleanedClientText || cleanedServerText ||
     clientParsed?.text || serverParsed.text;
+  const preferServerScheduledMetadata = useServerSchedulePayload &&
+    Boolean(serverParsed.scheduledDate || serverParsed.scheduledTime) &&
+    Boolean(sanitizedServerText) &&
+    (
+      !sanitizedClientText ||
+      looksLikeMultiClauseScheduledTitle(clientParsed?.text)
+    );
 
-  const text = sanitizeProposalTitle(cleanedClientText) ??
-    sanitizeProposalTitle(cleanedServerText) ??
+  const text = preferServerScheduledMetadata
+    ? sanitizedServerText ?? sanitizedClientText ?? fallbackText
+    : sanitizedClientText ?? sanitizedServerText ??
     fallbackText;
 
   return {
     text,
-    scheduledTime: clientParsed?.scheduledTime ??
-      (useServerSchedulePayload ? serverParsed.scheduledTime : null),
-    scheduledDate: clientParsed?.scheduledDate ??
-      (useServerSchedulePayload ? serverParsed.scheduledDate : null),
+    scheduledTime: preferServerScheduledMetadata
+      ? serverParsed.scheduledTime ?? clientParsed?.scheduledTime ?? null
+      : clientParsed?.scheduledTime ??
+        (useServerSchedulePayload ? serverParsed.scheduledTime : null),
+    scheduledDate: preferServerScheduledMetadata
+      ? serverParsed.scheduledDate ?? clientParsed?.scheduledDate ?? null
+      : clientParsed?.scheduledDate ??
+        (useServerSchedulePayload ? serverParsed.scheduledDate : null),
     estimatedDuration: clientParsed?.estimatedDuration ??
       serverParsed.estimatedDuration,
     recurrencePattern: clientParsed?.recurrencePattern ??
@@ -679,7 +776,9 @@ const normalizeParsedInput = (
     recurrenceEndDate: clientParsed?.recurrenceEndDate ??
       serverParsed.recurrenceEndDate,
     notes: clientParsed?.notes ?? serverParsed.notes,
-    category: clientParsed?.category ?? serverParsed.category,
+    category: preferServerScheduledMetadata
+      ? serverParsed.category ?? null
+      : clientParsed?.category ?? serverParsed.category ?? null,
     newTitle: clientParsed?.newTitle ?? serverParsed.newTitle,
   };
 };
@@ -946,6 +1045,7 @@ const inferPlannerStarterIntentFromMessage = (
     return "what_matters";
   }
   if (
+    !isScheduleQuestion(normalizedMessage) &&
     /\b(plan my day|what does today look like|show me today|today look like)\b/
       .test(normalizedMessage)
   ) {
@@ -980,6 +1080,12 @@ const getResolvedStarterIntent = (
 ): PlannerStarterIntent =>
   input.plannerContext.starterIntent ??
     inferPlannerStarterIntentFromMessage(input.message);
+
+const shouldSuppressLearnedTimingLanguage = (
+  input: PlannerBuildInput,
+): boolean =>
+  input.sessionState.pendingStarterIntent === "plan_day" ||
+  getResolvedStarterIntent(input) === "plan_day";
 
 const getResolvedPriorityScores = (
   input: PlannerBuildInput,
@@ -1195,6 +1301,7 @@ const isVaguePlanningPrompt = (
 const isLikelyAnswerOnly = (
   message: string,
   sessionState: PlannerSessionState,
+  parsed?: ParsedInputHint | null,
 ): boolean => {
   if (sessionState.openQuestionIds.length === 0) {
     return false;
@@ -1208,6 +1315,57 @@ const isLikelyAnswerOnly = (
     !sessionState.draft.draftKind
   ) {
     return false;
+  }
+
+  const parsedTitle = sanitizeProposalTitle(parsed?.newTitle ?? parsed?.text);
+  const draftTitle = sanitizeProposalTitle(sessionState.draft.title);
+  const normalizedParsedTitle = normalizeText(parsedTitle);
+  const normalizedDraftTitle = normalizeText(draftTitle);
+  const sameDraftTitle = Boolean(
+    normalizedParsedTitle &&
+      normalizedDraftTitle &&
+      normalizedParsedTitle === normalizedDraftTitle,
+  );
+  const hasExplicitSchedule = Boolean(
+    parsed?.scheduledDate || parsed?.scheduledTime,
+  );
+  const answersOpenQuestion =
+    isTimingOnlyReply(message, parsed) ||
+    (
+      sessionState.openQuestionIds.includes("time_of_day") &&
+      (
+        Boolean(extractTimeOfDay(message)) ||
+        (hasExplicitSchedule && (!parsedTitle || sameDraftTitle))
+      )
+    ) ||
+    (
+      sessionState.openQuestionIds.includes("time_reason") &&
+      Boolean(extractTimeReason(message, sessionState))
+    ) ||
+    (
+      sessionState.openQuestionIds.includes("cadence") &&
+      isCadenceOnlyReply(message, parsed)
+    ) ||
+    (
+      sessionState.openQuestionIds.includes("end_date") &&
+      (
+        Boolean(parsed?.recurrenceEndDate) ||
+        (hasExplicitSchedule && (!parsedTitle || sameDraftTitle))
+      )
+    ) ||
+    (
+      sessionState.openQuestionIds.includes("campaign_link") &&
+      isCampaignLinkOnlyReply(message)
+    );
+
+  if (!answersOpenQuestion) {
+    const introducesFreshTitle = Boolean(
+      normalizedParsedTitle &&
+        (!normalizedDraftTitle || normalizedParsedTitle !== normalizedDraftTitle),
+    );
+    if (introducesFreshTitle || hasExplicitSchedule) {
+      return false;
+    }
   }
 
   return (
@@ -1708,7 +1866,11 @@ const mergeDraft = (
   input: PlannerBuildInput,
   matched: MatchedEntities,
 ): PlannerDraftState => {
-  const carryForward = isLikelyAnswerOnly(input.message, input.sessionState);
+  const carryForward = isLikelyAnswerOnly(
+    input.message,
+    input.sessionState,
+    input.parsedInput,
+  );
   const base = carryForward ? { ...input.sessionState.draft } : {};
   const parsed = input.parsedInput;
   const plannerMemory = input.plannerContext.plannerMemory;
@@ -1867,6 +2029,106 @@ const defaultQuestDate = (
   return input.currentDate;
 };
 
+type ScheduledCalendarConflict = {
+  title: string;
+  date: string;
+  isAllDay: boolean;
+  startMinutes: number | null;
+  endMinutes: number | null;
+};
+
+const getDraftDurationMinutes = (
+  draft: PlannerDraftState,
+  matchedTask: PlannerContextTask | null,
+): number =>
+  Number.isFinite(draft.durationMinutes) && (draft.durationMinutes ?? 0) > 0
+    ? Number(draft.durationMinutes)
+    : matchedTask
+    ? getTaskDuration(matchedTask)
+    : DEFAULT_TASK_DURATION_MINUTES;
+
+const findCalendarConflictForQuestDraft = (
+  input: PlannerBuildInput,
+  draft: PlannerDraftState,
+  kind: PlannerProposalKind,
+  matchedTask: PlannerContextTask | null,
+): ScheduledCalendarConflict | null => {
+  if (kind !== "create_quest" && kind !== "update_quest") return null;
+
+  const taskDate = defaultQuestDate(input, draft);
+  const scheduledTime = preferredTime(draft);
+  const startMinutes = parseTimeToMinutes(scheduledTime);
+  if (!taskDate || startMinutes === null) return null;
+
+  const endMinutes = startMinutes + getDraftDurationMinutes(draft, matchedTask);
+  const dayStart = new Date(`${taskDate}T00:00:00`);
+  const nextDay = addDaysToDateKey(taskDate, 1);
+  const dayEnd = new Date(`${nextDay}T00:00:00`);
+
+  for (const event of input.plannerContext.calendarEvents) {
+    const start = new Date(event.start);
+    const end = new Date(event.end);
+    if (end <= dayStart || start >= dayEnd) continue;
+
+    if (event.isAllDay) {
+      return {
+        title: event.title,
+        date: taskDate,
+        isAllDay: true,
+        startMinutes: null,
+        endMinutes: null,
+      };
+    }
+
+    const localStart = start < dayStart ? dayStart : start;
+    const localEnd = end > dayEnd ? dayEnd : end;
+    const eventStartMinutes = (localStart.getHours() * 60) +
+      localStart.getMinutes();
+    const eventEndMinutes = (localEnd.getHours() * 60) + localEnd.getMinutes();
+    if (eventEndMinutes <= startMinutes || eventStartMinutes >= endMinutes) {
+      continue;
+    }
+
+    return {
+      title: event.title,
+      date: taskDate,
+      isAllDay: false,
+      startMinutes: eventStartMinutes,
+      endMinutes: eventEndMinutes,
+    };
+  }
+
+  return null;
+};
+
+const buildCalendarConflictReplyNote = (
+  input: PlannerBuildInput,
+  conflict: ScheduledCalendarConflict | null,
+): string | null => {
+  if (!conflict) return null;
+
+  const dateLabel = formatScheduleReference(input.currentDate, conflict.date);
+  if (conflict.isAllDay) {
+    return `Heads up: this overlaps with your saved calendar event "${conflict.title}" ${
+      dateLabel === "today" || dateLabel === "tomorrow"
+        ? dateLabel
+        : `on ${dateLabel}`
+    }.`;
+  }
+
+  const timeRange = formatAssistantTimeRange(
+    formatMinutes(conflict.startMinutes ?? 0),
+    formatMinutes(conflict.endMinutes ?? 0),
+  ) ??
+    `${formatMinutes(conflict.startMinutes ?? 0)}-${formatMinutes(conflict.endMinutes ?? 0)}`;
+
+  return `Heads up: this overlaps with your saved calendar event "${conflict.title}" ${
+    dateLabel === "today" || dateLabel === "tomorrow"
+      ? `${dateLabel} from ${timeRange}`
+      : `on ${dateLabel} from ${timeRange}`
+  }.`;
+};
+
 const hasExplicitSchedulingIntent = (
   input: PlannerBuildInput,
   kind: PlannerProposalKind,
@@ -2018,10 +2280,14 @@ const buildTimeQuestion = (input: PlannerBuildInput): PlannerQuestion => {
   const slotOptions = suggestedSlots.map((slot) =>
     formatSlotLabel(slot, insights?.selectedDate ?? input.currentDate)
   );
-  const preferredTimeOfDay = plannerMemory?.preferredTimeOfDay ??
-    input.sessionState.preferredTimeOfDay ?? null;
-  const preferredReason = plannerMemory?.preferredTimeReason ??
-    input.sessionState.preferredTimeReason ?? null;
+  const preferredTimeOfDay = shouldSuppressLearnedTimingLanguage(input)
+    ? null
+    : plannerMemory?.preferredTimeOfDay ??
+      input.sessionState.preferredTimeOfDay ?? null;
+  const preferredReason = shouldSuppressLearnedTimingLanguage(input)
+    ? null
+    : plannerMemory?.preferredTimeReason ??
+      input.sessionState.preferredTimeReason ?? null;
 
   if (suggestedSlots.length > 0) {
     const slotText = slotOptions.join(", ");
@@ -2149,6 +2415,7 @@ const buildFollowUpQuestions = (
   const carryForwardAnswer = isLikelyAnswerOnly(
     input.message,
     input.sessionState,
+    input.parsedInput,
   );
   const shouldConfirmLearnedTime = !carryForwardAnswer &&
     !input.parsedInput?.scheduledTime && !explicitTimeOfDay;
@@ -3583,8 +3850,9 @@ const composeReply = (
     ? normalizeAssistantTimeText(input.plannerContext.scheduleInsights.summary)
     : null;
   const interpretationLead = getCompanionInterpretationLead(input);
-  const preferredTimeOfDay = input.plannerContext.plannerMemory
-    ?.preferredTimeOfDay;
+  const preferredTimeOfDay = shouldSuppressLearnedTimingLanguage(input)
+    ? null
+    : input.plannerContext.plannerMemory?.preferredTimeOfDay;
   const memoryLead = preferredTimeOfDay
     ? `You usually land work like this in the ${preferredTimeOfDay}. `
     : "";
@@ -3699,6 +3967,35 @@ const buildGoalBreakdownStarterResponse = (
   },
 });
 
+const buildPlanDayStarterResponse = (
+  input: PlannerBuildInput,
+  sessionState: PlannerSessionState,
+  classificationHint: ClassificationHint,
+): PlannerBuildResult => ({
+  mode: "conversational",
+  reply: PLAN_DAY_STARTER_REPLY,
+  followUpQuestions: [],
+  proposals: [],
+  suggestedReminders: [],
+  memoryUpdates: {
+    preferredTimeOfDay: sessionState.preferredTimeOfDay ??
+      input.plannerContext.plannerMemory?.preferredTimeOfDay ?? null,
+    preferredTimeReason: sessionState.preferredTimeReason ??
+      input.plannerContext.plannerMemory?.preferredTimeReason ?? null,
+    reminderPreference: sessionState.reminderPreference ??
+      (input.plannerContext.plannerMemory?.reminderMinutesBefore
+        ? `${input.plannerContext.plannerMemory.reminderMinutesBefore} minutes`
+        : null),
+  },
+  sessionState: {
+    ...sessionState,
+    draft: {},
+    openQuestionIds: [],
+    pendingStarterIntent: "plan_day",
+    lastClassification: classificationHint.type,
+  },
+});
+
 const buildUpcomingStarterResponse = (
   input: PlannerBuildInput,
   sessionState: PlannerSessionState,
@@ -3784,6 +4081,72 @@ const buildIntentFirstResponse = (
   },
 });
 
+const extractPlanDayHardAnchor = (message: string): string | null => {
+  const match = message.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i);
+  if (!match?.[1]) return null;
+
+  let hours = Number.parseInt(match[1], 10);
+  const minutes = Number.parseInt(match[2] ?? "0", 10);
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) return null;
+
+  const meridiem = (match[3] ?? "").toLowerCase();
+  if (meridiem === "pm" && hours < 12) hours += 12;
+  if (meridiem === "am" && hours === 12) hours = 0;
+
+  const normalized = normalizeClockTime(
+    `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`,
+  );
+  if (!normalized) return null;
+
+  return formatAssistantTime(normalized) ?? normalized;
+};
+
+const buildPlanDayFollowUpResponse = (
+  input: PlannerBuildInput,
+  sessionState: PlannerSessionState,
+  classificationHint: ClassificationHint,
+): PlannerBuildResult => {
+  const scheduleSummary = input.plannerContext.scheduleInsights?.summary
+    ? normalizeAssistantTimeText(input.plannerContext.scheduleInsights.summary)
+    : null;
+  const hardAnchor = extractPlanDayHardAnchor(input.message);
+  const anchorLead = hardAnchor
+    ? `Got it. I'm treating ${hardAnchor} as a fixed anchor for the day.`
+    : "Got it. I'm treating the commitments you mentioned as fixed anchors for the day.";
+  const scheduleLead = scheduleSummary
+    ? `${scheduleSummary} `
+    : "";
+
+  return {
+    mode: "conversational",
+    reply: [
+      anchorLead,
+      `${scheduleLead}Based on what you shared, I'd front-load the highest-focus work before those fixed commitments, leave a little buffer around them, and save the more flexible or lower-pressure work for the later open window.`,
+      "If you want, I can help tighten that into a cleaner block-by-block plan next.",
+    ].join(" "),
+    followUpQuestions: [],
+    proposals: [],
+    suggestedReminders: [],
+    memoryUpdates: {
+      preferredTimeOfDay: sessionState.preferredTimeOfDay ??
+        input.plannerContext.plannerMemory?.preferredTimeOfDay ?? null,
+      preferredTimeReason: sessionState.preferredTimeReason ??
+        input.plannerContext.plannerMemory?.preferredTimeReason ?? null,
+      reminderPreference: sessionState.reminderPreference ??
+        (input.plannerContext.plannerMemory?.reminderMinutesBefore
+          ? `${input.plannerContext.plannerMemory.reminderMinutesBefore} minutes`
+          : null),
+    },
+    sessionState: {
+      ...sessionState,
+      draft: {},
+      openQuestionIds: [],
+      pendingStarterIntent: null,
+      lastClassification: classificationHint.type,
+    },
+  };
+};
+
 const inferClassification = (
   message: string,
   repeated: boolean,
@@ -3836,6 +4199,22 @@ export function buildPlannerResponse(
     const starterIntent = getResolvedStarterIntent(resolvedInput);
     const pendingStarterIntent =
       resolvedInput.sessionState.pendingStarterIntent ?? null;
+
+    if (pendingStarterIntent === "plan_day") {
+      return buildPlanDayFollowUpResponse(
+        resolvedInput,
+        resolvedInput.sessionState,
+        classificationHint,
+      );
+    }
+
+    if (starterIntent === "plan_day") {
+      return buildPlanDayStarterResponse(
+        resolvedInput,
+        resolvedInput.sessionState,
+        classificationHint,
+      );
+    }
 
     const freeUpAfterResponse = buildFreeUpAfterResponse(
       resolvedInput,
@@ -3921,7 +4300,6 @@ export function buildPlannerResponse(
     }
 
     if (
-      starterIntent === "plan_day" ||
       starterIntent === "make_room" ||
       starterIntent === "what_matters" ||
       starterIntent === "briefing_followup"
@@ -4163,6 +4541,15 @@ export function buildPlannerResponse(
     proposal.readyToConfirm = followUpQuestions.length === 0 &&
       missingFields.length === 0;
     proposal.missingFields = missingFields;
+    const calendarConflictNote = buildCalendarConflictReplyNote(
+      resolvedInput,
+      findCalendarConflictForQuestDraft(
+        resolvedInput,
+        resolvedDraft,
+        kind,
+        matched.task,
+      ),
+    );
 
     const memoryUpdates = {
       preferredTimeOfDay: resolvedDraft.timeOfDay ??
@@ -4183,13 +4570,16 @@ export function buildPlannerResponse(
 
     return {
       mode: "proposal",
-      reply: composeReply(
-        resolvedInput,
-        resolvedInput.tonePack,
-        proposal.kind,
-        proposal.readyToConfirm,
-        questCaptureResolution.assumption,
-      ),
+      reply: [
+        composeReply(
+          resolvedInput,
+          resolvedInput.tonePack,
+          proposal.kind,
+          proposal.readyToConfirm,
+          questCaptureResolution.assumption,
+        ),
+        calendarConflictNote,
+      ].filter(Boolean).join("\n\n"),
       followUpQuestions,
       proposals: [proposal],
       suggestedReminders: [],

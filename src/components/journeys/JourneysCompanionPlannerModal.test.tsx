@@ -447,6 +447,53 @@ describe("JourneysCompanionPlannerModal", () => {
     expect(screen.queryByText("Quick start")).not.toBeInTheDocument();
   });
 
+  it("shows a clean plan-day transcript without carried-over proposal cards", async () => {
+    mocks.state.messages = [
+      {
+        id: "plan-day-user-1",
+        role: "user",
+        content: "Plan my day",
+        createdAt: "2026-04-18T08:00:00.000Z",
+        source: "plan",
+      },
+      {
+        id: "plan-day-assistant-1",
+        role: "assistant",
+        content: [
+          "To help you build a great day, can you tell me:",
+          "- Which of your goals or tasks matters most today?",
+          "- Are there any time constraints or outside commitments?",
+          "- How's your energy this morning, and when do you usually feel your best?",
+          "",
+          "Once I know those, I can suggest the best flow for your day.",
+        ].join("\n"),
+        createdAt: "2026-04-18T08:01:00.000Z",
+        source: "plan",
+      },
+    ];
+    mocks.state.questions = [];
+    mocks.state.proposals = [];
+    mocks.state.pendingProposals = [];
+    mocks.state.readyProposalCount = 0;
+
+    render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        presentation="dialog"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Plan my day")).toBeInTheDocument();
+    });
+    expect(screen.getByTestId("journeys-companion-planner-dialogue-screen")).toHaveTextContent(
+      "To help you build a great day, can you tell me:",
+    );
+    expect(screen.queryByTestId("journeys-companion-planner-inline-proposal")).not.toBeInTheDocument();
+    expect(screen.queryByText("Create Focus quest")).not.toBeInTheDocument();
+  });
+
   it("does not show legacy starter template UI for custom assistant openers", () => {
     mocks.state.messages = [
       {

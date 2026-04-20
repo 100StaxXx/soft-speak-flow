@@ -796,6 +796,18 @@ const TITLE_SCAFFOLD_TOKENS = new Set([
   'tomorrows',
 ]);
 
+const SENTENCE_BOUNDARY_PATTERN = /[.!?\n]/;
+const LEFT_TIMED_CLAUSE_BOUNDARY_PATTERNS = [
+  /[,;:]\s*/g,
+  /\s[-–—]\s/g,
+  /\b(?:and|but|then)\s+(?=(?:i|we|you|he|she|they|there)\b)/gi,
+];
+const RIGHT_TIMED_CLAUSE_BOUNDARY_PATTERNS = [
+  /\s[-–—]\s/g,
+  /[,;:]\s*/g,
+  /\b(?:and|but|then)\b/gi,
+];
+
 function normalizeTaskTitleCandidate(value: string | null | undefined): string {
   return (value ?? '')
     .toLowerCase()
@@ -822,6 +834,144 @@ function extractPlannerWrappedTitle(text: string): string | null {
   }
 
   return null;
+}
+
+function cloneRegex(pattern: RegExp): RegExp {
+  const flags = pattern.flags.includes('g') ? pattern.flags : `${pattern.flags}g`;
+  return new RegExp(pattern.source, flags);
+}
+
+function findEarliestScheduleMatchIndex(text: string): { index: number; length: number } | null {
+  const matchers = [
+    ...TIME_PATTERNS.map((pattern) => pattern.regex),
+    ...RELATIVE_TIME_PATTERNS.map((pattern) => pattern.regex),
+    ...DATE_PATTERNS.map((pattern) => pattern.regex),
+  ];
+
+  let earliestMatch: { index: number; length: number } | null = null;
+
+  for (const pattern of matchers) {
+    const matcher = new RegExp(pattern.source, pattern.flags.replace(/g/g, ''));
+    const match = matcher.exec(text);
+    if (!match || match.index < 0) continue;
+
+    const candidate = { index: match.index, length: match[0].length };
+    if (!earliestMatch || candidate.index < earliestMatch.index) {
+      earliestMatch = candidate;
+    }
+  }
+
+  return earliestMatch;
+}
+
+function findSentenceBounds(text: string, matchIndex: number): { start: number; end: number } {
+  let start = 0;
+  for (let index = matchIndex - 1; index >= 0; index -= 1) {
+    if (SENTENCE_BOUNDARY_PATTERN.test(text[index])) {
+      start = index + 1;
+      break;
+    }
+  }
+
+  let end = text.length;
+  for (let index = matchIndex; index < text.length; index += 1) {
+    if (SENTENCE_BOUNDARY_PATTERN.test(text[index])) {
+      end = index;
+      break;
+    }
+  }
+
+  return { start, end };
+}
+
+function findBoundaryBefore(
+  text: string,
+  beforeIndex: number,
+  patterns: RegExp[],
+): number | null {
+  let boundary: number | null = null;
+
+  for (const pattern of patterns) {
+    const matcher = cloneRegex(pattern);
+    let match: RegExpExecArray | null;
+
+    while ((match = matcher.exec(text)) !== null) {
+      const candidate = match.index + match[0].length;
+      if (candidate > beforeIndex) break;
+      if (boundary === null || candidate > boundary) {
+        boundary = candidate;
+      }
+
+      if (match[0].length === 0) {
+        matcher.lastIndex += 1;
+      }
+    }
+  }
+
+  return boundary;
+}
+
+function findBoundaryAfter(
+  text: string,
+  afterIndex: number,
+  patterns: RegExp[],
+): number | null {
+  let boundary: number | null = null;
+
+  for (const pattern of patterns) {
+    const matcher = cloneRegex(pattern);
+    let match: RegExpExecArray | null;
+
+    while ((match = matcher.exec(text)) !== null) {
+      if (match.index < afterIndex) {
+        if (match[0].length === 0) {
+          matcher.lastIndex += 1;
+        }
+        continue;
+      }
+
+      if (boundary === null || match.index < boundary) {
+        boundary = match.index;
+      }
+      break;
+    }
+  }
+
+  return boundary;
+}
+
+function resolveTimedOwnerClause(
+  text: string,
+): { scheduleSource: string; titleSource: string } | null {
+  const scheduleMatch = findEarliestScheduleMatchIndex(text);
+  if (!scheduleMatch) return null;
+
+  const sentenceBounds = findSentenceBounds(text, scheduleMatch.index);
+  const scheduleSource = text.slice(sentenceBounds.start, sentenceBounds.end).trim();
+  if (!scheduleSource) return null;
+
+  const relativeMatchIndex = scheduleMatch.index - sentenceBounds.start;
+  const leftBoundary = findBoundaryBefore(
+    scheduleSource,
+    relativeMatchIndex,
+    LEFT_TIMED_CLAUSE_BOUNDARY_PATTERNS,
+  );
+  const rightBoundary = findBoundaryAfter(
+    scheduleSource,
+    relativeMatchIndex + scheduleMatch.length,
+    RIGHT_TIMED_CLAUSE_BOUNDARY_PATTERNS,
+  );
+  const titleCandidate = scheduleSource
+    .slice(leftBoundary ?? 0, rightBoundary ?? scheduleSource.length)
+    .trim();
+  const cleanedTitleCandidate = cleanTaskText(titleCandidate);
+
+  return {
+    scheduleSource,
+    titleSource: cleanedTitleCandidate && !isScaffoldOnlyTaskTitle(cleanedTitleCandidate)
+      ? titleCandidate
+      : scheduleSource,
+  };
 }
 
 function cleanTaskText(text: string): string {
@@ -861,6 +1011,10 @@ function cleanTaskText(text: string): string {
     .replace(/^please\s+/i, '')
     .replace(
       /^(?:add|put|place|slot|schedule|book|lock\s*in|fit|squeeze|move|reschedule|set\s*up)\s+/i,
+      '',
+    )
+    .replace(
+      /^(?:i\s+have\s+an?\s+|i(?:'ve| have)\s+got\s+an?\s+|there(?:'s| is)\s+an?\s+)/i,
       '',
     )
     .replace(/(^|\s)['’]s\b/gi, ' ')
@@ -933,6 +1087,10 @@ export function parseNaturalLanguage(
       imageUrl: null,
       attachments: [],
     };
+    const timedOwnerClause = resolveTimedOwnerClause(input);
+    const schedulingSource = timedOwnerClause?.scheduleSource ?? input;
+    const titleSource = timedOwnerClause?.titleSource ?? input;
+    const categorySource = timedOwnerClause?.scheduleSource ?? input;
     const inputWithoutRelativeTime = stripRelativeTimePhrases(input);
 
     for (const pattern of CLEAR_PATTERNS) {
@@ -950,7 +1108,7 @@ export function parseNaturalLanguage(
     }
 
     for (const pattern of TIME_PATTERNS) {
-      const match = input.match(pattern.regex);
+      const match = schedulingSource.match(pattern.regex);
       if (match) {
         result.scheduledTime = pattern.handler(match);
         break;
@@ -958,7 +1116,7 @@ export function parseNaturalLanguage(
     }
 
     for (const pattern of DATE_PATTERNS) {
-      const match = input.match(pattern.regex);
+      const match = schedulingSource.match(pattern.regex);
       if (match) {
         result.scheduledDate = pattern.handler(match);
         break;
@@ -967,7 +1125,7 @@ export function parseNaturalLanguage(
 
     if (!result.scheduledTime) {
       for (const pattern of RELATIVE_TIME_PATTERNS) {
-        const match = input.match(pattern.regex);
+        const match = schedulingSource.match(pattern.regex);
         if (!match) continue;
 
         const relativeSchedule = pattern.handler(match);
@@ -1036,7 +1194,7 @@ export function parseNaturalLanguage(
     }
 
     for (const pattern of CATEGORY_PATTERNS) {
-      if (pattern.regex.test(input)) {
+      if (pattern.regex.test(categorySource)) {
         result.category = pattern.category;
         break;
       }
@@ -1113,7 +1271,7 @@ export function parseNaturalLanguage(
       }
     }
 
-    result.text = cleanTaskText(input);
+    result.text = cleanTaskText(titleSource);
 
     return result;
   } finally {

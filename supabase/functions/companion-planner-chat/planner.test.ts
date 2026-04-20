@@ -184,6 +184,193 @@ Deno.test("normalizes conversational scheduled quest titles before building plan
   );
 });
 
+Deno.test("prefers the timed clause over later untimed asks for scheduled quest drafts", () => {
+  const result = buildPlannerResponse(baseInput({
+    message:
+      "I have a sales meeting at 4 today. This rest of my 9-5 I want to fill with other outside sales fitting tasks. I also want to get in a workout and work on coding the app later - you'd be able to do that?",
+    currentDate: "2026-04-20",
+    currentDateTime: "2026-04-20T08:37:00-07:00",
+    parsedInput: {
+      text:
+        "I have a sales meeting . This rest of my I want to fill with other outside sales fitting tasks. I also want to get in a workout and work on coding the app later - you'd be able to do that",
+      scheduledTime: "16:00",
+      scheduledDate: "2026-04-20",
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: "body",
+      newTitle: null,
+    },
+  }));
+
+  assertEquals(result.mode, "proposal");
+  assertEquals(result.followUpQuestions.length, 0);
+  assertEquals(result.proposals[0].kind, "create_quest");
+  assertEquals(result.proposals[0].readyToConfirm, true);
+  assertEquals(result.proposals[0].title, "Create Sales Meeting");
+  assertEquals(
+    (result.proposals[0].payload as {
+      taskText: string;
+      scheduledTime: string | null;
+      category?: string | null;
+    }).taskText,
+    "Sales Meeting",
+  );
+  assertEquals(
+    (result.proposals[0].payload as {
+      taskText: string;
+      scheduledTime: string | null;
+      category?: string | null;
+    }).scheduledTime,
+    "16:00",
+  );
+  assertEquals(
+    (result.proposals[0].payload as {
+      taskText: string;
+      scheduledTime: string | null;
+      category?: string | null;
+    }).category,
+    undefined,
+  );
+});
+
+Deno.test("lets a fresh task title override an unsaved draft instead of reusing it", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Workout",
+    currentDate: "2026-04-20",
+    currentDateTime: "2026-04-20T09:00:00-07:00",
+    sessionState: {
+      draft: {
+        title: "Write for my newsletter",
+        scheduledTime: "08:00",
+        draftKind: "create_quest",
+      },
+      openQuestionIds: ["time_of_day", "time_reason"],
+      preferredTimeOfDay: null,
+      preferredTimeReason: null,
+      reminderPreference: null,
+      lastClassification: "quest",
+    },
+    parsedInput: {
+      text: "workout",
+      scheduledTime: null,
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: "body",
+      newTitle: null,
+    },
+  }));
+
+  assertEquals(result.proposals[0].title, "Create workout");
+  assertEquals(
+    (result.proposals[0].payload as { taskText: string }).taskText,
+    "workout",
+  );
+  assertEquals(result.reply.includes("saved calendar event"), false);
+});
+
+Deno.test("lets a fresh scheduled request override an unsaved draft instead of merging into it", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Workout at 5 today",
+    currentDate: "2026-04-20",
+    currentDateTime: "2026-04-20T09:00:00-07:00",
+    sessionState: {
+      draft: {
+        title: "Write for my newsletter",
+        scheduledTime: "08:00",
+        draftKind: "create_quest",
+      },
+      openQuestionIds: ["time_of_day", "time_reason"],
+      preferredTimeOfDay: null,
+      preferredTimeReason: null,
+      reminderPreference: null,
+      lastClassification: "quest",
+    },
+    parsedInput: {
+      text: "workout",
+      scheduledTime: "17:00",
+      scheduledDate: "2026-04-20",
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: "body",
+      newTitle: null,
+    },
+  }));
+
+  assertEquals(result.proposals[0].title, "Create Workout");
+  assertEquals(
+    (result.proposals[0].payload as {
+      taskText: string;
+      scheduledTime: string | null;
+    }).taskText,
+    "Workout",
+  );
+  assertEquals(
+    (result.proposals[0].payload as {
+      taskText: string;
+      scheduledTime: string | null;
+    }).scheduledTime,
+    "17:00",
+  );
+  assertEquals(result.reply.includes("saved calendar event"), false);
+});
+
+Deno.test("calls out saved calendar conflicts for scheduled quest drafts", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Sales meeting at 4 today",
+    currentDate: "2026-04-20",
+    currentDateTime: "2026-04-20T08:37:00-07:00",
+    parsedInput: {
+      text: "sales meeting",
+      scheduledTime: "16:00",
+      scheduledDate: "2026-04-20",
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+    plannerContext: {
+      tasks: [],
+      inboxTasks: [],
+      activeEpics: [],
+      rituals: [],
+      calendarEvents: [{
+        id: "event-1",
+        title: "Client Call",
+        start: "2026-04-20T16:00:00-07:00",
+        end: "2026-04-20T17:00:00-07:00",
+        isAllDay: false,
+        provider: "google",
+        readOnly: true,
+      }],
+    },
+  }));
+
+  assertEquals(result.proposals[0].title, "Create Sales Meeting");
+  assertStringIncludes(result.reply, 'saved calendar event "Client Call"');
+  assertStringIncludes(result.reply, "4:00 pm");
+});
+
 Deno.test("treats a simple timed utterance as a ready-to-confirm quest draft", () => {
   const result = buildPlannerResponse(baseInput({
     message: "gym at 5pm tomorrow",
@@ -279,10 +466,12 @@ Deno.test("normalizes parsed input server-side for question-form scheduling requ
   );
 });
 
-Deno.test("uses ranked priorities for plan-my-day style reads", () => {
+Deno.test("returns the deterministic plan-day starter opener", () => {
   const result = buildPlannerResponse(baseInput({
-    message: "Plan my day",
+    message:
+      "Help me plan my day. Ask me follow-up questions about my goals, tasks, timing, and energy so we can build the best schedule.",
     plannerContext: {
+      starterIntent: "plan_day",
       tasks: [
         {
           id: "task-1",
@@ -324,9 +513,61 @@ Deno.test("uses ranked priorities for plan-my-day style reads", () => {
     },
   }));
 
-  assertEquals(result.mode, "schedule_read");
-  assertStringIncludes(result.reply, "Top ranked next moves");
-  assertStringIncludes(result.reply, "Ship landing page copy");
+  assertEquals(result.mode, "conversational");
+  assertEquals(result.followUpQuestions.length, 0);
+  assertEquals(result.proposals.length, 0);
+  assertEquals(result.sessionState.pendingStarterIntent, "plan_day");
+  assertStringIncludes(result.reply, "To help you build a great day");
+  assertStringIncludes(result.reply, "Which of your goals or tasks matters most today?");
+});
+
+Deno.test("handles the next plan-day reply as conversational intake without proposals or stale timing callbacks", () => {
+  const result = buildPlannerResponse(baseInput({
+    message:
+      "I have a sales meeting at 3 pm. I want sales work before that, a workout later, and some app work tonight.",
+    sessionState: {
+      pendingStarterIntent: "plan_day",
+    },
+    plannerContext: {
+      plannerMemory: {
+        tonePack: "soft",
+        preferredTimeOfDay: "afternoon",
+        preferredTimeReason: "that's the time of the meeting each week",
+        reminderMinutesBefore: null,
+        preferredWindows: [],
+        cadencePatterns: {},
+        wakeTime: "08:00",
+        windDownTime: "21:00",
+        peakProductivityTimes: [],
+        workloadTolerance: "normal",
+        contactCadencePatterns: {},
+        lastConfirmedAt: null,
+      },
+      scheduleInsights: {
+        horizon: "day",
+        selectedDate: "2026-04-18",
+        dayLoads: [],
+        overloadedDates: [],
+        emptyDates: [],
+        conflicts: [],
+        suggestedSlots: [],
+        moveSuggestions: [],
+        summary: "Today still has room around your fixed commitments.",
+      },
+    },
+  }));
+
+  assertEquals(result.mode, "conversational");
+  assertEquals(result.followUpQuestions.length, 0);
+  assertEquals(result.proposals.length, 0);
+  assertEquals(result.sessionState.pendingStarterIntent, null);
+  assertStringIncludes(result.reply, "3:00 pm");
+  assertStringIncludes(result.reply, "fixed anchor");
+  assertStringIncludes(result.reply, "Today still has room around your fixed commitments.");
+  assertEquals(result.reply.includes("previously said"), false);
+  assertEquals(result.reply.includes("What makes this timing the right fit"), false);
+  assertEquals(result.reply.includes("you usually"), false);
+  assertEquals(result.reply.includes("you've told me"), false);
 });
 
 Deno.test("drafts confirmable moves for free-me-up-after requests", () => {

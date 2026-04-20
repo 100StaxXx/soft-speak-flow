@@ -381,3 +381,77 @@ Deno.test("does not rewrite the quest-capture starter prompt", async () => {
   assertEquals(response.reply, "Quest?");
   assertEquals(captured.called, false);
 });
+
+Deno.test("does not rewrite the plan-day starter prompt", async () => {
+  const captured = {
+    called: false,
+  };
+
+  const response = await buildOrchestratedPlannerResponse({
+    guardedFetch: async (_input: RequestInfo | URL, _init?: RequestInit) => {
+      captured.called = true;
+      return new Response("unexpected");
+    },
+    input: {
+      ...baseInput(),
+      message: "Plan my day",
+      plannerContext: {
+        ...baseInput().plannerContext,
+        starterIntent: "plan_day",
+      },
+    },
+    baseResult: {
+      ...baseResult("conversational"),
+      reply: [
+        "To help you build a great day, can you tell me:",
+        "- Which of your goals or tasks matters most today?",
+        "- Are there any time constraints or outside commitments?",
+        "- How's your energy this morning, and when do you usually feel your best?",
+        "",
+        "Once I know those, I can suggest the best flow for your day.",
+      ].join("\n"),
+      sessionState: {
+        ...baseResult("conversational").sessionState,
+        pendingStarterIntent: "plan_day",
+      },
+    },
+    openAIApiKey: "test-openai-key",
+    model: "test-model",
+  });
+
+  assertEquals(response.mode, "conversational");
+  assertStringIncludes(response.reply, "To help you build a great day");
+  assertEquals(captured.called, false);
+});
+
+Deno.test("does not rewrite the immediate plan-day follow-up reply", async () => {
+  const captured = {
+    called: false,
+  };
+
+  const response = await buildOrchestratedPlannerResponse({
+    guardedFetch: async (_input: RequestInfo | URL, _init?: RequestInit) => {
+      captured.called = true;
+      return new Response("unexpected");
+    },
+    input: {
+      ...baseInput(),
+      message: "I have a meeting at 3 pm and want to work out later.",
+      sessionState: {
+        ...baseInput().sessionState,
+        pendingStarterIntent: "plan_day",
+      },
+    },
+    baseResult: {
+      ...baseResult("conversational"),
+      reply:
+        "Got it. I'm treating 3:00 pm as a fixed anchor for the day. Based on what you shared, I'd front-load the highest-focus work before those fixed commitments, leave a little buffer around them, and save the more flexible or lower-pressure work for the later open window. If you want, I can help tighten that into a cleaner block-by-block plan next.",
+    },
+    openAIApiKey: "test-openai-key",
+    model: "test-model",
+  });
+
+  assertEquals(response.mode, "conversational");
+  assertStringIncludes(response.reply, "fixed anchor");
+  assertEquals(captured.called, false);
+});

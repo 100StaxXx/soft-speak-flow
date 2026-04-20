@@ -102,4 +102,18 @@ describe("shared natural-language task parser scheduling coverage", () => {
       scheduledTime: "13:00",
     }));
   });
+
+  it("assigns explicit timing to the owning clause instead of later untimed asks", () => {
+    const parsed = parseNaturalLanguage(
+      "I have a sales meeting at 4 today. This rest of my 9-5 I want to fill with other outside sales fitting tasks. I also want to get in a workout and work on coding the app later - you'd be able to do that?",
+      { referenceDateTime: "2026-04-20T08:37:00-07:00" },
+    );
+
+    expect(parsed).toEqual(expect.objectContaining({
+      text: "sales meeting",
+      scheduledDate: "2026-04-20",
+      scheduledTime: "16:00",
+    }));
+    expect(parsed.category).not.toBe("body");
+  });
 });

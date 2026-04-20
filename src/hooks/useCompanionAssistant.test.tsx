@@ -78,7 +78,7 @@ const mocks = vi.hoisted(() => ({
       preferredTimeOfDay: null,
       preferredTimeReason: null,
       reminderPreference: null,
-      pendingStarterIntent: null as null | "quest_capture" | "upcoming_start" | "goal_breakdown_start",
+      pendingStarterIntent: null as null | "plan_day" | "quest_capture" | "upcoming_start" | "goal_breakdown_start",
       lastClassification: null as null | "quest" | "epic" | "habit" | "brain-dump",
     },
     pendingProposals: [] as Array<{
@@ -961,6 +961,42 @@ describe("useCompanionAssistant", () => {
       mocks.plannerSubmit.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
     );
     expect(onLaunchIntentConsumed).toHaveBeenCalledWith("launch-upcoming");
+  });
+
+  it("submits plan-day launcher intents as normal user starters", async () => {
+    const onLaunchIntentConsumed = vi.fn();
+    const planDayMessage =
+      "Help me plan my day. Ask me follow-up questions about my goals, tasks, timing, and energy so we can build the best schedule.";
+
+    renderHook(() => useCompanionAssistant({
+      surface: "journeys",
+      launchIntent: {
+        id: "launch-plan-day",
+        message: planDayMessage,
+        starterIntent: "plan_day",
+        briefingContext: null,
+      },
+      onLaunchIntentConsumed,
+    }));
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(mocks.startTemplateThread).toHaveBeenCalledTimes(1);
+    expect(mocks.plannerSubmit).toHaveBeenCalledWith(
+      planDayMessage,
+      "text",
+      {
+        skipUserEcho: false,
+        starterIntent: "plan_day",
+        briefingContext: null,
+      },
+    );
+    expect(mocks.startTemplateThread.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.plannerSubmit.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
+    );
+    expect(onLaunchIntentConsumed).toHaveBeenCalledWith("launch-plan-day");
   });
 
   it("seeds assistant-led quest launcher intents locally without a fake user echo", async () => {
