@@ -1,23 +1,8 @@
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 import type { ClassificationHint } from "./planner.ts";
 
-const PlannerClassificationTimelineSchema = z.object({
-  statedDays: z.number(),
-  typicalDays: z.number(),
-  feasibility: z.enum(["realistic", "aggressive", "very_aggressive"]),
-  adjustmentFactors: z.array(z.string()),
-}).nullable().optional();
-
-const PlannerClassificationHintSchema = z.object({
-  type: z.enum(["quest", "epic", "habit", "brain-dump"]),
-  confidence: z.number(),
-  reasoning: z.string(),
-  suggestedDeadline: z.string().optional(),
-  suggestedDuration: z.number().optional(),
-  timelineAnalysis: PlannerClassificationTimelineSchema,
-}).nullable().optional();
-
-const PlannerStarterIntentSchema = z.enum([
+const PLANNER_INTENT_TYPES = ["quest", "epic", "habit", "brain-dump"] as const;
+const PLANNER_STARTER_INTENTS = [
   "general",
   "plan_day",
   "make_room",
@@ -31,7 +16,83 @@ const PlannerStarterIntentSchema = z.enum([
   "upcoming_start",
   "quest_capture",
   "goal_breakdown_start",
-]);
+] as const;
+const PLANNER_TONE_PACKS = ["soft", "playful", "witty_sassy"] as const;
+const WORKLOAD_TOLERANCE_VALUES = ["light", "normal", "heavy"] as const;
+
+const normalizeIntentType = (value: unknown) => {
+  if (typeof value !== "string") return value;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "brain_dump" || normalized === "brain dump" || normalized === "braindump") {
+    return "brain-dump";
+  }
+  return normalized;
+};
+
+const normalizeStarterIntent = (value: unknown) => {
+  if (typeof value !== "string") return value;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "thread_history") {
+    return undefined;
+  }
+  return normalized;
+};
+
+const normalizeTonePack = (value: unknown) => {
+  if (typeof value !== "string") return value;
+  const normalized = value.trim().toLowerCase().replace(/[-\s]+/g, "_");
+  return normalized;
+};
+
+const normalizeWorkloadTolerance = (value: unknown) => {
+  if (typeof value !== "string") return value;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "low") return "light";
+  if (normalized === "medium") return "normal";
+  if (normalized === "high") return "heavy";
+  return normalized;
+};
+
+const PlannerIntentTypeSchema = z.preprocess(
+  normalizeIntentType,
+  z.enum(PLANNER_INTENT_TYPES),
+);
+
+const PlannerStarterIntentSchema = z.enum(PLANNER_STARTER_INTENTS);
+const PlannerOptionalStarterIntentSchema = z.preprocess(
+  normalizeStarterIntent,
+  PlannerStarterIntentSchema.optional(),
+);
+const PlannerNullableStarterIntentSchema = z.preprocess(
+  normalizeStarterIntent,
+  PlannerStarterIntentSchema.optional().nullable(),
+);
+
+const PlannerTonePackSchema = z.preprocess(
+  normalizeTonePack,
+  z.enum(PLANNER_TONE_PACKS),
+);
+
+const WorkloadToleranceSchema = z.preprocess(
+  normalizeWorkloadTolerance,
+  z.enum(WORKLOAD_TOLERANCE_VALUES),
+);
+
+const PlannerClassificationTimelineSchema = z.object({
+  statedDays: z.number(),
+  typicalDays: z.number(),
+  feasibility: z.enum(["realistic", "aggressive", "very_aggressive"]),
+  adjustmentFactors: z.array(z.string()),
+}).nullable().optional();
+
+const PlannerClassificationHintSchema = z.object({
+  type: PlannerIntentTypeSchema,
+  confidence: z.number(),
+  reasoning: z.string(),
+  suggestedDeadline: z.string().optional(),
+  suggestedDuration: z.number().optional(),
+  timelineAnalysis: PlannerClassificationTimelineSchema,
+}).nullable().optional();
 
 const CompanionStatAttributeSchema = z.enum([
   "vitality",
@@ -53,7 +114,7 @@ export const PlannerRequestSchema = z.object({
   currentDateTime: z.string().min(1).max(64),
   timezone: z.string().min(1).max(100).optional(),
   horizon: z.enum(["day", "week", "month"]),
-  tonePack: z.enum(["soft", "playful", "witty_sassy"]),
+  tonePack: PlannerTonePackSchema,
   conversationHistory: z.array(z.object({
     role: z.enum(["assistant", "user"]),
     content: z.string().min(1).max(4000),
@@ -64,8 +125,8 @@ export const PlannerRequestSchema = z.object({
     preferredTimeOfDay: z.string().nullable().optional(),
     preferredTimeReason: z.string().nullable().optional(),
     reminderPreference: z.string().nullable().optional(),
-    pendingStarterIntent: PlannerStarterIntentSchema.nullable().optional(),
-    lastClassification: z.enum(["quest", "epic", "habit", "brain-dump"]).nullable().optional(),
+    pendingStarterIntent: PlannerNullableStarterIntentSchema,
+    lastClassification: PlannerIntentTypeSchema.nullable().optional(),
   }),
   parsedInput: z.object({
     text: z.string(),
@@ -179,7 +240,7 @@ export const PlannerRequestSchema = z.object({
       inferredGoals: z.array(z.string()).optional(),
       dataSnapshot: z.record(z.unknown()).nullable().optional(),
     }).nullable().optional(),
-    starterIntent: PlannerStarterIntentSchema.optional(),
+    starterIntent: PlannerOptionalStarterIntentSchema,
     priorityScores: z.array(z.object({
       id: z.string(),
       kind: z.enum(["task", "ritual", "epic", "contact", "recovery"]),
@@ -230,7 +291,7 @@ export const PlannerRequestSchema = z.object({
       summary: z.string().optional(),
     }).optional(),
     plannerMemory: z.object({
-      tonePack: z.enum(["soft", "playful", "witty_sassy"]).optional(),
+      tonePack: PlannerTonePackSchema.optional(),
       preferredTimeOfDay: z.string().nullable().optional(),
       preferredTimeReason: z.string().nullable().optional(),
       reminderMinutesBefore: z.number().nullable().optional(),
@@ -244,7 +305,7 @@ export const PlannerRequestSchema = z.object({
         sourceCount: z.number().optional(),
       })).optional(),
       cadencePatterns: z.record(z.number()).optional(),
-      workloadTolerance: z.enum(["light", "normal", "heavy"]).nullable().optional(),
+      workloadTolerance: WorkloadToleranceSchema.nullable().optional(),
       contactCadencePatterns: z.record(z.number()).optional(),
       lastConfirmedAt: z.string().nullable().optional(),
     }).optional(),
@@ -281,7 +342,7 @@ export const PlannerRequestSchema = z.object({
       preferredHabitFrequency: z.string().optional(),
       preferredEpicDuration: z.number().optional(),
       commonContexts: z.array(z.string()).optional(),
-      suggestedWorkload: z.enum(["light", "normal", "heavy"]).optional(),
+      suggestedWorkload: WorkloadToleranceSchema.optional(),
     }).optional(),
   }),
 });

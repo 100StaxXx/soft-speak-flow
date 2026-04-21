@@ -99,6 +99,14 @@ serve(async (req) => {
     const parsed = PlannerRequestSchema.safeParse(body);
 
     if (!parsed.success) {
+      console.warn("[companion-planner-chat] invalid planner request", {
+        requestId,
+        issues: parsed.error.issues.map((issue) => ({
+          path: issue.path.join("."),
+          code: issue.code,
+          message: issue.message,
+        })),
+      });
       return createSafeErrorResponse(req, {
         status: 400,
         code: "INVALID_INPUT",

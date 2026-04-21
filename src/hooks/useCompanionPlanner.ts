@@ -499,6 +499,16 @@ const deriveStarterIntentFromMessage = (
   return "general";
 };
 
+const normalizeStarterIntentForPlanner = (
+  starterIntent: CompanionPlannerStarterIntent | null | undefined,
+): Exclude<CompanionPlannerStarterIntent, "thread_history"> | null => {
+  if (!starterIntent || starterIntent === "thread_history") {
+    return null;
+  }
+
+  return starterIntent;
+};
+
 const inferScheduledTimeFromProposal = (
   kind: CompanionPlannerProposalKind,
   payload: Record<string, unknown>,
@@ -1890,8 +1900,9 @@ export function useCompanionPlanner({
     const message = rawMessage.trim();
     if (!message || isSubmitting) return;
 
-    const resolvedStarterIntent = options?.starterIntent ??
-      deriveStarterIntentFromMessage(message);
+    const resolvedStarterIntent = normalizeStarterIntentForPlanner(
+      options?.starterIntent,
+    ) ?? deriveStarterIntentFromMessage(message);
     if (resolvedStarterIntent === "quest_capture" && !options?.skipUserEcho) {
       primeQuestCapture(message);
       return;

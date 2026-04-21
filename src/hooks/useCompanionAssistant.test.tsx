@@ -1118,6 +1118,32 @@ describe("useCompanionAssistant", () => {
     expect(onLaunchIntentConsumed).not.toHaveBeenCalled();
   });
 
+  it("ignores nonblank thread-history launch intents so they never hit the planner endpoint", async () => {
+    const onLaunchIntentConsumed = vi.fn();
+
+    renderHook(() => useCompanionAssistant({
+      surface: "journeys",
+      launchIntent: {
+        id: "launch-history-filled",
+        message: "Open a previous thread",
+        starterIntent: "thread_history",
+        target: "planner",
+        briefingContext: null,
+      },
+      onLaunchIntentConsumed,
+    }));
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(mocks.startTemplateThread).not.toHaveBeenCalled();
+    expect(mocks.plannerSubmit).not.toHaveBeenCalled();
+    expect(mocks.injectAssistantOpening).not.toHaveBeenCalled();
+    expect(mocks.primeQuestCapture).not.toHaveBeenCalled();
+    expect(onLaunchIntentConsumed).not.toHaveBeenCalled();
+  });
+
   it("surfaces journeys thread controls alongside the merged transcript", () => {
     const { result } = renderHook(() => useCompanionAssistant({ surface: "journeys" }));
 

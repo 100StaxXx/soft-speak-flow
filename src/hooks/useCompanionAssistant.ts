@@ -400,6 +400,7 @@ export function useCompanionAssistant({
   useEffect(() => {
     if (surface !== "journeys") return;
     if (!launchIntent?.id || !launchIntent.message.trim()) return;
+    if (launchIntent.starterIntent === "thread_history") return;
     if (lastLaunchIntentIdRef.current === launchIntent.id) return;
 
     lastLaunchIntentIdRef.current = launchIntent.id;

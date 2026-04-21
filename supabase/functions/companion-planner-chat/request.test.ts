@@ -78,3 +78,49 @@ Deno.test("accepts quest notes and subtask titles in planner task context", () =
   assertEquals(parsed.plannerContext.tasks[0]?.notes, "Leg day with extra stretching.");
   assertEquals(parsed.plannerContext.tasks[0]?.subtaskTitles, ["Warm up", "Cooldown walk"]);
 });
+
+Deno.test("normalizes legacy starter intent and classifier aliases instead of rejecting the request", () => {
+  const parsed = PlannerRequestSchema.parse({
+    ...baseRequest(),
+    sessionState: {
+      ...baseRequest().sessionState,
+      pendingStarterIntent: "thread_history",
+      lastClassification: "brain_dump",
+    },
+    classificationHint: {
+      type: "brain dump",
+      confidence: 0.6,
+      reasoning: "Legacy alias still coming through",
+      timelineAnalysis: null,
+    },
+    plannerContext: {
+      ...baseRequest().plannerContext,
+      starterIntent: "thread_history",
+    },
+  });
+
+  assertEquals(parsed.sessionState.pendingStarterIntent, undefined);
+  assertEquals(parsed.sessionState.lastClassification, "brain-dump");
+  assertEquals(parsed.classificationHint?.type, "brain-dump");
+  assertEquals(parsed.plannerContext.starterIntent, undefined);
+});
+
+Deno.test("normalizes legacy workload and tone pack values in planner context", () => {
+  const parsed = PlannerRequestSchema.parse({
+    ...baseRequest(),
+    plannerContext: {
+      ...baseRequest().plannerContext,
+      plannerMemory: {
+        tonePack: "witty-sassy",
+        workloadTolerance: "medium",
+      },
+      aiSignals: {
+        suggestedWorkload: "high",
+      },
+    },
+  });
+
+  assertEquals(parsed.plannerContext.plannerMemory?.tonePack, "witty_sassy");
+  assertEquals(parsed.plannerContext.plannerMemory?.workloadTolerance, "normal");
+  assertEquals(parsed.plannerContext.aiSignals?.suggestedWorkload, "heavy");
+});
