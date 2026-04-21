@@ -2,10 +2,14 @@ import { buildPlannerAISignals } from "@/utils/companionPlannerAiSignals";
 import type {
   CompanionPlannerRequest,
   PlannerCareState,
+  CompanionPlannerSessionState,
   PlannerStatInterpretation,
 } from "@/types/companionPlanner";
 
 type PlannerContext = CompanionPlannerRequest["plannerContext"];
+type PlannerConversationHistory = CompanionPlannerRequest["conversationHistory"];
+type PlannerSessionState = CompanionPlannerSessionState;
+type PlannerParsedInput = NonNullable<CompanionPlannerRequest["parsedInput"]>;
 
 const asNonEmptyString = (value: unknown): string | undefined => {
   if (typeof value !== "string") return undefined;
@@ -104,6 +108,32 @@ const isPlannerStarterIntent = (
   "quest_capture",
   "goal_breakdown_start",
 ].includes(String(value));
+
+const isPlannerConversationRole = (
+  value: unknown,
+): value is PlannerConversationHistory[number]["role"] =>
+  value === "assistant" || value === "user";
+
+const isPlannerSessionStarterIntent = (
+  value: unknown,
+): value is NonNullable<PlannerSessionState["pendingStarterIntent"]> =>
+  isPlannerStarterIntent(value) || value === "goal_breakdown";
+
+const isClassificationType = (
+  value: unknown,
+): value is NonNullable<PlannerSessionState["lastClassification"]> =>
+  value === "quest" ||
+  value === "epic" ||
+  value === "habit" ||
+  value === "brain-dump" ||
+  value === "brain_dump" ||
+  value === "brain dump" ||
+  value === "braindump";
+
+const isParsedInputCustomPeriod = (
+  value: unknown,
+): value is NonNullable<PlannerParsedInput["recurrenceCustomPeriod"]> =>
+  value === "week" || value === "month";
 
 const isCareTone = (
   value: unknown,
@@ -603,6 +633,91 @@ const sanitizeStatInterpretation = (
   };
 };
 
+export const sanitizePlannerConversationHistory = (
+  conversationHistory: PlannerConversationHistory,
+): PlannerConversationHistory =>
+  conversationHistory
+    .map((entry) => {
+      const content = asNonEmptyString(entry.content);
+      if (!content || !isPlannerConversationRole(entry.role)) {
+        return null;
+      }
+
+      return {
+        role: entry.role,
+        content: content.slice(0, 4000),
+      };
+    })
+    .filter((entry): entry is PlannerConversationHistory[number] =>
+      Boolean(entry)
+    )
+    .slice(-24);
+
+const sanitizeSessionDraft = (
+  draft: PlannerSessionState["draft"],
+): PlannerSessionState["draft"] =>
+  draft && typeof draft === "object" && !Array.isArray(draft)
+    ? draft
+    : {};
+
+export const sanitizePlannerSessionState = (
+  sessionState: PlannerSessionState,
+): PlannerSessionState => {
+  const normalizedLastClassification = typeof sessionState.lastClassification ===
+        "string"
+      ? sessionState.lastClassification.trim().toLowerCase()
+      : null;
+
+  return {
+    draft: sanitizeSessionDraft(sessionState.draft),
+    openQuestionIds: asStringArray(sessionState.openQuestionIds) ?? [],
+    preferredTimeOfDay: asNullableString(sessionState.preferredTimeOfDay),
+    preferredTimeReason: asNullableString(sessionState.preferredTimeReason),
+    reminderPreference: asNullableString(sessionState.reminderPreference),
+    pendingStarterIntent: isPlannerSessionStarterIntent(
+        sessionState.pendingStarterIntent,
+      )
+      ? sessionState.pendingStarterIntent
+      : sessionState.pendingStarterIntent === null
+      ? null
+      : undefined,
+    lastClassification: isClassificationType(normalizedLastClassification)
+      ? normalizedLastClassification === "brain_dump" ||
+          normalizedLastClassification === "brain dump" ||
+          normalizedLastClassification === "braindump"
+        ? "brain-dump"
+        : normalizedLastClassification
+      : sessionState.lastClassification === null
+      ? null
+      : undefined,
+  };
+};
+
+export const sanitizePlannerParsedInput = (
+  parsedInput: CompanionPlannerRequest["parsedInput"],
+): CompanionPlannerRequest["parsedInput"] => {
+  if (!parsedInput) return undefined;
+
+  return {
+    text: typeof parsedInput.text === "string" ? parsedInput.text : "",
+    scheduledTime: asNullableString(parsedInput.scheduledTime),
+    scheduledDate: asNullableString(parsedInput.scheduledDate),
+    estimatedDuration: asNullableNumber(parsedInput.estimatedDuration),
+    recurrencePattern: asNullableString(parsedInput.recurrencePattern),
+    recurrenceDays: asNumberArray(parsedInput.recurrenceDays) ?? [],
+    recurrenceMonthDays: asNumberArray(parsedInput.recurrenceMonthDays) ?? [],
+    recurrenceCustomPeriod: isParsedInputCustomPeriod(
+        parsedInput.recurrenceCustomPeriod,
+      )
+      ? parsedInput.recurrenceCustomPeriod
+      : null,
+    recurrenceEndDate: asNullableString(parsedInput.recurrenceEndDate),
+    notes: asNullableString(parsedInput.notes),
+    category: asNullableString(parsedInput.category),
+    newTitle: asNullableString(parsedInput.newTitle),
+  };
+};
+
 export const sanitizePlannerContext = (
   context: PlannerContext,
 ): PlannerContext => {
@@ -681,3 +796,52 @@ export const summarizePlannerContextForDebug = (context: PlannerContext) => ({
   aiSignals: context.aiSignals,
   starterIntent: context.starterIntent ?? null,
 });
+
+export const summarizePlannerSessionStateForDebug = (
+  sessionState: PlannerSessionState,
+) => ({
+  draftKeys: Object.keys(
+    sessionState.draft && typeof sessionState.draft === "object" &&
+        !Array.isArray(sessionState.draft)
+      ? sessionState.draft
+      : {},
+  ),
+  openQuestionIds: sessionState.openQuestionIds,
+  preferredTimeOfDayType: sessionState.preferredTimeOfDay === null
+    ? "null"
+    : typeof sessionState.preferredTimeOfDay,
+  preferredTimeReasonType: sessionState.preferredTimeReason === null
+    ? "null"
+    : typeof sessionState.preferredTimeReason,
+  reminderPreferenceType: sessionState.reminderPreference === null
+    ? "null"
+    : typeof sessionState.reminderPreference,
+  pendingStarterIntent: sessionState.pendingStarterIntent ?? null,
+  lastClassification: sessionState.lastClassification ?? null,
+});
+
+export const summarizePlannerParsedInputForDebug = (
+  parsedInput: CompanionPlannerRequest["parsedInput"],
+) => parsedInput
+  ? {
+    textLength: typeof parsedInput.text === "string" ? parsedInput.text.length : null,
+    scheduledTime: parsedInput.scheduledTime ?? null,
+    scheduledDate: parsedInput.scheduledDate ?? null,
+    estimatedDuration: parsedInput.estimatedDuration ?? null,
+    recurrencePattern: parsedInput.recurrencePattern ?? null,
+    recurrenceDays: Array.isArray(parsedInput.recurrenceDays)
+      ? parsedInput.recurrenceDays
+      : null,
+    recurrenceMonthDays: Array.isArray(parsedInput.recurrenceMonthDays)
+      ? parsedInput.recurrenceMonthDays
+      : null,
+    recurrenceCustomPeriod: parsedInput.recurrenceCustomPeriod ?? null,
+    notesType: parsedInput.notes === null ? "null" : typeof parsedInput.notes,
+    categoryType: parsedInput.category === null
+      ? "null"
+      : typeof parsedInput.category,
+    newTitleType: parsedInput.newTitle === null
+      ? "null"
+      : typeof parsedInput.newTitle,
+  }
+  : null;

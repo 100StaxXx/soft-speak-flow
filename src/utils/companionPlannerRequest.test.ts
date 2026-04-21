@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import type { CompanionPlannerRequest } from "@/types/companionPlanner";
-import { sanitizePlannerContext } from "@/utils/companionPlannerRequest";
+import {
+  sanitizePlannerContext,
+  sanitizePlannerParsedInput,
+  sanitizePlannerSessionState,
+} from "@/utils/companionPlannerRequest";
 
 describe("sanitizePlannerContext", () => {
   it("drops malformed dynamic planner entries and strips nullable ai signal fields", () => {
@@ -105,6 +109,64 @@ describe("sanitizePlannerContext", () => {
     expect(sanitized.aiSignals).toEqual({
       commonContexts: ["focus"],
       suggestedWorkload: "normal",
+    });
+  });
+});
+
+describe("sanitizePlannerSessionState", () => {
+  it("normalizes stale session values into the request-safe shape", () => {
+    const sanitized = sanitizePlannerSessionState({
+      draft: [] as unknown as CompanionPlannerRequest["sessionState"]["draft"],
+      openQuestionIds: ["details", 7, "", null] as unknown as string[],
+      preferredTimeOfDay: 9 as unknown as string,
+      preferredTimeReason: { why: "later" } as unknown as string,
+      reminderPreference: ["15 minutes"] as unknown as string,
+      pendingStarterIntent: "unknown_starter" as CompanionPlannerRequest["sessionState"]["pendingStarterIntent"],
+      lastClassification: "brain_dump" as CompanionPlannerRequest["sessionState"]["lastClassification"],
+    });
+
+    expect(sanitized).toEqual({
+      draft: {},
+      openQuestionIds: ["details"],
+      preferredTimeOfDay: null,
+      preferredTimeReason: null,
+      reminderPreference: null,
+      pendingStarterIntent: undefined,
+      lastClassification: "brain-dump",
+    });
+  });
+});
+
+describe("sanitizePlannerParsedInput", () => {
+  it("drops malformed parsed-input fields that can trigger request rejection", () => {
+    const sanitized = sanitizePlannerParsedInput({
+      text: "Plan my day",
+      scheduledTime: 900 as unknown as string,
+      scheduledDate: null,
+      estimatedDuration: Number.NaN,
+      recurrencePattern: ["daily"] as unknown as string,
+      recurrenceDays: [1, 2, Number.NaN] as unknown as number[],
+      recurrenceMonthDays: null as unknown as number[],
+      recurrenceCustomPeriod: "quarter" as "week",
+      recurrenceEndDate: 123 as unknown as string,
+      notes: false as unknown as string,
+      category: "mind",
+      newTitle: { value: "new" } as unknown as string,
+    });
+
+    expect(sanitized).toEqual({
+      text: "Plan my day",
+      scheduledTime: null,
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [1, 2],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: "mind",
+      newTitle: null,
     });
   });
 });

@@ -32,7 +32,12 @@ import { parseNaturalLanguage } from "@/features/tasks/hooks/useNaturalLanguageP
 import { buildPlannerAISignals } from "@/utils/companionPlannerAiSignals";
 import {
   sanitizePlannerContext,
+  sanitizePlannerConversationHistory,
+  sanitizePlannerParsedInput,
+  sanitizePlannerSessionState,
   summarizePlannerContextForDebug,
+  summarizePlannerParsedInputForDebug,
+  summarizePlannerSessionStateForDebug,
 } from "@/utils/companionPlannerRequest";
 import { buildCompanionPlannerScheduleInsights } from "@/utils/companionPlannerSchedule";
 import {
@@ -1973,6 +1978,24 @@ export function useCompanionPlanner({
     }
 
     const parsedInput = parseNaturalLanguage(message);
+    const sanitizedConversationHistory = sanitizePlannerConversationHistory(
+      conversationHistory,
+    );
+    const sanitizedSessionState = sanitizePlannerSessionState(sessionState);
+    const sanitizedParsedInput = sanitizePlannerParsedInput({
+      text: parsedInput.text,
+      scheduledTime: parsedInput.scheduledTime,
+      scheduledDate: parsedInput.scheduledDate,
+      estimatedDuration: parsedInput.estimatedDuration,
+      recurrencePattern: parsedInput.recurrencePattern,
+      recurrenceDays: parsedInput.recurrenceDays,
+      recurrenceMonthDays: parsedInput.recurrenceMonthDays,
+      recurrenceCustomPeriod: parsedInput.recurrenceCustomPeriod,
+      recurrenceEndDate: parsedInput.recurrenceEndDate,
+      notes: parsedInput.notes,
+      category: parsedInput.category,
+      newTitle: parsedInput.newTitle,
+    });
     let requestBody: CompanionPlannerRequest | null = null;
 
     try {
@@ -2054,22 +2077,9 @@ export function useCompanionPlanner({
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
         horizon,
         tonePack,
-        conversationHistory,
-        sessionState,
-        parsedInput: {
-          text: parsedInput.text,
-          scheduledTime: parsedInput.scheduledTime,
-          scheduledDate: parsedInput.scheduledDate,
-          estimatedDuration: parsedInput.estimatedDuration,
-          recurrencePattern: parsedInput.recurrencePattern,
-          recurrenceDays: parsedInput.recurrenceDays,
-          recurrenceMonthDays: parsedInput.recurrenceMonthDays,
-          recurrenceCustomPeriod: parsedInput.recurrenceCustomPeriod,
-          recurrenceEndDate: parsedInput.recurrenceEndDate,
-          notes: parsedInput.notes,
-          category: parsedInput.category,
-          newTitle: parsedInput.newTitle,
-        },
+        conversationHistory: sanitizedConversationHistory,
+        sessionState: sanitizedSessionState,
+        parsedInput: sanitizedParsedInput,
         classificationHint,
         plannerContext: requestPlannerContext,
       };
@@ -2138,6 +2148,12 @@ export function useCompanionPlanner({
             horizon: requestBody.horizon,
             currentDate: requestBody.currentDate,
             conversationHistoryCount: requestBody.conversationHistory.length,
+            sessionState: summarizePlannerSessionStateForDebug(
+              requestBody.sessionState,
+            ),
+            parsedInput: summarizePlannerParsedInputForDebug(
+              requestBody.parsedInput,
+            ),
             plannerContext: summarizePlannerContextForDebug(
               requestBody.plannerContext,
             ),
