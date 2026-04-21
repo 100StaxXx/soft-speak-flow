@@ -129,7 +129,31 @@ const buildAvailabilityFacts = (
 const buildSystemPrompt = (
   mode: PlannerResponseMode,
   tonePack: PlannerBuildInput["tonePack"],
+  options?: {
+    isPlanDayClarification?: boolean;
+  },
 ) => {
+  if (options?.isPlanDayClarification) {
+    return [
+      "You are an intelligent companion whose only job in this step is to understand what the user wants to focus on.",
+      "You do NOT schedule, suggest time slots, or create plans in this step.",
+      "You are only responsible for clarifying the user's direction.",
+      "Before responding, internally consider the current time of day and the user's recent activity, habits, or goals when available.",
+      "Use that context only to guide your question, and do not mention it unless it helps the question feel natural.",
+      "Ask a single, focused question that helps the user decide what they want to do.",
+      "The question must be simple, easy to answer, grounded in real options, and relevant to their current moment.",
+      "Avoid vague, broad, multi-part, or overwhelming questions.",
+      "Ask ONLY one question.",
+      "Do NOT suggest a schedule or next steps.",
+      "Do NOT break the question into multiple parts.",
+      "Keep it natural, conversational, and short.",
+      "If the user has already clearly stated what they want to do, briefly acknowledge their direction and stop.",
+      "Preserve the deterministic meaning of fallbackReply and any followUpQuestions options.",
+      "Use plain text only.",
+      "Return minified JSON with keys reply and mode only.",
+    ].join("\n");
+  }
+
   const modeInstructions = {
     conversational:
       "Reply like a natural assistant in an ongoing chat. Be warm, collaborative, and specific. You can reference schedule context when helpful, but do not force planning.",
@@ -278,6 +302,16 @@ const isQuestCaptureStarterResponse = (baseResult: PlannerBuildResult) =>
   baseResult.proposals.length === 0 &&
   baseResult.suggestedReminders.length === 0;
 
+const isPlanDayClarificationResponse = (
+  input: PlannerBuildInput,
+  baseResult: PlannerBuildResult,
+) =>
+  input.plannerContext.starterIntent === "plan_day" &&
+  baseResult.mode === "conversational" &&
+  baseResult.followUpQuestions.length > 0 &&
+  baseResult.proposals.length === 0 &&
+  baseResult.suggestedReminders.length === 0;
+
 const isPlanDayDeterministicResponse = (
   input: PlannerBuildInput,
   baseResult: PlannerBuildResult,
@@ -386,6 +420,10 @@ export async function buildOrchestratedPlannerResponse(params: {
     Deno.env.get("OPENAI_COMPANION_PLANNER_MODEL") ?? "gpt-4.1";
 
   try {
+    const isPlanDayClarification = isPlanDayClarificationResponse(
+      params.input,
+      params.baseResult,
+    );
     const response = await params.guardedFetch(OPENAI_API_URL, {
       method: "POST",
       headers: {
@@ -403,6 +441,7 @@ export async function buildOrchestratedPlannerResponse(params: {
             content: buildSystemPrompt(
               params.baseResult.mode,
               params.input.tonePack,
+              { isPlanDayClarification },
             ),
           },
           {

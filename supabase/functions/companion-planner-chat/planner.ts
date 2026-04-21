@@ -4247,8 +4247,232 @@ const buildPlanDaySlotOptions = (
   }));
 };
 
+const PLAN_DAY_GENERIC_FOCUS_TERMS = new Set([
+  "active",
+  "admin",
+  "chores",
+  "fitness",
+  "light",
+  "life admin",
+  "movement",
+  "people",
+  "personal",
+  "recovery",
+  "rest",
+  "social",
+  "something active",
+  "something light",
+  "work",
+]);
+
+const isGenericPlanDayFocusTitle = (value: string): boolean => {
+  const normalized = normalizeText(value);
+  if (!normalized) return true;
+  if (PLAN_DAY_GENERIC_FOCUS_TERMS.has(normalized)) return true;
+
+  const wordCount = normalized.split(/\s+/).filter(Boolean).length;
+  return wordCount <= 2 &&
+    /\b(work|active|light|admin|social|recovery|personal)\b/.test(
+      normalized,
+    );
+};
+
 const isPlanDayStarterTitle = (value: string): boolean =>
   normalizeText(value) === "plan my day";
+
+const getPlanDayFocusLabels = (input: PlannerBuildInput): string[] => {
+  const labels: string[] = [];
+  const seen = new Set<string>();
+  const pushLabel = (value: string | null | undefined) => {
+    if (!value) return;
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    const normalized = normalizeText(trimmed);
+    if (!normalized || seen.has(normalized)) return;
+    seen.add(normalized);
+    labels.push(trimmed);
+  };
+
+  for (const score of getResolvedPriorityScores(input)) {
+    if (labels.length >= 3) break;
+    if (score.kind === "contact" && score.contactId) {
+      const contactName = input.plannerContext.contactsNeedingAttention?.find((
+        candidate,
+      ) => candidate.id === score.contactId)?.name ?? score.title;
+      pushLabel(contactName);
+      continue;
+    }
+
+    pushLabel(score.title);
+  }
+
+  if (labels.length < 3) {
+    for (const task of [
+      ...input.plannerContext.tasks,
+      ...input.plannerContext.inboxTasks,
+    ]) {
+      if (labels.length >= 3) break;
+      if (task.completed === true) continue;
+      pushLabel(task.title);
+    }
+  }
+
+  if (labels.length < 3) {
+    for (const epic of input.plannerContext.activeEpics) {
+      if (labels.length >= 3) break;
+      pushLabel(epic.title);
+    }
+  }
+
+  if (labels.length < 3) {
+    for (const ritual of input.plannerContext.rituals) {
+      if (labels.length >= 3) break;
+      pushLabel(ritual.title);
+    }
+  }
+
+  if (labels.length === 0) {
+    const currentMinutes = getLocalMinutesFromDateTime(input.currentDateTime);
+    if (currentMinutes !== null && currentMinutes >= 17 * 60) {
+      return ["Work", "Something active", "Something light"];
+    }
+
+    return ["Work", "Something active", "People"];
+  }
+
+  return labels.slice(0, 3);
+};
+
+const buildPlanDayClarificationQuestion = (
+  input: PlannerBuildInput,
+): PlannerQuestion => {
+  const currentMinutes = getLocalMinutesFromDateTime(input.currentDateTime);
+  const prompt = currentMinutes !== null && currentMinutes < 12 * 60
+    ? "What are you feeling like focusing on this morning?"
+    : currentMinutes !== null && currentMinutes < 17 * 60
+    ? "What are you feeling like focusing on this afternoon?"
+    : "What are you feeling like focusing on right now?";
+
+  return question({
+    id: "details",
+    field: "details",
+    prompt,
+    reason:
+      "Once I know the direction, I can shape the rest of the day around it.",
+    required: true,
+    options: getPlanDayFocusLabels(input),
+  });
+};
+
+const scoreMatchesPlanDayFocus = (
+  score: PlannerPriorityScore,
+  focusText: string,
+  input: PlannerBuildInput,
+): boolean => {
+  const normalizedFocus = normalizeText(focusText);
+  if (!normalizedFocus) return false;
+
+  const scoreTitle = normalizeText(score.title);
+  if (
+    scoreTitle.includes(normalizedFocus) || normalizedFocus.includes(scoreTitle)
+  ) {
+    return true;
+  }
+
+  if (score.reasons.some((reason) =>
+    normalizeText(reason).includes(normalizedFocus)
+  )) {
+    return true;
+  }
+
+  if (
+    /\b(active|movement|workout|gym|run|walk|exercise|stretch|physical)\b/.test(
+      normalizedFocus,
+    )
+  ) {
+    return score.kind === "recovery" ||
+      inferEnergyTypeFromTitle(score.title) === "physical";
+  }
+
+  if (
+    /\b(light|admin|quick|easy|chores|clean|organize|errand|email|reply|call)\b/
+      .test(normalizedFocus)
+  ) {
+    const energyType = inferEnergyTypeFromTitle(score.title);
+    return energyType === "admin" || energyType === "errand" ||
+      score.kind === "contact";
+  }
+
+  if (
+    /\b(people|social|friend|family|mom|dad|text|reach out|follow up)\b/.test(
+      normalizedFocus,
+    )
+  ) {
+    return score.kind === "contact";
+  }
+
+  if (/\b(work|app|build|ship|code|project|focus)\b/.test(normalizedFocus)) {
+    if (score.kind === "task" || score.kind === "epic" || score.kind === "ritual") {
+      return inferEnergyTypeFromTitle(score.title) === "deep" ||
+        inferEnergyTypeFromTitle(score.title) === "admin";
+    }
+  }
+
+  if (score.kind === "contact" && score.contactId) {
+    const contactName = input.plannerContext.contactsNeedingAttention?.find((
+      candidate,
+    ) => candidate.id === score.contactId)?.name;
+    if (contactName) {
+      const normalizedContactName = normalizeText(contactName);
+      if (
+        normalizedContactName.includes(normalizedFocus) ||
+        normalizedFocus.includes(normalizedContactName)
+      ) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+};
+
+const getPlanDayRankedScores = (
+  input: PlannerBuildInput,
+): PlannerPriorityScore[] => {
+  const focusText = input.message;
+  const scores = getResolvedPriorityScores(input);
+  const matchingScores = scores.filter((score) =>
+    scoreMatchesPlanDayFocus(score, focusText, input)
+  );
+
+  if (matchingScores.length === 0) return scores;
+
+  const matchingIds = new Set(matchingScores.map((score) => score.id));
+  return [
+    ...matchingScores,
+    ...scores.filter((score) => !matchingIds.has(score.id)),
+  ];
+};
+
+const buildPlanDayAcknowledgement = (
+  input: PlannerBuildInput,
+): string | null => {
+  const parsedTitle = sanitizeProposalTitle(input.parsedInput?.text);
+  if (
+    parsedTitle &&
+    !isPlanDayStarterTitle(parsedTitle) &&
+    !isGenericPlanDayFocusTitle(parsedTitle)
+  ) {
+    return `Got it - let's focus on ${formatGeneratedTaskTitle(parsedTitle)}.`;
+  }
+
+  const matchedScore = getPlanDayRankedScores(input)[0];
+  if (matchedScore?.title) {
+    return `Got it - let's lean into ${matchedScore.title}.`;
+  }
+
+  return "Got it - let's shape the day around that.";
+};
 
 const buildPlanDayConcreteCandidate = (
   input: PlannerBuildInput,
@@ -4256,7 +4480,15 @@ const buildPlanDayConcreteCandidate = (
 ): OptimizerDraftCandidate | null => {
   const parsedTitle = sanitizeProposalTitle(input.parsedInput?.text);
   if (!parsedTitle || isPlanDayStarterTitle(parsedTitle)) return null;
+  if (isGenericPlanDayFocusTitle(parsedTitle)) return null;
   if (looksLikeMultiClauseScheduledTitle(parsedTitle)) return null;
+  if (
+    getPlanDayFocusLabels(input).some((label) =>
+      normalizeText(label) === normalizeText(parsedTitle)
+    )
+  ) {
+    return null;
+  }
 
   const title = formatGeneratedTaskTitle(parsedTitle);
   if (!title) return null;
@@ -4743,7 +4975,7 @@ const buildPlanDayDraftResponse = (
   addCandidate(buildPlanDayConcreteCandidate(input, targetDate));
 
   if (candidates.length < proposalTarget) {
-    for (const score of getResolvedPriorityScores(input)) {
+    for (const score of getPlanDayRankedScores(input)) {
       if (candidates.length >= proposalTarget) break;
       addCandidate(buildPlanDayPriorityCandidate(input, score, targetDate));
     }
@@ -4797,6 +5029,9 @@ const buildPlanDayDraftResponse = (
     ? normalizeAssistantTimeText(input.plannerContext.scheduleInsights.summary)
     : null;
   const dateLabel = formatScheduleReference(input.currentDate, targetDate);
+  const acknowledgement = input.sessionState.pendingStarterIntent === "plan_day"
+    ? buildPlanDayAcknowledgement(input)
+    : null;
 
   if (proposals.length === 0) {
     const noRoomReason = existingWorkItems >= targetTotal
@@ -4809,7 +5044,7 @@ const buildPlanDayDraftResponse = (
 
     return {
       mode: "conversational",
-      reply: [scheduleSummary, noRoomReason]
+      reply: [acknowledgement, scheduleSummary, noRoomReason]
         .filter(Boolean)
         .join(" "),
       followUpQuestions: [],
@@ -4836,6 +5071,7 @@ const buildPlanDayDraftResponse = (
   }
 
   const reply = [
+    acknowledgement,
     buildOptimizerReply(
       dateLabel,
       proposals,
@@ -4968,8 +5204,34 @@ const buildPlanDayStarterResponse = (
   input: PlannerBuildInput,
   sessionState: PlannerSessionState,
   classificationHint: ClassificationHint,
-): PlannerBuildResult =>
-  buildPlanDayDraftResponse(input, sessionState, classificationHint);
+): PlannerBuildResult => {
+  const focusQuestion = buildPlanDayClarificationQuestion(input);
+
+  return {
+    mode: "conversational",
+    reply: focusQuestion.prompt,
+    followUpQuestions: [focusQuestion],
+    proposals: [],
+    suggestedReminders: [],
+    memoryUpdates: {
+      preferredTimeOfDay: sessionState.preferredTimeOfDay ??
+        input.plannerContext.plannerMemory?.preferredTimeOfDay ?? null,
+      preferredTimeReason: sessionState.preferredTimeReason ??
+        input.plannerContext.plannerMemory?.preferredTimeReason ?? null,
+      reminderPreference: sessionState.reminderPreference ??
+        (input.plannerContext.plannerMemory?.reminderMinutesBefore
+          ? `${input.plannerContext.plannerMemory.reminderMinutesBefore} minutes`
+          : null),
+    },
+    sessionState: {
+      ...sessionState,
+      draft: {},
+      openQuestionIds: [focusQuestion.id],
+      pendingStarterIntent: "plan_day",
+      lastClassification: classificationHint.type,
+    },
+  };
+};
 
 const buildUpcomingStarterResponse = (
   input: PlannerBuildInput,

@@ -580,6 +580,63 @@ Deno.test("does not rewrite deterministic plan-day starter proposals", async () 
   assertEquals(captured.called, false);
 });
 
+Deno.test("rewrites the initial plan-day clarification turn with the focus prompt", async () => {
+  let capturedSystemPrompt = "";
+
+  const response = await buildOrchestratedPlannerResponse({
+    guardedFetch: async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body ?? "{}"));
+      capturedSystemPrompt = body.messages?.[0]?.content ?? "";
+      return new Response(JSON.stringify({
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              reply: "What are you feeling like focusing on right now?",
+              mode: "conversational",
+            }),
+          },
+        }],
+      }));
+    },
+    input: {
+      ...baseInput(),
+      message: "Plan my day",
+      plannerContext: {
+        ...baseInput().plannerContext,
+        starterIntent: "plan_day",
+      },
+    },
+    baseResult: {
+      ...baseResult("conversational"),
+      reply: "What are you feeling like focusing on right now?",
+      followUpQuestions: [{
+        id: "details",
+        prompt: "What are you feeling like focusing on right now?",
+        required: true,
+        field: "details",
+        options: ["Website relaunch", "Something active", "Mom"],
+      }],
+      sessionState: {
+        ...baseResult("conversational").sessionState,
+        openQuestionIds: ["details"],
+        pendingStarterIntent: "plan_day",
+      },
+    },
+    openAIApiKey: "test-openai-key",
+    model: "test-model",
+  });
+
+  assertEquals(response.mode, "conversational");
+  assertEquals(
+    response.reply,
+    "What are you feeling like focusing on right now?",
+  );
+  assertStringIncludes(
+    capturedSystemPrompt,
+    "You are an intelligent companion whose only job in this step is to understand what the user wants to focus on.",
+  );
+});
+
 Deno.test("does not rewrite deterministic no-room plan-day replies", async () => {
   const captured = {
     called: false,

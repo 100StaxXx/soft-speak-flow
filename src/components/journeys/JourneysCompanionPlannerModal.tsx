@@ -326,21 +326,36 @@ const JourneysCompanionOverlayBody = memo(({
   }, [assistant.messages, hasReadyQuestProposal]);
 
   const dialogueEntries = useMemo<DialogueEntry[]>(() => [
-    ...transcriptMessages.map((message) => ({
-      id: message.id,
-      role: message.role,
-      content: message.content,
-      isSeed: message.isSeed,
-    })),
-    ...(
-      hasReadyQuestProposal
-        ? []
-        : assistant.questions.map((question) => ({
-          id: `planner-question-${question.id}`,
-          role: "assistant" as const,
-          content: question.prompt,
-        }))
-    ),
+    ...(() => {
+      const transcriptEntries = transcriptMessages.map((message) => ({
+        id: message.id,
+        role: message.role,
+        content: message.content,
+        isSeed: message.isSeed,
+      }));
+      const seenAssistantPrompts = new Set(
+        transcriptEntries
+          .filter((entry) => entry.role === "assistant")
+          .map((entry) => entry.content.trim()),
+      );
+
+      return [
+        ...transcriptEntries,
+        ...(
+          hasReadyQuestProposal
+            ? []
+            : assistant.questions
+              .filter((question) =>
+                !seenAssistantPrompts.has(question.prompt.trim())
+              )
+              .map((question) => ({
+                id: `planner-question-${question.id}`,
+                role: "assistant" as const,
+                content: question.prompt,
+              }))
+        ),
+      ];
+    })(),
   ], [assistant.questions, hasReadyQuestProposal, transcriptMessages]);
 
   const latestAssistantEntry = useMemo(

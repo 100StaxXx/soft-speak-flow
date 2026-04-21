@@ -473,19 +473,20 @@ describe("JourneysCompanionPlannerModal", () => {
       {
         id: "plan-day-assistant-1",
         role: "assistant",
-        content: [
-          "To help you build a great day, can you tell me:",
-          "- Which of your goals or tasks matters most today?",
-          "- Are there any time constraints or outside commitments?",
-          "- How's your energy this morning, and when do you usually feel your best?",
-          "",
-          "Once I know those, I can suggest the best flow for your day.",
-        ].join("\n"),
+        content: "What are you feeling like focusing on right now?",
         createdAt: "2026-04-18T08:01:00.000Z",
         source: "plan",
       },
     ];
-    mocks.state.questions = [];
+    mocks.state.questions = [
+      {
+        id: "details",
+        prompt: "What are you feeling like focusing on right now?",
+        required: true,
+        field: "details",
+        options: ["Website relaunch", "Something active", "Mom"],
+      },
+    ];
     mocks.state.proposals = [];
     mocks.state.pendingProposals = [];
     mocks.state.readyProposalCount = 0;
@@ -501,9 +502,14 @@ describe("JourneysCompanionPlannerModal", () => {
     await waitFor(() => {
       expect(screen.getByText("Plan my day")).toBeInTheDocument();
     });
-    expect(screen.getByTestId("journeys-companion-planner-dialogue-screen")).toHaveTextContent(
-      "To help you build a great day, can you tell me:",
-    );
+    expect(
+      screen.getAllByText("What are you feeling like focusing on right now?"),
+    ).toHaveLength(1);
+    expect(
+      screen.getByTestId("journeys-companion-planner-inline-options"),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Website relaunch" }))
+      .toBeInTheDocument();
     expect(screen.queryByTestId("journeys-companion-planner-inline-proposals")).not.toBeInTheDocument();
     expect(screen.queryByText("Create Focus quest")).not.toBeInTheDocument();
   });

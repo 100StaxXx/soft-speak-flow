@@ -524,7 +524,7 @@ Deno.test("normalizes parsed input server-side for question-form scheduling requ
   );
 });
 
-Deno.test("returns confirmable quest proposals for the plan-day starter", () => {
+Deno.test("asks a single grounded focus question for the plan-day starter", () => {
   const result = buildPlannerResponse(baseInput({
     message: "Plan my day",
     parsedInput: {
@@ -664,6 +664,164 @@ Deno.test("returns confirmable quest proposals for the plan-day starter", () => 
     },
   }));
 
+  assertEquals(result.mode, "conversational");
+  assertEquals(result.proposals.length, 0);
+  assertEquals(result.followUpQuestions.length, 1);
+  assertEquals(result.followUpQuestions[0]?.field, "details");
+  assertEquals(result.followUpQuestions[0]?.required, true);
+  assertEquals(result.reply, result.followUpQuestions[0]?.prompt);
+  assertEquals(result.sessionState.pendingStarterIntent, "plan_day");
+  assertEquals(result.sessionState.openQuestionIds, ["details"]);
+  assertEquals(
+    (result.followUpQuestions[0]?.options ?? []).slice(0, 3),
+    ["Morning review", "Website relaunch", "Mom"],
+  );
+  assertEquals(result.reply.includes("?"), true);
+});
+
+Deno.test("turns a clear plan-day focus reply into confirmable quest drafts", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Work on my app",
+    parsedInput: {
+      text: "Work on my app",
+      scheduledTime: null,
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+    sessionState: {
+      pendingStarterIntent: "plan_day",
+      openQuestionIds: ["details"],
+    },
+    plannerContext: {
+      tasks: [
+        {
+          id: "task-scheduled-1",
+          title: "Ship landing page copy",
+          taskDate: "2026-04-18",
+          scheduledTime: "09:00",
+          estimatedDuration: 60,
+          difficulty: "hard",
+          recurrencePattern: null,
+          completed: false,
+          priority: "high",
+          epicId: "epic-1",
+          epicTitle: "Website relaunch",
+        },
+      ],
+      activeEpics: [
+        {
+          id: "epic-1",
+          title: "Website relaunch",
+          endDate: "2026-04-20",
+          progressPercentage: 35,
+          daysRemaining: 2,
+          habitCount: 2,
+        },
+      ],
+      rituals: [
+        {
+          id: "ritual-1",
+          epicId: "epic-1",
+          epicTitle: "Website relaunch",
+          title: "Morning review",
+          frequency: "daily",
+          preferredTime: "10:30",
+          currentStreak: 3,
+        },
+      ],
+      contactsNeedingAttention: [
+        {
+          id: "contact-1",
+          name: "Mom",
+          daysSinceContact: 9,
+          hasOverdueReminder: true,
+          reminderReason: "Check in this week",
+        },
+      ],
+      priorityScores: [
+        {
+          id: "ritual:ritual-1",
+          kind: "ritual",
+          title: "Morning review",
+          score: 88,
+          reasons: ["Keeps the relaunch moving early."],
+          ritualId: "ritual-1",
+          epicId: "epic-1",
+          targetDate: "2026-04-18",
+          suggestedTime: "10:30",
+        },
+        {
+          id: "epic:epic-1",
+          kind: "epic",
+          title: "Website relaunch",
+          score: 84,
+          reasons: ["Deadline-sensitive progress still matters today."],
+          epicId: "epic-1",
+          targetDate: "2026-04-18",
+          suggestedTime: "13:00",
+        },
+        {
+          id: "contact:contact-1",
+          kind: "contact",
+          title: "Mom",
+          score: 68,
+          reasons: ["A quick touch keeps an overdue relationship warm."],
+          contactId: "contact-1",
+          targetDate: "2026-04-18",
+          suggestedTime: "17:00",
+        },
+      ],
+      scheduleInsights: {
+        horizon: "day",
+        selectedDate: "2026-04-18",
+        dayLoads: [
+          {
+            date: "2026-04-18",
+            totalMinutes: 120,
+            taskCount: 1,
+            status: "balanced",
+          },
+        ],
+        overloadedDates: [],
+        emptyDates: [],
+        conflicts: [],
+        suggestedSlots: [
+          {
+            date: "2026-04-18",
+            time: "10:30",
+            endTime: "11:00",
+            score: 86,
+            reason: "Open mid-morning slot",
+          },
+          {
+            date: "2026-04-18",
+            time: "13:00",
+            endTime: "13:45",
+            score: 82,
+            reason: "Open early afternoon slot",
+          },
+          {
+            date: "2026-04-18",
+            time: "17:00",
+            endTime: "17:15",
+            score: 76,
+            reason: "Quick open check-in window",
+          },
+        ],
+        moveSuggestions: [],
+        summary: "Today still has room around your fixed commitments.",
+      },
+    },
+  }));
+
   assertEquals(result.mode, "proposal");
   assertEquals(result.followUpQuestions.length, 0);
   assertEquals(result.proposals.length, 3);
@@ -674,11 +832,92 @@ Deno.test("returns confirmable quest proposals for the plan-day starter", () => 
     true,
   );
   assertEquals(result.sessionState.pendingStarterIntent, null);
-  assertStringIncludes(
-    result.reply,
-    "Today still has room around your fixed commitments.",
-  );
+  assertStringIncludes(result.reply, "Got it");
   assertStringIncludes(result.reply, "I drafted 3 quests for today");
+  assertEquals(
+    (result.proposals[0]?.payload as {
+      taskText: string;
+    }).taskText,
+    "Work On My App",
+  );
+});
+
+Deno.test("drafts from a vague directional plan-day reply without asking a second question", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Something active",
+    parsedInput: {
+      text: "Something active",
+      scheduledTime: null,
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+    sessionState: {
+      pendingStarterIntent: "plan_day",
+      openQuestionIds: ["details"],
+    },
+    plannerContext: {
+      tasks: [],
+      inboxTasks: [],
+      activeEpics: [],
+      rituals: [],
+      priorityScores: [
+        {
+          id: "recovery:reset",
+          kind: "recovery",
+          title: "Recovery reset",
+          score: 72,
+          reasons: ["A movement block would help today."],
+          targetDate: "2026-04-18",
+          suggestedTime: "18:00",
+        },
+      ],
+      scheduleInsights: {
+        horizon: "day",
+        selectedDate: "2026-04-18",
+        dayLoads: [
+          {
+            date: "2026-04-18",
+            totalMinutes: 0,
+            taskCount: 0,
+            status: "open",
+          },
+        ],
+        overloadedDates: [],
+        emptyDates: ["2026-04-18"],
+        conflicts: [],
+        suggestedSlots: [
+          {
+            date: "2026-04-18",
+            time: "18:00",
+            endTime: "18:30",
+            score: 80,
+            reason: "Open evening movement block",
+          },
+        ],
+        moveSuggestions: [],
+        summary: "Today is open.",
+      },
+    },
+  }));
+
+  assertEquals(result.mode, "proposal");
+  assertEquals(result.followUpQuestions.length, 0);
+  assertEquals(result.proposals.length, 1);
+  assertStringIncludes(result.reply, "Got it");
+  assertEquals(
+    (result.proposals[0]?.payload as {
+      taskText: string;
+    }).taskText,
+    "Recovery reset",
+  );
 });
 
 Deno.test("raises the plan-day target for coasting users on a normal day", () => {
@@ -699,8 +938,10 @@ Deno.test("raises the plan-day target for coasting users on a normal day", () =>
       newTitle: null,
     },
     currentDateTime: "2026-04-18T08:15:00-07:00",
+    sessionState: {
+      pendingStarterIntent: "plan_day",
+    },
     plannerContext: {
-      starterIntent: "plan_day",
       tasks: [
         {
           id: "task-scheduled-1",
@@ -873,8 +1114,10 @@ Deno.test("raises the plan-day target to six for locked-in users without exceedi
       category: null,
       newTitle: null,
     },
+    sessionState: {
+      pendingStarterIntent: "plan_day",
+    },
     plannerContext: {
-      starterIntent: "plan_day",
       tasks: [
         {
           id: "task-scheduled-1",
@@ -1063,8 +1306,10 @@ Deno.test("does not ramp the plan-day target on overloaded days", () => {
       category: null,
       newTitle: null,
     },
+    sessionState: {
+      pendingStarterIntent: "plan_day",
+    },
     plannerContext: {
-      starterIntent: "plan_day",
       tasks: [
         {
           id: "task-scheduled-1",
