@@ -42,15 +42,15 @@ describe("insertTomorrowDailyPepTalkAndSync", () => {
 
     const result = await insertTomorrowDailyPepTalkAndSync({
       supabase,
-      mentorSlug: "atlas",
+      mentorSlug: "sage",
       logger,
       beforeSync,
-      insertPayload: { mentor_slug: "atlas", for_date: "2026-02-21" },
+      insertPayload: { mentor_slug: "sage", for_date: "2026-02-21" },
     });
 
     expect(spies.from).toHaveBeenCalledWith("daily_pep_talks");
     expect(spies.insert).toHaveBeenCalledWith(expect.objectContaining({
-      mentor_slug: "atlas",
+      mentor_slug: "sage",
       for_date: "2026-02-21",
       transcript_status: "pending",
       transcript_attempt_count: 0,
@@ -77,9 +77,9 @@ describe("insertTomorrowDailyPepTalkAndSync", () => {
 
     const result = await insertTomorrowDailyPepTalkAndSync({
       supabase,
-      mentorSlug: "atlas",
+      mentorSlug: "sage",
       logger,
-      insertPayload: { mentor_slug: "atlas", for_date: "2026-02-21" },
+      insertPayload: { mentor_slug: "sage", for_date: "2026-02-21" },
     });
 
     expect(result.dailyPepTalkId).toBe("daily-123");
@@ -109,9 +109,9 @@ describe("insertTomorrowDailyPepTalkAndSync", () => {
 
     await insertTomorrowDailyPepTalkAndSync({
       supabase,
-      mentorSlug: "atlas",
+      mentorSlug: "sage",
       logger,
-      insertPayload: { mentor_slug: "atlas", for_date: "2026-02-21" },
+      insertPayload: { mentor_slug: "sage", for_date: "2026-02-21" },
     });
 
     expect(spies.update).toHaveBeenCalledWith(expect.objectContaining({

@@ -46,6 +46,10 @@ type IndexProps = {
 type MentorPageData = {
   mentorImage: string;
   mentorName: string | null;
+  mentorShortTitle: string | null;
+  mentorToneDescription: string | null;
+  mentorSignatureLine: string | null;
+  mentorTargetUser: string | null;
   todaysQuote: {
     text: string;
     author?: string;
@@ -216,7 +220,7 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
 
       const { data: mentorData, error: mentorError } = await supabase
         .from("mentors")
-        .select("avatar_url, name, slug")
+        .select("avatar_url, name, slug, short_title, tone_description, signature_line, target_user")
         .eq("id", effectiveMentorId)
         .maybeSingle();
 
@@ -265,6 +269,10 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
       return {
         mentorImage: imageUrl,
         mentorName: mentorData.name ?? null,
+        mentorShortTitle: mentorData.short_title ?? null,
+        mentorToneDescription: mentorData.tone_description ?? null,
+        mentorSignatureLine: mentorData.signature_line ?? null,
+        mentorTargetUser: mentorData.target_user ?? null,
         todaysQuote: quote,
       } satisfies MentorPageData;
     },
@@ -275,8 +283,21 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
 
   const mentorImage = effectiveMentorId ? mentorPageData?.mentorImage || "" : "";
   const mentorName = effectiveMentorId ? mentorPageData?.mentorName || null : null;
+  const mentorShortTitle = effectiveMentorId ? mentorPageData?.mentorShortTitle || null : null;
+  const mentorToneDescription = effectiveMentorId ? mentorPageData?.mentorToneDescription || null : null;
+  const mentorSignatureLine = effectiveMentorId ? mentorPageData?.mentorSignatureLine || null : null;
+  const mentorTargetUser = effectiveMentorId ? mentorPageData?.mentorTargetUser || null : null;
   const todaysQuote = effectiveMentorId ? mentorPageData?.todaysQuote || null : null;
   const askMentorLabel = mentorName ? `Ask ${mentorName}` : "Ask your guide";
+  const mentorRailDescription =
+    mentorSignatureLine
+    || mentorToneDescription
+    || mentorTargetUser
+    || "Check in, get guidance, and keep your momentum steady.";
+  const mentorSupportDescription =
+    mentorToneDescription
+    || mentorTargetUser
+    || "Check-ins, briefings, coach guidance, and daily pep talks follow your primary guide.";
   const onboardingGate = useMemo(
     () =>
       getOnboardingGateState({
@@ -569,13 +590,13 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
               )}
               <div className="absolute inset-x-0 bottom-0 p-6">
                 <p className="text-xs font-semibold uppercase tracking-[0.28em] text-white/70">
-                  Guide tab
+                  {mentorShortTitle || "Guide tab"}
                 </p>
                 <h1 className="mt-2 text-3xl font-semibold tracking-tight text-white">
                   {mentorName || "Guide"}
                 </h1>
                 <p className="mt-2 max-w-xs text-sm text-white/80">
-                  Check in, get guidance, and keep your momentum steady.
+                  {mentorRailDescription}
                 </p>
               </div>
             </div>
@@ -586,9 +607,11 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
                   <Sparkles className="h-4 w-4" />
                 </div>
                 <div className="space-y-1">
-                  <p className="text-sm font-semibold">Everything from your guide</p>
+                  <p className="text-sm font-semibold">
+                    {mentorName ? `${mentorName}'s guidance` : "Everything from your guide"}
+                  </p>
                   <p className="text-sm text-muted-foreground">
-                    Check-ins, briefings, coach guidance, and daily pep talks follow your primary guide. You can still consult other voices whenever you need another perspective.
+                    {mentorSupportDescription} You can still consult other voices whenever you need another perspective.
                   </p>
                 </div>
               </div>

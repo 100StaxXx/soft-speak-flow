@@ -14,14 +14,14 @@ const mentor = {
 describe("generateMentorExplanation", () => {
   it("uses current questionnaire keys (focus_area + guidance_tone + mentor_energy)", () => {
     const result = generateMentorExplanation(mentor, {
-      focus_area: "discipline",
-      guidance_tone: "supportive",
-      mentor_energy: "masculine_preference",
+      focus_area: "execution_pressure",
+      guidance_tone: "direct_challenging",
+      mentor_energy: "masculine_presence",
     });
 
-    expect(result.paragraph).toContain("You're focused on building discipline");
-    expect(result.paragraph).toContain("prefer supportive growth");
-    expect(result.paragraph).toContain("asked for a man as your guide");
+    expect(result.paragraph).toContain("You're focused on execution, pressure, and accountability");
+    expect(result.paragraph).toContain("prefer direct, challenging guidance");
+    expect(result.paragraph).toContain("asked for masculine energy from your guide");
   });
 
   it("keeps backward compatibility with legacy keys", () => {

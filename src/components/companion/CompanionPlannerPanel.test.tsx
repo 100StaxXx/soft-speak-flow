@@ -12,10 +12,6 @@ const mocks = vi.hoisted(() => ({
     cancelPendingAction: vi.fn(),
     stopSpeaking: vi.fn(),
   },
-  modeSettings: {
-    setMode: vi.fn(),
-    setAdaptationEnabled: vi.fn(),
-  },
   state: {
     messages: [
       {
@@ -75,17 +71,6 @@ vi.mock("@/hooks/useCompanionAssistant", () => ({
     isSpeaking: false,
     speechProvider: "device" as const,
     stopSpeaking: mocks.assistant.stopSpeaking,
-  }),
-}));
-
-vi.mock("@/hooks/useCompanionModeSettings", () => ({
-  useCompanionModeSettings: () => ({
-    mode: "alpha" as const,
-    adaptationEnabled: true,
-    isLoading: false,
-    isSaving: false,
-    setMode: mocks.modeSettings.setMode,
-    setAdaptationEnabled: mocks.modeSettings.setAdaptationEnabled,
   }),
 }));
 

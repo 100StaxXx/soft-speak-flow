@@ -105,8 +105,8 @@ export function useAccessStatus(): AccessStatus {
     trialDaysRemaining = Math.max(0, Math.ceil(msRemaining / (1000 * 60 * 60 * 24)));
   }
 
-  // Product rule: once guided tutorial concludes, unsubscribed users should land on the trial CTA gate.
-  // This intentionally takes precedence over legacy trial timestamp fields.
+  // After access has fully dropped, tutorial completion determines whether we show
+  // the pre-trial signup gate for unsubscribed users.
   const needsPreTrialSignup = !isSubscribed && tutorialCompleted;
 
   let hasAccess = true;
@@ -116,15 +116,15 @@ export function useAccessStatus(): AccessStatus {
   if (isSubscribed) {
     accessSource = accessState.access_source === 'promo_code' ? 'promo_code' : 'subscription';
     hasAccess = true;
-  } else if (needsPreTrialSignup) {
-    hasAccess = false;
-    gateReason = 'pre_trial_signup';
   } else if (accessState.has_access) {
     accessSource = accessState.access_source === 'trial' ? 'trial' : 'subscription';
     hasAccess = true;
   } else if (trialExpired) {
     hasAccess = false;
     gateReason = 'trial_expired';
+  } else if (needsPreTrialSignup) {
+    hasAccess = false;
+    gateReason = 'pre_trial_signup';
   }
 
   return {

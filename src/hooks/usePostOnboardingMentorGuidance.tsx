@@ -196,6 +196,10 @@ const INTRO_DIALOGUE_BY_MENTOR_SLUG: Record<string, MentorDialogueLine> = {
     text: "I'm The Sage. Let's quiet the noise and make your next step clear.",
     support: "Stay with me through this short walkthrough. Calm first, then momentum.",
   },
+  lyra: {
+    text: "I'm Lyra. Let's read the pattern quickly so your first steps feel elegant and obvious.",
+    support: "Stay with me through this walkthrough and we'll turn noise into signal together.",
+  },
   icon: {
     text: "I'm The Icon. We're going to start with intention and a better standard.",
     support: "Move through this walkthrough cleanly, then carry that energy forward.",
@@ -215,10 +219,6 @@ const INTRO_DIALOGUE_BY_MENTOR_SLUG: Record<string, MentorDialogueLine> = {
   rival: {
     text: "I'm The Rival. If you're serious about leveling up, prove it.",
     support: "Finish this walkthrough and show me you can follow through.",
-  },
-  reign: {
-    text: "I'm Reign. We still move with standards, even in legacy mode.",
-    support: "Lock in this walkthrough, then make the day count.",
   },
 };
 

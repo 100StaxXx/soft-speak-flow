@@ -203,7 +203,7 @@ describe("supabaseFunctionErrors", () => {
       category: "http",
       isOffline: false,
       status: 500,
-      backendMessage: "No themes configured for mentor: solace",
+      backendMessage: "No themes configured for mentor: icon",
     };
     const audioProviderAuthError: ParsedFunctionInvokeError = {
       category: "http",
@@ -240,7 +240,7 @@ describe("supabaseFunctionErrors", () => {
     ).toContain("session has expired");
     expect(toUserFacingFunctionError(rateLimitParsed)).toBe("Daily limit reached");
     expect(toUserFacingFunctionError(serverParsed)).toContain("temporarily unavailable");
-    expect(toUserFacingFunctionError(serverParsedWithMessage)).toBe("No themes configured for mentor: solace");
+    expect(toUserFacingFunctionError(serverParsedWithMessage)).toBe("No themes configured for mentor: icon");
     expect(toUserFacingFunctionError(audioProviderAuthError)).toContain("provider authentication failed");
     expect(toUserFacingFunctionError(audioProviderCreditsError)).toContain("credits are exhausted");
     expect(toUserFacingFunctionError(rateLimitWithRetryHint)).toContain("30 seconds");

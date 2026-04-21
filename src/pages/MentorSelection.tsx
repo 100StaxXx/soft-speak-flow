@@ -6,13 +6,14 @@ import { useAuth } from "@/hooks/useAuth";
 import { MentorGrid } from "@/components/MentorGrid";
 import { useToast } from "@/hooks/use-toast";
 import { MentorSelectionSkeleton } from "@/components/skeletons/MentorSelectionSkeleton";
+import { buildBrowseMentorCatalog, type MentorBrowseEntry } from "@/lib/mentorCatalog";
 
 const MentorSelection = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const [mentors, setMentors] = useState<any[]>([]);
+  const [mentors, setMentors] = useState<MentorBrowseEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [selecting, setSelecting] = useState(false);
   const [currentMentorId, setCurrentMentorId] = useState<string | null>(null);
@@ -27,7 +28,21 @@ const MentorSelection = () => {
         .order("created_at");
 
       if (mentorsError) throw mentorsError;
-      setMentors(mentorsData || []);
+      setMentors(buildBrowseMentorCatalog((mentorsData || []).map((mentor) => ({
+        id: mentor.id,
+        name: mentor.name,
+        slug: mentor.slug || "",
+        archetype: mentor.mentor_type || mentor.description || "Guide",
+        short_title: mentor.short_title,
+        tone_description: mentor.tone_description,
+        style_description: mentor.style_description,
+        target_user: mentor.target_user,
+        signature_line: mentor.signature_line,
+        primary_color: mentor.primary_color || "#7B68EE",
+        avatar_url: mentor.avatar_url,
+        themes: mentor.themes || [],
+        availability: "active",
+      }))));
 
       // Fetch current mentor if user is logged in
       if (user) {

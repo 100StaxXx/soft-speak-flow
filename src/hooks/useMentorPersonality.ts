@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useMentorConnection } from "@/contexts/MentorConnectionContext";
-import { resolveMentorSlugAlias } from "@/lib/mentorRoster";
+import { resolveActiveMentorSlug } from "@/lib/mentorRoster";
 
 interface MentorPersonality {
   name: string;
@@ -22,6 +22,12 @@ const personalityTemplates: Record<string, Partial<MentorPersonality>> = {
     emptyState: (context) => `One clear step is enough. Begin with ${context}.`,
     encouragement: () => "Small steps still move mountains.",
     nudge: () => "Breathe first. Then continue.",
+  },
+  lyra: {
+    buttonText: (action) => `${action} with signal`,
+    emptyState: (context) => `Let's find the pattern in ${context} and move cleanly from there.`,
+    encouragement: () => "The pattern is already there. Keep following it.",
+    nudge: () => "Zoom out, find the signal, then act.",
   },
   icon: {
     buttonText: (action) => `${action} with intention`,
@@ -53,12 +59,6 @@ const personalityTemplates: Record<string, Partial<MentorPersonality>> = {
     encouragement: () => "You said you were different. Prove it.",
     nudge: () => "Try harder.",
   },
-  reign: {
-    buttonText: (action) => `${action}. No excuses.`,
-    emptyState: (context) => `Excellence still applies to ${context}.`,
-    encouragement: () => "Stand tall and make today count.",
-    nudge: () => "Lock in.",
-  },
 };
 
 export const useMentorPersonality = (): MentorPersonality | null => {
@@ -81,7 +81,7 @@ export const useMentorPersonality = (): MentorPersonality | null => {
 
   if (!mentor) return null;
 
-  const resolvedSlug = resolveMentorSlugAlias(mentor.slug) ?? mentor.slug ?? "sage";
+  const resolvedSlug = resolveActiveMentorSlug(mentor.slug) ?? "sage";
   const template = personalityTemplates[resolvedSlug] ?? personalityTemplates.sage;
 
   return {

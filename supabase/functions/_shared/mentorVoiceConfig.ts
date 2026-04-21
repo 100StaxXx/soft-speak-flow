@@ -19,6 +19,13 @@ export const ELEVENLABS_MENTOR_VOICES: Record<SupportedMentorSlug, MentorVoiceCo
     style_exaggeration: 0.28,
     use_speaker_boost: true,
   },
+  lyra: {
+    voiceId: "fgDJOgmENIR82PueQrVs",
+    stability: 0.66,
+    similarity_boost: 0.9,
+    style_exaggeration: 0.58,
+    use_speaker_boost: true,
+  },
   icon: {
     voiceId: "6p0P6gezgvY1v6xbLzmU",
     stability: 0.7,
@@ -27,7 +34,7 @@ export const ELEVENLABS_MENTOR_VOICES: Record<SupportedMentorSlug, MentorVoiceCo
     use_speaker_boost: true,
   },
   charles: {
-    voiceId: "wGkprrTXgBM5EC3Znt6U",
+    voiceId: "7iAGWaZOtZujCYrDewVi",
     stability: 0.76,
     similarity_boost: 0.86,
     style_exaggeration: 0.52,
@@ -54,23 +61,16 @@ export const ELEVENLABS_MENTOR_VOICES: Record<SupportedMentorSlug, MentorVoiceCo
     style_exaggeration: 0.84,
     use_speaker_boost: true,
   },
-  reign: {
-    voiceId: "GTQ4ImqrRljZAa9VJX6B",
-    stability: 0.52,
-    similarity_boost: 0.97,
-    style_exaggeration: 1,
-    use_speaker_boost: true,
-  },
 };
 
 export const OPENAI_TUTORIAL_VOICE_MAP: Record<SupportedMentorSlug, string> = {
   sage: "sage",
+  lyra: "nova",
   icon: "nova",
   charles: "echo",
   princess: "shimmer",
   operator: "onyx",
   rival: "fable",
-  reign: "fable",
 };
 
 export const resolveMentorVoiceConfig = (

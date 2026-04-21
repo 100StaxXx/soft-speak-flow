@@ -814,7 +814,6 @@ describe("guided tutorial intro dialogue sequence", () => {
     { name: "The Princess", slug: "princess", tone: "Empathetic" },
     { name: "The Operator", slug: "operator", tone: "Direct" },
     { name: "The Rival", slug: "rival", tone: "Tough" },
-    { name: "Reign", slug: "reign", tone: "Tough" },
   ])(
     "uses shared quests intro voice for $slug",
     async ({ name, slug, tone }) => {

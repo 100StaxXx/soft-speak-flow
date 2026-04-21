@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Drawer,
   DrawerContent,
@@ -68,6 +68,7 @@ export const JourneyDetailDrawer = ({
   const { regeneratePathForMilestone } = useJourneyPathImage(epicId);
 
   const currentPhase = getCurrentPhase();
+  const attemptedPostcardRecoveryRef = useRef<string | null>(null);
   // Get postcards for this epic
   const epicPostcards = useMemo(() => 
     postcards?.filter(p => p.epic_id === epicId) || [], 
@@ -77,6 +78,62 @@ export const JourneyDetailDrawer = ({
   // Get postcard for a specific milestone
   const getPostcardForMilestone = (milestone: Milestone) => 
     epicPostcards.find(p => p.milestone_percent === milestone.milestone_percent);
+
+  const companionPostcardData = useMemo(
+    () => ({
+      spirit_animal: companion?.spirit_animal,
+      favorite_color: companion?.favorite_color,
+      core_element: companion?.core_element,
+      eye_color: companion?.eye_color,
+      fur_color: companion?.fur_color,
+    }),
+    [
+      companion?.core_element,
+      companion?.eye_color,
+      companion?.favorite_color,
+      companion?.fur_color,
+      companion?.spirit_animal,
+    ]
+  );
+
+  const selectedMilestonePostcard = useMemo(
+    () => (selectedMilestone ? getPostcardForMilestone(selectedMilestone) : undefined),
+    [selectedMilestone, epicPostcards]
+  );
+
+  useEffect(() => {
+    if (!selectedMilestone) {
+      attemptedPostcardRecoveryRef.current = null;
+      return;
+    }
+
+    if (!selectedMilestone.completed_at || !selectedMilestone.is_postcard_milestone || selectedMilestonePostcard) {
+      attemptedPostcardRecoveryRef.current = null;
+      return;
+    }
+
+    if (attemptedPostcardRecoveryRef.current === selectedMilestone.id) {
+      return;
+    }
+
+    attemptedPostcardRecoveryRef.current = selectedMilestone.id;
+
+    void checkMilestoneForPostcard(
+      selectedMilestone.id,
+      epicId,
+      companion?.id || "",
+      companionPostcardData,
+    ).catch((error) => {
+      console.error("Failed to recover missing milestone postcard:", error);
+    });
+  }, [
+    checkMilestoneForPostcard,
+    companion?.id,
+    companionPostcardData,
+    epicId,
+    selectedMilestone,
+    selectedMilestonePostcard,
+  ]);
 
   // Check if phase is complete after milestone completion
   const checkPhaseCompletion = (completedMilestone: Milestone) => {
@@ -113,13 +170,7 @@ export const JourneyDetailDrawer = ({
       milestoneId: milestone.id,
       epicId,
       onPostcardTrigger: (completedMilestone) => {
-        checkMilestoneForPostcard(completedMilestone.id, epicId, companion?.id || "", {
-          spirit_animal: companion?.spirit_animal,
-          favorite_color: companion?.favorite_color,
-          core_element: companion?.core_element,
-          eye_color: companion?.eye_color,
-          fur_color: companion?.fur_color,
-        });
+        checkMilestoneForPostcard(completedMilestone.id, epicId, companion?.id || "", companionPostcardData);
       },
     }, {
       onSuccess: () => {
@@ -298,7 +349,7 @@ export const JourneyDetailDrawer = ({
       onUncomplete={handleMilestoneUncomplete}
       isCompleting={isCompleting}
       status={selectedMilestone ? getMilestoneStatus(selectedMilestone) : "pending"}
-      postcard={selectedMilestone ? getPostcardForMilestone(selectedMilestone) : undefined}
+      postcard={selectedMilestonePostcard}
     />
     </>
   );

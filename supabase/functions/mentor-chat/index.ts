@@ -241,8 +241,6 @@ function getMentorPersonalityAdjustments(mentorSlug?: string | null): string {
       return "Keep the response precise, controlled, and execution-focused. Emphasize structure, blocks, and systems.";
     case "rival":
       return "Keep the response direct, competitive, and challenging. Use pride and standards to drive action.";
-    case "reign":
-      return "Keep the response commanding, ambitious, and performance-focused.";
     default:
       return "";
   }

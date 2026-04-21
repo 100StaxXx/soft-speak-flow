@@ -26,6 +26,7 @@ import { generateMentorExplanation, type MentorExplanation } from "@/utils/mento
 import { useCompanion } from "@/hooks/useCompanion";
 import { pollWithDeadline } from "@/utils/asyncTimeout";
 import { logger } from "@/utils/logger";
+import { Button } from "@/components/ui/button";
 import {
   getPresetCompanionAssetUrl,
   getUniversalEggAssetUrl,
@@ -50,10 +51,11 @@ import {
 } from "@/utils/guidedTutorial";
 import { safeLocalStorage } from "@/utils/storage";
 import { resolveAssignedMentorFromActiveMentors } from "@/config/onboardingMentorAssignments";
+import { buildBrowseMentorCatalog } from "@/lib/mentorCatalog";
 
 // Removed duplicate outer function - using inner component method instead
 
-type OnboardingStage = 
+export type OnboardingStage = 
   | "prologue" 
   | "destiny"
   | "faction" 
@@ -157,6 +159,8 @@ interface Mentor {
   name: string;
   description: string;
   tone_description: string;
+  style_description?: string;
+  signature_line?: string;
   avatar_url?: string;
   tags: string[];
   mentor_type: string;
@@ -182,6 +186,7 @@ type MentorEnergyCandidate = {
 
 type AnswerEnergyInput = {
   questionId: string;
+  optionId?: string | null;
   tags?: string[] | null;
 };
 
@@ -227,6 +232,7 @@ interface StoryOnboardingProps {
   resumeState?: StoryOnboardingResumeState | null;
   onJourneyCinematicStart?: () => void;
   onJourneyCinematicComplete?: () => void;
+  onExitToAuth?: () => void;
 }
 
 type CompanionSelectionPreferences = {
@@ -240,12 +246,64 @@ type CompanionSelectionPreferences = {
 
 type CompanionSetupStatus = "idle" | "pending" | "ready" | "failed";
 
+interface OnboardingStageRecoveryInput {
+  stage: OnboardingStage;
+  startsAtCompanion: boolean;
+  resumesAtJourneyBegins: boolean;
+  hasFaction: boolean;
+  hasRecommendedMentor: boolean;
+  hasMentorExplanation: boolean;
+  hasSelectedPresetId: boolean;
+  companionSetupStatus: CompanionSetupStatus;
+  hasPendingCompanionSetup: boolean;
+}
+
+export const getOnboardingStageRecoveryTarget = ({
+  stage,
+  startsAtCompanion,
+  resumesAtJourneyBegins,
+  hasFaction,
+  hasRecommendedMentor,
+  hasMentorExplanation,
+  hasSelectedPresetId,
+  companionSetupStatus,
+  hasPendingCompanionSetup,
+}: OnboardingStageRecoveryInput): OnboardingStage | null => {
+  if (stage === "questionnaire" && !hasFaction && !startsAtCompanion) {
+    return "faction";
+  }
+
+  if (stage === "mentor-result" && (!hasRecommendedMentor || !hasMentorExplanation)) {
+    return hasFaction ? "questionnaire" : startsAtCompanion ? "story-tone" : "faction";
+  }
+
+  if (stage === "egg-prelude" && !hasSelectedPresetId) {
+    return "story-tone";
+  }
+
+  if (stage === "companion" && !startsAtCompanion && !hasFaction) {
+    return "faction";
+  }
+
+  if (
+    stage === "journey-begins"
+    && !resumesAtJourneyBegins
+    && companionSetupStatus !== "ready"
+    && !hasPendingCompanionSetup
+  ) {
+    return "companion";
+  }
+
+  return null;
+};
+
 export const StoryOnboarding = ({
   mode = "standard",
   existingCompanion = null,
   resumeState = null,
   onJourneyCinematicStart,
   onJourneyCinematicComplete,
+  onExitToAuth,
 }: StoryOnboardingProps) => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -314,6 +372,46 @@ export const StoryOnboarding = ({
   }, [resumeState?.companionLabel, resumeState?.userName, resumesAtJourneyBegins]);
 
   useEffect(() => {
+    const recoveryTarget = getOnboardingStageRecoveryTarget({
+      stage,
+      startsAtCompanion,
+      resumesAtJourneyBegins,
+      hasFaction: Boolean(faction),
+      hasRecommendedMentor: Boolean(recommendedMentor),
+      hasMentorExplanation: Boolean(mentorExplanation),
+      hasSelectedPresetId: Boolean(selectedPresetId),
+      companionSetupStatus,
+      hasPendingCompanionSetup: Boolean(pendingCompanionSetup),
+    });
+
+    if (!recoveryTarget || recoveryTarget === stage) {
+      return;
+    }
+
+    onboardingLog.warn("Recovering onboarding stage after missing intermediate state", {
+      stage,
+      recoveryTarget,
+      hasFaction: Boolean(faction),
+      hasRecommendedMentor: Boolean(recommendedMentor),
+      hasMentorExplanation: Boolean(mentorExplanation),
+      hasSelectedPresetId: Boolean(selectedPresetId),
+      companionSetupStatus,
+      hasPendingCompanionSetup: Boolean(pendingCompanionSetup),
+    });
+    setStage(recoveryTarget);
+  }, [
+    companionSetupStatus,
+    faction,
+    mentorExplanation,
+    pendingCompanionSetup,
+    recommendedMentor,
+    resumesAtJourneyBegins,
+    selectedPresetId,
+    stage,
+    startsAtCompanion,
+  ]);
+
+  useEffect(() => {
     if (isResetMode || stage !== "journey-begins" || journeyCinematicStartedRef.current) return;
 
     journeyCinematicStartedRef.current = true;
@@ -374,6 +472,8 @@ export const StoryOnboarding = ({
       name: mentorRow.name,
       description: mentorRow.description,
       tone_description: mentorRow.tone_description,
+      style_description: mentorRow.style_description ?? undefined,
+      signature_line: mentorRow.signature_line ?? undefined,
       avatar_url: mentorRow.avatar_url ?? undefined,
       tags: mentorRow.tags || [],
       mentor_type: mentorRow.mentor_type,
@@ -503,8 +603,8 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
 
         // Convert answers to Record format for explanation generator
         const selectedAnswers: Record<string, string> = {};
-        questionAnswers.forEach(answer => {
-          selectedAnswers[answer.questionId] = answer.tags[0] || "";
+        questionAnswers.forEach((answer) => {
+          selectedAnswers[answer.questionId] = answer.optionId;
         });
 
         // Generate explanation
@@ -622,8 +722,8 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
     
     // Generate explanation for the selected mentor
     const selectedAnswers: Record<string, string> = {};
-    answers.forEach(answer => {
-      selectedAnswers[answer.questionId] = answer.tags[0] || "";
+    answers.forEach((answer) => {
+      selectedAnswers[answer.questionId] = answer.optionId;
     });
     const explanation = generateMentorExplanation(selectedMentor, selectedAnswers);
     setMentorExplanation(explanation);
@@ -1121,6 +1221,19 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
     <div className="min-h-screen relative overflow-hidden bg-background">
       <StarfieldBackground />
       {backdropStage && <OnboardingCosmicBackdrop stage={backdropStage} faction={faction} motionLevel="balanced" />}
+
+      {onExitToAuth ? (
+        <div className="pointer-events-none absolute left-4 right-4 top-[max(1rem,env(safe-area-inset-top)+0.5rem)] z-20 flex justify-start">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={onExitToAuth}
+            className="pointer-events-auto rounded-full border border-white/[0.12] bg-black/30 px-5 text-white/[0.86] backdrop-blur-md hover:bg-black/45"
+          >
+            Back to Sign In
+          </Button>
+        </div>
+      ) : null}
       
       <AnimatePresence mode="wait">
         {stage === "prologue" && (
@@ -1220,13 +1333,21 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
               <p className="text-muted-foreground text-sm">Select the guide who resonates with you</p>
             </div>
             <MentorGrid
-              mentors={mentors.map(m => ({
-                ...m,
+              mentors={buildBrowseMentorCatalog(mentors.map((m) => ({
+                id: m.id,
+                name: m.name,
+                slug: m.slug,
                 archetype: m.mentor_type,
-                style_description: m.tone_description,
-                signature_line: m.description,
+                short_title: m.short_title,
+                tone_description: m.tone_description,
+                style_description: m.style_description ?? m.tone_description,
+                target_user: m.target_user,
+                signature_line: m.signature_line ?? m.description,
+                primary_color: m.primary_color,
+                avatar_url: m.avatar_url,
                 themes: m.themes || [],
-              }))}
+                availability: "active",
+              })))}
               onSelectMentor={handleMentorSelectFromGrid}
               recommendedMentorId={recommendedMentor?.id}
             />

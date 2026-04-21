@@ -29,9 +29,9 @@ Deno.test("mentor pep talk config resolves active mentor themes", () => {
   }
 });
 
-Deno.test("mentor pep talk config resolves legacy aliases", () => {
+Deno.test("mentor pep talk config rejects legacy aliases", () => {
   const resolved = resolveMentorSlug("elizabeth");
-  assert(resolved === "charles", "Expected elizabeth alias to map to charles");
+  assert(resolved === null, "Expected legacy alias to be rejected");
 });
 
 Deno.test("mentor pep talk config uses deterministic theme selection", () => {

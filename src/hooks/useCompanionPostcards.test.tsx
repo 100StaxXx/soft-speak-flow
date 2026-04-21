@@ -65,6 +65,32 @@ const createPostcardsSelectBuilder = () => {
   return builder;
 };
 
+const createMilestoneSelectBuilder = (data: Record<string, unknown>) => {
+  const builder = {
+    eq: vi.fn(() => builder),
+    maybeSingle: vi.fn(async () => ({
+      data,
+      error: null,
+    })),
+  };
+
+  return builder;
+};
+
+const createCompanionSelectBuilder = (data: Record<string, unknown>) => {
+  const builder = {
+    eq: vi.fn(() => builder),
+    order: vi.fn(() => builder),
+    limit: vi.fn(() => builder),
+    maybeSingle: vi.fn(async () => ({
+      data,
+      error: null,
+    })),
+  };
+
+  return builder;
+};
+
 describe("useCompanionPostcards", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -140,6 +166,72 @@ describe("useCompanionPostcards", () => {
     );
     expect(invalidateQueriesSpy).toHaveBeenCalledWith({
       queryKey: ["companion-postcards", "user-1"],
+    });
+  });
+
+  it("falls back to the latest companion and sends chapterNumber for milestone postcards", async () => {
+    mocks.fromMock.mockImplementation((table: string) => {
+      if (table === "companion_postcards") {
+        return {
+          select: vi.fn(() => createPostcardsSelectBuilder()),
+        };
+      }
+
+      if (table === "epic_milestones") {
+        return {
+          select: vi.fn(() =>
+            createMilestoneSelectBuilder({
+              id: "milestone-1",
+              title: "Establish Workout Routine",
+              milestone_percent: 25,
+              is_postcard_milestone: true,
+              chapter_number: 2,
+            }),
+          ),
+        };
+      }
+
+      if (table === "user_companion") {
+        return {
+          select: vi.fn(() =>
+            createCompanionSelectBuilder({
+              id: "companion-fallback",
+              spirit_animal: "Phoenix",
+              favorite_color: "#22c55e",
+              core_element: "air",
+              eye_color: "amber",
+              fur_color: "gold",
+            }),
+          ),
+        };
+      }
+
+      throw new Error(`Unexpected table: ${table}`);
+    });
+
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(() => useCompanionPostcards(), { wrapper });
+
+    await act(async () => {
+      await result.current.checkMilestoneForPostcard("milestone-1", "epic-7", "", {});
+    });
+
+    await waitFor(() => {
+      expect(mocks.invokeMock).toHaveBeenCalledWith("generate-cosmic-postcard", {
+        body: {
+          companionId: "companion-fallback",
+          epicId: "epic-7",
+          milestonePercent: 25,
+          companionData: {
+            spirit_animal: "Phoenix",
+            favorite_color: "#22c55e",
+            core_element: "air",
+            eye_color: "amber",
+            fur_color: "gold",
+          },
+          chapterNumber: 2,
+        },
+      });
     });
   });
 });

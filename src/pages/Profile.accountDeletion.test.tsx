@@ -163,6 +163,10 @@ vi.mock("@/components/CompanionAccessibilitySettings", () => ({
   CompanionAccessibilitySettings: () => null,
 }));
 
+vi.mock("@/components/CompanionPersonalitySettings", () => ({
+  CompanionPersonalitySettings: () => null,
+}));
+
 vi.mock("@/components/LegalDocumentViewer", () => ({
   LegalDocumentViewer: () => null,
 }));

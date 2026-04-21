@@ -54,10 +54,7 @@ import { useCompanionAssistant } from "@/hooks/useCompanionAssistant";
 import { useJourneysCompanionVisual } from "@/hooks/useJourneysCompanionVisual";
 import { cn, stripMarkdown } from "@/lib/utils";
 import type { CompanionChatThreadSummary } from "@/types/companionConversation";
-import type {
-  CompanionPlannerLaunchIntent,
-  CompanionPlannerProposal,
-} from "@/types/companionPlanner";
+import type { CompanionPlannerLaunchIntent } from "@/types/companionPlanner";
 
 type JourneysCompanionPlannerModalPresentation = "dialog" | "drawer";
 
@@ -65,13 +62,21 @@ interface JourneysCompanionPlannerModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   presentation: JourneysCompanionPlannerModalPresentation;
+  assistant: JourneysCompanionPlannerAssistant;
+  launchIntent?: CompanionPlannerLaunchIntent | null;
+  onLaunchIntentConsumed?: (intentId: string) => void;
+}
+
+interface JourneysCompanionPlannerControllerProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  presentation: JourneysCompanionPlannerModalPresentation;
   launchIntent?: CompanionPlannerLaunchIntent | null;
   onLaunchIntentConsumed?: (intentId: string) => void;
   onOpenCampaignBuilder?: (message: string) => void;
-  onQuestProposalEditHandoff?: (
-    proposal: CompanionPlannerProposal,
-  ) => Promise<{ saved: boolean; savedTitle?: string | null }>;
 }
+
+export type JourneysCompanionPlannerAssistant = ReturnType<typeof useCompanionAssistant>;
 
 type JourneysCompanionDrawerLayout = {
   shellHeight: number;
@@ -229,16 +234,16 @@ const JourneysCompanionThreadPicker = memo(function JourneysCompanionThreadPicke
 });
 
 const JourneysCompanionOverlayBody = memo(({
+  assistant,
   presentation,
   launchIntent,
   onLaunchIntentConsumed,
-  onOpenCampaignBuilder,
   drawerLayout,
 }: {
+  assistant: JourneysCompanionPlannerAssistant;
   presentation: JourneysCompanionPlannerModalPresentation;
   launchIntent?: CompanionPlannerLaunchIntent | null;
   onLaunchIntentConsumed?: (intentId: string) => void;
-  onOpenCampaignBuilder?: (message: string) => void;
   drawerLayout?: JourneysCompanionDrawerLayout;
 }) => {
   const {
@@ -249,13 +254,6 @@ const JourneysCompanionOverlayBody = memo(({
     element,
     usesPortraitShell,
   } = useJourneysCompanionVisual();
-  const assistant = useCompanionAssistant({
-    surface: "journeys",
-    conversationEnabled: true,
-    launchIntent: launchIntent ?? null,
-    onLaunchIntentConsumed,
-    onOpenCampaignBuilder,
-  });
   const prefersReducedMotion = getReducedMotionPreference();
   const isDrawerPresentation = presentation === "drawer";
 
@@ -511,7 +509,7 @@ const JourneysCompanionOverlayBody = memo(({
                         Pending confirmation
                       </Badge>
                       <Badge variant="outline" className={plannerPathfinderTheme.chip}>
-                        {assistant.pendingAction.actionType.replaceAll("_", " ")}
+                        {assistant.pendingAction.actionType.replace(/_/g, " ")}
                       </Badge>
                     </div>
                     <p className="mt-3 text-sm font-semibold text-white">
@@ -543,6 +541,32 @@ const JourneysCompanionOverlayBody = memo(({
                       >
                         <X className="mr-2 h-4 w-4" />
                         Cancel
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
+              {assistant.lastFailedMessage ? (
+                <div
+                  className="flex w-full justify-start"
+                  data-testid="journeys-companion-submit-error"
+                >
+                  <div className={cn(plannerPathfinderTheme.raisedPanel, "max-w-[88%] p-4")}>
+                    <p className="text-sm font-semibold text-white">
+                      {assistant.error ?? "Cosmiq hit a snag. Try that again."}
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        className={plannerPathfinderTheme.primaryButton}
+                        onClick={() => {
+                          void assistant.retryLastMessage();
+                        }}
+                        disabled={assistant.isSubmitting || assistant.isResolvingAction}
+                      >
+                        Retry
                       </Button>
                     </div>
                   </div>
@@ -679,9 +703,9 @@ export const JourneysCompanionPlannerModal = memo(function JourneysCompanionPlan
   open,
   onOpenChange,
   presentation,
+  assistant,
   launchIntent,
   onLaunchIntentConsumed,
-  onOpenCampaignBuilder,
 }: JourneysCompanionPlannerModalProps) {
   const [drawerLayout, setDrawerLayout] = useState<JourneysCompanionDrawerLayout>(() => getDrawerLayout());
 
@@ -706,10 +730,10 @@ export const JourneysCompanionPlannerModal = memo(function JourneysCompanionPlan
 
   const body = (
     <JourneysCompanionOverlayBody
+      assistant={assistant}
       presentation={presentation}
       launchIntent={launchIntent}
       onLaunchIntentConsumed={onLaunchIntentConsumed}
-      onOpenCampaignBuilder={onOpenCampaignBuilder}
       drawerLayout={presentation === "drawer" ? drawerLayout : undefined}
     />
   );
@@ -742,5 +766,33 @@ export const JourneysCompanionPlannerModal = memo(function JourneysCompanionPlan
         {body}
       </DrawerContent>
     </Drawer>
+  );
+});
+
+export const JourneysCompanionPlannerController = memo(function JourneysCompanionPlannerController({
+  open,
+  onOpenChange,
+  presentation,
+  launchIntent,
+  onLaunchIntentConsumed,
+  onOpenCampaignBuilder,
+}: JourneysCompanionPlannerControllerProps) {
+  const assistant = useCompanionAssistant({
+    surface: "journeys",
+    conversationEnabled: true,
+    launchIntent: launchIntent ?? null,
+    onLaunchIntentConsumed,
+    onOpenCampaignBuilder,
+  });
+
+  return (
+    <JourneysCompanionPlannerModal
+      open={open}
+      onOpenChange={onOpenChange}
+      presentation={presentation}
+      assistant={assistant}
+      launchIntent={launchIntent}
+      onLaunchIntentConsumed={onLaunchIntentConsumed}
+    />
   );
 });

@@ -43,8 +43,8 @@ vi.mock("@/hooks/useAccessState", () => ({
   useAccessState: () => accessState,
 }));
 
-vi.mock("@/components/TrialExpiredPaywall", () => ({
-  TrialExpiredPaywall: ({ variant }: { variant?: "pre_trial_signup" | "trial_expired" }) => (
+vi.mock("@/components/Paywall", () => ({
+  Paywall: ({ variant }: { variant?: "pre_trial_signup" | "trial_expired" }) => (
     <div>{`Paywall:${variant ?? "pre_trial_signup"}`}</div>
   ),
 }));
@@ -124,11 +124,11 @@ describe("ProtectedRoute post-tutorial gating", () => {
     expect(screen.queryByText("Tutorial Complete Screen")).not.toBeInTheDocument();
   });
 
-  it("still renders trial-expired gate when tutorial is not complete and trial is expired", () => {
+  it("still renders the trial-expired gate when tutorial is complete and trial access has expired", () => {
     profileState.profile = {
       ...profileState.profile,
       onboarding_data: {
-        guided_tutorial: { completed: false },
+        guided_tutorial: { completed: true },
       },
     };
     accessState.accessState = {
@@ -141,6 +141,26 @@ describe("ProtectedRoute post-tutorial gating", () => {
     renderRoute();
 
     expect(screen.getByText("Paywall:trial_expired")).toBeInTheDocument();
+  });
+
+  it("keeps protected content visible when tutorial is complete but an active trial is present", () => {
+    profileState.profile = {
+      ...profileState.profile,
+      onboarding_data: {
+        guided_tutorial: { completed: true },
+      },
+    };
+    accessState.accessState = {
+      has_access: true,
+      access_source: "trial",
+      trial_ends_at: "2026-03-01T00:00:00.000Z",
+      subscribed: false,
+    };
+
+    renderRoute();
+
+    expect(screen.getByText("Tutorial Complete Screen")).toBeInTheDocument();
+    expect(screen.queryByText("Paywall:pre_trial_signup")).not.toBeInTheDocument();
   });
 
   it("drops the paywall as soon as refreshed promo access is present", async () => {

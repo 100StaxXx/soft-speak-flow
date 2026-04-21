@@ -100,11 +100,30 @@ vi.mock("@/components/PageTransition", () => ({
 }));
 
 vi.mock("@/components/PageInfoButton", () => ({
-  PageInfoButton: () => null,
+  PageInfoButton: ({ onClick }: { onClick: () => void }) => (
+    <button type="button" onClick={onClick}>
+      PageInfo
+    </button>
+  ),
 }));
 
 vi.mock("@/components/PageInfoModal", () => ({
-  PageInfoModal: () => null,
+  PageInfoModal: ({
+    open,
+    description,
+    tip,
+  }: {
+    open: boolean;
+    description: string;
+    tip?: string;
+  }) => (
+    open ? (
+      <div>
+        <div>{description}</div>
+        {tip ? <div>{tip}</div> : null}
+      </div>
+    ) : null
+  ),
 }));
 
 import MentorChat from "./MentorChat";
@@ -146,7 +165,7 @@ describe("MentorChat mentor connection state", () => {
 
     renderMentorChat();
 
-    expect(screen.getByText("Loading your motivator...")).toBeInTheDocument();
+    expect(screen.getByText("Loading your guide...")).toBeInTheDocument();
     expect(screen.queryByText("No guide selected")).not.toBeInTheDocument();
   });
 
@@ -156,7 +175,7 @@ describe("MentorChat mentor connection state", () => {
     renderMentorChat();
 
     expect(screen.getByText("No guide selected")).toBeInTheDocument();
-    expect(screen.queryByText("Loading your motivator...")).not.toBeInTheDocument();
+    expect(screen.queryByText("Loading your guide...")).not.toBeInTheDocument();
   });
 
   it("keeps mentor actions clickable when mentor is ready", () => {
@@ -165,7 +184,11 @@ describe("MentorChat mentor connection state", () => {
     mocks.mentorQuery.data = {
       id: "mentor-1",
       name: "The Sage",
+      short_title: "Quiet Clarity",
       tone_description: "Steady guidance",
+      style_description: "Short, reflective guidance with gentle metaphors.",
+      signature_line: "Peace comes before progress.",
+      target_user: "Overwhelmed thinkers seeking calm clarity",
       avatar_url: "https://example.com/avatar.png",
     };
 
@@ -182,7 +205,11 @@ describe("MentorChat mentor connection state", () => {
     mocks.mentorQuery.data = {
       id: "mentor-2",
       name: "The Princess",
+      short_title: "Soft Discipline",
       tone_description: "Gentle guidance",
+      style_description: "Warm, calm, slightly dreamy guidance.",
+      signature_line: "A soft, productive day is enough.",
+      target_user: "Users building routines through gentle structure",
       avatar_url: "https://example.com/avatar.png",
     };
     mocks.primaryMentorQuery.data = {
@@ -196,5 +223,27 @@ describe("MentorChat mentor connection state", () => {
     expect(screen.getByText("Primary: The Sage")).toBeInTheDocument();
     expect(screen.getByText("Consulting: The Princess")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Return to The Sage" })).toBeInTheDocument();
+  });
+
+  it("uses mentor metadata for the chat subtitle and page info copy", () => {
+    mocks.mentorStatus = "ready";
+    mocks.effectiveMentorId = "mentor-1";
+    mocks.mentorQuery.data = {
+      id: "mentor-1",
+      name: "The Sage",
+      short_title: "Quiet Clarity",
+      tone_description: "Calm, wise, and metaphor-driven.",
+      style_description: "Short, reflective guidance with gentle metaphors.",
+      signature_line: "Peace comes before progress.",
+      target_user: "Overwhelmed thinkers seeking calm clarity",
+      avatar_url: "https://example.com/avatar.png",
+    };
+
+    renderMentorChat();
+
+    expect(screen.getByText("Quiet Clarity")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "PageInfo" }));
+    expect(screen.getByText("Short, reflective guidance with gentle metaphors.")).toBeInTheDocument();
+    expect(screen.getByText("Peace comes before progress.")).toBeInTheDocument();
   });
 });

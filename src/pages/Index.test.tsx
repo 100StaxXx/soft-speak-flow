@@ -16,6 +16,10 @@ const mocks = vi.hoisted(() => ({
     data: null as {
       mentorImage?: string;
       mentorName?: string | null;
+      mentorShortTitle?: string | null;
+      mentorToneDescription?: string | null;
+      mentorSignatureLine?: string | null;
+      mentorTargetUser?: string | null;
       todaysQuote?: { text: string; author?: string };
     } | null,
     isLoading: false,
@@ -203,9 +207,13 @@ describe("Index mentor connection state", () => {
     mocks.effectiveMentorId = "mentor-1";
     mocks.mentorQuery = {
       data: {
-        mentorName: "Atlas",
+        mentorName: "The Sage",
         mentorImage: "/mentor.png",
-        todaysQuote: { text: "Stay steady.", author: "Atlas" },
+        mentorShortTitle: "Quiet Clarity",
+        mentorToneDescription: "Calm, wise, and metaphor-driven.",
+        mentorSignatureLine: "Peace comes before progress.",
+        mentorTargetUser: "Overwhelmed thinkers seeking calm clarity",
+        todaysQuote: { text: "Stay steady.", author: "The Sage" },
       },
       isLoading: false,
       isError: false,
@@ -229,9 +237,13 @@ describe("Index mentor connection state", () => {
     mocks.effectiveMentorId = "mentor-1";
     mocks.mentorQuery = {
       data: {
-        mentorName: "Atlas",
+        mentorName: "The Sage",
         mentorImage: "/mentor.png",
-        todaysQuote: { text: "Stay steady.", author: "Atlas" },
+        mentorShortTitle: "Quiet Clarity",
+        mentorToneDescription: "Calm, wise, and metaphor-driven.",
+        mentorSignatureLine: "Peace comes before progress.",
+        mentorTargetUser: "Overwhelmed thinkers seeking calm clarity",
+        todaysQuote: { text: "Stay steady.", author: "The Sage" },
       },
       isLoading: false,
       isError: false,
@@ -241,7 +253,10 @@ describe("Index mentor connection state", () => {
 
     expect(screen.getByTestId("mentor-desktop-rail")).toBeInTheDocument();
     expect(screen.getByTestId("mentor-desktop-workspace")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Ask Atlas" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Ask The Sage" })).toBeInTheDocument();
+    expect(screen.getByText("Quiet Clarity")).toBeInTheDocument();
+    expect(screen.getByText("Peace comes before progress.")).toBeInTheDocument();
+    expect(screen.getByText(/The Sage's guidance/)).toBeInTheDocument();
     expect(screen.queryByText("MentorSwitcher")).not.toBeInTheDocument();
   });
 
@@ -276,9 +291,13 @@ describe("Index mentor connection state", () => {
     mocks.effectiveMentorId = "mentor-1";
     mocks.mentorQuery = {
       data: {
-        mentorName: "Atlas",
+        mentorName: "The Sage",
         mentorImage: "/mentor.png",
-        todaysQuote: { text: "Stay steady.", author: "Atlas" },
+        mentorShortTitle: "Quiet Clarity",
+        mentorToneDescription: "Calm, wise, and metaphor-driven.",
+        mentorSignatureLine: "Peace comes before progress.",
+        mentorTargetUser: "Overwhelmed thinkers seeking calm clarity",
+        todaysQuote: { text: "Stay steady.", author: "The Sage" },
       },
       isLoading: false,
       isError: false,

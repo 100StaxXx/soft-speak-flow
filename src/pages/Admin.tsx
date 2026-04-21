@@ -318,12 +318,12 @@ const Admin = () => {
   // Active mentors only
   const mentorPreviewTexts: Record<string, string> = {
     sage: "Peace comes before progress. Start with one clear step.",
+    lyra: "The pattern is already there. I will help you see it.",
     icon: "We don't do things that lower our standard.",
     charles: "Oh, we're procrastinating again. Shocking.",
     princess: "A soft, productive day is enough.",
     operator: "Your current system lacks structure. Let's correct it.",
     rival: "You said you were different. Show me.",
-    reign: "Excellence isn't optional. Let's make today count.",
   };
 
   const handleVoicePreview = async (mentorSlug: string) => {

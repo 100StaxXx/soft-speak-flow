@@ -14,27 +14,16 @@ import { AudioReactiveWaveform } from "@/components/AudioReactiveWaveform";
 import { PermissionRequestDialog } from "@/components/PermissionRequestDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useCompanionAssistant } from "@/hooks/useCompanionAssistant";
-import { useCompanionModeSettings } from "@/hooks/useCompanionModeSettings";
 import { cn, stripMarkdown } from "@/lib/utils";
-import { COMPANION_MODE_OPTIONS } from "@/shared/companionModes";
 
 export const CompanionPlannerPanel = memo(() => {
   const assistant = useCompanionAssistant({
     surface: "companion",
     conversationEnabled: true,
   });
-  const modeSettings = useCompanionModeSettings();
 
   const handleComposerKeyDown = useCallback(
     (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -65,41 +54,6 @@ export const CompanionPlannerPanel = memo(() => {
           </div>
 
           <div className="flex flex-wrap items-center justify-end gap-3">
-            <div className="min-w-[11rem]">
-              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.18em] text-white/45">
-                Mode
-              </label>
-              <Select
-                value={modeSettings.mode}
-                onValueChange={(value) => {
-                  void modeSettings.setMode(value as typeof modeSettings.mode);
-                }}
-              >
-                <SelectTrigger className="h-10 border-white/10 bg-white/5 text-white">
-                  <SelectValue placeholder="Choose a mode" />
-                </SelectTrigger>
-                <SelectContent>
-                  {COMPANION_MODE_OPTIONS.map((mode) => (
-                    <SelectItem key={mode.id} value={mode.id}>
-                      {mode.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <label className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/75">
-              <Switch
-                checked={modeSettings.adaptationEnabled}
-                onCheckedChange={(checked) => {
-                  void modeSettings.setAdaptationEnabled(checked);
-                }}
-                disabled={modeSettings.isSaving}
-                aria-label="Adaptive tone"
-              />
-              Adaptive tone
-            </label>
-
             <Badge
               variant="outline"
               className="border-white/10 bg-white/5 text-white/70"

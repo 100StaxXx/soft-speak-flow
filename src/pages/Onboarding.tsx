@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/components/ui/sonner";
@@ -46,6 +46,7 @@ export default function Onboarding() {
     status !== "loading" &&
     status !== "recovering" &&
     (!user || (!profileLoading && !companionLoading));
+  const isAuthResolving = status === "loading" || status === "recovering";
   const journeyResumeState = useMemo(() => {
     if (onboardingGate.resumeStep !== "journey-begins") return null;
 
@@ -76,6 +77,17 @@ export default function Onboarding() {
     setIsDeletingLegacyAccount(false);
     setIsShowingJourneyCinematic(false);
   }, [user?.id]);
+
+  useEffect(() => {
+    if (isAuthResolving || user) return;
+
+    navigate("/auth", {
+      replace: true,
+      state: {
+        message: "Sign in to continue onboarding.",
+      },
+    });
+  }, [isAuthResolving, navigate, user]);
 
   useEffect(() => {
     if (!user || !onboardingGateReady || onboardingSelfHealAttemptedRef.current) return;
@@ -162,8 +174,27 @@ export default function Onboarding() {
     navigate("/journeys", { replace: true });
   }, [user, onboardingGateReady, onboardingGate.isEstablished, isShowingJourneyCinematic, navigate]);
 
-  if (status === "loading" || status === "recovering") {
-    return null;
+  const handleExitToAuth = useCallback(async () => {
+    try {
+      await signOut();
+    } catch (error) {
+      console.warn("Sign out before leaving onboarding failed:", error);
+    } finally {
+      navigate("/auth", {
+        replace: true,
+        state: {
+          message: "You left onboarding. Sign in whenever you're ready to continue.",
+        },
+      });
+    }
+  }, [navigate, signOut]);
+
+  if (isAuthResolving) {
+    return <PageLoader message="Preparing onboarding..." />;
+  }
+
+  if (!user) {
+    return <PageLoader message="Returning to sign in..." />;
   }
 
   if (isDeletingLegacyAccount || (user && onboardingGate.needsCompanionMigration)) {
@@ -171,7 +202,15 @@ export default function Onboarding() {
   }
 
   if (user && (profileLoading || companionLoading || (onboardingGate.isEstablished && !isShowingJourneyCinematic))) {
-    return null;
+    return (
+      <PageLoader
+        message={
+          onboardingGate.isEstablished && !isShowingJourneyCinematic
+            ? "Taking you to your journey..."
+            : "Preparing onboarding..."
+        }
+      />
+    );
   }
 
   return (
@@ -180,6 +219,7 @@ export default function Onboarding() {
       resumeState={journeyResumeState}
       onJourneyCinematicStart={() => setIsShowingJourneyCinematic(true)}
       onJourneyCinematicComplete={() => setIsShowingJourneyCinematic(false)}
+      onExitToAuth={handleExitToAuth}
     />
   );
 }

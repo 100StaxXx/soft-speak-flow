@@ -725,10 +725,10 @@ export const AddQuestSheet = memo(function AddQuestSheet({
             <div className={cn("flex-shrink-0 px-5 py-5", QUEST_FORM_STYLES.desktopPanelHeader)}>
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-white/42">
+                  <p className={QUEST_FORM_STYLES.mobileHeaderKicker}>
                     New Quest
                   </p>
-                  <p className="mt-1 text-sm text-white/62">{summaryLine}</p>
+                  <p className={cn("mt-1 text-sm", QUEST_FORM_STYLES.textOnDarkMuted)}>{summaryLine}</p>
                 </div>
                 <button
                   onClick={() => requestOpenChange(false)}
@@ -789,7 +789,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                 <X className="h-4 w-4" />
               </button>
 
-              <div data-testid="add-quest-editor-header" className="pt-1 text-white">
+              <div data-testid="add-quest-editor-header" className={cn("pt-1", QUEST_FORM_STYLES.textOnDarkStrong)}>
                 <div className="pr-12">
                   <div className={QUEST_FORM_STYLES.titleFieldShell}>
                     <div className={QUEST_FORM_STYLES.titleFieldInner}>
@@ -840,10 +840,10 @@ export const AddQuestSheet = memo(function AddQuestSheet({
           <div className={cn("flex-shrink-0 px-5 py-4", QUEST_FORM_STYLES.desktopPanelHeader)}>
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-white/42">
+                <p className={QUEST_FORM_STYLES.mobileHeaderKicker}>
                   Quest Shortcuts
                 </p>
-                <p className="mt-1 text-sm text-white/62">
+                <p className={cn("mt-1 text-sm", QUEST_FORM_STYLES.textOnDarkMuted)}>
                   Pick a common quest or one you already use a lot.
                 </p>
               </div>
@@ -859,12 +859,12 @@ export const AddQuestSheet = memo(function AddQuestSheet({
         ) : (
           <div className={cn("relative px-4 pt-4 pb-4 flex-shrink-0", QUEST_FORM_STYLES.mobileHeader)}>
             <div className={QUEST_FORM_STYLES.mobileHeaderGlow} />
-            <div className="flex min-h-[128px] flex-col items-center justify-center pt-2 text-center text-white">
+            <div className={cn("flex min-h-[128px] flex-col items-center justify-center pt-2 text-center", QUEST_FORM_STYLES.textOnDarkStrong)}>
               <div className={QUEST_FORM_STYLES.heroIcon}>
                 <History className="h-5 w-5" />
               </div>
               <p className="mt-3 font-fredoka text-[1.15rem]">Quest shortcuts</p>
-              <p className="mt-1 max-w-[16rem] text-sm text-white/74">
+              <p className={cn("mt-1 max-w-[16rem] text-sm", QUEST_FORM_STYLES.textOnDarkMuted)}>
                 Pick a common quest or one you already use a lot.
               </p>
             </div>
@@ -879,13 +879,13 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                 <div className={cn(QUEST_FORM_STYLES.sectionCard, "px-4 py-4")}>
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <p className="font-fredoka text-[1.05rem] text-white">Your templates</p>
-                      <p className="text-xs text-white/60">Saved templates and repeat quests you can reuse fast</p>
+                      <p className={cn("font-fredoka text-[1.05rem]", QUEST_FORM_STYLES.textStrong)}>Your templates</p>
+                      <p className={cn("text-xs", QUEST_FORM_STYLES.textMuted)}>Saved templates and repeat quests you can reuse fast</p>
                     </div>
                     <button
                       type="button"
                       onClick={() => openTemplateBrowser("yours")}
-                      className="text-xs font-semibold text-white/72 transition-colors hover:text-white"
+                      className={cn("text-xs font-semibold transition-colors", QUEST_FORM_STYLES.footerLink)}
                     >
                       See all
                     </button>
@@ -901,7 +901,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                           QUEST_FORM_STYLES.sectionCardSoft,
                         )}
                       >
-                        <span className="line-clamp-2 text-sm font-semibold text-white">{template.title}</span>
+                        <span className={cn("line-clamp-2 text-sm font-semibold", QUEST_FORM_STYLES.textStrong)}>{template.title}</span>
                         <span className={cn("mt-2", QUEST_FORM_STYLES.subtleBadge)}>
                           {template.templateOrigin === "personal_explicit" ? "Saved" : `${template.frequency}x`}
                         </span>
@@ -914,7 +914,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                 <Popover open={showDatePicker} onOpenChange={setShowDatePicker}>
                   <PopoverTrigger asChild>
                     <button className={cn(
-                      "flex items-center justify-center gap-2 text-sm font-semibold text-white",
+                      "flex items-center justify-center gap-2 text-sm font-semibold",
                       QUEST_FORM_STYLES.selectorChip,
                       taskDate
                         ? ""
@@ -1019,11 +1019,11 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                       onChange={(e) => handleSubtaskChange(idx, e.target.value)}
                       onKeyDown={(e) => handleSubtaskKeyDown(idx, e)}
                       placeholder="Subtask"
-                      className="flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/42"
+                      className={cn("flex-1", QUEST_FORM_STYLES.bareInput)}
                     />
                     <button
                       onClick={() => handleDeleteSubtask(idx)}
-                      className="rounded-full p-1 opacity-0 transition-all hover:bg-white/[0.08] text-white/44 hover:text-white group-hover:opacity-100"
+                      className={cn("opacity-0 group-hover:opacity-100", QUEST_FORM_STYLES.iconGhostButton)}
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
@@ -1040,17 +1040,17 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                       handleAddSubtaskRow();
                     }
                   }}
-                  className={cn("flex w-full cursor-pointer items-center gap-2 px-4 py-3 text-left transition-colors hover:bg-white/[0.05]", `border-b ${QUEST_FORM_STYLES.divider}`)}
+                  className={cn("flex w-full cursor-pointer items-center gap-2 px-4 py-3 text-left transition-colors hover:bg-[#fff0c8]", `border-b ${QUEST_FORM_STYLES.divider}`)}
                 >
                   <Checkbox disabled className="h-4 w-4 border-white/14 opacity-40" />
-                  <span className="text-sm text-white/48">Add Subtask</span>
+                  <span className={cn("text-sm", QUEST_FORM_STYLES.textMuted)}>Add Subtask</span>
                 </div>
 
                 <Textarea
                   value={moreInformation || ""}
                   onChange={(e) => setMoreInformation(e.target.value || null)}
                   placeholder="Add notes, meeting links or phone numbers..."
-                  className="min-h-[88px] border-0 rounded-none bg-transparent resize-none px-4 py-4 text-sm text-white placeholder:text-white/42 focus-visible:ring-0 focus-visible:ring-offset-0"
+                  className={QUEST_FORM_STYLES.bareTextarea}
                   style={{ touchAction: "pan-y", WebkitTapHighlightColor: "transparent" }}
                   data-vaul-no-drag
                 />

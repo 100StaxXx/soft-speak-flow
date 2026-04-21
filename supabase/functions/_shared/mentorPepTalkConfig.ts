@@ -38,6 +38,23 @@ const THEMES_BY_MENTOR: Record<SupportedMentorSlug, MentorDailyTheme[]> = {
       triggers: ["In Transition", "Late Night Spiral"],
     },
   ],
+  lyra: [
+    {
+      topic_category: "clarity",
+      intensity: "medium",
+      triggers: ["Anxious & Overthinking", "Feeling Stuck"],
+    },
+    {
+      topic_category: "strategy",
+      intensity: "medium",
+      triggers: ["In Transition", "Avoiding Action"],
+    },
+    {
+      topic_category: "signal",
+      intensity: "soft",
+      triggers: ["Late Night Spiral", "Self-Doubt"],
+    },
+  ],
   icon: [
     {
       topic_category: "confidence",
@@ -116,23 +133,6 @@ const THEMES_BY_MENTOR: Record<SupportedMentorSlug, MentorDailyTheme[]> = {
       topic_category: "confidence",
       intensity: "medium",
       triggers: ["Self-Doubt", "Feeling Stuck"],
-    },
-  ],
-  reign: [
-    {
-      topic_category: "physique",
-      intensity: "strong",
-      triggers: ["Unmotivated", "Needing Discipline", "Frustrated"],
-    },
-    {
-      topic_category: "business",
-      intensity: "strong",
-      triggers: ["Motivated & Ready", "Feeling Stuck"],
-    },
-    {
-      topic_category: "discipline",
-      intensity: "strong",
-      triggers: ["Avoiding Action", "Needing Discipline"],
     },
   ],
 };

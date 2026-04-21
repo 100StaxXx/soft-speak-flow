@@ -119,9 +119,9 @@ vi.mock("@/integrations/supabase/client", () => ({
 
 import Auth from "./Auth";
 
-const renderAuth = () =>
+const renderAuth = (initialEntry: string | { pathname: string; state?: unknown } = "/auth") =>
   render(
-    <MemoryRouter initialEntries={["/auth"]}>
+    <MemoryRouter initialEntries={[initialEntry as any]}>
       <Routes>
         <Route path="/auth" element={<Auth />} />
       </Routes>
@@ -252,6 +252,26 @@ describe("Auth post-auth navigation", () => {
 
     expect(screen.queryByRole("button", { name: /continue as guest/i })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^sign in$/i })).toBeInTheDocument();
+  });
+
+  it("renders informational state messages when returning to auth from onboarding", async () => {
+    mocks.getSessionMock.mockResolvedValue({
+      data: {
+        session: null,
+      },
+    });
+
+    renderAuth({
+      pathname: "/auth",
+      state: {
+        message: "You left onboarding. Sign in whenever you're ready to continue.",
+      },
+    });
+    await flushMicrotasks();
+
+    expect(
+      screen.getByText("You left onboarding. Sign in whenever you're ready to continue."),
+    ).toBeInTheDocument();
   });
 
   it("renders an inline error card when password sign-in fails", async () => {

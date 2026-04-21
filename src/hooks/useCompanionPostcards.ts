@@ -35,6 +35,18 @@ export interface PostcardUnlockInfo {
   locationName?: string;
 }
 
+type CompanionPostcardData = {
+  spirit_animal?: string;
+  favorite_color?: string;
+  core_element?: string;
+  eye_color?: string;
+  fur_color?: string;
+};
+
+type CompanionSnapshot = CompanionPostcardData & {
+  id: string;
+};
+
 export const getCompanionPostcardsQueryKey = (userId?: string) =>
   ["companion-postcards", userId] as const;
 
@@ -69,34 +81,78 @@ export const useCompanionPostcards = () => {
     enabled: !!user?.id,
   });
 
+  const resolveCompanionForPostcard = useCallback(
+    async (
+      companionId: string,
+      companionData: CompanionPostcardData,
+    ): Promise<CompanionSnapshot> => {
+      if (companionId) {
+        return {
+          id: companionId,
+          ...companionData,
+        };
+      }
+
+      if (!user?.id) {
+        throw new Error("Not authenticated");
+      }
+
+      const { data, error: companionError } = await supabase
+        .from("user_companion")
+        .select("id, spirit_animal, favorite_color, core_element, eye_color, fur_color")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (companionError) throw companionError;
+      if (!data?.id) throw new Error("Companion not found");
+
+      return {
+        id: data.id,
+        spirit_animal: companionData.spirit_animal ?? data.spirit_animal ?? undefined,
+        favorite_color: companionData.favorite_color ?? data.favorite_color ?? undefined,
+        core_element: companionData.core_element ?? data.core_element ?? undefined,
+        eye_color: companionData.eye_color ?? data.eye_color ?? undefined,
+        fur_color: companionData.fur_color ?? data.fur_color ?? undefined,
+      };
+    },
+    [user?.id]
+  );
+
   const generatePostcard = useMutation({
     mutationFn: async ({
       companionId,
       epicId,
       milestonePercent,
       companionData,
+      chapterNumber,
       milestoneTitle,
     }: {
       companionId: string;
       epicId: string;
       milestonePercent: number;
-      companionData: {
-        spirit_animal?: string;
-        favorite_color?: string;
-        core_element?: string;
-        eye_color?: string;
-        fur_color?: string;
-      };
+      companionData: CompanionPostcardData;
+      chapterNumber?: number;
       milestoneTitle?: string;
     }) => {
       if (!user?.id) throw new Error("Not authenticated");
 
+      const resolvedCompanion = await resolveCompanionForPostcard(companionId, companionData);
+
       const { data, error } = await supabase.functions.invoke("generate-cosmic-postcard", {
         body: {
-          companionId,
+          companionId: resolvedCompanion.id,
           epicId,
           milestonePercent,
-          companionData,
+          companionData: {
+            spirit_animal: resolvedCompanion.spirit_animal,
+            favorite_color: resolvedCompanion.favorite_color,
+            core_element: resolvedCompanion.core_element,
+            eye_color: resolvedCompanion.eye_color,
+            fur_color: resolvedCompanion.fur_color,
+          },
+          chapterNumber,
         },
       });
 
@@ -106,32 +162,36 @@ export const useCompanionPostcards = () => {
       return { ...data, milestoneTitle };
     },
     onSuccess: async (data) => {
-      if (!data?.existing) {
-        queryClient.invalidateQueries({ queryKey: getCompanionPostcardsQueryKey(user?.id) });
-        
-        // Set unlock info for celebration animation
-        setPostcardJustUnlocked({
-          milestoneTitle: data?.milestoneTitle,
-          chapterNumber: data?.postcard?.chapter_number,
-          locationName: data?.postcard?.location_name,
-        });
-        
-        toast.success("📸 New cosmic postcard unlocked!", {
-          description: `Your companion visited ${data?.postcard?.location_name}!`,
-        });
+      const postcardAlreadyExisted = Boolean(data?.existing || data?.cached);
 
-        // Trigger journey path regeneration for the new milestone
-        // The chapter_number becomes the milestoneIndex for the path
-        if (typeof data?.postcard?.chapter_number === "number" && data?.postcard?.epic_id && user?.id) {
-          void requestJourneyPathGeneration({
-            epicId: data.postcard.epic_id,
-            milestoneIndex: data.postcard.chapter_number,
-            queryClient,
-            userId: user.id,
-          }).catch((err) => {
-            console.error("Failed to regenerate journey path:", err);
-          });
-        }
+      await queryClient.invalidateQueries({ queryKey: getCompanionPostcardsQueryKey(user?.id) });
+
+      if (postcardAlreadyExisted) {
+        return;
+      }
+
+      // Set unlock info for celebration animation
+      setPostcardJustUnlocked({
+        milestoneTitle: data?.milestoneTitle,
+        chapterNumber: data?.postcard?.chapter_number,
+        locationName: data?.postcard?.location_name,
+      });
+      
+      toast.success("📸 New cosmic postcard unlocked!", {
+        description: `Your companion visited ${data?.postcard?.location_name}!`,
+      });
+
+      // Trigger journey path regeneration for the new milestone
+      // The chapter_number becomes the milestoneIndex for the path
+      if (typeof data?.postcard?.chapter_number === "number" && data?.postcard?.epic_id && user?.id) {
+        void requestJourneyPathGeneration({
+          epicId: data.postcard.epic_id,
+          milestoneIndex: data.postcard.chapter_number,
+          queryClient,
+          userId: user.id,
+        }).catch((err) => {
+          console.error("Failed to regenerate journey path:", err);
+        });
       }
     },
     onError: (error) => {
@@ -187,20 +247,14 @@ export const useCompanionPostcards = () => {
       milestoneId: string,
       epicId: string,
       companionId: string,
-      companionData: {
-        spirit_animal?: string;
-        favorite_color?: string;
-        core_element?: string;
-        eye_color?: string;
-        fur_color?: string;
-      }
+      companionData: CompanionPostcardData
     ) => {
       if (!user?.id) return;
 
       // Fetch the milestone to check if it's a postcard milestone
       const { data: milestone, error } = await supabase
         .from("epic_milestones")
-        .select("id, title, milestone_percent, is_postcard_milestone")
+        .select("id, title, milestone_percent, is_postcard_milestone, chapter_number")
         .eq("id", milestoneId)
         .maybeSingle();
 
@@ -236,6 +290,7 @@ export const useCompanionPostcards = () => {
         epicId,
         milestonePercent: milestone.milestone_percent,
         companionData,
+        chapterNumber: milestone.chapter_number ?? undefined,
         milestoneTitle: milestone.title,
       });
     },

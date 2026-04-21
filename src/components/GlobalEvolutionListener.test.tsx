@@ -141,7 +141,7 @@ vi.mock("@/integrations/supabase/client", () => ({
             eq: vi.fn(() => ({
               maybeSingle: vi.fn(() => (
                 mocks.state.mentorLookup?.() ?? Promise.resolve({
-                  data: { slug: "atlas" },
+                  data: { slug: "sage" },
                   error: null,
                 })
               )),

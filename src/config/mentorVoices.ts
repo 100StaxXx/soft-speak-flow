@@ -1,4 +1,8 @@
-import { resolveMentorSlugAlias } from "@/lib/mentorRoster";
+import {
+  isActiveMentorSlug,
+  normalizeMentorSlug,
+  type ActiveMentorSlug,
+} from "@/lib/mentorRoster";
 
 export interface MentorVoiceConfig {
   mentorSlug: string;
@@ -15,7 +19,7 @@ export interface MentorVoiceConfig {
   };
 }
 
-export const mentorVoices: Record<string, MentorVoiceConfig> = {
+export const mentorVoices: Record<ActiveMentorSlug, MentorVoiceConfig> = {
   sage: {
     mentorSlug: "sage",
     mentorName: "The Sage",
@@ -27,6 +31,20 @@ export const mentorVoices: Record<string, MentorVoiceConfig> = {
       stability: 0.72,
       similarity_boost: 0.82,
       style_exaggeration: 0.28,
+      use_speaker_boost: true,
+    },
+  },
+  lyra: {
+    mentorSlug: "lyra",
+    mentorName: "Lyra",
+    voiceName: "Lyra",
+    voiceId: "fgDJOgmENIR82PueQrVs",
+    defaultIntensity: "medium",
+    categories: ["signal", "clarity", "strategy"],
+    voiceSettings: {
+      stability: 0.66,
+      similarity_boost: 0.9,
+      style_exaggeration: 0.58,
       use_speaker_boost: true,
     },
   },
@@ -48,7 +66,7 @@ export const mentorVoices: Record<string, MentorVoiceConfig> = {
     mentorSlug: "charles",
     mentorName: "Charles",
     voiceName: "Charles",
-    voiceId: "wGkprrTXgBM5EC3Znt6U",
+    voiceId: "7iAGWaZOtZujCYrDewVi",
     defaultIntensity: "medium",
     categories: ["accountability", "procrastination", "momentum"],
     voiceSettings: {
@@ -100,23 +118,10 @@ export const mentorVoices: Record<string, MentorVoiceConfig> = {
       use_speaker_boost: true,
     },
   },
-  reign: {
-    mentorSlug: "reign",
-    mentorName: "Reign",
-    voiceName: "Reign",
-    voiceId: "GTQ4ImqrRljZAa9VJX6B",
-    defaultIntensity: "high",
-    categories: ["legacy", "performance", "discipline"],
-    voiceSettings: {
-      stability: 0.52,
-      similarity_boost: 0.97,
-      style_exaggeration: 1,
-      use_speaker_boost: true,
-    },
-  },
 };
 
 export const getMentorVoiceConfig = (mentorSlug: string): MentorVoiceConfig | null => {
-  const resolvedSlug = resolveMentorSlugAlias(mentorSlug);
-  return resolvedSlug ? mentorVoices[resolvedSlug] ?? null : null;
+  const normalized = normalizeMentorSlug(mentorSlug);
+  if (!normalized || !isActiveMentorSlug(normalized)) return null;
+  return mentorVoices[normalized] ?? null;
 };

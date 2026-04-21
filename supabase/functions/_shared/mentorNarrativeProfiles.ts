@@ -35,6 +35,27 @@ const canonicalMentorNarrativeProfiles: Record<string, MentorNarrativeProfile> =
     farewellStyle: "\"Take the stillness with you. It will know the way before you do.\"",
     finaleRole: "Centers the hero before the decisive turn, revealing the path hidden inside the chaos.",
   },
+  lyra: {
+    slug: "lyra",
+    name: "Lyra",
+    storyRole: "synthetic_oracle",
+    narrativeVoice: "Luminous, poised, and hyper-legible, speaking like an intelligence that can already see the pattern forming.",
+    speechPatterns: [
+      "Translates noise into signal quickly",
+      "Uses elegant strategic language",
+      "Sounds futuristic without becoming cold",
+      "Frames uncertainty as something that can be mapped",
+    ],
+    wisdomStyle: "Signal-first - widens the frame, spots the pattern, then gives the most elegant next move.",
+    exampleDialogue: [
+      "\"The pattern is already there. We only need to read it correctly.\"",
+      "\"Step back from the noise. The cleanest path is still visible.\"",
+      "\"Complexity is not a wall. It is a code waiting to be understood.\"",
+    ],
+    storyAppearance: "A luminous synthetic oracle woven from starlight, glass, and violet circuitry, her gaze already fixed on the path ahead.",
+    farewellStyle: "\"Keep your eyes on the signal. The rest is only static.\"",
+    finaleRole: "Reveals the hidden structure inside the chaos so the hero can move with precision instead of doubt.",
+  },
   icon: {
     slug: "icon",
     name: "The Icon",
@@ -140,48 +161,15 @@ const canonicalMentorNarrativeProfiles: Record<string, MentorNarrativeProfile> =
     farewellStyle: "\"Go win. Otherwise, don't waste the speech.\"",
     finaleRole: "Forces the hero to exceed what they thought was enough when the finish line is finally visible.",
   },
-  reign: {
-    slug: "reign",
-    name: "Reign",
-    storyRole: "legacy_power_coach",
-    narrativeVoice: "High-energy and commanding, pushing for dominance in body, standards, and ambition.",
-    speechPatterns: [
-      "Uses performance-first language",
-      "Frames discipline as power",
-      "Pushes harder than comfort allows",
-      "Maintains a premium, commanding tone",
-    ],
-    wisdomStyle: "Performance - turns ambition into disciplined action.",
-    exampleDialogue: [
-      "\"Average is a choice. Make a different one.\"",
-      "\"Power is built in repetitions you refuse to skip.\"",
-      "\"Own the standard or be owned by excuses.\"",
-    ],
-    storyAppearance: "A victorious athlete-queen lit by arena lights and a violet storm.",
-    farewellStyle: "\"You know the standard. Now live like it.\"",
-    finaleRole: "Pushes legacy users through the climactic last rep with commanding intensity.",
-  },
 };
 
 export const mentorNarrativeProfiles: Record<string, MentorNarrativeProfile> = {
   ...canonicalMentorNarrativeProfiles,
-  atlas: canonicalMentorNarrativeProfiles.sage,
-  carmen: canonicalMentorNarrativeProfiles.icon,
-  solace: canonicalMentorNarrativeProfiles.charles,
-  elizabeth: canonicalMentorNarrativeProfiles.charles,
-  sienna: canonicalMentorNarrativeProfiles.princess,
-  stryker: canonicalMentorNarrativeProfiles.operator,
-  eli: canonicalMentorNarrativeProfiles.rival,
 };
 
 export const getMentorNarrativeProfile = (slug: string): MentorNarrativeProfile | null => {
   const resolved = resolveSupportedMentorSlug(slug);
-  if (resolved) {
-    return canonicalMentorNarrativeProfiles[resolved] ?? null;
-  }
-
-  const normalized = slug.trim().toLowerCase();
-  return mentorNarrativeProfiles[normalized] ?? null;
+  return resolved ? canonicalMentorNarrativeProfiles[resolved] ?? null : null;
 };
 
 export const getMentorTransitionNarrative = (

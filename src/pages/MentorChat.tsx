@@ -21,6 +21,40 @@ import {
   withConsultMentorState,
 } from "@/utils/mentorChatLocationState";
 
+const getGuideSubtitle = (
+  mentor: {
+    short_title?: string | null;
+    tone_description?: string | null;
+  } | null,
+): string => (
+  mentor?.short_title?.trim()
+  || mentor?.tone_description?.trim()
+  || "Guidance that matches your current season."
+);
+
+const getGuideDescription = (
+  mentor: {
+    style_description?: string | null;
+    tone_description?: string | null;
+    target_user?: string | null;
+  } | null,
+): string => (
+  mentor?.style_description?.trim()
+  || mentor?.tone_description?.trim()
+  || mentor?.target_user?.trim()
+  || "Personalized guidance is ready when you are."
+);
+
+const getGuideTip = (
+  mentor: {
+    signature_line?: string | null;
+    target_user?: string | null;
+  } | null,
+): string | undefined => (
+  mentor?.signature_line?.trim()
+  || mentor?.target_user?.trim()
+  || undefined
+);
 
 export default function MentorChat() {
   const { user } = useAuth();
@@ -108,9 +142,9 @@ export default function MentorChat() {
   if (!user || profileLoading || mentorLoading || mentorConnectionStatus === "recovering") {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <div className="text-center space-y-3">
+          <div className="text-center space-y-3">
           <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-muted-foreground text-sm">Loading your motivator...</p>
+          <p className="text-muted-foreground text-sm">Loading your guide...</p>
         </div>
       </div>
     );
@@ -248,7 +282,7 @@ export default function MentorChat() {
             <p className="text-sm text-muted-foreground text-center">
               {isConsultMode && primaryMentor?.name
                 ? `${primaryMentor.name} remains your primary guide`
-                : "Get guidance from your motivator"}
+                : getGuideSubtitle(mentor)}
             </p>
           </div>
         </div>
@@ -304,8 +338,8 @@ export default function MentorChat() {
         icon={MessageCircle}
         description={
           isConsultMode
-            ? `${mentor.name} is joining this conversation as a consult. ${primaryMentor?.name || "Your primary guide"} is still your main guide across the app.`
-            : "Your personal motivator is here to guide and support you on your journey."
+            ? `${mentor.name} is joining this conversation as a consult. ${getGuideDescription(mentor)} ${primaryMentor?.name || "Your primary guide"} is still your main guide across the app.`
+            : getGuideDescription(mentor)
         }
         features={[
           "Ask questions and get personalized advice",
@@ -316,7 +350,7 @@ export default function MentorChat() {
         tip={
           isConsultMode
             ? `Return to ${primaryMentor?.name || "your primary guide"} anytime, or make ${mentor.name} primary if this voice fits better.`
-            : "Your guide's tone and style match your preferences from onboarding."
+            : getGuideTip(mentor) || "Your guide's tone and style match your preferences from onboarding."
         }
       />
     </PageTransition>

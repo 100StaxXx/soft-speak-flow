@@ -75,7 +75,7 @@ const mocks = vi.hoisted(() => {
     existingPepTalkXpEvent: false,
     isTabActive: true,
     isGloballyMuted: false,
-    mentor: { slug: "carmen", name: "Carmen" },
+    mentor: { slug: "icon", name: "The Icon" },
     pepTalkWallpaper: null,
   };
 
@@ -274,7 +274,7 @@ function makePepTalk(overrides: Partial<MockPepTalk> = {}): MockPepTalk {
   return {
     id: "pep-talk-1",
     for_date: "2026-02-20",
-    mentor_slug: "carmen",
+    mentor_slug: "icon",
     title: "Execute Your Vision",
     summary: "Take strategic action and build momentum.",
     script: "word1 word2 word3 word4 word5 word6 word7 word8 word9 word10 word11 word12 word13 word14 word15 word16 word17 word18 word19 word20 word21 word22 word23 word24 word25",
@@ -357,7 +357,7 @@ describe("TodaysPepTalk transcript expand behavior", () => {
     mocks.state.existingPepTalkXpEvent = false;
     mocks.state.isTabActive = true;
     mocks.state.isGloballyMuted = false;
-    mocks.state.mentor = { slug: "carmen", name: "Carmen" };
+    mocks.state.mentor = { slug: "icon", name: "The Icon" };
     mocks.state.pepTalkWallpaper = null;
     mocks.audioListeners.clear();
   });
@@ -684,7 +684,7 @@ describe("TodaysPepTalk transcript expand behavior", () => {
         name: "FunctionsHttpError",
         message: "Edge Function returned a non-2xx status code",
         context: new Response(
-          JSON.stringify({ error: "No themes configured for mentor: solace" }),
+          JSON.stringify({ error: "No themes configured for mentor: icon" }),
           {
             status: 500,
             headers: { "Content-Type": "application/json" },
@@ -700,13 +700,13 @@ describe("TodaysPepTalk transcript expand behavior", () => {
 
     await waitFor(() => {
       expect(mocks.supabase.functions.invoke).toHaveBeenCalledWith("generate-single-daily-pep-talk", {
-        body: { mentorSlug: "carmen" },
+        body: { mentorSlug: "icon" },
       });
     });
 
     await waitFor(() => {
       expect(mocks.toastError).toHaveBeenCalled();
-      expect(mocks.toastError.mock.calls.at(-1)?.[0]).toBe("No themes configured for mentor: solace");
+      expect(mocks.toastError.mock.calls.at(-1)?.[0]).toBe("No themes configured for mentor: icon");
     });
   });
 

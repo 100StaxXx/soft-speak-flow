@@ -24,7 +24,7 @@ import { toast } from "@/components/ui/sonner";
 
 import { EditQuestDialog } from "@/features/quests/components/EditQuestDialog";
 import type { QuestComposerPrefillDraft } from "@/features/quests/types";
-import { applySubtaskTitlePlan, normalizeSubtaskTitles } from "@/features/tasks/lib/subtaskWrites";
+import { applySubtaskTitlePlan } from "@/features/tasks/lib/subtaskWrites";
 import { EditRitualSheet, RitualData } from "@/components/EditRitualSheet";
 import { useResilience } from "@/contexts/ResilienceContext";
 import { useDailyTasks } from "@/hooks/useDailyTasks";
@@ -57,7 +57,7 @@ import { InteractionLogModal } from "@/components/tasks/InteractionLogModal";
 import { useQuestCalendarSync } from "@/hooks/useQuestCalendarSync";
 import { useCalendarIntegrations } from "@/hooks/useCalendarIntegrations";
 import { HourlyViewModal } from "@/components/HourlyViewModal";
-import { JourneysCompanionPlannerModal } from "@/components/journeys/JourneysCompanionPlannerModal";
+import { JourneysCompanionPlannerController } from "@/components/journeys/JourneysCompanionPlannerModal";
 import { usePostOnboardingMentorGuidance } from "@/hooks/usePostOnboardingMentorGuidance";
 import { getTodayIfDateStale, JOURNEYS_ROUTE } from "@/pages/journeysDateSync";
 import { isOnboardingCleanupEligible } from "@/pages/journeysCleanupEligibility";
@@ -75,7 +75,6 @@ import { resolveCampaignBuilderInitialGoal } from "@/shared/bigGoalIntent";
 import { useVoiceInput } from "@/hooks/useVoiceInput";
 import type {
   CompanionPlannerLaunchIntent,
-  CompanionPlannerProposal,
   CompanionPlannerStarterIntent,
   PlannerBriefingContext,
 } from "@/types/companionPlanner";
@@ -90,35 +89,6 @@ const isQueuedTaskMutationResult = (
   && "queued" in value
   && (value as { queued?: boolean }).queued === true
 );
-
-const asRecord = (value: unknown): Record<string, unknown> | null =>
-  value && typeof value === "object" && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : null;
-
-const asString = (value: unknown): string | null =>
-  typeof value === "string" ? value : null;
-
-const asNumber = (value: unknown): number | null =>
-  typeof value === "number" && Number.isFinite(value) ? value : null;
-
-const asBoolean = (value: unknown): boolean | null =>
-  typeof value === "boolean" ? value : null;
-
-const asNumberArray = (value: unknown): number[] =>
-  Array.isArray(value)
-    ? value.filter((entry): entry is number => typeof entry === "number" && Number.isFinite(entry))
-    : [];
-
-const asStringArray = (value: unknown): string[] =>
-  Array.isArray(value)
-    ? value.filter((entry): entry is string => typeof entry === "string")
-    : [];
-
-const isQuestProposalEditable = (proposal: CompanionPlannerProposal): boolean =>
-  proposal.kind === "create_quest"
-  || proposal.kind === "update_quest"
-  || proposal.kind === "suggest_reminder";
 
 const toEditableQuestTask = (
   task: Pick<DailyTask, "id" | "task_text"> & Partial<EditableQuestTask>,
@@ -143,100 +113,6 @@ const toEditableQuestTask = (
   location: task.location ?? null,
   subtasks: task.subtasks ?? [],
 });
-
-const buildCreateQuestPrefillDraft = (
-  proposal: CompanionPlannerProposal,
-): QuestComposerPrefillDraft | null => {
-  if (proposal.kind !== "create_quest") return null;
-
-  const payload = asRecord(proposal.payload);
-  if (!payload) return null;
-
-  return {
-    text: asString(payload.taskText) ?? proposal.title,
-    taskDate: asString(payload.taskDate),
-    difficulty: (asString(payload.difficulty) as QuestComposerPrefillDraft["difficulty"]) ?? "medium",
-    scheduledTime: asString(payload.scheduledTime),
-    estimatedDuration: asNumber(payload.estimatedDuration) ?? 30,
-    recurrencePattern: asString(payload.recurrencePattern),
-    recurrenceDays: asNumberArray(payload.recurrenceDays),
-    recurrenceMonthDays: asNumberArray(payload.recurrenceMonthDays),
-    recurrenceCustomPeriod: (asString(payload.recurrenceCustomPeriod) as "week" | "month" | null) ?? null,
-    reminderEnabled: asBoolean(payload.reminderEnabled) ?? false,
-    reminderMinutesBefore: asNumber(payload.reminderMinutesBefore) ?? 15,
-    moreInformation: asString(payload.notes),
-    location: asString(payload.location),
-    subtasks: normalizeSubtaskTitles(asStringArray(payload.subtasks)),
-    creationSource: "nlp",
-  };
-};
-
-const buildPlannerEditDraft = (
-  task: EditableQuestTask,
-  proposal: CompanionPlannerProposal,
-): { task: EditableQuestTask; localSubtasks: string[] } | null => {
-  if (proposal.kind !== "update_quest" && proposal.kind !== "suggest_reminder") {
-    return null;
-  }
-
-  const payload = asRecord(proposal.payload);
-  const updates = asRecord(payload?.updates) ?? {};
-  const nextTask = toEditableQuestTask({
-    ...task,
-    task_text: asString(updates.task_text) ?? task.task_text,
-    task_date: updates.task_date === null ? null : asString(updates.task_date) ?? task.task_date,
-    difficulty: asString(updates.difficulty) ?? task.difficulty,
-    scheduled_time: updates.scheduled_time === null ? null : asString(updates.scheduled_time) ?? task.scheduled_time,
-    estimated_duration: updates.estimated_duration === null
-      ? null
-      : asNumber(updates.estimated_duration) ?? task.estimated_duration,
-    recurrence_pattern: updates.recurrence_pattern === null
-      ? null
-      : asString(updates.recurrence_pattern) ?? task.recurrence_pattern,
-    recurrence_days: Array.isArray(updates.recurrence_days)
-      ? asNumberArray(updates.recurrence_days)
-      : task.recurrence_days,
-    recurrence_month_days: Array.isArray(updates.recurrence_month_days)
-      ? asNumberArray(updates.recurrence_month_days)
-      : task.recurrence_month_days,
-    recurrence_custom_period: updates.recurrence_custom_period === null
-      ? null
-      : ((asString(updates.recurrence_custom_period) as "week" | "month" | null) ?? task.recurrence_custom_period),
-    reminder_enabled: asBoolean(updates.reminder_enabled) ?? task.reminder_enabled,
-    reminder_minutes_before: updates.reminder_minutes_before === null
-      ? null
-      : asNumber(updates.reminder_minutes_before) ?? task.reminder_minutes_before,
-    category: updates.category === null ? null : asString(updates.category) ?? task.category,
-    notes: updates.notes === null ? null : asString(updates.notes) ?? task.notes,
-    image_url: updates.image_url === null ? null : asString(updates.image_url) ?? task.image_url,
-    location: updates.location === null ? null : asString(updates.location) ?? task.location,
-  });
-
-  const baseSubtasks = normalizeSubtaskTitles(
-    (task.subtasks ?? []).map((subtask) => subtask.title ?? ""),
-  );
-
-  if (proposal.kind !== "update_quest") {
-    return {
-      task: nextTask,
-      localSubtasks: baseSubtasks,
-    };
-  }
-
-  const subtaskPlan = asRecord(payload?.subtaskPlan);
-  const mode = subtaskPlan?.mode === "append" || subtaskPlan?.mode === "replace"
-    ? subtaskPlan.mode
-    : null;
-  const proposalSubtasks = normalizeSubtaskTitles(asStringArray(subtaskPlan?.titles));
-  const localSubtasks = mode === "replace"
-    ? proposalSubtasks
-    : normalizeSubtaskTitles([...baseSubtasks, ...proposalSubtasks]);
-
-  return {
-    task: nextTask,
-    localSubtasks,
-  };
-};
 
 interface CreatedCampaignData {
   title: string;
@@ -265,24 +141,6 @@ type EditableQuestTask = Pick<
   | "location"
   | "subtasks"
 >;
-
-type PlannerQuestEditSessionResult = {
-  saved: boolean;
-  savedTitle?: string | null;
-};
-
-type PlannerQuestEditSession =
-  | {
-      proposalId: string;
-      editor: "create";
-      prefillDraft: QuestComposerPrefillDraft;
-      prefillKey: string;
-    }
-  | {
-      proposalId: string;
-      editor: "update";
-      localSubtasks: string[];
-    };
 
 type DesktopPlannerMode = "week" | "day";
 const MAC_TIMED_TASK_DURATION_FALLBACK_MINUTES = 30;
@@ -354,17 +212,9 @@ const Journeys = () => {
 
   // Edit quest state (for regular quests)
   const [editingTask, setEditingTask] = useState<EditableQuestTask | null>(null);
-  const [plannerQuestEditSession, setPlannerQuestEditSession] = useState<PlannerQuestEditSession | null>(null);
-  const plannerQuestEditResolverRef = useRef<((result: PlannerQuestEditSessionResult) => void) | null>(null);
 
   // Edit ritual state (for tasks linked to habits)
   const [editingRitual, setEditingRitual] = useState<RitualData | null>(null);
-  const finishPlannerQuestEdit = useCallback((result: PlannerQuestEditSessionResult) => {
-    const resolver = plannerQuestEditResolverRef.current;
-    plannerQuestEditResolverRef.current = null;
-    setPlannerQuestEditSession(null);
-    resolver?.(result);
-  }, []);
 
   const handleAddQuestSheetOpenChange = useCallback((nextOpen: boolean) => {
     setShowAddSheet(nextOpen);
@@ -372,11 +222,8 @@ const Journeys = () => {
       setPrefilledTime(null);
       setQuestSheetPrefillDraft(null);
       setQuestSheetPrefillKey(null);
-      if (plannerQuestEditSession?.editor === "create") {
-        finishPlannerQuestEdit({ saved: false });
-      }
     }
-  }, [finishPlannerQuestEdit, plannerQuestEditSession?.editor]);
+  }, []);
 
   const openAddQuestSheet = useCallback((options?: {
     date?: Date;
@@ -396,10 +243,7 @@ const Journeys = () => {
   const handleEditQuestDialogOpenChange = useCallback((nextOpen: boolean) => {
     if (nextOpen) return;
     setEditingTask(null);
-    if (plannerQuestEditSession?.editor === "update") {
-      finishPlannerQuestEdit({ saved: false });
-    }
-  }, [finishPlannerQuestEdit, plannerQuestEditSession?.editor]);
+  }, []);
 
   const openCampaignBuilder = useCallback((initialGoal?: string | null) => {
     setPathfinderInitialGoal(initialGoal?.trim() ?? "");
@@ -591,14 +435,12 @@ const Journeys = () => {
   } = useInboxTasks({ enabled: isTabActive });
   
   
-  const isPlannerCreateQuestEditActive = plannerQuestEditSession?.editor === "create";
-  const isPlannerUpdateQuestEditActive = plannerQuestEditSession?.editor === "update";
-  const isCompanionPlannerBlocked = (showAddSheet && !isPlannerCreateQuestEditActive)
+  const isCompanionPlannerBlocked = showAddSheet
     || showMonthView
     || showPageInfo
     || showQuickAdjust
     || showPathfinder
-    || (!!editingTask && !isPlannerUpdateQuestEditActive)
+    || !!editingTask
     || !!editingRitual
     || needsStreakDecision
     || isInteractionModalOpen;
@@ -637,12 +479,6 @@ const Journeys = () => {
       window.cancelAnimationFrame(frameId);
     };
   }, [isInboxRequested]);
-
-  useEffect(() => () => {
-    const resolver = plannerQuestEditResolverRef.current;
-    plannerQuestEditResolverRef.current = null;
-    resolver?.({ saved: false });
-  }, []);
 
   useEffect(() => {
     const routeState = (location.state as { companionPlannerLaunchIntent?: CompanionPlannerLaunchIntent | null } | null) ?? null;
@@ -840,75 +676,6 @@ const Journeys = () => {
     }
   }, []);
 
-  const handleQuestProposalEditHandoff = useCallback(async (
-    proposal: CompanionPlannerProposal,
-  ): Promise<PlannerQuestEditSessionResult> => {
-    if (!isQuestProposalEditable(proposal)) {
-      return { saved: false };
-    }
-
-    if (plannerQuestEditSession?.editor === "create") {
-      setShowAddSheet(false);
-    }
-    if (plannerQuestEditSession?.editor === "update") {
-      setEditingTask(null);
-    }
-    finishPlannerQuestEdit({ saved: false });
-
-    if (proposal.kind === "create_quest") {
-      const prefillDraft = buildCreateQuestPrefillDraft(proposal);
-      if (!prefillDraft) {
-        toast.error("Couldn't open that quest edit right now.");
-        return { saved: false };
-      }
-
-      const promise = new Promise<PlannerQuestEditSessionResult>((resolve) => {
-        plannerQuestEditResolverRef.current = resolve;
-      });
-
-      setPlannerQuestEditSession({
-        proposalId: proposal.id,
-        editor: "create",
-        prefillDraft,
-        prefillKey: `${proposal.id}:${Date.now()}`,
-      });
-      setPrefilledTime(null);
-      setShowAddSheet(true);
-      return promise;
-    }
-
-    const payload = asRecord(proposal.payload);
-    const taskId = asString(payload?.taskId);
-    if (!taskId) {
-      toast.error("Couldn't find the quest tied to that edit.");
-      return { saved: false };
-    }
-
-    const sourceTask = [...dailyTasks, ...inboxTasks].find((task) => task.id === taskId);
-    if (!sourceTask) {
-      toast.error("That quest isn't available to edit right now.");
-      return { saved: false };
-    }
-
-    const nextDraft = buildPlannerEditDraft(toEditableQuestTask(sourceTask), proposal);
-    if (!nextDraft) {
-      toast.error("Couldn't open that quest edit right now.");
-      return { saved: false };
-    }
-
-    const promise = new Promise<PlannerQuestEditSessionResult>((resolve) => {
-      plannerQuestEditResolverRef.current = resolve;
-    });
-
-    setPlannerQuestEditSession({
-      proposalId: proposal.id,
-      editor: "update",
-      localSubtasks: nextDraft.localSubtasks,
-    });
-    setEditingTask(nextDraft.task);
-    return promise;
-  }, [dailyTasks, finishPlannerQuestEdit, inboxTasks, plannerQuestEditSession?.editor]);
-
   // Deep link handling - open task from widget tap
   const { pendingTaskId, clearPendingTask } = useDeepLink();
   const deepLinkProcessedRef = useRef<string | null>(null);
@@ -1085,13 +852,6 @@ const Journeys = () => {
       attachments: data.attachments,
     });
 
-    if (plannerQuestEditSession?.editor === "create") {
-      finishPlannerQuestEdit({
-        saved: true,
-        savedTitle: data.text.trim() || null,
-      });
-    }
-
     setShowAddSheet(false);
 
     if (SEND_TO_CALENDAR_ENABLED && data.sendToCalendar && createdTask?.id) {
@@ -1109,7 +869,7 @@ const Journeys = () => {
         inboxSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       });
     }
-  }, [selectedDate, addTask, finishPlannerQuestEdit, handleSendTaskToCalendar, plannerQuestEditSession?.editor]);
+  }, [selectedDate, addTask, handleSendTaskToCalendar]);
 
   const handleToggleTask = useCallback((taskId: string, completed: boolean, xpReward: number, taskData?: { scheduled_time?: string | null; difficulty?: string | null; category?: string | null; ai_generated?: boolean | null; task_text?: string | null }) => {
     if (completed) {
@@ -1190,16 +950,8 @@ const Journeys = () => {
     }
     queryClient.invalidateQueries({ queryKey: ["inbox-tasks"] });
     queryClient.invalidateQueries({ queryKey: ["inbox-count"] });
-    if (plannerQuestEditSession?.editor === "update") {
-      finishPlannerQuestEdit({
-        saved: true,
-        savedTitle: updates.task_text.trim() || null,
-      });
-    }
     setEditingTask(null);
   }, [
-    finishPlannerQuestEdit,
-    plannerQuestEditSession?.editor,
     queryClient,
     queueAction,
     retryNow,
@@ -1620,19 +1372,25 @@ const Journeys = () => {
           </motion.div>
         </QuestsErrorBoundary>
 
-        <JourneysCompanionPlannerModal
-          open={showCompanionPlanner}
-          onOpenChange={setIsCompanionPlannerPinned}
-          presentation={isDesktopLayout || isMacHostedIOSApp ? "dialog" : "drawer"}
-          launchIntent={plannerLaunchIntent}
-          onLaunchIntentConsumed={(intentId) => {
-            setPlannerLaunchIntent((currentIntent) =>
-            currentIntent?.id === intentId ? null : currentIntent
-          );
-          }}
-          onOpenCampaignBuilder={openCampaignBuilderFromAssistant}
-          onQuestProposalEditHandoff={handleQuestProposalEditHandoff}
-        />
+        {isCompanionPlannerPinned ? (
+          <JourneysCompanionPlannerController
+            open={showCompanionPlanner}
+            onOpenChange={(next) => {
+              setIsCompanionPlannerPinned(next);
+              if (!next) {
+                setPlannerLaunchIntent(null);
+              }
+            }}
+            presentation={isDesktopLayout || isMacHostedIOSApp ? "dialog" : "drawer"}
+            launchIntent={plannerLaunchIntent}
+            onLaunchIntentConsumed={(intentId) => {
+              setPlannerLaunchIntent((currentIntent) =>
+                currentIntent?.id === intentId ? null : currentIntent
+              );
+            }}
+            onOpenCampaignBuilder={openCampaignBuilderFromAssistant}
+          />
+        ) : null}
 
         {/* Add Quest Sheet */}
         <AddQuestSheet
@@ -1644,12 +1402,8 @@ const Journeys = () => {
           prefilledTime={prefilledTime}
           autoFillTimeOnFirstTap={shouldAutoFillTutorialTime}
           presentation={isMacHostedIOSApp ? "desktop-panel" : "mobile-sheet"}
-          prefillDraft={plannerQuestEditSession?.editor === "create"
-            ? plannerQuestEditSession.prefillDraft
-            : questSheetPrefillDraft}
-          prefillKey={plannerQuestEditSession?.editor === "create"
-            ? plannerQuestEditSession.prefillKey
-            : questSheetPrefillKey}
+          prefillDraft={questSheetPrefillDraft}
+          prefillKey={questSheetPrefillKey}
           onCreateCampaign={() => openCampaignBuilder()}
         />
         
@@ -1666,7 +1420,6 @@ const Journeys = () => {
           onDelete={handleDeleteEditingQuest}
           isDeleting={isDeleting}
           presentation={isMacHostedIOSApp ? "desktop-panel" : "mobile-sheet"}
-          plannerSubtaskDraft={plannerQuestEditSession?.editor === "update" ? plannerQuestEditSession.localSubtasks : null}
         />
         
         {/* Edit Ritual Sheet (for habits/rituals with two-way sync) */}

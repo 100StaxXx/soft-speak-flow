@@ -20,6 +20,9 @@ export const loadMentorImage = async (slug: string): Promise<string> => {
       case "sage":
         module = await import("@/assets/sage-mentor.png");
         break;
+      case "lyra":
+        module = await import("@/assets/lyra-mentor.png");
+        break;
       case "icon":
         module = await import("@/assets/icon-mentor.png");
         break;
@@ -30,13 +33,10 @@ export const loadMentorImage = async (slug: string): Promise<string> => {
         module = await import("@/assets/princess-mentor.png");
         break;
       case "operator":
-        module = await import("@/assets/stryker-sage.png");
+        module = await import("@/assets/operator-mentor.png");
         break;
       case "rival":
         module = await import("@/assets/rival-mentor.png");
-        break;
-      case "reign":
-        module = await import("@/assets/reign-sage.png");
         break;
       default:
         module = await import("@/assets/sage-mentor.png");

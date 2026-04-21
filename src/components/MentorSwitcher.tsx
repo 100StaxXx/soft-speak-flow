@@ -71,8 +71,10 @@ const formatMoodLabel = (mood?: string | null): string | null => {
 };
 
 const getMentorDetail = (mentor: ActiveMentorRecord): string => {
-  if (mentor.short_title?.trim()) return mentor.short_title.trim();
-  return mentor.tone_description?.trim() || "Ready when you need a different voice.";
+  return mentor.tone_description?.trim()
+    || mentor.target_user?.trim()
+    || mentor.short_title?.trim()
+    || "Ready when you need a different voice.";
 };
 
 const getMoodSummary = ({
@@ -545,6 +547,11 @@ export const MentorSwitcher = ({
                                 <Badge variant="reward">{entry.reasonLabel}</Badge>
                               )}
                             </div>
+                            {mentor.short_title?.trim() ? (
+                              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                                {mentor.short_title.trim()}
+                              </p>
+                            ) : null}
                             <p className="text-sm text-muted-foreground">{getMentorDetail(mentor)}</p>
                             <div className="flex flex-wrap gap-2 pt-1">
                               {isPrimary ? (
@@ -642,6 +649,11 @@ export const MentorSwitcher = ({
                             )}
                           </div>
 
+                          {mentor.short_title?.trim() ? (
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                              {mentor.short_title.trim()}
+                            </p>
+                          ) : null}
                           <p className="text-sm text-muted-foreground">{getMentorDetail(mentor)}</p>
                           <div className="flex flex-wrap gap-2 pt-1">
                             {isPrimary ? (

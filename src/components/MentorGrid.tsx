@@ -2,26 +2,11 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Check, ArrowLeft } from "lucide-react";
 import { MentorAvatar } from "@/components/MentorAvatar";
-import { MENTOR_DISPLAY_ORDER, getMentorDisplaySortIndex } from "@/lib/mentorRoster";
+import type { MentorBrowseEntry } from "@/lib/mentorCatalog";
 import { cn } from "@/lib/utils";
 
-interface Mentor {
-  id: string;
-  name: string;
-  slug: string;
-  archetype: string;
-  short_title: string;
-  tone_description: string;
-  style_description: string;
-  target_user: string;
-  signature_line: string;
-  primary_color: string;
-  avatar_url?: string;
-  themes: string[];
-}
-
 interface MentorGridProps {
-  mentors: Mentor[];
+  mentors: MentorBrowseEntry[];
   onSelectMentor: (mentorId: string) => void;
   currentMentorId?: string | null;
   recommendedMentorId?: string | null;
@@ -40,24 +25,7 @@ export const MentorGrid = ({
   const [selectedMentor, setSelectedMentor] = useState<string | null>(null);
   const topControlOffset = 'calc(env(safe-area-inset-top, 0px) + 1rem)';
   const isOnboardingAppearance = appearance === "onboarding";
-
-  // Order mentors: first by MENTOR_ORDER, then any unlisted mentors alphabetically
-  const orderedMentors = (() => {
-    const orderedBySlug = MENTOR_DISPLAY_ORDER.map(slug =>
-      mentors.find(m => m.slug === slug)
-    ).filter(Boolean) as Mentor[];
-    
-    // Find any mentors not in MENTOR_ORDER and add them at the end
-    const unlistedMentors = mentors
-      .filter(m => !MENTOR_DISPLAY_ORDER.includes(m.slug as typeof MENTOR_DISPLAY_ORDER[number]))
-      .sort((a, b) => {
-        const sortDelta = getMentorDisplaySortIndex(a.slug) - getMentorDisplaySortIndex(b.slug);
-        if (sortDelta !== 0) return sortDelta;
-        return a.name.localeCompare(b.name);
-      });
-    
-    return [...orderedBySlug, ...unlistedMentors];
-  })();
+  const orderedMentors = mentors;
 
   const handleMentorClick = (mentorId: string) => {
     setSelectedMentor(mentorId);
@@ -68,6 +36,14 @@ export const MentorGrid = ({
   };
 
   const activeMentor = orderedMentors.find(m => m.id === selectedMentor);
+  const activeMentorGuidanceStyle = activeMentor?.style_description?.trim()
+    || activeMentor?.tone_description?.trim()
+    || "Guidance tailored to your current season.";
+  const activeMentorTargetUser = activeMentor?.target_user?.trim()
+    || "People who want a guide that matches how they work best.";
+  const activeMentorSignatureLine = activeMentor?.signature_line?.trim()
+    || "A guide voice shaped to meet you where you are.";
+  const activeMentorIsUpcoming = activeMentor?.availability === "upcoming_unlockable";
 
   return (
     <div
@@ -169,7 +145,7 @@ export const MentorGrid = ({
                       className="h-2.5 w-2.5 rounded-full"
                       style={{ backgroundColor: activeMentor.primary_color }}
                     />
-                    Guide Preview
+                    {activeMentorIsUpcoming ? "Upcoming Unlockable" : "Guide Preview"}
                   </div>
                 ) : (
                   <div className="h-1 w-32 bg-royal-gold animate-scale-in" />
@@ -186,6 +162,11 @@ export const MentorGrid = ({
                 <p className={cn("max-w-2xl text-xl italic", isOnboardingAppearance ? "text-white/70" : "text-steel")}>
                   {activeMentor.archetype}
                 </p>
+                {activeMentorIsUpcoming ? (
+                  <div className="inline-flex rounded-full border border-amber-300/25 bg-amber-300/12 px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-amber-100">
+                    {activeMentor.unavailable_label || "Upcoming Unlockable"}
+                  </div>
+                ) : null}
               </div>
 
               {/* Signature Line */}
@@ -197,7 +178,7 @@ export const MentorGrid = ({
                 style={{ borderColor: activeMentor.primary_color }}
               >
                 <p className="text-2xl md:text-3xl text-pure-white italic leading-relaxed">
-                  "{activeMentor.signature_line}"
+                  "{activeMentorSignatureLine}"
                 </p>
               </div>
 
@@ -216,7 +197,7 @@ export const MentorGrid = ({
                     How they guide
                   </h3>
                   <p className={cn("leading-relaxed", isOnboardingAppearance ? "text-white/74" : "text-steel")}>
-                    {activeMentor.tone_description}
+                    {activeMentorGuidanceStyle}
                   </p>
                 </div>
                 
@@ -233,7 +214,7 @@ export const MentorGrid = ({
                     Best for
                   </h3>
                   <p className={cn("leading-relaxed", isOnboardingAppearance ? "text-white/74" : "text-steel")}>
-                    {activeMentor.target_user}
+                    {activeMentorTargetUser}
                   </p>
                 </div>
               </div>
@@ -241,20 +222,25 @@ export const MentorGrid = ({
               {/* Action Button */}
               <div className="pt-4">
                 <Button
-                  onClick={() => onSelectMentor(activeMentor.id)}
-                  disabled={isSelecting}
+                  onClick={() => {
+                    if (activeMentor.availability !== "active") return;
+                    onSelectMentor(activeMentor.id);
+                  }}
+                  disabled={isSelecting || activeMentor.availability !== "active"}
                   variant={isOnboardingAppearance ? "default" : "default"}
                   className={cn(
                     "h-16 px-12 font-black uppercase tracking-wider transition-all duration-300",
                     isOnboardingAppearance
-                      ? "onb-stage-cta rounded-full shadow-[0_18px_50px_rgba(0,0,0,0.28)]"
-                      : "bg-transparent border-2 border-royal-purple text-pure-white hover:bg-royal-purple/10 shadow-[0_0_20px_rgba(137,81,204,0.5)] hover:shadow-[0_0_30px_rgba(137,81,204,0.7)]",
+                      ? "onb-stage-cta rounded-full shadow-[0_18px_50px_rgba(0,0,0,0.28)] disabled:opacity-100"
+                      : "bg-transparent border-2 border-royal-purple text-pure-white hover:bg-royal-purple/10 shadow-[0_0_20px_rgba(137,81,204,0.5)] hover:shadow-[0_0_30px_rgba(137,81,204,0.7)] disabled:border-white/20 disabled:text-white/60 disabled:shadow-none",
                   )}
                   style={isOnboardingAppearance ? {
                     background: `linear-gradient(135deg, ${activeMentor.primary_color}, rgba(137,81,204,0.92))`,
                   } : undefined}
                 >
-                  {isSelecting ? (
+                  {activeMentor.availability !== "active" ? (
+                    <>{activeMentor.unavailable_label || "Upcoming Unlockable"}</>
+                  ) : isSelecting ? (
                     <>Selecting...</>
                   ) : currentMentorId === activeMentor.id ? (
                     <>
@@ -265,6 +251,14 @@ export const MentorGrid = ({
                     <>Choose {activeMentor.name}</>
                   )}
                 </Button>
+                {activeMentorIsUpcoming ? (
+                  <p className={cn(
+                    "mt-3 max-w-2xl text-sm leading-6",
+                    isOnboardingAppearance ? "text-white/72" : "text-steel",
+                  )}>
+                    {activeMentor.unavailable_description || `${activeMentor.name} is planned as an upcoming unlockable and can't be selected yet.`}
+                  </p>
+                ) : null}
               </div>
             </div>
           </div>
@@ -309,6 +303,20 @@ export const MentorGrid = ({
                   </div>
                 </div>
               )}
+              {mentor.availability === "upcoming_unlockable" && (
+                <div className={cn("absolute z-10", isOnboardingAppearance ? "left-4 top-4" : "-bottom-2 left-1/2 -translate-x-1/2")}>
+                  <div className={cn(
+                    "rounded-full border px-3 py-1 shadow-lg backdrop-blur-md",
+                    isOnboardingAppearance
+                      ? "border-amber-200/15 bg-amber-200/10"
+                      : "border-white/12 bg-black/55",
+                  )}>
+                    <span className="text-[10px] font-black uppercase tracking-[0.18em] text-white">
+                      Upcoming
+                    </span>
+                  </div>
+                </div>
+              )}
               {isOnboardingAppearance ? (
                 <div className="space-y-4">
                   <div className="flex items-start gap-4">
@@ -331,13 +339,22 @@ export const MentorGrid = ({
                     <div className="min-w-0 flex-1 space-y-1">
                       <h3 className="text-2xl font-semibold text-white">{mentor.name}</h3>
                       <p className="text-sm uppercase tracking-[0.18em]" style={{ color: mentor.primary_color }}>
-                        {mentor.short_title}
+                        {mentor.short_title || "Guide"}
                       </p>
-                      <p className="text-sm leading-6 text-white/62">{mentor.tone_description}</p>
+                      <p className="text-sm leading-6 text-white/62">
+                        {mentor.tone_description || mentor.style_description || "Guidance matched to your pace."}
+                      </p>
+                      {mentor.availability === "upcoming_unlockable" ? (
+                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-100/80">
+                          {mentor.unavailable_label || "Upcoming Unlockable"}
+                        </p>
+                      ) : null}
                     </div>
                   </div>
 
-                  <p className="text-sm leading-6 text-white/76">{mentor.signature_line}</p>
+                  <p className="text-sm leading-6 text-white/76">
+                    {mentor.signature_line || mentor.style_description || mentor.tone_description || "A guide voice ready when you need it."}
+                  </p>
 
                   <div className="flex flex-wrap gap-2">
                     {mentor.themes.slice(0, 3).map((theme) => (
@@ -380,8 +397,13 @@ export const MentorGrid = ({
                       {mentor.name}
                     </h3>
                     <p className="text-steel text-xs md:text-sm" style={{ color: mentor.primary_color }}>
-                      {mentor.short_title}
+                      {mentor.short_title || "Guide"}
                     </p>
+                    {mentor.availability === "upcoming_unlockable" ? (
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/68">
+                        {mentor.unavailable_label || "Upcoming Unlockable"}
+                      </p>
+                    ) : null}
                   </div>
                 </>
               )}

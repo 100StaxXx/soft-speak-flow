@@ -11,14 +11,14 @@ vi.mock("@/components/MentorAvatar", () => ({
 const baseProps = {
   mentor: {
     id: "mentor-1",
-    slug: "atlas",
-    name: "Atlas",
-    short_title: "The Strategist",
+    slug: "sage",
+    name: "The Sage",
+    short_title: "Quiet Clarity",
     primary_color: "#7B68EE",
   },
   explanation: {
-    title: "Your Guide is Atlas",
-    subtitle: "The Strategist",
+    title: "Your Guide is: The Sage",
+    subtitle: "Quiet Clarity",
     paragraph: "A focused guide for disciplined builders.",
     bullets: ["Build clear systems.", "Stay grounded under pressure."],
   },
@@ -32,7 +32,7 @@ describe("MentorResult", () => {
 
     expect(screen.getByTestId("mentor-result-root")).toHaveAttribute("data-appearance", "default");
     expect(screen.getByText("We've Found Your Guide")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /choose atlas as my guide/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /choose the sage as my guide/i })).toBeInTheDocument();
   }, 10000);
 
   it("renders the onboarding appearance when requested", () => {
@@ -41,6 +41,6 @@ describe("MentorResult", () => {
     expect(screen.getByTestId("mentor-result-root")).toHaveAttribute("data-appearance", "onboarding");
     expect(screen.queryByText("We've Found Your Guide")).not.toBeInTheDocument();
     expect(screen.getByText(/guide found/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /continue with atlas/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /continue with the sage/i })).toBeInTheDocument();
   });
 });

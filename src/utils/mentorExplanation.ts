@@ -23,6 +23,11 @@ const MENTOR_BULLETS: Record<string, string[]> = {
     "Keeps you calm enough to hear what actually matters",
     "Turns overwhelm into one steady next step"
   ],
+  lyra: [
+    "Turns noise into signal when your thoughts feel scattered",
+    "Helps you spot the pattern before the problem keeps snowballing",
+    "Brings elegant strategy without losing emotional clarity"
+  ],
   icon: [
     "Helps you choose from standards instead of insecurity",
     "Sharpens your boundaries without making you louder",
@@ -47,16 +52,44 @@ const MENTOR_BULLETS: Record<string, string[]> = {
     "Uses challenge to wake up your competitive side",
     "Pushes past excuses fast",
     "Makes effort feel like something to prove"
-  ],
-  reign: [
-    "Keeps legacy performance energy available for existing users",
-    "Stays focused on ambition, pressure, and standards",
-    "Maintains a hard-driving tone without entering new flows"
   ]
 };
 
 // Map tags to readable text for explanation paragraph
 const TAG_TO_TEXT: Record<string, string> = {
+  clarity_signal: "clarity, signal, and perspective",
+  clarity_perspective: "clarity, calm, and perspective",
+  standards_identity: "identity, self-respect, and higher standards",
+  gentle_routines: "gentle habits and steady consistency",
+  execution_pressure: "execution, pressure, and accountability",
+  systems_execution: "structure and clean execution",
+  competitive_performance: "performance and intensity",
+  procrastination_accountability: "ending procrastination with accountability",
+
+  calm_reflective: "calm, reflective guidance",
+  direct_challenging: "direct, challenging guidance",
+  composed_polished: "composed, polished guidance",
+  warm_encouraging: "warm, encouraging guidance",
+  precise_no_nonsense: "precise, no-nonsense guidance",
+  aggressive_challenging: "aggressive, challenging guidance",
+  sharp_sarcastic: "sharp, sarcastic accountability",
+
+  perspective_next_step: "finding the clearest next step",
+  perspective_first: "slowing down and finding the clearest next step",
+  identity_alignment: "acting in a way that matches your standards",
+  gentle_accountability: "gentle accountability without shame",
+  hard_accountability: "hard accountability that pushes you to execute",
+  soft_support: "gentle support without shame",
+  system_building: "a tighter system and stronger structure",
+  pressure_prove_it: "pressure that pushes you to prove it",
+  callout_avoidance: "having your excuses called out quickly",
+  calm_perspective: "calm perspective",
+  pattern_strategy: "pattern strategy",
+  standards_self_command: "standards and self-command",
+  systems_precision: "systems precision",
+  prove_it_pressure: "prove-it pressure",
+  sarcastic_callout: "sarcastic callout",
+
   // Growth focus tags
   discipline: "building discipline",
   performance: "peak performance",
@@ -82,6 +115,10 @@ const TAG_TO_TEXT: Record<string, string> = {
   grounded: "grounded energy",
   spiritual: "spiritual guidance",
   intuition: "intuitive guidance",
+  neutral_presence: "neutral energy from your guide",
+  either_works: "any guide energy",
+  feminine_presence: "feminine energy from your guide",
+  masculine_presence: "masculine energy from your guide",
   feminine_preference: "a woman as your guide",
   masculine_preference: "a man as your guide",
 };

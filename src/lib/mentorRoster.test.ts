@@ -9,23 +9,31 @@ import {
 } from "./mentorRoster";
 
 describe("mentorRoster", () => {
-  it("maps legacy slugs to the new canonical mentors", () => {
-    expect(resolveMentorSlugAlias("atlas")).toBe("sage");
-    expect(resolveMentorSlugAlias("carmen")).toBe("icon");
-    expect(resolveMentorSlugAlias("solace")).toBe("charles");
-    expect(resolveMentorSlugAlias("sienna")).toBe("princess");
-    expect(resolveMentorSlugAlias("stryker")).toBe("operator");
-    expect(resolveMentorSlugAlias("eli")).toBe("rival");
-    expect(resolveMentorSlugAlias("reign")).toBe("reign");
+  it("accepts the active mentor roster slugs", () => {
+    expect(resolveMentorSlugAlias("sage")).toBe("sage");
+    expect(resolveMentorSlugAlias("lyra")).toBe("lyra");
+    expect(resolveMentorSlugAlias("icon")).toBe("icon");
+    expect(resolveMentorSlugAlias("charles")).toBe("charles");
+    expect(resolveMentorSlugAlias("princess")).toBe("princess");
+    expect(resolveMentorSlugAlias("operator")).toBe("operator");
+    expect(resolveMentorSlugAlias("rival")).toBe("rival");
   });
 
-  it("returns only active mentors from resolveActiveMentorSlug", () => {
-    expect(resolveActiveMentorSlug("atlas")).toBe("sage");
-    expect(resolveActiveMentorSlug("reign")).toBeNull();
+  it("rejects legacy mentor slugs", () => {
+    expect(resolveMentorSlugAlias("atlas")).toBeNull();
+    expect(resolveMentorSlugAlias("carmen")).toBeNull();
+    expect(resolveMentorSlugAlias("solace")).toBeNull();
+    expect(resolveMentorSlugAlias("elizabeth")).toBeNull();
+    expect(resolveMentorSlugAlias("sienna")).toBeNull();
+    expect(resolveMentorSlugAlias("stryker")).toBeNull();
+    expect(resolveMentorSlugAlias("eli")).toBeNull();
+    expect(resolveMentorSlugAlias("reign")).toBeNull();
+    expect(resolveActiveMentorSlug("atlas")).toBeNull();
   });
 
-  it("defines the initial avatar crop positions for the Final 6", () => {
+  it("defines the initial avatar crop positions for the active roster", () => {
     expect(MENTOR_AVATAR_POSITION_MAP.sage).toBe("center 22%");
+    expect(MENTOR_AVATAR_POSITION_MAP.lyra).toBe("center 18%");
     expect(MENTOR_AVATAR_POSITION_MAP.icon).toBe("center 18%");
     expect(MENTOR_AVATAR_POSITION_MAP.charles).toBe("center 35%");
     expect(MENTOR_AVATAR_POSITION_MAP.princess).toBe("center 18%");
@@ -35,7 +43,8 @@ describe("mentorRoster", () => {
   });
 
   it("keeps canonical mentor display order stable", () => {
-    expect(getMentorDisplaySortIndex("sage")).toBeLessThan(getMentorDisplaySortIndex("operator"));
+    expect(getMentorDisplaySortIndex("sage")).toBeLessThan(getMentorDisplaySortIndex("lyra"));
+    expect(getMentorDisplaySortIndex("lyra")).toBeLessThan(getMentorDisplaySortIndex("operator"));
     expect(getMentorDisplaySortIndex("operator")).toBeLessThan(getMentorDisplaySortIndex("rival"));
   });
 });

@@ -118,11 +118,15 @@ export async function handleGenerateMentorAudio(
     }
 
     const requestedMentorSlug = String(mentorSlug).trim().toLowerCase();
-    const resolvedMentorSlug = resolveSupportedMentorSlug(requestedMentorSlug) ?? requestedMentorSlug;
-    const voiceConfig = resolveMentorVoiceConfig(requestedMentorSlug);
+    const resolvedMentorSlug = resolveSupportedMentorSlug(requestedMentorSlug);
 
+    if (!resolvedMentorSlug) {
+      return errorResponse(400, `Unsupported mentorSlug: ${requestedMentorSlug}`, corsHeaders);
+    }
+
+    const voiceConfig = resolveMentorVoiceConfig(resolvedMentorSlug);
     if (!voiceConfig) {
-      throw new Error(`No voice configuration found for mentor: ${requestedMentorSlug}`);
+      return errorResponse(500, `No voice config found for mentorSlug: ${resolvedMentorSlug}`, corsHeaders);
     }
 
     const voiceSettings = {
@@ -132,7 +136,7 @@ export async function handleGenerateMentorAudio(
       use_speaker_boost: voiceConfig.use_speaker_boost ?? true,
     };
 
-    console.log(`Generating audio for mentor ${requestedMentorSlug} (resolved=${resolvedMentorSlug}) with voice ${voiceConfig.voiceId}`);
+    console.log(`Generating audio for mentor ${resolvedMentorSlug} with voice ${voiceConfig.voiceId}`);
 
     const startedAt = deps.now();
     const controller = new AbortController();
@@ -201,7 +205,7 @@ export async function handleGenerateMentorAudio(
       await logRateLimitedInvocation(supabaseAdmin, {
         userId: requestAuth.userId,
         templateKey: RATE_LIMIT_KEY,
-        inputData: { mentorSlug: requestedMentorSlug },
+        inputData: { mentorSlug: resolvedMentorSlug },
         outputData: { audioUrl },
         validationPassed: true,
         modelUsed: MODEL_NAME,

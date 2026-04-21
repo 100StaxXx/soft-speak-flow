@@ -176,6 +176,25 @@ describe("Onboarding route guard", () => {
     expect(mocks.navigate).not.toHaveBeenCalled();
   });
 
+  it("returns unauthenticated visitors to auth instead of rendering onboarding", async () => {
+    mocks.status = "unauthenticated";
+    mocks.user = null;
+
+    renderOnboarding();
+
+    expect(screen.getByText("Returning to sign in...")).toBeInTheDocument();
+    expect(screen.queryByText("StoryOnboarding")).not.toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(mocks.navigate).toHaveBeenCalledWith("/auth", {
+        replace: true,
+        state: {
+          message: "Sign in to continue onboarding.",
+        },
+      });
+    });
+  });
+
   it("keeps stage 0 egg accounts on onboarding and resumes the final cinematic", () => {
     mocks.profile = {
       onboarding_completed: true,
@@ -394,6 +413,28 @@ describe("Onboarding route guard", () => {
 
     await waitFor(() => {
       expect(mocks.navigate).toHaveBeenCalledWith("/journeys", { replace: true });
+    });
+  });
+
+  it("provides a way to leave onboarding and return to sign in", async () => {
+    renderOnboarding();
+
+    const storyOnboardingProps = mocks.storyOnboardingProps as {
+      onExitToAuth?: () => Promise<void> | void;
+    } | null;
+
+    expect(storyOnboardingProps?.onExitToAuth).toBeTypeOf("function");
+
+    await act(async () => {
+      await storyOnboardingProps?.onExitToAuth?.();
+    });
+
+    expect(mocks.signOut).toHaveBeenCalledTimes(1);
+    expect(mocks.navigate).toHaveBeenCalledWith("/auth", {
+      replace: true,
+      state: {
+        message: "You left onboarding. Sign in whenever you're ready to continue.",
+      },
     });
   });
 

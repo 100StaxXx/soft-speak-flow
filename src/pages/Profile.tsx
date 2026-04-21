@@ -25,6 +25,7 @@ import { ResetCompanionButton } from "@/components/ResetCompanionButton";
 import { SubscriptionManagement } from "@/components/SubscriptionManagement";
 import { SoundSettings } from "@/components/SoundSettings";
 import { CompanionAccessibilitySettings } from "@/components/CompanionAccessibilitySettings";
+import { CompanionPersonalitySettings } from "@/components/CompanionPersonalitySettings";
 import { LegalDocumentViewer } from "@/components/LegalDocumentViewer";
 import { QuestBehaviorSettings } from "@/components/QuestBehaviorSettings";
 import { DisplayNameSetting } from "@/components/DisplayNameSetting";
@@ -485,7 +486,14 @@ const Profile = () => {
                       )}
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-sm">{selectedMentor.name}</p>
-                        <p className="text-xs text-muted-foreground truncate">{selectedMentor.tone_description}</p>
+                        {selectedMentor.short_title ? (
+                          <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground/80">
+                            {selectedMentor.short_title}
+                          </p>
+                        ) : null}
+                        <p className="text-xs text-muted-foreground line-clamp-2">
+                          {selectedMentor.tone_description || selectedMentor.target_user}
+                        </p>
                       </div>
                     </div>
                   )}
@@ -644,6 +652,7 @@ const Profile = () => {
             <TabsContent value="preferences" className="space-y-4">
               <QuestBehaviorSettings />
               <CalendarIntegrationsSettings />
+              <CompanionPersonalitySettings />
               <CompanionAccessibilitySettings />
               <SoundSettings />
             </TabsContent>

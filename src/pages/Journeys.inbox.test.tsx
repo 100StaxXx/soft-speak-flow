@@ -105,6 +105,14 @@ vi.mock("@/components/CinematicPageBackground", () => ({
   ),
 }));
 
+vi.mock("@/contexts/ResilienceContext", () => ({
+  useResilience: () => ({
+    queueAction: vi.fn().mockResolvedValue(undefined),
+    shouldQueueWrites: false,
+    retryNow: vi.fn().mockResolvedValue(undefined),
+  }),
+}));
+
 vi.mock("@/components/DatePillsScroller", () => ({
   DatePillsScroller: () => <div data-testid="date-pills" />,
 }));
@@ -270,7 +278,7 @@ vi.mock("@/components/DraggableFAB", () => ({
 }));
 
 vi.mock("@/components/journeys/JourneysCompanionPlannerModal", () => ({
-  JourneysCompanionPlannerModal: () => null,
+  JourneysCompanionPlannerController: () => null,
 }));
 
 vi.mock("@/hooks/useJourneysCompanionVisual", () => ({

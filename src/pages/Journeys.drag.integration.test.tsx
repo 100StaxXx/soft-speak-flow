@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { isSameDay } from "date-fns";
@@ -78,12 +78,6 @@ const mocks = vi.hoisted(() => ({
   epicsLoading: false,
   isMacHostedIOSApp: false,
   draggableFabRenderCount: 0,
-  inboxTasks: [] as Array<{
-    id: string;
-    task_text: string;
-    completed: boolean;
-    task_date: string | null;
-  }>,
   lastDatePillSelectedDate: null as Date | null,
   lastAddQuestSheetProps: null as null | {
     autoFillTimeOnFirstTap?: boolean;
@@ -131,15 +125,7 @@ const mocks = vi.hoisted(() => ({
     onOpenChange?: (open: boolean) => void;
     presentation?: string;
     launchIntent?: unknown;
-    onQuestProposalEditHandoff?: (proposal: {
-      id: string;
-      kind: "create_quest" | "update_quest" | "suggest_reminder";
-      title: string;
-      summary: string;
-      payload: Record<string, unknown>;
-      status: "pending";
-      readyToConfirm: boolean;
-    }) => Promise<{ saved: boolean; savedTitle?: string | null }>;
+    onLaunchIntentConsumed?: (intentId: string) => void;
   },
   lastEditQuestDialogProps: null as null | {
     open?: boolean;
@@ -148,7 +134,6 @@ const mocks = vi.hoisted(() => ({
       task_text: string;
       scheduled_time?: string | null;
     } | null;
-    plannerSubtaskDraft?: string[] | null;
     onSave?: (taskId: string, updates: Record<string, unknown>) => Promise<void>;
   },
   lastDraggableFabOnOpenCompanionPlanner: null as null | ((intent?: unknown) => void),
@@ -295,23 +280,18 @@ vi.mock("@/components/AddQuestSheet", () => ({
 }));
 
 vi.mock("@/components/journeys/JourneysCompanionPlannerModal", () => ({
-  JourneysCompanionPlannerModal: (props: {
+  JourneysCompanionPlannerController: (props: {
     open?: boolean;
     onOpenChange?: (open: boolean) => void;
     presentation?: string;
     launchIntent?: unknown;
     onLaunchIntentConsumed?: (intentId: string) => void;
-    onQuestProposalEditHandoff?: (proposal: {
-      id: string;
-      kind: "create_quest" | "update_quest" | "suggest_reminder";
-      title: string;
-      summary: string;
-      payload: Record<string, unknown>;
-      status: "pending";
-      readyToConfirm: boolean;
-    }) => Promise<{ saved: boolean; savedTitle?: string | null }>;
   }) => {
     mocks.lastCompanionPlannerModalProps = props;
+
+    useEffect(() => () => {
+      mocks.lastCompanionPlannerModalProps = null;
+    }, []);
 
     if (!props.open) {
       return null;
@@ -361,7 +341,6 @@ vi.mock("@/features/quests/components/EditQuestDialog", () => ({
       task_text: string;
       scheduled_time?: string | null;
     } | null;
-    plannerSubtaskDraft?: string[] | null;
     onSave?: (taskId: string, updates: Record<string, unknown>) => Promise<void>;
   }) => {
     mocks.lastEditQuestDialogProps = props;
@@ -834,7 +813,6 @@ describe("Journeys row drag integration", () => {
     expect(screen.queryByTestId("draggable-fab")).not.toBeInTheDocument();
     expect(mocks.draggableFabRenderCount).toBe(0);
     expect(mocks.lastAddQuestSheetProps?.presentation).toBe("desktop-panel");
-    expect(mocks.lastCompanionPlannerModalProps?.presentation).toBe("dialog");
   });
 
   it("keeps the journeys add quest button targetable for the tutorial", async () => {
@@ -907,10 +885,7 @@ describe("Journeys row drag integration", () => {
       </QueryClientProvider>,
     );
 
-    await waitFor(() => {
-      expect(mocks.lastCompanionPlannerModalProps).not.toBeNull();
-    });
-    expect(mocks.lastCompanionPlannerModalProps?.open).toBe(false);
+    expect(mocks.lastCompanionPlannerModalProps).toBeNull();
     expect(screen.queryByTestId("journeys-companion-planner-modal")).not.toBeInTheDocument();
   });
 
@@ -951,7 +926,7 @@ describe("Journeys row drag integration", () => {
     expect(screen.getByTestId("journeys-companion-planner-modal")).toBeInTheDocument();
   });
 
-  it("keeps the planner open while a planner quest edit handoff is active and resolves back after save", async () => {
+  it("clears stale planner launch intents when the planner closes before consuming them", async () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -965,7 +940,7 @@ describe("Journeys row drag integration", () => {
           pathname: "/journeys",
           state: {
             companionPlannerLaunchIntent: {
-              id: "planner-handoff-1",
+              id: "planner-intent-close-1",
               message: "Help me plan my afternoon.",
               starterIntent: "adjust_today",
               target: "planner",
@@ -981,79 +956,30 @@ describe("Journeys row drag integration", () => {
     await waitFor(() => {
       expect(mocks.lastCompanionPlannerModalProps?.open).toBe(true);
     });
-
-    let handoffPromise:
-      | Promise<{ saved: boolean; savedTitle?: string | null }>
-      | undefined;
-
-    await act(async () => {
-      handoffPromise = mocks.lastCompanionPlannerModalProps?.onQuestProposalEditHandoff?.({
-        id: "proposal-create-1",
-        kind: "create_quest",
-        title: "Respond to emails",
-        summary: "Carve out a short inbox block first thing.",
-        payload: {
-          taskText: "Respond to emails",
-          taskDate: "2026-02-13",
-          scheduledTime: "09:00",
-          estimatedDuration: 30,
-          notes: "Start with urgent threads.",
-          location: "Desk",
-          subtasks: ["Reply to founders", "Clear urgent threads"],
-        },
-        status: "pending",
-        readyToConfirm: true,
-      });
-    });
-
-    await waitFor(() => {
-      expect(mocks.lastAddQuestSheetProps?.open).toBe(true);
-    });
-    expect(mocks.lastCompanionPlannerModalProps?.open).toBe(true);
-    expect(mocks.lastAddQuestSheetProps?.prefillDraft).toEqual(expect.objectContaining({
-      text: "Respond to emails",
-      taskDate: "2026-02-13",
-      scheduledTime: "09:00",
-      estimatedDuration: 30,
-      moreInformation: "Start with urgent threads.",
-      location: "Desk",
-      subtasks: ["Reply to founders", "Clear urgent threads"],
+    expect(mocks.lastCompanionPlannerModalProps?.launchIntent).toEqual(expect.objectContaining({
+      id: "planner-intent-close-1",
+      message: "Help me plan my afternoon.",
     }));
+    const reopenPlanner = mocks.lastCompanionPlannerModalProps?.onOpenChange;
+
+    fireEvent.click(screen.getByText("close-planner-modal"));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("journeys-companion-planner-modal")).not.toBeInTheDocument();
+    });
 
     await act(async () => {
-      await mocks.lastAddQuestSheetProps?.onAdd?.({
-        text: "Respond to emails",
-        taskDate: "2026-02-13",
-        difficulty: "medium",
-        scheduledTime: "09:00",
-        estimatedDuration: 30,
-        recurrencePattern: null,
-        recurrenceDays: [],
-        recurrenceMonthDays: [],
-        recurrenceCustomPeriod: null,
-        reminderEnabled: false,
-        reminderMinutesBefore: 15,
-        moreInformation: "Start with urgent threads.",
-        location: "Desk",
-        contactId: null,
-        autoLogInteraction: false,
-        sendToInbox: false,
-        sendToCalendar: false,
-        subtasks: ["Reply to founders", "Clear urgent threads"],
-        imageUrl: null,
-        attachments: [],
-        creationSource: "nlp",
-      });
+      await Promise.resolve();
     });
 
-    await expect(handoffPromise).resolves.toEqual({
-      saved: true,
-      savedTitle: "Respond to emails",
+    await act(async () => {
+      reopenPlanner?.(true);
     });
+
     await waitFor(() => {
-      expect(mocks.lastAddQuestSheetProps?.open).toBe(false);
+      expect(mocks.lastCompanionPlannerModalProps?.open).toBe(true);
     });
-    expect(mocks.lastCompanionPlannerModalProps?.open).toBe(true);
+    expect(mocks.lastCompanionPlannerModalProps?.launchIntent).toBeNull();
   });
 
   it("opens Pathfinder immediately for campaign-builder launcher intents without opening companion chat", async () => {

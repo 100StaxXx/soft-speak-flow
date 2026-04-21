@@ -363,7 +363,7 @@ Deno.test("generate-complete-pep-talk ignores spoofed user ids for rate limiting
   const response = await pepTalkModule.handleGenerateCompletePepTalk(
     new Request("https://example.com", {
       method: "POST",
-      body: JSON.stringify({ mentorSlug: "eli", userId: "spoofed-user" }),
+      body: JSON.stringify({ mentorSlug: "rival", userId: "spoofed-user" }),
     }),
     {
       authenticate: async () => ({ userId: "auth-user", isServiceRole: false }),
@@ -503,7 +503,7 @@ Deno.test("generate-mentor-audio succeeds for authenticated users and records us
   const response = await mentorAudioModule.handleGenerateMentorAudio(
     new Request("https://example.com", {
       method: "POST",
-      body: JSON.stringify({ mentorSlug: "eli", script: "Keep going." }),
+      body: JSON.stringify({ mentorSlug: "rival", script: "Keep going." }),
     }),
     {
       authorize: async () => ({ userId: "user-1", isInternal: false }),
@@ -519,4 +519,24 @@ Deno.test("generate-mentor-audio succeeds for authenticated users and records us
   assertEquals(response.status, 200, "Expected authenticated mentor audio request to succeed");
   assertEquals(body.audioUrl, "https://example.com/audio.mp3", "Expected audio URL from storage");
   assert(Boolean(logEntry?.payload), "Expected mentor audio usage to be logged");
+});
+
+Deno.test("generate-mentor-audio rejects legacy mentor slugs", async () => {
+  const response = await mentorAudioModule.handleGenerateMentorAudio(
+    new Request("https://example.com", {
+      method: "POST",
+      body: JSON.stringify({ mentorSlug: "eli", script: "Keep going." }),
+    }),
+    {
+      authorize: async () => ({ userId: "user-1", isInternal: false }),
+      createSupabaseClient: () => createMockSupabase({}),
+      fetchImpl: fetch,
+      checkRateLimitFn: async () => ({ allowed: true, available: true, remaining: 14, limit: 15, resetAt: new Date("2026-03-29T00:00:00.000Z") }),
+      now: () => 1000,
+    },
+  );
+
+  const body = await response.json();
+  assertEquals(response.status, 400, "Expected legacy mentor slug to be rejected");
+  assertEquals(body.error, "Unsupported mentorSlug: eli", "Expected legacy mentor error message");
 });

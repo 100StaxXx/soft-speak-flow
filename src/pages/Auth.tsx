@@ -64,6 +64,10 @@ interface PostAuthNavigationContext {
   preferGuardedLanding: boolean;
 }
 
+interface AuthLocationState {
+  message?: string | null;
+}
+
 const DEFAULT_POST_AUTH_NAVIGATION_CONTEXT: PostAuthNavigationContext = {
   provider: null,
   intent: null,
@@ -312,6 +316,11 @@ const Auth = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
+  const locationState = (location.state as AuthLocationState | null) ?? null;
+  const infoMessage =
+    typeof locationState?.message === "string" && locationState.message.trim().length > 0
+      ? locationState.message.trim()
+      : null;
   const pendingPostAuthNavigationContextRef = useRef<
     (PostAuthNavigationContext & { userId: string }) | null
   >(null);
@@ -1247,6 +1256,13 @@ const Auth = () => {
               >
                 <p className="text-[0.95rem] font-semibold text-pure-white">Error</p>
                 <p className="mt-1 text-sm leading-6 text-pure-white/[0.88]">{inlineError}</p>
+              </div>
+            ) : null}
+
+            {infoMessage ? (
+              <div className="rounded-[1.35rem] border border-white/[0.12] bg-white/[0.07] px-5 py-5 shadow-[0_18px_42px_rgba(5,2,16,0.28)]">
+                <p className="text-[0.95rem] font-semibold text-pure-white">Heads up</p>
+                <p className="mt-1 text-sm leading-6 text-pure-white/[0.82]">{infoMessage}</p>
               </div>
             ) : null}
 

@@ -39,6 +39,7 @@ import type {
 } from "@/types/companionConversation";
 import type { CompanionPlannerLaunchIntent } from "@/types/companionPlanner";
 import {
+  COMPANION_PENDING_ACTIONS_DISABLED_REASON,
   COMPANION_CHAT_THREAD_HISTORY_DISABLED_REASON,
   COMPANION_CHAT_THREAD_HISTORY_EMPTY_STATE,
   isCompanionChatSetupError,
@@ -58,6 +59,12 @@ export interface CompanionAssistantMessage {
   isSeed?: boolean;
   pendingAction?: PendingActionView;
   receipt?: ActionReceiptView;
+}
+
+export interface CompanionAssistantFailedMessage {
+  text: string;
+  inputMode: CompanionChatInputMode;
+  optimisticMessageId: string;
 }
 
 interface UseCompanionAssistantOptions {
@@ -174,6 +181,8 @@ export function useCompanionAssistant({
   const [pendingAction, setPendingAction] = useState<PendingActionView | null>(null);
   const [draftInput, setDraftInput] = useState("");
   const [interimText, setInterimText] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [lastFailedMessage, setLastFailedMessage] = useState<CompanionAssistantFailedMessage | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isResolvingAction, setIsResolvingAction] = useState(false);
   const [showPermissionDialog, setShowPermissionDialog] = useState(false);
@@ -238,6 +247,8 @@ export function useCompanionAssistant({
     setActiveSessionId(nextSessionId);
     setDraftInput("");
     setInterimText("");
+    setError(null);
+    setLastFailedMessage(null);
     setPendingAction(null);
     setMessages(
       greetingText
@@ -253,10 +264,19 @@ export function useCompanionAssistant({
   }, [scopeKey]);
 
   const loadThreadState = useCallback(async (sessionId: string) => {
-    const [threadMessages, loadedPendingAction] = await Promise.all([
-      loadCompanionChatThreadMessages(sessionId, surface),
-      loadCompanionPendingAction(sessionId),
-    ]);
+    const threadMessages = await loadCompanionChatThreadMessages(sessionId, surface);
+    let loadedPendingAction: PendingActionView | null = null;
+    let pendingActionsSetupUnavailable = false;
+
+    try {
+      loadedPendingAction = await loadCompanionPendingAction(sessionId);
+    } catch (error) {
+      if (!isCompanionChatSetupError(error)) {
+        throw error;
+      }
+
+      pendingActionsSetupUnavailable = true;
+    }
 
     localThreadCreatedAtRef.current =
       threadMessages[0]?.createdAt ?? new Date().toISOString();
@@ -265,7 +285,15 @@ export function useCompanionAssistant({
     setPendingAction(loadedPendingAction);
     setDraftInput("");
     setInterimText("");
-  }, [surface]);
+    setError(null);
+    setLastFailedMessage(null);
+
+    if (pendingActionsSetupUnavailable) {
+      toast.error(COMPANION_PENDING_ACTIONS_DISABLED_REASON, {
+        id: `companion-pending-actions-setup:${scopeKey}`,
+      });
+    }
+  }, [scopeKey, surface]);
 
   useEffect(() => {
     if (scopeKeyRef.current === scopeKey) return;
@@ -407,6 +435,8 @@ export function useCompanionAssistant({
   const appendAssistantResponse = useCallback((
     response: CompanionAgentResponse,
   ) => {
+    setError(null);
+    setLastFailedMessage(null);
     setMessages((previous) => [
       ...previous,
       createMessage("assistant", stripMarkdown(response.reply), {
@@ -419,14 +449,19 @@ export function useCompanionAssistant({
     void speakAssistantReply(response.reply, response.threadState.sessionId);
   }, [speakAssistantReply]);
 
-  const submitMessage = useCallback(async (
+  const submitMessageInternal = useCallback(async (
     rawMessage: string,
     inputMode: CompanionChatInputMode = "text",
+    options?: {
+      optimisticMessageId?: string;
+    },
   ) => {
     const message = rawMessage.trim();
     if (!message || isSubmitting || isResolvingAction) return;
 
     if (useLegacyFallback) {
+      setError(null);
+      setLastFailedMessage(null);
       await legacyAssistant.submitMessage(message, inputMode);
       return;
     }
@@ -439,12 +474,23 @@ export function useCompanionAssistant({
     setIsSubmitting(true);
     setDraftInput("");
     setInterimText("");
+    setError(null);
+    setLastFailedMessage(null);
 
-    const optimisticUserMessage = createMessage("user", message, {
+    const optimisticMessageId = options?.optimisticMessageId ?? generateMessageId();
+    const optimisticUserMessage: CompanionAssistantMessage = {
+      id: optimisticMessageId,
+      role: "user",
+      content: message,
+      createdAt: new Date().toISOString(),
       inputMode,
       source: "agent",
-    });
-    setMessages((previous) => [...previous, optimisticUserMessage]);
+    };
+    setMessages((previous) => (
+      previous.some((entry) => entry.id === optimisticMessageId)
+        ? previous
+        : [...previous, optimisticUserMessage]
+    ));
 
     try {
       const { data, error } = await supabase.functions.invoke("companion-agent", {
@@ -466,20 +512,21 @@ export function useCompanionAssistant({
     } catch (error) {
       console.error("Failed to submit companion agent message:", error);
       if (await shouldFallbackToLegacyAgent(error)) {
+        setError(null);
+        setLastFailedMessage(null);
         setUseLegacyFallback(true);
         await legacyAssistant.submitMessage(message, inputMode);
         return;
       }
 
-      toast.error("Cosmiq hit a snag. Try that again.");
-      setMessages((previous) => [
-        ...previous,
-        createMessage(
-          "assistant",
-          "I lost the thread for a second. Ask again and I’ll pick it right back up.",
-          { source: "agent" },
-        ),
-      ]);
+      const nextError = "Cosmiq hit a snag. Try that again.";
+      toast.error(nextError);
+      setError(nextError);
+      setLastFailedMessage({
+        text: message,
+        inputMode,
+        optimisticMessageId,
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -495,6 +542,21 @@ export function useCompanionAssistant({
     useLegacyFallback,
     user?.id,
   ]);
+
+  const submitMessage = useCallback(async (
+    rawMessage: string,
+    inputMode: CompanionChatInputMode = "text",
+  ) => {
+    await submitMessageInternal(rawMessage, inputMode);
+  }, [submitMessageInternal]);
+
+  const retryLastMessage = useCallback(async () => {
+    if (!lastFailedMessage) return;
+
+    await submitMessageInternal(lastFailedMessage.text, lastFailedMessage.inputMode, {
+      optimisticMessageId: lastFailedMessage.optimisticMessageId,
+    });
+  }, [lastFailedMessage, submitMessageInternal]);
 
   const resolvePendingAction = useCallback(async (mode: "confirm" | "cancel") => {
     if (useLegacyFallback) {
@@ -659,6 +721,8 @@ export function useCompanionAssistant({
       placeholder: legacyAssistant.placeholder,
       messages: legacyAssistant.messages,
       pendingAction: legacyAssistant.pendingAction,
+      error,
+      lastFailedMessage,
       draftInput,
       setDraftInput,
       interimText,
@@ -666,6 +730,7 @@ export function useCompanionAssistant({
       isResolvingAction: legacyAssistant.isResolvingAction,
       submitMessage,
       submitTypedMessage: () => submitMessage(draftInput, "text"),
+      retryLastMessage,
       confirmPendingAction: () => resolvePendingAction("confirm"),
       cancelPendingAction: () => resolvePendingAction("cancel"),
       isRecording,
@@ -701,6 +766,8 @@ export function useCompanionAssistant({
     placeholder,
     messages,
     pendingAction,
+    error,
+    lastFailedMessage,
     draftInput,
     setDraftInput,
     interimText,
@@ -708,6 +775,7 @@ export function useCompanionAssistant({
     isResolvingAction,
     submitMessage,
     submitTypedMessage: () => submitMessage(draftInput, "text"),
+    retryLastMessage,
     confirmPendingAction: () => resolvePendingAction("confirm"),
     cancelPendingAction: () => resolvePendingAction("cancel"),
     isRecording,

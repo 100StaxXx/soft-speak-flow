@@ -12,17 +12,17 @@ import {
 
 describe("mapGuidanceToneToIntensity", () => {
   it("maps plain-text guidance tones to the expected intensity", () => {
-    expect(mapGuidanceToneToIntensity("Direct & demanding")).toBe("high");
-    expect(mapGuidanceToneToIntensity("Gentle & compassionate")).toBe("gentle");
-    expect(mapGuidanceToneToIntensity("Calm & grounded")).toBe("gentle");
-    expect(mapGuidanceToneToIntensity("Encouraging & supportive")).toBe("medium");
+    expect(mapGuidanceToneToIntensity("Direct and challenging")).toBe("high");
+    expect(mapGuidanceToneToIntensity("Calm and reflective")).toBe("gentle");
+    expect(mapGuidanceToneToIntensity("Warm and encouraging")).toBe("gentle");
+    expect(mapGuidanceToneToIntensity("Composed and polished")).toBe("medium");
   });
 
   it("supports legacy emoji-prefixed variants and falls back safely", () => {
     expect(mapGuidanceToneToIntensity("⚔️ Direct & demanding")).toBe("high");
-    expect(mapGuidanceToneToIntensity("🌱 Gentle & compassionate")).toBe("gentle");
-    expect(mapGuidanceToneToIntensity("🧘 Calm & grounded")).toBe("gentle");
-    expect(mapGuidanceToneToIntensity("🤝 Encouraging & supportive")).toBe("medium");
+    expect(mapGuidanceToneToIntensity("🌙 Calm and reflective")).toBe("gentle");
+    expect(mapGuidanceToneToIntensity("🌷 Warm and encouraging")).toBe("gentle");
+    expect(mapGuidanceToneToIntensity("🪞 Composed, polished, and standards-first")).toBe("medium");
     expect(mapGuidanceToneToIntensity("something unexpected")).toBe("medium");
   });
 });
@@ -30,35 +30,48 @@ describe("mapGuidanceToneToIntensity", () => {
 describe("deriveOnboardingMentorCandidates", () => {
   const mentors = [
     { id: "m1", slug: "sage", gender_energy: "masculine", tags: ["discipline"] },
-    { id: "m2", slug: "princess", gender_energy: "feminine", tags: ["supportive"] },
-    { id: "m3", slug: "icon", gender_energy: "feminine", tags: ["confidence"] },
+    { id: "m2", slug: "charles", gender_energy: "masculine", tags: ["accountability"] },
+    { id: "m3", slug: "princess", gender_energy: "feminine", tags: ["supportive"] },
+    { id: "m4", slug: "icon", gender_energy: "feminine", tags: ["confidence"] },
+    { id: "m5", slug: "operator", gender_energy: "masculine", tags: ["execution"] },
+    { id: "m6", slug: "rival", gender_energy: "masculine", tags: ["momentum"] },
+    { id: "m7", slug: "lyra", gender_energy: "feminine", tags: ["clarity"] },
   ];
 
   it("keeps only masculine mentors for masculine presence", () => {
     const result = deriveOnboardingMentorCandidates(mentors, [
-      { questionId: "mentor_energy", tags: ["masculine_preference"] },
+      { questionId: "mentor_energy", optionId: "masculine_presence", tags: ["masculine_preference"] },
     ]);
 
     expect(result.energyPreference).toBe("masculine");
-    expect(result.mentorsForSelection.map((mentor) => mentor.id)).toEqual(["m1"]);
+    expect(result.mentorsForSelection.map((mentor) => mentor.id)).toEqual(["m1", "m2", "m5", "m6"]);
   });
 
   it("keeps only feminine mentors for feminine presence", () => {
     const result = deriveOnboardingMentorCandidates(mentors, [
-      { questionId: "mentor_energy", tags: ["feminine_preference"] },
+      { questionId: "mentor_energy", optionId: "feminine_presence", tags: ["feminine_preference"] },
     ]);
 
     expect(result.energyPreference).toBe("feminine");
-    expect(result.mentorsForSelection.map((mentor) => mentor.id)).toEqual(["m2", "m3"]);
+    expect(result.mentorsForSelection.map((mentor) => mentor.id)).toEqual(["m1", "m2", "m3", "m4", "m7"]);
+  });
+
+  it("keeps only neutral mentors for neutral presence", () => {
+    const result = deriveOnboardingMentorCandidates(mentors, [
+      { questionId: "mentor_energy", optionId: "neutral_presence", tags: ["neutral_preference"] },
+    ]);
+
+    expect(result.energyPreference).toBe("neutral");
+    expect(result.mentorsForSelection.map((mentor) => mentor.id)).toEqual(["m1", "m2"]);
   });
 
   it("keeps all mentors when no preference is selected", () => {
     const result = deriveOnboardingMentorCandidates(mentors, [
-      { questionId: "mentor_energy", tags: [] },
+      { questionId: "mentor_energy", optionId: "either_works", tags: [] },
     ]);
 
     expect(result.energyPreference).toBe("no_preference");
-    expect(result.mentorsForSelection.map((mentor) => mentor.id)).toEqual(["m1", "m2", "m3"]);
+    expect(result.mentorsForSelection.map((mentor) => mentor.id)).toEqual(["m1", "m2", "m3", "m4", "m5", "m6", "m7"]);
   });
 
   it("returns no mentors when a strict preference has no matches", () => {
@@ -67,10 +80,10 @@ describe("deriveOnboardingMentorCandidates", () => {
       { id: "f2", slug: "icon", gender_energy: "feminine", tags: ["confidence"] },
     ];
     const result = deriveOnboardingMentorCandidates(feminineOnlyMentors, [
-      { questionId: "mentor_energy", tags: ["masculine_preference"] },
+      { questionId: "mentor_energy", optionId: "neutral_presence", tags: ["neutral_preference"] },
     ]);
 
-    expect(result.energyPreference).toBe("masculine");
+    expect(result.energyPreference).toBe("neutral");
     expect(result.mentorsForSelection).toEqual([]);
   });
 });

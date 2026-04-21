@@ -94,7 +94,6 @@ interface EditQuestDialogProps {
   hasCalendarLink?: boolean;
   isSendingToCalendar?: boolean;
   presentation?: QuestComposerPresentation;
-  plannerSubtaskDraft?: string[] | null;
 }
 
 export function EditQuestDialog({
@@ -109,7 +108,6 @@ export function EditQuestDialog({
   hasCalendarLink = false,
   isSendingToCalendar = false,
   presentation = "mobile-sheet",
-  plannerSubtaskDraft = null,
 }: EditQuestDialogProps) {
   const [taskText, setTaskText] = useState("");
   const [taskDate, setTaskDate] = useState<string | null>(null);
@@ -128,38 +126,8 @@ export function EditQuestDialog({
   const [attachments, setAttachments] = useState<QuestAttachmentInput[]>([]);
   const [location, setLocation] = useState<string | null>(null);
   const [newSubtaskText, setNewSubtaskText] = useState("");
-  const [localPlannerSubtasks, setLocalPlannerSubtasks] = useState<string[]>([]);
 
   const { subtasks, addSubtask, toggleSubtask, deleteSubtask } = useSubtasks(task?.id ?? null);
-  const hasPlannerSubtaskDraft = Array.isArray(plannerSubtaskDraft);
-
-  useEffect(() => {
-    if (!open || !hasPlannerSubtaskDraft) {
-      setLocalPlannerSubtasks([]);
-      return;
-    }
-
-    setLocalPlannerSubtasks(
-      plannerSubtaskDraft
-        .map((subtask) => subtask.trim())
-        .filter((subtask, index, collection) => (
-          subtask.length > 0 && collection.indexOf(subtask) === index
-        )),
-    );
-  }, [hasPlannerSubtaskDraft, open, plannerSubtaskDraft]);
-
-  const displayedSubtasks = useMemo(
-    () => (
-      hasPlannerSubtaskDraft
-        ? localPlannerSubtasks.map((title, index) => ({
-            id: `planner-subtask-${index}-${title}`,
-            title,
-            completed: false,
-          }))
-        : subtasks
-    ),
-    [hasPlannerSubtaskDraft, localPlannerSubtasks, subtasks],
-  );
 
   // Initialize state from task
   useEffect(() => {
@@ -281,9 +249,6 @@ export function EditQuestDialog({
       image_url: attachments.find((attachment) => attachment.isImage)?.fileUrl ?? null,
       location,
       attachments,
-      subtasks: hasPlannerSubtaskDraft
-        ? localPlannerSubtasks.filter((subtask) => subtask.trim().length > 0)
-        : undefined,
     });
     onOpenChange(false);
   }, [
@@ -302,9 +267,7 @@ export function EditQuestDialog({
     moreInformation,
     attachments,
     location,
-    hasPlannerSubtaskDraft,
     hasRecurrenceWithoutTime,
-    localPlannerSubtasks,
     onOpenChange,
     onSave,
   ]);
@@ -318,14 +281,10 @@ export function EditQuestDialog({
 
   const handleAddSubtask = useCallback(() => {
     if (newSubtaskText.trim()) {
-      if (hasPlannerSubtaskDraft) {
-        setLocalPlannerSubtasks((current) => [...current, newSubtaskText.trim()]);
-      } else {
-        addSubtask(newSubtaskText.trim());
-      }
+      addSubtask(newSubtaskText.trim());
       setNewSubtaskText("");
     }
-  }, [addSubtask, hasPlannerSubtaskDraft, newSubtaskText]);
+  }, [addSubtask, newSubtaskText]);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -348,11 +307,11 @@ export function EditQuestDialog({
           <div className={cn("flex-shrink-0 px-5 py-5", QUEST_FORM_STYLES.desktopPanelHeader)}>
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-white/42">
-                  Edit Quest
-                </p>
-                <p className="mt-1 text-sm text-white/62">{summaryLine}</p>
-              </div>
+                  <p className={QUEST_FORM_STYLES.mobileHeaderKicker}>
+                    Edit Quest
+                  </p>
+                  <p className={cn("mt-1 text-sm", QUEST_FORM_STYLES.textOnDarkMuted)}>{summaryLine}</p>
+                </div>
               <button
                 onClick={() => onOpenChange(false)}
                 className={QUEST_FORM_STYLES.desktopPanelCloseButton}
@@ -445,7 +404,7 @@ export function EditQuestDialog({
               <Popover>
                 <PopoverTrigger asChild>
                   <button className={cn(
-                    "flex items-center justify-center gap-2 text-sm font-semibold text-white",
+                    "flex items-center justify-center gap-2 text-sm font-semibold",
                     QUEST_FORM_STYLES.selectorChip,
                     taskDate
                       ? ""
@@ -519,27 +478,21 @@ export function EditQuestDialog({
 
             {/* Subtasks + Notes Card */}
             <div className={cn(QUEST_FORM_STYLES.sectionCard, "overflow-hidden")}>
-              {displayedSubtasks.map((st, index) => (
+              {subtasks.map((st) => (
                 <div key={st.id} className={cn("group flex items-center gap-2 px-4 py-3", `border-b ${QUEST_FORM_STYLES.divider}`)}>
                   <Checkbox
                     checked={st.completed}
-                    disabled={hasPlannerSubtaskDraft}
                     onCheckedChange={(checked) => {
-                      if (hasPlannerSubtaskDraft) return;
                       toggleSubtask({ subtaskId: st.id, completed: !!checked });
                     }}
                     className="h-4 w-4 border-white/18"
                   />
-                  <span className={cn("flex-1 text-sm text-white", st.completed && "line-through text-white/42")}>{st.title}</span>
+                  <span className={cn("flex-1 text-sm", QUEST_FORM_STYLES.textStrong, st.completed && "line-through text-[#9a6d47]")}>{st.title}</span>
                   <button
                     onClick={() => {
-                      if (hasPlannerSubtaskDraft) {
-                        setLocalPlannerSubtasks((current) => current.filter((_, currentIndex) => currentIndex !== index));
-                        return;
-                      }
                       deleteSubtask(st.id);
                     }}
-                    className="rounded-full p-1 opacity-0 transition-all hover:bg-white/[0.08] text-white/44 hover:text-white group-hover:opacity-100"
+                    className={cn("opacity-0 group-hover:opacity-100", QUEST_FORM_STYLES.iconGhostButton)}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
@@ -559,7 +512,7 @@ export function EditQuestDialog({
                     }
                   }}
                   placeholder="Add Subtask"
-                  className="flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/42"
+                  className={cn("flex-1", QUEST_FORM_STYLES.bareInput)}
                 />
               </div>
 
@@ -567,7 +520,7 @@ export function EditQuestDialog({
                 value={moreInformation || ""}
                 onChange={(e) => setMoreInformation(e.target.value || null)}
                 placeholder="Add notes, meeting links or phone numbers..."
-                className="min-h-[88px] border-0 rounded-none bg-transparent resize-none px-4 py-4 text-sm text-white placeholder:text-white/42 focus-visible:ring-0 focus-visible:ring-offset-0"
+                className={QUEST_FORM_STYLES.bareTextarea}
                 style={{ touchAction: 'pan-y', WebkitTapHighlightColor: 'transparent' }}
                 data-vaul-no-drag
               />
@@ -577,8 +530,8 @@ export function EditQuestDialog({
               <QuestLocationLink
                 location={location}
                 label="Address"
-                className={cn(QUEST_FORM_STYLES.sectionCard, "text-white")}
-                textClassName="text-white"
+                className={cn(QUEST_FORM_STYLES.sectionCard, QUEST_FORM_STYLES.textStrong)}
+                textClassName={QUEST_FORM_STYLES.textStrong}
               />
             ) : null}
 
@@ -653,7 +606,7 @@ export function EditQuestDialog({
         <div
           className={cn(
             "flex-shrink-0 flex flex-col gap-3 px-5 pt-4",
-            isDesktopPanel ? `${QUEST_FORM_STYLES.desktopPanelFooter} pb-5` : "border-t border-white/8 pb-6",
+            isDesktopPanel ? `${QUEST_FORM_STYLES.desktopPanelFooter} pb-5` : "border-t-[3px] border-[#4d2811] pb-6",
           )}
         >
           <Button
@@ -686,7 +639,7 @@ export function EditQuestDialog({
               variant="ghost"
               onClick={() => setShowDeleteConfirm(true)}
               disabled={isDeleting}
-              className="w-full rounded-[24px] text-white/72 hover:bg-white/[0.06] hover:text-white"
+              className={cn("w-full rounded-[24px]", QUEST_FORM_STYLES.footerLink, "hover:bg-[#fff0c8]")}
             >
               <Trash2 className="w-4 h-4 mr-2" />
               Delete

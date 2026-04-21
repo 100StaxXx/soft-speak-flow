@@ -9,8 +9,8 @@ const mocks = vi.hoisted(() => ({
   companion: null as { id: string } | null,
   canEvolve: false,
   selectedMentor: {
-    slug: "atlas",
-    name: "Atlas",
+    slug: "sage",
+    name: "The Sage",
     primary_color: "#f97316",
   } as { slug: string; name: string; primary_color: string } | null,
   mentorLoading: false,
@@ -111,8 +111,8 @@ describe("BottomNav", () => {
     mocks.companion = null;
     mocks.canEvolve = false;
     mocks.selectedMentor = {
-      slug: "atlas",
-      name: "Atlas",
+      slug: "sage",
+      name: "The Sage",
       primary_color: "#f97316",
     };
     mocks.mentorLoading = false;

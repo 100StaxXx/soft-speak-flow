@@ -23,7 +23,7 @@ const mocks = vi.hoisted(() => ({
       tags: ["discipline"],
       themes: ["calm"],
       style_description: null,
-      target_user: null,
+      target_user: "Overwhelmed thinkers seeking calm clarity",
       intensity_level: "high",
     },
     {
@@ -37,7 +37,7 @@ const mocks = vi.hoisted(() => ({
       tags: ["healing"],
       themes: ["self_worth"],
       style_description: null,
-      target_user: null,
+      target_user: "Users building routines through gentle structure",
       intensity_level: "gentle",
     },
     {
@@ -51,7 +51,7 @@ const mocks = vi.hoisted(() => ({
       tags: ["confidence"],
       themes: ["confidence"],
       style_description: null,
-      target_user: null,
+      target_user: "Identity-led users refining standards and boundaries",
       intensity_level: "high",
     },
   ],
@@ -144,6 +144,8 @@ describe("MentorSwitcher", () => {
     expect(screen.getByText(/Best for overthinking/)).toBeInTheDocument();
     expect(screen.getAllByText("The Princess").length).toBeGreaterThan(0);
     expect(screen.getAllByText("The Sage").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Quiet Clarity").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Calm and wise").length).toBeGreaterThan(0);
   });
 
   it("supports a controlled triggerless dialog", () => {

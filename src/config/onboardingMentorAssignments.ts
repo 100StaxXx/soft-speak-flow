@@ -1,197 +1,169 @@
-import { resolveActiveMentorSlug } from "@/lib/mentorRoster";
+import {
+  ACTIVE_MENTOR_SLUGS,
+  isActiveMentorSlug,
+  resolveActiveMentorSlug,
+  type ActiveMentorSlug,
+} from "@/lib/mentorRoster";
 
 export const ENERGY_OPTION_IDS = [
   "feminine_presence",
   "masculine_presence",
+  "neutral_presence",
   "either_works",
 ] as const;
 
 export const FOCUS_OPTION_IDS = [
-  "clarity_mindset",
-  "emotions_healing",
-  "discipline_performance",
-  "confidence_self_belief",
+  "clarity_signal",
+  "standards_identity",
+  "gentle_routines",
+  "execution_pressure",
 ] as const;
 
 export const TONE_OPTION_IDS = [
-  "gentle_compassionate",
-  "encouraging_supportive",
-  "calm_grounded",
-  "direct_demanding",
+  "calm_reflective",
+  "composed_polished",
+  "warm_encouraging",
+  "direct_challenging",
 ] as const;
 
 export const PROGRESS_OPTION_IDS = [
-  "principles_logic",
-  "emotional_reassurance",
-  "belief_support",
-  "pressure_standards",
+  "perspective_next_step",
+  "identity_alignment",
+  "gentle_accountability",
+  "hard_accountability",
+] as const;
+
+export const CLARITY_LENS_OPTION_IDS = [
+  "calm_perspective",
+  "pattern_strategy",
+  "standards_self_command",
+] as const;
+
+export const PRESSURE_STYLE_OPTION_IDS = [
+  "systems_precision",
+  "prove_it_pressure",
+  "sarcastic_callout",
 ] as const;
 
 export type EnergyOptionId = (typeof ENERGY_OPTION_IDS)[number];
 export type FocusOptionId = (typeof FOCUS_OPTION_IDS)[number];
 export type ToneOptionId = (typeof TONE_OPTION_IDS)[number];
 export type ProgressOptionId = (typeof PROGRESS_OPTION_IDS)[number];
+export type ClarityLensOptionId = (typeof CLARITY_LENS_OPTION_IDS)[number];
+export type PressureStyleOptionId = (typeof PRESSURE_STYLE_OPTION_IDS)[number];
 
-export type OnboardingAssignmentKey =
-  `${EnergyOptionId}|${FocusOptionId}|${ToneOptionId}|${ProgressOptionId}`;
+export type ClarifierQuestionId = "clarity_lens" | "pressure_style";
+export type ClarifierOptionId = ClarityLensOptionId | PressureStyleOptionId;
 
-export const ACTIVE_ONBOARDING_MENTOR_SLUGS = [
-  "sage",
-  "icon",
-  "charles",
-  "princess",
-  "operator",
-  "rival",
-] as const;
-
-export type OnboardingMentorSlug = (typeof ACTIVE_ONBOARDING_MENTOR_SLUGS)[number];
+export const ACTIVE_ONBOARDING_MENTOR_SLUGS = ACTIVE_MENTOR_SLUGS;
+export type OnboardingMentorSlug = ActiveMentorSlug;
 
 export type AssignmentAnswerInput = {
   questionId: string;
   optionId?: string | null;
 };
 
-type MentorScoreCard = {
-  focus: Record<FocusOptionId, number>;
-  tone: Record<ToneOptionId, number>;
-  progress: Record<ProgressOptionId, number>;
+type WeightedQuestionId =
+  | "focus_area"
+  | "guidance_tone"
+  | "progress_style"
+  | ClarifierQuestionId;
+
+type MentorProfile = {
+  focus: FocusOptionId;
+  tone: ToneOptionId;
+  progress: ProgressOptionId;
+  clarifierQuestionId?: ClarifierQuestionId;
+  clarifierOptionId?: ClarifierOptionId;
+};
+
+type ScoredMentor = {
+  slug: OnboardingMentorSlug;
+  score: number;
+  primaryMatches: number;
+};
+
+const BASE_WEIGHT_BY_QUESTION: Record<WeightedQuestionId, number> = {
+  focus_area: 5,
+  guidance_tone: 4,
+  progress_style: 4,
+  clarity_lens: 6,
+  pressure_style: 6,
 };
 
 const ENERGY_CANDIDATES: Record<EnergyOptionId, readonly OnboardingMentorSlug[]> = {
-  feminine_presence: ["princess", "icon"],
-  masculine_presence: ["sage", "operator", "rival", "charles"],
-  either_works: ["sage", "icon", "charles", "princess", "operator", "rival"],
+  feminine_presence: ["lyra", "icon", "princess", "sage", "charles"],
+  masculine_presence: ["operator", "rival", "sage", "charles"],
+  neutral_presence: ["sage", "charles"],
+  either_works: ["sage", "lyra", "icon", "princess", "operator", "rival", "charles"],
 };
 
-const MENTOR_PRIORITY: readonly OnboardingMentorSlug[] = [
-  "sage",
-  "princess",
-  "operator",
-  "icon",
-  "rival",
-  "charles",
-];
+const PRIORITY_BY_ENERGY: Record<EnergyOptionId, readonly OnboardingMentorSlug[]> = {
+  feminine_presence: ["lyra", "icon", "princess", "sage", "charles"],
+  masculine_presence: ["operator", "rival", "sage", "charles"],
+  neutral_presence: ["sage", "charles"],
+  either_works: ["sage", "lyra", "icon", "princess", "operator", "rival", "charles"],
+};
 
-const SCORE_CARDS: Record<OnboardingMentorSlug, MentorScoreCard> = {
+const CLARITY_BRANCH_SLUGS = new Set<OnboardingMentorSlug>(["sage", "lyra", "icon"]);
+const DIRECT_BRANCH_SLUGS = new Set<OnboardingMentorSlug>(["operator", "rival", "charles"]);
+
+const MENTOR_PROFILES: Record<OnboardingMentorSlug, MentorProfile> = {
   sage: {
-    focus: {
-      clarity_mindset: 5,
-      emotions_healing: 5,
-      discipline_performance: 1,
-      confidence_self_belief: 2,
-    },
-    tone: {
-      gentle_compassionate: 3,
-      encouraging_supportive: 2,
-      calm_grounded: 5,
-      direct_demanding: 1,
-    },
-    progress: {
-      principles_logic: 4,
-      emotional_reassurance: 4,
-      belief_support: 3,
-      pressure_standards: 1,
-    },
+    focus: "clarity_signal",
+    tone: "calm_reflective",
+    progress: "perspective_next_step",
+    clarifierQuestionId: "clarity_lens",
+    clarifierOptionId: "calm_perspective",
+  },
+  lyra: {
+    focus: "clarity_signal",
+    tone: "composed_polished",
+    progress: "perspective_next_step",
+    clarifierQuestionId: "clarity_lens",
+    clarifierOptionId: "pattern_strategy",
   },
   icon: {
-    focus: {
-      clarity_mindset: 2,
-      emotions_healing: 1,
-      discipline_performance: 2,
-      confidence_self_belief: 5,
-    },
-    tone: {
-      gentle_compassionate: 1,
-      encouraging_supportive: 2,
-      calm_grounded: 2,
-      direct_demanding: 4,
-    },
-    progress: {
-      principles_logic: 2,
-      emotional_reassurance: 1,
-      belief_support: 4,
-      pressure_standards: 5,
-    },
+    focus: "standards_identity",
+    tone: "composed_polished",
+    progress: "identity_alignment",
+    clarifierQuestionId: "clarity_lens",
+    clarifierOptionId: "standards_self_command",
   },
   charles: {
-    focus: {
-      clarity_mindset: 3,
-      emotions_healing: 0,
-      discipline_performance: 5,
-      confidence_self_belief: 2,
-    },
-    tone: {
-      gentle_compassionate: 0,
-      encouraging_supportive: 0,
-      calm_grounded: 0,
-      direct_demanding: 6,
-    },
-    progress: {
-      principles_logic: 2,
-      emotional_reassurance: 0,
-      belief_support: 0,
-      pressure_standards: 6,
-    },
+    focus: "execution_pressure",
+    tone: "direct_challenging",
+    progress: "hard_accountability",
+    clarifierQuestionId: "pressure_style",
+    clarifierOptionId: "sarcastic_callout",
   },
   princess: {
-    focus: {
-      clarity_mindset: 2,
-      emotions_healing: 5,
-      discipline_performance: 3,
-      confidence_self_belief: 4,
-    },
-    tone: {
-      gentle_compassionate: 5,
-      encouraging_supportive: 5,
-      calm_grounded: 3,
-      direct_demanding: 0,
-    },
-    progress: {
-      principles_logic: 1,
-      emotional_reassurance: 5,
-      belief_support: 5,
-      pressure_standards: 1,
-    },
+    focus: "gentle_routines",
+    tone: "warm_encouraging",
+    progress: "gentle_accountability",
   },
   operator: {
-    focus: {
-      clarity_mindset: 5,
-      emotions_healing: 0,
-      discipline_performance: 5,
-      confidence_self_belief: 1,
-    },
-    tone: {
-      gentle_compassionate: 0,
-      encouraging_supportive: 0,
-      calm_grounded: 3,
-      direct_demanding: 5,
-    },
-    progress: {
-      principles_logic: 5,
-      emotional_reassurance: 0,
-      belief_support: 1,
-      pressure_standards: 5,
-    },
+    focus: "execution_pressure",
+    tone: "direct_challenging",
+    progress: "hard_accountability",
+    clarifierQuestionId: "pressure_style",
+    clarifierOptionId: "systems_precision",
   },
   rival: {
-    focus: {
-      clarity_mindset: 1,
-      emotions_healing: 0,
-      discipline_performance: 6,
-      confidence_self_belief: 3,
-    },
-    tone: {
-      gentle_compassionate: 0,
-      encouraging_supportive: 2,
-      calm_grounded: 0,
-      direct_demanding: 5,
-    },
-    progress: {
-      principles_logic: 2,
-      emotional_reassurance: 0,
-      belief_support: 2,
-      pressure_standards: 5,
-    },
+    focus: "execution_pressure",
+    tone: "direct_challenging",
+    progress: "hard_accountability",
+    clarifierQuestionId: "pressure_style",
+    clarifierOptionId: "prove_it_pressure",
+  },
+};
+
+const SECONDARY_SCORE_BONUSES: Partial<Record<OnboardingMentorSlug, Partial<Record<string, number>>>> = {
+  lyra: {
+    standards_identity: 1,
+  },
+  icon: {
+    clarity_signal: 1,
   },
 };
 
@@ -200,17 +172,12 @@ const ALLOWED_OPTION_IDS = new Set<string>([
   ...FOCUS_OPTION_IDS,
   ...TONE_OPTION_IDS,
   ...PROGRESS_OPTION_IDS,
+  ...CLARITY_LENS_OPTION_IDS,
+  ...PRESSURE_STYLE_OPTION_IDS,
 ]);
-
-const PRIORITY_INDEX = new Map(
-  MENTOR_PRIORITY.map((slug, index) => [slug, index]),
-);
 
 const isEnergyOptionId = (value: string): value is EnergyOptionId =>
   (ENERGY_OPTION_IDS as readonly string[]).includes(value);
-
-const isOnboardingMentorSlug = (value: string): value is OnboardingMentorSlug =>
-  (ACTIVE_ONBOARDING_MENTOR_SLUGS as readonly string[]).includes(value);
 
 const getOptionId = (answers: AssignmentAnswerInput[], questionId: string): string | null => {
   const answer = answers.find((candidate) => candidate.questionId === questionId);
@@ -221,134 +188,165 @@ const getOptionId = (answers: AssignmentAnswerInput[], questionId: string): stri
   return normalizedOptionId;
 };
 
-export const buildOnboardingAssignmentKey = (
-  answers: AssignmentAnswerInput[],
-): OnboardingAssignmentKey | null => {
-  const energyOptionId = getOptionId(answers, "mentor_energy");
-  const focusOptionId = getOptionId(answers, "focus_area");
-  const toneOptionId = getOptionId(answers, "guidance_tone");
-  const progressOptionId = getOptionId(answers, "progress_style");
-
-  if (!energyOptionId || !focusOptionId || !toneOptionId || !progressOptionId) return null;
-
-  return `${energyOptionId}|${focusOptionId}|${toneOptionId}|${progressOptionId}` as OnboardingAssignmentKey;
+const resolveEnergyOptionId = (answers: AssignmentAnswerInput[]): EnergyOptionId => {
+  const energyOptionCandidate = getOptionId(answers, "mentor_energy");
+  return energyOptionCandidate && isEnergyOptionId(energyOptionCandidate)
+    ? energyOptionCandidate
+    : "either_works";
 };
 
-const getMentorScore = (
+const scoreMentor = (
   mentorSlug: OnboardingMentorSlug,
-  focusOptionId: FocusOptionId,
-  toneOptionId: ToneOptionId,
-  progressOptionId: ProgressOptionId,
+  answers: AssignmentAnswerInput[],
+): ScoredMentor => {
+  const mentorProfile = MENTOR_PROFILES[mentorSlug];
+  let score = 0;
+  let primaryMatches = 0;
+
+  const focusOptionId = getOptionId(answers, "focus_area");
+  if (focusOptionId && focusOptionId === mentorProfile.focus) {
+    score += BASE_WEIGHT_BY_QUESTION.focus_area;
+    primaryMatches += 1;
+  }
+
+  const toneOptionId = getOptionId(answers, "guidance_tone");
+  if (toneOptionId && toneOptionId === mentorProfile.tone) {
+    score += BASE_WEIGHT_BY_QUESTION.guidance_tone;
+    primaryMatches += 1;
+  }
+
+  const progressOptionId = getOptionId(answers, "progress_style");
+  if (progressOptionId && progressOptionId === mentorProfile.progress) {
+    score += BASE_WEIGHT_BY_QUESTION.progress_style;
+    primaryMatches += 1;
+  }
+
+  if (mentorProfile.clarifierQuestionId && mentorProfile.clarifierOptionId) {
+    const clarifierOptionId = getOptionId(answers, mentorProfile.clarifierQuestionId);
+    if (clarifierOptionId && clarifierOptionId === mentorProfile.clarifierOptionId) {
+      score += BASE_WEIGHT_BY_QUESTION[mentorProfile.clarifierQuestionId];
+      primaryMatches += 1;
+    }
+  }
+
+  const secondaryBonuses = SECONDARY_SCORE_BONUSES[mentorSlug];
+  if (secondaryBonuses) {
+    const focusOptionId = getOptionId(answers, "focus_area");
+    if (focusOptionId && focusOptionId !== mentorProfile.focus) {
+      score += secondaryBonuses[focusOptionId] ?? 0;
+    }
+
+    const toneOptionId = getOptionId(answers, "guidance_tone");
+    if (toneOptionId && toneOptionId !== mentorProfile.tone) {
+      score += secondaryBonuses[toneOptionId] ?? 0;
+    }
+
+    const progressOptionId = getOptionId(answers, "progress_style");
+    if (progressOptionId && progressOptionId !== mentorProfile.progress) {
+      score += secondaryBonuses[progressOptionId] ?? 0;
+    }
+  }
+
+  return {
+    slug: mentorSlug,
+    score,
+    primaryMatches,
+  };
+};
+
+const compareByScoreAndMatches = (left: ScoredMentor, right: ScoredMentor): number => {
+  if (right.score !== left.score) return right.score - left.score;
+  if (right.primaryMatches !== left.primaryMatches) return right.primaryMatches - left.primaryMatches;
+  return 0;
+};
+
+const compareByBranchPriority = (
+  left: ScoredMentor,
+  right: ScoredMentor,
+  priorityIndex: Map<OnboardingMentorSlug, number>,
 ): number => {
-  const card = SCORE_CARDS[mentorSlug];
-  let score =
-    card.focus[focusOptionId]
-    + card.tone[toneOptionId]
-    + card.progress[progressOptionId];
-
-  if (mentorSlug === "sage" && toneOptionId === "calm_grounded") {
-    score += 1;
-  }
-
-  if (
-    mentorSlug === "princess"
-    && (focusOptionId === "emotions_healing" || focusOptionId === "confidence_self_belief")
-    && (toneOptionId === "gentle_compassionate" || toneOptionId === "encouraging_supportive")
-  ) {
-    score += 1;
-  }
-
-  if (
-    mentorSlug === "operator"
-    && focusOptionId === "clarity_mindset"
-    && progressOptionId === "principles_logic"
-  ) {
-    score += 1;
-  }
-
-  if (
-    mentorSlug === "rival"
-    && focusOptionId === "discipline_performance"
-    && toneOptionId === "direct_demanding"
-  ) {
-    score += 1;
-  }
-
-  if (
-    mentorSlug === "icon"
-    && focusOptionId === "confidence_self_belief"
-    && progressOptionId === "pressure_standards"
-  ) {
-    score += 1;
-  }
-
-  if (
-    mentorSlug === "charles"
-    && toneOptionId === "direct_demanding"
-    && progressOptionId === "pressure_standards"
-  ) {
-    score += 2;
-  }
-
-  return score;
+  const scoreAndMatchDelta = compareByScoreAndMatches(left, right);
+  if (scoreAndMatchDelta !== 0) return scoreAndMatchDelta;
+  return (priorityIndex.get(left.slug) ?? 999) - (priorityIndex.get(right.slug) ?? 999);
 };
 
-const selectMentorForCombination = (
-  energyOptionId: EnergyOptionId,
-  focusOptionId: FocusOptionId,
-  toneOptionId: ToneOptionId,
-  progressOptionId: ProgressOptionId,
-): OnboardingMentorSlug => {
-  const candidates = ENERGY_CANDIDATES[energyOptionId];
-  const winner = [...candidates].sort((left, right) => {
-    const scoreDelta =
-      getMentorScore(right, focusOptionId, toneOptionId, progressOptionId)
-      - getMentorScore(left, focusOptionId, toneOptionId, progressOptionId);
+const getComparableLeaders = (
+  scoredCandidates: ScoredMentor[],
+): ScoredMentor[] => {
+  if (scoredCandidates.length === 0) return [];
 
-    if (scoreDelta !== 0) return scoreDelta;
+  const sortedCandidates = [...scoredCandidates].sort(compareByScoreAndMatches);
+  const topCandidate = sortedCandidates[0];
 
-    return (PRIORITY_INDEX.get(left) ?? 999) - (PRIORITY_INDEX.get(right) ?? 999);
-  })[0];
-
-  return winner;
+  return sortedCandidates.filter((candidate) =>
+    candidate.score === topCandidate.score
+    && candidate.primaryMatches === topCandidate.primaryMatches,
+  );
 };
 
-export const ONBOARDING_MENTOR_ASSIGNMENTS: Record<OnboardingAssignmentKey, OnboardingMentorSlug> =
-  Object.fromEntries(
-    ENERGY_OPTION_IDS.flatMap((energyOptionId) =>
-      FOCUS_OPTION_IDS.flatMap((focusOptionId) =>
-        TONE_OPTION_IDS.flatMap((toneOptionId) =>
-          PROGRESS_OPTION_IDS.map((progressOptionId) => {
-            const key =
-              `${energyOptionId}|${focusOptionId}|${toneOptionId}|${progressOptionId}` as OnboardingAssignmentKey;
+const hasRequiredBaseAnswers = (answers: AssignmentAnswerInput[]): boolean => {
+  return Boolean(
+    getOptionId(answers, "focus_area")
+    && getOptionId(answers, "guidance_tone")
+    && getOptionId(answers, "progress_style"),
+  );
+};
 
-            return [
-              key,
-              selectMentorForCombination(
-                energyOptionId,
-                focusOptionId,
-                toneOptionId,
-                progressOptionId,
-              ),
-            ];
-          }),
-        ),
-      ),
-    ),
-  ) as Record<OnboardingAssignmentKey, OnboardingMentorSlug>;
+const getBaseAnswersOnly = (answers: AssignmentAnswerInput[]): AssignmentAnswerInput[] =>
+  answers.filter((answer) => answer.questionId !== "clarity_lens" && answer.questionId !== "pressure_style");
+
+export const resolveOnboardingClarifierQuestionId = (
+  answers: AssignmentAnswerInput[],
+): ClarifierQuestionId | null => {
+  const baseAnswers = getBaseAnswersOnly(answers);
+  if (!hasRequiredBaseAnswers(baseAnswers)) return null;
+
+  const energyOptionId = resolveEnergyOptionId(baseAnswers);
+  const scoredCandidates = ENERGY_CANDIDATES[energyOptionId].map((mentorSlug) =>
+    scoreMentor(mentorSlug, baseAnswers),
+  );
+  const comparableLeaders = getComparableLeaders(scoredCandidates);
+
+  const clarityLeaders = comparableLeaders.filter((candidate) =>
+    CLARITY_BRANCH_SLUGS.has(candidate.slug),
+  );
+  if (clarityLeaders.length > 1) {
+    return "clarity_lens";
+  }
+
+  const directLeaders = comparableLeaders.filter((candidate) =>
+    DIRECT_BRANCH_SLUGS.has(candidate.slug),
+  );
+  if (directLeaders.length > 1) {
+    return "pressure_style";
+  }
+
+  return null;
+};
 
 export const SAME_ENERGY_FALLBACKS: Record<EnergyOptionId, readonly OnboardingMentorSlug[]> = {
-  feminine_presence: ["princess", "icon"],
-  masculine_presence: ["sage", "operator", "rival", "charles"],
-  either_works: ["sage", "princess", "operator", "icon", "rival", "charles"],
+  feminine_presence: ["lyra", "icon", "princess", "sage", "charles"],
+  masculine_presence: ["operator", "rival", "sage", "charles"],
+  neutral_presence: ["sage", "charles"],
+  either_works: ["sage", "lyra", "icon", "princess", "operator", "rival", "charles"],
 };
 
 export const resolvePreassignedMentorSlug = (
   answers: AssignmentAnswerInput[],
 ): OnboardingMentorSlug | null => {
-  const key = buildOnboardingAssignmentKey(answers);
-  if (!key) return null;
-  return ONBOARDING_MENTOR_ASSIGNMENTS[key] ?? null;
+  if (!hasRequiredBaseAnswers(answers)) return null;
+
+  const energyOptionId = resolveEnergyOptionId(answers);
+  const priorityOrder = PRIORITY_BY_ENERGY[energyOptionId];
+  const priorityIndex = new Map(
+    priorityOrder.map((slug, index) => [slug, index]),
+  );
+
+  const rankedCandidates = ENERGY_CANDIDATES[energyOptionId]
+    .map((mentorSlug) => scoreMentor(mentorSlug, answers))
+    .sort((left, right) => compareByBranchPriority(left, right, priorityIndex));
+
+  return rankedCandidates[0]?.slug ?? null;
 };
 
 export interface AssignedMentorResolution<TMentor> {
@@ -365,7 +363,7 @@ export const resolveAssignedMentorFromActiveMentors = <TMentor extends { slug?: 
   const activeBySlug = new Map<OnboardingMentorSlug, TMentor>();
   activeMentors.forEach((mentor) => {
     const resolvedSlug = resolveActiveMentorSlug(mentor.slug);
-    if (!resolvedSlug || !isOnboardingMentorSlug(resolvedSlug)) return;
+    if (!resolvedSlug || !isActiveMentorSlug(resolvedSlug)) return;
     activeBySlug.set(resolvedSlug, mentor);
   });
 
@@ -382,11 +380,7 @@ export const resolveAssignedMentorFromActiveMentors = <TMentor extends { slug?: 
     }
   }
 
-  const energyOptionCandidate = getOptionId(answers, "mentor_energy");
-  const energyOptionId: EnergyOptionId =
-    energyOptionCandidate && isEnergyOptionId(energyOptionCandidate)
-      ? energyOptionCandidate
-      : "either_works";
+  const energyOptionId = resolveEnergyOptionId(answers);
 
   for (const fallbackSlug of SAME_ENERGY_FALLBACKS[energyOptionId]) {
     const fallbackMentor = activeBySlug.get(fallbackSlug);

@@ -6,32 +6,33 @@ import {
   CALCULATING_STAGE_DURATION_MS,
   QUESTIONNAIRE_PIPELINE_TIMEOUT_MS,
   StoryOnboarding,
+  getOnboardingStageRecoveryTarget,
 } from "./StoryOnboarding";
 
 const QUESTIONNAIRE_ANSWERS = [
   {
     questionId: "mentor_energy",
     optionId: "either_works",
-    answer: "Either works for me",
+    answer: "It doesn't matter",
     tags: [],
   },
   {
     questionId: "focus_area",
-    optionId: "clarity_mindset",
-    answer: "Clarity & mindset",
-    tags: ["calm"],
+    optionId: "clarity_signal",
+    answer: "Clarity, signal, and perspective",
+    tags: ["clarity", "signal"],
   },
   {
     questionId: "guidance_tone",
-    optionId: "encouraging_supportive",
-    answer: "Encouraging & supportive",
-    tags: ["supportive"],
+    optionId: "calm_reflective",
+    answer: "Calm and reflective",
+    tags: ["calm", "reflection"],
   },
   {
     questionId: "progress_style",
-    optionId: "principles_logic",
-    answer: "Clear principles and logic",
-    tags: ["discipline"],
+    optionId: "perspective_next_step",
+    answer: "Show me the clearest next step",
+    tags: ["calm", "clarity"],
   },
 ];
 
@@ -40,6 +41,8 @@ const ACTIVE_MENTOR = {
   name: "The Sage",
   description: "Calm, clarifying guide",
   tone_description: "Calm and clear",
+  style_description: "Short, reflective guidance with gentle metaphors.",
+  signature_line: "Peace comes before progress.",
   avatar_url: "",
   tags: ["discipline"],
   mentor_type: "coach",
@@ -68,6 +71,7 @@ const mocks = vi.hoisted(() => ({
   loggerError: vi.fn(),
   loggerWarn: vi.fn(),
   loggerInfo: vi.fn(),
+  mentorGridProps: null as Record<string, unknown> | null,
 }));
 
 const storageMocks = vi.hoisted(() => {
@@ -291,7 +295,10 @@ vi.mock("@/components/MentorResult", () => ({
 }));
 
 vi.mock("@/components/MentorGrid", () => ({
-  MentorGrid: () => <div data-testid="mentor-grid-stage">Mentor Grid</div>,
+  MentorGrid: (props: Record<string, unknown>) => {
+    mocks.mentorGridProps = props;
+    return <div data-testid="mentor-grid-stage">Mentor Grid</div>;
+  },
 }));
 
 vi.mock("./OnboardingStoryToneSelection", () => ({
@@ -448,6 +455,56 @@ const advanceFromMentorToEggSelection = async () => {
   await screen.findByRole("button", { name: "complete-companion" });
 };
 
+describe("getOnboardingStageRecoveryTarget", () => {
+  it("returns the questionnaire precursor when faction state is missing", () => {
+    expect(
+      getOnboardingStageRecoveryTarget({
+        stage: "questionnaire",
+        startsAtCompanion: false,
+        resumesAtJourneyBegins: false,
+        hasFaction: false,
+        hasRecommendedMentor: false,
+        hasMentorExplanation: false,
+        hasSelectedPresetId: false,
+        companionSetupStatus: "idle",
+        hasPendingCompanionSetup: false,
+      }),
+    ).toBe("faction");
+  });
+
+  it("returns to story-tone when egg-prelude state lost the selected preset", () => {
+    expect(
+      getOnboardingStageRecoveryTarget({
+        stage: "egg-prelude",
+        startsAtCompanion: false,
+        resumesAtJourneyBegins: false,
+        hasFaction: true,
+        hasRecommendedMentor: true,
+        hasMentorExplanation: true,
+        hasSelectedPresetId: false,
+        companionSetupStatus: "idle",
+        hasPendingCompanionSetup: false,
+      }),
+    ).toBe("story-tone");
+  });
+
+  it("returns to companion setup when journey-begins has no resumable setup state", () => {
+    expect(
+      getOnboardingStageRecoveryTarget({
+        stage: "journey-begins",
+        startsAtCompanion: false,
+        resumesAtJourneyBegins: false,
+        hasFaction: true,
+        hasRecommendedMentor: true,
+        hasMentorExplanation: true,
+        hasSelectedPresetId: true,
+        companionSetupStatus: "idle",
+        hasPendingCompanionSetup: false,
+      }),
+    ).toBe("companion");
+  });
+});
+
 describe("StoryOnboarding questionnaire submission flow", () => {
   beforeEach(() => {
     mocks.mentorsEq.mockReset();
@@ -464,6 +521,7 @@ describe("StoryOnboarding questionnaire submission flow", () => {
     mocks.loggerError.mockReset();
     mocks.loggerWarn.mockReset();
     mocks.loggerInfo.mockReset();
+    mocks.mentorGridProps = null;
 
     mocks.profilesMaybeSingle.mockResolvedValue({ data: { onboarding_data: {} }, error: null });
     mocks.profilesUpdateEq.mockResolvedValue({ error: null });
@@ -505,6 +563,19 @@ describe("StoryOnboarding questionnaire submission flow", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("renders a back-to-sign-in action when an auth escape hatch is provided", async () => {
+    const onExitToAuth = vi.fn();
+
+    renderOnboarding({ onExitToAuth });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /back to sign in/i }));
+
+    expect(onExitToAuth).toHaveBeenCalledTimes(1);
   });
 
   it("still reveals mentor after 2000ms when questionnaire persistence fails", async () => {
@@ -566,6 +637,35 @@ describe("StoryOnboarding questionnaire submission flow", () => {
         coreElement: "ice",
         storyTone: "dark_intense",
         companionName: null,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("passes the refreshed mentor signature and style fields into the manual mentor grid", async () => {
+    renderOnboarding();
+    await advanceToQuestionnaire();
+
+    vi.useFakeTimers();
+    try {
+      fireEvent.click(screen.getByRole("button", { name: "questionnaire-submit" }));
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(CALCULATING_STAGE_DURATION_MS);
+        await Promise.resolve();
+      });
+
+      fireEvent.click(screen.getByRole("button", { name: "mentor-see-all" }));
+
+      expect(screen.getByTestId("mentor-grid-stage")).toBeInTheDocument();
+      expect(mocks.mentorGridProps).toMatchObject({
+        mentors: expect.arrayContaining([
+          expect.objectContaining({
+            style_description: "Short, reflective guidance with gentle metaphors.",
+            signature_line: "Peace comes before progress.",
+          }),
+        ]),
       });
     } finally {
       vi.useRealTimers();
