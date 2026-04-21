@@ -424,7 +424,7 @@ describe("useCompanionPlanner", () => {
     );
   });
 
-  it("refreshes Outlook planner context before submitting to companion-planner-chat", async () => {
+  it("uses refreshed Outlook planner context when the preflight completes in time", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-04-19T09:30:00.000Z"));
     mocks.useCalendarIntegrations.mockReturnValue({
@@ -526,6 +526,106 @@ describe("useCompanionPlanner", () => {
         }),
       ]),
     );
+  });
+
+  it("falls back to the local planner context when Outlook sync preflight times out", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-19T09:30:00.000Z"));
+    mocks.useCalendarIntegrations.mockReturnValue({
+      connectedByProvider: {
+        outlook: {
+          id: "conn-outlook-1",
+          provider: "outlook",
+          sync_mode: "full_sync",
+        },
+      },
+      defaultProvider: "outlook",
+    });
+    mocks.syncPlanningContext.mockImplementation(
+      () => new Promise(() => undefined),
+    );
+    mocks.invoke.mockResolvedValue({
+      data: {
+        mode: "conversational",
+        reply: "Let's map your day.",
+        followUpQuestions: [],
+        proposals: [],
+        suggestedReminders: [],
+        memoryUpdates: {},
+        sessionState: {
+          draft: {},
+          openQuestionIds: [],
+          preferredTimeOfDay: null,
+          preferredTimeReason: null,
+          reminderPreference: null,
+          lastClassification: "quest",
+        },
+      },
+      error: null,
+    });
+
+    const { result } = renderHook(() =>
+      useCompanionPlanner({ bootstrapGreeting: false })
+    );
+
+    await act(async () => {
+      const submitPromise = result.current.submitMessage(
+        "Plan my day with Outlook in mind.",
+        "text",
+      );
+      await vi.advanceTimersByTimeAsync(3_000);
+      await submitPromise;
+    });
+
+    const request = mocks.invoke.mock.calls.at(-1)?.[1];
+    expect(mocks.syncPlanningContext).toHaveBeenCalledWith({
+      startDate: "2026-04-19",
+      endDate: "2026-04-19",
+    });
+    expect(request?.body.plannerContext.inboxTasks).toEqual([]);
+    expect(request?.body.plannerContext.calendarEvents).toEqual([]);
+  });
+
+  it("falls back to backend classification when client-side classification preflight times out", async () => {
+    vi.useFakeTimers();
+    mocks.classify.mockImplementation(
+      () => new Promise(() => undefined),
+    );
+    mocks.invoke.mockResolvedValue({
+      data: {
+        mode: "schedule_read",
+        reply: "Here is your schedule for 2026-04-18.",
+        followUpQuestions: [],
+        proposals: [],
+        suggestedReminders: [],
+        memoryUpdates: {},
+        sessionState: {
+          draft: {},
+          openQuestionIds: [],
+          preferredTimeOfDay: null,
+          preferredTimeReason: null,
+          reminderPreference: null,
+          lastClassification: "quest",
+        },
+      },
+      error: null,
+    });
+
+    const { result } = renderHook(() =>
+      useCompanionPlanner({ bootstrapGreeting: false })
+    );
+
+    await act(async () => {
+      const submitPromise = result.current.submitMessage(
+        "Show me today's route.",
+        "text",
+      );
+      await vi.advanceTimersByTimeAsync(3_000);
+      await submitPromise;
+    });
+
+    const request = mocks.invoke.mock.calls.at(-1)?.[1];
+    expect(request?.body.classificationHint).toBeNull();
   });
 
   it("tracks optimizer source, mode, and fallback telemetry when proposals are generated", async () => {

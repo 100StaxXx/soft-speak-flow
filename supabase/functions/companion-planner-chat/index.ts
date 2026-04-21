@@ -25,6 +25,7 @@ import {
 import { enrichQuestPlannerResult } from "./questEnrichment.ts";
 import { maybeApplyRemotePlannerOptimizer } from "./schedulerOptimizer.ts";
 import {
+  collectPlannerRequestNormalizationEvents,
   normalizePlannerClassificationHint,
   PlannerRequestSchema,
 } from "./request.ts";
@@ -112,6 +113,17 @@ serve(async (req) => {
         code: "INVALID_INPUT",
         error: "Invalid planner request",
         requestId,
+      });
+    }
+
+    const normalizationEvents = collectPlannerRequestNormalizationEvents(
+      body,
+      parsed.data,
+    );
+    if (normalizationEvents.length > 0) {
+      console.info("[companion-planner-chat] normalized planner request", {
+        requestId,
+        normalizations: normalizationEvents,
       });
     }
 

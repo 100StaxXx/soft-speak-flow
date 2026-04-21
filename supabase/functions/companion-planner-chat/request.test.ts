@@ -1,5 +1,9 @@
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { normalizePlannerClassificationHint, PlannerRequestSchema } from "./request.ts";
+import {
+  collectPlannerRequestNormalizationEvents,
+  normalizePlannerClassificationHint,
+  PlannerRequestSchema,
+} from "./request.ts";
 
 const baseRequest = () => ({
   message: "What do I have coming up?",
@@ -47,7 +51,9 @@ const baseRequest = () => ({
 
 Deno.test("accepts nullable timelineAnalysis and normalizes it away", () => {
   const parsed = PlannerRequestSchema.parse(baseRequest());
-  const normalized = normalizePlannerClassificationHint(parsed.classificationHint);
+  const normalized = normalizePlannerClassificationHint(
+    parsed.classificationHint,
+  );
 
   assertEquals(normalized, {
     type: "quest",
@@ -75,8 +81,14 @@ Deno.test("accepts quest notes and subtask titles in planner task context", () =
     },
   });
 
-  assertEquals(parsed.plannerContext.tasks[0]?.notes, "Leg day with extra stretching.");
-  assertEquals(parsed.plannerContext.tasks[0]?.subtaskTitles, ["Warm up", "Cooldown walk"]);
+  assertEquals(
+    parsed.plannerContext.tasks[0]?.notes,
+    "Leg day with extra stretching.",
+  );
+  assertEquals(parsed.plannerContext.tasks[0]?.subtaskTitles, [
+    "Warm up",
+    "Cooldown walk",
+  ]);
 });
 
 Deno.test("normalizes legacy starter intent and classifier aliases instead of rejecting the request", () => {
@@ -105,6 +117,39 @@ Deno.test("normalizes legacy starter intent and classifier aliases instead of re
   assertEquals(parsed.plannerContext.starterIntent, undefined);
 });
 
+Deno.test("treats explicit null plannerContext starter intent as absent", () => {
+  const parsed = PlannerRequestSchema.parse({
+    ...baseRequest(),
+    plannerContext: {
+      ...baseRequest().plannerContext,
+      starterIntent: null,
+    },
+  });
+
+  assertEquals(parsed.plannerContext.starterIntent, undefined);
+});
+
+Deno.test("accepts explicit null pending starter intent in session state", () => {
+  const parsed = PlannerRequestSchema.parse({
+    ...baseRequest(),
+    sessionState: {
+      ...baseRequest().sessionState,
+      pendingStarterIntent: null,
+    },
+  });
+
+  assertEquals(parsed.sessionState.pendingStarterIntent, null);
+});
+
+Deno.test("normalizes legacy top-level tone pack aliases", () => {
+  const parsed = PlannerRequestSchema.parse({
+    ...baseRequest(),
+    tonePack: "witty-sassy",
+  });
+
+  assertEquals(parsed.tonePack, "witty_sassy");
+});
+
 Deno.test("normalizes legacy workload and tone pack values in planner context", () => {
   const parsed = PlannerRequestSchema.parse({
     ...baseRequest(),
@@ -121,6 +166,112 @@ Deno.test("normalizes legacy workload and tone pack values in planner context", 
   });
 
   assertEquals(parsed.plannerContext.plannerMemory?.tonePack, "witty_sassy");
-  assertEquals(parsed.plannerContext.plannerMemory?.workloadTolerance, "normal");
+  assertEquals(
+    parsed.plannerContext.plannerMemory?.workloadTolerance,
+    "normal",
+  );
   assertEquals(parsed.plannerContext.aiSignals?.suggestedWorkload, "heavy");
+});
+
+Deno.test("rejects unrelated mixed-case intent types instead of blanket-lowercasing them", () => {
+  const parsed = PlannerRequestSchema.safeParse({
+    ...baseRequest(),
+    classificationHint: {
+      ...baseRequest().classificationHint,
+      type: "Quest",
+    },
+  });
+
+  assertEquals(parsed.success, false);
+});
+
+Deno.test("rejects conversation history longer than 24 messages", () => {
+  const parsed = PlannerRequestSchema.safeParse({
+    ...baseRequest(),
+    conversationHistory: Array.from({ length: 25 }, (_, index) => ({
+      role: index % 2 === 0 ? "user" : "assistant",
+      content: `Message ${index + 1}`,
+    })),
+  });
+
+  assertEquals(parsed.success, false);
+});
+
+Deno.test("collects normalization events for meaningful legacy coercions", () => {
+  const rawRequest = {
+    ...baseRequest(),
+    tonePack: "witty-sassy",
+    sessionState: {
+      ...baseRequest().sessionState,
+      pendingStarterIntent: "thread_history",
+      lastClassification: "brain_dump",
+    },
+    classificationHint: {
+      ...baseRequest().classificationHint,
+      type: "brain dump",
+    },
+    plannerContext: {
+      ...baseRequest().plannerContext,
+      starterIntent: null,
+      plannerMemory: {
+        tonePack: "witty-sassy",
+        workloadTolerance: "medium",
+      },
+      aiSignals: {
+        suggestedWorkload: "high",
+      },
+    },
+  };
+  const parsed = PlannerRequestSchema.parse(rawRequest);
+
+  assertEquals(collectPlannerRequestNormalizationEvents(rawRequest, parsed), [
+    {
+      path: "tonePack",
+      originalValue: "witty-sassy",
+      normalizedValue: "witty_sassy",
+      reason: "legacy_tone_pack_alias",
+    },
+    {
+      path: "classificationHint.type",
+      originalValue: "brain dump",
+      normalizedValue: "brain-dump",
+      reason: "legacy_intent_alias",
+    },
+    {
+      path: "sessionState.pendingStarterIntent",
+      originalValue: "thread_history",
+      normalizedValue: undefined,
+      reason: "stripped_thread_history",
+    },
+    {
+      path: "sessionState.lastClassification",
+      originalValue: "brain_dump",
+      normalizedValue: "brain-dump",
+      reason: "legacy_intent_alias",
+    },
+    {
+      path: "plannerContext.starterIntent",
+      originalValue: null,
+      normalizedValue: undefined,
+      reason: "null_to_absent",
+    },
+    {
+      path: "plannerContext.plannerMemory.tonePack",
+      originalValue: "witty-sassy",
+      normalizedValue: "witty_sassy",
+      reason: "legacy_tone_pack_alias",
+    },
+    {
+      path: "plannerContext.plannerMemory.workloadTolerance",
+      originalValue: "medium",
+      normalizedValue: "normal",
+      reason: "legacy_workload_alias",
+    },
+    {
+      path: "plannerContext.aiSignals.suggestedWorkload",
+      originalValue: "high",
+      normalizedValue: "heavy",
+      reason: "legacy_workload_alias",
+    },
+  ]);
 });

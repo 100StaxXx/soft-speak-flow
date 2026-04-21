@@ -19,14 +19,38 @@ const PLANNER_STARTER_INTENTS = [
 ] as const;
 const PLANNER_TONE_PACKS = ["soft", "playful", "witty_sassy"] as const;
 const WORKLOAD_TOLERANCE_VALUES = ["light", "normal", "heavy"] as const;
+const LEGACY_INTENT_TYPE_ALIASES = [
+  "brain_dump",
+  "brain dump",
+  "braindump",
+] as const;
+
+export type PlannerRequestNormalizationReason =
+  | "legacy_intent_alias"
+  | "legacy_tone_pack_alias"
+  | "legacy_workload_alias"
+  | "stripped_thread_history"
+  | "null_to_absent";
+
+export interface PlannerRequestNormalizationEvent {
+  path: string;
+  originalValue: unknown;
+  normalizedValue: unknown;
+  reason: PlannerRequestNormalizationReason;
+}
 
 const normalizeIntentType = (value: unknown) => {
   if (typeof value !== "string") return value;
-  const normalized = value.trim().toLowerCase();
-  if (normalized === "brain_dump" || normalized === "brain dump" || normalized === "braindump") {
+  const trimmed = value.trim();
+  const normalized = trimmed.toLowerCase();
+  if (
+    LEGACY_INTENT_TYPE_ALIASES.includes(
+      normalized as typeof LEGACY_INTENT_TYPE_ALIASES[number],
+    )
+  ) {
     return "brain-dump";
   }
-  return normalized;
+  return trimmed;
 };
 
 const normalizeStarterIntent = (value: unknown) => {
@@ -36,6 +60,16 @@ const normalizeStarterIntent = (value: unknown) => {
     return undefined;
   }
   return normalized;
+};
+
+const normalizeOptionalStarterIntent = (value: unknown) => {
+  if (value === null) return undefined;
+  return normalizeStarterIntent(value);
+};
+
+const normalizeNullableStarterIntent = (value: unknown) => {
+  if (value === null) return null;
+  return normalizeStarterIntent(value);
 };
 
 const normalizeTonePack = (value: unknown) => {
@@ -60,11 +94,11 @@ const PlannerIntentTypeSchema = z.preprocess(
 
 const PlannerStarterIntentSchema = z.enum(PLANNER_STARTER_INTENTS);
 const PlannerOptionalStarterIntentSchema = z.preprocess(
-  normalizeStarterIntent,
+  normalizeOptionalStarterIntent,
   PlannerStarterIntentSchema.optional(),
 );
 const PlannerNullableStarterIntentSchema = z.preprocess(
-  normalizeStarterIntent,
+  normalizeNullableStarterIntent,
   PlannerStarterIntentSchema.optional().nullable(),
 );
 
@@ -229,7 +263,14 @@ export const PlannerRequestSchema = z.object({
     careSignals: z.object({
       overallCare: z.number(),
       hasDormancyWarning: z.boolean(),
-      dialogueTone: z.enum(["joyful", "content", "neutral", "reserved", "quiet", "silent"]),
+      dialogueTone: z.enum([
+        "joyful",
+        "content",
+        "neutral",
+        "reserved",
+        "quiet",
+        "silent",
+      ]),
       inactiveDays: z.number(),
       daysUntilDormancy: z.number().nullable(),
     }).nullable().optional(),
@@ -330,8 +371,19 @@ export const PlannerRequestSchema = z.object({
         creativity: CompanionStatNeedSchema,
         alignment: CompanionStatNeedSchema,
       }),
-      momentumState: z.enum(["locked_in", "coasting", "slipping", "rebuilding"]),
-      recentMissInterpretation: z.enum(["overload", "low_energy", "avoidance", "interruption", "normal_variance"]),
+      momentumState: z.enum([
+        "locked_in",
+        "coasting",
+        "slipping",
+        "rebuilding",
+      ]),
+      recentMissInterpretation: z.enum([
+        "overload",
+        "low_energy",
+        "avoidance",
+        "interruption",
+        "normal_variance",
+      ]),
       narrativeBrief: z.string(),
       dailyNarrative: z.string(),
       weeklyNarrative: z.string().optional(),
@@ -347,10 +399,156 @@ export const PlannerRequestSchema = z.object({
   }),
 });
 
-type PlannerRequestClassificationHint = z.infer<typeof PlannerRequestSchema>["classificationHint"];
+type PlannerRequestClassificationHint = z.infer<
+  typeof PlannerRequestSchema
+>["classificationHint"];
+type ParsedPlannerRequest = z.infer<typeof PlannerRequestSchema>;
+
+const getValueAtPath = (source: unknown, path: string): unknown => {
+  if (!source || typeof source !== "object") return undefined;
+
+  return path.split(".").reduce<unknown>((current, segment) => {
+    if (!current || typeof current !== "object") return undefined;
+    return (current as Record<string, unknown>)[segment];
+  }, source);
+};
+
+const getTonePackNormalizationReason = (
+  originalValue: unknown,
+  normalizedValue: unknown,
+): PlannerRequestNormalizationReason | null => {
+  if (
+    typeof originalValue !== "string" || typeof normalizedValue !== "string"
+  ) {
+    return null;
+  }
+
+  const trimmed = originalValue.trim();
+  return trimmed !== normalizedValue &&
+      trimmed.toLowerCase().replace(/[-\s]+/g, "_") === normalizedValue
+    ? "legacy_tone_pack_alias"
+    : null;
+};
+
+const getIntentTypeNormalizationReason = (
+  originalValue: unknown,
+  normalizedValue: unknown,
+): PlannerRequestNormalizationReason | null => {
+  if (
+    typeof originalValue !== "string" || typeof normalizedValue !== "string"
+  ) {
+    return null;
+  }
+
+  return LEGACY_INTENT_TYPE_ALIASES.includes(
+      originalValue.trim()
+        .toLowerCase() as typeof LEGACY_INTENT_TYPE_ALIASES[number],
+    ) && normalizedValue === "brain-dump"
+    ? "legacy_intent_alias"
+    : null;
+};
+
+const getStarterIntentNormalizationReason = (
+  originalValue: unknown,
+  normalizedValue: unknown,
+): PlannerRequestNormalizationReason | null => {
+  if (originalValue === null && normalizedValue === undefined) {
+    return "null_to_absent";
+  }
+
+  if (
+    typeof originalValue === "string" &&
+    originalValue.trim().toLowerCase() === "thread_history" &&
+    normalizedValue === undefined
+  ) {
+    return "stripped_thread_history";
+  }
+
+  return null;
+};
+
+const getWorkloadNormalizationReason = (
+  originalValue: unknown,
+  normalizedValue: unknown,
+): PlannerRequestNormalizationReason | null => {
+  if (
+    typeof originalValue !== "string" || typeof normalizedValue !== "string"
+  ) {
+    return null;
+  }
+
+  const normalizedOriginal = originalValue.trim().toLowerCase();
+  return normalizedOriginal !== normalizedValue &&
+      (normalizedOriginal === "low" ||
+        normalizedOriginal === "medium" ||
+        normalizedOriginal === "high")
+    ? "legacy_workload_alias"
+    : null;
+};
+
+const PLANNER_REQUEST_NORMALIZATION_RULES: Array<{
+  path: string;
+  getReason: (
+    originalValue: unknown,
+    normalizedValue: unknown,
+  ) => PlannerRequestNormalizationReason | null;
+}> = [
+  { path: "tonePack", getReason: getTonePackNormalizationReason },
+  {
+    path: "classificationHint.type",
+    getReason: getIntentTypeNormalizationReason,
+  },
+  {
+    path: "sessionState.pendingStarterIntent",
+    getReason: getStarterIntentNormalizationReason,
+  },
+  {
+    path: "sessionState.lastClassification",
+    getReason: getIntentTypeNormalizationReason,
+  },
+  {
+    path: "plannerContext.starterIntent",
+    getReason: getStarterIntentNormalizationReason,
+  },
+  {
+    path: "plannerContext.plannerMemory.tonePack",
+    getReason: getTonePackNormalizationReason,
+  },
+  {
+    path: "plannerContext.plannerMemory.workloadTolerance",
+    getReason: getWorkloadNormalizationReason,
+  },
+  {
+    path: "plannerContext.aiSignals.suggestedWorkload",
+    getReason: getWorkloadNormalizationReason,
+  },
+];
+
+export const collectPlannerRequestNormalizationEvents = (
+  rawRequest: unknown,
+  parsedRequest: ParsedPlannerRequest,
+): PlannerRequestNormalizationEvent[] =>
+  PLANNER_REQUEST_NORMALIZATION_RULES.flatMap(({ path, getReason }) => {
+    const originalValue = getValueAtPath(rawRequest, path);
+    const normalizedValue = getValueAtPath(parsedRequest, path);
+    const reason = getReason(originalValue, normalizedValue);
+
+    return reason
+      ? [{
+        path,
+        originalValue,
+        normalizedValue,
+        reason,
+      }]
+      : [];
+  });
 
 export const normalizePlannerClassificationHint = (
-  classificationHint: PlannerRequestClassificationHint | ClassificationHint | null | undefined,
+  classificationHint:
+    | PlannerRequestClassificationHint
+    | ClassificationHint
+    | null
+    | undefined,
 ): ClassificationHint | null => {
   if (!classificationHint) return null;
 

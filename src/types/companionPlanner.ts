@@ -29,6 +29,11 @@ export type CompanionPlannerStarterIntent =
   | "goal_breakdown_start"
   | "thread_history";
 
+export type CompanionPlannerContextStarterIntent = Exclude<
+  CompanionPlannerStarterIntent,
+  "thread_history"
+>;
+
 export type CompanionPlannerLaunchTarget =
   | "auto"
   | "conversation"
@@ -351,7 +356,7 @@ export interface CompanionPlannerRequest {
     reflectionSignals?: PlannerReflectionSignal[];
     careSignals?: PlannerCareState | null;
     briefingContext?: PlannerBriefingContext | null;
-    starterIntent?: CompanionPlannerStarterIntent;
+    starterIntent?: CompanionPlannerContextStarterIntent;
     priorityScores?: PlannerPriorityScore[];
     scheduleInsights?: PlannerScheduleInsights;
     plannerMemory?: PlannerMemoryProfile;

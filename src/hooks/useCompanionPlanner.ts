@@ -49,9 +49,11 @@ import {
 } from "@/shared/companionPlannerReadyProposal";
 import { computePlannerPriorityScores } from "@/shared/companionPlannerPriority";
 import { buildCompanionStatInterpretation } from "@/shared/companionStatSignals";
+import { withTimeout } from "@/utils/asyncTimeout";
 import { normalizeUuidLikeId } from "@/utils/offlineId";
 import type {
   CompanionChatSurface,
+  CompanionPlannerContextStarterIntent,
   CompanionChatThreadMessage,
   CompanionPlannerMessage,
   CompanionPlannerProposal,
@@ -79,6 +81,7 @@ import type {
 const STORAGE_KEY = "companion-planner-preferences-v1";
 const MAX_CONTEXT_TASKS = 18;
 const OUTLOOK_PLANNER_SYNC_INTERVAL_MS = 90_000;
+const PLANNER_PREFLIGHT_TIMEOUT_MS = 3_000;
 
 type StoredPlannerPreferences = {
   tonePack?: PlannerTonePack;
@@ -501,7 +504,7 @@ const deriveStarterIntentFromMessage = (
 
 const normalizeStarterIntentForPlanner = (
   starterIntent: CompanionPlannerStarterIntent | null | undefined,
-): Exclude<CompanionPlannerStarterIntent, "thread_history"> | null => {
+): CompanionPlannerContextStarterIntent | null => {
   if (!starterIntent || starterIntent === "thread_history") {
     return null;
   }
@@ -1923,9 +1926,41 @@ export function useCompanionPlanner({
 
     try {
       const resolvedBriefingContext = options?.briefingContext ?? null;
+      const outlookSyncPromise = withTimeout(
+        () => syncOutlookPlanningContext(),
+        {
+          timeoutMs: PLANNER_PREFLIGHT_TIMEOUT_MS,
+          operation: "planner Outlook sync",
+          timeoutCode: "PLANNER_OUTLOOK_SYNC_TIMEOUT",
+        },
+      ).catch((error) => {
+        console.warn(
+          "Planner Outlook sync preflight timed out; continuing with local context.",
+          error,
+        );
+        return null;
+      });
+      const classificationPromise = withTimeout(
+        () => classify(message),
+        {
+          timeoutMs: PLANNER_PREFLIGHT_TIMEOUT_MS,
+          operation: "planner intent classification",
+          timeoutCode: "PLANNER_CLASSIFICATION_TIMEOUT",
+        },
+      ).catch((error) => {
+        console.warn(
+          "Planner intent classification preflight timed out; falling back to backend classification.",
+          error,
+        );
+        return null;
+      });
+      const [outlookPlanningContext, classification] = await Promise.all([
+        outlookSyncPromise,
+        classificationPromise,
+      ]);
       const syncedPlannerContext = mergePlannerContextWithOutlookSync(
         plannerContext,
-        await syncOutlookPlanningContext(),
+        outlookPlanningContext,
       );
       const requestPriorityScores = computePlannerPriorityScores({
         currentDate: todayIso,
@@ -1952,7 +1987,6 @@ export function useCompanionPlanner({
         starterIntent: resolvedStarterIntent,
         briefingContext: resolvedBriefingContext,
       };
-      const classification = await classify(message);
       const classificationHint = normalizeClassificationHint(classification);
       const { data, error } = await supabase.functions.invoke(
         "companion-planner-chat",

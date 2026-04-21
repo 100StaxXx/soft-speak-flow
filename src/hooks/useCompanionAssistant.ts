@@ -54,6 +54,8 @@ interface UseCompanionAssistantOptions {
 
 const ASSISTANT_LED_LAUNCHER_STARTER_INTENTS = new Set<CompanionPlannerLaunchIntent["starterIntent"]>([
   "free_talk_start",
+  // Direct planner.submitMessage(...) callers still use this set even though
+  // the launch-intent effect short-circuits quest capture into primeQuestCapture(...).
   "quest_capture",
   "goal_breakdown_start",
 ]);
@@ -170,16 +172,11 @@ export function useCompanionAssistant({
   const lastLaunchIntentIdRef = useRef<string | null>(null);
 
   const messages = useMemo(() => (
-    surface === "journeys"
-      ? sortMessages([
-        ...normalizeConversationMessages(conversation.messages),
-        ...normalizePlannerMessages(planner.messages),
-      ])
-      : sortMessages([
-        ...normalizeConversationMessages(conversation.messages),
-        ...normalizePlannerMessages(planner.messages),
-      ])
-  ), [conversation.messages, planner.messages, surface]);
+    sortMessages([
+      ...normalizeConversationMessages(conversation.messages),
+      ...normalizePlannerMessages(planner.messages),
+    ])
+  ), [conversation.messages, planner.messages]);
 
   const hasOpenPlannerThread = planner.questions.length > 0
     || planner.pendingProposals.some((proposal) => proposal.status === "pending")
