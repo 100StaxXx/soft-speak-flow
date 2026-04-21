@@ -29,6 +29,7 @@ import {
   useQuestCalendarSync,
 } from "@/hooks/useQuestCalendarSync";
 import { parseNaturalLanguage } from "@/features/tasks/hooks/useNaturalLanguageParser";
+import { buildPlannerAISignals } from "@/utils/companionPlannerAiSignals";
 import { buildCompanionPlannerScheduleInsights } from "@/utils/companionPlannerSchedule";
 import { resolveCompanionPlannerError } from "@/utils/companionPlannerErrors";
 import { formatCurrentDateTimeWithOffset } from "@/utils/currentDateTime";
@@ -1441,6 +1442,11 @@ export function useCompanionPlanner({
     return rankedNeed?.[1].level === "low" ? null : rankedNeed?.[0] ?? null;
   }, [statInterpretation]);
 
+  const plannerAISignals = useMemo(
+    () => buildPlannerAISignals(enrichedContext),
+    [enrichedContext],
+  );
+
   const priorityScores = useMemo<PlannerPriorityScore[]>(
     () =>
       computePlannerPriorityScores({
@@ -1457,9 +1463,9 @@ export function useCompanionPlanner({
         scheduleInsights,
         plannerMemory,
         statInterpretation,
-        aiSignals: enrichedContext
+        aiSignals: plannerAISignals?.suggestedWorkload
           ? {
-            suggestedWorkload: enrichedContext.suggestedWorkload,
+            suggestedWorkload: plannerAISignals.suggestedWorkload,
           }
           : undefined,
         starterIntent: "general",
@@ -1470,8 +1476,8 @@ export function useCompanionPlanner({
       contactsAttentionQuery.data,
       contextEventsQuery.events,
       contextTasks,
-      enrichedContext,
       inboxTasks,
+      plannerAISignals,
       plannerMemory,
       statInterpretation,
       reflectionSignalsQuery.data,
@@ -1495,15 +1501,7 @@ export function useCompanionPlanner({
       scheduleInsights,
       plannerMemory,
       statInterpretation,
-      aiSignals: enrichedContext
-        ? {
-          preferredDifficulty: enrichedContext.preferredDifficulty,
-          preferredHabitFrequency: enrichedContext.preferredHabitFrequency,
-          preferredEpicDuration: enrichedContext.preferredEpicDuration,
-          commonContexts: enrichedContext.commonContexts,
-          suggestedWorkload: enrichedContext.suggestedWorkload,
-        }
-        : undefined,
+      aiSignals: plannerAISignals,
     }),
     [
       activeEpics,
@@ -1511,8 +1509,8 @@ export function useCompanionPlanner({
       contactsAttentionQuery.data,
       contextEventsQuery.events,
       contextTasks,
-      enrichedContext,
       inboxTasks,
+      plannerAISignals,
       plannerMemory,
       priorityScores,
       statInterpretation,
@@ -1977,9 +1975,9 @@ export function useCompanionPlanner({
         starterIntent: resolvedStarterIntent,
         scheduleInsights,
         plannerMemory,
-        aiSignals: enrichedContext
+        aiSignals: plannerAISignals?.suggestedWorkload
           ? {
-            suggestedWorkload: enrichedContext.suggestedWorkload,
+            suggestedWorkload: plannerAISignals.suggestedWorkload,
           }
           : undefined,
       });
@@ -2093,12 +2091,12 @@ export function useCompanionPlanner({
     contextEventsQuery.events,
     contextTasks,
     conversationHistory,
-    enrichedContext,
     horizon,
     inboxTasks,
     isSubmitting,
     persistPlannerThreadRows,
     plannerContext,
+    plannerAISignals,
     plannerMemory,
     reflectionSignalsQuery.data,
     scheduleInsights,

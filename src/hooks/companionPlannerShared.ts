@@ -9,6 +9,7 @@ import { useExternalCalendarEvents } from "@/hooks/useExternalCalendarEvents";
 import { useInboxTasks } from "@/hooks/useInboxTasks";
 import { useTasksQuery } from "@/hooks/useTasksQuery";
 import { useUserAIContext } from "@/hooks/useUserAIContext";
+import { buildPlannerAISignals } from "@/utils/companionPlannerAiSignals";
 import { buildCompanionPlannerScheduleInsights } from "@/utils/companionPlannerSchedule";
 import { formatCurrentDateTimeWithOffset } from "@/utils/currentDateTime";
 import type { Json } from "@/integrations/supabase/types";
@@ -477,6 +478,11 @@ export function useCompanionPlanningContext({
       plannerMemory,
     }), [activeEventsQuery.events, activeTasks, horizon, plannerMemory, today, todayIso]);
 
+  const plannerAISignals = useMemo(
+    () => buildPlannerAISignals(enrichedContext),
+    [enrichedContext],
+  );
+
   const plannerContext = useMemo<CompanionPlannerRequest["plannerContext"]>(() => ({
     tasks: mapTasksToPlannerContext(contextTasks.map(serializeTaskToPlannerContext)),
     inboxTasks: mapTasksToPlannerContext(inboxTasks.map(serializeTaskToPlannerContext)),
@@ -485,16 +491,8 @@ export function useCompanionPlanningContext({
     calendarEvents: contextEventsQuery.events,
     scheduleInsights,
     plannerMemory,
-    aiSignals: enrichedContext
-      ? {
-          preferredDifficulty: enrichedContext.preferredDifficulty,
-          preferredHabitFrequency: enrichedContext.preferredHabitFrequency,
-          preferredEpicDuration: enrichedContext.preferredEpicDuration,
-          commonContexts: enrichedContext.commonContexts,
-          suggestedWorkload: enrichedContext.suggestedWorkload,
-        }
-      : undefined,
-  }), [activeEpics, contextEventsQuery.events, contextTasks, enrichedContext, inboxTasks, plannerMemory, scheduleInsights]);
+    aiSignals: plannerAISignals,
+  }), [activeEpics, contextEventsQuery.events, contextTasks, inboxTasks, plannerAISignals, plannerMemory, scheduleInsights]);
 
   return {
     today,

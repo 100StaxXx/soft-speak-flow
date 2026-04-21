@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
   sendTaskToCalendar: vi.fn(),
   syncPlanningContext: vi.fn(),
   useCalendarIntegrations: vi.fn(),
+  enrichedContext: null as Record<string, unknown> | null,
   user: {
     id: "user-1",
   } as { id: string } | null,
@@ -142,7 +143,7 @@ vi.mock("@/hooks/useQuestCalendarSync", () => ({
 
 vi.mock("@/hooks/useUserAIContext", () => ({
   useUserAIContext: () => ({
-    enrichedContext: null,
+    enrichedContext: mocks.enrichedContext,
   }),
 }));
 
@@ -218,6 +219,7 @@ describe("useCompanionPlanner", () => {
       connectedByProvider: {},
       defaultProvider: null,
     });
+    mocks.enrichedContext = null;
     Object.defineProperty(window, "localStorage", {
       configurable: true,
       writable: true,
@@ -1505,6 +1507,48 @@ describe("useCompanionPlanner", () => {
     expect(request?.body.currentDateTime).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     expect(request?.body.conversationHistory).toEqual([]);
     expect("timelineAnalysis" in request.body.classificationHint).toBe(false);
+  });
+
+  it("strips nullable AI signal fields before building the planner request body", async () => {
+    mocks.enrichedContext = {
+      preferredDifficulty: null,
+      preferredHabitFrequency: null,
+      preferredEpicDuration: null,
+      commonContexts: null,
+      suggestedWorkload: "normal",
+    };
+    mocks.invoke.mockResolvedValue({
+      data: {
+        mode: "schedule_read",
+        reply: "Here is your schedule for 2026-04-18.",
+        followUpQuestions: [],
+        proposals: [],
+        suggestedReminders: [],
+        memoryUpdates: {},
+        sessionState: {
+          draft: {},
+          openQuestionIds: [],
+          preferredTimeOfDay: null,
+          preferredTimeReason: null,
+          reminderPreference: null,
+          lastClassification: "quest",
+        },
+      },
+      error: null,
+    });
+
+    const { result } = renderHook(() =>
+      useCompanionPlanner({ bootstrapGreeting: false })
+    );
+
+    await act(async () => {
+      await result.current.submitMessage("Plan my day", "text");
+    });
+
+    const request = mocks.invoke.mock.calls[0]?.[1];
+    expect(request?.body.plannerContext.aiSignals).toEqual({
+      suggestedWorkload: "normal",
+    });
   });
 
   it("clears stale pending proposals when the planner responds with a clarification question only", async () => {
