@@ -48,7 +48,6 @@ import { QuickAdjustDrawer } from "@/components/SmartDayPlanner/components/Quick
 
 import { Pathfinder } from "@/components/Pathfinder";
 import { CampaignCreatedAnimation } from "@/components/CampaignCreatedAnimation";
-import { DraggableFAB } from "@/components/DraggableFAB";
 import { QuestsErrorBoundary } from "@/components/SectionErrorBoundary";
 
 import { Wand2 } from "lucide-react";
@@ -69,10 +68,11 @@ import { isMacDesignedForIPadIOSApp, isMacSession } from "@/utils/platformTarget
 import { QuestInboxSection } from "@/components/QuestInboxSection";
 import { QUEST_ACTION_TOAST_DURATION_MS } from "@/constants/questToast";
 import { trackResilienceEvent } from "@/utils/resilienceTelemetry";
-import { safeLocalStorage } from "@/utils/storage";
 import { normalizeUuidLikeId } from "@/utils/offlineId";
 import { parseNaturalLanguage } from "@/features/tasks/hooks/useNaturalLanguageParser";
+import { buildVoiceQuestPrefillFromTranscript } from "@/features/quests/utils/voiceQuestPrefill";
 import { resolveCampaignBuilderInitialGoal } from "@/shared/bigGoalIntent";
+import { useVoiceInput } from "@/hooks/useVoiceInput";
 import type {
   CompanionPlannerLaunchIntent,
   CompanionPlannerProposal,
@@ -82,7 +82,6 @@ import type {
 
 const TIME_24H_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const DATE_INPUT_REGEX = /^\d{4}-\d{2}-\d{2}$/;
-const JOURNEYS_COMPANION_PINNED_KEY = "journeys-companion-planner-pinned-v1";
 const isQueuedTaskMutationResult = (
   value: unknown,
 ): value is { queued: true } => (
@@ -287,7 +286,6 @@ type PlannerQuestEditSession =
 
 type DesktopPlannerMode = "week" | "day";
 const MAC_TIMED_TASK_DURATION_FALLBACK_MINUTES = 30;
-const readPinnedCompanionPlannerPreference = () => safeLocalStorage.getItem(JOURNEYS_COMPANION_PINNED_KEY) === "true";
 const createPlannerLaunchIntentId = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto
     ? crypto.randomUUID()
@@ -308,12 +306,14 @@ const Journeys = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showPageInfo, setShowPageInfo] = useState(false);
   const [showAddSheet, setShowAddSheet] = useState(false);
-  const [isCompanionPlannerPinned, setIsCompanionPlannerPinned] = useState(readPinnedCompanionPlannerPreference);
+  const [isCompanionPlannerPinned, setIsCompanionPlannerPinned] = useState(false);
   const [plannerLaunchIntent, setPlannerLaunchIntent] = useState<CompanionPlannerLaunchIntent | null>(null);
   const [showMonthView, setShowMonthView] = useState(false);
   const [desktopPlannerMode, setDesktopPlannerMode] = useState<DesktopPlannerMode>("week");
   
   const [prefilledTime, setPrefilledTime] = useState<string | null>(null);
+  const [questSheetPrefillDraft, setQuestSheetPrefillDraft] = useState<QuestComposerPrefillDraft | null>(null);
+  const [questSheetPrefillKey, setQuestSheetPrefillKey] = useState<string | null>(null);
   const [showQuickAdjust, setShowQuickAdjust] = useState(false);
   
   // Campaign creation state
@@ -370,17 +370,26 @@ const Journeys = () => {
     setShowAddSheet(nextOpen);
     if (!nextOpen) {
       setPrefilledTime(null);
+      setQuestSheetPrefillDraft(null);
+      setQuestSheetPrefillKey(null);
       if (plannerQuestEditSession?.editor === "create") {
         finishPlannerQuestEdit({ saved: false });
       }
     }
   }, [finishPlannerQuestEdit, plannerQuestEditSession?.editor]);
 
-  const openAddQuestSheet = useCallback((options?: { date?: Date; time?: string | null }) => {
+  const openAddQuestSheet = useCallback((options?: {
+    date?: Date;
+    time?: string | null;
+    prefillDraft?: QuestComposerPrefillDraft | null;
+    prefillKey?: string | null;
+  }) => {
     if (options?.date) {
       setSelectedDate(options.date);
     }
-    setPrefilledTime(options?.time ?? null);
+    setPrefilledTime(options?.time ?? options?.prefillDraft?.scheduledTime ?? null);
+    setQuestSheetPrefillDraft(options?.prefillDraft ?? null);
+    setQuestSheetPrefillKey(options?.prefillKey ?? null);
     setShowAddSheet(true);
   }, []);
 
@@ -423,6 +432,37 @@ const Journeys = () => {
     });
     setIsCompanionPlannerPinned(true);
   }, []);
+
+  const {
+    isRecording: isVoiceAddRecording,
+    isSupported: isVoiceAddSupported,
+    toggleRecording: toggleVoiceAddRecording,
+  } = useVoiceInput({
+    onFinalResult: (transcript) => {
+      const cleanedTranscript = transcript.trim();
+      if (!cleanedTranscript) return;
+
+      const prefillDraft = buildVoiceQuestPrefillFromTranscript(cleanedTranscript);
+      const nextSelectedDate = prefillDraft.taskDate
+        ? new Date(`${prefillDraft.taskDate}T00:00:00`)
+        : selectedDate;
+
+      openAddQuestSheet({
+        date: nextSelectedDate,
+        time: prefillDraft.scheduledTime ?? null,
+        prefillDraft,
+        prefillKey: createPlannerLaunchIntentId(),
+      });
+    },
+    onError: (message) => {
+      toast.error(message);
+    },
+    onPermissionNeeded: () => {
+      toast.error("Microphone access is required for voice capture.");
+    },
+    language: "en-US",
+    autoStopOnSilence: true,
+  });
 
   const openCampaignBuilderFromAssistant = useCallback((message: string) => {
     const parsed = parseNaturalLanguage(message);
@@ -598,10 +638,6 @@ const Journeys = () => {
     };
   }, [isInboxRequested]);
 
-  useEffect(() => {
-    safeLocalStorage.setItem(JOURNEYS_COMPANION_PINNED_KEY, String(isCompanionPlannerPinned));
-  }, [isCompanionPlannerPinned]);
-
   useEffect(() => () => {
     const resolver = plannerQuestEditResolverRef.current;
     plannerQuestEditResolverRef.current = null;
@@ -611,10 +647,9 @@ const Journeys = () => {
   useEffect(() => {
     const routeState = (location.state as { companionPlannerLaunchIntent?: CompanionPlannerLaunchIntent | null } | null) ?? null;
     const nextLaunchIntent = routeState?.companionPlannerLaunchIntent ?? null;
-    if (!nextLaunchIntent?.id || !nextLaunchIntent.message) return;
+    if (!nextLaunchIntent?.id) return;
 
-    setPlannerLaunchIntent(nextLaunchIntent);
-    setIsCompanionPlannerPinned(true);
+    openCompanionPlanner(nextLaunchIntent);
 
     const nextState = {
       ...(routeState ?? {}),
@@ -631,7 +666,7 @@ const Journeys = () => {
         state: nextState,
       },
     );
-  }, [location.pathname, location.search, location.state, navigate]);
+  }, [location.pathname, location.search, location.state, navigate, openCompanionPlanner]);
 
   useEffect(() => {
     if (!isMacHostedIOSApp || location.pathname !== JOURNEYS_ROUTE) return;
@@ -1530,6 +1565,10 @@ const Journeys = () => {
                 onToggle={handleToggleTask}
                 onAddQuest={() => openAddQuestSheet()}
                 onOpenCompanionPlanner={openCompanionPlanner}
+                onVoiceAddQuest={toggleVoiceAddRecording}
+                isVoiceAddRecording={isVoiceAddRecording}
+                isVoiceAddSupported={isVoiceAddSupported}
+                showCompanionPlannerHeaderAction={isMacHostedIOSApp}
                 onOpenMonthView={() => setShowMonthView(true)}
                 onUndoToggle={handleUndoToggle}
                 onEditQuest={handleEditQuest}
@@ -1549,6 +1588,10 @@ const Journeys = () => {
                 onToggle={handleToggleTask}
                 onAddQuest={() => openAddQuestSheet()}
                 onOpenCompanionPlanner={openCompanionPlanner}
+                onVoiceAddQuest={toggleVoiceAddRecording}
+                isVoiceAddRecording={isVoiceAddRecording}
+                isVoiceAddSupported={isVoiceAddSupported}
+                showCompanionPlannerHeaderAction={isMacHostedIOSApp}
                 completedCount={completedCount}
                 totalCount={totalCount}
                 currentStreak={currentStreak}
@@ -1601,8 +1644,12 @@ const Journeys = () => {
           prefilledTime={prefilledTime}
           autoFillTimeOnFirstTap={shouldAutoFillTutorialTime}
           presentation={isMacHostedIOSApp ? "desktop-panel" : "mobile-sheet"}
-          prefillDraft={plannerQuestEditSession?.editor === "create" ? plannerQuestEditSession.prefillDraft : null}
-          prefillKey={plannerQuestEditSession?.editor === "create" ? plannerQuestEditSession.prefillKey : null}
+          prefillDraft={plannerQuestEditSession?.editor === "create"
+            ? plannerQuestEditSession.prefillDraft
+            : questSheetPrefillDraft}
+          prefillKey={plannerQuestEditSession?.editor === "create"
+            ? plannerQuestEditSession.prefillKey
+            : questSheetPrefillKey}
           onCreateCampaign={() => openCampaignBuilder()}
         />
         
@@ -1728,12 +1775,6 @@ const Journeys = () => {
           habits={createdCampaignData?.habits || []}
           onComplete={handleAnimationComplete}
         />
-        {/* Draggable FAB */}
-        {!isMacHostedIOSApp ? (
-          <DraggableFAB
-            onOpenCompanionPlanner={openCompanionPlanner}
-          />
-        ) : null}
       </div>
       </div>
 

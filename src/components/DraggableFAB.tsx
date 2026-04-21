@@ -10,7 +10,8 @@ import { getJourneysCompanionLauncherTemplates } from "@/shared/journeysCompanio
 import type { CompanionPlannerLaunchIntent } from "@/types/companionPlanner";
 
 interface DraggableFABProps {
-  onOpenCompanionPlanner: (intent?: CompanionPlannerLaunchIntent | null) => void;
+  onOpenCompanionPlanner?: (intent?: CompanionPlannerLaunchIntent | null) => void;
+  onTap?: () => void;
 }
 
 const FLOATING_LAUNCHER_SIZE_PX = 144;
@@ -32,7 +33,7 @@ const getPopupWidthPx = () => {
   return Math.max(0, Math.min(21 * safeRootFontSize, window.innerWidth - (POPUP_VIEWPORT_GUTTER_PX * 2)));
 };
 
-export const DraggableFAB = ({ onOpenCompanionPlanner }: DraggableFABProps) => {
+export const DraggableFAB = ({ onOpenCompanionPlanner, onTap }: DraggableFABProps) => {
   const { user } = useAuth();
   const suppressTapRef = useRef(false);
   const suppressTapResetRef = useRef<number | null>(null);
@@ -151,6 +152,10 @@ export const DraggableFAB = ({ onOpenCompanionPlanner }: DraggableFABProps) => {
   }, [closeMenu, isMenuOpen]);
 
   const handleOptionSelect = useCallback((template: (typeof launcherTemplates)[number]) => {
+    if (!onOpenCompanionPlanner) {
+      closeMenu();
+      return;
+    }
     closeMenu();
     const launchIntent: CompanionPlannerLaunchIntent = {
       id: typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -165,6 +170,10 @@ export const DraggableFAB = ({ onOpenCompanionPlanner }: DraggableFABProps) => {
   }, [closeMenu, launcherTemplates, onOpenCompanionPlanner]);
 
   const handleOpenHistory = useCallback(() => {
+    if (!onOpenCompanionPlanner) {
+      closeMenu();
+      return;
+    }
     closeMenu();
     const launchIntent: CompanionPlannerLaunchIntent = {
       id: typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -195,7 +204,7 @@ export const DraggableFAB = ({ onOpenCompanionPlanner }: DraggableFABProps) => {
       {...longPressHandlers}
     >
       <JourneysCompanionLauncherPopup
-        open={isMenuOpen}
+        open={Boolean(onOpenCompanionPlanner) && isMenuOpen}
         alignment={popupAlignment}
         companionLabel={companionLabel}
         options={launcherTemplates}
@@ -217,6 +226,12 @@ export const DraggableFAB = ({ onOpenCompanionPlanner }: DraggableFABProps) => {
         data-testid="journeys-companion-launcher-floating"
         onClick={() => {
           if (suppressTapRef.current) {
+            return;
+          }
+          if (!onOpenCompanionPlanner) {
+            if (canTriggerTap) {
+              onTap?.();
+            }
             return;
           }
           if (canTriggerTap) {

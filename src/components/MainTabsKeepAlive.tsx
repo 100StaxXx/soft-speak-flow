@@ -1,6 +1,7 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState, type ComponentType } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
+import { useLocation, useNavigate } from "react-router-dom";
 import Mentor from "@/pages/Mentor";
 import Companion from "@/pages/Companion";
 import Journeys from "@/pages/Journeys";
@@ -8,10 +9,13 @@ import Campaigns from "@/pages/Campaigns";
 import { useAuth } from "@/hooks/useAuth";
 import { MainTabVisibilityProvider } from "@/contexts/MainTabVisibilityContext";
 import { logger } from "@/utils/logger";
+import { DraggableFAB } from "@/components/DraggableFAB";
 import {
   warmDailyTasksQueryFromRemote,
   warmEpicsQueryFromRemote,
 } from "@/utils/plannerSync";
+import type { CompanionPlannerLaunchIntent } from "@/types/companionPlanner";
+import { isMacDesignedForIPadIOSApp } from "@/utils/platformTargets";
 
 type MainTabPath = "/mentor" | "/journeys" | "/campaigns" | "/companion";
 
@@ -39,6 +43,8 @@ const SCROLL_RESTORE_EPSILON_PX = 1;
 export const MainTabsKeepAlive = memo(({ activePath }: { activePath: MainTabPath }) => {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [mountedTabs, setMountedTabs] = useState<MainTabPath[]>([activePath]);
   const activePathRef = useRef<MainTabPath>(activePath);
   const visitedTabsRef = useRef<Set<MainTabPath>>(new Set([activePath]));
@@ -58,6 +64,32 @@ export const MainTabsKeepAlive = memo(({ activePath }: { activePath: MainTabPath
 
     void Promise.resolve(warmEpicsQueryFromRemote(queryClient, user.id)).catch(() => undefined);
   }, [queryClient, user?.id]);
+  const openUniversalCompanionPlanner = useCallback((intent?: CompanionPlannerLaunchIntent | null) => {
+    if (!intent) return;
+
+    if (activePath === "/journeys") {
+      navigate(
+        {
+          pathname: location.pathname,
+          search: location.search,
+        },
+        {
+          state: {
+            ...((location.state as Record<string, unknown> | null) ?? {}),
+            companionPlannerLaunchIntent: intent,
+          },
+        },
+      );
+      return;
+    }
+
+    navigate("/journeys", {
+      state: {
+        companionPlannerLaunchIntent: intent,
+      },
+    });
+  }, [activePath, location.pathname, location.search, location.state, navigate]);
+  const showUniversalPlannerFab = !isMacDesignedForIPadIOSApp();
 
   useEffect(() => {
     prefetchJourneysTasks();
@@ -133,6 +165,9 @@ export const MainTabsKeepAlive = memo(({ activePath }: { activePath: MainTabPath
           </div>
         );
       })}
+      {showUniversalPlannerFab ? (
+        <DraggableFAB onOpenCompanionPlanner={openUniversalCompanionPlanner} />
+      ) : null}
     </div>
   );
 });

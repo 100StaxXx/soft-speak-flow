@@ -4,6 +4,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   warmDailyTasksQueryFromRemote: vi.fn().mockResolvedValue([]),
   warmEpicsQueryFromRemote: vi.fn().mockResolvedValue([]),
+  navigate: vi.fn(),
+  location: {
+    pathname: "/mentor",
+    search: "",
+    state: null as Record<string, unknown> | null,
+  },
+  lastFabHandler: null as null | ((intent?: {
+    id: string;
+    message: string;
+    starterIntent: string;
+    target?: string;
+    briefingContext?: null;
+  } | null) => void),
   mountCounts: {
     mentor: 0,
     journeys: 0,
@@ -16,6 +29,11 @@ vi.mock("@tanstack/react-query", () => ({
   useQueryClient: () => ({}),
 }));
 
+vi.mock("react-router-dom", () => ({
+  useLocation: () => mocks.location,
+  useNavigate: () => mocks.navigate,
+}));
+
 vi.mock("@/hooks/useAuth", () => ({
   useAuth: () => ({
     user: { id: "user-1" },
@@ -25,6 +43,41 @@ vi.mock("@/hooks/useAuth", () => ({
 vi.mock("@/utils/plannerSync", () => ({
   warmDailyTasksQueryFromRemote: (...args: unknown[]) => mocks.warmDailyTasksQueryFromRemote(...args),
   warmEpicsQueryFromRemote: (...args: unknown[]) => mocks.warmEpicsQueryFromRemote(...args),
+}));
+
+vi.mock("@/utils/platformTargets", () => ({
+  isMacDesignedForIPadIOSApp: () => false,
+}));
+
+vi.mock("@/components/DraggableFAB", () => ({
+  DraggableFAB: ({
+    onOpenCompanionPlanner,
+  }: {
+    onOpenCompanionPlanner?: (intent?: {
+      id: string;
+      message: string;
+      starterIntent: string;
+      target?: string;
+      briefingContext?: null;
+    } | null) => void;
+  }) => {
+    mocks.lastFabHandler = onOpenCompanionPlanner ?? null;
+    return (
+      <button
+        type="button"
+        data-testid="main-tabs-universal-fab"
+        onClick={() => onOpenCompanionPlanner?.({
+          id: "launch-1",
+          message: "Help me plan today",
+          starterIntent: "plan_day",
+          target: "planner",
+          briefingContext: null,
+        })}
+      >
+        universal fab
+      </button>
+    );
+  },
 }));
 
 vi.mock("@/pages/Mentor", async () => {
@@ -107,6 +160,11 @@ describe("MainTabsKeepAlive", () => {
     mocks.mountCounts.journeys = 0;
     mocks.mountCounts.campaigns = 0;
     mocks.mountCounts.companion = 0;
+    mocks.navigate.mockReset();
+    mocks.location.pathname = "/mentor";
+    mocks.location.search = "";
+    mocks.location.state = null;
+    mocks.lastFabHandler = null;
 
     let rafId = 0;
     vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback: FrameRequestCallback) => {
@@ -139,6 +197,46 @@ describe("MainTabsKeepAlive", () => {
     expect(mocks.warmDailyTasksQueryFromRemote).toHaveBeenCalledWith(expect.any(Object), "user-1", expect.any(String));
     expect(mocks.warmEpicsQueryFromRemote).toHaveBeenCalledTimes(1);
     expect(mocks.warmEpicsQueryFromRemote).toHaveBeenCalledWith(expect.any(Object), "user-1");
+  });
+
+  it("renders the shared planner fab and routes planner intents into journeys", () => {
+    render(<MainTabsKeepAlive activePath="/mentor" />);
+
+    fireEvent.click(screen.getByTestId("main-tabs-universal-fab"));
+
+    expect(mocks.navigate).toHaveBeenCalledWith("/journeys", {
+      state: {
+        companionPlannerLaunchIntent: expect.objectContaining({
+          id: "launch-1",
+          message: "Help me plan today",
+        }),
+      },
+    });
+  });
+
+  it("preserves the current journeys location when the shared planner fab launches in-place", () => {
+    mocks.location.pathname = "/journeys";
+    mocks.location.search = "?section=inbox";
+    mocks.location.state = { fromTest: true };
+
+    render(<MainTabsKeepAlive activePath="/journeys" />);
+
+    fireEvent.click(screen.getByTestId("main-tabs-universal-fab"));
+
+    expect(mocks.navigate).toHaveBeenCalledWith(
+      {
+        pathname: "/journeys",
+        search: "?section=inbox",
+      },
+      {
+        state: {
+          fromTest: true,
+          companionPlannerLaunchIntent: expect.objectContaining({
+            id: "launch-1",
+          }),
+        },
+      },
+    );
   });
 
   it("preserves tab state and avoids remounting visited tabs", () => {

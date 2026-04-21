@@ -6,6 +6,9 @@ import {
   ChevronLeft,
   ChevronRight,
   Flame,
+  Mic,
+  MicOff,
+  Plus,
   Target,
   Trophy,
 } from "lucide-react";
@@ -62,6 +65,9 @@ interface DesktopWeekPlannerProps {
   onAddQuest: () => void;
   onOpenCompanionPlanner?: () => void;
   onVoiceAddQuest?: () => void;
+  isVoiceAddRecording?: boolean;
+  isVoiceAddSupported?: boolean;
+  showCompanionPlannerHeaderAction?: boolean;
   onOpenMonthView?: () => void;
   onUndoToggle?: (taskId: string, xpReward: number) => void;
   onEditQuest?: (task: DailyTask) => void;
@@ -343,6 +349,9 @@ export function DesktopWeekPlanner({
   onAddQuest,
   onOpenCompanionPlanner,
   onVoiceAddQuest,
+  isVoiceAddRecording = false,
+  isVoiceAddSupported = true,
+  showCompanionPlannerHeaderAction = false,
   onOpenMonthView,
   onUndoToggle,
   onEditQuest,
@@ -351,7 +360,39 @@ export function DesktopWeekPlanner({
   onSendToCalendar,
   hasCalendarLink,
 }: DesktopWeekPlannerProps) {
-  const plannerLauncherAction = onOpenCompanionPlanner ?? onVoiceAddQuest ?? onAddQuest;
+  const hasCompanionPlannerShortcut = Boolean(onOpenCompanionPlanner);
+  const voiceAddButtonLabel = isVoiceAddRecording ? "Stop voice capture" : "Start voice capture";
+  const quickCaptureControls = (
+    <div
+      className="flex items-center gap-2"
+      data-has-companion-planner-shortcut={hasCompanionPlannerShortcut ? "true" : "false"}
+    >
+      <Button
+        variant="outline"
+        size="icon"
+        className="h-9 w-9 rounded-[18px] border-white/10 bg-white/5 hover:bg-white/10"
+        onClick={onAddQuest}
+        aria-label="Add quest"
+        data-tour="add-quest-fab"
+      >
+        <Plus className="h-4 w-4" />
+      </Button>
+      <Button
+        variant={isVoiceAddRecording ? "secondary" : "outline"}
+        size="icon"
+        className={cn(
+          "h-9 w-9 rounded-[18px] border-white/10 bg-white/5 hover:bg-white/10",
+          isVoiceAddRecording && "border-primary/40 bg-primary/15 text-primary hover:bg-primary/20",
+        )}
+        onClick={onVoiceAddQuest}
+        aria-label={voiceAddButtonLabel}
+        disabled={!onVoiceAddQuest || !isVoiceAddSupported}
+        data-testid="desktop-week-voice-add-button"
+      >
+        {isVoiceAddRecording ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+      </Button>
+    </div>
+  );
   const [openDetailsTaskId, setOpenDetailsTaskId] = useState<string | null>(null);
   const weekStart = useMemo(() => startOfWeek(selectedDate, { weekStartsOn: 0 }), [selectedDate]);
   const weekDays = useMemo(
@@ -646,16 +687,17 @@ export function DesktopWeekPlanner({
                 Month
               </Button>
             ) : null}
-            <div className="flex items-center gap-2">
+            {showCompanionPlannerHeaderAction && onOpenCompanionPlanner ? (
               <JourneysCompanionLauncher
                 variant="inline"
                 compact
                 data-tour="add-quest-launcher"
                 text="Chat with companion"
                 className="shadow-[0_14px_28px_rgba(122,61,255,0.2)]"
-                onClick={plannerLauncherAction}
+                onClick={onOpenCompanionPlanner}
               />
-            </div>
+            ) : null}
+            {quickCaptureControls}
           </div>
         </div>
 

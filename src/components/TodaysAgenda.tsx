@@ -32,6 +32,9 @@ import {
   Trash2,
   ChevronLeft,
   ChevronRight,
+  Mic,
+  MicOff,
+  Plus,
 } from "lucide-react";
 import { JourneysCompanionLauncher } from "@/components/journeys/JourneysCompanionLauncher";
 import {
@@ -201,6 +204,9 @@ interface TodaysAgendaProps {
   onAddQuest: () => void;
   onOpenCompanionPlanner?: () => void;
   onVoiceAddQuest?: () => void;
+  isVoiceAddRecording?: boolean;
+  isVoiceAddSupported?: boolean;
+  showCompanionPlannerHeaderAction?: boolean;
   completedCount: number;
   totalCount: number;
   currentStreak?: number;
@@ -640,6 +646,9 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   onAddQuest,
   onOpenCompanionPlanner,
   onVoiceAddQuest,
+  isVoiceAddRecording = false,
+  isVoiceAddSupported = true,
+  showCompanionPlannerHeaderAction = false,
   completedCount,
   totalCount,
   currentStreak = 0,
@@ -660,6 +669,37 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 }: TodaysAgendaProps) {
   const { user } = useAuth();
   const plannerLauncherAction = onOpenCompanionPlanner ?? onVoiceAddQuest ?? onAddQuest;
+  const voiceAddButtonLabel = isVoiceAddRecording ? "Stop voice capture" : "Start voice capture";
+  const quickCaptureControls = (
+    <div className="flex items-center gap-2">
+      <Button
+        type="button"
+        variant="outline"
+        size="icon"
+        className="h-9 w-9 rounded-[18px] border-white/10 bg-white/5 hover:bg-white/10"
+        onClick={onAddQuest}
+        aria-label="Add quest"
+        data-tour="add-quest-fab"
+      >
+        <Plus className="h-4 w-4" />
+      </Button>
+      <Button
+        type="button"
+        variant={isVoiceAddRecording ? "secondary" : "outline"}
+        size="icon"
+        className={cn(
+          "h-9 w-9 rounded-[18px] border-white/10 bg-white/5 hover:bg-white/10",
+          isVoiceAddRecording && "border-primary/40 bg-primary/15 text-primary hover:bg-primary/20",
+        )}
+        onClick={onVoiceAddQuest}
+        aria-label={voiceAddButtonLabel}
+        disabled={!onVoiceAddQuest || !isVoiceAddSupported}
+        data-testid="journeys-voice-add-button"
+      >
+        {isVoiceAddRecording ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+      </Button>
+    </div>
+  );
   const prefersReducedMotion = useReducedMotion();
   const { capabilities } = useMotionProfile();
   const [isDesktopLayout, setIsDesktopLayout] = useState(() => {
@@ -2748,6 +2788,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
               )} />
               <span className="font-semibold text-stardust-gold">{totalXP}</span>
             </div>
+            {quickCaptureControls}
           </div>
         </div>
 
@@ -2838,16 +2879,17 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                   Month
                 </Button>
               ) : null}
-              <div className="flex items-center gap-2">
+              {showCompanionPlannerHeaderAction && onOpenCompanionPlanner ? (
                 <JourneysCompanionLauncher
                   variant="inline"
                   compact
                   data-tour="add-quest-launcher"
                   text="Chat with companion"
                   className="shadow-[0_14px_28px_rgba(122,61,255,0.2)]"
-                  onClick={plannerLauncherAction}
+                  onClick={onOpenCompanionPlanner}
                 />
-              </div>
+              ) : null}
+              {quickCaptureControls}
             </div>
           </div>
         ) : null}

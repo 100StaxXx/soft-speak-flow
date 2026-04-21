@@ -90,14 +90,16 @@ describe("DesktopWeekPlanner", () => {
     expect(screen.getByTestId("desktop-week-hour-6")).toBeInTheDocument();
     expect(screen.getByRole("group", { name: /desktop planner mode/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Today" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Chat with companion/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add quest" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Start voice capture" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Day" }));
     expect(onPlannerModeChange).toHaveBeenCalledWith("day");
   }, 15000);
 
-  it("routes the compact companion launcher through the planner entry callback", () => {
-    const onOpenCompanionPlanner = vi.fn();
+  it("routes the desktop quick capture controls through the add and voice callbacks", () => {
+    const onAddQuest = vi.fn();
+    const onVoiceAddQuest = vi.fn();
 
     render(
       <DesktopWeekPlanner
@@ -107,17 +109,21 @@ describe("DesktopWeekPlanner", () => {
         onDateSelect={vi.fn()}
         onPlannerModeChange={vi.fn()}
         onToggle={vi.fn()}
-        onAddQuest={vi.fn()}
-        onOpenCompanionPlanner={onOpenCompanionPlanner}
+        onAddQuest={onAddQuest}
+        onVoiceAddQuest={onVoiceAddQuest}
         onOpenMonthView={vi.fn()}
       />,
     );
 
-    const launcher = screen.getByRole("button", { name: /Chat with companion/i });
-    fireEvent.click(launcher);
+    const addButton = screen.getByRole("button", { name: "Add quest" });
+    const voiceButton = screen.getByRole("button", { name: "Start voice capture" });
 
-    expect(onOpenCompanionPlanner).toHaveBeenCalledTimes(1);
-    expect(launcher).toHaveAttribute("data-tour", "add-quest-launcher");
+    fireEvent.click(addButton);
+    fireEvent.click(voiceButton);
+
+    expect(onAddQuest).toHaveBeenCalledTimes(1);
+    expect(onVoiceAddQuest).toHaveBeenCalledTimes(1);
+    expect(addButton).toHaveAttribute("data-tour", "add-quest-fab");
   });
 
   it("places timed tasks into hour rows and keeps cards title-only until clicked", () => {

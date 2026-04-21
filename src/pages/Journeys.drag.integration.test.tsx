@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { isSameDay } from "date-fns";
 import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -15,6 +15,30 @@ vi.mock("@/hooks/useJourneysCompanionVisual", () => ({
     usesPortraitShell: false,
   }),
 }));
+
+const localStorageState = vi.hoisted(() => ({
+  store: new Map<string, string>(),
+}));
+
+Object.defineProperty(globalThis, "localStorage", {
+  configurable: true,
+  value: {
+    getItem: (key: string) => localStorageState.store.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      localStorageState.store.set(key, value);
+    },
+    removeItem: (key: string) => {
+      localStorageState.store.delete(key);
+    },
+    clear: () => {
+      localStorageState.store.clear();
+    },
+    key: (index: number) => Array.from(localStorageState.store.keys())[index] ?? null,
+    get length() {
+      return localStorageState.store.size;
+    },
+  },
+});
 
 const mocks = vi.hoisted(() => ({
   addTask: vi.fn(),
@@ -688,6 +712,7 @@ describe("Journeys row drag integration", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorageState.store.clear();
     mocks.isTabActive = true;
     mocks.pendingTaskId = null;
     mocks.unsurfacedEpicHabitsCount = 0;
@@ -812,7 +837,7 @@ describe("Journeys row drag integration", () => {
     expect(mocks.lastCompanionPlannerModalProps?.presentation).toBe("dialog");
   });
 
-  it("keeps the mobile floating add quest FAB targetable for the tutorial", async () => {
+  it("keeps the journeys add quest button targetable for the tutorial", async () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -828,9 +853,8 @@ describe("Journeys row drag integration", () => {
       </QueryClientProvider>,
     );
 
-    const fab = await screen.findByTestId("draggable-fab");
-    expect(within(fab).getByTestId("journeys-companion-launcher-floating")).toHaveAttribute("data-tour", "add-quest-fab");
-    expect(mocks.draggableFabRenderCount).toBe(1);
+    expect(await screen.findByLabelText("Add quest")).toHaveAttribute("data-tour", "add-quest-fab");
+    expect(mocks.draggableFabRenderCount).toBe(0);
   });
 
   it("opens the companion planner modal from the desktop journeys launcher", async () => {
@@ -865,7 +889,9 @@ describe("Journeys row drag integration", () => {
     expect(screen.getByTestId("journeys-companion-planner-modal")).toBeInTheDocument();
   });
 
-  it("keeps the planner open while a planner quest edit handoff is active and resolves back after save", async () => {
+  it("keeps the planner closed on first load even when an old pinned preference exists", async () => {
+    localStorageState.store.set("journeys-companion-planner-pinned-v1", "true");
+
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -881,7 +907,76 @@ describe("Journeys row drag integration", () => {
       </QueryClientProvider>,
     );
 
-    fireEvent.click(await screen.findByTestId("journeys-companion-launcher-floating"));
+    await waitFor(() => {
+      expect(mocks.lastCompanionPlannerModalProps).not.toBeNull();
+    });
+    expect(mocks.lastCompanionPlannerModalProps?.open).toBe(false);
+    expect(screen.queryByTestId("journeys-companion-planner-modal")).not.toBeInTheDocument();
+  });
+
+  it("opens the planner when journeys receives a route launch intent", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={[{
+          pathname: "/journeys",
+          state: {
+            companionPlannerLaunchIntent: {
+              id: "launch-intent-1",
+              message: "Help me plan my afternoon.",
+              starterIntent: "plan_my_day",
+              target: "planner",
+              briefingContext: null,
+            },
+          },
+        }]}>
+          <Journeys />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(mocks.lastCompanionPlannerModalProps?.open).toBe(true);
+    });
+    expect(mocks.lastCompanionPlannerModalProps?.launchIntent).toEqual(expect.objectContaining({
+      id: "launch-intent-1",
+      message: "Help me plan my afternoon.",
+    }));
+    expect(screen.getByTestId("journeys-companion-planner-modal")).toBeInTheDocument();
+  });
+
+  it("keeps the planner open while a planner quest edit handoff is active and resolves back after save", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={[{
+          pathname: "/journeys",
+          state: {
+            companionPlannerLaunchIntent: {
+              id: "planner-handoff-1",
+              message: "Help me plan my afternoon.",
+              starterIntent: "adjust_today",
+              target: "planner",
+              briefingContext: null,
+            },
+          },
+        }]}>
+          <Journeys />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
 
     await waitFor(() => {
       expect(mocks.lastCompanionPlannerModalProps?.open).toBe(true);
@@ -971,21 +1066,22 @@ describe("Journeys row drag integration", () => {
 
     render(
       <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={["/journeys"]}>
+        <MemoryRouter initialEntries={[{
+          pathname: "/journeys",
+          state: {
+            companionPlannerLaunchIntent: {
+              id: "launch-goal",
+              message: "Let's lock in a new goal",
+              starterIntent: "goal_breakdown_start",
+              target: "campaign_builder",
+              briefingContext: null,
+            },
+          },
+        }]}>
           <Journeys />
         </MemoryRouter>
       </QueryClientProvider>,
     );
-
-    act(() => {
-      mocks.lastDraggableFabOnOpenCompanionPlanner?.({
-        id: "launch-goal",
-        message: "Let's lock in a new goal",
-        starterIntent: "goal_breakdown_start",
-        target: "campaign_builder",
-        briefingContext: null,
-      });
-    });
 
     await waitFor(() => {
       expect(mocks.lastPathfinderProps?.open).toBe(true);
