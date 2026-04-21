@@ -238,6 +238,41 @@ describe("useCompanionAssistant", () => {
     expect(result.current.pendingAction?.id).toBe("action-1");
   });
 
+  it("strips the stale journeys planner opener when rehydrating a saved thread", async () => {
+    mocks.loadThreadMessages.mockResolvedValue([
+      {
+        id: "legacy-opener",
+        sessionId: "persisted-session",
+        role: "assistant",
+        content: "The road's open. What are we setting in motion?",
+        createdAt: "2026-04-18T07:59:00.000Z",
+        source: "agent",
+      },
+      {
+        id: "m1",
+        sessionId: "persisted-session",
+        role: "assistant",
+        content: "What does tomorrow look like?",
+        createdAt: "2026-04-18T08:00:00.000Z",
+        source: "agent",
+      },
+    ]);
+
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(
+      () => useCompanionAssistant({ surface: "journeys" }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(result.current.activeThread?.sessionId).toBe("persisted-session");
+    });
+
+    expect(result.current.messages.map((message) => message.content)).toEqual([
+      "What does tomorrow look like?",
+    ]);
+  });
+
   it("keeps the reopened thread active when pending actions are unavailable during setup", async () => {
     mocks.loadPendingAction.mockRejectedValue(createPendingActionsSetupError());
 
@@ -274,8 +309,7 @@ describe("useCompanionAssistant", () => {
     });
 
     expect(result.current.activeThread?.sessionId).toBe("fresh-session");
-    expect(result.current.messages[0]?.content).not.toBe("What does tomorrow look like?");
-    expect(result.current.messages[0]?.isSeed).toBe(true);
+    expect(result.current.messages).toEqual([]);
     expect(mocks.toastError).not.toHaveBeenCalledWith(
       COMPANION_PENDING_ACTIONS_DISABLED_REASON,
       { id: getPendingActionsSetupToastId() },

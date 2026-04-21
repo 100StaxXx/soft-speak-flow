@@ -19,14 +19,13 @@ import {
   COMPANION_CHAT_THREAD_HISTORY_EMPTY_STATE,
   isCompanionChatSetupError,
 } from "@/utils/companionChatSetup";
-import { getCompanionPlannerOpener } from "@/shared/companionPlannerCopy";
+import { stripLegacyJourneysPlannerOpeners } from "@/utils/legacyJourneysPlannerOpener";
 
 type JourneysAssistantMessage = {
   role: "assistant" | "user";
   content: string;
   createdAt: string;
   source: "chat" | "plan";
-  isSeed?: boolean;
 };
 
 interface UseJourneysCompanionThreadsOptions {
@@ -39,7 +38,7 @@ interface UseJourneysCompanionThreadsOptions {
   hasPendingPlannerWork: boolean;
   isBusy: boolean;
   conversation: {
-    resetThread: (options?: { sessionId?: string; greetingText?: string }) => void;
+    resetThread: (options?: { sessionId?: string }) => void;
     hydrateThread: (options: {
       sessionId: string;
       messages: Array<{
@@ -69,8 +68,6 @@ const getActivePersistedThread = (
   threads: CompanionChatThreadSummary[] | undefined,
 ) =>
   threads?.find((thread) => thread.archivedAt === null) ?? null;
-
-const isRealThreadMessage = (message: JourneysAssistantMessage) => !message.isSeed;
 
 const mapChatMessages = (messages: CompanionChatThreadMessage[]) =>
   messages
@@ -108,14 +105,7 @@ export function useJourneysCompanionThreads({
   const scopeKeyRef = useRef<string | null>(null);
   const bootstrappedScopeKeyRef = useRef<string | null>(null);
   const threadMutationVersionRef = useRef(0);
-  const freshThreadGreeting = useMemo(
-    () => getCompanionPlannerOpener({ userId: userId ?? null }),
-    [userId],
-  );
-  const hasRealThreadMessages = useMemo(
-    () => messages.some(isRealThreadMessage),
-    [messages],
-  );
+  const hasRealThreadMessages = useMemo(() => messages.length > 0, [messages]);
 
   const scopeKey = `${userId ?? "anon"}:${companionId ?? "none"}`;
   const threadsQueryKey = getCompanionChatThreadsQueryKey(
@@ -157,7 +147,6 @@ export function useJourneysCompanionThreads({
   const openFreshThread = useCallback((options?: {
     sessionId?: string;
     markBootstrapped?: boolean;
-    greetingText?: string;
   }) => {
     const nextSessionId = options?.sessionId ?? generateCompanionThreadSessionId();
     threadMutationVersionRef.current += 1;
@@ -168,16 +157,9 @@ export function useJourneysCompanionThreads({
     if (options?.markBootstrapped) {
       bootstrappedScopeKeyRef.current = scopeKey;
     }
-    resetConversationThread(
-      options?.greetingText
-        ? {
-            sessionId: nextSessionId,
-            greetingText: options.greetingText,
-          }
-        : {
-            sessionId: nextSessionId,
-          },
-    );
+    resetConversationThread({
+      sessionId: nextSessionId,
+    });
     resetPlannerThread({
       sessionId: nextSessionId,
     });
@@ -209,7 +191,6 @@ export function useJourneysCompanionThreads({
         openFreshThread({
           sessionId: activeSessionId || undefined,
           markBootstrapped: true,
-          greetingText: freshThreadGreeting,
         });
       } else {
         bootstrappedScopeKeyRef.current = scopeKey;
@@ -224,19 +205,21 @@ export function useJourneysCompanionThreads({
     void loadCompanionChatThreadMessages(activePersistedThread.sessionId, "journeys")
       .then((threadMessages) => {
         if (cancelled || threadMutationVersionRef.current !== hydrationVersion) return;
+        const visibleThreadMessages = stripLegacyJourneysPlannerOpeners(threadMessages);
 
         localThreadCreatedAtRef.current =
-          threadMessages[0]?.createdAt
+          visibleThreadMessages[0]?.createdAt
+          ?? threadMessages[0]?.createdAt
           ?? activePersistedThread.createdAt;
         setLocallyArchivedSessionId(null);
         setActiveSessionId(activePersistedThread.sessionId);
         hydrateConversationThread({
           sessionId: activePersistedThread.sessionId,
-          messages: mapChatMessages(threadMessages),
+          messages: mapChatMessages(visibleThreadMessages),
         });
         hydratePlannerThread({
           sessionId: activePersistedThread.sessionId,
-          messages: mapPlannerMessages(threadMessages),
+          messages: mapPlannerMessages(visibleThreadMessages),
         });
         bootstrappedScopeKeyRef.current = scopeKey;
       })
@@ -248,9 +231,7 @@ export function useJourneysCompanionThreads({
               ? COMPANION_CHAT_THREAD_HISTORY_DISABLED_REASON
               : "I couldn't reopen the latest thread, so I started a fresh one.",
           );
-          openFreshThread({
-            greetingText: freshThreadGreeting,
-          });
+          openFreshThread();
           bootstrappedScopeKeyRef.current = scopeKey;
         }
       })
@@ -267,7 +248,6 @@ export function useJourneysCompanionThreads({
     activeSessionId,
     companionId,
     enabled,
-    freshThreadGreeting,
     hasRealThreadMessages,
     hydrateConversationThread,
     hydratePlannerThread,
@@ -290,9 +270,8 @@ export function useJourneysCompanionThreads({
   );
 
   const localActiveThread = useMemo<CompanionChatThreadSummary>(() => {
-    const realMessages = messages.filter(isRealThreadMessage);
-    const firstUserMessage = realMessages.find((message) => message.role === "user");
-    const latestMessage = realMessages[realMessages.length - 1];
+    const firstUserMessage = messages.find((message) => message.role === "user");
+    const latestMessage = messages[messages.length - 1];
 
     return {
       sessionId: activeSessionId,
@@ -300,10 +279,10 @@ export function useJourneysCompanionThreads({
       surface: "journeys",
       title: buildCompanionThreadTitle(firstUserMessage?.content ?? "New thread"),
       previewText: buildCompanionThreadPreview(latestMessage?.content ?? ""),
-      createdAt: realMessages[0]?.createdAt ?? localThreadCreatedAtRef.current,
+      createdAt: messages[0]?.createdAt ?? localThreadCreatedAtRef.current,
       lastMessageAt: latestMessage?.createdAt ?? localThreadCreatedAtRef.current,
       archivedAt: null,
-      messageCount: realMessages.length,
+      messageCount: messages.length,
     };
   }, [activeSessionId, companionId, messages]);
 
@@ -393,9 +372,7 @@ export function useJourneysCompanionThreads({
         await setCompanionChatThreadArchived(persistedActiveThread.sessionId, true);
       }
 
-      openFreshThread({
-        greetingText: freshThreadGreeting,
-      });
+      openFreshThread();
       await queryClient.invalidateQueries({ queryKey: threadsQueryKey });
     } catch (error) {
       setLocallyArchivedSessionId(null);
@@ -407,7 +384,6 @@ export function useJourneysCompanionThreads({
       );
     }
   }, [
-    freshThreadGreeting,
     newChatDisabledReason,
     openFreshThread,
     persistedActiveThread,
@@ -466,20 +442,22 @@ export function useJourneysCompanionThreads({
 
       await setCompanionChatThreadArchived(sessionId, false);
       const threadMessages = await loadCompanionChatThreadMessages(sessionId, "journeys");
+      const visibleThreadMessages = stripLegacyJourneysPlannerOpeners(threadMessages);
       if (threadMutationVersionRef.current !== hydrationVersion) return;
 
       localThreadCreatedAtRef.current =
-        threadMessages[0]?.createdAt
+        visibleThreadMessages[0]?.createdAt
+        ?? threadMessages[0]?.createdAt
         ?? new Date().toISOString();
       setLocallyArchivedSessionId(null);
       setActiveSessionId(sessionId);
       hydrateConversationThread({
         sessionId,
-        messages: mapChatMessages(threadMessages),
+        messages: mapChatMessages(visibleThreadMessages),
       });
       hydratePlannerThread({
         sessionId,
-        messages: mapPlannerMessages(threadMessages),
+        messages: mapPlannerMessages(visibleThreadMessages),
       });
 
       await queryClient.invalidateQueries({ queryKey: threadsQueryKey });

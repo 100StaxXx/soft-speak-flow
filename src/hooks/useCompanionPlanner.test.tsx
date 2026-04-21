@@ -1,6 +1,5 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getCompanionPlannerOpener } from "@/shared/companionPlannerCopy";
 
 const mocks = vi.hoisted(() => ({
   externalCalendarHorizons: [] as string[],
@@ -57,12 +56,6 @@ vi.mock("@/hooks/useAuth", () => ({
 vi.mock("@/hooks/useCompanion", () => ({
   useCompanion: () => ({
     companion: null,
-  }),
-}));
-
-vi.mock("@/hooks/useCompanionDialogue", () => ({
-  useCompanionDialogue: () => ({
-    greeting: "Let's line things up.",
   }),
 }));
 
@@ -233,25 +226,19 @@ describe("useCompanionPlanner", () => {
 
   it("initializes the default horizon before dependent event queries run", () => {
     const { result } = renderHook(() =>
-      useCompanionPlanner({ bootstrapGreeting: false })
+      useCompanionPlanner()
     );
 
     expect(result.current.horizon).toBe("day");
     expect(mocks.externalCalendarHorizons).toEqual(["day", "week"]);
   });
 
-  it("bootstraps with planner-specific opener copy", async () => {
+  it("starts with an empty transcript by default", async () => {
     const { result } = renderHook(() => useCompanionPlanner());
 
     await waitFor(() => {
-      expect(result.current.messages[0]?.content).toBe(
-        getCompanionPlannerOpener({ userId: null }),
-      );
+      expect(result.current.messages).toEqual([]);
     });
-
-    expect(result.current.messages[0]?.content).not.toBe(
-      "Let's line things up.",
-    );
   });
 
   it("primes quest capture locally and keeps the planner idle", async () => {
@@ -272,7 +259,7 @@ describe("useCompanionPlanner", () => {
     });
 
     const { result } = renderHook(() =>
-      useCompanionPlanner({ bootstrapGreeting: false })
+      useCompanionPlanner()
     );
 
     act(() => {
@@ -340,7 +327,7 @@ describe("useCompanionPlanner", () => {
     });
 
     const { result } = renderHook(() =>
-      useCompanionPlanner({ bootstrapGreeting: false })
+      useCompanionPlanner()
     );
 
     act(() => {
@@ -373,7 +360,7 @@ describe("useCompanionPlanner", () => {
 
   it("treats an exact typed quest starter like a local quest-capture seed", async () => {
     const { result } = renderHook(() =>
-      useCompanionPlanner({ bootstrapGreeting: false })
+      useCompanionPlanner()
     );
 
     await act(async () => {
@@ -401,7 +388,7 @@ describe("useCompanionPlanner", () => {
     });
 
     const { result } = renderHook(() =>
-      useCompanionPlanner({ bootstrapGreeting: false })
+      useCompanionPlanner()
     );
 
     await act(async () => {
@@ -495,7 +482,7 @@ describe("useCompanionPlanner", () => {
     });
 
     const { result } = renderHook(() =>
-      useCompanionPlanner({ bootstrapGreeting: false })
+      useCompanionPlanner()
     );
 
     await act(async () => {
@@ -567,7 +554,7 @@ describe("useCompanionPlanner", () => {
     });
 
     const { result } = renderHook(() =>
-      useCompanionPlanner({ bootstrapGreeting: false })
+      useCompanionPlanner()
     );
 
     await act(async () => {
@@ -614,7 +601,7 @@ describe("useCompanionPlanner", () => {
     });
 
     const { result } = renderHook(() =>
-      useCompanionPlanner({ bootstrapGreeting: false })
+      useCompanionPlanner()
     );
 
     await act(async () => {
@@ -716,7 +703,7 @@ describe("useCompanionPlanner", () => {
     });
 
     const { result } = renderHook(() =>
-      useCompanionPlanner({ bootstrapGreeting: false })
+      useCompanionPlanner()
     );
 
     await act(async () => {
@@ -788,7 +775,7 @@ describe("useCompanionPlanner", () => {
     });
 
     const { result } = renderHook(() =>
-      useCompanionPlanner({ bootstrapGreeting: false })
+      useCompanionPlanner()
     );
 
     await act(async () => {
@@ -884,7 +871,7 @@ describe("useCompanionPlanner", () => {
     });
 
     const { result } = renderHook(() =>
-      useCompanionPlanner({ bootstrapGreeting: false })
+      useCompanionPlanner()
     );
 
     act(() => {
@@ -980,7 +967,7 @@ describe("useCompanionPlanner", () => {
     });
 
     const { result } = renderHook(() =>
-      useCompanionPlanner({ bootstrapGreeting: false })
+      useCompanionPlanner()
     );
 
     await act(async () => {
@@ -1058,7 +1045,7 @@ describe("useCompanionPlanner", () => {
     });
 
     const { result } = renderHook(() =>
-      useCompanionPlanner({ bootstrapGreeting: false })
+      useCompanionPlanner()
     );
 
     await act(async () => {
@@ -1118,7 +1105,7 @@ describe("useCompanionPlanner", () => {
     });
 
     const { result } = renderHook(() =>
-      useCompanionPlanner({ bootstrapGreeting: false })
+      useCompanionPlanner()
     );
 
     await act(async () => {
@@ -1192,7 +1179,7 @@ describe("useCompanionPlanner", () => {
     });
 
     const { result } = renderHook(() =>
-      useCompanionPlanner({ bootstrapGreeting: false })
+      useCompanionPlanner()
     );
 
     await act(async () => {
@@ -1264,7 +1251,7 @@ describe("useCompanionPlanner", () => {
     });
 
     const { result } = renderHook(() =>
-      useCompanionPlanner({ bootstrapGreeting: false })
+      useCompanionPlanner()
     );
 
     await act(async () => {
@@ -1335,7 +1322,7 @@ describe("useCompanionPlanner", () => {
     });
 
     const { result } = renderHook(() =>
-      useCompanionPlanner({ bootstrapGreeting: false })
+      useCompanionPlanner()
     );
 
     await act(async () => {
@@ -1430,7 +1417,7 @@ describe("useCompanionPlanner", () => {
     });
 
     const { result } = renderHook(() =>
-      useCompanionPlanner({ bootstrapGreeting: false })
+      useCompanionPlanner()
     );
 
     await act(async () => {
@@ -1491,7 +1478,7 @@ describe("useCompanionPlanner", () => {
     });
 
     const { result } = renderHook(() =>
-      useCompanionPlanner({ bootstrapGreeting: false })
+      useCompanionPlanner()
     );
 
     await act(async () => {
@@ -1542,7 +1529,7 @@ describe("useCompanionPlanner", () => {
     });
 
     const { result } = renderHook(() =>
-      useCompanionPlanner({ bootstrapGreeting: false })
+      useCompanionPlanner()
     );
 
     await act(async () => {
@@ -1587,7 +1574,7 @@ describe("useCompanionPlanner", () => {
     });
 
     const { result } = renderHook(() =>
-      useCompanionPlanner({ bootstrapGreeting: false })
+      useCompanionPlanner()
     );
 
     await act(async () => {
@@ -1665,7 +1652,7 @@ describe("useCompanionPlanner", () => {
       });
 
     const { result } = renderHook(() =>
-      useCompanionPlanner({ bootstrapGreeting: false })
+      useCompanionPlanner()
     );
 
     await act(async () => {
@@ -1748,7 +1735,7 @@ describe("useCompanionPlanner", () => {
       });
 
     const { result } = renderHook(() =>
-      useCompanionPlanner({ bootstrapGreeting: false })
+      useCompanionPlanner()
     );
 
     await act(async () => {
@@ -1825,7 +1812,7 @@ describe("useCompanionPlanner", () => {
       });
 
     const { result } = renderHook(() =>
-      useCompanionPlanner({ bootstrapGreeting: false })
+      useCompanionPlanner()
     );
 
     await act(async () => {
@@ -1899,7 +1886,7 @@ describe("useCompanionPlanner", () => {
     });
 
     const { result } = renderHook(() =>
-      useCompanionPlanner({ bootstrapGreeting: false })
+      useCompanionPlanner()
     );
 
     await act(async () => {
@@ -1984,7 +1971,7 @@ describe("useCompanionPlanner", () => {
     });
 
     const { result } = renderHook(() =>
-      useCompanionPlanner({ bootstrapGreeting: false })
+      useCompanionPlanner()
     );
 
     await act(async () => {
@@ -2071,7 +2058,7 @@ describe("useCompanionPlanner", () => {
     });
 
     const { result } = renderHook(() =>
-      useCompanionPlanner({ bootstrapGreeting: false })
+      useCompanionPlanner()
     );
 
     await act(async () => {

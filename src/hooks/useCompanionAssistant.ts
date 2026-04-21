@@ -25,7 +25,6 @@ import {
   stopCompanionSpeech,
   type CompanionSpeechProvider,
 } from "@/services/companionSpeech";
-import { getCompanionPlannerOpener } from "@/shared/companionPlannerCopy";
 import type {
   ActionReceiptView,
   CompanionAgentResponse,
@@ -45,6 +44,7 @@ import {
   isCompanionChatSetupError,
 } from "@/utils/companionChatSetup";
 import { formatCurrentDateTimeWithOffset } from "@/utils/currentDateTime";
+import { stripLegacyJourneysPlannerOpeners } from "@/utils/legacyJourneysPlannerOpener";
 import { parseFunctionInvokeError } from "@/utils/supabaseFunctionErrors";
 
 export type CompanionAssistantSurface = "companion" | "journeys";
@@ -196,9 +196,7 @@ export function useCompanionAssistant({
   const handledLaunchIntentIdRef = useRef<string | null>(null);
 
   const scopeKey = `${surface}:${user?.id ?? "anon"}:${companion?.id ?? "none"}`;
-  const baseGreeting = surface === "journeys"
-    ? getCompanionPlannerOpener({ userId: user?.id ?? null })
-    : greeting;
+  const baseGreeting = surface === "journeys" ? null : greeting;
   const todayLabel = getTodayLabel();
   const placeholder = pendingAction
     ? "Reply here or confirm the pending action."
@@ -265,6 +263,9 @@ export function useCompanionAssistant({
 
   const loadThreadState = useCallback(async (sessionId: string) => {
     const threadMessages = await loadCompanionChatThreadMessages(sessionId, surface);
+    const visibleThreadMessages = surface === "journeys"
+      ? stripLegacyJourneysPlannerOpeners(threadMessages)
+      : threadMessages;
     let loadedPendingAction: PendingActionView | null = null;
     let pendingActionsSetupUnavailable = false;
 
@@ -279,9 +280,11 @@ export function useCompanionAssistant({
     }
 
     localThreadCreatedAtRef.current =
-      threadMessages[0]?.createdAt ?? new Date().toISOString();
+      visibleThreadMessages[0]?.createdAt
+      ?? threadMessages[0]?.createdAt
+      ?? new Date().toISOString();
     setActiveSessionId(sessionId);
-    setMessages(threadMessages.map(mapLoadedMessage));
+    setMessages(visibleThreadMessages.map(mapLoadedMessage));
     setPendingAction(loadedPendingAction);
     setDraftInput("");
     setInterimText("");

@@ -1,9 +1,5 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  COMPANION_PLANNER_OPENER_TEMPLATES,
-  getCompanionPlannerOpener,
-} from "@/shared/companionPlannerCopy";
 
 const mocks = vi.hoisted(() => ({
   invoke: vi.fn(),
@@ -65,24 +61,17 @@ vi.mock("@/integrations/supabase/client", () => ({
   },
 }));
 
-import {
-  JOURNEYS_COMPANION_OPENERS,
-  useJourneysCompanionConversation,
-} from "./useJourneysCompanionConversation";
+import { useJourneysCompanionConversation } from "./useJourneysCompanionConversation";
 
 describe("useJourneysCompanionConversation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("starts with a blank transcript while still exposing the journeys greeting", () => {
+  it("starts with a blank transcript", () => {
     const { result } = renderHook(() => useJourneysCompanionConversation());
-    const expectedOpener = getCompanionPlannerOpener({ userId: "user-1" });
 
     expect(result.current.messages).toEqual([]);
-    expect(result.current.greeting).toBe(expectedOpener);
-    expect(COMPANION_PLANNER_OPENER_TEMPLATES).toContain(expectedOpener);
-    expect(JOURNEYS_COMPANION_OPENERS).toContain(expectedOpener);
   });
 
   it("injects an explicit assistant opening into a blank thread", async () => {
@@ -96,43 +85,15 @@ describe("useJourneysCompanionConversation", () => {
     expect(result.current.messages[0]).toMatchObject({
       role: "assistant",
       content: "What's on your mind?",
-      isSeed: true,
     });
-    expect(result.current.hasRealMessages).toBe(false);
+    expect(result.current.hasRealMessages).toBe(true);
   });
 
-  it("seeds resetThread greeting text without counting it as a real exchange", async () => {
+  it("clears the transcript when resetThread is called", async () => {
     const { result } = renderHook(() => useJourneysCompanionConversation());
 
     await act(async () => {
-      result.current.resetThread({
-        sessionId: "fresh-seeded-session",
-        greetingText: "Fresh start. What's the move?",
-      });
-    });
-
-    expect(result.current.sessionId).toBe("fresh-seeded-session");
-    expect(result.current.messages).toEqual([
-      expect.objectContaining({
-        role: "assistant",
-        content: "Fresh start. What's the move?",
-        isSeed: true,
-      }),
-    ]);
-    expect(result.current.hasRealMessages).toBe(false);
-  });
-
-  it("clears the transcript when resetThread is called without a greeting", async () => {
-    const { result } = renderHook(() => useJourneysCompanionConversation());
-
-    await act(async () => {
-      result.current.resetThread({
-        sessionId: "fresh-seeded-session",
-        greetingText: "Fresh start. What's the move?",
-      });
-    });
-
-    await act(async () => {
+      result.current.injectAssistantOpening("What's on your mind?");
       result.current.resetThread({
         sessionId: "fresh-empty-session",
       });
@@ -143,7 +104,7 @@ describe("useJourneysCompanionConversation", () => {
     expect(result.current.hasRealMessages).toBe(false);
   });
 
-  it("omits seeded assistant openers from the submitted conversation history", async () => {
+  it("submits an empty conversation history after a thread reset", async () => {
     mocks.invoke.mockResolvedValue({
       data: {
         reply: "We can talk it through one step at a time.",
@@ -151,7 +112,7 @@ describe("useJourneysCompanionConversation", () => {
         handoffToPlanner: false,
         memoryUpdateApplied: false,
         persistenceReady: true,
-        sessionId: "session-seeded-history",
+        sessionId: "session-reset-history",
       },
       error: null,
     });
@@ -159,10 +120,8 @@ describe("useJourneysCompanionConversation", () => {
     const { result } = renderHook(() => useJourneysCompanionConversation());
 
     await act(async () => {
-      result.current.resetThread({
-        sessionId: "fresh-seeded-session",
-        greetingText: "Fresh start. What's the move?",
-      });
+      result.current.injectAssistantOpening("What's on your mind?");
+      result.current.resetThread({ sessionId: "fresh-empty-session" });
       result.current.setDraftInput("I need a little momentum");
     });
 

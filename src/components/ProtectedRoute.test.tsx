@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from "@testing-library/react";
+import type { ComponentProps } from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -30,14 +31,14 @@ vi.mock("@/components/Paywall", () => ({
 
 import { ProtectedRoute } from "./ProtectedRoute";
 
-const renderProtectedRoute = () =>
+const renderProtectedRoute = (props?: Partial<ComponentProps<typeof ProtectedRoute>>) =>
   render(
     <MemoryRouter initialEntries={["/protected"]}>
       <Routes>
         <Route
           path="/protected"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute {...props}>
               <div>Protected Content</div>
             </ProtectedRoute>
           }
@@ -90,6 +91,19 @@ describe("ProtectedRoute", () => {
     expect(screen.getByText("Protected Content")).toBeInTheDocument();
   });
 
+  it("does not render the paywall when access is missing but the route does not require it", () => {
+    authState.status = "authenticated";
+    authState.loading = false;
+    authState.user = { id: "user-free" };
+    accessState.hasAccess = false;
+    accessState.gateReason = "pre_trial_signup";
+
+    renderProtectedRoute();
+
+    expect(screen.getByText("Protected Content")).toBeInTheDocument();
+    expect(screen.queryByText("Paywall:pre_trial_signup")).not.toBeInTheDocument();
+  });
+
   it("renders pre-trial paywall variant when access requires trial signup", () => {
     authState.status = "authenticated";
     authState.loading = false;
@@ -97,7 +111,7 @@ describe("ProtectedRoute", () => {
     accessState.hasAccess = false;
     accessState.gateReason = "pre_trial_signup";
 
-    renderProtectedRoute();
+    renderProtectedRoute({ requireAccess: true });
 
     expect(screen.getByText("Paywall:pre_trial_signup")).toBeInTheDocument();
   });
@@ -109,7 +123,7 @@ describe("ProtectedRoute", () => {
     accessState.hasAccess = false;
     accessState.gateReason = "trial_expired";
 
-    renderProtectedRoute();
+    renderProtectedRoute({ requireAccess: true });
 
     expect(screen.getByText("Paywall:trial_expired")).toBeInTheDocument();
   });

@@ -58,7 +58,7 @@ const UPCOMING_MENTORS: readonly MentorBrowseEntry[] = [
   },
 ] as const;
 
-const upcomingSortIndex = new Map(
+const upcomingSortIndex = new Map<string, number>(
   UPCOMING_MENTOR_ORDER.map((slug, index) => [slug, index]),
 );
 
@@ -72,7 +72,15 @@ export const buildBrowseMentorCatalog = (
       return {
         ...lyraFallback,
         ...mentor,
-        themes: mentor.themes ?? lyraFallback?.themes ?? [],
+        archetype: mentor.archetype ?? lyraFallback?.archetype ?? "Guide",
+        short_title: mentor.short_title ?? lyraFallback?.short_title ?? null,
+        tone_description: mentor.tone_description ?? lyraFallback?.tone_description ?? null,
+        style_description: mentor.style_description ?? lyraFallback?.style_description ?? null,
+        target_user: mentor.target_user ?? lyraFallback?.target_user ?? null,
+        signature_line: mentor.signature_line ?? lyraFallback?.signature_line ?? null,
+        themes: mentor.themes && mentor.themes.length > 0
+          ? mentor.themes
+          : lyraFallback?.themes ?? [],
         avatar_url: mentor.avatar_url ?? lyraFallback?.avatar_url ?? null,
         availability: "active" as const,
         unavailable_label: null,

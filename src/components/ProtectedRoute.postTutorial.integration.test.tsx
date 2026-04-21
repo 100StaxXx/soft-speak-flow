@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from "@testing-library/react";
+import type { ComponentProps } from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -51,14 +52,14 @@ vi.mock("@/components/Paywall", () => ({
 
 import { ProtectedRoute } from "./ProtectedRoute";
 
-const renderRoute = () =>
+const renderRoute = (props?: Partial<ComponentProps<typeof ProtectedRoute>>) =>
   render(
     <MemoryRouter initialEntries={["/companion"]}>
       <Routes>
         <Route
           path="/companion"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute {...props}>
               <div>Tutorial Complete Screen</div>
             </ProtectedRoute>
           }
@@ -90,7 +91,7 @@ describe("ProtectedRoute post-tutorial gating", () => {
     };
   });
 
-  it("shows pre-trial gate right after tutorial completion state is persisted", async () => {
+  it("keeps protected content visible after tutorial completion when access is not required", async () => {
     const { rerender } = renderRoute();
 
     expect(screen.getByText("Tutorial Complete Screen")).toBeInTheDocument();
@@ -119,12 +120,12 @@ describe("ProtectedRoute post-tutorial gating", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Paywall:pre_trial_signup")).toBeInTheDocument();
+      expect(screen.getByText("Tutorial Complete Screen")).toBeInTheDocument();
     });
-    expect(screen.queryByText("Tutorial Complete Screen")).not.toBeInTheDocument();
+    expect(screen.queryByText("Paywall:pre_trial_signup")).not.toBeInTheDocument();
   });
 
-  it("still renders the trial-expired gate when tutorial is complete and trial access has expired", () => {
+  it("still renders the trial-expired gate on access-gated routes when tutorial is complete and trial access has expired", () => {
     profileState.profile = {
       ...profileState.profile,
       onboarding_data: {
@@ -138,12 +139,12 @@ describe("ProtectedRoute post-tutorial gating", () => {
       subscribed: false,
     };
 
-    renderRoute();
+    renderRoute({ requireAccess: true });
 
     expect(screen.getByText("Paywall:trial_expired")).toBeInTheDocument();
   });
 
-  it("keeps protected content visible when tutorial is complete but an active trial is present", () => {
+  it("keeps protected content visible on access-gated routes when tutorial is complete but an active trial is present", () => {
     profileState.profile = {
       ...profileState.profile,
       onboarding_data: {
@@ -157,13 +158,13 @@ describe("ProtectedRoute post-tutorial gating", () => {
       subscribed: false,
     };
 
-    renderRoute();
+    renderRoute({ requireAccess: true });
 
     expect(screen.getByText("Tutorial Complete Screen")).toBeInTheDocument();
     expect(screen.queryByText("Paywall:pre_trial_signup")).not.toBeInTheDocument();
   });
 
-  it("drops the paywall as soon as refreshed promo access is present", async () => {
+  it("drops the paywall on access-gated routes as soon as refreshed promo access is present", async () => {
     profileState.profile = {
       ...profileState.profile,
       onboarding_data: {
@@ -171,7 +172,7 @@ describe("ProtectedRoute post-tutorial gating", () => {
       },
     };
 
-    const { rerender } = renderRoute();
+    const { rerender } = renderRoute({ requireAccess: true });
 
     expect(screen.getByText("Paywall:pre_trial_signup")).toBeInTheDocument();
 
@@ -188,7 +189,7 @@ describe("ProtectedRoute post-tutorial gating", () => {
           <Route
             path="/companion"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute requireAccess>
                 <div>Tutorial Complete Screen</div>
               </ProtectedRoute>
             }

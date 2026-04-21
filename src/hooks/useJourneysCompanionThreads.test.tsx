@@ -2,7 +2,6 @@ import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getCompanionPlannerOpener } from "@/shared/companionPlannerCopy";
 import { useJourneysCompanionThreads } from "./useJourneysCompanionThreads";
 
 const mocks = vi.hoisted(() => ({
@@ -87,8 +86,6 @@ const createDeferred = <T,>() => {
 };
 
 describe("useJourneysCompanionThreads", () => {
-  const seededFreshThreadGreeting = getCompanionPlannerOpener({ userId: "user-1" });
-
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.generatedSessionIds = ["fresh-session-1", "fresh-session-2", "fresh-session-3"];
@@ -212,7 +209,68 @@ describe("useJourneysCompanionThreads", () => {
     ]);
   });
 
-  it("seeds a fresh local thread when no persisted active thread exists", async () => {
+  it("filters the stale journeys planner opener when hydrating a saved thread", async () => {
+    mocks.loadCompanionChatThreadMessages.mockImplementationOnce(async (sessionId: string) => [
+      {
+        id: "legacy-opener",
+        sessionId,
+        role: "assistant" as const,
+        content: "The road's open. What are we setting in motion?",
+        createdAt: "2026-04-18T07:59:00.000Z",
+        source: "chat" as const,
+      },
+      {
+        id: "active-chat-1",
+        sessionId,
+        role: "assistant" as const,
+        content: "Let's plan today.",
+        createdAt: "2026-04-18T08:00:00.000Z",
+        source: "chat" as const,
+      },
+      {
+        id: "active-plan-1",
+        sessionId,
+        role: "assistant" as const,
+        content: "You have room this afternoon.",
+        createdAt: "2026-04-18T08:03:00.000Z",
+        source: "plan" as const,
+      },
+    ]);
+
+    renderJourneysThreads();
+
+    await waitFor(() => {
+      expect(mocks.hydrateConversationThread).toHaveBeenCalledWith({
+        sessionId: "active-session-1",
+        messages: [
+          expect.objectContaining({
+            id: "active-chat-1",
+            content: "Let's plan today.",
+          }),
+        ],
+      });
+    });
+
+    expect(mocks.hydrateConversationThread).not.toHaveBeenCalledWith({
+      sessionId: "active-session-1",
+      messages: expect.arrayContaining([
+        expect.objectContaining({
+          id: "legacy-opener",
+        }),
+      ]),
+    });
+    expect(mocks.hydratePlannerThread).toHaveBeenCalledWith({
+      sessionId: "active-session-1",
+      messages: [
+        expect.objectContaining({
+          id: "active-plan-1",
+          content: "You have room this afternoon.",
+        }),
+      ],
+    });
+  });
+
+  it("starts a fresh local thread when no persisted active thread exists", async () => {
     mocks.listCompanionChatThreads.mockResolvedValue([
       {
         sessionId: "archived-session-1",
@@ -240,7 +298,6 @@ describe("useJourneysCompanionThreads", () => {
     await waitFor(() => {
       expect(mocks.resetConversationThread).toHaveBeenLastCalledWith({
         sessionId: "fresh-session-1",
-        greetingText: seededFreshThreadGreeting,
       });
     });
   });
@@ -339,7 +396,7 @@ describe("useJourneysCompanionThreads", () => {
     });
   });
 
-  it("seeds a fresh thread after bootstrap hydration fails to reopen the latest thread", async () => {
+  it("starts a fresh empty thread after bootstrap hydration fails to reopen the latest thread", async () => {
     mocks.loadCompanionChatThreadMessages.mockRejectedValueOnce(new Error("network hiccup"));
 
     const { result } = renderJourneysThreads();
@@ -352,7 +409,6 @@ describe("useJourneysCompanionThreads", () => {
 
     expect(mocks.resetConversationThread).toHaveBeenLastCalledWith({
       sessionId: "fresh-session-2",
-      greetingText: seededFreshThreadGreeting,
     });
     expect(result.current.activeThread?.sessionId).toBe("fresh-session-2");
   });
@@ -417,7 +473,6 @@ describe("useJourneysCompanionThreads", () => {
     expect(mocks.setCompanionChatThreadArchived).toHaveBeenCalledWith("active-session-1", true);
     expect(mocks.resetConversationThread).toHaveBeenLastCalledWith({
       sessionId: "fresh-session-2",
-      greetingText: seededFreshThreadGreeting,
     });
     expect(mocks.resetPlannerThread).toHaveBeenLastCalledWith({
       sessionId: "fresh-session-2",
@@ -527,7 +582,6 @@ describe("useJourneysCompanionThreads", () => {
     expect(mocks.setCompanionChatThreadArchived).not.toHaveBeenCalled();
     expect(mocks.resetConversationThread).toHaveBeenLastCalledWith({
       sessionId: "fresh-session-2",
-      greetingText: seededFreshThreadGreeting,
     });
     expect(mocks.resetPlannerThread).toHaveBeenLastCalledWith({
       sessionId: "fresh-session-2",

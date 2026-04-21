@@ -54,7 +54,6 @@ import {
   getCompanionChatThreadsQueryKey,
   persistCompanionThreadMessages,
 } from "@/services/companionChatThreads";
-import { getCompanionPlannerOpener } from "@/shared/companionPlannerCopy";
 import { LOCKED_COMPANION_TONE_PACK } from "@/shared/companionChaosVoice";
 import {
   buildConfirmReadyPlannerReply,
@@ -973,7 +972,6 @@ const normalizePlannerResponse = (
 };
 
 interface UseCompanionPlannerOptions {
-  bootstrapGreeting?: boolean;
   threadPersistence?: {
     enabled?: boolean;
     surface?: CompanionChatSurface;
@@ -981,7 +979,6 @@ interface UseCompanionPlannerOptions {
 }
 
 export function useCompanionPlanner({
-  bootstrapGreeting = true,
   threadPersistence,
 }: UseCompanionPlannerOptions = {}) {
   const { user } = useAuth();
@@ -996,10 +993,6 @@ export function useCompanionPlanner({
   });
   const today = new Date();
   const todayIso = format(today, "yyyy-MM-dd");
-  const plannerGreeting = useMemo(
-    () => getCompanionPlannerOpener({ userId: user?.id ?? null }),
-    [user?.id],
-  );
   const todayTasksQuery = useTasksQuery(today);
   const weekTasksQuery = useCalendarTasks(today, "week");
   const monthTasksQuery = useCalendarTasks(today, "month");
@@ -1045,7 +1038,6 @@ export function useCompanionPlanner({
   const [plannerMemoryOverride, setPlannerMemoryOverride] = useState<
     Partial<PlannerMemoryProfile> | null
   >(null);
-  const bootstrappedGreetingRef = useRef(false);
   const lastSubmissionContextRef = useRef<PlannerSubmissionContext>({
     starterIntent: null,
     briefingContext: null,
@@ -1620,20 +1612,6 @@ export function useCompanionPlanner({
     plannerSyncRange.startDate,
     syncPlanningContext,
   ]);
-
-  useEffect(() => {
-    if (!bootstrapGreeting) return;
-    if (bootstrappedGreetingRef.current) return;
-    if (!plannerGreeting) return;
-
-    bootstrappedGreetingRef.current = true;
-    setMessages([
-      createMessage("companion", plannerGreeting, {
-        questions: [],
-        proposalIds: [],
-      }),
-    ]);
-  }, [bootstrapGreeting, plannerGreeting]);
 
   useEffect(() => {
     writeStoredPreferences({
@@ -2694,16 +2672,7 @@ export function useCompanionPlanner({
   const resetThread = useCallback((options?: { sessionId?: string }) => {
     sessionIdRef.current = options?.sessionId ??
       generateCompanionThreadSessionId();
-    setMessages(
-      bootstrapGreeting && plannerGreeting
-        ? [
-          createMessage("companion", plannerGreeting, {
-            questions: [],
-            proposalIds: [],
-          }),
-        ]
-        : [],
-    );
+    setMessages([]);
     setProposals([]);
     setQuestions([]);
     setSessionState(createInitialSessionState(storedPreferences));
@@ -2713,7 +2682,7 @@ export function useCompanionPlanner({
     setIsRequestingPermission(false);
     setIsSubmitting(false);
     setPlannerMemoryOverride(null);
-  }, [bootstrapGreeting, plannerGreeting, storedPreferences]);
+  }, [storedPreferences]);
 
   const hydrateThread = useCallback((options: {
     sessionId: string;
@@ -2739,7 +2708,6 @@ export function useCompanionPlanner({
   }, [storedPreferences]);
 
   return {
-    greeting: plannerGreeting,
     sessionId: sessionIdRef.current,
     currentDate: todayIso,
     tonePack,

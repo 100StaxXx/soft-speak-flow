@@ -8,10 +8,6 @@ import { useVoiceInput } from "@/hooks/useVoiceInput";
 import { supabase } from "@/integrations/supabase/client";
 import { stripMarkdown } from "@/lib/utils";
 import { getCompanionChatThreadsQueryKey } from "@/services/companionChatThreads";
-import {
-  COMPANION_PLANNER_OPENER_TEMPLATES,
-  getCompanionPlannerOpener,
-} from "@/shared/companionPlannerCopy";
 import type {
   CompanionChatJourneysContext,
   CompanionChatInputMode,
@@ -23,15 +19,12 @@ import { resolveCompanionChatError } from "@/utils/companionChatErrors";
 
 const MAX_HISTORY_MESSAGES = 8;
 
-export const JOURNEYS_COMPANION_OPENERS = COMPANION_PLANNER_OPENER_TEMPLATES;
-
 type JourneysCompanionMessage = {
   id: string;
   role: "assistant" | "user";
   content: string;
   createdAt: string;
   speechText?: string;
-  isSeed?: boolean;
   inputMode?: CompanionChatInputMode;
 };
 
@@ -55,19 +48,12 @@ const createMessage = (
   ...extras,
 });
 
-const createSeedAssistantMessage = (content: string) =>
-  createMessage("assistant", content, { isSeed: true });
-
 export function useJourneysCompanionConversation() {
   const { user } = useAuth();
   const { companion } = useCompanion();
   const { trackInteraction } = useAIInteractionTracker();
   const queryClient = useQueryClient();
   const sessionIdRef = useRef<string>(generateId());
-  const greeting = useMemo(
-    () => getCompanionPlannerOpener({ userId: user?.id ?? null }),
-    [user?.id],
-  );
 
   const [messages, setMessages] = useState<JourneysCompanionMessage[]>([]);
   const [draftInput, setDraftInput] = useState("");
@@ -82,7 +68,6 @@ export function useJourneysCompanionConversation() {
   const conversationHistory = useMemo(
     () =>
       messages
-        .filter((message) => !message.isSeed)
         .slice(-MAX_HISTORY_MESSAGES)
         .map((message) => ({
           role: message.role,
@@ -99,15 +84,7 @@ export function useJourneysCompanionConversation() {
     const trimmedContent = content.trim();
     if (!trimmedContent) return;
 
-    setMessages((previous) => {
-      const hasRealMessages = previous.some((message) => !message.isSeed);
-
-      if (!hasRealMessages) {
-        return [createSeedAssistantMessage(trimmedContent)];
-      }
-
-      return [...previous, createMessage("assistant", trimmedContent)];
-    });
+    setMessages((previous) => [...previous, createMessage("assistant", trimmedContent)]);
     setPendingPlannerHandoffMessage(null);
     setDraftInput("");
     setInterimText("");
@@ -115,11 +92,9 @@ export function useJourneysCompanionConversation() {
 
   const resetThread = useCallback((options?: {
     sessionId?: string;
-    greetingText?: string;
   }) => {
-    const greetingText = options?.greetingText?.trim();
     sessionIdRef.current = options?.sessionId ?? generateId();
-    setMessages(greetingText ? [createSeedAssistantMessage(greetingText)] : []);
+    setMessages([]);
     setDraftInput("");
     setInterimText("");
     setShowPermissionDialog(false);
@@ -274,10 +249,9 @@ export function useJourneysCompanionConversation() {
   }, [requestPermission, toggleRecording]);
 
   return {
-    greeting,
     sessionId: sessionIdRef.current,
     messages,
-    hasRealMessages: messages.some((message) => !message.isSeed),
+    hasRealMessages: messages.length > 0,
     draftInput,
     setDraftInput,
     interimText,

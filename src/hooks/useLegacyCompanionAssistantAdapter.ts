@@ -5,7 +5,6 @@ import { parseNaturalLanguage } from "@/features/tasks/hooks/useNaturalLanguageP
 import { useAuth } from "@/hooks/useAuth";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionChat } from "@/hooks/useCompanionChat";
-import { useCompanionDialogue } from "@/hooks/useCompanionDialogue";
 import { useCompanionPlanner } from "@/hooks/useCompanionPlanner";
 import { useJourneysCompanionConversation } from "@/hooks/useJourneysCompanionConversation";
 import { useJourneysCompanionThreads } from "@/hooks/useJourneysCompanionThreads";
@@ -165,13 +164,11 @@ export function useLegacyCompanionAssistantAdapter({
 }: UseLegacyCompanionAssistantAdapterOptions) {
   const { user } = useAuth();
   const { companion } = useCompanion();
-  const { greeting } = useCompanionDialogue();
   const companionChat = useCompanionChat({
     enabled: enabled && surface === "companion" && conversationEnabled,
   });
   const journeysConversation = useJourneysCompanionConversation();
   const planner = useCompanionPlanner({
-    bootstrapGreeting: false,
     threadPersistence: surface === "journeys"
       ? {
         enabled: true,
@@ -297,9 +294,6 @@ export function useLegacyCompanionAssistantAdapter({
   ]);
 
   return {
-    greeting: surface === "journeys"
-      ? journeysConversation.greeting
-      : companionChat.greeting ?? greeting,
     messages,
     pendingAction,
     placeholder,

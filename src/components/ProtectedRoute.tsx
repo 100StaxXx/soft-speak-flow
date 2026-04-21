@@ -14,7 +14,7 @@ interface ProtectedRouteProps {
 export const ProtectedRoute = ({
   children,
   requireMentor: _requireMentor = true,
-  requireAccess = true,
+  requireAccess = false,
 }: ProtectedRouteProps) => {
   const { user, loading: authLoading, status } = useAuth();
   const { hasAccess, gateReason, loading: accessLoading } = useAccessStatus();
