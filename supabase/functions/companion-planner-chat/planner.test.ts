@@ -371,6 +371,64 @@ Deno.test("calls out saved calendar conflicts for scheduled quest drafts", () =>
   assertStringIncludes(result.reply, "4:00 pm");
 });
 
+Deno.test("calls out saved calendar conflicts for explicit future drafts using the user's offset", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Workout on April 23, 2026 at 6:00 pm",
+    currentDate: "2026-04-20",
+    currentDateTime: "2026-04-20T08:37:00-07:00",
+    horizon: "week",
+    parsedInput: {
+      text: "workout",
+      scheduledTime: "18:00",
+      scheduledDate: "2026-04-23",
+      estimatedDuration: 45,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: "body",
+      newTitle: null,
+    },
+    plannerContext: {
+      tasks: [],
+      inboxTasks: [],
+      activeEpics: [],
+      rituals: [],
+      calendarEvents: [{
+        id: "event-1",
+        title: "Dinner Reservation",
+        start: "2026-04-23T18:15:00-07:00",
+        end: "2026-04-23T19:00:00-07:00",
+        isAllDay: false,
+        provider: "google",
+        readOnly: true,
+      }],
+      scheduleInsights: {
+        horizon: "week",
+        selectedDate: "2026-04-23",
+        dayLoads: [{
+          date: "2026-04-23",
+          totalMinutes: 240,
+          taskCount: 4,
+          status: "busy",
+        }],
+        overloadedDates: [],
+        emptyDates: [],
+        conflicts: [],
+        suggestedSlots: [],
+        moveSuggestions: [],
+        summary: "Thursday is fairly busy.",
+      },
+    },
+  }));
+
+  assertEquals(result.proposals[0].title, "Create Workout");
+  assertStringIncludes(result.reply, 'saved calendar event "Dinner Reservation"');
+  assertStringIncludes(result.reply, "6:15 pm-7:00 pm");
+});
+
 Deno.test("treats a simple timed utterance as a ready-to-confirm quest draft", () => {
   const result = buildPlannerResponse(baseInput({
     message: "gym at 5pm tomorrow",

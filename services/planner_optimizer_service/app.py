@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, Optional, Tuple
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
@@ -34,37 +34,37 @@ except ImportError as exc:  # pragma: no cover - deployment dependency
 
 
 class TimingPreference(BaseModel):
-    label: Literal["morning", "afternoon", "evening", "later", "tonight", "after_work"] | None = None
-    earliest_start: str | None = None
-    latest_end: str | None = None
+    label: Optional[Literal["morning", "afternoon", "evening", "later", "tonight", "after_work"]] = None
+    earliest_start: Optional[str] = None
+    latest_end: Optional[str] = None
 
 
 class TaskToSchedule(BaseModel):
     id: str
     title: str
-    category: str | None = None
+    category: Optional[str] = None
     duration_min: int = Field(gt=0)
-    timing_preference: TimingPreference | None = None
-    energy_type: Literal["deep", "admin", "physical", "errand", "social"] | None = None
+    timing_preference: Optional[TimingPreference] = None
+    energy_type: Optional[Literal["deep", "admin", "physical", "errand", "social"]] = None
     priority: int = Field(default=1, ge=1, le=5)
     confidence: float = Field(ge=0.0, le=1.0)
-    derived_from_message: str | None = None
-    notes: str | None = None
+    derived_from_message: Optional[str] = None
+    notes: Optional[str] = None
 
 
 class ExistingTask(BaseModel):
     id: str
     start: str
     end: str
-    status: str | None = None
+    status: Optional[str] = None
 
 
 class CalendarEvent(BaseModel):
     id: str
-    title: str | None = None
+    title: Optional[str] = None
     start: str
     end: str
-    source: Literal["google", "outlook", "internal"] | None = None
+    source: Optional[Literal["google", "outlook", "internal"]] = None
     hard_block: bool = True
 
 
@@ -72,7 +72,7 @@ class Habit(BaseModel):
     id: str
     title: str
     preferred_windows: list[str] = Field(default_factory=list)
-    duration_min: int | None = None
+    duration_min: Optional[int] = None
 
 
 class WorkHours(BaseModel):
@@ -81,9 +81,9 @@ class WorkHours(BaseModel):
 
 
 class PlannerMemory(BaseModel):
-    wake_time: str | None = None
-    wind_down_time: str | None = None
-    work_hours: WorkHours | None = None
+    wake_time: Optional[str] = None
+    wind_down_time: Optional[str] = None
+    work_hours: Optional[WorkHours] = None
     preferred_workout_windows: list[str] = Field(default_factory=list)
     preferred_deep_work_windows: list[str] = Field(default_factory=list)
 
@@ -104,8 +104,8 @@ class PlanningWindow(BaseModel):
 class Constraints(BaseModel):
     slot_granularity_min: int = Field(gt=0)
     min_buffer_min: int = Field(ge=0)
-    max_scheduled_minutes_per_day: int | None = None
-    max_deep_work_blocks_per_day: int | None = None
+    max_scheduled_minutes_per_day: Optional[int] = None
+    max_deep_work_blocks_per_day: Optional[int] = None
     suggested_slots: list[SuggestedSlot] = Field(default_factory=list)
 
 
@@ -125,15 +125,15 @@ class OptimizerRequest(BaseModel):
 class DraftResponse(BaseModel):
     task_id: str
     title: str
-    start: str | None = None
-    end: str | None = None
+    start: Optional[str] = None
+    end: Optional[str] = None
     status: Literal["scheduled_draft", "needs_scheduling", "tentative_time"]
-    slot_score: int | None = None
+    slot_score: Optional[int] = None
     hard_conflict: bool
     soft_conflicts: list[str]
     reason_codes: list[str]
     reason_summary: str
-    fallback_to_inbox: bool | None = None
+    fallback_to_inbox: Optional[bool] = None
 
 
 class UnscheduledResponse(BaseModel):
@@ -197,7 +197,7 @@ def build_iso(date_key: str, minutes: int, offset: str) -> str:
     return f"{date_key}T{format_clock(minutes)}:00{offset}"
 
 
-def parse_date_key(date_key: str) -> tuple[int, int, int]:
+def parse_date_key(date_key: str) -> Tuple[int, int, int]:
     year, month, day = date_key.split("-")
     return int(year), int(month), int(day)
 
@@ -221,7 +221,7 @@ def list_date_keys(start_date_key: str, end_date_key: str) -> list[str]:
     return [add_days(start_date_key, index) for index in range(date_diff(start_date_key, end_date_key) + 1)]
 
 
-def get_daily_window(start_value: str, end_value: str, target_date: str) -> tuple[int, int] | None:
+def get_daily_window(start_value: str, end_value: str, target_date: str) -> Optional[Tuple[int, int]]:
     start_date = extract_date(start_value)
     end_date = extract_date(end_value)
     if target_date < start_date or target_date > end_date:
@@ -242,8 +242,8 @@ def get_daily_window(start_value: str, end_value: str, target_date: str) -> tupl
     return 0, 24 * 60
 
 
-def blocked_intervals(request: OptimizerRequest, target_date: str) -> list[tuple[int, int]]:
-    blocked: list[tuple[int, int]] = []
+def blocked_intervals(request: OptimizerRequest, target_date: str) -> list[Tuple[int, int]]:
+    blocked: list[Tuple[int, int]] = []
     for task in request.existing_tasks:
         window = get_daily_window(task.start, task.end, target_date)
         if window:
@@ -256,7 +256,7 @@ def blocked_intervals(request: OptimizerRequest, target_date: str) -> list[tuple
             blocked.append(window)
 
     blocked.sort(key=lambda interval: interval[0])
-    merged: list[tuple[int, int]] = []
+    merged: list[Tuple[int, int]] = []
     for start, end in blocked:
         if not merged or start > merged[-1][1]:
             merged.append((start, end))
@@ -265,12 +265,12 @@ def blocked_intervals(request: OptimizerRequest, target_date: str) -> list[tuple
     return merged
 
 
-def build_free_windows(request: OptimizerRequest, target_date: str) -> list[tuple[int, int]]:
+def build_free_windows(request: OptimizerRequest, target_date: str) -> list[Tuple[int, int]]:
     wake = parse_clock(request.planner_memory.wake_time or "08:00")
     wind_down = parse_clock(request.planner_memory.wind_down_time or "21:00")
     step = request.constraints.slot_granularity_min
     blocked = blocked_intervals(request, target_date)
-    free: list[tuple[int, int]] = []
+    free: list[Tuple[int, int]] = []
     cursor = wake
 
     for block_start, block_end in blocked:
@@ -290,7 +290,7 @@ def build_free_windows(request: OptimizerRequest, target_date: str) -> list[tupl
     ]
 
 
-def preferred_range(request: OptimizerRequest, task: TaskToSchedule) -> tuple[int, int] | None:
+def preferred_range(request: OptimizerRequest, task: TaskToSchedule) -> Optional[Tuple[int, int]]:
     label = task.timing_preference.label if task.timing_preference else None
     work_end = parse_clock(request.planner_memory.work_hours.end) if request.planner_memory.work_hours else 17 * 60
     if label == "morning":
@@ -308,7 +308,7 @@ def preferred_range(request: OptimizerRequest, task: TaskToSchedule) -> tuple[in
     return None
 
 
-def energy_window(request: OptimizerRequest, task: TaskToSchedule) -> tuple[int, int] | None:
+def energy_window(request: OptimizerRequest, task: TaskToSchedule) -> Optional[Tuple[int, int]]:
     windows: list[str] = []
     if task.energy_type == "physical":
         windows = request.planner_memory.preferred_workout_windows
@@ -320,8 +320,8 @@ def energy_window(request: OptimizerRequest, task: TaskToSchedule) -> tuple[int,
     return parse_clock(start), parse_clock(end)
 
 
-def suggested_windows(request: OptimizerRequest, target_date: str) -> list[tuple[int, int]]:
-    windows: list[tuple[int, int]] = []
+def suggested_windows(request: OptimizerRequest, target_date: str) -> list[Tuple[int, int]]:
+    windows: list[Tuple[int, int]] = []
     for slot in request.constraints.suggested_slots:
         if slot.date != target_date:
             continue
@@ -341,7 +341,7 @@ def adjusted_duration(request: OptimizerRequest, task: TaskToSchedule) -> int:
 def build_candidate_starts(
     request: OptimizerRequest,
     target_date: str,
-    free_windows: list[tuple[int, int]],
+    free_windows: list[Tuple[int, int]],
     task: TaskToSchedule,
     duration: int,
 ) -> list[int]:
@@ -415,7 +415,7 @@ def get_existing_deep_blocks(_request: OptimizerRequest, _target_date: str) -> i
     return 0
 
 
-def overlaps_window(start: int, end: int, window: tuple[int, int] | None) -> bool:
+def overlaps_window(start: int, end: int, window: Optional[Tuple[int, int]]) -> bool:
     return bool(window) and start >= window[0] and end <= window[1]
 
 
@@ -439,7 +439,7 @@ def score_candidate(
     day_index: int,
     start: int,
     duration: int,
-    free_windows: list[tuple[int, int]],
+    free_windows: list[Tuple[int, int]],
 ) -> SlotCandidate:
     policy = load_policy()
     end = start + duration
@@ -453,6 +453,7 @@ def score_candidate(
     existing_minutes = get_existing_scheduled_minutes(request, target_date)
     existing_deep_blocks = get_existing_deep_blocks(request, target_date)
     wind_down = parse_clock(request.planner_memory.wind_down_time or "21:00")
+    step = request.constraints.slot_granularity_min
 
     if overlaps_window(start, end, preferred):
         score += policy["preferred_window_bonus"]
@@ -523,7 +524,6 @@ def score_candidate(
 
     status = get_draft_status(score, request.scheduling_mode)
     reason_summary = build_reason_summary(status, reason_codes, soft_conflicts)
-    step = request.constraints.slot_granularity_min
 
     return SlotCandidate(
         task_id=task.id,
@@ -547,7 +547,7 @@ def explicit_candidate(
     task: TaskToSchedule,
     target_date: str,
     day_index: int,
-) -> SlotCandidate | None:
+) -> Optional[SlotCandidate]:
     if not task.timing_preference or not task.timing_preference.earliest_start or not task.timing_preference.latest_end:
         return None
     if extract_date(task.timing_preference.earliest_start) != target_date:
@@ -702,7 +702,7 @@ def optimize_schedule(request: OptimizerRequest) -> OptimizerResponse:
     unscheduled_tasks: list[UnscheduledResponse] = []
 
     for task in request.tasks_to_schedule:
-        selected_candidate: SlotCandidate | None = None
+        selected_candidate: Optional[SlotCandidate] = None
         for var, candidate in assignment_vars[task.id]:
             if solver.Value(var):
                 selected_candidate = candidate

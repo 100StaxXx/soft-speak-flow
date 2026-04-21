@@ -603,12 +603,22 @@ const extractOptimizerTelemetry = (
   const fallbackToInbox = typeof payload.fallbackToInbox === "boolean"
     ? payload.fallbackToInbox
     : null;
-  const optimizerSource = typeof payload.source === "string"
+  const optimizerSource = typeof payload.optimizerSource === "string"
+    ? payload.optimizerSource
+    : typeof payload.source === "string"
     ? payload.source
+    : null;
+  const optimizerMode = typeof payload.optimizerMode === "string"
+    ? payload.optimizerMode
+    : null;
+  const usedFallback = typeof payload.usedFallback === "boolean"
+    ? payload.usedFallback
     : null;
 
   return {
     ...(optimizerSource ? { optimizerSource } : {}),
+    ...(optimizerMode ? { optimizerMode } : {}),
+    ...(typeof usedFallback === "boolean" ? { usedFallback } : {}),
     ...(draftStatus ? { draftStatus } : {}),
     ...(schedulingConfidence ? { schedulingConfidence } : {}),
     ...(typeof slotScore === "number" ? { slotScore } : {}),
@@ -617,6 +627,54 @@ const extractOptimizerTelemetry = (
     ...(softConflicts.length > 0 ? { softConflicts } : {}),
     ...(typeof hardConflict === "boolean" ? { hardConflict } : {}),
     ...(typeof fallbackToInbox === "boolean" ? { fallbackToInbox } : {}),
+  };
+};
+
+const summarizeProposalGenerationTelemetry = (
+  proposals: CompanionPlannerProposal[],
+  horizon: PlannerHorizon,
+): Record<string, unknown> => {
+  const optimizerTelemetry = proposals
+    .map((proposal) => extractOptimizerTelemetry(proposal))
+    .filter((telemetry) => Object.keys(telemetry).length > 0);
+
+  if (optimizerTelemetry.length === 0) {
+    return {};
+  }
+
+  const optimizerSources = [
+    ...new Set(
+      optimizerTelemetry
+        .map((telemetry) => typeof telemetry.optimizerSource === "string"
+          ? telemetry.optimizerSource
+          : null)
+        .filter((source): source is string => Boolean(source)),
+    ),
+  ];
+  const optimizerModes = [
+    ...new Set(
+      optimizerTelemetry
+        .map((telemetry) => typeof telemetry.optimizerMode === "string"
+          ? telemetry.optimizerMode
+          : null)
+        .filter((mode): mode is string => Boolean(mode)),
+    ),
+  ];
+  const usedFallback = optimizerTelemetry.some((telemetry) =>
+    telemetry.usedFallback === true
+  );
+  const fallbackProposalCount = optimizerTelemetry.filter((telemetry) =>
+    telemetry.fallbackToInbox === true
+  ).length;
+
+  return {
+    optimizerProposalCount: optimizerTelemetry.length,
+    optimizerSources,
+    optimizerModes: optimizerModes.length > 0 ? optimizerModes : [
+      horizon === "week" ? "week" : "day",
+    ],
+    usedFallback,
+    fallbackProposalCount,
   };
 };
 
@@ -1964,6 +2022,10 @@ export function useCompanionPlanner({
           proposalKinds: response.proposals.map((proposal) => proposal.kind),
         },
         userAction: "accepted",
+        modifications: summarizeProposalGenerationTelemetry(
+          response.proposals,
+          horizon,
+        ),
       });
     } catch (error) {
       console.error("Failed to submit planner message:", error);

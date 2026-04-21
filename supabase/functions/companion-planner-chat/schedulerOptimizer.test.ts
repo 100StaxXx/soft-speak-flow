@@ -137,6 +137,9 @@ const basePlannerResult = (): PlannerBuildResult => ({
         scheduledTime: "17:30",
         estimatedDuration: 60,
         source: "optimizer",
+        optimizerSource: "local",
+        optimizerMode: "day",
+        usedFallback: true,
         slotScore: 70,
         reasonCodes: ["after_work_window"],
         reasonSummary:
@@ -344,6 +347,9 @@ Deno.test("remote optimizer success overwrites local optimizer metadata", async 
   assertEquals(payload.scheduledTime, "18:15");
   assertEquals(payload.taskDate, "2026-04-21");
   assertEquals(payload.draftStatus, "tentative_time");
+  assertEquals(payload.optimizerSource, "remote");
+  assertEquals(payload.optimizerMode, "day");
+  assertEquals(payload.usedFallback, false);
   assertEquals(
     payload.reasonSummary,
     "Scheduled after work to match your availability. It uses a tighter gap than ideal. consider moving it earlier if the day tightens.",
@@ -363,6 +369,9 @@ Deno.test("remote optimizer failure preserves local proposals unchanged", async 
 
   const payload = result.proposals[0]?.payload as Record<string, unknown>;
   assertEquals(payload.scheduledTime, "17:30");
+  assertEquals(payload.optimizerSource, "local");
+  assertEquals(payload.optimizerMode, "day");
+  assertEquals(payload.usedFallback, true);
   assertEquals(
     payload.reasonSummary,
     "Scheduled after work to match your availability. and keeps this moving today.",

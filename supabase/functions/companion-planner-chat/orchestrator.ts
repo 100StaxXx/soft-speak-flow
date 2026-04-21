@@ -306,6 +306,18 @@ const hasReadyQuestProposalResponse = (
   baseResult: PlannerBuildResult,
 ) => baseResult.mode === "proposal" && getReadyQuestProposalDrafts(baseResult).length > 0;
 
+const extractPreservedProposalReplyNotes = (
+  reply: string,
+): string[] =>
+  reply
+    .split(/\n{2,}/)
+    .map((segment) => segment.trim())
+    .filter((segment) => segment.length > 0)
+    .filter((segment) =>
+      /saved calendar event/i.test(segment) ||
+      /external calendar events are read-only/i.test(segment)
+    );
+
 export const sanitizeReadyQuestProposalResponse = (
   baseResult: PlannerBuildResult,
 ): PlannerBuildResult => {
@@ -317,11 +329,15 @@ export const sanitizeReadyQuestProposalResponse = (
   const shouldReplaceReply = baseResult.followUpQuestions.length > 0 ||
     baseResult.sessionState.openQuestionIds.length > 0 ||
     isQuestionLikePlannerReply(baseResult.reply);
+  const preservedNotes = extractPreservedProposalReplyNotes(baseResult.reply);
 
   return normalizePlannerBuildResultText({
     ...baseResult,
     reply: shouldReplaceReply
-      ? buildConfirmReadyPlannerReply(readyQuestProposals[0]?.kind ?? "")
+      ? [
+        buildConfirmReadyPlannerReply(readyQuestProposals[0]?.kind ?? ""),
+        ...preservedNotes,
+      ].join("\n\n")
       : baseResult.reply,
     followUpQuestions: [],
     sessionState: {

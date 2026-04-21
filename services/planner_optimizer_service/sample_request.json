@@ -1,0 +1,98 @@
+{
+  "current_datetime": "2026-04-20T15:50:00-07:00",
+  "timezone": "America/Los_Angeles",
+  "scheduling_mode": "aggressive",
+  "planning_window": {
+    "start_date": "2026-04-20",
+    "end_date": "2026-04-21"
+  },
+  "tasks_to_schedule": [
+    {
+      "id": "clean-house",
+      "title": "Clean The House",
+      "category": "home",
+      "duration_min": 60,
+      "timing_preference": {
+        "label": "after_work"
+      },
+      "energy_type": "physical",
+      "priority": 5,
+      "confidence": 0.92,
+      "derived_from_message": "clean the house later"
+    },
+    {
+      "id": "work-app",
+      "title": "Work On The App",
+      "category": "work",
+      "duration_min": 90,
+      "timing_preference": {
+        "label": "later"
+      },
+      "energy_type": "deep",
+      "priority": 4,
+      "confidence": 0.88,
+      "derived_from_message": "work on the app later"
+    },
+    {
+      "id": "workout",
+      "title": "Workout",
+      "category": "body",
+      "duration_min": 45,
+      "timing_preference": {
+        "label": "after_work"
+      },
+      "energy_type": "physical",
+      "priority": 3,
+      "confidence": 0.9,
+      "derived_from_message": "workout later"
+    }
+  ],
+  "existing_tasks": [],
+  "calendar_events": [
+    {
+      "id": "sales-meeting",
+      "title": "Sales Meeting",
+      "start": "2026-04-20T16:00:00-07:00",
+      "end": "2026-04-20T17:00:00-07:00",
+      "source": "google",
+      "hard_block": true
+    }
+  ],
+  "habits": [],
+  "planner_memory": {
+    "wake_time": "07:00",
+    "wind_down_time": "22:00",
+    "work_hours": {
+      "start": "09:00",
+      "end": "17:00"
+    },
+    "preferred_workout_windows": [
+      "17:30-19:00"
+    ],
+    "preferred_deep_work_windows": [
+      "09:00-11:00"
+    ]
+  },
+  "constraints": {
+    "slot_granularity_min": 15,
+    "min_buffer_min": 15,
+    "max_scheduled_minutes_per_day": 180,
+    "max_deep_work_blocks_per_day": 2,
+    "suggested_slots": [
+      {
+        "date": "2026-04-20",
+        "time": "17:15",
+        "end_time": "18:15",
+        "score": 88,
+        "reason": "Strong after-work opening"
+      },
+      {
+        "date": "2026-04-21",
+        "time": "18:00",
+        "end_time": "20:00",
+        "score": 80,
+        "reason": "Backup evening window"
+      }
+    ]
+  }
+}

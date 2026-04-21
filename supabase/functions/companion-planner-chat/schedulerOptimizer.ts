@@ -1145,6 +1145,8 @@ const applyRemoteDraftToProposal = (
       ...payload,
       taskDate: draft.fallback_to_inbox ? null : nextTaskDate,
       scheduledTime: draft.fallback_to_inbox ? null : nextScheduledTime,
+      optimizerSource: "remote",
+      usedFallback: false,
       slotScore: draft.slot_score,
       hardConflict: draft.hard_conflict,
       softConflicts: draft.soft_conflicts,

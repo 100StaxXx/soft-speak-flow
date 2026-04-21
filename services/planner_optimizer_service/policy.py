@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal, TypedDict
+from typing import Literal, Optional, TypedDict
 
 
 class PlannerScoringPolicy(TypedDict):
@@ -40,7 +40,7 @@ def load_policy() -> PlannerScoringPolicy:
         return json.load(handle)
 
 
-def clamp_priority(value: int | None) -> int:
+def clamp_priority(value: Optional[int]) -> int:
     normalized = round(value or 1)
     return max(1, min(5, normalized))
 

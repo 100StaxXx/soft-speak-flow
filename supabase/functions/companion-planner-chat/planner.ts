@@ -2178,9 +2178,10 @@ const findCalendarConflictForQuestDraft = (
   if (!taskDate || startMinutes === null) return null;
 
   const endMinutes = startMinutes + getDraftDurationMinutes(draft, matchedTask);
-  const dayStart = new Date(`${taskDate}T00:00:00`);
+  const offset = getDateTimeOffset(input.currentDateTime);
+  const dayStart = new Date(buildOffsetDateTime(taskDate, "00:00", offset));
   const nextDay = addDaysToDateKey(taskDate, 1);
-  const dayEnd = new Date(`${nextDay}T00:00:00`);
+  const dayEnd = new Date(buildOffsetDateTime(nextDay, "00:00", offset));
 
   for (const event of input.plannerContext.calendarEvents) {
     const start = new Date(event.start);
@@ -2199,9 +2200,14 @@ const findCalendarConflictForQuestDraft = (
 
     const localStart = start < dayStart ? dayStart : start;
     const localEnd = end > dayEnd ? dayEnd : end;
-    const eventStartMinutes = (localStart.getHours() * 60) +
-      localStart.getMinutes();
-    const eventEndMinutes = (localEnd.getHours() * 60) + localEnd.getMinutes();
+    const eventStartMinutes = Math.max(
+      0,
+      Math.round((localStart.getTime() - dayStart.getTime()) / 60000),
+    );
+    const eventEndMinutes = Math.min(
+      24 * 60,
+      Math.round((localEnd.getTime() - dayStart.getTime()) / 60000),
+    );
     if (eventEndMinutes <= startMinutes || eventStartMinutes >= endMinutes) {
       continue;
     }
@@ -4626,6 +4632,9 @@ const buildOptimizerQuestProposal = (
       category: candidate.category ?? undefined,
       notes: candidate.notes ?? undefined,
       source: "optimizer",
+      optimizerSource: "local",
+      optimizerMode: input.horizon === "week" ? "week" : "day",
+      usedFallback: true,
       questSource: fallbackToInbox ? "inbox" : "manual",
       slotScore: optimizerDraft?.slot_score ?? 0,
       reasonCodes: optimizerDraft?.reason_codes ?? [],

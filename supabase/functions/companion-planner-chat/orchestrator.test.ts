@@ -266,6 +266,46 @@ Deno.test("sanitizes leaked follow-up state when a ready quest proposal already 
   );
 });
 
+Deno.test("preserves calendar conflict notes when sanitizing ready quest proposals", () => {
+  const response = sanitizeReadyQuestProposalResponse({
+    ...baseResult("proposal"),
+    reply: [
+      "Just to check: Do you want to keep this time?",
+      'Heads up: this overlaps with your saved calendar event "Dinner Reservation" on Thursday from 6:15 pm-7:00 pm.',
+    ].join("\n\n"),
+    followUpQuestions: [{
+      id: "time_of_day",
+      prompt: "Do you want to keep this time?",
+      required: true,
+      field: "time_of_day",
+    }],
+    proposals: [{
+      id: "proposal-1",
+      kind: "create_quest",
+      title: "Create Workout",
+      summary: "Create Workout at 18:00.",
+      payload: { taskText: "Workout" },
+      status: "pending",
+      readyToConfirm: true,
+      missingFields: [],
+    }],
+    sessionState: {
+      ...baseResult("proposal").sessionState,
+      openQuestionIds: ["time_of_day"],
+    },
+  });
+
+  assertEquals(response.followUpQuestions, []);
+  assertEquals(response.sessionState.openQuestionIds, []);
+  assertEquals(
+    response.reply,
+    [
+      "I drafted this quest for you. Review it and confirm if it fits.",
+      'Heads up: this overlaps with your saved calendar event "Dinner Reservation" on Thursday from 6:15 pm-7:00 pm.',
+    ].join("\n\n"),
+  );
+});
+
 Deno.test("sends tone and availability grounding to the model for witty_sassy planner replies", async () => {
   const captured = {
     body: null as {

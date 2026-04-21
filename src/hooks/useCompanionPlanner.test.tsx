@@ -528,6 +528,118 @@ describe("useCompanionPlanner", () => {
     );
   });
 
+  it("tracks optimizer source, mode, and fallback telemetry when proposals are generated", async () => {
+    mocks.invoke.mockResolvedValue({
+      data: {
+        mode: "proposal",
+        reply: "I drafted three quests for you.",
+        followUpQuestions: [],
+        proposals: [
+          {
+            id: "proposal-1",
+            kind: "create_quest",
+            title: "Create Clean The House",
+            summary: "Create a quest for Clean The House.",
+            payload: {
+              taskText: "Clean The House",
+              source: "optimizer",
+              optimizerSource: "remote",
+              optimizerMode: "week",
+              usedFallback: false,
+              fallbackToInbox: false,
+              draftStatus: "scheduled_draft",
+              reasonSummary:
+                "Scheduled after work to match your availability. and keeps this moving today.",
+            },
+            status: "pending",
+            readyToConfirm: true,
+            missingFields: [],
+          },
+          {
+            id: "proposal-2",
+            kind: "create_quest",
+            title: "Create Workout",
+            summary: "Create a quest for Workout.",
+            payload: {
+              taskText: "Workout",
+              source: "optimizer",
+              optimizerSource: "remote",
+              optimizerMode: "week",
+              usedFallback: false,
+              fallbackToInbox: false,
+              draftStatus: "tentative_time",
+              reasonSummary:
+                "Scheduled after work to match your availability. consider moving it earlier if the day tightens.",
+            },
+            status: "pending",
+            readyToConfirm: true,
+            missingFields: [],
+          },
+          {
+            id: "proposal-3",
+            kind: "create_quest",
+            title: "Create Work On The App",
+            summary: "Create an inbox quest for Work On The App.",
+            payload: {
+              taskText: "Work On The App",
+              source: "optimizer",
+              optimizerSource: "local",
+              optimizerMode: "week",
+              usedFallback: true,
+              fallbackToInbox: true,
+              draftStatus: "needs_scheduling",
+              reasonSummary:
+                "I kept this as a draft because I couldn't find a clean slot yet. approve it later or place it manually.",
+            },
+            status: "pending",
+            readyToConfirm: true,
+            missingFields: [],
+          },
+        ],
+        suggestedReminders: [],
+        memoryUpdates: {},
+        sessionState: {
+          draft: {
+            title: "Workout",
+            draftKind: "create_quest",
+          },
+          openQuestionIds: [],
+          preferredTimeOfDay: null,
+          preferredTimeReason: null,
+          reminderPreference: null,
+          lastClassification: "quest",
+        },
+      },
+      error: null,
+    });
+
+    const { result } = renderHook(() =>
+      useCompanionPlanner({ bootstrapGreeting: false })
+    );
+
+    await act(async () => {
+      await result.current.setHorizon("week");
+      await result.current.submitMessage(
+        "Clean the house, work on the app, and workout later",
+        "text",
+      );
+    });
+
+    expect(mocks.trackInteraction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        interactionType: "companion_planner",
+        userAction: "accepted",
+        modifications: expect.objectContaining({
+          optimizerProposalCount: 3,
+          optimizerSources: ["remote", "local"],
+          optimizerModes: ["week"],
+          usedFallback: true,
+          fallbackProposalCount: 1,
+        }),
+      }),
+    );
+  });
+
   it("passes enriched quest notes and subtasks through create confirmations", async () => {
     mocks.invoke.mockResolvedValue({
       data: {
@@ -1558,6 +1670,9 @@ describe("useCompanionPlanner", () => {
               taskDate: "2026-04-18",
               scheduledTime: "17:30",
               source: "optimizer",
+              optimizerSource: "remote",
+              optimizerMode: "day",
+              usedFallback: false,
               draftStatus: "scheduled_draft",
               schedulingConfidence: "high",
               slotScore: 72,
@@ -1608,7 +1723,9 @@ describe("useCompanionPlanner", () => {
         modifications: expect.objectContaining({
           proposalId: "proposal-1",
           proposalKind: "create_quest",
-          optimizerSource: "optimizer",
+          optimizerSource: "remote",
+          optimizerMode: "day",
+          usedFallback: false,
           draftStatus: "scheduled_draft",
           schedulingConfidence: "high",
           slotScore: 72,
@@ -1638,6 +1755,9 @@ describe("useCompanionPlanner", () => {
             payload: {
               taskText: "Workout",
               source: "optimizer",
+              optimizerSource: "local",
+              optimizerMode: "day",
+              usedFallback: true,
               draftStatus: "needs_scheduling",
               schedulingConfidence: "low",
               slotScore: 0,
@@ -1689,7 +1809,9 @@ describe("useCompanionPlanner", () => {
           proposalId: "proposal-1",
           proposalKind: "create_quest",
           decisionOverride: true,
-          optimizerSource: "optimizer",
+          optimizerSource: "local",
+          optimizerMode: "day",
+          usedFallback: true,
           draftStatus: "needs_scheduling",
           schedulingConfidence: "low",
           slotScore: 0,
@@ -1720,6 +1842,9 @@ describe("useCompanionPlanner", () => {
             payload: {
               taskText: "Workout",
               source: "optimizer",
+              optimizerSource: "remote",
+              optimizerMode: "day",
+              usedFallback: false,
               draftStatus: "tentative_time",
               schedulingConfidence: "medium",
               slotScore: 44,
@@ -1774,7 +1899,9 @@ describe("useCompanionPlanner", () => {
           proposalKind: "create_quest",
           savedTitle: "Workout moved to tomorrow",
           editedExternally: true,
-          optimizerSource: "optimizer",
+          optimizerSource: "remote",
+          optimizerMode: "day",
+          usedFallback: false,
           draftStatus: "tentative_time",
           schedulingConfidence: "medium",
           slotScore: 44,

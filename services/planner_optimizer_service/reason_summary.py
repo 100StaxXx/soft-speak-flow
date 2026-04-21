@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import Literal, Optional, Set, Tuple
 
 
 PlannerDraftStatus = Literal["scheduled_draft", "needs_scheduling", "tentative_time"]
 
-PRIMARY_REASON_TEMPLATES: list[tuple[str, str]] = [
+PRIMARY_REASON_TEMPLATES: list[Tuple[str, str]] = [
     ("respects_user_requested_time", "Scheduled at the time you asked for."),
     ("after_work_window", "Scheduled after work to match your availability."),
     ("tonight_window", "Scheduled tonight to fit the time you named."),
@@ -25,7 +25,7 @@ PRIMARY_REASON_TEMPLATES: list[tuple[str, str]] = [
     ("needs_manual_scheduling", "I kept this as a draft because I couldn't find a clean slot yet."),
 ]
 
-SECONDARY_REASON_TEMPLATES: list[tuple[str, str]] = [
+SECONDARY_REASON_TEMPLATES: list[Tuple[str, str]] = [
     ("daily_load_cap_pressure", "The day is already carrying a lot."),
     ("outside_preferred_window", "It sits outside the ideal timing window."),
     ("misses_energy_window", "It misses your best energy window."),
@@ -45,9 +45,9 @@ STATUS_SUFFIX = {
 
 def _pick_summary(
     candidates: list[str],
-    templates: list[tuple[str, str]],
-    excluded: set[str] | None = None,
-) -> tuple[str | None, str | None]:
+    templates: list[Tuple[str, str]],
+    excluded: Optional[Set[str]] = None,
+) -> Tuple[Optional[str], Optional[str]]:
     excluded = excluded or set()
     for key, summary in templates:
         if key in excluded:

@@ -105,6 +105,16 @@ const buildQuestion = (input: {
   options: input.options,
 });
 
+const extractPreservedPlannerReplyNotes = (reply: string): string[] =>
+  reply
+    .split(/\n{2,}/)
+    .map((segment) => segment.trim())
+    .filter((segment) => segment.length > 0)
+    .filter((segment) =>
+      /saved calendar event/i.test(segment) ||
+      /external calendar events are read-only/i.test(segment)
+    );
+
 const getPrimaryProposal = (
   result: PlannerBuildResult,
 ): (PlannerProposal & { kind: QuestProposalKind }) | null => {
@@ -299,11 +309,12 @@ const buildQuestResponse = (
   const followUpQuestions = options.followUpQuestions ?? [];
   const missingFields = options.missingFields ?? [];
   const readyToConfirm = followUpQuestions.length === 0 && missingFields.length === 0;
+  const preservedNotes = extractPreservedPlannerReplyNotes(baseResult.reply);
 
   return {
     ...baseResult,
     mode: "proposal",
-    reply: options.reply,
+    reply: [options.reply, ...preservedNotes].filter(Boolean).join("\n\n"),
     followUpQuestions,
     proposals: [
       {
