@@ -46,6 +46,7 @@ export interface PlannerOptimizerExistingTask {
   id: string;
   start: string;
   end: string;
+  energy_type?: PlannerTaskEnergyType | null;
   status?: string | null;
 }
 

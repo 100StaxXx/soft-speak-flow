@@ -17,6 +17,7 @@ import type {
   PlannerOptimizerRequest,
   PlannerOptimizerResponse,
   PlannerOptimizerTaskToSchedule,
+  PlannerTaskEnergyType,
 } from "../../../src/shared/plannerOptimizer.ts";
 import type {
   PlannerBuildInput,
@@ -81,6 +82,64 @@ const getDateKey = (value: string): string => {
   const match = value.match(/^(\d{4}-\d{2}-\d{2})T/);
   return match?.[1] ?? value.slice(0, 10);
 };
+
+const normalizeCategoryValue = (value: unknown): string | null =>
+  typeof value === "string" && value.trim().length > 0
+    ? value.trim().toLowerCase()
+    : null;
+
+const PHYSICAL_TITLE_PATTERN =
+  /\b(workout|exercise|lift|run|walk|stretch|gym)\b/i;
+const ERRAND_TITLE_PATTERN =
+  /\b(clean|vacuum|laundry|dishes|organize|tidy|house)\b/i;
+const ADMIN_TITLE_PATTERN =
+  /\b(reply|email|pay|book|schedule|review|plan)\b/i;
+
+const inferPlannerEnergyType = (input: {
+  title: string;
+  category?: unknown;
+  contactId?: unknown;
+}): PlannerTaskEnergyType => {
+  if (typeof input.contactId === "string" && input.contactId.trim().length > 0) {
+    return "social";
+  }
+
+  const category = normalizeCategoryValue(input.category);
+  if (category === "social" || category === "relationship") {
+    return "social";
+  }
+  if (category === "body") {
+    return "physical";
+  }
+  if (category === "errand" || category === "errands" || category === "home") {
+    return "errand";
+  }
+  if (category === "admin") {
+    return "admin";
+  }
+
+  if (PHYSICAL_TITLE_PATTERN.test(input.title)) {
+    return "physical";
+  }
+  if (ERRAND_TITLE_PATTERN.test(input.title)) {
+    return "errand";
+  }
+  if (ADMIN_TITLE_PATTERN.test(input.title)) {
+    return "admin";
+  }
+
+  return "deep";
+};
+
+const getEstimatedDuration = (
+  payload: Record<string, unknown>,
+  fallbackMinutes: number,
+): number =>
+  typeof payload.estimatedDuration === "number" &&
+      Number.isFinite(payload.estimatedDuration) &&
+      payload.estimatedDuration > 0
+    ? payload.estimatedDuration
+    : fallbackMinutes;
 
 const minutesFromIso = (value: string): number | null => {
   const match = value.match(/T(\d{2}):(\d{2})/);
@@ -909,25 +968,31 @@ export const maybeRunRemotePlannerOptimizer = async (params: {
 
   const secret = params.optimizerSecret ??
     (Deno.env.get("PLANNER_OPTIMIZER_SECRET") ?? "");
-  const response = await params.fetchImpl(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(secret ? { Authorization: `Bearer ${secret}` } : {}),
-    },
-    body: JSON.stringify(params.request),
-  });
+  try {
+    const response = await params.fetchImpl(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(secret ? { Authorization: `Bearer ${secret}` } : {}),
+      },
+      body: JSON.stringify(params.request),
+      signal: AbortSignal.timeout(5000),
+    });
 
-  if (!response.ok) {
-    console.warn(
-      "[schedulerOptimizer] remote optimizer failed",
-      response.status,
-      await response.text(),
-    );
+    if (!response.ok) {
+      console.warn(
+        "[schedulerOptimizer] remote optimizer failed",
+        response.status,
+        await response.text(),
+      );
+      return null;
+    }
+
+    return await response.json() as PlannerOptimizerResponse;
+  } catch (error) {
+    console.warn("[schedulerOptimizer] remote optimizer request failed", error);
     return null;
   }
-
-  return await response.json() as PlannerOptimizerResponse;
 };
 
 const buildPlanningWindowForInput = (
@@ -983,6 +1048,13 @@ const toPlannerOptimizerRequest = (
     planningWindow.start_date,
     planningWindow.end_date,
   );
+  const maxScheduledMinutesPerDay = optimizerProposals.reduce(
+    (total, proposal) => {
+      const payload = proposal.payload as Record<string, unknown>;
+      return total + getEstimatedDuration(payload, 60);
+    },
+    0,
+  );
 
   const tasksToSchedule: PlannerOptimizerTaskToSchedule[] = optimizerProposals
     .map((proposal, index) => {
@@ -993,36 +1065,34 @@ const toPlannerOptimizerRequest = (
       const scheduledTime = typeof payload.scheduledTime === "string"
         ? payload.scheduledTime
         : null;
+      const durationMinutes = getEstimatedDuration(payload, 45);
+      const taskTitle = typeof payload.taskText === "string"
+        ? payload.taskText
+        : proposal.title;
       return {
         id: proposal.id,
-        title: typeof payload.taskText === "string"
-          ? payload.taskText
-          : proposal.title,
+        title: taskTitle,
         category: typeof payload.category === "string"
           ? payload.category
           : null,
-        duration_min: typeof payload.estimatedDuration === "number"
-          ? payload.estimatedDuration
-          : 45,
+        duration_min: durationMinutes,
         timing_preference: scheduledTime && taskDate
           ? {
             earliest_start: buildDateTime(taskDate, scheduledTime, offset),
             latest_end: buildDateTime(
               taskDate,
               formatClockMinutes(
-                (parseClockMinutes(scheduledTime) ?? 0) +
-                  (typeof payload.estimatedDuration === "number"
-                    ? payload.estimatedDuration
-                    : 45),
+                (parseClockMinutes(scheduledTime) ?? 0) + durationMinutes,
               ),
               offset,
             ),
           }
           : undefined,
-        energy_type:
-          typeof payload.category === "string" && payload.category === "body"
-            ? "physical"
-            : "deep",
+        energy_type: inferPlannerEnergyType({
+          title: taskTitle,
+          category: payload.category,
+          contactId: payload.contactId,
+        }),
         priority: normalizeBundlePriority(index),
         confidence: payload.schedulingConfidence === "low"
           ? 0.55
@@ -1064,6 +1134,11 @@ const toPlannerOptimizerRequest = (
             formatClockMinutes((parseClockMinutes(startTime) ?? 0) + duration),
             offset,
           ),
+          energy_type: inferPlannerEnergyType({
+            title: task.title,
+            category: task.category,
+            contactId: task.contactId,
+          }),
           status: task.completed === true ? "completed" : "active",
         };
       }),
@@ -1104,7 +1179,7 @@ const toPlannerOptimizerRequest = (
     constraints: {
       slot_granularity_min: 15,
       min_buffer_min: 15,
-      max_scheduled_minutes_per_day: optimizerProposals.length * 60,
+      max_scheduled_minutes_per_day: maxScheduledMinutesPerDay,
       max_deep_work_blocks_per_day: 2,
       suggested_slots: input.plannerContext.scheduleInsights?.suggestedSlots
         .filter((slot) => windowDates.includes(slot.date))
@@ -1146,7 +1221,7 @@ const applyRemoteDraftToProposal = (
       taskDate: draft.fallback_to_inbox ? null : nextTaskDate,
       scheduledTime: draft.fallback_to_inbox ? null : nextScheduledTime,
       optimizerSource: "remote",
-      usedFallback: false,
+      usedFallback: draft.fallback_to_inbox ?? false,
       slotScore: draft.slot_score,
       hardConflict: draft.hard_conflict,
       softConflicts: draft.soft_conflicts,

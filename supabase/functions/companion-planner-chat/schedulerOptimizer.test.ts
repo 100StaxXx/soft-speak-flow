@@ -1,4 +1,5 @@
 import {
+  assert,
   assertEquals,
   assertStringIncludes,
 } from "https://deno.land/std@0.224.0/assert/mod.ts";
@@ -162,6 +163,38 @@ const basePlannerResult = (): PlannerBuildResult => ({
     reminderPreference: null,
     lastClassification: null,
   },
+});
+
+const buildOptimizerProposal = (input: {
+  id: string;
+  title: string;
+  taskText?: string;
+  taskDate?: string | null;
+  scheduledTime?: string | null;
+  estimatedDuration?: number | null;
+  category?: string | null;
+  contactId?: string | null;
+}): PlannerBuildResult["proposals"][number] => ({
+  id: input.id,
+  kind: "create_quest",
+  title: input.title,
+  summary: `Create a quest for "${input.taskText ?? input.title}".`,
+  reasoning: null,
+  payload: {
+    taskText: input.taskText ?? input.title,
+    taskDate: input.taskDate ?? "2026-04-20",
+    scheduledTime: input.scheduledTime ?? "17:30",
+    estimatedDuration: input.estimatedDuration ?? 60,
+    category: input.category ?? null,
+    contactId: input.contactId ?? null,
+    source: "optimizer",
+    optimizerSource: "local",
+    optimizerMode: "day",
+    usedFallback: true,
+  },
+  status: "pending",
+  readyToConfirm: true,
+  missingFields: [],
 });
 
 Deno.test("planner scoring policy stays locked to the shared artifact", () => {
@@ -356,6 +389,44 @@ Deno.test("remote optimizer success overwrites local optimizer metadata", async 
   );
 });
 
+Deno.test("remote optimizer inbox fallbacks preserve fallback telemetry", async () => {
+  const result = await maybeApplyRemotePlannerOptimizer({
+    input: basePlannerInput(),
+    result: basePlannerResult(),
+    optimizerEnabled: true,
+    optimizerUrl: "https://optimizer.test/optimize",
+    optimizerSecret: "",
+    fetchImpl: async () =>
+      new Response(JSON.stringify({
+        drafts: [{
+          task_id: "proposal-1",
+          title: "Clean The House",
+          status: "needs_scheduling",
+          slot_score: 0,
+          hard_conflict: false,
+          soft_conflicts: ["no_safe_slot_found"],
+          reason_codes: ["needs_manual_scheduling"],
+          reason_summary:
+            "I kept this as a draft because I couldn't find a clean slot yet. approve it later or place it manually.",
+          fallback_to_inbox: true,
+        }],
+        unscheduled: [{
+          task_id: "proposal-1",
+          title: "Clean The House",
+          estimated_duration: 60,
+          reason_codes: ["needs_manual_scheduling"],
+        }],
+      })),
+  });
+
+  const payload = result.proposals[0]?.payload as Record<string, unknown>;
+  assertEquals(payload.taskDate, null);
+  assertEquals(payload.scheduledTime, null);
+  assertEquals(payload.optimizerSource, "remote");
+  assertEquals(payload.usedFallback, true);
+  assertEquals(payload.fallbackToInbox, true);
+});
+
 Deno.test("remote optimizer failure preserves local proposals unchanged", async () => {
   const original = basePlannerResult();
   const result = await maybeApplyRemotePlannerOptimizer({
@@ -375,5 +446,165 @@ Deno.test("remote optimizer failure preserves local proposals unchanged", async 
   assertEquals(
     payload.reasonSummary,
     "Scheduled after work to match your availability. and keeps this moving today.",
+  );
+});
+
+Deno.test("remote optimizer thrown fetch errors preserve local proposals unchanged", async () => {
+  const original = basePlannerResult();
+  const result = await maybeApplyRemotePlannerOptimizer({
+    input: basePlannerInput(),
+    result: original,
+    optimizerEnabled: true,
+    optimizerUrl: "https://optimizer.test/optimize",
+    optimizerSecret: "",
+    fetchImpl: async () => {
+      throw new Error("socket hang up");
+    },
+  });
+
+  const payload = result.proposals[0]?.payload as Record<string, unknown>;
+  assertEquals(payload.optimizerSource, "local");
+  assertEquals(payload.usedFallback, true);
+  assertEquals(payload.scheduledTime, "17:30");
+});
+
+Deno.test("remote optimizer request shaping uses actual durations and mapped energy types", async () => {
+  let capturedRequest: PlannerOptimizerRequest | null = null;
+  let capturedSignal: unknown = null;
+  const result: PlannerBuildResult = {
+    ...basePlannerResult(),
+    proposals: [
+      buildOptimizerProposal({
+        id: "proposal-physical",
+        title: "Create Workout",
+        taskText: "Workout",
+        estimatedDuration: 30,
+        category: "body",
+      }),
+      buildOptimizerProposal({
+        id: "proposal-errand",
+        title: "Create Clean The House",
+        taskText: "Clean The House",
+        estimatedDuration: 45,
+        category: "home",
+      }),
+      buildOptimizerProposal({
+        id: "proposal-admin",
+        title: "Create Reply To Email",
+        taskText: "Reply To Email",
+        estimatedDuration: 20,
+        category: null,
+      }),
+      buildOptimizerProposal({
+        id: "proposal-social",
+        title: "Create Reach Out To Maya",
+        taskText: "Reach Out To Maya",
+        estimatedDuration: 15,
+        contactId: "contact-123",
+      }),
+      buildOptimizerProposal({
+        id: "proposal-deep",
+        title: "Create Work On The App",
+        taskText: "Work On The App",
+        estimatedDuration: 120,
+        category: "work",
+      }),
+    ],
+  };
+  const input: PlannerBuildInput = {
+    ...basePlannerInput(),
+    plannerContext: {
+      ...basePlannerInput().plannerContext,
+      tasks: [
+        {
+          id: "task-physical",
+          title: "Gym Session",
+          taskDate: "2026-04-20",
+          category: "body",
+          scheduledTime: "08:00",
+          estimatedDuration: 45,
+          recurrencePattern: null,
+          completed: false,
+        },
+        {
+          id: "task-errand",
+          title: "Clean Kitchen",
+          taskDate: "2026-04-20",
+          category: "home",
+          scheduledTime: "10:00",
+          estimatedDuration: 30,
+          recurrencePattern: null,
+          completed: false,
+        },
+        {
+          id: "task-admin",
+          title: "Reply To Email",
+          taskDate: "2026-04-20",
+          category: null,
+          scheduledTime: "11:00",
+          estimatedDuration: 20,
+          recurrencePattern: null,
+          completed: false,
+        },
+      ],
+      inboxTasks: [
+        {
+          id: "task-social",
+          title: "Reach Out To Maya",
+          taskDate: "2026-04-20",
+          category: null,
+          scheduledTime: "13:00",
+          estimatedDuration: 15,
+          recurrencePattern: null,
+          completed: false,
+          contactId: "contact-123",
+        },
+        {
+          id: "task-deep",
+          title: "Work On The App",
+          taskDate: "2026-04-20",
+          category: "work",
+          scheduledTime: "14:00",
+          estimatedDuration: 90,
+          recurrencePattern: null,
+          completed: false,
+        },
+      ],
+    },
+  };
+
+  await maybeApplyRemotePlannerOptimizer({
+    input,
+    result,
+    optimizerEnabled: true,
+    optimizerUrl: "https://optimizer.test/optimize",
+    optimizerSecret: "",
+    fetchImpl: async (_url, init) => {
+      const requestInit = (init ?? {}) as Record<string, unknown>;
+      capturedRequest = JSON.parse(
+        String(requestInit.body ?? "{}"),
+      ) as PlannerOptimizerRequest;
+      capturedSignal = requestInit.signal instanceof AbortSignal
+        ? requestInit.signal
+        : null;
+      return new Response(JSON.stringify({ drafts: [], unscheduled: [] }));
+    },
+  });
+
+  if (capturedRequest === null) {
+    throw new Error("Expected a remote optimizer request to be captured.");
+  }
+  if (!(capturedSignal instanceof AbortSignal)) {
+    throw new Error("Expected the remote request to include an AbortSignal.");
+  }
+  const request: PlannerOptimizerRequest = capturedRequest;
+  assertEquals(request.constraints.max_scheduled_minutes_per_day, 230);
+  assertEquals(
+    request.tasks_to_schedule.map((task) => task.energy_type),
+    ["physical", "errand", "admin", "social", "deep"],
+  );
+  assertEquals(
+    request.existing_tasks.map((task) => task.energy_type),
+    ["physical", "errand", "admin", "social", "deep"],
   );
 });

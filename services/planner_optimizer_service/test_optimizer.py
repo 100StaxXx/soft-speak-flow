@@ -12,6 +12,7 @@ try:
     from services.planner_optimizer_service.app import (
         CalendarEvent,
         Constraints,
+        ExistingTask,
         OptimizerRequest,
         PlannerMemory,
         PlanningWindow,
@@ -19,6 +20,7 @@ try:
         TimingPreference,
         WorkHours,
         app,
+        get_existing_deep_blocks,
         optimize_schedule,
     )
     IMPORT_ERROR: Optional[Exception] = None
@@ -109,6 +111,59 @@ class PlannerOptimizerServiceTests(unittest.TestCase):
         self.assertEqual(response.drafts[0].status, "needs_scheduling")
         self.assertTrue(response.drafts[0].fallback_to_inbox)
         self.assertEqual(len(response.unscheduled), 1)
+
+    def test_get_existing_deep_blocks_counts_overlapping_deep_work(self) -> None:
+        request = self.base_request()
+        request.existing_tasks = [
+            ExistingTask(
+                id="deep-1",
+                start="2026-04-20T09:00:00-07:00",
+                end="2026-04-20T10:00:00-07:00",
+                energy_type="deep",
+                status="active",
+            ),
+            ExistingTask(
+                id="admin-1",
+                start="2026-04-20T11:00:00-07:00",
+                end="2026-04-20T11:30:00-07:00",
+                energy_type="admin",
+                status="active",
+            ),
+        ]
+
+        self.assertEqual(get_existing_deep_blocks(request, "2026-04-20"), 1)
+        self.assertEqual(get_existing_deep_blocks(request, "2026-04-21"), 0)
+
+    def test_existing_deep_work_adds_deep_block_pressure_to_new_deep_task(self) -> None:
+        request = self.base_request()
+        request.tasks_to_schedule = [
+            TaskToSchedule(
+                id="task-1",
+                title="Work On The App",
+                duration_min=45,
+                timing_preference=TimingPreference(label="after_work"),
+                energy_type="deep",
+                priority=5,
+                confidence=0.88,
+                derived_from_message="work on the app later",
+            )
+        ]
+        request.existing_tasks = [
+            ExistingTask(
+                id="deep-1",
+                start="2026-04-20T09:00:00-07:00",
+                end="2026-04-20T10:00:00-07:00",
+                energy_type="deep",
+                status="active",
+            )
+        ]
+        request.constraints.max_deep_work_blocks_per_day = 1
+
+        response = optimize_schedule(request)
+
+        self.assertEqual(len(response.drafts), 1)
+        self.assertIn("deep_work_block_limit", response.drafts[0].soft_conflicts)
+        self.assertNotIn("deep_work_block_available", response.drafts[0].reason_codes)
 
     def test_http_optimize_returns_three_drafts_with_spillover(self) -> None:
         sample_path = Path(__file__).with_name("sample_request.json")

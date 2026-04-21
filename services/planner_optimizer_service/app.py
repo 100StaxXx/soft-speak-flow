@@ -56,6 +56,7 @@ class ExistingTask(BaseModel):
     id: str
     start: str
     end: str
+    energy_type: Optional[Literal["deep", "admin", "physical", "errand", "social"]] = None
     status: Optional[str] = None
 
 
@@ -411,8 +412,16 @@ def get_existing_scheduled_minutes(request: OptimizerRequest, target_date: str) 
     return total
 
 
-def get_existing_deep_blocks(_request: OptimizerRequest, _target_date: str) -> int:
-    return 0
+def get_existing_deep_blocks(request: OptimizerRequest, target_date: str) -> int:
+    count = 0
+    for task in request.existing_tasks:
+        if task.energy_type != "deep":
+            continue
+        window = get_daily_window(task.start, task.end, target_date)
+        if not window:
+            continue
+        count += 1
+    return count
 
 
 def overlaps_window(start: int, end: int, window: Optional[Tuple[int, int]]) -> bool:
