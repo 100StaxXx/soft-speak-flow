@@ -1181,7 +1181,9 @@ const toPlannerOptimizerRequest = (
       min_buffer_min: 15,
       max_scheduled_minutes_per_day: maxScheduledMinutesPerDay,
       max_deep_work_blocks_per_day: 2,
-      suggested_slots: input.plannerContext.scheduleInsights?.suggestedSlots
+      suggested_slots: (
+        input.plannerContext.scheduleInsights?.suggestedSlots ?? []
+      )
         .filter((slot) => windowDates.includes(slot.date))
         .map((slot) => ({
           date: slot.date,
