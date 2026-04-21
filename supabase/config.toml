@@ -205,6 +205,12 @@ verify_jwt = true
 [functions.companion-chat]
 verify_jwt = true
 
+[functions.companion-agent]
+verify_jwt = true
+
+[functions.companion-agent-action]
+verify_jwt = true
+
 [functions.generate-companion-tts]
 verify_jwt = true
 

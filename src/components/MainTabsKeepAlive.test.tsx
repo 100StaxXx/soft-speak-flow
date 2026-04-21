@@ -199,22 +199,21 @@ describe("MainTabsKeepAlive", () => {
     expect(mocks.warmEpicsQueryFromRemote).toHaveBeenCalledWith(expect.any(Object), "user-1");
   });
 
-  it("renders the shared planner fab and routes planner intents into journeys", () => {
+  it("does not render the planner fab outside the journeys tab", () => {
     render(<MainTabsKeepAlive activePath="/mentor" />);
 
-    fireEvent.click(screen.getByTestId("main-tabs-universal-fab"));
-
-    expect(mocks.navigate).toHaveBeenCalledWith("/journeys", {
-      state: {
-        companionPlannerLaunchIntent: expect.objectContaining({
-          id: "launch-1",
-          message: "Help me plan today",
-        }),
-      },
-    });
+    expect(screen.queryByTestId("main-tabs-universal-fab")).not.toBeInTheDocument();
   });
 
-  it("preserves the current journeys location when the shared planner fab launches in-place", () => {
+  it("renders the planner fab on the journeys tab", () => {
+    mocks.location.pathname = "/journeys";
+
+    render(<MainTabsKeepAlive activePath="/journeys" />);
+
+    expect(screen.getByTestId("main-tabs-universal-fab")).toBeInTheDocument();
+  });
+
+  it("preserves the current journeys location when the journeys planner fab launches in-place", () => {
     mocks.location.pathname = "/journeys";
     mocks.location.search = "?section=inbox";
     mocks.location.state = { fromTest: true };

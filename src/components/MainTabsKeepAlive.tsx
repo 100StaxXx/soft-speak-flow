@@ -89,7 +89,7 @@ export const MainTabsKeepAlive = memo(({ activePath }: { activePath: MainTabPath
       },
     });
   }, [activePath, location.pathname, location.search, location.state, navigate]);
-  const showUniversalPlannerFab = !isMacDesignedForIPadIOSApp();
+  const showJourneysPlannerFab = !isMacDesignedForIPadIOSApp() && activePath === "/journeys";
 
   useEffect(() => {
     prefetchJourneysTasks();
@@ -165,7 +165,7 @@ export const MainTabsKeepAlive = memo(({ activePath }: { activePath: MainTabPath
           </div>
         );
       })}
-      {showUniversalPlannerFab ? (
+      {showJourneysPlannerFab ? (
         <DraggableFAB onOpenCompanionPlanner={openUniversalCompanionPlanner} />
       ) : null}
     </div>

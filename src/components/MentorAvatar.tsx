@@ -1,16 +1,10 @@
 import { useEffect, useState, memo } from "react";
+import {
+  DEFAULT_MENTOR_AVATAR_POSITION,
+  MENTOR_AVATAR_POSITION_MAP,
+  resolveMentorSlugAlias,
+} from "@/lib/mentorRoster";
 import { loadMentorImage } from "@/utils/mentorImageLoader";
-
-// Active mentors only
-const POSITION_MAP: Record<string, string> = {
-  atlas: 'center 20%',
-  eli: 'center 15%',
-  sienna: 'center 30%',
-  stryker: 'center 25%',
-  carmen: 'center 20%',
-  reign: 'center 20%',
-  solace: 'center 25%',
-};
 
 interface MentorAvatarProps {
   mentorSlug: string;
@@ -51,19 +45,18 @@ export const MentorAvatar = memo(({
       return;
     }
     
-    const baseSlug = (mentorSlug || '').trim().toLowerCase();
-    if (baseSlug) {
-      loadMentorImage(baseSlug).then(setMentorImage).catch(() => {
+    const resolvedSlug = resolveMentorSlugAlias(mentorSlug);
+    if (resolvedSlug) {
+      loadMentorImage(resolvedSlug).then(setMentorImage).catch(() => {
         // Keep empty string as fallback
       });
     }
   }, [mentorSlug, avatarUrl]);
 
-  // Normalize slug for position lookup
-  const baseSlug = (mentorSlug || '').trim().toLowerCase();
-  const nameSlug = (mentorName || '').trim().toLowerCase().replace(/\s+/g, '-');
-  const key = baseSlug || nameSlug;
-  const imagePosition = POSITION_MAP[key] || 'center 25%';
+  const resolvedSlug = resolveMentorSlugAlias(mentorSlug);
+  const imagePosition = resolvedSlug
+    ? MENTOR_AVATAR_POSITION_MAP[resolvedSlug]
+    : DEFAULT_MENTOR_AVATAR_POSITION;
   const getInitials = (name: string) => name.split(' ').map(n => n[0]).join('').toUpperCase();
 
   return (

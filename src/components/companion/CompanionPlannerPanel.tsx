@@ -1,14 +1,11 @@
-import { type KeyboardEvent, memo, useCallback, useMemo } from "react";
+import { type KeyboardEvent, memo, useCallback } from "react";
 import {
   CalendarDays,
   Check,
-  Clock3,
   Loader2,
-  Lock,
   Mic,
   MicOff,
   Send,
-  Sparkles,
   Waves,
   X,
 } from "lucide-react";
@@ -17,278 +14,27 @@ import { AudioReactiveWaveform } from "@/components/AudioReactiveWaveform";
 import { PermissionRequestDialog } from "@/components/PermissionRequestDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Textarea } from "@/components/ui/textarea";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { useAccessStatus } from "@/hooks/useAccessStatus";
-import { useCompanionAssistant } from "@/hooks/useCompanionAssistant";
-import { cn, stripMarkdown } from "@/lib/utils";
 import {
-  hasReadyQuestPlannerProposal,
-  isQuestionLikePlannerReply,
-} from "@/shared/companionPlannerReadyProposal";
-import type {
-  CompanionPlannerProposal,
-  PlannerHorizon,
-} from "@/types/companionPlanner";
-import { getCompanionPlannerQuestProposalPreview } from "@/utils/companionPlannerProposalPreview";
-
-const HORIZON_LABELS: Record<PlannerHorizon, string> = {
-  day: "Day",
-  week: "Week",
-  month: "Month",
-};
-
-const PROPOSAL_KIND_LABELS: Record<CompanionPlannerProposal["kind"], string> = {
-  create_quest: "Quest",
-  update_quest: "Quest edit",
-  create_campaign: "Campaign",
-  update_campaign: "Campaign edit",
-  adjust_campaign_plan: "Campaign adjust",
-  create_ritual: "Ritual",
-  update_ritual: "Ritual edit",
-  suggest_reminder: "Reminder",
-};
-
-const STATUS_BADGE_CLASSNAME: Record<
-  CompanionPlannerProposal["status"],
-  string
-> = {
-  pending: "border-amber-400/30 bg-amber-400/10 text-amber-100",
-  confirmed: "border-emerald-400/30 bg-emerald-400/10 text-emerald-100",
-  modified: "border-sky-400/30 bg-sky-400/10 text-sky-100",
-  rejected: "border-slate-400/30 bg-slate-400/10 text-slate-100",
-};
-
-const OPTIMIZER_DRAFT_STATUS_LABELS = {
-  scheduled_draft: "scheduled",
-  tentative_time: "tentative",
-  needs_scheduling: "needs scheduling",
-} as const;
-
-const OPTIMIZER_DRAFT_STATUS_CLASSNAME = {
-  scheduled_draft: "border-emerald-300/20 bg-emerald-400/10 text-emerald-50",
-  tentative_time: "border-amber-300/20 bg-amber-400/10 text-amber-50",
-  needs_scheduling: "border-slate-300/20 bg-slate-400/10 text-slate-100",
-} as const;
-
-const asRecord = (value: unknown): Record<string, unknown> | null =>
-  value && typeof value === "object" && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : null;
-
-const asString = (value: unknown): string | null =>
-  typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
-
-const getOptimizerProposalMeta = (
-  proposal: CompanionPlannerProposal,
-): {
-  draftStatus: keyof typeof OPTIMIZER_DRAFT_STATUS_LABELS;
-  reasonSummary: string;
-} | null => {
-  if (proposal.kind !== "create_quest") return null;
-  const payload = asRecord(proposal.payload);
-  const draftStatus = asString(payload?.draftStatus);
-  const reasonSummary = asString(payload?.reasonSummary);
-  if (
-    !draftStatus ||
-    !(draftStatus in OPTIMIZER_DRAFT_STATUS_LABELS) ||
-    !reasonSummary
-  ) {
-    return null;
-  }
-
-  return {
-    draftStatus: draftStatus as keyof typeof OPTIMIZER_DRAFT_STATUS_LABELS,
-    reasonSummary,
-  };
-};
-
-const ProposalCard = memo(({
-  proposal,
-  onConfirm,
-  onReject,
-}: {
-  proposal: CompanionPlannerProposal;
-  onConfirm: (proposalId: string) => void;
-  onReject: (proposalId: string) => void;
-}) => {
-  const questPreview = getCompanionPlannerQuestProposalPreview(proposal);
-  const optimizerMeta = getOptimizerProposalMeta(proposal);
-
-  return (
-    <div
-      className="rounded-2xl border border-white/10 bg-black/20 p-4 shadow-[0_20px_45px_-30px_rgba(0,0,0,0.8)]"
-      data-testid={`assistant-proposal-${proposal.id}`}
-    >
-      <div className="flex flex-wrap items-center gap-2">
-        <Badge
-          variant="outline"
-          className="border-sky-300/30 bg-sky-400/10 text-sky-100"
-        >
-          {PROPOSAL_KIND_LABELS[proposal.kind]}
-        </Badge>
-        <Badge
-          variant="outline"
-          className={STATUS_BADGE_CLASSNAME[proposal.status]}
-        >
-          {proposal.status}
-        </Badge>
-        {optimizerMeta
-          ? (
-            <Badge
-              variant="outline"
-              className={OPTIMIZER_DRAFT_STATUS_CLASSNAME[
-                optimizerMeta.draftStatus
-              ]}
-            >
-              {OPTIMIZER_DRAFT_STATUS_LABELS[optimizerMeta.draftStatus]}
-            </Badge>
-          )
-          : null}
-        {!proposal.readyToConfirm && proposal.status === "pending"
-          ? (
-            <Badge
-              variant="outline"
-              className="border-rose-300/30 bg-rose-400/10 text-rose-100"
-            >
-              needs detail
-            </Badge>
-          )
-          : null}
-      </div>
-
-      <div className="mt-3 space-y-1">
-        <h4 className="text-sm font-semibold text-white">{proposal.title}</h4>
-        <p className="text-sm text-white/80">{proposal.summary}</p>
-        {proposal.reasoning
-          ? <p className="text-xs text-white/55">{proposal.reasoning}</p>
-          : null}
-        {!proposal.readyToConfirm && proposal.missingFields?.length
-          ? (
-            <p className="text-xs text-rose-100/90">
-              Still waiting on: {proposal.missingFields.join(", ")}.
-            </p>
-          )
-          : null}
-      </div>
-
-      {optimizerMeta
-        ? (
-          <div
-            className="mt-3 rounded-2xl border border-sky-300/10 bg-sky-400/5 p-3"
-            data-testid={`assistant-proposal-why-${proposal.id}`}
-          >
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-100/55">
-              Why this plan works
-            </p>
-            <p className="mt-1 text-sm text-white/78">
-              {optimizerMeta.reasonSummary}
-            </p>
-          </div>
-        )
-        : null}
-
-      {questPreview?.notes
-        ? (
-          <div
-            className="mt-3 rounded-2xl border border-white/8 bg-white/5 p-3"
-            data-testid={`assistant-proposal-notes-${proposal.id}`}
-          >
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/45">
-              Stored note
-            </p>
-            <p className="mt-1 text-sm text-white/78">{questPreview.notes}</p>
-          </div>
-        )
-        : null}
-
-      {questPreview?.subtasks.length
-        ? (
-          <div
-            className="mt-3 rounded-2xl border border-white/8 bg-white/5 p-3"
-            data-testid={`assistant-proposal-subtasks-${proposal.id}`}
-          >
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/45">
-                {questPreview.subtasks.length}{" "}
-                step{questPreview.subtasks.length === 1 ? "" : "s"}
-              </p>
-              {proposal.kind === "update_quest" && questPreview.subtaskPlanMode
-                ? (
-                  <Badge
-                    variant="outline"
-                    className="border-emerald-300/20 bg-emerald-400/10 text-emerald-50"
-                  >
-                    {questPreview.subtaskPlanMode === "replace"
-                      ? "Replace steps"
-                      : "Append steps"}
-                  </Badge>
-                )
-                : null}
-            </div>
-            <div className="mt-2 space-y-1">
-              {questPreview.subtasks.map((subtask) => (
-                <p key={subtask} className="text-sm text-white/78">
-                  - {subtask}
-                </p>
-              ))}
-            </div>
-          </div>
-        )
-        : null}
-
-      <div className="mt-4 flex flex-wrap gap-2">
-        <Button
-          size="sm"
-          onClick={() => onConfirm(proposal.id)}
-          disabled={proposal.status !== "pending" || !proposal.readyToConfirm}
-        >
-          <Check className="mr-2 h-4 w-4" />
-          Confirm
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => onReject(proposal.id)}
-          disabled={proposal.status !== "pending"}
-        >
-          <X className="mr-2 h-4 w-4" />
-          Reject
-        </Button>
-      </div>
-    </div>
-  );
-});
-
-ProposalCard.displayName = "ProposalCard";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
+import { useCompanionAssistant } from "@/hooks/useCompanionAssistant";
+import { useCompanionModeSettings } from "@/hooks/useCompanionModeSettings";
+import { cn, stripMarkdown } from "@/lib/utils";
+import { COMPANION_MODE_OPTIONS } from "@/shared/companionModes";
 
 export const CompanionPlannerPanel = memo(() => {
-  const { isSubscribed } = useAccessStatus();
   const assistant = useCompanionAssistant({
     surface: "companion",
-    conversationEnabled: isSubscribed,
+    conversationEnabled: true,
   });
-  const hasReadyQuestProposal = hasReadyQuestPlannerProposal(
-    assistant.pendingProposals,
-  );
-  const transcriptMessages = useMemo(() => {
-    if (!hasReadyQuestProposal) return assistant.messages;
-
-    for (let index = assistant.messages.length - 1; index >= 0; index -= 1) {
-      const message = assistant.messages[index];
-      if (message?.role !== "assistant") continue;
-      if (!isQuestionLikePlannerReply(message.content)) {
-        return assistant.messages;
-      }
-
-      return assistant.messages.filter((_, messageIndex) =>
-        messageIndex !== index
-      );
-    }
-
-    return assistant.messages;
-  }, [assistant.messages, hasReadyQuestProposal]);
+  const modeSettings = useCompanionModeSettings();
 
   const handleComposerKeyDown = useCallback(
     (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -301,27 +47,59 @@ export const CompanionPlannerPanel = memo(() => {
 
   return (
     <section
-      className="mt-3 overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.9),rgba(2,6,23,0.96))] shadow-[0_28px_80px_-45px_rgba(15,23,42,0.95)]"
+      className="mt-3 overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.92),rgba(2,6,23,0.98))] shadow-[0_28px_80px_-45px_rgba(15,23,42,0.95)]"
       data-testid="companion-planner-panel"
     >
       <div className="border-b border-white/10 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.18),transparent_55%)] px-4 py-4 sm:px-5">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-sky-100/70">
-              <Sparkles className="h-3.5 w-3.5" />
-              Direct Companion Assistant
+              Cosmiq Companion
             </div>
             <h2 className="text-base font-semibold text-white sm:text-lg">
-              Ask what is scheduled, move quests around, or talk normally
-              without switching modes.
+              Talk naturally, ask what your schedule looks like, or prepare one confirmable action.
             </h2>
             <p className="text-sm text-white/60">
-              Planning replies stay inline, nothing saves without confirmation,
-              and connected calendar events stay read-only.
+              Nothing changes until you confirm it.
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 text-xs">
+          <div className="flex flex-wrap items-center justify-end gap-3">
+            <div className="min-w-[11rem]">
+              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.18em] text-white/45">
+                Mode
+              </label>
+              <Select
+                value={modeSettings.mode}
+                onValueChange={(value) => {
+                  void modeSettings.setMode(value as typeof modeSettings.mode);
+                }}
+              >
+                <SelectTrigger className="h-10 border-white/10 bg-white/5 text-white">
+                  <SelectValue placeholder="Choose a mode" />
+                </SelectTrigger>
+                <SelectContent>
+                  {COMPANION_MODE_OPTIONS.map((mode) => (
+                    <SelectItem key={mode.id} value={mode.id}>
+                      {mode.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <label className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/75">
+              <Switch
+                checked={modeSettings.adaptationEnabled}
+                onCheckedChange={(checked) => {
+                  void modeSettings.setAdaptationEnabled(checked);
+                }}
+                disabled={modeSettings.isSaving}
+                aria-label="Adaptive tone"
+              />
+              Adaptive tone
+            </label>
+
             <Badge
               variant="outline"
               className="border-white/10 bg-white/5 text-white/70"
@@ -334,106 +112,6 @@ export const CompanionPlannerPanel = memo(() => {
       </div>
 
       <div className="space-y-4 px-4 py-4 sm:px-5">
-        {!isSubscribed
-          ? (
-            <div className="rounded-[26px] border border-amber-300/20 bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.18),transparent_60%),linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-5">
-              <div className="flex items-start gap-3">
-                <div className="rounded-2xl border border-amber-300/25 bg-amber-400/10 p-3 text-amber-50">
-                  <Lock className="h-5 w-5" />
-                </div>
-                <div className="space-y-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-sm font-semibold text-white">
-                      Conversation mode is Premium
-                    </p>
-                    <Badge
-                      variant="outline"
-                      className="border-amber-300/25 bg-amber-400/10 text-amber-50"
-                    >
-                      Premium
-                    </Badge>
-                  </div>
-                  <p className="text-sm text-white/75">
-                    Scheduling questions, quest moves, and campaign adjustments
-                    still work here. Premium unlocks the full freeform talk
-                    lane.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )
-          : (
-            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
-              <div className="grid gap-3">
-                <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
-                  <div className="space-y-1.5">
-                    <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-white/45">
-                      Horizon
-                    </p>
-                    <ToggleGroup
-                      type="single"
-                      value={assistant.horizon}
-                      onValueChange={(value) => {
-                        if (value) {
-                          assistant.setHorizon(value as PlannerHorizon);
-                        }
-                      }}
-                      className="flex flex-wrap justify-start gap-2"
-                      data-testid="assistant-horizon-toggle"
-                    >
-                      {(Object.keys(HORIZON_LABELS) as PlannerHorizon[]).map((
-                        option,
-                      ) => (
-                        <ToggleGroupItem
-                          key={option}
-                          value={option}
-                          variant="outline"
-                          size="sm"
-                          className="rounded-full border-white/10 bg-white/5 px-3 text-white/80 data-[state=on]:border-emerald-300/35 data-[state=on]:bg-emerald-400/15 data-[state=on]:text-white"
-                        >
-                          {HORIZON_LABELS[option]}
-                        </ToggleGroupItem>
-                      ))}
-                    </ToggleGroup>
-                  </div>
-                </div>
-              </div>
-
-              <Button
-                type="button"
-                variant="ghost"
-                className={cn(
-                  "group relative h-28 w-28 rounded-full border border-white/15 bg-[radial-gradient(circle_at_top,rgba(96,165,250,0.34),rgba(16,185,129,0.16)_55%,rgba(15,23,42,0.92))] text-white shadow-[0_24px_60px_-28px_rgba(59,130,246,0.65)] transition-transform hover:scale-[1.02]",
-                  assistant.isRecording &&
-                    "border-rose-300/40 shadow-[0_28px_70px_-28px_rgba(251,113,133,0.85)]",
-                )}
-                onClick={assistant.toggleRecording}
-                disabled={!assistant.isVoiceSupported && !assistant.isRecording}
-                data-testid="companion-assistant-mic-button"
-              >
-                <div className="flex flex-col items-center gap-2">
-                  {assistant.isRecording
-                    ? (
-                      <>
-                        <MicOff className="h-7 w-7" />
-                        <span className="text-xs font-medium">
-                          {assistant.isAutoStopping ? "Stopping" : "Listening"}
-                        </span>
-                      </>
-                    )
-                    : (
-                      <>
-                        <Mic className="h-7 w-7" />
-                        <span className="text-xs font-medium">
-                          Push to talk
-                        </span>
-                      </>
-                    )}
-                </div>
-              </Button>
-            </div>
-          )}
-
         {assistant.isRecording || assistant.interimText || assistant.isSpeaking
           ? (
             <div className="rounded-[26px] border border-white/10 bg-black/20 p-4">
@@ -441,8 +119,7 @@ export const CompanionPlannerPanel = memo(() => {
                 ? (
                   <>
                     <AudioReactiveWaveform
-                      isActive={assistant.isRecording &&
-                        !assistant.isAutoStopping}
+                      isActive={assistant.isRecording && !assistant.isAutoStopping}
                       className="justify-start"
                     />
                     <p className="mt-2 text-sm text-white/80">
@@ -456,9 +133,7 @@ export const CompanionPlannerPanel = memo(() => {
                   <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-emerald-300/20 bg-emerald-400/10 px-4 py-3">
                     <div className="flex items-center gap-2 text-sm text-emerald-50">
                       <Waves className="h-4 w-4" />
-                      Speaking {assistant.speechProvider === "cloud"
-                        ? "with fallback audio"
-                        : "on-device"}.
+                      Speaking {assistant.speechProvider === "cloud" ? "with fallback audio" : "on-device"}.
                     </div>
                     <Button
                       type="button"
@@ -475,54 +150,12 @@ export const CompanionPlannerPanel = memo(() => {
           )
           : null}
 
-        {assistant.questions.length > 0 && !hasReadyQuestProposal
-          ? (
-            <div className="grid gap-2" data-testid="assistant-question-list">
-              {assistant.questions.map((question) => (
-                <div
-                  key={question.id}
-                  className="rounded-2xl border border-amber-300/20 bg-amber-400/10 p-3"
-                >
-                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-amber-100/80">
-                    <Clock3 className="h-3.5 w-3.5" />
-                    Needed before save
-                  </div>
-                  <p className="mt-2 text-sm font-medium text-white">
-                    {question.prompt}
-                  </p>
-                  {question.reason
-                    ? (
-                      <p className="mt-1 text-xs text-white/65">
-                        {question.reason}
-                      </p>
-                    )
-                    : null}
-                  {question.options?.length
-                    ? (
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {question.options.map((option) => (
-                          <Badge
-                            key={option}
-                            variant="outline"
-                            className="border-white/15 bg-white/5 text-white/75"
-                          >
-                            {option}
-                          </Badge>
-                        ))}
-                      </div>
-                    )
-                    : null}
-                </div>
-              ))}
-            </div>
-          )
-          : null}
         <ScrollArea
           className="max-h-[24rem] pr-3"
           data-testid="companion-assistant-transcript"
         >
           <div className="space-y-3">
-            {transcriptMessages.map((message) => (
+            {assistant.messages.map((message) => (
               <div
                 key={message.id}
                 className={cn(
@@ -546,71 +179,101 @@ export const CompanionPlannerPanel = memo(() => {
           </div>
         </ScrollArea>
 
-        {assistant.proposals.length > 0
+        {assistant.pendingAction
           ? (
-            <div className="space-y-3" data-testid="assistant-proposals">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold text-white">
-                    Pending changes
-                  </p>
-                  <p className="text-xs text-white/55">
-                    Nothing saves until you confirm it.
-                  </p>
-                </div>
-                {assistant.readyProposalCount > 1
-                  ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={assistant.confirmAll}
-                    >
-                      Confirm all
-                    </Button>
-                  )
-                  : null}
+            <div
+              className="rounded-[26px] border border-amber-300/20 bg-amber-400/10 p-4"
+              data-testid="companion-agent-pending-action"
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge
+                  variant="outline"
+                  className="border-amber-300/25 bg-amber-400/10 text-amber-50"
+                >
+                  Pending confirmation
+                </Badge>
+                <Badge
+                  variant="outline"
+                  className="border-white/10 bg-white/5 text-white/70"
+                >
+                  {assistant.pendingAction.actionType.replaceAll("_", " ")}
+                </Badge>
               </div>
-              <div className="grid gap-3">
-                {assistant.proposals.map((proposal) => (
-                  <ProposalCard
-                    key={proposal.id}
-                    proposal={proposal}
-                    onConfirm={assistant.confirmProposal}
-                    onReject={assistant.rejectProposal}
-                  />
-                ))}
+              <p className="mt-3 text-sm font-medium text-white">
+                {assistant.pendingAction.summary}
+              </p>
+              {assistant.pendingAction.confirmationMessage
+                ? (
+                  <p className="mt-1 text-sm text-white/70">
+                    {assistant.pendingAction.confirmationMessage}
+                  </p>
+                )
+                : null}
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  onClick={assistant.confirmPendingAction}
+                  disabled={assistant.isResolvingAction || assistant.isSubmitting}
+                >
+                  <Check className="mr-2 h-4 w-4" />
+                  Confirm
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={assistant.cancelPendingAction}
+                  disabled={assistant.isResolvingAction || assistant.isSubmitting}
+                >
+                  <X className="mr-2 h-4 w-4" />
+                  Cancel
+                </Button>
               </div>
             </div>
           )
           : null}
 
-        <div className="rounded-[26px] border border-white/10 bg-white/5 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
-          <label htmlFor="companion-assistant-input" className="sr-only">
-            Message your companion assistant
-          </label>
-          <Textarea
-            id="companion-assistant-input"
-            value={assistant.draftInput}
-            onChange={(event) => assistant.setDraftInput(event.target.value)}
-            onKeyDown={handleComposerKeyDown}
-            placeholder={assistant.placeholder}
-            className="min-h-[104px] resize-none border-white/10 bg-black/20 text-white placeholder:text-white/35"
-            data-testid="companion-assistant-text-input"
-          />
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-            <div className="text-xs text-white/50">
-              Ask for support, schedule answers, or confirmable quest and
-              campaign changes in the same thread.
-            </div>
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+          <div className="rounded-[26px] border border-white/10 bg-white/5 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+            <label htmlFor="companion-assistant-input" className="sr-only">
+              Message your companion assistant
+            </label>
+            <Textarea
+              id="companion-assistant-input"
+              value={assistant.draftInput}
+              onChange={(event) => assistant.setDraftInput(event.target.value)}
+              onKeyDown={handleComposerKeyDown}
+              placeholder={assistant.placeholder}
+              className="min-h-[104px] resize-none border-white/10 bg-black/20 text-white placeholder:text-white/35"
+              data-testid="companion-assistant-text-input"
+            />
+          </div>
+
+          <div className="flex flex-col gap-3">
+            <Button
+              type="button"
+              variant="ghost"
+              className={cn(
+                "group relative h-14 w-14 rounded-full border border-white/15 bg-[radial-gradient(circle_at_top,rgba(96,165,250,0.34),rgba(16,185,129,0.16)_55%,rgba(15,23,42,0.92))] text-white shadow-[0_24px_60px_-28px_rgba(59,130,246,0.65)] transition-transform hover:scale-[1.02]",
+                assistant.isRecording &&
+                  "border-rose-300/40 shadow-[0_28px_70px_-28px_rgba(251,113,133,0.85)]",
+              )}
+              onClick={assistant.toggleRecording}
+              disabled={!assistant.isVoiceSupported && !assistant.isRecording}
+              data-testid="companion-assistant-mic-button"
+            >
+              {assistant.isRecording
+                ? <MicOff className="h-5 w-5" />
+                : <Mic className="h-5 w-5" />}
+            </Button>
+
             <Button
               type="button"
               onClick={assistant.submitTypedMessage}
-              disabled={assistant.isSubmitting || assistant.isClassifying ||
-                !assistant.draftInput.trim()}
+              disabled={assistant.isSubmitting || assistant.isResolvingAction || !assistant.draftInput.trim()}
               className="min-w-[8rem]"
               data-testid="companion-assistant-send-button"
             >
-              {assistant.isSubmitting || assistant.isClassifying
+              {assistant.isSubmitting || assistant.isResolvingAction
                 ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />

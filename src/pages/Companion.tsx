@@ -9,6 +9,7 @@ import { TrendingUp, BookOpen, Package, Sparkles, Timer, Settings } from "lucide
 import { CollectionTab } from "@/components/companion/CollectionTab";
 import { FocusTab } from "@/components/companion/FocusTab";
 import { MemoryWhisper } from "@/components/companion/MemoryWhisper";
+import { CompanionPlannerPanel } from "@/components/companion/CompanionPlannerPanel";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useAuth } from "@/hooks/useAuth";
 import { usePostOnboardingMentorGuidance } from "@/hooks/usePostOnboardingMentorGuidance";
@@ -93,6 +94,8 @@ const OverviewTab = memo(({
   if (isDesktop) {
     return (
       <div className="space-y-6 pt-1">
+        <CompanionPlannerPanel />
+
         <div className={cn("rounded-2xl border p-4", outerShellCardClassName)}>
           <MemoryWhisper chance={0.2} className="px-0" />
         </div>
@@ -116,6 +119,8 @@ const OverviewTab = memo(({
 
   return (
     <div className="space-y-6 mt-6">
+      <CompanionPlannerPanel />
+
       <MemoryWhisper chance={0.2} className="px-2" />
 
       <ParallaxCard offset={30}>

@@ -11,15 +11,13 @@ import type {
   CompanionShimmerType,
 } from "@/config/companionDialoguePacks";
 import {
-  LOCKED_COMPANION_BOND_LEVEL_DIALOGUE,
-  LOCKED_COMPANION_ENCOURAGEMENT_TEMPLATES,
-  LOCKED_COMPANION_PERSONALITY_TRAITS,
-  LOCKED_COMPANION_TONE_PACK,
-  LOCKED_COMPANION_VOICE_STYLE,
-} from "@/shared/companionChaosVoice";
+  DEFAULT_COMPANION_MODE,
+  getCompanionModeVoiceTemplate,
+} from "@/shared/companionModes";
 import { useAuth } from "./useAuth";
 import { useCompanion } from "./useCompanion";
 import { useCompanionCareSignals } from "./useCompanionCareSignals";
+import { useCompanionModeSettings } from "./useCompanionModeSettings";
 
 const MIN_DIALOGUE_REFRESH_INTERVAL_MS = 90 * 1000;
 const PASSIVE_DIALOGUE_REFRESH_MS = 35 * 60 * 1000;
@@ -35,7 +33,8 @@ type DialogueEventState = {
   lineId: string;
 };
 
-const DIALOGUE_FALLBACK_LINE_ID = `${LOCKED_COMPANION_TONE_PACK}.base_greetings.01`;
+const DEFAULT_VOICE_TEMPLATE = getCompanionModeVoiceTemplate(DEFAULT_COMPANION_MODE);
+const DIALOGUE_FALLBACK_LINE_ID = `${DEFAULT_VOICE_TEMPLATE.tonePack}.base_greetings.01`;
 
 const toDialogueEventState = (selected: {
   greeting: string;
@@ -74,25 +73,17 @@ const createBootstrapDialogueEvent = (): DialogueEventState => {
     });
     return toDialogueEventState(selected);
   } catch {
-    return {
-      greeting: DEFAULT_GREETING,
-      shimmerType: "none",
-      microTitle: null,
-      outcomeTag: "basic_checkin",
-      tonePack: LOCKED_COMPANION_TONE_PACK,
-      bucketKey: "base_greetings",
-      lineId: DIALOGUE_FALLBACK_LINE_ID,
-    };
+      return {
+        greeting: DEFAULT_GREETING,
+        shimmerType: "none",
+        microTitle: null,
+        outcomeTag: "basic_checkin",
+        tonePack: DEFAULT_VOICE_TEMPLATE.tonePack,
+        bucketKey: "base_greetings",
+        lineId: DIALOGUE_FALLBACK_LINE_ID,
+      };
   }
 };
-
-const LOCKED_COMPANION_VOICE_TEMPLATE = {
-  species: "universal",
-  voice_style: LOCKED_COMPANION_VOICE_STYLE,
-  personality_traits: [...LOCKED_COMPANION_PERSONALITY_TRAITS],
-  encouragement_templates: [...LOCKED_COMPANION_ENCOURAGEMENT_TEMPLATES],
-  bond_level_dialogue: LOCKED_COMPANION_BOND_LEVEL_DIALOGUE,
-} as const;
 
 export type DialogueMood = SelectorDialogueMood;
 
@@ -118,7 +109,14 @@ export function useCompanionDialogue() {
   const { user } = useAuth();
   const { companion, progressToNext, nextEvolutionXP } = useCompanion();
   const { care, isLoading: careLoading } = useCompanionCareSignals();
-  const voiceTemplate = LOCKED_COMPANION_VOICE_TEMPLATE;
+  const {
+    mode,
+    adaptationEnabled,
+  } = useCompanionModeSettings();
+  const voiceTemplate = useMemo(
+    () => getCompanionModeVoiceTemplate(mode),
+    [mode],
+  );
 
   const dialogueMood = useMemo((): DialogueMood => {
     if (!care) return "content";
@@ -165,9 +163,10 @@ export function useCompanionDialogue() {
         companion && typeof nextEvolutionXP === "number"
           ? Math.max(0, nextEvolutionXP - companion.current_xp)
           : Number.MAX_SAFE_INTEGER,
-      voiceStyle: voiceTemplate.voice_style,
+      voiceStyle: voiceTemplate.voiceStyle,
       needsClarity:
-        !care?.hasDormancyWarning
+        adaptationEnabled
+        && !care?.hasDormancyWarning
         && (dialogueMood === "content" || dialogueMood === "thriving")
         && (care?.overallCare ?? 0) >= 0.55
         && (typeof progressToNext === "number" ? progressToNext : 0) < 65
@@ -184,6 +183,8 @@ export function useCompanionDialogue() {
       progressToNext,
       nextEvolutionXP,
       hasRequiredContext,
+      adaptationEnabled,
+      voiceTemplate.voiceStyle,
     ],
   );
 
@@ -296,14 +297,14 @@ export function useCompanionDialogue() {
     if (!care?.bond) return null;
 
     const bondLevel = Math.min(5, Math.max(1, care.bond.level));
-    const bondLines = voiceTemplate.bond_level_dialogue?.[String(bondLevel)];
+    const bondLines = voiceTemplate.bondLevelDialogue?.[String(bondLevel)];
     if (!bondLines || bondLines.length === 0) return null;
 
     return pickRandom(bondLines, `bond-${bondLevel}`);
   }, [voiceTemplate, care?.bond, pickRandom]);
 
   const encouragement = useMemo(() => {
-    return pickRandom(voiceTemplate.encouragement_templates, "encouragement");
+    return pickRandom(voiceTemplate.encouragementTemplates, "encouragement");
   }, [voiceTemplate, pickRandom]);
 
   const refreshDialogue = useCallback((triggerSource: DialogueTriggerSource = "idle", force = false) => {
@@ -315,14 +316,16 @@ export function useCompanionDialogue() {
     bondDialogue,
     encouragement,
     dialogueMood,
-    voiceStyle: voiceTemplate?.voice_style || "",
-    personalityTraits: voiceTemplate?.personality_traits || [],
+    voiceStyle: voiceTemplate?.voiceStyle || "",
+    personalityTraits: voiceTemplate?.personalityTraits || [],
     shimmerType: dialogueEvent.shimmerType,
     microTitle: dialogueEvent.microTitle,
     outcomeTag: dialogueEvent.outcomeTag,
     tonePack: dialogueEvent.tonePack,
     bucketKey: dialogueEvent.bucketKey,
     lineId: dialogueEvent.lineId,
+    mode,
+    adaptationEnabled,
     refreshDialogue,
     isLoading: careLoading,
   };
