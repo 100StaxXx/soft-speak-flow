@@ -9,7 +9,7 @@ import { useExternalCalendarEvents } from "@/hooks/useExternalCalendarEvents";
 import { useInboxTasks } from "@/hooks/useInboxTasks";
 import { useTasksQuery } from "@/hooks/useTasksQuery";
 import { useUserAIContext } from "@/hooks/useUserAIContext";
-import { buildPlannerAISignals } from "@/utils/companionPlannerAiSignals";
+import { sanitizePlannerContext } from "@/utils/companionPlannerRequest";
 import { buildCompanionPlannerScheduleInsights } from "@/utils/companionPlannerSchedule";
 import { formatCurrentDateTimeWithOffset } from "@/utils/currentDateTime";
 import type { Json } from "@/integrations/supabase/types";
@@ -478,21 +478,17 @@ export function useCompanionPlanningContext({
       plannerMemory,
     }), [activeEventsQuery.events, activeTasks, horizon, plannerMemory, today, todayIso]);
 
-  const plannerAISignals = useMemo(
-    () => buildPlannerAISignals(enrichedContext),
-    [enrichedContext],
-  );
-
-  const plannerContext = useMemo<CompanionPlannerRequest["plannerContext"]>(() => ({
-    tasks: mapTasksToPlannerContext(contextTasks.map(serializeTaskToPlannerContext)),
-    inboxTasks: mapTasksToPlannerContext(inboxTasks.map(serializeTaskToPlannerContext)),
-    activeEpics: mapEpicsToPlannerContext(activeEpics),
-    rituals: mapRitualsToPlannerContext(activeEpics),
-    calendarEvents: contextEventsQuery.events,
-    scheduleInsights,
-    plannerMemory,
-    aiSignals: plannerAISignals,
-  }), [activeEpics, contextEventsQuery.events, contextTasks, inboxTasks, plannerAISignals, plannerMemory, scheduleInsights]);
+  const plannerContext = useMemo<CompanionPlannerRequest["plannerContext"]>(() =>
+    sanitizePlannerContext({
+      tasks: mapTasksToPlannerContext(contextTasks.map(serializeTaskToPlannerContext)),
+      inboxTasks: mapTasksToPlannerContext(inboxTasks.map(serializeTaskToPlannerContext)),
+      activeEpics: mapEpicsToPlannerContext(activeEpics),
+      rituals: mapRitualsToPlannerContext(activeEpics),
+      calendarEvents: contextEventsQuery.events,
+      scheduleInsights,
+      plannerMemory,
+      aiSignals: enrichedContext,
+    }), [activeEpics, contextEventsQuery.events, contextTasks, enrichedContext, inboxTasks, plannerMemory, scheduleInsights]);
 
   return {
     today,

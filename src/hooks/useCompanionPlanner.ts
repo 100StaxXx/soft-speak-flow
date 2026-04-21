@@ -30,9 +30,16 @@ import {
 } from "@/hooks/useQuestCalendarSync";
 import { parseNaturalLanguage } from "@/features/tasks/hooks/useNaturalLanguageParser";
 import { buildPlannerAISignals } from "@/utils/companionPlannerAiSignals";
+import {
+  sanitizePlannerContext,
+  summarizePlannerContextForDebug,
+} from "@/utils/companionPlannerRequest";
 import { buildCompanionPlannerScheduleInsights } from "@/utils/companionPlannerSchedule";
-import { resolveCompanionPlannerError } from "@/utils/companionPlannerErrors";
+import {
+  toUserFacingCompanionPlannerError,
+} from "@/utils/companionPlannerErrors";
 import { formatCurrentDateTimeWithOffset } from "@/utils/currentDateTime";
+import { parseFunctionInvokeError } from "@/utils/supabaseFunctionErrors";
 import type { Json } from "@/integrations/supabase/types";
 import type { EpicRecord } from "@/hooks/epicsQuery";
 import { stripMarkdown } from "@/lib/utils";
@@ -853,11 +860,33 @@ const normalizeClassificationHint = (
 ): CompanionPlannerRequest["classificationHint"] => {
   if (!classification) return null;
 
+  const rawType = typeof classification.type === "string"
+    ? classification.type.trim().toLowerCase()
+    : null;
+  const normalizedType = rawType === "brain_dump" ||
+      rawType === "brain dump" || rawType === "braindump"
+    ? "brain-dump"
+    : rawType === "quest" || rawType === "epic" || rawType === "habit" ||
+        rawType === "brain-dump"
+    ? rawType
+    : null;
+  const confidence = typeof classification.confidence === "number" &&
+      Number.isFinite(classification.confidence)
+    ? classification.confidence
+    : null;
+  const reasoning = typeof classification.reasoning === "string"
+    ? classification.reasoning.trim()
+    : "";
+
+  if (!normalizedType || confidence === null || reasoning.length === 0) {
+    return null;
+  }
+
   const normalized: NonNullable<CompanionPlannerRequest["classificationHint"]> =
     {
-      type: classification.type,
-      confidence: classification.confidence,
-      reasoning: classification.reasoning,
+      type: normalizedType,
+      confidence,
+      reasoning,
     };
 
   if (typeof classification.suggestedDeadline === "string") {
@@ -868,8 +897,31 @@ const normalizeClassificationHint = (
     normalized.suggestedDuration = classification.suggestedDuration;
   }
 
-  if (classification.timelineAnalysis) {
-    normalized.timelineAnalysis = classification.timelineAnalysis;
+  if (
+    classification.timelineAnalysis &&
+    typeof classification.timelineAnalysis === "object" &&
+    typeof classification.timelineAnalysis.statedDays === "number" &&
+    Number.isFinite(classification.timelineAnalysis.statedDays) &&
+    typeof classification.timelineAnalysis.typicalDays === "number" &&
+    Number.isFinite(classification.timelineAnalysis.typicalDays) &&
+    (
+      classification.timelineAnalysis.feasibility === "realistic" ||
+      classification.timelineAnalysis.feasibility === "aggressive" ||
+      classification.timelineAnalysis.feasibility === "very_aggressive"
+    )
+  ) {
+    normalized.timelineAnalysis = {
+      statedDays: classification.timelineAnalysis.statedDays,
+      typicalDays: classification.timelineAnalysis.typicalDays,
+      feasibility: classification.timelineAnalysis.feasibility,
+      adjustmentFactors: Array.isArray(
+          classification.timelineAnalysis.adjustmentFactors,
+        )
+        ? classification.timelineAnalysis.adjustmentFactors.filter((factor) =>
+          typeof factor === "string"
+        )
+        : [],
+    };
   }
 
   return normalized;
@@ -1487,7 +1539,7 @@ export function useCompanionPlanner({
   );
 
   const plannerContext = useMemo<CompanionPlannerRequest["plannerContext"]>(
-    () => ({
+    () => sanitizePlannerContext({
       tasks: mapTasksToContext(contextTasks.map(serializeTaskContext)),
       inboxTasks: mapTasksToContext(inboxTasks.map(serializeTaskContext)),
       activeEpics: mapEpicsToContext(activeEpics, todayIso),
@@ -1921,6 +1973,7 @@ export function useCompanionPlanner({
     }
 
     const parsedInput = parseNaturalLanguage(message);
+    let requestBody: CompanionPlannerRequest | null = null;
 
     try {
       const resolvedBriefingContext = options?.briefingContext ?? null;
@@ -1956,9 +2009,11 @@ export function useCompanionPlanner({
         outlookSyncPromise,
         classificationPromise,
       ]);
-      const syncedPlannerContext = mergePlannerContextWithOutlookSync(
-        plannerContext,
-        outlookPlanningContext,
+      const syncedPlannerContext = sanitizePlannerContext(
+        mergePlannerContextWithOutlookSync(
+          plannerContext,
+          outlookPlanningContext,
+        ),
       );
       const requestPriorityScores = computePlannerPriorityScores({
         currentDate: todayIso,
@@ -1986,40 +2041,42 @@ export function useCompanionPlanner({
         briefingContext: resolvedBriefingContext,
       };
       const classificationHint = normalizeClassificationHint(classification);
+      const requestPlannerContext = sanitizePlannerContext({
+        ...syncedPlannerContext,
+        starterIntent: resolvedStarterIntent,
+        briefingContext: resolvedBriefingContext,
+        priorityScores: requestPriorityScores,
+      });
+      requestBody = {
+        message,
+        currentDate: todayIso,
+        currentDateTime: formatCurrentDateTimeWithOffset(new Date()),
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+        horizon,
+        tonePack,
+        conversationHistory,
+        sessionState,
+        parsedInput: {
+          text: parsedInput.text,
+          scheduledTime: parsedInput.scheduledTime,
+          scheduledDate: parsedInput.scheduledDate,
+          estimatedDuration: parsedInput.estimatedDuration,
+          recurrencePattern: parsedInput.recurrencePattern,
+          recurrenceDays: parsedInput.recurrenceDays,
+          recurrenceMonthDays: parsedInput.recurrenceMonthDays,
+          recurrenceCustomPeriod: parsedInput.recurrenceCustomPeriod,
+          recurrenceEndDate: parsedInput.recurrenceEndDate,
+          notes: parsedInput.notes,
+          category: parsedInput.category,
+          newTitle: parsedInput.newTitle,
+        },
+        classificationHint,
+        plannerContext: requestPlannerContext,
+      };
       const { data, error } = await supabase.functions.invoke(
         "companion-planner-chat",
         {
-          body: {
-            message,
-            currentDate: todayIso,
-            currentDateTime: formatCurrentDateTimeWithOffset(new Date()),
-            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
-            horizon,
-            tonePack,
-            conversationHistory,
-            sessionState,
-            parsedInput: {
-              text: parsedInput.text,
-              scheduledTime: parsedInput.scheduledTime,
-              scheduledDate: parsedInput.scheduledDate,
-              estimatedDuration: parsedInput.estimatedDuration,
-              recurrencePattern: parsedInput.recurrencePattern,
-              recurrenceDays: parsedInput.recurrenceDays,
-              recurrenceMonthDays: parsedInput.recurrenceMonthDays,
-              recurrenceCustomPeriod: parsedInput.recurrenceCustomPeriod,
-              recurrenceEndDate: parsedInput.recurrenceEndDate,
-              notes: parsedInput.notes,
-              category: parsedInput.category,
-              newTitle: parsedInput.newTitle,
-            },
-            classificationHint,
-            plannerContext: {
-              ...syncedPlannerContext,
-              starterIntent: resolvedStarterIntent,
-              briefingContext: resolvedBriefingContext,
-              priorityScores: requestPriorityScores,
-            },
-          } satisfies CompanionPlannerRequest,
+          body: requestBody,
         },
       );
 
@@ -2072,8 +2129,22 @@ export function useCompanionPlanner({
         ),
       });
     } catch (error) {
-      console.error("Failed to submit planner message:", error);
-      const userMessage = await resolveCompanionPlannerError(error);
+      const parsedError = await parseFunctionInvokeError(error);
+      console.error("Failed to submit planner message:", {
+        parsedError,
+        requestSummary: requestBody
+          ? {
+            messageLength: requestBody.message.length,
+            horizon: requestBody.horizon,
+            currentDate: requestBody.currentDate,
+            conversationHistoryCount: requestBody.conversationHistory.length,
+            plannerContext: summarizePlannerContextForDebug(
+              requestBody.plannerContext,
+            ),
+          }
+          : null,
+      });
+      const userMessage = toUserFacingCompanionPlannerError(parsedError);
       toast.error(userMessage);
       setMessages((previous) => [
         ...previous,

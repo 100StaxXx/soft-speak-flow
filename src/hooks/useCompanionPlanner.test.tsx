@@ -1509,6 +1509,55 @@ describe("useCompanionPlanner", () => {
     expect("timelineAnalysis" in request.body.classificationHint).toBe(false);
   });
 
+  it("normalizes legacy classifier aliases and drops malformed timeline analysis before sending the planner request", async () => {
+    mocks.classify.mockResolvedValue({
+      type: "brain_dump",
+      confidence: 0.83,
+      reasoning: "Needs unpacking",
+      timelineAnalysis: {
+        statedDays: "14",
+        typicalDays: 60,
+        feasibility: "impossible",
+        adjustmentFactors: ["retake", 2],
+      },
+    });
+    mocks.invoke.mockResolvedValue({
+      data: {
+        mode: "schedule_read",
+        reply: "Here is your schedule for 2026-04-18.",
+        followUpQuestions: [],
+        proposals: [],
+        suggestedReminders: [],
+        memoryUpdates: {},
+        sessionState: {
+          draft: {},
+          openQuestionIds: [],
+          preferredTimeOfDay: null,
+          preferredTimeReason: null,
+          reminderPreference: null,
+          lastClassification: "quest",
+        },
+      },
+      error: null,
+    });
+
+    const { result } = renderHook(() =>
+      useCompanionPlanner({ bootstrapGreeting: false })
+    );
+
+    await act(async () => {
+      await result.current.submitMessage("Show me today's route.", "text");
+    });
+
+    const request = mocks.invoke.mock.calls[0]?.[1];
+    expect(request?.body.classificationHint).toEqual({
+      type: "brain-dump",
+      confidence: 0.83,
+      reasoning: "Needs unpacking",
+    });
+    expect("timelineAnalysis" in request.body.classificationHint).toBe(false);
+  });
+
   it("strips nullable AI signal fields before building the planner request body", async () => {
     mocks.enrichedContext = {
       preferredDifficulty: null,

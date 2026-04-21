@@ -145,7 +145,9 @@ export async function handleAiOrchestrator(req: Request) {
 
         if (classifyResponse.ok) {
           aiResponse = await classifyResponse.json();
-          detectedIntent = (aiResponse as any).intent || null;
+          detectedIntent = typeof (aiResponse as { type?: unknown }).type === 'string'
+            ? (aiResponse as { type: string }).type
+            : null;
           
           // Add capacity warnings to response
           if (enrichedContext) {
