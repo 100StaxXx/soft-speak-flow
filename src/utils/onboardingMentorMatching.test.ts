@@ -36,7 +36,7 @@ describe("resolveMentorEnergy", () => {
       resolveMentorEnergy({
         gender_energy: "female",
         tags: ["masculine"],
-        slug: "atlas",
+        slug: "sage",
       }),
     ).toBe("feminine");
   });
@@ -46,8 +46,8 @@ describe("resolveMentorEnergy", () => {
   });
 
   it("uses slug fallback when no explicit energy metadata exists", () => {
-    expect(resolveMentorEnergy({ slug: "sienna" })).toBe("feminine");
-    expect(resolveMentorEnergy({ slug: "stryker" })).toBe("masculine");
+    expect(resolveMentorEnergy({ slug: "princess" })).toBe("feminine");
+    expect(resolveMentorEnergy({ slug: "operator" })).toBe("masculine");
   });
 
   it("returns unknown when no energy metadata exists", () => {
@@ -57,9 +57,9 @@ describe("resolveMentorEnergy", () => {
 
 describe("filterMentorsByEnergyPreference", () => {
   const mentors = [
-    { id: "m1", slug: "atlas", gender_energy: "masculine" },
-    { id: "m2", slug: "sienna", gender_energy: "feminine" },
-    { id: "m3", slug: "solace", gender_energy: "feminine" },
+    { id: "m1", slug: "sage", gender_energy: "masculine" },
+    { id: "m2", slug: "princess", gender_energy: "feminine" },
+    { id: "m3", slug: "icon", gender_energy: "feminine" },
   ];
 
   it("keeps only masculine mentors when masculine is selected", () => {
@@ -79,8 +79,8 @@ describe("filterMentorsByEnergyPreference", () => {
 
   it("returns no candidates when preferred energy has no matches", () => {
     const feminineOnlyMentors = [
-      { id: "f1", slug: "sienna", gender_energy: "feminine" },
-      { id: "f2", slug: "solace", gender_energy: "feminine" },
+      { id: "f1", slug: "princess", gender_energy: "feminine" },
+      { id: "f2", slug: "icon", gender_energy: "feminine" },
     ];
     const result = filterMentorsByEnergyPreference(feminineOnlyMentors, "masculine");
 
@@ -89,8 +89,8 @@ describe("filterMentorsByEnergyPreference", () => {
 
   it("filters using slug inference when gender_energy is missing", () => {
     const inferredMentors = [
-      { id: "s1", slug: "atlas", tags: [] as string[] },
-      { id: "s2", slug: "sienna", tags: [] as string[] },
+      { id: "s1", slug: "operator", tags: [] as string[] },
+      { id: "s2", slug: "princess", tags: [] as string[] },
     ];
 
     const masculineResult = filterMentorsByEnergyPreference(inferredMentors, "masculine");

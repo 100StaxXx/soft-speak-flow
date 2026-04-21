@@ -254,7 +254,7 @@ export async function handleGenerateWeeklyRecap(
         .single();
 
       let mentorName = "Your Mentor";
-      let narrativeProfile = getMentorNarrativeProfile("eli");
+      let narrativeProfile = getMentorNarrativeProfile("sage");
 
       if (profile?.selected_mentor_id) {
         const { data: mentor } = await supabase

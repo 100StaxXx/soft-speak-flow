@@ -137,8 +137,8 @@ serve(async (req) => {
     }).join('\n');
 
     // Get mentor narrative profile
-    const mentorSlug = mentorData?.slug || 'eli';
-    const mentorProfile = getMentorNarrativeProfile(mentorSlug) || mentorNarrativeProfiles.eli;
+    const mentorSlug = mentorData?.slug || 'sage';
+    const mentorProfile = getMentorNarrativeProfile(mentorSlug) || mentorNarrativeProfiles.sage;
 
     // Build milestone schedule for the prompt
     let milestoneSchedule = '';

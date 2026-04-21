@@ -224,7 +224,7 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
       if (!mentorData) return null;
 
       // Dynamically load mentor image
-      const imageUrl = mentorData.avatar_url || await loadMentorImage(mentorData.slug || 'atlas');
+      const imageUrl = mentorData.avatar_url || await loadMentorImage(mentorData.slug || "sage");
 
       // Get today's pep talk and quote in parallel
       const { data: dailyPepTalk, error: pepTalkError } = await supabase

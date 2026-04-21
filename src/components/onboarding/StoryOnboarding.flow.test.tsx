@@ -37,19 +37,19 @@ const QUESTIONNAIRE_ANSWERS = [
 
 const ACTIVE_MENTOR = {
   id: "mentor-1",
-  name: "Atlas",
-  description: "Disciplined guide",
-  tone_description: "Direct and clear",
+  name: "The Sage",
+  description: "Calm, clarifying guide",
+  tone_description: "Calm and clear",
   avatar_url: "",
   tags: ["discipline"],
   mentor_type: "coach",
   target_user_type: "builders",
-  slug: "atlas",
-  short_title: "The Strategist",
+  slug: "sage",
+  short_title: "Quiet Clarity",
   primary_color: "#7B68EE",
   target_user: "focused achievers",
   themes: ["clarity"],
-  intensity_level: "high",
+  intensity_level: "medium",
   gender_energy: "masculine",
 };
 
@@ -130,8 +130,8 @@ vi.mock("@/hooks/useCompanion", () => ({
 
 vi.mock("@/utils/mentorExplanation", () => ({
   generateMentorExplanation: () => ({
-    title: "Your Guide is: Atlas",
-    subtitle: "The Strategist",
+    title: "Your Guide is: The Sage",
+    subtitle: "Quiet Clarity",
     paragraph: "A fit for focused builders.",
     bullets: ["Clear guidance"],
   }),

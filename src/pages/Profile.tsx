@@ -34,6 +34,7 @@ import { CinematicPageBackground } from "@/components/CinematicPageBackground";
 import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
 import { applyMentorChange } from "@/pages/profileMentorChange";
+import { getMentorDisplaySortIndex } from "@/lib/mentorRoster";
 import {
   deleteCurrentAccount,
   getAccountDeletionErrorMetadata,
@@ -184,7 +185,11 @@ const Profile = () => {
         const key = (m.slug || m.name || "").trim().toLowerCase();
         if (!map.has(key)) map.set(key, m);
       }
-      return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+      return Array.from(map.values()).sort((a, b) => {
+        const sortDelta = getMentorDisplaySortIndex(a.slug) - getMentorDisplaySortIndex(b.slug);
+        if (sortDelta !== 0) return sortDelta;
+        return a.name.localeCompare(b.name);
+      });
     },
   });
 

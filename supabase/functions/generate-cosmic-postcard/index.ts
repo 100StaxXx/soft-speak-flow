@@ -317,9 +317,9 @@ serve(async (req) => {
       }
     }
 
-    // Default to Eli's nurturing voice if no mentor selected
+    // Default to the Sage if no mentor selected
     if (!mentorProfile) {
-      mentorProfile = mentorNarrativeProfiles.eli;
+      mentorProfile = mentorNarrativeProfiles.sage;
     }
     const speciesType = getSpeciesType(companion.spirit_animal);
     console.log(`[Cosmic Postcard] Species type: ${speciesType}`);

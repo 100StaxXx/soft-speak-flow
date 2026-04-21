@@ -14,10 +14,10 @@ const mocks = vi.hoisted(() => ({
     mentor_response: string | null;
   } | null,
   personality: {
-    name: "Atlas",
-    slug: "atlas",
+    name: "The Sage",
+    slug: "sage",
     primary_color: "#000000",
-    avatar_url: "https://cdn.example.com/atlas.png",
+    avatar_url: "https://cdn.example.com/sage.png",
   } as {
     name: string;
     slug: string;
@@ -172,10 +172,10 @@ describe("MorningCheckIn completion portrait", () => {
       mentor_response: "Consistency beats intensity.",
     };
     mocks.personality = {
-      name: "Atlas",
-      slug: "atlas",
+      name: "The Sage",
+      slug: "sage",
       primary_color: "#000000",
-      avatar_url: "https://cdn.example.com/atlas.png",
+      avatar_url: "https://cdn.example.com/sage.png",
     };
     mocks.loadMentorImage.mockReset();
     mocks.parseFunctionInvokeError.mockReset();
@@ -207,38 +207,38 @@ describe("MorningCheckIn completion portrait", () => {
     expect(screen.getByTestId("mentor-response-panel")).toHaveClass("bg-white/[0.03]");
     expect(screen.getByTestId("mentor-response-panel")).toHaveClass("backdrop-blur-xl");
     expect(portrait).toHaveClass("float-right");
-    expect((portrait as HTMLImageElement).src).toContain("https://cdn.example.com/atlas.png");
+    expect((portrait as HTMLImageElement).src).toContain("https://cdn.example.com/sage.png");
     expect(screen.getByText(/Consistency beats intensity/i)).toBeInTheDocument();
   });
 
   it("falls back to loadMentorImage when avatar_url is missing", async () => {
     mocks.personality = {
-      name: "Atlas",
-      slug: "atlas",
+      name: "The Sage",
+      slug: "sage",
       primary_color: "#000000",
     };
-    mocks.loadMentorImage.mockResolvedValueOnce("/assets/atlas-fallback.png");
+    mocks.loadMentorImage.mockResolvedValueOnce("/assets/sage-fallback.png");
 
     render(<MorningCheckIn />);
 
-    await waitFor(() => expect(mocks.loadMentorImage).toHaveBeenCalledWith("atlas"));
+    await waitFor(() => expect(mocks.loadMentorImage).toHaveBeenCalledWith("sage"));
     const portrait = await screen.findByTestId("mentor-portrait-tile");
-    expect((portrait as HTMLImageElement).src).toContain("/assets/atlas-fallback.png");
+    expect((portrait as HTMLImageElement).src).toContain("/assets/sage-fallback.png");
   });
 
   it("keeps mentor copy visible when portrait loading fails", async () => {
     mocks.personality = {
-      name: "Atlas",
-      slug: "atlas",
+      name: "The Sage",
+      slug: "sage",
       primary_color: "#000000",
     };
     mocks.loadMentorImage.mockRejectedValueOnce(new Error("load failed"));
 
     render(<MorningCheckIn />);
 
-    await waitFor(() => expect(mocks.loadMentorImage).toHaveBeenCalledWith("atlas"));
+    await waitFor(() => expect(mocks.loadMentorImage).toHaveBeenCalledWith("sage"));
     expect(screen.queryByTestId("mentor-portrait-tile")).not.toBeInTheDocument();
-    expect(screen.getByText("Atlas")).toBeInTheDocument();
+    expect(screen.getByText("The Sage")).toBeInTheDocument();
     expect(screen.getByText(/Consistency beats intensity/i)).toBeInTheDocument();
   });
 

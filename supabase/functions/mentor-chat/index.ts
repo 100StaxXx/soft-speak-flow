@@ -15,6 +15,7 @@ import {
   createCostGuardrailSession,
   isCostGuardrailBlockedError,
 } from "../_shared/costGuardrails.ts";
+import { resolveSupportedMentorSlug } from "../_shared/mentorRoster.ts";
 
 const ChatSchema = z.object({
   message: z.string().min(1).max(1000),
@@ -24,6 +25,7 @@ const ChatSchema = z.object({
   })).max(20).optional(),
   mentorName: z.string().min(1).max(50),
   mentorTone: z.string().min(1).max(200),
+  mentorSlug: z.string().max(50).optional(),
   comprehensiveMode: z.boolean().optional(),
   briefingContext: z.string().max(5000).optional(),
 });
@@ -223,6 +225,29 @@ function sanitizeError(error: unknown): string {
   return "An error occurred. Please try again.";
 }
 
+function getMentorPersonalityAdjustments(mentorSlug?: string | null): string {
+  const resolved = resolveSupportedMentorSlug(mentorSlug);
+
+  switch (resolved) {
+    case "sage":
+      return "Keep the response calm, concise, and lightly metaphorical. Prioritize perspective over pressure.";
+    case "icon":
+      return "Keep the response composed, standards-driven, and elegant. Frame advice around alignment, identity, and boundaries.";
+    case "charles":
+      return "Keep the response short, blunt, and lightly snarky. Accountability should sting a little, but stay useful.";
+    case "princess":
+      return "Keep the response warm, gentle, and encouraging. Make discipline feel soft, aesthetic, and kind.";
+    case "operator":
+      return "Keep the response precise, controlled, and execution-focused. Emphasize structure, blocks, and systems.";
+    case "rival":
+      return "Keep the response direct, competitive, and challenging. Use pride and standards to drive action.";
+    case "reign":
+      return "Keep the response commanding, ambitious, and performance-focused.";
+    default:
+      return "";
+  }
+}
+
 export async function handleMentorChat(req: Request) {
   if (req.method === "OPTIONS") {
     return handleCors(req);
@@ -287,11 +312,21 @@ export async function handleMentorChat(req: Request) {
       );
     }
 
-    const { message, conversationHistory, mentorName, mentorTone, comprehensiveMode, briefingContext } = validation.data;
+    const {
+      message,
+      conversationHistory,
+      mentorName,
+      mentorTone,
+      mentorSlug,
+      comprehensiveMode,
+      briefingContext,
+    } = validation.data;
 
     // Analyze user communication for learning (non-blocking)
     const communicationAnalysis = analyzeUserCommunication(message);
     
+    const personalityAdjustments = getMentorPersonalityAdjustments(mentorSlug);
+
     // Build additional context for comprehensive mode
     let additionalContext = '';
     if (briefingContext) {
@@ -349,7 +384,7 @@ export async function handleMentorChat(req: Request) {
         mentorTone,
         userMessage: message,
         contextualInfo: contextualInfo + additionalContext,
-        personalityAdjustments: '',
+        personalityAdjustments,
         maxSentences: 4
       }
     });
@@ -438,7 +473,10 @@ export async function handleMentorChat(req: Request) {
       JSON.stringify({ 
         response: assistantMessage,
         dailyLimit: DAILY_MESSAGE_LIMIT,
-        messagesUsed: (messagesToday || 0) + 1
+        messagesUsed: (messagesToday || 0) + 1,
+        responderMentorSlug: resolveSupportedMentorSlug(mentorSlug),
+        openerMentorSlug: null,
+        routingReason: resolveSupportedMentorSlug(mentorSlug) ? "direct_mentor_request" : null,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

@@ -13,8 +13,8 @@ interface MentorLike {
   slug?: string | null;
 }
 
-const MASCULINE_SLUGS = new Set(["atlas", "eli", "stryker"]);
-const FEMININE_SLUGS = new Set(["sienna", "carmen", "reign", "solace"]);
+const MASCULINE_SLUGS = new Set(["sage", "operator", "rival", "charles"]);
+const FEMININE_SLUGS = new Set(["princess", "icon"]);
 
 const normalizeEnergy = (value?: string | null): MentorEnergy | null => {
   if (!value) return null;

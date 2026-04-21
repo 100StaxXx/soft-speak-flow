@@ -29,9 +29,9 @@ describe("mapGuidanceToneToIntensity", () => {
 
 describe("deriveOnboardingMentorCandidates", () => {
   const mentors = [
-    { id: "m1", slug: "atlas", gender_energy: "masculine", tags: ["discipline"] },
-    { id: "m2", slug: "sienna", gender_energy: "feminine", tags: ["supportive"] },
-    { id: "m3", slug: "reign", gender_energy: "feminine", tags: ["momentum"] },
+    { id: "m1", slug: "sage", gender_energy: "masculine", tags: ["discipline"] },
+    { id: "m2", slug: "princess", gender_energy: "feminine", tags: ["supportive"] },
+    { id: "m3", slug: "icon", gender_energy: "feminine", tags: ["confidence"] },
   ];
 
   it("keeps only masculine mentors for masculine presence", () => {
@@ -63,8 +63,8 @@ describe("deriveOnboardingMentorCandidates", () => {
 
   it("returns no mentors when a strict preference has no matches", () => {
     const feminineOnlyMentors = [
-      { id: "f1", slug: "sienna", gender_energy: "feminine", tags: ["supportive"] },
-      { id: "f2", slug: "reign", gender_energy: "feminine", tags: ["momentum"] },
+      { id: "f1", slug: "princess", gender_energy: "feminine", tags: ["supportive"] },
+      { id: "f2", slug: "icon", gender_energy: "feminine", tags: ["confidence"] },
     ];
     const result = deriveOnboardingMentorCandidates(feminineOnlyMentors, [
       { questionId: "mentor_energy", tags: ["masculine_preference"] },

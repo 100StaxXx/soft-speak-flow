@@ -13,8 +13,8 @@ import {
   resolvePreassignedMentorSlug,
 } from "@/config/onboardingMentorAssignments";
 
-const feminineSlugs = new Set(["sienna", "carmen", "reign", "solace"]);
-const masculineSlugs = new Set(["atlas", "eli", "stryker"]);
+const feminineSlugs = new Set(["princess", "icon"]);
+const masculineSlugs = new Set(["sage", "operator", "rival", "charles"]);
 const validSlugs = new Set(ACTIVE_ONBOARDING_MENTOR_SLUGS);
 
 const makeAnswers = (
@@ -68,7 +68,7 @@ describe("resolvePreassignedMentorSlug", () => {
     const slug = resolvePreassignedMentorSlug(
       makeAnswers("feminine_presence", "clarity_mindset", "gentle_compassionate", "principles_logic"),
     );
-    expect(slug).toBe("sienna");
+    expect(slug).toBe("princess");
   });
 
   it("returns null when option IDs are incomplete", () => {
@@ -96,10 +96,10 @@ describe("resolveAssignedMentorFromActiveMentors", () => {
     );
     const result = resolveAssignedMentorFromActiveMentors(answers, activeMentors);
 
-    expect(result.mentor?.slug).toBe("stryker");
+    expect(result.mentor?.slug).toBe("charles");
     expect(result.usedFallback).toBe(false);
-    expect(result.requestedSlug).toBe("stryker");
-    expect(result.resolvedSlug).toBe("stryker");
+    expect(result.requestedSlug).toBe("charles");
+    expect(result.resolvedSlug).toBe("charles");
   });
 
   it("falls back within same feminine branch when assigned slug is inactive", () => {
@@ -109,10 +109,10 @@ describe("resolveAssignedMentorFromActiveMentors", () => {
       "gentle_compassionate",
       "principles_logic",
     );
-    const withoutSienna = activeMentors.filter((mentor) => mentor.slug !== "sienna");
-    const result = resolveAssignedMentorFromActiveMentors(answers, withoutSienna);
+    const withoutPrincess = activeMentors.filter((mentor) => mentor.slug !== "princess");
+    const result = resolveAssignedMentorFromActiveMentors(answers, withoutPrincess);
 
-    expect(result.requestedSlug).toBe("sienna");
+    expect(result.requestedSlug).toBe("princess");
     expect(result.usedFallback).toBe(true);
     expect(result.mentor?.slug).toBe(SAME_ENERGY_FALLBACKS.feminine_presence[1]);
     expect(feminineSlugs.has(result.mentor?.slug ?? "")).toBe(true);
@@ -136,12 +136,12 @@ describe("resolveAssignedMentorFromActiveMentors", () => {
 
   it("uses mixed fallback order for either branch", () => {
     const answers = makeAnswers("either_works", "emotions_healing", "gentle_compassionate", "belief_support");
-    const onlyReign = activeMentors.filter((mentor) => mentor.slug === "reign");
-    const result = resolveAssignedMentorFromActiveMentors(answers, onlyReign);
+    const onlyIcon = activeMentors.filter((mentor) => mentor.slug === "icon");
+    const result = resolveAssignedMentorFromActiveMentors(answers, onlyIcon);
 
     expect(result.usedFallback).toBe(true);
-    expect(result.mentor?.slug).toBe("reign");
-    expect(result.resolvedSlug).toBe("reign");
+    expect(result.mentor?.slug).toBe("icon");
+    expect(result.resolvedSlug).toBe("icon");
   });
 });
 

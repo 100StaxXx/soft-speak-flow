@@ -8,6 +8,7 @@ import { MentorResponseLoader } from "./MentorResponseLoader";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { resolveMentorSlugAlias } from "@/lib/mentorRoster";
 import { cn } from "@/lib/utils";
 import { getFallbackResponse, getConnectionErrorFallback } from "@/utils/mentorFallbacks";
 import { parseFunctionInvokeError } from "@/utils/supabaseFunctionErrors";
@@ -26,6 +27,7 @@ const DEFAULT_DAILY_LIMIT = 20;
 interface AskMentorChatProps {
   mentorName: string;
   mentorTone: string;
+  mentorSlug?: string;
   mentorId?: string;
   hasActiveHabits?: boolean;
   hasActiveChallenges?: boolean;
@@ -34,17 +36,31 @@ interface AskMentorChatProps {
 }
 
 const getSmartPrompts = (
+  mentorSlug: string | undefined,
   mentorTone: string,
   hasActiveHabits: boolean,
   hasActiveChallenges: boolean
 ): string[] => {
   const hour = new Date().getHours();
+  const resolvedSlug = resolveMentorSlugAlias(mentorSlug);
   const isTough = /tough|direct/i.test(mentorTone);
   const isEmpathetic = /empathetic|supportive/i.test(mentorTone);
   
-  const prompts = [];
+  const prompts: string[] = [];
   
-  if (hour >= 5 && hour < 12) {
+  if (resolvedSlug === "operator") {
+    prompts.push("Help me build a clean plan for today", "Time-block my next few hours");
+  } else if (resolvedSlug === "sage") {
+    prompts.push("I'm overwhelmed. Help me reset", "Give me one calm next step");
+  } else if (resolvedSlug === "icon") {
+    prompts.push("Is this aligned with who I'm becoming?", "Help me set a better boundary");
+  } else if (resolvedSlug === "charles") {
+    prompts.push("Call me out and get me moving", "Roast my procrastination");
+  } else if (resolvedSlug === "princess") {
+    prompts.push("Help me build a soft routine", "Give me a gentle reset");
+  } else if (resolvedSlug === "rival") {
+    prompts.push("Push me harder", "Break my laziness");
+  } else if (hour >= 5 && hour < 12) {
     prompts.push("Help me start my day strong", "What should I focus on today?");
   } else if (hour >= 12 && hour < 17) {
     prompts.push("I need an afternoon boost", "Keep me on track");
@@ -72,6 +88,7 @@ const getSmartPrompts = (
 export const AskMentorChat = ({ 
   mentorName, 
   mentorTone,
+  mentorSlug,
   mentorId,
   hasActiveHabits = false,
   hasActiveChallenges = false,
@@ -127,6 +144,7 @@ export const AskMentorChat = ({
           message: text,
           mentorName,
           mentorTone,
+          mentorSlug,
           conversationHistory: currentMessages.slice(-10),
           comprehensiveMode,
           briefingContext,
@@ -202,7 +220,7 @@ export const AskMentorChat = ({
     } finally {
       setIsLoading(false);
     }
-  }, [dailyMessageCount, dailyLimit, toast, mentorName, mentorTone, mentorId, isOnline, comprehensiveMode, briefingContext]);
+  }, [dailyMessageCount, dailyLimit, toast, mentorName, mentorTone, mentorSlug, mentorId, isOnline, comprehensiveMode, briefingContext]);
 
   useEffect(() => {
     // Check today's message count on mount only
@@ -226,8 +244,8 @@ export const AskMentorChat = ({
   }, [user]); // Only run on mount and user change, not on every message
 
   useEffect(() => {
-    setSuggestedPrompts(getSmartPrompts(mentorTone, hasActiveHabits, hasActiveChallenges));
-  }, [mentorTone, hasActiveHabits, hasActiveChallenges]);
+    setSuggestedPrompts(getSmartPrompts(mentorSlug, mentorTone, hasActiveHabits, hasActiveChallenges));
+  }, [mentorSlug, mentorTone, hasActiveHabits, hasActiveChallenges]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });

@@ -31,13 +31,13 @@ Deno.test("mentor pep talk config resolves active mentor themes", () => {
 
 Deno.test("mentor pep talk config resolves legacy aliases", () => {
   const resolved = resolveMentorSlug("elizabeth");
-  assert(resolved === "solace", "Expected elizabeth alias to map to solace");
+  assert(resolved === "charles", "Expected elizabeth alias to map to charles");
 });
 
 Deno.test("mentor pep talk config uses deterministic theme selection", () => {
   const date = new Date("2026-02-22T00:00:00.000Z");
-  const first = selectThemeForDate("atlas", date);
-  const second = selectThemeForDate("atlas", date);
+  const first = selectThemeForDate("sage", date);
+  const second = selectThemeForDate("sage", date);
 
   assert(first.theme.topic_category === second.theme.topic_category, "Theme should be stable for same date");
   assert(first.theme.intensity === second.theme.intensity, "Intensity should be stable for same date");

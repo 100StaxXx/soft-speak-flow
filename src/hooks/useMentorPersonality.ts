@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useMentorConnection } from "@/contexts/MentorConnectionContext";
+import { resolveMentorSlugAlias } from "@/lib/mentorRoster";
 
 interface MentorPersonality {
   name: string;
@@ -16,36 +17,48 @@ interface MentorPersonality {
 }
 
 const personalityTemplates: Record<string, Partial<MentorPersonality>> = {
-  tough: {
-    buttonText: (action) => `${action}. Now.`,
-    emptyState: (context) => `No excuses. Start ${context}.`,
-    encouragement: () => "You're tougher than this. Prove it.",
-    nudge: () => "Stop waiting. Act."
+  sage: {
+    buttonText: (action) => `${action} with calm`,
+    emptyState: (context) => `One clear step is enough. Begin with ${context}.`,
+    encouragement: () => "Small steps still move mountains.",
+    nudge: () => "Breathe first. Then continue.",
   },
-  direct: {
-    buttonText: (action) => action,
-    emptyState: (context) => `Time to ${context}.`,
-    encouragement: () => "Keep pushing forward.",
-    nudge: () => "Get it done."
+  icon: {
+    buttonText: (action) => `${action} with intention`,
+    emptyState: (context) => `Does ${context} match your standard?`,
+    encouragement: () => "We don't shrink to make the choice easier.",
+    nudge: () => "Stay aligned with who you're becoming.",
   },
-  empathetic: {
-    buttonText: (action) => `${action} when you're ready`,
-    emptyState: (context) => `Take your time with ${context}. I'm here.`,
-    encouragement: () => "You're doing great. Keep going.",
-    nudge: () => "Just checking in on you."
+  charles: {
+    buttonText: (action) => `${action}. Obviously.`,
+    emptyState: (context) => `We're avoiding ${context} now? Cute.`,
+    encouragement: () => "Embarrassing would be stopping now.",
+    nudge: () => "You know better. Do better.",
   },
-  supportive: {
+  princess: {
     buttonText: (action) => `Let's ${action.toLowerCase()}`,
-    emptyState: (context) => `Ready to ${context}? I believe in you.`,
-    encouragement: () => "You've got this!",
-    nudge: () => "How are you feeling today?"
+    emptyState: (context) => `A soft start still counts. Begin with ${context}.`,
+    encouragement: () => "A gentle, productive day is enough.",
+    nudge: () => "Let's take care of ourselves today.",
   },
-  wise: {
-    buttonText: (action) => `${action} mindfully`,
-    emptyState: (context) => `Consider ${context} as your next step.`,
-    encouragement: () => "Every step forward is progress.",
-    nudge: () => "Reflect on your path."
-  }
+  operator: {
+    buttonText: (action) => `${action}. Execute.`,
+    emptyState: (context) => `Your current system lacks ${context}. Let's correct it.`,
+    encouragement: () => "We're not guessing. We're executing.",
+    nudge: () => "Start the next block.",
+  },
+  rival: {
+    buttonText: (action) => `${action}. Show me.`,
+    emptyState: (context) => `That's the standard? Raise it while you ${context}.`,
+    encouragement: () => "You said you were different. Prove it.",
+    nudge: () => "Try harder.",
+  },
+  reign: {
+    buttonText: (action) => `${action}. No excuses.`,
+    emptyState: (context) => `Excellence still applies to ${context}.`,
+    encouragement: () => "Stand tall and make today count.",
+    nudge: () => "Lock in.",
+  },
 };
 
 export const useMentorPersonality = (): MentorPersonality | null => {
@@ -68,21 +81,8 @@ export const useMentorPersonality = (): MentorPersonality | null => {
 
   if (!mentor) return null;
 
-  const toneDescription = mentor.tone_description?.toLowerCase() ?? "";
-
-  // Determine personality type from tone
-  const toneKeyword = toneDescription;
-  let template = personalityTemplates.supportive; // default
-  
-  if (toneKeyword.includes('tough') || toneKeyword.includes('hard')) {
-    template = personalityTemplates.tough;
-  } else if (toneKeyword.includes('direct')) {
-    template = personalityTemplates.direct;
-  } else if (toneKeyword.includes('empathetic')) {
-    template = personalityTemplates.empathetic;
-  } else if (toneKeyword.includes('wise') || toneKeyword.includes('calm')) {
-    template = personalityTemplates.wise;
-  }
+  const resolvedSlug = resolveMentorSlugAlias(mentor.slug) ?? mentor.slug ?? "sage";
+  const template = personalityTemplates[resolvedSlug] ?? personalityTemplates.sage;
 
   return {
     name: mentor.name,

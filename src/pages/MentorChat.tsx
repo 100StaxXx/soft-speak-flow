@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { AskMentorChat } from "@/components/AskMentorChat";
+import { MentorAvatar } from "@/components/MentorAvatar";
 import { MentorSwitcher } from "@/components/MentorSwitcher";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -206,21 +207,19 @@ export default function MentorChat() {
             <div className="absolute top-1/2 right-1/4 w-2 h-2 bg-accent/50 rounded-full animate-float-slow" style={{ animationDelay: '1.5s' }} />
           </div>
           
-          {/* Mentor Avatar */}
-          {mentor.avatar_url && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="relative">
-                <div className="absolute inset-0 bg-primary/30 blur-3xl rounded-full animate-pulse" />
-                <img
-                  src={mentor.avatar_url}
-                  alt={mentor.name}
-                  className="relative w-24 h-24 md:w-32 md:h-32 rounded-full border-4 border-background shadow-glow-lg object-cover"
-                  loading="lazy"
-                  decoding="async"
-                />
-              </div>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="relative">
+              <div className="absolute inset-0 rounded-full bg-primary/30 blur-3xl animate-pulse" />
+              <MentorAvatar
+                mentorSlug={mentor.slug || mentor.name}
+                mentorName={mentor.name}
+                primaryColor={mentor.primary_color || "#7c3aed"}
+                avatarUrl={mentor.avatar_url || undefined}
+                size="md"
+                className="relative !h-24 !w-24 md:!h-32 md:!w-32 border-4 border-background shadow-glow-lg"
+              />
             </div>
-          )}
+          </div>
           
           {/* Buttons Container */}
           <div className="absolute top-4 left-4 right-4 z-10 flex items-center justify-between safe-area-top">
@@ -289,6 +288,7 @@ export default function MentorChat() {
             key={mentor.id}
             mentorName={mentor.name}
             mentorTone={mentor.tone_description}
+            mentorSlug={mentor.slug}
             mentorId={mentor.id}
             briefingContext={briefingContext}
             comprehensiveMode={comprehensiveMode}
