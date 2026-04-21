@@ -7,7 +7,6 @@ import {
   getAllLinesForBucket,
   getLinesForToneAndBucket,
 } from "@/config/companionDialoguePacks";
-import { LOCKED_COMPANION_TONE_PACK } from "@/shared/companionChaosVoice";
 import { safeLocalStorage } from "@/utils/storage";
 
 export type DialogueMood = "thriving" | "content" | "concerned" | "desperate" | "recovering";
@@ -112,10 +111,35 @@ const BUCKETS_BY_SHIMMER: Record<CompanionShimmerType, CompanionDialogueBucketKe
   gold: ["legendary_moments"],
 };
 
-const LOCKED_TONE_WEIGHTS: Record<CompanionDialogueTonePack, number> = {
-  soft: 0,
-  playful: 0,
-  witty_sassy: 1,
+const BASE_TONE_WEIGHTS_BY_MOOD: Record<
+  DialogueMood,
+  Record<CompanionDialogueTonePack, number>
+> = {
+  thriving: {
+    soft: 2,
+    playful: 3,
+    witty_sassy: 3,
+  },
+  content: {
+    soft: 3,
+    playful: 3,
+    witty_sassy: 2,
+  },
+  concerned: {
+    soft: 4,
+    playful: 2,
+    witty_sassy: 1,
+  },
+  desperate: {
+    soft: 5,
+    playful: 1,
+    witty_sassy: 1,
+  },
+  recovering: {
+    soft: 4,
+    playful: 2,
+    witty_sassy: 1,
+  },
 };
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
@@ -177,12 +201,62 @@ const pickWeighted = <T extends string>(weights: Record<T, number>, rng: () => n
   return entries[entries.length - 1][0];
 };
 
-const getToneWeightsForMood = (_mood: DialogueMood) => ({ ...LOCKED_TONE_WEIGHTS });
+const getToneWeightsForMood = (mood: DialogueMood) => ({
+  ...BASE_TONE_WEIGHTS_BY_MOOD[mood],
+});
+
+const inferPreferredTonePack = (
+  voiceStyle?: string,
+): CompanionDialogueTonePack | null => {
+  const normalized = (voiceStyle ?? "").trim().toLowerCase();
+  if (!normalized) return null;
+
+  if (
+    normalized.includes("calm")
+    || normalized.includes("mentor")
+    || normalized.includes("grounded")
+    || normalized.includes("supportive")
+    || normalized.includes("wise")
+    || normalized.includes("reassuring")
+  ) {
+    return "soft";
+  }
+
+  if (
+    normalized.includes("strategic")
+    || normalized.includes("analytical")
+    || normalized.includes("efficient")
+    || normalized.includes("systems")
+  ) {
+    return "playful";
+  }
+
+  if (
+    normalized.includes("alpha")
+    || normalized.includes("chaotic")
+    || normalized.includes("sharp")
+    || normalized.includes("streetwise")
+    || normalized.includes("irreverent")
+    || normalized.includes("witty")
+  ) {
+    return "witty_sassy";
+  }
+
+  return null;
+};
 
 const applyVoiceStyleBias = (
   weights: Record<CompanionDialogueTonePack, number>,
-  _voiceStyle?: string,
-) => weights;
+  voiceStyle?: string,
+) => {
+  const preferredTonePack = inferPreferredTonePack(voiceStyle);
+  if (!preferredTonePack) return weights;
+
+  return {
+    ...weights,
+    [preferredTonePack]: (weights[preferredTonePack] ?? 0) + 6,
+  };
+};
 
 const getBucketsForShimmer = (shimmerType: CompanionShimmerType) => BUCKETS_BY_SHIMMER[shimmerType];
 
@@ -501,7 +575,8 @@ export const selectDialogueLineCandidate = ({
   const baseCandidates = filterLinesAgainstHistory(getAllLinesForBucket("base_greetings"), history, now);
   const baseLine =
     pickLineFromCandidates(baseCandidates, rng)
-    ?? getLinesForToneAndBucket(LOCKED_COMPANION_TONE_PACK, "base_greetings")[0];
+    ?? getLinesForToneAndBucket(tonePack, "base_greetings")[0]
+    ?? COMPANION_DIALOGUE_TONE_PACKS.soft.base_greetings[0];
 
   return {
     line: baseLine,

@@ -3,9 +3,9 @@ import { generateMentorExplanation } from "./mentorExplanation";
 
 const mentor = {
   id: "mentor-1",
-  slug: "atlas",
-  name: "Atlas",
-  short_title: "Stoic Strategist",
+  slug: "sage",
+  name: "The Sage",
+  short_title: "Quiet Clarity",
   tone_description: "Direct and calm",
   target_user: "users who need structure",
   themes: ["discipline", "focus"],
@@ -36,6 +36,6 @@ describe("generateMentorExplanation", () => {
 
   it("falls back when growth/guidance tags are missing", () => {
     const result = generateMentorExplanation(mentor, {});
-    expect(result.paragraph).toContain("Atlas is direct and calm and is best for users who need structure.");
+    expect(result.paragraph).toContain("The Sage is direct and calm and is best for users who need structure.");
   });
 });

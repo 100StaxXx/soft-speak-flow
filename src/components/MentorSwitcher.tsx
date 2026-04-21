@@ -19,10 +19,15 @@ import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  getMentorDisplaySortIndex,
+  normalizeMentorSlug,
+} from "@/lib/mentorRoster";
 import { cn } from "@/lib/utils";
 import { useMentorConnection } from "@/contexts/MentorConnectionContext";
 import { applyMentorChange } from "@/pages/profileMentorChange";
 import {
+  collectMentorTraits,
   getMentorRecommendations,
   getMoodLabel,
   type MentorRecommendation,
@@ -92,6 +97,22 @@ const getMoodSummary = ({
   }
 
   return "Browse the full guide lineup and consult the voice you need right now.";
+};
+
+const getTimeBasedRecommendationConfig = (
+  date: Date,
+): { label: string; slugs: string[] } => {
+  const hour = date.getHours();
+
+  if (hour >= 5 && hour < 12) {
+    return { label: "this morning", slugs: ["operator", "princess"] };
+  }
+
+  if (hour >= 12 && hour < 17) {
+    return { label: "the midday slump", slugs: ["charles", "rival"] };
+  }
+
+  return { label: "tonight", slugs: ["sage", "princess"] };
 };
 
 const TriggerCard = forwardRef<
@@ -278,9 +299,40 @@ export const MentorSwitcher = ({
   });
 
   const currentMood = pendingMood || todayCheckIn?.mood || latestCheckIn?.mood || null;
+  const orderedMentors = useMemo(
+    () =>
+      [...mentors].sort((left, right) => {
+        const sortDelta = getMentorDisplaySortIndex(left.slug) - getMentorDisplaySortIndex(right.slug);
+        if (sortDelta !== 0) return sortDelta;
+        return left.name.localeCompare(right.name);
+      }),
+    [mentors],
+  );
   const recommendations = useMemo(
-    () => getMentorRecommendations(mentors, currentMood, 2),
-    [currentMood, mentors],
+    () => {
+      const moodRecommendations = getMentorRecommendations(orderedMentors, currentMood, 2);
+      if (moodRecommendations.length > 0 || currentMood) {
+        return moodRecommendations;
+      }
+
+      const timeBasedConfig = getTimeBasedRecommendationConfig(new Date());
+      return orderedMentors
+        .filter((mentor) => {
+          const slug = normalizeMentorSlug(mentor.slug);
+          return Boolean(slug && timeBasedConfig.slugs.includes(slug));
+        })
+        .slice(0, 2)
+        .map((mentor, index) => ({
+          mentor,
+          score: 2 - index,
+          matchedTraits: [],
+          traits: collectMentorTraits(mentor),
+          reasonLabel: index === 0
+            ? `Suggested for ${timeBasedConfig.label}`
+            : `Also strong for ${timeBasedConfig.label}`,
+        }));
+    },
+    [currentMood, orderedMentors],
   );
   const recommendationByMentorId = useMemo(
     () => new Map(recommendations.map((entry) => [entry.mentor.id, entry])),
@@ -288,12 +340,12 @@ export const MentorSwitcher = ({
   );
   const consultMentorId = getConsultMentorIdFromState(location.state);
   const activeMentor = useMemo(
-    () => mentors.find((mentor) => mentor.id === activeMentorId) ?? null,
-    [activeMentorId, mentors],
+    () => orderedMentors.find((mentor) => mentor.id === activeMentorId) ?? null,
+    [activeMentorId, orderedMentors],
   );
   const consultMentor = useMemo(
-    () => mentors.find((mentor) => mentor.id === consultMentorId) ?? null,
-    [consultMentorId, mentors],
+    () => orderedMentors.find((mentor) => mentor.id === consultMentorId) ?? null,
+    [consultMentorId, orderedMentors],
   );
   const isConsultingAlternateMentor = Boolean(
     consultMentor && activeMentor && consultMentor.id !== activeMentor.id,
@@ -555,7 +607,7 @@ export const MentorSwitcher = ({
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {mentors.map((mentor) => {
+                  {orderedMentors.map((mentor) => {
                     const isPrimary = mentor.id === activeMentorId;
                     const isConsulting = mentor.id === consultMentorId && mentor.id !== activeMentorId;
                     const isSwitching = switchingMentorId === mentor.id;

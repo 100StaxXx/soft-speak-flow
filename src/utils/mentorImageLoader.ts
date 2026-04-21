@@ -1,73 +1,63 @@
 /**
- * Dynamic Mentor Image Loader
- * Only loads the mentor image that's actually needed, not all 23MB upfront!
+ * Dynamic mentor image loader.
+ * Only imports the requested fallback portrait instead of the whole roster upfront.
  */
 
-// Cache loaded images to avoid re-importing
+import { resolveMentorSlugAlias } from "@/lib/mentorRoster";
+
 const imageCache = new Map<string, string>();
 
-/**
- * Dynamically imports only the needed mentor image
- * This reduces initial bundle size by ~20MB!
- */
 export const loadMentorImage = async (slug: string): Promise<string> => {
-  // Check cache first
-  if (imageCache.has(slug)) {
-    return imageCache.get(slug)!;
+  const resolvedSlug = resolveMentorSlugAlias(slug) ?? "sage";
+
+  if (imageCache.has(resolvedSlug)) {
+    return imageCache.get(resolvedSlug)!;
   }
 
-  // Dynamically import only the needed image
   try {
     let module;
-    switch (slug.toLowerCase()) {
-      case 'atlas':
-        module = await import('@/assets/atlas-sage.png');
+    switch (resolvedSlug) {
+      case "sage":
+        module = await import("@/assets/sage-mentor.png");
         break;
-      case 'eli':
-        module = await import('@/assets/darius-sage.png'); // Eli uses Darius's image
+      case "icon":
+        module = await import("@/assets/icon-mentor.png");
         break;
-      case 'sienna':
-        module = await import('@/assets/sienna-sage.png');
+      case "charles":
+        module = await import("@/assets/charles-mentor.png");
         break;
-      case 'stryker':
-        module = await import('@/assets/stryker-sage.png');
+      case "princess":
+        module = await import("@/assets/princess-mentor.png");
         break;
-      case 'carmen':
-        module = await import('@/assets/carmen-sage.png');
+      case "operator":
+        module = await import("@/assets/stryker-sage.png");
         break;
-      case 'reign':
-        module = await import('@/assets/reign-sage.png');
+      case "rival":
+        module = await import("@/assets/rival-mentor.png");
         break;
-      case 'solace':
-        module = await import('@/assets/solace-sage.png');
+      case "reign":
+        module = await import("@/assets/reign-sage.png");
         break;
       default:
-        // Default fallback
-        module = await import('@/assets/atlas-sage.png');
+        module = await import("@/assets/sage-mentor.png");
+        break;
     }
-    
+
     const imageUrl = module.default;
-    imageCache.set(slug, imageUrl);
+    imageCache.set(resolvedSlug, imageUrl);
     return imageUrl;
   } catch (error) {
     console.error(`Failed to load mentor image for ${slug}:`, error);
-    // Return empty string as fallback
-    return '';
+    return "";
   }
 };
 
-/**
- * Preload a mentor image (for next page/mentor)
- */
 export const preloadMentorImage = (slug: string): void => {
   loadMentorImage(slug).catch(() => {
-    // Silent fail for preload
+    // Ignore preload failures.
   });
 };
 
-/**
- * Clear the image cache (useful for memory management)
- */
 export const clearMentorImageCache = (): void => {
   imageCache.clear();
 };

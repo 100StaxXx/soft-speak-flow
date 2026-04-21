@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 import { stripMarkdown } from "@/lib/utils";
+import type { PendingActionView } from "@/types/companionAgent";
 import type {
   CompanionChatInputMode,
   CompanionChatRole,
@@ -12,6 +13,7 @@ import type {
 
 type CompanionChatThreadRow = Tables<"companion_chat_threads">;
 type CompanionChatRow = Tables<"companion_chats">;
+type CompanionPendingActionRow = Tables<"companion_pending_actions">;
 
 type PersistableThreadMessage = {
   role: CompanionChatRole;
@@ -61,6 +63,21 @@ const mapThreadMessage = (
   createdAt: row.created_at,
   inputMode: row.input_mode as CompanionChatInputMode | null ?? undefined,
   source: row.source as CompanionChatSource,
+});
+
+const mapPendingAction = (
+  row: CompanionPendingActionRow,
+): PendingActionView => ({
+  id: row.id,
+  status: row.status as PendingActionView["status"],
+  intent: row.intent as PendingActionView["intent"],
+  actionType: row.action_type as PendingActionView["actionType"],
+  summary: row.summary,
+  confirmationMessage: row.confirmation_message,
+  normalizedPayload: row.normalized_payload,
+  affectedEntities: row.affected_entities,
+  expiresAt: row.expires_at,
+  createdAt: row.created_at,
 });
 
 const updateThreadRow = async (
@@ -176,6 +193,22 @@ export const loadCompanionChatThreadMessages = async (
 
   if (error) throw error;
   return (data ?? []).map(mapThreadMessage);
+};
+
+export const loadCompanionPendingAction = async (
+  sessionId: string,
+) => {
+  const { data, error } = await supabase
+    .from("companion_pending_actions")
+    .select("*")
+    .eq("session_id", sessionId)
+    .eq("status", "pending")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data ? mapPendingAction(data as CompanionPendingActionRow) : null;
 };
 
 export const persistCompanionThreadMessages = async (params: {

@@ -1,3 +1,5 @@
+import { resolveMentorSlugAlias } from "@/lib/mentorRoster";
+
 export interface MentorVoiceConfig {
   mentorSlug: string;
   mentorName: string;
@@ -14,106 +16,107 @@ export interface MentorVoiceConfig {
 }
 
 export const mentorVoices: Record<string, MentorVoiceConfig> = {
-  atlas: {
-    mentorSlug: "atlas",
-    mentorName: "Atlas",
-    voiceName: "George",
-    voiceId: "JBFqnCBsd6RMkjVDRZzb",
-    defaultIntensity: "medium",
-    categories: ["motivation", "discipline", "growth"],
+  sage: {
+    mentorSlug: "sage",
+    mentorName: "The Sage",
+    voiceName: "The Sage",
+    voiceId: "mcuuWJIofmzgKEGk3EMA",
+    defaultIntensity: "gentle",
+    categories: ["clarity", "calm", "reflection"],
     voiceSettings: {
-      stability: 0.75,
-      similarity_boost: 0.85,
-      style_exaggeration: 0.5,
+      stability: 0.72,
+      similarity_boost: 0.82,
+      style_exaggeration: 0.28,
       use_speaker_boost: true,
     },
   },
-  eli: {
-    mentorSlug: "eli",
-    mentorName: "Eli",
-    voiceName: "Chris",
-    voiceId: "mcuuWJIofmzgKEGk3EMA",
+  icon: {
+    mentorSlug: "icon",
+    mentorName: "The Icon",
+    voiceName: "The Icon",
+    voiceId: "6p0P6gezgvY1v6xbLzmU",
     defaultIntensity: "medium",
-    categories: ["wisdom", "reflection", "growth"],
+    categories: ["standards", "identity", "boundaries"],
     voiceSettings: {
       stability: 0.7,
-      similarity_boost: 0.8,
-      style_exaggeration: 0.4,
+      similarity_boost: 0.84,
+      style_exaggeration: 0.64,
       use_speaker_boost: true,
     },
   },
-  sienna: {
-    mentorSlug: "sienna",
-    mentorName: "Sienna",
-    voiceName: "Charlotte",
-    voiceId: "wGcFBfKz5yUQqhqr0mVy",
-    defaultIntensity: "gentle",
-    categories: ["compassion", "healing", "support"],
+  charles: {
+    mentorSlug: "charles",
+    mentorName: "Charles",
+    voiceName: "Charles",
+    voiceId: "wGkprrTXgBM5EC3Znt6U",
+    defaultIntensity: "medium",
+    categories: ["accountability", "procrastination", "momentum"],
     voiceSettings: {
-      stability: 0.8,
-      similarity_boost: 0.85,
-      style_exaggeration: 0.3,
+      stability: 0.76,
+      similarity_boost: 0.86,
+      style_exaggeration: 0.52,
       use_speaker_boost: true,
     },
   },
-  stryker: {
-    mentorSlug: "stryker",
-    mentorName: "Stryker",
-    voiceName: "Adam",
+  princess: {
+    mentorSlug: "princess",
+    mentorName: "The Princess",
+    voiceName: "The Princess",
+    voiceId: "nBKdbSdaLWZTX0tYSgvZ",
+    defaultIntensity: "gentle",
+    categories: ["self-care", "habits", "soft-discipline"],
+    voiceSettings: {
+      stability: 0.82,
+      similarity_boost: 0.88,
+      style_exaggeration: 0.24,
+      use_speaker_boost: true,
+    },
+  },
+  operator: {
+    mentorSlug: "operator",
+    mentorName: "The Operator",
+    voiceName: "The Operator",
     voiceId: "pNInz6obpgDQGcFmaJgB",
     defaultIntensity: "high",
-    categories: ["strength", "resilience", "power"],
+    categories: ["structure", "execution", "optimization"],
     voiceSettings: {
-      stability: 0.85,
-      similarity_boost: 0.9,
-      style_exaggeration: 0.7,
+      stability: 0.58,
+      similarity_boost: 0.96,
+      style_exaggeration: 1,
       use_speaker_boost: true,
     },
   },
-  carmen: {
-    mentorSlug: "carmen",
-    mentorName: "Carmen",
-    voiceName: "Domi",
-    voiceId: "4opnKWPbOJPB3xz3YUBh",
+  rival: {
+    mentorSlug: "rival",
+    mentorName: "The Rival",
+    voiceName: "The Rival",
+    voiceId: "V33LkP9pVLdcjeB2y5Na",
     defaultIntensity: "high",
-    categories: ["discipline", "business", "confidence"],
+    categories: ["competition", "performance", "intensity"],
     voiceSettings: {
-      stability: 0.75,
-      similarity_boost: 0.85,
-      style_exaggeration: 0.7,
+      stability: 0.68,
+      similarity_boost: 0.88,
+      style_exaggeration: 0.84,
       use_speaker_boost: true,
     },
   },
   reign: {
     mentorSlug: "reign",
     mentorName: "Reign",
-    voiceName: "Reign Custom",
+    voiceName: "Reign",
     voiceId: "GTQ4ImqrRljZAa9VJX6B",
     defaultIntensity: "high",
-    categories: ["physique", "business", "momentum"],
+    categories: ["legacy", "performance", "discipline"],
     voiceSettings: {
-      stability: 0.65,
-      similarity_boost: 0.90,
-      style_exaggeration: 0.85,
-      use_speaker_boost: true,
-    },
-  },
-  solace: {
-    mentorSlug: "solace",
-    mentorName: "Solace",
-    voiceName: "Matilda",
-    voiceId: "XB0fDUnXU5powFXDhCwa",
-    defaultIntensity: "medium",
-    categories: ["confidence", "support", "encouragement"],
-    voiceSettings: {
-      stability: 0.80,
-      similarity_boost: 0.80,
-      style_exaggeration: 0.35,
+      stability: 0.52,
+      similarity_boost: 0.97,
+      style_exaggeration: 1,
       use_speaker_boost: true,
     },
   },
 };
 
 export const getMentorVoiceConfig = (mentorSlug: string): MentorVoiceConfig | null => {
-  return mentorVoices[mentorSlug] || null;
+  const resolvedSlug = resolveMentorSlugAlias(mentorSlug);
+  return resolvedSlug ? mentorVoices[resolvedSlug] ?? null : null;
 };

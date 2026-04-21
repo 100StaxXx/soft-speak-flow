@@ -7,24 +7,11 @@ import {
   createCostGuardrailSupabaseClient,
   isCostGuardrailBlockedError,
 } from "../_shared/costGuardrails.ts";
+import { resolveTutorialVoice } from "../_shared/mentorVoiceConfig.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-// Map mentor slugs to OpenAI TTS voices
-const mentorVoiceMap: Record<string, string> = {
-  atlas: 'onyx',      // deep, authoritative
-  eli: 'echo',        // wise, measured
-  nova: 'nova',       // innovative, energetic
-  sienna: 'shimmer',  // warm, compassionate
-  lumi: 'alloy',      // calm, peaceful
-  kai: 'onyx',        // high energy
-  stryker: 'fable',   // strong, resilient
-  carmen: 'nova',     // strong, authoritative female
-  reign: 'fable',     // commanding, high-energy
-  elizabeth: 'shimmer', // warm, nurturing
 };
 
 serve(async (req) => {
@@ -49,7 +36,7 @@ serve(async (req) => {
       throw new Error('OPENAI_API_KEY not configured');
     }
 
-    const voice = mentorVoiceMap[mentorSlug] || 'alloy';
+    const voice = resolveTutorialVoice(mentorSlug);
     const costGuardrails = createCostGuardrailSession({
       supabase: createCostGuardrailSupabaseClient(),
       endpointKey: "generate-tutorial-tts",

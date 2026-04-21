@@ -79,18 +79,11 @@ export const canonicalizeTags = (tags: Array<string | null | undefined>): Canoni
 };
 
 export const MENTOR_FALLBACK_TAGS: Record<string, CanonicalTrait[]> = {
-  // HIGH INTENSITY (discipline-focused)
-  atlas: ["discipline", "calm"],           // Stoic discipline + inner calm
-  stryker: ["momentum", "discipline"],     // High-energy momentum first
-
-  // STRONG FEMALE
-  carmen: ["discipline", "confidence"],    // Feminine tough-love coach
-  reign: ["momentum", "discipline"],       // Elite performance queen
-
-  // BALANCED (confidence/supportive)
-  eli: ["confidence", "supportive"],       // Uplifting confidence + warmth
-  solace: ["confidence", "supportive"],    // Uplift sister
-
-  // SOFT/HEALING
-  sienna: ["healing", "calm"],             // Deep healing + gentle calm
+  sage: ["calm", "healing"],
+  icon: ["confidence", "discipline"],
+  charles: ["momentum", "discipline"],
+  princess: ["supportive", "healing"],
+  operator: ["discipline", "calm"],
+  rival: ["momentum", "discipline"],
+  reign: ["momentum", "discipline"],
 };

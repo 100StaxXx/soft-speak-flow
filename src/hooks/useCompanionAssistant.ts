@@ -1,35 +1,50 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/components/ui/sonner";
-import { parseNaturalLanguage } from "@/features/tasks/hooks/useNaturalLanguageParser";
+import { isCompanionAgentSurfaceEnabled } from "@/config/companionAgentRollout";
 import { useAuth } from "@/hooks/useAuth";
 import { useCompanion } from "@/hooks/useCompanion";
-import { useCompanionChat } from "@/hooks/useCompanionChat";
 import { useCompanionDialogue } from "@/hooks/useCompanionDialogue";
-import { useCompanionPlanner } from "@/hooks/useCompanionPlanner";
-import { useJourneysCompanionConversation } from "@/hooks/useJourneysCompanionConversation";
-import { useJourneysCompanionThreads } from "@/hooks/useJourneysCompanionThreads";
+import { useLegacyCompanionAssistantAdapter } from "@/hooks/useLegacyCompanionAssistantAdapter";
+import { useCompanionVoiceSettings } from "@/hooks/useCompanionVoiceSettings";
 import { useVoiceInput } from "@/hooks/useVoiceInput";
+import { supabase } from "@/integrations/supabase/client";
 import { stripMarkdown } from "@/lib/utils";
 import {
-  analyzeSchedulingIntent,
-  shouldRouteMessageToPlanner,
-} from "@/shared/schedulingIntent";
-import {
-  isGoalBreakdownStarterMessage,
-  looksLikeBigGoal,
-} from "@/shared/bigGoalIntent";
+  buildCompanionThreadPreview,
+  buildCompanionThreadTitle,
+  generateCompanionThreadSessionId,
+  getCompanionChatThreadsQueryKey,
+  listCompanionChatThreads,
+  loadCompanionChatThreadMessages,
+  loadCompanionPendingAction,
+  setCompanionChatThreadArchived,
+} from "@/services/companionChatThreads";
 import {
   speakCompanionReply,
   stopCompanionSpeech,
   type CompanionSpeechProvider,
 } from "@/services/companionSpeech";
-import type { CompanionChatInputMode } from "@/types/companionConversation";
+import { getCompanionPlannerOpener } from "@/shared/companionPlannerCopy";
 import type {
-  CompanionPlannerLaunchIntent,
-  CompanionPlannerLaunchTarget,
-} from "@/types/companionPlanner";
+  ActionReceiptView,
+  CompanionAgentResponse,
+  PendingActionView,
+} from "@/types/companionAgent";
+import type {
+  CompanionChatInputMode,
+  CompanionChatSource,
+  CompanionChatSurface,
+  CompanionChatThreadSummary,
+} from "@/types/companionConversation";
+import type { CompanionPlannerLaunchIntent } from "@/types/companionPlanner";
+import {
+  COMPANION_CHAT_THREAD_HISTORY_DISABLED_REASON,
+  COMPANION_CHAT_THREAD_HISTORY_EMPTY_STATE,
+  isCompanionChatSetupError,
+} from "@/utils/companionChatSetup";
 import { formatCurrentDateTimeWithOffset } from "@/utils/currentDateTime";
+import { parseFunctionInvokeError } from "@/utils/supabaseFunctionErrors";
 
 export type CompanionAssistantSurface = "companion" | "journeys";
 
@@ -38,10 +53,11 @@ export interface CompanionAssistantMessage {
   role: "assistant" | "user";
   content: string;
   createdAt: string;
-  speechText?: string;
   inputMode?: CompanionChatInputMode;
-  source: "chat" | "plan";
+  source: CompanionChatSource;
   isSeed?: boolean;
+  pendingAction?: PendingActionView;
+  receipt?: ActionReceiptView;
 }
 
 interface UseCompanionAssistantOptions {
@@ -52,87 +68,84 @@ interface UseCompanionAssistantOptions {
   onOpenCampaignBuilder?: (message: string) => void;
 }
 
-const ASSISTANT_LED_LAUNCHER_STARTER_INTENTS = new Set<CompanionPlannerLaunchIntent["starterIntent"]>([
-  "free_talk_start",
-  // Direct planner.submitMessage(...) callers still use this set even though
-  // the launch-intent effect short-circuits quest capture into primeQuestCapture(...).
-  "quest_capture",
-  "goal_breakdown_start",
-]);
-
-const normalizeConversationMessages = (
-  messages: Array<{
-    id: string;
-    role: "assistant" | "user";
-    content: string;
-    createdAt: string;
-    speechText?: string;
-    inputMode?: CompanionChatInputMode;
-    isSeed?: boolean;
-  }>,
-): CompanionAssistantMessage[] =>
-  messages.map((message) => ({
-    id: message.id,
-    role: message.role,
-    content: message.role === "assistant"
-      ? stripMarkdown(message.content)
-      : message.content,
-    createdAt: message.createdAt,
-    speechText: message.role === "assistant" ? message.speechText : undefined,
-    inputMode: message.inputMode,
-    source: "chat",
-    isSeed: message.isSeed,
-  }));
-
-const normalizePlannerMessages = (
-  messages: Array<{
-    id: string;
-    role: "companion" | "user";
-    content: string;
-    createdAt: string;
-    inputMode?: CompanionChatInputMode;
-  }>,
-): CompanionAssistantMessage[] =>
-  messages.map((message) => ({
-    id: message.id,
-    role: message.role === "companion" ? "assistant" : "user",
-    content: message.role === "companion"
-      ? stripMarkdown(message.content)
-      : message.content,
-    createdAt: message.createdAt,
-    inputMode: message.inputMode,
-    source: "plan",
-    isSeed: false,
-  }));
-
-const sortMessages = (messages: CompanionAssistantMessage[]) =>
-  messages
-    .slice()
-    .sort((left, right) => (
-      left.createdAt.localeCompare(right.createdAt)
-      || left.id.localeCompare(right.id)
-    ));
-
-const shouldRouteToPlanner = (
-  surface: CompanionAssistantSurface,
-  message: string,
-  hasOpenPlannerThread: boolean,
-): boolean => {
-  const parsed = parseNaturalLanguage(message);
-  const analysis = analyzeSchedulingIntent(message, parsed);
-
-  return shouldRouteMessageToPlanner({
-    surface,
-    analysis,
-    hasOpenPlannerThread,
-  });
+type ThreadsQueryResult = {
+  threads: CompanionChatThreadSummary[];
+  setupUnavailable: boolean;
 };
 
-const isExactQuestCaptureStarterMessage = (message: string): boolean =>
-  message.trim().toLowerCase() === "quest?";
+const generateMessageId = () => {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
 
-const isExactPlanDayStarterMessage = (message: string): boolean =>
-  message.trim().toLowerCase() === "plan my day";
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+};
+
+const createMessage = (
+  role: CompanionAssistantMessage["role"],
+  content: string,
+  extras: Partial<CompanionAssistantMessage> = {},
+): CompanionAssistantMessage => ({
+  id: generateMessageId(),
+  role,
+  content,
+  createdAt: new Date().toISOString(),
+  source: "agent",
+  ...extras,
+});
+
+const mapLoadedMessage = (
+  message: Awaited<ReturnType<typeof loadCompanionChatThreadMessages>>[number],
+): CompanionAssistantMessage => ({
+  id: message.id,
+  role: message.role,
+  content: message.content,
+  createdAt: message.createdAt,
+  inputMode: message.inputMode,
+  source: message.source,
+});
+
+const getTodayLabel = () =>
+  new Intl.DateTimeFormat(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  }).format(new Date());
+
+const shouldFallbackToLegacyAgent = async (error: unknown) => {
+  const parsed = await parseFunctionInvokeError(error);
+  const source = [
+    parsed.name,
+    parsed.message,
+    parsed.backendMessage,
+    parsed.responsePayload?.error,
+    parsed.responsePayload?.message,
+    parsed.responsePayload?.code,
+  ]
+    .filter((value): value is string => typeof value === "string" && value.length > 0)
+    .join(" ")
+    .toLowerCase();
+
+  const hasSchemaSignal = source.includes("does not exist")
+    || source.includes("undefined_table")
+    || source.includes("undefined_column")
+    || source.includes("schema cache")
+    || source.includes("relation")
+    || source.includes("column");
+
+  return source.includes("function not found")
+    || source.includes("no route matched")
+    || source.includes("could not find function")
+    || source.includes("could not find the function")
+    || (parsed.status === 404 && !parsed.backendMessage)
+    || (hasSchemaSignal && (
+      source.includes("companion_pending_actions")
+      || source.includes("openai_conversation_id")
+      || source.includes("last_openai_response_id")
+      || source.includes("companion_mode")
+      || source.includes("companion_mode_adaptation_enabled")
+    ));
+};
 
 export function useCompanionAssistant({
   surface,
@@ -143,341 +156,458 @@ export function useCompanionAssistant({
 }: UseCompanionAssistantOptions) {
   const { user } = useAuth();
   const { companion } = useCompanion();
-  const { voiceStyle, greeting } = useCompanionDialogue();
-  const companionChat = useCompanionChat({
-    enabled: surface === "companion" && conversationEnabled,
-  });
-  const journeysConversation = useJourneysCompanionConversation();
-  const planner = useCompanionPlanner({
-    bootstrapGreeting: false,
-    threadPersistence: surface === "journeys"
-      ? {
-          enabled: true,
-          surface: "journeys",
-        }
-      : undefined,
-  });
-  const conversation = surface === "journeys" ? journeysConversation : companionChat;
+  const { greeting, voiceStyle } = useCompanionDialogue();
+  const { autoplayVoice, muteSpokenReplies } = useCompanionVoiceSettings();
+  const queryClient = useQueryClient();
+  const agentSurfaceEnabled = isCompanionAgentSurfaceEnabled(surface);
+  const [useLegacyFallback, setUseLegacyFallback] = useState(!agentSurfaceEnabled);
 
+  const legacyAssistant = useLegacyCompanionAssistantAdapter({
+    enabled: useLegacyFallback,
+    surface,
+    conversationEnabled,
+    onOpenCampaignBuilder,
+  });
+
+  const [activeSessionId, setActiveSessionId] = useState(() => generateCompanionThreadSessionId());
+  const [messages, setMessages] = useState<CompanionAssistantMessage[]>([]);
+  const [pendingAction, setPendingAction] = useState<PendingActionView | null>(null);
   const [draftInput, setDraftInput] = useState("");
   const [interimText, setInterimText] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isResolvingAction, setIsResolvingAction] = useState(false);
   const [showPermissionDialog, setShowPermissionDialog] = useState(false);
   const [isRequestingPermission, setIsRequestingPermission] = useState(false);
-  const [assistantSpeechProvider, setAssistantSpeechProvider] = useState<CompanionSpeechProvider>("none");
-  const [assistantIsSpeaking, setAssistantIsSpeaking] = useState(false);
-  const lastSpokenPlannerMessageIdRef = useRef<string | null>(null);
-  const latestJourneysMessagesRef = useRef<CompanionAssistantMessage[]>([]);
-  const knownJourneysAssistantMessageIdsRef = useRef<Set<string> | null>(null);
-  const pendingPlannerHandoffRef = useRef<string | null>(null);
-  const lastLaunchIntentIdRef = useRef<string | null>(null);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [speechProvider, setSpeechProvider] = useState<CompanionSpeechProvider>("none");
 
-  const messages = useMemo(() => (
-    sortMessages([
-      ...normalizeConversationMessages(conversation.messages),
-      ...normalizePlannerMessages(planner.messages),
-    ])
-  ), [conversation.messages, planner.messages]);
+  const localThreadCreatedAtRef = useRef(new Date().toISOString());
+  const scopeKeyRef = useRef<string | null>(null);
+  const bootstrappedScopeRef = useRef<string | null>(null);
+  const handledLaunchIntentIdRef = useRef<string | null>(null);
 
-  const hasOpenPlannerThread = planner.questions.length > 0
-    || planner.pendingProposals.some((proposal) => proposal.status === "pending")
-    || !!planner.sessionState.pendingStarterIntent;
+  const scopeKey = `${surface}:${user?.id ?? "anon"}:${companion?.id ?? "none"}`;
+  const baseGreeting = surface === "journeys"
+    ? getCompanionPlannerOpener({ userId: user?.id ?? null })
+    : greeting;
+  const todayLabel = getTodayLabel();
+  const placeholder = pendingAction
+    ? "Reply here or confirm the pending action."
+    : surface === "journeys"
+      ? "Talk to Cosmiq"
+      : "Talk to Cosmiq naturally.";
 
-  const journeysThreads = useJourneysCompanionThreads({
-    enabled: surface === "journeys",
-    userId: user?.id,
-    companionId: companion?.id,
-    messages: surface === "journeys" ? messages : [],
-    persistenceReady: journeysConversation.threadPersistenceReady,
-    persistenceUnavailableReason: journeysConversation.threadPersistenceUnavailableReason,
-    hasPendingPlannerWork: hasOpenPlannerThread,
-    isBusy: planner.isSubmitting || planner.isClassifying || conversation.isSubmitting,
-    conversation: {
-      resetThread: journeysConversation.resetThread,
-      hydrateThread: journeysConversation.hydrateThread,
-    },
-    planner: {
-      resetThread: planner.resetThread,
-      hydrateThread: planner.hydrateThread,
+  const threadsQuery = useQuery({
+    queryKey: getCompanionChatThreadsQueryKey(user?.id, companion?.id, surface),
+    enabled: !!user?.id && !!companion?.id,
+    staleTime: 30 * 1000,
+    queryFn: async (): Promise<ThreadsQueryResult> => {
+      if (!companion?.id) {
+        return {
+          threads: [],
+          setupUnavailable: false,
+        };
+      }
+
+      try {
+        return {
+          threads: await listCompanionChatThreads(companion.id, surface),
+          setupUnavailable: false,
+        };
+      } catch (error) {
+        if (!isCompanionChatSetupError(error)) {
+          throw error;
+        }
+
+        return {
+          threads: [],
+          setupUnavailable: true,
+        };
+      }
     },
   });
 
-  const activePlaceholder = hasOpenPlannerThread
-    ? "Reply here..."
-    : surface === "journeys"
-      ? "Chat"
-      : "Talk to me, or ask what your day looks like.";
-
-  const speakAssistantTurn = useCallback(async ({
-    text,
-    sessionId,
-  }: {
-    text: string;
-    sessionId?: string | null;
+  const openFreshThread = useCallback((options?: {
+    sessionId?: string;
+    greetingText?: string;
+    markBootstrapped?: boolean;
   }) => {
-    const trimmedText = text.trim();
-    if (!companion?.id || !trimmedText) return;
+    const nextSessionId = options?.sessionId ?? generateCompanionThreadSessionId();
+    const greetingText = options?.greetingText?.trim();
+    localThreadCreatedAtRef.current = new Date().toISOString();
+    setActiveSessionId(nextSessionId);
+    setDraftInput("");
+    setInterimText("");
+    setPendingAction(null);
+    setMessages(
+      greetingText
+        ? [createMessage("assistant", greetingText, { isSeed: true, source: "agent" })]
+        : [],
+    );
 
-    setAssistantIsSpeaking(true);
+    if (options?.markBootstrapped) {
+      bootstrappedScopeRef.current = scopeKey;
+    }
+
+    return nextSessionId;
+  }, [scopeKey]);
+
+  const loadThreadState = useCallback(async (sessionId: string) => {
+    const [threadMessages, loadedPendingAction] = await Promise.all([
+      loadCompanionChatThreadMessages(sessionId, surface),
+      loadCompanionPendingAction(sessionId),
+    ]);
+
+    localThreadCreatedAtRef.current =
+      threadMessages[0]?.createdAt ?? new Date().toISOString();
+    setActiveSessionId(sessionId);
+    setMessages(threadMessages.map(mapLoadedMessage));
+    setPendingAction(loadedPendingAction);
+    setDraftInput("");
+    setInterimText("");
+  }, [surface]);
+
+  useEffect(() => {
+    if (scopeKeyRef.current === scopeKey) return;
+
+    scopeKeyRef.current = scopeKey;
+    setUseLegacyFallback(!agentSurfaceEnabled);
+    bootstrappedScopeRef.current = null;
+    handledLaunchIntentIdRef.current = null;
+    openFreshThread({
+      greetingText: baseGreeting,
+    });
+  }, [agentSurfaceEnabled, baseGreeting, openFreshThread, scopeKey]);
+
+  useEffect(() => {
+    if (!threadsQuery.isSuccess) return;
+    if (bootstrappedScopeRef.current === scopeKey) return;
+
+    const activePersistedThread = threadsQuery.data.threads.find((thread) =>
+      thread.archivedAt === null
+    );
+
+    if (!activePersistedThread) {
+      openFreshThread({
+        sessionId: activeSessionId || undefined,
+        greetingText: baseGreeting,
+        markBootstrapped: true,
+      });
+      return;
+    }
+
+    let cancelled = false;
+    void loadThreadState(activePersistedThread.sessionId)
+      .then(() => {
+        if (cancelled) return;
+        bootstrappedScopeRef.current = scopeKey;
+      })
+      .catch((error) => {
+        console.error("Failed to hydrate companion thread:", error);
+        if (cancelled) return;
+        toast.error(
+          isCompanionChatSetupError(error)
+            ? COMPANION_CHAT_THREAD_HISTORY_DISABLED_REASON
+            : "I couldn't reopen the last thread, so I started a fresh one.",
+        );
+        openFreshThread({
+          greetingText: baseGreeting,
+          markBootstrapped: true,
+        });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activeSessionId,
+    baseGreeting,
+    loadThreadState,
+    openFreshThread,
+    scopeKey,
+    threadsQuery.data,
+    threadsQuery.isSuccess,
+  ]);
+
+  const persistedActiveThread = useMemo(
+    () => threadsQuery.data?.threads.find((thread) =>
+      thread.sessionId === activeSessionId && thread.archivedAt === null
+    ) ?? null,
+    [activeSessionId, threadsQuery.data],
+  );
+
+  const hasRealMessages = useMemo(
+    () => messages.some((message) => !message.isSeed),
+    [messages],
+  );
+
+  const localActiveThread = useMemo<CompanionChatThreadSummary>(() => {
+    const realMessages = messages.filter((message) => !message.isSeed);
+    const firstUserMessage = realMessages.find((message) => message.role === "user");
+    const latestMessage = realMessages[realMessages.length - 1];
+
+    return {
+      sessionId: activeSessionId,
+      companionId: companion?.id ?? "",
+      surface,
+      title: buildCompanionThreadTitle(firstUserMessage?.content ?? "New thread"),
+      previewText: buildCompanionThreadPreview(latestMessage?.content ?? ""),
+      createdAt: realMessages[0]?.createdAt ?? localThreadCreatedAtRef.current,
+      lastMessageAt: latestMessage?.createdAt ?? localThreadCreatedAtRef.current,
+      archivedAt: null,
+      messageCount: realMessages.length,
+    };
+  }, [activeSessionId, companion?.id, messages, surface]);
+
+  const activeThread = persistedActiveThread ?? localActiveThread;
+  const historyThreads = useMemo(
+    () => (threadsQuery.data?.threads ?? []).filter((thread) =>
+      thread.sessionId !== persistedActiveThread?.sessionId && thread.messageCount >= 2
+    ),
+    [persistedActiveThread?.sessionId, threadsQuery.data],
+  );
+  const hasPersistedActiveThread = Boolean(persistedActiveThread);
+
+  const speakAssistantReply = useCallback(async (
+    text: string,
+    sessionId: string,
+  ) => {
+    if (!conversationEnabled || !companion?.id) return;
+    if (!autoplayVoice || muteSpokenReplies) return;
+    const trimmedText = text.trim();
+    if (!trimmedText) return;
+
+    setIsSpeaking(true);
     try {
       const provider = await speakCompanionReply({
         text: trimmedText,
         companionId: companion.id,
         voiceStyle,
-        sessionId: sessionId ?? undefined,
+        sessionId,
       });
-      setAssistantSpeechProvider(provider);
+      setSpeechProvider(provider);
     } catch (error) {
-      console.error("Failed to speak assistant reply:", error);
-      setAssistantSpeechProvider("none");
+      console.error("Failed to speak companion reply:", error);
+      setSpeechProvider("none");
     } finally {
-      setAssistantIsSpeaking(false);
+      setIsSpeaking(false);
     }
-  }, [companion?.id, voiceStyle]);
+  }, [autoplayVoice, companion?.id, conversationEnabled, muteSpokenReplies, voiceStyle]);
 
-  const submitPlannerMessage = useCallback(async (
-    rawMessage: string,
-    inputMode: CompanionChatInputMode = "text",
+  useEffect(() => () => {
+    stopCompanionSpeech();
+  }, []);
+
+  const invalidateThreads = useCallback(() => {
+    return queryClient.invalidateQueries({
+      queryKey: getCompanionChatThreadsQueryKey(user?.id, companion?.id, surface),
+    });
+  }, [companion?.id, queryClient, surface, user?.id]);
+
+  const appendAssistantResponse = useCallback((
+    response: CompanionAgentResponse,
   ) => {
-    const message = rawMessage.trim();
-    if (!message) return;
-
-    setDraftInput("");
-    setInterimText("");
-    await planner.submitMessage(message, inputMode);
-  }, [planner]);
-
-  useEffect(() => {
-    latestJourneysMessagesRef.current = messages;
-  }, [messages]);
+    setMessages((previous) => [
+      ...previous,
+      createMessage("assistant", stripMarkdown(response.reply), {
+        source: "agent",
+        pendingAction: response.pendingAction,
+        receipt: response.receipt,
+      }),
+    ]);
+    setPendingAction(response.pendingAction ?? null);
+    void speakAssistantReply(response.reply, response.threadState.sessionId);
+  }, [speakAssistantReply]);
 
   const submitMessage = useCallback(async (
     rawMessage: string,
     inputMode: CompanionChatInputMode = "text",
   ) => {
     const message = rawMessage.trim();
-    if (!message) return;
+    if (!message || isSubmitting || isResolvingAction) return;
 
-    const parsed = parseNaturalLanguage(message);
-    const shouldOpenCampaignBuilder = surface === "journeys" &&
-      !!onOpenCampaignBuilder &&
-      (
-        isGoalBreakdownStarterMessage(message) ||
-        looksLikeBigGoal(
-          parsed.text || message,
-          parsed.estimatedDuration,
-          parsed.scheduledDate,
-        )
-      );
-    const routeToPlanner = shouldRouteToPlanner(
-      surface,
-      message,
-      hasOpenPlannerThread,
-    );
+    if (useLegacyFallback) {
+      await legacyAssistant.submitMessage(message, inputMode);
+      return;
+    }
+
+    if (!user?.id || !companion?.id) {
+      toast.error("Your companion is still loading. Try again in a moment.");
+      return;
+    }
+
+    setIsSubmitting(true);
     setDraftInput("");
     setInterimText("");
 
-    if (isExactQuestCaptureStarterMessage(message)) {
-      planner.primeQuestCapture(message);
+    const optimisticUserMessage = createMessage("user", message, {
+      inputMode,
+      source: "agent",
+    });
+    setMessages((previous) => [...previous, optimisticUserMessage]);
+
+    try {
+      const { data, error } = await supabase.functions.invoke("companion-agent", {
+        body: {
+          surface,
+          sessionId: activeSessionId,
+          message,
+          inputMode,
+          currentDateTime: formatCurrentDateTimeWithOffset(new Date()),
+        },
+      });
+
+      if (error) throw error;
+
+      const response = data as CompanionAgentResponse;
+      setActiveSessionId(response.threadState.sessionId);
+      appendAssistantResponse(response);
+      void invalidateThreads();
+    } catch (error) {
+      console.error("Failed to submit companion agent message:", error);
+      if (await shouldFallbackToLegacyAgent(error)) {
+        setUseLegacyFallback(true);
+        await legacyAssistant.submitMessage(message, inputMode);
+        return;
+      }
+
+      toast.error("Cosmiq hit a snag. Try that again.");
+      setMessages((previous) => [
+        ...previous,
+        createMessage(
+          "assistant",
+          "I lost the thread for a second. Ask again and I’ll pick it right back up.",
+          { source: "agent" },
+        ),
+      ]);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [
+    activeSessionId,
+    appendAssistantResponse,
+    companion?.id,
+    invalidateThreads,
+    isResolvingAction,
+    isSubmitting,
+    legacyAssistant,
+    surface,
+    useLegacyFallback,
+    user?.id,
+  ]);
+
+  const resolvePendingAction = useCallback(async (mode: "confirm" | "cancel") => {
+    if (useLegacyFallback) {
+      if (mode === "confirm") {
+        await legacyAssistant.confirmPendingAction();
+      } else {
+        await legacyAssistant.cancelPendingAction();
+      }
       return;
     }
 
-    if (isExactPlanDayStarterMessage(message)) {
-      await planner.submitMessage(message, inputMode);
-      return;
-    }
+    if (!pendingAction || isResolvingAction || isSubmitting) return;
 
-    if (!routeToPlanner && surface === "companion" && !conversationEnabled) {
-      toast.error("Companion Talk is a Premium feature. Planning and scheduling still work here.");
-      return;
-    }
+    setIsResolvingAction(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("companion-agent-action", {
+        body: {
+          sessionId: activeSessionId,
+          actionId: pendingAction.id,
+          action: mode,
+        },
+      });
 
-    if (routeToPlanner) {
-      await planner.submitMessage(message, inputMode);
-      return;
-    }
+      if (error) throw error;
 
-    if (shouldOpenCampaignBuilder) {
-      onOpenCampaignBuilder(message);
-      return;
+      const response = data as CompanionAgentResponse;
+      setPendingAction(null);
+      setMessages((previous) => [
+        ...previous,
+        createMessage("user", mode === "confirm" ? "Confirm" : "Cancel", {
+          source: "agent",
+        }),
+        createMessage("assistant", stripMarkdown(response.reply), {
+          source: "agent",
+          receipt: response.receipt,
+        }),
+      ]);
+      void speakAssistantReply(response.reply, response.threadState.sessionId);
+      void invalidateThreads();
+    } catch (error) {
+      console.error(`Failed to ${mode} pending action:`, error);
+      toast.error(
+        mode === "confirm"
+          ? "I couldn't confirm that action right now."
+          : "I couldn't cancel that action right now.",
+      );
+    } finally {
+      setIsResolvingAction(false);
     }
+  }, [
+    activeSessionId,
+    invalidateThreads,
+    isResolvingAction,
+    isSubmitting,
+    legacyAssistant,
+    pendingAction,
+    speakAssistantReply,
+    useLegacyFallback,
+  ]);
 
-    if (surface === "journeys") {
-      await journeysConversation.submitMessage(message, inputMode, {
-        currentDate: planner.currentDate,
-        currentDateTime: formatCurrentDateTimeWithOffset(new Date()),
-        journeysContext: planner.plannerContext,
+  const archiveCurrentThread = useCallback(async () => {
+    if (!persistedActiveThread) {
+      openFreshThread({
+        greetingText: baseGreeting,
       });
       return;
     }
 
-    await conversation.submitMessage(message, inputMode);
-  }, [
-    conversation,
-    conversationEnabled,
-    hasOpenPlannerThread,
-    journeysConversation,
-    onOpenCampaignBuilder,
-    planner,
-    surface,
-  ]);
+    await setCompanionChatThreadArchived(persistedActiveThread.sessionId, true);
+    await invalidateThreads();
+    openFreshThread({
+      greetingText: baseGreeting,
+    });
+  }, [baseGreeting, invalidateThreads, openFreshThread, persistedActiveThread]);
 
-  useEffect(() => {
-    if (surface !== "journeys") return;
-    knownJourneysAssistantMessageIdsRef.current = new Set(
-      latestJourneysMessagesRef.current
-        .filter((message) => message.role === "assistant")
-        .map((message) => message.id),
-    );
-  }, [planner.sessionId, journeysConversation.sessionId, surface]);
-
-  useEffect(() => {
-    if (surface !== "journeys") return;
-
-    const knownIds = knownJourneysAssistantMessageIdsRef.current;
-    if (!knownIds) return;
-
-    const assistantMessages = messages.filter((message) => message.role === "assistant");
-    const newAssistantMessages = assistantMessages.filter((message) => !knownIds.has(message.id));
-
-    if (newAssistantMessages.length === 0) return;
-
-    for (const message of newAssistantMessages) {
-      knownIds.add(message.id);
+  const startNewChat = useCallback(async () => {
+    if (persistedActiveThread) {
+      await setCompanionChatThreadArchived(persistedActiveThread.sessionId, true);
+      await invalidateThreads();
     }
 
-    if (!companionChat.autoplayVoice || companionChat.muteSpokenReplies) return;
-
-    const newestSpokenMessage = [...newAssistantMessages]
-      .reverse()
-      .find((message) => !message.isSeed);
-
-    if (!newestSpokenMessage) return;
-
-    void speakAssistantTurn({
-      text: newestSpokenMessage.speechText?.trim() || newestSpokenMessage.content,
-      sessionId: newestSpokenMessage.source === "chat"
-        ? journeysConversation.sessionId
-        : planner.sessionId,
+    openFreshThread({
+      greetingText: baseGreeting,
     });
-  }, [
-    companionChat.autoplayVoice,
-    companionChat.muteSpokenReplies,
-    messages,
-    planner.sessionId,
-    journeysConversation.sessionId,
-    speakAssistantTurn,
-    surface,
-  ]);
+  }, [baseGreeting, invalidateThreads, openFreshThread, persistedActiveThread]);
+
+  const resumeThread = useCallback(async (sessionId: string) => {
+    await loadThreadState(sessionId);
+  }, [loadThreadState]);
 
   useEffect(() => {
-    if (surface !== "journeys") return;
-    const pendingMessage = journeysConversation.pendingPlannerHandoffMessage;
-    if (!pendingMessage) {
-      pendingPlannerHandoffRef.current = null;
-      return;
-    }
-    if (pendingPlannerHandoffRef.current === pendingMessage) return;
-
-    pendingPlannerHandoffRef.current = pendingMessage;
-
-    void planner.submitMessage(
-      pendingMessage,
-      "text",
-      { skipUserEcho: true },
-    ).finally(() => {
-      journeysConversation.clearPlannerHandoff();
-    });
-  }, [
-    journeysConversation.clearPlannerHandoff,
-    journeysConversation.pendingPlannerHandoffMessage,
-    planner.submitMessage,
-    surface,
-  ]);
-
-  useEffect(() => {
-    if (surface !== "journeys") return;
-    if (!launchIntent?.id || !launchIntent.message.trim()) return;
+    if (!launchIntent?.id) return;
+    if (handledLaunchIntentIdRef.current === launchIntent.id) return;
     if (launchIntent.starterIntent === "thread_history") return;
-    if (lastLaunchIntentIdRef.current === launchIntent.id) return;
+    if (!threadsQuery.isSuccess) return;
 
-    lastLaunchIntentIdRef.current = launchIntent.id;
-    const resolvedTarget: CompanionPlannerLaunchTarget = launchIntent.target ?? "auto";
+    handledLaunchIntentIdRef.current = launchIntent.id;
 
-    if ((resolvedTarget === "campaign_builder"
-      || (resolvedTarget === "auto" && launchIntent.starterIntent === "goal_breakdown"))
-      && onOpenCampaignBuilder) {
-      onOpenCampaignBuilder(launchIntent.message);
+    if (launchIntent.target === "campaign_builder") {
+      onOpenCampaignBuilder?.(launchIntent.message);
       onLaunchIntentConsumed?.(launchIntent.id);
       return;
     }
 
-    if (resolvedTarget === "conversation") {
-      journeysThreads.startTemplateThread();
-      journeysConversation.injectAssistantOpening(launchIntent.message);
-      onLaunchIntentConsumed?.(launchIntent.id);
-      return;
-    }
-
-    journeysThreads.startTemplateThread();
-    if (launchIntent.starterIntent === "quest_capture") {
-      planner.primeQuestCapture(launchIntent.message);
-      onLaunchIntentConsumed?.(launchIntent.id);
-      return;
-    }
-
-    void planner.submitMessage(
-      launchIntent.message,
-      "text",
-      {
-        skipUserEcho: ASSISTANT_LED_LAUNCHER_STARTER_INTENTS.has(launchIntent.starterIntent),
-        starterIntent: launchIntent.starterIntent,
-        briefingContext: launchIntent.briefingContext ?? null,
-      },
-    ).finally(() => {
-      onLaunchIntentConsumed?.(launchIntent.id);
-    });
+    void submitMessage(launchIntent.message, "text");
+    onLaunchIntentConsumed?.(launchIntent.id);
   }, [
-    journeysConversation,
-    journeysThreads,
     launchIntent,
-    onOpenCampaignBuilder,
     onLaunchIntentConsumed,
-    planner,
-    surface,
+    onOpenCampaignBuilder,
+    submitMessage,
+    threadsQuery.isSuccess,
   ]);
-
-  const latestPlannerAssistantMessage = useMemo(
-    () => [...planner.messages].reverse().find((message) => message.role === "companion") ?? null,
-    [planner.messages],
-  );
-
-  useEffect(() => {
-    if (surface !== "companion" || !conversationEnabled) return;
-    if (!companion?.id || !latestPlannerAssistantMessage) return;
-    if (!companionChat.autoplayVoice || companionChat.muteSpokenReplies) return;
-    if (lastSpokenPlannerMessageIdRef.current === latestPlannerAssistantMessage.id) return;
-
-    lastSpokenPlannerMessageIdRef.current = latestPlannerAssistantMessage.id;
-    void speakAssistantTurn({
-      text: latestPlannerAssistantMessage.content,
-    });
-  }, [
-    companion?.id,
-    companionChat.autoplayVoice,
-    companionChat.muteSpokenReplies,
-    conversationEnabled,
-    latestPlannerAssistantMessage,
-    speakAssistantTurn,
-    surface,
-  ]);
-
-  useEffect(() => {
-    if (!companionChat.autoplayVoice || companionChat.muteSpokenReplies) {
-      stopCompanionSpeech();
-      setAssistantIsSpeaking(false);
-      setAssistantSpeechProvider("none");
-    }
-  }, [companionChat.autoplayVoice, companionChat.muteSpokenReplies]);
 
   const { isRecording, isAutoStopping, isSupported, permissionStatus, toggleRecording, requestPermission } = useVoiceInput({
     onInterimResult: (text) => {
@@ -509,34 +639,77 @@ export function useCompanionAssistant({
     }
   }, [requestPermission, toggleRecording]);
 
-  const stopSpeaking = useCallback(() => {
-    stopCompanionSpeech();
-    companionChat.stopSpeaking?.();
-    setAssistantIsSpeaking(false);
-    setAssistantSpeechProvider("none");
-  }, [companionChat]);
+  const canStartNewChat = !isSubmitting && !isResolvingAction && !pendingAction;
+  const canArchiveThread = canStartNewChat && hasPersistedActiveThread;
+  const newChatDisabledReason = pendingAction
+    ? "Resolve or cancel the pending action first."
+    : null;
+  const archiveDisabledReason = pendingAction
+    ? "Resolve or cancel the pending action first."
+    : hasPersistedActiveThread
+      ? null
+      : "This chat isn't saved yet.";
+  const threadHistoryEmptyStateMessage = threadsQuery.data?.setupUnavailable
+    ? COMPANION_CHAT_THREAD_HISTORY_DISABLED_REASON
+    : COMPANION_CHAT_THREAD_HISTORY_EMPTY_STATE;
+
+  if (useLegacyFallback) {
+    return {
+      todayLabel: legacyAssistant.todayLabel,
+      placeholder: legacyAssistant.placeholder,
+      messages: legacyAssistant.messages,
+      pendingAction: legacyAssistant.pendingAction,
+      draftInput,
+      setDraftInput,
+      interimText,
+      isSubmitting: legacyAssistant.isSubmitting,
+      isResolvingAction: legacyAssistant.isResolvingAction,
+      submitMessage,
+      submitTypedMessage: () => submitMessage(draftInput, "text"),
+      confirmPendingAction: () => resolvePendingAction("confirm"),
+      cancelPendingAction: () => resolvePendingAction("cancel"),
+      isRecording,
+      isAutoStopping,
+      isVoiceSupported: isSupported,
+      permissionStatus,
+      showPermissionDialog,
+      setShowPermissionDialog,
+      isRequestingPermission,
+      toggleRecording,
+      requestMicrophonePermission,
+      isSpeaking: legacyAssistant.isSpeaking,
+      speechProvider: legacyAssistant.speechProvider,
+      stopSpeaking: legacyAssistant.stopSpeaking,
+      activeThread: legacyAssistant.activeThread,
+      historyThreads: legacyAssistant.historyThreads,
+      isLoadingThreads: legacyAssistant.isLoadingThreads,
+      hasPersistedActiveThread: legacyAssistant.hasPersistedActiveThread,
+      canOpenThreadPicker: legacyAssistant.canOpenThreadPicker,
+      threadHistoryEmptyStateMessage: legacyAssistant.threadHistoryEmptyStateMessage,
+      resumeThread: legacyAssistant.resumeThread,
+      archiveCurrentThread: legacyAssistant.archiveCurrentThread,
+      canArchiveThread: legacyAssistant.canArchiveThread,
+      archiveDisabledReason: legacyAssistant.archiveDisabledReason,
+      startNewChat: legacyAssistant.startNewChat,
+      canStartNewChat: legacyAssistant.canStartNewChat,
+      newChatDisabledReason: legacyAssistant.newChatDisabledReason,
+    };
+  }
 
   return {
-    greeting: surface === "journeys"
-      ? journeysConversation.greeting
-      : companionChat.greeting ?? greeting,
+    todayLabel,
+    placeholder,
     messages,
-    questions: planner.questions,
-    proposals: planner.proposals,
-    pendingProposals: planner.pendingProposals,
-    readyProposalCount: planner.readyProposalCount,
-    plannerMemory: planner.plannerMemory,
-    scheduleInsights: planner.scheduleInsights,
-    todayLabel: planner.todayLabel,
-    isLoadingContext: planner.isLoadingContext,
-    horizon: planner.horizon,
-    setHorizon: planner.setHorizon,
+    pendingAction,
     draftInput,
     setDraftInput,
     interimText,
-    placeholder: activePlaceholder,
-    isSubmitting: planner.isSubmitting || conversation.isSubmitting,
-    isClassifying: planner.isClassifying,
+    isSubmitting,
+    isResolvingAction,
+    submitMessage,
+    submitTypedMessage: () => submitMessage(draftInput, "text"),
+    confirmPendingAction: () => resolvePendingAction("confirm"),
+    cancelPendingAction: () => resolvePendingAction("cancel"),
     isRecording,
     isAutoStopping,
     isVoiceSupported: isSupported,
@@ -544,63 +717,27 @@ export function useCompanionAssistant({
     showPermissionDialog,
     setShowPermissionDialog,
     isRequestingPermission,
-    submitTypedMessage: () => submitMessage(draftInput, "text"),
-    submitMessage,
-    submitPlannerMessage,
     toggleRecording,
     requestMicrophonePermission,
-    confirmProposal: planner.confirmProposal,
-    rejectProposal: planner.rejectProposal,
-    completeProposalEdit: planner.completeProposalEdit,
-    confirmAll: planner.confirmAll,
-    autoplayVoice: companionChat.autoplayVoice,
-    setAutoplayVoice: companionChat.setAutoplayVoice,
-    muteSpokenReplies: companionChat.muteSpokenReplies,
-    setMuteSpokenReplies: companionChat.setMuteSpokenReplies,
-    isSpeaking: assistantIsSpeaking || companionChat.isSpeaking,
-    speechProvider: assistantIsSpeaking ? assistantSpeechProvider : companionChat.speechProvider,
-    stopSpeaking,
-    activeThread: surface === "journeys"
-      ? journeysThreads.activeThread
-      : null,
-    historyThreads: surface === "journeys"
-      ? journeysThreads.historyThreads
-      : [],
-    canOpenThreadPicker: surface === "journeys"
-      ? journeysThreads.canOpenThreadPicker
-      : false,
-    threadPickerDisabledReason: surface === "journeys"
-      ? journeysThreads.threadPickerDisabledReason
-      : null,
-    threadHistoryEmptyStateMessage: surface === "journeys"
-      ? journeysThreads.threadHistoryEmptyStateMessage
-      : "Past chats will show up here after at least one real exchange.",
-    hasPersistedActiveThread: surface === "journeys"
-      ? journeysThreads.hasPersistedActiveThread
-      : false,
-    canStartNewChat: surface === "journeys"
-      ? journeysThreads.canStartNewChat
-      : false,
-    newChatDisabledReason: surface === "journeys"
-      ? journeysThreads.newChatDisabledReason
-      : null,
-    startNewChat: surface === "journeys"
-      ? journeysThreads.startNewChat
-      : (async () => undefined),
-    canArchiveThread: surface === "journeys"
-      ? journeysThreads.canArchiveThread
-      : false,
-    archiveDisabledReason: surface === "journeys"
-      ? journeysThreads.archiveDisabledReason
-      : null,
-    archiveCurrentThread: surface === "journeys"
-      ? journeysThreads.archiveCurrentThread
-      : (async () => undefined),
-    resumeThread: surface === "journeys"
-      ? journeysThreads.resumeThread
-      : (async () => undefined),
-    isLoadingThreads: surface === "journeys"
-      ? journeysThreads.isLoadingThreads
-      : false,
+    isSpeaking,
+    speechProvider,
+    stopSpeaking: () => {
+      stopCompanionSpeech();
+      setIsSpeaking(false);
+      setSpeechProvider("none");
+    },
+    activeThread,
+    historyThreads,
+    isLoadingThreads: threadsQuery.isLoading,
+    hasPersistedActiveThread,
+    canOpenThreadPicker: !threadsQuery.data?.setupUnavailable,
+    threadHistoryEmptyStateMessage,
+    resumeThread,
+    archiveCurrentThread,
+    canArchiveThread,
+    archiveDisabledReason,
+    startNewChat,
+    canStartNewChat,
+    newChatDisabledReason,
   };
 }

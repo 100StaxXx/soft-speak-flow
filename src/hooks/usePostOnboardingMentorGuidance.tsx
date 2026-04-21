@@ -192,33 +192,33 @@ interface MentorDialogueLine {
 }
 
 const INTRO_DIALOGUE_BY_MENTOR_SLUG: Record<string, MentorDialogueLine> = {
-  atlas: {
-    text: "Greetings, I'm Atlas. Let's begin your path to productivity.",
-    support: "Stay with me through this short walkthrough.",
+  sage: {
+    text: "I'm The Sage. Let's quiet the noise and make your next step clear.",
+    support: "Stay with me through this short walkthrough. Calm first, then momentum.",
   },
-  eli: {
-    text: "Hey, I'm glad you're here. I'm Eli. We'll take this one step at a time.",
-    support: "Quick walkthrough first. Then you'll have a rhythm you can rely on.",
+  icon: {
+    text: "I'm The Icon. We're going to start with intention and a better standard.",
+    support: "Move through this walkthrough cleanly, then carry that energy forward.",
   },
-  sienna: {
-    text: "Hi. I'm really glad you're here. I'm Sienna. Let's get started.",
-    support: "I'll guide your first steps so everything feels clear and manageable.",
+  charles: {
+    text: "Charles. Let's handle this walkthrough properly so we don't embarrass ourselves later.",
+    support: "Finish this cleanly and your system will be a lot less chaotic.",
   },
-  stryker: {
-    text: "You showed up. Good. We move fast and execute clean.",
-    support: "Complete the walkthrough. Then run your day like a mission.",
+  princess: {
+    text: "I'm The Princess. Let's make your first steps feel gentle, clear, and beautiful.",
+    support: "We'll move through this together so your routine starts with softness and structure.",
   },
-  carmen: {
-    text: "Welcome. I'm Carmen. Today we establish your standard.",
-    support: "Finish this walkthrough and your system goes live.",
+  operator: {
+    text: "I'm The Operator. We are not improvising. We're building a system.",
+    support: "Complete the walkthrough, then execute with structure.",
+  },
+  rival: {
+    text: "I'm The Rival. If you're serious about leveling up, prove it.",
+    support: "Finish this walkthrough and show me you can follow through.",
   },
   reign: {
-    text: "Good. you're here. I'm Reign. Let's set your pace and move with intention.",
-    support: "Lock in this walkthrough, then build momentum and own the day.",
-  },
-  solace: {
-    text: "Hi! I'm Solace. You're exactly where you need to be.",
-    support: "I'll keep this walkthrough clear and concise so you feel grounded from the start.",
+    text: "I'm Reign. We still move with standards, even in legacy mode.",
+    support: "Lock in this walkthrough, then make the day count.",
   },
 };
 

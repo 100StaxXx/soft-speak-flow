@@ -9,31 +9,31 @@ import {
 describe("mentorRecommendations", () => {
   const mentors = [
     {
-      id: "atlas",
-      name: "Atlas",
-      slug: "atlas",
-      tags: ["tough_love", "discipline"],
+      id: "sage",
+      name: "The Sage",
+      slug: "sage",
+      tags: ["calm", "discipline"],
       themes: ["calm"],
-      tone_description: "Direct, grounded, calm under pressure",
-      short_title: "Stoic Builder",
+      tone_description: "Calm, wise, and grounded",
+      short_title: "Quiet Clarity",
     },
     {
-      id: "sienna",
-      name: "Sienna",
-      slug: "sienna",
+      id: "princess",
+      name: "The Princess",
+      slug: "princess",
       tags: ["healing", "gentle"],
       themes: ["self_worth"],
       tone_description: "Gentle and deeply supportive",
-      short_title: "Soft Guide",
+      short_title: "Soft Discipline",
     },
     {
-      id: "reign",
-      name: "Reign",
-      slug: "reign",
+      id: "rival",
+      name: "The Rival",
+      slug: "rival",
       tags: ["high_energy"],
       themes: ["confidence"],
-      tone_description: "Bold, motivating, and elite",
-      short_title: "Performance Queen",
+      tone_description: "Competitive and intense",
+      short_title: "Prove It",
     },
   ];
 
@@ -56,10 +56,10 @@ describe("mentorRecommendations", () => {
     const recommendations = getMentorRecommendations(mentors, "overthinking", 2);
 
     expect(recommendations).toHaveLength(2);
-    expect(recommendations[0].mentor.name).toBe("Sienna");
+    expect(recommendations[0].mentor.name).toBe("The Sage");
     expect(recommendations[0].reasonLabel).toBe("Best for overthinking");
-    expect(recommendations[1].mentor.name).toBe("Atlas");
-    expect(recommendations[1].reasonLabel).toBe("Strong fit for overthinking");
+    expect(recommendations[1].mentor.name).toBe("The Princess");
+    expect(recommendations[1].reasonLabel).toBe("Good when you want healing");
   });
 
   it("falls back to trait-based copy when only the secondary trait matches", () => {
@@ -67,8 +67,8 @@ describe("mentorRecommendations", () => {
       [
         {
           id: "mentor-1",
-          name: "Solace",
-          slug: "solace",
+          name: "The Princess",
+          slug: "princess",
           tags: ["supportive"],
           themes: [],
           tone_description: "",

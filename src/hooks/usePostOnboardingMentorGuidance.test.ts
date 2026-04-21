@@ -771,11 +771,11 @@ describe("guided tutorial intro dialogue sequence", () => {
     });
   });
 
-  it("uses atlas voice for the intro hello", async () => {
+  it("uses sage voice for the intro hello", async () => {
     mocks.state.personality = {
-      name: "Atlas",
-      slug: "atlas",
-      tone: "Direct",
+      name: "The Sage",
+      slug: "sage",
+      tone: "Wise",
       style: "",
       primary_color: "#f59e0b",
     };
@@ -785,14 +785,14 @@ describe("guided tutorial intro dialogue sequence", () => {
     });
 
     await waitFor(() => {
-      expect(result.current.dialogueText).toContain("I'm Atlas");
+      expect(result.current.dialogueText).toContain("I'm The Sage");
     });
   });
 
-  it("uses sienna voice for the intro hello", async () => {
+  it("uses princess voice for the intro hello", async () => {
     mocks.state.personality = {
-      name: "Sienna",
-      slug: "sienna",
+      name: "The Princess",
+      slug: "princess",
       tone: "Supportive",
       style: "",
       primary_color: "#f59e0b",
@@ -803,18 +803,18 @@ describe("guided tutorial intro dialogue sequence", () => {
     });
 
     await waitFor(() => {
-      expect(result.current.dialogueText).toContain("I'm Sienna");
+      expect(result.current.dialogueText).toContain("I'm The Princess");
     });
   });
 
   it.each([
-    { name: "Atlas", slug: "atlas", tone: "Wise" },
-    { name: "Eli", slug: "eli", tone: "Supportive" },
-    { name: "Sienna", slug: "sienna", tone: "Empathetic" },
-    { name: "Stryker", slug: "stryker", tone: "Direct" },
-    { name: "Carmen", slug: "carmen", tone: "Direct" },
+    { name: "The Sage", slug: "sage", tone: "Wise" },
+    { name: "The Icon", slug: "icon", tone: "Composed" },
+    { name: "Charles", slug: "charles", tone: "Direct" },
+    { name: "The Princess", slug: "princess", tone: "Empathetic" },
+    { name: "The Operator", slug: "operator", tone: "Direct" },
+    { name: "The Rival", slug: "rival", tone: "Tough" },
     { name: "Reign", slug: "reign", tone: "Tough" },
-    { name: "Solace", slug: "solace", tone: "Supportive" },
   ])(
     "uses shared quests intro voice for $slug",
     async ({ name, slug, tone }) => {
@@ -852,8 +852,8 @@ describe("guided tutorial intro dialogue sequence", () => {
     storageMocks.safeLocalStorage.removeItem("guided_tutorial_progress_user-1");
 
     mocks.state.personality = {
-      name: "Atlas",
-      slug: "atlas",
+      name: "The Sage",
+      slug: "sage",
       tone: "Wise",
       style: "",
       primary_color: "#f59e0b",
@@ -875,14 +875,14 @@ describe("guided tutorial intro dialogue sequence", () => {
     let atlasIntroText = "";
     await waitFor(() => {
       atlasIntroText = atlasIntroResult.current.dialogueText;
-      expect(atlasIntroText).toContain("I'm Atlas");
+      expect(atlasIntroText).toContain("I'm The Sage");
     });
     unmountAtlasIntro();
 
     storageMocks.safeLocalStorage.removeItem("guided_tutorial_progress_user-1");
     mocks.state.personality = {
-      name: "Stryker",
-      slug: "stryker",
+      name: "The Operator",
+      slug: "operator",
       tone: "Direct",
       style: "",
       primary_color: "#f59e0b",
@@ -904,7 +904,7 @@ describe("guided tutorial intro dialogue sequence", () => {
     let strykerIntroText = "";
     await waitFor(() => {
       strykerIntroText = strykerIntroResult.current.dialogueText;
-      expect(strykerIntroText).toContain("We move fast and execute clean");
+      expect(strykerIntroText).toContain("We're building a system");
     });
     unmountStrykerIntro();
 
@@ -912,8 +912,8 @@ describe("guided tutorial intro dialogue sequence", () => {
 
     storageMocks.safeLocalStorage.removeItem("guided_tutorial_progress_user-1");
     mocks.state.personality = {
-      name: "Atlas",
-      slug: "atlas",
+      name: "The Sage",
+      slug: "sage",
       tone: "Wise",
       style: "",
       primary_color: "#f59e0b",
@@ -941,8 +941,8 @@ describe("guided tutorial intro dialogue sequence", () => {
 
     storageMocks.safeLocalStorage.removeItem("guided_tutorial_progress_user-1");
     mocks.state.personality = {
-      name: "Stryker",
-      slug: "stryker",
+      name: "The Operator",
+      slug: "operator",
       tone: "Direct",
       style: "",
       primary_color: "#f59e0b",

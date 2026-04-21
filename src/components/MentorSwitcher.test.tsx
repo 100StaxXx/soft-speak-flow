@@ -9,17 +9,17 @@ const mocks = vi.hoisted(() => ({
     timezone: "America/Los_Angeles",
     onboarding_data: { storyTone: "bold" },
   } as Record<string, unknown> | null,
-  mentorId: "atlas",
+  mentorId: "sage",
   pendingMood: "overthinking" as string | null,
   mentors: [
     {
-      id: "atlas",
-      name: "Atlas",
-      slug: "atlas",
+      id: "sage",
+      name: "The Sage",
+      slug: "sage",
       avatar_url: null,
       primary_color: "#0f172a",
-      short_title: "Stoic Builder",
-      tone_description: "Direct and calm",
+      short_title: "Quiet Clarity",
+      tone_description: "Calm and wise",
       tags: ["discipline"],
       themes: ["calm"],
       style_description: null,
@@ -27,12 +27,12 @@ const mocks = vi.hoisted(() => ({
       intensity_level: "high",
     },
     {
-      id: "sienna",
-      name: "Sienna",
-      slug: "sienna",
+      id: "princess",
+      name: "The Princess",
+      slug: "princess",
       avatar_url: null,
       primary_color: "#be185d",
-      short_title: "Soft Guide",
+      short_title: "Soft Discipline",
       tone_description: "Gentle and supportive",
       tags: ["healing"],
       themes: ["self_worth"],
@@ -41,14 +41,14 @@ const mocks = vi.hoisted(() => ({
       intensity_level: "gentle",
     },
     {
-      id: "reign",
-      name: "Reign",
-      slug: "reign",
+      id: "icon",
+      name: "The Icon",
+      slug: "icon",
       avatar_url: null,
       primary_color: "#9333ea",
-      short_title: "Performance Queen",
-      tone_description: "High energy and confident",
-      tags: ["high_energy"],
+      short_title: "Standards First",
+      tone_description: "Confident and composed",
+      tags: ["confidence"],
       themes: ["confidence"],
       style_description: null,
       target_user: null,
@@ -123,7 +123,7 @@ describe("MentorSwitcher", () => {
       timezone: "America/Los_Angeles",
       onboarding_data: { storyTone: "bold" },
     };
-    mocks.mentorId = "atlas";
+    mocks.mentorId = "sage";
     mocks.pendingMood = "overthinking";
     mocks.todayCheckIn = null;
     mocks.latestCheckIn = { mood: "content" };
@@ -141,9 +141,9 @@ describe("MentorSwitcher", () => {
 
     expect(await screen.findByTestId("mentor-switcher-dialog")).toBeInTheDocument();
     expect(screen.getByText("Mood signal: Overthinking")).toBeInTheDocument();
-    expect(screen.getAllByText("Best for overthinking").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Sienna").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Atlas").length).toBeGreaterThan(0);
+    expect(screen.getByText(/Best for overthinking/)).toBeInTheDocument();
+    expect(screen.getAllByText("The Princess").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("The Sage").length).toBeGreaterThan(0);
   });
 
   it("supports a controlled triggerless dialog", () => {
@@ -164,12 +164,12 @@ describe("MentorSwitcher", () => {
 
     fireEvent.click(screen.getByTestId("mentor-switcher-trigger"));
 
-    const siennaCard = screen.getAllByText("Sienna").find((element) =>
+    const princessCard = screen.getAllByText("The Princess").find((element) =>
       element.closest(".rounded-2xl"),
     )?.closest(".rounded-2xl");
 
-    expect(siennaCard).toBeTruthy();
-    fireEvent.click(within(siennaCard as HTMLElement).getByRole("button", { name: "Consult" }));
+    expect(princessCard).toBeTruthy();
+    fireEvent.click(within(princessCard as HTMLElement).getByRole("button", { name: "Consult" }));
 
     expect(mocks.applyMentorChange).not.toHaveBeenCalled();
     expect(mocks.navigate).toHaveBeenCalledWith(
@@ -177,7 +177,7 @@ describe("MentorSwitcher", () => {
       expect.objectContaining({
         replace: false,
         state: expect.objectContaining({
-          consultMentorId: "sienna",
+          consultMentorId: "princess",
           consultSource: "/mentor",
         }),
       }),
@@ -189,17 +189,17 @@ describe("MentorSwitcher", () => {
 
     fireEvent.click(screen.getByTestId("mentor-switcher-trigger"));
 
-    const reignCard = screen.getAllByText("Reign").find((element) =>
+    const iconCard = screen.getAllByText("The Icon").find((element) =>
       element.closest(".rounded-2xl"),
     )?.closest(".rounded-2xl");
 
-    expect(reignCard).toBeTruthy();
-    fireEvent.click(within(reignCard as HTMLElement).getByRole("button", { name: "Make primary" }));
+    expect(iconCard).toBeTruthy();
+    fireEvent.click(within(iconCard as HTMLElement).getByRole("button", { name: "Make primary" }));
 
     await waitFor(() =>
       expect(mocks.applyMentorChange).toHaveBeenCalledWith(
         expect.objectContaining({
-          mentorId: "reign",
+          mentorId: "icon",
           userId: "user-1",
           timezone: "America/Los_Angeles",
         }),

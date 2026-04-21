@@ -24,19 +24,18 @@ export const EMOTIONAL_TRIGGERS = [
   "Motivated & Ready",
 ] as const;
 
-// Default mentor mapping for emotional triggers (for AI hints)
-// Active mentors: atlas, eli, sienna, stryker, carmen, reign, solace
+// Default guide mapping for emotional triggers (for AI hints)
 export const TRIGGER_MENTOR_MAPPING: Record<string, string[]> = {
-  "Exhausted": ["sienna", "atlas"],
-  "Avoiding Action": ["stryker", "carmen"],
-  "Anxious & Overthinking": ["sienna", "solace", "atlas"],
-  "Self-Doubt": ["eli", "solace"],
-  "Feeling Stuck": ["atlas", "stryker"],
-  "Frustrated": ["stryker", "carmen"],
-  "Heavy or Low": ["sienna", "solace"],
-  "Emotionally Hurt": ["sienna", "solace"],
-  "Unmotivated": ["stryker", "reign", "eli"],
-  "In Transition": ["atlas", "sienna", "solace"],
-  "Needing Discipline": ["carmen", "reign", "stryker"],
-  "Motivated & Ready": ["stryker", "reign", "eli"],
+  "Exhausted": ["princess", "sage"],
+  "Avoiding Action": ["operator", "charles"],
+  "Anxious & Overthinking": ["sage", "princess"],
+  "Self-Doubt": ["icon", "princess"],
+  "Feeling Stuck": ["operator", "sage", "charles"],
+  "Frustrated": ["rival", "operator"],
+  "Heavy or Low": ["princess", "sage"],
+  "Emotionally Hurt": ["princess", "sage", "icon"],
+  "Unmotivated": ["charles", "rival", "operator"],
+  "In Transition": ["sage", "icon", "princess"],
+  "Needing Discipline": ["operator", "rival", "charles"],
+  "Motivated & Ready": ["operator", "rival"],
 };

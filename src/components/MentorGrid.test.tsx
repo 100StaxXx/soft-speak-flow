@@ -11,12 +11,12 @@ vi.mock("@/components/MentorAvatar", () => ({
 const mentors = [
   {
     id: "mentor-1",
-    name: "Atlas",
-    slug: "atlas",
+    name: "The Sage",
+    slug: "sage",
     archetype: "coach",
-    short_title: "The Strategist",
-    tone_description: "Direct and clear",
-    style_description: "Direct and clear",
+    short_title: "Quiet Clarity",
+    tone_description: "Calm and clear",
+    style_description: "Calm and clear",
     target_user: "Focused builders",
     signature_line: "Build the system, then trust it.",
     primary_color: "#7B68EE",
@@ -24,10 +24,10 @@ const mentors = [
   },
   {
     id: "mentor-2",
-    name: "Sienna",
-    slug: "sienna",
+    name: "The Princess",
+    slug: "princess",
     archetype: "healer",
-    short_title: "The Hearth",
+    short_title: "Soft Discipline",
     tone_description: "Warm and steady",
     style_description: "Warm and steady",
     target_user: "Tender-hearted seekers",
@@ -48,7 +48,7 @@ describe("MentorGrid", () => {
     );
 
     expect(screen.getByTestId("mentor-grid-root")).toHaveAttribute("data-appearance", "default");
-    expect(screen.getByText("Atlas")).toBeInTheDocument();
+    expect(screen.getByText("The Sage")).toBeInTheDocument();
     expect(screen.getByText("Recommended")).toBeInTheDocument();
   });
 
@@ -62,8 +62,8 @@ describe("MentorGrid", () => {
     );
 
     expect(screen.getByTestId("mentor-grid-root")).toHaveAttribute("data-appearance", "onboarding");
-    fireEvent.click(screen.getByText("Atlas"));
+    fireEvent.click(screen.getByText("The Sage"));
     expect(screen.getByText("Guide Preview")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /choose atlas/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /choose the sage/i })).toBeInTheDocument();
   });
 });

@@ -1,24 +1,18 @@
+import {
+  ACTIVE_MENTOR_SLUGS,
+  resolveSupportedMentorSlug,
+  type ActiveMentorSlug,
+  type SupportedMentorSlug,
+} from "./mentorRoster.ts";
+
 export interface MentorDailyTheme {
   topic_category: string;
   intensity: string;
   triggers: string[];
 }
 
-export const ACTIVE_MENTOR_SLUGS = [
-  "atlas",
-  "eli",
-  "stryker",
-  "sienna",
-  "carmen",
-  "reign",
-  "solace",
-] as const;
-
-export type ActiveMentorSlug = (typeof ACTIVE_MENTOR_SLUGS)[number];
-
-export const LEGACY_MENTOR_ALIASES: Record<string, ActiveMentorSlug> = {
-  elizabeth: "solace",
-};
+export { ACTIVE_MENTOR_SLUGS };
+export type { ActiveMentorSlug };
 
 const SAFE_DEFAULT_THEME: MentorDailyTheme = {
   topic_category: "mindset",
@@ -26,49 +20,54 @@ const SAFE_DEFAULT_THEME: MentorDailyTheme = {
   triggers: ["Feeling Stuck", "In Transition"],
 };
 
-const THEMES_BY_MENTOR: Record<ActiveMentorSlug, MentorDailyTheme[]> = {
-  atlas: [
+const THEMES_BY_MENTOR: Record<SupportedMentorSlug, MentorDailyTheme[]> = {
+  sage: [
     {
       topic_category: "focus",
-      intensity: "medium",
+      intensity: "soft",
       triggers: ["Anxious & Overthinking", "Feeling Stuck"],
     },
     {
       topic_category: "mindset",
-      intensity: "medium",
-      triggers: ["In Transition", "Self-Doubt"],
+      intensity: "soft",
+      triggers: ["Heavy or Low", "Emotionally Hurt"],
     },
     {
-      topic_category: "business",
+      topic_category: "reflection",
+      intensity: "medium",
+      triggers: ["In Transition", "Late Night Spiral"],
+    },
+  ],
+  icon: [
+    {
+      topic_category: "confidence",
+      intensity: "medium",
+      triggers: ["Self-Doubt", "Feeling Stuck"],
+    },
+    {
+      topic_category: "identity",
       intensity: "medium",
       triggers: ["In Transition", "Avoiding Action"],
     },
-  ],
-  eli: [
     {
-      topic_category: "confidence",
-      intensity: "soft",
-      triggers: ["Self-Doubt", "Heavy or Low"],
-    },
-    {
-      topic_category: "mindset",
+      topic_category: "boundaries",
       intensity: "medium",
-      triggers: ["Heavy or Low", "Emotionally Hurt"],
+      triggers: ["Emotionally Hurt", "Self-Doubt"],
     },
   ],
-  stryker: [
+  charles: [
     {
-      topic_category: "physique",
+      topic_category: "discipline",
       intensity: "strong",
-      triggers: ["Unmotivated", "Needing Discipline", "Frustrated"],
+      triggers: ["Avoiding Action", "Unmotivated"],
     },
     {
-      topic_category: "business",
+      topic_category: "focus",
       intensity: "strong",
-      triggers: ["Motivated & Ready", "Feeling Stuck"],
+      triggers: ["Feeling Stuck", "Frustrated"],
     },
   ],
-  sienna: [
+  princess: [
     {
       topic_category: "mindset",
       intensity: "soft",
@@ -79,17 +78,44 @@ const THEMES_BY_MENTOR: Record<ActiveMentorSlug, MentorDailyTheme[]> = {
       intensity: "soft",
       triggers: ["Self-Doubt", "Heavy or Low"],
     },
+    {
+      topic_category: "habits",
+      intensity: "medium",
+      triggers: ["In Transition", "Feeling Stuck"],
+    },
   ],
-  carmen: [
+  operator: [
     {
       topic_category: "discipline",
       intensity: "strong",
-      triggers: ["Avoiding Action", "Needing Discipline"],
+      triggers: ["Needing Discipline", "Feeling Stuck"],
+    },
+    {
+      topic_category: "focus",
+      intensity: "medium",
+      triggers: ["Anxious & Overthinking", "Motivated & Ready"],
     },
     {
       topic_category: "business",
       intensity: "strong",
-      triggers: ["In Transition", "Feeling Stuck"],
+      triggers: ["In Transition", "Avoiding Action"],
+    },
+  ],
+  rival: [
+    {
+      topic_category: "physique",
+      intensity: "strong",
+      triggers: ["Unmotivated", "Frustrated", "Needing Discipline"],
+    },
+    {
+      topic_category: "discipline",
+      intensity: "strong",
+      triggers: ["Avoiding Action", "Motivated & Ready"],
+    },
+    {
+      topic_category: "confidence",
+      intensity: "medium",
+      triggers: ["Self-Doubt", "Feeling Stuck"],
     },
   ],
   reign: [
@@ -109,39 +135,12 @@ const THEMES_BY_MENTOR: Record<ActiveMentorSlug, MentorDailyTheme[]> = {
       triggers: ["Avoiding Action", "Needing Discipline"],
     },
   ],
-  solace: [
-    {
-      topic_category: "mindset",
-      intensity: "soft",
-      triggers: ["Heavy or Low", "Emotionally Hurt"],
-    },
-    {
-      topic_category: "focus",
-      intensity: "soft",
-      triggers: ["Anxious & Overthinking", "Feeling Stuck"],
-    },
-  ],
 };
-
-function normalizeMentorSlug(value: string | null | undefined): string | null {
-  if (typeof value !== "string") {
-    return null;
-  }
-  const normalized = value.trim().toLowerCase();
-  return normalized.length > 0 ? normalized : null;
-}
 
 export function resolveMentorSlug(
   mentorSlug: string | null | undefined,
-): ActiveMentorSlug | null {
-  const normalized = normalizeMentorSlug(mentorSlug);
-  if (!normalized) return null;
-
-  if ((ACTIVE_MENTOR_SLUGS as readonly string[]).includes(normalized)) {
-    return normalized as ActiveMentorSlug;
-  }
-
-  return LEGACY_MENTOR_ALIASES[normalized] ?? null;
+): SupportedMentorSlug | null {
+  return resolveSupportedMentorSlug(mentorSlug);
 }
 
 export function getMentorThemes(
@@ -159,11 +158,12 @@ export function selectThemeForDate(
   date: Date,
 ): {
   requestedMentorSlug: string | null;
-  resolvedMentorSlug: ActiveMentorSlug | null;
+  resolvedMentorSlug: SupportedMentorSlug | null;
   theme: MentorDailyTheme;
   usedFallbackTheme: boolean;
 } {
-  const requestedMentorSlug = normalizeMentorSlug(mentorSlug);
+  const requestedMentorSlug =
+    typeof mentorSlug === "string" ? mentorSlug.trim().toLowerCase() || null : null;
   const resolvedMentorSlug = resolveMentorSlug(mentorSlug);
   const themes = getMentorThemes(mentorSlug);
 

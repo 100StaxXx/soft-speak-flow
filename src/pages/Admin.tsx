@@ -317,13 +317,13 @@ const Admin = () => {
 
   // Active mentors only
   const mentorPreviewTexts: Record<string, string> = {
-    atlas: "Let's take a breath, get clear, and move with purpose.",
-    eli: "Hey, you're doing better than you think. Keep going.",
-    sienna: "You're safe, you're growing, and you're allowed to take your time.",
-    stryker: "Stand tall. Lock in. This is your moment to push.",
-    carmen: "No excuses. Show me what you're made of.",
+    sage: "Peace comes before progress. Start with one clear step.",
+    icon: "We don't do things that lower our standard.",
+    charles: "Oh, we're procrastinating again. Shocking.",
+    princess: "A soft, productive day is enough.",
+    operator: "Your current system lacks structure. Let's correct it.",
+    rival: "You said you were different. Show me.",
     reign: "Excellence isn't optional. Let's make today count.",
-    solace: "Let your mind settle. Peace starts from within.",
   };
 
   const handleVoicePreview = async (mentorSlug: string) => {

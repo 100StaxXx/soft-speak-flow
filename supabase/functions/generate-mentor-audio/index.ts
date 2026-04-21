@@ -15,6 +15,8 @@ import {
   createCostGuardrailSession,
   isCostGuardrailBlockedError,
 } from "../_shared/costGuardrails.ts";
+import { resolveMentorVoiceConfig } from "../_shared/mentorVoiceConfig.ts";
+import { resolveSupportedMentorSlug } from "../_shared/mentorRoster.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -23,43 +25,6 @@ const corsHeaders = {
 
 const MODEL_NAME = "eleven_multilingual_v2";
 const RATE_LIMIT_KEY = "mentor-audio";
-
-interface MentorVoiceConfig {
-  voiceId: string;
-  stability: number;
-  similarity_boost: number;
-  style_exaggeration: number;
-  use_speaker_boost?: boolean;
-}
-
-const mentorVoices: Record<string, MentorVoiceConfig> = {
-  atlas: { voiceId: "JBFqnCBsd6RMkjVDRZzb", stability: 0.75, similarity_boost: 0.85, style_exaggeration: 0.5 },
-  eli: { voiceId: "mcuuWJIofmzgKEGk3EMA", stability: 0.7, similarity_boost: 0.8, style_exaggeration: 0.4 },
-  nova: { voiceId: "onwK4e9ZLuTAKqWW03F9", stability: 0.65, similarity_boost: 0.75, style_exaggeration: 0.6 },
-  sienna: { voiceId: "wGcFBfKz5yUQqhqr0mVy", stability: 0.8, similarity_boost: 0.85, style_exaggeration: 0.3 },
-  lumi: { voiceId: "EXAVITQu4vr4xnSDxMaL", stability: 0.75, similarity_boost: 0.8, style_exaggeration: 0.2 },
-  kai: { voiceId: "N2lVS1w4EtoT3dr4eOWO", stability: 0.7, similarity_boost: 0.85, style_exaggeration: 0.8 },
-  stryker: {
-    voiceId: "pNInz6obpgDQGcFmaJgB",
-    stability: 0.58,
-    similarity_boost: 0.96,
-    style_exaggeration: 1.0,
-    use_speaker_boost: true,
-  },
-  carmen: { voiceId: "4opnKWPbOJPB3xz3YUBh", stability: 0.75, similarity_boost: 0.85, style_exaggeration: 0.7 },
-  reign: {
-    voiceId: "GTQ4ImqrRljZAa9VJX6B",
-    stability: 0.52,
-    similarity_boost: 0.97,
-    style_exaggeration: 1.0,
-    use_speaker_boost: true,
-  },
-  solace: { voiceId: "XB0fDUnXU5powFXDhCwa", stability: 0.8, similarity_boost: 0.8, style_exaggeration: 0.35 },
-};
-
-const legacyVoiceAliases: Record<string, string> = {
-  elizabeth: "solace",
-};
 
 interface GenerateMentorAudioDeps {
   authorize: (req: Request, corsHeaders: HeadersInit) => Promise<UserOrInternalRequestAuth | Response>;
@@ -153,8 +118,8 @@ export async function handleGenerateMentorAudio(
     }
 
     const requestedMentorSlug = String(mentorSlug).trim().toLowerCase();
-    const resolvedMentorSlug = legacyVoiceAliases[requestedMentorSlug] ?? requestedMentorSlug;
-    const voiceConfig = mentorVoices[resolvedMentorSlug];
+    const resolvedMentorSlug = resolveSupportedMentorSlug(requestedMentorSlug) ?? requestedMentorSlug;
+    const voiceConfig = resolveMentorVoiceConfig(requestedMentorSlug);
 
     if (!voiceConfig) {
       throw new Error(`No voice configuration found for mentor: ${requestedMentorSlug}`);

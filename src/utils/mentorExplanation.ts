@@ -1,3 +1,5 @@
+import { resolveMentorSlugAlias } from "@/lib/mentorRoster";
+
 interface Mentor {
   id: string;
   slug: string;
@@ -16,40 +18,40 @@ export interface MentorExplanation {
 }
 
 const MENTOR_BULLETS: Record<string, string[]> = {
-  atlas: [
-    "Brings clarity when life gets noisy",
-    "Keeps you grounded in principles, not impulses",
-    "Unlocks clear thinking even in emotional moments"
+  sage: [
+    "Brings perspective when your mind feels crowded",
+    "Keeps you calm enough to hear what actually matters",
+    "Turns overwhelm into one steady next step"
   ],
-  eli: [
-    "Reminds you of the strength you already have",
-    "Celebrates your progress, not just perfection",
-    "Fuels your confidence with steady encouragement"
+  icon: [
+    "Helps you choose from standards instead of insecurity",
+    "Sharpens your boundaries without making you louder",
+    "Keeps your actions aligned with the version of you you're building"
   ],
-  sienna: [
-    "Honors your journey while moving you forward",
-    "Creates emotional safety while building strength",
-    "Validates your feelings and guides you gently"
+  charles: [
+    "Calls out procrastination before it turns into a whole day",
+    "Keeps accountability sharp, short, and memorable",
+    "Turns avoidance into action with a little attitude"
   ],
-  stryker: [
-    "Maximizes your focus and execution",
-    "Treats your goals like an athlete treats competition",
-    "Elevates you toward peak performance daily"
+  princess: [
+    "Makes consistency feel supportive instead of punishing",
+    "Builds routines that still leave room for softness",
+    "Pairs self-respect with steady forward motion"
   ],
-  carmen: [
-    "Pushes you to meet your full potential",
-    "Holds you accountable with fierce compassion",
-    "Builds your leadership and executive presence"
+  operator: [
+    "Builds structure where your day keeps leaking time",
+    "Turns intentions into clean execution",
+    "Treats your routine like a system worth optimizing"
+  ],
+  rival: [
+    "Uses challenge to wake up your competitive side",
+    "Pushes past excuses fast",
+    "Makes effort feel like something to prove"
   ],
   reign: [
-    "Demands peak performance in body and mind",
-    "Transforms you through relentless discipline",
-    "Elevates your physical and professional standards"
-  ],
-  solace: [
-    "Celebrates your wins with genuine warmth",
-    "Builds your confidence through steady support",
-    "Reminds you of your strength when you forget"
+    "Keeps legacy performance energy available for existing users",
+    "Stays focused on ambition, pressure, and standards",
+    "Maintains a hard-driving tone without entering new flows"
   ]
 };
 
@@ -135,7 +137,8 @@ export function generateMentorExplanation(
 
   // Get bullets
   const shortTitle = mentor.short_title || mentor.name || "guide";
-  const bullets = MENTOR_BULLETS[mentor.slug] || [
+  const resolvedSlug = resolveMentorSlugAlias(mentor.slug) ?? mentor.slug;
+  const bullets = MENTOR_BULLETS[resolvedSlug] || [
     `Guides you with ${shortTitle.toLowerCase()}`,
     `Matches your communication style`,
     `Helps you reach your goals`

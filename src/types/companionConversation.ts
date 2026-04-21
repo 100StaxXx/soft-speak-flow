@@ -8,7 +8,7 @@ import type {
 
 export type CompanionConversationMode = "talk" | "plan";
 export type CompanionChatSurface = "companion" | "journeys";
-export type CompanionChatSource = "chat" | "plan";
+export type CompanionChatSource = "chat" | "plan" | "agent";
 
 export type CompanionChatRole = "assistant" | "user";
 

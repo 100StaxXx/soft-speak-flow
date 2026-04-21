@@ -79,6 +79,10 @@ vi.mock("@/components/MentorSwitcher", () => ({
   MentorSwitcher: () => <div>MentorSwitcher</div>,
 }));
 
+vi.mock("@/components/MentorAvatar", () => ({
+  MentorAvatar: ({ mentorName }: { mentorName: string }) => <div>{mentorName} Avatar</div>,
+}));
+
 vi.mock("@/components/AskMentorChat", () => ({
   AskMentorChat: () => (
     <button onClick={mocks.askMentorAction} type="button">
@@ -160,7 +164,7 @@ describe("MentorChat mentor connection state", () => {
     mocks.effectiveMentorId = "mentor-1";
     mocks.mentorQuery.data = {
       id: "mentor-1",
-      name: "Atlas",
+      name: "The Sage",
       tone_description: "Steady guidance",
       avatar_url: "https://example.com/avatar.png",
     };
@@ -177,20 +181,20 @@ describe("MentorChat mentor connection state", () => {
     mocks.effectiveMentorId = "mentor-1";
     mocks.mentorQuery.data = {
       id: "mentor-2",
-      name: "Sienna",
+      name: "The Princess",
       tone_description: "Gentle guidance",
       avatar_url: "https://example.com/avatar.png",
     };
     mocks.primaryMentorQuery.data = {
       id: "mentor-1",
-      name: "Atlas",
+      name: "The Sage",
     };
 
     renderMentorChat({ consultMentorId: "mentor-2" });
 
-    expect(screen.getByText("Consult Sienna")).toBeInTheDocument();
-    expect(screen.getByText("Primary: Atlas")).toBeInTheDocument();
-    expect(screen.getByText("Consulting: Sienna")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Return to Atlas" })).toBeInTheDocument();
+    expect(screen.getByText("Consult The Princess")).toBeInTheDocument();
+    expect(screen.getByText("Primary: The Sage")).toBeInTheDocument();
+    expect(screen.getByText("Consulting: The Princess")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Return to The Sage" })).toBeInTheDocument();
   });
 });

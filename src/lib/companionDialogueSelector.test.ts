@@ -252,15 +252,14 @@ describe("companionDialogueSelector", () => {
     expect(blockedIds.has(result.line.id)).toBe(false);
   });
 
-  it("locks tone selection to the chaos sidekick pack", () => {
+  it("biases tone selection by mood and voice style", () => {
     const desperateTones = runToneDistribution(1800, {
       dialogueMood: "desperate",
       voiceStyle: "balanced",
     });
 
-    expect(desperateTones.soft).toBe(0);
-    expect(desperateTones.playful).toBe(0);
-    expect(desperateTones.witty_sassy).toBe(1800);
+    expect(desperateTones.soft).toBeGreaterThan(desperateTones.playful);
+    expect(desperateTones.soft).toBeGreaterThan(desperateTones.witty_sassy);
 
     const contentBaseline = runToneDistribution(1800, {
       dialogueMood: "content",
@@ -272,12 +271,10 @@ describe("companionDialogueSelector", () => {
       voiceStyle: "warm gentle supportive",
     });
 
-    expect(contentBaseline.soft).toBe(0);
-    expect(contentBaseline.playful).toBe(0);
-    expect(contentBaseline.witty_sassy).toBe(1800);
-    expect(contentWarmBias.soft).toBe(0);
-    expect(contentWarmBias.playful).toBe(0);
-    expect(contentWarmBias.witty_sassy).toBe(1800);
+    expect(contentBaseline.soft).toBeGreaterThan(0);
+    expect(contentBaseline.playful).toBeGreaterThan(0);
+    expect(contentWarmBias.soft).toBeGreaterThan(contentBaseline.soft);
+    expect(contentWarmBias.soft).toBeGreaterThan(contentWarmBias.witty_sassy);
   });
 
   it("forces none shimmer once five colored shimmers were already shown today", () => {

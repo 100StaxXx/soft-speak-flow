@@ -1701,7 +1701,9 @@ export type Database = {
           companion_id: string
           created_at: string
           last_message_at: string
+          last_openai_response_id: string | null
           message_count: number
+          openai_conversation_id: string | null
           preview_text: string
           session_id: string
           surface: string
@@ -1713,7 +1715,9 @@ export type Database = {
           companion_id: string
           created_at?: string
           last_message_at?: string
+          last_openai_response_id?: string | null
           message_count?: number
+          openai_conversation_id?: string | null
           preview_text: string
           session_id: string
           surface: string
@@ -1725,7 +1729,9 @@ export type Database = {
           companion_id?: string
           created_at?: string
           last_message_at?: string
+          last_openai_response_id?: string | null
           message_count?: number
+          openai_conversation_id?: string | null
           preview_text?: string
           session_id?: string
           surface?: string
@@ -1739,6 +1745,103 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "user_companion"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      companion_pending_actions: {
+        Row: {
+          action_type: string
+          affected_entities: Json | null
+          cancelled_at: string | null
+          companion_id: string
+          confirmation_message: string | null
+          confirmed_at: string | null
+          created_at: string
+          executed_at: string | null
+          execution_error: Json | null
+          execution_result: Json | null
+          expires_at: string
+          id: string
+          idempotency_key: string
+          intent: string
+          metadata: Json | null
+          normalized_payload: Json
+          replaced_by_action_id: string | null
+          session_id: string
+          status: string
+          summary: string
+          thread_id: string
+          user_id: string
+        }
+        Insert: {
+          action_type: string
+          affected_entities?: Json | null
+          cancelled_at?: string | null
+          companion_id: string
+          confirmation_message?: string | null
+          confirmed_at?: string | null
+          created_at?: string
+          executed_at?: string | null
+          execution_error?: Json | null
+          execution_result?: Json | null
+          expires_at?: string
+          id?: string
+          idempotency_key: string
+          intent: string
+          metadata?: Json | null
+          normalized_payload: Json
+          replaced_by_action_id?: string | null
+          session_id: string
+          status?: string
+          summary: string
+          thread_id: string
+          user_id: string
+        }
+        Update: {
+          action_type?: string
+          affected_entities?: Json | null
+          cancelled_at?: string | null
+          companion_id?: string
+          confirmation_message?: string | null
+          confirmed_at?: string | null
+          created_at?: string
+          executed_at?: string | null
+          execution_error?: Json | null
+          execution_result?: Json | null
+          expires_at?: string
+          id?: string
+          idempotency_key?: string
+          intent?: string
+          metadata?: Json | null
+          normalized_payload?: Json
+          replaced_by_action_id?: string | null
+          session_id?: string
+          status?: string
+          summary?: string
+          thread_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "companion_pending_actions_companion_id_fkey"
+            columns: ["companion_id"]
+            isOneToOne: false
+            referencedRelation: "user_companion"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "companion_pending_actions_replaced_by_action_id_fkey"
+            columns: ["replaced_by_action_id"]
+            isOneToOne: false
+            referencedRelation: "companion_pending_actions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "companion_pending_actions_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "companion_chat_threads"
+            referencedColumns: ["session_id"]
           },
         ]
       }
@@ -6948,6 +7051,8 @@ export type Database = {
         Row: {
           avg_message_length: number | null
           avoid_topics: string[] | null
+          companion_mode: string
+          companion_mode_adaptation_enabled: boolean
           created_at: string | null
           detail_level: string | null
           engagement_patterns: Json | null
@@ -6967,6 +7072,8 @@ export type Database = {
         Insert: {
           avg_message_length?: number | null
           avoid_topics?: string[] | null
+          companion_mode?: string
+          companion_mode_adaptation_enabled?: boolean
           created_at?: string | null
           detail_level?: string | null
           engagement_patterns?: Json | null
@@ -6986,6 +7093,8 @@ export type Database = {
         Update: {
           avg_message_length?: number | null
           avoid_topics?: string[] | null
+          companion_mode?: string
+          companion_mode_adaptation_enabled?: boolean
           created_at?: string | null
           detail_level?: string | null
           engagement_patterns?: Json | null

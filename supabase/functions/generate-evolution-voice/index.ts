@@ -9,25 +9,11 @@ import {
   createCostGuardrailSession,
   isCostGuardrailBlockedError,
 } from "../_shared/costGuardrails.ts";
+import { resolveMentorVoiceConfig } from "../_shared/mentorVoiceConfig.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-// Mentor voice IDs for ElevenLabs
-const MENTOR_VOICES: Record<string, string> = {
-  'atlas': 'JBFqnCBsd6RMkjVDRZzb', // George
-  'darius': 'rWyjfFeMZ6PxkHqD3wGC', // Brian
-  'eli': 'mcuuWJIofmzgKEGk3EMA', // Chris
-  'nova': 'onwK4e9ZLuTAKqWW03F9', // Daniel
-  'sienna': 'wGcFBfKz5yUQqhqr0mVy', // Charlotte
-  'lumi': 'EXAVITQu4vr4xnSDxMaL', // Sarah
-  'kai': 'N2lVS1w4EtoT3dr4eOWO', // Callum
-  'stryker': 'pNInz6obpgDQGcFmaJgB', // Rich
-  'carmen': '4opnKWPbOJPB3xz3YUBh', // Carmen
-  'reign': 'GTQ4ImqrRljZAa9VJX6B', // Reign custom voice
-  'solace': 'XB0fDUnXU5powFXDhCwa', // Solace
 };
 
 serve(async (req) => {
@@ -123,9 +109,9 @@ Generate a SHORT, powerful one-liner (10-15 words MAX) celebrating that the user
 Focus on DISCIPLINE and CONSISTENCY.
 
 Examples for different mentors:
-- Atlas (authoritative): "Growth like this doesn't happen by accident."
-- Darius (intense): "This is what consistency looks like."
-- Solace (gentle): "Look at what you're building, gently and surely."
+- The Sage: "Steady effort becomes visible all at once."
+- The Operator: "This is what disciplined execution produces."
+- Charles: "See? Progress. Try acting shocked."
 
 Make it personal to ${mentor.name}'s voice. Keep it SHORT and IMPACTFUL.`
           },
@@ -150,7 +136,9 @@ Make it personal to ${mentor.name}'s voice. Keep it SHORT and IMPACTFUL.`
     console.log('Generated voice line:', voiceLine);
 
     // Convert to speech using ElevenLabs
-    const voiceId = MENTOR_VOICES[mentorSlug] || MENTOR_VOICES['atlas'];
+    const voiceId = resolveMentorVoiceConfig(mentorSlug)?.voiceId
+      ?? resolveMentorVoiceConfig("sage")?.voiceId
+      ?? "";
     
     const elevenLabsResponse = await guardedFetch(
       `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,

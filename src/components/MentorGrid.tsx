@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Check, ArrowLeft } from "lucide-react";
 import { MentorAvatar } from "@/components/MentorAvatar";
+import { MENTOR_DISPLAY_ORDER, getMentorDisplaySortIndex } from "@/lib/mentorRoster";
 import { cn } from "@/lib/utils";
 
 interface Mentor {
@@ -28,9 +29,6 @@ interface MentorGridProps {
   appearance?: "default" | "onboarding";
 }
 
-// Preferred display order - active mentors only
-const MENTOR_ORDER = ['atlas', 'eli', 'sienna', 'stryker', 'carmen', 'reign', 'solace'];
-
 export const MentorGrid = ({
   mentors,
   onSelectMentor,
@@ -45,14 +43,18 @@ export const MentorGrid = ({
 
   // Order mentors: first by MENTOR_ORDER, then any unlisted mentors alphabetically
   const orderedMentors = (() => {
-    const orderedBySlug = MENTOR_ORDER.map(slug => 
+    const orderedBySlug = MENTOR_DISPLAY_ORDER.map(slug =>
       mentors.find(m => m.slug === slug)
     ).filter(Boolean) as Mentor[];
     
     // Find any mentors not in MENTOR_ORDER and add them at the end
     const unlistedMentors = mentors
-      .filter(m => !MENTOR_ORDER.includes(m.slug))
-      .sort((a, b) => a.name.localeCompare(b.name));
+      .filter(m => !MENTOR_DISPLAY_ORDER.includes(m.slug as typeof MENTOR_DISPLAY_ORDER[number]))
+      .sort((a, b) => {
+        const sortDelta = getMentorDisplaySortIndex(a.slug) - getMentorDisplaySortIndex(b.slug);
+        if (sortDelta !== 0) return sortDelta;
+        return a.name.localeCompare(b.name);
+      });
     
     return [...orderedBySlug, ...unlistedMentors];
   })();
