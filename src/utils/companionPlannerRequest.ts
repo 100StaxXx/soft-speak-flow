@@ -845,3 +845,25 @@ export const summarizePlannerParsedInputForDebug = (
       : typeof parsedInput.newTitle,
   }
   : null;
+
+export const summarizePlannerRequestForDebug = (
+  request: CompanionPlannerRequest,
+) => ({
+  messageLength: request.message.length,
+  horizon: request.horizon,
+  currentDate: request.currentDate,
+  currentDateTime: request.currentDateTime,
+  timezone: request.timezone ?? null,
+  tonePack: request.tonePack,
+  conversationHistoryCount: request.conversationHistory.length,
+  sessionState: summarizePlannerSessionStateForDebug(request.sessionState),
+  parsedInput: summarizePlannerParsedInputForDebug(request.parsedInput),
+  classificationHint: request.classificationHint
+    ? {
+      type: request.classificationHint.type,
+      confidence: request.classificationHint.confidence,
+      hasTimelineAnalysis: Boolean(request.classificationHint.timelineAnalysis),
+    }
+    : null,
+  plannerContext: summarizePlannerContextForDebug(request.plannerContext),
+});

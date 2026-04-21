@@ -35,10 +35,11 @@ import {
   sanitizePlannerConversationHistory,
   sanitizePlannerParsedInput,
   sanitizePlannerSessionState,
-  summarizePlannerContextForDebug,
-  summarizePlannerParsedInputForDebug,
-  summarizePlannerSessionStateForDebug,
+  summarizePlannerRequestForDebug,
 } from "@/utils/companionPlannerRequest";
+import {
+  validateCompanionPlannerRequest,
+} from "@/utils/companionPlannerRequestValidation";
 import { buildCompanionPlannerScheduleInsights } from "@/utils/companionPlannerSchedule";
 import {
   toUserFacingCompanionPlannerError,
@@ -2083,6 +2084,14 @@ export function useCompanionPlanner({
         classificationHint,
         plannerContext: requestPlannerContext,
       };
+      const localValidation = validateCompanionPlannerRequest(requestBody);
+      if (!localValidation.success) {
+        const validationError = new Error(
+          "Planner request failed local validation",
+        );
+        validationError.name = "PlannerRequestValidationError";
+        throw validationError;
+      }
       const { data, error } = await supabase.functions.invoke(
         "companion-planner-chat",
         {
@@ -2140,24 +2149,14 @@ export function useCompanionPlanner({
       });
     } catch (error) {
       const parsedError = await parseFunctionInvokeError(error);
+      const localValidation = requestBody
+        ? validateCompanionPlannerRequest(requestBody)
+        : null;
       console.error("Failed to submit planner message:", {
         parsedError,
+        localValidation,
         requestSummary: requestBody
-          ? {
-            messageLength: requestBody.message.length,
-            horizon: requestBody.horizon,
-            currentDate: requestBody.currentDate,
-            conversationHistoryCount: requestBody.conversationHistory.length,
-            sessionState: summarizePlannerSessionStateForDebug(
-              requestBody.sessionState,
-            ),
-            parsedInput: summarizePlannerParsedInputForDebug(
-              requestBody.parsedInput,
-            ),
-            plannerContext: summarizePlannerContextForDebug(
-              requestBody.plannerContext,
-            ),
-          }
+          ? summarizePlannerRequestForDebug(requestBody)
           : null,
       });
       const userMessage = toUserFacingCompanionPlannerError(parsedError);

@@ -5,7 +5,11 @@ import {
   sanitizePlannerContext,
   sanitizePlannerParsedInput,
   sanitizePlannerSessionState,
+  summarizePlannerRequestForDebug,
 } from "@/utils/companionPlannerRequest";
+import {
+  validateCompanionPlannerRequest,
+} from "@/utils/companionPlannerRequestValidation";
 
 describe("sanitizePlannerContext", () => {
   it("drops malformed dynamic planner entries and strips nullable ai signal fields", () => {
@@ -168,5 +172,222 @@ describe("sanitizePlannerParsedInput", () => {
       category: "mind",
       newTitle: null,
     });
+  });
+});
+
+const buildValidPlannerRequest = (): CompanionPlannerRequest => ({
+  message: "Plan my day",
+  currentDate: "2026-04-21",
+  currentDateTime: "2026-04-21T11:21:59-07:00",
+  timezone: "America/Los_Angeles",
+  horizon: "day",
+  tonePack: "soft",
+  conversationHistory: [],
+  sessionState: {
+    draft: {},
+    openQuestionIds: [],
+    preferredTimeOfDay: null,
+    preferredTimeReason: null,
+    reminderPreference: null,
+    pendingStarterIntent: null,
+    lastClassification: null,
+  },
+  parsedInput: {
+    text: "",
+    scheduledTime: null,
+    scheduledDate: null,
+    estimatedDuration: null,
+    recurrencePattern: null,
+    recurrenceDays: [],
+    recurrenceMonthDays: [],
+    recurrenceCustomPeriod: null,
+    recurrenceEndDate: null,
+    notes: null,
+    category: null,
+    newTitle: null,
+  },
+  classificationHint: null,
+  plannerContext: {
+    tasks: [{
+      id: "task-1",
+      title: "Morning reset",
+      taskDate: "2026-04-21",
+      category: null,
+      scheduledTime: null,
+      estimatedDuration: 30,
+      notes: null,
+      recurrencePattern: null,
+    }],
+    inboxTasks: [],
+    activeEpics: [{
+      id: "epic-1",
+      title: "April focus",
+      endDate: "2026-04-30",
+      progressPercentage: 50,
+      daysRemaining: 9,
+      habitCount: 2,
+    }],
+    rituals: [{
+      id: "ritual-1",
+      epicId: "epic-1",
+      epicTitle: "April focus",
+      title: "Daily planning",
+      frequency: "daily",
+      preferredTime: "09:00",
+      currentStreak: 4,
+    }],
+    calendarEvents: [{
+      id: "event-1",
+      title: "Standup",
+      start: "2026-04-21T09:00:00-07:00",
+      end: "2026-04-21T09:15:00-07:00",
+      isAllDay: false,
+      provider: "google",
+      readOnly: true,
+    }],
+    contactsNeedingAttention: [],
+    reflectionSignals: [{
+      date: "2026-04-20",
+      source: "check_in",
+      mood: "steady",
+      energy: "medium",
+      wins: null,
+      tomorrowAdjustment: null,
+    }],
+    careSignals: {
+      overallCare: 0.8,
+      hasDormancyWarning: false,
+      dialogueTone: "content",
+      inactiveDays: 0,
+      daysUntilDormancy: null,
+    },
+    starterIntent: "plan_day",
+    priorityScores: [{
+      id: "priority-1",
+      kind: "task",
+      title: "Morning reset",
+      score: 10,
+      reasons: ["today"],
+      taskId: "task-1",
+      epicId: null,
+      ritualId: null,
+      contactId: null,
+      targetDate: "2026-04-21",
+      suggestedTime: null,
+    }],
+    scheduleInsights: {
+      horizon: "day",
+      selectedDate: "2026-04-21",
+      dayLoads: [{
+        date: "2026-04-21",
+        totalMinutes: 30,
+        taskCount: 1,
+        status: "open",
+      }],
+      overloadedDates: [],
+      emptyDates: [],
+      conflicts: [],
+      suggestedSlots: [{
+        date: "2026-04-21",
+        time: "10:00",
+        endTime: "10:30",
+        score: 0.8,
+        reason: "Open window",
+      }],
+      moveSuggestions: [],
+      summary: "Open morning",
+    },
+    plannerMemory: {
+      tonePack: "soft",
+      preferredTimeOfDay: null,
+      preferredTimeReason: null,
+      reminderMinutesBefore: null,
+      wakeTime: null,
+      windDownTime: null,
+      peakProductivityTimes: [],
+      preferredWindows: [],
+      cadencePatterns: {},
+      workloadTolerance: "light",
+      contactCadencePatterns: {},
+      lastConfirmedAt: null,
+    },
+    statInterpretation: {
+      statProfile: {
+        scores: {
+          vitality: 1,
+          wisdom: 2,
+          discipline: 3,
+          resolve: 4,
+          creativity: 5,
+          alignment: 6,
+        },
+        dominantStat: "alignment",
+        secondaryStat: "creativity",
+      },
+      statNeeds: {
+        vitality: { level: "low", reasons: [] },
+        wisdom: { level: "medium", reasons: [] },
+        discipline: { level: "high", reasons: [] },
+        resolve: { level: "medium", reasons: [] },
+        creativity: { level: "low", reasons: [] },
+        alignment: { level: "medium", reasons: [] },
+      },
+      momentumState: "coasting",
+      recentMissInterpretation: "normal_variance",
+      narrativeBrief: "Steady progress.",
+      dailyNarrative: "Today has space for one meaningful task.",
+      weeklyNarrative: "The week still feels flexible.",
+      identityBootstrap: "You are building consistency.",
+    },
+    aiSignals: {
+      preferredDifficulty: "medium",
+      preferredHabitFrequency: "daily",
+      preferredEpicDuration: 30,
+      commonContexts: ["focus"],
+      suggestedWorkload: "light",
+    },
+  },
+});
+
+describe("validateCompanionPlannerRequest", () => {
+  it("accepts a request that matches the backend schema", () => {
+    expect(validateCompanionPlannerRequest(buildValidPlannerRequest())).toEqual({
+      success: true,
+    });
+  });
+
+  it("surfaces exact issue paths when the request is still invalid", () => {
+    const request = buildValidPlannerRequest();
+    request.sessionState.draft = [] as unknown as CompanionPlannerRequest["sessionState"]["draft"];
+    request.plannerContext.calendarEvents[0]!.readOnly = undefined as unknown as boolean;
+
+    expect(validateCompanionPlannerRequest(request)).toEqual({
+      success: false,
+      issues: [
+        {
+          path: "sessionState.draft",
+          code: "invalid_type",
+          message: "Expected object, received array",
+        },
+        {
+          path: "plannerContext.calendarEvents.0.readOnly",
+          code: "invalid_type",
+          message: "Required",
+        },
+      ],
+    });
+  });
+});
+
+describe("summarizePlannerRequestForDebug", () => {
+  it("includes top-level fields that were missing from the earlier debug logs", () => {
+    expect(summarizePlannerRequestForDebug(buildValidPlannerRequest())).toEqual(
+      expect.objectContaining({
+        currentDateTime: "2026-04-21T11:21:59-07:00",
+        timezone: "America/Los_Angeles",
+        tonePack: "soft",
+        classificationHint: null,
+      }),
+    );
   });
 });
