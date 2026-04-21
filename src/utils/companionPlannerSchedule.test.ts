@@ -36,6 +36,7 @@ describe("buildCompanionPlannerScheduleInsights", () => {
     const insights = buildCompanionPlannerScheduleInsights({
       horizon: "day",
       selectedDate: "2026-04-18",
+      currentDateTime: "2026-04-18T07:30:00-07:00",
       plannerMemory: {
         preferredTimeOfDay: "morning",
         preferredTimeReason: "I am sharper before messages start flying.",
@@ -68,13 +69,13 @@ describe("buildCompanionPlannerScheduleInsights", () => {
       date: "2026-04-18",
       time: "08:00",
     });
-    expect(insights.summary).toContain("overlap");
   });
 
   it("flags overloaded days and suggests moving work to lighter dates", () => {
     const insights = buildCompanionPlannerScheduleInsights({
       horizon: "week",
       selectedDate: "2026-04-18",
+      currentDateTime: "2026-04-18T07:30:00-07:00",
       plannerMemory: {
         wakeTime: "08:00",
         windDownTime: "20:00",
@@ -100,6 +101,7 @@ describe("buildCompanionPlannerScheduleInsights", () => {
     const insights = buildCompanionPlannerScheduleInsights({
       horizon: "day",
       selectedDate: "2026-04-18",
+      currentDateTime: "2026-04-18T07:30:00-07:00",
       plannerMemory: {
         wakeTime: "08:00",
         windDownTime: "21:00",
@@ -119,5 +121,31 @@ describe("buildCompanionPlannerScheduleInsights", () => {
 
     expect(insights.dayLoads[0]?.totalMinutes).toBeGreaterThan(120);
     expect(insights.suggestedSlots.some((slot) => slot.time === "16:00")).toBe(false);
+  });
+
+  it("never suggests past openings for the current day late at night", () => {
+    const insights = buildCompanionPlannerScheduleInsights({
+      horizon: "day",
+      selectedDate: "2026-04-20",
+      currentDateTime: "2026-04-20T21:48:00-07:00",
+      plannerMemory: {
+        wakeTime: "08:00",
+        windDownTime: "22:30",
+        preferredWindows: [
+          {
+            timeOfDay: "morning",
+            time: "09:00",
+            reason: "Morning focus still tends to work best.",
+            sourceCount: 2,
+          },
+        ],
+      },
+      tasks: [],
+      calendarEvents: [],
+    });
+
+    expect(insights.suggestedSlots.some((slot) => slot.time === "08:00")).toBe(false);
+    expect(insights.suggestedSlots.some((slot) => slot.time === "09:00")).toBe(false);
+    expect(insights.suggestedSlots.every((slot) => slot.time >= "21:48")).toBe(true);
   });
 });

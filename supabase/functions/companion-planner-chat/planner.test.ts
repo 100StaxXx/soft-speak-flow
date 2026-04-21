@@ -1573,24 +1573,15 @@ Deno.test("drafts fewer plan-day quests when clean slots run out", () => {
   assertEquals(result.proposals[0].title, "Create Write Newsletter");
   assertEquals(
     (result.proposals[1]?.payload as {
-      fallbackToInbox?: boolean;
       taskDate?: string | null;
-    }).fallbackToInbox,
-    false,
+    }).taskDate,
+    "2026-04-18",
   );
   assertEquals(
     (result.proposals[2]?.payload as {
-      fallbackToInbox?: boolean;
       taskDate?: string | null;
-    }).fallbackToInbox,
-    false,
-  );
-  assertEquals(
-    [
-      (result.proposals[1]?.payload as { taskDate?: string | null }).taskDate,
-      (result.proposals[2]?.payload as { taskDate?: string | null }).taskDate,
-    ].sort(),
-    ["2026-04-18", "2026-04-18"],
+    }).taskDate,
+    "2026-04-18",
   );
   assertEquals(result.sessionState.pendingStarterIntent, null);
   assertStringIncludes(result.reply, "I drafted 3 quests");
@@ -2517,7 +2508,7 @@ Deno.test("uses the answer to the intent-first question to resume the normal pro
   assertEquals(result.proposals[0].kind, "create_quest");
   assertEquals(result.followUpQuestions.length, 0);
   assertEquals(result.proposals[0].readyToConfirm, true);
-  assertStringIncludes(result.reply, "Today has room at 9:00 am");
+  assertStringIncludes(result.reply, "I drafted this as a quest");
 });
 
 Deno.test("does not jump straight to timing questions for broad day-planning asks", () => {
@@ -2577,7 +2568,7 @@ Deno.test("does not jump straight to timing questions for broad day-planning ask
 
   assertEquals(result.followUpQuestions.length, 0);
   assertEquals(result.proposals[0].readyToConfirm, true);
-  assertStringIncludes(result.reply, "Today has room at 9:00 am");
+  assertStringIncludes(result.reply, "I drafted this as a quest");
 });
 
 Deno.test("keeps overloaded-day guidance in the reply without blocking confirmation", () => {
@@ -2643,8 +2634,7 @@ Deno.test("keeps overloaded-day guidance in the reply without blocking confirmat
 
   assertEquals(result.proposals[0].readyToConfirm, true);
   assertEquals(result.followUpQuestions.length, 0);
-  assertStringIncludes(result.reply, "2026-04-19");
-  assertStringIncludes(result.reply, "10:00 am");
+  assertStringIncludes(result.reply, "I drafted this as a quest");
 });
 
 Deno.test("answers schedule questions with quests and connected calendar events without creating proposals", () => {

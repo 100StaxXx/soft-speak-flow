@@ -5,14 +5,10 @@ import {
   hasDayShapingLanguage,
 } from "../../../src/shared/actionBundleScheduling.ts";
 import type {
-  PlannerOptimizerDraft,
-  PlannerOptimizerHabit,
-  PlannerOptimizerRequest,
   PlannerOptimizerTaskToSchedule,
   PlannerTaskTimingLabel,
 } from "../../../src/shared/plannerOptimizer.ts";
 import {
-  clampPlannerOptimizerPriority,
   normalizeBundlePriority,
   normalizePlannerScorePriority,
 } from "../../../src/shared/plannerScoringPolicy.ts";
@@ -29,7 +25,6 @@ import {
   formatAssistantTimeRange,
   normalizeAssistantTimeText,
 } from "../_shared/assistantScheduleCopy.ts";
-import { runLocalPlannerOptimizer } from "./schedulerOptimizer.ts";
 
 export type PlannerHorizon = "day" | "week" | "month";
 export type PlannerTonePack = "soft" | "playful" | "witty_sassy";
@@ -266,7 +261,7 @@ export interface PlannerScheduleInsights {
   conflicts: PlannerScheduleConflict[];
   suggestedSlots: PlannerOpenSlot[];
   moveSuggestions: PlannerMoveSuggestion[];
-  summary: string;
+  summary?: string;
 }
 
 export interface PlannerMemoryProfile {
@@ -3291,9 +3286,6 @@ const buildUpcomingDigestReply = (input: PlannerBuildInput): string => {
 };
 
 const buildMakeRoomStarterReply = (input: PlannerBuildInput): string => {
-  const weekSummary = input.plannerContext.scheduleInsights?.summary
-    ? normalizeAssistantTimeText(input.plannerContext.scheduleInsights.summary)
-    : "The week still has room to flex.";
   const lead = isWittySassyTone(input.tonePack)
     ? buildWittyAvailabilityCallout(input, input.currentDate, true) ??
       "Here's the room I see right now, minus the decorative chaos."
@@ -3305,7 +3297,6 @@ const buildMakeRoomStarterReply = (input: PlannerBuildInput): string => {
   return [
     lead,
     buildDayDigest(input, input.currentDate, "Today", true),
-    `Week ahead: ${weekSummary}`,
     closer,
   ].join("\n\n");
 };
@@ -3968,9 +3959,6 @@ const composeReply = (
     suggest_reminder: "reminder tweak",
   })[kind];
   const explicitQuestCaptureTiming = hasExplicitQuestCaptureTiming(input, kind);
-  const scheduleSummary = input.plannerContext.scheduleInsights?.summary
-    ? normalizeAssistantTimeText(input.plannerContext.scheduleInsights.summary)
-    : null;
   const interpretationLead = getCompanionInterpretationLead(input);
   const preferredTimeOfDay = shouldSuppressLearnedTimingLanguage(input) ||
       explicitQuestCaptureTiming
@@ -3979,9 +3967,6 @@ const composeReply = (
   const memoryLead = preferredTimeOfDay
     ? `You usually land work like this in the ${preferredTimeOfDay}. `
     : "";
-  const scheduleLead = explicitQuestCaptureTiming || !scheduleSummary
-    ? ""
-    : `${scheduleSummary} `;
   const explicitQuestCaptureTime = preferredTime(draft);
   const explicitQuestCaptureTimeLabel = explicitQuestCaptureTime
     ? formatAssistantTime(explicitQuestCaptureTime) ?? explicitQuestCaptureTime
@@ -4013,27 +3998,27 @@ const composeReply = (
     if (readyToConfirm) {
       return `${
         interpretationLead ? `${interpretationLead} ` : ""
-      }${scheduleLead}${
+      }${
         questCaptureReplyLead || `I drafted this as a ${baseLabel}. `
       }Review it, confirm it if it holds up, and spare me the fake ceremony.`;
     }
 
     return `${
       interpretationLead ? `${interpretationLead} ` : ""
-    }${scheduleLead}${memoryLead}I can shape this into a ${baseLabel}, but I need one real detail before we dress vague intentions up like a finished plan.`;
+    }${memoryLead}I can shape this into a ${baseLabel}, but I need one real detail before we dress vague intentions up like a finished plan.`;
   }
 
   if (readyToConfirm) {
     return `${
       interpretationLead ? `${interpretationLead} ` : ""
-    }${scheduleLead}${
+    }${
       questCaptureReplyLead || `I drafted this as a ${baseLabel}. `
     }Take a look, and confirm it if it fits.`;
   }
 
   return `${
     interpretationLead ? `${interpretationLead} ` : ""
-  }${scheduleLead}${memoryLead}I can help shape this into a ${baseLabel}. First I need one quick detail.`;
+  }${memoryLead}I can help shape this into a ${baseLabel}. First I need one quick detail.`;
 };
 
 const buildConversationalResponse = (
@@ -4041,21 +4026,11 @@ const buildConversationalResponse = (
   sessionState: PlannerSessionState,
   classificationHint: ClassificationHint,
 ): PlannerBuildResult => {
-  const message = input.message.toLowerCase();
-  const scheduleSummary = input.plannerContext.scheduleInsights?.summary
-    ? normalizeAssistantTimeText(input.plannerContext.scheduleInsights.summary)
-    : null;
-  const scheduleLead =
-    /\b(today|tomorrow|week|calendar|schedule)\b/i.test(message) &&
-      scheduleSummary
-      ? `${scheduleSummary} `
-      : "";
-
   return {
     mode: "conversational",
     reply: isWittySassyTone(input.tonePack)
-      ? `${scheduleLead}I'm with you. Tell me what actually matters, or point at the bullshit and I'll help turn it into a draft quest or campaign.`
-      : `${scheduleLead}I'm here with you. Tell me what feels most important, or ask me to turn it into a draft quest or campaign when you're ready.`,
+      ? "I'm with you. Tell me what actually matters, or point at the bullshit and I'll help turn it into a draft quest or campaign."
+      : "I'm here with you. Tell me what feels most important, or ask me to turn it into a draft quest or campaign when you're ready.",
     followUpQuestions: [],
     proposals: [],
     suggestedReminders: [],
@@ -4126,11 +4101,6 @@ type OptimizerDraftCandidate = {
   priority?: number;
 };
 
-const buildPlannerMemoryWindow = (time: string | null | undefined): string[] =>
-  time
-    ? [`${time}-${formatMinutes((parseTimeToMinutes(time) ?? 0) + 60)}`]
-    : [];
-
 const getDateTimeOffset = (value: string): string => {
   const match = value.match(/([+-]\d{2}:\d{2}|Z)$/);
   return match?.[1] ?? "Z";
@@ -4141,11 +4111,6 @@ const buildOffsetDateTime = (
   clockTime: string,
   offset: string,
 ): string => `${dateKey}T${clockTime}:00${offset}`;
-
-const getDateKeyFromDateTime = (value: string): string => {
-  const match = value.match(/^(\d{4}-\d{2}-\d{2})T/);
-  return match?.[1] ?? value.slice(0, 10);
-};
 
 const inferTimingLabelFromClock = (
   clockTime: string | null | undefined,
@@ -4219,33 +4184,6 @@ const countPlanDayExistingWorkItems = (
   [...input.plannerContext.tasks, ...input.plannerContext.inboxTasks]
     .filter((task) => task.completed !== true && task.taskDate === targetDate)
     .length;
-
-const buildPlanDaySlotOptions = (
-  input: PlannerBuildInput,
-  targetDate: string,
-): PlannerOpenSlot[] => {
-  const currentDateKey = getLocalDateFromDateTime(input.currentDateTime);
-  const currentMinutes = getLocalMinutesFromDateTime(input.currentDateTime);
-  const fromInsights = input.plannerContext.scheduleInsights?.suggestedSlots
-    .filter((slot) => slot.date === targetDate)
-    .filter((slot) => {
-      if (targetDate !== currentDateKey || currentMinutes === null) return true;
-      const slotMinutes = parseTimeToMinutes(slot.time);
-      return slotMinutes === null || slotMinutes >= currentMinutes;
-    }) ?? [];
-
-  if (fromInsights.length > 0) {
-    return fromInsights;
-  }
-
-  return buildFreeWindowsForDate(input, targetDate, null).map((window) => ({
-    date: targetDate,
-    time: window.start,
-    endTime: window.end,
-    score: 0,
-    reason: "Open planner window",
-  }));
-};
 
 const PLAN_DAY_GENERIC_FOCUS_TERMS = new Set([
   "active",
@@ -4650,237 +4588,37 @@ const buildPlanDayPriorityCandidate = (
   return null;
 };
 
-const buildOptimizerRequest = (
-  input: PlannerBuildInput,
-  candidates: OptimizerDraftCandidate[],
-  targetDate: string,
-  options: {
-    schedulingMode: "aggressive" | "balanced" | "light";
-    maxQuests: number;
-  },
-): PlannerOptimizerRequest => {
-  const offset = getDateTimeOffset(input.currentDateTime);
-  const hasDatePinnedCandidate = Boolean(input.parsedInput?.scheduledDate) ||
-    targetDate !== input.currentDate ||
-    candidates.some((candidate) => Boolean(candidate.scheduledTime));
-  const planningWindow = input.horizon === "week"
-    ? {
-      start_date: targetDate,
-      end_date: addDaysToDateKey(targetDate, 6),
-    }
-    : input.horizon === "day" && !hasDatePinnedCandidate
-    ? {
-      start_date: targetDate,
-      end_date: addDaysToDateKey(targetDate, 1),
-    }
-    : {
-      start_date: targetDate,
-      end_date: targetDate,
-    };
-  const planningDates = Array.from(
-    {
-      length: Math.max(
-        1,
-        (
-          (Date.parse(`${planningWindow.end_date}T00:00:00Z`) -
-            Date.parse(`${planningWindow.start_date}T00:00:00Z`)) /
-          86_400_000
-        ) + 1,
-      ),
-    },
-    (_, index) => addDaysToDateKey(planningWindow.start_date, index),
-  );
-  const existingTasks = [
-    ...input.plannerContext.tasks,
-    ...input.plannerContext.inboxTasks,
-  ]
-    .filter((task) =>
-      task.completed !== true &&
-      task.taskDate !== null &&
-      planningDates.includes(task.taskDate) &&
-      Boolean(task.scheduledTime)
-    )
-    .map((task) => {
-      const scheduledTime = task.scheduledTime ?? "09:00";
-      const duration = getTaskDuration(task);
-      const taskDate = task.taskDate ?? targetDate;
-      const start = buildOffsetDateTime(taskDate, scheduledTime, offset);
-      const end = buildOffsetDateTime(
-        taskDate,
-        formatMinutes((parseTimeToMinutes(scheduledTime) ?? 0) + duration),
-        offset,
-      );
-
-      return {
-        id: task.id,
-        start,
-        end,
-        status: task.completed === true ? "completed" : "active",
-      };
-    });
-
-  const habits: PlannerOptimizerHabit[] = input.plannerContext.rituals.map((
-    ritual,
-  ) => ({
-    id: ritual.id,
-    title: ritual.title,
-    preferred_windows: buildPlannerMemoryWindow(ritual.preferredTime),
-    duration_min: 30,
-  }));
-
-  return {
-    current_datetime: input.currentDateTime,
-    timezone: input.timezone ?? "UTC",
-    planning_window: planningWindow,
-    scheduling_mode: options.schedulingMode,
-    tasks_to_schedule: candidates.map((candidate) => ({
-      id: candidate.id,
-      title: candidate.title,
-      category: candidate.category ?? null,
-      duration_min: candidate.estimatedDuration,
-      timing_preference: candidate.scheduledTime
-        ? {
-          label: inferTimingLabelFromClock(candidate.scheduledTime),
-          earliest_start: buildOffsetDateTime(
-            targetDate,
-            candidate.scheduledTime,
-            offset,
-          ),
-          latest_end: buildOffsetDateTime(
-            targetDate,
-            formatMinutes(
-              (parseTimeToMinutes(candidate.scheduledTime) ?? 0) +
-                candidate.estimatedDuration,
-            ),
-            offset,
-          ),
-        }
-        : candidate.timingPreferenceLabel
-        ? {
-          label: candidate.timingPreferenceLabel,
-        }
-        : undefined,
-      energy_type: candidate.energyType,
-      priority: clampPlannerOptimizerPriority(candidate.priority),
-      confidence: candidate.confidence,
-      derived_from_message: candidate.derivedFromMessage,
-      notes: candidate.notes ?? null,
-    })),
-    existing_tasks: existingTasks,
-    calendar_events: input.plannerContext.calendarEvents.map((event) => ({
-      id: event.id,
-      title: event.title,
-      start: event.start,
-      end: event.end,
-      source: event.provider === "google" || event.provider === "outlook"
-        ? event.provider
-        : "internal",
-      hard_block: true,
-    })),
-    habits,
-    planner_memory: {
-      wake_time: input.plannerContext.plannerMemory?.wakeTime ?? null,
-      wind_down_time: input.plannerContext.plannerMemory?.windDownTime ?? null,
-      work_hours: {
-        start: "09:00",
-        end: "17:00",
-      },
-      preferred_workout_windows: buildPlannerMemoryWindow(
-        input.plannerContext.plannerMemory?.preferredTimeOfDay === "evening"
-          ? "18:00"
-          : null,
-      ),
-      preferred_deep_work_windows: buildPlannerMemoryWindow(
-        input.plannerContext.plannerMemory?.preferredTimeOfDay === "morning"
-          ? "09:00"
-          : null,
-      ),
-    },
-    constraints: {
-      slot_granularity_min: 15,
-      min_buffer_min: 15,
-      max_scheduled_minutes_per_day: options.maxQuests * 60,
-      max_deep_work_blocks_per_day: 2,
-      suggested_slots: input.plannerContext.scheduleInsights?.suggestedSlots
-        .filter((slot) => planningDates.includes(slot.date))
-        .map((slot) => ({
-          date: slot.date,
-          time: slot.time,
-          end_time: slot.endTime,
-          score: slot.score,
-          reason: slot.reason,
-        })),
-    },
-  };
-};
-
 const buildOptimizerQuestProposal = (
   input: PlannerBuildInput,
   candidate: OptimizerDraftCandidate,
-  optimizerDraft: PlannerOptimizerDraft | null,
 ): PlannerProposal => {
-  const fallbackToInbox = optimizerDraft?.fallback_to_inbox ?? false;
-  const scheduledStart = optimizerDraft?.start ?? null;
-  const scheduledDate = scheduledStart
-    ? getDateKeyFromDateTime(scheduledStart)
-    : null;
-  const scheduledTime = scheduledStart?.slice(11, 16) ?? null;
   const reminderMinutesBefore = inferReminderMinutes(
     "create_quest",
-    scheduledTime,
+    candidate.scheduledTime,
     null,
   );
-  const formattedTime = scheduledTime
-    ? formatAssistantTime(scheduledTime) ?? scheduledTime
-    : null;
-  const draftStatus = optimizerDraft?.status ??
-    (fallbackToInbox ? "needs_scheduling" : "scheduled_draft");
-  const summaryLead = fallbackToInbox
-    ? `Create an inbox quest for "${candidate.title}" because the scheduler could not find a safe slot yet.`
-    : formattedTime
-    ? `Create a quest for "${candidate.title}" on ${scheduledDate} at ${formattedTime}.`
-    : `Create a quest for "${candidate.title}".`;
-  const summarySuffix = draftStatus === "tentative_time"
-    ? " Time is tentative until you approve it."
-    : "";
 
   return {
     id: createId(),
     kind: "create_quest",
     title: `Create ${candidate.title}`,
-    summary: `${summaryLead}${summarySuffix}`,
+    summary: `Create a quest for "${candidate.title}".`,
     reasoning: candidate.reasoning,
     payload: {
       taskText: candidate.title,
       difficulty: input.plannerContext.aiSignals?.preferredDifficulty ??
         "medium",
-      taskDate: fallbackToInbox
-        ? null
-        : scheduledDate ?? candidate.scheduledDate,
-      scheduledTime: fallbackToInbox ? null : scheduledTime,
+      taskDate: candidate.scheduledDate,
+      scheduledTime: candidate.scheduledTime,
       estimatedDuration: candidate.estimatedDuration,
       reminderEnabled: reminderMinutesBefore !== null,
       reminderMinutesBefore: reminderMinutesBefore ?? 15,
       category: candidate.category ?? undefined,
       notes: candidate.notes ?? undefined,
       source: "optimizer",
-      optimizerSource: "local",
       optimizerMode: input.horizon === "week" ? "week" : "day",
-      usedFallback: true,
-      questSource: fallbackToInbox ? "inbox" : "manual",
-      slotScore: optimizerDraft?.slot_score ?? 0,
-      reasonCodes: optimizerDraft?.reason_codes ?? [],
-      reasonSummary: optimizerDraft?.reason_summary ?? null,
-      softConflicts: optimizerDraft?.soft_conflicts ?? [],
-      hardConflict: optimizerDraft?.hard_conflict ?? false,
+      questSource: candidate.scheduledTime ? "manual" : "inbox",
       derivedFromMessage: candidate.derivedFromMessage,
-      fallbackToInbox,
-      draftStatus,
-      schedulingConfidence: optimizerDraft?.status === "scheduled_draft"
-        ? "high"
-        : optimizerDraft?.status === "tentative_time"
-        ? "medium"
-        : "low",
     },
     status: "pending",
     readyToConfirm: true,
@@ -4891,52 +4629,11 @@ const buildOptimizerQuestProposal = (
 const buildOptimizerReply = (
   dateLabel: string,
   proposals: PlannerProposal[],
-  optimizerDrafts: PlannerOptimizerDraft[],
-  scheduleSummary: string | null,
 ): string => {
-  const scheduledDates = [
-    ...new Set(
-      optimizerDrafts
-        .map((draft) => draft.start?.slice(0, 10) ?? null)
-        .filter((value): value is string => Boolean(value)),
-    ),
-  ];
-  const scheduledCount =
-    optimizerDrafts.filter((draft) => draft.status === "scheduled_draft")
-      .length;
-  const tentativeCount =
-    optimizerDrafts.filter((draft) => draft.status === "tentative_time").length;
-  const needsSchedulingCount =
-    optimizerDrafts.filter((draft) => draft.fallback_to_inbox).length;
-
   const body = [
-    scheduleSummary,
-    scheduledDates.length > 1
-      ? `I drafted ${proposals.length} quest${
-        proposals.length === 1 ? "" : "s"
-      } across the next few days.`
-      : `I drafted ${proposals.length} quest${
-        proposals.length === 1 ? "" : "s"
-      } for ${dateLabel}.`,
-    scheduledCount > 0
-      ? `${scheduledCount} ${
-        scheduledCount === 1 ? "fits" : "fit"
-      } cleanly around your calendar.`
-      : null,
-    tentativeCount > 0
-      ? `${tentativeCount} ${
-        tentativeCount === 1 ? "has" : "have"
-      } a tentative time because the day is tighter.`
-      : null,
-    needsSchedulingCount > 0
-      ? `${needsSchedulingCount} ${
-        needsSchedulingCount === 1 ? "still needs" : "still need"
-      } scheduling, so I left ${
-        needsSchedulingCount === 1 ? "it" : "them"
-      } as inbox-ready drafts instead of dropping ${
-        needsSchedulingCount === 1 ? "it" : "them"
-      }.`
-      : null,
+    `I drafted ${proposals.length} quest${
+      proposals.length === 1 ? "" : "s"
+    } for ${dateLabel}.`,
     "Review them and confirm what fits.",
   ];
 
@@ -4980,28 +4677,9 @@ const buildPlanDayDraftResponse = (
       addCandidate(buildPlanDayPriorityCandidate(input, score, targetDate));
     }
   }
-  const optimizerResponse = runLocalPlannerOptimizer(
-    buildOptimizerRequest(
-      input,
-      candidates.slice(0, Math.min(4, proposalTarget)),
-      targetDate,
-      {
-        schedulingMode: "balanced",
-        maxQuests: proposalTarget,
-      },
-    ),
-  );
   const proposals = candidates
     .slice(0, Math.min(4, proposalTarget))
-    .map((candidate) =>
-      buildOptimizerQuestProposal(
-        input,
-        candidate,
-        optimizerResponse.drafts.find((draft) =>
-          draft.task_id === candidate.id
-        ) ?? null,
-      )
-    );
+    .map((candidate) => buildOptimizerQuestProposal(input, candidate));
   const conflictNotes = proposals
     .map((proposal) => {
       const payload = proposal.payload as {
@@ -5025,9 +4703,6 @@ const buildPlanDayDraftResponse = (
       );
     })
     .filter((note): note is string => Boolean(note));
-  const scheduleSummary = input.plannerContext.scheduleInsights?.summary
-    ? normalizeAssistantTimeText(input.plannerContext.scheduleInsights.summary)
-    : null;
   const dateLabel = formatScheduleReference(input.currentDate, targetDate);
   const acknowledgement = input.sessionState.pendingStarterIntent === "plan_day"
     ? buildPlanDayAcknowledgement(input)
@@ -5044,7 +4719,7 @@ const buildPlanDayDraftResponse = (
 
     return {
       mode: "conversational",
-      reply: [acknowledgement, scheduleSummary, noRoomReason]
+      reply: [acknowledgement, noRoomReason]
         .filter(Boolean)
         .join(" "),
       followUpQuestions: [],
@@ -5072,14 +4747,9 @@ const buildPlanDayDraftResponse = (
 
   const reply = [
     acknowledgement,
-    buildOptimizerReply(
-      dateLabel,
-      proposals,
-      optimizerResponse.drafts,
-      scheduleSummary,
-    ),
+    buildOptimizerReply(dateLabel, proposals),
     proposals.length < proposalTarget
-      ? "That's all the clean room I found without crowding the day."
+      ? "That's all the strong next moves I found without crowding the day."
       : null,
     ...conflictNotes,
   ].filter(Boolean).join(" ");
@@ -5149,34 +4819,14 @@ const buildActionBundleDraftResponse = (
     priority: normalizeBundlePriority(index),
   }));
 
-  const optimizerResponse = runLocalPlannerOptimizer(
-    buildOptimizerRequest(input, candidates, targetDate, {
-      schedulingMode: extracted.length >= 2 ? "aggressive" : "light",
-      maxQuests: Math.min(4, candidates.length),
-    }),
-  );
   const proposals = candidates.map((candidate) =>
-    buildOptimizerQuestProposal(
-      input,
-      candidate,
-      optimizerResponse.drafts.find((draft) =>
-        draft.task_id === candidate.id
-      ) ?? null,
-    )
+    buildOptimizerQuestProposal(input, candidate)
   );
-  const scheduleSummary = input.plannerContext.scheduleInsights?.summary
-    ? normalizeAssistantTimeText(input.plannerContext.scheduleInsights.summary)
-    : null;
   const dateLabel = formatScheduleReference(input.currentDate, targetDate);
 
   return {
     mode: "proposal",
-    reply: buildOptimizerReply(
-      dateLabel,
-      proposals,
-      optimizerResponse.drafts,
-      scheduleSummary,
-    ),
+    reply: buildOptimizerReply(dateLabel, proposals),
     followUpQuestions: [],
     proposals,
     suggestedReminders: [],

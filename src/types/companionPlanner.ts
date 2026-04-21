@@ -267,7 +267,7 @@ export interface PlannerScheduleInsights {
   conflicts: PlannerScheduleConflict[];
   suggestedSlots: PlannerOpenSlot[];
   moveSuggestions: PlannerMoveSuggestion[];
-  summary: string;
+  summary?: string;
 }
 
 export interface PlannerMemoryProfile {

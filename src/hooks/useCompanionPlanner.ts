@@ -1338,9 +1338,10 @@ export function useCompanionPlanner({
         calendarEvents: activeEventsQuery.events,
         horizon,
         selectedDate: todayIso,
+        currentDateTime: formatCurrentDateTimeWithOffset(today),
         plannerMemory,
       }),
-    [activeEventsQuery.events, activeTasks, horizon, plannerMemory, todayIso],
+    [activeEventsQuery.events, activeTasks, horizon, plannerMemory, today, todayIso],
   );
 
   const careSignals = useMemo<PlannerCareState>(() => ({

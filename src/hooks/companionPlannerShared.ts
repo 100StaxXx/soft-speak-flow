@@ -10,6 +10,7 @@ import { useInboxTasks } from "@/hooks/useInboxTasks";
 import { useTasksQuery } from "@/hooks/useTasksQuery";
 import { useUserAIContext } from "@/hooks/useUserAIContext";
 import { buildCompanionPlannerScheduleInsights } from "@/utils/companionPlannerSchedule";
+import { formatCurrentDateTimeWithOffset } from "@/utils/currentDateTime";
 import type { Json } from "@/integrations/supabase/types";
 import { supabase } from "@/integrations/supabase/client";
 import type { EpicRecord } from "@/hooks/epicsQuery";
@@ -472,8 +473,9 @@ export function useCompanionPlanningContext({
       calendarEvents: activeEventsQuery.events,
       horizon,
       selectedDate: todayIso,
+      currentDateTime: formatCurrentDateTimeWithOffset(today),
       plannerMemory,
-    }), [activeEventsQuery.events, activeTasks, horizon, plannerMemory, todayIso]);
+    }), [activeEventsQuery.events, activeTasks, horizon, plannerMemory, today, todayIso]);
 
   const plannerContext = useMemo<CompanionPlannerRequest["plannerContext"]>(() => ({
     tasks: mapTasksToPlannerContext(contextTasks.map(serializeTaskToPlannerContext)),

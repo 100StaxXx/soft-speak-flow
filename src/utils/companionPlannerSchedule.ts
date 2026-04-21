@@ -23,6 +23,7 @@ type BuildScheduleInsightsInput = {
   calendarEvents?: PlannerContextCalendarEvent[];
   horizon: PlannerHorizon;
   selectedDate: string;
+  currentDateTime: string;
   plannerMemory?: PlannerMemoryProfile | null;
 };
 
@@ -115,6 +116,22 @@ const getDayBounds = (date: string) => {
   const start = parseISO(`${date}T00:00:00`);
   const end = parseISO(`${date}T23:59:59`);
   return { start, end };
+};
+
+const getLocalDateKeyFromDateTime = (value: string): string => {
+  const match = value.match(/^(\d{4}-\d{2}-\d{2})T/);
+  return match?.[1] ?? value.slice(0, 10);
+};
+
+const getLocalMinutesFromDateTime = (value: string): number | null => {
+  const match = value.match(/T(\d{2}):(\d{2})/);
+  if (!match) return null;
+
+  const hour = Number.parseInt(match[1] ?? "", 10);
+  const minute = Number.parseInt(match[2] ?? "", 10);
+  if (Number.isNaN(hour) || Number.isNaN(minute)) return null;
+
+  return (hour * 60) + minute;
 };
 
 const buildTaskIntervals = (tasks: PlannerContextTask[]): TimelineInterval[] =>
@@ -270,6 +287,7 @@ const buildSuggestedSlots = ({
   tasksByDate,
   calendarEvents,
   selectedDate,
+  currentDateTime,
   dayLoads,
   plannerMemory,
 }: {
@@ -277,6 +295,7 @@ const buildSuggestedSlots = ({
   tasksByDate: Map<string, PlannerContextTask[]>;
   calendarEvents: PlannerContextCalendarEvent[];
   selectedDate: string;
+  currentDateTime: string;
   dayLoads: PlannerDayLoad[];
   plannerMemory?: PlannerMemoryProfile | null;
 }): PlannerOpenSlot[] => {
@@ -293,6 +312,8 @@ const buildSuggestedSlots = ({
   const wakeMinutes = getWakeMinutes(plannerMemory);
   const windDownMinutes = getWindDownMinutes(plannerMemory);
   const minimumSlotMinutes = 30;
+  const currentDateKey = getLocalDateKeyFromDateTime(currentDateTime);
+  const currentMinutes = getLocalMinutesFromDateTime(currentDateTime);
 
   const slots: PlannerOpenSlot[] = [];
 
@@ -313,6 +334,9 @@ const buildSuggestedSlots = ({
     };
 
     let cursor = wakeMinutes;
+    if (date === currentDateKey && currentMinutes !== null) {
+      cursor = Math.max(cursor, currentMinutes);
+    }
     const localSlots: PlannerOpenSlot[] = [];
 
     const pushSlot = (slotStart: number, slotEnd: number) => {
@@ -321,7 +345,11 @@ const buildSuggestedSlots = ({
 
       const preferredStart = preferredWindows
         .map((window) => parseTimeToMinutes(window.time))
-        .find((minutes) => minutes !== null && minutes >= slotStart && minutes + minimumSlotMinutes <= slotEnd);
+        .find((minutes) =>
+          minutes !== null &&
+          minutes >= slotStart &&
+          minutes + minimumSlotMinutes <= slotEnd
+        );
 
       const chosenStart = preferredStart ?? slotStart;
       const chosenEnd = Math.min(slotEnd, chosenStart + Math.max(minimumSlotMinutes, Math.min(duration, 90)));
@@ -402,52 +430,6 @@ const buildMoveSuggestions = ({
   return suggestions.slice(0, Math.min(rangeDates.length, 3));
 };
 
-const buildSummary = ({
-  horizon,
-  selectedDate,
-  dayLoads,
-  conflicts,
-  suggestedSlots,
-  moveSuggestions,
-}: {
-  horizon: PlannerHorizon;
-  selectedDate: string;
-  dayLoads: PlannerDayLoad[];
-  conflicts: PlannerScheduleConflict[];
-  suggestedSlots: PlannerOpenSlot[];
-  moveSuggestions: PlannerMoveSuggestion[];
-}): string => {
-  const selectedLoad = dayLoads.find((load) => load.date === selectedDate);
-  const firstSlot = suggestedSlots[0];
-
-  if (horizon === "day") {
-    if (conflicts.length > 0) {
-      return `${conflicts.length} time overlap${conflicts.length === 1 ? "" : "s"} today. Best opening: ${firstSlot?.time ?? "later in the day"}.`;
-    }
-
-    if (selectedLoad?.status === "overloaded") {
-      return `Today is running heavy with ${selectedLoad.totalMinutes} planned minutes. ${firstSlot ? `${firstSlot.time} is your cleanest opening.` : "A lighter day may work better."}`;
-    }
-
-    return firstSlot
-      ? `Today has room at ${firstSlot.time}. ${firstSlot.reason}`
-      : "Today is already pretty packed, so any new block will need a careful reshuffle.";
-  }
-
-  const overloadedCount = dayLoads.filter((load) => load.status === "overloaded").length;
-  const openCount = dayLoads.filter((load) => load.status === "open").length;
-
-  if (moveSuggestions.length > 0) {
-    return `${overloadedCount} ${horizon} day${overloadedCount === 1 ? " is" : "s are"} overloaded. ${moveSuggestions[0]?.taskTitle ?? "One task"} could move to ${moveSuggestions[0]?.toDate}${moveSuggestions[0]?.suggestedTime ? ` at ${moveSuggestions[0].suggestedTime}` : ""}.`;
-  }
-
-  if (conflicts.length > 0) {
-    return `${conflicts.length} conflict${conflicts.length === 1 ? "" : "s"} spotted across this ${horizon}. ${firstSlot ? `${firstSlot.date} at ${firstSlot.time} is the best open window.` : ""}`.trim();
-  }
-
-  return `${openCount} lighter day${openCount === 1 ? "" : "s"} and ${overloadedCount} overloaded day${overloadedCount === 1 ? "" : "s"} in view.${firstSlot ? ` Best opening: ${firstSlot.date} at ${firstSlot.time}.` : ""}`;
-};
-
 const buildConflicts = (intervals: TimelineInterval[]): PlannerScheduleConflict[] => {
   if (intervals.length < 2) return [];
 
@@ -481,6 +463,7 @@ export const buildCompanionPlannerScheduleInsights = ({
   calendarEvents = [],
   horizon,
   selectedDate,
+  currentDateTime,
   plannerMemory,
 }: BuildScheduleInsightsInput): PlannerScheduleInsights => {
   const rangeDates = getRangeDates(selectedDate, horizon);
@@ -537,6 +520,7 @@ export const buildCompanionPlannerScheduleInsights = ({
     tasksByDate,
     calendarEvents,
     selectedDate,
+    currentDateTime,
     dayLoads,
     plannerMemory,
   });
@@ -557,13 +541,5 @@ export const buildCompanionPlannerScheduleInsights = ({
     conflicts,
     suggestedSlots,
     moveSuggestions,
-    summary: buildSummary({
-      horizon,
-      selectedDate,
-      dayLoads,
-      conflicts,
-      suggestedSlots,
-      moveSuggestions,
-    }),
   };
 };

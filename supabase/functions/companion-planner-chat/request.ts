@@ -227,7 +227,7 @@ export const PlannerRequestSchema = z.object({
         suggestedTime: z.string().nullable().optional(),
         reason: z.string(),
       })),
-      summary: z.string(),
+      summary: z.string().optional(),
     }).optional(),
     plannerMemory: z.object({
       tonePack: z.enum(["soft", "playful", "witty_sassy"]).optional(),

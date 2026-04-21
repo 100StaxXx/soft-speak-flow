@@ -322,15 +322,16 @@ describe("CompanionPlannerPanel", () => {
     mocks.state.draftInput = "What do I have scheduled today?";
   });
 
-  it("renders a unified assistant transcript with schedule insight and proposals", () => {
+  it("renders a unified assistant transcript with proposals and no duplicate schedule card", () => {
     render(<CompanionPlannerPanel />);
 
     expect(screen.getByTestId("companion-planner-panel")).toBeInTheDocument();
     expect(screen.getByTestId("companion-assistant-transcript"))
       .toBeInTheDocument();
-    expect(screen.getByTestId("assistant-schedule-insights"))
+    expect(screen.queryByTestId("assistant-schedule-insights")).not
       .toBeInTheDocument();
-    expect(screen.getByText("Today has room at 09:00.")).toBeInTheDocument();
+    expect(screen.queryByText("Today has room at 09:00.")).not
+      .toBeInTheDocument();
     expect(screen.getByText("Move Workout")).toBeInTheDocument();
     expect(screen.getByText("Adjust Campaign Aurora")).toBeInTheDocument();
     expect(screen.queryByTestId("assistant-question-list")).not

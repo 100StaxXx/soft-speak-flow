@@ -517,69 +517,6 @@ export const CompanionPlannerPanel = memo(() => {
             </div>
           )
           : null}
-
-        {assistant.scheduleInsights
-          ? (
-            <div
-              className="rounded-[26px] border border-white/10 bg-[linear-gradient(180deg,rgba(14,165,233,0.12),rgba(15,23,42,0.18))] p-4"
-              data-testid="assistant-schedule-insights"
-            >
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="space-y-1">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-100/70">
-                    Schedule read
-                  </p>
-                  <p className="text-sm text-white">
-                    {assistant.scheduleInsights.summary}
-                  </p>
-                  {assistant.plannerMemory?.preferredTimeOfDay
-                    ? (
-                      <p className="text-xs text-white/60">
-                        Usual rhythm:{" "}
-                        {assistant.plannerMemory.preferredTimeOfDay}
-                        {assistant.plannerMemory.preferredTimeReason
-                          ? ` because ${assistant.plannerMemory.preferredTimeReason}`
-                          : ""}.
-                      </p>
-                    )
-                    : null}
-                </div>
-                <Badge
-                  variant="outline"
-                  className="border-white/15 bg-white/5 text-white/70"
-                >
-                  {assistant.scheduleInsights.horizon}
-                </Badge>
-              </div>
-
-              {assistant.scheduleInsights.suggestedSlots.length > 0
-                ? (
-                  <div className="mt-3 space-y-2">
-                    <p className="text-xs font-medium uppercase tracking-[0.18em] text-white/45">
-                      Best openings
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {assistant.scheduleInsights.suggestedSlots.slice(0, 3)
-                        .map((slot) => (
-                          <Badge
-                            key={`${slot.date}-${slot.time}`}
-                            variant="outline"
-                            className="border-emerald-300/20 bg-emerald-400/10 text-emerald-50"
-                          >
-                            {slot.date ===
-                                assistant.scheduleInsights?.selectedDate
-                              ? slot.time
-                              : `${slot.date} ${slot.time}`}
-                          </Badge>
-                        ))}
-                    </div>
-                  </div>
-                )
-                : null}
-            </div>
-          )
-          : null}
-
         <ScrollArea
           className="max-h-[24rem] pr-3"
           data-testid="companion-assistant-transcript"

@@ -583,7 +583,7 @@ describe("useCompanionPlanner", () => {
             payload: {
               taskText: "Work On The App",
               source: "optimizer",
-              optimizerSource: "local",
+              optimizerSource: "remote",
               optimizerMode: "week",
               usedFallback: true,
               fallbackToInbox: true,
@@ -631,7 +631,7 @@ describe("useCompanionPlanner", () => {
         userAction: "accepted",
         modifications: expect.objectContaining({
           optimizerProposalCount: 3,
-          optimizerSources: ["remote", "local"],
+          optimizerSources: ["remote"],
           optimizerModes: ["week"],
           usedFallback: true,
           fallbackProposalCount: 1,
@@ -1755,7 +1755,7 @@ describe("useCompanionPlanner", () => {
             payload: {
               taskText: "Workout",
               source: "optimizer",
-              optimizerSource: "local",
+              optimizerSource: "remote",
               optimizerMode: "day",
               usedFallback: true,
               draftStatus: "needs_scheduling",
@@ -1809,7 +1809,7 @@ describe("useCompanionPlanner", () => {
           proposalId: "proposal-1",
           proposalKind: "create_quest",
           decisionOverride: true,
-          optimizerSource: "local",
+          optimizerSource: "remote",
           optimizerMode: "day",
           usedFallback: true,
           draftStatus: "needs_scheduling",
