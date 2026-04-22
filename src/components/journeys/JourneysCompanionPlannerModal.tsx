@@ -15,7 +15,6 @@ import {
   ChevronRight,
   Loader2,
   Mic,
-  MicOff,
   Plus,
   Send,
   Waves,
@@ -298,9 +297,9 @@ const JourneysCompanionOverlayBody = memo(({
     if (!composer) return;
 
     composer.style.height = "0px";
-    const nextHeight = Math.max(48, Math.min(140, composer.scrollHeight));
+    const nextHeight = Math.max(72, Math.min(260, composer.scrollHeight));
     composer.style.height = `${nextHeight}px`;
-    composer.style.overflowY = composer.scrollHeight > 140 ? "auto" : "hidden";
+    composer.style.overflowY = composer.scrollHeight > 260 ? "auto" : "hidden";
   }, []);
 
   useLayoutEffect(() => {
@@ -590,29 +589,14 @@ const JourneysCompanionOverlayBody = memo(({
               </div>
             ) : null}
 
-            <div className={plannerPathfinderTheme.composerBar}>
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                className={cn(
-                  "h-11 w-11 shrink-0 rounded-full border-[3px] border-[#4d2811] bg-white/65 text-[#7f3b12] hover:bg-white/80",
-                  assistant.isRecording && "border-[#7f1616] bg-[linear-gradient(180deg,#ffb8a7_0%,#ff7a59_100%)] text-[#4c0f0f]",
-                )}
-                onClick={handleVoiceToggle}
-                disabled={!assistant.isVoiceSupported && !assistant.isRecording}
-                aria-label={micButtonLabel}
-                data-testid="journeys-companion-planner-mic-button"
-              >
-                {assistant.isRecording ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-              </Button>
+            <div className={cn(plannerPathfinderTheme.composerBar, "flex-col items-stretch gap-2")}>
               <label htmlFor="journeys-companion-chat-input" className="sr-only">
                 Message your companion
               </label>
               <Textarea
                 ref={composerRef}
                 id="journeys-companion-chat-input"
-                rows={1}
+                rows={2}
                 value={assistant.draftInput}
                 onChange={(event) => {
                   assistant.setDraftInput(event.target.value);
@@ -622,30 +606,47 @@ const JourneysCompanionOverlayBody = memo(({
                 placeholder={assistant.placeholder}
                 className={cn(
                   plannerPathfinderTheme.textField,
-                  "min-h-[48px] max-h-[140px] flex-1 w-auto resize-none leading-5",
+                  "min-h-[72px] max-h-[260px] w-full resize-none leading-5",
                 )}
-                style={{ height: "48px", overflowY: "hidden" }}
+                style={{ height: "72px", overflowY: "hidden" }}
                 data-testid="journeys-companion-planner-text-input"
               />
-              <Button
-                type="button"
-                onClick={assistant.submitTypedMessage}
-                disabled={sendDisabled}
-                className={cn(plannerPathfinderTheme.primaryButton, "h-11 shrink-0 px-4")}
-                data-testid="journeys-companion-planner-send-button"
-              >
-                {assistant.isSubmitting || assistant.isResolvingAction ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Thinking
-                  </>
-                ) : (
-                  <>
-                    <Send className="mr-2 h-4 w-4" />
-                    Send
-                  </>
-                )}
-              </Button>
+              <div className="flex items-center justify-between gap-2">
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className={cn(
+                    "h-11 w-11 shrink-0 rounded-full border-[3px] border-[#4d2811] bg-white/65 text-[#7f3b12] hover:bg-white/80",
+                    assistant.isRecording && "border-[#7f1616] bg-[linear-gradient(180deg,#ffb8a7_0%,#ff7a59_100%)] text-[#4c0f0f]",
+                  )}
+                  onClick={handleVoiceToggle}
+                  disabled={!assistant.isVoiceSupported && !assistant.isRecording}
+                  aria-label={micButtonLabel}
+                  data-testid="journeys-companion-planner-mic-button"
+                >
+                  <Mic className="h-4 w-4" />
+                </Button>
+                <Button
+                  type="button"
+                  onClick={assistant.submitTypedMessage}
+                  disabled={sendDisabled}
+                  className={cn(plannerPathfinderTheme.primaryButton, "h-11 shrink-0 px-4")}
+                  data-testid="journeys-companion-planner-send-button"
+                >
+                  {assistant.isSubmitting || assistant.isResolvingAction ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Thinking
+                    </>
+                  ) : (
+                    <>
+                      <Send className="mr-2 h-4 w-4" />
+                      Send
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
         </div>
