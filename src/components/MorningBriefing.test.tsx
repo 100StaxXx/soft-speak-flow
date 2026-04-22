@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   toastMock: vi.fn(),
   useMorningBriefingMock: vi.fn(),
   useMentorPersonalityMock: vi.fn(),
+  loadMentorImageMock: vi.fn(),
   dialogOnOpenChange: null as null | ((open: boolean) => void),
   generateMutateAsync: vi.fn().mockResolvedValue(undefined),
   dismissMutateAsync: vi.fn().mockResolvedValue(undefined),
@@ -28,6 +29,10 @@ vi.mock("@/hooks/useMorningBriefing", () => ({
 
 vi.mock("@/hooks/useMentorPersonality", () => ({
   useMentorPersonality: () => mocks.useMentorPersonalityMock(),
+}));
+
+vi.mock("@/utils/mentorImageLoader", () => ({
+  loadMentorImage: (...args: unknown[]) => mocks.loadMentorImageMock(...args),
 }));
 
 vi.mock("@/components/MentorAvatar", () => ({
@@ -90,6 +95,8 @@ describe("MorningBriefing", () => {
     mocks.generateMutateAsync.mockClear();
     mocks.dismissMutateAsync.mockClear();
     mocks.markViewedMutate.mockClear();
+    mocks.loadMentorImageMock.mockReset();
+    mocks.loadMentorImageMock.mockResolvedValue("/mock/fallback-mentor.png");
     mocks.dialogOnOpenChange = null;
 
     mocks.useMentorPersonalityMock.mockReturnValue(personality);
@@ -108,8 +115,8 @@ describe("MorningBriefing", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Expand Lyra mentor image" }));
     expect(screen.getByTestId("dialog-root")).toBeInTheDocument();
-    expect(screen.getByText("Lyra portrait")).toBeInTheDocument();
-    expect(screen.getByTestId("mentor-avatar-lg")).toBeInTheDocument();
+    expect(screen.getAllByText("Lyra").length).toBeGreaterThan(0);
+    expect(screen.getByAltText("Lyra")).toHaveAttribute("src", "https://example.com/lyra.png");
 
     act(() => {
       mocks.dialogOnOpenChange?.(false);
@@ -141,12 +148,30 @@ describe("MorningBriefing", () => {
     expect(screen.getByRole("button", { name: "Show less" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Expand Lyra mentor image" }));
-    expect(screen.getByText("Lyra portrait")).toBeInTheDocument();
+    expect(screen.getAllByText("Lyra").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Lyra portrait")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Ask Lyra More" }));
     expect(onAskMore).toHaveBeenCalledWith(briefing.content, briefing.action_prompt);
 
     fireEvent.click(screen.getByRole("button", { name: "Done" }));
     expect(mocks.dismissMutateAsync).toHaveBeenCalledWith("briefing-1");
+  });
+
+  it("loads the canonical fallback portrait for mentors without a direct avatar url", async () => {
+    mocks.useMentorPersonalityMock.mockReturnValue({
+      ...personality,
+      name: "The Operator",
+      slug: "operator",
+      avatar_url: undefined,
+    });
+
+    render(<MorningBriefing />);
+
+    expect(mocks.loadMentorImageMock).toHaveBeenCalledWith("operator");
+
+    fireEvent.click(screen.getByRole("button", { name: "Expand The Operator mentor image" }));
+    expect(await screen.findByAltText("The Operator")).toHaveAttribute("src", "/mock/fallback-mentor.png");
+    expect(screen.getAllByText("The Operator").length).toBeGreaterThan(0);
   });
 });

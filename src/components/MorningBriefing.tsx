@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { useMorningBriefing } from "@/hooks/useMorningBriefing";
 import { useMentorPersonality } from "@/hooks/useMentorPersonality";
+import { loadMentorImage } from "@/utils/mentorImageLoader";
 import { 
   Sparkles, 
   Target, 
@@ -47,6 +48,71 @@ export const MorningBriefing = memo(({ onAskMore, className }: MorningBriefingPr
   const [showFull, setShowFull] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMentorImageOpen, setIsMentorImageOpen] = useState(false);
+  const [mentorPortraitUrl, setMentorPortraitUrl] = useState("");
+  const [didPortraitFallback, setDidPortraitFallback] = useState(false);
+
+  useEffect(() => {
+    if (!personality) {
+      setMentorPortraitUrl("");
+      setDidPortraitFallback(false);
+      return;
+    }
+
+    const avatarUrl = personality.avatar_url?.trim();
+    if (avatarUrl) {
+      setMentorPortraitUrl(avatarUrl);
+      setDidPortraitFallback(false);
+      return;
+    }
+
+    const mentorSlug = (personality.slug || "").trim().toLowerCase();
+    if (!mentorSlug) {
+      setMentorPortraitUrl("");
+      setDidPortraitFallback(false);
+      return;
+    }
+
+    let cancelled = false;
+    setDidPortraitFallback(false);
+
+    loadMentorImage(mentorSlug)
+      .then((imageUrl) => {
+        if (!cancelled) {
+          setMentorPortraitUrl(imageUrl || "");
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setMentorPortraitUrl("");
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [personality?.avatar_url, personality?.slug, personality?.name]);
+
+  const handleExpandedPortraitError = () => {
+    if (!personality || didPortraitFallback) {
+      setMentorPortraitUrl("");
+      return;
+    }
+
+    const mentorSlug = (personality.slug || "").trim().toLowerCase();
+    if (!mentorSlug) {
+      setMentorPortraitUrl("");
+      return;
+    }
+
+    setDidPortraitFallback(true);
+    loadMentorImage(mentorSlug)
+      .then((imageUrl) => {
+        setMentorPortraitUrl(imageUrl || "");
+      })
+      .catch(() => {
+        setMentorPortraitUrl("");
+      });
+  };
 
   // Mark as viewed when component mounts with a briefing
   useEffect(() => {
@@ -137,6 +203,48 @@ export const MorningBriefing = memo(({ onAskMore, className }: MorningBriefingPr
       </button>
     );
   };
+
+  const renderMentorImageDialog = () => (
+    <Dialog open={isMentorImageOpen} onOpenChange={setIsMentorImageOpen}>
+      <DialogContent
+        className="h-[94vh] w-[96vw] max-w-none border-white/10 bg-card/98 p-0 sm:h-[95vh] sm:w-[94vw]"
+        aria-describedby="morning-briefing-mentor-image-description"
+      >
+        <DialogHeader className="sr-only">
+          <DialogTitle>{personality?.name || "Mentor"}</DialogTitle>
+          <DialogDescription id="morning-briefing-mentor-image-description">
+            Expanded morning briefing mentor image.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex h-full flex-col items-center justify-center gap-4 p-4 sm:p-6">
+          <div className="flex min-h-0 w-full flex-1 items-center justify-center overflow-hidden rounded-[2rem] bg-black/30">
+            {personality && mentorPortraitUrl ? (
+              <img
+                src={mentorPortraitUrl}
+                alt={personality.name}
+                className="h-full w-full object-contain"
+                loading="lazy"
+                decoding="async"
+                onError={handleExpandedPortraitError}
+              />
+            ) : personality ? (
+              <MentorAvatar
+                mentorSlug={(personality.slug || "").toLowerCase()}
+                mentorName={personality.name}
+                primaryColor={personality.primary_color || "#000"}
+                avatarUrl={undefined}
+                size="xl"
+                showBorder={false}
+              />
+            ) : null}
+          </div>
+          <p className="text-center text-lg font-semibold text-foreground sm:text-xl">
+            {personality?.name || "Mentor"}
+          </p>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
 
   // Collapsed state - show minimized preview that can be expanded
   if (isCollapsed && briefing) {
@@ -245,36 +353,7 @@ export const MorningBriefing = memo(({ onAskMore, className }: MorningBriefingPr
             </div>
           </div>
         </div>
-        <Dialog open={isMentorImageOpen} onOpenChange={setIsMentorImageOpen}>
-          <DialogContent
-            className="max-w-md border-white/10 bg-card/95 p-6 sm:p-8"
-            aria-describedby="morning-briefing-mentor-image-description"
-          >
-            <DialogHeader>
-              <DialogTitle className="text-center sm:text-center">
-                {personality?.name || "Mentor"} portrait
-              </DialogTitle>
-              <DialogDescription
-                id="morning-briefing-mentor-image-description"
-                className="text-center"
-              >
-                A larger view of your morning briefing mentor image.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="flex justify-center py-2">
-              {personality && (
-                <MentorAvatar
-                  mentorSlug={(personality.slug || "").toLowerCase()}
-                  mentorName={personality.name}
-                  primaryColor={personality.primary_color || "#000"}
-                  avatarUrl={personality.avatar_url || undefined}
-                  size="lg"
-                  showBorder={true}
-                />
-              )}
-            </div>
-          </DialogContent>
-        </Dialog>
+        {renderMentorImageDialog()}
       </>
     );
   }
@@ -389,36 +468,7 @@ export const MorningBriefing = memo(({ onAskMore, className }: MorningBriefingPr
           Ask {personality?.name || 'Guide'} More
         </Button>
       </div>
-      <Dialog open={isMentorImageOpen} onOpenChange={setIsMentorImageOpen}>
-        <DialogContent
-          className="max-w-md border-white/10 bg-card/95 p-6 sm:p-8"
-          aria-describedby="morning-briefing-mentor-image-description"
-        >
-          <DialogHeader>
-            <DialogTitle className="text-center sm:text-center">
-              {personality?.name || "Mentor"} portrait
-            </DialogTitle>
-            <DialogDescription
-              id="morning-briefing-mentor-image-description"
-              className="text-center"
-            >
-              A larger view of your morning briefing mentor image.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex justify-center py-2">
-            {personality && (
-              <MentorAvatar
-                mentorSlug={(personality.slug || "").toLowerCase()}
-                mentorName={personality.name}
-                primaryColor={personality.primary_color || "#000"}
-                avatarUrl={personality.avatar_url || undefined}
-                size="lg"
-                showBorder={true}
-              />
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      {renderMentorImageDialog()}
     </Card>
   );
 });
