@@ -61,16 +61,20 @@ vi.mock("@/hooks/useCompanionVoiceSettings", () => ({
 }));
 
 vi.mock("@/hooks/useLegacyCompanionAssistantAdapter", () => ({
-  useLegacyCompanionAssistantAdapter: () => ({
+  useLegacyCompanionAssistantAdapter: ({ enabled }: { enabled: boolean }) => ({
     todayLabel: "Saturday, April 18",
     placeholder: "Talk to Cosmiq",
     messages: [],
     pendingAction: null,
     isSubmitting: false,
     isResolvingAction: false,
-    submitMessage: mocks.legacySubmitMessage,
-    confirmPendingAction: mocks.legacyConfirmPendingAction,
-    cancelPendingAction: mocks.legacyCancelPendingAction,
+    submitMessage: enabled ? mocks.legacySubmitMessage : vi.fn().mockResolvedValue(undefined),
+    confirmPendingAction: enabled
+      ? mocks.legacyConfirmPendingAction
+      : vi.fn().mockResolvedValue(undefined),
+    cancelPendingAction: enabled
+      ? mocks.legacyCancelPendingAction
+      : vi.fn().mockResolvedValue(undefined),
     isSpeaking: false,
     speechProvider: "none" as const,
     stopSpeaking: vi.fn(),
@@ -654,10 +658,12 @@ describe("useCompanionAssistant", () => {
       await result.current.submitMessage("What does tomorrow look like?", "text");
     });
 
-    expect(mocks.legacySubmitMessage).toHaveBeenCalledWith(
-      "What does tomorrow look like?",
-      "text",
-    );
+    await waitFor(() => {
+      expect(mocks.legacySubmitMessage).toHaveBeenCalledWith(
+        "What does tomorrow look like?",
+        "text",
+      );
+    });
   });
 
   it("falls back to the legacy adapter when companion-agent hits a recoverable fetch failure", async () => {
@@ -689,10 +695,12 @@ describe("useCompanionAssistant", () => {
       await result.current.submitMessage("What does tomorrow look like?", "text");
     });
 
-    expect(mocks.legacySubmitMessage).toHaveBeenCalledWith(
-      "What does tomorrow look like?",
-      "text",
-    );
+    await waitFor(() => {
+      expect(mocks.legacySubmitMessage).toHaveBeenCalledWith(
+        "What does tomorrow look like?",
+        "text",
+      );
+    });
     expect(result.current.error).toBeNull();
     expect(result.current.lastFailedMessage).toBeNull();
   });

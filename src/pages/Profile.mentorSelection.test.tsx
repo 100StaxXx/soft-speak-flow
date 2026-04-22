@@ -235,7 +235,7 @@ describe("Profile mentor selection", () => {
     mocks.mentorId = "mentor-lyra";
   });
 
-  it("renders all active guides while keeping the canonical roster first", () => {
+  it("renders only the canonical guide roster in the selector", () => {
     renderProfile();
 
     expect(screen.getByText("Your Guide")).toBeInTheDocument();
@@ -248,12 +248,10 @@ describe("Profile mentor selection", () => {
       "The Princess",
       "The Operator",
       "The Rival",
-      "Atlas",
-      "Stryker",
     ]);
 
-    expect(screen.getByRole("option", { name: "Atlas" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Atlas" })).not.toBeInTheDocument();
     expect(screen.queryByRole("option", { name: "The Guy" })).not.toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "Stryker" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Stryker" })).not.toBeInTheDocument();
   });
 });

@@ -52,7 +52,24 @@ const ACTIVE_MENTORS: MentorBrowseEntry[] = [
 
 describe("mentorCatalog", () => {
   it("treats Lyra as an active mentor and only appends The Guy as upcoming", () => {
-    const result = buildBrowseMentorCatalog(ACTIVE_MENTORS);
+    const result = buildBrowseMentorCatalog([
+      {
+        id: "atlas-id",
+        name: "Atlas",
+        slug: "atlas",
+        archetype: "Legacy",
+        short_title: "Legacy",
+        tone_description: "Outdated",
+        style_description: "Outdated",
+        target_user: "Legacy users",
+        signature_line: "Old roster",
+        primary_color: "#111827",
+        avatar_url: null,
+        themes: ["legacy"],
+        availability: "active",
+      },
+      ...ACTIVE_MENTORS,
+    ]);
 
     expect(result.map((mentor) => mentor.slug)).toEqual(["sage", "lyra", "operator", "the-guy"]);
 

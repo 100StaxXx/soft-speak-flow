@@ -68,6 +68,11 @@ export interface CompanionAssistantFailedMessage {
   optimisticMessageId: string;
 }
 
+interface PendingLegacyFallbackSubmission {
+  text: string;
+  inputMode: CompanionChatInputMode;
+}
+
 interface UseCompanionAssistantOptions {
   surface: CompanionAssistantSurface;
   conversationEnabled?: boolean;
@@ -194,6 +199,8 @@ export function useCompanionAssistant({
   const [interimText, setInterimText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [lastFailedMessage, setLastFailedMessage] = useState<CompanionAssistantFailedMessage | null>(null);
+  const [pendingLegacyFallbackSubmission, setPendingLegacyFallbackSubmission] =
+    useState<PendingLegacyFallbackSubmission | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isResolvingAction, setIsResolvingAction] = useState(false);
   const [showPermissionDialog, setShowPermissionDialog] = useState(false);
@@ -205,6 +212,7 @@ export function useCompanionAssistant({
   const scopeKeyRef = useRef<string | null>(null);
   const bootstrappedScopeRef = useRef<string | null>(null);
   const handledLaunchIntentIdRef = useRef<string | null>(null);
+  const isHandingOffToLegacyRef = useRef(false);
 
   const scopeKey = `${surface}:${user?.id ?? "anon"}:${companion?.id ?? "none"}`;
   const baseGreeting = surface === "journeys" ? null : greeting;
@@ -528,15 +536,19 @@ export function useCompanionAssistant({
       appendAssistantResponse(response);
       void invalidateThreads();
     } catch (error) {
-      console.error("Failed to submit companion agent message:", error);
       if (await shouldFallbackToLegacyAgent(error)) {
+        console.warn("Companion agent unavailable, falling back to legacy assistant:", error);
         setError(null);
         setLastFailedMessage(null);
         setUseLegacyFallback(true);
-        await legacyAssistant.submitMessage(message, inputMode);
+        setPendingLegacyFallbackSubmission({
+          text: message,
+          inputMode,
+        });
         return;
       }
 
+      console.error("Failed to submit companion agent message:", error);
       const nextError = "Cosmiq hit a snag. Try that again.";
       toast.error(nextError);
       setError(nextError);
@@ -560,6 +572,24 @@ export function useCompanionAssistant({
     useLegacyFallback,
     user?.id,
   ]);
+
+  useEffect(() => {
+    if (!useLegacyFallback || !pendingLegacyFallbackSubmission || isHandingOffToLegacyRef.current) {
+      return;
+    }
+
+    isHandingOffToLegacyRef.current = true;
+    const submission = pendingLegacyFallbackSubmission;
+    setPendingLegacyFallbackSubmission(null);
+
+    void legacyAssistant.submitMessage(submission.text, submission.inputMode)
+      .catch((fallbackError) => {
+        console.error("Failed to hand off companion message to legacy assistant:", fallbackError);
+      })
+      .finally(() => {
+        isHandingOffToLegacyRef.current = false;
+      });
+  }, [legacyAssistant, pendingLegacyFallbackSubmission, useLegacyFallback]);
 
   const submitMessage = useCallback(async (
     rawMessage: string,

@@ -36,7 +36,7 @@ import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
 import { applyMentorChange } from "@/pages/profileMentorChange";
 import {
-  sortMentorsForDisplay,
+  sortCanonicalMentors,
 } from "@/lib/mentorRoster";
 import {
   deleteCurrentAccount,
@@ -188,7 +188,7 @@ const Profile = () => {
         const key = (m.slug || m.name || "").trim().toLowerCase();
         if (!map.has(key)) map.set(key, m);
       }
-      return sortMentorsForDisplay(Array.from(map.values()));
+      return sortCanonicalMentors(Array.from(map.values()));
     },
   });
 
@@ -211,7 +211,7 @@ const Profile = () => {
     },
   });
 
-  const displayMentors = useMemo(() => sortMentorsForDisplay(mentors), [mentors]);
+  const displayMentors = useMemo(() => sortCanonicalMentors(mentors), [mentors]);
   const displaySelectedMentor = useMemo(() => {
     if (selectedMentor) return selectedMentor;
     if (!resolvedMentorId) return null;

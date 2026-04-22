@@ -1,6 +1,10 @@
 import lyraMentorImage from "@/assets/lyra-mentor.png";
 import theGuyMentorImage from "@/assets/the-guy-mentor.png";
-import { normalizeMentorSlug, sortMentorsForDisplay } from "@/lib/mentorRoster";
+import {
+  normalizeMentorSlug,
+  resolveActiveMentorSlug,
+  sortMentorsForDisplay,
+} from "@/lib/mentorRoster";
 
 export type MentorAvailability = "active" | "upcoming_unlockable";
 
@@ -37,6 +41,7 @@ const LYRA_ACTIVE_FALLBACK: Partial<MentorBrowseEntry> = {
 };
 
 const UPCOMING_MENTOR_ORDER = ["the-guy"] as const;
+const UPCOMING_MENTOR_SLUGS = new Set<string>(UPCOMING_MENTOR_ORDER);
 
 const UPCOMING_MENTORS: readonly MentorBrowseEntry[] = [
   {
@@ -66,6 +71,11 @@ export const buildBrowseMentorCatalog = (
   activeMentors: MentorBrowseEntry[],
 ): MentorBrowseEntry[] => {
   const normalizedActiveMentors = sortMentorsForDisplay(activeMentors)
+    .filter((mentor) => {
+      const normalizedSlug = normalizeMentorSlug(mentor.slug);
+      if (!normalizedSlug) return false;
+      return resolveActiveMentorSlug(normalizedSlug) !== null || UPCOMING_MENTOR_SLUGS.has(normalizedSlug);
+    })
     .map((mentor) => {
       const lyraFallback = mentor.slug === "lyra" ? LYRA_ACTIVE_FALLBACK : null;
 
