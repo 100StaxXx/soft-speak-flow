@@ -219,7 +219,7 @@ Deno.test("remote optimizer inbox fallbacks preserve remote fallback telemetry",
   assertEquals(payload.questSource, "inbox");
 });
 
-Deno.test("remote optimizer failure returns a fail-closed conversational result", async () => {
+Deno.test("remote optimizer failure falls back to inbox", async () => {
   const result = await maybeApplyRemotePlannerOptimizer({
     input: basePlannerInput(),
     result: basePlannerResult(),
@@ -229,16 +229,18 @@ Deno.test("remote optimizer failure returns a fail-closed conversational result"
     fetchImpl: async () => new Response("nope", { status: 503 }),
   });
 
-  assertEquals(result.mode, "conversational");
-  assertEquals(result.proposals.length, 0);
-  assertEquals(result.suggestedReminders.length, 0);
-  assertEquals(
-    result.reply,
-    "Scheduling is temporarily unavailable right now, so I didn't place any new quest drafts. Try again in a moment.",
-  );
+  assertEquals(result.mode, "proposal");
+  assertEquals(result.proposals.length, 1);
+  const payload = result.proposals[0]?.payload as Record<string, unknown>;
+  assertEquals(payload.taskDate, null);
+  assertEquals(payload.scheduledTime, null);
+  assertEquals(payload.questSource, "inbox");
+  assertEquals(payload.optimizerSource, "fallback");
+  assertEquals(payload.usedFallback, true);
+  assertEquals(payload.fallbackToInbox, true);
 });
 
-Deno.test("remote optimizer thrown fetch errors also fail closed", async () => {
+Deno.test("remote optimizer thrown fetch errors fall back to inbox", async () => {
   const result = await maybeApplyRemotePlannerOptimizer({
     input: basePlannerInput(),
     result: basePlannerResult(),
@@ -250,8 +252,28 @@ Deno.test("remote optimizer thrown fetch errors also fail closed", async () => {
     },
   });
 
-  assertEquals(result.mode, "conversational");
-  assertEquals(result.proposals.length, 0);
+  assertEquals(result.mode, "proposal");
+  assertEquals(result.proposals.length, 1);
+  const payload = result.proposals[0]?.payload as Record<string, unknown>;
+  assertEquals(payload.questSource, "inbox");
+  assertEquals(payload.optimizerSource, "fallback");
+});
+
+Deno.test("remote optimizer disabled passes through local result unchanged", async () => {
+  const base = basePlannerResult();
+  const result = await maybeApplyRemotePlannerOptimizer({
+    input: basePlannerInput(),
+    result: base,
+    optimizerEnabled: false,
+    fetchImpl: async () => {
+      throw new Error("should not be called");
+    },
+  });
+
+  assertEquals(result.mode, "proposal");
+  assertEquals(result.proposals.length, 1);
+  const payload = result.proposals[0]?.payload as Record<string, unknown>;
+  assertEquals(payload.taskDate, "2026-04-20");
 });
 
 Deno.test("remote optimizer request shaping uses actual durations and mapped energy types", async () => {

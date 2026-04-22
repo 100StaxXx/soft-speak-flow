@@ -444,16 +444,32 @@ const applyRemoteDraftToProposal = (
   };
 };
 
-const buildRemoteUnavailableResult = (
+const buildInboxFallbackResult = (
   result: PlannerBuildResult,
 ): PlannerBuildResult => ({
   ...result,
-  mode: "conversational",
-  reply:
-    "Scheduling is temporarily unavailable right now, so I didn't place any new quest drafts. Try again in a moment.",
-  followUpQuestions: [],
-  proposals: [],
-  suggestedReminders: [],
+  proposals: result.proposals.map((proposal) => {
+    if (
+      proposal.kind !== "create_quest" ||
+      proposal.status !== "pending" ||
+      (proposal.payload as Record<string, unknown>).source !== "optimizer"
+    ) {
+      return proposal;
+    }
+    const payload = proposal.payload as Record<string, unknown>;
+    return {
+      ...proposal,
+      payload: {
+        ...payload,
+        taskDate: null,
+        scheduledTime: null,
+        questSource: "inbox",
+        optimizerSource: "fallback",
+        usedFallback: true,
+        fallbackToInbox: true,
+      },
+    };
+  }),
 });
 
 export const maybeApplyRemotePlannerOptimizer = async (params: {
@@ -467,14 +483,18 @@ export const maybeApplyRemotePlannerOptimizer = async (params: {
   const request = toPlannerOptimizerRequest(params.input, params.result);
   if (!request) return params.result;
 
+  const url = params.optimizerUrl ?? getOptimizerUrl();
+  const optimizerEnabled = params.optimizerEnabled ?? getOptimizerEnabled();
+  if (!optimizerEnabled || !url) return params.result;
+
   const remote = await maybeRunRemotePlannerOptimizer({
     request,
     fetchImpl: params.fetchImpl,
-    optimizerEnabled: params.optimizerEnabled,
-    optimizerUrl: params.optimizerUrl,
+    optimizerEnabled,
+    optimizerUrl: url,
     optimizerSecret: params.optimizerSecret,
   });
-  if (!remote) return buildRemoteUnavailableResult(params.result);
+  if (!remote) return buildInboxFallbackResult(params.result);
 
   return {
     ...params.result,
