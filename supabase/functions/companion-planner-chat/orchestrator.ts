@@ -320,10 +320,14 @@ const isPlanDayDeterministicResponse = (
     input.sessionState.pendingStarterIntent === "plan_day") &&
   baseResult.followUpQuestions.length === 0 &&
   (
+    baseResult.structuredResponse?.planDay !== undefined ||
     baseResult.mode === "proposal" ||
     (
       baseResult.mode === "conversational" &&
-      baseResult.proposals.length === 0 &&
+      (
+        baseResult.proposals.length === 0 ||
+        baseResult.proposals.every((proposal) => proposal.status === "suggested")
+      ) &&
       baseResult.suggestedReminders.length === 0
     )
   );

@@ -3,9 +3,11 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_MENTOR_AVATAR_POSITION,
   MENTOR_AVATAR_POSITION_MAP,
+  filterCanonicalActiveMentors,
   getMentorDisplaySortIndex,
   resolveActiveMentorSlug,
   resolveMentorSlugAlias,
+  sortCanonicalMentors,
 } from "./mentorRoster";
 
 describe("mentorRoster", () => {
@@ -42,5 +44,36 @@ describe("mentorRoster", () => {
     expect(getMentorDisplaySortIndex("sage")).toBeLessThan(getMentorDisplaySortIndex("lyra"));
     expect(getMentorDisplaySortIndex("lyra")).toBeLessThan(getMentorDisplaySortIndex("operator"));
     expect(getMentorDisplaySortIndex("operator")).toBeLessThan(getMentorDisplaySortIndex("rival"));
+  });
+
+  it("filters legacy mentors out of canonical picker lists", () => {
+    const roster = [
+      { id: "legacy-1", name: "Atlas", slug: "atlas" },
+      { id: "sage-1", name: "The Sage", slug: "sage" },
+      { id: "legacy-2", name: "Stryker", slug: "stryker" },
+      { id: "lyra-1", name: "Lyra", slug: "lyra" },
+    ];
+
+    expect(filterCanonicalActiveMentors(roster).map((mentor) => mentor.slug)).toEqual([
+      "sage",
+      "lyra",
+    ]);
+  });
+
+  it("sorts canonical mentors using the stable roster order", () => {
+    const roster = [
+      { id: "operator-1", name: "The Operator", slug: "operator" },
+      { id: "sage-1", name: "The Sage", slug: "sage" },
+      { id: "legacy-1", name: "Atlas", slug: "atlas" },
+      { id: "princess-1", name: "The Princess", slug: "princess" },
+      { id: "lyra-1", name: "Lyra", slug: "lyra" },
+    ];
+
+    expect(sortCanonicalMentors(roster).map((mentor) => mentor.slug)).toEqual([
+      "sage",
+      "lyra",
+      "princess",
+      "operator",
+    ]);
   });
 });

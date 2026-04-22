@@ -13,6 +13,20 @@ const mocks = vi.hoisted(() => ({
   pendingMood: "overthinking" as string | null,
   mentors: [
     {
+      id: "atlas",
+      name: "Atlas",
+      slug: "atlas",
+      avatar_url: null,
+      primary_color: "#1f2937",
+      short_title: "Legacy Guide",
+      tone_description: "Legacy tone",
+      tags: ["legacy"],
+      themes: ["legacy"],
+      style_description: null,
+      target_user: "Legacy users",
+      intensity_level: "medium",
+    },
+    {
       id: "sage",
       name: "The Sage",
       slug: "sage",
@@ -52,6 +66,20 @@ const mocks = vi.hoisted(() => ({
       themes: ["confidence"],
       style_description: null,
       target_user: "Identity-led users refining standards and boundaries",
+      intensity_level: "high",
+    },
+    {
+      id: "stryker",
+      name: "Stryker",
+      slug: "stryker",
+      avatar_url: null,
+      primary_color: "#334155",
+      short_title: "Legacy Guide",
+      tone_description: "Legacy tone",
+      tags: ["legacy"],
+      themes: ["legacy"],
+      style_description: null,
+      target_user: "Legacy users",
       intensity_level: "high",
     },
   ],
@@ -146,6 +174,8 @@ describe("MentorSwitcher", () => {
     expect(screen.getAllByText("The Sage").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Quiet Clarity").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Calm and wise").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Atlas")).not.toBeInTheDocument();
+    expect(screen.queryByText("Stryker")).not.toBeInTheDocument();
   });
 
   it("supports a controlled triggerless dialog", () => {

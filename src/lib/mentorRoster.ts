@@ -36,6 +36,14 @@ const DISPLAY_ORDER_INDEX = new Map(
   MENTOR_DISPLAY_ORDER.map((slug, index) => [slug, index]),
 );
 
+type MentorSlugRecord = {
+  slug?: string | null;
+};
+
+type MentorSortableRecord = MentorSlugRecord & {
+  name?: string | null;
+};
+
 export const normalizeMentorSlug = (value?: string | null): string | null => {
   if (typeof value !== "string") return null;
 
@@ -59,6 +67,32 @@ export const resolveMentorSlugAlias = (
 export const resolveActiveMentorSlug = (value?: string | null): ActiveMentorSlug | null => {
   const resolved = resolveMentorSlugAlias(value);
   return resolved && isActiveMentorSlug(resolved) ? resolved : null;
+};
+
+export const hasCanonicalActiveMentorSlug = <T extends MentorSlugRecord>(
+  mentor: T | null | undefined,
+): mentor is T & { slug: ActiveMentorSlug } => {
+  return resolveActiveMentorSlug(mentor?.slug) !== null;
+};
+
+export const filterCanonicalActiveMentors = <T extends MentorSlugRecord>(
+  mentors: readonly T[] | null | undefined,
+): T[] => {
+  if (!mentors || mentors.length === 0) return [];
+  return mentors.filter(hasCanonicalActiveMentorSlug);
+};
+
+export const sortCanonicalMentors = <T extends MentorSortableRecord>(
+  mentors: readonly T[] | null | undefined,
+): T[] => {
+  return filterCanonicalActiveMentors(mentors).sort((left, right) => {
+    const sortDelta = getMentorDisplaySortIndex(left.slug) - getMentorDisplaySortIndex(right.slug);
+    if (sortDelta !== 0) return sortDelta;
+
+    const leftName = left.name?.trim() ?? "";
+    const rightName = right.name?.trim() ?? "";
+    return leftName.localeCompare(rightName);
+  });
 };
 
 export const getMentorDisplaySortIndex = (value?: string | null): number => {

@@ -1,4 +1,5 @@
 import type { Json } from "@/integrations/supabase/types";
+import type { CompanionStructuredResponse } from "@/shared/companionStructuredOutput";
 import type {
   CompanionChatInputMode,
   CompanionChatRole,
@@ -96,6 +97,7 @@ export interface CompanionAgentResponse {
   mode: CompanionAgentMode;
   intent: CompanionAgentIntent;
   confidence: number;
+  structuredResponse?: CompanionStructuredResponse | null;
   pendingAction?: PendingActionView;
   receipt?: ActionReceiptView;
   threadState: CompanionAgentThreadState;
@@ -116,6 +118,7 @@ export interface CompanionAgentMessage {
   inputMode?: CompanionChatInputMode;
   mode?: CompanionAgentMode;
   intent?: CompanionAgentIntent;
+  structuredResponse?: CompanionStructuredResponse | null;
   pendingAction?: PendingActionView;
   receipt?: ActionReceiptView;
 }

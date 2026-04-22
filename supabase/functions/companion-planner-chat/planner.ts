@@ -25,6 +25,15 @@ import {
   formatAssistantTimeRange,
   normalizeAssistantTimeText,
 } from "../_shared/assistantScheduleCopy.ts";
+import type {
+  CompanionComingUpStructuredOutput,
+  CompanionDayAssessment,
+  CompanionIntentMetadata,
+  CompanionStructuredResponse,
+  CompanionSuggestedQuest,
+  CompanionSuggestedQuestSource,
+  CompanionTomorrowSummary,
+} from "../../../src/shared/companionStructuredOutput.ts";
 
 export type PlannerHorizon = "day" | "week" | "month";
 export type PlannerTonePack = "soft" | "playful" | "witty_sassy";
@@ -80,7 +89,7 @@ export interface PlannerProposal {
   summary: string;
   reasoning?: string | null;
   payload: Record<string, unknown>;
-  status: "pending" | "confirmed" | "rejected";
+  status: "suggested" | "pending" | "confirmed" | "rejected";
   readyToConfirm: boolean;
   missingFields?: string[];
 }
@@ -413,6 +422,7 @@ export interface PlannerBuildResult {
   followUpQuestions: PlannerQuestion[];
   proposals: PlannerProposal[];
   suggestedReminders: PlannerProposal[];
+  structuredResponse?: CompanionStructuredResponse | null;
   memoryUpdates: {
     preferredTimeOfDay?: string | null;
     preferredTimeReason?: string | null;
@@ -442,6 +452,61 @@ export const normalizePlannerBuildResultText = (
     ...proposal,
     summary: normalizePlannerDisplayText(proposal.summary),
   })),
+  structuredResponse: result.structuredResponse
+    ? {
+      ...result.structuredResponse,
+      planDay: result.structuredResponse.planDay
+        ? {
+          ...result.structuredResponse.planDay,
+          message: normalizePlannerDisplayText(
+            result.structuredResponse.planDay.message,
+          ),
+          suggestedQuests: result.structuredResponse.planDay.suggestedQuests
+            .map((quest) => ({
+              ...quest,
+              title: normalizePlannerDisplayText(quest.title),
+              estimatedDuration: normalizePlannerDisplayText(
+                quest.estimatedDuration,
+              ),
+              reason: normalizePlannerDisplayText(quest.reason),
+            })),
+        }
+        : result.structuredResponse.planDay,
+      comingUp: result.structuredResponse.comingUp
+        ? {
+          ...result.structuredResponse.comingUp,
+          message: normalizePlannerDisplayText(
+            result.structuredResponse.comingUp.message,
+          ),
+          nextEvent: result.structuredResponse.comingUp.nextEvent
+            ? {
+              ...result.structuredResponse.comingUp.nextEvent,
+              title: normalizePlannerDisplayText(
+                result.structuredResponse.comingUp.nextEvent.title,
+              ),
+              label: normalizePlannerDisplayText(
+                result.structuredResponse.comingUp.nextEvent.label,
+              ),
+            }
+            : null,
+          remainingToday: result.structuredResponse.comingUp.remainingToday.map(
+            (item) => ({
+              ...item,
+              title: normalizePlannerDisplayText(item.title),
+              label: normalizePlannerDisplayText(item.label),
+            }),
+          ),
+          missedItems: result.structuredResponse.comingUp.missedItems.map(
+            (item) => ({
+              ...item,
+              title: normalizePlannerDisplayText(item.title),
+              label: normalizePlannerDisplayText(item.label),
+            }),
+          ),
+        }
+        : result.structuredResponse.comingUp,
+    }
+    : result.structuredResponse,
 });
 
 type MatchedEntities = {
@@ -3200,6 +3265,125 @@ const collectScheduleItemsForDate = (
   ));
 };
 
+const collectStructuredScheduleItemsForDate = (
+  input: PlannerBuildInput,
+  date: string,
+  remainingOnly: boolean,
+) => {
+  const now = new Date(input.currentDateTime);
+  const currentDateKey = getLocalDateFromDateTime(input.currentDateTime);
+  const currentMinutes = getLocalMinutesFromDateTime(input.currentDateTime);
+  const tasks = [
+    ...input.plannerContext.tasks,
+    ...input.plannerContext.inboxTasks,
+  ]
+    .filter((task) => task.completed !== true && task.taskDate === date)
+    .filter((task) => {
+      if (!remainingOnly || date !== currentDateKey) return true;
+      const scheduledMinutes = parseTimeToMinutes(task.scheduledTime);
+      if (scheduledMinutes === null || currentMinutes === null) return true;
+      return scheduledMinutes >= currentMinutes;
+    })
+    .map((task) => ({
+      id: task.id,
+      title: task.title,
+      label: buildAssistantTaskScheduleLabel({
+        title: task.title,
+        taskDate: task.taskDate,
+        scheduledTime: task.scheduledTime,
+        estimatedDuration: task.estimatedDuration,
+        currentDate: input.currentDate,
+        currentDateTime: input.currentDateTime,
+      }),
+      startsAt: task.taskDate && task.scheduledTime
+        ? buildOffsetDateTime(
+          task.taskDate,
+          task.scheduledTime,
+          getDateTimeOffset(input.currentDateTime),
+        )
+        : null,
+      endsAt: task.taskDate && task.scheduledTime &&
+          task.estimatedDuration && task.estimatedDuration > 0
+        ? buildOffsetDateTime(
+          task.taskDate,
+          formatMinutes(
+            (parseTimeToMinutes(task.scheduledTime) ?? 0) +
+              task.estimatedDuration,
+          ),
+          getDateTimeOffset(input.currentDateTime),
+        )
+        : null,
+      isAllDay: false,
+      source: "task" as const,
+      sortMinutes: parseTimeToMinutes(task.scheduledTime),
+    }));
+
+  const events = input.plannerContext.calendarEvents
+    .filter((event) => {
+      const start = new Date(event.start);
+      const end = new Date(event.end);
+      const dayStart = new Date(`${date}T00:00:00`);
+      const dayEnd = new Date(`${addDaysToDateKey(date, 1)}T00:00:00`);
+      if (!(end > dayStart && start < dayEnd)) return false;
+      if (!remainingOnly || date !== currentDateKey) return true;
+      return end > now;
+    })
+    .map((event) => ({
+      id: event.id,
+      title: event.title,
+      label: buildAssistantEventScheduleLabel({
+        title: event.title,
+        start: event.start,
+        end: event.end,
+        isAllDay: event.isAllDay,
+        currentDate: input.currentDate,
+        currentDateTime: input.currentDateTime,
+      }),
+      startsAt: event.start,
+      endsAt: event.end,
+      isAllDay: event.isAllDay,
+      source: "calendar" as const,
+      sortMinutes: event.isAllDay ? -1 : parseTimeToMinutes(
+        `${new Date(event.start).getHours()}:${
+          String(new Date(event.start).getMinutes()).padStart(2, "0")
+        }`,
+      ),
+    }));
+
+  return [...tasks, ...events]
+    .sort((left, right) => (left.sortMinutes ?? 9999) - (right.sortMinutes ?? 9999))
+    .map(({ sortMinutes: _sortMinutes, ...item }) => item);
+};
+
+const collectMissedTasksForToday = (
+  input: PlannerBuildInput,
+) => {
+  const currentDateKey = getLocalDateFromDateTime(input.currentDateTime);
+  const currentMinutes = getLocalMinutesFromDateTime(input.currentDateTime);
+  if (currentMinutes === null) return [];
+
+  return [...input.plannerContext.tasks, ...input.plannerContext.inboxTasks]
+    .filter((task) =>
+      task.completed !== true &&
+      task.taskDate === currentDateKey &&
+      task.scheduledTime
+    )
+    .filter((task) => (parseTimeToMinutes(task.scheduledTime) ?? 9999) < currentMinutes)
+    .map((task) => ({
+      id: task.id,
+      title: task.title,
+      label: buildAssistantTaskScheduleLabel({
+        title: task.title,
+        taskDate: task.taskDate,
+        scheduledTime: task.scheduledTime,
+        estimatedDuration: task.estimatedDuration,
+        currentDate: input.currentDate,
+        currentDateTime: input.currentDateTime,
+      }),
+      source: "task" as const,
+    }));
+};
+
 const buildDayDigest = (
   input: PlannerBuildInput,
   date: string,
@@ -3284,6 +3468,126 @@ const buildUpcomingDigestReply = (input: PlannerBuildInput): string => {
     buildDayDigest(input, tomorrow, "Tomorrow"),
   ].join("\n");
 };
+
+const getTomorrowSummary = (
+  input: PlannerBuildInput,
+): CompanionTomorrowSummary => {
+  const tomorrow = addDaysToDateKey(input.currentDate, 1);
+  const tomorrowLoad = input.plannerContext.scheduleInsights?.dayLoads.find((
+    day,
+  ) => day.date === tomorrow);
+  if (!tomorrowLoad || tomorrowLoad.status === "open") return "open";
+  if (tomorrowLoad.status === "balanced") return "light";
+  return "busy";
+};
+
+const buildComingUpStructuredOutput = (
+  input: PlannerBuildInput,
+  message: string,
+  classificationHint: ClassificationHint,
+): CompanionStructuredResponse => {
+  const remainingToday = collectStructuredScheduleItemsForDate(
+    input,
+    input.currentDate,
+    true,
+  );
+
+  return {
+    intent: mapPlannerIntentType(input, classificationHint, {
+      forceIntentType: "conversation",
+      shouldCreateQuest: false,
+      shouldPromptCampaign: false,
+    }),
+    comingUp: {
+      message,
+      nextEvent: remainingToday[0] ?? null,
+      remainingToday,
+      tomorrowSummary: getTomorrowSummary(input),
+      missedItems: collectMissedTasksForToday(input),
+    },
+    planDay: null,
+  };
+};
+
+const derivePlanDayAssessment = (
+  input: PlannerBuildInput,
+): CompanionDayAssessment => {
+  const currentDayLoad = input.plannerContext.scheduleInsights?.dayLoads.find((
+    day,
+  ) => day.date === input.currentDate);
+  const missedCount = collectMissedTasksForToday(input).length;
+  const momentumState = input.plannerContext.statInterpretation?.momentumState;
+  const latestEnergy = input.plannerContext.reflectionSignals?.[0]?.energy ?? null;
+
+  if (latestEnergy === "low") return "low_energy";
+  if (missedCount >= 2) return "behind";
+  if (momentumState === "locked_in") return "productive";
+  if (currentDayLoad?.status === "overloaded" || currentDayLoad?.status === "busy") {
+    return "busy";
+  }
+  if (currentDayLoad?.status === "balanced") return "balanced";
+  return "open";
+};
+
+const mapPriorityToSuggestedQuestType = (
+  priority: number | null | undefined,
+): CompanionSuggestedQuest["type"] => {
+  const normalized = Math.round(priority ?? 0);
+  if (normalized >= 4) return "must";
+  if (normalized >= 2) return "should";
+  return "nice";
+};
+
+const inferSuggestedQuestSource = (
+  candidate: OptimizerDraftCandidate,
+): CompanionSuggestedQuestSource => {
+  if (/recovery/i.test(candidate.title)) return "recovery";
+  if (candidate.category && /habit|ritual/i.test(candidate.category)) {
+    return "habit";
+  }
+  if (candidate.notes && /epic|campaign/i.test(candidate.notes)) {
+    return "campaign";
+  }
+  return "optimization";
+};
+
+const buildPlanDayStructuredOutput = (
+  input: PlannerBuildInput,
+  reply: string,
+  classificationHint: ClassificationHint,
+  proposals: PlannerProposal[],
+): CompanionStructuredResponse => ({
+  intent: mapPlannerIntentType(input, classificationHint, {
+    forceIntentType: "quest",
+    shouldCreateQuest: proposals.length > 0,
+    shouldPromptCampaign: false,
+  }),
+  planDay: {
+    message: reply,
+    dayAssessment: derivePlanDayAssessment(input),
+    suggestedQuests: proposals.map((proposal) => {
+      const payload = proposal.payload as {
+        estimatedDuration?: number | null;
+        suggestionSource?: CompanionSuggestedQuestSource;
+        suggestionType?: CompanionSuggestedQuest["type"];
+      };
+
+      return {
+        suggestionId: proposal.id,
+        proposalId: proposal.id,
+        title: proposal.title.replace(/^Create\s+/i, ""),
+        type: payload.suggestionType ?? "should",
+        estimatedDuration: formatEstimatedDurationLabel(
+          payload.estimatedDuration ?? null,
+        ),
+        estimatedDurationMinutes: payload.estimatedDuration ?? null,
+        source: payload.suggestionSource ?? "optimization",
+        reason: proposal.reasoning ?? proposal.summary,
+      };
+    }),
+  },
+  comingUp: null,
+});
 
 const buildMakeRoomStarterReply = (input: PlannerBuildInput): string => {
   const lead = isWittySassyTone(input.tonePack)
@@ -3424,12 +3728,14 @@ const buildReadOnlyResponse = (
   reply: string,
   sessionState: PlannerSessionState,
   mode: PlannerResponseMode = "conversational",
+  structuredResponse: CompanionStructuredResponse | null = null,
 ): PlannerBuildResult => ({
   mode,
   reply,
   followUpQuestions: [],
   proposals: [],
   suggestedReminders: [],
+  structuredResponse,
   memoryUpdates: {
     preferredTimeOfDay: sessionState.preferredTimeOfDay ?? null,
     preferredTimeReason: sessionState.preferredTimeReason ?? null,
@@ -3441,6 +3747,66 @@ const buildReadOnlyResponse = (
     pendingStarterIntent: null,
   },
 });
+
+const formatEstimatedDurationLabel = (minutes: number | null | undefined): string => {
+  if (!minutes || minutes <= 0) return "Flexible";
+  if (minutes < 60) return `${minutes} min`;
+  if (minutes % 60 === 0) return `${minutes / 60} hr`;
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  return `${hours} hr ${remainder} min`;
+};
+
+const mapPlannerIntentType = (
+  input: PlannerBuildInput,
+  classificationHint: ClassificationHint,
+  options?: {
+    hasClarifyingQuestion?: boolean;
+    forceIntentType?: CompanionIntentMetadata["intentType"];
+    shouldCreateQuest?: boolean;
+    shouldPromptCampaign?: boolean;
+  },
+): CompanionIntentMetadata => {
+  const normalizedMessage = normalizeText(input.message);
+  const isRecurring = Boolean(
+    input.parsedInput?.recurrencePattern ||
+    classificationHint.type === "habit",
+  );
+  const timeHorizon: CompanionIntentMetadata["timeHorizon"] =
+    input.plannerContext.starterIntent === "plan_day" ||
+      input.plannerContext.starterIntent === "upcoming_start" ||
+      /\b(today|tonight|tomorrow)\b/.test(normalizedMessage)
+      ? "today"
+      : classificationHint.type === "epic" ||
+          /\b(this month|next month|this quarter|long term|eventually)\b/
+            .test(normalizedMessage)
+      ? "long_term"
+      : "short_term";
+
+  const inferredIntentType = options?.hasClarifyingQuestion
+    ? "clarification"
+    : input.plannerContext.starterIntent === "plan_day" ||
+        classificationHint.type === "quest" ||
+        classificationHint.type === "habit"
+    ? "quest"
+    : input.plannerContext.starterIntent === "goal_breakdown" ||
+        input.plannerContext.starterIntent === "goal_breakdown_start" ||
+        classificationHint.type === "epic"
+    ? "campaign"
+    : "conversation";
+
+  return {
+    intentType: options?.forceIntentType ?? inferredIntentType,
+    timeHorizon,
+    isRecurring,
+    shouldCreateQuest: options?.shouldCreateQuest ??
+      ((options?.forceIntentType ?? inferredIntentType) === "quest" &&
+        timeHorizon === "today"),
+    shouldPromptCampaign: options?.shouldPromptCampaign ??
+      ((options?.forceIntentType ?? inferredIntentType) === "campaign" &&
+        timeHorizon !== "today"),
+  };
+};
 
 const buildBatchQuestProposals = (
   input: PlannerBuildInput,
@@ -4591,6 +4957,9 @@ const buildPlanDayPriorityCandidate = (
 const buildOptimizerQuestProposal = (
   input: PlannerBuildInput,
   candidate: OptimizerDraftCandidate,
+  options?: {
+    status?: PlannerProposal["status"];
+  },
 ): PlannerProposal => {
   const reminderMinutesBefore = inferReminderMinutes(
     "create_quest",
@@ -4619,8 +4988,10 @@ const buildOptimizerQuestProposal = (
       optimizerMode: input.horizon === "week" ? "week" : "day",
       questSource: candidate.scheduledTime ? "manual" : "inbox",
       derivedFromMessage: candidate.derivedFromMessage,
+      suggestionSource: inferSuggestedQuestSource(candidate),
+      suggestionType: mapPriorityToSuggestedQuestType(candidate.priority),
     },
-    status: "pending",
+    status: options?.status ?? "pending",
     readyToConfirm: true,
     missingFields: [],
   };
@@ -4679,7 +5050,9 @@ const buildPlanDayDraftResponse = (
   }
   const proposals = candidates
     .slice(0, Math.min(4, proposalTarget))
-    .map((candidate) => buildOptimizerQuestProposal(input, candidate));
+    .map((candidate) =>
+      buildOptimizerQuestProposal(input, candidate, { status: "suggested" })
+    );
   const conflictNotes = proposals
     .map((proposal) => {
       const payload = proposal.payload as {
@@ -4725,6 +5098,12 @@ const buildPlanDayDraftResponse = (
       followUpQuestions: [],
       proposals: [],
       suggestedReminders: [],
+      structuredResponse: buildPlanDayStructuredOutput(
+        input,
+        [acknowledgement, noRoomReason].filter(Boolean).join(" "),
+        classificationHint,
+        [],
+      ),
       memoryUpdates: {
         preferredTimeOfDay: sessionState.preferredTimeOfDay ??
           input.plannerContext.plannerMemory?.preferredTimeOfDay ?? null,
@@ -4755,11 +5134,17 @@ const buildPlanDayDraftResponse = (
   ].filter(Boolean).join(" ");
 
   return {
-    mode: "proposal",
+    mode: "conversational",
     reply,
     followUpQuestions: [],
     proposals,
     suggestedReminders: [],
+    structuredResponse: buildPlanDayStructuredOutput(
+      input,
+      reply,
+      classificationHint,
+      proposals,
+    ),
     memoryUpdates: {
       preferredTimeOfDay: sessionState.preferredTimeOfDay ??
         input.plannerContext.plannerMemory?.preferredTimeOfDay ?? null,
@@ -4854,34 +5239,15 @@ const buildPlanDayStarterResponse = (
   input: PlannerBuildInput,
   sessionState: PlannerSessionState,
   classificationHint: ClassificationHint,
-): PlannerBuildResult => {
-  const focusQuestion = buildPlanDayClarificationQuestion(input);
-
-  return {
-    mode: "conversational",
-    reply: focusQuestion.prompt,
-    followUpQuestions: [focusQuestion],
-    proposals: [],
-    suggestedReminders: [],
-    memoryUpdates: {
-      preferredTimeOfDay: sessionState.preferredTimeOfDay ??
-        input.plannerContext.plannerMemory?.preferredTimeOfDay ?? null,
-      preferredTimeReason: sessionState.preferredTimeReason ??
-        input.plannerContext.plannerMemory?.preferredTimeReason ?? null,
-      reminderPreference: sessionState.reminderPreference ??
-        (input.plannerContext.plannerMemory?.reminderMinutesBefore
-          ? `${input.plannerContext.plannerMemory.reminderMinutesBefore} minutes`
-          : null),
-    },
-    sessionState: {
+): PlannerBuildResult =>
+  buildPlanDayDraftResponse(
+    input,
+    {
       ...sessionState,
-      draft: {},
-      openQuestionIds: [focusQuestion.id],
       pendingStarterIntent: "plan_day",
-      lastClassification: classificationHint.type,
     },
-  };
-};
+    classificationHint,
+  );
 
 const buildUpcomingStarterResponse = (
   input: PlannerBuildInput,
@@ -4898,6 +5264,11 @@ const buildUpcomingStarterResponse = (
       lastClassification: classificationHint.type,
     },
     "schedule_read",
+    buildComingUpStructuredOutput(
+      input,
+      buildUpcomingDigestReply(input),
+      classificationHint,
+    ),
   );
 
 const buildQuestCaptureStarterResponse = (
@@ -5094,6 +5465,11 @@ export function buildPlannerResponse(
           lastClassification: classificationHint.type,
         },
         "schedule_read",
+        buildComingUpStructuredOutput(
+          followUpInput,
+          buildReadOnlyScheduleReply(followUpInput, followUpMessage),
+          classificationHint,
+        ),
       );
     }
 
@@ -5106,13 +5482,22 @@ export function buildPlannerResponse(
     }
 
     if (isScheduleQuestion(resolvedInput.message)) {
+      const reply = buildReadOnlyScheduleReply(
+        resolvedInput,
+        resolvedInput.message,
+      );
       return buildReadOnlyResponse(
-        buildReadOnlyScheduleReply(resolvedInput, resolvedInput.message),
+        reply,
         {
           ...resolvedInput.sessionState,
           lastClassification: classificationHint.type,
         },
         "schedule_read",
+        buildComingUpStructuredOutput(
+          resolvedInput,
+          reply,
+          classificationHint,
+        ),
       );
     }
 

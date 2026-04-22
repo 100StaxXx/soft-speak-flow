@@ -4,11 +4,11 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { supabase } from "@/integrations/supabase/client";
+import { resolveActiveMentorSlug } from "@/lib/mentorRoster";
 import {
   getOnboardingMentorId,
   getResolvedMentorId,
   isInvalidMentorReferenceError,
-  stripOnboardingMentorId,
 } from "@/utils/mentor";
 import { logger } from "@/utils/logger";
 
@@ -26,6 +26,7 @@ const RECOVERY_DELAY_MS = 750;
 
 const stableMentorByUser = new Map<string, string>();
 const log = logger.scope("MentorConnectionHealth");
+const CANONICAL_SAGE_SLUG = "sage";
 
 const sleep = async (durationMs: number) =>
   new Promise<void>((resolve) => {
@@ -49,7 +50,7 @@ export function useMentorConnectionHealth(): {
     resolvedMentorId ?? stableMentorId,
   );
   const [status, setStatus] = useState<MentorConnectionStatus>(
-    resolvedMentorId ? "ready" : loading ? "recovering" : "missing",
+    resolvedMentorId || loading ? "recovering" : "missing",
   );
 
   const invalidateMentorQueries = useCallback(async () => {
@@ -58,32 +59,26 @@ export function useMentorConnectionHealth(): {
       queryClient.invalidateQueries({ queryKey: ["mentor-personality"] }),
       queryClient.invalidateQueries({ queryKey: ["mentor"] }),
       queryClient.invalidateQueries({ queryKey: ["selected-mentor"] }),
+      queryClient.invalidateQueries({ queryKey: ["morning-check-in"] }),
     ]);
   }, [queryClient]);
 
-  const sanitizeOnboardingMentor = useCallback(
-    async (userId: string, candidateProfile: LightweightProfile) => {
-      const sanitizedOnboardingData = stripOnboardingMentorId(candidateProfile?.onboarding_data);
-      const { error: cleanupError } = await supabase
-        .from("profiles")
-        .update({ onboarding_data: sanitizedOnboardingData })
-        .eq("id", userId);
+  const getOnboardingDataRecord = useCallback((candidateProfile: LightweightProfile): Record<string, unknown> => {
+    if (
+      candidateProfile?.onboarding_data
+      && typeof candidateProfile.onboarding_data === "object"
+      && !Array.isArray(candidateProfile.onboarding_data)
+    ) {
+      return candidateProfile.onboarding_data as Record<string, unknown>;
+    }
 
-      if (cleanupError) {
-        log.warn("Failed to clear stale onboarding mentor ID", { userId, error: cleanupError });
-        return;
-      }
+    return {};
+  }, []);
 
-      log.warn("Cleared stale onboarding mentor ID", { userId });
-      await queryClient.refetchQueries({ queryKey: ["profile", userId] });
-    },
-    [queryClient],
-  );
-
-  const validateOnboardingMentor = useCallback(async (mentorId: string) => {
+  const getMentorRecord = useCallback(async (mentorId: string) => {
     const { data: mentorLookup, error: mentorLookupError } = await supabase
       .from("mentors")
-      .select("id")
+      .select("id, slug")
       .eq("id", mentorId)
       .maybeSingle();
 
@@ -91,24 +86,46 @@ export function useMentorConnectionHealth(): {
       throw mentorLookupError;
     }
 
-    return mentorLookup?.id ?? null;
+    return mentorLookup ?? null;
   }, []);
 
-  const backfillMentor = useCallback(
-    async (userId: string, mentorId: string, candidateProfile: LightweightProfile) => {
+  const getCanonicalSageMentor = useCallback(async () => {
+    const { data: mentorLookup, error: mentorLookupError } = await supabase
+      .from("mentors")
+      .select("id, slug")
+      .eq("slug", CANONICAL_SAGE_SLUG)
+      .maybeSingle();
+
+    if (mentorLookupError) {
+      throw mentorLookupError;
+    }
+
+    if (!mentorLookup) return null;
+    return resolveActiveMentorSlug(mentorLookup.slug) === CANONICAL_SAGE_SLUG ? mentorLookup : null;
+  }, []);
+
+  const persistMentorSelection = useCallback(
+    async (userId: string, mentorId: string, candidateProfile: LightweightProfile, reason: string) => {
+      const onboardingData = getOnboardingDataRecord(candidateProfile);
       const { error: updateError } = await supabase
         .from("profiles")
-        .update({ selected_mentor_id: mentorId })
+        .update({
+          selected_mentor_id: mentorId,
+          onboarding_data: {
+            ...onboardingData,
+            mentorId,
+          },
+        })
         .eq("id", userId);
 
       if (updateError) {
         if (isInvalidMentorReferenceError(updateError)) {
-          log.warn("Invalid mentor reference while backfilling, stripping onboarding mentor", {
+          log.warn("Invalid mentor reference while persisting canonical mentor", {
             userId,
             mentorId,
+            reason,
             error: updateError,
           });
-          await sanitizeOnboardingMentor(userId, candidateProfile);
           return null;
         }
 
@@ -119,7 +136,79 @@ export function useMentorConnectionHealth(): {
       await invalidateMentorQueries();
       return mentorId;
     },
-    [invalidateMentorQueries, queryClient, sanitizeOnboardingMentor],
+    [getOnboardingDataRecord, invalidateMentorQueries, queryClient],
+  );
+
+  const repairMentorSelectionToSage = useCallback(
+    async (
+      userId: string,
+      invalidMentorId: string,
+      candidateProfile: LightweightProfile,
+      source: "selected_mentor" | "onboarding_mentor",
+    ) => {
+      const sageMentor = await getCanonicalSageMentor();
+      if (!sageMentor?.id) {
+        log.warn("Unable to repair mentor selection because canonical Sage is unavailable", {
+          userId,
+          source,
+          invalidMentorId,
+        });
+        return { mentorId: null, cause: "sage_fallback_missing" as const };
+      }
+
+      const repairedMentorId = await persistMentorSelection(
+        userId,
+        sageMentor.id,
+        candidateProfile,
+        `fallback_from_${source}`,
+      );
+
+      if (!repairedMentorId) {
+        return { mentorId: null, cause: "sage_fallback_persist_failed" as const };
+      }
+
+      log.warn("Repaired stale mentor selection to canonical Sage", {
+        userId,
+        source,
+        invalidMentorId,
+        repairedMentorId,
+      });
+      return { mentorId: repairedMentorId, cause: "fallback_to_sage" as const };
+    },
+    [getCanonicalSageMentor, persistMentorSelection],
+  );
+
+  const ensureCanonicalMentor = useCallback(
+    async (
+      userId: string,
+      mentorId: string,
+      candidateProfile: LightweightProfile,
+      source: "selected_mentor" | "onboarding_mentor",
+    ) => {
+      const mentorRecord = await getMentorRecord(mentorId);
+      const resolvedSlug = resolveActiveMentorSlug(mentorRecord?.slug);
+
+      if (!mentorRecord?.id || !resolvedSlug) {
+        return repairMentorSelectionToSage(userId, mentorId, candidateProfile, source);
+      }
+
+      if (source === "selected_mentor") {
+        return { mentorId: mentorRecord.id, cause: "profile_selected_mentor" as const };
+      }
+
+      const backfilledMentorId = await persistMentorSelection(
+        userId,
+        mentorRecord.id,
+        candidateProfile,
+        "backfill_from_onboarding",
+      );
+
+      return {
+        mentorId: backfilledMentorId,
+        cause: backfilledMentorId ? "backfilled_from_onboarding" as const : "backfill_failed" as const,
+      };
+    },
+    [getMentorRecord, persistMentorSelection, repairMentorSelectionToSage],
   );
 
   const attemptRecovery = useCallback(async () => {
@@ -133,7 +222,7 @@ export function useMentorConnectionHealth(): {
     recoveryInFlightRef.current = true;
 
     setStatus("recovering");
-    setEffectiveMentorId(stableMentorByUser.get(user.id) ?? null);
+    setEffectiveMentorId(stableMentorByUser.get(user.id) ?? resolvedMentorId ?? null);
 
     const startedAt = performance.now();
     let recoveredMentorId: string | null = null;
@@ -171,8 +260,14 @@ export function useMentorConnectionHealth(): {
           finalCause = "profile_missing";
           log.warn("Profile missing during mentor recovery", { userId: user.id, attempt });
         } else if (latestProfile.selected_mentor_id) {
-          recoveredMentorId = latestProfile.selected_mentor_id;
-          finalCause = "profile_selected_mentor";
+          const canonicalSelection = await ensureCanonicalMentor(
+            user.id,
+            latestProfile.selected_mentor_id,
+            latestProfile,
+            "selected_mentor",
+          );
+          recoveredMentorId = canonicalSelection.mentorId;
+          finalCause = canonicalSelection.cause;
           break;
         } else {
           const onboardingMentorId = getOnboardingMentorId(latestProfile);
@@ -180,21 +275,15 @@ export function useMentorConnectionHealth(): {
             finalCause = "profile_missing";
             log.warn("No onboarding mentor available during recovery", { userId: user.id, attempt });
           } else {
-            const validatedMentorId = await validateOnboardingMentor(onboardingMentorId);
-            if (!validatedMentorId) {
-              finalCause = "mentor_lookup_empty";
-              log.warn("Onboarding mentor lookup returned empty result", {
-                userId: user.id,
-                attempt,
-                mentorId: onboardingMentorId,
-              });
-              await sanitizeOnboardingMentor(user.id, latestProfile);
-              finalCause = "invalid_onboarding_mentor";
-            } else {
-              recoveredMentorId = await backfillMentor(user.id, validatedMentorId, latestProfile);
-              finalCause = recoveredMentorId ? "backfilled_from_onboarding" : "invalid_onboarding_mentor";
-              if (recoveredMentorId) break;
-            }
+            const canonicalSelection = await ensureCanonicalMentor(
+              user.id,
+              onboardingMentorId,
+              latestProfile,
+              "onboarding_mentor",
+            );
+            recoveredMentorId = canonicalSelection.mentorId;
+            finalCause = canonicalSelection.cause;
+            if (recoveredMentorId) break;
           }
         }
 
@@ -226,23 +315,23 @@ export function useMentorConnectionHealth(): {
       return;
     }
 
-    const fallbackMentorId = stableMentorByUser.get(user.id) ?? null;
+    const offlineFallbackMentorId = stableMentorByUser.get(user.id) ?? resolvedMentorId ?? null;
     if (finalCause === "offline") {
-      setEffectiveMentorId(fallbackMentorId);
+      setEffectiveMentorId(offlineFallbackMentorId);
       setStatus("recovering");
       log.warn("Mentor recovery still pending (offline)", { userId: user.id, attemptsUsed });
       return;
     }
 
+    const fallbackMentorId = stableMentorByUser.get(user.id) ?? null;
     setEffectiveMentorId(fallbackMentorId);
     setStatus("missing");
     log.warn("Mentor connection recovery failed", { userId: user.id, attemptsUsed, cause: finalCause });
   }, [
-    backfillMentor,
+    ensureCanonicalMentor,
     queryClient,
-    sanitizeOnboardingMentor,
+    resolvedMentorId,
     user?.id,
-    validateOnboardingMentor,
   ]);
 
   const refreshConnection = useCallback(async () => {
@@ -256,20 +345,15 @@ export function useMentorConnectionHealth(): {
       return;
     }
 
-    if (resolvedMentorId) {
-      stableMentorByUser.set(user.id, resolvedMentorId);
-      setEffectiveMentorId(resolvedMentorId);
-      setStatus("ready");
-      return;
-    }
-
     const fallbackMentor = stableMentorByUser.get(user.id) ?? null;
     if (loading) {
-      setEffectiveMentorId(fallbackMentor);
+      setEffectiveMentorId(resolvedMentorId ?? fallbackMentor);
       setStatus("recovering");
       return;
     }
 
+    setEffectiveMentorId(resolvedMentorId ?? fallbackMentor);
+    setStatus("recovering");
     void attemptRecovery();
   }, [attemptRecovery, loading, resolvedMentorId, user?.id]);
 

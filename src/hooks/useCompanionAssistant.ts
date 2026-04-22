@@ -57,6 +57,7 @@ export interface CompanionAssistantMessage {
   inputMode?: CompanionChatInputMode;
   source: CompanionChatSource;
   isSeed?: boolean;
+  structuredResponse?: CompanionAgentResponse["structuredResponse"];
   pendingAction?: PendingActionView;
   receipt?: ActionReceiptView;
 }
@@ -178,6 +179,9 @@ export function useCompanionAssistant({
 
   const [activeSessionId, setActiveSessionId] = useState(() => generateCompanionThreadSessionId());
   const [messages, setMessages] = useState<CompanionAssistantMessage[]>([]);
+  const [structuredResponse, setStructuredResponse] = useState<
+    CompanionAgentResponse["structuredResponse"]
+  >(null);
   const [pendingAction, setPendingAction] = useState<PendingActionView | null>(null);
   const [draftInput, setDraftInput] = useState("");
   const [interimText, setInterimText] = useState("");
@@ -248,6 +252,7 @@ export function useCompanionAssistant({
     setError(null);
     setLastFailedMessage(null);
     setPendingAction(null);
+    setStructuredResponse(null);
     setMessages(
       greetingText
         ? [createMessage("assistant", greetingText, { isSeed: true, source: "agent" })]
@@ -286,6 +291,7 @@ export function useCompanionAssistant({
     setActiveSessionId(sessionId);
     setMessages(visibleThreadMessages.map(mapLoadedMessage));
     setPendingAction(loadedPendingAction);
+    setStructuredResponse(null);
     setDraftInput("");
     setInterimText("");
     setError(null);
@@ -442,12 +448,14 @@ export function useCompanionAssistant({
     setLastFailedMessage(null);
     setMessages((previous) => [
       ...previous,
-      createMessage("assistant", stripMarkdown(response.reply), {
-        source: "agent",
-        pendingAction: response.pendingAction,
-        receipt: response.receipt,
-      }),
+        createMessage("assistant", stripMarkdown(response.reply), {
+          source: "agent",
+          structuredResponse: response.structuredResponse ?? null,
+          pendingAction: response.pendingAction,
+          receipt: response.receipt,
+        }),
     ]);
+    setStructuredResponse(response.structuredResponse ?? null);
     setPendingAction(response.pendingAction ?? null);
     void speakAssistantReply(response.reply, response.threadState.sessionId);
   }, [speakAssistantReply]);
@@ -594,9 +602,11 @@ export function useCompanionAssistant({
         }),
         createMessage("assistant", stripMarkdown(response.reply), {
           source: "agent",
+          structuredResponse: response.structuredResponse ?? null,
           receipt: response.receipt,
         }),
       ]);
+      setStructuredResponse(response.structuredResponse ?? null);
       void speakAssistantReply(response.reply, response.threadState.sessionId);
       void invalidateThreads();
     } catch (error) {
@@ -723,6 +733,7 @@ export function useCompanionAssistant({
       todayLabel: legacyAssistant.todayLabel,
       placeholder: legacyAssistant.placeholder,
       messages: legacyAssistant.messages,
+      structuredResponse: legacyAssistant.structuredResponse,
       pendingAction: legacyAssistant.pendingAction,
       error,
       lastFailedMessage,
@@ -733,6 +744,7 @@ export function useCompanionAssistant({
       isResolvingAction: legacyAssistant.isResolvingAction,
       submitMessage,
       submitTypedMessage: () => submitMessage(draftInput, "text"),
+      acceptSuggestedQuest: legacyAssistant.acceptSuggestedQuest,
       retryLastMessage,
       confirmPendingAction: () => resolvePendingAction("confirm"),
       cancelPendingAction: () => resolvePendingAction("cancel"),
@@ -768,6 +780,7 @@ export function useCompanionAssistant({
     todayLabel,
     placeholder,
     messages,
+    structuredResponse,
     pendingAction,
     error,
     lastFailedMessage,
@@ -778,6 +791,7 @@ export function useCompanionAssistant({
     isResolvingAction,
     submitMessage,
     submitTypedMessage: () => submitMessage(draftInput, "text"),
+    acceptSuggestedQuest: async (_proposalId: string) => undefined,
     retryLastMessage,
     confirmPendingAction: () => resolvePendingAction("confirm"),
     cancelPendingAction: () => resolvePendingAction("cancel"),

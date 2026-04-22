@@ -524,7 +524,7 @@ Deno.test("normalizes parsed input server-side for question-form scheduling requ
   );
 });
 
-Deno.test("asks a single grounded focus question for the plan-day starter", () => {
+Deno.test("returns typed quest suggestions for the plan-day starter", () => {
   const result = buildPlannerResponse(baseInput({
     message: "Plan my day",
     parsedInput: {
@@ -665,18 +665,16 @@ Deno.test("asks a single grounded focus question for the plan-day starter", () =
   }));
 
   assertEquals(result.mode, "conversational");
-  assertEquals(result.proposals.length, 0);
-  assertEquals(result.followUpQuestions.length, 1);
-  assertEquals(result.followUpQuestions[0]?.field, "details");
-  assertEquals(result.followUpQuestions[0]?.required, true);
-  assertEquals(result.reply, result.followUpQuestions[0]?.prompt);
-  assertEquals(result.sessionState.pendingStarterIntent, "plan_day");
-  assertEquals(result.sessionState.openQuestionIds, ["details"]);
+  assertEquals(result.proposals.length, 3);
+  assertEquals(result.followUpQuestions.length, 0);
   assertEquals(
-    (result.followUpQuestions[0]?.options ?? []).slice(0, 3),
-    ["Morning review", "Website relaunch", "Mom"],
+    result.proposals.every((proposal) => proposal.status === "suggested"),
+    true,
   );
-  assertEquals(result.reply.includes("?"), true);
+  assertEquals(result.structuredResponse?.planDay?.suggestedQuests.length, 3);
+  assertEquals(result.sessionState.pendingStarterIntent, null);
+  assertEquals(result.sessionState.openQuestionIds, []);
+  assertStringIncludes(result.reply, "I drafted 3 quests for today");
 });
 
 Deno.test("turns a clear plan-day focus reply into confirmable quest drafts", () => {
@@ -822,18 +820,21 @@ Deno.test("turns a clear plan-day focus reply into confirmable quest drafts", ()
     },
   }));
 
-  assertEquals(result.mode, "proposal");
+  assertEquals(result.mode, "conversational");
   assertEquals(result.followUpQuestions.length, 0);
   assertEquals(result.proposals.length, 3);
   assertEquals(
     result.proposals.every((proposal) =>
-      proposal.kind === "create_quest" && proposal.readyToConfirm
+      proposal.kind === "create_quest" &&
+      proposal.readyToConfirm &&
+      proposal.status === "suggested"
     ),
     true,
   );
   assertEquals(result.sessionState.pendingStarterIntent, null);
   assertStringIncludes(result.reply, "Got it");
   assertStringIncludes(result.reply, "I drafted 3 quests for today");
+  assertEquals(result.structuredResponse?.planDay?.suggestedQuests.length, 3);
   assertEquals(
     (result.proposals[0]?.payload as {
       taskText: string;
@@ -908,9 +909,10 @@ Deno.test("drafts from a vague directional plan-day reply without asking a secon
     },
   }));
 
-  assertEquals(result.mode, "proposal");
+  assertEquals(result.mode, "conversational");
   assertEquals(result.followUpQuestions.length, 0);
   assertEquals(result.proposals.length, 1);
+  assertEquals(result.proposals[0]?.status, "suggested");
   assertStringIncludes(result.reply, "Got it");
   assertEquals(
     (result.proposals[0]?.payload as {
@@ -1093,8 +1095,9 @@ Deno.test("raises the plan-day target for coasting users on a normal day", () =>
     },
   }));
 
-  assertEquals(result.mode, "proposal");
+  assertEquals(result.mode, "conversational");
   assertEquals(result.proposals.length, 3);
+  assertEquals(result.structuredResponse?.planDay?.suggestedQuests.length, 3);
 });
 
 Deno.test("raises the plan-day target to six for locked-in users without exceeding four new quests", () => {
@@ -1285,8 +1288,9 @@ Deno.test("raises the plan-day target to six for locked-in users without exceedi
     },
   }));
 
-  assertEquals(result.mode, "proposal");
+  assertEquals(result.mode, "conversational");
   assertEquals(result.proposals.length, 4);
+  assertEquals(result.structuredResponse?.planDay?.suggestedQuests.length, 4);
 });
 
 Deno.test("does not ramp the plan-day target on overloaded days", () => {
@@ -1477,8 +1481,9 @@ Deno.test("does not ramp the plan-day target on overloaded days", () => {
     },
   }));
 
-  assertEquals(result.mode, "proposal");
+  assertEquals(result.mode, "conversational");
   assertEquals(result.proposals.length, 2);
+  assertEquals(result.structuredResponse?.planDay?.suggestedQuests.length, 2);
 });
 
 Deno.test("drafts fewer plan-day quests when clean slots run out", () => {
@@ -1568,8 +1573,12 @@ Deno.test("drafts fewer plan-day quests when clean slots run out", () => {
     },
   }));
 
-  assertEquals(result.mode, "proposal");
+  assertEquals(result.mode, "conversational");
   assertEquals(result.proposals.length, 3);
+  assertEquals(
+    result.proposals.every((proposal) => proposal.status === "suggested"),
+    true,
+  );
   assertEquals(result.proposals[0].title, "Create Write Newsletter");
   assertEquals(
     (result.proposals[1]?.payload as {
@@ -1711,9 +1720,10 @@ Deno.test("keeps calendar conflict notes on plan-day quest drafts", () => {
     },
   }));
 
-  assertEquals(result.mode, "proposal");
+  assertEquals(result.mode, "conversational");
   assertEquals(result.proposals.length, 1);
   assertEquals(result.proposals[0].title, "Create Sales Meeting");
+  assertEquals(result.proposals[0].status, "suggested");
   assertEquals(result.sessionState.pendingStarterIntent, null);
   assertStringIncludes(result.reply, 'saved calendar event "Client Call"');
   assertStringIncludes(result.reply, "4:00 pm");

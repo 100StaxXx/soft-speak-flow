@@ -39,6 +39,65 @@ export const COMPANION_PENDING_ACTION_STATUSES = [
   "executed",
 ] as const;
 
+const CompanionIntentMetadataSchema = z.object({
+  intentType: z.enum(["conversation", "quest", "campaign", "clarification"]),
+  timeHorizon: z.enum(["today", "short_term", "long_term"]),
+  isRecurring: z.boolean(),
+  shouldCreateQuest: z.boolean(),
+  shouldPromptCampaign: z.boolean(),
+});
+
+const CompanionSuggestedQuestSchema = z.object({
+  suggestionId: z.string().min(1).max(200),
+  proposalId: z.string().min(1).max(200).nullable().optional(),
+  title: z.string().min(1).max(200),
+  type: z.enum(["must", "should", "nice"]),
+  estimatedDuration: z.string().min(1).max(80),
+  estimatedDurationMinutes: z.number().int().min(0).max(1440).nullable(),
+  source: z.enum(["campaign", "habit", "recovery", "optimization"]),
+  reason: z.string().min(1).max(2000),
+});
+
+const CompanionScheduleItemSchema = z.object({
+  id: z.string().min(1).max(200),
+  title: z.string().min(1).max(200),
+  label: z.string().min(1).max(500),
+  startsAt: z.string().nullable(),
+  endsAt: z.string().nullable(),
+  isAllDay: z.boolean(),
+  source: z.enum(["task", "calendar"]),
+});
+
+const CompanionMissedItemSchema = z.object({
+  id: z.string().min(1).max(200),
+  title: z.string().min(1).max(200),
+  label: z.string().min(1).max(500),
+  source: z.literal("task"),
+});
+
+const CompanionStructuredResponseSchema = z.object({
+  intent: CompanionIntentMetadataSchema,
+  planDay: z.object({
+    message: z.string().min(1).max(4000),
+    dayAssessment: z.enum([
+      "open",
+      "balanced",
+      "busy",
+      "behind",
+      "productive",
+      "low_energy",
+    ]),
+    suggestedQuests: z.array(CompanionSuggestedQuestSchema).max(8),
+  }).nullable().optional(),
+  comingUp: z.object({
+    message: z.string().min(1).max(4000),
+    nextEvent: CompanionScheduleItemSchema.nullable(),
+    remainingToday: z.array(CompanionScheduleItemSchema).max(24),
+    tomorrowSummary: z.enum(["busy", "light", "open"]),
+    missedItems: z.array(CompanionMissedItemSchema).max(24),
+  }).nullable().optional(),
+});
+
 export const SurfaceSchema = z.enum(["companion", "journeys"]);
 export const InputModeSchema = z.enum(["text", "voice"]);
 export const ModeSchema = z.enum(COMPANION_AGENT_MODES);
@@ -77,6 +136,7 @@ export const SubmitCompanionResultSchema = z.object({
   mode: ModeSchema,
   intent: IntentSchema,
   confidence: z.number().min(0).max(1),
+  structured_response: CompanionStructuredResponseSchema.nullable().optional(),
   prepared_action_id: z.string().uuid().nullable().optional(),
 });
 

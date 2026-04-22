@@ -1,6 +1,6 @@
 import lyraMentorImage from "@/assets/lyra-mentor.png";
 import theGuyMentorImage from "@/assets/the-guy-mentor.png";
-import { getMentorDisplaySortIndex } from "@/lib/mentorRoster";
+import { sortCanonicalMentors } from "@/lib/mentorRoster";
 
 export type MentorAvailability = "active" | "upcoming_unlockable";
 
@@ -65,7 +65,7 @@ const upcomingSortIndex = new Map<string, number>(
 export const buildBrowseMentorCatalog = (
   activeMentors: MentorBrowseEntry[],
 ): MentorBrowseEntry[] => {
-  const normalizedActiveMentors = activeMentors
+  const normalizedActiveMentors = sortCanonicalMentors(activeMentors)
     .map((mentor) => {
       const lyraFallback = mentor.slug === "lyra" ? LYRA_ACTIVE_FALLBACK : null;
 
@@ -86,11 +86,6 @@ export const buildBrowseMentorCatalog = (
         unavailable_label: null,
         unavailable_description: null,
       };
-    })
-    .sort((left, right) => {
-      const sortDelta = getMentorDisplaySortIndex(left.slug) - getMentorDisplaySortIndex(right.slug);
-      if (sortDelta !== 0) return sortDelta;
-      return left.name.localeCompare(right.name);
     });
 
   const sortedUpcomingMentors = [...UPCOMING_MENTORS].sort((left, right) => {

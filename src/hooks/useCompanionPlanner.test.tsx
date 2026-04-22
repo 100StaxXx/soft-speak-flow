@@ -1587,6 +1587,169 @@ describe("useCompanionPlanner", () => {
     });
   });
 
+  it("keeps plan-day suggestions out of pending confirmation until a suggestion is accepted", async () => {
+    mocks.invoke.mockResolvedValue({
+      data: {
+        mode: "conversational",
+        reply: "I found a few clean next moves for the rest of today.",
+        followUpQuestions: [],
+        proposals: [
+          {
+            id: "proposal-1",
+            kind: "create_quest",
+            title: "Create Recovery reset",
+            summary: "Create a quest for Recovery reset.",
+            reasoning:
+              "You missed a couple of earlier blocks, so a reset helps you recover momentum.",
+            payload: {
+              taskText: "Recovery reset",
+              estimatedDuration: 30,
+              suggestionSource: "recovery",
+              suggestionType: "must",
+            },
+            status: "suggested",
+            readyToConfirm: true,
+            missingFields: [],
+          },
+        ],
+        suggestedReminders: [],
+        structuredResponse: {
+          intent: {
+            intentType: "quest",
+            timeHorizon: "today",
+            isRecurring: false,
+            shouldCreateQuest: true,
+            shouldPromptCampaign: false,
+          },
+          planDay: {
+            message: "I found a few clean next moves for the rest of today.",
+            dayAssessment: "behind",
+            suggestedQuests: [
+              {
+                suggestionId: "proposal-1",
+                proposalId: "proposal-1",
+                title: "Recovery reset",
+                type: "must",
+                estimatedDuration: "30 min",
+                estimatedDurationMinutes: 30,
+                source: "recovery",
+                reason:
+                  "You missed a couple of earlier blocks, so a reset helps you recover momentum.",
+              },
+            ],
+          },
+          comingUp: null,
+        },
+        memoryUpdates: {},
+        sessionState: {
+          draft: {},
+          openQuestionIds: [],
+          preferredTimeOfDay: null,
+          preferredTimeReason: null,
+          reminderPreference: null,
+          lastClassification: "quest",
+        },
+      },
+      error: null,
+    });
+
+    const { result } = renderHook(() => useCompanionPlanner());
+
+    await act(async () => {
+      await result.current.submitMessage("Plan my day", "text");
+    });
+
+    expect(result.current.pendingProposals).toHaveLength(0);
+    expect(result.current.structuredResponse?.planDay?.suggestedQuests).toHaveLength(1);
+
+    await act(async () => {
+      await result.current.acceptSuggestedQuest("proposal-1");
+    });
+
+    expect(result.current.pendingProposals).toHaveLength(1);
+
+    await act(async () => {
+      await result.current.rejectProposal("proposal-1");
+    });
+
+    expect(result.current.pendingProposals).toHaveLength(0);
+    expect(result.current.structuredResponse?.planDay?.suggestedQuests[0]?.title).toBe(
+      "Recovery reset",
+    );
+  });
+
+  it("surfaces a typed coming-up summary without creating pending proposals", async () => {
+    mocks.invoke.mockResolvedValue({
+      data: {
+        mode: "schedule_read",
+        reply: "Today: Dentist at 3:00 PM; +1 more. Tomorrow: nothing scheduled.",
+        followUpQuestions: [],
+        proposals: [],
+        suggestedReminders: [],
+        structuredResponse: {
+          intent: {
+            intentType: "conversation",
+            timeHorizon: "today",
+            isRecurring: false,
+            shouldCreateQuest: false,
+            shouldPromptCampaign: false,
+          },
+          planDay: null,
+          comingUp: {
+            message:
+              "Today: Dentist at 3:00 PM; +1 more. Tomorrow: nothing scheduled.",
+            nextEvent: {
+              id: "event-1",
+              title: "Dentist",
+              label: "Dentist at 3:00 PM",
+              startsAt: "2026-04-21T15:00:00-07:00",
+              endsAt: "2026-04-21T16:00:00-07:00",
+              isAllDay: false,
+              source: "calendar",
+            },
+            remainingToday: [
+              {
+                id: "event-1",
+                title: "Dentist",
+                label: "Dentist at 3:00 PM",
+                startsAt: "2026-04-21T15:00:00-07:00",
+                endsAt: "2026-04-21T16:00:00-07:00",
+                isAllDay: false,
+                source: "calendar",
+              },
+            ],
+            tomorrowSummary: "open",
+            missedItems: [],
+          },
+        },
+        memoryUpdates: {},
+        sessionState: {
+          draft: {},
+          openQuestionIds: [],
+          preferredTimeOfDay: null,
+          preferredTimeReason: null,
+          reminderPreference: null,
+          lastClassification: "quest",
+        },
+      },
+      error: null,
+    });
+
+    const { result } = renderHook(() => useCompanionPlanner());
+
+    await act(async () => {
+      await result.current.submitMessage("What do I have coming up?", "text");
+    });
+
+    expect(result.current.pendingProposals).toHaveLength(0);
+    expect(result.current.structuredResponse?.comingUp?.nextEvent?.title).toBe(
+      "Dentist",
+    );
+    expect(result.current.structuredResponse?.comingUp?.tomorrowSummary).toBe(
+      "open",
+    );
+  });
+
   it("clears stale pending proposals when the planner responds with a clarification question only", async () => {
     mocks.invoke
       .mockResolvedValueOnce({

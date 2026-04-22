@@ -13,6 +13,22 @@ const mocks = vi.hoisted(() => ({
   },
   mentorRows: [
     {
+      id: "mentor-legacy-atlas",
+      name: "Atlas",
+      slug: "atlas",
+      mentor_type: "Legacy Guide",
+      description: "Old roster entry",
+      short_title: "Legacy",
+      tone_description: "Old tone",
+      style_description: "Old style",
+      target_user: "Legacy users",
+      signature_line: "Outdated.",
+      primary_color: "#111827",
+      avatar_url: null,
+      themes: ["legacy"],
+      is_active: true,
+    },
+    {
       id: "mentor-1",
       name: "The Sage",
       slug: "sage",
@@ -42,6 +58,22 @@ const mocks = vi.hoisted(() => ({
       primary_color: "#A855F7",
       avatar_url: null,
       themes: ["signal", "clarity", "future-facing"],
+      is_active: true,
+    },
+    {
+      id: "mentor-legacy-stryker",
+      name: "Stryker",
+      slug: "stryker",
+      mentor_type: "Legacy Guide",
+      description: "Old roster entry",
+      short_title: "Legacy",
+      tone_description: "Old tone",
+      style_description: "Old style",
+      target_user: "Legacy users",
+      signature_line: "Outdated.",
+      primary_color: "#0f172a",
+      avatar_url: null,
+      themes: ["legacy"],
       is_active: true,
     },
   ],
@@ -113,6 +145,8 @@ describe("MentorSelection", () => {
     expect(await screen.findByText("The Sage")).toBeInTheDocument();
     expect(screen.getByText("Lyra")).toBeInTheDocument();
     expect(screen.getByText("The Guy")).toBeInTheDocument();
+    expect(screen.queryByText("Atlas")).not.toBeInTheDocument();
+    expect(screen.queryByText("Stryker")).not.toBeInTheDocument();
 
     await waitFor(() => {
       expect(screen.getAllByText(/Upcoming Unlockable/i)).toHaveLength(1);

@@ -52,6 +52,7 @@ import {
 import { safeLocalStorage } from "@/utils/storage";
 import { resolveAssignedMentorFromActiveMentors } from "@/config/onboardingMentorAssignments";
 import { buildBrowseMentorCatalog } from "@/lib/mentorCatalog";
+import { sortCanonicalMentors } from "@/lib/mentorRoster";
 
 // Removed duplicate outer function - using inner component method instead
 
@@ -467,7 +468,7 @@ export const StoryOnboarding = ({
       return [];
     }
 
-    return data.map((mentorRow) => ({
+    return sortCanonicalMentors(data.map((mentorRow) => ({
       id: mentorRow.id,
       name: mentorRow.name,
       description: mentorRow.description,
@@ -485,7 +486,7 @@ export const StoryOnboarding = ({
       themes: mentorRow.themes ?? undefined,
       intensity_level: mentorRow.intensity_level ?? undefined,
       gender_energy: mentorRow.gender_energy ?? null,
-    }));
+    })));
   }, []);
 
   // Load mentors on mount

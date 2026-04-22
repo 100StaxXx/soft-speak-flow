@@ -61,6 +61,7 @@ import {
   isQuestionLikePlannerReply,
 } from "@/shared/companionPlannerReadyProposal";
 import { computePlannerPriorityScores } from "@/shared/companionPlannerPriority";
+import type { CompanionStructuredResponse } from "@/shared/companionStructuredOutput";
 import { buildCompanionStatInterpretation } from "@/shared/companionStatSignals";
 import { withTimeout } from "@/utils/asyncTimeout";
 import { normalizeUuidLikeId } from "@/utils/offlineId";
@@ -1027,6 +1028,8 @@ export function useCompanionPlanner({
   const [messages, setMessages] = useState<CompanionPlannerMessage[]>([]);
   const [proposals, setProposals] = useState<CompanionPlannerProposal[]>([]);
   const [questions, setQuestions] = useState<CompanionPlannerQuestion[]>([]);
+  const [structuredResponse, setStructuredResponse] =
+    useState<CompanionStructuredResponse | null>(null);
   const [sessionState, setSessionState] = useState<
     CompanionPlannerSessionState
   >(() => createInitialSessionState(storedPreferences));
@@ -1715,13 +1718,15 @@ export function useCompanionPlanner({
           questions: response.followUpQuestions,
           proposalIds: [...response.proposals, ...response.suggestedReminders]
             .map((proposal) => proposal.id),
+          structuredResponse: response.structuredResponse ?? null,
         },
       );
 
       setQuestions(response.followUpQuestions);
+      setStructuredResponse(response.structuredResponse ?? null);
       setProposals((previous) => {
         const settled = previous.filter((proposal) =>
-          proposal.status !== "pending"
+          proposal.status !== "pending" && proposal.status !== "suggested"
         );
         const incoming = [
           ...response.proposals,
@@ -1748,10 +1753,12 @@ export function useCompanionPlanner({
       createMessage("companion", trimmedPrompt, {
         questions: [],
         proposalIds: [],
+        structuredResponse: null,
       }),
     ]);
     setProposals([]);
     setQuestions([]);
+    setStructuredResponse(null);
     setSessionState((previous) => ({
       ...previous,
       draft: {
@@ -2171,6 +2178,49 @@ export function useCompanionPlanner({
     trackInteraction,
   ]);
 
+  const acceptSuggestedQuest = useCallback(async (proposalId: string) => {
+    const proposal = findProposalById(proposals, proposalId);
+    if (!proposal || proposal.status !== "suggested") return;
+
+    setProposals((previous) =>
+      previous.map((candidate) => {
+        if (candidate.id === proposalId) {
+          return {
+            ...candidate,
+            status: "pending",
+          };
+        }
+
+        return candidate.status === "pending"
+          ? {
+            ...candidate,
+            status: "suggested",
+          }
+          : candidate;
+      })
+    );
+
+    const pendingMessage = createMessage(
+      "companion",
+      buildConfirmReadyPlannerReply(proposal.kind),
+      {
+        proposalIds: [proposal.id],
+        structuredResponse,
+      },
+    );
+    setMessages((previous) => [
+      ...previous,
+      pendingMessage,
+    ]);
+    await persistPlannerThreadRows([
+      {
+        role: "assistant",
+        content: pendingMessage.content,
+        createdAt: pendingMessage.createdAt,
+      },
+    ]);
+  }, [persistPlannerThreadRows, proposals, structuredResponse]);
+
   const autoPublishConfirmedQuestToOutlook = useCallback(async (
     proposal: CompanionPlannerProposal,
     taskId: string | null,
@@ -2506,12 +2556,15 @@ export function useCompanionPlanner({
     const proposal = findProposalById(proposals, proposalId);
     if (!proposal) return;
 
+    const shouldReturnToSuggested = proposal.kind === "create_quest" &&
+      typeof proposal.payload.suggestionType === "string";
+
     setProposals((previous) =>
       previous.map((candidate) =>
         candidate.id === proposalId
           ? {
             ...candidate,
-            status: "rejected",
+            status: shouldReturnToSuggested ? "suggested" : "rejected",
           }
           : candidate
       )
@@ -2519,7 +2572,9 @@ export function useCompanionPlanner({
     setQuestions([]);
     const rejectionMessage = createMessage(
       "companion",
-      `No problem. I won't save "${proposal.title}" as-is.`,
+      shouldReturnToSuggested
+        ? `No problem. I put "${proposal.title}" back in suggestions.`
+        : `No problem. I won't save "${proposal.title}" as-is.`,
     );
     setMessages((previous) => [
       ...previous,
@@ -2675,6 +2730,7 @@ export function useCompanionPlanner({
     setMessages([]);
     setProposals([]);
     setQuestions([]);
+    setStructuredResponse(null);
     setSessionState(createInitialSessionState(storedPreferences));
     setDraftInput("");
     setInterimText("");
@@ -2698,6 +2754,7 @@ export function useCompanionPlanner({
     })));
     setProposals([]);
     setQuestions([]);
+    setStructuredResponse(null);
     setSessionState(createInitialSessionState(storedPreferences));
     setDraftInput("");
     setInterimText("");
@@ -2716,6 +2773,7 @@ export function useCompanionPlanner({
     setHorizon,
     messages,
     hasRealMessages: messages.length > 0,
+    structuredResponse,
     questions,
     proposals,
     pendingProposals,
@@ -2739,6 +2797,7 @@ export function useCompanionPlanner({
     hydrateThread,
     toggleRecording,
     requestMicrophonePermission,
+    acceptSuggestedQuest,
     confirmProposal: handleConfirmProposal,
     rejectProposal: handleRejectProposal,
     completeProposalEdit: handleCompleteProposalEdit,

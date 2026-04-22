@@ -120,6 +120,10 @@ describe("useMentorConnectionHealth", () => {
       },
       error: null,
     });
+    mocks.state.mentorMaybeSingleResponses.push({
+      data: { id: "mentor-restored", slug: "sage" },
+      error: null,
+    });
 
     const { result } = renderHook(() => useMentorConnectionHealth());
 
@@ -147,7 +151,7 @@ describe("useMentorConnectionHealth", () => {
       error: null,
     });
     mocks.state.mentorMaybeSingleResponses.push({
-      data: { id: "66d0b7e0-215c-4c6c-b091-33c217de7fbb" },
+      data: { id: "66d0b7e0-215c-4c6c-b091-33c217de7fbb", slug: "sage" },
       error: null,
     });
     mocks.state.profileUpdateResponses.push({ error: null });
@@ -167,32 +171,31 @@ describe("useMentorConnectionHealth", () => {
     ).toBe(true);
   });
 
-  it("sanitizes invalid onboarding mentor and eventually resolves to missing", async () => {
-    mocks.state.user = { id: "user-invalid-onboarding" };
+  it("repairs a legacy onboarding mentor to canonical Sage", async () => {
+    mocks.state.user = { id: "user-legacy-onboarding" };
     mocks.state.profile = {
       selected_mentor_id: null,
       onboarding_completed: true,
       onboarding_data: { mentorId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", keep: true },
     };
-    mocks.state.profileMaybeSingleResponses.push(
+    mocks.state.profileMaybeSingleResponses.push({
+      data: {
+        selected_mentor_id: null,
+        onboarding_completed: true,
+        onboarding_data: { mentorId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", keep: true },
+      },
+      error: null,
+    });
+    mocks.state.mentorMaybeSingleResponses.push(
       {
-        data: {
-          selected_mentor_id: null,
-          onboarding_completed: true,
-          onboarding_data: { mentorId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", keep: true },
-        },
+        data: { id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", slug: "atlas" },
         error: null,
       },
       {
-        data: {
-          selected_mentor_id: null,
-          onboarding_completed: true,
-          onboarding_data: { keep: true },
-        },
+        data: { id: "sage-fixed", slug: "sage" },
         error: null,
       },
     );
-    mocks.state.mentorMaybeSingleResponses.push({ data: null, error: null });
     mocks.state.profileUpdateResponses.push({ error: null });
 
     const { result } = renderHook(() => useMentorConnectionHealth());
@@ -201,15 +204,97 @@ describe("useMentorConnectionHealth", () => {
       await vi.advanceTimersByTimeAsync(2000);
     });
 
-    expect(result.current.status).toBe("missing");
-    expect(result.current.effectiveMentorId).toBeNull();
+    expect(result.current.status).toBe("ready");
+    expect(result.current.effectiveMentorId).toBe("sage-fixed");
     expect(
       mocks.state.profileUpdatePayloads.some(
         (payload) =>
-          Object.prototype.hasOwnProperty.call(payload, "onboarding_data") &&
-          !Object.prototype.hasOwnProperty.call(payload.onboarding_data as object, "mentorId"),
+          payload.selected_mentor_id === "sage-fixed"
+          && (payload.onboarding_data as Record<string, unknown>)?.mentorId === "sage-fixed"
+          && (payload.onboarding_data as Record<string, unknown>)?.keep === true,
       ),
     ).toBe(true);
+  });
+
+  it("auto-repairs a legacy selected mentor to canonical Sage", async () => {
+    mocks.state.user = { id: "user-legacy-selected" };
+    mocks.state.profile = {
+      selected_mentor_id: "legacy-selected",
+      onboarding_completed: true,
+      onboarding_data: { mentorId: "legacy-selected" },
+    };
+    mocks.state.profileMaybeSingleResponses.push({
+      data: {
+        selected_mentor_id: "legacy-selected",
+        onboarding_completed: true,
+        onboarding_data: { mentorId: "legacy-selected" },
+      },
+      error: null,
+    });
+    mocks.state.mentorMaybeSingleResponses.push(
+      {
+        data: { id: "legacy-selected", slug: "atlas" },
+        error: null,
+      },
+      {
+        data: { id: "sage-selected", slug: "sage" },
+        error: null,
+      },
+    );
+    mocks.state.profileUpdateResponses.push({ error: null });
+
+    const { result } = renderHook(() => useMentorConnectionHealth());
+
+    await act(async () => {
+      await vi.runAllTimersAsync();
+    });
+
+    expect(result.current.status).toBe("ready");
+    expect(result.current.effectiveMentorId).toBe("sage-selected");
+    expect(
+      mocks.state.profileUpdatePayloads.some(
+        (payload) =>
+          payload.selected_mentor_id === "sage-selected"
+          && (payload.onboarding_data as Record<string, unknown>)?.mentorId === "sage-selected",
+      ),
+    ).toBe(true);
+  });
+
+  it("does not write a fallback when canonical Sage cannot be resolved", async () => {
+    mocks.state.user = { id: "user-missing-sage" };
+    mocks.state.profile = {
+      selected_mentor_id: "legacy-selected",
+      onboarding_completed: true,
+      onboarding_data: { mentorId: "legacy-selected" },
+    };
+    mocks.state.profileMaybeSingleResponses.push({
+      data: {
+        selected_mentor_id: "legacy-selected",
+        onboarding_completed: true,
+        onboarding_data: { mentorId: "legacy-selected" },
+      },
+      error: null,
+    });
+    mocks.state.mentorMaybeSingleResponses.push(
+      {
+        data: { id: "legacy-selected", slug: "atlas" },
+        error: null,
+      },
+      {
+        data: null,
+        error: null,
+      },
+    );
+
+    const { result } = renderHook(() => useMentorConnectionHealth());
+
+    await act(async () => {
+      await vi.runAllTimersAsync();
+    });
+
+    expect(result.current.status).toBe("missing");
+    expect(result.current.effectiveMentorId).toBeNull();
+    expect(mocks.state.profileUpdatePayloads).toEqual([]);
   });
 
   it("stays recovering while offline and retries on reconnect", async () => {
@@ -236,6 +321,10 @@ describe("useMentorConnectionHealth", () => {
         onboarding_completed: true,
         onboarding_data: null,
       },
+      error: null,
+    });
+    mocks.state.mentorMaybeSingleResponses.push({
+      data: { id: "mentor-after-online", slug: "sage" },
       error: null,
     });
 

@@ -438,6 +438,7 @@ function buildInstructions(params: {
     "If a write is appropriate, prepare exactly one normalized pending action and then call submit_companion_result with mode pending_confirmation.",
     "If detail is missing for a write, ask one concise clarifying question with mode clarify.",
     "If the user wants schedule or task state, use the read tools and summarize only what is actually present.",
+    "When consult_planner returns structured_response for Plan My Day or coming-up summaries, pass that structured_response through unchanged in submit_companion_result.",
     "Never invent task, ritual, campaign, reminder, or calendar state.",
     "Never say something is scheduled, saved, moved, updated, logged, or confirmed unless it has already executed. Preparation is not execution.",
     "Keep replies natural, warm, concise, and non-robotic.",
@@ -766,6 +767,9 @@ function buildToolDefinitions() {
           ],
         },
         confidence: { type: "number" },
+        structured_response: {
+          type: "object",
+        },
         prepared_action_id: { type: "string" },
       },
     }),
@@ -878,6 +882,7 @@ function buildToolExecutor(params: {
           follow_up_questions: plannerResult.questions,
           action_hints: plannerResult.actionHints,
           schedule_insights: plannerResult.scheduleInsights,
+          structured_response: plannerResult.structuredResponse,
         };
       }
       case "prepare_task_create": {
@@ -1054,6 +1059,7 @@ export async function runCompanionAgent(params: RunAgentParams) {
             mode: "conversation" as CompanionAgentMode,
             intent: "unknown" as CompanionAgentIntent,
             confidence: 0.25,
+            structuredResponse: null,
             preparedActionId: null,
           },
           openaiConversationId: currentConversationId,
@@ -1070,6 +1076,7 @@ export async function runCompanionAgent(params: RunAgentParams) {
             mode: payload.mode,
             intent: payload.intent,
             confidence: payload.confidence,
+            structuredResponse: payload.structured_response ?? null,
             preparedActionId: payload.prepared_action_id ?? null,
           },
           openaiConversationId: currentConversationId,
@@ -1192,6 +1199,7 @@ export async function runCompanionAgent(params: RunAgentParams) {
     mode: agentResult.result.mode,
     intent: agentResult.result.intent,
     confidence: agentResult.result.confidence,
+    structuredResponse: agentResult.result.structuredResponse ?? null,
     pendingAction: persistedPendingAction
       ? {
           id: persistedPendingAction.id,

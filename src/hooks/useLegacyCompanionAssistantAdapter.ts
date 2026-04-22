@@ -295,12 +295,15 @@ export function useLegacyCompanionAssistantAdapter({
 
   return {
     messages,
+    structuredResponse: planner.structuredResponse,
     pendingAction,
     placeholder,
     todayLabel: planner.todayLabel,
     isSubmitting: planner.isSubmitting || conversation.isSubmitting,
     isResolvingAction: planner.isSubmitting,
     submitMessage,
+    acceptSuggestedQuest: (proposalId: string) =>
+      planner.acceptSuggestedQuest(proposalId),
     confirmPendingAction: activePendingProposal
       ? () => planner.confirmProposal(activePendingProposal.id)
       : async () => undefined,

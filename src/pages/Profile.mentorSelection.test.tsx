@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
   navigate: vi.fn(),
   queryClient: {},
   mentors: [
+    { id: "mentor-atlas", name: "Atlas", slug: "atlas", avatar_url: null, is_active: true },
     { id: "mentor-sage", name: "The Sage", slug: "sage", avatar_url: null, is_active: true },
     { id: "mentor-lyra", name: "Lyra", slug: "lyra", avatar_url: null, is_active: true },
     { id: "mentor-icon", name: "The Icon", slug: "icon", avatar_url: null, is_active: true },
@@ -28,6 +29,7 @@ const mocks = vi.hoisted(() => ({
     { id: "mentor-princess", name: "The Princess", slug: "princess", avatar_url: null, is_active: true },
     { id: "mentor-operator", name: "The Operator", slug: "operator", avatar_url: null, is_active: true },
     { id: "mentor-rival", name: "The Rival", slug: "rival", avatar_url: null, is_active: true },
+    { id: "mentor-stryker", name: "Stryker", slug: "stryker", avatar_url: null, is_active: true },
   ],
 }));
 
@@ -248,6 +250,8 @@ describe("Profile mentor selection", () => {
       "The Rival",
     ]);
 
+    expect(screen.queryByRole("option", { name: "Atlas" })).not.toBeInTheDocument();
     expect(screen.queryByRole("option", { name: "The Guy" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Stryker" })).not.toBeInTheDocument();
   });
 });

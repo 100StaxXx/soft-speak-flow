@@ -20,8 +20,8 @@ import { useProfile } from "@/hooks/useProfile";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  getMentorDisplaySortIndex,
   normalizeMentorSlug,
+  sortCanonicalMentors,
 } from "@/lib/mentorRoster";
 import { cn } from "@/lib/utils";
 import { useMentorConnection } from "@/contexts/MentorConnectionContext";
@@ -256,7 +256,7 @@ export const MentorSwitcher = ({
         .order("name");
 
       if (error) throw error;
-      return data || [];
+      return sortCanonicalMentors(data || []);
     },
   });
 
@@ -302,12 +302,7 @@ export const MentorSwitcher = ({
 
   const currentMood = pendingMood || todayCheckIn?.mood || latestCheckIn?.mood || null;
   const orderedMentors = useMemo(
-    () =>
-      [...mentors].sort((left, right) => {
-        const sortDelta = getMentorDisplaySortIndex(left.slug) - getMentorDisplaySortIndex(right.slug);
-        if (sortDelta !== 0) return sortDelta;
-        return left.name.localeCompare(right.name);
-      }),
+    () => sortCanonicalMentors(mentors),
     [mentors],
   );
   const recommendations = useMemo(

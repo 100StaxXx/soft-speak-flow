@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, memo, useRef, type ChangeEvent, type FormEvent, type PointerEvent } from "react";
+import { useState, useEffect, useCallback, useMemo, memo, useRef, type ChangeEvent, type FormEvent, type PointerEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -35,7 +35,10 @@ import { CinematicPageBackground } from "@/components/CinematicPageBackground";
 import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
 import { applyMentorChange } from "@/pages/profileMentorChange";
-import { getMentorDisplaySortIndex } from "@/lib/mentorRoster";
+import {
+  hasCanonicalActiveMentorSlug,
+  sortCanonicalMentors,
+} from "@/lib/mentorRoster";
 import {
   deleteCurrentAccount,
   getAccountDeletionErrorMetadata,
@@ -186,11 +189,7 @@ const Profile = () => {
         const key = (m.slug || m.name || "").trim().toLowerCase();
         if (!map.has(key)) map.set(key, m);
       }
-      return Array.from(map.values()).sort((a, b) => {
-        const sortDelta = getMentorDisplaySortIndex(a.slug) - getMentorDisplaySortIndex(b.slug);
-        if (sortDelta !== 0) return sortDelta;
-        return a.name.localeCompare(b.name);
-      });
+      return sortCanonicalMentors(Array.from(map.values()));
     },
   });
 
@@ -212,6 +211,9 @@ const Profile = () => {
       return data;
     },
   });
+
+  const canonicalMentors = useMemo(() => sortCanonicalMentors(mentors), [mentors]);
+  const canonicalSelectedMentor = hasCanonicalActiveMentorSlug(selectedMentor) ? selectedMentor : null;
 
 
   const handleChangeMentor = useCallback(async (mentorId: string) => {
@@ -473,36 +475,36 @@ const Profile = () => {
                   <CardDescription className="text-xs">Change your guide anytime</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {selectedMentor && (
+                  {canonicalSelectedMentor && (
                     <div className="flex items-center gap-3 p-2.5 bg-muted/30 rounded-lg">
-                      {selectedMentor.avatar_url && (
+                      {canonicalSelectedMentor.avatar_url && (
                         <img 
-                          src={selectedMentor.avatar_url} 
-                          alt={selectedMentor.name} 
+                          src={canonicalSelectedMentor.avatar_url} 
+                          alt={canonicalSelectedMentor.name} 
                           className="w-10 h-10 rounded-full object-cover" 
                           loading="lazy" 
                           decoding="async" 
                         />
                       )}
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm">{selectedMentor.name}</p>
-                        {selectedMentor.short_title ? (
+                        <p className="font-medium text-sm">{canonicalSelectedMentor.name}</p>
+                        {canonicalSelectedMentor.short_title ? (
                           <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground/80">
-                            {selectedMentor.short_title}
+                            {canonicalSelectedMentor.short_title}
                           </p>
                         ) : null}
                         <p className="text-xs text-muted-foreground line-clamp-2">
-                          {selectedMentor.tone_description || selectedMentor.target_user}
+                          {canonicalSelectedMentor.tone_description || canonicalSelectedMentor.target_user}
                         </p>
                       </div>
                     </div>
                   )}
-                  <Select value={profile?.selected_mentor_id || ""} onValueChange={handleChangeMentor} disabled={isChangingMentor}>
+                  <Select value={resolvedMentorId || ""} onValueChange={handleChangeMentor} disabled={isChangingMentor}>
                     <SelectTrigger disabled={isChangingMentor} className="h-9">
                       <SelectValue placeholder={isChangingMentor ? "Changing..." : "Select guide"} />
                     </SelectTrigger>
                     <SelectContent>
-                      {mentors?.map((m) => (<SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>))}
+                      {canonicalMentors.map((m) => (<SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>))}
                     </SelectContent>
                   </Select>
                   <div className="grid grid-cols-2 gap-2">

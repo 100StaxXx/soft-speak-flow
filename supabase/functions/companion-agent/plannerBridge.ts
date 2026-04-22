@@ -19,6 +19,7 @@ import {
   type PlannerScheduleInsights,
   type PlannerSessionState,
 } from "../companion-planner-chat/planner.ts";
+import type { CompanionStructuredResponse } from "../../../src/shared/companionStructuredOutput.ts";
 import type {
   CompanionAgentIntent,
   CompanionPendingActionType,
@@ -61,6 +62,7 @@ export interface PlannerAssistResult {
   questions: PlannerQuestion[];
   actionHints: PlannerActionHint[];
   scheduleInsights: PlannerScheduleInsights;
+  structuredResponse: CompanionStructuredResponse | null;
 }
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
@@ -869,7 +871,10 @@ export function consultPlannerForAgent(params: {
     mode: plannerResult.mode,
     reply: plannerResult.reply,
     questions: plannerResult.followUpQuestions,
-    actionHints: plannerResult.proposals.map(mapPlannerProposal),
+    actionHints: plannerResult.proposals
+      .filter((proposal) => proposal.status === "pending")
+      .map(mapPlannerProposal),
     scheduleInsights,
+    structuredResponse: plannerResult.structuredResponse ?? null,
   };
 }
