@@ -331,5 +331,6 @@ export function useLegacyCompanionAssistantAdapter({
     startNewChat: surface === "journeys" ? journeysThreads.startNewChat : (async () => undefined),
     canStartNewChat: surface === "journeys" ? journeysThreads.canStartNewChat : false,
     newChatDisabledReason: surface === "journeys" ? journeysThreads.newChatDisabledReason : null,
+    startTemplateThread: surface === "journeys" ? journeysThreads.startTemplateThread : () => "",
   };
 }
