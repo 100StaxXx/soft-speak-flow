@@ -344,12 +344,12 @@ export async function replacePendingAction(params: {
       action_type: params.candidate.actionType,
       normalized_payload: params.candidate.normalizedPayload,
       summary: params.candidate.summary,
-      affected_entities: params.candidate.affectedEntities,
+      affected_entities: params.candidate.affectedEntities ?? {},
       confirmation_message: params.candidate.confirmationMessage,
       created_at: now,
       expires_at: expiresAt,
       idempotency_key: `${params.sessionId}:${params.candidate.id}`,
-      metadata: params.metadata ?? null,
+      metadata: params.metadata ?? {},
       replaced_by_action_id: null,
     })
     .select("*")

@@ -64,6 +64,23 @@ describe("useAIInteractionTracker", () => {
     });
   });
 
+  it("does not warn when the edge function is unavailable", async () => {
+    const warnSpy = vi.spyOn(console, "warn");
+    mocks.invoke.mockRejectedValue(new Error("Function not found"));
+
+    const { result } = renderHook(() => useAIInteractionTracker());
+    await act(async () => {
+      await result.current.trackInteraction({
+        interactionType: "chat",
+        inputText: "Test",
+        userAction: "accepted",
+      });
+    });
+
+    expect(warnSpy).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
   it("tracks daily plan outcomes through the server function", async () => {
     const { result } = renderHook(() => useAIInteractionTracker());
 
