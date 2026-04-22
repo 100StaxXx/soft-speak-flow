@@ -64,6 +64,8 @@ interface JourneysCompanionPlannerControllerProps {
 const MOBILE_DRAWER_HEIGHT_MIN_PX = 320;
 const MOBILE_DRAWER_HEIGHT_MAX_PX = 736;
 const MOBILE_DRAWER_VIEWPORT_OFFSET_PX = 24;
+const COMPOSER_MIN_HEIGHT_PX = 52;
+const COMPOSER_MAX_HEIGHT_PX = 160;
 
 const getDrawerLayout = (): JourneysCompanionDrawerLayout => {
   if (typeof window === "undefined") {
@@ -261,6 +263,20 @@ const JourneysCompanionPlannerBody = memo(({
     return !(Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios");
   }, []);
 
+  const resizeComposer = useCallback(() => {
+    const composer = composerRef.current;
+    if (!composer) return;
+
+    composer.style.height = `${COMPOSER_MIN_HEIGHT_PX}px`;
+    const nextHeight = Math.max(
+      COMPOSER_MIN_HEIGHT_PX,
+      Math.min(COMPOSER_MAX_HEIGHT_PX, composer.scrollHeight),
+    );
+
+    composer.style.height = `${nextHeight}px`;
+    composer.style.overflowY = composer.scrollHeight > COMPOSER_MAX_HEIGHT_PX ? "auto" : "hidden";
+  }, []);
+
   const focusComposer = useCallback(() => {
     if (!shouldAutoFocusComposer) return;
     window.requestAnimationFrame(() => {
@@ -286,6 +302,10 @@ const JourneysCompanionPlannerBody = memo(({
 
     focusComposer();
   }, [focusComposer, open]);
+
+  useEffect(() => {
+    resizeComposer();
+  }, [assistant.draftInput, open, resizeComposer]);
 
   useEffect(() => {
     keepBottomContentVisible();
@@ -378,7 +398,11 @@ const JourneysCompanionPlannerBody = memo(({
   const shellStyle = isDrawerPresentation
     ? {
         height: `${drawerLayout.shellHeight}px`,
-        paddingBottom: `${Math.max(16, drawerLayout.keyboardInset + 16)}px`,
+      }
+    : undefined;
+  const composerDockStyle = isDrawerPresentation && drawerLayout.keyboardInset > 0
+    ? {
+        paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))",
       }
     : undefined;
 
@@ -397,6 +421,7 @@ const JourneysCompanionPlannerBody = memo(({
             isDrawerPresentation ? "h-full" : "h-[min(82vh,46rem)] min-h-[32rem]",
           )}
           style={shellStyle}
+          data-testid="journeys-companion-planner-shell"
         >
           <div
             className="flex items-center gap-3 rounded-[1.9rem] border-[3px] border-[#5d3114] bg-[linear-gradient(180deg,rgba(244,186,140,0.78),rgba(194,106,63,0.82))] px-4 py-3 shadow-[0_10px_0_rgba(77,40,17,0.84)]"
@@ -629,7 +654,7 @@ const JourneysCompanionPlannerBody = memo(({
               </div>
             </div>
 
-            <div className="p-4 pt-3 sm:p-5">
+            <div className="p-4 pt-3 sm:p-5" style={composerDockStyle}>
               <div className="flex items-center gap-3 rounded-[1.8rem] border-[3px] border-[#6d3518] bg-[linear-gradient(180deg,#fff3d8_0%,#ffd57d_100%)] px-4 py-3 shadow-[0_8px_0_rgba(109,53,24,0.82),inset_0_2px_0_rgba(255,255,255,0.5)]">
                 <button
                   type="button"
@@ -657,7 +682,7 @@ const JourneysCompanionPlannerBody = memo(({
                       onKeyDown={handleComposerKeyDown}
                       onFocus={keepBottomContentVisible}
                       placeholder={assistant.placeholder}
-                      className="min-h-[52px] flex-1 resize-none border-none bg-transparent px-0 py-3 text-base text-[#8a5a35] placeholder:text-[#b1865c] focus-visible:ring-0"
+                      className="min-h-[52px] flex-1 resize-none overflow-y-hidden border-none bg-transparent px-0 py-3 text-base text-[#8a5a35] placeholder:text-[#b1865c] focus-visible:ring-0"
                       data-testid="journeys-companion-planner-text-input"
                     />
                   </div>

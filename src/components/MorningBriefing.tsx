@@ -4,6 +4,13 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { MentorAvatar } from "@/components/MentorAvatar";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useMorningBriefing } from "@/hooks/useMorningBriefing";
 import { useMentorPersonality } from "@/hooks/useMentorPersonality";
 import { 
@@ -39,6 +46,7 @@ export const MorningBriefing = memo(({ onAskMore, className }: MorningBriefingPr
   
   const [showFull, setShowFull] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isMentorImageOpen, setIsMentorImageOpen] = useState(false);
 
   // Mark as viewed when component mounts with a briefing
   useEffect(() => {
@@ -97,6 +105,39 @@ export const MorningBriefing = memo(({ onAskMore, className }: MorningBriefingPr
     });
   };
 
+  const renderExpandableMentorAvatar = (
+    size: "md" | "lg" = "md",
+    options?: {
+      className?: string;
+      showBorder?: boolean;
+    }
+  ) => {
+    if (!personality) return null;
+
+    return (
+      <button
+        type="button"
+        onClick={() => setIsMentorImageOpen(true)}
+        className={cn(
+          "group relative rounded-full transition-transform duration-200 hover:scale-[1.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+          options?.className
+        )}
+        aria-label={`Expand ${personality.name} mentor image`}
+      >
+        <MentorAvatar
+          mentorSlug={(personality.slug || '').toLowerCase()}
+          mentorName={personality.name}
+          primaryColor={personality.primary_color || '#000'}
+          avatarUrl={personality.avatar_url || undefined}
+          size={size}
+          showBorder={options?.showBorder ?? true}
+          className="transition-shadow duration-200 group-hover:shadow-[0_0_0_4px_rgba(255,255,255,0.08)]"
+        />
+        <span className="sr-only">Open larger mentor image</span>
+      </button>
+    );
+  };
+
   // Collapsed state - show minimized preview that can be expanded
   if (isCollapsed && briefing) {
     return (
@@ -153,64 +194,88 @@ export const MorningBriefing = memo(({ onAskMore, className }: MorningBriefingPr
   // No briefing yet - show generate button
   if (!briefing) {
     return (
-      <div className={cn(
-        "rounded-2xl bg-card/25 backdrop-blur-2xl border border-white/[0.08] overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.12)]",
-        className
-      )}>
-        {/* Header */}
-        <div className="px-4 py-3 sm:px-5 sm:py-4 border-b border-white/[0.06] bg-gradient-to-r from-primary/5 to-accent/[0.02]">
-          <div className="flex items-center gap-3">
-            <div className="h-9 w-9 sm:h-11 sm:w-11 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center border border-primary/30">
-              <Brain className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
-            </div>
-            <h3 className="font-heading font-black text-lg sm:text-2xl tracking-wide text-primary">MORNING BRIEFING</h3>
-          </div>
-        </div>
-
-        {/* Content */}
-        <div className="p-4 sm:p-5">
-          <div className="flex flex-col items-center gap-4">
-            {personality && (
-              <div className="relative flex-shrink-0">
-                <div className="absolute -inset-1 rounded-full bg-gradient-to-br from-red-500 to-pink-500 opacity-70" />
-                <MentorAvatar
-                  mentorSlug={(personality.slug || '').toLowerCase()}
-                  mentorName={personality.name}
-                  primaryColor={personality.primary_color || '#000'}
-                  avatarUrl={personality.avatar_url || undefined}
-                  size="md"
-                  showBorder={false}
-                  className="relative"
-                />
+      <>
+        <div className={cn(
+          "rounded-2xl bg-card/25 backdrop-blur-2xl border border-white/[0.08] overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.12)]",
+          className
+        )}>
+          {/* Header */}
+          <div className="px-4 py-3 sm:px-5 sm:py-4 border-b border-white/[0.06] bg-gradient-to-r from-primary/5 to-accent/[0.02]">
+            <div className="flex items-center gap-3">
+              <div className="h-9 w-9 sm:h-11 sm:w-11 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center border border-primary/30">
+                <Brain className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
               </div>
-            )}
-            <div className="w-full space-y-4 text-center">
-              <p className="text-sm text-muted-foreground">
-                Get personalized insights from {personality?.name || 'your guide'} based on your activity
-              </p>
-              <Button
-                onClick={handleGenerate}
-                disabled={isGenerating}
-                variant="gradient"
-                className="w-full h-10 sm:h-12"
-                size="lg"
-              >
-                {isGenerating ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Analyzing your progress...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="h-5 w-5" />
-                    Prepare My Briefing
-                  </>
-                )}
-              </Button>
+              <h3 className="font-heading font-black text-lg sm:text-2xl tracking-wide text-primary">MORNING BRIEFING</h3>
+            </div>
+          </div>
+
+          {/* Content */}
+          <div className="p-4 sm:p-5">
+            <div className="flex flex-col items-center gap-4">
+              {personality && (
+                <div className="relative flex-shrink-0">
+                  <div className="absolute -inset-1 rounded-full bg-gradient-to-br from-red-500 to-pink-500 opacity-70" />
+                  {renderExpandableMentorAvatar("md", { className: "relative", showBorder: false })}
+                </div>
+              )}
+              <div className="w-full space-y-4 text-center">
+                <p className="text-sm text-muted-foreground">
+                  Get personalized insights from {personality?.name || 'your guide'} based on your activity
+                </p>
+                <Button
+                  onClick={handleGenerate}
+                  disabled={isGenerating}
+                  variant="gradient"
+                  className="w-full h-10 sm:h-12"
+                  size="lg"
+                >
+                  {isGenerating ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Analyzing your progress...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-5 w-5" />
+                      Prepare My Briefing
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+        <Dialog open={isMentorImageOpen} onOpenChange={setIsMentorImageOpen}>
+          <DialogContent
+            className="max-w-md border-white/10 bg-card/95 p-6 sm:p-8"
+            aria-describedby="morning-briefing-mentor-image-description"
+          >
+            <DialogHeader>
+              <DialogTitle className="text-center sm:text-center">
+                {personality?.name || "Mentor"} portrait
+              </DialogTitle>
+              <DialogDescription
+                id="morning-briefing-mentor-image-description"
+                className="text-center"
+              >
+                A larger view of your morning briefing mentor image.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex justify-center py-2">
+              {personality && (
+                <MentorAvatar
+                  mentorSlug={(personality.slug || "").toLowerCase()}
+                  mentorName={personality.name}
+                  primaryColor={personality.primary_color || "#000"}
+                  avatarUrl={personality.avatar_url || undefined}
+                  size="lg"
+                  showBorder={true}
+                />
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+      </>
     );
   }
 
@@ -229,15 +294,7 @@ export const MorningBriefing = memo(({ onAskMore, className }: MorningBriefingPr
       <div className="p-4 sm:p-6 border-b border-white/[0.06]">
         <div className="flex items-start gap-4">
           {personality && (
-            <MentorAvatar
-              mentorSlug={(personality.slug || '').toLowerCase()}
-              mentorName={personality.name}
-              primaryColor={personality.primary_color || '#000'}
-              avatarUrl={personality.avatar_url || undefined}
-              size="md"
-              showBorder={true}
-              className="flex-shrink-0"
-            />
+            renderExpandableMentorAvatar("md", { className: "flex-shrink-0", showBorder: true })
           )}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
@@ -332,6 +389,36 @@ export const MorningBriefing = memo(({ onAskMore, className }: MorningBriefingPr
           Ask {personality?.name || 'Guide'} More
         </Button>
       </div>
+      <Dialog open={isMentorImageOpen} onOpenChange={setIsMentorImageOpen}>
+        <DialogContent
+          className="max-w-md border-white/10 bg-card/95 p-6 sm:p-8"
+          aria-describedby="morning-briefing-mentor-image-description"
+        >
+          <DialogHeader>
+            <DialogTitle className="text-center sm:text-center">
+              {personality?.name || "Mentor"} portrait
+            </DialogTitle>
+            <DialogDescription
+              id="morning-briefing-mentor-image-description"
+              className="text-center"
+            >
+              A larger view of your morning briefing mentor image.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-center py-2">
+            {personality && (
+              <MentorAvatar
+                mentorSlug={(personality.slug || "").toLowerCase()}
+                mentorName={personality.name}
+                primaryColor={personality.primary_color || "#000"}
+                avatarUrl={personality.avatar_url || undefined}
+                size="lg"
+                showBorder={true}
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 });

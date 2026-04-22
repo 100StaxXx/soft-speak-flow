@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -171,6 +171,43 @@ vi.mock("@/components/ui/drawer", () => ({
 
 import { JourneysCompanionPlannerController } from "./JourneysCompanionPlannerModal";
 
+type MockVisualViewport = {
+  height: number;
+  offsetTop: number;
+  addEventListener: ReturnType<typeof vi.fn>;
+  removeEventListener: ReturnType<typeof vi.fn>;
+  dispatch: (type: "resize" | "scroll") => void;
+};
+
+const createMockVisualViewport = ({
+  height,
+  offsetTop,
+}: {
+  height: number;
+  offsetTop?: number;
+}): MockVisualViewport => {
+  const listeners = new Map<"resize" | "scroll", Set<() => void>>([
+    ["resize", new Set()],
+    ["scroll", new Set()],
+  ]);
+
+  return {
+    height,
+    offsetTop: offsetTop ?? 0,
+    addEventListener: vi.fn((type: "resize" | "scroll", listener: () => void) => {
+      listeners.get(type)?.add(listener);
+    }),
+    removeEventListener: vi.fn((type: "resize" | "scroll", listener: () => void) => {
+      listeners.get(type)?.delete(listener);
+    }),
+    dispatch: (type: "resize" | "scroll") => {
+      for (const listener of listeners.get(type) ?? []) {
+        listener();
+      }
+    },
+  };
+};
+
 describe("JourneysCompanionPlannerController", () => {
   beforeEach(() => {
     mocks.assistantCounter = 0;
@@ -189,6 +226,16 @@ describe("JourneysCompanionPlannerController", () => {
     mocks.retryLastMessage.mockReset();
     mocks.confirmPendingAction.mockReset();
     mocks.cancelPendingAction.mockReset();
+    Object.defineProperty(window, "innerHeight", {
+      configurable: true,
+      writable: true,
+      value: 900,
+    });
+    Object.defineProperty(window, "visualViewport", {
+      configurable: true,
+      writable: true,
+      value: undefined,
+    });
   });
 
   it("keeps the journeys assistant state alive while the modal view closes and reopens", () => {
@@ -387,5 +434,66 @@ describe("JourneysCompanionPlannerController", () => {
     expect(focusSpy).not.toHaveBeenCalled();
     rafSpy.mockRestore();
     focusSpy.mockRestore();
+  });
+
+  it("keeps drawer height responsive without lifting the whole shell above the keyboard", () => {
+    const visualViewport = createMockVisualViewport({ height: 820 });
+    Object.defineProperty(window, "visualViewport", {
+      configurable: true,
+      writable: true,
+      value: visualViewport,
+    });
+
+    render(
+      <JourneysCompanionPlannerController
+        open
+        onOpenChange={vi.fn()}
+        presentation="drawer"
+      />,
+    );
+
+    const shell = screen.getByTestId("journeys-companion-planner-shell");
+    expect(shell.style.height).toBe("736px");
+    expect(shell.style.paddingBottom).toBe("");
+
+    act(() => {
+      visualViewport.height = 540;
+      visualViewport.dispatch("resize");
+    });
+
+    expect(shell.style.height).toBe("516px");
+    expect(shell.style.paddingBottom).toBe("");
+  });
+
+  it("auto-grows and shrinks the composer as the draft changes", () => {
+    render(
+      <JourneysCompanionPlannerController
+        open
+        onOpenChange={vi.fn()}
+        presentation="dialog"
+      />,
+    );
+
+    const composer = screen.getByTestId("journeys-companion-planner-text-input") as HTMLTextAreaElement;
+    let mockedScrollHeight = 68;
+
+    Object.defineProperty(composer, "scrollHeight", {
+      configurable: true,
+      get: () => mockedScrollHeight,
+    });
+
+    fireEvent.change(composer, { target: { value: "building\nmy app" } });
+    expect(composer.style.height).toBe("68px");
+    expect(composer.style.overflowY).toBe("hidden");
+
+    mockedScrollHeight = 220;
+    fireEvent.change(composer, { target: { value: "building\nmy app\nwith more detail\nand even more detail" } });
+    expect(composer.style.height).toBe("160px");
+    expect(composer.style.overflowY).toBe("auto");
+
+    mockedScrollHeight = 52;
+    fireEvent.change(composer, { target: { value: "done" } });
+    expect(composer.style.height).toBe("52px");
+    expect(composer.style.overflowY).toBe("hidden");
   });
 });
