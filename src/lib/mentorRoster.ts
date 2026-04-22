@@ -82,17 +82,40 @@ export const filterCanonicalActiveMentors = <T extends MentorSlugRecord>(
   return mentors.filter(hasCanonicalActiveMentorSlug);
 };
 
-export const sortCanonicalMentors = <T extends MentorSortableRecord>(
+export const sortMentorsForDisplay = <T extends MentorSortableRecord>(
   mentors: readonly T[] | null | undefined,
 ): T[] => {
-  return filterCanonicalActiveMentors(mentors).sort((left, right) => {
-    const sortDelta = getMentorDisplaySortIndex(left.slug) - getMentorDisplaySortIndex(right.slug);
-    if (sortDelta !== 0) return sortDelta;
+  if (!mentors || mentors.length === 0) return [];
+
+  return [...mentors].sort((left, right) => {
+    const leftIndex = getMentorDisplaySortIndex(left.slug);
+    const rightIndex = getMentorDisplaySortIndex(right.slug);
+    const leftIsCanonical = leftIndex !== Number.MAX_SAFE_INTEGER;
+    const rightIsCanonical = rightIndex !== Number.MAX_SAFE_INTEGER;
+
+    if (leftIsCanonical && rightIsCanonical && leftIndex !== rightIndex) {
+      return leftIndex - rightIndex;
+    }
+
+    if (leftIsCanonical !== rightIsCanonical) {
+      return leftIsCanonical ? -1 : 1;
+    }
 
     const leftName = left.name?.trim() ?? "";
     const rightName = right.name?.trim() ?? "";
-    return leftName.localeCompare(rightName);
+    const nameDelta = leftName.localeCompare(rightName);
+    if (nameDelta !== 0) return nameDelta;
+
+    const leftSlug = normalizeMentorSlug(left.slug) ?? "";
+    const rightSlug = normalizeMentorSlug(right.slug) ?? "";
+    return leftSlug.localeCompare(rightSlug);
   });
+};
+
+export const sortCanonicalMentors = <T extends MentorSortableRecord>(
+  mentors: readonly T[] | null | undefined,
+): T[] => {
+  return sortMentorsForDisplay(filterCanonicalActiveMentors(mentors));
 };
 
 export const getMentorDisplaySortIndex = (value?: string | null): number => {

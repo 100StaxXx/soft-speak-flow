@@ -260,7 +260,7 @@ describe("useMentorConnectionHealth", () => {
     ).toBe(true);
   });
 
-  it("does not write a fallback when canonical Sage cannot be resolved", async () => {
+  it("falls back to the next canonical mentor when Sage is unavailable", async () => {
     mocks.state.user = { id: "user-missing-sage" };
     mocks.state.profile = {
       selected_mentor_id: "legacy-selected",
@@ -284,6 +284,57 @@ describe("useMentorConnectionHealth", () => {
         data: null,
         error: null,
       },
+      {
+        data: { id: "lyra-fallback", slug: "lyra" },
+        error: null,
+      },
+    );
+    mocks.state.profileUpdateResponses.push({ error: null });
+
+    const { result } = renderHook(() => useMentorConnectionHealth());
+
+    await act(async () => {
+      await vi.runAllTimersAsync();
+    });
+
+    expect(result.current.status).toBe("ready");
+    expect(result.current.effectiveMentorId).toBe("lyra-fallback");
+    expect(
+      mocks.state.profileUpdatePayloads.some(
+        (payload) =>
+          payload.selected_mentor_id === "lyra-fallback"
+          && (payload.onboarding_data as Record<string, unknown>)?.mentorId === "lyra-fallback",
+      ),
+    ).toBe(true);
+  });
+
+  it("does not write a fallback when no canonical mentor can be resolved", async () => {
+    mocks.state.user = { id: "user-no-fallback" };
+    mocks.state.profile = {
+      selected_mentor_id: "legacy-selected",
+      onboarding_completed: true,
+      onboarding_data: { mentorId: "legacy-selected" },
+    };
+    mocks.state.profileMaybeSingleResponses.push({
+      data: {
+        selected_mentor_id: "legacy-selected",
+        onboarding_completed: true,
+        onboarding_data: { mentorId: "legacy-selected" },
+      },
+      error: null,
+    });
+    mocks.state.mentorMaybeSingleResponses.push(
+      {
+        data: { id: "legacy-selected", slug: "atlas" },
+        error: null,
+      },
+      { data: null, error: null },
+      { data: null, error: null },
+      { data: null, error: null },
+      { data: null, error: null },
+      { data: null, error: null },
+      { data: null, error: null },
+      { data: null, error: null },
     );
 
     const { result } = renderHook(() => useMentorConnectionHealth());

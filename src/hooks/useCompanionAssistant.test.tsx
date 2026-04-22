@@ -630,6 +630,8 @@ describe("useCompanionAssistant", () => {
     mocks.supabaseInvoke.mockRejectedValueOnce(new Error("agent unavailable"));
     mocks.parseFunctionInvokeError.mockResolvedValueOnce({
       status: 404,
+      isOffline: false,
+      category: "http",
       backendMessage: null,
       name: "FunctionsHttpError",
       message: "Function not found",
@@ -656,5 +658,42 @@ describe("useCompanionAssistant", () => {
       "What does tomorrow look like?",
       "text",
     );
+  });
+
+  it("falls back to the legacy adapter when companion-agent hits a recoverable fetch failure", async () => {
+    mocks.supabaseInvoke.mockRejectedValueOnce({
+      name: "FunctionsFetchError",
+      message: "Failed to send a request to the Edge Function",
+      context: {},
+    });
+    mocks.parseFunctionInvokeError.mockResolvedValueOnce({
+      status: undefined,
+      isOffline: false,
+      category: "network",
+      backendMessage: null,
+      name: "FunctionsFetchError",
+      message: "Failed to send a request to the Edge Function",
+    });
+
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(
+      () => useCompanionAssistant({ surface: "journeys" }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(result.current.activeThread?.sessionId).toBe("persisted-session");
+    });
+
+    await act(async () => {
+      await result.current.submitMessage("What does tomorrow look like?", "text");
+    });
+
+    expect(mocks.legacySubmitMessage).toHaveBeenCalledWith(
+      "What does tomorrow look like?",
+      "text",
+    );
+    expect(result.current.error).toBeNull();
+    expect(result.current.lastFailedMessage).toBeNull();
   });
 });

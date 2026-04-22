@@ -52,7 +52,7 @@ import {
 import { safeLocalStorage } from "@/utils/storage";
 import { resolveAssignedMentorFromActiveMentors } from "@/config/onboardingMentorAssignments";
 import { buildBrowseMentorCatalog } from "@/lib/mentorCatalog";
-import { sortCanonicalMentors } from "@/lib/mentorRoster";
+import { sortMentorsForDisplay } from "@/lib/mentorRoster";
 
 // Removed duplicate outer function - using inner component method instead
 
@@ -468,7 +468,7 @@ export const StoryOnboarding = ({
       return [];
     }
 
-    return sortCanonicalMentors(data.map((mentorRow) => ({
+    return sortMentorsForDisplay(data.map((mentorRow) => ({
       id: mentorRow.id,
       name: mentorRow.name,
       description: mentorRow.description,

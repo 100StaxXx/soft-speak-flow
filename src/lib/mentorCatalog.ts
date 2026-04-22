@@ -1,6 +1,6 @@
 import lyraMentorImage from "@/assets/lyra-mentor.png";
 import theGuyMentorImage from "@/assets/the-guy-mentor.png";
-import { sortCanonicalMentors } from "@/lib/mentorRoster";
+import { normalizeMentorSlug, sortMentorsForDisplay } from "@/lib/mentorRoster";
 
 export type MentorAvailability = "active" | "upcoming_unlockable";
 
@@ -65,7 +65,7 @@ const upcomingSortIndex = new Map<string, number>(
 export const buildBrowseMentorCatalog = (
   activeMentors: MentorBrowseEntry[],
 ): MentorBrowseEntry[] => {
-  const normalizedActiveMentors = sortCanonicalMentors(activeMentors)
+  const normalizedActiveMentors = sortMentorsForDisplay(activeMentors)
     .map((mentor) => {
       const lyraFallback = mentor.slug === "lyra" ? LYRA_ACTIVE_FALLBACK : null;
 
@@ -87,13 +87,20 @@ export const buildBrowseMentorCatalog = (
         unavailable_description: null,
       };
     });
+  const activeMentorSlugs = new Set(
+    normalizedActiveMentors
+      .map((mentor) => normalizeMentorSlug(mentor.slug))
+      .filter((slug): slug is string => Boolean(slug)),
+  );
 
-  const sortedUpcomingMentors = [...UPCOMING_MENTORS].sort((left, right) => {
-    const leftIndex = upcomingSortIndex.get(left.slug) ?? Number.MAX_SAFE_INTEGER;
-    const rightIndex = upcomingSortIndex.get(right.slug) ?? Number.MAX_SAFE_INTEGER;
-    if (leftIndex !== rightIndex) return leftIndex - rightIndex;
-    return left.name.localeCompare(right.name);
-  });
+  const sortedUpcomingMentors = [...UPCOMING_MENTORS]
+    .filter((mentor) => !activeMentorSlugs.has(mentor.slug))
+    .sort((left, right) => {
+      const leftIndex = upcomingSortIndex.get(left.slug) ?? Number.MAX_SAFE_INTEGER;
+      const rightIndex = upcomingSortIndex.get(right.slug) ?? Number.MAX_SAFE_INTEGER;
+      if (leftIndex !== rightIndex) return leftIndex - rightIndex;
+      return left.name.localeCompare(right.name);
+    });
 
   return [...normalizedActiveMentors, ...sortedUpcomingMentors];
 };

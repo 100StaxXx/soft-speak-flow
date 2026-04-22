@@ -7,7 +7,7 @@ import { MentorGrid } from "@/components/MentorGrid";
 import { useToast } from "@/hooks/use-toast";
 import { MentorSelectionSkeleton } from "@/components/skeletons/MentorSelectionSkeleton";
 import { buildBrowseMentorCatalog, type MentorBrowseEntry } from "@/lib/mentorCatalog";
-import { sortCanonicalMentors } from "@/lib/mentorRoster";
+import { sortMentorsForDisplay } from "@/lib/mentorRoster";
 
 const MentorSelection = () => {
   const { user } = useAuth();
@@ -29,7 +29,7 @@ const MentorSelection = () => {
         .order("created_at");
 
       if (mentorsError) throw mentorsError;
-      const canonicalMentors = sortCanonicalMentors((mentorsData || []).map((mentor) => ({
+      const displayMentors = sortMentorsForDisplay((mentorsData || []).map((mentor) => ({
         id: mentor.id,
         name: mentor.name,
         slug: mentor.slug || "",
@@ -44,7 +44,7 @@ const MentorSelection = () => {
         themes: mentor.themes || [],
         availability: "active",
       })));
-      setMentors(buildBrowseMentorCatalog(canonicalMentors));
+      setMentors(buildBrowseMentorCatalog(displayMentors));
 
       // Fetch current mentor if user is logged in
       if (user) {

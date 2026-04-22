@@ -140,8 +140,15 @@ const shouldFallbackToLegacyAgent = async (error: unknown) => {
     || source.includes("schema cache")
     || source.includes("relation")
     || source.includes("column");
+  const hasRecoverableNetworkFailure = !parsed.isOffline && (
+    parsed.category === "network"
+    || source.includes("functionsfetcherror")
+    || source.includes("failed to fetch")
+    || source.includes("failed to send a request to the edge function")
+  );
 
-  return source.includes("function not found")
+  return hasRecoverableNetworkFailure
+    || source.includes("function not found")
     || source.includes("no route matched")
     || source.includes("could not find function")
     || source.includes("could not find the function")

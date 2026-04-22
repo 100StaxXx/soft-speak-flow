@@ -71,4 +71,32 @@ describe("mentorCatalog", () => {
       }),
     ]);
   });
+
+  it("does not append The Guy as upcoming when he is already active", () => {
+    const result = buildBrowseMentorCatalog([
+      ...ACTIVE_MENTORS,
+      {
+        id: "the-guy-id",
+        name: "The Guy",
+        slug: "the-guy",
+        archetype: "Field commander",
+        short_title: "Field Commander",
+        tone_description: "Direct and tactical",
+        style_description: "Mission-first coaching",
+        target_user: "People who want decisive pressure",
+        signature_line: "You need a plan and the will to execute it.",
+        primary_color: "#C26B3C",
+        avatar_url: null,
+        themes: ["discipline"],
+        availability: "active",
+      },
+    ]);
+
+    expect(result.filter((mentor) => mentor.slug === "the-guy")).toEqual([
+      expect.objectContaining({
+        id: "the-guy-id",
+        availability: "active",
+      }),
+    ]);
+  });
 });

@@ -4,7 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { supabase } from "@/integrations/supabase/client";
-import { resolveActiveMentorSlug } from "@/lib/mentorRoster";
+import { ACTIVE_MENTOR_SLUGS, resolveActiveMentorSlug } from "@/lib/mentorRoster";
 import {
   getOnboardingMentorId,
   getResolvedMentorId,
@@ -26,7 +26,7 @@ const RECOVERY_DELAY_MS = 750;
 
 const stableMentorByUser = new Map<string, string>();
 const log = logger.scope("MentorConnectionHealth");
-const CANONICAL_SAGE_SLUG = "sage";
+const PREFERRED_FALLBACK_MENTOR_SLUGS = ACTIVE_MENTOR_SLUGS;
 
 const sleep = async (durationMs: number) =>
   new Promise<void>((resolve) => {
@@ -89,20 +89,32 @@ export function useMentorConnectionHealth(): {
     return mentorLookup ?? null;
   }, []);
 
-  const getCanonicalSageMentor = useCallback(async () => {
+  const getMentorBySlug = useCallback(async (slug: string) => {
     const { data: mentorLookup, error: mentorLookupError } = await supabase
       .from("mentors")
       .select("id, slug")
-      .eq("slug", CANONICAL_SAGE_SLUG)
+      .eq("slug", slug)
       .maybeSingle();
 
     if (mentorLookupError) {
       throw mentorLookupError;
     }
 
-    if (!mentorLookup) return null;
-    return resolveActiveMentorSlug(mentorLookup.slug) === CANONICAL_SAGE_SLUG ? mentorLookup : null;
+    return mentorLookup ?? null;
   }, []);
+
+  const getPreferredFallbackMentor = useCallback(async () => {
+    for (const slug of PREFERRED_FALLBACK_MENTOR_SLUGS) {
+      const mentorLookup = await getMentorBySlug(slug);
+      if (!mentorLookup) continue;
+
+      if (resolveActiveMentorSlug(mentorLookup.slug) === slug) {
+        return mentorLookup;
+      }
+    }
+
+    return null;
+  }, [getMentorBySlug]);
 
   const persistMentorSelection = useCallback(
     async (userId: string, mentorId: string, candidateProfile: LightweightProfile, reason: string) => {
@@ -146,36 +158,37 @@ export function useMentorConnectionHealth(): {
       candidateProfile: LightweightProfile,
       source: "selected_mentor" | "onboarding_mentor",
     ) => {
-      const sageMentor = await getCanonicalSageMentor();
-      if (!sageMentor?.id) {
-        log.warn("Unable to repair mentor selection because canonical Sage is unavailable", {
+      const fallbackMentor = await getPreferredFallbackMentor();
+      if (!fallbackMentor?.id) {
+        log.warn("Unable to repair mentor selection because no canonical fallback mentor is available", {
           userId,
           source,
           invalidMentorId,
         });
-        return { mentorId: null, cause: "sage_fallback_missing" as const };
+        return { mentorId: null, cause: "canonical_fallback_missing" as const };
       }
 
       const repairedMentorId = await persistMentorSelection(
         userId,
-        sageMentor.id,
+        fallbackMentor.id,
         candidateProfile,
         `fallback_from_${source}`,
       );
 
       if (!repairedMentorId) {
-        return { mentorId: null, cause: "sage_fallback_persist_failed" as const };
+        return { mentorId: null, cause: "canonical_fallback_persist_failed" as const };
       }
 
-      log.warn("Repaired stale mentor selection to canonical Sage", {
+      log.warn("Repaired stale mentor selection to canonical fallback mentor", {
         userId,
         source,
         invalidMentorId,
         repairedMentorId,
+        fallbackSlug: fallbackMentor.slug,
       });
-      return { mentorId: repairedMentorId, cause: "fallback_to_sage" as const };
+      return { mentorId: repairedMentorId, cause: "fallback_to_canonical_mentor" as const };
     },
-    [getCanonicalSageMentor, persistMentorSelection],
+    [getPreferredFallbackMentor, persistMentorSelection],
   );
 
   const ensureCanonicalMentor = useCallback(

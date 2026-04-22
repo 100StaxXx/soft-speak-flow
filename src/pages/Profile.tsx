@@ -36,8 +36,7 @@ import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
 import { applyMentorChange } from "@/pages/profileMentorChange";
 import {
-  hasCanonicalActiveMentorSlug,
-  sortCanonicalMentors,
+  sortMentorsForDisplay,
 } from "@/lib/mentorRoster";
 import {
   deleteCurrentAccount,
@@ -189,7 +188,7 @@ const Profile = () => {
         const key = (m.slug || m.name || "").trim().toLowerCase();
         if (!map.has(key)) map.set(key, m);
       }
-      return sortCanonicalMentors(Array.from(map.values()));
+      return sortMentorsForDisplay(Array.from(map.values()));
     },
   });
 
@@ -212,8 +211,12 @@ const Profile = () => {
     },
   });
 
-  const canonicalMentors = useMemo(() => sortCanonicalMentors(mentors), [mentors]);
-  const canonicalSelectedMentor = hasCanonicalActiveMentorSlug(selectedMentor) ? selectedMentor : null;
+  const displayMentors = useMemo(() => sortMentorsForDisplay(mentors), [mentors]);
+  const displaySelectedMentor = useMemo(() => {
+    if (selectedMentor) return selectedMentor;
+    if (!resolvedMentorId) return null;
+    return displayMentors.find((mentor) => mentor.id === resolvedMentorId) ?? null;
+  }, [displayMentors, resolvedMentorId, selectedMentor]);
 
 
   const handleChangeMentor = useCallback(async (mentorId: string) => {
@@ -475,26 +478,26 @@ const Profile = () => {
                   <CardDescription className="text-xs">Change your guide anytime</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {canonicalSelectedMentor && (
+                  {displaySelectedMentor && (
                     <div className="flex items-center gap-3 p-2.5 bg-muted/30 rounded-lg">
-                      {canonicalSelectedMentor.avatar_url && (
+                      {displaySelectedMentor.avatar_url && (
                         <img 
-                          src={canonicalSelectedMentor.avatar_url} 
-                          alt={canonicalSelectedMentor.name} 
+                          src={displaySelectedMentor.avatar_url} 
+                          alt={displaySelectedMentor.name} 
                           className="w-10 h-10 rounded-full object-cover" 
                           loading="lazy" 
                           decoding="async" 
                         />
                       )}
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm">{canonicalSelectedMentor.name}</p>
-                        {canonicalSelectedMentor.short_title ? (
+                        <p className="font-medium text-sm">{displaySelectedMentor.name}</p>
+                        {displaySelectedMentor.short_title ? (
                           <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground/80">
-                            {canonicalSelectedMentor.short_title}
+                            {displaySelectedMentor.short_title}
                           </p>
                         ) : null}
                         <p className="text-xs text-muted-foreground line-clamp-2">
-                          {canonicalSelectedMentor.tone_description || canonicalSelectedMentor.target_user}
+                          {displaySelectedMentor.tone_description || displaySelectedMentor.target_user}
                         </p>
                       </div>
                     </div>
@@ -504,7 +507,7 @@ const Profile = () => {
                       <SelectValue placeholder={isChangingMentor ? "Changing..." : "Select guide"} />
                     </SelectTrigger>
                     <SelectContent>
-                      {canonicalMentors.map((m) => (<SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>))}
+                      {displayMentors.map((m) => (<SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>))}
                     </SelectContent>
                   </Select>
                   <div className="grid grid-cols-2 gap-2">

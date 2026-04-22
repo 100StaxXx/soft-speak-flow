@@ -8,6 +8,7 @@ import {
   resolveActiveMentorSlug,
   resolveMentorSlugAlias,
   sortCanonicalMentors,
+  sortMentorsForDisplay,
 } from "./mentorRoster";
 
 describe("mentorRoster", () => {
@@ -74,6 +75,22 @@ describe("mentorRoster", () => {
       "lyra",
       "princess",
       "operator",
+    ]);
+  });
+
+  it("keeps canonical mentors first while still showing new active mentors", () => {
+    const roster = [
+      { id: "atlas-1", name: "Atlas", slug: "atlas" },
+      { id: "operator-1", name: "The Operator", slug: "operator" },
+      { id: "stryker-1", name: "Stryker", slug: "stryker" },
+      { id: "lyra-1", name: "Lyra", slug: "lyra" },
+    ];
+
+    expect(sortMentorsForDisplay(roster).map((mentor) => mentor.slug)).toEqual([
+      "lyra",
+      "operator",
+      "atlas",
+      "stryker",
     ]);
   });
 });
