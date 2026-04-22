@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { parseFunctionInvokeError } from '@/utils/supabaseFunctionErrors';
 
 type UserAction = 'accepted' | 'modified' | 'rejected';
 
@@ -34,6 +35,29 @@ async function invokeTracker(body: Record<string, unknown>) {
   }
 }
 
+async function isRecoverableTrackingError(error: unknown): Promise<boolean> {
+  const parsed = await parseFunctionInvokeError(error);
+  const source = [
+    parsed.name,
+    parsed.message,
+    parsed.backendMessage,
+    parsed.responsePayload?.error,
+    parsed.responsePayload?.message,
+    parsed.responsePayload?.code,
+  ]
+    .filter((value): value is string => typeof value === 'string' && value.length > 0)
+    .join(' ')
+    .toLowerCase();
+
+  return parsed.isOffline
+    || parsed.category === 'network'
+    || source.includes('functionsfetcherror')
+    || source.includes('failed to fetch')
+    || source.includes('failed to send a request to the edge function')
+    || source.includes('function not found')
+    || source.includes('could not find function');
+}
+
 export function useAIInteractionTracker() {
   const { user } = useAuth();
 
@@ -60,6 +84,9 @@ export function useAIInteractionTracker() {
         modifications: options.modifications,
       });
     } catch (err) {
+      if (await isRecoverableTrackingError(err)) {
+        return;
+      }
       console.warn('Error tracking interaction (non-blocking):', err);
     }
   }, [user]);

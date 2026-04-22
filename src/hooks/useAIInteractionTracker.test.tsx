@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   invoke: vi.fn(),
   getSession: vi.fn(),
   from: vi.fn(),
+  parseFunctionInvokeError: vi.fn(),
 }));
 
 vi.mock("@/hooks/useAuth", () => ({
@@ -25,6 +26,10 @@ vi.mock("@/integrations/supabase/client", () => ({
   },
 }));
 
+vi.mock("@/utils/supabaseFunctionErrors", () => ({
+  parseFunctionInvokeError: (...args: unknown[]) => mocks.parseFunctionInvokeError(...args),
+}));
+
 import { useAIInteractionTracker } from "./useAIInteractionTracker";
 
 describe("useAIInteractionTracker", () => {
@@ -38,6 +43,14 @@ describe("useAIInteractionTracker", () => {
       },
     });
     mocks.invoke.mockResolvedValue({ data: { success: true }, error: null });
+    mocks.parseFunctionInvokeError.mockResolvedValue({
+      isOffline: false,
+      category: "unknown",
+      name: undefined,
+      message: undefined,
+      backendMessage: undefined,
+      responsePayload: undefined,
+    });
     mocks.from.mockImplementation(() => {
       throw new Error("Direct table access is not expected in this test");
     });
@@ -80,5 +93,38 @@ describe("useAIInteractionTracker", () => {
         outcome: "completed",
       }),
     });
+  });
+
+  it("silences recoverable tracking fetch errors", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    mocks.invoke.mockResolvedValue({
+      data: null,
+      error: {
+        name: "FunctionsFetchError",
+        message: "Failed to send a request to the Edge Function",
+        context: {},
+      },
+    });
+    mocks.parseFunctionInvokeError.mockResolvedValue({
+      isOffline: false,
+      category: "network",
+      name: "FunctionsFetchError",
+      message: "Failed to send a request to the Edge Function",
+      backendMessage: null,
+      responsePayload: undefined,
+    });
+
+    const { result } = renderHook(() => useAIInteractionTracker());
+
+    await act(async () => {
+      await result.current.trackInteraction({
+        interactionType: "chat",
+        inputText: "Help me plan",
+        userAction: "accepted",
+      });
+    });
+
+    expect(warnSpy).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
   });
 });
