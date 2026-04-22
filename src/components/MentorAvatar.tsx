@@ -37,27 +37,48 @@ export const MentorAvatar = memo(({
   style,
 }: MentorAvatarProps) => {
   const [mentorImage, setMentorImage] = useState<string>(avatarUrl || '');
+  const [hasTriedFallback, setHasTriedFallback] = useState(false);
+
+  const resolvedSlug = resolveMentorSlugAlias(mentorSlug);
   
   // Dynamically load mentor image
   useEffect(() => {
+    setHasTriedFallback(false);
+
     if (avatarUrl) {
       setMentorImage(avatarUrl);
       return;
     }
     
-    const resolvedSlug = resolveMentorSlugAlias(mentorSlug);
     if (resolvedSlug) {
       loadMentorImage(resolvedSlug).then(setMentorImage).catch(() => {
         // Keep empty string as fallback
       });
+      return;
     }
-  }, [mentorSlug, avatarUrl]);
+    setMentorImage("");
+  }, [avatarUrl, resolvedSlug]);
 
-  const resolvedSlug = resolveMentorSlugAlias(mentorSlug);
   const imagePosition = resolvedSlug
     ? MENTOR_AVATAR_POSITION_MAP[resolvedSlug]
     : DEFAULT_MENTOR_AVATAR_POSITION;
   const getInitials = (name: string) => name.split(' ').map(n => n[0]).join('').toUpperCase();
+
+  const handleImageError = () => {
+    if (!resolvedSlug || hasTriedFallback) {
+      setMentorImage("");
+      return;
+    }
+
+    setHasTriedFallback(true);
+    loadMentorImage(resolvedSlug)
+      .then((fallbackImage) => {
+        setMentorImage(fallbackImage || "");
+      })
+      .catch(() => {
+        setMentorImage("");
+      });
+  };
 
   return (
     <div
@@ -80,6 +101,7 @@ export const MentorAvatar = memo(({
           style={{ objectPosition: imagePosition }}
           loading="lazy"
           decoding="async"
+          onError={handleImageError}
         />
       ) : (
         <div

@@ -254,13 +254,13 @@ const Journeys = () => {
   const openCompanionPlanner = useCallback((intent?: CompanionPlannerLaunchIntent | null) => {
     if (intent) {
       if (intent.target === "campaign_builder") {
-        openCampaignBuilder();
+        navigate("/campaigns");
         return;
       }
       setPlannerLaunchIntent(intent);
     }
     setIsCompanionPlannerPinned(true);
-  }, [openCampaignBuilder]);
+  }, [navigate]);
 
   const launchPlannerIntent = useCallback((
     message: string,
@@ -484,6 +484,11 @@ const Journeys = () => {
     const routeState = (location.state as { companionPlannerLaunchIntent?: CompanionPlannerLaunchIntent | null } | null) ?? null;
     const nextLaunchIntent = routeState?.companionPlannerLaunchIntent ?? null;
     if (!nextLaunchIntent?.id) return;
+
+    if (nextLaunchIntent.target === "campaign_builder") {
+      navigate("/campaigns", { replace: true });
+      return;
+    }
 
     openCompanionPlanner(nextLaunchIntent);
 

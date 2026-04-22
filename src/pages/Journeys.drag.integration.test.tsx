@@ -982,13 +982,24 @@ describe("Journeys row drag integration", () => {
     expect(mocks.lastCompanionPlannerModalProps?.launchIntent).toBeNull();
   });
 
-  it("opens Pathfinder immediately for campaign-builder launcher intents without opening companion chat", async () => {
+  it("redirects campaign-builder launcher intents to campaigns without opening companion chat", async () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
         mutations: { retry: false },
       },
     });
+
+    const RouteHarness = () => {
+      const location = useLocation();
+
+      return (
+        <>
+          <div data-testid="route-path">{location.pathname}</div>
+          <Journeys />
+        </>
+      );
+    };
 
     render(
       <QueryClientProvider client={queryClient}>
@@ -1004,15 +1015,15 @@ describe("Journeys row drag integration", () => {
             },
           },
         }]}>
-          <Journeys />
+          <RouteHarness />
         </MemoryRouter>
       </QueryClientProvider>,
     );
 
     await waitFor(() => {
-      expect(mocks.lastPathfinderProps?.open).toBe(true);
+      expect(screen.getByTestId("route-path").textContent).toBe("/campaigns");
     });
-    expect(mocks.lastPathfinderProps?.initialGoal ?? "").toBe("");
+    expect(mocks.lastPathfinderProps?.open).not.toBe(true);
     expect(mocks.lastCompanionPlannerModalProps?.open).not.toBe(true);
   });
 
