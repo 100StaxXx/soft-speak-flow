@@ -17,10 +17,6 @@ type PlannerLLMReply = {
   mode: PlannerResponseMode;
 };
 
-type StarterPromptIntent = NonNullable<
-  PlannerBuildInput["plannerContext"]["starterIntent"]
->;
-
 const addDaysToDateKey = (dateKey: string, days: number): string => {
   const next = new Date(`${dateKey}T00:00:00`);
   next.setDate(next.getDate() + days);
@@ -135,7 +131,6 @@ const buildSystemPrompt = (
   tonePack: PlannerBuildInput["tonePack"],
   options?: {
     isPlanDayClarification?: boolean;
-    starterIntent?: StarterPromptIntent | null;
   },
 ) => {
   if (options?.isPlanDayClarification) {
@@ -148,7 +143,6 @@ const buildSystemPrompt = (
       "Ask a single, focused question that helps the user decide what they want to do.",
       "The question must be simple, easy to answer, grounded in real options, and relevant to their current moment.",
       "Avoid vague, broad, multi-part, or overwhelming questions.",
-      "This question is setting up a contextual rest-of-day planning reply on the next turn, so aim for one focus-defining answer instead of an intake form.",
       "Ask ONLY one question.",
       "Do NOT suggest a schedule or next steps.",
       "Do NOT break the question into multiple parts.",
@@ -173,27 +167,6 @@ const buildSystemPrompt = (
     : tonePack === "playful"
     ? "Voice: keep it lightly playful and friendly, with no hard-edged roasting."
     : "Voice: keep it warm, grounded, and supportive, with no roasting or swagger bits.";
-  const starterInstructions = options?.starterIntent === "plan_day"
-    ? [
-      "The user selected: \"Plan my day.\"",
-      "Use the provided app context to understand the day already in progress instead of starting from zero.",
-      "Internally assess the day shape from the remaining day context: busy and structured, open and flexible, behind and recovering, momentum-building, or low-energy and overloaded.",
-      "If mode is proposal, treat deterministicContext.proposals as the full set of drafted quests for the rest of today. Do not invent extra quests, extra scheduled blocks, or extra times beyond deterministicContext.",
-      "Start with a short read on the day, then make the drafted quests feel clearly tied to the user's reality, current momentum, and what still matters today.",
-      "Favor a small, realistic set of suggestions for the remainder of today. Do not describe an idealized perfect day.",
-      "If unfinished or missed items matter, you may acknowledge that briefly and frame the drafted quests as the recovery move.",
-      "You may lightly signal must do, should do, or nice to do if that helps, but keep it compact and natural.",
-    ].join("\n")
-    : options?.starterIntent === "upcoming_start"
-    ? [
-      "The user selected: \"What do I have coming up?\"",
-      "Focus first on the remaining events and tasks for today, then summarize tomorrow.",
-      "Prioritize the next upcoming event, the remaining commitments that actually matter today, and whether tomorrow looks busy, light, or open.",
-      "If something earlier today was missed, passed, or still unresolved and it affects what is coming up, mention it briefly and label it clearly.",
-      "Keep the answer brief, practical, and read-only. Do not turn it into a planning strategy unless deterministicContext already requires that.",
-      "Do not pretend missed items are still upcoming, and do not pad with irrelevant details.",
-    ].join("\n")
-    : null;
 
   return [
     "You are the user's Cosmiq companion inside the Journeys tab.",
@@ -210,10 +183,9 @@ const buildSystemPrompt = (
     "Schedule facts come before interpretation. Acknowledge open, light, or crowded days plainly before giving opinions or coaching.",
     "If deterministicContext.availabilityFacts says the day is open, balanced, or has zero/one scheduled items, say that clearly and do not describe the day as packed, slammed, crowded, or overbooked.",
     "Preserve the deterministic meaning of fallbackReply. Rewrite for voice, but do not contradict schedule truth, proposal state, or missing details.",
-    starterInstructions,
     modeInstructions[mode],
     "Return minified JSON with keys reply and mode only.",
-  ].filter(Boolean).join("\n");
+  ].join("\n");
 };
 
 const buildUserPrompt = (
@@ -288,22 +260,6 @@ const buildUserPrompt = (
         title: epic.title,
         endDate: epic.endDate,
       })),
-      rituals: input.plannerContext.rituals.slice(0, 8).map((ritual) => ({
-        title: ritual.title,
-        epicTitle: ritual.epicTitle,
-        frequency: ritual.frequency,
-        preferredTime: ritual.preferredTime,
-        currentStreak: ritual.currentStreak ?? null,
-      })),
-      reflectionSignals: (input.plannerContext.reflectionSignals ?? []).slice(0, 6)
-        .map((signal) => ({
-          date: signal.date,
-          source: signal.source,
-          mood: signal.mood,
-          energy: signal.energy ?? null,
-          wins: signal.wins ?? null,
-          tomorrowAdjustment: signal.tomorrowAdjustment ?? null,
-        })),
       plannerMemory: input.plannerContext.plannerMemory
         ? {
           preferredTimeOfDay:
@@ -373,16 +329,6 @@ const isPlanDayStarterTurn = (
 ) =>
   input.plannerContext.starterIntent === "plan_day" ||
   input.sessionState.pendingStarterIntent === "plan_day";
-
-const getStarterPromptIntent = (
-  input: PlannerBuildInput,
-): StarterPromptIntent | null => {
-  if (isPlanDayStarterTurn(input)) {
-    return "plan_day";
-  }
-
-  return input.plannerContext.starterIntent ?? null;
-};
 
 const extractPreservedProposalReplyNotes = (
   reply: string,
@@ -460,7 +406,6 @@ export async function buildOrchestratedPlannerResponse(params: {
       params.input,
       params.baseResult,
     );
-    const starterIntent = getStarterPromptIntent(params.input);
     const response = await params.guardedFetch(OPENAI_API_URL, {
       method: "POST",
       headers: {
@@ -478,7 +423,7 @@ export async function buildOrchestratedPlannerResponse(params: {
             content: buildSystemPrompt(
               params.baseResult.mode,
               params.input.tonePack,
-              { isPlanDayClarification, starterIntent },
+              { isPlanDayClarification },
             ),
           },
           {
