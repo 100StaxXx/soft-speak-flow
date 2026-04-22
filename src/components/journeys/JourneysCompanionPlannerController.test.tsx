@@ -49,9 +49,11 @@ const mocks = vi.hoisted(() => ({
   startNewChat: vi.fn(),
   archiveCurrentThread: vi.fn(),
   resumeThread: vi.fn(),
+  toggleRecording: vi.fn(),
   retryLastMessage: vi.fn(),
   confirmPendingAction: vi.fn(),
   cancelPendingAction: vi.fn(),
+  drawerRootProps: [] as Array<{ open: boolean; repositionInputs?: boolean }>,
 }));
 
 vi.mock("@capacitor/core", () => ({
@@ -95,7 +97,7 @@ vi.mock("@/hooks/useCompanionAssistant", async () => {
 
       return {
         todayLabel: assistantId,
-        placeholder: "chat",
+        placeholder: "Talk to Cosmiq",
         messages,
         structuredResponse: mocks.structuredResponse,
         pendingAction: mocks.pendingAction,
@@ -130,7 +132,7 @@ vi.mock("@/hooks/useCompanionAssistant", async () => {
         showPermissionDialog: false,
         setShowPermissionDialog: vi.fn(),
         isRequestingPermission: false,
-        toggleRecording: vi.fn(),
+        toggleRecording: mocks.toggleRecording,
         requestMicrophonePermission: vi.fn(),
         isSpeaking: false,
         speechProvider: "none" as const,
@@ -162,7 +164,18 @@ vi.mock("@/components/ui/dialog", () => ({
 }));
 
 vi.mock("@/components/ui/drawer", () => ({
-  Drawer: ({ open, children }: { open: boolean; children: ReactNode }) => (open ? <div>{children}</div> : null),
+  Drawer: ({
+    open,
+    children,
+    repositionInputs,
+  }: {
+    open: boolean;
+    children: ReactNode;
+    repositionInputs?: boolean;
+  }) => {
+    mocks.drawerRootProps.push({ open, repositionInputs });
+    return open ? <div data-reposition-inputs={String(repositionInputs)}>{children}</div> : null;
+  },
   DrawerContent: ({ children, className }: { children: ReactNode; className?: string }) => <div className={className}>{children}</div>,
   DrawerHeader: ({ children, className }: { children: ReactNode; className?: string }) => <div className={className}>{children}</div>,
   DrawerTitle: ({ children }: { children: ReactNode }) => <div>{children}</div>,
@@ -223,9 +236,11 @@ describe("JourneysCompanionPlannerController", () => {
     mocks.startNewChat.mockReset();
     mocks.archiveCurrentThread.mockReset();
     mocks.resumeThread.mockReset();
+    mocks.toggleRecording.mockReset();
     mocks.retryLastMessage.mockReset();
     mocks.confirmPendingAction.mockReset();
     mocks.cancelPendingAction.mockReset();
+    mocks.drawerRootProps.length = 0;
     Object.defineProperty(window, "innerHeight", {
       configurable: true,
       writable: true,
@@ -287,7 +302,7 @@ describe("JourneysCompanionPlannerController", () => {
 
     expect(screen.getByTestId("journeys-companion-new-chat-button")).toBeInTheDocument();
     expect(screen.getByTestId("journeys-companion-thread-history-button")).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("chat")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Talk to Cosmiq")).toBeInTheDocument();
 
     const assistantBubble = screen.getByText("thread:assistant-1").closest('[data-message-role="assistant"]');
     expect(assistantBubble).toBeInTheDocument();
@@ -438,7 +453,7 @@ describe("JourneysCompanionPlannerController", () => {
   });
 
   it("keeps drawer height responsive without lifting the whole shell above the keyboard", () => {
-    const visualViewport = createMockVisualViewport({ height: 820 });
+    const visualViewport = createMockVisualViewport({ height: 900 });
     Object.defineProperty(window, "visualViewport", {
       configurable: true,
       writable: true,
@@ -454,8 +469,10 @@ describe("JourneysCompanionPlannerController", () => {
     );
 
     const shell = screen.getByTestId("journeys-companion-planner-shell");
+    const composerDock = screen.getByTestId("journeys-companion-planner-composer-dock");
+    expect(mocks.drawerRootProps.some((props) => props.open && props.repositionInputs === false)).toBe(true);
     expect(shell.style.height).toBe("736px");
-    expect(shell.style.paddingBottom).toBe("");
+    expect(composerDock.className).not.toContain("pb-[max(0.75rem,env(safe-area-inset-bottom))]");
 
     act(() => {
       visualViewport.height = 540;
@@ -463,7 +480,38 @@ describe("JourneysCompanionPlannerController", () => {
     });
 
     expect(shell.style.height).toBe("516px");
-    expect(shell.style.paddingBottom).toBe("");
+    expect(composerDock.className).toContain("pb-[max(0.75rem,env(safe-area-inset-bottom))]");
+  });
+
+  it("opens keyboard dictation on native ios without toggling app recording", () => {
+    mocks.isNativePlatform = true;
+    mocks.platform = "ios";
+
+    render(
+      <JourneysCompanionPlannerController
+        open
+        onOpenChange={vi.fn()}
+        presentation="drawer"
+      />,
+    );
+
+    const micButton = screen.getByTestId("journeys-companion-planner-mic-button");
+    const composer = screen.getByLabelText("Message your companion") as HTMLTextAreaElement;
+    const focusSpy = vi.spyOn(composer, "focus");
+    const selectionSpy = vi.spyOn(composer, "setSelectionRange");
+
+    expect(micButton).toHaveAccessibleName("Open keyboard dictation");
+    expect(micButton).not.toBeDisabled();
+
+    fireEvent.click(micButton);
+
+    expect(focusSpy).toHaveBeenCalled();
+    expect(selectionSpy).toHaveBeenCalledWith(composer.value.length, composer.value.length);
+    expect(mocks.toggleRecording).not.toHaveBeenCalled();
+    expect(screen.queryByLabelText("Stop recording")).not.toBeInTheDocument();
+
+    selectionSpy.mockRestore();
+    focusSpy.mockRestore();
   });
 
   it("auto-grows and shrinks the composer as the draft changes", () => {
@@ -476,6 +524,8 @@ describe("JourneysCompanionPlannerController", () => {
     );
 
     const composer = screen.getByTestId("journeys-companion-planner-text-input") as HTMLTextAreaElement;
+    expect(composer).toHaveAttribute("enterkeyhint", "send");
+    expect(screen.getByLabelText("Message your companion")).toBe(composer);
     let mockedScrollHeight = 68;
 
     Object.defineProperty(composer, "scrollHeight", {

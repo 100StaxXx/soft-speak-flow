@@ -428,11 +428,9 @@ const JourneysCompanionPlannerBody = memo(({
         height: `${drawerLayout.shellHeight}px`,
       }
     : undefined;
-  const composerDockStyle = isDrawerPresentation && drawerLayout.keyboardInset > 0
-    ? {
-        paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))",
-      }
-    : undefined;
+  const composerDockClassName = isDrawerPresentation && drawerLayout.keyboardInset > 0
+    ? "pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+    : "";
 
   return (
     <>
@@ -676,8 +674,7 @@ const JourneysCompanionPlannerBody = memo(({
             </div>
 
             <div
-              className="p-4 pt-3 sm:p-5"
-              style={composerDockStyle}
+              className={cn("p-4 pt-3 sm:p-5", composerDockClassName)}
               data-testid="journeys-companion-planner-composer-dock"
             >
               <div className="flex items-center gap-3 rounded-[1.8rem] border-[3px] border-[#6d3518] bg-[linear-gradient(180deg,#fff2d0_0%,#ffd37a_100%)] px-3 py-3 shadow-[0_6px_0_rgba(109,53,24,0.76),inset_0_2px_0_rgba(255,255,255,0.46)]">
