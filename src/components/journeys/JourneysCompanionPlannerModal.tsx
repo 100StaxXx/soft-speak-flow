@@ -10,7 +10,7 @@ import {
 } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { Capacitor } from "@capacitor/core";
-import { Archive, Check, ChevronRight, Loader2, Plus, Send, X } from "lucide-react";
+import { Archive, Check, ChevronRight, Loader2, Mic, MicOff, Plus, Send, X } from "lucide-react";
 
 import { CompanionImage, CompanionPortraitShell } from "@/components/CompanionImage";
 import { Button } from "@/components/ui/button";
@@ -28,6 +28,7 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer";
+import { PermissionRequestDialog } from "@/components/PermissionRequestDialog";
 import { Textarea } from "@/components/ui/textarea";
 import { useCompanionAssistant } from "@/hooks/useCompanionAssistant";
 import { useJourneysCompanionVisual } from "@/hooks/useJourneysCompanionVisual";
@@ -629,42 +630,71 @@ const JourneysCompanionPlannerBody = memo(({
             </div>
 
             <div className="p-4 pt-3 sm:p-5">
-              <div className="flex items-end gap-3 rounded-[1.8rem] border-[3px] border-[#221d1f] bg-[#111114] px-4 py-3 shadow-[inset_0_2px_0_rgba(255,255,255,0.05)]">
+              <div className="flex items-center gap-3 rounded-[1.8rem] border-[3px] border-[#6d3518] bg-[linear-gradient(180deg,#fff3d8_0%,#ffd57d_100%)] px-4 py-3 shadow-[0_8px_0_rgba(109,53,24,0.82),inset_0_2px_0_rgba(255,255,255,0.5)]">
+                <button
+                  type="button"
+                  onClick={assistant.toggleRecording}
+                  disabled={!assistant.isVoiceSupported && !assistant.isRecording}
+                  className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-full border-[3px] border-[#6d3518] bg-[linear-gradient(180deg,#fffdf8_0%,#fff6e7_100%)] text-[#8a4a1d] shadow-[0_6px_0_rgba(109,53,24,0.82)] transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+                  aria-label={assistant.isRecording ? "Stop recording" : "Start recording"}
+                  data-testid="journeys-companion-planner-mic-button"
+                >
+                  {assistant.isRecording ? <MicOff className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
+                </button>
                 <label htmlFor="journeys-companion-chat-input" className="sr-only">
                   Message your companion
                 </label>
-                <Textarea
-                  ref={composerRef}
-                  id="journeys-companion-chat-input"
-                  rows={1}
-                  value={assistant.draftInput}
-                  onChange={(event) => {
-                    assistant.setDraftInput(event.target.value);
-                  }}
-                  onKeyDown={handleComposerKeyDown}
-                  onFocus={keepBottomContentVisible}
-                  placeholder={assistant.placeholder}
-                  className="min-h-[52px] flex-1 resize-none border-none bg-transparent px-0 text-base text-white placeholder:text-white/45 focus-visible:ring-0"
-                  data-testid="journeys-companion-planner-text-input"
-                />
-                <button
-                  type="button"
-                  onClick={assistant.submitTypedMessage}
-                  disabled={assistant.isSubmitting || assistant.isResolvingAction || !assistant.draftInput.trim()}
-                  className="inline-flex h-14 min-w-[5.25rem] items-center justify-center rounded-[1.3rem] border-[3px] border-[#5d3114] bg-[linear-gradient(180deg,#fffaf0_0%,#ffe2a6_100%)] px-4 text-[#5b2e13] shadow-[0_6px_0_rgba(77,40,17,0.82)] transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
-                  data-testid="journeys-companion-planner-send-button"
-                >
-                  {assistant.isSubmitting || assistant.isResolvingAction ? (
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                  ) : (
-                    <Send className="h-5 w-5" />
-                  )}
-                </button>
+                <div className="flex min-w-0 flex-1 items-center gap-3">
+                  <div className="flex min-w-0 flex-1 items-center rounded-[1.45rem] border-[3px] border-[#6d3518] bg-[linear-gradient(180deg,#fffefb_0%,#f7f0e7_100%)] px-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]">
+                    <Textarea
+                      ref={composerRef}
+                      id="journeys-companion-chat-input"
+                      rows={1}
+                      value={assistant.draftInput}
+                      onChange={(event) => {
+                        assistant.setDraftInput(event.target.value);
+                      }}
+                      onKeyDown={handleComposerKeyDown}
+                      onFocus={keepBottomContentVisible}
+                      placeholder={assistant.placeholder}
+                      className="min-h-[52px] flex-1 resize-none border-none bg-transparent px-0 py-3 text-base text-[#8a5a35] placeholder:text-[#b1865c] focus-visible:ring-0"
+                      data-testid="journeys-companion-planner-text-input"
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={assistant.submitTypedMessage}
+                    disabled={assistant.isSubmitting || assistant.isResolvingAction || !assistant.draftInput.trim()}
+                    className="inline-flex h-14 min-w-[8.5rem] shrink-0 items-center justify-center gap-2 rounded-[1.5rem] border-[3px] border-[#a5b96c] bg-[linear-gradient(180deg,#edf992_0%,#d7ea63_100%)] px-5 text-[1.05rem] font-semibold text-[#7f7a3e] shadow-[0_6px_0_rgba(126,138,63,0.72)] transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+                    data-testid="journeys-companion-planner-send-button"
+                  >
+                    {assistant.isSubmitting || assistant.isResolvingAction ? (
+                      <>
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        <span>Thinking</span>
+                      </>
+                    ) : (
+                      <>
+                        <Send className="h-5 w-5" />
+                        <span>Send</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
+
+      <PermissionRequestDialog
+        isOpen={assistant.showPermissionDialog}
+        onClose={() => assistant.setShowPermissionDialog(false)}
+        onRequestPermission={assistant.requestMicrophonePermission}
+        permissionStatus={assistant.permissionStatus}
+        isRequesting={assistant.isRequestingPermission}
+      />
 
       <JourneysCompanionThreadPicker
         open={isThreadPickerOpen}
