@@ -30,6 +30,20 @@ export const mentorVoices: Record<string, MentorVoiceConfig> = {
       use_speaker_boost: true,
     },
   },
+  lyra: {
+    mentorSlug: "lyra",
+    mentorName: "Lyra",
+    voiceName: "Lyra",
+    voiceId: "fgDJOgmENIR82PueQrVs",
+    defaultIntensity: "gentle",
+    categories: ["clarity", "signal", "insight"],
+    voiceSettings: {
+      stability: 0.74,
+      similarity_boost: 0.84,
+      style_exaggeration: 0.22,
+      use_speaker_boost: true,
+    },
+  },
   icon: {
     mentorSlug: "icon",
     mentorName: "The Icon",

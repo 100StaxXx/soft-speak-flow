@@ -37,6 +37,7 @@ export type OnboardingAssignmentKey =
 
 export const ACTIVE_ONBOARDING_MENTOR_SLUGS = [
   "sage",
+  "lyra",
   "icon",
   "charles",
   "princess",
@@ -58,13 +59,14 @@ type MentorScoreCard = {
 };
 
 const ENERGY_CANDIDATES: Record<EnergyOptionId, readonly OnboardingMentorSlug[]> = {
-  feminine_presence: ["princess", "icon"],
+  feminine_presence: ["princess", "icon", "lyra"],
   masculine_presence: ["sage", "operator", "rival", "charles"],
-  either_works: ["sage", "icon", "charles", "princess", "operator", "rival"],
+  either_works: ["sage", "lyra", "icon", "charles", "princess", "operator", "rival"],
 };
 
 const MENTOR_PRIORITY: readonly OnboardingMentorSlug[] = [
   "sage",
+  "lyra",
   "princess",
   "operator",
   "icon",
@@ -91,6 +93,26 @@ const SCORE_CARDS: Record<OnboardingMentorSlug, MentorScoreCard> = {
       emotional_reassurance: 4,
       belief_support: 3,
       pressure_standards: 1,
+    },
+  },
+  lyra: {
+    focus: {
+      clarity_mindset: 5,
+      emotions_healing: 4,
+      discipline_performance: 1,
+      confidence_self_belief: 3,
+    },
+    tone: {
+      gentle_compassionate: 4,
+      encouraging_supportive: 3,
+      calm_grounded: 5,
+      direct_demanding: 0,
+    },
+    progress: {
+      principles_logic: 3,
+      emotional_reassurance: 4,
+      belief_support: 4,
+      pressure_standards: 0,
     },
   },
   icon: {
@@ -338,9 +360,9 @@ export const ONBOARDING_MENTOR_ASSIGNMENTS: Record<OnboardingAssignmentKey, Onbo
   ) as Record<OnboardingAssignmentKey, OnboardingMentorSlug>;
 
 export const SAME_ENERGY_FALLBACKS: Record<EnergyOptionId, readonly OnboardingMentorSlug[]> = {
-  feminine_presence: ["princess", "icon"],
+  feminine_presence: ["princess", "icon", "lyra"],
   masculine_presence: ["sage", "operator", "rival", "charles"],
-  either_works: ["sage", "princess", "operator", "icon", "rival", "charles"],
+  either_works: ["sage", "lyra", "princess", "operator", "icon", "rival", "charles"],
 };
 
 export const resolvePreassignedMentorSlug = (

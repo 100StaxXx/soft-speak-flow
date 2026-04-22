@@ -1,5 +1,6 @@
 export const ACTIVE_MENTOR_SLUGS = [
   "sage",
+  "lyra",
   "icon",
   "charles",
   "princess",
@@ -24,6 +25,7 @@ export const LEGACY_MENTOR_ALIASES: Record<string, ActiveMentorSlug> = {
 
 export const MENTOR_DISPLAY_ORDER: readonly ActiveMentorSlug[] = [
   "sage",
+  "lyra",
   "icon",
   "charles",
   "princess",
@@ -33,6 +35,7 @@ export const MENTOR_DISPLAY_ORDER: readonly ActiveMentorSlug[] = [
 
 export const MENTOR_AVATAR_POSITION_MAP: Record<ActiveMentorSlug | LegacyOnlyMentorSlug, string> = {
   sage: "center 22%",
+  lyra: "center 22%",
   icon: "center 18%",
   charles: "center 35%",
   princess: "center 18%",
