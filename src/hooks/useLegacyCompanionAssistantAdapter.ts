@@ -217,10 +217,10 @@ export function useLegacyCompanionAssistantAdapter({
     [activePendingProposal],
   );
 
-  const placeholder = hasOpenPlannerThread
-    ? "Reply here..."
-    : surface === "journeys"
-      ? "Talk to Cosmiq"
+  const placeholder = surface === "journeys"
+    ? "chat"
+    : hasOpenPlannerThread
+      ? "Reply here..."
       : "Talk to Cosmiq naturally.";
 
   const submitMessage = useCallback(async (

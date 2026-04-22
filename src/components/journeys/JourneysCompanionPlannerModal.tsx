@@ -98,8 +98,8 @@ const formatThreadTimestamp = (value: string) => {
 };
 
 const speechBubbleClassName = {
-  assistant: "border-[#6d3518] bg-[linear-gradient(180deg,#fffaf0_0%,#ffe4b1_100%)] text-[#5b2e13] shadow-[0_10px_0_rgba(109,53,24,0.88),0_18px_26px_rgba(76,34,12,0.22)]",
-  user: "border-[#4f6716] bg-[linear-gradient(180deg,#d8ff6d_0%,#b0eb3e_100%)] text-[#243b07] shadow-[0_10px_0_rgba(79,103,22,0.92),0_18px_26px_rgba(52,75,13,0.22)]",
+  assistant: "border-[#6d3518] bg-[linear-gradient(180deg,#fffaf0_0%,#ffe4b1_100%)] text-[#5b2e13] shadow-[0_8px_0_rgba(109,53,24,0.82),0_14px_22px_rgba(76,34,12,0.18)]",
+  user: "border-[#4f6716] bg-[linear-gradient(180deg,#d8ff6d_0%,#b0eb3e_100%)] text-[#243b07] shadow-[0_8px_0_rgba(79,103,22,0.86),0_14px_22px_rgba(52,75,13,0.18)]",
 } as const;
 
 function CompanionSpeechBubble({
@@ -255,13 +255,17 @@ const JourneysCompanionPlannerBody = memo(({
   const transcriptEndRef = useRef<HTMLDivElement | null>(null);
   const handledThreadHistoryIntentRef = useRef<string | null>(null);
   const isDrawerPresentation = presentation === "drawer";
+  const isNativeIOS = useMemo(
+    () => Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios",
+    [],
+  );
   const [drawerLayout, setDrawerLayout] = useState<JourneysCompanionDrawerLayout>(() => getDrawerLayout());
   const [isThreadPickerOpen, setIsThreadPickerOpen] = useState(false);
 
   const shouldAutoFocusComposer = useMemo(() => {
     if (typeof window === "undefined") return false;
-    return !(Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios");
-  }, []);
+    return !isNativeIOS;
+  }, [isNativeIOS]);
 
   const resizeComposer = useCallback(() => {
     const composer = composerRef.current;
@@ -346,6 +350,21 @@ const JourneysCompanionPlannerBody = memo(({
     assistant.submitTypedMessage();
   }, [assistant]);
 
+  const handleMicButtonClick = useCallback(() => {
+    if (!isNativeIOS) {
+      assistant.toggleRecording();
+      return;
+    }
+
+    const composer = composerRef.current;
+    if (!composer) return;
+
+    const cursorPosition = composer.value.length;
+    composer.focus({ preventScroll: true });
+    composer.setSelectionRange(cursorPosition, cursorPosition);
+    keepBottomContentVisible();
+  }, [assistant, isNativeIOS, keepBottomContentVisible]);
+
   const handleOpenThreadPicker = useCallback(async () => {
     if (assistant.canArchiveThread) {
       await assistant.archiveCurrentThread();
@@ -395,6 +414,15 @@ const JourneysCompanionPlannerBody = memo(({
 
   const planDay = assistant.structuredResponse?.planDay ?? null;
   const comingUp = assistant.structuredResponse?.comingUp ?? null;
+  const usesKeyboardDictation = isNativeIOS;
+  const micButtonDisabled = usesKeyboardDictation
+    ? false
+    : !assistant.isVoiceSupported && !assistant.isRecording;
+  const micButtonLabel = usesKeyboardDictation
+    ? "Open keyboard dictation"
+    : assistant.isRecording
+      ? "Stop recording"
+      : "Start recording";
   const shellStyle = isDrawerPresentation
     ? {
         height: `${drawerLayout.shellHeight}px`,
@@ -409,7 +437,7 @@ const JourneysCompanionPlannerBody = memo(({
   return (
     <>
       <div
-        className="relative overflow-hidden rounded-[2.2rem] border-[4px] border-[#4d2811] bg-[radial-gradient(circle_at_top_left,rgba(255,245,207,0.24),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(255,147,41,0.22),transparent_28%),linear-gradient(180deg,#a33518_0%,#751e0d_66%,#541208_100%)] text-white shadow-[0_18px_0_#4d2811,0_34px_86px_-36px_rgba(44,12,4,0.72)]"
+        className="relative overflow-hidden rounded-[2.2rem] border-[4px] border-[#4d2811] bg-[radial-gradient(circle_at_top_left,rgba(255,245,207,0.24),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(255,147,41,0.18),transparent_28%),linear-gradient(180deg,#a33518_0%,#751e0d_66%,#541208_100%)] text-white shadow-[0_14px_0_#4d2811,0_28px_72px_-40px_rgba(44,12,4,0.64)]"
         data-testid="journeys-companion-planner-modal"
       >
         <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.14),transparent_14%,transparent_84%,rgba(74,18,9,0.14))]" />
@@ -424,7 +452,7 @@ const JourneysCompanionPlannerBody = memo(({
           data-testid="journeys-companion-planner-shell"
         >
           <div
-            className="flex items-center gap-3 rounded-[1.9rem] border-[3px] border-[#5d3114] bg-[linear-gradient(180deg,rgba(244,186,140,0.78),rgba(194,106,63,0.82))] px-4 py-3 shadow-[0_10px_0_rgba(77,40,17,0.84)]"
+            className="flex items-center gap-3 rounded-[1.9rem] border-[3px] border-[#5d3114] bg-[linear-gradient(180deg,rgba(244,186,140,0.84),rgba(194,106,63,0.8))] px-4 py-3 shadow-[0_8px_0_rgba(77,40,17,0.8)]"
             data-testid="journeys-companion-planner-chat-header"
           >
             {avatar}
@@ -441,7 +469,7 @@ const JourneysCompanionPlannerBody = memo(({
                   void handleNewChat();
                 }}
                 disabled={!assistant.canStartNewChat}
-                className="inline-flex h-14 w-14 items-center justify-center rounded-[1.2rem] border-[3px] border-[#5d3114] bg-[linear-gradient(180deg,rgba(255,250,240,0.26),rgba(255,206,108,0.18))] text-white shadow-[0_6px_0_rgba(77,40,17,0.82)] transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex h-14 w-14 items-center justify-center rounded-[1.2rem] border-[3px] border-[#5d3114] bg-[linear-gradient(180deg,rgba(255,250,240,0.28),rgba(255,206,108,0.2))] text-white shadow-[0_5px_0_rgba(77,40,17,0.78)] transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
                 aria-label="Start a new chat"
                 data-testid="journeys-companion-new-chat-button"
               >
@@ -452,7 +480,7 @@ const JourneysCompanionPlannerBody = memo(({
                 onClick={() => {
                   void handleOpenThreadPicker();
                 }}
-                className="inline-flex h-14 w-14 items-center justify-center rounded-[1.2rem] border-[3px] border-[#5d3114] bg-[linear-gradient(180deg,rgba(255,250,240,0.26),rgba(255,206,108,0.18))] text-white shadow-[0_6px_0_rgba(77,40,17,0.82)] transition-transform hover:-translate-y-0.5"
+                className="inline-flex h-14 w-14 items-center justify-center rounded-[1.2rem] border-[3px] border-[#5d3114] bg-[linear-gradient(180deg,rgba(255,250,240,0.28),rgba(255,206,108,0.2))] text-white shadow-[0_5px_0_rgba(77,40,17,0.78)] transition-transform hover:-translate-y-0.5"
                 aria-label="Open past chats"
                 data-testid="journeys-companion-thread-history-button"
               >
@@ -461,14 +489,14 @@ const JourneysCompanionPlannerBody = memo(({
             </div>
           </div>
 
-          <div className="mt-4 flex min-h-0 flex-1 flex-col overflow-hidden rounded-[2rem] border-[4px] border-[#5d3114] bg-[linear-gradient(180deg,#9c3d21_0%,#873119_100%)] shadow-[inset_0_3px_0_rgba(255,248,225,0.14)]">
-            <div className="relative flex min-h-0 flex-1 overflow-hidden rounded-[1.55rem] border-[3px] border-[#6d3518] bg-[linear-gradient(180deg,#9c4223_0%,#883119_100%)] m-4 mb-0 shadow-[inset_0_2px_0_rgba(255,238,196,0.1)]">
+          <div className="mt-4 flex min-h-0 flex-1 flex-col overflow-hidden rounded-[2rem] border-[4px] border-[#5d3114] bg-[linear-gradient(180deg,#9c3d21_0%,#873119_100%)] shadow-[inset_0_2px_0_rgba(255,248,225,0.12)]">
+            <div className="m-4 mb-0 flex min-h-0 flex-1 overflow-hidden rounded-[1.55rem] border-[3px] border-[#6d3518] bg-[linear-gradient(180deg,#9c4223_0%,#883119_100%)] shadow-[inset_0_2px_0_rgba(255,238,196,0.08)]">
               <div
                 ref={transcriptViewportRef}
-                className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5 [scrollbar-color:#2e314f_transparent] [scrollbar-width:thin]"
+                className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5 [scrollbar-color:#8f4c20_transparent] [scrollbar-width:thin]"
                 data-testid="journeys-companion-planner-transcript"
               >
-                <div className="space-y-5 pr-6">
+                <div className="space-y-5">
                   {assistant.messages.map((message) => (
                     <div
                       key={message.id}
@@ -645,36 +673,41 @@ const JourneysCompanionPlannerBody = memo(({
                   <div ref={transcriptEndRef} />
                 </div>
               </div>
-
-              <div
-                aria-hidden="true"
-                className="pointer-events-none absolute inset-y-6 right-3 w-2 rounded-full bg-[#2c2748] shadow-[inset_0_2px_3px_rgba(255,255,255,0.08)]"
-              >
-                <div className="mt-14 h-24 rounded-full bg-[#34355d]" />
-              </div>
             </div>
 
-            <div className="p-4 pt-3 sm:p-5" style={composerDockStyle}>
-              <div className="flex items-center gap-3 rounded-[1.8rem] border-[3px] border-[#6d3518] bg-[linear-gradient(180deg,#fff3d8_0%,#ffd57d_100%)] px-4 py-3 shadow-[0_8px_0_rgba(109,53,24,0.82),inset_0_2px_0_rgba(255,255,255,0.5)]">
+            <div
+              className="p-4 pt-3 sm:p-5"
+              style={composerDockStyle}
+              data-testid="journeys-companion-planner-composer-dock"
+            >
+              <div className="flex items-center gap-3 rounded-[1.8rem] border-[3px] border-[#6d3518] bg-[linear-gradient(180deg,#fff2d0_0%,#ffd37a_100%)] px-3 py-3 shadow-[0_6px_0_rgba(109,53,24,0.76),inset_0_2px_0_rgba(255,255,255,0.46)]">
                 <button
                   type="button"
-                  onClick={assistant.toggleRecording}
-                  disabled={!assistant.isVoiceSupported && !assistant.isRecording}
-                  className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-full border-[3px] border-[#6d3518] bg-[linear-gradient(180deg,#fffdf8_0%,#fff6e7_100%)] text-[#8a4a1d] shadow-[0_6px_0_rgba(109,53,24,0.82)] transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
-                  aria-label={assistant.isRecording ? "Stop recording" : "Start recording"}
+                  onClick={handleMicButtonClick}
+                  disabled={micButtonDisabled}
+                  className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-full border-[3px] border-[#6d3518] bg-[linear-gradient(180deg,#fffdf8_0%,#fff6e7_100%)] text-[#8a4a1d] shadow-[0_5px_0_rgba(109,53,24,0.78)] transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+                  aria-label={micButtonLabel}
                   data-testid="journeys-companion-planner-mic-button"
                 >
-                  {assistant.isRecording ? <MicOff className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
+                  {usesKeyboardDictation || !assistant.isRecording ? (
+                    <Mic className="h-6 w-6" />
+                  ) : (
+                    <MicOff className="h-6 w-6" />
+                  )}
                 </button>
                 <label htmlFor="journeys-companion-chat-input" className="sr-only">
                   Message your companion
                 </label>
                 <div className="flex min-w-0 flex-1 items-center gap-3">
-                  <div className="flex min-w-0 flex-1 items-center rounded-[1.45rem] border-[3px] border-[#6d3518] bg-[linear-gradient(180deg,#fffefb_0%,#f7f0e7_100%)] px-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]">
+                  <div
+                    className="flex min-w-0 flex-1 items-center rounded-[1.45rem] border-[2px] border-[#8b5630] bg-[linear-gradient(180deg,#fffdf9_0%,#f8efe4_100%)] px-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.84)] transition-colors duration-150 focus-within:border-[#d0833e] focus-within:bg-[linear-gradient(180deg,#fffdfa_0%,#fff7ee_100%)] focus-within:shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_0_0_2px_rgba(255,225,185,0.55)]"
+                    data-testid="journeys-companion-planner-input-shell"
+                  >
                     <Textarea
                       ref={composerRef}
                       id="journeys-companion-chat-input"
                       rows={1}
+                      enterKeyHint="send"
                       value={assistant.draftInput}
                       onChange={(event) => {
                         assistant.setDraftInput(event.target.value);
@@ -682,7 +715,7 @@ const JourneysCompanionPlannerBody = memo(({
                       onKeyDown={handleComposerKeyDown}
                       onFocus={keepBottomContentVisible}
                       placeholder={assistant.placeholder}
-                      className="min-h-[52px] flex-1 resize-none overflow-y-hidden border-none bg-transparent px-0 py-3 text-base text-[#8a5a35] placeholder:text-[#b1865c] focus-visible:ring-0"
+                      className="min-h-[52px] flex-1 resize-none overflow-y-hidden rounded-none border-0 bg-transparent px-0 py-3 text-base font-medium text-[#6f3916] shadow-none outline-none caret-[#a24f20] placeholder:text-[#a77449] focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
                       data-testid="journeys-companion-planner-text-input"
                     />
                   </div>
@@ -691,7 +724,7 @@ const JourneysCompanionPlannerBody = memo(({
                     type="button"
                     onClick={assistant.submitTypedMessage}
                     disabled={assistant.isSubmitting || assistant.isResolvingAction || !assistant.draftInput.trim()}
-                    className="inline-flex h-14 min-w-[8.5rem] shrink-0 items-center justify-center gap-2 rounded-[1.5rem] border-[3px] border-[#a5b96c] bg-[linear-gradient(180deg,#edf992_0%,#d7ea63_100%)] px-5 text-[1.05rem] font-semibold text-[#7f7a3e] shadow-[0_6px_0_rgba(126,138,63,0.72)] transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex h-14 min-w-[8.5rem] shrink-0 items-center justify-center gap-2 rounded-[1.5rem] border-[3px] border-[#8da24b] bg-[linear-gradient(180deg,#eff884_0%,#d9ea5c_100%)] px-5 text-[1.05rem] font-semibold text-[#55610d] shadow-[0_5px_0_rgba(107,124,46,0.72)] transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
                     data-testid="journeys-companion-planner-send-button"
                   >
                     {assistant.isSubmitting || assistant.isResolvingAction ? (
@@ -772,7 +805,7 @@ export const JourneysCompanionPlannerModal = memo(function JourneysCompanionPlan
   }
 
   return (
-    <Drawer open={open} onOpenChange={onOpenChange}>
+    <Drawer open={open} onOpenChange={onOpenChange} repositionInputs={false}>
       <DrawerContent className="border-none bg-transparent p-0 shadow-none">
         <DrawerHeader className="sr-only">
           <DrawerTitle>Cosmiq companion</DrawerTitle>

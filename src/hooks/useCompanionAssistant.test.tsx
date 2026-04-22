@@ -63,7 +63,7 @@ vi.mock("@/hooks/useCompanionVoiceSettings", () => ({
 vi.mock("@/hooks/useLegacyCompanionAssistantAdapter", () => ({
   useLegacyCompanionAssistantAdapter: ({ enabled }: { enabled: boolean }) => ({
     todayLabel: "Saturday, April 18",
-    placeholder: "Talk to Cosmiq",
+    placeholder: "chat",
     messages: [],
     pendingAction: null,
     isSubmitting: false,
@@ -238,6 +238,7 @@ describe("useCompanionAssistant", () => {
       expect(result.current.activeThread?.sessionId).toBe("persisted-session");
     });
 
+    expect(result.current.placeholder).toBe("chat");
     expect(result.current.messages[0]?.content).toBe("What does tomorrow look like?");
     expect(result.current.pendingAction?.id).toBe("action-1");
   });

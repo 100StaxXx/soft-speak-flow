@@ -217,10 +217,10 @@ export function useCompanionAssistant({
   const scopeKey = `${surface}:${user?.id ?? "anon"}:${companion?.id ?? "none"}`;
   const baseGreeting = surface === "journeys" ? null : greeting;
   const todayLabel = getTodayLabel();
-  const placeholder = pendingAction
-    ? "Reply here or confirm the pending action."
-    : surface === "journeys"
-      ? "Talk to Cosmiq"
+  const placeholder = surface === "journeys"
+    ? "chat"
+    : pendingAction
+      ? "Reply here or confirm the pending action."
       : "Talk to Cosmiq naturally.";
 
   const threadsQuery = useQuery({

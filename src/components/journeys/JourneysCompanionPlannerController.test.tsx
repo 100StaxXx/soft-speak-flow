@@ -95,7 +95,7 @@ vi.mock("@/hooks/useCompanionAssistant", async () => {
 
       return {
         todayLabel: assistantId,
-        placeholder: "Talk to Cosmiq",
+        placeholder: "chat",
         messages,
         structuredResponse: mocks.structuredResponse,
         pendingAction: mocks.pendingAction,
@@ -287,6 +287,7 @@ describe("JourneysCompanionPlannerController", () => {
 
     expect(screen.getByTestId("journeys-companion-new-chat-button")).toBeInTheDocument();
     expect(screen.getByTestId("journeys-companion-thread-history-button")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("chat")).toBeInTheDocument();
 
     const assistantBubble = screen.getByText("thread:assistant-1").closest('[data-message-role="assistant"]');
     expect(assistantBubble).toBeInTheDocument();
