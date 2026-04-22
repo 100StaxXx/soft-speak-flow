@@ -2023,9 +2023,8 @@ export function useCompanionPlanner({
           timeoutCode: "PLANNER_CLASSIFICATION_TIMEOUT",
         },
       ).catch((error) => {
-        console.warn(
+        console.info(
           "Planner intent classification preflight timed out; falling back to backend classification.",
-          error,
         );
         return null;
       });

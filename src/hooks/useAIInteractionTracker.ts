@@ -24,6 +24,17 @@ interface UpdateLearningOptions {
   wasSuccessful: boolean;
 }
 
+function isRecoverableTrackerError(err: unknown): boolean {
+  const msg = (err instanceof Error ? err.message : String(err)).toLowerCase();
+  return (
+    msg.includes("function not found") ||
+    msg.includes("no route matched") ||
+    msg.includes("failed to fetch") ||
+    msg.includes("networkerror") ||
+    msg.includes("load failed")
+  );
+}
+
 async function invokeTracker(body: Record<string, unknown>) {
   const { error } = await supabase.functions.invoke('record-ai-interaction', {
     body,
@@ -60,7 +71,9 @@ export function useAIInteractionTracker() {
         modifications: options.modifications,
       });
     } catch (err) {
-      console.warn('Error tracking interaction (non-blocking):', err);
+      if (!isRecoverableTrackerError(err)) {
+        console.warn('Error tracking interaction (non-blocking):', err);
+      }
     }
   }, [user]);
 
@@ -144,7 +157,9 @@ export function useAIInteractionTracker() {
         metadata,
       });
     } catch (err) {
-      console.warn('Error tracking daily plan outcome (non-blocking):', err);
+      if (!isRecoverableTrackerError(err)) {
+        console.warn('Error tracking daily plan outcome (non-blocking):', err);
+      }
     }
   }, [user]);
 

@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS public.companion_pending_actions (
   normalized_payload jsonb NOT NULL DEFAULT '{}'::jsonb,
   summary text NOT NULL,
   affected_entities jsonb NOT NULL DEFAULT '{}'::jsonb,
-  confirmation_message text NOT NULL,
+  confirmation_message text,
   created_at timestamptz NOT NULL DEFAULT now(),
   expires_at timestamptz NOT NULL,
   confirmed_at timestamptz,
