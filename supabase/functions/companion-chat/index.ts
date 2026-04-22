@@ -99,7 +99,6 @@ const RequestSchema = z.object({
   currentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   currentDateTime: z.string().datetime({ offset: true }).optional(),
   journeysContext: JourneysContextSchema,
-  disablePlannerHandoff: z.boolean().optional().default(false),
 });
 
 type JsonObject = Record<string, unknown>;
@@ -772,9 +771,7 @@ serve(async (req) => {
     }
 
     const existingProfile = normalizeProfile(context.learning?.conversation_profile ?? DEFAULT_PROFILE);
-    const planningIntent = parsed.data.disablePlannerHandoff
-      ? false
-      : shouldHandoffToPlanner(parsed.data.message, surface);
+    const planningIntent = shouldHandoffToPlanner(parsed.data.message, surface);
     const costGuardrails = createCostGuardrailSession({
       supabase: createCostGuardrailSupabaseClient(),
       endpointKey: "companion-chat",

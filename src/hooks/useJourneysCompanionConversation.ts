@@ -26,7 +26,6 @@ type JourneysCompanionMessage = {
   createdAt: string;
   speechText?: string;
   inputMode?: CompanionChatInputMode;
-  variant?: "default" | "quest_prompt";
 };
 
 const generateId = () => {
@@ -81,32 +80,15 @@ export function useJourneysCompanionConversation() {
     setPendingPlannerHandoffMessage(null);
   }, []);
 
-  const appendLocalMessage = useCallback((
-    role: JourneysCompanionMessage["role"],
-    content: string,
-    extras: Partial<JourneysCompanionMessage> = {},
-  ) => {
+  const injectAssistantOpening = useCallback((content: string) => {
     const trimmedContent = content.trim();
     if (!trimmedContent) return;
 
-    setMessages((previous) => [
-      ...previous,
-      createMessage(role, trimmedContent, extras),
-    ]);
-  }, []);
-
-  const injectAssistantOpening = useCallback((
-    content: string,
-    extras: Partial<JourneysCompanionMessage> = {},
-  ) => {
-    const trimmedContent = content.trim();
-    if (!trimmedContent) return;
-
-    appendLocalMessage("assistant", trimmedContent, extras);
+    setMessages((previous) => [...previous, createMessage("assistant", trimmedContent)]);
     setPendingPlannerHandoffMessage(null);
     setDraftInput("");
     setInterimText("");
-  }, [appendLocalMessage]);
+  }, []);
 
   const resetThread = useCallback((options?: {
     sessionId?: string;
@@ -146,7 +128,6 @@ export function useJourneysCompanionConversation() {
       currentDate?: string;
       currentDateTime?: string;
       journeysContext?: CompanionChatJourneysContext | null;
-      disablePlannerHandoff?: boolean;
     },
   ) => {
     const message = rawMessage.trim();
@@ -177,7 +158,6 @@ export function useJourneysCompanionConversation() {
           currentDate: options?.currentDate,
           currentDateTime: options?.currentDateTime,
           journeysContext: options?.journeysContext ?? undefined,
-          disablePlannerHandoff: options?.disablePlannerHandoff ?? false,
         } satisfies CompanionChatRequest,
       });
 
@@ -196,7 +176,7 @@ export function useJourneysCompanionConversation() {
           : COMPANION_CHAT_THREAD_HISTORY_DISABLED_REASON,
       );
 
-      if (response.handoffToPlanner && !options?.disablePlannerHandoff) {
+      if (response.handoffToPlanner) {
         setPendingPlannerHandoffMessage(message);
       } else {
         setMessages((previous) => [
@@ -279,7 +259,6 @@ export function useJourneysCompanionConversation() {
     pendingPlannerHandoffMessage,
     threadPersistenceReady,
     threadPersistenceUnavailableReason,
-    appendLocalMessage,
     clearPlannerHandoff,
     injectAssistantOpening,
     resetThread,

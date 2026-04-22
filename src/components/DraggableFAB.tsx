@@ -169,6 +169,24 @@ export const DraggableFAB = ({ onOpenCompanionPlanner, onTap }: DraggableFABProp
     onOpenCompanionPlanner(launchIntent);
   }, [closeMenu, launcherTemplates, onOpenCompanionPlanner]);
 
+  const handleOpenHistory = useCallback(() => {
+    if (!onOpenCompanionPlanner) {
+      closeMenu();
+      return;
+    }
+    closeMenu();
+    const launchIntent: CompanionPlannerLaunchIntent = {
+      id: typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+      message: "",
+      starterIntent: "thread_history",
+      target: "planner",
+      briefingContext: null,
+    };
+    onOpenCompanionPlanner(launchIntent);
+  }, [closeMenu, onOpenCompanionPlanner]);
+
   return (
     <motion.div
       ref={rootRef}
@@ -191,6 +209,7 @@ export const DraggableFAB = ({ onOpenCompanionPlanner, onTap }: DraggableFABProp
         companionLabel={companionLabel}
         options={launcherTemplates}
         onSelect={handleOptionSelect}
+        onOpenHistory={handleOpenHistory}
         popupStyle={popupPlacement.popupStyle}
         tailStyle={popupPlacement.tailStyle}
       />

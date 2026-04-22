@@ -60,7 +60,6 @@ export interface CompanionChatRequest {
   currentDate?: string;
   currentDateTime?: string;
   journeysContext?: CompanionChatJourneysContext;
-  disablePlannerHandoff?: boolean;
 }
 
 export interface CompanionChatResponse {

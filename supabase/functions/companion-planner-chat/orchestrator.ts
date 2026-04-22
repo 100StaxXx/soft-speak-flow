@@ -312,6 +312,22 @@ const isPlanDayClarificationResponse = (
   baseResult.proposals.length === 0 &&
   baseResult.suggestedReminders.length === 0;
 
+const isPlanDayDeterministicResponse = (
+  input: PlannerBuildInput,
+  baseResult: PlannerBuildResult,
+) =>
+  (input.plannerContext.starterIntent === "plan_day" ||
+    input.sessionState.pendingStarterIntent === "plan_day") &&
+  baseResult.followUpQuestions.length === 0 &&
+  (
+    baseResult.mode === "proposal" ||
+    (
+      baseResult.mode === "conversational" &&
+      baseResult.proposals.length === 0 &&
+      baseResult.suggestedReminders.length === 0
+    )
+  );
+
 const getReadyQuestProposalDrafts = (
   baseResult: PlannerBuildResult,
 ) =>
@@ -323,12 +339,6 @@ const getReadyQuestProposalDrafts = (
 const hasReadyQuestProposalResponse = (
   baseResult: PlannerBuildResult,
 ) => baseResult.mode === "proposal" && getReadyQuestProposalDrafts(baseResult).length > 0;
-
-const isPlanDayStarterTurn = (
-  input: PlannerBuildInput,
-) =>
-  input.plannerContext.starterIntent === "plan_day" ||
-  input.sessionState.pendingStarterIntent === "plan_day";
 
 const extractPreservedProposalReplyNotes = (
   reply: string,
@@ -382,14 +392,22 @@ export async function buildOrchestratedPlannerResponse(params: {
     params.baseResult,
   );
 
+  if (
+    params.input.plannerContext.starterIntent === "upcoming_start" &&
+    params.baseResult.mode === "schedule_read"
+  ) {
+    return normalizedBaseResult;
+  }
+
   if (isQuestCaptureStarterResponse(params.baseResult)) {
     return normalizedBaseResult;
   }
 
-  if (
-    hasReadyQuestProposalResponse(params.baseResult) &&
-    !isPlanDayStarterTurn(params.input)
-  ) {
+  if (isPlanDayDeterministicResponse(params.input, params.baseResult)) {
+    return normalizedBaseResult;
+  }
+
+  if (hasReadyQuestProposalResponse(params.baseResult)) {
     return normalizedBaseResult;
   }
 

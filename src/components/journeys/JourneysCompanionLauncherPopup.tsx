@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { Archive } from "lucide-react";
 import type { FABPopupAlignment } from "@/hooks/useDraggableFAB";
 import { cn } from "@/lib/utils";
 import type { JourneysCompanionLauncherTemplate } from "@/shared/journeysCompanionLauncherTemplates";
@@ -10,6 +11,7 @@ interface JourneysCompanionLauncherPopupProps {
   companionLabel: string;
   options: JourneysCompanionLauncherTemplate[];
   onSelect: (option: JourneysCompanionLauncherTemplate) => void;
+  onOpenHistory: () => void;
   popupStyle?: CSSProperties;
   tailStyle?: CSSProperties;
 }
@@ -35,6 +37,7 @@ export function JourneysCompanionLauncherPopup({
   companionLabel,
   options,
   onSelect,
+  onOpenHistory,
   popupStyle,
   tailStyle,
 }: JourneysCompanionLauncherPopupProps) {
@@ -68,10 +71,19 @@ export function JourneysCompanionLauncherPopup({
               )}
               style={tailStyle}
             />
-            <div className="rounded-[1.4rem] border-2 border-white/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(255,244,210,0.88))] px-4 py-3 shadow-[inset_0_3px_0_rgba(255,255,255,0.55)]">
+            <div className="flex items-center justify-between gap-3 rounded-[1.4rem] border-2 border-white/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(255,244,210,0.88))] px-4 py-3 shadow-[inset_0_3px_0_rgba(255,255,255,0.55)]">
               <p className="text-[0.7rem] font-black uppercase tracking-[0.22em] text-[#b04b12]">
                 {companionLabel}
               </p>
+              <button
+                type="button"
+                onClick={onOpenHistory}
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-[3px] border-[#6b3416] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(255,233,183,0.96))] text-[#b04b12] shadow-[0_4px_0_#7a3a14] transition-transform hover:-translate-y-0.5"
+                aria-label="Open past chats"
+                data-testid="journeys-companion-launcher-history-button"
+              >
+                <Archive className="h-4 w-4" />
+              </button>
             </div>
 
             <div className="mt-3 space-y-2.5">
