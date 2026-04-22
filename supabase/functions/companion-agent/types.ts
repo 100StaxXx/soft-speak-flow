@@ -22,9 +22,12 @@ export const COMPANION_AGENT_INTENTS = [
 ] as const;
 
 export const COMPANION_PENDING_ACTION_TYPES = [
+  "campaign_create",
+  "campaign_adjust",
   "task_create",
   "task_update",
   "ritual_create",
+  "ritual_update",
   "reminder_create",
   "campaign_update",
   "journal_entry",

@@ -5,6 +5,117 @@ import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Journeys from "./Journeys";
 
+const bridge = vi.hoisted(() => ({
+  toMockQuest: (task: {
+    id: string;
+    task_text: string;
+    completed: boolean;
+    xp_reward: number;
+    task_date: string | null;
+    scheduled_time: string | null;
+    difficulty?: string | null;
+    is_main_quest: boolean;
+    habit_source_id?: string | null;
+    epic_id?: string | null;
+  }) => ({
+    id: task.id,
+    userId: "user-1",
+    title: task.task_text,
+    xpReward: task.xp_reward,
+    taskDate: task.task_date,
+    scheduledTime: task.scheduled_time,
+    estimatedDuration: null,
+    completed: task.completed,
+    completedAt: null,
+    priority: null,
+    difficulty: task.difficulty ?? null,
+    campaignId: task.epic_id ?? null,
+    campaignTitle: null,
+    habitSourceId: task.habit_source_id ?? null,
+    isMainQuest: task.is_main_quest,
+    isRecurring: false,
+    reminderEnabled: false,
+    reminderMinutesBefore: null,
+    aiGenerated: false,
+    notes: null,
+    location: null,
+    source: null,
+    category: null,
+    imageUrl: null,
+    contactId: null,
+    autoLogInteraction: false,
+    sortOrder: null,
+    recurrencePattern: null,
+    recurrenceDays: [],
+    recurrenceMonthDays: [],
+    recurrenceCustomPeriod: null,
+    recurrenceEndDate: null,
+    subtasks: [],
+    attachments: [],
+  }),
+  toMockCampaign: (epic: {
+    id: string;
+    title: string;
+    status: string;
+    progress_percentage?: number | null;
+    target_days?: number;
+    start_date?: string;
+    end_date?: string | null;
+    epic_habits?: Array<{
+      habit_id: string;
+      habits?: {
+        id: string;
+        title: string;
+        difficulty?: string | null;
+        description?: string | null;
+        frequency?: string;
+        estimated_minutes?: number | null;
+        custom_days?: number[] | null;
+        custom_month_days?: number[] | null;
+        preferred_time?: string | null;
+        category?: string | null;
+      } | null;
+    }>;
+  }) => ({
+    id: epic.id,
+    userId: "user-1",
+    title: epic.title,
+    description: null,
+    status: epic.status,
+    startDate: epic.start_date ?? "2026-03-27",
+    endDate: epic.end_date ?? null,
+    targetDays: epic.target_days ?? 0,
+    progressPercentage: epic.progress_percentage ?? null,
+    themeColor: null,
+    habitCount: epic.epic_habits?.length ?? 0,
+    milestoneCount: 0,
+    latestJourneyPathUrl: null,
+    latestJourneyPathGeneratedAt: null,
+    latestJourneyPathMilestoneIndex: null,
+    createdAt: null,
+    completedAt: null,
+    xpReward: null,
+    isPublic: null,
+    inviteCode: null,
+    storyTypeSlug: null,
+    rituals: (epic.epic_habits ?? []).map((habitLink) => ({
+      habitId: habitLink.habit_id,
+      habit: habitLink.habits ? {
+        id: habitLink.habits.id,
+        title: habitLink.habits.title,
+        difficulty: habitLink.habits.difficulty ?? null,
+        description: habitLink.habits.description ?? null,
+        frequency: habitLink.habits.frequency ?? null,
+        estimatedMinutes: habitLink.habits.estimated_minutes ?? null,
+        customDays: habitLink.habits.custom_days ?? null,
+        customMonthDays: habitLink.habits.custom_month_days ?? null,
+        preferredTime: habitLink.habits.preferred_time ?? null,
+        category: habitLink.habits.category ?? null,
+      } : null,
+    })),
+  }),
+}));
+
 const mocks = vi.hoisted(() => ({
   inboxTasks: [] as Array<{
     id: string;
@@ -318,16 +429,16 @@ vi.mock("@/hooks/useProfile", () => ({
   }),
 }));
 
-vi.mock("@/hooks/useDailyTasks", () => ({
-  useDailyTasks: () => ({
-    tasks: mocks.dailyTasks,
+vi.mock("@/hooks/useQuests", () => ({
+  useQuests: () => ({
+    quests: mocks.dailyTasks.map(bridge.toMockQuest),
     isLoading: false,
-    addTask: mocks.addTask,
-    toggleTask: mocks.toggleTask,
-    updateTask: mocks.updateTask,
-    deleteTask: mocks.deleteTask,
-    restoreTask: mocks.restoreTask,
-    moveTaskToDate: mocks.moveTaskToDate,
+    createQuest: mocks.addTask,
+    toggleQuest: mocks.toggleTask,
+    updateQuest: mocks.updateTask,
+    deleteQuest: mocks.deleteTask,
+    restoreQuest: mocks.restoreTask,
+    moveQuestToDate: mocks.moveTaskToDate,
     completedCount: 0,
     totalCount: mocks.dailyTasks.length,
     isAdding: false,
@@ -387,15 +498,14 @@ vi.mock("@/hooks/useOnboardingTaskCleanup", () => ({
   useOnboardingTaskCleanup: () => undefined,
 }));
 
-vi.mock("@/hooks/useEpics", () => ({
-  useEpics: () => ({
-    epics: mocks.activeEpics,
-    activeEpics: mocks.activeEpics,
-    completedEpics: [],
+vi.mock("@/hooks/useCampaigns", () => ({
+  useCampaigns: () => ({
+    campaigns: mocks.activeEpics.map(bridge.toMockCampaign),
+    activeCampaigns: mocks.activeEpics.map(bridge.toMockCampaign),
+    completedCampaigns: [],
     isLoading: false,
-    createEpic: mocks.createEpic,
+    createCampaign: mocks.createEpic,
     isCreating: false,
-    updateEpicStatus: vi.fn(),
   }),
 }));
 

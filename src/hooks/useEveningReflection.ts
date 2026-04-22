@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { JOURNAL_ENTRIES_QUERY_KEY } from "@/hooks/useJournalEntries";
 import { useXPRewards } from "@/hooks/useXPRewards";
 import { format } from "date-fns";
 
@@ -88,6 +89,7 @@ export const useEveningReflection = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["evening-reflection"] });
+      queryClient.invalidateQueries({ queryKey: JOURNAL_ENTRIES_QUERY_KEY });
       void awardReflectionComplete();
       setIsDrawerOpen(false);
     },

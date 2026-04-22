@@ -96,6 +96,7 @@ export interface Quest {
   id: string;
   userId: string;
   title: string;
+  xpReward: number;
   taskDate: string | null;
   scheduledTime: string | null;
   estimatedDuration: number | null;

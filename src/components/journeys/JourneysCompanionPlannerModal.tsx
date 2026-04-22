@@ -30,7 +30,10 @@ import {
 } from "@/components/ui/drawer";
 import { PermissionRequestDialog } from "@/components/PermissionRequestDialog";
 import { Textarea } from "@/components/ui/textarea";
-import { useCompanionAssistant } from "@/hooks/useCompanionAssistant";
+import {
+  useCompanionAssistant,
+  type CompanionAssistantState,
+} from "@/hooks/useCompanionAssistant";
 import { useJourneysCompanionVisual } from "@/hooks/useJourneysCompanionVisual";
 import { cn, stripMarkdown } from "@/lib/utils";
 import type { CompanionChatThreadSummary } from "@/types/companionConversation";
@@ -47,7 +50,7 @@ interface JourneysCompanionPlannerModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   presentation: JourneysCompanionPlannerModalPresentation;
-  assistant: ReturnType<typeof useCompanionAssistant>;
+  assistant: CompanionAssistantState;
   launchIntent?: CompanionPlannerLaunchIntent | null;
   onLaunchIntentConsumed?: (intentId: string) => void;
 }
@@ -238,7 +241,7 @@ const JourneysCompanionPlannerBody = memo(({
 }: {
   open: boolean;
   presentation: JourneysCompanionPlannerModalPresentation;
-  assistant: ReturnType<typeof useCompanionAssistant>;
+  assistant: CompanionAssistantState;
   launchIntent?: CompanionPlannerLaunchIntent | null;
   onLaunchIntentConsumed?: (intentId: string) => void;
 }) => {
@@ -313,7 +316,14 @@ const JourneysCompanionPlannerBody = memo(({
 
   useEffect(() => {
     keepBottomContentVisible();
-  }, [assistant.isSubmitting, assistant.messages, assistant.pendingAction, assistant.error, keepBottomContentVisible]);
+  }, [
+    assistant.isSubmitting,
+    assistant.messages,
+    assistant.pendingAction,
+    assistant.unsupportedPendingProposalNotice,
+    assistant.error,
+    keepBottomContentVisible,
+  ]);
 
   useEffect(() => {
     if (!isDrawerPresentation) return;
@@ -414,6 +424,9 @@ const JourneysCompanionPlannerBody = memo(({
 
   const planDay = assistant.structuredResponse?.planDay ?? null;
   const comingUp = assistant.structuredResponse?.comingUp ?? null;
+  const threadControlNotice = assistant.unsupportedPendingProposalNotice
+    ? assistant.newChatDisabledReason ?? assistant.archiveDisabledReason
+    : null;
   const usesKeyboardDictation = isNativeIOS;
   const micButtonDisabled = usesKeyboardDictation
     ? false
@@ -460,30 +473,45 @@ const JourneysCompanionPlannerBody = memo(({
                 {assistant.isSubmitting ? "Thinking..." : assistant.todayLabel}
               </p>
             </div>
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  void handleNewChat();
-                }}
-                disabled={!assistant.canStartNewChat}
-                className="inline-flex h-14 w-14 items-center justify-center rounded-[1.2rem] border-[3px] border-[#5d3114] bg-[linear-gradient(180deg,rgba(255,250,240,0.28),rgba(255,206,108,0.2))] text-white shadow-[0_5px_0_rgba(77,40,17,0.78)] transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
-                aria-label="Start a new chat"
-                data-testid="journeys-companion-new-chat-button"
-              >
-                <Plus className="h-6 w-6" />
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  void handleOpenThreadPicker();
-                }}
-                className="inline-flex h-14 w-14 items-center justify-center rounded-[1.2rem] border-[3px] border-[#5d3114] bg-[linear-gradient(180deg,rgba(255,250,240,0.28),rgba(255,206,108,0.2))] text-white shadow-[0_5px_0_rgba(77,40,17,0.78)] transition-transform hover:-translate-y-0.5"
-                aria-label="Open past chats"
-                data-testid="journeys-companion-thread-history-button"
-              >
-                <Archive className="h-6 w-6" />
-              </button>
+            <div className="flex flex-col items-end gap-2">
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    void handleNewChat();
+                  }}
+                  disabled={!assistant.canStartNewChat}
+                  title={!assistant.canStartNewChat ? assistant.newChatDisabledReason ?? undefined : undefined}
+                  className="inline-flex h-14 w-14 items-center justify-center rounded-[1.2rem] border-[3px] border-[#5d3114] bg-[linear-gradient(180deg,rgba(255,250,240,0.28),rgba(255,206,108,0.2))] text-white shadow-[0_5px_0_rgba(77,40,17,0.78)] transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+                  aria-label="Start a new chat"
+                  data-testid="journeys-companion-new-chat-button"
+                >
+                  <Plus className="h-6 w-6" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void handleOpenThreadPicker();
+                  }}
+                  disabled={!assistant.canOpenThreadPicker}
+                  title={!assistant.canOpenThreadPicker
+                    ? assistant.threadPickerDisabledReason ?? undefined
+                    : assistant.archiveDisabledReason ?? undefined}
+                  className="inline-flex h-14 w-14 items-center justify-center rounded-[1.2rem] border-[3px] border-[#5d3114] bg-[linear-gradient(180deg,rgba(255,250,240,0.28),rgba(255,206,108,0.2))] text-white shadow-[0_5px_0_rgba(77,40,17,0.78)] transition-transform hover:-translate-y-0.5"
+                  aria-label="Open past chats"
+                  data-testid="journeys-companion-thread-history-button"
+                >
+                  <Archive className="h-6 w-6" />
+                </button>
+              </div>
+              {threadControlNotice ? (
+                <p
+                  className="max-w-[14rem] text-right text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-[#ffe0b5]"
+                  data-testid="journeys-companion-thread-control-notice"
+                >
+                  {threadControlNotice}
+                </p>
+              ) : null}
             </div>
           </div>
 
@@ -524,15 +552,32 @@ const JourneysCompanionPlannerBody = memo(({
                       </p>
                       {planDay.suggestedQuests.length > 0 ? (
                         <div className="mt-4 space-y-3">
+                          {!assistant.canAcceptSuggestedQuests ? (
+                            <p className="text-sm text-[#7a4a21]">
+                              {assistant.suggestedQuestDisabledReason}
+                            </p>
+                          ) : null}
                           {planDay.suggestedQuests.map((quest) => (
+                            (() => {
+                              const suggestedQuestDisabledReason = assistant.isSubmitting ||
+                                  assistant.isResolvingAction
+                                ? "Wait for the current reply to finish."
+                                : !quest.proposalId
+                                  ? "This suggestion isn't ready to save yet."
+                                  : !assistant.canAcceptSuggestedQuests
+                                    ? assistant.suggestedQuestDisabledReason ?? null
+                                    : null;
+
+                              return (
                             <button
                               key={quest.suggestionId}
                               type="button"
                               onClick={() => {
-                                if (!quest.proposalId) return;
+                                if (suggestedQuestDisabledReason || !quest.proposalId) return;
                                 void assistant.acceptSuggestedQuest(quest.proposalId);
                               }}
-                              disabled={assistant.isSubmitting || assistant.isResolvingAction || !quest.proposalId}
+                              disabled={Boolean(suggestedQuestDisabledReason)}
+                              title={suggestedQuestDisabledReason ?? undefined}
                               className="w-full rounded-[1.35rem] border-[3px] border-[#6d3518] bg-[linear-gradient(180deg,#fff9ef_0%,#ffe2a6_100%)] px-4 py-4 text-left shadow-[0_8px_0_rgba(109,53,24,0.82)] transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-70"
                             >
                               <div className="flex items-start justify-between gap-3">
@@ -549,6 +594,8 @@ const JourneysCompanionPlannerBody = memo(({
                                 <span>{quest.source}</span>
                               </div>
                             </button>
+                              );
+                            })()
                           ))}
                         </div>
                       ) : (
@@ -648,6 +695,23 @@ const JourneysCompanionPlannerBody = memo(({
                           Cancel
                         </Button>
                       </div>
+                    </CompanionSpeechBubble>
+                  ) : null}
+
+                  {assistant.unsupportedPendingProposalNotice ? (
+                    <CompanionSpeechBubble
+                      role="assistant"
+                      className="max-w-[92%] rounded-tl-[1.1rem]"
+                    >
+                      <p className="text-[0.72rem] font-black uppercase tracking-[0.22em] text-[#99602c]">
+                        Pending Draft
+                      </p>
+                      <p className="mt-2 text-sm font-semibold">
+                        {assistant.unsupportedPendingProposalNotice.summary}
+                      </p>
+                      <p className="mt-2 text-sm text-[#7a4a21]">
+                        {assistant.unsupportedPendingProposalNotice.detail}
+                      </p>
                     </CompanionSpeechBubble>
                   ) : null}
 

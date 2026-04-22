@@ -11,6 +11,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useMentorPersonality } from "@/hooks/useMentorPersonality";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { JOURNAL_ENTRIES_QUERY_KEY } from "@/hooks/useJournalEntries";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { CheckInErrorFallback } from "@/components/ErrorFallback";
 import { logger } from "@/utils/logger";
@@ -250,6 +251,7 @@ const MorningCheckInContent = () => {
         });
         setIsSubmitting(false);
         queryClient.invalidateQueries({ queryKey: ['morning-check-in'] });
+        queryClient.invalidateQueries({ queryKey: JOURNAL_ENTRIES_QUERY_KEY });
         return;
       }
 
@@ -328,6 +330,7 @@ const MorningCheckInContent = () => {
       }
 
       queryClient.invalidateQueries({ queryKey: ['morning-check-in'] });
+      queryClient.invalidateQueries({ queryKey: JOURNAL_ENTRIES_QUERY_KEY });
     } catch (error) {
       logger.error('Check-in save error:', error);
       toast({ 

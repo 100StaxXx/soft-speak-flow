@@ -1,5 +1,8 @@
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
-import { getCompanionModeConfig, isCompanionModeId } from "../../../src/shared/companionModes.ts";
+import {
+  getCompanionModeConfig,
+  isCompanionModeId,
+} from "../../../src/shared/companionModes.ts";
 import { withCompanionChatPersistenceCapability } from "../companion-chat/persistenceCapability.ts";
 import {
   type CompanionAgentIntent,
@@ -34,13 +37,29 @@ const PrepareTaskCreateSchema = z.object({
   title: z.string().min(1).max(200),
   task_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
   scheduled_time: z.string().regex(/^\d{2}:\d{2}$/).optional().nullable(),
+  difficulty: z.string().max(40).optional().nullable(),
   estimated_duration: z.number().int().min(1).max(1440).optional().nullable(),
+  recurrence_pattern: z.string().max(40).optional().nullable(),
+  recurrence_days: z.array(z.number().int().min(0).max(6)).max(7).optional()
+    .nullable(),
+  recurrence_month_days: z.array(z.number().int().min(1).max(31)).max(31)
+    .optional().nullable(),
+  recurrence_custom_period: z.enum(["week", "month"]).optional().nullable(),
+  recurrence_end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional()
+    .nullable(),
   notes: z.string().max(2000).optional().nullable(),
   location: z.string().max(300).optional().nullable(),
+  category: z.string().max(80).optional().nullable(),
   epic_id: z.string().uuid().optional().nullable(),
   priority: z.string().max(40).optional().nullable(),
+  contact_id: z.string().uuid().optional().nullable(),
+  auto_log_interaction: z.boolean().optional().nullable(),
+  image_url: z.string().max(2000).optional().nullable(),
+  source: z.string().max(80).optional().nullable(),
+  subtasks: z.array(z.string().min(1).max(200)).max(20).optional().nullable(),
   reminder_enabled: z.boolean().optional().nullable(),
-  reminder_minutes_before: z.number().int().min(0).max(1440).optional().nullable(),
+  reminder_minutes_before: z.number().int().min(0).max(1440).optional()
+    .nullable(),
 });
 
 const PrepareTaskUpdateSchema = z.object({
@@ -54,25 +73,92 @@ const PrepareTaskUpdateSchema = z.object({
   priority: z.string().max(40).optional().nullable(),
   completed: z.boolean().optional().nullable(),
   reminder_enabled: z.boolean().optional().nullable(),
-  reminder_minutes_before: z.number().int().min(0).max(1440).optional().nullable(),
+  reminder_minutes_before: z.number().int().min(0).max(1440).optional()
+    .nullable(),
 });
 
 const PrepareRitualCreateSchema = z.object({
   title: z.string().min(1).max(200),
   frequency: z.string().min(1).max(50),
+  epic_id: z.string().uuid().optional().nullable(),
+  difficulty: z.string().max(40).optional().nullable(),
   preferred_time: z.string().regex(/^\d{2}:\d{2}$/).optional().nullable(),
   estimated_minutes: z.number().int().min(1).max(1440).optional().nullable(),
   description: z.string().max(2000).optional().nullable(),
   category: z.string().max(80).optional().nullable(),
+  custom_days: z.array(z.number().int().min(0).max(6)).max(7).optional()
+    .nullable(),
+  custom_month_days: z.array(z.number().int().min(1).max(31)).max(31).optional()
+    .nullable(),
   reminder_enabled: z.boolean().optional().nullable(),
-  reminder_minutes_before: z.number().int().min(0).max(1440).optional().nullable(),
+  reminder_minutes_before: z.number().int().min(0).max(1440).optional()
+    .nullable(),
+});
+
+const PrepareRitualUpdateSchema = z.object({
+  habit_id: z.string().uuid(),
+  title: z.string().min(1).max(200),
+  difficulty: z.string().max(40).optional().nullable(),
+  frequency: z.string().min(1).max(50),
+  preferred_time: z.string().regex(/^\d{2}:\d{2}$/).optional().nullable(),
+  estimated_minutes: z.number().int().min(1).max(1440).optional().nullable(),
+  description: z.string().max(2000).optional().nullable(),
+  category: z.string().max(80).optional().nullable(),
+  custom_days: z.array(z.number().int().min(0).max(6)).max(7).optional()
+    .nullable(),
+  custom_month_days: z.array(z.number().int().min(1).max(31)).max(31).optional()
+    .nullable(),
+  reminder_enabled: z.boolean().optional().nullable(),
+  reminder_minutes_before: z.number().int().min(0).max(1440).optional()
+    .nullable(),
 });
 
 const PrepareReminderCreateSchema = z.object({
   target_type: z.enum(["task", "ritual"]),
   target_id: z.string().uuid(),
   reminder_enabled: z.boolean().default(true),
-  reminder_minutes_before: z.number().int().min(0).max(1440).optional().nullable(),
+  reminder_minutes_before: z.number().int().min(0).max(1440).optional()
+    .nullable(),
+});
+
+const PrepareCampaignHabitSchema = z.object({
+  title: z.string().min(1).max(200),
+  description: z.string().max(2000).optional().nullable(),
+  difficulty: z.string().max(40).optional().nullable(),
+  frequency: z.string().min(1).max(50),
+  custom_days: z.array(z.number().int().min(0).max(6)).max(7).optional()
+    .nullable(),
+  custom_month_days: z.array(z.number().int().min(1).max(31)).max(31).optional()
+    .nullable(),
+  preferred_time: z.string().regex(/^\d{2}:\d{2}$/).optional().nullable(),
+  reminder_enabled: z.boolean().optional().nullable(),
+  reminder_minutes_before: z.number().int().min(0).max(1440).optional()
+    .nullable(),
+  estimated_minutes: z.number().int().min(1).max(1440).optional().nullable(),
+  category: z.string().max(80).optional().nullable(),
+});
+
+const PrepareCampaignCreateSchema = z.object({
+  title: z.string().min(1).max(200),
+  description: z.string().max(2000).optional().nullable(),
+  target_days: z.number().int().min(1).max(365),
+  theme_color: z.string().max(40).optional().nullable(),
+  story_type_slug: z.string().max(120).optional().nullable(),
+  habits: z.array(PrepareCampaignHabitSchema).min(1).max(8),
+});
+
+const PrepareCampaignAdjustSchema = z.object({
+  campaign_id: z.string().uuid(),
+  adjustment_type: z.enum([
+    "extend_deadline",
+    "reduce_scope",
+    "add_habits",
+    "remove_habits",
+    "reschedule",
+    "custom",
+  ]).default("custom"),
+  reason: z.string().max(1000).optional().nullable(),
+  requested_summary: z.string().max(2000).optional().nullable(),
 });
 
 const PrepareCampaignUpdateSchema = z.object({
@@ -87,7 +173,8 @@ const PrepareCampaignUpdateSchema = z.object({
 const PrepareJournalEntrySchema = z.object({
   note: z.string().min(1).max(4000),
   mood: z.string().max(80).optional().nullable(),
-  reflection_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+  reflection_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional()
+    .nullable(),
 });
 
 type GuardedFetch = typeof fetch;
@@ -136,7 +223,8 @@ const addDays = (dateOnly: string, days: number) => {
 const buildDateRange = (request: CompanionAgentRequest) => {
   const baseDate = toDateOnly(request.currentDateTime);
   const start = request.visibleDateStart ?? baseDate;
-  const end = request.visibleDateEnd ?? addDays(start, (request.horizonDays ?? 7) - 1);
+  const end = request.visibleDateEnd ??
+    addDays(start, (request.horizonDays ?? 7) - 1);
   return {
     start,
     end,
@@ -144,19 +232,26 @@ const buildDateRange = (request: CompanionAgentRequest) => {
   };
 };
 
-const maybeSingle = async <T>(promise: Promise<{ data: T | null; error: any }>) => {
+const maybeSingle = async <T>(
+  promise: Promise<{ data: T | null; error: any }>,
+) => {
   const { data, error } = await promise;
   if (error) throw error;
   return data;
 };
 
-const formatDateTimeLabel = (date: string | null | undefined, time: string | null | undefined) => {
+const formatDateTimeLabel = (
+  date: string | null | undefined,
+  time: string | null | undefined,
+) => {
   if (!date && !time) return "unscheduled";
   if (date && time) return `${date} at ${time}`;
   return date ?? time ?? "unscheduled";
 };
 
-const createPreparedAction = (input: Omit<PendingActionCandidate, "id">): PendingActionCandidate => ({
+const createPreparedAction = (
+  input: Omit<PendingActionCandidate, "id">,
+): PendingActionCandidate => ({
   id: crypto.randomUUID(),
   ...input,
 });
@@ -198,8 +293,8 @@ async function loadUserAIPreferences(supabase: any, userId: string) {
     : String(error).toLowerCase();
 
   if (
-    !source.includes("companion_mode")
-    && !source.includes("companion_mode_adaptation_enabled")
+    !source.includes("companion_mode") &&
+    !source.includes("companion_mode_adaptation_enabled")
   ) {
     throw error;
   }
@@ -245,7 +340,9 @@ async function loadCompanionAgentContext(params: {
     loadActivePendingAction(params.supabase, params.userId, params.sessionId),
     params.supabase
       .from("daily_tasks")
-      .select("id, task_text, task_date, scheduled_time, estimated_duration, completed, epic_id, priority, location, notes, reminder_enabled, reminder_minutes_before, recurrence_pattern, recurrence_end_date")
+      .select(
+        "id, task_text, task_date, scheduled_time, estimated_duration, completed, epic_id, priority, location, notes, reminder_enabled, reminder_minutes_before, recurrence_pattern, recurrence_end_date",
+      )
       .eq("user_id", params.userId)
       .gte("task_date", range.start)
       .lte("task_date", range.end)
@@ -254,28 +351,36 @@ async function loadCompanionAgentContext(params: {
       .limit(MAX_TASKS),
     params.supabase
       .from("daily_tasks")
-      .select("id, task_text, task_date, scheduled_time, estimated_duration, completed, epic_id, priority, location, notes, reminder_enabled, reminder_minutes_before, recurrence_pattern, recurrence_end_date")
+      .select(
+        "id, task_text, task_date, scheduled_time, estimated_duration, completed, epic_id, priority, location, notes, reminder_enabled, reminder_minutes_before, recurrence_pattern, recurrence_end_date",
+      )
       .eq("user_id", params.userId)
       .is("task_date", null)
       .order("created_at", { ascending: false })
       .limit(MAX_INBOX_TASKS),
     params.supabase
       .from("habits")
-      .select("id, title, frequency, preferred_time, estimated_minutes, description, category, reminder_enabled, reminder_minutes_before")
+      .select(
+        "id, title, frequency, preferred_time, estimated_minutes, description, category, reminder_enabled, reminder_minutes_before",
+      )
       .eq("user_id", params.userId)
       .eq("is_active", true)
       .order("created_at", { ascending: false })
       .limit(MAX_RITUALS),
     params.supabase
       .from("epics")
-      .select("id, title, description, start_date, end_date, status, target_days, progress_percentage")
+      .select(
+        "id, title, description, start_date, end_date, status, target_days, progress_percentage",
+      )
       .eq("user_id", params.userId)
       .is("completed_at", null)
       .order("updated_at", { ascending: false })
       .limit(MAX_CAMPAIGNS),
     params.supabase
       .from("external_calendar_events")
-      .select("id, title, start_time, end_time, is_all_day, location, description, source")
+      .select(
+        "id, title, start_time, end_time, is_all_day, location, description, source",
+      )
       .eq("user_id", params.userId)
       .lt("start_time", `${addDays(range.end, 1)}T00:00:00`)
       .gte("end_time", `${range.start}T00:00:00`)
@@ -283,7 +388,9 @@ async function loadCompanionAgentContext(params: {
       .limit(MAX_CALENDAR_EVENTS),
     params.supabase
       .from("user_ai_learning")
-      .select("conversation_profile, common_contexts, peak_productivity_times, preferred_epic_duration, preferred_habit_frequency, preferred_habit_difficulty, successful_patterns")
+      .select(
+        "conversation_profile, common_contexts, peak_productivity_times, preferred_epic_duration, preferred_habit_frequency, preferred_habit_difficulty, successful_patterns",
+      )
       .eq("user_id", params.userId)
       .maybeSingle(),
     params.supabase
@@ -294,7 +401,9 @@ async function loadCompanionAgentContext(params: {
     loadUserAIPreferences(params.supabase, params.userId),
     params.supabase
       .from("companion_memories")
-      .select("id, memory_type, memory_date, memory_context, created_at, last_referenced_at")
+      .select(
+        "id, memory_type, memory_date, memory_context, created_at, last_referenced_at",
+      )
       .eq("user_id", params.userId)
       .eq("companion_id", params.companionId)
       .order("last_referenced_at", { ascending: false, nullsFirst: false })
@@ -308,7 +417,9 @@ async function loadCompanionAgentContext(params: {
       .limit(MAX_REFLECTIONS),
     params.supabase
       .from("daily_check_ins")
-      .select("id, check_in_type, mood, reflection, intention, completed_at, created_at")
+      .select(
+        "id, check_in_type, mood, reflection, intention, completed_at, created_at",
+      )
       .eq("user_id", params.userId)
       .order("created_at", { ascending: false })
       .limit(MAX_REFLECTIONS),
@@ -331,12 +442,20 @@ async function loadCompanionAgentContext(params: {
     dailyCheckIns,
   ].forEach(check);
 
-  const datedTasks = (datedTasksResult.data ?? []) as Array<Record<string, unknown>>;
-  const inboxTasks = (inboxTasksResult.data ?? []) as Array<Record<string, unknown>>;
+  const datedTasks = (datedTasksResult.data ?? []) as Array<
+    Record<string, unknown>
+  >;
+  const inboxTasks = (inboxTasksResult.data ?? []) as Array<
+    Record<string, unknown>
+  >;
   const tasks = [...datedTasks, ...inboxTasks];
   const rituals = (ritualsResult.data ?? []) as Array<Record<string, unknown>>;
-  const campaigns = (campaignsResult.data ?? []) as Array<Record<string, unknown>>;
-  const calendarEvents = (calendarResult.data ?? []) as Array<Record<string, unknown>>;
+  const campaigns = (campaignsResult.data ?? []) as Array<
+    Record<string, unknown>
+  >;
+  const calendarEvents = (calendarResult.data ?? []) as Array<
+    Record<string, unknown>
+  >;
 
   const reminders = [
     ...tasks
@@ -363,7 +482,9 @@ async function loadCompanionAgentContext(params: {
   const learningRecord = asRecord(aiLearning.data);
   const profile = asRecord(learningRecord?.conversation_profile);
   const profileGoals = Array.isArray(profile?.goals)
-    ? profile?.goals.filter((entry): entry is string => typeof entry === "string")
+    ? profile?.goals.filter((entry): entry is string =>
+      typeof entry === "string"
+    )
     : [];
   const campaignGoals = campaigns
     .map((campaign) => campaign.title)
@@ -371,10 +492,13 @@ async function loadCompanionAgentContext(params: {
 
   const recentMemory = {
     ai_learning: learningRecord,
-    ai_learning_peak_productivity_times: learningRecord?.peak_productivity_times,
+    ai_learning_peak_productivity_times: learningRecord
+      ?.peak_productivity_times,
     ai_preferences: asRecord(aiPreferences),
     planner_preferences: asRecord(plannerPreferences.data),
-    callback_memories: (companionMemories.data ?? []) as Array<Record<string, unknown>>,
+    callback_memories: (companionMemories.data ?? []) as Array<
+      Record<string, unknown>
+    >,
   };
 
   const preferenceRecord = asRecord(aiPreferences);
@@ -392,7 +516,9 @@ async function loadCompanionAgentContext(params: {
     ...((dailyCheckIns.data ?? []) as Array<Record<string, unknown>>),
   ]
     .sort((left, right) =>
-      String(right.created_at ?? "").localeCompare(String(left.created_at ?? ""))
+      String(right.created_at ?? "").localeCompare(
+        String(left.created_at ?? ""),
+      )
     )
     .slice(0, MAX_REFLECTIONS);
 
@@ -439,6 +565,8 @@ function buildInstructions(params: {
     "If detail is missing for a write, ask one concise clarifying question with mode clarify.",
     "If the user wants schedule or task state, use the read tools and summarize only what is actually present.",
     "When consult_planner returns structured_response for Plan My Day or coming-up summaries, pass that structured_response through unchanged in submit_companion_result.",
+    "When consult_planner returns action_hints, prefer reusing the matching prepare tool with the hint's normalizedPayload instead of inventing a new write shape.",
+    "If an action hint has actionType null or an unsupportedReason, do not improvise a write for it. Stay conversational or clarify instead.",
     "Never invent task, ritual, campaign, reminder, or calendar state.",
     "Never say something is scheduled, saved, moved, updated, logged, or confirmed unless it has already executed. Preparation is not execution.",
     "Keep replies natural, warm, concise, and non-robotic.",
@@ -449,7 +577,9 @@ function buildInstructions(params: {
     `Surface: ${params.surface}.`,
     `Current local datetime from the app: ${params.currentDateTime}.`,
     `Current visible planning range: ${params.context.visibleDateStart} through ${params.context.visibleDateEnd}.`,
-    `Companion state: mood ${currentMood}, stage ${params.companion.current_stage ?? 0}, spirit animal ${params.companion.spirit_animal ?? "unknown"}.`,
+    `Companion state: mood ${currentMood}, stage ${
+      params.companion.current_stage ?? 0
+    }, spirit animal ${params.companion.spirit_animal ?? "unknown"}.`,
     `Selected companion mode: ${modeConfig.label}.`,
     `Mode guidance: ${modeConfig.description}`,
     params.context.companionModeAdaptationEnabled
@@ -507,7 +637,9 @@ async function createOpenAIConversation(params: {
   });
 
   if (!response.ok) {
-    throw new Error(`OpenAI conversation create failed: ${await response.text()}`);
+    throw new Error(
+      `OpenAI conversation create failed: ${await response.text()}`,
+    );
   }
 
   const body = await response.json() as { id?: string };
@@ -527,9 +659,9 @@ async function createOpenAIResponse(params: {
   if (!openAIApiKey) throw new Error("OPENAI_API_KEY not configured");
 
   const body: Record<string, unknown> = {
-    model: Deno.env.get("OPENAI_COMPANION_AGENT_MODEL")
-      ?? Deno.env.get("OPENAI_TEXT_MODEL")
-      ?? "gpt-4.1",
+    model: Deno.env.get("OPENAI_COMPANION_AGENT_MODEL") ??
+      Deno.env.get("OPENAI_TEXT_MODEL") ??
+      "gpt-4.1",
     instructions: params.instructions,
     input: params.input,
     tools: params.tools,
@@ -587,192 +719,401 @@ function buildToolDefinitions() {
   });
 
   return [
-    functionTool("get_current_datetime", "Return the current local datetime, timezone offset, and visible date range.", {
-      type: "object",
-      additionalProperties: false,
-      properties: {},
-    }),
-    functionTool("get_user_profile", "Return the user's current companion state and learned preference summary.", {
-      type: "object",
-      additionalProperties: false,
-      properties: {},
-    }),
-    functionTool("get_user_goals", "Return current goals and active campaign titles.", {
-      type: "object",
-      additionalProperties: false,
-      properties: {},
-    }),
-    functionTool("get_calendar_range", "Return scheduled tasks and calendar events in the visible range or in a requested local date range.", {
-      type: "object",
-      additionalProperties: false,
-      properties: {
-        start_date: { type: "string" },
-        end_date: { type: "string" },
+    functionTool(
+      "get_current_datetime",
+      "Return the current local datetime, timezone offset, and visible date range.",
+      {
+        type: "object",
+        additionalProperties: false,
+        properties: {},
       },
-    }),
-    functionTool("get_today_calendar", "Return today's scheduled tasks and calendar events.", {
-      type: "object",
-      additionalProperties: false,
-      properties: {},
-    }),
-    functionTool("list_tasks", "Return tasks, including scheduled tasks and inbox tasks.", {
-      type: "object",
-      additionalProperties: false,
-      properties: {
-        include_unscheduled: { type: "boolean" },
+    ),
+    functionTool(
+      "get_user_profile",
+      "Return the user's current companion state and learned preference summary.",
+      {
+        type: "object",
+        additionalProperties: false,
+        properties: {},
       },
-    }),
-    functionTool("list_rituals", "Return active rituals and habit-style routines.", {
-      type: "object",
-      additionalProperties: false,
-      properties: {},
-    }),
+    ),
+    functionTool(
+      "get_user_goals",
+      "Return current goals and active campaign titles.",
+      {
+        type: "object",
+        additionalProperties: false,
+        properties: {},
+      },
+    ),
+    functionTool(
+      "get_calendar_range",
+      "Return scheduled tasks and calendar events in the visible range or in a requested local date range.",
+      {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          start_date: { type: "string" },
+          end_date: { type: "string" },
+        },
+      },
+    ),
+    functionTool(
+      "get_today_calendar",
+      "Return today's scheduled tasks and calendar events.",
+      {
+        type: "object",
+        additionalProperties: false,
+        properties: {},
+      },
+    ),
+    functionTool(
+      "list_tasks",
+      "Return tasks, including scheduled tasks and inbox tasks.",
+      {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          include_unscheduled: { type: "boolean" },
+        },
+      },
+    ),
+    functionTool(
+      "list_rituals",
+      "Return active rituals and habit-style routines.",
+      {
+        type: "object",
+        additionalProperties: false,
+        properties: {},
+      },
+    ),
     functionTool("list_campaigns", "Return active campaigns and goal tracks.", {
       type: "object",
       additionalProperties: false,
       properties: {},
     }),
-    functionTool("list_reminders", "Return existing reminders on tasks or rituals.", {
-      type: "object",
-      additionalProperties: false,
-      properties: {},
-    }),
-    functionTool("get_recent_conversation_context", "Return the most recent user and assistant turns from this thread.", {
-      type: "object",
-      additionalProperties: false,
-      properties: {},
-    }),
-    functionTool("get_active_pending_action", "Return the currently active pending confirmation, if one exists.", {
-      type: "object",
-      additionalProperties: false,
-      properties: {},
-    }),
-    functionTool("consult_planner", "Reuse the existing planner logic for schedule reads, day or week planning, prioritization, and goal breakdowns.", {
-      type: "object",
-      additionalProperties: false,
-      properties: {
-        horizon: {
-          type: "string",
-          enum: ["day", "week"],
+    functionTool(
+      "list_reminders",
+      "Return existing reminders on tasks or rituals.",
+      {
+        type: "object",
+        additionalProperties: false,
+        properties: {},
+      },
+    ),
+    functionTool(
+      "get_recent_conversation_context",
+      "Return the most recent user and assistant turns from this thread.",
+      {
+        type: "object",
+        additionalProperties: false,
+        properties: {},
+      },
+    ),
+    functionTool(
+      "get_active_pending_action",
+      "Return the currently active pending confirmation, if one exists.",
+      {
+        type: "object",
+        additionalProperties: false,
+        properties: {},
+      },
+    ),
+    functionTool(
+      "consult_planner",
+      "Reuse the existing planner logic for schedule reads, day or week planning, prioritization, and goal breakdowns.",
+      {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          horizon: {
+            type: "string",
+            enum: ["day", "week"],
+          },
         },
       },
-    }),
-    functionTool("prepare_task_create", "Prepare a new task or scheduled plan item. Use this for normal scheduling requests.", {
-      type: "object",
-      additionalProperties: false,
-      required: ["title"],
-      properties: {
-        title: { type: "string" },
-        task_date: { type: "string" },
-        scheduled_time: { type: "string" },
-        estimated_duration: { type: "number" },
-        notes: { type: "string" },
-        location: { type: "string" },
-        epic_id: { type: "string" },
-        priority: { type: "string" },
-        reminder_enabled: { type: "boolean" },
-        reminder_minutes_before: { type: "number" },
-      },
-    }),
-    functionTool("prepare_task_update", "Prepare an update to an existing task or scheduled plan item.", {
-      type: "object",
-      additionalProperties: false,
-      required: ["task_id"],
-      properties: {
-        task_id: { type: "string" },
-        title: { type: "string" },
-        task_date: { type: "string" },
-        scheduled_time: { type: "string" },
-        estimated_duration: { type: "number" },
-        notes: { type: "string" },
-        location: { type: "string" },
-        priority: { type: "string" },
-        completed: { type: "boolean" },
-        reminder_enabled: { type: "boolean" },
-        reminder_minutes_before: { type: "number" },
-      },
-    }),
-    functionTool("prepare_ritual_create", "Prepare a new ritual or repeating habit.", {
-      type: "object",
-      additionalProperties: false,
-      required: ["title", "frequency"],
-      properties: {
-        title: { type: "string" },
-        frequency: { type: "string" },
-        preferred_time: { type: "string" },
-        estimated_minutes: { type: "number" },
-        description: { type: "string" },
-        category: { type: "string" },
-        reminder_enabled: { type: "boolean" },
-        reminder_minutes_before: { type: "number" },
-      },
-    }),
-    functionTool("prepare_reminder_create", "Prepare a reminder on an existing task or ritual.", {
-      type: "object",
-      additionalProperties: false,
-      required: ["target_type", "target_id"],
-      properties: {
-        target_type: { type: "string", enum: ["task", "ritual"] },
-        target_id: { type: "string" },
-        reminder_enabled: { type: "boolean" },
-        reminder_minutes_before: { type: "number" },
-      },
-    }),
-    functionTool("prepare_campaign_update", "Prepare an update to an existing campaign or goal track.", {
-      type: "object",
-      additionalProperties: false,
-      required: ["campaign_id"],
-      properties: {
-        campaign_id: { type: "string" },
-        title: { type: "string" },
-        description: { type: "string" },
-        end_date: { type: "string" },
-        status: { type: "string" },
-        target_days: { type: "number" },
-      },
-    }),
-    functionTool("prepare_journal_entry", "Prepare a journal or reflection entry.", {
-      type: "object",
-      additionalProperties: false,
-      required: ["note"],
-      properties: {
-        note: { type: "string" },
-        mood: { type: "string" },
-        reflection_date: { type: "string" },
-      },
-    }),
-    functionTool("submit_companion_result", "Submit the final result for this turn after you have gathered any needed context and optionally prepared one action.", {
-      type: "object",
-      additionalProperties: false,
-      required: ["reply", "mode", "intent", "confidence"],
-      properties: {
-        reply: { type: "string" },
-        mode: {
-          type: "string",
-          enum: ["conversation", "clarify", "schedule_read", "pending_confirmation", "receipt"],
+    ),
+    functionTool(
+      "prepare_task_create",
+      "Prepare a new task or scheduled plan item. Use this for normal scheduling requests.",
+      {
+        type: "object",
+        additionalProperties: false,
+        required: ["title"],
+        properties: {
+          title: { type: "string" },
+          task_date: { type: "string" },
+          scheduled_time: { type: "string" },
+          difficulty: { type: "string" },
+          estimated_duration: { type: "number" },
+          recurrence_pattern: { type: "string" },
+          recurrence_days: {
+            type: "array",
+            items: { type: "number" },
+          },
+          recurrence_month_days: {
+            type: "array",
+            items: { type: "number" },
+          },
+          recurrence_custom_period: {
+            type: "string",
+            enum: ["week", "month"],
+          },
+          recurrence_end_date: { type: "string" },
+          notes: { type: "string" },
+          location: { type: "string" },
+          category: { type: "string" },
+          epic_id: { type: "string" },
+          priority: { type: "string" },
+          contact_id: { type: "string" },
+          auto_log_interaction: { type: "boolean" },
+          image_url: { type: "string" },
+          source: { type: "string" },
+          subtasks: {
+            type: "array",
+            items: { type: "string" },
+          },
+          reminder_enabled: { type: "boolean" },
+          reminder_minutes_before: { type: "number" },
         },
-        intent: {
-          type: "string",
-          enum: [
-            "schedule_task",
-            "plan_day",
-            "plan_week",
-            "check_calendar",
-            "update_existing_plan",
-            "goal_setting",
-            "journal",
-            "explore",
-            "reflect",
-            "unknown",
-          ],
-        },
-        confidence: { type: "number" },
-        structured_response: {
-          type: "object",
-        },
-        prepared_action_id: { type: "string" },
       },
-    }),
+    ),
+    functionTool(
+      "prepare_task_update",
+      "Prepare an update to an existing task or scheduled plan item.",
+      {
+        type: "object",
+        additionalProperties: false,
+        required: ["task_id"],
+        properties: {
+          task_id: { type: "string" },
+          title: { type: "string" },
+          task_date: { type: "string" },
+          scheduled_time: { type: "string" },
+          estimated_duration: { type: "number" },
+          notes: { type: "string" },
+          location: { type: "string" },
+          priority: { type: "string" },
+          completed: { type: "boolean" },
+          reminder_enabled: { type: "boolean" },
+          reminder_minutes_before: { type: "number" },
+        },
+      },
+    ),
+    functionTool(
+      "prepare_ritual_create",
+      "Prepare a new ritual or repeating habit.",
+      {
+        type: "object",
+        additionalProperties: false,
+        required: ["title", "frequency"],
+        properties: {
+          title: { type: "string" },
+          frequency: { type: "string" },
+          epic_id: { type: "string" },
+          difficulty: { type: "string" },
+          preferred_time: { type: "string" },
+          estimated_minutes: { type: "number" },
+          description: { type: "string" },
+          category: { type: "string" },
+          custom_days: {
+            type: "array",
+            items: { type: "number" },
+          },
+          custom_month_days: {
+            type: "array",
+            items: { type: "number" },
+          },
+          reminder_enabled: { type: "boolean" },
+          reminder_minutes_before: { type: "number" },
+        },
+      },
+    ),
+    functionTool(
+      "prepare_ritual_update",
+      "Prepare an update to an existing ritual or repeating habit.",
+      {
+        type: "object",
+        additionalProperties: false,
+        required: ["habit_id", "title", "frequency"],
+        properties: {
+          habit_id: { type: "string" },
+          title: { type: "string" },
+          difficulty: { type: "string" },
+          frequency: { type: "string" },
+          preferred_time: { type: "string" },
+          estimated_minutes: { type: "number" },
+          description: { type: "string" },
+          category: { type: "string" },
+          custom_days: {
+            type: "array",
+            items: { type: "number" },
+          },
+          custom_month_days: {
+            type: "array",
+            items: { type: "number" },
+          },
+          reminder_enabled: { type: "boolean" },
+          reminder_minutes_before: { type: "number" },
+        },
+      },
+    ),
+    functionTool(
+      "prepare_reminder_create",
+      "Prepare a reminder on an existing task or ritual.",
+      {
+        type: "object",
+        additionalProperties: false,
+        required: ["target_type", "target_id"],
+        properties: {
+          target_type: { type: "string", enum: ["task", "ritual"] },
+          target_id: { type: "string" },
+          reminder_enabled: { type: "boolean" },
+          reminder_minutes_before: { type: "number" },
+        },
+      },
+    ),
+    functionTool(
+      "prepare_campaign_create",
+      "Prepare a new campaign with at least one starter ritual.",
+      {
+        type: "object",
+        additionalProperties: false,
+        required: ["title", "target_days", "habits"],
+        properties: {
+          title: { type: "string" },
+          description: { type: "string" },
+          target_days: { type: "number" },
+          theme_color: { type: "string" },
+          story_type_slug: { type: "string" },
+          habits: {
+            type: "array",
+            items: {
+              type: "object",
+              additionalProperties: false,
+              required: ["title", "frequency"],
+              properties: {
+                title: { type: "string" },
+                description: { type: "string" },
+                difficulty: { type: "string" },
+                frequency: { type: "string" },
+                custom_days: {
+                  type: "array",
+                  items: { type: "number" },
+                },
+                custom_month_days: {
+                  type: "array",
+                  items: { type: "number" },
+                },
+                preferred_time: { type: "string" },
+                reminder_enabled: { type: "boolean" },
+                reminder_minutes_before: { type: "number" },
+                estimated_minutes: { type: "number" },
+                category: { type: "string" },
+              },
+            },
+          },
+        },
+      },
+    ),
+    functionTool(
+      "prepare_campaign_adjust",
+      "Prepare a campaign adjustment request that will generate and apply revision suggestions on confirmation.",
+      {
+        type: "object",
+        additionalProperties: false,
+        required: ["campaign_id"],
+        properties: {
+          campaign_id: { type: "string" },
+          adjustment_type: {
+            type: "string",
+            enum: [
+              "extend_deadline",
+              "reduce_scope",
+              "add_habits",
+              "remove_habits",
+              "reschedule",
+              "custom",
+            ],
+          },
+          reason: { type: "string" },
+          requested_summary: { type: "string" },
+        },
+      },
+    ),
+    functionTool(
+      "prepare_campaign_update",
+      "Prepare an update to an existing campaign or goal track.",
+      {
+        type: "object",
+        additionalProperties: false,
+        required: ["campaign_id"],
+        properties: {
+          campaign_id: { type: "string" },
+          title: { type: "string" },
+          description: { type: "string" },
+          end_date: { type: "string" },
+          status: { type: "string" },
+          target_days: { type: "number" },
+        },
+      },
+    ),
+    functionTool(
+      "prepare_journal_entry",
+      "Prepare a journal or reflection entry.",
+      {
+        type: "object",
+        additionalProperties: false,
+        required: ["note"],
+        properties: {
+          note: { type: "string" },
+          mood: { type: "string" },
+          reflection_date: { type: "string" },
+        },
+      },
+    ),
+    functionTool(
+      "submit_companion_result",
+      "Submit the final result for this turn after you have gathered any needed context and optionally prepared one action.",
+      {
+        type: "object",
+        additionalProperties: false,
+        required: ["reply", "mode", "intent", "confidence"],
+        properties: {
+          reply: { type: "string" },
+          mode: {
+            type: "string",
+            enum: [
+              "conversation",
+              "clarify",
+              "schedule_read",
+              "pending_confirmation",
+              "receipt",
+            ],
+          },
+          intent: {
+            type: "string",
+            enum: [
+              "schedule_task",
+              "plan_day",
+              "plan_week",
+              "check_calendar",
+              "update_existing_plan",
+              "goal_setting",
+              "journal",
+              "explore",
+              "reflect",
+              "unknown",
+            ],
+          },
+          confidence: { type: "number" },
+          structured_response: {
+            type: "object",
+          },
+          prepared_action_id: { type: "string" },
+        },
+      },
+    ),
   ];
 }
 
@@ -787,8 +1128,12 @@ function filterCalendarRange(
   });
 
   const calendarEvents = context.calendarEvents.filter((event) => {
-    const start = typeof event.start_time === "string" ? event.start_time.slice(0, 10) : "";
-    const end = typeof event.end_time === "string" ? event.end_time.slice(0, 10) : start;
+    const start = typeof event.start_time === "string"
+      ? event.start_time.slice(0, 10)
+      : "";
+    const end = typeof event.end_time === "string"
+      ? event.end_time.slice(0, 10)
+      : start;
     return start <= endDate && end >= startDate;
   });
 
@@ -830,9 +1175,10 @@ function buildToolExecutor(params: {
           active_campaigns: params.context.campaigns,
         };
       case "get_calendar_range": {
-        const startDate = typeof parsed.start_date === "string" && parsed.start_date
-          ? parsed.start_date
-          : params.context.visibleDateStart;
+        const startDate =
+          typeof parsed.start_date === "string" && parsed.start_date
+            ? parsed.start_date
+            : params.context.visibleDateStart;
         const endDate = typeof parsed.end_date === "string" && parsed.end_date
           ? parsed.end_date
           : params.context.visibleDateEnd;
@@ -845,7 +1191,9 @@ function buildToolExecutor(params: {
       case "list_tasks":
         return {
           tasks: parsed.include_unscheduled === false
-            ? params.context.tasks.filter((task) => typeof task.task_date === "string")
+            ? params.context.tasks.filter((task) =>
+              typeof task.task_date === "string"
+            )
             : params.context.tasks,
         };
       case "list_rituals":
@@ -887,12 +1235,22 @@ function buildToolExecutor(params: {
       }
       case "prepare_task_create": {
         const data = PrepareTaskCreateSchema.parse(parsed);
-        const summary = `Add "${data.title}" for ${formatDateTimeLabel(data.task_date ?? null, data.scheduled_time ?? null)}.`;
+        const summary = `Add "${data.title}" for ${
+          formatDateTimeLabel(
+            data.task_date ?? null,
+            data.scheduled_time ?? null,
+          )
+        }.`;
         const candidate = createPreparedAction({
           actionType: "task_create",
           intent: "schedule_task",
           summary,
-          confirmationMessage: `Want me to add "${data.title}" for ${formatDateTimeLabel(data.task_date ?? null, data.scheduled_time ?? null)}?`,
+          confirmationMessage: `Want me to add "${data.title}" for ${
+            formatDateTimeLabel(
+              data.task_date ?? null,
+              data.scheduled_time ?? null,
+            )
+          }?`,
           normalizedPayload: data,
           affectedEntities: data.epic_id ? { epic_id: data.epic_id } : null,
         });
@@ -905,15 +1263,26 @@ function buildToolExecutor(params: {
         if (!existingTask) {
           return { error: "task_not_found" };
         }
-        const nextTitle = data.title ?? String(existingTask.task_text ?? "task");
-        const nextDate = data.task_date ?? (typeof existingTask.task_date === "string" ? existingTask.task_date : null);
-        const nextTime = data.scheduled_time ?? (typeof existingTask.scheduled_time === "string" ? existingTask.scheduled_time : null);
-        const summary = `Update "${nextTitle}" to ${formatDateTimeLabel(nextDate, nextTime)}.`;
+        const nextTitle = data.title ??
+          String(existingTask.task_text ?? "task");
+        const nextDate = data.task_date ??
+          (typeof existingTask.task_date === "string"
+            ? existingTask.task_date
+            : null);
+        const nextTime = data.scheduled_time ??
+          (typeof existingTask.scheduled_time === "string"
+            ? existingTask.scheduled_time
+            : null);
+        const summary = `Update "${nextTitle}" to ${
+          formatDateTimeLabel(nextDate, nextTime)
+        }.`;
         const candidate = createPreparedAction({
           actionType: "task_update",
           intent: "update_existing_plan",
           summary,
-          confirmationMessage: `Want me to update "${nextTitle}" to ${formatDateTimeLabel(nextDate, nextTime)}?`,
+          confirmationMessage: `Want me to update "${nextTitle}" to ${
+            formatDateTimeLabel(nextDate, nextTime)
+          }?`,
           normalizedPayload: data,
           affectedEntities: { task_id: data.task_id },
         });
@@ -922,14 +1291,29 @@ function buildToolExecutor(params: {
       }
       case "prepare_ritual_create": {
         const data = PrepareRitualCreateSchema.parse(parsed);
-        const summary = `Create ritual "${data.title}" with ${data.frequency} frequency.`;
+        const summary =
+          `Create ritual "${data.title}" with ${data.frequency} frequency.`;
         const candidate = createPreparedAction({
           actionType: "ritual_create",
           intent: "goal_setting",
           summary,
           confirmationMessage: `Want me to create the ritual "${data.title}"?`,
           normalizedPayload: data,
-          affectedEntities: null,
+          affectedEntities: data.epic_id ? { epic_id: data.epic_id } : null,
+        });
+        params.preparedActions.set(candidate.id, candidate);
+        return { prepared_action_id: candidate.id, ...candidate };
+      }
+      case "prepare_ritual_update": {
+        const data = PrepareRitualUpdateSchema.parse(parsed);
+        const summary = `Update ritual "${data.title}".`;
+        const candidate = createPreparedAction({
+          actionType: "ritual_update",
+          intent: "update_existing_plan",
+          summary,
+          confirmationMessage: `Want me to update the ritual "${data.title}"?`,
+          normalizedPayload: data,
+          affectedEntities: { habit_id: data.habit_id },
         });
         params.preparedActions.set(candidate.id, candidate);
         return { prepared_action_id: candidate.id, ...candidate };
@@ -951,10 +1335,46 @@ function buildToolExecutor(params: {
         params.preparedActions.set(candidate.id, candidate);
         return { prepared_action_id: candidate.id, ...candidate };
       }
+      case "prepare_campaign_create": {
+        const data = PrepareCampaignCreateSchema.parse(parsed);
+        const summary = `Create campaign "${data.title}".`;
+        const candidate = createPreparedAction({
+          actionType: "campaign_create",
+          intent: "goal_setting",
+          summary,
+          confirmationMessage:
+            `Want me to create the campaign "${data.title}"?`,
+          normalizedPayload: data,
+          affectedEntities: null,
+        });
+        params.preparedActions.set(candidate.id, candidate);
+        return { prepared_action_id: candidate.id, ...candidate };
+      }
+      case "prepare_campaign_adjust": {
+        const data = PrepareCampaignAdjustSchema.parse(parsed);
+        const existingCampaign = findCampaign(data.campaign_id);
+        const campaignTitle = String(existingCampaign?.title ?? "campaign");
+        const summary = data.requested_summary?.trim().length
+          ? `Adjust campaign "${campaignTitle}": ${data.requested_summary.trim()}`
+          : `Adjust campaign "${campaignTitle}".`;
+        const candidate = createPreparedAction({
+          actionType: "campaign_adjust",
+          intent: "goal_setting",
+          summary,
+          confirmationMessage:
+            `Want me to apply that adjustment to "${campaignTitle}"?`,
+          normalizedPayload: data,
+          affectedEntities: { campaign_id: data.campaign_id },
+        });
+        params.preparedActions.set(candidate.id, candidate);
+        return { prepared_action_id: candidate.id, ...candidate };
+      }
       case "prepare_campaign_update": {
         const data = PrepareCampaignUpdateSchema.parse(parsed);
         const existingCampaign = findCampaign(data.campaign_id);
-        const summary = `Update campaign "${data.title ?? String(existingCampaign?.title ?? "campaign")}".`;
+        const summary = `Update campaign "${
+          data.title ?? String(existingCampaign?.title ?? "campaign")
+        }".`;
         const candidate = createPreparedAction({
           actionType: "campaign_update",
           intent: "goal_setting",
@@ -997,11 +1417,13 @@ function buildToolOutput(callId: string, output: unknown) {
 }
 
 function isLinkageError(error: unknown) {
-  const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
-  return message.includes("previous_response_id")
-    || message.includes("conversation")
-    || message.includes("not found")
-    || message.includes("invalid");
+  const message = error instanceof Error
+    ? error.message.toLowerCase()
+    : String(error).toLowerCase();
+  return message.includes("previous_response_id") ||
+    message.includes("conversation") ||
+    message.includes("not found") ||
+    message.includes("invalid");
 }
 
 export async function runCompanionAgent(params: RunAgentParams) {
@@ -1047,7 +1469,8 @@ export async function runCompanionAgent(params: RunAgentParams) {
       tools,
     });
 
-    let currentConversationId = response.conversation?.id ?? transport.conversationId ?? null;
+    let currentConversationId = response.conversation?.id ??
+      transport.conversationId ?? null;
     let currentPreviousResponseId = response.id;
 
     for (let loop = 0; loop < MAX_TOOL_LOOPS; loop += 1) {
@@ -1067,9 +1490,13 @@ export async function runCompanionAgent(params: RunAgentParams) {
         };
       }
 
-      const finalCall = functionCalls.find((call) => call.name === "submit_companion_result");
+      const finalCall = functionCalls.find((call) =>
+        call.name === "submit_companion_result"
+      );
       if (finalCall) {
-        const payload = SubmitCompanionResultSchema.parse(JSON.parse(finalCall.arguments || "{}"));
+        const payload = SubmitCompanionResultSchema.parse(
+          JSON.parse(finalCall.arguments || "{}"),
+        );
         return {
           result: {
             reply: payload.reply.trim(),
@@ -1095,11 +1522,14 @@ export async function runCompanionAgent(params: RunAgentParams) {
         input: toolOutputs,
         instructions,
         conversationId: currentConversationId,
-        previousResponseId: currentConversationId ? null : currentPreviousResponseId,
+        previousResponseId: currentConversationId
+          ? null
+          : currentPreviousResponseId,
         tools,
       });
 
-      currentConversationId = response.conversation?.id ?? currentConversationId;
+      currentConversationId = response.conversation?.id ??
+        currentConversationId;
       currentPreviousResponseId = response.id;
     }
 
@@ -1145,8 +1575,12 @@ export async function runCompanionAgent(params: RunAgentParams) {
     });
   }
 
-  let persistedPendingAction: PendingActionRow | null = context.activePendingAction;
-  if (agentResult.result.mode === "pending_confirmation" && agentResult.result.preparedActionId) {
+  let persistedPendingAction: PendingActionRow | null =
+    context.activePendingAction;
+  if (
+    agentResult.result.mode === "pending_confirmation" &&
+    agentResult.result.preparedActionId
+  ) {
     const candidate = preparedActions.get(agentResult.result.preparedActionId);
     if (candidate) {
       persistedPendingAction = await replacePendingAction({
@@ -1160,25 +1594,28 @@ export async function runCompanionAgent(params: RunAgentParams) {
           source: "companion-agent",
           visibleDateStart: context.visibleDateStart,
           visibleDateEnd: context.visibleDateEnd,
+          currentDateTime: context.currentDateTime,
         },
       });
     }
   }
 
-  const persistenceReady = await withCompanionChatPersistenceCapability(async () => {
-    await persistAgentTurn({
-      supabase: params.supabase,
-      userId: params.userId,
-      companionId: companion.id,
-      sessionId: params.request.sessionId,
-      surface: params.request.surface,
-      userMessage: params.request.message,
-      assistantReply: agentResult.result.reply,
-      inputMode: params.request.inputMode,
-      openaiConversationId: agentResult.openaiConversationId,
-      lastOpenAIResponseId: agentResult.lastOpenAIResponseId,
-    });
-  });
+  const persistenceReady = await withCompanionChatPersistenceCapability(
+    async () => {
+      await persistAgentTurn({
+        supabase: params.supabase,
+        userId: params.userId,
+        companionId: companion.id,
+        sessionId: params.request.sessionId,
+        surface: params.request.surface,
+        userMessage: params.request.message,
+        assistantReply: agentResult.result.reply,
+        inputMode: params.request.inputMode,
+        openaiConversationId: agentResult.openaiConversationId,
+        lastOpenAIResponseId: agentResult.lastOpenAIResponseId,
+      });
+    },
+  );
 
   console.log("[companion-agent] turn", {
     sessionId: params.request.sessionId,
@@ -1202,17 +1639,17 @@ export async function runCompanionAgent(params: RunAgentParams) {
     structuredResponse: agentResult.result.structuredResponse ?? null,
     pendingAction: persistedPendingAction
       ? {
-          id: persistedPendingAction.id,
-          status: persistedPendingAction.status,
-          intent: persistedPendingAction.intent,
-          actionType: persistedPendingAction.action_type,
-          summary: persistedPendingAction.summary,
-          confirmationMessage: persistedPendingAction.confirmation_message,
-          normalizedPayload: persistedPendingAction.normalized_payload,
-          affectedEntities: persistedPendingAction.affected_entities,
-          expiresAt: persistedPendingAction.expires_at,
-          createdAt: persistedPendingAction.created_at,
-        }
+        id: persistedPendingAction.id,
+        status: persistedPendingAction.status,
+        intent: persistedPendingAction.intent,
+        actionType: persistedPendingAction.action_type,
+        summary: persistedPendingAction.summary,
+        confirmationMessage: persistedPendingAction.confirmation_message,
+        normalizedPayload: persistedPendingAction.normalized_payload,
+        affectedEntities: persistedPendingAction.affected_entities,
+        expiresAt: persistedPendingAction.expires_at,
+        createdAt: persistedPendingAction.created_at,
+      }
       : undefined,
     threadState: {
       threadId: params.request.sessionId,

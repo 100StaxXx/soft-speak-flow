@@ -258,6 +258,15 @@ export function useJourneysCompanionThreads({
     userId,
   ]);
 
+  useEffect(() => {
+    if (enabled) return;
+
+    setActiveSessionId("");
+    setIsHydratingThread(false);
+    setLocallyArchivedSessionId(null);
+    bootstrappedScopeKeyRef.current = null;
+  }, [enabled]);
+
   const persistedActiveThread = useMemo(
     () =>
       threadsQuery.data?.threads.find(
@@ -307,8 +316,12 @@ export function useJourneysCompanionThreads({
     if (isHydratingThread) {
       return "Loading thread history.";
     }
+    if (hasPendingPlannerWork) {
+      return "Finish or dismiss the current plan before switching chats.";
+    }
     return null;
   }, [
+    hasPendingPlannerWork,
     isHydratingThread,
     persistenceReady,
     persistenceUnavailableReason,
@@ -483,6 +496,28 @@ export function useJourneysCompanionThreads({
     threadPickerDisabledReason,
     threadsQueryKey,
   ]);
+
+  if (!enabled) {
+    return {
+      activeSessionId: "",
+      activeThread: null,
+      historyThreads: [],
+      hasPersistedActiveThread: false,
+      canStartNewChat: false,
+      newChatDisabledReason: null,
+      canArchiveThread: false,
+      archiveDisabledReason: null,
+      canOpenThreadPicker: false,
+      threadPickerDisabledReason: null,
+      threadHistoryEmptyStateMessage:
+        "Past chats will show up here after at least one real exchange.",
+      startNewChat: async () => undefined,
+      startTemplateThread: () => undefined,
+      archiveCurrentThread: async () => undefined,
+      resumeThread: async () => undefined,
+      isLoadingThreads: false,
+    };
+  }
 
   return {
     activeSessionId,

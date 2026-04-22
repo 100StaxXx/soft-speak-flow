@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { CompanionAssistantState } from "@/hooks/useCompanionAssistant";
 
 const mocks = vi.hoisted(() => ({
   assistantCounter: 0,
@@ -29,8 +30,21 @@ const mocks = vi.hoisted(() => ({
     };
   },
   pendingAction: null as null | {
+    id: string;
+    status: "pending";
+    intent: "schedule_task";
+    actionType: "task_create";
     summary: string;
-    confirmationMessage?: string | null;
+    confirmationMessage: string | null;
+    normalizedPayload: Record<string, never>;
+    affectedEntities: null;
+    expiresAt: string;
+    createdAt: string;
+  },
+  unsupportedPendingProposalNotice: null as null | {
+    id: string;
+    summary: string;
+    detail: string;
   },
   error: null as string | null,
   lastFailedMessage: null as null | {
@@ -40,11 +54,23 @@ const mocks = vi.hoisted(() => ({
   },
   historyThreads: [] as Array<{
     sessionId: string;
+    companionId: string;
+    surface: "journeys";
     title: string;
     previewText: string;
+    createdAt: string;
     lastMessageAt: string;
+    archivedAt: string | null;
+    messageCount: number;
   }>,
+  canArchiveThread: false,
+  archiveDisabledReason: null as string | null,
+  canStartNewChat: true,
+  newChatDisabledReason: null as string | null,
   canOpenThreadPicker: false,
+  threadPickerDisabledReason: null as string | null,
+  canAcceptSuggestedQuests: true,
+  suggestedQuestDisabledReason: null as string | null,
   threadHistoryEmptyStateMessage: "",
   startNewChat: vi.fn(),
   archiveCurrentThread: vi.fn(),
@@ -95,12 +121,13 @@ vi.mock("@/hooks/useCompanionAssistant", async () => {
         },
       ]);
 
-      return {
+      const assistantState = {
         todayLabel: assistantId,
         placeholder: "Talk to Cosmiq",
         messages,
         structuredResponse: mocks.structuredResponse,
         pendingAction: mocks.pendingAction,
+        unsupportedPendingProposalNotice: mocks.unsupportedPendingProposalNotice,
         error: mocks.error,
         lastFailedMessage: mocks.lastFailedMessage,
         draftInput,
@@ -109,7 +136,7 @@ vi.mock("@/hooks/useCompanionAssistant", async () => {
         isSubmitting: false,
         isResolvingAction: false,
         submitMessage: vi.fn(),
-        submitTypedMessage: () => {
+        submitTypedMessage: async () => {
           setMessages((previous) => [
             ...previous,
             {
@@ -122,6 +149,8 @@ vi.mock("@/hooks/useCompanionAssistant", async () => {
           setDraftInput("");
         },
         acceptSuggestedQuest: vi.fn(),
+        canAcceptSuggestedQuests: mocks.canAcceptSuggestedQuests,
+        suggestedQuestDisabledReason: mocks.suggestedQuestDisabledReason,
         retryLastMessage: mocks.retryLastMessage,
         confirmPendingAction: mocks.confirmPendingAction,
         cancelPendingAction: mocks.cancelPendingAction,
@@ -142,15 +171,18 @@ vi.mock("@/hooks/useCompanionAssistant", async () => {
         isLoadingThreads: false,
         hasPersistedActiveThread: false,
         canOpenThreadPicker: mocks.canOpenThreadPicker,
+        threadPickerDisabledReason: mocks.threadPickerDisabledReason,
         threadHistoryEmptyStateMessage: mocks.threadHistoryEmptyStateMessage,
         resumeThread: mocks.resumeThread,
         archiveCurrentThread: mocks.archiveCurrentThread,
-        canArchiveThread: false,
-        archiveDisabledReason: null,
+        canArchiveThread: mocks.canArchiveThread,
+        archiveDisabledReason: mocks.archiveDisabledReason,
         startNewChat: mocks.startNewChat,
-        canStartNewChat: true,
-        newChatDisabledReason: null,
-      };
+        canStartNewChat: mocks.canStartNewChat,
+        newChatDisabledReason: mocks.newChatDisabledReason,
+      } satisfies CompanionAssistantState;
+
+      return assistantState;
     },
   };
 });
@@ -228,10 +260,18 @@ describe("JourneysCompanionPlannerController", () => {
     mocks.platform = "web";
     mocks.structuredResponse = null;
     mocks.pendingAction = null;
+    mocks.unsupportedPendingProposalNotice = null;
     mocks.error = null;
     mocks.lastFailedMessage = null;
     mocks.historyThreads = [];
+    mocks.canArchiveThread = false;
+    mocks.archiveDisabledReason = null;
+    mocks.canStartNewChat = true;
+    mocks.newChatDisabledReason = null;
     mocks.canOpenThreadPicker = false;
+    mocks.threadPickerDisabledReason = null;
+    mocks.canAcceptSuggestedQuests = true;
+    mocks.suggestedQuestDisabledReason = null;
     mocks.threadHistoryEmptyStateMessage = "";
     mocks.startNewChat.mockReset();
     mocks.archiveCurrentThread.mockReset();
@@ -319,9 +359,14 @@ describe("JourneysCompanionPlannerController", () => {
     mocks.historyThreads = [
       {
         sessionId: "thread-1",
+        companionId: "companion-1",
+        surface: "journeys",
         title: "Morning check-in",
         previewText: "Let’s rebalance the morning.",
+        createdAt: "2026-04-21T09:45:00.000Z",
         lastMessageAt: "2026-04-21T10:00:00.000Z",
+        archivedAt: null,
+        messageCount: 4,
       },
     ];
     mocks.canOpenThreadPicker = true;
@@ -389,8 +434,16 @@ describe("JourneysCompanionPlannerController", () => {
       },
     };
     mocks.pendingAction = {
+      id: "action-1",
+      status: "pending",
+      intent: "schedule_task",
+      actionType: "task_create",
       summary: "Create the Daily Hydration quest?",
       confirmationMessage: "Nothing changes until you confirm it.",
+      normalizedPayload: {},
+      affectedEntities: null,
+      expiresAt: "2026-04-21T22:00:00.000Z",
+      createdAt: "2026-04-21T10:02:00.000Z",
     };
     mocks.error = "Cosmiq hit a snag. Try that again.";
     mocks.lastFailedMessage = {
@@ -416,6 +469,46 @@ describe("JourneysCompanionPlannerController", () => {
     expect(screen.getByRole("button", { name: "Confirm" })).toBeInTheDocument();
     expect(screen.getByText("Cosmiq hit a snag. Try that again.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+  });
+
+  it("disables plan-day suggestion buttons when the active path cannot accept suggested quests", () => {
+    mocks.canAcceptSuggestedQuests = false;
+    mocks.suggestedQuestDisabledReason =
+      "Tap-to-add for suggested day-plan quests isn't available in this mode yet. Ask me to add it directly instead.";
+    mocks.structuredResponse = {
+      planDay: {
+        message: "We should protect your energy first.",
+        dayAssessment: "low_energy",
+        suggestedQuests: [
+          {
+            suggestionId: "quest-1",
+            proposalId: "proposal-1",
+            title: "Daily Hydration",
+            type: "should",
+            estimatedDuration: "10 min",
+            source: "recovery",
+            reason: "It will help your baseline.",
+          },
+        ],
+      },
+    };
+
+    render(
+      <JourneysCompanionPlannerController
+        open
+        onOpenChange={vi.fn()}
+        presentation="dialog"
+      />,
+    );
+
+    expect(screen.getByText(
+      "Tap-to-add for suggested day-plan quests isn't available in this mode yet. Ask me to add it directly instead.",
+    )).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Daily Hydration/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Daily Hydration/i })).toHaveAttribute(
+      "title",
+      "Tap-to-add for suggested day-plan quests isn't available in this mode yet. Ask me to add it directly instead.",
+    );
   });
 
   it("autofocuses the composer on web but not on native ios", () => {
@@ -450,6 +543,82 @@ describe("JourneysCompanionPlannerController", () => {
     expect(focusSpy).not.toHaveBeenCalled();
     rafSpy.mockRestore();
     focusSpy.mockRestore();
+  });
+
+  it("renders a pending draft notice without confirm buttons when the fallback proposal is unsupported", () => {
+    mocks.unsupportedPendingProposalNotice = {
+      id: "proposal-unsupported-1",
+      summary: "Review the unsupported planner draft",
+      detail: "This proposed change is visible here, but it can't be confirmed from this screen yet.",
+    };
+
+    render(
+      <JourneysCompanionPlannerController
+        open
+        onOpenChange={vi.fn()}
+        presentation="dialog"
+      />,
+    );
+
+    expect(screen.getByText("Pending Draft")).toBeInTheDocument();
+    expect(screen.getByText("Review the unsupported planner draft")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Confirm" })).not.toBeInTheDocument();
+  });
+
+  it("shows the thread-control notice when a visible pending draft blocks new chat", () => {
+    mocks.unsupportedPendingProposalNotice = {
+      id: "proposal-unsupported-1",
+      summary: "Review the unsupported planner draft",
+      detail: "This proposed change is visible here, but it can't be confirmed from this screen yet.",
+    };
+    mocks.pendingAction = null;
+    mocks.canStartNewChat = false;
+    mocks.newChatDisabledReason =
+      "Keep this thread open while the visible pending draft is still unresolved.";
+    mocks.canOpenThreadPicker = false;
+    mocks.threadPickerDisabledReason =
+      "Keep this thread open while the visible pending draft is still unresolved.";
+    mocks.archiveDisabledReason =
+      "Keep this thread open while the visible pending draft is still unresolved.";
+
+    render(
+      <JourneysCompanionPlannerController
+        open
+        onOpenChange={vi.fn()}
+        presentation="dialog"
+      />,
+    );
+
+    expect(screen.getByTestId("journeys-companion-thread-control-notice")).toHaveTextContent(
+      "Keep this thread open while the visible pending draft is still unresolved.",
+    );
+    expect(screen.getByTestId("journeys-companion-new-chat-button")).toHaveAttribute(
+      "title",
+      "Keep this thread open while the visible pending draft is still unresolved.",
+    );
+    expect(screen.getByTestId("journeys-companion-thread-history-button")).toHaveAttribute(
+      "title",
+      "Keep this thread open while the visible pending draft is still unresolved.",
+    );
+  });
+
+  it("disables the past-chats button when the active assistant reports thread switching is blocked", () => {
+    mocks.canOpenThreadPicker = false;
+    mocks.threadPickerDisabledReason = "Resolve or cancel the pending action first.";
+
+    render(
+      <JourneysCompanionPlannerController
+        open
+        onOpenChange={vi.fn()}
+        presentation="dialog"
+      />,
+    );
+
+    expect(screen.getByTestId("journeys-companion-thread-history-button")).toBeDisabled();
+    expect(screen.getByTestId("journeys-companion-thread-history-button")).toHaveAttribute(
+      "title",
+      "Resolve or cancel the pending action first.",
+    );
   });
 
   it("keeps drawer height responsive without lifting the whole shell above the keyboard", () => {

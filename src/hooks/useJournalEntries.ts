@@ -7,13 +7,18 @@ import {
   toJournalEntryFromEveningReflection,
   toJournalEntryFromReflection,
 } from "@/shared/journalEntryAdapters";
+import type { JournalEntryType } from "@/types/domain";
 
 interface UseJournalEntriesOptions {
   enabled?: boolean;
   startDate?: string;
   endDate?: string;
   limit?: number;
+  entryTypes?: JournalEntryType[];
+  checkInType?: string;
 }
+
+export const JOURNAL_ENTRIES_QUERY_KEY = ["journal-entries"] as const;
 
 export const useJournalEntries = (options: UseJournalEntriesOptions = {}) => {
   const { user } = useAuth();
@@ -22,37 +27,65 @@ export const useJournalEntries = (options: UseJournalEntriesOptions = {}) => {
     startDate,
     endDate,
     limit,
+    entryTypes,
+    checkInType,
   } = options;
+  const normalizedEntryTypes = [...new Set(entryTypes ?? [
+    "reflection",
+    "evening_reflection",
+    "daily_check_in",
+  ])].sort();
+  const includeReflections = normalizedEntryTypes.includes("reflection");
+  const includeEveningReflections = normalizedEntryTypes.includes("evening_reflection");
+  const includeDailyCheckIns = normalizedEntryTypes.includes("daily_check_in");
 
   const query = useQuery({
-    queryKey: ["journal-entries", user?.id, startDate ?? "all", endDate ?? "all", limit ?? "all"],
+    queryKey: [
+      ...JOURNAL_ENTRIES_QUERY_KEY,
+      user?.id,
+      startDate ?? "all",
+      endDate ?? "all",
+      limit ?? "all",
+      normalizedEntryTypes.join(","),
+      checkInType ?? "all",
+    ],
     enabled: enabled && !!user?.id,
     queryFn: async () => {
       if (!user?.id) return [];
 
-      let reflectionsQuery = supabase
-        .from("user_reflections")
-        .select("*")
-        .eq("user_id", user.id);
-      let eveningReflectionsQuery = supabase
-        .from("evening_reflections")
-        .select("*")
-        .eq("user_id", user.id);
-      let dailyCheckInsQuery = supabase
-        .from("daily_check_ins")
-        .select("*")
-        .eq("user_id", user.id);
+      let reflectionsQuery = includeReflections
+        ? supabase
+          .from("user_reflections")
+          .select("*")
+          .eq("user_id", user.id)
+        : null;
+      let eveningReflectionsQuery = includeEveningReflections
+        ? supabase
+          .from("evening_reflections")
+          .select("*")
+          .eq("user_id", user.id)
+        : null;
+      let dailyCheckInsQuery = includeDailyCheckIns
+        ? supabase
+          .from("daily_check_ins")
+          .select("*")
+          .eq("user_id", user.id)
+        : null;
 
       if (startDate) {
-        reflectionsQuery = reflectionsQuery.gte("reflection_date", startDate);
-        eveningReflectionsQuery = eveningReflectionsQuery.gte("reflection_date", startDate);
-        dailyCheckInsQuery = dailyCheckInsQuery.gte("check_in_date", startDate);
+        reflectionsQuery = reflectionsQuery?.gte("reflection_date", startDate) ?? null;
+        eveningReflectionsQuery = eveningReflectionsQuery?.gte("reflection_date", startDate) ?? null;
+        dailyCheckInsQuery = dailyCheckInsQuery?.gte("check_in_date", startDate) ?? null;
       }
 
       if (endDate) {
-        reflectionsQuery = reflectionsQuery.lte("reflection_date", endDate);
-        eveningReflectionsQuery = eveningReflectionsQuery.lte("reflection_date", endDate);
-        dailyCheckInsQuery = dailyCheckInsQuery.lte("check_in_date", endDate);
+        reflectionsQuery = reflectionsQuery?.lte("reflection_date", endDate) ?? null;
+        eveningReflectionsQuery = eveningReflectionsQuery?.lte("reflection_date", endDate) ?? null;
+        dailyCheckInsQuery = dailyCheckInsQuery?.lte("check_in_date", endDate) ?? null;
+      }
+
+      if (checkInType && dailyCheckInsQuery) {
+        dailyCheckInsQuery = dailyCheckInsQuery.eq("check_in_type", checkInType);
       }
 
       const [
@@ -60,9 +93,15 @@ export const useJournalEntries = (options: UseJournalEntriesOptions = {}) => {
         eveningReflectionsResult,
         dailyCheckInsResult,
       ] = await Promise.all([
-        reflectionsQuery.order("reflection_date", { ascending: false }).order("created_at", { ascending: false }),
-        eveningReflectionsQuery.order("reflection_date", { ascending: false }).order("created_at", { ascending: false }),
-        dailyCheckInsQuery.order("check_in_date", { ascending: false }).order("created_at", { ascending: false }),
+        reflectionsQuery
+          ? reflectionsQuery.order("reflection_date", { ascending: false }).order("created_at", { ascending: false })
+          : Promise.resolve({ data: [], error: null }),
+        eveningReflectionsQuery
+          ? eveningReflectionsQuery.order("reflection_date", { ascending: false }).order("created_at", { ascending: false })
+          : Promise.resolve({ data: [], error: null }),
+        dailyCheckInsQuery
+          ? dailyCheckInsQuery.order("check_in_date", { ascending: false }).order("created_at", { ascending: false })
+          : Promise.resolve({ data: [], error: null }),
       ]);
 
       if (reflectionsResult.error) throw reflectionsResult.error;

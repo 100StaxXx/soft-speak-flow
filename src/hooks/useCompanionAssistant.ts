@@ -1,11 +1,18 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/components/ui/sonner";
-import { isCompanionAgentSurfaceEnabled } from "@/config/companionAgentRollout";
 import { useAuth } from "@/hooks/useAuth";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionDialogue } from "@/hooks/useCompanionDialogue";
-import { useLegacyCompanionAssistantAdapter } from "@/hooks/useLegacyCompanionAssistantAdapter";
+import type { PermissionStatus } from "@/hooks/useMicrophonePermission";
 import { useCompanionVoiceSettings } from "@/hooks/useCompanionVoiceSettings";
 import { useVoiceInput } from "@/hooks/useVoiceInput";
 import { supabase } from "@/integrations/supabase/client";
@@ -36,7 +43,10 @@ import type {
   CompanionChatSurface,
   CompanionChatThreadSummary,
 } from "@/types/companionConversation";
-import type { CompanionPlannerLaunchIntent } from "@/types/companionPlanner";
+import type {
+  CompanionPlannerLaunchIntent,
+  CompanionPlannerPendingNotice,
+} from "@/types/companionPlanner";
 import {
   COMPANION_PENDING_ACTIONS_DISABLED_REASON,
   COMPANION_CHAT_THREAD_HISTORY_DISABLED_REASON,
@@ -45,7 +55,6 @@ import {
 } from "@/utils/companionChatSetup";
 import { formatCurrentDateTimeWithOffset } from "@/utils/currentDateTime";
 import { stripLegacyJourneysPlannerOpeners } from "@/utils/legacyJourneysPlannerOpener";
-import { parseFunctionInvokeError } from "@/utils/supabaseFunctionErrors";
 
 export type CompanionAssistantSurface = "companion" | "journeys";
 
@@ -68,9 +77,65 @@ export interface CompanionAssistantFailedMessage {
   optimisticMessageId: string;
 }
 
-interface PendingLegacyFallbackSubmission {
-  text: string;
-  inputMode: CompanionChatInputMode;
+type CompanionAssistantSubmitMessage = (
+  rawMessage: string,
+  inputMode?: CompanionChatInputMode,
+) => Promise<void>;
+
+type CompanionAssistantAsyncAction = () => Promise<void>;
+
+type CompanionAssistantAcceptSuggestedQuest = (
+  proposalId: string,
+) => Promise<void | undefined>;
+
+export interface CompanionAssistantState {
+  todayLabel: string;
+  placeholder: string;
+  messages: CompanionAssistantMessage[];
+  structuredResponse: CompanionAgentResponse["structuredResponse"];
+  pendingAction: PendingActionView | null;
+  unsupportedPendingProposalNotice: CompanionPlannerPendingNotice | null;
+  error: string | null;
+  lastFailedMessage: CompanionAssistantFailedMessage | null;
+  draftInput: string;
+  setDraftInput: Dispatch<SetStateAction<string>>;
+  interimText: string;
+  isSubmitting: boolean;
+  isResolvingAction: boolean;
+  submitMessage: CompanionAssistantSubmitMessage;
+  submitTypedMessage: CompanionAssistantAsyncAction;
+  acceptSuggestedQuest: CompanionAssistantAcceptSuggestedQuest;
+  canAcceptSuggestedQuests: boolean;
+  suggestedQuestDisabledReason: string | null;
+  retryLastMessage: CompanionAssistantAsyncAction;
+  confirmPendingAction: CompanionAssistantAsyncAction;
+  cancelPendingAction: CompanionAssistantAsyncAction;
+  isRecording: boolean;
+  isAutoStopping: boolean;
+  isVoiceSupported: boolean;
+  permissionStatus: PermissionStatus;
+  showPermissionDialog: boolean;
+  setShowPermissionDialog: Dispatch<SetStateAction<boolean>>;
+  isRequestingPermission: boolean;
+  toggleRecording: () => void;
+  requestMicrophonePermission: CompanionAssistantAsyncAction;
+  isSpeaking: boolean;
+  speechProvider: CompanionSpeechProvider;
+  stopSpeaking: () => void;
+  activeThread: CompanionChatThreadSummary | null;
+  historyThreads: CompanionChatThreadSummary[];
+  isLoadingThreads: boolean;
+  hasPersistedActiveThread: boolean;
+  canOpenThreadPicker: boolean;
+  threadPickerDisabledReason: string | null;
+  threadHistoryEmptyStateMessage: string;
+  resumeThread: (sessionId: string) => Promise<void>;
+  archiveCurrentThread: CompanionAssistantAsyncAction;
+  canArchiveThread: boolean;
+  archiveDisabledReason: string | null;
+  startNewChat: CompanionAssistantAsyncAction;
+  canStartNewChat: boolean;
+  newChatDisabledReason: string | null;
 }
 
 interface UseCompanionAssistantOptions {
@@ -125,69 +190,18 @@ const getTodayLabel = () =>
     day: "numeric",
   }).format(new Date());
 
-const shouldFallbackToLegacyAgent = async (error: unknown) => {
-  const parsed = await parseFunctionInvokeError(error);
-  const source = [
-    parsed.name,
-    parsed.message,
-    parsed.backendMessage,
-    parsed.responsePayload?.error,
-    parsed.responsePayload?.message,
-    parsed.responsePayload?.code,
-  ]
-    .filter((value): value is string => typeof value === "string" && value.length > 0)
-    .join(" ")
-    .toLowerCase();
-
-  const hasSchemaSignal = source.includes("does not exist")
-    || source.includes("undefined_table")
-    || source.includes("undefined_column")
-    || source.includes("schema cache")
-    || source.includes("relation")
-    || source.includes("column");
-  const hasRecoverableNetworkFailure = !parsed.isOffline && (
-    parsed.category === "network"
-    || source.includes("functionsfetcherror")
-    || source.includes("failed to fetch")
-    || source.includes("failed to send a request to the edge function")
-  );
-
-  return hasRecoverableNetworkFailure
-    || source.includes("function not found")
-    || source.includes("no route matched")
-    || source.includes("could not find function")
-    || source.includes("could not find the function")
-    || (parsed.status === 404 && !parsed.backendMessage)
-    || (hasSchemaSignal && (
-      source.includes("companion_pending_actions")
-      || source.includes("openai_conversation_id")
-      || source.includes("last_openai_response_id")
-      || source.includes("companion_mode")
-      || source.includes("companion_mode_adaptation_enabled")
-    ));
-};
-
 export function useCompanionAssistant({
   surface,
   conversationEnabled = true,
   launchIntent = null,
   onLaunchIntentConsumed,
   onOpenCampaignBuilder,
-}: UseCompanionAssistantOptions) {
+}: UseCompanionAssistantOptions): CompanionAssistantState {
   const { user } = useAuth();
   const { companion } = useCompanion();
   const { greeting, voiceStyle } = useCompanionDialogue();
   const { autoplayVoice, muteSpokenReplies } = useCompanionVoiceSettings();
   const queryClient = useQueryClient();
-  const agentSurfaceEnabled = isCompanionAgentSurfaceEnabled(surface);
-  const [useLegacyFallback, setUseLegacyFallback] = useState(!agentSurfaceEnabled);
-
-  const legacyAssistant = useLegacyCompanionAssistantAdapter({
-    enabled: useLegacyFallback,
-    surface,
-    conversationEnabled,
-    onOpenCampaignBuilder,
-  });
 
   const [activeSessionId, setActiveSessionId] = useState(() => generateCompanionThreadSessionId());
   const [messages, setMessages] = useState<CompanionAssistantMessage[]>([]);
@@ -199,8 +213,6 @@ export function useCompanionAssistant({
   const [interimText, setInterimText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [lastFailedMessage, setLastFailedMessage] = useState<CompanionAssistantFailedMessage | null>(null);
-  const [pendingLegacyFallbackSubmission, setPendingLegacyFallbackSubmission] =
-    useState<PendingLegacyFallbackSubmission | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isResolvingAction, setIsResolvingAction] = useState(false);
   const [showPermissionDialog, setShowPermissionDialog] = useState(false);
@@ -212,7 +224,6 @@ export function useCompanionAssistant({
   const scopeKeyRef = useRef<string | null>(null);
   const bootstrappedScopeRef = useRef<string | null>(null);
   const handledLaunchIntentIdRef = useRef<string | null>(null);
-  const isHandingOffToLegacyRef = useRef(false);
 
   const scopeKey = `${surface}:${user?.id ?? "anon"}:${companion?.id ?? "none"}`;
   const baseGreeting = surface === "journeys" ? null : greeting;
@@ -323,13 +334,12 @@ export function useCompanionAssistant({
     if (scopeKeyRef.current === scopeKey) return;
 
     scopeKeyRef.current = scopeKey;
-    setUseLegacyFallback(!agentSurfaceEnabled);
     bootstrappedScopeRef.current = null;
     handledLaunchIntentIdRef.current = null;
     openFreshThread({
       greetingText: baseGreeting,
     });
-  }, [agentSurfaceEnabled, baseGreeting, openFreshThread, scopeKey]);
+  }, [baseGreeting, openFreshThread, scopeKey]);
 
   useEffect(() => {
     if (!threadsQuery.isSuccess) return;
@@ -485,13 +495,6 @@ export function useCompanionAssistant({
     const message = rawMessage.trim();
     if (!message || isSubmitting || isResolvingAction) return;
 
-    if (useLegacyFallback) {
-      setError(null);
-      setLastFailedMessage(null);
-      await legacyAssistant.submitMessage(message, inputMode);
-      return;
-    }
-
     if (!user?.id || !companion?.id) {
       toast.error("Your companion is still loading. Try again in a moment.");
       return;
@@ -536,18 +539,6 @@ export function useCompanionAssistant({
       appendAssistantResponse(response);
       void invalidateThreads();
     } catch (error) {
-      if (await shouldFallbackToLegacyAgent(error)) {
-        console.warn("Companion agent unavailable, falling back to legacy assistant:", error);
-        setError(null);
-        setLastFailedMessage(null);
-        setUseLegacyFallback(true);
-        setPendingLegacyFallbackSubmission({
-          text: message,
-          inputMode,
-        });
-        return;
-      }
-
       console.error("Failed to submit companion agent message:", error);
       const nextError = "Cosmiq hit a snag. Try that again.";
       toast.error(nextError);
@@ -567,29 +558,9 @@ export function useCompanionAssistant({
     invalidateThreads,
     isResolvingAction,
     isSubmitting,
-    legacyAssistant,
     surface,
-    useLegacyFallback,
     user?.id,
   ]);
-
-  useEffect(() => {
-    if (!useLegacyFallback || !pendingLegacyFallbackSubmission || isHandingOffToLegacyRef.current) {
-      return;
-    }
-
-    isHandingOffToLegacyRef.current = true;
-    const submission = pendingLegacyFallbackSubmission;
-    setPendingLegacyFallbackSubmission(null);
-
-    void legacyAssistant.submitMessage(submission.text, submission.inputMode)
-      .catch((fallbackError) => {
-        console.error("Failed to hand off companion message to legacy assistant:", fallbackError);
-      })
-      .finally(() => {
-        isHandingOffToLegacyRef.current = false;
-      });
-  }, [legacyAssistant, pendingLegacyFallbackSubmission, useLegacyFallback]);
 
   const submitMessage = useCallback(async (
     rawMessage: string,
@@ -607,15 +578,6 @@ export function useCompanionAssistant({
   }, [lastFailedMessage, submitMessageInternal]);
 
   const resolvePendingAction = useCallback(async (mode: "confirm" | "cancel") => {
-    if (useLegacyFallback) {
-      if (mode === "confirm") {
-        await legacyAssistant.confirmPendingAction();
-      } else {
-        await legacyAssistant.cancelPendingAction();
-      }
-      return;
-    }
-
     if (!pendingAction || isResolvingAction || isSubmitting) return;
 
     setIsResolvingAction(true);
@@ -661,41 +623,9 @@ export function useCompanionAssistant({
     invalidateThreads,
     isResolvingAction,
     isSubmitting,
-    legacyAssistant,
     pendingAction,
     speakAssistantReply,
-    useLegacyFallback,
   ]);
-
-  const archiveCurrentThread = useCallback(async () => {
-    if (!persistedActiveThread) {
-      openFreshThread({
-        greetingText: baseGreeting,
-      });
-      return;
-    }
-
-    await setCompanionChatThreadArchived(persistedActiveThread.sessionId, true);
-    await invalidateThreads();
-    openFreshThread({
-      greetingText: baseGreeting,
-    });
-  }, [baseGreeting, invalidateThreads, openFreshThread, persistedActiveThread]);
-
-  const startNewChat = useCallback(async () => {
-    if (persistedActiveThread) {
-      await setCompanionChatThreadArchived(persistedActiveThread.sessionId, true);
-      await invalidateThreads();
-    }
-
-    openFreshThread({
-      greetingText: baseGreeting,
-    });
-  }, [baseGreeting, invalidateThreads, openFreshThread, persistedActiveThread]);
-
-  const resumeThread = useCallback(async (sessionId: string) => {
-    await loadThreadState(sessionId);
-  }, [loadThreadState]);
 
   useEffect(() => {
     if (!launchIntent?.id) return;
@@ -751,67 +681,76 @@ export function useCompanionAssistant({
     }
   }, [requestPermission, toggleRecording]);
 
-  const canStartNewChat = !isSubmitting && !isResolvingAction && !pendingAction;
-  const canArchiveThread = canStartNewChat && hasPersistedActiveThread;
   const newChatDisabledReason = pendingAction
     ? "Resolve or cancel the pending action first."
-    : null;
+    : isSubmitting || isResolvingAction
+      ? "Wait for the current reply to finish."
+      : null;
   const archiveDisabledReason = pendingAction
     ? "Resolve or cancel the pending action first."
-    : hasPersistedActiveThread
-      ? null
-      : "This chat isn't saved yet.";
+    : isSubmitting || isResolvingAction
+      ? "Wait for the current reply to finish."
+      : hasPersistedActiveThread
+        ? null
+        : "This chat isn't saved yet.";
+  const threadPickerDisabledReason = surface !== "journeys"
+    ? null
+    : pendingAction
+      ? "Resolve or cancel the pending action first."
+      : isSubmitting || isResolvingAction
+        ? "Wait for the current reply to finish."
+        : threadsQuery.isLoading
+          ? "Loading thread history."
+          : threadsQuery.data?.setupUnavailable
+            ? COMPANION_CHAT_THREAD_HISTORY_DISABLED_REASON
+            : null;
+  const canStartNewChat = newChatDisabledReason === null;
+  const canArchiveThread = archiveDisabledReason === null;
+  const canOpenThreadPicker = threadPickerDisabledReason === null;
+
+  const archiveCurrentThread = useCallback(async () => {
+    if (archiveDisabledReason || !persistedActiveThread) return;
+
+    await setCompanionChatThreadArchived(persistedActiveThread.sessionId, true);
+    await invalidateThreads();
+    openFreshThread({
+      greetingText: baseGreeting,
+    });
+  }, [
+    archiveDisabledReason,
+    baseGreeting,
+    invalidateThreads,
+    openFreshThread,
+    persistedActiveThread,
+  ]);
+
+  const startNewChat = useCallback(async () => {
+    if (newChatDisabledReason) return;
+
+    if (persistedActiveThread) {
+      await setCompanionChatThreadArchived(persistedActiveThread.sessionId, true);
+      await invalidateThreads();
+    }
+
+    openFreshThread({
+      greetingText: baseGreeting,
+    });
+  }, [
+    baseGreeting,
+    invalidateThreads,
+    newChatDisabledReason,
+    openFreshThread,
+    persistedActiveThread,
+  ]);
+
+  const resumeThread = useCallback(async (sessionId: string) => {
+    if (threadPickerDisabledReason || sessionId === activeSessionId) return;
+    await loadThreadState(sessionId);
+  }, [activeSessionId, loadThreadState, threadPickerDisabledReason]);
+
   const threadHistoryEmptyStateMessage = threadsQuery.data?.setupUnavailable
     ? COMPANION_CHAT_THREAD_HISTORY_DISABLED_REASON
     : COMPANION_CHAT_THREAD_HISTORY_EMPTY_STATE;
-
-  if (useLegacyFallback) {
-    return {
-      todayLabel: legacyAssistant.todayLabel,
-      placeholder: legacyAssistant.placeholder,
-      messages: legacyAssistant.messages,
-      structuredResponse: legacyAssistant.structuredResponse,
-      pendingAction: legacyAssistant.pendingAction,
-      error,
-      lastFailedMessage,
-      draftInput,
-      setDraftInput,
-      interimText,
-      isSubmitting: legacyAssistant.isSubmitting,
-      isResolvingAction: legacyAssistant.isResolvingAction,
-      submitMessage,
-      submitTypedMessage: () => submitMessage(draftInput, "text"),
-      acceptSuggestedQuest: legacyAssistant.acceptSuggestedQuest,
-      retryLastMessage,
-      confirmPendingAction: () => resolvePendingAction("confirm"),
-      cancelPendingAction: () => resolvePendingAction("cancel"),
-      isRecording,
-      isAutoStopping,
-      isVoiceSupported: isSupported,
-      permissionStatus,
-      showPermissionDialog,
-      setShowPermissionDialog,
-      isRequestingPermission,
-      toggleRecording,
-      requestMicrophonePermission,
-      isSpeaking: legacyAssistant.isSpeaking,
-      speechProvider: legacyAssistant.speechProvider,
-      stopSpeaking: legacyAssistant.stopSpeaking,
-      activeThread: legacyAssistant.activeThread,
-      historyThreads: legacyAssistant.historyThreads,
-      isLoadingThreads: legacyAssistant.isLoadingThreads,
-      hasPersistedActiveThread: legacyAssistant.hasPersistedActiveThread,
-      canOpenThreadPicker: legacyAssistant.canOpenThreadPicker,
-      threadHistoryEmptyStateMessage: legacyAssistant.threadHistoryEmptyStateMessage,
-      resumeThread: legacyAssistant.resumeThread,
-      archiveCurrentThread: legacyAssistant.archiveCurrentThread,
-      canArchiveThread: legacyAssistant.canArchiveThread,
-      archiveDisabledReason: legacyAssistant.archiveDisabledReason,
-      startNewChat: legacyAssistant.startNewChat,
-      canStartNewChat: legacyAssistant.canStartNewChat,
-      newChatDisabledReason: legacyAssistant.newChatDisabledReason,
-    };
-  }
 
   return {
     todayLabel,
@@ -819,6 +758,7 @@ export function useCompanionAssistant({
     messages,
     structuredResponse,
     pendingAction,
+    unsupportedPendingProposalNotice: null,
     error,
     lastFailedMessage,
     draftInput,
@@ -829,6 +769,9 @@ export function useCompanionAssistant({
     submitMessage,
     submitTypedMessage: () => submitMessage(draftInput, "text"),
     acceptSuggestedQuest: async (_proposalId: string) => undefined,
+    canAcceptSuggestedQuests: false,
+    suggestedQuestDisabledReason:
+      "Tap-to-add for suggested day-plan quests isn't available in this mode yet. Ask me to add it directly instead.",
     retryLastMessage,
     confirmPendingAction: () => resolvePendingAction("confirm"),
     cancelPendingAction: () => resolvePendingAction("cancel"),
@@ -852,7 +795,8 @@ export function useCompanionAssistant({
     historyThreads,
     isLoadingThreads: threadsQuery.isLoading,
     hasPersistedActiveThread,
-    canOpenThreadPicker: !threadsQuery.data?.setupUnavailable,
+    canOpenThreadPicker,
+    threadPickerDisabledReason,
     threadHistoryEmptyStateMessage,
     resumeThread,
     archiveCurrentThread,

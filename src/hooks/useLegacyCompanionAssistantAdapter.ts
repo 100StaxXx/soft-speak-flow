@@ -17,12 +17,18 @@ import {
   isGoalBreakdownStarterMessage,
   looksLikeBigGoal,
 } from "@/shared/bigGoalIntent";
+import type { CompanionStructuredResponse } from "@/shared/companionStructuredOutput";
+import { getPlannerProposalPendingActionMetadata } from "@/shared/companionPlannerPendingAction";
+import type { Json } from "@/integrations/supabase/types";
 import type { PendingActionView } from "@/types/companionAgent";
 import type {
   CompanionChatInputMode,
   CompanionChatThreadSummary,
 } from "@/types/companionConversation";
-import type { CompanionPlannerLaunchIntent } from "@/types/companionPlanner";
+import type {
+  CompanionPlannerLaunchIntent,
+  CompanionPlannerPendingNotice,
+} from "@/types/companionPlanner";
 import { formatCurrentDateTimeWithOffset } from "@/utils/currentDateTime";
 
 export type LegacyCompanionAssistantMessage = {
@@ -34,6 +40,49 @@ export type LegacyCompanionAssistantMessage = {
   source: "chat" | "plan";
   isSeed?: boolean;
 };
+
+type LegacyCompanionAssistantAsyncAction = () => Promise<void>;
+
+type LegacyCompanionAssistantAcceptSuggestedQuest = (
+  proposalId: string,
+) => Promise<void | undefined>;
+
+export interface LegacyCompanionAssistantState {
+  messages: LegacyCompanionAssistantMessage[];
+  structuredResponse: CompanionStructuredResponse | null;
+  pendingAction: PendingActionView | null;
+  unsupportedPendingProposalNotice: CompanionPlannerPendingNotice | null;
+  placeholder: string;
+  todayLabel: string;
+  isSubmitting: boolean;
+  isResolvingAction: boolean;
+  submitMessage: (
+    rawMessage: string,
+    inputMode?: CompanionChatInputMode,
+  ) => Promise<void>;
+  acceptSuggestedQuest: LegacyCompanionAssistantAcceptSuggestedQuest;
+  canAcceptSuggestedQuests: boolean;
+  suggestedQuestDisabledReason: string | null;
+  confirmPendingAction: LegacyCompanionAssistantAsyncAction;
+  cancelPendingAction: LegacyCompanionAssistantAsyncAction;
+  isSpeaking: boolean;
+  speechProvider: "device" | "cloud" | "none";
+  stopSpeaking: () => void;
+  activeThread: CompanionChatThreadSummary | null;
+  historyThreads: CompanionChatThreadSummary[];
+  isLoadingThreads: boolean;
+  hasPersistedActiveThread: boolean;
+  canOpenThreadPicker: boolean;
+  threadPickerDisabledReason: string | null;
+  threadHistoryEmptyStateMessage: string;
+  resumeThread: (sessionId: string) => Promise<void>;
+  archiveCurrentThread: LegacyCompanionAssistantAsyncAction;
+  canArchiveThread: boolean;
+  archiveDisabledReason: string | null;
+  startNewChat: LegacyCompanionAssistantAsyncAction;
+  canStartNewChat: boolean;
+  newChatDisabledReason: string | null;
+}
 
 type CompanionAssistantSurface = "companion" | "journeys";
 
@@ -127,29 +176,17 @@ const mapLegacyProposalToPendingAction = (
 ): PendingActionView | null => {
   if (!proposal) return null;
 
-  const actionType = proposal.kind === "create_quest"
-    ? "task_create"
-    : proposal.kind === "update_quest"
-      ? "task_update"
-      : proposal.kind === "create_ritual"
-        ? "ritual_create"
-        : proposal.kind === "suggest_reminder"
-          ? "reminder_create"
-          : "campaign_update";
-  const intent = proposal.kind === "create_quest"
-    ? "schedule_task"
-    : proposal.kind === "update_quest" || proposal.kind === "suggest_reminder"
-      ? "update_existing_plan"
-      : "goal_setting";
+  const metadata = getPlannerProposalPendingActionMetadata(proposal.kind);
+  if (!metadata) return null;
 
   return {
     id: proposal.id,
     status: "pending",
-    intent,
-    actionType,
+    intent: metadata.intent,
+    actionType: metadata.actionType,
     summary: proposal.summary,
     confirmationMessage: proposal.reasoning ?? "Want me to lock that in?",
-    normalizedPayload: proposal.payload,
+    normalizedPayload: proposal.payload as unknown as Json,
     affectedEntities: null,
     expiresAt: new Date(Date.now() + (1000 * 60 * 60 * 12)).toISOString(),
     createdAt: new Date().toISOString(),
@@ -161,14 +198,18 @@ export function useLegacyCompanionAssistantAdapter({
   surface,
   conversationEnabled = true,
   onOpenCampaignBuilder,
-}: UseLegacyCompanionAssistantAdapterOptions) {
+}: UseLegacyCompanionAssistantAdapterOptions): LegacyCompanionAssistantState {
   const { user } = useAuth();
   const { companion } = useCompanion();
   const companionChat = useCompanionChat({
     enabled: enabled && surface === "companion" && conversationEnabled,
   });
-  const journeysConversation = useJourneysCompanionConversation();
+  const journeysConversation = useJourneysCompanionConversation({
+    enabled: enabled && surface === "journeys",
+  });
   const planner = useCompanionPlanner({
+    enabled,
+    legacyExecutionEnabled: enabled,
     threadPersistence: surface === "journeys"
       ? {
         enabled: true,
@@ -209,13 +250,20 @@ export function useLegacyCompanionAssistantAdapter({
   });
 
   const activePendingProposal = useMemo(
-    () => planner.pendingProposals.find((proposal) => proposal.status === "pending") ?? null,
-    [planner.pendingProposals],
+    () => planner.legacyConfirmation.activePendingProposal,
+    [planner.legacyConfirmation.activePendingProposal],
   );
   const pendingAction = useMemo(
     () => mapLegacyProposalToPendingAction(activePendingProposal),
     [activePendingProposal],
   );
+  const unsupportedPendingProposalNotice = planner.legacyConfirmation
+    .unsupportedPendingProposalNotice;
+  const unsupportedJourneysDraftThreadReason = surface === "journeys" && unsupportedPendingProposalNotice
+    ? "Keep this thread open while the visible pending draft is still unresolved."
+    : null;
+  const noopAsync = useCallback(async (..._args: unknown[]) => undefined, []);
+  const noopSync = useCallback((..._args: unknown[]) => undefined, []);
 
   const placeholder = surface === "journeys"
     ? "chat"
@@ -293,10 +341,47 @@ export function useLegacyCompanionAssistantAdapter({
     conversation,
   ]);
 
+  if (!enabled) {
+    return {
+      messages: [],
+      structuredResponse: null,
+      pendingAction: null,
+      unsupportedPendingProposalNotice: null,
+      placeholder: surface === "journeys" ? "chat" : "Talk to Cosmiq naturally.",
+      todayLabel: planner.todayLabel,
+      isSubmitting: false,
+      isResolvingAction: false,
+      submitMessage: noopAsync,
+      acceptSuggestedQuest: noopAsync,
+      canAcceptSuggestedQuests: false,
+      suggestedQuestDisabledReason: null,
+      confirmPendingAction: noopAsync,
+      cancelPendingAction: noopAsync,
+      isSpeaking: false,
+      speechProvider: "none" as const,
+      stopSpeaking: noopSync,
+      activeThread: null,
+      historyThreads: [],
+      isLoadingThreads: false,
+      hasPersistedActiveThread: false,
+      canOpenThreadPicker: false,
+      threadPickerDisabledReason: null,
+      threadHistoryEmptyStateMessage: "Past chats will show up here after at least one real exchange.",
+      resumeThread: noopAsync,
+      archiveCurrentThread: noopAsync,
+      canArchiveThread: false,
+      archiveDisabledReason: null,
+      startNewChat: noopAsync,
+      canStartNewChat: false,
+      newChatDisabledReason: null,
+    };
+  }
+
   return {
     messages,
     structuredResponse: planner.structuredResponse,
     pendingAction,
+    unsupportedPendingProposalNotice,
     placeholder,
     todayLabel: planner.todayLabel,
     isSubmitting: planner.isSubmitting || conversation.isSubmitting,
@@ -304,11 +389,15 @@ export function useLegacyCompanionAssistantAdapter({
     submitMessage,
     acceptSuggestedQuest: (proposalId: string) =>
       planner.acceptSuggestedQuest(proposalId),
-    confirmPendingAction: activePendingProposal
-      ? () => planner.confirmProposal(activePendingProposal.id)
+    canAcceptSuggestedQuests: true,
+    suggestedQuestDisabledReason: null,
+    confirmPendingAction:
+      planner.legacyExecution.enabled && activePendingProposal && pendingAction
+      ? () => planner.legacyExecution.confirmProposal(activePendingProposal.id)
       : async () => undefined,
-    cancelPendingAction: activePendingProposal
-      ? () => planner.rejectProposal(activePendingProposal.id)
+    cancelPendingAction:
+      planner.legacyExecution.enabled && activePendingProposal && pendingAction
+      ? () => planner.legacyExecution.rejectProposal(activePendingProposal.id)
       : async () => undefined,
     isSpeaking: companionChat.isSpeaking,
     speechProvider: companionChat.speechProvider,
@@ -317,16 +406,29 @@ export function useLegacyCompanionAssistantAdapter({
     historyThreads: surface === "journeys" ? journeysThreads.historyThreads : [],
     isLoadingThreads: surface === "journeys" ? journeysThreads.isLoadingThreads : false,
     hasPersistedActiveThread: surface === "journeys" ? journeysThreads.hasPersistedActiveThread : false,
-    canOpenThreadPicker: surface === "journeys" ? journeysThreads.canOpenThreadPicker : false,
+    canOpenThreadPicker: surface === "journeys"
+      ? unsupportedJourneysDraftThreadReason === null && journeysThreads.canOpenThreadPicker
+      : false,
+    threadPickerDisabledReason: surface === "journeys"
+      ? unsupportedJourneysDraftThreadReason ?? journeysThreads.threadPickerDisabledReason
+      : null,
     threadHistoryEmptyStateMessage: surface === "journeys"
       ? journeysThreads.threadHistoryEmptyStateMessage
       : "Past chats will show up here after at least one real exchange.",
     resumeThread: surface === "journeys" ? journeysThreads.resumeThread : (async () => undefined),
     archiveCurrentThread: surface === "journeys" ? journeysThreads.archiveCurrentThread : (async () => undefined),
-    canArchiveThread: surface === "journeys" ? journeysThreads.canArchiveThread : false,
-    archiveDisabledReason: surface === "journeys" ? journeysThreads.archiveDisabledReason : null,
+    canArchiveThread: surface === "journeys"
+      ? unsupportedJourneysDraftThreadReason === null && journeysThreads.canArchiveThread
+      : false,
+    archiveDisabledReason: surface === "journeys"
+      ? unsupportedJourneysDraftThreadReason ?? journeysThreads.archiveDisabledReason
+      : null,
     startNewChat: surface === "journeys" ? journeysThreads.startNewChat : (async () => undefined),
-    canStartNewChat: surface === "journeys" ? journeysThreads.canStartNewChat : false,
-    newChatDisabledReason: surface === "journeys" ? journeysThreads.newChatDisabledReason : null,
+    canStartNewChat: surface === "journeys"
+      ? unsupportedJourneysDraftThreadReason === null && journeysThreads.canStartNewChat
+      : false,
+    newChatDisabledReason: surface === "journeys"
+      ? unsupportedJourneysDraftThreadReason ?? journeysThreads.newChatDisabledReason
+      : null,
   };
 }

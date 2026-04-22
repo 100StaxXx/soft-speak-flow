@@ -90,6 +90,38 @@ export interface CompanionPlannerProposal {
   missingFields?: string[];
 }
 
+export interface CompanionPlannerProposalView extends CompanionPlannerProposal {
+  legacyConfirmationSupported: boolean;
+  legacyConfirmationUnsupportedReason: string | null;
+}
+
+export interface CompanionPlannerPendingNotice {
+  id: string;
+  summary: string;
+  detail: string;
+}
+
+export interface CompanionPlannerLegacyConfirmationState {
+  activePendingProposal: CompanionPlannerProposalView | null;
+  supportedPendingProposals: CompanionPlannerProposalView[];
+  unsupportedPendingProposalNotice: CompanionPlannerPendingNotice | null;
+  readySupportedProposalCount: number;
+}
+
+export interface CompanionPlannerLegacyExecutionState {
+  compatibilityOnly: true;
+  enabled: boolean;
+  disabledReason: string | null;
+  supportedProposalKinds: CompanionPlannerProposalKind[];
+  confirmProposal: (proposalId: string) => Promise<void>;
+  rejectProposal: (proposalId: string) => Promise<void>;
+  completeProposalEdit: (
+    proposalId: string,
+    options?: { savedTitle?: string | null },
+  ) => Promise<void>;
+  confirmAll: () => Promise<void>;
+}
+
 export interface CompanionPlannerMessage {
   id: string;
   role: CompanionPlannerMessageRole;

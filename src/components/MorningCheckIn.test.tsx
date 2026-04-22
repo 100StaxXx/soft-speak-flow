@@ -407,5 +407,11 @@ describe("MorningCheckIn completion portrait", () => {
     });
 
     expect(mocks.safeLocalStorage.getItem(getMorningCheckInDraftStorageKey("user-1"))).toBeNull();
+    expect(mocks.queryClient.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ["morning-check-in"],
+    });
+    expect(mocks.queryClient.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ["journal-entries"],
+    });
   });
 });

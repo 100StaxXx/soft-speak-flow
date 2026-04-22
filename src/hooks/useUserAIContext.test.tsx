@@ -116,4 +116,17 @@ describe("useUserAIContext", () => {
 
     expect(result.current.capacityWarning).toBe(ACTIVE_CAMPAIGN_LIMIT_WARNING);
   });
+
+  it("does not invoke enrich-user-context when disabled", async () => {
+    const { result } = renderHook(() => useUserAIContext({ enabled: false }), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    expect(mocks.invoke).not.toHaveBeenCalled();
+    expect(result.current.enrichedContext).toBeUndefined();
+  });
 });

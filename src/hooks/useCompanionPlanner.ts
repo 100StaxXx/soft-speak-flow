@@ -3,18 +3,21 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { addDays, format } from "date-fns";
 import { toast } from "@/components/ui/sonner";
 import { useResilience } from "@/contexts/ResilienceContext";
-import { applySubtaskTitlePlan } from "@/features/tasks/lib/subtaskWrites";
 import { supabase } from "@/integrations/supabase/client";
 import { useIntentClassifier } from "@/hooks/useIntentClassifier";
 import type { IntentClassification } from "@/hooks/useIntentClassifier";
 import { useVoiceInput } from "@/hooks/useVoiceInput";
-import { useTasksQuery } from "@/hooks/useTasksQuery";
+import { useCalendarItems } from "@/hooks/useCalendarItems";
 import { useCalendarTasks } from "@/hooks/useCalendarTasks";
-import { useExternalCalendarEvents } from "@/hooks/useExternalCalendarEvents";
+import { useCampaigns } from "@/hooks/useCampaigns";
+import {
+  createLegacyPlannerConfirmationHandlers,
+  executeLegacyPlannerProposalConfirmation as confirmLegacyPlannerProposal,
+} from "@/hooks/companionPlannerLegacyConfirmation";
 import { useInboxTasks } from "@/hooks/useInboxTasks";
-import { useEpics } from "@/hooks/useEpics";
+import { useJournalEntries } from "@/hooks/useJournalEntries";
+import { useQuests } from "@/hooks/useQuests";
 import { useTaskMutations } from "@/hooks/useTaskMutations";
-import type { AddTaskParams } from "@/hooks/useTaskMutations";
 import { useRitualUpdate } from "@/hooks/useRitualUpdate";
 import { useUserAIContext } from "@/hooks/useUserAIContext";
 import { useAIInteractionTracker } from "@/hooks/useAIInteractionTracker";
@@ -47,7 +50,6 @@ import {
 import { formatCurrentDateTimeWithOffset } from "@/utils/currentDateTime";
 import { parseFunctionInvokeError } from "@/utils/supabaseFunctionErrors";
 import type { Json } from "@/integrations/supabase/types";
-import type { EpicRecord } from "@/hooks/epicsQuery";
 import { stripMarkdown } from "@/lib/utils";
 import {
   generateCompanionThreadSessionId,
@@ -60,18 +62,27 @@ import {
   getReadyQuestPlannerProposals,
   isQuestionLikePlannerReply,
 } from "@/shared/companionPlannerReadyProposal";
+import {
+  PLANNER_PENDING_ACTION_PROPOSAL_KINDS,
+  getPlannerProposalPendingActionMetadata,
+} from "@/shared/companionPlannerPendingAction";
 import { computePlannerPriorityScores } from "@/shared/companionPlannerPriority";
 import type { CompanionStructuredResponse } from "@/shared/companionStructuredOutput";
 import { buildCompanionStatInterpretation } from "@/shared/companionStatSignals";
 import { withTimeout } from "@/utils/asyncTimeout";
-import { normalizeUuidLikeId } from "@/utils/offlineId";
+import type { CalendarItem, Campaign, Quest } from "@/types/domain";
 import type {
   CompanionChatSurface,
-  CompanionPlannerContextStarterIntent,
   CompanionChatThreadMessage,
+} from "@/types/companionConversation";
+import type {
+  CompanionPlannerLegacyExecutionState,
+  CompanionPlannerLegacyConfirmationState,
+  CompanionPlannerContextStarterIntent,
   CompanionPlannerMessage,
   CompanionPlannerProposal,
   CompanionPlannerProposalKind,
+  CompanionPlannerProposalView,
   CompanionPlannerQuestion,
   CompanionPlannerRequest,
   CompanionPlannerResponse,
@@ -96,6 +107,8 @@ const STORAGE_KEY = "companion-planner-preferences-v1";
 const MAX_CONTEXT_TASKS = 18;
 const OUTLOOK_PLANNER_SYNC_INTERVAL_MS = 90_000;
 const PLANNER_PREFLIGHT_TIMEOUT_MS = 3_000;
+const LEGACY_PLANNER_EXECUTION_DISABLED_REASON =
+  "Legacy planner execution is compatibility-only and must be explicitly enabled.";
 
 type StoredPlannerPreferences = {
   tonePack?: PlannerTonePack;
@@ -119,11 +132,6 @@ type PlannerMemoryQueryResult = {
 type PlannerSubmissionContext = {
   starterIntent: CompanionPlannerStarterIntent | null;
   briefingContext: PlannerBriefingContext | null;
-};
-
-type CompanionPlannerQuestSubtaskPlan = {
-  mode: "append" | "replace";
-  titles: string[];
 };
 
 const DEFAULT_SESSION_STATE: CompanionPlannerSessionState = {
@@ -425,22 +433,6 @@ const asUnknownStringArray = (value: unknown): string[] =>
       .map((entry) => entry.trim())
     : [];
 
-const extractQuestSubtaskPlan = (
-  payload: Record<string, unknown>,
-): CompanionPlannerQuestSubtaskPlan | null => {
-  const subtaskPlan = asUnknownRecord(payload.subtaskPlan);
-  const mode = subtaskPlan?.mode === "append" || subtaskPlan?.mode === "replace"
-    ? subtaskPlan.mode
-    : null;
-
-  if (!mode) return null;
-
-  return {
-    mode,
-    titles: asUnknownStringArray(subtaskPlan.titles),
-  };
-};
-
 const mapMoodToEnergy = (
   mood: string | null | undefined,
 ): PlannerReflectionSignal["energy"] => {
@@ -559,51 +551,6 @@ const inferScheduledTimeFromProposal = (
   return null;
 };
 
-const sanitizeCreateQuestProposalPayload = (
-  payload: Record<string, unknown>,
-): AddTaskParams => {
-  const reminderMinutesBefore =
-    typeof payload.reminderMinutesBefore === "number"
-      ? payload.reminderMinutesBefore
-      : 15;
-
-  return {
-    taskText: typeof payload.taskText === "string" ? payload.taskText : "Quest",
-    difficulty: payload.difficulty === "easy" || payload.difficulty === "hard"
-      ? payload.difficulty
-      : "medium",
-    source: typeof payload.questSource === "string"
-      ? payload.questSource
-      : typeof payload.taskDate === "string"
-      ? "manual"
-      : "inbox",
-    taskDate: typeof payload.taskDate === "string" ? payload.taskDate : null,
-    scheduledTime: typeof payload.scheduledTime === "string"
-      ? payload.scheduledTime
-      : null,
-    estimatedDuration: typeof payload.estimatedDuration === "number"
-      ? payload.estimatedDuration
-      : null,
-    reminderEnabled: Boolean(payload.reminderEnabled),
-    reminderMinutesBefore,
-    category: typeof payload.category === "string"
-      ? payload.category
-      : undefined,
-    notes: typeof payload.notes === "string" ? payload.notes : null,
-    contactId: typeof payload.contactId === "string" ? payload.contactId : null,
-    autoLogInteraction: typeof payload.autoLogInteraction === "boolean"
-      ? payload.autoLogInteraction
-      : true,
-    imageUrl: typeof payload.imageUrl === "string" ? payload.imageUrl : null,
-    location: typeof payload.location === "string" ? payload.location : null,
-    subtasks: Array.isArray(payload.subtasks)
-      ? payload.subtasks.filter((entry): entry is string =>
-        typeof entry === "string"
-      )
-      : [],
-  };
-};
-
 const extractOptimizerTelemetry = (
   proposal: CompanionPlannerProposal,
 ): Record<string, unknown> => {
@@ -705,7 +652,7 @@ const summarizeProposalGenerationTelemetry = (
   };
 };
 
-const serializeTaskContext = (task: {
+type PlannerTaskContextSource = {
   id: string;
   task_text: string;
   task_date: string | null;
@@ -724,7 +671,32 @@ const serializeTaskContext = (task: {
   epic_id?: string | null;
   epic_title?: string | null;
   contact_id?: string | null;
-}): PlannerContextTask => ({
+};
+
+const toLegacyPlannerTask = (quest: Quest): PlannerTaskContextSource => ({
+  id: quest.id,
+  task_text: quest.title,
+  task_date: quest.taskDate,
+  category: quest.category ?? null,
+  scheduled_time: quest.scheduledTime,
+  estimated_duration: quest.estimatedDuration ?? null,
+  notes: quest.notes ?? null,
+  subtasks: quest.subtasks.map((subtask) => ({
+    title: subtask.title,
+  })),
+  difficulty: quest.difficulty ?? null,
+  recurrence_pattern: quest.recurrencePattern,
+  recurrence_end_date: quest.recurrenceEndDate ?? null,
+  completed: quest.completed,
+  priority: quest.priority ?? null,
+  source: quest.source ?? null,
+  habit_source_id: quest.habitSourceId ?? null,
+  epic_id: quest.campaignId ?? null,
+  epic_title: quest.campaignTitle ?? null,
+  contact_id: quest.contactId ?? null,
+});
+
+const serializeTaskContext = (task: PlannerTaskContextSource): PlannerContextTask => ({
   id: task.id,
   title: task.task_text,
   taskDate: task.task_date,
@@ -807,38 +779,53 @@ const mergePlannerContextWithOutlookSync = (
 };
 
 const mapEpicsToContext = (
-  epics: EpicRecord[],
+  campaigns: Campaign[],
   currentDate: string,
 ): PlannerContextEpic[] =>
-  epics.map((epic) => ({
-    id: epic.id,
-    title: epic.title,
-    endDate: epic.end_date,
-    progressPercentage: epic.progress_percentage ?? null,
-    daysRemaining: epic.end_date
+  campaigns.map((campaign) => ({
+    id: campaign.id,
+    title: campaign.title,
+    endDate: campaign.endDate,
+    progressPercentage: campaign.progressPercentage ?? null,
+    daysRemaining: campaign.endDate
       ? Math.round(
-        (new Date(`${epic.end_date}T00:00:00`).getTime() -
+        (new Date(`${campaign.endDate}T00:00:00`).getTime() -
           new Date(`${currentDate}T00:00:00`).getTime()) /
           (1000 * 60 * 60 * 24),
       )
       : null,
-    habitCount: epic.epic_habits?.length ?? 0,
+    habitCount: campaign.habitCount,
   }));
 
-const mapRitualsToContext = (epics: EpicRecord[]): PlannerContextRitual[] =>
-  epics.flatMap((epic) =>
-    (epic.epic_habits ?? [])
-      .filter((link) => link.habits)
-      .map((link) => ({
-        id: link.habits?.id ?? link.habit_id,
-        epicId: epic.id,
-        epicTitle: epic.title,
-        title: link.habits?.title ?? "Untitled ritual",
-        frequency: link.habits?.frequency ?? null,
-        preferredTime: link.habits?.preferred_time ?? null,
+const mapRitualsToContext = (campaigns: Campaign[]): PlannerContextRitual[] =>
+  campaigns.flatMap((campaign) =>
+    campaign.rituals
+      .filter((ritual) => ritual.habit)
+      .map((ritual) => ({
+        id: ritual.habit?.id ?? ritual.habitId,
+        epicId: campaign.id,
+        epicTitle: campaign.title,
+        title: ritual.habit?.title ?? "Untitled ritual",
+        frequency: ritual.habit?.frequency ?? null,
+        preferredTime: ritual.habit?.preferredTime ?? null,
         currentStreak: null,
       }))
   );
+
+const mapCalendarItemsToContextEvents = (
+  items: CalendarItem[],
+): PlannerContextCalendarEvent[] =>
+  items
+    .filter((item) => item.source === "external_event")
+    .map((item) => ({
+      id: item.externalEventId ?? item.id,
+      title: item.title,
+      start: item.startsAt,
+      end: item.endsAt,
+      isAllDay: item.isAllDay,
+      provider: item.provider ?? "calendar",
+      readOnly: item.readOnly,
+    }));
 
 const hasOwnMemoryUpdate = (
   updates: CompanionPlannerResponse["memoryUpdates"],
@@ -972,7 +959,23 @@ const normalizePlannerResponse = (
   };
 };
 
+const toPlannerProposalView = (
+  proposal: CompanionPlannerProposal,
+): CompanionPlannerProposalView => {
+  const metadata = getPlannerProposalPendingActionMetadata(proposal.kind);
+
+  return {
+    ...proposal,
+    legacyConfirmationSupported: metadata !== null,
+    legacyConfirmationUnsupportedReason: metadata === null
+      ? `Legacy fallback can't confirm proposal kind "${proposal.kind}" yet.`
+      : null,
+  };
+};
+
 interface UseCompanionPlannerOptions {
+  enabled?: boolean;
+  legacyExecutionEnabled?: boolean;
   threadPersistence?: {
     enabled?: boolean;
     surface?: CompanionChatSurface;
@@ -980,11 +983,13 @@ interface UseCompanionPlannerOptions {
 }
 
 export function useCompanionPlanner({
+  enabled = true,
+  legacyExecutionEnabled = false,
   threadPersistence,
 }: UseCompanionPlannerOptions = {}) {
   const { user } = useAuth();
   const { companion } = useCompanion();
-  const { care } = useCompanionCareSignals();
+  const { care } = useCompanionCareSignals({ enabled });
   const queryClient = useQueryClient();
   const storedPreferences = useMemo(readStoredPreferences, []);
   const [horizon, setHorizon] = useState<PlannerHorizon>("day");
@@ -994,22 +999,37 @@ export function useCompanionPlanner({
   });
   const today = new Date();
   const todayIso = format(today, "yyyy-MM-dd");
-  const todayTasksQuery = useTasksQuery(today);
-  const weekTasksQuery = useCalendarTasks(today, "week");
-  const monthTasksQuery = useCalendarTasks(today, "month");
-  const activeEventsQuery = useExternalCalendarEvents(today, horizon);
-  const contextEventsQuery = useExternalCalendarEvents(
+  const todayQuestsQuery = useQuests(today, { enabled });
+  const weekTasksQuery = useCalendarTasks(today, "week", { enabled });
+  const monthTasksQuery = useCalendarTasks(today, "month", { enabled });
+  const activeCalendarItemsQuery = useCalendarItems(today, horizon, {
+    enabled,
+    includeQuests: false,
+  });
+  const contextCalendarItemsQuery = useCalendarItems(
     today,
     horizon === "month" ? "month" : "week",
+    {
+      enabled,
+      includeQuests: false,
+    },
   );
-  const { inboxTasks } = useInboxTasks();
-  const { activeEpics, createEpic, renameEpic, createCampaignRitual } =
-    useEpics();
-  const { addTask, updateTask } = useTaskMutations();
+  const { inboxTasks } = useInboxTasks({ enabled });
+  const {
+    activeCampaigns,
+    createCampaign,
+    renameCampaign,
+    createCampaignRitual,
+  } = useCampaigns({ enabled });
+  const { addTask, updateTask } = useTaskMutations(todayIso);
   const { saveRitual } = useRitualUpdate();
-  const { connectedByProvider, defaultProvider } = useCalendarIntegrations();
-  const { sendTaskToCalendar, syncPlanningContext } = useQuestCalendarSync();
-  const { enrichedContext } = useUserAIContext();
+  const { connectedByProvider, defaultProvider } = useCalendarIntegrations({
+    enabled,
+  });
+  const { sendTaskToCalendar, syncPlanningContext } = useQuestCalendarSync({
+    enabled,
+  });
+  const { enrichedContext } = useUserAIContext({ enabled });
   const { trackInteraction } = useAIInteractionTracker();
   const { trackTaskCreation, trackScheduleModification } =
     useSchedulingLearner();
@@ -1051,7 +1071,7 @@ export function useCompanionPlanner({
 
   const plannerMemoryQuery = useQuery({
     queryKey: ["companion-planner-memory", user?.id],
-    enabled: !!user?.id,
+    enabled: enabled && !!user?.id,
     staleTime: 5 * 60 * 1000,
     queryFn: async (): Promise<PlannerMemoryQueryResult | null> => {
       if (!user?.id) return null;
@@ -1101,7 +1121,7 @@ export function useCompanionPlanner({
       user?.id,
       plannerMemoryQuery.data?.coldContactThresholdDays ?? 14,
     ],
-    enabled: !!user?.id,
+    enabled: enabled && !!user?.id,
     staleTime: 5 * 60 * 1000,
     queryFn: async (): Promise<PlannerContactNeedingAttention[]> => {
       if (!user?.id) return [];
@@ -1180,64 +1200,31 @@ export function useCompanionPlanner({
     },
   });
 
-  const reflectionSignalsQuery = useQuery({
-    queryKey: ["companion-planner-reflections", user?.id],
-    enabled: !!user?.id,
-    staleTime: 5 * 60 * 1000,
-    queryFn: async (): Promise<PlannerReflectionSignal[]> => {
-      if (!user?.id) return [];
-
-      const [
-        { data: checkIns, error: checkInError },
-        { data: reflections, error: reflectionError },
-      ] = await Promise.all([
-        supabase
-          .from("daily_check_ins")
-          .select("check_in_date, mood, reflection")
-          .eq("user_id", user.id)
-          .eq("check_in_type", "morning")
-          .order("check_in_date", { ascending: false })
-          .limit(3),
-        supabase
-          .from("evening_reflections")
-          .select("reflection_date, mood, wins, tomorrow_adjustment")
-          .eq("user_id", user.id)
-          .order("reflection_date", { ascending: false })
-          .limit(2),
-      ]);
-
-      if (checkInError) throw checkInError;
-      if (reflectionError) throw reflectionError;
-
-      const checkInSignals: PlannerReflectionSignal[] = (checkIns ?? []).map((
-        checkIn,
-      ) => ({
-        date: checkIn.check_in_date,
-        source: "check_in",
-        mood: checkIn.mood ?? "unknown",
-        energy: mapMoodToEnergy(checkIn.mood),
-        wins: checkIn.reflection ?? null,
-        tomorrowAdjustment: null,
-      }));
-      const reflectionSignals: PlannerReflectionSignal[] = (reflections ?? [])
-        .map((reflection) => ({
-          date: reflection.reflection_date,
-          source: "reflection",
-          mood: reflection.mood ?? "unknown",
-          energy: mapMoodToEnergy(reflection.mood),
-          wins: reflection.wins ?? null,
-          tomorrowAdjustment: reflection.tomorrow_adjustment ?? null,
-        }));
-
-      return [...checkInSignals, ...reflectionSignals]
-        .sort((left, right) => right.date.localeCompare(left.date))
-        .slice(0, 5);
-    },
+  const journalEntriesQuery = useJournalEntries({
+    enabled,
+    entryTypes: ["daily_check_in", "evening_reflection"],
+    checkInType: "morning",
+    limit: 5,
   });
+  const reflectionSignals = useMemo<PlannerReflectionSignal[]>(
+    () => journalEntriesQuery.entries.map((entry) => ({
+      date: entry.date,
+      source: entry.entryType === "daily_check_in" ? "check_in" : "reflection",
+      mood: entry.mood ?? "unknown",
+      energy: mapMoodToEnergy(entry.mood),
+      wins: entry.entryType === "daily_check_in"
+        ? entry.body ?? null
+        : entry.wins ?? null,
+      tomorrowAdjustment: entry.entryType === "daily_check_in"
+        ? null
+        : entry.tomorrowAdjustment ?? null,
+    })),
+    [journalEntriesQuery.entries],
+  );
 
   const recentStatSignalsQuery = useQuery({
     queryKey: ["companion-planner-stat-signals", user?.id, todayIso],
-    enabled: !!user?.id,
+    enabled: enabled && !!user?.id,
     staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       if (!user?.id) {
@@ -1284,17 +1271,27 @@ export function useCompanionPlanner({
   const activeTasks = useMemo(() => {
     if (horizon === "month") return monthTasksQuery.tasks;
     if (horizon === "week") return weekTasksQuery.tasks;
-    return todayTasksQuery.tasks;
+    return todayQuestsQuery.quests.map(toLegacyPlannerTask);
   }, [
     horizon,
     monthTasksQuery.tasks,
-    todayTasksQuery.tasks,
+    todayQuestsQuery.quests,
     weekTasksQuery.tasks,
   ]);
 
   const contextTasks = useMemo(() => (
     horizon === "month" ? monthTasksQuery.tasks : weekTasksQuery.tasks
   ), [horizon, monthTasksQuery.tasks, weekTasksQuery.tasks]);
+
+  const activeCalendarEvents = useMemo<PlannerContextCalendarEvent[]>(
+    () => mapCalendarItemsToContextEvents(activeCalendarItemsQuery.items),
+    [activeCalendarItemsQuery.items],
+  );
+
+  const contextCalendarEvents = useMemo<PlannerContextCalendarEvent[]>(
+    () => mapCalendarItemsToContextEvents(contextCalendarItemsQuery.items),
+    [contextCalendarItemsQuery.items],
+  );
 
   const plannerMemory = useMemo<PlannerMemoryProfile>(() => {
     const remoteProfile = extractPlannerProfile(
@@ -1402,13 +1399,13 @@ export function useCompanionPlanner({
     () =>
       buildCompanionPlannerScheduleInsights({
         tasks: activeTasks.map(serializeTaskContext),
-        calendarEvents: activeEventsQuery.events,
+        calendarEvents: activeCalendarEvents,
         horizon,
         selectedDate: todayIso,
         currentDateTime: formatCurrentDateTimeWithOffset(today),
         plannerMemory,
       }),
-    [activeEventsQuery.events, activeTasks, horizon, plannerMemory, today, todayIso],
+    [activeCalendarEvents, activeTasks, horizon, plannerMemory, today, todayIso],
   );
 
   const careSignals = useMemo<PlannerCareState>(() => ({
@@ -1460,7 +1457,7 @@ export function useCompanionPlanner({
         contactId: task.contact_id,
         habitSourceId: task.habit_source_id,
       })),
-      reflectionSignals: reflectionSignalsQuery.data ?? [],
+      reflectionSignals,
       scheduleSummary: {
         selectedDateStatus: scheduleInsights.dayLoads.find((entry) =>
           entry.date === todayIso
@@ -1476,7 +1473,7 @@ export function useCompanionPlanner({
     companion?.wisdom,
     recentStatSignalsQuery.data?.recentEvents,
     recentStatSignalsQuery.data?.recentTasks,
-    reflectionSignalsQuery.data,
+    reflectionSignals,
     scheduleInsights.dayLoads,
     scheduleInsights.overloadedDates,
     todayIso,
@@ -1506,12 +1503,11 @@ export function useCompanionPlanner({
         currentDate: todayIso,
         tasks: contextTasks.map(serializeTaskContext),
         inboxTasks: inboxTasks.map(serializeTaskContext),
-        activeEpics: mapEpicsToContext(activeEpics, todayIso),
-        rituals: mapRitualsToContext(activeEpics),
-        calendarEvents: contextEventsQuery
-          .events as PlannerContextCalendarEvent[],
+        activeEpics: mapEpicsToContext(activeCampaigns, todayIso),
+        rituals: mapRitualsToContext(activeCampaigns),
+        calendarEvents: contextCalendarEvents,
         contactsNeedingAttention: contactsAttentionQuery.data ?? [],
-        reflectionSignals: reflectionSignalsQuery.data ?? [],
+        reflectionSignals,
         careSignals,
         scheduleInsights,
         plannerMemory,
@@ -1524,16 +1520,16 @@ export function useCompanionPlanner({
         starterIntent: "general",
       }),
     [
-      activeEpics,
+      activeCampaigns,
       careSignals,
       contactsAttentionQuery.data,
-      contextEventsQuery.events,
+      contextCalendarEvents,
       contextTasks,
       inboxTasks,
       plannerAISignals,
       plannerMemory,
       statInterpretation,
-      reflectionSignalsQuery.data,
+      reflectionSignals,
       scheduleInsights,
       todayIso,
     ],
@@ -1543,12 +1539,11 @@ export function useCompanionPlanner({
     () => sanitizePlannerContext({
       tasks: mapTasksToContext(contextTasks.map(serializeTaskContext)),
       inboxTasks: mapTasksToContext(inboxTasks.map(serializeTaskContext)),
-      activeEpics: mapEpicsToContext(activeEpics, todayIso),
-      rituals: mapRitualsToContext(activeEpics),
-      calendarEvents: contextEventsQuery
-        .events as PlannerContextCalendarEvent[],
+      activeEpics: mapEpicsToContext(activeCampaigns, todayIso),
+      rituals: mapRitualsToContext(activeCampaigns),
+      calendarEvents: contextCalendarEvents,
       contactsNeedingAttention: contactsAttentionQuery.data ?? [],
-      reflectionSignals: reflectionSignalsQuery.data ?? [],
+      reflectionSignals,
       careSignals,
       priorityScores,
       scheduleInsights,
@@ -1557,17 +1552,17 @@ export function useCompanionPlanner({
       aiSignals: plannerAISignals,
     }),
     [
-      activeEpics,
+      activeCampaigns,
       careSignals,
       contactsAttentionQuery.data,
-      contextEventsQuery.events,
+      contextCalendarEvents,
       contextTasks,
       inboxTasks,
       plannerAISignals,
       plannerMemory,
       priorityScores,
       statInterpretation,
-      reflectionSignalsQuery.data,
+      reflectionSignals,
       scheduleInsights,
       todayIso,
     ],
@@ -2033,7 +2028,7 @@ export function useCompanionPlanner({
         calendarEvents: syncedPlannerContext
           .calendarEvents as PlannerContextCalendarEvent[],
         contactsNeedingAttention: contactsAttentionQuery.data ?? [],
-        reflectionSignals: reflectionSignalsQuery.data ?? [],
+        reflectionSignals,
         careSignals,
         briefingContext: resolvedBriefingContext,
         starterIntent: resolvedStarterIntent,
@@ -2154,12 +2149,12 @@ export function useCompanionPlanner({
       setIsSubmitting(false);
     }
   }, [
-    activeEpics,
+    activeCampaigns,
     appendAssistantTurn,
     careSignals,
     classify,
     contactsAttentionQuery.data,
-    contextEventsQuery.events,
+    contextCalendarEvents,
     contextTasks,
     conversationHistory,
     horizon,
@@ -2169,7 +2164,7 @@ export function useCompanionPlanner({
     plannerContext,
     plannerAISignals,
     plannerMemory,
-    reflectionSignalsQuery.data,
+    reflectionSignals,
     scheduleInsights,
     sessionState,
     syncOutlookPlanningContext,
@@ -2249,6 +2244,50 @@ export function useCompanionPlanner({
     }
   }, [sendTaskToCalendar, shouldAutoPublishToOutlook]);
 
+  const legacyPlannerConfirmationHandlers = useMemo(
+    () => createLegacyPlannerConfirmationHandlers({
+      activeTasks,
+      inboxTasks,
+      userId: user?.id,
+      addTask,
+      updateTask,
+      createCampaign,
+      renameCampaign,
+      createCampaignRitual,
+      saveRitual,
+      trackTaskCreation,
+      trackScheduleModification,
+      queueAction,
+      shouldQueueWrites,
+      retryNow,
+      queryClient,
+    }),
+    [
+      activeTasks,
+      addTask,
+      createCampaign,
+      createCampaignRitual,
+      inboxTasks,
+      queryClient,
+      queueAction,
+      renameCampaign,
+      retryNow,
+      saveRitual,
+      shouldQueueWrites,
+      trackScheduleModification,
+      trackTaskCreation,
+      updateTask,
+      user?.id,
+    ],
+  );
+
+  // Compatibility-only dispatcher for the legacy planner fallback path.
+  const executeLegacyPlannerProposalConfirmation = useCallback(async (
+    proposal: CompanionPlannerProposal,
+  ) => {
+    return confirmLegacyPlannerProposal(proposal, legacyPlannerConfirmationHandlers);
+  }, [legacyPlannerConfirmationHandlers]);
+
   const handleConfirmProposal = useCallback(async (proposalId: string) => {
     const proposal = findProposalById(proposals, proposalId);
     if (!proposal) return;
@@ -2258,216 +2297,11 @@ export function useCompanionPlanner({
     }
 
     try {
-      let confirmationContent = `Saved: ${proposal.title}.`;
-      let localTaskId: string | null = null;
-      let mutationResult: { queued?: boolean } | null = null;
-
-      switch (proposal.kind) {
-        case "create_quest": {
-          const payload = sanitizeCreateQuestProposalPayload(proposal.payload);
-          const createResult = await addTask(payload);
-          localTaskId = typeof createResult?.id === "string"
-            ? createResult.id
-            : null;
-          mutationResult = createResult as { queued?: boolean } | null;
-          await trackTaskCreation(
-            payload.scheduledTime ?? null,
-            payload.difficulty ?? "medium",
-            payload.category,
-            payload.taskText,
-          );
-          break;
-        }
-        case "update_quest": {
-          const payload = proposal.payload as {
-            taskId?: unknown;
-            updates?: unknown;
-            subtaskPlan?: unknown;
-          };
-          const taskId = typeof payload.taskId === "string"
-            ? payload.taskId
-            : null;
-          if (!taskId) {
-            throw new Error("Missing quest id for update proposal");
-          }
-
-          const updates = asUnknownRecord(payload.updates) as
-            | Parameters<typeof updateTask>[0]["updates"]
-            | null;
-          const taskUpdatePayload = {
-            taskId,
-            updates: updates ?? {},
-          } satisfies Parameters<typeof updateTask>[0];
-          const subtaskPlan = extractQuestSubtaskPlan(proposal.payload);
-          const previousTask = activeTasks.find((task) => task.id === taskId) ??
-            inboxTasks.find((task) => task.id === taskId);
-
-          mutationResult = await updateTask(taskUpdatePayload) as {
-            queued?: boolean;
-          } | null;
-          localTaskId = taskId;
-
-          const nextScheduledTime = typeof updates?.scheduled_time === "string"
-            ? updates.scheduled_time
-            : null;
-          if (
-            previousTask?.scheduled_time && nextScheduledTime &&
-            previousTask.scheduled_time !== nextScheduledTime
-          ) {
-            await trackScheduleModification(
-              previousTask.scheduled_time,
-              nextScheduledTime,
-              previousTask.difficulty ?? "medium",
-            );
-          }
-
-          if (subtaskPlan) {
-            if (!user?.id) {
-              throw new Error("User not authenticated");
-            }
-
-            try {
-              await applySubtaskTitlePlan({
-                mode: subtaskPlan.mode,
-                taskId,
-                userId: user.id,
-                titles: subtaskPlan.titles,
-                shouldQueueWrites,
-                queueAction,
-                retryNow,
-              });
-
-              await Promise.all([
-                queryClient.invalidateQueries({
-                  queryKey: ["subtasks", normalizeUuidLikeId(taskId)],
-                }),
-                queryClient.invalidateQueries({ queryKey: ["daily-tasks"] }),
-                queryClient.invalidateQueries({ queryKey: ["calendar-tasks"] }),
-                queryClient.invalidateQueries({ queryKey: ["inbox-tasks"] }),
-              ]);
-            } catch (subtaskError) {
-              console.error(
-                "Failed to apply quest subtask plan:",
-                subtaskError,
-              );
-              confirmationContent =
-                `Saved: ${proposal.title}. I couldn't finish the step breakdown yet.`;
-              toast(
-                "Quest updated, but I couldn't finish the step breakdown yet.",
-              );
-            }
-          }
-          break;
-        }
-        case "create_campaign": {
-          const payload = proposal.payload as Parameters<typeof createEpic>[0];
-          await createEpic(payload);
-          const starterHabit = payload.habits?.[0];
-          if (starterHabit?.preferred_time) {
-            await trackTaskCreation(
-              starterHabit.preferred_time,
-              starterHabit.difficulty ?? "medium",
-              starterHabit.category ?? undefined,
-              starterHabit.title,
-            );
-          }
-          break;
-        }
-        case "update_campaign": {
-          const payload = proposal.payload as { epicId: string; title: string };
-          await renameEpic(payload);
-          break;
-        }
-        case "adjust_campaign_plan": {
-          const payload = proposal.payload as {
-            epicId: string;
-            adjustmentType?:
-              | "extend_deadline"
-              | "reduce_scope"
-              | "add_habits"
-              | "remove_habits"
-              | "reschedule"
-              | "custom";
-            reason?: string | null;
-          };
-
-          const { data: adjustmentResult, error: adjustmentError } =
-            await supabase.functions.invoke("adjust-epic-plan", {
-              body: {
-                epicId: payload.epicId,
-                adjustmentType: payload.adjustmentType ?? "custom",
-                reason: payload.reason ?? undefined,
-                customRequest: payload.reason ?? undefined,
-              },
-            });
-
-          if (adjustmentError) throw adjustmentError;
-
-          const suggestions = Array.isArray(
-              (adjustmentResult as { suggestions?: unknown[] } | null)
-                ?.suggestions,
-            )
-            ? (adjustmentResult as { suggestions: unknown[] }).suggestions
-            : [];
-
-          if (suggestions.length === 0) {
-            throw new Error("No campaign adjustments were generated.");
-          }
-
-          const { error: applyError } = await supabase.functions.invoke(
-            "apply-epic-adjustments",
-            {
-              body: {
-                epicId: payload.epicId,
-                adjustments: suggestions,
-                adjustmentType: payload.adjustmentType ?? "custom",
-                reason: payload.reason ?? undefined,
-              },
-            },
-          );
-
-          if (applyError) throw applyError;
-          break;
-        }
-        case "create_ritual": {
-          const payload = proposal.payload as Parameters<
-            typeof createCampaignRitual
-          >[0];
-          await createCampaignRitual(payload);
-          if (payload.preferredTime) {
-            await trackTaskCreation(
-              payload.preferredTime,
-              payload.difficulty ?? "medium",
-              payload.category ?? undefined,
-              payload.title,
-            );
-          }
-          break;
-        }
-        case "update_ritual": {
-          const payload = proposal.payload as Parameters<typeof saveRitual>[0];
-          await saveRitual(payload);
-          if (payload.preferredTime) {
-            await trackTaskCreation(
-              payload.preferredTime,
-              payload.difficulty ?? "medium",
-              payload.category ?? undefined,
-              payload.title,
-            );
-          }
-          break;
-        }
-        case "suggest_reminder": {
-          const payload = proposal.payload as Parameters<typeof updateTask>[0];
-          mutationResult = await updateTask(payload) as
-            | { queued?: boolean }
-            | null;
-          localTaskId = payload.taskId;
-          break;
-        }
-        default:
-          return;
-      }
+      let {
+        confirmationContent,
+        localTaskId,
+        mutationResult,
+      } = await executeLegacyPlannerProposalConfirmation(proposal);
 
       const autoPublishSucceeded = await autoPublishConfirmedQuestToOutlook(
         proposal,
@@ -2528,28 +2362,14 @@ export function useCompanionPlanner({
       toast.error("I couldn't save that change yet.");
     }
   }, [
-    activeTasks,
-    addTask,
-    createCampaignRitual,
-    createEpic,
-    inboxTasks,
-    queryClient,
     proposals,
-    queueAction,
-    renameEpic,
-    retryNow,
-    saveRitual,
     sessionState,
     persistPlannerMemory,
     persistPlannerThreadRows,
-    shouldQueueWrites,
     autoPublishConfirmedQuestToOutlook,
+    executeLegacyPlannerProposalConfirmation,
     strongestPlannerNeed,
     trackInteraction,
-    trackScheduleModification,
-    trackTaskCreation,
-    updateTask,
-    user?.id,
   ]);
 
   const handleRejectProposal = useCallback(async (proposalId: string) => {
@@ -2668,17 +2488,6 @@ export function useCompanionPlanner({
     trackInteraction,
   ]);
 
-  const handleConfirmAll = useCallback(async () => {
-    const readyProposals = proposals.filter((proposal) =>
-      proposal.status === "pending" && proposal.readyToConfirm
-    );
-    for (const proposal of readyProposals) {
-      // Sequential saves keep the confirmation flow predictable and mutation-safe.
-      await handleConfirmProposal(proposal.id);
-    }
-    setQuestions([]);
-  }, [handleConfirmProposal, proposals]);
-
   const {
     isRecording,
     isAutoStopping,
@@ -2716,13 +2525,86 @@ export function useCompanionPlanner({
     }
   }, [requestPermission, toggleRecording]);
 
-  const pendingProposals = useMemo(
-    () => proposals.filter((proposal) => proposal.status === "pending"),
+  const proposalViews = useMemo(
+    () => proposals.map(toPlannerProposalView),
     [proposals],
   );
 
-  const readyProposalCount =
-    pendingProposals.filter((proposal) => proposal.readyToConfirm).length;
+  const pendingProposals = useMemo(
+    () => proposalViews.filter((proposal) => proposal.status === "pending"),
+    [proposalViews],
+  );
+
+  const legacyConfirmation = useMemo<CompanionPlannerLegacyConfirmationState>(() => {
+    const supportedPendingProposals = pendingProposals.filter((proposal) =>
+      proposal.legacyConfirmationSupported
+    );
+    const unsupportedPendingProposal = pendingProposals.find((proposal) =>
+      !proposal.legacyConfirmationSupported
+    ) ?? null;
+
+    return {
+      activePendingProposal: supportedPendingProposals[0] ?? null,
+      supportedPendingProposals,
+      unsupportedPendingProposalNotice: unsupportedPendingProposal
+        ? {
+          id: unsupportedPendingProposal.id,
+          summary: unsupportedPendingProposal.summary,
+          detail:
+            "This proposed change is visible here, but it can't be confirmed from this screen yet.",
+        }
+        : null,
+      readySupportedProposalCount: supportedPendingProposals.filter((proposal) =>
+        proposal.readyToConfirm
+      ).length,
+    };
+  }, [pendingProposals]);
+
+  const handleConfirmAll = useCallback(async () => {
+    const readyProposals = legacyConfirmation.supportedPendingProposals.filter(
+      (proposal) => proposal.readyToConfirm,
+    );
+    for (const proposal of readyProposals) {
+      // Sequential saves keep the confirmation flow predictable and mutation-safe.
+      await handleConfirmProposal(proposal.id);
+    }
+    setQuestions([]);
+  }, [handleConfirmProposal, legacyConfirmation.supportedPendingProposals]);
+
+  const legacyExecution = useMemo<CompanionPlannerLegacyExecutionState>(() => ({
+    compatibilityOnly: true,
+    enabled: legacyExecutionEnabled,
+    disabledReason: legacyExecutionEnabled
+      ? null
+      : LEGACY_PLANNER_EXECUTION_DISABLED_REASON,
+    supportedProposalKinds: [...PLANNER_PENDING_ACTION_PROPOSAL_KINDS],
+    confirmProposal: legacyExecutionEnabled
+      ? handleConfirmProposal
+      : async () => {
+        throw new Error(LEGACY_PLANNER_EXECUTION_DISABLED_REASON);
+      },
+    rejectProposal: legacyExecutionEnabled
+      ? handleRejectProposal
+      : async () => {
+        throw new Error(LEGACY_PLANNER_EXECUTION_DISABLED_REASON);
+      },
+    completeProposalEdit: legacyExecutionEnabled
+      ? handleCompleteProposalEdit
+      : async () => {
+        throw new Error(LEGACY_PLANNER_EXECUTION_DISABLED_REASON);
+      },
+    confirmAll: legacyExecutionEnabled
+      ? handleConfirmAll
+      : async () => {
+        throw new Error(LEGACY_PLANNER_EXECUTION_DISABLED_REASON);
+      },
+  }), [
+    handleCompleteProposalEdit,
+    handleConfirmAll,
+    handleConfirmProposal,
+    handleRejectProposal,
+    legacyExecutionEnabled,
+  ]);
 
   const resetThread = useCallback((options?: { sessionId?: string }) => {
     sessionIdRef.current = options?.sessionId ??
@@ -2739,6 +2621,13 @@ export function useCompanionPlanner({
     setIsSubmitting(false);
     setPlannerMemoryOverride(null);
   }, [storedPreferences]);
+
+  useEffect(() => {
+    if (enabled) return;
+
+    setHorizon("day");
+    resetThread();
+  }, [enabled, resetThread]);
 
   const hydrateThread = useCallback((options: {
     sessionId: string;
@@ -2775,9 +2664,10 @@ export function useCompanionPlanner({
     hasRealMessages: messages.length > 0,
     structuredResponse,
     questions,
-    proposals,
+    proposals: proposalViews,
     pendingProposals,
-    readyProposalCount,
+    legacyConfirmation,
+    legacyExecution,
     draftInput,
     setDraftInput,
     interimText,
@@ -2798,24 +2688,20 @@ export function useCompanionPlanner({
     toggleRecording,
     requestMicrophonePermission,
     acceptSuggestedQuest,
-    confirmProposal: handleConfirmProposal,
-    rejectProposal: handleRejectProposal,
-    completeProposalEdit: handleCompleteProposalEdit,
-    confirmAll: handleConfirmAll,
     sessionState,
     plannerContext,
     plannerMemory,
     statInterpretation,
     scheduleInsights,
     todayLabel: format(today, "EEEE, MMMM d"),
-    isLoadingContext: todayTasksQuery.isLoading ||
+    isLoadingContext: todayQuestsQuery.isLoading ||
       weekTasksQuery.isLoading ||
       monthTasksQuery.isLoading ||
-      activeEventsQuery.isLoading ||
-      contextEventsQuery.isLoading ||
+      activeCalendarItemsQuery.isLoading ||
+      contextCalendarItemsQuery.isLoading ||
       plannerMemoryQuery.isLoading ||
       contactsAttentionQuery.isLoading ||
-      reflectionSignalsQuery.isLoading ||
+      journalEntriesQuery.isLoading ||
       recentStatSignalsQuery.isLoading,
   };
 }

@@ -34,9 +34,12 @@ export type CompanionAgentActionStatus =
   | "executed";
 
 export type CompanionPendingActionType =
+  | "campaign_create"
+  | "campaign_adjust"
   | "task_create"
   | "task_update"
   | "ritual_create"
+  | "ritual_update"
   | "reminder_create"
   | "campaign_update"
   | "journal_entry";

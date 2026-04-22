@@ -362,6 +362,42 @@ describe("useJourneysCompanionThreads", () => {
     );
   });
 
+  it("returns a dormant shell when disabled", async () => {
+    const { result } = renderJourneysThreads({
+      enabled: false,
+      messages: [
+        {
+          role: "user",
+          content: "Stale local thread",
+          createdAt: "2026-04-19T08:05:00.000Z",
+          source: "chat",
+        },
+      ],
+    });
+
+    expect(result.current.activeSessionId).toBe("");
+    expect(result.current.activeThread).toBeNull();
+    expect(result.current.historyThreads).toEqual([]);
+    expect(result.current.hasPersistedActiveThread).toBe(false);
+    expect(result.current.canOpenThreadPicker).toBe(false);
+    expect(result.current.canArchiveThread).toBe(false);
+    expect(result.current.canStartNewChat).toBe(false);
+    expect(result.current.isLoadingThreads).toBe(false);
+
+    await act(async () => {
+      await result.current.startNewChat();
+      result.current.startTemplateThread();
+      await result.current.archiveCurrentThread();
+      await result.current.resumeThread("active-session-1");
+    });
+
+    expect(mocks.listCompanionChatThreads).not.toHaveBeenCalled();
+    expect(mocks.loadCompanionChatThreadMessages).not.toHaveBeenCalled();
+    expect(mocks.setCompanionChatThreadArchived).not.toHaveBeenCalled();
+    expect(mocks.resetConversationThread).not.toHaveBeenCalled();
+    expect(mocks.resetPlannerThread).not.toHaveBeenCalled();
+  });
+
   it("falls back to a local thread when thread history storage is not set up yet", async () => {
     mocks.listCompanionChatThreads.mockRejectedValueOnce({
       code: "42P01",
@@ -637,6 +673,10 @@ describe("useJourneysCompanionThreads", () => {
     expect(result.current.canStartNewChat).toBe(false);
     expect(result.current.newChatDisabledReason).toBe(
       "Finish or dismiss the current plan before starting a new chat.",
+    );
+    expect(result.current.canOpenThreadPicker).toBe(false);
+    expect(result.current.threadPickerDisabledReason).toBe(
+      "Finish or dismiss the current plan before switching chats.",
     );
   });
 

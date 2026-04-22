@@ -198,4 +198,53 @@ describe("useCompanionChat", () => {
       expect(companion.result.current.muteSpokenReplies).toBe(true);
     });
   });
+
+  it("clears dormant state and rehydrates cleanly when re-enabled", async () => {
+    mocks.invoke.mockResolvedValue({
+      data: {
+        reply: "That sounds like planning work.",
+        speechText: "That sounds like planning work.",
+        handoffToPlanner: true,
+        memoryUpdateApplied: false,
+        sessionId: "session-handoff",
+      },
+      error: null,
+    });
+
+    const wrapper = createWrapper();
+    const { result, rerender } = renderHook(
+      ({ enabled }) => useCompanionChat({ enabled }),
+      {
+        wrapper,
+        initialProps: { enabled: true },
+      },
+    );
+
+    await waitFor(() => {
+      expect(result.current.messages[0]?.content).toBe("You made it back.");
+    });
+
+    await act(async () => {
+      await result.current.submitMessage("Help me plan tomorrow.", "text");
+    });
+
+    await waitFor(() => {
+      expect(result.current.handoffToPlanner).toBe(true);
+    });
+
+    rerender({ enabled: false });
+
+    expect(result.current.messages).toEqual([]);
+    expect(result.current.handoffToPlanner).toBe(false);
+    expect(result.current.isSubmitting).toBe(false);
+    expect(result.current.draftInput).toBe("");
+    expect(result.current.interimText).toBe("");
+
+    rerender({ enabled: true });
+
+    await waitFor(() => {
+      expect(result.current.messages[0]?.content).toBe("You made it back.");
+    });
+    expect(result.current.handoffToPlanner).toBe(false);
+  });
 });

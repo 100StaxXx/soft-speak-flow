@@ -19,6 +19,10 @@ import { resolveCompanionChatError } from "@/utils/companionChatErrors";
 
 const MAX_HISTORY_MESSAGES = 8;
 
+interface UseJourneysCompanionConversationOptions {
+  enabled?: boolean;
+}
+
 type JourneysCompanionMessage = {
   id: string;
   role: "assistant" | "user";
@@ -48,12 +52,15 @@ const createMessage = (
   ...extras,
 });
 
-export function useJourneysCompanionConversation() {
+export function useJourneysCompanionConversation(
+  options: UseJourneysCompanionConversationOptions = {},
+) {
   const { user } = useAuth();
   const { companion } = useCompanion();
   const { trackInteraction } = useAIInteractionTracker();
   const queryClient = useQueryClient();
   const sessionIdRef = useRef<string>(generateId());
+  const { enabled = true } = options;
 
   const [messages, setMessages] = useState<JourneysCompanionMessage[]>([]);
   const [draftInput, setDraftInput] = useState("");
@@ -118,8 +125,15 @@ export function useJourneysCompanionConversation() {
   }, []);
 
   useEffect(() => {
+    if (!enabled) {
+      resetThread();
+      setThreadPersistenceReady(true);
+      setThreadPersistenceUnavailableReason(null);
+      return;
+    }
+
     resetThread();
-  }, [companion?.id, resetThread]);
+  }, [companion?.id, enabled, resetThread]);
 
   const submitMessage = useCallback(async (
     rawMessage: string,
@@ -130,6 +144,8 @@ export function useJourneysCompanionConversation() {
       journeysContext?: CompanionChatJourneysContext | null;
     },
   ) => {
+    if (!enabled) return;
+
     const message = rawMessage.trim();
     if (!message || isSubmitting) return;
 
@@ -216,7 +232,7 @@ export function useJourneysCompanionConversation() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [companion?.id, conversationHistory, isSubmitting, queryClient, trackInteraction, user?.id]);
+  }, [companion?.id, conversationHistory, enabled, isSubmitting, queryClient, trackInteraction, user?.id]);
 
   const { isRecording, isAutoStopping, isSupported, permissionStatus, toggleRecording, requestPermission } = useVoiceInput({
     onInterimResult: (text) => {
@@ -236,6 +252,8 @@ export function useJourneysCompanionConversation() {
   });
 
   const requestMicrophonePermission = useCallback(async () => {
+    if (!enabled) return;
+
     setIsRequestingPermission(true);
     try {
       const status = await requestPermission();
@@ -246,7 +264,7 @@ export function useJourneysCompanionConversation() {
     } finally {
       setIsRequestingPermission(false);
     }
-  }, [requestPermission, toggleRecording]);
+  }, [enabled, requestPermission, toggleRecording]);
 
   return {
     sessionId: sessionIdRef.current,

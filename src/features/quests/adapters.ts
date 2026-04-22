@@ -49,6 +49,7 @@ export const toQuest = (task: DailyTask): Quest => ({
   id: task.id,
   userId: task.user_id,
   title: task.task_text,
+  xpReward: task.xp_reward,
   taskDate: task.task_date ?? null,
   scheduledTime: task.scheduled_time ?? null,
   estimatedDuration: task.estimated_duration ?? null,

@@ -1,6 +1,7 @@
 import { addDays, format, parseISO } from "https://esm.sh/date-fns@3.6.0";
 
 import { computePlannerPriorityScores } from "../../../src/shared/companionPlannerPriority.ts";
+import { getPlannerProposalPendingActionMetadata } from "../../../src/shared/companionPlannerPendingAction.ts";
 import { getCompanionModeConfig } from "../../../src/shared/companionModes.ts";
 import {
   buildPlannerResponse,
@@ -81,9 +82,18 @@ const asStringArray = (value: unknown): string[] =>
     ? value.filter((entry): entry is string => typeof entry === "string")
     : [];
 
+const asNumberArray = (value: unknown): number[] =>
+  Array.isArray(value)
+    ? value.filter((entry): entry is number =>
+      typeof entry === "number" && Number.isFinite(entry)
+    )
+    : [];
+
 const isReminderEnabled = (value: unknown) => value === true;
 
-const parseTimeToMinutes = (value: string | null | undefined): number | null => {
+const parseTimeToMinutes = (
+  value: string | null | undefined,
+): number | null => {
   if (!value) return null;
   const match = value.match(/^(\d{1,2}):(\d{2})/);
   if (!match) return null;
@@ -107,7 +117,10 @@ const getTaskDuration = (task: PlannerContextTask): number =>
     ? Number(task.estimatedDuration)
     : DEFAULT_DURATION_MINUTES;
 
-const getRangeDates = (selectedDate: string, horizon: PlannerHorizon): string[] => {
+const getRangeDates = (
+  selectedDate: string,
+  horizon: PlannerHorizon,
+): string[] => {
   const start = parseISO(selectedDate);
   const totalDays = horizon === "day" ? 1 : horizon === "week" ? 7 : 30;
   return Array.from(
@@ -126,7 +139,9 @@ const toTimeOfDay = (time: string | null | undefined): string | null => {
   return "night";
 };
 
-const getPreferredWindows = (plannerMemory?: Record<string, unknown> | null): PreferredWindow[] => {
+const getPreferredWindows = (
+  plannerMemory?: Record<string, unknown> | null,
+): PreferredWindow[] => {
   const rawWindows = Array.isArray(plannerMemory?.preferredWindows)
     ? plannerMemory?.preferredWindows
     : [];
@@ -154,10 +169,13 @@ const getPreferredWindows = (plannerMemory?: Record<string, unknown> | null): Pr
 };
 
 const getWakeMinutes = (plannerMemory?: Record<string, unknown> | null) =>
-  parseTimeToMinutes(asString(plannerMemory?.wakeTime) ?? DEFAULT_WAKE_TIME) ?? 8 * 60;
+  parseTimeToMinutes(asString(plannerMemory?.wakeTime) ?? DEFAULT_WAKE_TIME) ??
+    8 * 60;
 
 const getWindDownMinutes = (plannerMemory?: Record<string, unknown> | null) =>
-  parseTimeToMinutes(asString(plannerMemory?.windDownTime) ?? DEFAULT_WIND_DOWN_TIME) ?? 21 * 60;
+  parseTimeToMinutes(
+    asString(plannerMemory?.windDownTime) ?? DEFAULT_WIND_DOWN_TIME,
+  ) ?? 21 * 60;
 
 const getLocalDateKeyFromDateTime = (value: string): string => {
   const match = value.match(/^(\d{4}-\d{2}-\d{2})T/);
@@ -190,7 +208,9 @@ const normalizeScheduleReadMessage = (message: string): string => {
 
 const buildTaskIntervals = (tasks: PlannerContextTask[]): TimelineInterval[] =>
   tasks
-    .filter((task) => task.completed !== true && task.taskDate && task.scheduledTime)
+    .filter((task) =>
+      task.completed !== true && task.taskDate && task.scheduledTime
+    )
     .map((task) => {
       const startMinutes = parseTimeToMinutes(task.scheduledTime);
       if (startMinutes === null) return null;
@@ -232,7 +252,8 @@ const buildCalendarIntervals = (
 
       const localStart = eventStart < dayStart ? dayStart : eventStart;
       const localEnd = eventEnd > dayEnd ? dayEnd : eventEnd;
-      const startMinutes = (localStart.getHours() * 60) + localStart.getMinutes();
+      const startMinutes = (localStart.getHours() * 60) +
+        localStart.getMinutes();
       const endMinutes = (localEnd.getHours() * 60) + localEnd.getMinutes();
       if (endMinutes <= startMinutes) return null;
 
@@ -253,15 +274,16 @@ const buildIntervalsForDate = (params: {
   calendarEvents: PlannerContextCalendarEvent[];
   wakeMinutes: number;
   windDownMinutes: number;
-}) => [
-  ...buildTaskIntervals(params.tasks),
-  ...buildCalendarIntervals(
-    params.date,
-    params.calendarEvents,
-    params.wakeMinutes,
-    params.windDownMinutes,
-  ),
-].sort((left, right) => left.startMinutes - right.startMinutes);
+}) =>
+  [
+    ...buildTaskIntervals(params.tasks),
+    ...buildCalendarIntervals(
+      params.date,
+      params.calendarEvents,
+      params.wakeMinutes,
+      params.windDownMinutes,
+    ),
+  ].sort((left, right) => left.startMinutes - right.startMinutes);
 
 const getDayLoadStatus = (
   totalMinutes: number,
@@ -283,9 +305,15 @@ const scoreSlot = (params: {
 }): { score: number; reason: string } => {
   const slotTime = formatMinutesAsTime(params.slotStart);
   const slotTimeOfDay = toTimeOfDay(slotTime);
-  const exactMatch = params.preferredWindows.find((window) => window.time === slotTime);
-  const windowMatch = params.preferredWindows.find((window) => window.timeOfDay === slotTimeOfDay);
-  const peakMatch = params.peakHours.some((hour) => Math.abs((hour * 60) - params.slotStart) <= 60);
+  const exactMatch = params.preferredWindows.find((window) =>
+    window.time === slotTime
+  );
+  const windowMatch = params.preferredWindows.find((window) =>
+    window.timeOfDay === slotTimeOfDay
+  );
+  const peakMatch = params.peakHours.some((hour) =>
+    Math.abs((hour * 60) - params.slotStart) <= 60
+  );
 
   let score = 50;
   let reason = "Open time in your schedule.";
@@ -310,7 +338,8 @@ const scoreSlot = (params: {
     score += 12;
     reason = "Near one of your stronger focus hours.";
   } else if (params.load.status === "open") {
-    reason = "This day is light, so it has room without crowding anything else.";
+    reason =
+      "This day is light, so it has room without crowding anything else.";
   } else if (params.load.status === "balanced") {
     reason = "This window keeps the day balanced without creating a pileup.";
   }
@@ -332,7 +361,11 @@ const buildSuggestedSlots = (params: {
 }): PlannerOpenSlot[] => {
   const preferredWindows = getPreferredWindows(params.plannerMemory);
   const peakHours = asStringArray(params.plannerMemory?.peakProductivityTimes)
-    .map((value) => value.includes(":") ? parseTimeToMinutes(value) : parseTimeToMinutes(`${value.padStart(2, "0")}:00`))
+    .map((value) =>
+      value.includes(":")
+        ? parseTimeToMinutes(value)
+        : parseTimeToMinutes(`${value.padStart(2, "0")}:00`)
+    )
     .filter((minutes): minutes is number => minutes !== null)
     .map((minutes) => Math.floor(minutes / 60));
   const wakeMinutes = getWakeMinutes(params.plannerMemory);
@@ -374,7 +407,10 @@ const buildSuggestedSlots = (params: {
           minutes + 30 <= slotEnd
         );
       const chosenStart = preferredStart ?? slotStart;
-      const chosenEnd = Math.min(slotEnd, chosenStart + Math.max(30, Math.min(duration, 90)));
+      const chosenEnd = Math.min(
+        slotEnd,
+        chosenStart + Math.max(30, Math.min(duration, 90)),
+      );
       const scored = scoreSlot({
         slotStart: chosenStart,
         selectedDate: params.selectedDate,
@@ -417,8 +453,12 @@ const buildMoveSuggestions = (params: {
   dayLoads: PlannerDayLoad[];
   suggestedSlots: PlannerOpenSlot[];
 }): PlannerMoveSuggestion[] => {
-  const openTargets = params.dayLoads.filter((load) => load.status === "open" || load.status === "balanced");
-  const overloadedLoads = params.dayLoads.filter((load) => load.status === "overloaded");
+  const openTargets = params.dayLoads.filter((load) =>
+    load.status === "open" || load.status === "balanced"
+  );
+  const overloadedLoads = params.dayLoads.filter((load) =>
+    load.status === "overloaded"
+  );
   const suggestions: PlannerMoveSuggestion[] = [];
 
   overloadedLoads.forEach((load) => {
@@ -428,10 +468,14 @@ const buildMoveSuggestions = (params: {
       .sort((left, right) => getTaskDuration(right) - getTaskDuration(left));
 
     const moveTask = tasks[0];
-    const targetDay = openTargets.find((candidate) => candidate.date !== load.date);
+    const targetDay = openTargets.find((candidate) =>
+      candidate.date !== load.date
+    );
     if (!moveTask || !targetDay) return;
 
-    const targetSlot = params.suggestedSlots.find((slot) => slot.date === targetDay.date);
+    const targetSlot = params.suggestedSlots.find((slot) =>
+      slot.date === targetDay.date
+    );
     suggestions.push({
       fromDate: load.date,
       toDate: targetDay.date,
@@ -447,17 +491,24 @@ const buildMoveSuggestions = (params: {
   return suggestions.slice(0, Math.min(params.rangeDates.length, 3));
 };
 
-const buildConflicts = (intervals: TimelineInterval[]): PlannerScheduleConflict[] => {
+const buildConflicts = (
+  intervals: TimelineInterval[],
+): PlannerScheduleConflict[] => {
   if (intervals.length < 2) return [];
 
   const conflicts: PlannerScheduleConflict[] = [];
   for (let index = 0; index < intervals.length - 1; index += 1) {
     const current = intervals[index];
-    for (let nextIndex = index + 1; nextIndex < intervals.length; nextIndex += 1) {
+    for (
+      let nextIndex = index + 1;
+      nextIndex < intervals.length;
+      nextIndex += 1
+    ) {
       const next = intervals[nextIndex];
       if (next.startMinutes >= current.endMinutes) break;
 
-      const overlapMinutes = Math.min(current.endMinutes, next.endMinutes) - next.startMinutes;
+      const overlapMinutes = Math.min(current.endMinutes, next.endMinutes) -
+        next.startMinutes;
       if (overlapMinutes <= 0) continue;
 
       conflicts.push({
@@ -498,13 +549,16 @@ const buildScheduleInsights = (params: {
   const dayLoads = rangeDates.map((date) => {
     const intervals = buildIntervalsForDate({
       date,
-      tasks: (tasksByDate.get(date) ?? []).filter((task) => task.completed !== true),
+      tasks: (tasksByDate.get(date) ?? []).filter((task) =>
+        task.completed !== true
+      ),
       calendarEvents: params.calendarEvents,
       wakeMinutes,
       windDownMinutes,
     });
     const totalMinutes = intervals.reduce(
-      (sum, interval) => sum + Math.max(0, interval.endMinutes - interval.startMinutes),
+      (sum, interval) =>
+        sum + Math.max(0, interval.endMinutes - interval.startMinutes),
       0,
     );
 
@@ -543,8 +597,11 @@ const buildScheduleInsights = (params: {
     horizon: params.horizon,
     selectedDate: params.selectedDate,
     dayLoads,
-    overloadedDates: dayLoads.filter((load) => load.status === "overloaded").map((load) => load.date),
-    emptyDates: dayLoads.filter((load) => load.status === "open").map((load) => load.date),
+    overloadedDates: dayLoads.filter((load) => load.status === "overloaded")
+      .map((load) => load.date),
+    emptyDates: dayLoads.filter((load) => load.status === "open").map((load) =>
+      load.date
+    ),
     conflicts,
     suggestedSlots,
     moveSuggestions: buildMoveSuggestions({
@@ -572,7 +629,9 @@ const mapTask = (task: Record<string, unknown>): PlannerContextTask => ({
   epicTitle: asString(task.epic_title),
 });
 
-const mapCampaign = (campaign: Record<string, unknown>): PlannerContextEpic => ({
+const mapCampaign = (
+  campaign: Record<string, unknown>,
+): PlannerContextEpic => ({
   id: String(campaign.id),
   title: asString(campaign.title) ?? "Untitled campaign",
   endDate: asString(campaign.end_date),
@@ -588,7 +647,9 @@ const mapRitual = (ritual: Record<string, unknown>): PlannerContextRitual => ({
   preferredTime: asString(ritual.preferred_time),
 });
 
-const mapCalendarEvent = (event: Record<string, unknown>): PlannerContextCalendarEvent => ({
+const mapCalendarEvent = (
+  event: Record<string, unknown>,
+): PlannerContextCalendarEvent => ({
   id: String(event.id),
   title: asString(event.title) ?? "Calendar event",
   start: asString(event.start_time) ?? "",
@@ -602,23 +663,41 @@ const buildPlannerMemory = (
   context: LoadedCompanionAgentContext,
 ): Record<string, unknown> | null => {
   const plannerPreferences = asRecord(context.recentMemory.planner_preferences);
-  const preferredWorkBlocks = asRecord(plannerPreferences?.preferred_work_blocks);
+  const preferredWorkBlocks = asRecord(
+    plannerPreferences?.preferred_work_blocks,
+  );
   const profile = asRecord(preferredWorkBlocks?.planner_profile) ?? {};
 
   return {
     ...profile,
-    wakeTime: asString(plannerPreferences?.wake_time) ?? asString(profile.wakeTime),
-    windDownTime: asString(plannerPreferences?.wind_down_time) ?? asString(profile.windDownTime),
+    wakeTime: asString(plannerPreferences?.wake_time) ??
+      asString(profile.wakeTime),
+    windDownTime: asString(plannerPreferences?.wind_down_time) ??
+      asString(profile.windDownTime),
     peakProductivityTimes: asStringArray(
-      profile.peakProductivityTimes ?? context.recentMemory.ai_learning_peak_productivity_times,
+      profile.peakProductivityTimes ??
+        context.recentMemory.ai_learning_peak_productivity_times,
     ),
   };
 };
 
-const mapPlannerProposal = (
+export const mapPlannerProposal = (
   proposal: PlannerProposal,
 ): PlannerActionHint => {
   const payload = asRecord(proposal.payload) ?? {};
+  const metadata = getPlannerProposalPendingActionMetadata(proposal.kind);
+
+  if (!metadata) {
+    return {
+      proposalId: proposal.id,
+      title: proposal.title,
+      summary: proposal.summary,
+      actionType: null,
+      intent: "unknown",
+      normalizedPayload: null,
+      unsupportedReason: `Unsupported planner proposal kind: ${proposal.kind}`,
+    };
+  }
 
   switch (proposal.kind) {
     case "create_quest":
@@ -626,15 +705,31 @@ const mapPlannerProposal = (
         proposalId: proposal.id,
         title: proposal.title,
         summary: proposal.summary,
-        actionType: "task_create",
-        intent: "schedule_task",
+        actionType: metadata.actionType,
+        intent: metadata.intent,
         normalizedPayload: {
-          title: asString(payload.taskText) ?? proposal.title.replace(/^Create\s+/i, ""),
+          title: asString(payload.taskText) ??
+            proposal.title.replace(/^Create\s+/i, ""),
           task_date: asString(payload.taskDate),
           scheduled_time: asString(payload.scheduledTime),
+          difficulty: asString(payload.difficulty) ?? "medium",
           estimated_duration: asNumber(payload.estimatedDuration),
+          recurrence_pattern: asString(payload.recurrencePattern),
+          recurrence_days: asNumberArray(payload.recurrenceDays),
+          recurrence_month_days: asNumberArray(payload.recurrenceMonthDays),
+          recurrence_custom_period: asString(payload.recurrenceCustomPeriod),
+          recurrence_end_date: asString(payload.recurrenceEndDate),
           notes: asString(payload.notes),
+          location: asString(payload.location),
+          category: asString(payload.category),
           priority: asString(payload.priority),
+          contact_id: asString(payload.contactId),
+          auto_log_interaction: payload.autoLogInteraction === false
+            ? false
+            : true,
+          image_url: asString(payload.imageUrl),
+          source: asString(payload.questSource),
+          subtasks: asStringArray(payload.subtasks),
           reminder_enabled: isReminderEnabled(payload.reminderEnabled),
           reminder_minutes_before: asNumber(payload.reminderMinutesBefore),
           epic_id: asString(payload.epicId),
@@ -646,8 +741,8 @@ const mapPlannerProposal = (
         proposalId: proposal.id,
         title: proposal.title,
         summary: proposal.summary,
-        actionType: "task_update",
-        intent: "update_existing_plan",
+        actionType: metadata.actionType,
+        intent: metadata.intent,
         normalizedPayload: {
           task_id: asString(payload.taskId),
           title: asString(updates.task_text),
@@ -656,7 +751,11 @@ const mapPlannerProposal = (
           estimated_duration: asNumber(updates.estimated_duration),
           notes: asString(updates.notes),
           priority: asString(updates.priority),
-          completed: updates.completed === true ? true : updates.completed === false ? false : undefined,
+          completed: updates.completed === true
+            ? true
+            : updates.completed === false
+            ? false
+            : undefined,
           reminder_enabled: updates.reminder_enabled === true
             ? true
             : updates.reminder_enabled === false
@@ -671,15 +770,20 @@ const mapPlannerProposal = (
         proposalId: proposal.id,
         title: proposal.title,
         summary: proposal.summary,
-        actionType: "ritual_create",
-        intent: "goal_setting",
+        actionType: metadata.actionType,
+        intent: metadata.intent,
         normalizedPayload: {
-          title: asString(payload.title) ?? proposal.title.replace(/^Add\s+/i, ""),
+          title: asString(payload.title) ??
+            proposal.title.replace(/^Add\s+/i, ""),
           frequency: asString(payload.frequency) ?? "daily",
+          difficulty: asString(payload.difficulty) ?? "medium",
           preferred_time: asString(payload.preferredTime),
           estimated_minutes: asNumber(payload.estimatedMinutes),
           description: asString(payload.description),
           category: asString(payload.category),
+          custom_days: asNumberArray(payload.customDays),
+          custom_month_days: asNumberArray(payload.customMonthDays),
+          epic_id: asString(payload.epicId),
           reminder_enabled: isReminderEnabled(payload.reminderEnabled),
           reminder_minutes_before: asNumber(payload.reminderMinutesBefore),
         },
@@ -690,8 +794,8 @@ const mapPlannerProposal = (
         proposalId: proposal.id,
         title: proposal.title,
         summary: proposal.summary,
-        actionType: "reminder_create",
-        intent: "update_existing_plan",
+        actionType: metadata.actionType,
+        intent: metadata.intent,
         normalizedPayload: {
           target_type: "task",
           target_id: asString(payload.taskId),
@@ -705,8 +809,8 @@ const mapPlannerProposal = (
         proposalId: proposal.id,
         title: proposal.title,
         summary: proposal.summary,
-        actionType: "campaign_update",
-        intent: "goal_setting",
+        actionType: metadata.actionType,
+        intent: metadata.intent,
         normalizedPayload: {
           campaign_id: asString(payload.epicId),
           title: asString(payload.title),
@@ -717,12 +821,13 @@ const mapPlannerProposal = (
         proposalId: proposal.id,
         title: proposal.title,
         summary: proposal.summary,
-        actionType: "campaign_update",
-        intent: "goal_setting",
+        actionType: metadata.actionType,
+        intent: metadata.intent,
         normalizedPayload: {
           campaign_id: asString(payload.epicId),
-          description: asString(payload.reason) ?? asString(payload.requestedSummary),
-          status: "needs_adjustment",
+          adjustment_type: asString(payload.adjustmentType) ?? "custom",
+          reason: asString(payload.reason),
+          requested_summary: asString(payload.requestedSummary),
         },
       };
     case "create_campaign":
@@ -730,20 +835,60 @@ const mapPlannerProposal = (
         proposalId: proposal.id,
         title: proposal.title,
         summary: proposal.summary,
-        actionType: null,
-        intent: "goal_setting",
-        normalizedPayload: null,
-        unsupportedReason: "Campaign creation stays conversational in v1.",
+        actionType: metadata.actionType,
+        intent: metadata.intent,
+        normalizedPayload: {
+          title: asString(payload.title) ??
+            proposal.title.replace(/^Create\s+/i, ""),
+          description: asString(payload.description),
+          target_days: asNumber(payload.target_days) ?? 30,
+          theme_color: asString(payload.theme_color),
+          story_type_slug: asString(payload.story_type_slug),
+          habits: Array.isArray(payload.habits)
+            ? payload.habits
+              .map((entry) => asRecord(entry))
+              .filter((entry): entry is Record<string, unknown> =>
+                Boolean(entry)
+              )
+              .map((entry) => ({
+                title: asString(entry.title) ?? "Starter ritual",
+                description: asString(entry.description),
+                difficulty: asString(entry.difficulty) ?? "medium",
+                frequency: asString(entry.frequency) ?? "daily",
+                custom_days: asNumberArray(entry.custom_days),
+                custom_month_days: asNumberArray(entry.custom_month_days),
+                preferred_time: asString(entry.preferred_time),
+                estimated_minutes: asNumber(entry.estimated_minutes),
+                category: asString(entry.category),
+                reminder_enabled: isReminderEnabled(entry.reminder_enabled),
+                reminder_minutes_before: asNumber(
+                  entry.reminder_minutes_before,
+                ),
+              }))
+            : [],
+        },
       };
     case "update_ritual":
       return {
         proposalId: proposal.id,
         title: proposal.title,
         summary: proposal.summary,
-        actionType: null,
-        intent: "update_existing_plan",
-        normalizedPayload: null,
-        unsupportedReason: "Ritual updates are not exposed as direct writes in v1.",
+        actionType: metadata.actionType,
+        intent: metadata.intent,
+        normalizedPayload: {
+          habit_id: asString(payload.habitId),
+          title: asString(payload.title),
+          description: asString(payload.description),
+          difficulty: asString(payload.difficulty) ?? "medium",
+          frequency: asString(payload.frequency) ?? "daily",
+          estimated_minutes: asNumber(payload.estimatedMinutes),
+          preferred_time: asString(payload.preferredTime),
+          category: asString(payload.category),
+          custom_days: asNumberArray(payload.customDays),
+          custom_month_days: asNumberArray(payload.customMonthDays),
+          reminder_enabled: isReminderEnabled(payload.reminderEnabled),
+          reminder_minutes_before: asNumber(payload.reminderMinutesBefore),
+        },
       };
   }
 };
@@ -764,7 +909,8 @@ export function consultPlannerForAgent(params: {
   const activeEpics = params.context.campaigns.map(mapCampaign);
   const rituals = params.context.rituals.map(mapRitual);
   const calendarEvents = params.context.calendarEvents.map(mapCalendarEvent);
-  const horizon = params.horizon ?? (params.context.visibleDateEnd > currentDate ? "week" : "day");
+  const horizon = params.horizon ??
+    (params.context.visibleDateEnd > currentDate ? "week" : "day");
   const scheduleInsights = buildScheduleInsights({
     tasks: scheduledTasks,
     calendarEvents,
@@ -785,7 +931,9 @@ export function consultPlannerForAgent(params: {
       preferredTimeOfDay: asString(plannerMemory?.preferredTimeOfDay),
       wakeTime: asString(plannerMemory?.wakeTime),
       windDownTime: asString(plannerMemory?.windDownTime),
-      peakProductivityTimes: asStringArray(plannerMemory?.peakProductivityTimes),
+      peakProductivityTimes: asStringArray(
+        plannerMemory?.peakProductivityTimes,
+      ),
       preferredWindows: Array.isArray(plannerMemory?.preferredWindows)
         ? plannerMemory.preferredWindows as Array<{
           timeOfDay: string;
@@ -801,7 +949,9 @@ export function consultPlannerForAgent(params: {
         | null,
     },
     aiSignals: {
-      suggestedWorkload: asString(asRecord(params.context.recentMemory.ai_learning)?.suggested_workload) as
+      suggestedWorkload: asString(
+        asRecord(params.context.recentMemory.ai_learning)?.suggested_workload,
+      ) as
         | "light"
         | "normal"
         | "heavy"
@@ -846,7 +996,9 @@ export function consultPlannerForAgent(params: {
         reminderMinutesBefore: asNumber(plannerMemory?.reminderMinutesBefore),
         wakeTime: asString(plannerMemory?.wakeTime),
         windDownTime: asString(plannerMemory?.windDownTime),
-        peakProductivityTimes: asStringArray(plannerMemory?.peakProductivityTimes),
+        peakProductivityTimes: asStringArray(
+          plannerMemory?.peakProductivityTimes,
+        ),
         preferredWindows: Array.isArray(plannerMemory?.preferredWindows)
           ? plannerMemory.preferredWindows as Array<{
             timeOfDay: string;
@@ -857,7 +1009,9 @@ export function consultPlannerForAgent(params: {
           : [],
       },
       aiSignals: {
-        commonContexts: asStringArray(asRecord(params.context.recentMemory.ai_learning)?.common_contexts),
+        commonContexts: asStringArray(
+          asRecord(params.context.recentMemory.ai_learning)?.common_contexts,
+        ),
       },
     },
     currentDate,

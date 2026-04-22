@@ -186,6 +186,30 @@ export const CompanionPlannerPanel = memo(() => {
           )
           : null}
 
+        {assistant.unsupportedPendingProposalNotice
+          ? (
+            <div
+              className="rounded-[26px] border border-white/10 bg-white/5 p-4"
+              data-testid="companion-pending-proposal-notice"
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge
+                  variant="outline"
+                  className="border-white/10 bg-white/5 text-white/70"
+                >
+                  Pending draft
+                </Badge>
+              </div>
+              <p className="mt-3 text-sm font-medium text-white">
+                {assistant.unsupportedPendingProposalNotice.summary}
+              </p>
+              <p className="mt-1 text-sm text-white/70">
+                {assistant.unsupportedPendingProposalNotice.detail}
+              </p>
+            </div>
+          )
+          : null}
+
         <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
           <div className="rounded-[26px] border border-white/10 bg-white/5 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
             <label htmlFor="companion-assistant-input" className="sr-only">

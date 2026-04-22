@@ -2,10 +2,18 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  externalCalendarHorizons: [] as string[],
+  calendarItemHorizons: [] as string[],
   classify: vi.fn(),
   invoke: vi.fn(),
   upsertPlannerPreferences: vi.fn(),
+  useQuests: vi.fn(),
+  useCalendarTasks: vi.fn(),
+  useCalendarItems: vi.fn(),
+  useInboxTasks: vi.fn(),
+  useJournalEntries: vi.fn(),
+  useCampaigns: vi.fn(),
+  useQuestCalendarSync: vi.fn(),
+  useUserAIContext: vi.fn(),
   invalidateQueries: vi.fn(),
   addTask: vi.fn(),
   updateTask: vi.fn(),
@@ -73,36 +81,31 @@ vi.mock("@/hooks/useTasksQuery", () => ({
   }),
 }));
 
-vi.mock("@/hooks/useCalendarTasks", () => ({
-  useCalendarTasks: () => ({
-    tasks: [],
-    isLoading: false,
-  }),
+vi.mock("@/hooks/useQuests", () => ({
+  useQuests: (...args: unknown[]) => mocks.useQuests(...args),
 }));
 
-vi.mock("@/hooks/useExternalCalendarEvents", () => ({
-  useExternalCalendarEvents: (_date: Date, horizon: string) => {
-    mocks.externalCalendarHorizons.push(horizon);
-    return {
-      events: [],
-      isLoading: false,
-    };
+vi.mock("@/hooks/useCalendarTasks", () => ({
+  useCalendarTasks: (...args: unknown[]) => mocks.useCalendarTasks(...args),
+}));
+
+vi.mock("@/hooks/useCalendarItems", () => ({
+  useCalendarItems: (_date: Date, horizon: string, options?: unknown) => {
+    mocks.calendarItemHorizons.push(horizon);
+    return mocks.useCalendarItems(_date, horizon, options);
   },
 }));
 
 vi.mock("@/hooks/useInboxTasks", () => ({
-  useInboxTasks: () => ({
-    inboxTasks: [],
-  }),
+  useInboxTasks: (...args: unknown[]) => mocks.useInboxTasks(...args),
 }));
 
-vi.mock("@/hooks/useEpics", () => ({
-  useEpics: () => ({
-    activeEpics: [],
-    createEpic: vi.fn(),
-    renameEpic: vi.fn(),
-    createCampaignRitual: vi.fn(),
-  }),
+vi.mock("@/hooks/useJournalEntries", () => ({
+  useJournalEntries: (...args: unknown[]) => mocks.useJournalEntries(...args),
+}));
+
+vi.mock("@/hooks/useCampaigns", () => ({
+  useCampaigns: (...args: unknown[]) => mocks.useCampaigns(...args),
 }));
 
 vi.mock("@/hooks/useTaskMutations", () => ({
@@ -124,20 +127,11 @@ vi.mock("@/hooks/useCalendarIntegrations", () => ({
 }));
 
 vi.mock("@/hooks/useQuestCalendarSync", () => ({
-  useQuestCalendarSync: () => ({
-    sendTaskToCalendar: {
-      mutateAsync: (...args: unknown[]) => mocks.sendTaskToCalendar(...args),
-    },
-    syncPlanningContext: {
-      mutateAsync: (...args: unknown[]) => mocks.syncPlanningContext(...args),
-    },
-  }),
+  useQuestCalendarSync: (...args: unknown[]) => mocks.useQuestCalendarSync(...args),
 }));
 
 vi.mock("@/hooks/useUserAIContext", () => ({
-  useUserAIContext: () => ({
-    enrichedContext: mocks.enrichedContext,
-  }),
+  useUserAIContext: (...args: unknown[]) => mocks.useUserAIContext(...args),
 }));
 
 vi.mock("@/hooks/useAIInteractionTracker", () => ({
@@ -195,10 +189,36 @@ describe("useCompanionPlanner", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.externalCalendarHorizons.length = 0;
+    mocks.calendarItemHorizons.length = 0;
     mocks.classify.mockResolvedValue(null);
     mocks.user = { id: "user-1" };
     mocks.upsertPlannerPreferences.mockResolvedValue({ error: null });
+    mocks.useQuests.mockReturnValue({
+      quests: [],
+      isLoading: false,
+    });
+    mocks.useCalendarTasks.mockReturnValue({
+      tasks: [],
+      isLoading: false,
+    });
+    mocks.useCalendarItems.mockReturnValue({
+      items: [],
+      isLoading: false,
+    });
+    mocks.useInboxTasks.mockReturnValue({
+      inboxTasks: [],
+    });
+    mocks.useJournalEntries.mockReturnValue({
+      entries: [],
+      isLoading: false,
+      error: null,
+    });
+    mocks.useCampaigns.mockReturnValue({
+      activeCampaigns: [],
+      createCampaign: vi.fn(),
+      renameCampaign: vi.fn(),
+      createCampaignRitual: vi.fn(),
+    });
     mocks.addTask.mockResolvedValue(undefined);
     mocks.updateTask.mockResolvedValue(undefined);
     mocks.applySubtaskTitlePlan.mockResolvedValue([]);
@@ -208,11 +228,22 @@ describe("useCompanionPlanner", () => {
     mocks.trackScheduleModification.mockResolvedValue(undefined);
     mocks.sendTaskToCalendar.mockResolvedValue(undefined);
     mocks.syncPlanningContext.mockResolvedValue(null);
+    mocks.useQuestCalendarSync.mockReturnValue({
+      sendTaskToCalendar: {
+        mutateAsync: (...args: unknown[]) => mocks.sendTaskToCalendar(...args),
+      },
+      syncPlanningContext: {
+        mutateAsync: (...args: unknown[]) => mocks.syncPlanningContext(...args),
+      },
+    });
     mocks.useCalendarIntegrations.mockReturnValue({
       connectedByProvider: {},
       defaultProvider: null,
     });
     mocks.enrichedContext = null;
+    mocks.useUserAIContext.mockImplementation(() => ({
+      enrichedContext: mocks.enrichedContext,
+    }));
     Object.defineProperty(window, "localStorage", {
       configurable: true,
       writable: true,
@@ -230,7 +261,209 @@ describe("useCompanionPlanner", () => {
     );
 
     expect(result.current.horizon).toBe("day");
-    expect(mocks.externalCalendarHorizons).toEqual(["day", "week"]);
+    expect(result.current.legacyExecution.compatibilityOnly).toBe(true);
+    expect(result.current.legacyExecution.enabled).toBe(false);
+    expect(result.current.legacyExecution.disabledReason).toContain(
+      "compatibility-only",
+    );
+    expect(result.current.legacyExecution.supportedProposalKinds).toContain(
+      "create_quest",
+    );
+    expect(mocks.calendarItemHorizons).toEqual(["day", "week"]);
+  });
+
+  it("reads day planner context through canonical campaign, quest, journal, and calendar wrappers", () => {
+    renderHook(() => useCompanionPlanner());
+
+    expect(mocks.useCampaigns).toHaveBeenCalledWith({ enabled: true });
+    expect(mocks.useQuests).toHaveBeenCalledWith(expect.any(Date), {
+      enabled: true,
+    });
+    expect(mocks.useCalendarItems).toHaveBeenNthCalledWith(
+      1,
+      expect.any(Date),
+      "day",
+      { enabled: true, includeQuests: false },
+    );
+    expect(mocks.useCalendarItems).toHaveBeenNthCalledWith(
+      2,
+      expect.any(Date),
+      "week",
+      { enabled: true, includeQuests: false },
+    );
+    expect(mocks.useJournalEntries).toHaveBeenCalledWith({
+      enabled: true,
+      entryTypes: ["daily_check_in", "evening_reflection"],
+      checkInType: "morning",
+      limit: 5,
+    });
+  });
+
+  it("disables planner read hooks when the legacy path is inactive", () => {
+    renderHook(() => useCompanionPlanner({ enabled: false }));
+
+    expect(mocks.useQuests).toHaveBeenCalledWith(expect.any(Date), {
+      enabled: false,
+    });
+    expect(mocks.useCalendarTasks).toHaveBeenNthCalledWith(
+      1,
+      expect.any(Date),
+      "week",
+      { enabled: false },
+    );
+    expect(mocks.useCalendarTasks).toHaveBeenNthCalledWith(
+      2,
+      expect.any(Date),
+      "month",
+      { enabled: false },
+    );
+    expect(mocks.useCalendarItems).toHaveBeenNthCalledWith(
+      1,
+      expect.any(Date),
+      "day",
+      { enabled: false, includeQuests: false },
+    );
+    expect(mocks.useCalendarItems).toHaveBeenNthCalledWith(
+      2,
+      expect.any(Date),
+      "week",
+      { enabled: false, includeQuests: false },
+    );
+    expect(mocks.useInboxTasks).toHaveBeenCalledWith({ enabled: false });
+    expect(mocks.useCampaigns).toHaveBeenCalledWith({ enabled: false });
+    expect(mocks.useCalendarIntegrations).toHaveBeenCalledWith({
+      enabled: false,
+    });
+    expect(mocks.useQuestCalendarSync).toHaveBeenCalledWith({
+      enabled: false,
+    });
+    expect(mocks.useUserAIContext).toHaveBeenCalledWith({ enabled: false });
+    expect(mocks.useJournalEntries).toHaveBeenCalledWith({
+      enabled: false,
+      entryTypes: ["daily_check_in", "evening_reflection"],
+      checkInType: "morning",
+      limit: 5,
+    });
+  });
+
+  it("clears local planner state when disabled", async () => {
+    const { result, rerender } = renderHook(
+      ({ enabled }) => useCompanionPlanner({ enabled }),
+      {
+        initialProps: { enabled: true },
+      },
+    );
+
+    act(() => {
+      result.current.setHorizon("week");
+      result.current.primeQuestCapture();
+      result.current.setDraftInput("Old draft");
+    });
+
+    expect(result.current.messages).toHaveLength(1);
+    expect(result.current.sessionState.pendingStarterIntent).toBe(
+      "quest_capture",
+    );
+    expect(result.current.horizon).toBe("week");
+
+    rerender({ enabled: false });
+
+    await waitFor(() => {
+      expect(result.current.messages).toEqual([]);
+    });
+
+    expect(result.current.pendingProposals).toEqual([]);
+    expect(result.current.questions).toEqual([]);
+    expect(result.current.structuredResponse).toBeNull();
+    expect(result.current.sessionState.pendingStarterIntent).toBeNull();
+    expect(result.current.draftInput).toBe("");
+    expect(result.current.horizon).toBe("day");
+  });
+
+  it("maps canonical external calendar items into planner context events", async () => {
+    mocks.useCalendarItems.mockImplementation((_date: Date, horizon: string) => ({
+      items: horizon === "week"
+        ? [
+          {
+            id: "external:event-row-1",
+            source: "external_event",
+            title: "Strategy block",
+            startsAt: "2026-04-22T13:00:00.000Z",
+            endsAt: "2026-04-22T14:00:00.000Z",
+            isAllDay: false,
+            provider: "google",
+            readOnly: true,
+            questId: null,
+            syncMode: null,
+            sourceTable: "external_calendar_events",
+            externalEventId: "event-row-1",
+            connectionId: "connection-1",
+            taskDate: null,
+            scheduledTime: null,
+            estimatedDuration: null,
+          },
+          {
+            id: "quest:task-1",
+            source: "quest",
+            title: "Ignored quest projection",
+            startsAt: "2026-04-22T15:00:00.000Z",
+            endsAt: "2026-04-22T15:30:00.000Z",
+            isAllDay: false,
+            provider: null,
+            readOnly: false,
+            questId: "task-1",
+            syncMode: null,
+            sourceTable: "daily_tasks",
+            externalEventId: null,
+            connectionId: null,
+            taskDate: "2026-04-22",
+            scheduledTime: "15:00",
+            estimatedDuration: 30,
+          },
+        ]
+        : [],
+      isLoading: false,
+    }));
+    mocks.invoke.mockResolvedValue({
+      data: {
+        mode: "conversational",
+        reply: "Here's your plan.",
+        followUpQuestions: [],
+        proposals: [],
+        suggestedReminders: [],
+        memoryUpdates: {},
+        sessionState: {
+          draft: {},
+          openQuestionIds: [],
+          preferredTimeOfDay: null,
+          preferredTimeReason: null,
+          reminderPreference: null,
+          lastClassification: "quest",
+        },
+      },
+      error: null,
+    });
+
+    const { result } = renderHook(() =>
+      useCompanionPlanner({ legacyExecutionEnabled: true })
+    );
+
+    await act(async () => {
+      await result.current.submitMessage("Help me plan today.", "text");
+    });
+
+    const request = mocks.invoke.mock.calls.at(-1)?.[1];
+    expect(request?.body.plannerContext.calendarEvents).toEqual([
+      {
+        id: "event-row-1",
+        title: "Strategy block",
+        start: "2026-04-22T13:00:00.000Z",
+        end: "2026-04-22T14:00:00.000Z",
+        isAllDay: false,
+        provider: "google",
+        readOnly: true,
+      },
+    ]);
   });
 
   it("starts with an empty transcript by default", async () => {
@@ -259,7 +492,7 @@ describe("useCompanionPlanner", () => {
     });
 
     const { result } = renderHook(() =>
-      useCompanionPlanner()
+      useCompanionPlanner({ legacyExecutionEnabled: true })
     );
 
     act(() => {
@@ -327,7 +560,7 @@ describe("useCompanionPlanner", () => {
     });
 
     const { result } = renderHook(() =>
-      useCompanionPlanner()
+      useCompanionPlanner({ legacyExecutionEnabled: true })
     );
 
     act(() => {
@@ -360,7 +593,7 @@ describe("useCompanionPlanner", () => {
 
   it("treats an exact typed quest starter like a local quest-capture seed", async () => {
     const { result } = renderHook(() =>
-      useCompanionPlanner()
+      useCompanionPlanner({ legacyExecutionEnabled: true })
     );
 
     await act(async () => {
@@ -388,7 +621,7 @@ describe("useCompanionPlanner", () => {
     });
 
     const { result } = renderHook(() =>
-      useCompanionPlanner()
+      useCompanionPlanner({ legacyExecutionEnabled: true })
     );
 
     await act(async () => {
@@ -482,7 +715,7 @@ describe("useCompanionPlanner", () => {
     });
 
     const { result } = renderHook(() =>
-      useCompanionPlanner()
+      useCompanionPlanner({ legacyExecutionEnabled: true })
     );
 
     await act(async () => {
@@ -554,7 +787,7 @@ describe("useCompanionPlanner", () => {
     });
 
     const { result } = renderHook(() =>
-      useCompanionPlanner()
+      useCompanionPlanner({ legacyExecutionEnabled: true })
     );
 
     await act(async () => {
@@ -601,7 +834,7 @@ describe("useCompanionPlanner", () => {
     });
 
     const { result } = renderHook(() =>
-      useCompanionPlanner()
+      useCompanionPlanner({ legacyExecutionEnabled: true })
     );
 
     await act(async () => {
@@ -703,7 +936,7 @@ describe("useCompanionPlanner", () => {
     });
 
     const { result } = renderHook(() =>
-      useCompanionPlanner()
+      useCompanionPlanner({ legacyExecutionEnabled: true })
     );
 
     await act(async () => {
@@ -775,7 +1008,7 @@ describe("useCompanionPlanner", () => {
     });
 
     const { result } = renderHook(() =>
-      useCompanionPlanner()
+      useCompanionPlanner({ legacyExecutionEnabled: true })
     );
 
     await act(async () => {
@@ -790,7 +1023,7 @@ describe("useCompanionPlanner", () => {
     });
 
     await act(async () => {
-      await result.current.confirmProposal("proposal-1");
+      await result.current.legacyExecution.confirmProposal("proposal-1");
     });
 
     expect(mocks.addTask).toHaveBeenCalledWith(expect.objectContaining({
@@ -871,7 +1104,7 @@ describe("useCompanionPlanner", () => {
     });
 
     const { result } = renderHook(() =>
-      useCompanionPlanner()
+      useCompanionPlanner({ legacyExecutionEnabled: true })
     );
 
     act(() => {
@@ -890,7 +1123,7 @@ describe("useCompanionPlanner", () => {
     expect(result.current.sessionState.preferredTimeReason).toBeNull();
 
     await act(async () => {
-      await result.current.confirmProposal("proposal-1");
+      await result.current.legacyExecution.confirmProposal("proposal-1");
     });
 
     expect(mocks.addTask).toHaveBeenCalledWith(expect.objectContaining({
@@ -967,7 +1200,7 @@ describe("useCompanionPlanner", () => {
     });
 
     const { result } = renderHook(() =>
-      useCompanionPlanner()
+      useCompanionPlanner({ legacyExecutionEnabled: true })
     );
 
     await act(async () => {
@@ -981,7 +1214,7 @@ describe("useCompanionPlanner", () => {
     );
 
     await act(async () => {
-      await result.current.confirmProposal("proposal-1");
+      await result.current.legacyExecution.confirmProposal("proposal-1");
     });
 
     expect(result.current.questions).toEqual([]);
@@ -1045,7 +1278,7 @@ describe("useCompanionPlanner", () => {
     });
 
     const { result } = renderHook(() =>
-      useCompanionPlanner()
+      useCompanionPlanner({ legacyExecutionEnabled: true })
     );
 
     await act(async () => {
@@ -1105,7 +1338,7 @@ describe("useCompanionPlanner", () => {
     });
 
     const { result } = renderHook(() =>
-      useCompanionPlanner()
+      useCompanionPlanner({ legacyExecutionEnabled: true })
     );
 
     await act(async () => {
@@ -1115,7 +1348,7 @@ describe("useCompanionPlanner", () => {
     expect(result.current.questions).toEqual([]);
 
     await act(async () => {
-      await result.current.rejectProposal("proposal-1");
+      await result.current.legacyExecution.rejectProposal("proposal-1");
     });
 
     expect(result.current.questions).toEqual([]);
@@ -1179,7 +1412,7 @@ describe("useCompanionPlanner", () => {
     });
 
     const { result } = renderHook(() =>
-      useCompanionPlanner()
+      useCompanionPlanner({ legacyExecutionEnabled: true })
     );
 
     await act(async () => {
@@ -1189,7 +1422,7 @@ describe("useCompanionPlanner", () => {
     expect(result.current.questions).toEqual([]);
 
     await act(async () => {
-      await result.current.confirmAll();
+      await result.current.legacyExecution.confirmAll();
     });
 
     expect(result.current.questions).toEqual([]);
@@ -1251,7 +1484,7 @@ describe("useCompanionPlanner", () => {
     });
 
     const { result } = renderHook(() =>
-      useCompanionPlanner()
+      useCompanionPlanner({ legacyExecutionEnabled: true })
     );
 
     await act(async () => {
@@ -1263,7 +1496,7 @@ describe("useCompanionPlanner", () => {
     });
 
     await act(async () => {
-      await result.current.confirmProposal("proposal-outlook-1");
+      await result.current.legacyExecution.confirmProposal("proposal-outlook-1");
     });
 
     expect(mocks.sendTaskToCalendar).toHaveBeenCalledWith({
@@ -1322,7 +1555,7 @@ describe("useCompanionPlanner", () => {
     });
 
     const { result } = renderHook(() =>
-      useCompanionPlanner()
+      useCompanionPlanner({ legacyExecutionEnabled: true })
     );
 
     await act(async () => {
@@ -1334,7 +1567,7 @@ describe("useCompanionPlanner", () => {
     });
 
     await act(async () => {
-      await result.current.confirmProposal("proposal-1");
+      await result.current.legacyExecution.confirmProposal("proposal-1");
     });
 
     expect(mocks.updateTask).toHaveBeenCalledWith({
@@ -1417,7 +1650,7 @@ describe("useCompanionPlanner", () => {
     });
 
     const { result } = renderHook(() =>
-      useCompanionPlanner()
+      useCompanionPlanner({ legacyExecutionEnabled: true })
     );
 
     await act(async () => {
@@ -1429,7 +1662,7 @@ describe("useCompanionPlanner", () => {
     });
 
     await act(async () => {
-      await result.current.confirmProposal("proposal-1");
+      await result.current.legacyExecution.confirmProposal("proposal-1");
     });
 
     await waitFor(() => {
@@ -1448,6 +1681,164 @@ describe("useCompanionPlanner", () => {
     expect(result.current.messages.at(-1)?.content).toBe(
       "Saved: Update Workout. I couldn't finish the step breakdown yet.",
     );
+  });
+
+  it("fails loudly when a future planner proposal kind reaches the legacy confirm path", async () => {
+    mocks.invoke.mockResolvedValue({
+      data: {
+        mode: "proposal",
+        reply: "I drafted a future proposal.",
+        followUpQuestions: [],
+        proposals: [
+          {
+            id: "proposal-1",
+            kind: "future_kind",
+            title: "Future Proposal",
+            summary: "A proposal kind the legacy confirmer does not support.",
+            payload: {},
+            status: "pending",
+            readyToConfirm: true,
+            missingFields: [],
+          },
+        ],
+        suggestedReminders: [],
+        memoryUpdates: {},
+        sessionState: {
+          draft: {},
+          openQuestionIds: [],
+          preferredTimeOfDay: null,
+          preferredTimeReason: null,
+          reminderPreference: null,
+          lastClassification: "quest",
+        },
+      },
+      error: null,
+    });
+
+    const { result } = renderHook(() =>
+      useCompanionPlanner({ legacyExecutionEnabled: true })
+    );
+
+    await act(async () => {
+      await result.current.submitMessage("Handle a future proposal", "text");
+    });
+
+    await waitFor(() => {
+      expect(result.current.pendingProposals).toHaveLength(1);
+    });
+
+    expect(result.current.pendingProposals[0]?.legacyConfirmationSupported).toBe(
+      false,
+    );
+    expect(
+      result.current.pendingProposals[0]?.legacyConfirmationUnsupportedReason,
+    ).toContain("future_kind");
+    expect(result.current.legacyConfirmation.supportedPendingProposals).toHaveLength(0);
+    expect(result.current.legacyConfirmation.activePendingProposal).toBeNull();
+    expect(result.current.legacyConfirmation.unsupportedPendingProposalNotice)
+      .toEqual({
+        id: "proposal-1",
+        summary: "A proposal kind the legacy confirmer does not support.",
+        detail:
+          "This proposed change is visible here, but it can't be confirmed from this screen yet.",
+      });
+
+    await act(async () => {
+      await result.current.legacyExecution.confirmProposal("proposal-1");
+    });
+
+    await waitFor(() => {
+      expect(mocks.toastError).toHaveBeenCalledWith(
+        "I couldn't save that change yet.",
+      );
+    });
+
+    expect(result.current.proposals[0]?.status).toBe("pending");
+    expect(mocks.addTask).not.toHaveBeenCalled();
+    expect(mocks.updateTask).not.toHaveBeenCalled();
+  });
+
+  it("only counts and batch-confirms legacy proposals the compatibility executor supports", async () => {
+    mocks.invoke.mockResolvedValue({
+      data: {
+        mode: "proposal",
+        reply: "I drafted a couple of next moves.",
+        followUpQuestions: [],
+        proposals: [
+          {
+            id: "proposal-unsupported-1",
+            kind: "future_kind",
+            title: "Future Proposal",
+            summary: "Unsupported in the legacy confirmer.",
+            payload: {},
+            status: "pending",
+            readyToConfirm: true,
+            missingFields: [],
+          },
+          {
+            id: "proposal-supported-1",
+            kind: "create_quest",
+            title: "Create Workout",
+            summary: "Create a quest for Workout.",
+            payload: {
+              taskText: "Workout",
+            },
+            status: "pending",
+            readyToConfirm: true,
+            missingFields: [],
+          },
+        ],
+        suggestedReminders: [],
+        memoryUpdates: {},
+        sessionState: {
+          draft: {},
+          openQuestionIds: [],
+          preferredTimeOfDay: null,
+          preferredTimeReason: null,
+          reminderPreference: null,
+          lastClassification: "quest",
+        },
+      },
+      error: null,
+    });
+
+    const { result } = renderHook(() =>
+      useCompanionPlanner({ legacyExecutionEnabled: true })
+    );
+
+    await act(async () => {
+      await result.current.submitMessage("Draft two actions", "text");
+    });
+
+    await waitFor(() => {
+      expect(result.current.pendingProposals).toHaveLength(2);
+    });
+
+    expect(result.current.legacyConfirmation.supportedPendingProposals).toHaveLength(1);
+    expect(
+      result.current.legacyConfirmation.activePendingProposal?.id,
+    ).toBe("proposal-supported-1");
+    expect(result.current.legacyConfirmation.readySupportedProposalCount).toBe(1);
+    expect(result.current.legacyConfirmation.unsupportedPendingProposalNotice)
+      .toEqual({
+        id: "proposal-unsupported-1",
+        summary: "Unsupported in the legacy confirmer.",
+        detail:
+          "This proposed change is visible here, but it can't be confirmed from this screen yet.",
+      });
+
+    await act(async () => {
+      await result.current.legacyExecution.confirmAll();
+    });
+
+    expect(mocks.addTask).toHaveBeenCalledTimes(1);
+    expect(mocks.toastError).not.toHaveBeenCalledWith(
+      "I couldn't save that change yet.",
+    );
+    expect(result.current.proposals.find((proposal) => proposal.id === "proposal-supported-1")?.status)
+      .toBe("confirmed");
+    expect(result.current.proposals.find((proposal) => proposal.id === "proposal-unsupported-1")?.status)
+      .toBe("pending");
   });
 
   it("omits nullable nested classification fields from the planner request body", async () => {
@@ -1478,7 +1869,7 @@ describe("useCompanionPlanner", () => {
     });
 
     const { result } = renderHook(() =>
-      useCompanionPlanner()
+      useCompanionPlanner({ legacyExecutionEnabled: true })
     );
 
     await act(async () => {
@@ -1529,7 +1920,7 @@ describe("useCompanionPlanner", () => {
     });
 
     const { result } = renderHook(() =>
-      useCompanionPlanner()
+      useCompanionPlanner({ legacyExecutionEnabled: true })
     );
 
     await act(async () => {
@@ -1574,7 +1965,7 @@ describe("useCompanionPlanner", () => {
     });
 
     const { result } = renderHook(() =>
-      useCompanionPlanner()
+      useCompanionPlanner({ legacyExecutionEnabled: true })
     );
 
     await act(async () => {
@@ -1653,7 +2044,9 @@ describe("useCompanionPlanner", () => {
       error: null,
     });
 
-    const { result } = renderHook(() => useCompanionPlanner());
+    const { result } = renderHook(() =>
+      useCompanionPlanner({ legacyExecutionEnabled: true })
+    );
 
     await act(async () => {
       await result.current.submitMessage("Plan my day", "text");
@@ -1669,7 +2062,7 @@ describe("useCompanionPlanner", () => {
     expect(result.current.pendingProposals).toHaveLength(1);
 
     await act(async () => {
-      await result.current.rejectProposal("proposal-1");
+      await result.current.legacyExecution.rejectProposal("proposal-1");
     });
 
     expect(result.current.pendingProposals).toHaveLength(0);
@@ -1815,7 +2208,7 @@ describe("useCompanionPlanner", () => {
       });
 
     const { result } = renderHook(() =>
-      useCompanionPlanner()
+      useCompanionPlanner({ legacyExecutionEnabled: true })
     );
 
     await act(async () => {
@@ -1898,7 +2291,7 @@ describe("useCompanionPlanner", () => {
       });
 
     const { result } = renderHook(() =>
-      useCompanionPlanner()
+      useCompanionPlanner({ legacyExecutionEnabled: true })
     );
 
     await act(async () => {
@@ -1975,7 +2368,7 @@ describe("useCompanionPlanner", () => {
       });
 
     const { result } = renderHook(() =>
-      useCompanionPlanner()
+      useCompanionPlanner({ legacyExecutionEnabled: true })
     );
 
     await act(async () => {
@@ -2049,7 +2442,7 @@ describe("useCompanionPlanner", () => {
     });
 
     const { result } = renderHook(() =>
-      useCompanionPlanner()
+      useCompanionPlanner({ legacyExecutionEnabled: true })
     );
 
     await act(async () => {
@@ -2057,7 +2450,7 @@ describe("useCompanionPlanner", () => {
     });
 
     await act(async () => {
-      await result.current.confirmProposal("proposal-1");
+      await result.current.legacyExecution.confirmProposal("proposal-1");
     });
 
     expect(mocks.trackInteraction).toHaveBeenCalledWith(
@@ -2134,7 +2527,7 @@ describe("useCompanionPlanner", () => {
     });
 
     const { result } = renderHook(() =>
-      useCompanionPlanner()
+      useCompanionPlanner({ legacyExecutionEnabled: true })
     );
 
     await act(async () => {
@@ -2142,7 +2535,7 @@ describe("useCompanionPlanner", () => {
     });
 
     await act(async () => {
-      await result.current.rejectProposal("proposal-1");
+      await result.current.legacyExecution.rejectProposal("proposal-1");
     });
 
     expect(mocks.trackInteraction).toHaveBeenCalledWith(
@@ -2221,7 +2614,7 @@ describe("useCompanionPlanner", () => {
     });
 
     const { result } = renderHook(() =>
-      useCompanionPlanner()
+      useCompanionPlanner({ legacyExecutionEnabled: true })
     );
 
     await act(async () => {
@@ -2229,7 +2622,7 @@ describe("useCompanionPlanner", () => {
     });
 
     await act(async () => {
-      await result.current.completeProposalEdit("proposal-1", {
+      await result.current.legacyExecution.completeProposalEdit("proposal-1", {
         savedTitle: "Workout moved to tomorrow",
       });
     });

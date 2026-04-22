@@ -56,8 +56,15 @@ const DORMANCY_RECOVERY_DAYS_REQUIRED = 5;
  * These are calculated daily by process-daily-decay and stored in user_companion.
  * This data drives visual/behavioral changes but is never shown as numbers.
  */
-export const useCompanionCareSignals = () => {
+interface UseCompanionCareSignalsOptions {
+  enabled?: boolean;
+}
+
+export const useCompanionCareSignals = (
+  options: UseCompanionCareSignalsOptions = {},
+) => {
   const { user } = useAuth();
+  const { enabled = true } = options;
 
   const { data: careData, isLoading } = useQuery({
     queryKey: ['companion-care-signals', user?.id],
@@ -94,7 +101,7 @@ export const useCompanionCareSignals = () => {
       
       return data;
     },
-    enabled: !!user?.id,
+    enabled: enabled && !!user?.id,
     staleTime: 60000, // 1 minute
   });
 

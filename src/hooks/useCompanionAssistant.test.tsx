@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { CompanionPlannerLaunchIntent } from "@/types/companionPlanner";
 
 const mocks = vi.hoisted(() => ({
   toastError: vi.fn(),
@@ -24,6 +25,11 @@ const mocks = vi.hoisted(() => ({
   legacySubmitMessage: vi.fn().mockResolvedValue(undefined),
   legacyConfirmPendingAction: vi.fn().mockResolvedValue(undefined),
   legacyCancelPendingAction: vi.fn().mockResolvedValue(undefined),
+  legacyUnsupportedPendingProposalNotice: null as null | {
+    id: string;
+    summary: string;
+    detail: string;
+  },
 }));
 
 let scopeCounter = 0;
@@ -66,6 +72,7 @@ vi.mock("@/hooks/useLegacyCompanionAssistantAdapter", () => ({
     placeholder: "chat",
     messages: [],
     pendingAction: null,
+    unsupportedPendingProposalNotice: mocks.legacyUnsupportedPendingProposalNotice,
     isSubmitting: false,
     isResolvingAction: false,
     submitMessage: enabled ? mocks.legacySubmitMessage : vi.fn().mockResolvedValue(undefined),
@@ -75,6 +82,8 @@ vi.mock("@/hooks/useLegacyCompanionAssistantAdapter", () => ({
     cancelPendingAction: enabled
       ? mocks.legacyCancelPendingAction
       : vi.fn().mockResolvedValue(undefined),
+    canAcceptSuggestedQuests: enabled,
+    suggestedQuestDisabledReason: null,
     isSpeaking: false,
     speechProvider: "none" as const,
     stopSpeaking: vi.fn(),
@@ -83,6 +92,7 @@ vi.mock("@/hooks/useLegacyCompanionAssistantAdapter", () => ({
     isLoadingThreads: false,
     hasPersistedActiveThread: false,
     canOpenThreadPicker: false,
+    threadPickerDisabledReason: null,
     threadHistoryEmptyStateMessage: "Past chats will show up here after at least one real exchange.",
     resumeThread: vi.fn(),
     archiveCurrentThread: vi.fn(),
@@ -172,6 +182,7 @@ describe("useCompanionAssistant", () => {
     scopeCounter += 1;
     mocks.currentUserId = "user-1";
     mocks.currentCompanionId = `companion-${scopeCounter}`;
+    mocks.legacyUnsupportedPendingProposalNotice = null;
     mocks.listThreads.mockResolvedValue([
       {
         sessionId: "persisted-session",
@@ -241,6 +252,18 @@ describe("useCompanionAssistant", () => {
     expect(result.current.placeholder).toBe("chat");
     expect(result.current.messages[0]?.content).toBe("What does tomorrow look like?");
     expect(result.current.pendingAction?.id).toBe("action-1");
+    expect(result.current.canStartNewChat).toBe(false);
+    expect(result.current.newChatDisabledReason).toBe("Resolve or cancel the pending action first.");
+    expect(result.current.canArchiveThread).toBe(false);
+    expect(result.current.archiveDisabledReason).toBe("Resolve or cancel the pending action first.");
+    expect(result.current.canOpenThreadPicker).toBe(false);
+    expect(result.current.threadPickerDisabledReason).toBe(
+      "Resolve or cancel the pending action first.",
+    );
+    expect(result.current.canAcceptSuggestedQuests).toBe(false);
+    expect(result.current.suggestedQuestDisabledReason).toBe(
+      "Tap-to-add for suggested day-plan quests isn't available in this mode yet. Ask me to add it directly instead.",
+    );
   });
 
   it("strips the stale journeys planner opener when rehydrating a saved thread", async () => {
@@ -504,16 +527,149 @@ describe("useCompanionAssistant", () => {
     expect(result.current.messages.at(-1)?.content).toBe('Got it — "Gym" added for 3:00 PM.');
   });
 
+  it("blocks active thread switching and fresh-chat actions while a pending action is unresolved", async () => {
+    mocks.loadPendingAction.mockResolvedValue({
+      id: "action-1",
+      status: "pending",
+      intent: "schedule_task",
+      actionType: "task_create",
+      summary: 'Add "Gym" for 2026-04-18 at 15:00.',
+      confirmationMessage: 'Want me to add "Gym" for 2026-04-18 at 15:00?',
+      normalizedPayload: {},
+      affectedEntities: null,
+      expiresAt: "2026-04-18T20:00:00.000Z",
+      createdAt: "2026-04-18T08:02:00.000Z",
+    });
+    mocks.loadThreadMessages.mockImplementation(async (sessionId: string) => (
+      sessionId === "resumed-session"
+        ? [
+            {
+              id: "m2",
+              sessionId: "resumed-session",
+              role: "assistant",
+              content: "Need a recap",
+              createdAt: "2026-04-18T08:05:00.000Z",
+              source: "agent",
+            },
+          ]
+        : [
+            {
+              id: "m1",
+              sessionId: "persisted-session",
+              role: "assistant",
+              content: "What does tomorrow look like?",
+              createdAt: "2026-04-18T08:00:00.000Z",
+              source: "agent",
+            },
+          ]
+    ));
+
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(
+      () => useCompanionAssistant({ surface: "journeys" }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(result.current.pendingAction?.id).toBe("action-1");
+    });
+
+    const initialLoadThreadCallCount = mocks.loadThreadMessages.mock.calls.length;
+
+    await act(async () => {
+      await result.current.resumeThread("resumed-session");
+      await result.current.archiveCurrentThread();
+      await result.current.startNewChat();
+    });
+
+    expect(mocks.loadThreadMessages).toHaveBeenCalledTimes(initialLoadThreadCallCount);
+    expect(mocks.archiveThread).not.toHaveBeenCalled();
+    expect(result.current.activeThread?.sessionId).toBe("persisted-session");
+    expect(result.current.pendingAction?.id).toBe("action-1");
+  });
+
+  it("reports busy thread-control reasons while the active agent reply is still in flight", async () => {
+    let resolveAgentResponse: ((value: {
+      data: {
+        reply: string;
+        mode: string;
+        intent: string;
+        confidence: number;
+        threadState: {
+          threadId: string;
+          sessionId: string;
+          openaiConversationId: string;
+          lastOpenAIResponseId: string;
+          hasPendingAction: boolean;
+        };
+      };
+      error: null;
+    }) => void) | null = null;
+    mocks.supabaseInvoke.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveAgentResponse = resolve;
+        }),
+    );
+
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(
+      () => useCompanionAssistant({ surface: "journeys" }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(result.current.activeThread?.sessionId).toBe("persisted-session");
+    });
+
+    await act(async () => {
+      void result.current.submitMessage("What does tomorrow look like?", "text");
+      await Promise.resolve();
+    });
+
+    expect(result.current.isSubmitting).toBe(true);
+    expect(result.current.canStartNewChat).toBe(false);
+    expect(result.current.newChatDisabledReason).toBe("Wait for the current reply to finish.");
+    expect(result.current.canArchiveThread).toBe(false);
+    expect(result.current.archiveDisabledReason).toBe("Wait for the current reply to finish.");
+    expect(result.current.canOpenThreadPicker).toBe(false);
+    expect(result.current.threadPickerDisabledReason).toBe("Wait for the current reply to finish.");
+
+    await act(async () => {
+      resolveAgentResponse?.({
+        data: {
+          reply: "Tomorrow is pretty light.",
+          mode: "schedule_read",
+          intent: "check_calendar",
+          confidence: 0.93,
+          threadState: {
+            threadId: "persisted-session",
+            sessionId: "persisted-session",
+            openaiConversationId: "conv_123",
+            lastOpenAIResponseId: "resp_123",
+            hasPendingAction: false,
+          },
+        },
+        error: null,
+      });
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSubmitting).toBe(false);
+    });
+  });
+
   it("submits a pending launch intent only once after a threads-query remount", async () => {
     let resolveThreads: ((threads: Awaited<ReturnType<typeof mocks.listThreads>>) => void) | null = null;
     mocks.listThreads.mockImplementationOnce(() => new Promise((resolve) => {
       resolveThreads = resolve;
     }));
 
-    const launchIntent = {
+    const launchIntent: CompanionPlannerLaunchIntent = {
       id: "launch-intent-1",
       message: "Help me plan tomorrow.",
-      starterIntent: "plan_my_day" as const,
+      starterIntent: "plan_day",
       target: "planner" as const,
       briefingContext: null,
     };
@@ -631,7 +787,7 @@ describe("useCompanionAssistant", () => {
     expect(result.current.messages.at(-1)?.content).toBe("Tomorrow is pretty light.");
   });
 
-  it("falls back to the legacy adapter when the agent endpoint is unavailable", async () => {
+  it("surfaces an error instead of falling back when the agent endpoint is unavailable", async () => {
     mocks.supabaseInvoke.mockRejectedValueOnce(new Error("agent unavailable"));
     mocks.parseFunctionInvokeError.mockResolvedValueOnce({
       status: 404,
@@ -659,15 +815,17 @@ describe("useCompanionAssistant", () => {
       await result.current.submitMessage("What does tomorrow look like?", "text");
     });
 
-    await waitFor(() => {
-      expect(mocks.legacySubmitMessage).toHaveBeenCalledWith(
-        "What does tomorrow look like?",
-        "text",
-      );
+    expect(mocks.legacySubmitMessage).not.toHaveBeenCalled();
+    expect(result.current.error).toBe("Cosmiq hit a snag. Try that again.");
+    expect(result.current.lastFailedMessage).toEqual({
+      text: "What does tomorrow look like?",
+      inputMode: "text",
+      optimisticMessageId: expect.any(String),
     });
+    expect(result.current.unsupportedPendingProposalNotice).toBeNull();
   });
 
-  it("falls back to the legacy adapter when companion-agent hits a recoverable fetch failure", async () => {
+  it("surfaces an error instead of falling back on recoverable fetch failures", async () => {
     mocks.supabaseInvoke.mockRejectedValueOnce({
       name: "FunctionsFetchError",
       message: "Failed to send a request to the Edge Function",
@@ -696,13 +854,49 @@ describe("useCompanionAssistant", () => {
       await result.current.submitMessage("What does tomorrow look like?", "text");
     });
 
-    await waitFor(() => {
-      expect(mocks.legacySubmitMessage).toHaveBeenCalledWith(
-        "What does tomorrow look like?",
-        "text",
-      );
+    expect(mocks.legacySubmitMessage).not.toHaveBeenCalled();
+    expect(result.current.error).toBe("Cosmiq hit a snag. Try that again.");
+    expect(result.current.lastFailedMessage).toEqual({
+      text: "What does tomorrow look like?",
+      inputMode: "text",
+      optimisticMessageId: expect.any(String),
     });
-    expect(result.current.error).toBeNull();
-    expect(result.current.lastFailedMessage).toBeNull();
+  });
+
+  it("does not surface legacy planner notices when agent submission fails", async () => {
+    mocks.legacyUnsupportedPendingProposalNotice = {
+      id: "proposal-unsupported-1",
+      summary: "Unsupported proposal",
+      detail: "This proposed change is visible here, but it can't be confirmed from this screen yet.",
+    };
+    mocks.supabaseInvoke.mockRejectedValueOnce(new Error("agent unavailable"));
+    mocks.parseFunctionInvokeError.mockResolvedValueOnce({
+      status: 404,
+      isOffline: false,
+      category: "http",
+      backendMessage: null,
+      name: "FunctionsHttpError",
+      message: "Function not found",
+      responsePayload: {
+        code: "function_not_found",
+      },
+    });
+
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(
+      () => useCompanionAssistant({ surface: "journeys" }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(result.current.activeThread?.sessionId).toBe("persisted-session");
+    });
+
+    await act(async () => {
+      await result.current.submitMessage("What does tomorrow look like?", "text");
+    });
+
+    expect(result.current.unsupportedPendingProposalNotice).toBeNull();
+    expect(mocks.legacySubmitMessage).not.toHaveBeenCalled();
   });
 });

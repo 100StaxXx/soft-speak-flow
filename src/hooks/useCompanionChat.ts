@@ -159,8 +159,18 @@ export function useCompanionChat({ enabled = true }: UseCompanionChatOptions = {
 
   useEffect(() => {
     if (!enabled) {
-      initialisedRef.current = true;
+      initialisedRef.current = false;
+      sessionIdRef.current = generateId();
+      stopCompanionSpeech();
       setMessages([]);
+      setDraftInput("");
+      setInterimText("");
+      setShowPermissionDialog(false);
+      setIsRequestingPermission(false);
+      setIsSubmitting(false);
+      setIsSpeaking(false);
+      setSpeechProvider("none");
+      setHandoffToPlanner(false);
       return;
     }
 
@@ -326,6 +336,8 @@ export function useCompanionChat({ enabled = true }: UseCompanionChatOptions = {
   });
 
   const requestMicrophonePermission = useCallback(async () => {
+    if (!enabled) return;
+
     setIsRequestingPermission(true);
     try {
       const status = await requestPermission();
@@ -336,7 +348,7 @@ export function useCompanionChat({ enabled = true }: UseCompanionChatOptions = {
     } finally {
       setIsRequestingPermission(false);
     }
-  }, [requestPermission, toggleRecording]);
+  }, [enabled, requestPermission, toggleRecording]);
 
   const clearPlannerHandoff = useCallback(() => {
     setHandoffToPlanner(false);

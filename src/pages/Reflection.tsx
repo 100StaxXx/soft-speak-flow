@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useActivityFeed } from "@/hooks/useActivityFeed";
+import { JOURNAL_ENTRIES_QUERY_KEY } from "@/hooks/useJournalEntries";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
@@ -19,6 +21,7 @@ export default function Reflection() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { logActivity } = useActivityFeed();
+  const queryClient = useQueryClient();
   
   const [selectedMood, setSelectedMood] = useState<string | null>(null);
   const [note, setNote] = useState("");
@@ -106,6 +109,7 @@ export default function Reflection() {
       });
 
       setTodayReflection(reflection);
+      void queryClient.invalidateQueries({ queryKey: JOURNAL_ENTRIES_QUERY_KEY });
     } catch (error) {
       console.error('Error saving reflection:', error);
       toast({

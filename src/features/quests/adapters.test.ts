@@ -71,6 +71,7 @@ describe("quest adapters", () => {
       id: "task-1",
       userId: "user-1",
       title: "Ship wrapper hooks",
+      xpReward: 30,
       taskDate: "2026-04-22",
       scheduledTime: "09:30",
       estimatedDuration: 45,

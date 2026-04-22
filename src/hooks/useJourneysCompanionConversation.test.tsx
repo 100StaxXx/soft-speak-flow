@@ -74,6 +74,31 @@ describe("useJourneysCompanionConversation", () => {
     expect(result.current.messages).toEqual([]);
   });
 
+  it("stays dormant and skips submissions when disabled", async () => {
+    const { result, rerender } = renderHook(
+      ({ enabled }) => useJourneysCompanionConversation({ enabled }),
+      {
+        initialProps: { enabled: true },
+      },
+    );
+
+    await act(async () => {
+      result.current.injectAssistantOpening("What's on your mind?");
+    });
+
+    expect(result.current.messages).toHaveLength(1);
+
+    rerender({ enabled: false });
+
+    expect(result.current.messages).toEqual([]);
+
+    await act(async () => {
+      await result.current.submitMessage("Hello?", "text");
+    });
+
+    expect(mocks.invoke).not.toHaveBeenCalled();
+  });
+
   it("injects an explicit assistant opening into a blank thread", async () => {
     const { result } = renderHook(() => useJourneysCompanionConversation());
 
@@ -207,6 +232,9 @@ describe("useJourneysCompanionConversation", () => {
             selectedDate: "2026-04-19",
             summary: "The day is light.",
             dayLoads: [],
+            overloadedDates: [],
+            emptyDates: [],
+            conflicts: [],
             suggestedSlots: [],
             moveSuggestions: [],
           },

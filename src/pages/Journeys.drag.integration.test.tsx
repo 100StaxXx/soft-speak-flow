@@ -16,6 +16,56 @@ vi.mock("@/hooks/useJourneysCompanionVisual", () => ({
   }),
 }));
 
+const bridge = vi.hoisted(() => ({
+  toMockQuest: (task: {
+    id: string;
+    task_text: string;
+    completed: boolean;
+    xp_reward: number;
+    task_date: string | null;
+    scheduled_time: string | null;
+    difficulty: string;
+    is_main_quest: boolean;
+    habit_source_id?: string | null;
+    epic_id?: string | null;
+  }) => ({
+    id: task.id,
+    userId: "user-1",
+    title: task.task_text,
+    xpReward: task.xp_reward,
+    taskDate: task.task_date,
+    scheduledTime: task.scheduled_time,
+    estimatedDuration: null,
+    completed: task.completed,
+    completedAt: null,
+    priority: null,
+    difficulty: task.difficulty,
+    campaignId: task.epic_id ?? null,
+    campaignTitle: null,
+    habitSourceId: task.habit_source_id ?? null,
+    isMainQuest: task.is_main_quest,
+    isRecurring: false,
+    reminderEnabled: false,
+    reminderMinutesBefore: null,
+    aiGenerated: false,
+    notes: null,
+    location: null,
+    source: null,
+    category: null,
+    imageUrl: null,
+    contactId: null,
+    autoLogInteraction: false,
+    sortOrder: null,
+    recurrencePattern: null,
+    recurrenceDays: [],
+    recurrenceMonthDays: [],
+    recurrenceCustomPeriod: null,
+    recurrenceEndDate: null,
+    subtasks: [],
+    attachments: [],
+  }),
+}));
+
 const localStorageState = vi.hoisted(() => ({
   store: new Map<string, string>(),
 }));
@@ -461,11 +511,13 @@ vi.mock("@/hooks/useAIInteractionTracker", () => ({
   }),
 }));
 
-vi.mock("@/hooks/useEpics", () => ({
-  useEpics: () => ({
-    epics: [],
+vi.mock("@/hooks/useCampaigns", () => ({
+  useCampaigns: () => ({
+    campaigns: [],
+    activeCampaigns: [],
+    completedCampaigns: [],
     isLoading: mocks.epicsLoading,
-    createEpic: mocks.createEpic,
+    createCampaign: mocks.createEpic,
     isCreating: false,
   }),
 }));
@@ -513,16 +565,16 @@ vi.mock("@/hooks/useTaskCompletionWithInteraction", () => ({
   }),
 }));
 
-vi.mock("@/hooks/useDailyTasks", () => ({
-  useDailyTasks: () => ({
-    tasks: mocks.dailyTasks,
+vi.mock("@/hooks/useQuests", () => ({
+  useQuests: () => ({
+    quests: mocks.dailyTasks.map(bridge.toMockQuest),
     isLoading: false,
-    addTask: mocks.addTask,
-    toggleTask: mocks.toggleTask,
-    updateTask: mocks.updateTask,
-    deleteTask: mocks.deleteTask,
-    restoreTask: mocks.restoreTask,
-    moveTaskToDate: mocks.moveTaskToDate,
+    createQuest: mocks.addTask,
+    toggleQuest: mocks.toggleTask,
+    updateQuest: mocks.updateTask,
+    deleteQuest: mocks.deleteTask,
+    restoreQuest: mocks.restoreTask,
+    moveQuestToDate: mocks.moveTaskToDate,
     completedCount: mocks.dailyTasks.filter((task) => task.completed).length,
     totalCount: mocks.dailyTasks.length,
     isAdding: false,
