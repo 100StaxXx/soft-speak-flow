@@ -170,6 +170,11 @@ export function useCompanionAssistant({
   });
 
   const [activeSessionId, setActiveSessionId] = useState(() => generateCompanionThreadSessionId());
+  const activeSessionIdRef = useRef(activeSessionId);
+  const applyActiveSessionId = useCallback((nextSessionId: string) => {
+    activeSessionIdRef.current = nextSessionId;
+    setActiveSessionId(nextSessionId);
+  }, []);
   const [messages, setMessages] = useState<CompanionAssistantMessage[]>([]);
   const [pendingAction, setPendingAction] = useState<PendingActionView | null>(null);
   const [draftInput, setDraftInput] = useState("");
@@ -235,7 +240,7 @@ export function useCompanionAssistant({
     const nextSessionId = options?.sessionId ?? generateCompanionThreadSessionId();
     const greetingText = options?.greetingText?.trim();
     localThreadCreatedAtRef.current = new Date().toISOString();
-    setActiveSessionId(nextSessionId);
+    applyActiveSessionId(nextSessionId);
     setDraftInput("");
     setInterimText("");
     setPendingAction(null);
@@ -250,7 +255,7 @@ export function useCompanionAssistant({
     }
 
     return nextSessionId;
-  }, [scopeKey]);
+  }, [applyActiveSessionId, scopeKey]);
 
   const loadThreadState = useCallback(async (sessionId: string) => {
     const [threadMessages, loadedPendingAction] = await Promise.all([
@@ -260,12 +265,12 @@ export function useCompanionAssistant({
 
     localThreadCreatedAtRef.current =
       threadMessages[0]?.createdAt ?? new Date().toISOString();
-    setActiveSessionId(sessionId);
+    applyActiveSessionId(sessionId);
     setMessages(threadMessages.map(mapLoadedMessage));
     setPendingAction(loadedPendingAction);
     setDraftInput("");
     setInterimText("");
-  }, [surface]);
+  }, [applyActiveSessionId, surface]);
 
   useEffect(() => {
     if (scopeKeyRef.current === scopeKey) return;
@@ -450,7 +455,7 @@ export function useCompanionAssistant({
       const { data, error } = await supabase.functions.invoke("companion-agent", {
         body: {
           surface,
-          sessionId: activeSessionId,
+          sessionId: activeSessionIdRef.current,
           message,
           inputMode,
           currentDateTime: formatCurrentDateTimeWithOffset(new Date()),
@@ -460,7 +465,7 @@ export function useCompanionAssistant({
       if (error) throw error;
 
       const response = data as CompanionAgentResponse;
-      setActiveSessionId(response.threadState.sessionId);
+      applyActiveSessionId(response.threadState.sessionId);
       appendAssistantResponse(response);
       void invalidateThreads();
     } catch (error) {
@@ -484,7 +489,7 @@ export function useCompanionAssistant({
       setIsSubmitting(false);
     }
   }, [
-    activeSessionId,
+    applyActiveSessionId,
     appendAssistantResponse,
     companion?.id,
     invalidateThreads,
@@ -512,7 +517,7 @@ export function useCompanionAssistant({
     try {
       const { data, error } = await supabase.functions.invoke("companion-agent-action", {
         body: {
-          sessionId: activeSessionId,
+          sessionId: activeSessionIdRef.current,
           actionId: pendingAction.id,
           action: mode,
         },
@@ -545,7 +550,6 @@ export function useCompanionAssistant({
       setIsResolvingAction(false);
     }
   }, [
-    activeSessionId,
     invalidateThreads,
     isResolvingAction,
     isSubmitting,
@@ -570,14 +574,18 @@ export function useCompanionAssistant({
     });
   }, [baseGreeting, invalidateThreads, openFreshThread, persistedActiveThread]);
 
-  const startNewChat = useCallback(async () => {
+  const startNewChat = useCallback(async (options?: { greetingText?: string | null }) => {
     if (persistedActiveThread) {
       await setCompanionChatThreadArchived(persistedActiveThread.sessionId, true);
       await invalidateThreads();
     }
 
-    openFreshThread({
-      greetingText: baseGreeting,
+    const greetingText = options?.greetingText === null
+      ? undefined
+      : options?.greetingText ?? baseGreeting;
+
+    return openFreshThread({
+      greetingText,
     });
   }, [baseGreeting, invalidateThreads, openFreshThread, persistedActiveThread]);
 
@@ -599,20 +607,25 @@ export function useCompanionAssistant({
       return;
     }
 
-    if (useLegacyFallback) {
-      legacyAssistant.startTemplateThread();
-    } else {
-      openFreshThread();
-    }
+    const launchMessage = launchIntent.message;
+    const intentId = launchIntent.id;
 
-    void submitMessage(launchIntent.message, "text");
-    onLaunchIntentConsumed?.(launchIntent.id);
+    void (async () => {
+      if (useLegacyFallback) {
+        legacyAssistant.startTemplateThread();
+      } else {
+        await startNewChat({ greetingText: null });
+      }
+
+      await submitMessage(launchMessage, "text");
+      onLaunchIntentConsumed?.(intentId);
+    })();
   }, [
     launchIntent,
     legacyAssistant,
     onLaunchIntentConsumed,
     onOpenCampaignBuilder,
-    openFreshThread,
+    startNewChat,
     submitMessage,
     threadsQuery.isSuccess,
     useLegacyFallback,
