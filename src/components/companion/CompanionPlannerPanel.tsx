@@ -1,10 +1,9 @@
-import { type KeyboardEvent, memo, useCallback } from "react";
+import { type KeyboardEvent, memo, useCallback, useLayoutEffect, useRef } from "react";
 import {
   CalendarDays,
   Check,
   Loader2,
   Mic,
-  MicOff,
   Send,
   Waves,
   X,
@@ -44,6 +43,17 @@ export const CompanionPlannerPanel = memo(() => {
     },
     [assistant],
   );
+
+  const composerRef = useRef<HTMLTextAreaElement | null>(null);
+
+  useLayoutEffect(() => {
+    const composer = composerRef.current;
+    if (!composer) return;
+    composer.style.height = "0px";
+    const nextHeight = Math.max(104, Math.min(360, composer.scrollHeight));
+    composer.style.height = `${nextHeight}px`;
+    composer.style.overflowY = composer.scrollHeight > 360 ? "auto" : "hidden";
+  }, [assistant.draftInput]);
 
   return (
     <section
@@ -238,12 +248,13 @@ export const CompanionPlannerPanel = memo(() => {
               Message your companion assistant
             </label>
             <Textarea
+              ref={composerRef}
               id="companion-assistant-input"
               value={assistant.draftInput}
               onChange={(event) => assistant.setDraftInput(event.target.value)}
               onKeyDown={handleComposerKeyDown}
               placeholder={assistant.placeholder}
-              className="min-h-[104px] resize-none border-white/10 bg-black/20 text-white placeholder:text-white/35"
+              className="min-h-[104px] max-h-[360px] resize-none border-white/10 bg-black/20 text-white placeholder:text-white/35"
               data-testid="companion-assistant-text-input"
             />
           </div>
@@ -261,9 +272,7 @@ export const CompanionPlannerPanel = memo(() => {
               disabled={!assistant.isVoiceSupported && !assistant.isRecording}
               data-testid="companion-assistant-mic-button"
             >
-              {assistant.isRecording
-                ? <MicOff className="h-5 w-5" />
-                : <Mic className="h-5 w-5" />}
+              <Mic className="h-5 w-5" />
             </Button>
 
             <Button
