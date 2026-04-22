@@ -28,9 +28,9 @@ describe("mentorImageLoader", () => {
     await expect(loadMentorImage("operator")).resolves.toBe("/mock/operator-mentor.png");
   });
 
-  it("defaults unknown and legacy slugs to sage", async () => {
-    await expect(loadMentorImage("reign")).resolves.toBe("/mock/sage-mentor.png");
-    await expect(loadMentorImage("atlas")).resolves.toBe("/mock/sage-mentor.png");
+  it("defaults unknown and unsupported slugs to sage", async () => {
+    await expect(loadMentorImage("retired-guide")).resolves.toBe("/mock/sage-mentor.png");
+    await expect(loadMentorImage("legacy-alpha")).resolves.toBe("/mock/sage-mentor.png");
     await expect(loadMentorImage("unknown-mentor")).resolves.toBe("/mock/sage-mentor.png");
   });
 });

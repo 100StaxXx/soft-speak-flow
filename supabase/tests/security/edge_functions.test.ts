@@ -234,7 +234,7 @@ Deno.test("edge-function security regression suite", async (t) => {
     const result = await harness.invokeFunction("mentor-chat", {
       body: {
         message: "Rate limit me",
-        mentorName: "Eli",
+        mentorName: "The Sage",
         mentorTone: "supportive",
       },
       headers: userHeaders(normalUser.accessToken, harness.config.anonKey),
@@ -248,7 +248,7 @@ Deno.test("edge-function security regression suite", async (t) => {
     const result = await harness.invokeFunction("mentor-chat", {
       body: {
         message: "Daily cap check",
-        mentorName: "Eli",
+        mentorName: "The Sage",
         mentorTone: "supportive",
       },
       headers: userHeaders(secondUser.accessToken, harness.config.anonKey),

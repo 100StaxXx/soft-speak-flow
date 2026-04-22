@@ -37,7 +37,7 @@ const analysis = {
   generatedAt: "2026-04-18T18:30:00.000Z",
   mentor: {
     id: "mentor-1",
-    name: "Eli",
+    name: "Lyra",
     tone: "Supportive and specific",
     avatarUrl: null,
     primaryColor: "#ff7a59",
@@ -163,7 +163,7 @@ const analysis = {
       recentDrivers: [],
     },
   ],
-  summary: "Eli sees consistent momentum in your daily rhythm.",
+  summary: "Lyra sees consistent momentum in your daily rhythm.",
   suggestedAction: "Pair one morning check-in with one on-time task today.",
 };
 
@@ -192,7 +192,7 @@ describe("CompanionStatAnalysisSurface", () => {
 
     expect(screen.getByTestId("drawer-root")).toBeInTheDocument();
     expect(screen.getByTestId("companion-stats-analysis-drawer")).toBeInTheDocument();
-    expect(screen.getByText("Eli says your stats make sense.")).toBeInTheDocument();
+    expect(screen.getByText("Lyra says your stats make sense.")).toBeInTheDocument();
     expect(screen.getByText("Cached for today")).toBeInTheDocument();
   });
 

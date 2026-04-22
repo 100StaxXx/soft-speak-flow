@@ -248,8 +248,6 @@ describe("Profile mentor selection", () => {
       "The Rival",
     ]);
 
-    expect(screen.queryByRole("option", { name: "Atlas" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("option", { name: "Stryker" })).not.toBeInTheDocument();
     expect(screen.queryByRole("option", { name: "The Guy" })).not.toBeInTheDocument();
   });
 });

@@ -271,14 +271,14 @@ Deno.test("composer never surfaces the species label as a companion push title",
 Deno.test("composer formats daily quote copy", () => {
   const dailyQuote = composeNotificationCopy({
     type: "daily_quote",
-    payload: { quote_text: "Stay steady.", author: "Atlas" },
+    payload: { quote_text: "Stay steady.", author: "The Sage" },
   });
 
   if (dailyQuote.title !== "Daily quote") {
     throw new Error(`Expected daily quote title, got ${dailyQuote.title}`);
   }
 
-  if (dailyQuote.body !== "\"Stay steady.\" - Atlas") {
+  if (dailyQuote.body !== "\"Stay steady.\" - The Sage") {
     throw new Error(`Unexpected daily quote body: ${dailyQuote.body}`);
   }
 });

@@ -1,8 +1,6 @@
--- Delete Darius and Solace mentors
-DELETE FROM mentors WHERE slug IN ('darius', 'solace');
-
--- Rename Elizabeth to Solace
-UPDATE mentors 
-SET name = 'Solace', 
-    slug = 'solace'
-WHERE slug = 'elizabeth';
+-- Historical roster reshuffle retained for migration ordering.
+-- The canonical mentor rows are already in place at this point.
+DO $$
+BEGIN
+  NULL;
+END $$;

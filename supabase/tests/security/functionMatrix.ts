@@ -17,7 +17,7 @@ export const FUNCTION_SECURITY_MATRIX: readonly FunctionSecurityTarget[] = [
     authMode: "jwt",
     body: {
       message: "Security suite check-in",
-      mentorName: "Eli",
+      mentorName: "The Sage",
       mentorTone: "supportive",
     },
   },

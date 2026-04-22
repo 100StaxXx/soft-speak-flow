@@ -432,7 +432,7 @@ Deno.test("keeps upcoming-digest orchestration scoped to today and tomorrow", as
           message: {
             content: JSON.stringify({
               reply:
-                "Today: Therapy at 14:00 and Workout at 15:00. Tomorrow: Inbox cleanup at 09:30. Tell me what feels most important, and I'll help from there.",
+                "Today: Therapy at 2:00 pm and Workout at 3:00 pm. Tomorrow looks light with Inbox cleanup at 9:30 am.",
               mode: "schedule_read",
             }),
           },
@@ -487,9 +487,22 @@ Deno.test("keeps upcoming-digest orchestration scoped to today and tomorrow", as
   assertEquals(response.mode, "schedule_read");
   assertEquals(
     response.reply,
-    "Today: 2:00 pm-3:00 pm Therapy; 3:00 pm Workout.\nTomorrow: 9:30 am Inbox cleanup.",
+    "Today: Therapy at 2:00 pm and Workout at 3:00 pm. Tomorrow looks light with Inbox cleanup at 9:30 am.",
   );
-  assertEquals(captured.body, null);
+  assertEquals(Boolean(captured.body), true);
+  const systemMessage = captured.body?.messages?.[0]?.content ?? "";
+  assertStringIncludes(
+    systemMessage,
+    'The user selected: "What do I have coming up?"',
+  );
+  assertStringIncludes(
+    systemMessage,
+    "Focus first on the remaining events and tasks for today, then summarize tomorrow.",
+  );
+  assertStringIncludes(
+    systemMessage,
+    "Keep the answer brief, practical, and read-only.",
+  );
 });
 
 Deno.test("does not rewrite the quest-capture starter prompt", async () => {
@@ -530,15 +543,30 @@ Deno.test("does not rewrite the quest-capture starter prompt", async () => {
   assertEquals(captured.called, false);
 });
 
-Deno.test("does not rewrite deterministic plan-day starter proposals", async () => {
+Deno.test("rewrites deterministic plan-day starter proposals when OpenAI is available", async () => {
   const captured = {
     called: false,
+    systemPrompt: "",
   };
 
   const response = await buildOrchestratedPlannerResponse({
-    guardedFetch: async (_input: RequestInfo | URL, _init?: RequestInit) => {
+    guardedFetch: async (_input: RequestInfo | URL, init?: RequestInit) => {
       captured.called = true;
-      return new Response("unexpected");
+      const body = JSON.parse(String(init?.body ?? "{}")) as {
+        messages?: Array<Record<string, string>>;
+      };
+      captured.systemPrompt = body.messages?.[0]?.content ?? "";
+      return new Response(JSON.stringify({
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              reply:
+                "I mapped three draft quests around your fixed blocks. Review them and confirm what fits.",
+              mode: "proposal",
+            }),
+          },
+        }],
+      }));
     },
     input: {
       ...baseInput(),
@@ -576,8 +604,23 @@ Deno.test("does not rewrite deterministic plan-day starter proposals", async () 
   });
 
   assertEquals(response.mode, "proposal");
-  assertStringIncludes(response.reply, "I drafted 3 quests for today");
-  assertEquals(captured.called, false);
+  assertEquals(
+    response.reply,
+    "I mapped three draft quests around your fixed blocks. Review them and confirm what fits.",
+  );
+  assertEquals(captured.called, true);
+  assertStringIncludes(
+    captured.systemPrompt,
+    'The user selected: "Plan my day."',
+  );
+  assertStringIncludes(
+    captured.systemPrompt,
+    "If mode is proposal, treat deterministicContext.proposals as the full set of drafted quests for the rest of today.",
+  );
+  assertStringIncludes(
+    captured.systemPrompt,
+    "Start with a short read on the day",
+  );
 });
 
 Deno.test("rewrites the initial plan-day clarification turn with the focus prompt", async () => {
@@ -635,9 +678,13 @@ Deno.test("rewrites the initial plan-day clarification turn with the focus promp
     capturedSystemPrompt,
     "You are an intelligent companion whose only job in this step is to understand what the user wants to focus on.",
   );
+  assertStringIncludes(
+    capturedSystemPrompt,
+    "This question is setting up a contextual rest-of-day planning reply on the next turn",
+  );
 });
 
-Deno.test("does not rewrite deterministic no-room plan-day replies", async () => {
+Deno.test("rewrites deterministic no-room plan-day replies when OpenAI is available", async () => {
   const captured = {
     called: false,
   };
@@ -645,7 +692,17 @@ Deno.test("does not rewrite deterministic no-room plan-day replies", async () =>
   const response = await buildOrchestratedPlannerResponse({
     guardedFetch: async (_input: RequestInfo | URL, _init?: RequestInit) => {
       captured.called = true;
-      return new Response("unexpected");
+      return new Response(JSON.stringify({
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              reply:
+                "Today is already pretty full, so I wouldn't stack more on top unless something changes.",
+              mode: "conversational",
+            }),
+          },
+        }],
+      }));
     },
     input: {
       ...baseInput(),
@@ -670,8 +727,8 @@ Deno.test("does not rewrite deterministic no-room plan-day replies", async () =>
   assertEquals(response.mode, "conversational");
   assertEquals(
     response.reply,
-    "Today is already carrying about as much quest load as I want to give it.",
+    "Today is already pretty full, so I wouldn't stack more on top unless something changes.",
   );
   assertEquals(response.proposals.length, 0);
-  assertEquals(captured.called, false);
+  assertEquals(captured.called, true);
 });

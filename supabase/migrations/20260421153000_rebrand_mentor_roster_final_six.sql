@@ -1,11 +1,4 @@
--- Rebrand the active mentor roster to the Final 6 lineup while preserving existing mentor UUIDs.
--- Atlas -> The Sage
--- Carmen -> The Icon
--- Solace -> Charles
--- Sienna -> The Princess
--- Stryker -> The Operator
--- Eli -> The Rival
--- Reign remains supported for existing users but is hidden from active flows.
+-- Refresh the canonical active mentor roster while preserving existing mentor UUIDs.
 
 UPDATE public.mentors
 SET
@@ -31,7 +24,7 @@ SET
   themes = ARRAY['clarity', 'calm', 'reflection'],
   avatar_url = 'https://opbfpbbqvuksuvmtmssd.supabase.co/storage/v1/object/public/mentors-avatars/sage-mentor.png',
   is_active = true
-WHERE slug = 'atlas';
+WHERE slug = 'sage';
 
 UPDATE public.mentors
 SET
@@ -57,7 +50,7 @@ SET
   themes = ARRAY['confidence', 'identity', 'boundaries'],
   avatar_url = 'https://opbfpbbqvuksuvmtmssd.supabase.co/storage/v1/object/public/mentors-avatars/icon-mentor.png',
   is_active = true
-WHERE slug = 'carmen';
+WHERE slug = 'icon';
 
 UPDATE public.mentors
 SET
@@ -83,7 +76,7 @@ SET
   themes = ARRAY['discipline', 'momentum', 'accountability'],
   avatar_url = 'https://opbfpbbqvuksuvmtmssd.supabase.co/storage/v1/object/public/mentors-avatars/charles-mentor.png',
   is_active = true
-WHERE slug = 'solace';
+WHERE slug = 'charles';
 
 UPDATE public.mentors
 SET
@@ -109,7 +102,7 @@ SET
   themes = ARRAY['habits', 'self_worth', 'routines'],
   avatar_url = 'https://opbfpbbqvuksuvmtmssd.supabase.co/storage/v1/object/public/mentors-avatars/princess-mentor.png',
   is_active = true
-WHERE slug = 'sienna';
+WHERE slug = 'princess';
 
 UPDATE public.mentors
 SET
@@ -134,7 +127,7 @@ SET
   welcome_message = 'We''re not improvising. We''re building a system.',
   themes = ARRAY['discipline', 'focus', 'execution'],
   is_active = true
-WHERE slug = 'stryker';
+WHERE slug = 'operator';
 
 UPDATE public.mentors
 SET
@@ -160,9 +153,4 @@ SET
   themes = ARRAY['discipline', 'performance', 'momentum'],
   avatar_url = 'https://opbfpbbqvuksuvmtmssd.supabase.co/storage/v1/object/public/mentors-avatars/rival-mentor.png',
   is_active = true
-WHERE slug = 'eli';
-
-UPDATE public.mentors
-SET
-  is_active = false
-WHERE slug = 'reign';
+WHERE slug = 'rival';

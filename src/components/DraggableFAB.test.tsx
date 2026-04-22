@@ -173,24 +173,17 @@ describe("DraggableFAB", () => {
     });
   });
 
-  it("shows a history button in the popup and routes it through a thread-history launch intent", async () => {
+  it("shows only the five quick actions and no history button", () => {
     render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
 
     fireEvent.click(screen.getByTestId("journeys-companion-launcher-floating"));
 
-    expect(screen.getByTestId("journeys-companion-launcher-history-button")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByTestId("journeys-companion-launcher-history-button"));
-
-    expect(mocks.onOpenCompanionPlanner).toHaveBeenCalledWith(expect.objectContaining({
-      message: "",
-      starterIntent: "thread_history",
-      target: "planner",
-    }));
-
-    await waitFor(() => {
-      expect(screen.getByTestId("journeys-companion-launcher-popup")).toHaveStyle("opacity: 0");
-    });
+    expect(screen.getByTestId("journeys-companion-launcher-option-free-talk")).toBeInTheDocument();
+    expect(screen.getByTestId("journeys-companion-launcher-option-plan-day")).toBeInTheDocument();
+    expect(screen.getByTestId("journeys-companion-launcher-option-upcoming")).toBeInTheDocument();
+    expect(screen.getByTestId("journeys-companion-launcher-option-quest")).toBeInTheDocument();
+    expect(screen.getByTestId("journeys-companion-launcher-option-goal")).toBeInTheDocument();
+    expect(screen.queryByTestId("journeys-companion-launcher-history-button")).not.toBeInTheDocument();
   });
 
   it("closes the popup on outside press", async () => {
@@ -254,14 +247,14 @@ describe("DraggableFAB", () => {
     }));
   });
 
-  it("routes the quest option through the planner as a one-prompt quest capture starter", () => {
+  it("routes the quest option into the simplified conversation lane as a one-prompt starter", () => {
     render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
 
     fireEvent.click(screen.getByTestId("journeys-companion-launcher-floating"));
     fireEvent.click(screen.getByTestId("journeys-companion-launcher-option-quest"));
 
     expect(mocks.onOpenCompanionPlanner).toHaveBeenCalledWith(expect.objectContaining({
-      target: "planner",
+      target: "conversation",
       starterIntent: "quest_capture",
       message: "Quest?",
     }));

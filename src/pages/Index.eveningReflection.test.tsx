@@ -5,9 +5,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   mentorQuery: {
     data: {
-      mentorName: "Atlas",
+      mentorName: "The Sage",
       mentorImage: "/mentor.png",
-      todaysQuote: { text: "Stay steady.", author: "Atlas" },
+      todaysQuote: { text: "Stay steady.", author: "The Sage" },
     },
     isLoading: false,
     isError: false,

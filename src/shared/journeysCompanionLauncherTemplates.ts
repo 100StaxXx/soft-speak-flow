@@ -95,7 +95,7 @@ export const getJourneysCompanionLauncherTemplates = ({
       id: "quest",
       label: "Quest?",
       message: "Quest?",
-      target: "planner",
+      target: "conversation",
       starterIntent: "quest_capture",
     },
     {

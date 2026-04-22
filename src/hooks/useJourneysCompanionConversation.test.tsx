@@ -89,6 +89,23 @@ describe("useJourneysCompanionConversation", () => {
     expect(result.current.hasRealMessages).toBe(true);
   });
 
+  it("appends local transcript messages with custom variants", async () => {
+    const { result } = renderHook(() => useJourneysCompanionConversation());
+
+    await act(async () => {
+      result.current.appendLocalMessage("assistant", "Quest?", {
+        variant: "quest_prompt",
+      });
+    });
+
+    expect(result.current.messages).toHaveLength(1);
+    expect(result.current.messages[0]).toMatchObject({
+      role: "assistant",
+      content: "Quest?",
+      variant: "quest_prompt",
+    });
+  });
+
   it("clears the transcript when resetThread is called", async () => {
     const { result } = renderHook(() => useJourneysCompanionConversation());
 
@@ -257,6 +274,43 @@ describe("useJourneysCompanionConversation", () => {
 
     expect(result.current.messages).toHaveLength(1);
     expect(result.current.messages[0]?.content).toBe("Help me plan tomorrow");
+  });
+
+  it("bypasses planner handoff when explicitly disabled for typed chat", async () => {
+    mocks.invoke.mockResolvedValue({
+      data: {
+        reply: "Tell me more about what you're feeling.",
+        speechText: "Tell me more about what you're feeling.",
+        handoffToPlanner: true,
+        memoryUpdateApplied: false,
+        persistenceReady: true,
+        sessionId: "session-chat-only",
+      },
+      error: null,
+    });
+
+    const { result } = renderHook(() => useJourneysCompanionConversation());
+
+    await act(async () => {
+      await result.current.submitMessage("Quest details", "text", {
+        disablePlannerHandoff: true,
+      });
+    });
+
+    await waitFor(() => {
+      expect(result.current.messages).toHaveLength(2);
+    });
+
+    expect(result.current.pendingPlannerHandoffMessage).toBeNull();
+    expect(result.current.messages[1]).toMatchObject({
+      role: "assistant",
+      content: "Tell me more about what you're feeling.",
+    });
+    expect(mocks.invoke).toHaveBeenCalledWith("companion-chat", expect.objectContaining({
+      body: expect.objectContaining({
+        disablePlannerHandoff: true,
+      }),
+    }));
   });
 
   it("keeps the live reply while marking thread persistence unavailable during rollout", async () => {

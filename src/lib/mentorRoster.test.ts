@@ -19,16 +19,12 @@ describe("mentorRoster", () => {
     expect(resolveMentorSlugAlias("rival")).toBe("rival");
   });
 
-  it("rejects legacy mentor slugs", () => {
-    expect(resolveMentorSlugAlias("atlas")).toBeNull();
-    expect(resolveMentorSlugAlias("carmen")).toBeNull();
-    expect(resolveMentorSlugAlias("solace")).toBeNull();
-    expect(resolveMentorSlugAlias("elizabeth")).toBeNull();
-    expect(resolveMentorSlugAlias("sienna")).toBeNull();
-    expect(resolveMentorSlugAlias("stryker")).toBeNull();
-    expect(resolveMentorSlugAlias("eli")).toBeNull();
-    expect(resolveMentorSlugAlias("reign")).toBeNull();
-    expect(resolveActiveMentorSlug("atlas")).toBeNull();
+  it("rejects unsupported mentor slugs", () => {
+    expect(resolveMentorSlugAlias("legacy-alpha")).toBeNull();
+    expect(resolveMentorSlugAlias("legacy-beta")).toBeNull();
+    expect(resolveMentorSlugAlias("placeholder")).toBeNull();
+    expect(resolveMentorSlugAlias("retired-guide")).toBeNull();
+    expect(resolveActiveMentorSlug("legacy-alpha")).toBeNull();
   });
 
   it("defines the initial avatar crop positions for the active roster", () => {

@@ -37,7 +37,7 @@ const baseAnalysis: CompanionStatAnalysis = {
   generatedAt: "2026-04-18T18:30:00.000Z",
   mentor: {
     id: "mentor-1",
-    name: "Eli",
+    name: "Lyra",
     tone: "Supportive and specific",
     avatarUrl: null,
     primaryColor: "#ff7a59",
@@ -163,7 +163,7 @@ const baseAnalysis: CompanionStatAnalysis = {
       recentDrivers: [],
     },
   ],
-  summary: "Eli sees consistent momentum in your daily rhythm.",
+  summary: "Lyra sees consistent momentum in your daily rhythm.",
   suggestedAction: "Pair one morning check-in with one on-time task today.",
 };
 
@@ -214,7 +214,7 @@ describe("useCompanionStatAnalysis", () => {
         data: {
           analysis: {
             ...baseAnalysis,
-            summary: "Eli sees a fresher wave of Discipline momentum today.",
+            summary: "Lyra sees a fresher wave of Discipline momentum today.",
             suggestedAction: "Finish one planned task on time before lunch.",
           },
           cached: false,
@@ -235,7 +235,7 @@ describe("useCompanionStatAnalysis", () => {
     });
 
     await waitFor(() => {
-      expect(result.current.analysis?.summary).toBe("Eli sees a fresher wave of Discipline momentum today.");
+      expect(result.current.analysis?.summary).toBe("Lyra sees a fresher wave of Discipline momentum today.");
     });
 
     expect(mocks.invokeMock).toHaveBeenNthCalledWith(2, "generate-companion-stat-analysis", {

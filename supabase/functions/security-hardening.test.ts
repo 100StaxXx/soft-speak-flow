@@ -521,11 +521,11 @@ Deno.test("generate-mentor-audio succeeds for authenticated users and records us
   assert(Boolean(logEntry?.payload), "Expected mentor audio usage to be logged");
 });
 
-Deno.test("generate-mentor-audio rejects legacy mentor slugs", async () => {
+Deno.test("generate-mentor-audio rejects unsupported mentor slugs", async () => {
   const response = await mentorAudioModule.handleGenerateMentorAudio(
     new Request("https://example.com", {
       method: "POST",
-      body: JSON.stringify({ mentorSlug: "eli", script: "Keep going." }),
+      body: JSON.stringify({ mentorSlug: "legacy-alpha", script: "Keep going." }),
     }),
     {
       authorize: async () => ({ userId: "user-1", isInternal: false }),
@@ -537,6 +537,6 @@ Deno.test("generate-mentor-audio rejects legacy mentor slugs", async () => {
   );
 
   const body = await response.json();
-  assertEquals(response.status, 400, "Expected legacy mentor slug to be rejected");
-  assertEquals(body.error, "Unsupported mentorSlug: eli", "Expected legacy mentor error message");
+  assertEquals(response.status, 400, "Expected unsupported mentor slug to be rejected");
+  assertEquals(body.error, "Unsupported mentorSlug: legacy-alpha", "Expected unsupported mentor error message");
 });

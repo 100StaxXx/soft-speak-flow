@@ -24,10 +24,10 @@ describe("mentorVoices", () => {
     expect(mentorVoices.lyra.voiceId).toBe("fgDJOgmENIR82PueQrVs");
   });
 
-  it("rejects legacy mentor voice lookups", () => {
-    expect(getMentorVoiceConfig("atlas")).toBeNull();
-    expect(getMentorVoiceConfig("elizabeth")).toBeNull();
-    expect(getMentorVoiceConfig("stryker")).toBeNull();
-    expect(getMentorVoiceConfig("reign")).toBeNull();
+  it("rejects unsupported mentor voice lookups", () => {
+    expect(getMentorVoiceConfig("legacy-alpha")).toBeNull();
+    expect(getMentorVoiceConfig("legacy-beta")).toBeNull();
+    expect(getMentorVoiceConfig("placeholder")).toBeNull();
+    expect(getMentorVoiceConfig("retired-guide")).toBeNull();
   });
 });

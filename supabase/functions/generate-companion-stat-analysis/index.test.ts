@@ -84,7 +84,7 @@ const baseAnalysis = {
   generatedAt: "2026-04-18T18:30:00.000Z",
   mentor: {
     id: "mentor-1",
-    name: "Eli",
+    name: "Lyra",
     tone: "Supportive and specific",
     avatarUrl: null,
     primaryColor: "#ff7a59",
@@ -165,7 +165,7 @@ function createFreshAnalysisResponseMap(): Record<string, MockResponse[]> {
     mentors: [{
       data: {
         id: "mentor-1",
-        name: "Eli",
+        name: "Lyra",
         tone_description: "Supportive and specific",
         avatar_url: null,
         primary_color: "#ff7a59",
@@ -332,7 +332,7 @@ Deno.test("buildCompanionStatAnalysisPayload maps drivers deterministically and 
     generatedAt: "2026-04-18T18:30:00.000Z",
     mentor: {
       id: "mentor-1",
-      name: "Eli",
+      name: "Lyra",
       tone: "Supportive and specific",
       avatarUrl: null,
       primaryColor: "#ff7a59",

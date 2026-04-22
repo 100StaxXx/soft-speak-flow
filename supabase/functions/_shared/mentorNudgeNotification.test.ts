@@ -5,11 +5,11 @@ import {
 
 Deno.test("buildMentorNudgeNotificationTitle uses mentor branding for non-companion nudges", () => {
   const title = buildMentorNudgeNotificationTitle({
-    mentorName: "Atlas",
+    mentorName: "The Sage",
     nudgeType: "check_in",
   });
 
-  if (title !== "Atlas says:") {
+  if (title !== "The Sage says:") {
     throw new Error(`Expected mentor title, got ${title}`);
   }
 });

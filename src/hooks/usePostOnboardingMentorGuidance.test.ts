@@ -866,17 +866,17 @@ describe("guided tutorial intro dialogue sequence", () => {
       milestonesCompleted: [],
     };
 
-    const { result: atlasIntroResult, unmount: unmountAtlasIntro } = renderHook(
+    const { result: sageIntroResult, unmount: unmountSageIntro } = renderHook(
       () => usePostOnboardingMentorGuidance(),
       { wrapper: createWrapper("/mentor") }
     );
 
-    let atlasIntroText = "";
+    let sageIntroText = "";
     await waitFor(() => {
-      atlasIntroText = atlasIntroResult.current.dialogueText;
-      expect(atlasIntroText).toContain("I'm The Sage");
+      sageIntroText = sageIntroResult.current.dialogueText;
+      expect(sageIntroText).toContain("I'm The Sage");
     });
-    unmountAtlasIntro();
+    unmountSageIntro();
 
     storageMocks.safeLocalStorage.removeItem("guided_tutorial_progress_user-1");
     mocks.state.personality = {
@@ -895,19 +895,19 @@ describe("guided tutorial intro dialogue sequence", () => {
       milestonesCompleted: [],
     };
 
-    const { result: strykerIntroResult, unmount: unmountStrykerIntro } = renderHook(
+    const { result: operatorIntroResult, unmount: unmountOperatorIntro } = renderHook(
       () => usePostOnboardingMentorGuidance(),
       { wrapper: createWrapper("/mentor") }
     );
 
-    let strykerIntroText = "";
+    let operatorIntroText = "";
     await waitFor(() => {
-      strykerIntroText = strykerIntroResult.current.dialogueText;
-      expect(strykerIntroText).toContain("We're building a system");
+      operatorIntroText = operatorIntroResult.current.dialogueText;
+      expect(operatorIntroText).toContain("We're building a system");
     });
-    unmountStrykerIntro();
+    unmountOperatorIntro();
 
-    expect(atlasIntroText).not.toEqual(strykerIntroText);
+    expect(sageIntroText).not.toEqual(operatorIntroText);
 
     storageMocks.safeLocalStorage.removeItem("guided_tutorial_progress_user-1");
     mocks.state.personality = {
@@ -926,17 +926,17 @@ describe("guided tutorial intro dialogue sequence", () => {
       milestonesCompleted: ["mentor_intro_hello"],
     };
 
-    const { result: atlasQuestsResult, unmount: unmountAtlasQuests } = renderHook(
+    const { result: sageQuestsResult, unmount: unmountSageQuests } = renderHook(
       () => usePostOnboardingMentorGuidance(),
       { wrapper: createWrapper("/journeys") }
     );
 
-    let atlasQuestsText = "";
+    let sageQuestsText = "";
     await waitFor(() => {
-      atlasQuestsText = atlasQuestsResult.current.dialogueText;
-      expect(atlasQuestsText).toContain("daily to-do list");
+      sageQuestsText = sageQuestsResult.current.dialogueText;
+      expect(sageQuestsText).toContain("daily to-do list");
     });
-    unmountAtlasQuests();
+    unmountSageQuests();
 
     storageMocks.safeLocalStorage.removeItem("guided_tutorial_progress_user-1");
     mocks.state.personality = {
@@ -955,18 +955,18 @@ describe("guided tutorial intro dialogue sequence", () => {
       milestonesCompleted: ["mentor_intro_hello"],
     };
 
-    const { result: strykerQuestsResult } = renderHook(
+    const { result: operatorQuestsResult } = renderHook(
       () => usePostOnboardingMentorGuidance(),
       { wrapper: createWrapper("/journeys") }
     );
 
-    let strykerQuestsText = "";
+    let operatorQuestsText = "";
     await waitFor(() => {
-      strykerQuestsText = strykerQuestsResult.current.dialogueText;
-      expect(strykerQuestsText).toContain("daily to-do list");
+      operatorQuestsText = operatorQuestsResult.current.dialogueText;
+      expect(operatorQuestsText).toContain("daily to-do list");
     });
 
-    expect(atlasQuestsText).toEqual(strykerQuestsText);
+    expect(sageQuestsText).toEqual(operatorQuestsText);
   });
 
   it("returns no support text for open mentor milestone copy", async () => {

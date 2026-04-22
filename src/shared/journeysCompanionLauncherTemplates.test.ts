@@ -67,5 +67,13 @@ describe("journeys companion launcher greetings", () => {
       target: "planner",
       starterIntent: "plan_day",
     });
+
+    expect(templates[3]).toMatchObject({
+      id: "quest",
+      label: "Quest?",
+      message: "Quest?",
+      target: "conversation",
+      starterIntent: "quest_capture",
+    });
   });
 });

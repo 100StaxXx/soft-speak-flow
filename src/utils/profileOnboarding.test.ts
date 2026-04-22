@@ -321,7 +321,7 @@ describe("buildEstablishedProfileSelfHealPatch", () => {
             guided_tutorial: {
               completed: false,
             },
-            mentorName: "Atlas",
+            mentorName: "The Sage",
           },
         },
         hasCompanion: true,
@@ -333,7 +333,7 @@ describe("buildEstablishedProfileSelfHealPatch", () => {
         guided_tutorial: {
           completed: false,
         },
-        mentorName: "Atlas",
+        mentorName: "The Sage",
         walkthrough_completed: true,
       },
     });

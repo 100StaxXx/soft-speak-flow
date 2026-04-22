@@ -11,7 +11,7 @@ vi.mock("react-router-dom", () => ({
 
 vi.mock("@/hooks/useMentorPersonality", () => ({
   useMentorPersonality: () => ({
-    name: "Carmen",
+    name: "The Icon",
   }),
 }));
 
@@ -26,7 +26,7 @@ describe("MentorQuickChat", () => {
     expect(shell).toHaveClass("bg-transparent");
     expect(shell).toHaveClass("backdrop-blur-none");
     expect(shell).toHaveClass("shadow-none");
-    expect(screen.getByRole("heading", { name: "Ask Carmen" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Ask The Icon" })).toBeInTheDocument();
     expect(screen.getByPlaceholderText("Or type your own...")).toBeInTheDocument();
   });
 
