@@ -3,6 +3,8 @@
  * Centralizes task type definitions to ensure consistency across calendar and task components
  */
 
+import type { Quest } from "@/types/domain";
+
 export type TaskCategory = 'mind' | 'body' | 'soul';
 export type TaskDifficulty = 'easy' | 'medium' | 'hard';
 
@@ -76,3 +78,7 @@ export function isValidCategory(category: string | null | undefined): category i
 export function isValidDifficulty(difficulty: string | null | undefined): difficulty is TaskDifficulty {
   return difficulty === 'easy' || difficulty === 'medium' || difficulty === 'hard';
 }
+
+// Canonical app-boundary noun: Quest. These task-scoped interfaces remain
+// compatibility helpers for legacy UI surfaces.
+export type CanonicalQuestRecord = Quest;

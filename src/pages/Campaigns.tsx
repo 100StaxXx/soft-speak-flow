@@ -11,9 +11,10 @@ import { CampaignCreatedAnimation } from "@/components/CampaignCreatedAnimation"
 import { Button } from "@/components/ui/button";
 import { clearShellCardClassName } from "@/components/ui/card";
 import { ACTIVE_CAMPAIGN_LIMIT_MESSAGE, hasReachedActiveCampaignLimit } from "@/features/epics/constants";
-import { useEpics } from "@/hooks/useEpics";
+import { useCampaigns } from "@/hooks/useCampaigns";
 import { useMainTabVisibility } from "@/contexts/MainTabVisibilityContext";
 import { cn } from "@/lib/utils";
+import type { Campaign } from "@/types/domain";
 
 interface CreatedCampaignData {
   title: string;
@@ -26,29 +27,59 @@ const CAMPAIGN_PANEL_CLASS = cn(
   clearShellCardClassName,
 );
 
+const toCampaignCardModel = (campaign: Campaign) => ({
+  id: campaign.id,
+  user_id: campaign.userId,
+  title: campaign.title,
+  description: campaign.description ?? undefined,
+  target_days: campaign.targetDays,
+  start_date: campaign.startDate,
+  end_date: campaign.endDate,
+  status: campaign.status,
+  xp_reward: campaign.xpReward ?? 0,
+  progress_percentage: campaign.progressPercentage ?? 0,
+  is_public: campaign.isPublic ?? undefined,
+  invite_code: campaign.inviteCode ?? undefined,
+  theme_color: campaign.themeColor ?? undefined,
+  story_type_slug: campaign.storyTypeSlug ?? null,
+  epic_habits: campaign.rituals.map((ritual) => ({
+    habit_id: ritual.habitId,
+    habits: ritual.habit ? {
+      id: ritual.habit.id,
+      title: ritual.habit.title,
+      difficulty: ritual.habit.difficulty ?? "medium",
+      description: ritual.habit.description ?? undefined,
+      frequency: ritual.habit.frequency ?? undefined,
+      estimated_minutes: ritual.habit.estimatedMinutes ?? undefined,
+      custom_days: ritual.habit.customDays ?? null,
+      custom_month_days: ritual.habit.customMonthDays ?? null,
+    } : null,
+  })),
+});
+
 const Campaigns = () => {
   const prefersReducedMotion = useReducedMotion();
   const { isTabActive } = useMainTabVisibility();
   const {
-    activeEpics,
-    completedEpics,
+    activeCampaigns,
+    completedCampaigns,
     isLoading,
-    createEpic,
+    createCampaign,
     isCreating,
-    renameEpic,
-    updateEpicStatus,
-  } = useEpics({ enabled: isTabActive });
+    renameCampaign,
+    updateCampaignStatus,
+  } = useCampaigns({ enabled: isTabActive });
   const [showPathfinder, setShowPathfinder] = useState(false);
   const [showPageInfo, setShowPageInfo] = useState(false);
   const [showCreatedAnimation, setShowCreatedAnimation] = useState(false);
   const [createdCampaignData, setCreatedCampaignData] = useState<CreatedCampaignData | null>(null);
 
-  const hasCampaigns = activeEpics.length > 0 || completedEpics.length > 0;
-  const hasReachedLimit = hasReachedActiveCampaignLimit(activeEpics.length);
+  const hasCampaigns = activeCampaigns.length > 0 || completedCampaigns.length > 0;
+  const hasReachedLimit = hasReachedActiveCampaignLimit(activeCampaigns.length);
 
-  const handleCreateCampaign = useCallback(async (data: Parameters<typeof createEpic>[0]) => {
+  const handleCreateCampaign = useCallback(async (data: Parameters<typeof createCampaign>[0]) => {
     try {
-      await createEpic(data);
+      await createCampaign(data);
       setShowPathfinder(false);
       setCreatedCampaignData({
         title: data.title,
@@ -58,7 +89,7 @@ const Campaigns = () => {
     } catch (error) {
       console.error("Failed to create campaign:", error);
     }
-  }, [createEpic]);
+  }, [createCampaign]);
 
   const handleAnimationComplete = useCallback(() => {
     setShowCreatedAnimation(false);
@@ -159,14 +190,16 @@ const Campaigns = () => {
                     </div>
                   </div>
                   <div className="space-y-4">
-                    {activeEpics.length > 0 ? (
-                      activeEpics.map((epic) => (
+                    {activeCampaigns.length > 0 ? (
+                      activeCampaigns.map((campaign) => (
                         <CampaignCard
-                          key={epic.id}
-                          campaign={epic}
-                          onRename={(title) => renameEpic({ epicId: epic.id, title })}
-                          onComplete={() => updateEpicStatus({ epicId: epic.id, status: "completed" })}
-                          onAbandon={() => updateEpicStatus({ epicId: epic.id, status: "abandoned" })}
+                          key={campaign.id}
+                          campaign={toCampaignCardModel(campaign)}
+                          onRename={async (title) => {
+                            await renameCampaign({ epicId: campaign.id, title });
+                          }}
+                          onComplete={() => updateCampaignStatus({ epicId: campaign.id, status: "completed" })}
+                          onAbandon={() => updateCampaignStatus({ epicId: campaign.id, status: "abandoned" })}
                         />
                       ))
                     ) : (
@@ -183,9 +216,9 @@ const Campaigns = () => {
                     Completed campaigns
                   </div>
                   <div className="space-y-4">
-                    {completedEpics.length > 0 ? (
-                      completedEpics.map((epic) => (
-                        <CampaignCard key={epic.id} campaign={epic} />
+                    {completedCampaigns.length > 0 ? (
+                      completedCampaigns.map((campaign) => (
+                        <CampaignCard key={campaign.id} campaign={toCampaignCardModel(campaign)} />
                       ))
                     ) : (
                       <div className="rounded-[24px] border border-celestial-blue/18 bg-celestial-blue/[0.08] px-4 py-6 text-sm text-muted-foreground backdrop-blur-xl">

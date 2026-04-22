@@ -6845,6 +6845,56 @@ export type Database = {
           },
         ]
       }
+      task_attachments: {
+        Row: {
+          created_at: string
+          file_name: string
+          file_path: string
+          file_size_bytes: number
+          file_url: string
+          id: string
+          is_image: boolean
+          mime_type: string
+          sort_order: number
+          task_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          file_path: string
+          file_size_bytes?: number
+          file_url: string
+          id?: string
+          is_image?: boolean
+          mime_type: string
+          sort_order?: number
+          task_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          file_path?: string
+          file_size_bytes?: number
+          file_url?: string
+          id?: string
+          is_image?: boolean
+          mime_type?: string
+          sort_order?: number
+          task_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_attachments_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "daily_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       task_contexts: {
         Row: {
           color: string | null
@@ -7279,6 +7329,66 @@ export type Database = {
           },
           {
             foreignKeyName: "quest_calendar_links_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "daily_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quest_outlook_task_links: {
+        Row: {
+          connection_id: string
+          created_at: string
+          external_task_id: string
+          external_task_list_id: string
+          id: string
+          last_app_sync_at: string | null
+          last_provider_sync_at: string | null
+          provider: string
+          sync_mode: string
+          task_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          connection_id: string
+          created_at?: string
+          external_task_id: string
+          external_task_list_id: string
+          id?: string
+          last_app_sync_at?: string | null
+          last_provider_sync_at?: string | null
+          provider?: string
+          sync_mode?: string
+          task_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          connection_id?: string
+          created_at?: string
+          external_task_id?: string
+          external_task_list_id?: string
+          id?: string
+          last_app_sync_at?: string | null
+          last_provider_sync_at?: string | null
+          provider?: string
+          sync_mode?: string
+          task_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quest_outlook_task_links_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "user_calendar_connections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quest_outlook_task_links_task_id_fkey"
             columns: ["task_id"]
             isOneToOne: false
             referencedRelation: "daily_tasks"

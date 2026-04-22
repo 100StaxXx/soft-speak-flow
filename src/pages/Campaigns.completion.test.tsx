@@ -4,21 +4,32 @@ import { render, screen, within } from "@testing-library/react";
 
 type MockEpic = {
   id: string;
+  userId: string;
   title: string;
-  user_id: string;
   description: string | null;
   status: "active" | "completed";
-  progress_percentage: number | null;
-  target_days: number;
-  start_date: string;
-  end_date: string | null;
-  xp_reward: number;
-  epic_habits: [];
+  progressPercentage: number | null;
+  targetDays: number;
+  startDate: string;
+  endDate: string | null;
+  themeColor: string | null;
+  habitCount: number;
+  milestoneCount: number;
+  latestJourneyPathUrl: string | null;
+  latestJourneyPathGeneratedAt: string | null;
+  latestJourneyPathMilestoneIndex: number | null;
+  createdAt: string | null;
+  completedAt: string | null;
+  xpReward: number | null;
+  isPublic: boolean | null;
+  inviteCode: string | null;
+  storyTypeSlug: string | null;
+  rituals: [];
 };
 
 const mocks = vi.hoisted(() => ({
-  activeEpics: [] as MockEpic[],
-  completedEpics: [] as MockEpic[],
+  activeCampaigns: [] as MockEpic[],
+  completedCampaigns: [] as MockEpic[],
 }));
 
 const createEpic = ({
@@ -31,16 +42,27 @@ const createEpic = ({
   progress_percentage: number | null;
 }): MockEpic => ({
   id,
+  userId: "user-1",
   title: `${status}-${id}`,
-  user_id: "user-1",
   description: null,
   status,
-  progress_percentage,
-  target_days: 14,
-  start_date: "2026-04-01",
-  end_date: status === "completed" ? "2026-04-14" : null,
-  xp_reward: 140,
-  epic_habits: [],
+  progressPercentage: progress_percentage,
+  targetDays: 14,
+  startDate: "2026-04-01",
+  endDate: status === "completed" ? "2026-04-14" : null,
+  themeColor: null,
+  habitCount: 0,
+  milestoneCount: 0,
+  latestJourneyPathUrl: null,
+  latestJourneyPathGeneratedAt: null,
+  latestJourneyPathMilestoneIndex: null,
+  createdAt: "2026-04-01T00:00:00.000Z",
+  completedAt: status === "completed" ? "2026-04-14T00:00:00.000Z" : null,
+  xpReward: 140,
+  isPublic: false,
+  inviteCode: null,
+  storyTypeSlug: null,
+  rituals: [],
 });
 
 vi.mock("framer-motion", () => ({
@@ -84,15 +106,15 @@ vi.mock("@/contexts/MainTabVisibilityContext", () => ({
   }),
 }));
 
-vi.mock("@/hooks/useEpics", () => ({
-  useEpics: () => ({
-    activeEpics: mocks.activeEpics,
-    completedEpics: mocks.completedEpics,
+vi.mock("@/hooks/useCampaigns", () => ({
+  useCampaigns: () => ({
+    activeCampaigns: mocks.activeCampaigns,
+    completedCampaigns: mocks.completedCampaigns,
     isLoading: false,
-    createEpic: vi.fn(),
+    createCampaign: vi.fn(),
     isCreating: false,
-    renameEpic: vi.fn(),
-    updateEpicStatus: vi.fn(),
+    renameCampaign: vi.fn(),
+    updateCampaignStatus: vi.fn(),
   }),
 }));
 
@@ -100,13 +122,13 @@ import Campaigns from "./Campaigns";
 
 describe("Campaigns populated layout", () => {
   beforeEach(() => {
-    mocks.activeEpics = [];
-    mocks.completedEpics = [];
+    mocks.activeCampaigns = [];
+    mocks.completedCampaigns = [];
   });
 
   it("places the create button inside the existing campaigns section above the active campaign cards", () => {
-    mocks.activeEpics = [createEpic({ id: "active-1", status: "active", progress_percentage: 40 })];
-    mocks.completedEpics = [
+    mocks.activeCampaigns = [createEpic({ id: "active-1", status: "active", progress_percentage: 40 })];
+    mocks.completedCampaigns = [
       createEpic({ id: "completed-1", status: "completed", progress_percentage: 100 }),
       createEpic({ id: "completed-2", status: "completed", progress_percentage: 100 }),
     ];
@@ -124,11 +146,11 @@ describe("Campaigns populated layout", () => {
   });
 
   it("does not render the removed campaign summary stats", () => {
-    mocks.activeEpics = [
+    mocks.activeCampaigns = [
       createEpic({ id: "active-1", status: "active", progress_percentage: 10 }),
       createEpic({ id: "active-2", status: "active", progress_percentage: 90 }),
     ];
-    mocks.completedEpics = [createEpic({ id: "completed-1", status: "completed", progress_percentage: 100 })];
+    mocks.completedCampaigns = [createEpic({ id: "completed-1", status: "completed", progress_percentage: 100 })];
 
     render(<Campaigns />);
 

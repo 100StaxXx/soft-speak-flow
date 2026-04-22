@@ -798,7 +798,7 @@ export const useTaskMutations = (taskDate: string) => {
 
     if (options.replaceExisting) {
       const { error: deleteError } = await supabase
-        .from('task_attachments' as any)
+        .from('task_attachments')
         .delete()
         .eq('task_id', remoteTaskId)
         .eq('user_id', user.id);
@@ -826,7 +826,7 @@ export const useTaskMutations = (taskDate: string) => {
     }));
 
     const { error } = await supabase
-      .from('task_attachments' as any)
+      .from('task_attachments')
       .insert(rows);
 
     if (error) {

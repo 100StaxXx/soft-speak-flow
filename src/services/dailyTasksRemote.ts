@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import type { Tables } from "@/integrations/supabase/types";
 import type { TaskAttachment } from "@/types/questAttachments";
 import { createQuestAttachmentSignedUrlMap } from "@/utils/questAttachmentUrls";
 
@@ -57,6 +58,14 @@ export interface DailyTask {
   location: string | null;
   subtasks?: DailySubtask[];
 }
+
+type TaskAttachmentRow = Tables<"task_attachments">;
+type DailyTaskRowWithRelations = Omit<DailyTask, "attachments" | "subtasks" | "contact" | "epic_title"> & {
+  epics: { title: string } | null;
+  contact: { id: string; name: string; avatar_url: string | null } | null;
+  subtasks: DailySubtask[] | null;
+  task_attachments?: TaskAttachmentRow[] | null;
+};
 
 const DAILY_TASKS_SELECT_WITH_ATTACHMENTS = `
   *,
@@ -128,26 +137,17 @@ export async function fetchDailyTasksRemote(userId: string, taskDate: string): P
     throw error;
   }
 
-  const rawTasks = data || [];
+  const rawTasks = Array.isArray(data)
+    ? data as unknown as DailyTaskRowWithRelations[]
+    : [];
   const signedUrlMap = await createQuestAttachmentSignedUrlMap(
     rawTasks.flatMap((task) =>
-      (((task.task_attachments as Array<{ file_path: string }> | null) ?? []).map((attachment) => attachment.file_path)),
+      (task.task_attachments ?? []).map((attachment) => attachment.file_path),
     ),
   );
 
   return rawTasks.map((task) => {
-    const attachments = (((task.task_attachments as Array<{
-      id: string;
-      task_id: string;
-      file_url: string;
-      file_path: string;
-      file_name: string;
-      mime_type: string;
-      file_size_bytes: number;
-      is_image: boolean;
-      sort_order: number | null;
-      created_at: string;
-    }> | null) ?? [])
+    const attachments = ((task.task_attachments ?? [])
       .slice()
       .sort((a, b) => (a.sort_order ?? Number.MAX_SAFE_INTEGER) - (b.sort_order ?? Number.MAX_SAFE_INTEGER))
       .map((attachment) => ({
@@ -165,10 +165,10 @@ export async function fetchDailyTasksRemote(userId: string, taskDate: string): P
 
     return {
       ...task,
-      epic_title: (task.epics as { title: string } | null)?.title || null,
-      contact: task.contact as { id: string; name: string; avatar_url: string | null } | null,
+      epic_title: task.epics?.title ?? null,
+      contact: task.contact,
       image_url: attachments.find((attachment) => attachment.isImage)?.fileUrl ?? task.image_url,
-      subtasks: ((task.subtasks as DailySubtask[] | null) ?? [])
+      subtasks: (task.subtasks ?? [])
         .slice()
         .sort((a, b) => (a.sort_order ?? Number.MAX_SAFE_INTEGER) - (b.sort_order ?? Number.MAX_SAFE_INTEGER)),
       attachments,

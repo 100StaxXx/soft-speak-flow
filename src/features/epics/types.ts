@@ -2,6 +2,8 @@
  * Epics feature types
  */
 
+import type { Campaign } from "@/types/domain";
+
 export interface Epic {
   id: string;
   user_id: string;
@@ -38,3 +40,6 @@ export interface EpicTemplate {
   popularity_count: number | null;
   created_at: string | null;
 }
+
+// Canonical app-boundary noun: Campaign. `Epic` remains the storage-era shape.
+export type CanonicalCampaign = Campaign;

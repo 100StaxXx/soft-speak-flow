@@ -210,7 +210,7 @@ export function useQuestCalendarSync(options: QuestCalendarSyncOptions = {}) {
       if (!user?.id) return [];
 
       const { data, error } = await supabase
-        .from('quest_outlook_task_links' as any)
+        .from('quest_outlook_task_links')
         .select('id, task_id, user_id, connection_id, provider, external_task_list_id, external_task_id, sync_mode, last_app_sync_at, last_provider_sync_at')
         .eq('user_id', user.id);
 

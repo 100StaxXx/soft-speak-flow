@@ -2,6 +2,8 @@
  * Type definitions for profile onboarding data
  */
 
+import type { UserProfile } from "@/types/domain";
+
 export type GuidedTutorialStepId =
   | "quests_campaigns_intro"
   | "create_quest"
@@ -89,3 +91,7 @@ export interface OnboardingData {
 export interface ProfilePreferences {
   [key: string]: unknown;
 }
+
+// Canonical app-boundary noun: UserProfile. Existing profile/onboarding helpers
+// stay in place while the broader normalization pass is compatibility-first.
+export type CanonicalUserProfile = UserProfile;

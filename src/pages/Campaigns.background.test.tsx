@@ -45,15 +45,15 @@ vi.mock("@/contexts/MainTabVisibilityContext", () => ({
   }),
 }));
 
-vi.mock("@/hooks/useEpics", () => ({
-  useEpics: () => ({
-    activeEpics: [],
-    completedEpics: [],
+vi.mock("@/hooks/useCampaigns", () => ({
+  useCampaigns: () => ({
+    activeCampaigns: [],
+    completedCampaigns: [],
     isLoading: false,
-    createEpic: vi.fn(),
+    createCampaign: vi.fn(),
     isCreating: false,
-    renameEpic: vi.fn(),
-    updateEpicStatus: vi.fn(),
+    renameCampaign: vi.fn(),
+    updateCampaignStatus: vi.fn(),
   }),
 }));
 

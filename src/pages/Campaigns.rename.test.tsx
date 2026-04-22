@@ -3,8 +3,8 @@ import { render } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  campaignCardMock: vi.fn(() => <div data-testid="campaign-card" />),
-  renameEpicMock: vi.fn(),
+  campaignCardMock: vi.fn((_props?: unknown) => <div data-testid="campaign-card" />),
+  renameCampaignMock: vi.fn(),
 }));
 
 vi.mock("framer-motion", () => ({
@@ -48,43 +48,65 @@ vi.mock("@/contexts/MainTabVisibilityContext", () => ({
   }),
 }));
 
-vi.mock("@/hooks/useEpics", () => ({
-  useEpics: () => ({
-    activeEpics: [
+vi.mock("@/hooks/useCampaigns", () => ({
+  useCampaigns: () => ({
+    activeCampaigns: [
       {
         id: "active-1",
+        userId: "user-1",
         title: "Active Campaign",
-        user_id: "user-1",
         description: null,
         status: "active",
-        progress_percentage: 10,
-        target_days: 14,
-        start_date: "2026-04-01",
-        end_date: null,
-        xp_reward: 140,
-        epic_habits: [],
+        progressPercentage: 10,
+        targetDays: 14,
+        startDate: "2026-04-01",
+        endDate: null,
+        themeColor: null,
+        habitCount: 0,
+        milestoneCount: 0,
+        latestJourneyPathUrl: null,
+        latestJourneyPathGeneratedAt: null,
+        latestJourneyPathMilestoneIndex: null,
+        createdAt: "2026-04-01T00:00:00.000Z",
+        completedAt: null,
+        xpReward: 140,
+        isPublic: false,
+        inviteCode: null,
+        storyTypeSlug: null,
+        rituals: [],
       },
     ],
-    completedEpics: [
+    completedCampaigns: [
       {
         id: "complete-1",
+        userId: "user-1",
         title: "Completed Campaign",
-        user_id: "user-1",
         description: null,
         status: "completed",
-        progress_percentage: 100,
-        target_days: 14,
-        start_date: "2026-03-01",
-        end_date: "2026-03-14",
-        xp_reward: 140,
-        epic_habits: [],
+        progressPercentage: 100,
+        targetDays: 14,
+        startDate: "2026-03-01",
+        endDate: "2026-03-14",
+        themeColor: null,
+        habitCount: 0,
+        milestoneCount: 0,
+        latestJourneyPathUrl: null,
+        latestJourneyPathGeneratedAt: null,
+        latestJourneyPathMilestoneIndex: null,
+        createdAt: "2026-03-01T00:00:00.000Z",
+        completedAt: "2026-03-14T00:00:00.000Z",
+        xpReward: 140,
+        isPublic: false,
+        inviteCode: null,
+        storyTypeSlug: null,
+        rituals: [],
       },
     ],
     isLoading: false,
-    createEpic: vi.fn(),
+    createCampaign: vi.fn(),
     isCreating: false,
-    renameEpic: mocks.renameEpicMock,
-    updateEpicStatus: vi.fn(),
+    renameCampaign: mocks.renameCampaignMock,
+    updateCampaignStatus: vi.fn(),
   }),
 }));
 

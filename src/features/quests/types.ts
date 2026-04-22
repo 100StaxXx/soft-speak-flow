@@ -2,6 +2,7 @@
  * Quest feature types
  */
 
+import type { Quest } from "@/types/domain";
 import type { QuestAttachmentInput } from "@/types/questAttachments";
 
 export type QuestDifficulty = "easy" | "medium" | "hard";
@@ -104,3 +105,7 @@ export interface QuestFormState {
   reminderMinutesBefore: number;
   moreInformation: string | null;
 }
+
+// Canonical app-boundary noun: Quest. This file keeps feature-local drafts and
+// compatibility helpers that still use task-era naming.
+export type CanonicalQuest = Quest;
