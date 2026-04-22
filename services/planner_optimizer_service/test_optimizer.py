@@ -165,6 +165,20 @@ class PlannerOptimizerServiceTests(unittest.TestCase):
         self.assertIn("deep_work_block_limit", response.drafts[0].soft_conflicts)
         self.assertNotIn("deep_work_block_available", response.drafts[0].reason_codes)
 
+    def test_solver_failure_returns_inbox_fallback(self) -> None:
+        from unittest.mock import patch
+        from ortools.sat.python import cp_model
+
+        with patch.object(cp_model.CpSolver, "Solve", return_value=cp_model.UNKNOWN):
+            response = optimize_schedule(self.base_request())
+
+        self.assertEqual(len(response.drafts), 1)
+        self.assertEqual(response.drafts[0].status, "needs_scheduling")
+        self.assertTrue(response.drafts[0].fallback_to_inbox)
+        self.assertIn("solver_unavailable", response.drafts[0].soft_conflicts)
+        self.assertEqual(len(response.unscheduled), 1)
+        self.assertEqual(response.unscheduled[0].task_id, "task-1")
+
     def test_http_optimize_returns_three_drafts_with_spillover(self) -> None:
         sample_path = Path(__file__).with_name("sample_request.json")
         payload = json.loads(sample_path.read_text(encoding="utf-8"))

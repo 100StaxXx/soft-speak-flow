@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal, Optional, Tuple
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from pydantic import BaseModel, Field
 
 try:
@@ -705,7 +705,34 @@ def optimize_schedule(request: OptimizerRequest) -> OptimizerResponse:
 
     status = solver.Solve(model)
     if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
-        raise HTTPException(status_code=503, detail="optimizer did not find a feasible solution")
+        return OptimizerResponse(
+            drafts=[
+                DraftResponse(
+                    task_id=task.id,
+                    title=task.title,
+                    status="needs_scheduling",
+                    slot_score=0,
+                    hard_conflict=False,
+                    soft_conflicts=["solver_unavailable"],
+                    reason_codes=["needs_manual_scheduling"],
+                    reason_summary=build_reason_summary(
+                        "needs_scheduling",
+                        ["needs_manual_scheduling"],
+                        ["solver_unavailable"],
+                    ),
+                    fallback_to_inbox=True,
+                )
+                for task in request.tasks_to_schedule
+            ],
+            unscheduled=[
+                UnscheduledResponse(
+                    task_id=task.id,
+                    title=task.title,
+                    reason_codes=["needs_manual_scheduling"],
+                )
+                for task in request.tasks_to_schedule
+            ],
+        )
 
     drafts: list[DraftResponse] = []
     unscheduled_tasks: list[UnscheduledResponse] = []
