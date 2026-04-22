@@ -446,9 +446,9 @@ const applyRemoteDraftToProposal = (
 
 const buildInboxFallbackResult = (
   result: PlannerBuildResult,
-): PlannerBuildResult => ({
-  ...result,
-  proposals: result.proposals.map((proposal) => {
+): PlannerBuildResult => {
+  let movedCount = 0;
+  const proposals = result.proposals.map((proposal) => {
     if (
       proposal.kind !== "create_quest" ||
       proposal.status !== "pending" ||
@@ -456,6 +456,7 @@ const buildInboxFallbackResult = (
     ) {
       return proposal;
     }
+    movedCount++;
     const payload = proposal.payload as Record<string, unknown>;
     return {
       ...proposal,
@@ -469,8 +470,16 @@ const buildInboxFallbackResult = (
         fallbackToInbox: true,
       },
     };
-  }),
-});
+  });
+
+  if (movedCount === 0) return { ...result, proposals };
+
+  return {
+    ...result,
+    proposals,
+    reply: `I drafted ${movedCount} quest${movedCount === 1 ? "" : "s"} for your inbox. Review and confirm what fits.`,
+  };
+};
 
 export const maybeApplyRemotePlannerOptimizer = async (params: {
   input: PlannerBuildInput;

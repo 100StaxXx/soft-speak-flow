@@ -599,14 +599,23 @@ export function useCompanionAssistant({
       return;
     }
 
+    if (useLegacyFallback) {
+      legacyAssistant.startTemplateThread();
+    } else {
+      openFreshThread();
+    }
+
     void submitMessage(launchIntent.message, "text");
     onLaunchIntentConsumed?.(launchIntent.id);
   }, [
     launchIntent,
+    legacyAssistant,
     onLaunchIntentConsumed,
     onOpenCampaignBuilder,
+    openFreshThread,
     submitMessage,
     threadsQuery.isSuccess,
+    useLegacyFallback,
   ]);
 
   const { isRecording, isAutoStopping, isSupported, permissionStatus, toggleRecording, requestPermission } = useVoiceInput({
