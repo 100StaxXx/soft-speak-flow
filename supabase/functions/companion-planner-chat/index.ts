@@ -20,10 +20,11 @@ import {
 } from "./planner.ts";
 import {
   buildOrchestratedPlannerResponse,
+  buildPlanDayAIResponse,
+  buildUpcomingAIResponse,
   sanitizeReadyQuestProposalResponse,
 } from "./orchestrator.ts";
 import { enrichQuestPlannerResult } from "./questEnrichment.ts";
-import { maybeApplyRemotePlannerOptimizer } from "./schedulerOptimizer.ts";
 import {
   collectPlannerRequestNormalizationEvents,
   normalizePlannerClassificationHint,
@@ -163,16 +164,60 @@ serve(async (req) => {
       providers: ["openai"],
     });
 
-    const optimizerBackedResult = await maybeApplyRemotePlannerOptimizer({
-      input: plannerInput,
-      result,
-      fetchImpl: guardedFetch,
-    });
+    const starterIntent = plannerInput.plannerContext.starterIntent;
+
+    if (starterIntent === "plan_day") {
+      const aiResult = await buildPlanDayAIResponse({
+        guardedFetch,
+        input: plannerInput,
+        baseResult: result,
+      });
+      if (aiResult) {
+        const responseResult = sanitizeReadyQuestProposalResponse(
+          normalizePlannerBuildResultText(aiResult),
+        );
+        return new Response(JSON.stringify(responseResult), {
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+            "X-Request-Id": requestId,
+          },
+        });
+      }
+      console.warn(
+        "[companion-planner-chat] plan_day AI failed, falling back to deterministic",
+        { requestId },
+      );
+    }
+
+    if (starterIntent === "upcoming_start") {
+      const aiResult = await buildUpcomingAIResponse({
+        guardedFetch,
+        input: plannerInput,
+        baseResult: result,
+      });
+      if (aiResult) {
+        const responseResult = sanitizeReadyQuestProposalResponse(
+          normalizePlannerBuildResultText(aiResult),
+        );
+        return new Response(JSON.stringify(responseResult), {
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+            "X-Request-Id": requestId,
+          },
+        });
+      }
+      console.warn(
+        "[companion-planner-chat] upcoming_start AI failed, falling back to deterministic",
+        { requestId },
+      );
+    }
 
     const enrichedResult = await enrichQuestPlannerResult({
       fetchImpl: guardedFetch,
       input: plannerInput,
-      baseResult: optimizerBackedResult,
+      baseResult: result,
     });
 
     const orchestratedResult = await buildOrchestratedPlannerResponse({
