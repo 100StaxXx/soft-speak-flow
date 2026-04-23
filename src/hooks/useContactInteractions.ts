@@ -2,6 +2,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from "@/components/ui/sonner";
+import {
+  invalidateContactInteractionsQuery,
+  invalidateContactsQueryFamily,
+} from '@/lib/contactQueryCache';
 import { queryKeys } from '@/lib/queryKeys';
 
 export type InteractionType = 'call' | 'email' | 'meeting' | 'message' | 'note';
@@ -64,8 +68,8 @@ export function useContactInteractions(contactId?: string) {
       return data;
     },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.contactInteractions.byContact(variables.contact_id) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.contacts.all });
+      void invalidateContactInteractionsQuery(queryClient, variables.contact_id);
+      void invalidateContactsQueryFamily(queryClient);
       toast.success('Interaction logged');
     },
     onError: (error) => {
@@ -85,7 +89,7 @@ export function useContactInteractions(contactId?: string) {
       return contactId;
     },
     onSuccess: (contactId) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.contactInteractions.byContact(contactId) });
+      void invalidateContactInteractionsQuery(queryClient, contactId);
       toast.success('Interaction deleted');
     },
     onError: (error) => {

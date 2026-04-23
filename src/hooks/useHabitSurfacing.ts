@@ -6,6 +6,13 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/components/ui/sonner";
 import { getHabitXP } from "@/config/xpRewards";
 import { useResilience } from "@/contexts/ResilienceContext";
+import { invalidateCampaignContextQueryFamilies } from "@/lib/campaignContextQueryCache";
+import { queryKeys } from "@/lib/queryKeys";
+import {
+  invalidatePlannerRuntimeTasksQuery,
+  invalidateTaskQueryFamilies,
+  taskQueryFamilyGroups,
+} from "@/lib/taskQueryCache";
 import { categorizeQuest } from "@/utils/questCategorization";
 import { isHabitScheduledForDate } from "@/utils/habitSchedule";
 import { getEffectiveDayOfWeek, getEffectiveMissionDate } from "@/utils/timezone";
@@ -453,7 +460,7 @@ export function useHabitSurfacing(selectedDate?: Date) {
   const effectiveDateKey = effectiveDate.getTime();
 
   const query = useQuery({
-    queryKey: ["habit-surfacing", user?.id, taskDate],
+    queryKey: queryKeys.habitSurfacing.byDate(user?.id, taskDate),
     queryFn: async () => {
       if (!user?.id) return [];
       return buildSurfacedHabits(user.id, taskDate);
@@ -498,7 +505,7 @@ export function useHabitSurfacing(selectedDate?: Date) {
           refreshed.tasks,
         );
         queryClient.setQueryData(
-          ["habit-surfacing", user.id, taskDate],
+          queryKeys.habitSurfacing.byDate(user.id, taskDate),
           refreshed.surfacedHabits,
         );
       } catch (error) {
@@ -584,10 +591,9 @@ export function useHabitSurfacing(selectedDate?: Date) {
       );
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["habit-surfacing"] });
-      queryClient.invalidateQueries({ queryKey: ["tasks"] });
-      queryClient.invalidateQueries({ queryKey: ["calendar-tasks"] });
-      queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
+      void invalidateCampaignContextQueryFamilies(queryClient, ["habitSurfacing"]);
+      void invalidatePlannerRuntimeTasksQuery(queryClient);
+      void invalidateTaskQueryFamilies(queryClient, taskQueryFamilyGroups.planner);
     },
   });
 
@@ -614,10 +620,9 @@ export function useHabitSurfacing(selectedDate?: Date) {
       );
     },
     onSuccess: (rows) => {
-      queryClient.invalidateQueries({ queryKey: ["habit-surfacing"] });
-      queryClient.invalidateQueries({ queryKey: ["tasks"] });
-      queryClient.invalidateQueries({ queryKey: ["calendar-tasks"] });
-      queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
+      void invalidateCampaignContextQueryFamilies(queryClient, ["habitSurfacing"]);
+      void invalidatePlannerRuntimeTasksQuery(queryClient);
+      void invalidateTaskQueryFamilies(queryClient, taskQueryFamilyGroups.planner);
 
       if (rows.length > 0) {
         const queuedCount = rows.filter((row) => row.queued).length;

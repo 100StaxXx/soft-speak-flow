@@ -14,6 +14,11 @@ import confetti from "canvas-confetti";
 import { format } from "date-fns";
 import { categorizeQuest } from "@/utils/questCategorization";
 import { useResilience } from "@/contexts/ResilienceContext";
+import {
+  campaignContextQueryFamilyGroups,
+  invalidateCampaignContextQueryFamilies,
+} from "@/lib/campaignContextQueryCache";
+import { queryKeys } from "@/lib/queryKeys";
 import { createOfflinePlannerId, removePlannerRecord, upsertPlannerRecord } from "@/utils/plannerLocalStore";
 import {
   PLANNER_SYNC_EVENT,
@@ -37,7 +42,7 @@ export function useHabits() {
   const { queueAction, shouldQueueWrites, retryNow } = useResilience();
 
   const habitsQuery = useQuery({
-    queryKey: ["habits", user?.id],
+    queryKey: queryKeys.habits.byUser(user?.id),
     queryFn: async () => {
       if (!user?.id) throw new Error("User not authenticated");
       return loadLocalHabits(user.id);
@@ -46,7 +51,7 @@ export function useHabits() {
   });
 
   const completionsQuery = useQuery({
-    queryKey: ["habit-completions", user?.id, getToday()],
+    queryKey: queryKeys.habits.completions(user?.id, getToday()),
     queryFn: async () => {
       if (!user?.id) throw new Error("User not authenticated");
       return loadLocalHabitCompletions(user.id, getToday());
@@ -64,8 +69,11 @@ export function useHabits() {
         await syncLocalHabitsFromRemote(user.id, getToday());
         if (disposed) return;
 
-        queryClient.setQueryData(["habits", user.id], await loadLocalHabits(user.id));
-        queryClient.setQueryData(["habit-completions", user.id, getToday()], await loadLocalHabitCompletions(user.id, getToday()));
+        queryClient.setQueryData(queryKeys.habits.byUser(user.id), await loadLocalHabits(user.id));
+        queryClient.setQueryData(
+          queryKeys.habits.completions(user.id, getToday()),
+          await loadLocalHabitCompletions(user.id, getToday()),
+        );
       } catch (error) {
         console.warn("Failed to sync local habits from remote:", error);
       }
@@ -194,7 +202,7 @@ export function useHabits() {
       return { queued: false };
     },
     onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ["habits"] });
+      void invalidateCampaignContextQueryFamilies(queryClient, ["habits"]);
       toast({
         title: result.queued ? "Habit saved offline" : "Habit created successfully!",
         description: result.queued ? "We'll sync it when you're back online." : undefined,
@@ -366,8 +374,10 @@ export function useHabits() {
       return { isCompleting: true, isFirstCompletion, queued: false };
     },
     onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ["habit-completions"] });
-      queryClient.invalidateQueries({ queryKey: ["habits"] });
+      void invalidateCampaignContextQueryFamilies(
+        queryClient,
+        campaignContextQueryFamilyGroups.habitCompletionState,
+      );
       if (result?.queued) {
         toast({
           title: "Habit saved offline",
@@ -444,8 +454,10 @@ export function useHabits() {
       return { queued: false };
     },
     onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ["habits"] });
-      queryClient.invalidateQueries({ queryKey: ["epics"] });
+      void invalidateCampaignContextQueryFamilies(
+        queryClient,
+        campaignContextQueryFamilyGroups.epicsAndHabits,
+      );
       toast({
         title: result.queued ? "Habit saved offline" : "Habit updated successfully!",
         description: result.queued ? "We'll sync this update when you're back online." : undefined,
@@ -496,7 +508,7 @@ export function useHabits() {
       return { queued: false };
     },
     onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ["habits"] });
+      void invalidateCampaignContextQueryFamilies(queryClient, ["habits"]);
       toast({
         title: result.queued ? "Habit deleted offline" : "Habit deleted permanently",
         description: result.queued ? "We'll remove it from the server when you're back online." : undefined,
@@ -568,7 +580,7 @@ export function useHabits() {
       return { queued: false };
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["habits"] });
+      void invalidateCampaignContextQueryFamilies(queryClient, ["habits"]);
     },
   });
 

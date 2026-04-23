@@ -1,5 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { invalidateGuildMutedUserQueries } from "@/lib/guildQueryCache";
+import { queryKeys } from "@/lib/queryKeys";
 import { useAuth } from "./useAuth";
 import { toast } from "@/components/ui/sonner";
 
@@ -16,7 +18,7 @@ export const useMutedUsers = (epicId?: string) => {
   const queryClient = useQueryClient();
 
   const { data: mutedUsers, isLoading } = useQuery<MutedUser[]>({
-    queryKey: ["muted-users", user?.id, epicId],
+    queryKey: queryKeys.guild.mutedUsers(user?.id, epicId),
     queryFn: async () => {
       if (!user?.id) return [];
 
@@ -52,7 +54,11 @@ export const useMutedUsers = (epicId?: string) => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["muted-users"] });
+      void invalidateGuildMutedUserQueries(queryClient, {
+        userId: user?.id,
+        epicId,
+        includeDetail: true,
+      });
       toast.success("User muted");
     },
     onError: (error) => {
@@ -81,7 +87,11 @@ export const useMutedUsers = (epicId?: string) => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["muted-users"] });
+      void invalidateGuildMutedUserQueries(queryClient, {
+        userId: user?.id,
+        epicId,
+        includeDetail: true,
+      });
       toast.success("User unmuted");
     },
     onError: (error) => {

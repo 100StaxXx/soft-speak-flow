@@ -53,6 +53,8 @@ import { safeLocalStorage } from "@/utils/storage";
 import { resolveAssignedMentorFromActiveMentors } from "@/config/onboardingMentorAssignments";
 import { buildBrowseMentorCatalog } from "@/lib/mentorCatalog";
 import { sortCanonicalMentors } from "@/lib/mentorRoster";
+import { refetchCompanionQueries } from "@/lib/companionContextQueryCache";
+import { refetchProfileQueries } from "@/lib/profileQueryCache";
 
 // Removed duplicate outer function - using inner component method instead
 
@@ -705,7 +707,10 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
       }
       
       // Force immediate refetch to ensure fresh data
-      await queryClient.refetchQueries({ queryKey: ["profile", user.id] });
+      await refetchProfileQueries(queryClient, {
+        userId: user.id,
+        includeDetail: true,
+      });
     }
     
     setStage("story-tone");
@@ -851,8 +856,14 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
 
       safeLocalStorage.removeItem(getGuidedTutorialLocalProgressKey(user.id));
 
-      await queryClient.refetchQueries({ queryKey: ["profile", user.id] });
-      await queryClient.refetchQueries({ queryKey: ["companion", user.id] });
+      await refetchProfileQueries(queryClient, {
+        userId: user.id,
+        includeDetail: true,
+      });
+      await refetchCompanionQueries(queryClient, {
+        userId: user.id,
+        includeDetail: true,
+      });
 
       const today = new Date().toISOString().split("T")[0];
       supabase
@@ -1002,8 +1013,14 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
           throw profileUpdateError;
         }
 
-        await queryClient.refetchQueries({ queryKey: ["profile", user.id] });
-        await queryClient.refetchQueries({ queryKey: ["companion", user.id] });
+        await refetchProfileQueries(queryClient, {
+          userId: user.id,
+          includeDetail: true,
+        });
+        await refetchCompanionQueries(queryClient, {
+          userId: user.id,
+          includeDetail: true,
+        });
         safeLocalStorage.removeItem(getGuidedTutorialLocalProgressKey(user.id));
         setCompanionSetupStatus("ready");
         toast.success(`${preset.displayName} is now your companion form.`);
@@ -1203,8 +1220,14 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
         getGuidedTutorialLocalProgressKey(user.id),
         JSON.stringify(initialGuidedTutorialProgress),
       );
-      await queryClient.refetchQueries({ queryKey: ["profile", user.id] });
-      await queryClient.refetchQueries({ queryKey: ["companion", user.id] });
+      await refetchProfileQueries(queryClient, {
+        userId: user.id,
+        includeDetail: true,
+      });
+      await refetchCompanionQueries(queryClient, {
+        userId: user.id,
+        includeDetail: true,
+      });
 
       onJourneyCinematicComplete?.();
       toast.success("Welcome to Cosmiq! Your journey begins.");

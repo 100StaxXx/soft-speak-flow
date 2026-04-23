@@ -4,6 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useXPRewards } from "@/hooks/useXPRewards";
 import { useWeeklyRecapContext } from "@/contexts/WeeklyRecapContext";
+import { queryKeys } from "@/lib/queryKeys";
+import { invalidateWeeklyRecapQueries } from "@/lib/weeklyRecapQueryCache";
 import { format } from "date-fns";
 import { safeLocalStorage } from "@/utils/storage";
 import {
@@ -72,7 +74,7 @@ export const useWeeklyRecap = () => {
 
   // Fetch current week's recap
   const { data: currentRecap, isLoading } = useQuery({
-    queryKey: ["weekly-recap", user?.id, currentWeekStart],
+    queryKey: queryKeys.weeklyRecaps.current(user?.id, currentWeekStart),
     queryFn: async () => {
       if (!user?.id) return null;
 
@@ -91,7 +93,7 @@ export const useWeeklyRecap = () => {
 
   // Fetch all past recaps
   const { data: pastRecaps } = useQuery({
-    queryKey: ["weekly-recaps-all", user?.id],
+    queryKey: queryKeys.weeklyRecaps.history(user?.id),
     queryFn: async () => {
       if (!user?.id) return [];
 
@@ -118,8 +120,14 @@ export const useWeeklyRecap = () => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["weekly-recap"] });
-      queryClient.invalidateQueries({ queryKey: ["weekly-recaps-all"] });
+      void invalidateWeeklyRecapQueries(queryClient, {
+        userId: user?.id,
+        weekStart: currentWeekStart,
+        includeCurrentAll: true,
+        includeCurrentDetail: true,
+        includeHistoryAll: true,
+        includeHistoryDetail: true,
+      });
     },
   });
 
@@ -133,8 +141,14 @@ export const useWeeklyRecap = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["weekly-recap"] });
-      queryClient.invalidateQueries({ queryKey: ["weekly-recaps-all"] });
+      void invalidateWeeklyRecapQueries(queryClient, {
+        userId: user?.id,
+        weekStart: currentWeekStart,
+        includeCurrentAll: true,
+        includeCurrentDetail: true,
+        includeHistoryAll: true,
+        includeHistoryDetail: true,
+      });
     },
   });
 

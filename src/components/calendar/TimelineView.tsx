@@ -1,9 +1,10 @@
 import { useMemo, useRef } from "react";
 import { format, isSameDay } from "date-fns";
 import { motion } from "framer-motion";
+import type { CalendarMilestone } from "@/features/epics/types";
+import type { CalendarQuest } from "@/features/quests/display";
 import { cn } from "@/lib/utils";
 import { Clock, Plus, ChevronRight } from "lucide-react";
-import { CalendarTask, CalendarMilestone } from "@/types/quest";
 import { useTimelineDrag } from "@/hooks/useTimelineDrag";
 import {
   SHARED_TIMELINE_DRAG_INTERACTION_PROFILE,
@@ -19,9 +20,9 @@ import { Button } from "../ui/button";
 interface TimelineViewProps {
   selectedDate: Date;
   onDateSelect: (date: Date) => void;
-  tasks: CalendarTask[];
+  quests: CalendarQuest[];
   milestones?: CalendarMilestone[];
-  onTaskClick?: (task: CalendarTask) => void;
+  onQuestClick?: (quest: CalendarQuest) => void;
   onTaskLongPress?: (taskId: string) => void;
   onTimeSlotLongPress?: (date: Date, time: string) => void;
   onMilestoneClick?: (milestone: CalendarMilestone) => void;
@@ -33,9 +34,9 @@ interface TimelineViewProps {
 export function TimelineView({
   selectedDate,
   onDateSelect,
-  tasks,
+  quests,
   milestones = [],
-  onTaskClick,
+  onQuestClick,
   onTaskLongPress,
   onTimeSlotLongPress: _onTimeSlotLongPress,
   onMilestoneClick,
@@ -46,23 +47,23 @@ export function TimelineView({
   const dateStr = format(selectedDate, "yyyy-MM-dd");
   const isToday = isSameDay(selectedDate, new Date());
 
-  // Filter and sort tasks for the selected day
-  const dayTasks = useMemo(() => {
-    return tasks
-      .filter((t) => t.task_date === dateStr)
+  // Filter and sort quests for the selected day
+  const dayQuests = useMemo(() => {
+    return quests
+      .filter((quest) => quest.taskDate === dateStr)
       .sort((a, b) => {
-        if (a.scheduled_time && b.scheduled_time) {
-          return a.scheduled_time.localeCompare(b.scheduled_time);
+        if (a.scheduledTime && b.scheduledTime) {
+          return a.scheduledTime.localeCompare(b.scheduledTime);
         }
-        if (a.scheduled_time) return -1;
-        if (b.scheduled_time) return 1;
+        if (a.scheduledTime) return -1;
+        if (b.scheduledTime) return 1;
         return 0;
       });
-  }, [tasks, dateStr]);
+  }, [quests, dateStr]);
 
-  const allDayTasks = dayTasks.filter((t) => t.estimated_duration === 1440);
-  const scheduledTasks = dayTasks.filter((t) => t.scheduled_time && t.estimated_duration !== 1440);
-  const unscheduledTasks = dayTasks.filter((t) => !t.scheduled_time && t.estimated_duration !== 1440);
+  const allDayQuests = dayQuests.filter((quest) => quest.estimatedDuration === 1440);
+  const scheduledQuests = dayQuests.filter((quest) => quest.scheduledTime && quest.estimatedDuration !== 1440);
+  const unscheduledQuests = dayQuests.filter((quest) => !quest.scheduledTime && quest.estimatedDuration !== 1440);
   const dayMilestones = milestones.filter((m) => m.target_date === dateStr);
   const timelineDragContainerRef = useRef<HTMLDivElement>(null);
   const timelineDrag = useTimelineDrag({
@@ -95,7 +96,7 @@ export function TimelineView({
         <WeekStrip 
           selectedDate={selectedDate} 
           onDateSelect={onDateSelect}
-          tasks={tasks}
+          quests={quests}
         />
       </div>
 
@@ -103,7 +104,7 @@ export function TimelineView({
       <div className="flex-1 overflow-y-auto overscroll-contain">
         <div className="relative px-4">
           {/* Vertical Timeline Line */}
-          {(scheduledTasks.length > 0 || unscheduledTasks.length > 0) && (
+          {(scheduledQuests.length > 0 || unscheduledQuests.length > 0) && (
             <div className="absolute left-11 top-4 bottom-4 w-px border-l-2 border-dashed border-border/40" />
           )}
 
@@ -126,30 +127,30 @@ export function TimelineView({
           )}
 
           {/* All Day Tasks */}
-          {allDayTasks.length > 0 && (
+          {allDayQuests.length > 0 && (
             <div className="py-3 space-y-1.5">
-              {allDayTasks.map((task) => (
+              {allDayQuests.map((quest) => (
                 <AllDayTaskBanner
-                  key={task.id}
-                  task={task}
-                  onClick={onTaskClick}
+                  key={quest.id}
+                  quest={quest}
+                  onClick={onQuestClick ? () => onQuestClick(quest) : undefined}
                 />
               ))}
             </div>
           )}
 
           {/* Scheduled Tasks Timeline */}
-          {scheduledTasks.length > 0 && (
+          {scheduledQuests.length > 0 && (
             <div className="py-4" ref={timelineDragContainerRef}>
-              {scheduledTasks.map((task) => {
-                const isThisDragging = timelineDrag.draggingTaskId === task.id;
-                const isThisLongPressed = timelineDrag.longPressTaskId === task.id;
+              {scheduledQuests.map((quest) => {
+                const isThisDragging = timelineDrag.draggingTaskId === quest.id;
+                const isThisLongPressed = timelineDrag.longPressTaskId === quest.id;
                 const isThisEngaged = isThisDragging || isThisLongPressed;
                 const isAnyDragging = timelineDrag.isDragging;
 
                 return (
                 <motion.div 
-                  key={task.id} 
+                  key={quest.id} 
                   className={cn(
                     "relative transition-transform duration-75",
                     isThisDragging && "z-10"
@@ -162,13 +163,13 @@ export function TimelineView({
                   }}
                 >
                   <TimelineTaskCard
-                    task={task}
-                    onTaskClick={onTaskClick}
-                    onTaskLongPress={onTaskLongPress}
+                    quest={quest}
+                    onQuestClick={onQuestClick ? () => onQuestClick(quest) : undefined}
+                    onQuestLongPress={onTaskLongPress}
                     isDragging={isThisDragging}
                     previewTime={isThisDragging ? timelineDrag.previewTime : null}
-                    rowDragProps={task.scheduled_time && !task.completed
-                      ? timelineDrag.getRowDragProps(task.id, task.scheduled_time)
+                    rowDragProps={quest.scheduledTime && !quest.completed
+                      ? timelineDrag.getRowDragProps(quest.id, quest.scheduledTime)
                       : undefined}
                   />
                 </motion.div>
@@ -193,24 +194,24 @@ export function TimelineView({
           )}
 
           {/* Unscheduled / Anytime Tasks */}
-          {unscheduledTasks.length > 0 && (
+          {unscheduledQuests.length > 0 && (
             <div className="py-4 border-t border-dashed border-border/40">
               <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3 pl-16">
                 <Clock className="h-3.5 w-3.5" />
                 Anytime
               </div>
               <div className="space-y-1">
-                {unscheduledTasks.map((task) => (
+                {unscheduledQuests.map((quest) => (
                   <div
-                    key={task.id}
-                    onClick={() => onTaskClick?.(task)}
+                    key={quest.id}
+                    onClick={() => onQuestClick?.(quest)}
                     className="flex items-center gap-4 py-3 cursor-pointer"
                   >
                     <div className="w-14 h-14 rounded-full bg-muted/30 flex items-center justify-center">
                       <Clock className="h-6 w-6 text-muted-foreground" />
                     </div>
                     <span className="font-semibold text-lg text-foreground flex-1 truncate">
-                      {task.task_text}
+                      {quest.title}
                     </span>
                     <div className="w-8 h-8 rounded-full border-2 border-muted-foreground/30" />
                   </div>
@@ -221,7 +222,7 @@ export function TimelineView({
 
 
           {/* Empty State */}
-          {dayTasks.length === 0 && (
+          {dayQuests.length === 0 && (
             <div className="flex flex-col items-center justify-center py-20 text-center">
               <div className="w-20 h-20 rounded-full bg-coral-500/10 flex items-center justify-center mb-4">
                 <Plus className="h-10 w-10 text-coral-500" />

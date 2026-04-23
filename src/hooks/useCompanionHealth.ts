@@ -4,6 +4,12 @@ import { useAuth } from "./useAuth";
 import { useCompanion } from "./useCompanion";
 import { useMemo } from "react";
 import { normalizeCompanionAssetSourceUrls } from "@/lib/companionAssetResolver";
+import {
+  companionContextQueryFamilyGroups,
+  invalidateCompanionQueries,
+  invalidateCompanionContextQueryFamilies,
+} from "@/lib/companionContextQueryCache";
+import { queryKeys } from "@/lib/queryKeys";
 
 export type CompanionMoodState = 'happy' | 'content' | 'neutral' | 'worried' | 'sad' | 'sick';
 
@@ -49,7 +55,7 @@ export const useCompanionHealth = () => {
 
   // Fetch extended companion data with neglect fields
   const { data: companionHealthData, isLoading: isHealthLoading } = useQuery({
-    queryKey: ['companion-health', user?.id],
+    queryKey: queryKeys.companion.health(user?.id),
     queryFn: async () => {
       if (!user?.id) return null;
       
@@ -72,7 +78,7 @@ export const useCompanionHealth = () => {
 
   // Fetch streak freeze data from profile
   const { data: streakFreezeData, isLoading: isFreezeLoading } = useQuery({
-    queryKey: ['streak-freezes', user?.id],
+    queryKey: queryKeys.streaks.freezes(user?.id),
     queryFn: async () => {
       if (!user?.id) return null;
       
@@ -191,8 +197,13 @@ export const useCompanionHealth = () => {
       if (error) throw error;
 
       // Invalidate queries to refresh UI
-      queryClient.invalidateQueries({ queryKey: ['companion-health'] });
-      queryClient.invalidateQueries({ queryKey: ['companion'] });
+      await Promise.all([
+        invalidateCompanionQueries(queryClient, { includeAll: true }),
+        invalidateCompanionContextQueryFamilies(
+          queryClient,
+          companionContextQueryFamilyGroups.healthStatus,
+        ),
+      ]);
     } catch (error) {
       console.error('Failed to mark user active:', error);
     }

@@ -35,6 +35,7 @@ import { CinematicPageBackground } from "@/components/CinematicPageBackground";
 import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
 import { applyMentorChange } from "@/pages/profileMentorChange";
+import { queryKeys } from "@/lib/queryKeys";
 import {
   sortCanonicalMentors,
 } from "@/lib/mentorRoster";
@@ -174,7 +175,7 @@ const Profile = () => {
 
 
   const { data: mentors } = useQuery({
-    queryKey: ["mentors", "active"],
+    queryKey: queryKeys.mentor.activeMentors(),
     staleTime: 10 * 60 * 1000, // 10 minutes - mentors rarely change
     queryFn: async () => {
       const { data, error } = await supabase
@@ -193,7 +194,7 @@ const Profile = () => {
   });
 
   const { data: selectedMentor } = useQuery({
-    queryKey: ["selected-mentor", resolvedMentorId],
+    queryKey: queryKeys.mentor.selected(resolvedMentorId ?? undefined),
     staleTime: 10 * 60 * 1000, // 10 minutes - mentor selection rarely changes
     enabled: !!resolvedMentorId,
     queryFn: async () => {

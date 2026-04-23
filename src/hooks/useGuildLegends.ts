@@ -5,6 +5,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { queryKeys } from "@/lib/queryKeys";
 
 export interface GuildLegend {
   id: string;
@@ -32,7 +33,7 @@ interface UseGuildLegendsOptions {
 export const useGuildLegends = ({ epicId, communityId }: UseGuildLegendsOptions) => {
   // Fetch legends
   const { data: legends, isLoading } = useQuery({
-    queryKey: ["guild-legends", epicId, communityId],
+    queryKey: queryKeys.guild.legends(epicId, communityId),
     queryFn: async () => {
       let query = supabase
         .from("guild_legends")

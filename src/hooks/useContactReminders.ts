@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { invalidateContactRemindersQueries } from '@/lib/contactQueryCache';
 import { queryKeys } from '@/lib/queryKeys';
 import { toast } from "@/components/ui/sonner";
 
@@ -87,8 +88,10 @@ export function useContactReminders(contactId?: string) {
       return data;
     },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.contactReminders.byContact(variables.contactId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.contactReminders.upcoming() });
+      void invalidateContactRemindersQueries(queryClient, {
+        contactId: variables.contactId,
+        includeUpcoming: true,
+      });
       toast.success('Follow-up quest scheduled! 🗓️');
     },
     onError: (error) => {
@@ -107,10 +110,10 @@ export function useContactReminders(contactId?: string) {
       if (error) throw error;
     },
     onSuccess: () => {
-      if (contactId) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.contactReminders.byContact(contactId) });
-      }
-      queryClient.invalidateQueries({ queryKey: queryKeys.contactReminders.upcoming() });
+      void invalidateContactRemindersQueries(queryClient, {
+        contactId,
+        includeUpcoming: true,
+      });
       toast.success('Follow-up quest cancelled');
     },
     onError: (error) => {
@@ -129,10 +132,10 @@ export function useContactReminders(contactId?: string) {
       if (error) throw error;
     },
     onSuccess: () => {
-      if (contactId) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.contactReminders.byContact(contactId) });
-      }
-      queryClient.invalidateQueries({ queryKey: queryKeys.contactReminders.upcoming() });
+      void invalidateContactRemindersQueries(queryClient, {
+        contactId,
+        includeUpcoming: true,
+      });
       toast.success('Quest complete! Connection made 🎉');
     },
     onError: (error) => {

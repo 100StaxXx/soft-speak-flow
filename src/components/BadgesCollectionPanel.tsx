@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { queryKeys } from "@/lib/queryKeys";
 import { Card } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Skeleton } from "./ui/skeleton";
@@ -42,7 +43,7 @@ export const BadgesCollectionPanel = ({ layoutMode = "mobile" }: BadgesCollectio
   const isDesktop = layoutMode === "desktop";
 
   const { data: earnedAchievements, isLoading } = useQuery({
-    queryKey: ["achievements", user?.id],
+    queryKey: queryKeys.achievements.byUser(user?.id),
     enabled: !!user,
     queryFn: async () => {
       if (!user?.id) return [];

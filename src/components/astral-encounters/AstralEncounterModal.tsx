@@ -32,6 +32,7 @@ import { X } from 'lucide-react';
 import { isFullscreenEncounterGame } from './fullscreenGames';
 import { resolveCompanionVisualAssetUrl } from '@/lib/companionAssetResolver';
 import { getBundledCompanionImageFocalPoint } from '@/lib/companionImageFocal';
+import { queryKeys } from '@/lib/queryKeys';
 
 // Lazy load mini-games for bundle optimization
 const EnergyBeamGame = lazy(() => import('./EnergyBeamGame').then(m => ({ default: m.EnergyBeamGame })));
@@ -124,7 +125,7 @@ export const AstralEncounterModal = ({
 
   // Query current evolution card for creature name - include current_stage in key for proper cache invalidation
   const { data: currentCard } = useQuery({
-    queryKey: ['current-evolution-card', companion?.id, companion?.current_stage],
+    queryKey: queryKeys.companion.currentEvolutionCard(companion?.id, companion?.current_stage),
     queryFn: async () => {
       if (!companion?.id) return null;
       const { data } = await supabase

@@ -14,6 +14,7 @@ import { Mic } from "lucide-react";
 import { PageTransition } from "@/components/PageTransition";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { GlassCard } from "@/components/ui/glass-card";
+import { queryKeys } from "@/lib/queryKeys";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function PepTalks() {
@@ -25,7 +26,7 @@ export default function PepTalks() {
 
   // Fetch pep talks with filters
   const { data: pepTalks, isLoading } = useQuery({
-    queryKey: ["pep-talks", selectedCategory, selectedTrigger],
+    queryKey: queryKeys.pepTalks.filtered(selectedCategory, selectedTrigger),
     queryFn: async () => {
       let query = supabase
         .from("pep_talks")

@@ -68,35 +68,39 @@ describe("EditQuestDialog", () => {
     vi.clearAllMocks();
   });
 
-  const legacyTask = {
+  const legacyQuest = {
     id: "task-1",
-    task_text: "Legacy quest",
-    task_date: "2026-02-13T08:00:00.000Z",
+    title: "Legacy quest",
+    taskDate: "2026-02-13T08:00:00.000Z",
     difficulty: "challenging",
-    scheduled_time: "09:30:00",
-    estimated_duration: 30,
-    recurrence_pattern: null,
-    recurrence_days: [],
-    reminder_enabled: false,
-    reminder_minutes_before: 15,
+    scheduledTime: "09:30:00",
+    estimatedDuration: 30,
+    recurrencePattern: null,
+    recurrenceDays: [],
+    recurrenceMonthDays: [],
+    recurrenceCustomPeriod: null,
+    reminderEnabled: false,
+    reminderMinutesBefore: 15,
     category: null,
     notes: null,
-    image_url: null,
+    habitSourceId: null,
+    imageUrl: null,
+    attachments: [],
     location: null,
   };
 
-  const legacyWeeklyMultiDayTask = {
-    ...legacyTask,
+  const legacyWeeklyMultiDayQuest = {
+    ...legacyQuest,
     id: "task-2",
-    recurrence_pattern: "weekly",
-    recurrence_days: [0, 2, 4],
+    recurrencePattern: "weekly",
+    recurrenceDays: [0, 2, 4],
   };
 
-  const legacyRecurringWithoutTimeTask = {
-    ...legacyTask,
+  const legacyRecurringWithoutTimeQuest = {
+    ...legacyQuest,
     id: "task-3",
-    recurrence_pattern: "daily",
-    scheduled_time: null,
+    recurrencePattern: "daily",
+    scheduledTime: null,
   };
 
   it("reopens safely with legacy time values", () => {
@@ -105,7 +109,7 @@ describe("EditQuestDialog", () => {
 
     const { rerender } = render(
       <EditQuestDialog
-        task={legacyTask}
+        quest={legacyQuest}
         open
         onOpenChange={onOpenChange}
         onSave={onSave}
@@ -119,7 +123,7 @@ describe("EditQuestDialog", () => {
 
     rerender(
       <EditQuestDialog
-        task={legacyTask}
+        quest={legacyQuest}
         open
         onOpenChange={onOpenChange}
         onSave={onSave}
@@ -134,7 +138,7 @@ describe("EditQuestDialog", () => {
   it("colors the Save Changes CTA green when easy is selected", () => {
     render(
       <EditQuestDialog
-        task={legacyTask}
+        quest={legacyQuest}
         open
         onOpenChange={vi.fn()}
         onSave={vi.fn().mockResolvedValue(undefined)}
@@ -152,7 +156,7 @@ describe("EditQuestDialog", () => {
   it("colors the Save Changes CTA orange when medium is selected", () => {
     render(
       <EditQuestDialog
-        task={legacyTask}
+        quest={legacyQuest}
         open
         onOpenChange={vi.fn()}
         onSave={vi.fn().mockResolvedValue(undefined)}
@@ -170,7 +174,7 @@ describe("EditQuestDialog", () => {
   it("renders the desktop panel presentation when requested", () => {
     render(
       <EditQuestDialog
-        task={legacyTask}
+        quest={legacyQuest}
         open
         presentation="desktop-panel"
         onOpenChange={vi.fn()}
@@ -187,7 +191,7 @@ describe("EditQuestDialog", () => {
   it("renders early reminder above subtasks after the time controls", () => {
     render(
       <EditQuestDialog
-        task={legacyTask}
+        quest={legacyQuest}
         open
         onOpenChange={vi.fn()}
         onSave={vi.fn().mockResolvedValue(undefined)}
@@ -210,7 +214,7 @@ describe("EditQuestDialog", () => {
     (presentation) => {
       render(
         <EditQuestDialog
-          task={legacyTask}
+          quest={legacyQuest}
           open
           presentation={presentation}
           onOpenChange={vi.fn()}
@@ -239,7 +243,7 @@ describe("EditQuestDialog", () => {
 
     render(
       <EditQuestDialog
-        task={legacyTask}
+        quest={legacyQuest}
         open
         onOpenChange={onOpenChange}
         onSave={onSave}
@@ -256,9 +260,9 @@ describe("EditQuestDialog", () => {
     expect(onSave).toHaveBeenCalledWith(
       "task-1",
       expect.objectContaining({
-        task_date: "2026-02-13",
+        taskDate: "2026-02-13",
         difficulty: "hard",
-        scheduled_time: "09:30",
+        scheduledTime: "09:30",
       }),
     );
     expect(onOpenChange).toHaveBeenCalledWith(false);
@@ -270,7 +274,7 @@ describe("EditQuestDialog", () => {
 
     render(
       <EditQuestDialog
-        task={legacyTask}
+        quest={legacyQuest}
         open
         onOpenChange={onOpenChange}
         onSave={onSave}
@@ -293,7 +297,7 @@ describe("EditQuestDialog", () => {
     expect(onSave).toHaveBeenCalledWith(
       "task-1",
       expect.objectContaining({
-        scheduled_time: "11:17",
+        scheduledTime: "11:17",
       }),
     );
   });
@@ -312,7 +316,7 @@ describe("EditQuestDialog", () => {
     try {
       render(
         <EditQuestDialog
-          task={legacyTask}
+          quest={legacyQuest}
           open
           onOpenChange={vi.fn()}
           onSave={vi.fn().mockResolvedValue(undefined)}
@@ -350,7 +354,7 @@ describe("EditQuestDialog", () => {
 
     render(
       <EditQuestDialog
-        task={legacyWeeklyMultiDayTask}
+        quest={legacyWeeklyMultiDayQuest}
         open
         onOpenChange={onOpenChange}
         onSave={onSave}
@@ -367,8 +371,8 @@ describe("EditQuestDialog", () => {
     expect(onSave).toHaveBeenCalledWith(
       "task-2",
       expect.objectContaining({
-        recurrence_pattern: "custom",
-        recurrence_days: [0, 2, 4],
+        recurrencePattern: "custom",
+        recurrenceDays: [0, 2, 4],
       }),
     );
   });
@@ -379,7 +383,7 @@ describe("EditQuestDialog", () => {
 
     render(
       <EditQuestDialog
-        task={legacyTask}
+        quest={legacyQuest}
         open
         onOpenChange={onOpenChange}
         onSave={onSave}
@@ -400,7 +404,7 @@ describe("EditQuestDialog", () => {
         attachments: expect.arrayContaining([
           expect.objectContaining({ fileUrl: "https://example.com/a.png" }),
         ]),
-        image_url: "https://example.com/a.png",
+        imageUrl: "https://example.com/a.png",
       }),
     );
   });
@@ -410,7 +414,7 @@ describe("EditQuestDialog", () => {
 
     render(
       <EditQuestDialog
-        task={legacyRecurringWithoutTimeTask}
+        quest={legacyRecurringWithoutTimeQuest}
         open
         onOpenChange={vi.fn()}
         onSave={onSave}

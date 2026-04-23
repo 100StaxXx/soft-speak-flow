@@ -2,9 +2,11 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { JOURNAL_ENTRIES_QUERY_KEY } from "@/hooks/useJournalEntries";
 import { useXPRewards } from "@/hooks/useXPRewards";
 import { format } from "date-fns";
+import { invalidateEveningReflectionQueries } from "@/lib/dailyReflectionQueryCache";
+import { invalidateJournalEntryQueries } from "@/lib/journalEntryQueryCache";
+import { queryKeys } from "@/lib/queryKeys";
 
 export interface EveningReflection {
   id: string;
@@ -33,7 +35,7 @@ export const useEveningReflection = () => {
 
   // Check if reflection exists for today
   const { data: todaysReflection, isLoading } = useQuery({
-    queryKey: ["evening-reflection", user?.id, today],
+    queryKey: queryKeys.checkIns.evening(user?.id, today),
     queryFn: async () => {
       if (!user?.id) return null;
       
@@ -88,8 +90,13 @@ export const useEveningReflection = () => {
       return reflection;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["evening-reflection"] });
-      queryClient.invalidateQueries({ queryKey: JOURNAL_ENTRIES_QUERY_KEY });
+      void invalidateEveningReflectionQueries(queryClient, {
+        date: today,
+        userId: user?.id,
+        includeAll: true,
+        includeDetail: true,
+      });
+      void invalidateJournalEntryQueries(queryClient);
       void awardReflectionComplete();
       setIsDrawerOpen(false);
     },

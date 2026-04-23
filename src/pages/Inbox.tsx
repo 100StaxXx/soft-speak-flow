@@ -7,15 +7,22 @@ import { PageTransition } from "@/components/PageTransition";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { EmptyState } from "@/components/EmptyState";
 import { Badge } from "@/components/ui/badge";
+import { invalidateTaskQueryFamilies, taskQueryFamilyGroups } from "@/lib/taskQueryCache";
 import { cn } from "@/lib/utils";
 import { useInboxTasks } from "@/hooks/useInboxTasks";
 import { DraggableFAB } from "@/components/DraggableFAB";
 import { AddQuestSheet, type AddQuestData } from "@/components/AddQuestSheet";
 import { EditQuestDialog } from "@/features/quests/components/EditQuestDialog";
+import {
+  toEditableQuestFromLegacyTask,
+  toLegacyQuestUpdateInput,
+  type EditableQuest,
+  type QuestUpdateDraft,
+} from "@/features/quests/editing";
 import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "@/hooks/useAuth";
-import { useTaskMutations } from "@/hooks/useTaskMutations";
+import { useQuestMutations } from "@/hooks/useQuestMutations";
 import { useQueryClient } from "@tanstack/react-query";
 import { haptics } from "@/utils/haptics";
 import { useQuestCalendarSync } from "@/hooks/useQuestCalendarSync";
@@ -48,9 +55,9 @@ const InboxPage = memo(function InboxPage() {
   });
 
   const [showAddQuest, setShowAddQuest] = useState(false);
-  const [editingTask, setEditingTask] = useState<typeof inboxTasks[number] | null>(null);
+  const [editingQuest, setEditingQuest] = useState<EditableQuest | null>(null);
 
-  const { addTask, updateTask, isUpdating } = useTaskMutations(format(new Date(), "yyyy-MM-dd"));
+  const { createQuest, updateQuest, isUpdating } = useQuestMutations(format(new Date(), "yyyy-MM-dd"));
   const { sendTaskToCalendar, syncTaskUpdate, syncTaskDelete, hasLinkedEvent } = useQuestCalendarSync({
     enabled: isTabActive,
   });
@@ -163,8 +170,11 @@ const InboxPage = memo(function InboxPage() {
     }
   }, [calendarConnections.length, navigate, sendTaskToCalendar]);
 
-  const handleSaveEdit = useCallback(async (taskId: string, updates: any) => {
-    const updateResult = await updateTask({ taskId, updates });
+  const handleSaveEdit = useCallback(async (taskId: string, updates: QuestUpdateDraft) => {
+    const updateResult = await updateQuest({
+      taskId,
+      updates: toLegacyQuestUpdateInput(updates),
+    });
     if (!isQueuedTaskMutationResult(updateResult)) {
       await syncTaskUpdate.mutateAsync({ taskId }).catch((error) => {
         const message = error instanceof Error ? error.message : "";
@@ -175,10 +185,9 @@ const InboxPage = memo(function InboxPage() {
         toast.error("Saved quest, but failed to sync linked calendar event");
       });
     }
-    queryClient.invalidateQueries({ queryKey: ["inbox-tasks"] });
-    queryClient.invalidateQueries({ queryKey: ["inbox-count"] });
-    setEditingTask(null);
-  }, [updateTask, syncTaskUpdate, queryClient]);
+    void invalidateTaskQueryFamilies(queryClient, taskQueryFamilyGroups.inbox);
+    setEditingQuest(null);
+  }, [queryClient, syncTaskUpdate, updateQuest]);
 
   const handleDeleteQuest = useCallback(async (taskId: string) => {
     await syncTaskDelete.mutateAsync({ taskId }).catch(() => {
@@ -193,7 +202,7 @@ const InboxPage = memo(function InboxPage() {
       ? null
       : (data.taskDate ?? format(new Date(), 'yyyy-MM-dd'));
 
-    const createdTask = await addTask({
+    const createdTask = await createQuest({
       taskText: data.text,
       difficulty: data.difficulty,
       source: data.creationSource,
@@ -227,12 +236,11 @@ const InboxPage = memo(function InboxPage() {
         });
       });
     }
-    if (!data.sendToInbox) {
-      queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
-    }
-    queryClient.invalidateQueries({ queryKey: ["inbox-tasks"] });
-    queryClient.invalidateQueries({ queryKey: ["inbox-count"] });
-  }, [user?.id, addTask, handleSendTaskToCalendar, queryClient]);
+    void invalidateTaskQueryFamilies(
+      queryClient,
+      data.sendToInbox ? taskQueryFamilyGroups.inbox : taskQueryFamilyGroups.plannerAndInbox,
+    );
+  }, [createQuest, handleSendTaskToCalendar, queryClient, user?.id]);
 
   return (
     <PageTransition mode="instant">
@@ -305,7 +313,7 @@ const InboxPage = memo(function InboxPage() {
                   <div className="flex items-center gap-1 flex-shrink-0">
                     <button
                       onClick={() => {
-                        setEditingTask(task);
+                        setEditingQuest(toEditableQuestFromLegacyTask(task));
                         haptics.light();
                       }}
                       className="p-2 rounded-xl hover:bg-muted/55 text-muted-foreground hover:text-foreground transition-colors touch-manipulation"
@@ -343,17 +351,17 @@ const InboxPage = memo(function InboxPage() {
         />
 
         <EditQuestDialog
-          task={editingTask}
-          open={!!editingTask}
-          onOpenChange={(open) => !open && setEditingTask(null)}
+          quest={editingQuest}
+          open={!!editingQuest}
+          onOpenChange={(open) => !open && setEditingQuest(null)}
           onSave={handleSaveEdit}
           isSaving={isUpdating}
           onSendToCalendar={SEND_TO_CALENDAR_ENABLED ? handleSendTaskToCalendar : undefined}
-          hasCalendarLink={editingTask ? hasLinkedEvent(editingTask.id) : false}
+          hasCalendarLink={editingQuest ? hasLinkedEvent(editingQuest.id) : false}
           isSendingToCalendar={sendTaskToCalendar.isPending}
           onDelete={async (taskId) => {
             await handleDeleteQuest(taskId);
-            setEditingTask(null);
+            setEditingQuest(null);
           }}
           isDeleting={false}
           presentation={isMacHostedIOSApp ? "desktop-panel" : "mobile-sheet"}

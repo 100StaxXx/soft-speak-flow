@@ -5,13 +5,22 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/components/ui/sonner";
 import { useResilience } from "@/contexts/ResilienceContext";
 import {
+  getTaskSubtasksQueryKey,
+  invalidateTaskQueryFamilies,
+  invalidateTaskSubtasksQuery,
+} from "@/lib/taskQueryCache";
+import {
+  createOfflinePlannerId,
   getLocalSubtasksForTask,
   removePlannerRecord,
   upsertPlannerRecord,
 } from "@/utils/plannerLocalStore";
 import { normalizeUuidLikeId } from "@/utils/offlineId";
 import { PLANNER_SYNC_EVENT } from "@/utils/plannerSync";
-import { applySubtaskTitlePlan } from "@/features/tasks/lib/subtaskWrites";
+import {
+  applySubtaskTitlePlan,
+  type QueueSubtaskAction,
+} from "@/features/tasks/lib/subtaskWrites";
 
 export interface Subtask {
   id: string;
@@ -30,7 +39,7 @@ export const useSubtasks = (parentTaskId: string | null) => {
   const { queueAction, shouldQueueWrites, retryNow } = useResilience();
   const normalizedParentTaskId = parentTaskId ? normalizeUuidLikeId(parentTaskId) : null;
   const subtasksQueryKey = useMemo(
-    () => ["subtasks", normalizedParentTaskId] as const,
+    () => getTaskSubtasksQueryKey(normalizedParentTaskId),
     [normalizedParentTaskId],
   );
 
@@ -76,7 +85,7 @@ export const useSubtasks = (parentTaskId: string | null) => {
     if (!normalizedParentTaskId) return;
 
     const handlePlannerSync = () => {
-      queryClient.invalidateQueries({ queryKey: subtasksQueryKey });
+      void invalidateTaskSubtasksQuery(queryClient, normalizedParentTaskId);
     };
 
     window.addEventListener(PLANNER_SYNC_EVENT, handlePlannerSync);
@@ -113,7 +122,7 @@ export const useSubtasks = (parentTaskId: string | null) => {
           actionKind: "SUBTASK_CREATE",
           entityType: "subtask",
           entityId: subtaskRow.id,
-          payload: subtaskRow,
+          payload: subtaskRow as unknown as Record<string, unknown>,
         });
         return;
       }
@@ -127,14 +136,14 @@ export const useSubtasks = (parentTaskId: string | null) => {
           actionKind: "SUBTASK_CREATE",
           entityType: "subtask",
           entityId: subtaskRow.id,
-          payload: subtaskRow,
+          payload: subtaskRow as unknown as Record<string, unknown>,
         });
         void retryNow();
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: subtasksQueryKey });
-      queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
+      void invalidateTaskSubtasksQuery(queryClient, normalizedParentTaskId);
+      void invalidateTaskQueryFamilies(queryClient, ["daily"]);
     },
     onError: () => {
       toast.error("Failed to add subtask");
@@ -196,8 +205,8 @@ export const useSubtasks = (parentTaskId: string | null) => {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: subtasksQueryKey });
-      queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
+      void invalidateTaskSubtasksQuery(queryClient, normalizedParentTaskId);
+      void invalidateTaskQueryFamilies(queryClient, ["daily"]);
     },
   });
 
@@ -235,8 +244,8 @@ export const useSubtasks = (parentTaskId: string | null) => {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: subtasksQueryKey });
-      queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
+      void invalidateTaskSubtasksQuery(queryClient, normalizedParentTaskId);
+      void invalidateTaskQueryFamilies(queryClient, ["daily"]);
     },
   });
 
@@ -283,8 +292,8 @@ export const useSubtasks = (parentTaskId: string | null) => {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: subtasksQueryKey });
-      queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
+      void invalidateTaskSubtasksQuery(queryClient, normalizedParentTaskId);
+      void invalidateTaskQueryFamilies(queryClient, ["daily"]);
     },
     onError: () => {
       toast.error("Failed to update subtask");
@@ -300,13 +309,13 @@ export const useSubtasks = (parentTaskId: string | null) => {
         userId: user.id,
         titles,
         shouldQueueWrites,
-        queueAction,
+        queueAction: queueAction as QueueSubtaskAction,
         retryNow,
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: subtasksQueryKey });
-      queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
+      void invalidateTaskSubtasksQuery(queryClient, normalizedParentTaskId);
+      void invalidateTaskQueryFamilies(queryClient, ["daily"]);
       toast.success("Subtasks added!");
     },
     onError: () => {

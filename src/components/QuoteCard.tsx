@@ -1,7 +1,9 @@
 import { Heart } from "lucide-react";
 import { useState, memo } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { invalidateLibraryQueries } from "@/lib/libraryQueryCache";
 import { ShareButton } from "@/components/ShareButton";
 
 interface Quote {
@@ -22,6 +24,7 @@ export const QuoteCard = memo(({ quote, isFavorited: initialFavorited, onFavorit
   const [isFavorited, setIsFavorited] = useState(initialFavorited || false);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const toggleFavorite = async () => {
     setLoading(true);
@@ -60,6 +63,12 @@ export const QuoteCard = memo(({ quote, isFavorited: initialFavorited, onFavorit
         setIsFavorited(true);
       }
 
+      await invalidateLibraryQueries(queryClient, {
+        userId: session.user.id,
+        includeFavoritesAll: true,
+        includeFavoritesDetail: true,
+        includeFavoriteQuotesAll: true,
+      });
       onFavoriteChange?.();
     } catch (error) {
       console.error("Error toggling favorite:", error);

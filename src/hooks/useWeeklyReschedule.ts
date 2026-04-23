@@ -3,6 +3,12 @@ import { format, addDays, startOfDay } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/queryKeys';
+import {
+  invalidateTaskQueryFamilies,
+  setTaskQueryFamiliesData,
+  taskQueryFamilyGroups,
+} from '@/lib/taskQueryCache';
 import { toast } from "@/components/ui/sonner";
 import { normalizeTaskSchedulingState } from '@/utils/taskSchedulingRules';
 
@@ -159,11 +165,7 @@ export function useWeeklyReschedule(weeklyTasks: WeeklyTask[], startDate: Date =
 
     // Optimistic update
     const updateMap = new Map(updates.map(u => [u.id, u.task_date]));
-    queryClient.setQueriesData({ queryKey: ['daily-tasks'] }, (old: any) => {
-      if (!Array.isArray(old)) return old;
-      return old.map(t => updateMap.has(t.id) ? { ...t, task_date: updateMap.get(t.id) } : t);
-    });
-    queryClient.setQueriesData({ queryKey: ['calendar-tasks'] }, (old: any) => {
+    setTaskQueryFamiliesData(queryClient, taskQueryFamilyGroups.planner, (old) => {
       if (!Array.isArray(old)) return old;
       return old.map(t => updateMap.has(t.id) ? { ...t, task_date: updateMap.get(t.id) } : t);
     });
@@ -186,16 +188,14 @@ export function useWeeklyReschedule(weeklyTasks: WeeklyTask[], startDate: Date =
           .eq('user_id', user.id);
       }
 
-      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
-      queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
+      void invalidateTaskQueryFamilies(queryClient, taskQueryFamilyGroups.planner);
 
       const normalizedCount = updates.filter(update => update.normalizedToInbox).length;
       if (normalizedCount > 0) {
         toast(`${normalizedCount} quest${normalizedCount === 1 ? '' : 's'} stayed in Inbox (time required).`);
       }
     } catch {
-      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
-      queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
+      void invalidateTaskQueryFamilies(queryClient, taskQueryFamilyGroups.planner);
     } finally {
       setIsRescheduling(false);
     }
@@ -234,11 +234,7 @@ export function useWeeklyReschedule(weeklyTasks: WeeklyTask[], startDate: Date =
 
     // Optimistic update
     const updateMap = new Map(updates.map(u => [u.id, u.task_date]));
-    queryClient.setQueriesData({ queryKey: ['daily-tasks'] }, (old: any) => {
-      if (!Array.isArray(old)) return old;
-      return old.map(t => updateMap.has(t.id) ? { ...t, task_date: updateMap.get(t.id) } : t);
-    });
-    queryClient.setQueriesData({ queryKey: ['calendar-tasks'] }, (old: any) => {
+    setTaskQueryFamiliesData(queryClient, taskQueryFamilyGroups.planner, (old) => {
       if (!Array.isArray(old)) return old;
       return old.map(t => updateMap.has(t.id) ? { ...t, task_date: updateMap.get(t.id) } : t);
     });
@@ -261,16 +257,14 @@ export function useWeeklyReschedule(weeklyTasks: WeeklyTask[], startDate: Date =
           .eq('user_id', user.id);
       }
 
-      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
-      queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
+      void invalidateTaskQueryFamilies(queryClient, taskQueryFamilyGroups.planner);
 
       const normalizedCount = updates.filter(update => update.normalizedToInbox).length;
       if (normalizedCount > 0) {
         toast(`${normalizedCount} quest${normalizedCount === 1 ? '' : 's'} stayed in Inbox (time required).`);
       }
     } catch {
-      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
-      queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
+      void invalidateTaskQueryFamilies(queryClient, taskQueryFamilyGroups.planner);
     } finally {
       setIsRescheduling(false);
     }
@@ -321,11 +315,7 @@ export function useWeeklyReschedule(weeklyTasks: WeeklyTask[], startDate: Date =
 
     // Optimistic update
     const updateMap = new Map(updates.map(u => [u.id, u.task_date]));
-    queryClient.setQueriesData({ queryKey: ['daily-tasks'] }, (old: any) => {
-      if (!Array.isArray(old)) return old;
-      return old.map(t => updateMap.has(t.id) ? { ...t, task_date: updateMap.get(t.id) } : t);
-    });
-    queryClient.setQueriesData({ queryKey: ['calendar-tasks'] }, (old: any) => {
+    setTaskQueryFamiliesData(queryClient, taskQueryFamilyGroups.planner, (old) => {
       if (!Array.isArray(old)) return old;
       return old.map(t => updateMap.has(t.id) ? { ...t, task_date: updateMap.get(t.id) } : t);
     });
@@ -348,16 +338,14 @@ export function useWeeklyReschedule(weeklyTasks: WeeklyTask[], startDate: Date =
           .eq('user_id', user.id);
       }
 
-      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
-      queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
+      void invalidateTaskQueryFamilies(queryClient, taskQueryFamilyGroups.planner);
 
       const normalizedCount = updates.filter(update => update.normalizedToInbox).length;
       if (normalizedCount > 0) {
         toast(`${normalizedCount} quest${normalizedCount === 1 ? '' : 's'} stayed in Inbox (time required).`);
       }
     } catch {
-      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
-      queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
+      void invalidateTaskQueryFamilies(queryClient, taskQueryFamilyGroups.planner);
     } finally {
       setIsRescheduling(false);
     }

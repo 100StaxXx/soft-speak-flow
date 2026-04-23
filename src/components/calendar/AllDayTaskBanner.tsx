@@ -1,10 +1,10 @@
 import { cn } from "@/lib/utils";
 import { Check } from "lucide-react";
-import { CalendarTask } from "@/types/quest";
+import type { DisplayQuest } from "@/features/quests/display";
 
 interface AllDayTaskBannerProps {
-  task: CalendarTask;
-  onClick?: (task: CalendarTask) => void;
+  quest: DisplayQuest;
+  onClick?: () => void;
 }
 
 const CATEGORY_ACCENT: Record<string, string> = {
@@ -14,15 +14,15 @@ const CATEGORY_ACCENT: Record<string, string> = {
   default: "bg-muted-foreground/40",
 };
 
-export function AllDayTaskBanner({ task, onClick }: AllDayTaskBannerProps) {
-  const accent = CATEGORY_ACCENT[task.category || "default"] || CATEGORY_ACCENT.default;
+export function AllDayTaskBanner({ quest, onClick }: AllDayTaskBannerProps) {
+  const accent = CATEGORY_ACCENT[quest.category || "default"] || CATEGORY_ACCENT.default;
 
   return (
     <button
-      onClick={() => onClick?.(task)}
+      onClick={() => onClick?.()}
       className={cn(
         "flex items-center gap-3 w-full rounded-lg bg-muted/30 px-3 py-2.5 text-left transition-colors hover:bg-muted/50",
-        task.completed && "opacity-50"
+        quest.completed && "opacity-50"
       )}
     >
       {/* Category accent bar */}
@@ -31,9 +31,9 @@ export function AllDayTaskBanner({ task, onClick }: AllDayTaskBannerProps) {
       {/* Title */}
       <span className={cn(
         "flex-1 text-sm font-medium text-foreground truncate",
-        task.completed && "line-through text-muted-foreground"
+        quest.completed && "line-through text-muted-foreground"
       )}>
-        {task.task_text}
+        {quest.title}
       </span>
 
       {/* All Day label */}
@@ -42,11 +42,11 @@ export function AllDayTaskBanner({ task, onClick }: AllDayTaskBannerProps) {
       {/* Checkbox */}
       <div className={cn(
         "flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all",
-        task.completed
+        quest.completed
           ? "bg-coral-500 border-coral-500"
           : "border-coral-500/50"
       )}>
-        {task.completed && <Check className="h-3 w-3 text-white" />}
+        {quest.completed && <Check className="h-3 w-3 text-white" />}
       </div>
     </button>
   );

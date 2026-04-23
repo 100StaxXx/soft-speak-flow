@@ -18,6 +18,8 @@ import { DailyCoachPanel } from "@/components/DailyCoachPanel";
 import { IndexPageSkeleton } from "@/components/skeletons";
 import { ParallaxCard } from "@/components/ui/parallax-card";
 import { Button } from "@/components/ui/button";
+import { refetchMentorContextQueries } from "@/lib/mentorContextQueryCache";
+import { queryKeys } from "@/lib/queryKeys";
 import { loadMentorImage } from "@/utils/mentorImageLoader";
 import {
   buildEstablishedProfileSelfHealPatch,
@@ -214,7 +216,7 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
     isLoading: mentorPageDataLoading,
     isError: mentorPageDataError,
   } = useQuery({
-    queryKey: ['mentor-page-data', effectiveMentorId, pepTalkDate],
+    queryKey: queryKeys.mentor.pageData(effectiveMentorId ?? undefined, pepTalkDate),
     queryFn: async () => {
       if (!effectiveMentorId) return null;
 
@@ -382,8 +384,10 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
 
   const handleMentorRetry = useCallback(() => {
     void refreshConnection();
-    void queryClient.refetchQueries({ queryKey: ["mentor-page-data"] });
-    void queryClient.refetchQueries({ queryKey: ["mentor-personality"] });
+    void refetchMentorContextQueries(queryClient, {
+      includeMentor: false,
+      includeSelectedMentor: false,
+    });
   }, [queryClient, refreshConnection]);
 
   const handleMentorReconnect = useCallback(() => {
@@ -723,9 +727,6 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
       >
         {isDesktop ? desktopContent : mobileContent}
       </div>
-      
-      <ErrorBoundary>
-      </ErrorBoundary>
     </PageTransition>
   );
 };

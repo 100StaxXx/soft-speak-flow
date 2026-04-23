@@ -2,6 +2,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { toast } from "@/components/ui/sonner";
+import { invalidateGuildRivalryQueries } from "@/lib/guildCombatQueryCache";
+import { queryKeys } from "@/lib/queryKeys";
 
 export interface GuildRivalry {
   id: string;
@@ -34,7 +36,7 @@ export const useGuildRivalry = (options: UseGuildRivalryOptions | string = {}) =
 
   // Fetch user's rivalry in this epic or community
   const { data: rivalry, isLoading } = useQuery<GuildRivalry | null>({
-    queryKey: ["guild-rivalry", queryKeyType, queryKeyId, user?.id],
+    queryKey: queryKeys.guild.rivalry(queryKeyType, queryKeyId, user?.id),
     queryFn: async () => {
       if ((!epicId && !communityId) || !user) return null;
 
@@ -93,7 +95,12 @@ export const useGuildRivalry = (options: UseGuildRivalryOptions | string = {}) =
     },
     onSuccess: () => {
       toast.success("Rival set! ⚔️ Let the competition begin!");
-      queryClient.invalidateQueries({ queryKey: ["guild-rivalry", queryKeyType, queryKeyId] });
+      void invalidateGuildRivalryQueries(queryClient, {
+        scopeType: queryKeyType,
+        scopeId: queryKeyId,
+        userId: user?.id,
+        includeDetail: true,
+      });
     },
     onError: (error) => {
       toast.error("Failed to set rival");
@@ -124,7 +131,12 @@ export const useGuildRivalry = (options: UseGuildRivalryOptions | string = {}) =
     },
     onSuccess: () => {
       toast.success("Rivalry ended");
-      queryClient.invalidateQueries({ queryKey: ["guild-rivalry", queryKeyType, queryKeyId] });
+      void invalidateGuildRivalryQueries(queryClient, {
+        scopeType: queryKeyType,
+        scopeId: queryKeyId,
+        userId: user?.id,
+        includeDetail: true,
+      });
     },
     onError: (error) => {
       toast.error("Failed to remove rival");

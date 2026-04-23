@@ -1,12 +1,26 @@
 import React, { useState, useRef, useCallback } from "react";
 import { Card } from "@/components/ui/card";
 import { Clock, Zap, Flame, Mountain, Star, Brain, Dumbbell, Heart } from "lucide-react";
+import type { DisplayQuest } from "@/features/quests/display";
+import { isValidQuestCategory } from "@/features/quests/validation";
 import { cn } from "@/lib/utils";
-import { DragTask, isValidCategory } from "@/types/quest";
 import { playSound } from "@/utils/soundEffects";
 
+export type QuestDragCardQuest = Pick<
+  DisplayQuest,
+  | "id"
+  | "title"
+  | "scheduledTime"
+  | "estimatedDuration"
+  | "isMainQuest"
+  | "difficulty"
+  | "category"
+  | "xpReward"
+  | "completed"
+>;
+
 interface QuestDragCardProps {
-  task: DragTask;
+  quest: QuestDragCardQuest;
   isDragging?: boolean;
   onDragStart?: (e: React.DragEvent) => void;
   onDragEnd?: (e: React.DragEvent) => void;
@@ -64,7 +78,7 @@ const difficultyConfig = {
 };
 
 export const QuestDragCard = React.memo(({ 
-  task, 
+  quest,
   isDragging, 
   onDragStart, 
   onDragEnd,
@@ -118,9 +132,9 @@ export const QuestDragCard = React.memo(({
     }
   }, [handleTouchEnd]);
 
-  const difficulty = task.difficulty?.toLowerCase() as 'easy' | 'medium' | 'hard' | undefined;
+  const difficulty = quest.difficulty?.toLowerCase() as 'easy' | 'medium' | 'hard' | undefined;
   const config = difficulty ? difficultyConfig[difficulty] : null;
-  const category = isValidCategory(task.category) ? task.category : undefined;
+  const category = isValidQuestCategory(quest.category) ? quest.category : undefined;
   const categoryInfo = category ? categoryConfig[category] : null;
 
   const formatTime = (time: string) => {
@@ -153,15 +167,15 @@ export const QuestDragCard = React.memo(({
           isDragging && "opacity-50 scale-95",
           !isDragging && "hover:scale-[1.02] active:scale-[0.98]",
           isPressed && !isDragging && "scale-[0.97] opacity-90",
-          task.completed && "opacity-60",
+          quest.completed && "opacity-60",
           // Main Quest - gold styling
-          task.is_main_quest && "border-2 border-[hsl(45,100%,60%)] shadow-[0_0_20px_hsl(45,100%,60%/0.3)]",
+          quest.isMainQuest && "border-2 border-[hsl(45,100%,60%)] shadow-[0_0_20px_hsl(45,100%,60%/0.3)]",
           // Category-based left border for non-main quests
-          !task.is_main_quest && categoryInfo && `border-l-4 ${categoryInfo.colors.split(' ').find(c => c.includes('border'))}`,
+          !quest.isMainQuest && categoryInfo && `border-l-4 ${categoryInfo.colors.split(' ').find(c => c.includes('border'))}`,
           // Difficulty-based colors for side quests
-          !task.is_main_quest && config?.borderColor,
-          !task.is_main_quest && isHovering && config?.glow,
-          !task.is_main_quest && isHovering && categoryInfo?.glow
+          !quest.isMainQuest && config?.borderColor,
+          !quest.isMainQuest && isHovering && config?.glow,
+          !quest.isMainQuest && isHovering && categoryInfo?.glow
         )}
         style={{ 
           willChange: isDragging ? 'transform, opacity' : 'auto',
@@ -175,14 +189,14 @@ export const QuestDragCard = React.memo(({
         onTouchCancel={handleTouchEnd}
       >
         {/* Main Quest Gold Shimmer */}
-        {task.is_main_quest && !task.completed && (
+        {quest.isMainQuest && !quest.completed && (
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[hsl(45,100%,60%)]/10 to-transparent animate-pulse" />
         )}
 
         {/* Card Content */}
         <div className={cn("relative flex items-start gap-3", compact ? "p-2" : "p-3")}>
           {/* Difficulty Icon */}
-          {config && !task.is_main_quest && !compact && (
+          {config && !quest.isMainQuest && !compact && (
             <div className={cn("flex-shrink-0 mt-0.5", config.textColor)}>
               {React.createElement(config.icon, { className: "h-4 w-4" })}
             </div>
@@ -191,19 +205,19 @@ export const QuestDragCard = React.memo(({
           {/* Quest Info */}
           <div className="flex-1 space-y-1">
             <div className="flex items-start gap-2">
-              {task.is_main_quest && <Star className="h-4 w-4 text-[hsl(45,100%,60%)] flex-shrink-0 mt-0.5 animate-pulse" />}
+              {quest.isMainQuest && <Star className="h-4 w-4 text-[hsl(45,100%,60%)] flex-shrink-0 mt-0.5 animate-pulse" />}
               <p className={cn(
                 "font-medium leading-relaxed",
                 compact ? "text-xs" : "text-sm",
-                task.completed && "line-through text-muted-foreground",
-                task.is_main_quest && "text-base font-semibold"
+                quest.completed && "line-through text-muted-foreground",
+                quest.isMainQuest && "text-base font-semibold"
               )}>
-                {task.task_text}
+                {quest.title}
               </p>
             </div>
 
             {/* Category Badge */}
-            {categoryInfo && !task.is_main_quest && !compact && (
+            {categoryInfo && !quest.isMainQuest && !compact && (
               <div className="flex items-center gap-1">
                 <div className={cn(
                   "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gradient-to-r border",
@@ -218,25 +232,25 @@ export const QuestDragCard = React.memo(({
             {/* Quest Meta Info */}
             {!compact && (
               <div className="flex items-center gap-3 text-xs flex-wrap">
-                {showTime && task.scheduled_time && (
+                {showTime && quest.scheduledTime && (
                   <div className="flex items-center gap-1 text-muted-foreground">
                     <Clock className="w-3 h-3" />
-                    {formatTime(task.scheduled_time)}
+                    {formatTime(quest.scheduledTime)}
                   </div>
                 )}
 
-                {task.estimated_duration && (
+                {quest.estimatedDuration && (
                   <div className="flex items-center gap-1 text-muted-foreground">
                     <Clock className="w-3 h-3" />
-                    {formatDuration(task.estimated_duration)}
+                    {formatDuration(quest.estimatedDuration)}
                   </div>
                 )}
 
                 <div className={cn(
                   "font-semibold",
-                  task.is_main_quest ? "text-[hsl(45,100%,60%)]" : "text-muted-foreground"
+                  quest.isMainQuest ? "text-[hsl(45,100%,60%)]" : "text-muted-foreground"
                 )}>
-                  +{task.xp_reward} XP
+                  +{quest.xpReward} XP
                 </div>
               </div>
             )}
@@ -244,7 +258,7 @@ export const QuestDragCard = React.memo(({
         </div>
 
         {/* Drag hint on hover */}
-        {isHovering && !task.completed && (
+        {isHovering && !quest.completed && (
           <div className="absolute bottom-1 right-1 text-[10px] text-muted-foreground/50 opacity-0 group-hover:opacity-100 transition-opacity">
             Drag to reorder
           </div>

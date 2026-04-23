@@ -3,23 +3,25 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useCallback } from "react";
 import { toast } from "@/components/ui/sonner";
+import { queryKeys } from "@/lib/queryKeys";
+import {
+  invalidateTaskQueryFamilies,
+  taskQueryFamilyGroups,
+} from "@/lib/taskQueryCache";
 import { normalizeTaskSchedulingState } from "@/utils/taskSchedulingRules";
 import { useResilience } from "@/contexts/ResilienceContext";
 import { isQueueableWriteError } from "@/utils/networkErrors";
 import { normalizeUuidLikeId } from "@/utils/offlineId";
-
-export const INBOX_TASKS_QUERY_KEY = "inbox-tasks";
-export const INBOX_COUNT_QUERY_KEY = "inbox-count";
 
 interface InboxTasksOptions {
   enabled?: boolean;
 }
 
 export const getInboxTasksQueryKey = (userId: string | undefined) =>
-  [INBOX_TASKS_QUERY_KEY, userId] as const;
+  queryKeys.inbox.tasks(userId);
 
 export const getInboxCountQueryKey = (userId: string | undefined) =>
-  [INBOX_COUNT_QUERY_KEY, userId] as const;
+  queryKeys.inbox.count(userId);
 
 export const fetchInboxTasks = async (userId: string) => {
   const { data, error } = await supabase
@@ -51,8 +53,7 @@ export const useInboxTasks = (options: InboxTasksOptions = {}) => {
   const queryClient = useQueryClient();
   const { enabled = true } = options;
   const invalidateInboxQueries = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: [INBOX_TASKS_QUERY_KEY] });
-    queryClient.invalidateQueries({ queryKey: [INBOX_COUNT_QUERY_KEY] });
+    void invalidateTaskQueryFamilies(queryClient, taskQueryFamilyGroups.inbox);
   }, [queryClient]);
   const getRemoteTaskId = useCallback((taskId: string) => normalizeUuidLikeId(taskId), []);
 
@@ -133,7 +134,7 @@ export const useInboxTasks = (options: InboxTasksOptions = {}) => {
     },
     onSuccess: (data) => {
       invalidateInboxQueries();
-      queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
+      void invalidateTaskQueryFamilies(queryClient, ["daily"]);
       if ((data as { queued?: boolean } | undefined)?.queued) {
         toast("Quest schedule queued. It will sync when connection is restored.");
         return;
@@ -176,7 +177,7 @@ export const useInboxTasks = (options: InboxTasksOptions = {}) => {
     },
     onSuccess: (data) => {
       invalidateInboxQueries();
-      queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
+      void invalidateTaskQueryFamilies(queryClient, ["daily"]);
       if ((data as { queued?: boolean } | undefined)?.queued) {
         toast("Quest completion queued. It will sync when connection is restored.");
       }
@@ -206,7 +207,7 @@ export const useInboxTasks = (options: InboxTasksOptions = {}) => {
     },
     onSuccess: (data) => {
       invalidateInboxQueries();
-      queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
+      void invalidateTaskQueryFamilies(queryClient, ["daily"]);
       if ((data as { queued?: boolean } | undefined)?.queued) {
         toast("Quest deletion queued. It will sync when connection is restored.");
       }

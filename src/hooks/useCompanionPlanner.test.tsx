@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
   invoke: vi.fn(),
   upsertPlannerPreferences: vi.fn(),
   useQuests: vi.fn(),
-  useCalendarTasks: vi.fn(),
+  useCalendarQuests: vi.fn(),
   useCalendarItems: vi.fn(),
   useInboxTasks: vi.fn(),
   useJournalEntries: vi.fn(),
@@ -85,8 +85,8 @@ vi.mock("@/hooks/useQuests", () => ({
   useQuests: (...args: unknown[]) => mocks.useQuests(...args),
 }));
 
-vi.mock("@/hooks/useCalendarTasks", () => ({
-  useCalendarTasks: (...args: unknown[]) => mocks.useCalendarTasks(...args),
+vi.mock("@/hooks/useCalendarQuests", () => ({
+  useCalendarQuests: (...args: unknown[]) => mocks.useCalendarQuests(...args),
 }));
 
 vi.mock("@/hooks/useCalendarItems", () => ({
@@ -108,10 +108,10 @@ vi.mock("@/hooks/useCampaigns", () => ({
   useCampaigns: (...args: unknown[]) => mocks.useCampaigns(...args),
 }));
 
-vi.mock("@/hooks/useTaskMutations", () => ({
-  useTaskMutations: () => ({
-    addTask: mocks.addTask,
-    updateTask: mocks.updateTask,
+vi.mock("@/hooks/useQuestMutations", () => ({
+  useQuestMutations: () => ({
+    createQuest: mocks.addTask,
+    updateQuest: mocks.updateTask,
   }),
 }));
 
@@ -197,8 +197,8 @@ describe("useCompanionPlanner", () => {
       quests: [],
       isLoading: false,
     });
-    mocks.useCalendarTasks.mockReturnValue({
-      tasks: [],
+    mocks.useCalendarQuests.mockReturnValue({
+      quests: [],
       isLoading: false,
     });
     mocks.useCalendarItems.mockReturnValue({
@@ -305,13 +305,13 @@ describe("useCompanionPlanner", () => {
     expect(mocks.useQuests).toHaveBeenCalledWith(expect.any(Date), {
       enabled: false,
     });
-    expect(mocks.useCalendarTasks).toHaveBeenNthCalledWith(
+    expect(mocks.useCalendarQuests).toHaveBeenNthCalledWith(
       1,
       expect.any(Date),
       "week",
       { enabled: false },
     );
-    expect(mocks.useCalendarTasks).toHaveBeenNthCalledWith(
+    expect(mocks.useCalendarQuests).toHaveBeenNthCalledWith(
       2,
       expect.any(Date),
       "month",

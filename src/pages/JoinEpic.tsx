@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/components/ui/sonner";
+import { invalidateCampaignContextQueryFamilies } from "@/lib/campaignContextQueryCache";
+import { queryKeys } from "@/lib/queryKeys";
 import { Target, Calendar, Zap, Users, Loader2, ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -18,7 +20,7 @@ const JoinEpic = () => {
 
   // Fetch epic details by invite code
   const { data: epic, isLoading } = useQuery({
-    queryKey: ["epic-preview", code],
+    queryKey: queryKeys.epics.preview(code),
     queryFn: async () => {
       if (!code) throw new Error("No invite code provided");
 
@@ -82,8 +84,7 @@ const JoinEpic = () => {
       return result;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["epics"] });
-      queryClient.invalidateQueries({ queryKey: ["habits"] });
+      void invalidateCampaignContextQueryFamilies(queryClient, ["epics", "habits"]);
       toast.success("Epic Joined! ⚔️", {
         description: "You're now part of this legendary quest!",
       });

@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { invalidateAdminReferralQueries } from "@/lib/adminReferralQueryCache";
+import { queryKeys } from "@/lib/queryKeys";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -46,7 +48,7 @@ export const AdminReferralCodes = () => {
 
   // Fetch all referral codes with conversion stats
   const { data: codes, isLoading } = useQuery({
-    queryKey: ["admin-referral-codes"],
+    queryKey: queryKeys.adminReferral.codes(),
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke(
         "manage-referral-codes",
@@ -79,7 +81,7 @@ export const AdminReferralCodes = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-referral-codes"] });
+      void invalidateAdminReferralQueries(queryClient, { includeCodes: true });
       toast.success("Code status updated");
       setTogglingId(null);
     },

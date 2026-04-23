@@ -11,6 +11,7 @@ import { PepTalkCard } from "@/components/PepTalkCard";
 import { QuoteCard } from "@/components/QuoteCard";
 import { PageTransition } from "@/components/PageTransition";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
+import { queryKeys } from "@/lib/queryKeys";
 import { formatDisplayLabel } from "@/lib/utils";
 
 type LibraryTab = "favorites" | "downloads" | "history";
@@ -22,7 +23,7 @@ export default function Library() {
 
   // Fetch favorites
   const { data: favorites, isLoading: loadingFavorites } = useQuery({
-    queryKey: ["favorites", user?.id],
+    queryKey: queryKeys.library.favorites(user?.id),
     enabled: !!user,
     queryFn: async () => {
       if (!user?.id) {
@@ -45,10 +46,14 @@ export default function Library() {
     },
     staleTime: 5 * 60 * 1000,
   });
+  const favoriteQuoteIds = favorites?.filter((f) => f.content_type === "quote").map((f) => f.content_id) || [];
+  const favoriteQuoteIdsKey = favoriteQuoteIds.join(",");
+  const favoritePepTalkIds = favorites?.filter((f) => f.content_type === "pep_talk").map((f) => f.content_id) || [];
+  const favoritePepTalkIdsKey = favoritePepTalkIds.join(",");
 
   // Fetch downloads
   const { data: downloads, isLoading: loadingDownloads } = useQuery({
-    queryKey: ["downloads", user?.id],
+    queryKey: queryKeys.library.downloads(user?.id),
     enabled: !!user,
     queryFn: async () => {
       if (!user?.id) {
@@ -74,16 +79,15 @@ export default function Library() {
 
   // Fetch quote favorites with quote details
   const { data: favoriteQuotes } = useQuery({
-    queryKey: ["favorite-quotes", favorites],
-    enabled: !!favorites && favorites.filter(f => f.content_type === "quote").length > 0,
+    queryKey: queryKeys.library.favoriteQuotes(user?.id, favoriteQuoteIdsKey),
+    enabled: !!favorites && favoriteQuoteIds.length > 0,
     queryFn: async () => {
-      const quoteIds = favorites?.filter(f => f.content_type === "quote").map(f => f.content_id) || [];
-      if (quoteIds.length === 0) return [];
+      if (favoriteQuoteIds.length === 0) return [];
 
       const { data, error } = await supabase
         .from("quotes")
         .select("*")
-        .in("id", quoteIds);
+        .in("id", favoriteQuoteIds);
 
       if (error) throw error;
       return data || [];
@@ -93,16 +97,15 @@ export default function Library() {
 
   // Fetch pep talk favorites with details
   const { data: favoritePepTalks } = useQuery({
-    queryKey: ["favorite-pep-talks", favorites],
-    enabled: !!favorites && favorites.filter(f => f.content_type === "pep_talk").length > 0,
+    queryKey: queryKeys.library.favoritePepTalks(user?.id, favoritePepTalkIdsKey),
+    enabled: !!favorites && favoritePepTalkIds.length > 0,
     queryFn: async () => {
-      const pepTalkIds = favorites?.filter(f => f.content_type === "pep_talk").map(f => f.content_id) || [];
-      if (pepTalkIds.length === 0) return [];
+      if (favoritePepTalkIds.length === 0) return [];
 
       const { data, error } = await supabase
         .from("pep_talks")
         .select("*")
-        .in("id", pepTalkIds);
+        .in("id", favoritePepTalkIds);
 
       if (error) throw error;
       return data || [];

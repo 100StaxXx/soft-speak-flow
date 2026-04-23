@@ -3,6 +3,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Capacitor } from '@capacitor/core';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { invalidateCalendarIntegrationQueries } from '@/lib/calendarIntegrationQueryCache';
+import { queryKeys } from '@/lib/queryKeys';
+import type { TablesInsert } from '@/integrations/supabase/types';
 import { NativeCalendar } from '@/plugins/NativeCalendarPlugin';
 import { parseFunctionInvokeError, toUserFacingFunctionError } from '@/utils/supabaseFunctionErrors';
 
@@ -29,6 +32,8 @@ interface CalendarUserSettings {
   nudge_dismissed_at: string | null;
   default_provider: CalendarProvider | null;
 }
+
+type CalendarUserSettingsInsert = TablesInsert<'calendar_user_settings'>;
 
 interface ProviderCalendarOption {
   id: string;
@@ -87,7 +92,7 @@ export function useCalendarIntegrations(options: CalendarIntegrationsOptions = {
   const appleNativeUnavailableReason = canConnectAppleNative ? null : APP_UPDATE_REQUIRED_MESSAGE;
 
   const settingsQuery = useQuery({
-    queryKey: ['calendar-user-settings', user?.id],
+    queryKey: queryKeys.calendar.settings(user?.id),
     enabled: enabled && !!user?.id,
     queryFn: async () => {
       if (!user?.id) return null;
@@ -104,7 +109,7 @@ export function useCalendarIntegrations(options: CalendarIntegrationsOptions = {
   });
 
   const connectionsQuery = useQuery({
-    queryKey: ['calendar-connections', user?.id],
+    queryKey: queryKeys.calendar.connections(user?.id),
     enabled: enabled && !!user?.id,
     queryFn: async () => {
       if (!user?.id) return [];
@@ -119,7 +124,7 @@ export function useCalendarIntegrations(options: CalendarIntegrationsOptions = {
         .order('created_at', { ascending: true });
 
       if (error) throw error;
-      return (data || []) as ConnectedCalendar[];
+      return ((data || []) as unknown) as ConnectedCalendar[];
     },
   });
 
@@ -138,19 +143,24 @@ export function useCalendarIntegrations(options: CalendarIntegrationsOptions = {
   const integrationVisible = settings?.integration_visible ?? false;
 
   const invalidate = async () => {
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['calendar-user-settings'] }),
-      queryClient.invalidateQueries({ queryKey: ['calendar-connections'] }),
-      queryClient.invalidateQueries({ queryKey: ['quest-calendar-links'] }),
-      queryClient.invalidateQueries({ queryKey: ['quest-outlook-task-links'] }),
-    ]);
+    await invalidateCalendarIntegrationQueries(queryClient, {
+      userId: user?.id,
+      includeSettingsAll: true,
+      includeSettingsDetail: true,
+      includeConnectionsAll: true,
+      includeConnectionsDetail: true,
+      includeQuestLinksAll: true,
+      includeQuestLinksDetail: true,
+      includeOutlookTaskLinksAll: true,
+      includeOutlookTaskLinksDetail: true,
+    });
   };
 
   const upsertSettings = useMutation({
     mutationFn: async (updates: Partial<CalendarUserSettings>) => {
       if (!user?.id) throw new Error('User not authenticated');
 
-      const payload: Record<string, unknown> = {
+      const payload: CalendarUserSettingsInsert = {
         user_id: user.id,
         integration_visible: integrationVisible,
         default_provider: defaultProvider,
@@ -426,7 +436,8 @@ export function useCalendarIntegrations(options: CalendarIntegrationsOptions = {
   });
 
   const connectAppleNative = useMutation({
-    mutationFn: async ({ syncMode = 'send_only' as CalendarSyncMode } = {}) => {
+    mutationFn: async (variables?: { syncMode?: CalendarSyncMode }) => {
+      const syncMode = variables?.syncMode ?? 'send_only';
       if (!user?.id) throw new Error('User not authenticated');
       if (!isNativeIOS()) throw new Error('Apple Calendar is only available on iOS native');
       if (!canConnectAppleNative) throw new Error(appleNativeUnavailableReason ?? APP_UPDATE_REQUIRED_MESSAGE);

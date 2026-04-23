@@ -1,6 +1,8 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect } from "react";
+import { invalidateGuildActivityQueries } from "@/lib/guildQueryCache";
+import { queryKeys } from "@/lib/queryKeys";
 import { logger } from "@/utils/logger";
 
 export interface GuildActivity {
@@ -16,7 +18,7 @@ export const useGuildActivity = (epicId?: string) => {
   const queryClient = useQueryClient();
 
   const { data: activities, isLoading } = useQuery<GuildActivity[]>({
-    queryKey: ["guild-activity", epicId],
+    queryKey: queryKeys.guild.activity(epicId),
     queryFn: async () => {
       if (!epicId) return [];
 
@@ -49,7 +51,10 @@ export const useGuildActivity = (epicId?: string) => {
           filter: `epic_id=eq.${epicId}`,
         },
         () => {
-          queryClient.invalidateQueries({ queryKey: ["guild-activity", epicId] });
+          void invalidateGuildActivityQueries(queryClient, {
+            epicId,
+            includeDetail: true,
+          });
         }
       )
       .subscribe((status, err) => {

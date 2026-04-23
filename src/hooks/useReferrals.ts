@@ -1,6 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Capacitor } from "@capacitor/core";
 import { supabase } from "@/integrations/supabase/client";
+import { invalidateProfileAccessQueries } from "@/lib/profileAccessQueryCache";
+import { queryKeys } from "@/lib/queryKeys";
 import { useAuth } from "./useAuth";
 import { toast } from "@/components/ui/sonner";
 import { WinWinKit } from "@/plugins/WinWinKitPlugin";
@@ -18,7 +20,7 @@ export const useReferrals = () => {
 
   // Fetch user's referral code from profiles table (auto-generated on signup)
   const { data: referralStats, isLoading } = useQuery({
-    queryKey: ["referral-stats", user?.id],
+    queryKey: queryKeys.referrals.stats(user?.id),
     staleTime: 5 * 60 * 1000, // 5 minutes - referral stats don't change frequently
     queryFn: async () => {
       if (!user) return null;
@@ -44,7 +46,7 @@ export const useReferrals = () => {
 
   // Fetch unlocked skins
   const { data: unlockedSkins } = useQuery({
-    queryKey: ["unlocked-skins", user?.id],
+    queryKey: queryKeys.referrals.unlockedSkins(user?.id),
     staleTime: 5 * 60 * 1000, // 5 minutes
     queryFn: async () => {
       if (!user) return [];
@@ -68,7 +70,7 @@ export const useReferrals = () => {
 
   // Fetch available skins (for display)
   const { data: availableSkins } = useQuery({
-    queryKey: ["available-skins"],
+    queryKey: queryKeys.referrals.availableSkins(),
     staleTime: 10 * 60 * 1000, // 10 minutes - available skins rarely change
     queryFn: async () => {
       // FIX Bug #25: Add pagination limit for safety
@@ -115,9 +117,12 @@ export const useReferrals = () => {
       return applyResult;
     },
     onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ["referral-stats"] });
-      queryClient.invalidateQueries({ queryKey: ["profile", user?.id] });
-      queryClient.invalidateQueries({ queryKey: ["applied-referral-code-state", user?.id] });
+      void invalidateProfileAccessQueries(queryClient, {
+        userId: user?.id,
+        includeProfileDetail: true,
+        includeReferralStatsAll: true,
+        includeAppliedReferralCodeStateDetail: true,
+      });
 
       const defaultMessage = result.code_type === "affiliate"
         ? "Creator code applied! Your yearly plan is now eligible for the Apple discount flow."
@@ -164,7 +169,10 @@ export const useReferrals = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["unlocked-skins"] });
+      void invalidateProfileAccessQueries(queryClient, {
+        userId: user?.id,
+        includeUnlockedSkinsAll: true,
+      });
       toast.success("Skin equipped!");
     },
   });
@@ -183,7 +191,10 @@ export const useReferrals = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["unlocked-skins"] });
+      void invalidateProfileAccessQueries(queryClient, {
+        userId: user?.id,
+        includeUnlockedSkinsAll: true,
+      });
       toast.success("Skin unequipped");
     },
   });

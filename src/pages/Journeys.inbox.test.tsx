@@ -457,9 +457,9 @@ vi.mock("@/hooks/useInboxTasks", () => ({
   }),
 }));
 
-vi.mock("@/hooks/useCalendarTasks", () => ({
-  useCalendarTasks: (_selectedDate: Date, view: "list" | "month" | "week") => ({
-    tasks: view === "week" ? mocks.weekCalendarTasks : [],
+vi.mock("@/hooks/useCalendarQuests", () => ({
+  useCalendarQuests: (_selectedDate: Date, view: "list" | "month" | "week") => ({
+    quests: view === "week" ? mocks.weekCalendarTasks.map(bridge.toMockQuest) : [],
   }),
 }));
 

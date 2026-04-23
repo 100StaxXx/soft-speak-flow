@@ -15,6 +15,8 @@ import type {
   RewardRarity 
 } from "@/types/epicRewards";
 import { STORY_TYPE_BADGES } from "@/types/epicRewards";
+import { invalidateEpicRewardQueries } from "@/lib/epicRewardQueryCache";
+import { queryKeys } from "@/lib/queryKeys";
 
 export const useEpicRewards = () => {
   const { user } = useAuth();
@@ -22,7 +24,7 @@ export const useEpicRewards = () => {
 
   // Fetch all available rewards
   const { data: allRewards = [] } = useQuery({
-    queryKey: ['epic-rewards'],
+    queryKey: queryKeys.epicRewards.all,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('epic_rewards')
@@ -37,7 +39,7 @@ export const useEpicRewards = () => {
 
   // Fetch user's unlocked rewards
   const { data: userRewards = [], isLoading } = useQuery({
-    queryKey: ['user-epic-rewards', user?.id],
+    queryKey: queryKeys.epicRewards.user(user?.id),
     queryFn: async () => {
       if (!user?.id) return [];
       
@@ -93,7 +95,11 @@ export const useEpicRewards = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['user-epic-rewards'] });
+      void invalidateEpicRewardQueries(queryClient, {
+        userId: user?.id,
+        includeUserRewardsAll: true,
+        includeUserRewardsDetail: true,
+      });
     },
     onError: (error) => {
       console.error('Failed to equip reward:', error);
@@ -156,7 +162,11 @@ export const useEpicRewards = () => {
         return { reward: null, isDuplicate: false };
       }
       
-      queryClient.invalidateQueries({ queryKey: ['user-epic-rewards'] });
+      void invalidateEpicRewardQueries(queryClient, {
+        userId: user?.id,
+        includeUserRewardsAll: true,
+        includeUserRewardsDetail: true,
+      });
     }
     
     return { reward: selectedReward, isDuplicate: false };

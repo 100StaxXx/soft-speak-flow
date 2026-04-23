@@ -5,6 +5,12 @@ import { useAuth } from '@/hooks/useAuth';
 import { AdversaryTheme } from '@/types/astralEncounters';
 import { ASTRAL_ENCOUNTER_DAILY_XP_CAP } from '@/config/xpRewards';
 import { toast } from "@/components/ui/sonner";
+import {
+  invalidateAstralResistQueries,
+  prependBadHabitQueryData,
+  removeBadHabitQueryData,
+} from "@/lib/astralResistQueryCache";
+import { queryKeys } from "@/lib/queryKeys";
 
 export interface BadHabit {
   id: string;
@@ -39,7 +45,7 @@ export const useResistMode = () => {
 
   // Fetch user's bad habits
   const { data: habits, isLoading: habitsLoading } = useQuery({
-    queryKey: ['bad-habits', user?.id],
+    queryKey: queryKeys.resist.badHabits(user?.id),
     queryFn: async () => {
       if (!user?.id) return [];
       const { data, error } = await supabase
@@ -57,7 +63,7 @@ export const useResistMode = () => {
 
   // Fetch resist history (last 30 days)
   const { data: resistHistory, isLoading: historyLoading } = useQuery({
-    queryKey: ['resist-log', user?.id],
+    queryKey: queryKeys.resist.log(user?.id),
     queryFn: async () => {
       if (!user?.id) return [];
       const thirtyDaysAgo = new Date();
@@ -77,7 +83,7 @@ export const useResistMode = () => {
   });
 
   const { data: todayAstralXpEvents, isLoading: astralXpLoading } = useQuery({
-    queryKey: ['astral-encounter-xp-today', user?.id, startOfTodayIso],
+    queryKey: queryKeys.astral.xpToday(user?.id, startOfTodayIso),
     queryFn: async () => {
       if (!user?.id) return [];
 
@@ -114,11 +120,15 @@ export const useResistMode = () => {
       return data as BadHabit;
     },
     onSuccess: (newHabit) => {
-      queryClient.setQueryData(
-        ['bad-habits', user?.id],
-        (old: BadHabit[] | undefined) => [newHabit, ...(old ?? [])]
-      );
-      queryClient.invalidateQueries({ queryKey: ['bad-habits'] });
+      prependBadHabitQueryData(queryClient, {
+        userId: user?.id,
+        habit: newHabit,
+      });
+      void invalidateAstralResistQueries(queryClient, {
+        userId: user?.id,
+        includeBadHabitsAll: true,
+        includeBadHabitsDetail: true,
+      });
       toast.success('Bad habit added! Ready to resist.');
     },
     onError: (error) => {
@@ -141,11 +151,15 @@ export const useResistMode = () => {
       if (error) throw error;
     },
     onSuccess: (_data, habitId) => {
-      queryClient.setQueryData(
-        ['bad-habits', user?.id],
-        (old: BadHabit[] | undefined) => (old ?? []).filter(h => h.id !== habitId)
-      );
-      queryClient.invalidateQueries({ queryKey: ['bad-habits'] });
+      removeBadHabitQueryData<BadHabit>(queryClient, {
+        userId: user?.id,
+        habitId,
+      });
+      void invalidateAstralResistQueries(queryClient, {
+        userId: user?.id,
+        includeBadHabitsAll: true,
+        includeBadHabitsDetail: true,
+      });
       toast.success('Habit removed');
     },
     onError: (error) => {

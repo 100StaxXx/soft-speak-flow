@@ -5,6 +5,13 @@ import { useAuth } from "./useAuth";
 import { toast } from "@/components/ui/sonner";
 import type { GenerationPhase } from "@/components/ImageGenerationProgress";
 import { generateWithValidation } from "@/utils/validateCompanionImage";
+import {
+  companionContextQueryFamilyGroups,
+  invalidateCompanionQueries,
+  invalidateCompanionContextQueryFamilies,
+} from "@/lib/companionContextQueryCache";
+import { invalidateCommunityQueries } from "@/lib/communityQueryCache";
+import { queryKeys } from "@/lib/queryKeys";
 
 const MAX_REGENERATIONS = 2;
 
@@ -126,7 +133,7 @@ export const useCompanionRegenerate = () => {
     },
     onSuccess: (data) => {
       queryClient.setQueriesData(
-        { queryKey: ["companion"] },
+        { queryKey: queryKeys.companion.all },
         (cachedCompanion: unknown) => {
           if (!cachedCompanion || typeof cachedCompanion !== "object") return cachedCompanion;
           return {
@@ -148,7 +155,7 @@ export const useCompanionRegenerate = () => {
       );
 
       queryClient.setQueriesData(
-        { queryKey: ["companion-health"] },
+        { queryKey: queryKeys.companion.healthAll },
         (cachedHealth: unknown) => {
           if (!cachedHealth || typeof cachedHealth !== "object") return cachedHealth;
           return {
@@ -164,7 +171,7 @@ export const useCompanionRegenerate = () => {
       );
 
       queryClient.setQueriesData(
-        { queryKey: ["community-members"] },
+        { queryKey: queryKeys.community.membersAll },
         (cachedMembers: unknown) => {
           if (!Array.isArray(cachedMembers) || !user?.id) return cachedMembers;
 
@@ -193,9 +200,16 @@ export const useCompanionRegenerate = () => {
         },
       );
 
-      queryClient.invalidateQueries({ queryKey: ["companion"] });
-      queryClient.invalidateQueries({ queryKey: ["companion-health"] });
-      queryClient.invalidateQueries({ queryKey: ["community-members"] });
+      void Promise.all([
+        invalidateCompanionQueries(queryClient, { includeAll: true }),
+        invalidateCompanionContextQueryFamilies(
+          queryClient,
+          companionContextQueryFamilyGroups.healthStatus,
+        ),
+      ]);
+      void invalidateCommunityQueries(queryClient, {
+        includeMembersAll: true,
+      });
       if (data.validationPassed) {
         toast.success(`New look unlocked! ${data.regenerationsRemaining} look refresh${data.regenerationsRemaining === 1 ? '' : 'es'} remaining.`);
       } else {

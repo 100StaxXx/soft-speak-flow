@@ -23,6 +23,8 @@ import type {
 import { isCompanionChatSetupError } from "@/utils/companionChatSetup";
 import { resolveCompanionChatError } from "@/utils/companionChatErrors";
 import { safeLocalStorage } from "@/utils/storage";
+import { invalidateCompanionChatHistoryQuery } from "@/lib/companionConversationQueryCache";
+import { queryKeys } from "@/lib/queryKeys";
 
 const SPOKEN_REPLY_COUNT_KEY = "companion-chat-spoken-replies-v1";
 const MAX_HISTORY_MESSAGES = 18;
@@ -56,7 +58,10 @@ const mapChatHistory = (rows: CompanionChatRow[]): CompanionChatMessage[] =>
     role: row.role,
     content: row.content,
     createdAt: row.created_at,
-    inputMode: row.input_mode ?? undefined,
+    inputMode:
+      row.input_mode === "text" || row.input_mode === "voice"
+        ? row.input_mode
+        : undefined,
   }));
 
 const getTodayKey = () => new Date().toISOString().slice(0, 10);
@@ -119,7 +124,7 @@ export function useCompanionChat({ enabled = true }: UseCompanionChatOptions = {
   const [handoffToPlanner, setHandoffToPlanner] = useState(false);
 
   const historyQuery = useQuery({
-    queryKey: ["companion-chat-history", user?.id, companion?.id],
+    queryKey: queryKeys.companion.chatHistory(user?.id, companion?.id),
     enabled: enabled && !!user?.id && !!companion?.id,
     staleTime: 60 * 1000,
     queryFn: async (): Promise<CompanionChatRow[]> => {
@@ -298,8 +303,9 @@ export function useCompanionChat({ enabled = true }: UseCompanionChatOptions = {
         userAction: "accepted",
       });
 
-      queryClient.invalidateQueries({
-        queryKey: ["companion-chat-history", user?.id, companion.id],
+      void invalidateCompanionChatHistoryQuery(queryClient, {
+        userId: user?.id,
+        companionId: companion.id,
       });
 
       void speakReplyIfNeeded(response);

@@ -2,6 +2,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { toast } from "@/components/ui/sonner";
+import { invalidateCommunityQueries } from "@/lib/communityQueryCache";
+import { queryKeys } from "@/lib/queryKeys";
 
 export interface CommunityMember {
   id: string;
@@ -28,7 +30,7 @@ export const useCommunityMembers = (communityId?: string) => {
 
   // Fetch members of a community
   const { data: members, isLoading } = useQuery<CommunityMember[]>({
-    queryKey: ["community-members", communityId],
+    queryKey: queryKeys.community.members(communityId),
     queryFn: async () => {
       if (!communityId) return [];
 
@@ -101,8 +103,10 @@ export const useCommunityMembers = (communityId?: string) => {
     },
     onSuccess: () => {
       toast.success("Welcome to the guild! 🎉");
-      queryClient.invalidateQueries({ queryKey: ["communities"] });
-      queryClient.invalidateQueries({ queryKey: ["community-members"] });
+      void invalidateCommunityQueries(queryClient, {
+        includeCommunitiesAll: true,
+        includeMembersAll: true,
+      });
     },
     onError: (error) => {
       console.error("Join community error:", error);
@@ -131,8 +135,10 @@ export const useCommunityMembers = (communityId?: string) => {
     },
     onSuccess: () => {
       toast.success("Left the guild");
-      queryClient.invalidateQueries({ queryKey: ["communities"] });
-      queryClient.invalidateQueries({ queryKey: ["community-members"] });
+      void invalidateCommunityQueries(queryClient, {
+        includeCommunitiesAll: true,
+        includeMembersAll: true,
+      });
     },
     onError: (error) => {
       console.error("Leave community error:", error);
@@ -158,7 +164,10 @@ export const useCommunityMembers = (communityId?: string) => {
     },
     onSuccess: () => {
       toast.success("Member role updated");
-      queryClient.invalidateQueries({ queryKey: ["community-members", communityId] });
+      void invalidateCommunityQueries(queryClient, {
+        communityId,
+        includeMembersDetail: true,
+      });
     },
     onError: (error) => {
       console.error("Update member role error:", error);
@@ -180,7 +189,10 @@ export const useCommunityMembers = (communityId?: string) => {
     },
     onSuccess: () => {
       toast.success("Member removed");
-      queryClient.invalidateQueries({ queryKey: ["community-members", communityId] });
+      void invalidateCommunityQueries(queryClient, {
+        communityId,
+        includeMembersDetail: true,
+      });
     },
     onError: (error) => {
       console.error("Remove member error:", error);
@@ -211,7 +223,10 @@ export const useCommunityMembers = (communityId?: string) => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["community-members", communityId] });
+      void invalidateCommunityQueries(queryClient, {
+        communityId,
+        includeMembersDetail: true,
+      });
     },
     onError: (error) => {
       console.error("Add contribution error:", error);

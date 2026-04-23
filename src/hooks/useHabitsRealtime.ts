@@ -5,6 +5,12 @@
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  campaignContextQueryFamilyGroups,
+  invalidateCampaignContextQueryFamilies,
+  invalidateHabitScopeQueries,
+} from "@/lib/campaignContextQueryCache";
+import { invalidateQuestAutocompleteQueries } from "@/lib/questAutocompleteQueryCache";
 import { useAuth } from "./useAuth";
 import { logger } from "@/utils/logger";
 import {
@@ -37,10 +43,16 @@ export const useHabitsRealtime = () => {
             warmEpicsQueryFromRemote(queryClient, user.id),
           ]);
           dispatchPlannerSyncFinished();
-          queryClient.invalidateQueries({ queryKey: ['habits', user.id] });
-          queryClient.invalidateQueries({ queryKey: ['habits'] });
-          queryClient.invalidateQueries({ queryKey: ['habit-surfacing'] });
-          queryClient.invalidateQueries({ queryKey: ['epics'] });
+          void invalidateHabitScopeQueries(queryClient, user.id);
+          void invalidateQuestAutocompleteQueries(queryClient, {
+            userId: user.id,
+            includeHabitsAll: true,
+            includeHabitsDetail: true,
+          });
+          void invalidateCampaignContextQueryFamilies(
+            queryClient,
+            campaignContextQueryFamilyGroups.habitPlannerState,
+          );
         }
       )
       .on(
@@ -52,11 +64,13 @@ export const useHabitsRealtime = () => {
           filter: `user_id=eq.${user.id}`,
         },
         () => {
-          queryClient.invalidateQueries({ queryKey: ['habit-completions', user.id] });
-          queryClient.invalidateQueries({ queryKey: ['habit-completions'] });
-          queryClient.invalidateQueries({ queryKey: ['habits', user.id] });
-          queryClient.invalidateQueries({ queryKey: ['habits'] });
-          queryClient.invalidateQueries({ queryKey: ['quest-autocomplete-habits', user.id] });
+          void invalidateHabitScopeQueries(queryClient, user.id, {
+            includeCompletions: true,
+          });
+          void invalidateCampaignContextQueryFamilies(
+            queryClient,
+            campaignContextQueryFamilyGroups.habitCompletionState,
+          );
         }
       )
       .subscribe((status, err) => {

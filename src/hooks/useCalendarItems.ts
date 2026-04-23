@@ -1,8 +1,8 @@
 import type { PlannerHorizon } from "@/types/companionPlanner";
 
-import { useCalendarTasks } from "@/hooks/useCalendarTasks";
-import { useDailyTasks } from "@/hooks/useDailyTasks";
+import { useCalendarQuests } from "@/hooks/useCalendarQuests";
 import { useExternalCalendarEvents } from "@/hooks/useExternalCalendarEvents";
+import { useQuests } from "@/hooks/useQuests";
 import { useQuestCalendarSync } from "@/hooks/useQuestCalendarSync";
 import {
   toCalendarItemFromExternalEvent,
@@ -29,10 +29,10 @@ export const useCalendarItems = (
   const externalEvents = useExternalCalendarEvents(selectedDate, horizon, {
     enabled: enabled && includeExternal,
   });
-  const dayQuests = useDailyTasks(selectedDate, {
+  const dayQuests = useQuests(selectedDate, {
     enabled: enabled && includeQuests && horizon === "day",
   });
-  const rangeQuests = useCalendarTasks(
+  const rangeQuests = useCalendarQuests(
     selectedDate,
     horizon === "month" ? "month" : "week",
     {
@@ -43,7 +43,7 @@ export const useCalendarItems = (
     enabled: enabled && includeQuests,
   });
 
-  const questTasks = horizon === "day" ? dayQuests.tasks : rangeQuests.tasks;
+  const questTasks = horizon === "day" ? dayQuests.quests : rangeQuests.quests;
   const questLoading = horizon === "day" ? dayQuests.isLoading : rangeQuests.isLoading;
 
   const items = [
@@ -64,9 +64,9 @@ export const useCalendarItems = (
       user_id: "",
     })),
     ...questTasks
-      .map((task) => toCalendarItemFromQuest(task, {
-        calendarLinks: calendarSync.linksByTask.get(task.id),
-        outlookTaskLinks: calendarSync.outlookTaskLinksByTask.get(task.id),
+      .map((quest) => toCalendarItemFromQuest(quest, {
+        calendarLinks: calendarSync.linksByTask.get(quest.id),
+        outlookTaskLinks: calendarSync.outlookTaskLinksByTask.get(quest.id),
       }))
       .filter((item): item is NonNullable<typeof item> => item !== null),
   ].sort((left, right) => (

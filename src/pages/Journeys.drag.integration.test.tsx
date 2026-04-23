@@ -179,10 +179,10 @@ const mocks = vi.hoisted(() => ({
   },
   lastEditQuestDialogProps: null as null | {
     open?: boolean;
-    task?: {
+    quest?: {
       id: string;
-      task_text: string;
-      scheduled_time?: string | null;
+      title: string;
+      scheduledTime?: string | null;
     } | null;
     onSave?: (taskId: string, updates: Record<string, unknown>) => Promise<void>;
   },
@@ -386,10 +386,10 @@ vi.mock("@/components/StreakFreezePromptModal", () => ({
 vi.mock("@/features/quests/components/EditQuestDialog", () => ({
   EditQuestDialog: (props: {
     open?: boolean;
-    task?: {
+    quest?: {
       id: string;
-      task_text: string;
-      scheduled_time?: string | null;
+      title: string;
+      scheduledTime?: string | null;
     } | null;
     onSave?: (taskId: string, updates: Record<string, unknown>) => Promise<void>;
   }) => {
@@ -593,9 +593,9 @@ vi.mock("@/hooks/useInboxTasks", () => ({
   }),
 }));
 
-vi.mock("@/hooks/useCalendarTasks", () => ({
-  useCalendarTasks: () => ({
-    tasks: [],
+vi.mock("@/hooks/useCalendarQuests", () => ({
+  useCalendarQuests: () => ({
+    quests: [],
   }),
 }));
 

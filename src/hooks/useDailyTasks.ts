@@ -1,5 +1,5 @@
 import { useTasksQuery, type DailyTask } from "./useTasksQuery";
-import { useTaskMutations, type AddTaskParams } from "./useTaskMutations";
+import { useQuestMutations, type CreateQuestParams } from "./useQuestMutations";
 
 interface DailyTasksOptions {
   enabled?: boolean;
@@ -20,15 +20,15 @@ export const useDailyTasks = (selectedDate?: Date, options: DailyTasksOptions = 
   } = useTasksQuery(selectedDate, { enabled });
   
   const { 
-    addTask, 
-    toggleTask, 
-    deleteTask, 
+    createQuest,
+    toggleQuest,
+    deleteQuest,
     setMainQuest,
-    updateTask,
-    reorderTasks,
-    moveTaskToSection,
-    moveTaskToDate,
-    restoreTask,
+    updateQuest,
+    reorderQuests,
+    moveQuestToSection,
+    moveQuestToDate,
+    restoreQuest,
     isAdding, 
     isToggling,
     isDeleting,
@@ -37,20 +37,20 @@ export const useDailyTasks = (selectedDate?: Date, options: DailyTasksOptions = 
     isMoving,
     isMovingDate,
     isRestoring,
-  } = useTaskMutations(taskDate);
+  } = useQuestMutations(taskDate);
 
   return {
     tasks,
     isLoading,
-    addTask,
-    toggleTask,
-    deleteTask,
+    addTask: createQuest,
+    toggleTask: toggleQuest,
+    deleteTask: deleteQuest,
     setMainQuest,
-    updateTask,
-    reorderTasks,
-    moveTaskToSection,
-    moveTaskToDate,
-    restoreTask,
+    updateTask: updateQuest,
+    reorderTasks: reorderQuests,
+    moveTaskToSection: moveQuestToSection,
+    moveTaskToDate: moveQuestToDate,
+    restoreTask: restoreQuest,
     isAdding,
     isToggling,
     isDeleting,
@@ -65,4 +65,4 @@ export const useDailyTasks = (selectedDate?: Date, options: DailyTasksOptions = 
 };
 
 // Re-export types for convenience
-export type { DailyTask, AddTaskParams };
+export type { DailyTask, CreateQuestParams as AddTaskParams };

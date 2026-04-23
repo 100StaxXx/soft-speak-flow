@@ -8,7 +8,7 @@ import {
   savePersonalQuestTemplate,
   type UpsertPersonalQuestTemplateInput,
 } from "@/features/quests/services/personalQuestTemplates";
-import { isValidDifficulty } from "@/types/quest";
+import { isValidQuestDifficulty } from "@/features/quests/validation";
 import {
   getAllLocalTasksForUser,
   getLocalSubtasksForTask,
@@ -68,7 +68,7 @@ const getTemplateRecencyTimestamp = (template: Pick<PersonalQuestTemplate, "last
 };
 
 const normalizeDifficulty = (difficulty: string | null): QuestDifficulty =>
-  isValidDifficulty(difficulty) ? difficulty : "medium";
+  isValidQuestDifficulty(difficulty) ? difficulty : "medium";
 
 export const isEligiblePersonalQuestTask = (task: DailyTask): boolean => {
   const normalizedTitle = normalizeQuestTemplateTitleForIdentity(task.task_text);

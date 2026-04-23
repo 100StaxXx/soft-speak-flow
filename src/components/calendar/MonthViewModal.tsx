@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, subMonths, startOfWeek, endOfWeek, setYear } from "date-fns";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import type { CalendarMilestone } from "@/features/epics/types";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { CalendarTask, CalendarMilestone } from "@/types/quest";
+import type { CalendarQuest } from "@/features/quests/display";
 import {
   Dialog,
   DialogContent,
@@ -15,7 +16,7 @@ interface MonthViewModalProps {
   onOpenChange: (open: boolean) => void;
   selectedDate: Date;
   onDateSelect: (date: Date) => void;
-  tasks: CalendarTask[];
+  quests: CalendarQuest[];
   milestones?: CalendarMilestone[];
 }
 
@@ -24,7 +25,7 @@ export function MonthViewModal({
   onOpenChange, 
   selectedDate, 
   onDateSelect, 
-  tasks,
+  quests,
   milestones = []
 }: MonthViewModalProps) {
   const [showYearView, setShowYearView] = useState(false);
@@ -62,9 +63,9 @@ export function MonthViewModal({
     onOpenChange(false);
   };
 
-  const getTasksForDate = (date: Date) => {
+  const getQuestsForDate = (date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
-    return tasks.filter(task => task.task_date === dateStr);
+    return quests.filter((quest) => quest.taskDate === dateStr);
   };
 
   const getMilestonesForDate = (date: Date) => {
@@ -85,7 +86,7 @@ export function MonthViewModal({
             onBack={() => setShowYearView(false)}
             onClose={handleClose}
             onYearChange={handleYearChange}
-            tasks={tasks}
+            quests={quests}
             milestones={milestones}
           />
         ) : (
@@ -137,12 +138,12 @@ export function MonthViewModal({
               {/* Calendar days */}
               <div className="grid grid-cols-7 gap-1">
                 {days.map((day) => {
-                  const dayTasks = getTasksForDate(day);
+                  const dayQuests = getQuestsForDate(day);
                   const dayMilestones = getMilestonesForDate(day);
                   const isSelected = isSameDay(day, selectedDate);
                   const isToday = isSameDay(day, new Date());
-                  const incompleteTasks = dayTasks.filter(t => !t.completed).length;
-                  const completedTasks = dayTasks.filter(t => t.completed).length;
+                  const incompleteTasks = dayQuests.filter((quest) => !quest.completed).length;
+                  const completedTasks = dayQuests.filter((quest) => quest.completed).length;
                   const hasMilestones = dayMilestones.length > 0;
 
                   return (

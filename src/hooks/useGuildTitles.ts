@@ -7,6 +7,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
+import { invalidateGuildTitleQueries } from "@/lib/guildQueryCache";
+import { queryKeys } from "@/lib/queryKeys";
 
 export interface GuildTitle {
   id: string;
@@ -41,7 +43,7 @@ export const useGuildTitles = ({ epicId, communityId }: UseGuildTitlesOptions) =
 
   // Fetch all available titles
   const { data: allTitles, isLoading: isLoadingTitles } = useQuery({
-    queryKey: ["guild-titles"],
+    queryKey: queryKeys.guild.titles(),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("guild_titles")
@@ -55,7 +57,7 @@ export const useGuildTitles = ({ epicId, communityId }: UseGuildTitlesOptions) =
 
   // Fetch user's earned titles
   const { data: myTitles, isLoading: isLoadingMyTitles } = useQuery({
-    queryKey: ["my-guild-titles", user?.id, epicId, communityId],
+    queryKey: queryKeys.guild.myTitles(user?.id, epicId, communityId),
     queryFn: async () => {
       if (!user) return [];
 
@@ -129,7 +131,13 @@ export const useGuildTitles = ({ epicId, communityId }: UseGuildTitlesOptions) =
         title: "Title updated! 👑",
         description: "Your new title is now displayed.",
       });
-      queryClient.invalidateQueries({ queryKey: ["my-guild-titles"] });
+      void invalidateGuildTitleQueries(queryClient, {
+        userId: user?.id,
+        epicId,
+        communityId,
+        includeMyTitlesAll: true,
+        includeMyTitlesDetail: true,
+      });
     },
     onError: (error: Error) => {
       toast({

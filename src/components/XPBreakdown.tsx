@@ -3,6 +3,7 @@ import { Card, outerShellCardClassName } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { queryKeys } from "@/lib/queryKeys";
 import { Sparkles, TrendingUp, Flame } from "lucide-react";
 import { useStreakMultiplier } from "@/hooks/useStreakMultiplier";
 import { cn, formatDisplayLabel } from "@/lib/utils";
@@ -15,7 +16,7 @@ export const XPBreakdown = memo(() => {
   const startOfTodayIso = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
 
   const { data: todayXP } = useQuery({
-    queryKey: ['xp-breakdown', today, user?.id],
+    queryKey: queryKeys.xp.breakdown(today, user?.id),
     queryFn: async () => {
       if (!user) return null;
 

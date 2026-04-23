@@ -37,7 +37,14 @@ import {
   getProgressionThreshold,
   resolveProgressionLevelFromXp,
 } from "@/config/progression";
+import {
+  companionContextQueryFamilyGroups,
+  invalidateCompanionQueries,
+  invalidateCompanionContextQueryFamilies,
+  refetchCompanionQueries,
+} from "@/lib/companionContextQueryCache";
 import { persistCompanionCustomName } from "@/lib/companionName";
+import { queryKeys } from "@/lib/queryKeys";
 
 export interface Companion {
   id: string;
@@ -85,7 +92,7 @@ export interface Companion {
 export const XP_REWARDS = SYSTEM_XP_REWARDS;
 
 export const getCompanionQueryKey = (userId: string | undefined) =>
-  ["companion", userId] as const;
+  queryKeys.companion.detail(userId);
 
 type CompanionEvolutionHistoryRow = {
   stage: number | null;
@@ -849,8 +856,11 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
         return;
       }
 
-      queryClient.invalidateQueries({ queryKey: getCompanionQueryKey(user?.id) });
-      queryClient.invalidateQueries({ queryKey: ["companion-health", user?.id] });
+      void invalidateCompanionQueries(queryClient, {
+        userId: user?.id,
+        includeDetail: true,
+        includeHealthDetail: true,
+      });
     }).catch((invokeError) => {
       logger.warn("Companion image focal backfill request threw", {
         companionId: companion.id,
@@ -927,7 +937,7 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
         ): Promise<CreateCompanionRpcResult> => {
           return await supabase.rpc(
             "create_companion_if_not_exists",
-            args,
+            args as never,
           ) as unknown as CreateCompanionRpcResult;
         };
 
@@ -1046,7 +1056,10 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
                   },
                 },
               });
-              queryClient.invalidateQueries({ queryKey: ["evolution-cards"] });
+              void invalidateCompanionContextQueryFamilies(
+                queryClient,
+                companionContextQueryFamilyGroups.evolutionCardsOnly,
+              );
             } catch (cardError) {
               console.error("Stage 0 card generation failed (non-critical):", cardError);
             }
@@ -1071,8 +1084,10 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
                 if (error) throw error;
 
                 logger.log("Stage 0 story generation started");
-                queryClient.invalidateQueries({ queryKey: ["companion-story"] });
-                queryClient.invalidateQueries({ queryKey: ["companion-stories-all"] });
+                await invalidateCompanionContextQueryFamilies(
+                  queryClient,
+                  companionContextQueryFamilyGroups.storyContent,
+                );
                 return;
               } catch (storyError) {
                 const errorMessage = storyError instanceof Error ? storyError.message : String(storyError);
@@ -1121,7 +1136,7 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
     },
     onSuccess: () => {
       companionCreationInProgress.current = false;
-      queryClient.invalidateQueries({ queryKey: ["companion"] });
+      void invalidateCompanionQueries(queryClient, { includeAll: true });
       logger.log("Companion creation successful!");
       // Don't show toast here - let the parent component handle success message
     },
@@ -1230,7 +1245,10 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
               },
             },
           });
-          queryClient.invalidateQueries({ queryKey: ["evolution-cards"] });
+          void invalidateCompanionContextQueryFamilies(
+            queryClient,
+            companionContextQueryFamilyGroups.evolutionCardsOnly,
+          );
         } catch (cardError) {
           console.error("Stage 1 card generation failed (non-critical):", cardError);
         }
@@ -1242,8 +1260,10 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
               stage: 1,
             },
           });
-          queryClient.invalidateQueries({ queryKey: ["companion-story"] });
-          queryClient.invalidateQueries({ queryKey: ["companion-stories-all"] });
+          await invalidateCompanionContextQueryFamilies(
+            queryClient,
+            companionContextQueryFamilyGroups.storyContent,
+          );
         } catch (storyError) {
           console.error("Stage 1 story generation failed (non-critical):", storyError);
         }
@@ -1274,12 +1294,11 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
       );
 
       setIsEvolvingLoading(false);
-      queryClient.invalidateQueries({ queryKey: ["companion"] });
-      queryClient.invalidateQueries({ queryKey: ["companion-story"] });
-      queryClient.invalidateQueries({ queryKey: ["companion-stories-all"] });
-      queryClient.invalidateQueries({ queryKey: ["companion-evolution-image"] });
-      queryClient.invalidateQueries({ queryKey: ["evolution-cards"] });
-      queryClient.invalidateQueries({ queryKey: ["current-evolution-card"] });
+      void invalidateCompanionQueries(queryClient, { includeAll: true });
+      void invalidateCompanionContextQueryFamilies(
+        queryClient,
+        companionContextQueryFamilyGroups.evolutionArtifacts,
+      );
     },
     onError: (error) => {
       setIsEvolvingLoading(false);
@@ -1312,8 +1331,11 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
 
       if (!companionToUse) {
         logger.warn('Companion not loaded yet, fetching...');
-        await queryClient.refetchQueries({ queryKey: ["companion", user.id] });
-        companionToUse = queryClient.getQueryData(["companion", user.id]) as Companion | null;
+        await refetchCompanionQueries(queryClient, {
+          userId: user.id,
+          includeDetail: true,
+        });
+        companionToUse = queryClient.getQueryData(queryKeys.companion.detail(user.id)) as Companion | null;
 
         if (!companionToUse) {
           throw new Error("No companion found. Please create one first.");
@@ -1323,7 +1345,7 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
       return await performXPAward(companionToUse, xpAmount, eventType, metadata, user, idempotencyKey);
     },
     onSuccess: ({ shouldEvolve, claimedStage, earnedLevel, earnedLevelBefore, pendingEvolutionCount }) => {
-      queryClient.invalidateQueries({ queryKey: ["companion"] });
+      void invalidateCompanionQueries(queryClient, { includeAll: true });
 
       if (shouldEvolve && earnedLevel > earnedLevelBefore) {
         const nextClaimedLevel = claimedStage + 1;
@@ -1551,10 +1573,11 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
       if (typeof result.newStage === "number") {
         await checkCompanionAchievements(result.newStage);
       }
-      queryClient.invalidateQueries({ queryKey: ["companion"] });
-      queryClient.invalidateQueries({ queryKey: ["companion-stories-all"] });
-      queryClient.invalidateQueries({ queryKey: ["evolution-cards"] });
-      queryClient.invalidateQueries({ queryKey: ["current-evolution-card"] });
+      void invalidateCompanionQueries(queryClient, { includeAll: true });
+      void invalidateCompanionContextQueryFamilies(
+        queryClient,
+        companionContextQueryFamilyGroups.evolutionProgression,
+      );
     },
     onError: (error) => {
       evolutionInProgress.current = false;

@@ -8,7 +8,7 @@ import { useIntentClassifier } from "@/hooks/useIntentClassifier";
 import type { IntentClassification } from "@/hooks/useIntentClassifier";
 import { useVoiceInput } from "@/hooks/useVoiceInput";
 import { useCalendarItems } from "@/hooks/useCalendarItems";
-import { useCalendarTasks } from "@/hooks/useCalendarTasks";
+import { useCalendarQuests } from "@/hooks/useCalendarQuests";
 import { useCampaigns } from "@/hooks/useCampaigns";
 import {
   createLegacyPlannerConfirmationHandlers,
@@ -16,8 +16,8 @@ import {
 } from "@/hooks/companionPlannerLegacyConfirmation";
 import { useInboxTasks } from "@/hooks/useInboxTasks";
 import { useJournalEntries } from "@/hooks/useJournalEntries";
+import { useQuestMutations } from "@/hooks/useQuestMutations";
 import { useQuests } from "@/hooks/useQuests";
-import { useTaskMutations } from "@/hooks/useTaskMutations";
 import { useRitualUpdate } from "@/hooks/useRitualUpdate";
 import { useUserAIContext } from "@/hooks/useUserAIContext";
 import { useAIInteractionTracker } from "@/hooks/useAIInteractionTracker";
@@ -50,12 +50,14 @@ import {
 import { formatCurrentDateTimeWithOffset } from "@/utils/currentDateTime";
 import { parseFunctionInvokeError } from "@/utils/supabaseFunctionErrors";
 import type { Json } from "@/integrations/supabase/types";
+import { invalidateCompanionChatThreadsQuery } from "@/lib/companionConversationQueryCache";
 import { stripMarkdown } from "@/lib/utils";
 import {
   generateCompanionThreadSessionId,
   getCompanionChatThreadsQueryKey,
   persistCompanionThreadMessages,
 } from "@/services/companionChatThreads";
+import { queryKeys } from "@/lib/queryKeys";
 import { LOCKED_COMPANION_TONE_PACK } from "@/shared/companionChaosVoice";
 import {
   buildConfirmReadyPlannerReply,
@@ -66,11 +68,18 @@ import {
   PLANNER_PENDING_ACTION_PROPOSAL_KINDS,
   getPlannerProposalPendingActionMetadata,
 } from "@/shared/companionPlannerPendingAction";
+import {
+  type PlannerTaskContextSource,
+  toLegacyPlannerTask,
+} from "@/shared/plannerTaskAdapters";
 import { computePlannerPriorityScores } from "@/shared/companionPlannerPriority";
 import type { CompanionStructuredResponse } from "@/shared/companionStructuredOutput";
-import { buildCompanionStatInterpretation } from "@/shared/companionStatSignals";
+import {
+  buildCompanionStatInterpretation,
+  type CompanionStatEventInput,
+} from "@/shared/companionStatSignals";
 import { withTimeout } from "@/utils/asyncTimeout";
-import type { CalendarItem, Campaign, Quest } from "@/types/domain";
+import type { CalendarItem, Campaign } from "@/types/domain";
 import type {
   CompanionChatSurface,
   CompanionChatThreadMessage,
@@ -237,7 +246,7 @@ const asNumberRecord = (
     Object.entries(value).filter(([, entry]) =>
       typeof entry === "number" && Number.isFinite(entry)
     ),
-  );
+  ) as Record<string, number>;
 };
 
 const parseReminderPreferenceMinutes = (
@@ -455,7 +464,7 @@ const mapMoodToEnergy = (
 
 const deriveStarterIntentFromMessage = (
   message: string,
-): CompanionPlannerStarterIntent => {
+): CompanionPlannerContextStarterIntent => {
   const normalizedMessage = message.trim().toLowerCase();
 
   if (normalizedMessage === "quest?") {
@@ -651,50 +660,6 @@ const summarizeProposalGenerationTelemetry = (
     fallbackProposalCount,
   };
 };
-
-type PlannerTaskContextSource = {
-  id: string;
-  task_text: string;
-  task_date: string | null;
-  category?: string | null;
-  scheduled_time: string | null;
-  estimated_duration?: number | null;
-  notes?: string | null;
-  subtasks?: Array<{ title: string | null } | null> | null;
-  difficulty?: string | null;
-  recurrence_pattern: string | null;
-  recurrence_end_date?: string | null;
-  completed?: boolean | null;
-  priority?: string | null;
-  source?: string | null;
-  habit_source_id?: string | null;
-  epic_id?: string | null;
-  epic_title?: string | null;
-  contact_id?: string | null;
-};
-
-const toLegacyPlannerTask = (quest: Quest): PlannerTaskContextSource => ({
-  id: quest.id,
-  task_text: quest.title,
-  task_date: quest.taskDate,
-  category: quest.category ?? null,
-  scheduled_time: quest.scheduledTime,
-  estimated_duration: quest.estimatedDuration ?? null,
-  notes: quest.notes ?? null,
-  subtasks: quest.subtasks.map((subtask) => ({
-    title: subtask.title,
-  })),
-  difficulty: quest.difficulty ?? null,
-  recurrence_pattern: quest.recurrencePattern,
-  recurrence_end_date: quest.recurrenceEndDate ?? null,
-  completed: quest.completed,
-  priority: quest.priority ?? null,
-  source: quest.source ?? null,
-  habit_source_id: quest.habitSourceId ?? null,
-  epic_id: quest.campaignId ?? null,
-  epic_title: quest.campaignTitle ?? null,
-  contact_id: quest.contactId ?? null,
-});
 
 const serializeTaskContext = (task: PlannerTaskContextSource): PlannerContextTask => ({
   id: task.id,
@@ -1000,8 +965,8 @@ export function useCompanionPlanner({
   const today = new Date();
   const todayIso = format(today, "yyyy-MM-dd");
   const todayQuestsQuery = useQuests(today, { enabled });
-  const weekTasksQuery = useCalendarTasks(today, "week", { enabled });
-  const monthTasksQuery = useCalendarTasks(today, "month", { enabled });
+  const weekQuestsQuery = useCalendarQuests(today, "week", { enabled });
+  const monthQuestsQuery = useCalendarQuests(today, "month", { enabled });
   const activeCalendarItemsQuery = useCalendarItems(today, horizon, {
     enabled,
     includeQuests: false,
@@ -1021,7 +986,7 @@ export function useCompanionPlanner({
     renameCampaign,
     createCampaignRitual,
   } = useCampaigns({ enabled });
-  const { addTask, updateTask } = useTaskMutations(todayIso);
+  const { createQuest, updateQuest } = useQuestMutations(todayIso);
   const { saveRitual } = useRitualUpdate();
   const { connectedByProvider, defaultProvider } = useCalendarIntegrations({
     enabled,
@@ -1070,7 +1035,7 @@ export function useCompanionPlanner({
   >(null);
 
   const plannerMemoryQuery = useQuery({
-    queryKey: ["companion-planner-memory", user?.id],
+    queryKey: queryKeys.companionPlanner.memory(user?.id),
     enabled: enabled && !!user?.id,
     staleTime: 5 * 60 * 1000,
     queryFn: async (): Promise<PlannerMemoryQueryResult | null> => {
@@ -1116,11 +1081,10 @@ export function useCompanionPlanner({
   });
 
   const contactsAttentionQuery = useQuery({
-    queryKey: [
-      "companion-planner-contacts",
+    queryKey: queryKeys.companionPlanner.contacts(
       user?.id,
       plannerMemoryQuery.data?.coldContactThresholdDays ?? 14,
-    ],
+    ),
     enabled: enabled && !!user?.id,
     staleTime: 5 * 60 * 1000,
     queryFn: async (): Promise<PlannerContactNeedingAttention[]> => {
@@ -1223,7 +1187,7 @@ export function useCompanionPlanner({
   );
 
   const recentStatSignalsQuery = useQuery({
-    queryKey: ["companion-planner-stat-signals", user?.id, todayIso],
+    queryKey: queryKeys.companionPlanner.statSignals(user?.id, todayIso),
     enabled: enabled && !!user?.id,
     staleTime: 5 * 60 * 1000,
     queryFn: async () => {
@@ -1269,19 +1233,21 @@ export function useCompanionPlanner({
   });
 
   const activeTasks = useMemo(() => {
-    if (horizon === "month") return monthTasksQuery.tasks;
-    if (horizon === "week") return weekTasksQuery.tasks;
+    if (horizon === "month") return monthQuestsQuery.quests.map(toLegacyPlannerTask);
+    if (horizon === "week") return weekQuestsQuery.quests.map(toLegacyPlannerTask);
     return todayQuestsQuery.quests.map(toLegacyPlannerTask);
   }, [
     horizon,
-    monthTasksQuery.tasks,
+    monthQuestsQuery.quests,
     todayQuestsQuery.quests,
-    weekTasksQuery.tasks,
+    weekQuestsQuery.quests,
   ]);
 
   const contextTasks = useMemo(() => (
-    horizon === "month" ? monthTasksQuery.tasks : weekTasksQuery.tasks
-  ), [horizon, monthTasksQuery.tasks, weekTasksQuery.tasks]);
+    horizon === "month"
+      ? monthQuestsQuery.quests.map(toLegacyPlannerTask)
+      : weekQuestsQuery.quests.map(toLegacyPlannerTask)
+  ), [horizon, monthQuestsQuery.quests, weekQuestsQuery.quests]);
 
   const activeCalendarEvents = useMemo<PlannerContextCalendarEvent[]>(
     () => mapCalendarItemsToContextEvents(activeCalendarItemsQuery.items),
@@ -1436,8 +1402,8 @@ export function useCompanionPlanner({
       recentEvents: (recentStatSignalsQuery.data?.recentEvents ?? []).map((
         event,
       ) => ({
-        attribute: event.attribute,
-        sourceEvent: event.source_event,
+        attribute: event.attribute as CompanionStatEventInput["attribute"],
+        sourceEvent: event.source_event as CompanionStatEventInput["sourceEvent"],
         amountAwarded: event.amount_awarded,
         echoAmount: event.echo_amount,
         createdAt: event.created_at,
@@ -1686,12 +1652,10 @@ export function useCompanionPlanner({
         rows,
       });
 
-      await queryClient.invalidateQueries({
-        queryKey: getCompanionChatThreadsQueryKey(
-          user.id,
-          companion.id,
-          threadPersistence.surface,
-        ),
+      await invalidateCompanionChatThreadsQuery(queryClient, {
+        userId: user.id,
+        companionId: companion.id,
+        surface: threadPersistence.surface,
       });
     } catch (error) {
       console.warn("Failed to persist journeys planner thread rows:", error);
@@ -2249,8 +2213,8 @@ export function useCompanionPlanner({
       activeTasks,
       inboxTasks,
       userId: user?.id,
-      addTask,
-      updateTask,
+      createQuest,
+      updateQuest,
       createCampaign,
       renameCampaign,
       createCampaignRitual,
@@ -2264,7 +2228,7 @@ export function useCompanionPlanner({
     }),
     [
       activeTasks,
-      addTask,
+      createQuest,
       createCampaign,
       createCampaignRitual,
       inboxTasks,
@@ -2276,7 +2240,7 @@ export function useCompanionPlanner({
       shouldQueueWrites,
       trackScheduleModification,
       trackTaskCreation,
-      updateTask,
+      updateQuest,
       user?.id,
     ],
   );
@@ -2695,8 +2659,8 @@ export function useCompanionPlanner({
     scheduleInsights,
     todayLabel: format(today, "EEEE, MMMM d"),
     isLoadingContext: todayQuestsQuery.isLoading ||
-      weekTasksQuery.isLoading ||
-      monthTasksQuery.isLoading ||
+      weekQuestsQuery.isLoading ||
+      monthQuestsQuery.isLoading ||
       activeCalendarItemsQuery.isLoading ||
       contextCalendarItemsQuery.isLoading ||
       plannerMemoryQuery.isLoading ||

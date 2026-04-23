@@ -10,6 +10,7 @@ import {
   loadCompanionChatThreadMessages,
   setCompanionChatThreadArchived,
 } from "@/services/companionChatThreads";
+import { invalidateCompanionChatThreadsQuery } from "@/lib/companionConversationQueryCache";
 import type {
   CompanionChatThreadMessage,
   CompanionChatThreadSummary,
@@ -364,7 +365,11 @@ export function useJourneysCompanionThreads({
     try {
       setLocallyArchivedSessionId(persistedActiveThread.sessionId);
       await setCompanionChatThreadArchived(persistedActiveThread.sessionId, true);
-      await queryClient.invalidateQueries({ queryKey: threadsQueryKey });
+      await invalidateCompanionChatThreadsQuery(queryClient, {
+        userId,
+        companionId,
+        surface: "journeys",
+      });
     } catch (error) {
       setLocallyArchivedSessionId(null);
       console.error("Failed to archive journeys companion thread:", error);
@@ -386,7 +391,11 @@ export function useJourneysCompanionThreads({
       }
 
       openFreshThread();
-      await queryClient.invalidateQueries({ queryKey: threadsQueryKey });
+      await invalidateCompanionChatThreadsQuery(queryClient, {
+        userId,
+        companionId,
+        surface: "journeys",
+      });
     } catch (error) {
       setLocallyArchivedSessionId(null);
       console.error("Failed to start a fresh journeys companion thread:", error);
@@ -424,7 +433,11 @@ export function useJourneysCompanionThreads({
 
         setLocallyArchivedSessionId(threadToArchive.sessionId);
         await setCompanionChatThreadArchived(threadToArchive.sessionId, true);
-        await queryClient.invalidateQueries({ queryKey: threadsQueryKey });
+        await invalidateCompanionChatThreadsQuery(queryClient, {
+          userId,
+          companionId,
+          surface: "journeys",
+        });
       } catch (error) {
         setLocallyArchivedSessionId(null);
         console.warn("Failed to archive the previous journeys template thread:", error);
@@ -473,7 +486,11 @@ export function useJourneysCompanionThreads({
         messages: mapPlannerMessages(visibleThreadMessages),
       });
 
-      await queryClient.invalidateQueries({ queryKey: threadsQueryKey });
+      await invalidateCompanionChatThreadsQuery(queryClient, {
+        userId,
+        companionId,
+        surface: "journeys",
+      });
     } catch (error) {
       if (threadMutationVersionRef.current !== hydrationVersion) return;
       console.error("Failed to resume journeys companion thread:", error);

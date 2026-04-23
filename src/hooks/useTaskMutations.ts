@@ -8,6 +8,20 @@ import { useCompanionAttributes } from "@/hooks/useCompanionAttributes";
 import { useXPToast } from "@/contexts/XPContext";
 import { useXPRewards } from "@/hooks/useXPRewards";
 import { useSchedulingLearner } from "@/hooks/useSchedulingLearner";
+import {
+  campaignContextQueryFamilyGroups,
+  invalidateCampaignContextQueryFamilies,
+} from "@/lib/campaignContextQueryCache";
+import { queryKeys } from "@/lib/queryKeys";
+import {
+  cancelTaskQueryFamilies,
+  invalidateTaskQueryFamilies,
+  restoreTaskQueryFamilies,
+  setTaskQueryFamiliesData,
+  snapshotTaskQueryFamilies,
+  taskQueryFamilyGroups,
+} from "@/lib/taskQueryCache";
+import { invalidateQuestAutocompleteQueries } from "@/lib/questAutocompleteQueryCache";
 import { useRef, createElement } from "react";
 import { getEffectiveQuestXP, MAIN_QUEST_XP_MULTIPLIER } from "@/config/xpRewards";
 import { calculateGuildBonus } from "@/utils/guildBonus";
@@ -1206,13 +1220,8 @@ export const useTaskMutations = (taskDate: string) => {
       }
     }),
     onMutate: async (params: AddTaskParams) => {
-      // Cancel outgoing refetches
-      await queryClient.cancelQueries({ queryKey: ['daily-tasks'] });
-      await queryClient.cancelQueries({ queryKey: ['calendar-tasks'] });
-
-      // Snapshot previous values
-      const previousDailyTasks = queryClient.getQueriesData({ queryKey: ['daily-tasks'] });
-      const previousCalendarTasks = queryClient.getQueriesData({ queryKey: ['calendar-tasks'] });
+      await cancelTaskQueryFamilies(queryClient, taskQueryFamilyGroups.planner);
+      const previousTaskQueries = snapshotTaskQueryFamilies(queryClient, taskQueryFamilyGroups.planner);
 
       const normalizedScheduling = normalizeTaskSchedulingState({
         task_date: params.taskDate !== undefined ? params.taskDate : taskDate,
@@ -1263,26 +1272,16 @@ export const useTaskMutations = (taskDate: string) => {
 
       // Only update the specific day query to avoid cross-day cache pollution
       if (optimisticTask.task_date) {
-        queryClient.setQueryData(['daily-tasks', user?.id, optimisticTask.task_date], (old: any) => {
+        queryClient.setQueryData(queryKeys.dailyTasks.byDate(user?.id, optimisticTask.task_date), (old: any) => {
           if (!old || !Array.isArray(old)) return old;
           return [optimisticTask, ...old];
         });
       }
 
-      return { previousDailyTasks, previousCalendarTasks };
+      return { previousTaskQueries };
     },
     onError: (error: Error, _params, context) => {
-      // Rollback on error
-      if (context?.previousDailyTasks) {
-        context.previousDailyTasks.forEach(([queryKey, data]) => {
-          queryClient.setQueryData(queryKey, data);
-        });
-      }
-      if (context?.previousCalendarTasks) {
-        context.previousCalendarTasks.forEach(([queryKey, data]) => {
-          queryClient.setQueryData(queryKey, data);
-        });
-      }
+      restoreTaskQueryFamilies(queryClient, context?.previousTaskQueries);
       reportApiFailure(error, { source: "task_add_onError" });
       toast({
         title: "Failed to add quest",
@@ -1291,11 +1290,12 @@ export const useTaskMutations = (taskDate: string) => {
       });
     },
     onSettled: () => {
-      // Refetch to sync with server
-      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
-      queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
-      queryClient.invalidateQueries({ queryKey: ['inbox-tasks'] });
-      queryClient.invalidateQueries({ queryKey: ['inbox-count'] });
+      void invalidateTaskQueryFamilies(queryClient, taskQueryFamilyGroups.plannerAndInbox);
+      void invalidateQuestAutocompleteQueries(queryClient, {
+        userId: user?.id,
+        includeTaskHistoryAll: true,
+        includeTaskHistoryDetail: true,
+      });
     },
     onSuccess: (data) => {
       const createdTask = data as TaskCreateMutationResult | undefined;
@@ -1581,14 +1581,13 @@ export const useTaskMutations = (taskDate: string) => {
         taskCategory,
         contactId,
       } = result ?? {};
-      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
-      queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
+      void invalidateTaskQueryFamilies(queryClient, taskQueryFamilyGroups.planner);
 
       if (habitSourceId) {
-        queryClient.invalidateQueries({ queryKey: ['habit-completions'] });
-        queryClient.invalidateQueries({ queryKey: ['habits'] });
-        queryClient.invalidateQueries({ queryKey: ['habit-surfacing'] });
-        queryClient.invalidateQueries({ queryKey: ['epics'] });
+        void invalidateCampaignContextQueryFamilies(
+          queryClient,
+          [...campaignContextQueryFamilyGroups.habitCompletionState, "habitSurfacing", "epics"],
+        );
       }
 
       if (result?.queued) {
@@ -1778,8 +1777,12 @@ export const useTaskMutations = (taskDate: string) => {
       return { queued: false };
     }),
     onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
-      queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
+      void invalidateTaskQueryFamilies(queryClient, taskQueryFamilyGroups.planner);
+      void invalidateQuestAutocompleteQueries(queryClient, {
+        userId: user?.id,
+        includeTaskHistoryAll: true,
+        includeTaskHistoryDetail: true,
+      });
       if ((result as { queued?: boolean } | undefined)?.queued) {
         toast({
           title: "Quest deletion queued",
@@ -1923,8 +1926,12 @@ export const useTaskMutations = (taskDate: string) => {
       }
     }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
-      queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
+      void invalidateTaskQueryFamilies(queryClient, taskQueryFamilyGroups.planner);
+      void invalidateQuestAutocompleteQueries(queryClient, {
+        userId: user?.id,
+        includeTaskHistoryAll: true,
+        includeTaskHistoryDetail: true,
+      });
     },
     onError: (error: Error) => {
       toast({ title: "Failed to restore quest", description: error.message, variant: "destructive" });
@@ -1990,8 +1997,7 @@ export const useTaskMutations = (taskDate: string) => {
       return { queued: false };
     }),
     onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
-      queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
+      void invalidateTaskQueryFamilies(queryClient, taskQueryFamilyGroups.planner);
       toast({
         title: result?.queued ? "Main quest saved offline" : "Main quest updated!",
         description: result?.queued ? "We'll sync this change when connection is restored." : undefined,
@@ -2224,8 +2230,12 @@ export const useTaskMutations = (taskDate: string) => {
       };
     }),
     onSuccess: (data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
-      queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
+      void invalidateTaskQueryFamilies(queryClient, taskQueryFamilyGroups.planner);
+      void invalidateQuestAutocompleteQueries(queryClient, {
+        userId: user?.id,
+        includeTaskHistoryAll: true,
+        includeTaskHistoryDetail: true,
+      });
 
       if (data?.queued) {
         toast({
@@ -2333,19 +2343,13 @@ export const useTaskMutations = (taskDate: string) => {
       return { queued: false };
     }),
     onMutate: async (reorderedTasks: { id: string; sort_order: number }[]) => {
-      // Cancel outgoing refetches to prevent race conditions
-      await queryClient.cancelQueries({ queryKey: ['daily-tasks'] });
-      await queryClient.cancelQueries({ queryKey: ['calendar-tasks'] });
-
-      // Snapshot previous values for rollback
-      const previousDailyTasks = queryClient.getQueriesData({ queryKey: ['daily-tasks'] });
-      const previousCalendarTasks = queryClient.getQueriesData({ queryKey: ['calendar-tasks'] });
+      await cancelTaskQueryFamilies(queryClient, taskQueryFamilyGroups.planner);
+      const previousTaskQueries = snapshotTaskQueryFamilies(queryClient, taskQueryFamilyGroups.planner);
 
       // Create a map of new sort orders
       const sortOrderMap = new Map(reorderedTasks.map(t => [t.id, t.sort_order]));
 
-      // Optimistically update all daily-tasks queries
-      queryClient.setQueriesData({ queryKey: ['daily-tasks'] }, (old: any) => {
+      setTaskQueryFamiliesData(queryClient, taskQueryFamilyGroups.planner, (old) => {
         if (!old || !Array.isArray(old)) return old;
         return [...old]
           .map(task => ({
@@ -2357,39 +2361,14 @@ export const useTaskMutations = (taskDate: string) => {
           .sort((a, b) => (a.sort_order ?? 999) - (b.sort_order ?? 999));
       });
 
-      // Optimistically update all calendar-tasks queries
-      queryClient.setQueriesData({ queryKey: ['calendar-tasks'] }, (old: any) => {
-        if (!old || !Array.isArray(old)) return old;
-        return [...old]
-          .map(task => ({
-            ...task,
-            sort_order: sortOrderMap.has(task.id) 
-              ? sortOrderMap.get(task.id) 
-              : task.sort_order
-          }))
-          .sort((a, b) => (a.sort_order ?? 999) - (b.sort_order ?? 999));
-      });
-
-      return { previousDailyTasks, previousCalendarTasks };
+      return { previousTaskQueries };
     },
     onError: (error: Error, _params, context) => {
-      // Rollback to previous state on error
-      if (context?.previousDailyTasks) {
-        context.previousDailyTasks.forEach(([queryKey, data]: [any, any]) => {
-          queryClient.setQueryData(queryKey, data);
-        });
-      }
-      if (context?.previousCalendarTasks) {
-        context.previousCalendarTasks.forEach(([queryKey, data]: [any, any]) => {
-          queryClient.setQueryData(queryKey, data);
-        });
-      }
+      restoreTaskQueryFamilies(queryClient, context?.previousTaskQueries);
       toast({ title: "Failed to reorder quests", description: error.message, variant: "destructive" });
     },
     onSettled: () => {
-      // Sync with server after mutation settles
-      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
-      queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
+      void invalidateTaskQueryFamilies(queryClient, taskQueryFamilyGroups.planner);
     },
   });
 
@@ -2458,8 +2437,7 @@ export const useTaskMutations = (taskDate: string) => {
       return { ...normalizedScheduling, queued: false };
     }),
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
-      queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
+      void invalidateTaskQueryFamilies(queryClient, taskQueryFamilyGroups.planner);
       if (data?.queued) {
         toast({
           title: "Quest move queued",
@@ -2548,24 +2526,12 @@ export const useTaskMutations = (taskDate: string) => {
       };
     }),
     onMutate: async () => {
-      // Cancel outgoing refetches
-      await queryClient.cancelQueries({ queryKey: ['daily-tasks'] });
-      await queryClient.cancelQueries({ queryKey: ['calendar-tasks'] });
-
-      // Snapshot previous values
-      const previousDaily = queryClient.getQueriesData({ queryKey: ['daily-tasks'] });
-      const previousCalendar = queryClient.getQueriesData({ queryKey: ['calendar-tasks'] });
-
-      return { previousDaily, previousCalendar };
+      await cancelTaskQueryFamilies(queryClient, taskQueryFamilyGroups.planner);
+      const previousTaskQueries = snapshotTaskQueryFamilies(queryClient, taskQueryFamilyGroups.planner);
+      return { previousTaskQueries };
     },
     onError: (error: Error, _vars, context) => {
-      // Rollback on error
-      if (context?.previousDaily) {
-        context.previousDaily.forEach(([key, data]) => queryClient.setQueryData(key, data));
-      }
-      if (context?.previousCalendar) {
-        context.previousCalendar.forEach(([key, data]) => queryClient.setQueryData(key, data));
-      }
+      restoreTaskQueryFamilies(queryClient, context?.previousTaskQueries);
       toast({ title: "Failed to move quest", description: error.message, variant: "destructive" });
     },
     onSuccess: (data) => {
@@ -2583,8 +2549,7 @@ export const useTaskMutations = (taskDate: string) => {
       }
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
-      queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
+      void invalidateTaskQueryFamilies(queryClient, taskQueryFamilyGroups.planner);
     },
   });
 

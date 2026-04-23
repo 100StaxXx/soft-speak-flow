@@ -9,6 +9,12 @@ import { useAchievements } from "@/hooks/useAchievements";
 import { format } from "date-fns";
 import type { StoryTypeSlug } from "@/types/narrativeTypes";
 import { getEpicsQueryKey, type EpicRecord } from "@/hooks/epicsQuery";
+import {
+  campaignContextQueryFamilyGroups,
+  invalidateCampaignContextQueryFamilies,
+} from "@/lib/campaignContextQueryCache";
+import { invalidateEpicMilestonesQuery } from "@/lib/epicResourceQueryCache";
+import { invalidateTaskQueryFamilies } from "@/lib/taskQueryCache";
 import { requestJourneyPathGeneration } from "@/utils/journeyPathCache";
 import { useResilience } from "@/contexts/ResilienceContext";
 import {
@@ -185,6 +191,7 @@ type LocalHabitRow = {
   current_streak: number | null;
   longest_streak: number | null;
   created_at: string | null;
+  sort_order?: number | null;
 };
 
 type LocalEpicRow = EpicRecord;
@@ -319,6 +326,7 @@ export interface CreateCampaignRitualResult {
 type LocalTaskEpicTitleRow = {
   id: string;
   user_id: string;
+  task_date: string | null;
   epic_id: string | null;
   epic_title?: string | null;
 };
@@ -693,7 +701,7 @@ async function applyLocalEpicStatusChange(userId: string, epicId: string, status
     getLocalEpicHabits<Array<{ id: string; epic_id: string; habit_id: string }>[number]>([epicId]),
     getLocalHabits<LocalHabitRow>(userId),
     getLocalEpicMilestones<Array<{ id: string; epic_id: string; user_id: string }>[number]>(epicId),
-    getAllLocalTasksForUser<Array<{ id: string; habit_source_id: string | null; task_date: string | null; completed: boolean | null }>[number]>(userId),
+    getAllLocalTasksForUser<Array<{ id: string; user_id: string; habit_source_id: string | null; task_date: string | null; completed: boolean | null }>[number]>(userId),
   ]);
 
   const today = format(new Date(), "yyyy-MM-dd");
@@ -777,7 +785,7 @@ async function applyLocalEpicDelete(userId: string, epicId: string) {
     getLocalHabits<LocalHabitRow>(userId),
     getLocalJourneyPhases<Array<{ id: string; epic_id: string; user_id: string }>[number]>(epicId),
     getLocalEpicMilestones<Array<{ id: string; epic_id: string; user_id: string }>[number]>(epicId),
-    getLocalJourneyPaths<Array<{ id: string; epic_id: string; user_id: string }>[number]>(userId),
+    getLocalJourneyPaths<Array<{ id: string; epic_id: string; user_id: string; milestone_index: number; image_url: string; generated_at: string }>[number]>(userId),
     getAllLocalTasksForUser<LocalTaskCampaignCleanupRow>(userId),
     getLocalHabitCompletions<Array<{ id: string; habit_id: string | null; user_id: string; date: string }>[number]>(userId),
   ]);
@@ -1024,7 +1032,7 @@ export const useEpics = (options: EpicsOptions = {}) => {
   const [hasHydratedFromRemote, setHasHydratedFromRemote] = useState(() => !enabled || !user?.id);
 
   const epicsQuery = useQuery({
-    queryKey: ["epics", user?.id],
+    queryKey: getEpicsQueryKey(user?.id),
     queryFn: async () => {
       if (!user?.id) return [];
       return loadLocalEpics(user.id);
@@ -1361,11 +1369,11 @@ export const useEpics = (options: EpicsOptions = {}) => {
       });
     },
     onSuccess: async ({ queued, epic, isNewCreate }) => {
-      queryClient.invalidateQueries({ queryKey: ["epics"] });
-      queryClient.invalidateQueries({ queryKey: ["habits"] });
-      queryClient.invalidateQueries({ queryKey: ["habit-surfacing"] });
-      queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
-      queryClient.invalidateQueries({ queryKey: ["user-ai-context"] });
+      void invalidateCampaignContextQueryFamilies(
+        queryClient,
+        campaignContextQueryFamilyGroups.campaignContext,
+      );
+      void invalidateTaskQueryFamilies(queryClient, ["daily"]);
 
       if (!queued && isNewCreate && user?.id) {
         const { count } = await supabase
@@ -1482,11 +1490,11 @@ export const useEpics = (options: EpicsOptions = {}) => {
       return { epic, status, wasAlreadyCompleted: epic.status === "completed", queued: false };
     },
     onSuccess: async ({ epic, status, wasAlreadyCompleted, queued }, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["epics"] });
-      queryClient.invalidateQueries({ queryKey: ["habits"] });
-      queryClient.invalidateQueries({ queryKey: ["habit-surfacing"] });
-      queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
-      queryClient.invalidateQueries({ queryKey: ["user-ai-context"] });
+      void invalidateCampaignContextQueryFamilies(
+        queryClient,
+        campaignContextQueryFamilyGroups.campaignContext,
+      );
+      void invalidateTaskQueryFamilies(queryClient, ["daily"]);
 
       if (status === "completed" || status === "abandoned") {
         trackEpicOutcome(variables.epicId, status).catch((err) => {
@@ -1627,10 +1635,11 @@ export const useEpics = (options: EpicsOptions = {}) => {
       return { epic: nextEpic, updates: normalizedUpdates, queued: false };
     },
     onSuccess: ({ queued, updates }) => {
-      queryClient.invalidateQueries({ queryKey: ["epics"] });
-      queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
-      queryClient.invalidateQueries({ queryKey: ["habit-surfacing"] });
-      queryClient.invalidateQueries({ queryKey: ["user-ai-context"] });
+      void invalidateCampaignContextQueryFamilies(
+        queryClient,
+        ["epics", "habitSurfacing", "userAiContext"],
+      );
+      void invalidateTaskQueryFamilies(queryClient, ["daily"]);
 
       const changedKeys = Object.keys(updates);
       const titleOnly = changedKeys.length === 1 && changedKeys[0] === "title";
@@ -1704,12 +1713,12 @@ export const useEpics = (options: EpicsOptions = {}) => {
       return { epic, queued: false };
     },
     onSuccess: ({ epic, queued }) => {
-      queryClient.invalidateQueries({ queryKey: ["epics"] });
-      queryClient.invalidateQueries({ queryKey: ["habits"] });
-      queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
-      queryClient.invalidateQueries({ queryKey: ["habit-surfacing"] });
-      queryClient.invalidateQueries({ queryKey: ["user-ai-context"] });
-      queryClient.invalidateQueries({ queryKey: ["milestones", epic.id] });
+      void invalidateCampaignContextQueryFamilies(
+        queryClient,
+        campaignContextQueryFamilyGroups.campaignContext,
+      );
+      void invalidateTaskQueryFamilies(queryClient, ["daily"]);
+      void invalidateEpicMilestonesQuery(queryClient, epic.id);
 
       toast.success(queued ? "Campaign deletion saved offline" : "Campaign deleted", {
         description: queued
@@ -1776,7 +1785,7 @@ export const useEpics = (options: EpicsOptions = {}) => {
 
         await applyLocalCampaignRitualPayload(payload);
         await refreshEpicsQueryFromLocalStore(queryClient, user.id);
-        await queryClient.invalidateQueries({ queryKey: ["epics"] });
+        await invalidateCampaignContextQueryFamilies(queryClient, ["epics"]);
         dispatchPlannerSyncFinished();
 
         if (shouldQueueWrites) {
@@ -1814,7 +1823,7 @@ export const useEpics = (options: EpicsOptions = {}) => {
             try {
               await rollbackLocalCampaignRitualPayload(payload);
               await refreshEpicsQueryFromLocalStore(queryClient, user.id);
-              await queryClient.invalidateQueries({ queryKey: ["epics"] });
+              await invalidateCampaignContextQueryFamilies(queryClient, ["epics"]);
               dispatchPlannerSyncFinished();
             } catch (rollbackError) {
               console.warn("Failed to roll back local campaign ritual after create error:", rollbackError);
@@ -1845,10 +1854,10 @@ export const useEpics = (options: EpicsOptions = {}) => {
       });
     },
     onSuccess: ({ queued, habit }) => {
-      queryClient.invalidateQueries({ queryKey: ["epics"] });
-      queryClient.invalidateQueries({ queryKey: ["habits"] });
-      queryClient.invalidateQueries({ queryKey: ["habit-surfacing"] });
-      queryClient.invalidateQueries({ queryKey: ["user-ai-context"] });
+      void invalidateCampaignContextQueryFamilies(
+        queryClient,
+        campaignContextQueryFamilyGroups.campaignContext,
+      );
 
       toast.success(queued ? "Ritual saved offline" : "Ritual added to campaign!", {
         description: queued
@@ -1896,7 +1905,7 @@ export const useEpics = (options: EpicsOptions = {}) => {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["epics"] });
+      void invalidateCampaignContextQueryFamilies(queryClient, ["epics"]);
       toast.success("Habit linked to epic! ⚔️");
     },
     onError: (error) => {
@@ -1935,7 +1944,7 @@ export const useEpics = (options: EpicsOptions = {}) => {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["epics"] });
+      void invalidateCampaignContextQueryFamilies(queryClient, ["epics"]);
       toast("Habit removed from epic");
     },
     onError: (error) => {

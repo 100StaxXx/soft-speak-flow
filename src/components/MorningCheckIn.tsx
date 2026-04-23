@@ -11,7 +11,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useMentorPersonality } from "@/hooks/useMentorPersonality";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { JOURNAL_ENTRIES_QUERY_KEY } from "@/hooks/useJournalEntries";
+import { invalidateMorningCheckInQueries } from "@/lib/dailyReflectionQueryCache";
+import { invalidateJournalEntryQueries } from "@/lib/journalEntryQueryCache";
+import { queryKeys } from "@/lib/queryKeys";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { CheckInErrorFallback } from "@/components/ErrorFallback";
 import { logger } from "@/utils/logger";
@@ -104,7 +106,7 @@ const MorningCheckInContent = () => {
   }, [personality?.avatar_url, personality?.slug, personality?.name]);
 
   const { data: existingCheckIn } = useQuery({
-    queryKey: ['morning-check-in', today, user?.id],
+    queryKey: queryKeys.checkIns.morningByDate(today, user?.id),
     queryFn: async () => {
       if (!user) return null;
       
@@ -250,8 +252,15 @@ const MorningCheckInContent = () => {
           variant: "destructive" 
         });
         setIsSubmitting(false);
-        queryClient.invalidateQueries({ queryKey: ['morning-check-in'] });
-        queryClient.invalidateQueries({ queryKey: JOURNAL_ENTRIES_QUERY_KEY });
+        void invalidateMorningCheckInQueries(queryClient, {
+          date: today,
+          userId: user.id,
+          includeAll: true,
+          includeByDate: true,
+          includeLatestAll: true,
+          includeLatestDetail: true,
+        });
+        void invalidateJournalEntryQueries(queryClient);
         return;
       }
 
@@ -329,8 +338,15 @@ const MorningCheckInContent = () => {
         });
       }
 
-      queryClient.invalidateQueries({ queryKey: ['morning-check-in'] });
-      queryClient.invalidateQueries({ queryKey: JOURNAL_ENTRIES_QUERY_KEY });
+      void invalidateMorningCheckInQueries(queryClient, {
+        date: today,
+        userId: user.id,
+        includeAll: true,
+        includeByDate: true,
+        includeLatestAll: true,
+        includeLatestDetail: true,
+      });
+      void invalidateJournalEntryQueries(queryClient);
     } catch (error) {
       logger.error('Check-in save error:', error);
       toast({ 

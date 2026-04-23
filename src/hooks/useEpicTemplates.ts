@@ -1,5 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { invalidateEpicTemplatesQuery } from "@/lib/epicResourceQueryCache";
+import { queryKeys } from "@/lib/queryKeys";
 
 export interface EpicTemplate {
   id: string;
@@ -25,7 +27,7 @@ export const useEpicTemplates = () => {
   const queryClient = useQueryClient();
 
   const { data: templates, isLoading } = useQuery<EpicTemplate[]>({
-    queryKey: ["epic-templates"],
+    queryKey: queryKeys.epics.templates(),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("epic_templates")
@@ -63,7 +65,7 @@ export const useEpicTemplates = () => {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["epic-templates"] });
+      void invalidateEpicTemplatesQuery(queryClient);
     },
   });
 

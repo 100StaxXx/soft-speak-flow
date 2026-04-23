@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { ComponentProps, ReactNode } from "react";
-import type { CalendarTask } from "@/types/quest";
+import type { CalendarQuest } from "@/features/quests/display";
 
 const mocks = vi.hoisted(() => ({
   playSound: vi.fn(),
@@ -51,22 +51,22 @@ vi.mock("./QuestDropZone", () => ({
 
 vi.mock("./QuestDragCard", () => ({
   QuestDragCard: ({
-    task,
+    quest,
     onDragStart,
     onDragEnd,
   }: {
-    task: { id: string; task_text: string };
+    quest: { id: string; title: string };
     onDragStart?: (e: React.DragEvent<HTMLDivElement>) => void;
     onDragEnd?: (e: React.DragEvent<HTMLDivElement>) => void;
   }) => (
     <div
-      data-testid={`quest-card-${task.id}`}
+      data-testid={`quest-card-${quest.id}`}
       data-quest-card="true"
       draggable={Boolean(onDragStart)}
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
     >
-      {task.task_text}
+      {quest.title}
     </div>
   ),
 }));
@@ -85,17 +85,26 @@ import { CalendarWeekView } from "./CalendarWeekView";
 
 const selectedDate = new Date("2026-02-13T09:00:00.000Z");
 
-const baseTask = (overrides: Partial<CalendarTask> = {}): CalendarTask => ({
-  id: "task-1",
-  task_text: "Week quest",
-  task_date: "2026-02-13",
-  scheduled_time: "09:00",
-  estimated_duration: 30,
+const baseQuest = (overrides: Partial<CalendarQuest> = {}): CalendarQuest => ({
+  id: "quest-1",
+  title: "Week quest",
+  taskDate: "2026-02-13",
+  scheduledTime: "09:00",
+  estimatedDuration: 30,
   completed: false,
-  is_main_quest: false,
+  isMainQuest: false,
   difficulty: "medium",
-  xp_reward: 20,
+  xpReward: 20,
   category: null,
+  habitSourceId: null,
+  notes: null,
+  priority: null,
+  isRecurring: false,
+  recurrencePattern: null,
+  imageUrl: null,
+  attachments: [],
+  subtasks: [],
+  location: null,
   ...overrides,
 });
 
@@ -103,14 +112,14 @@ const createDataTransfer = (taskId: string = "") => ({
   getData: vi.fn((key: string) => (key === "taskId" ? taskId : "")),
 });
 
-const setup = (tasks: CalendarTask[], overrides?: Partial<ComponentProps<typeof CalendarWeekView>>) => {
+const setup = (quests: CalendarQuest[], overrides?: Partial<ComponentProps<typeof CalendarWeekView>>) => {
   const onTaskDrop = vi.fn();
 
   render(
     <CalendarWeekView
       selectedDate={selectedDate}
       onDateSelect={vi.fn()}
-      tasks={tasks}
+      quests={quests}
       onTaskDrop={onTaskDrop}
       {...overrides}
     />,
@@ -146,8 +155,8 @@ describe("CalendarWeekView drops", () => {
 
   it("blocks conflicting drop and keeps conflict error path", () => {
     const { onTaskDrop } = setup([
-      baseTask({ id: "task-a", task_text: "Conflict A", scheduled_time: "09:00" }),
-      baseTask({ id: "task-b", task_text: "Conflict B", scheduled_time: "09:30" }),
+      baseQuest({ id: "quest-a", title: "Conflict A", scheduledTime: "09:00" }),
+      baseQuest({ id: "quest-b", title: "Conflict B", scheduledTime: "09:30" }),
     ]);
     const conflictZone = screen.getAllByTestId("drop-zone-conflict")[0];
     const dataTransfer = createDataTransfer("drop-task-conflict");

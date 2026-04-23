@@ -2,12 +2,14 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { invalidateCosmicLibraryQueries } from "@/lib/cosmicLibraryQueryCache";
+import { queryKeys } from "@/lib/queryKeys";
 import { NarrativeEpic, StorySeed } from "@/types/narrativeTypes";
 
 // Fetch narrative epic with story seed
 export const useNarrativeEpic = (epicId: string | undefined) => {
   const { data: epic, isLoading } = useQuery({
-    queryKey: ['narrative-epic', epicId],
+    queryKey: queryKeys.narrative.epic(epicId),
     queryFn: async () => {
       if (!epicId) return null;
 
@@ -39,7 +41,7 @@ export const useNarrativeEpic = (epicId: string | undefined) => {
 // Fetch story types for epic creation
 export const useStoryTypes = () => {
   const { data: storyTypes, isLoading } = useQuery({
-    queryKey: ['story-types'],
+    queryKey: queryKeys.narrative.storyTypes(),
     queryFn: async () => {
       const { data, error } = await supabase
         .from('epic_story_types')
@@ -114,8 +116,12 @@ export const useGenerateNarrativeSeed = () => {
       return data;
     },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['narrative-epic', variables.epicId] });
-      queryClient.invalidateQueries({ queryKey: ['story-characters'] });
+      void invalidateCosmicLibraryQueries(queryClient, {
+        epicId: variables.epicId,
+        includeNarrativeEpicAll: true,
+        includeNarrativeEpicDetail: true,
+        includeStoryCharactersAll: true,
+      });
     },
   });
 };

@@ -6,8 +6,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useVoiceInput } from "@/hooks/useVoiceInput";
 import { supabase } from "@/integrations/supabase/client";
+import { invalidateCompanionChatThreadsQuery } from "@/lib/companionConversationQueryCache";
 import { stripMarkdown } from "@/lib/utils";
-import { getCompanionChatThreadsQueryKey } from "@/services/companionChatThreads";
 import type {
   CompanionChatJourneysContext,
   CompanionChatInputMode,
@@ -216,8 +216,10 @@ export function useJourneysCompanionConversation(
         userAction: "accepted",
       });
 
-      void queryClient.invalidateQueries({
-        queryKey: getCompanionChatThreadsQueryKey(user.id, companion.id, "journeys"),
+      void invalidateCompanionChatThreadsQuery(queryClient, {
+        userId: user.id,
+        companionId: companion.id,
+        surface: "journeys",
       });
     } catch (error) {
       console.error("Failed to submit journeys companion message:", error);

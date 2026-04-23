@@ -3,18 +3,20 @@ import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 
 import { useAuth } from "@/hooks/useAuth";
-import { useCalendarTasks } from "@/hooks/useCalendarTasks";
-import { useEpics } from "@/hooks/useEpics";
+import { useCalendarQuests } from "@/hooks/useCalendarQuests";
+import { useCampaigns } from "@/hooks/useCampaigns";
 import { useExternalCalendarEvents } from "@/hooks/useExternalCalendarEvents";
 import { useInboxTasks } from "@/hooks/useInboxTasks";
 import { useTasksQuery } from "@/hooks/useTasksQuery";
 import { useUserAIContext } from "@/hooks/useUserAIContext";
+import { queryKeys } from "@/lib/queryKeys";
+import { toLegacyPlannerTask } from "@/shared/plannerTaskAdapters";
 import { sanitizePlannerContext } from "@/utils/companionPlannerRequest";
 import { buildCompanionPlannerScheduleInsights } from "@/utils/companionPlannerSchedule";
 import { formatCurrentDateTimeWithOffset } from "@/utils/currentDateTime";
 import type { Json } from "@/integrations/supabase/types";
 import { supabase } from "@/integrations/supabase/client";
-import type { EpicRecord } from "@/hooks/epicsQuery";
+import type { Campaign } from "@/types/domain";
 import type {
   CompanionPlannerProposal,
   CompanionPlannerProposalKind,
@@ -85,7 +87,7 @@ const asNumberRecord = (value: Json | null | undefined): Record<string, number> 
 
   return Object.fromEntries(
     Object.entries(value).filter(([, entry]) => typeof entry === "number" && Number.isFinite(entry)),
-  );
+  ) as Record<string, number>;
 };
 
 export const mapTasksToPlannerContext = (tasks: PlannerContextTask[]) =>
@@ -290,24 +292,24 @@ export const serializeTaskToPlannerContext = (task: {
   epicTitle: task.epic_title ?? null,
 });
 
-export const mapEpicsToPlannerContext = (epics: EpicRecord[]): PlannerContextEpic[] =>
-  epics.map((epic) => ({
-    id: epic.id,
-    title: epic.title,
-    endDate: epic.end_date,
+export const mapCampaignsToPlannerContext = (campaigns: Campaign[]): PlannerContextEpic[] =>
+  campaigns.map((campaign) => ({
+    id: campaign.id,
+    title: campaign.title,
+    endDate: campaign.endDate,
   }));
 
-export const mapRitualsToPlannerContext = (epics: EpicRecord[]): PlannerContextRitual[] =>
-  epics.flatMap((epic) =>
-    (epic.epic_habits ?? [])
-      .filter((link) => link.habits)
-      .map((link) => ({
-        id: link.habits?.id ?? link.habit_id,
-        epicId: epic.id,
-        epicTitle: epic.title,
-        title: link.habits?.title ?? "Untitled ritual",
-        frequency: link.habits?.frequency ?? null,
-        preferredTime: link.habits?.preferred_time ?? null,
+export const mapCampaignRitualsToPlannerContext = (campaigns: Campaign[]): PlannerContextRitual[] =>
+  campaigns.flatMap((campaign) =>
+    campaign.rituals
+      .filter((ritual) => ritual.habit)
+      .map((ritual) => ({
+        id: ritual.habit?.id ?? ritual.habitId,
+        epicId: campaign.id,
+        epicTitle: campaign.title,
+        title: ritual.habit?.title ?? "Untitled ritual",
+        frequency: ritual.habit?.frequency ?? null,
+        preferredTime: ritual.habit?.preferredTime ?? null,
       })),
   );
 
@@ -345,16 +347,16 @@ export function useCompanionPlanningContext({
   const today = new Date();
   const todayIso = format(today, "yyyy-MM-dd");
   const todayTasksQuery = useTasksQuery(today);
-  const weekTasksQuery = useCalendarTasks(today, "week");
-  const monthTasksQuery = useCalendarTasks(today, "month");
+  const weekQuestsQuery = useCalendarQuests(today, "week");
+  const monthQuestsQuery = useCalendarQuests(today, "month");
   const activeEventsQuery = useExternalCalendarEvents(today, horizon);
   const contextEventsQuery = useExternalCalendarEvents(today, horizon === "month" ? "month" : "week");
   const { inboxTasks } = useInboxTasks();
-  const { activeEpics } = useEpics();
+  const { activeCampaigns } = useCampaigns();
   const { enrichedContext } = useUserAIContext();
 
   const plannerMemoryQuery = useQuery({
-    queryKey: ["companion-planner-memory", user?.id],
+    queryKey: queryKeys.companionPlanner.memory(user?.id),
     enabled: !!user?.id,
     staleTime: 5 * 60 * 1000,
     queryFn: async (): Promise<PlannerMemoryQueryResult | null> => {
@@ -388,14 +390,16 @@ export function useCompanionPlanningContext({
   });
 
   const activeTasks = useMemo(() => {
-    if (horizon === "month") return monthTasksQuery.tasks;
-    if (horizon === "week") return weekTasksQuery.tasks;
+    if (horizon === "month") return monthQuestsQuery.quests.map(toLegacyPlannerTask);
+    if (horizon === "week") return weekQuestsQuery.quests.map(toLegacyPlannerTask);
     return todayTasksQuery.tasks;
-  }, [horizon, monthTasksQuery.tasks, todayTasksQuery.tasks, weekTasksQuery.tasks]);
+  }, [horizon, monthQuestsQuery.quests, todayTasksQuery.tasks, weekQuestsQuery.quests]);
 
   const contextTasks = useMemo(() => (
-    horizon === "month" ? monthTasksQuery.tasks : weekTasksQuery.tasks
-  ), [horizon, monthTasksQuery.tasks, weekTasksQuery.tasks]);
+    horizon === "month"
+      ? monthQuestsQuery.quests.map(toLegacyPlannerTask)
+      : weekQuestsQuery.quests.map(toLegacyPlannerTask)
+  ), [horizon, monthQuestsQuery.quests, weekQuestsQuery.quests]);
 
   const plannerMemory = useMemo<PlannerMemoryProfile>(() => {
     const remoteProfile = extractPlannerProfile(plannerMemoryQuery.data?.preferredWorkBlocks);
@@ -482,13 +486,13 @@ export function useCompanionPlanningContext({
     sanitizePlannerContext({
       tasks: mapTasksToPlannerContext(contextTasks.map(serializeTaskToPlannerContext)),
       inboxTasks: mapTasksToPlannerContext(inboxTasks.map(serializeTaskToPlannerContext)),
-      activeEpics: mapEpicsToPlannerContext(activeEpics),
-      rituals: mapRitualsToPlannerContext(activeEpics),
+      activeEpics: mapCampaignsToPlannerContext(activeCampaigns),
+      rituals: mapCampaignRitualsToPlannerContext(activeCampaigns),
       calendarEvents: contextEventsQuery.events,
       scheduleInsights,
       plannerMemory,
       aiSignals: enrichedContext,
-    }), [activeEpics, contextEventsQuery.events, contextTasks, enrichedContext, inboxTasks, plannerMemory, scheduleInsights]);
+    }), [activeCampaigns, contextEventsQuery.events, contextTasks, enrichedContext, inboxTasks, plannerMemory, scheduleInsights]);
 
   return {
     today,
@@ -499,15 +503,15 @@ export function useCompanionPlanningContext({
     activeCalendarEvents: activeEventsQuery.events as PlannerContextCalendarEvent[],
     contextCalendarEvents: contextEventsQuery.events as PlannerContextCalendarEvent[],
     inboxTasks,
-    activeEpics,
+    activeEpics: activeCampaigns,
     plannerMemory,
     plannerMemoryQuery,
     plannerContext,
     scheduleInsights,
     isLoadingContext:
       todayTasksQuery.isLoading
-      || weekTasksQuery.isLoading
-      || monthTasksQuery.isLoading
+      || weekQuestsQuery.isLoading
+      || monthQuestsQuery.isLoading
       || activeEventsQuery.isLoading
       || contextEventsQuery.isLoading
       || plannerMemoryQuery.isLoading,

@@ -3,6 +3,8 @@ import { useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
+import { invalidateDailyMissionQueries } from "@/lib/dailyMissionQueryCache";
+import { queryKeys } from "@/lib/queryKeys";
 
 export interface MorningBriefing {
   id: string;
@@ -39,7 +41,7 @@ export const useMorningBriefing = () => {
 
   // Fetch today's briefing
   const { data: briefing, isLoading, error, refetch } = useQuery({
-    queryKey: ['morning-briefing', today, user?.id],
+    queryKey: queryKeys.morningBriefing.byDate(today, user?.id),
     queryFn: async () => {
       if (!user) return null;
       
@@ -81,7 +83,11 @@ export const useMorningBriefing = () => {
       return data.briefing as MorningBriefing;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['morning-briefing'] });
+      void invalidateDailyMissionQueries(queryClient, {
+        missionDate: today,
+        userId: user?.id,
+        includeMorningBriefingAll: true,
+      });
     },
   });
 
@@ -96,7 +102,11 @@ export const useMorningBriefing = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['morning-briefing'] });
+      void invalidateDailyMissionQueries(queryClient, {
+        missionDate: today,
+        userId: user?.id,
+        includeMorningBriefingAll: true,
+      });
     },
   });
 
@@ -111,7 +121,11 @@ export const useMorningBriefing = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['morning-briefing'] });
+      void invalidateDailyMissionQueries(queryClient, {
+        missionDate: today,
+        userId: user?.id,
+        includeMorningBriefingAll: true,
+      });
     },
   });
 

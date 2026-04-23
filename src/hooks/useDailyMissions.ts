@@ -19,10 +19,15 @@ import {
   parseFunctionInvokeError,
   toUserFacingFunctionError,
 } from "@/utils/supabaseFunctionErrors";
+import { invalidateCompanionQueries } from "@/lib/companionContextQueryCache";
+import { invalidateDailyMissionQueries } from "@/lib/dailyMissionQueryCache";
+import { queryKeys } from "@/lib/queryKeys";
+import type { Tables } from "@/integrations/supabase/types";
 
 const MAX_MISSION_QUERY_RETRIES = 2;
 
 type MissionTheme = { name: string; emoji: string };
+type DailyMission = Tables<"daily_missions">;
 
 type MissionGenerationMeta = {
   source?: "ai" | "fallback";
@@ -31,7 +36,7 @@ type MissionGenerationMeta = {
 };
 
 type MissionGenerationResponse = {
-  missions?: unknown[];
+  missions?: DailyMission[];
   generated?: boolean;
   theme?: MissionTheme;
   meta?: MissionGenerationMeta;
@@ -131,8 +136,8 @@ export const useDailyMissions = () => {
     return newMissions;
   };
 
-  const { data: missions, isLoading, error } = useQuery({
-    queryKey: ['daily-missions', today, user?.id],
+  const { data: missions = [], isLoading, error } = useQuery<DailyMission[], MissionQueryError>({
+    queryKey: queryKeys.dailyMissions.byDate(today, user?.id),
     queryFn: async () => {
       if (!user) return [];
       
@@ -193,7 +198,7 @@ export const useDailyMissions = () => {
   useEffect(() => {
     if (error) {
       const title = generationErrorMessage ? "Mission refresh failed" : "Unable to load daily missions";
-      const description = generationErrorMessage || error.message;
+      const description = generationErrorMessage || error.message || "Unable to load daily missions right now.";
       const toastKey = `${user?.id ?? "anon"}:${today}:${title}:${description}`;
       if (lastErrorToastKeyRef.current === toastKey) return;
       lastErrorToastKeyRef.current = toastKey;
@@ -240,8 +245,12 @@ export const useDailyMissions = () => {
       return newMissions;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['daily-missions'] });
-      queryClient.invalidateQueries({ queryKey: ['daily-mission-pulse'] });
+      void invalidateDailyMissionQueries(queryClient, {
+        missionDate: today,
+        userId: user?.id,
+        includeMissionsAll: true,
+        includePulseAll: true,
+      });
       toast({
         title: "Daily missions refreshed",
         description: "Fresh challenges are ready for you!",
@@ -266,7 +275,7 @@ export const useDailyMissions = () => {
       const mission = missions?.find(m => m.id === missionId);
       if (!mission) throw new Error("Mission not found");
 
-      if (mission.completed) {
+      if (mission.completed === true) {
         throw new MissionCompletionError(
           "XP has already been claimed for this mission.",
           "already_completed",
@@ -282,7 +291,7 @@ export const useDailyMissions = () => {
       }
 
       showMissionRewardFeedback(completionResult, showXPToast, "Mission Complete!");
-      await queryClient.invalidateQueries({ queryKey: ["companion"] });
+      await invalidateCompanionQueries(queryClient, { includeAll: true });
 
       // Check for first mission achievement
       const { count } = await supabase
@@ -300,8 +309,12 @@ export const useDailyMissions = () => {
       return completionResult;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['daily-missions'] });
-      queryClient.invalidateQueries({ queryKey: ['daily-mission-pulse'] });
+      void invalidateDailyMissionQueries(queryClient, {
+        missionDate: today,
+        userId: user?.id,
+        includeMissionsAll: true,
+        includePulseAll: true,
+      });
       toast({ title: "Mission Complete!", description: "XP awarded!" });
       playMissionComplete();
       
@@ -325,12 +338,12 @@ export const useDailyMissions = () => {
     },
   });
 
-  const completedCount = missions?.filter(m => m.completed).length || 0;
-  const totalCount = missions?.length || 0;
+  const completedCount = missions.filter((mission) => mission.completed === true).length;
+  const totalCount = missions.length;
 
   return {
     missionDate: today,
-    missions: missions || [],
+    missions,
     isLoading,
     completeMission: completeMission.mutateAsync,
     isCompleting: completeMission.isPending,

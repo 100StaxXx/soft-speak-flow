@@ -101,6 +101,8 @@ describe("useDailyTasksRealtime", () => {
     expect(mocks.invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: ["tasks"] });
     expect(mocks.invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: ["calendar-tasks"] });
     expect(mocks.invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: ["habit-surfacing"] });
+    expect(mocks.invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: ["quest-autocomplete-tasks"] });
+    expect(mocks.invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: ["quest-autocomplete-tasks", "user-123"] });
   });
 
   it("dispatches planner refresh for subtask events", async () => {

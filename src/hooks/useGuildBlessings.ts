@@ -6,6 +6,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { invalidateGuildBlessingQueries } from "@/lib/guildQueryCache";
+import { queryKeys } from "@/lib/queryKeys";
 import { toast } from "@/hooks/use-toast";
 
 export interface BlessingType {
@@ -55,7 +57,7 @@ export const useGuildBlessings = ({ epicId, communityId }: UseGuildBlessingsOpti
 
   // Fetch blessing types
   const { data: blessingTypes, isLoading: isLoadingTypes } = useQuery({
-    queryKey: ["blessing-types"],
+    queryKey: queryKeys.guild.blessingTypes,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("guild_blessing_types")
@@ -69,7 +71,7 @@ export const useGuildBlessings = ({ epicId, communityId }: UseGuildBlessingsOpti
 
   // Fetch user's blessing charges
   const { data: charges, isLoading: isLoadingCharges } = useQuery({
-    queryKey: ["blessing-charges", user?.id],
+    queryKey: queryKeys.guild.blessingCharges(user?.id),
     queryFn: async () => {
       if (!user) return null;
 
@@ -121,7 +123,7 @@ export const useGuildBlessings = ({ epicId, communityId }: UseGuildBlessingsOpti
 
   // Fetch active blessings for the user
   const { data: myBlessings, isLoading: isLoadingBlessings } = useQuery({
-    queryKey: ["my-blessings", user?.id, epicId, communityId],
+    queryKey: queryKeys.guild.myBlessings(user?.id, epicId, communityId),
     queryFn: async () => {
       if (!user) return [];
 
@@ -153,7 +155,7 @@ export const useGuildBlessings = ({ epicId, communityId }: UseGuildBlessingsOpti
 
   // Fetch recent blessings in the guild (feed)
   const { data: recentBlessings } = useQuery({
-    queryKey: ["guild-blessings-feed", epicId, communityId],
+    queryKey: queryKeys.guild.blessingsFeed(epicId, communityId),
     queryFn: async () => {
       let query = supabase
         .from("guild_blessings")
@@ -233,9 +235,14 @@ export const useGuildBlessings = ({ epicId, communityId }: UseGuildBlessingsOpti
         title: "Blessing sent! ✨",
         description: "Your ally has been blessed with magical power!",
       });
-      queryClient.invalidateQueries({ queryKey: ["blessing-charges"] });
-      queryClient.invalidateQueries({ queryKey: ["guild-blessings-feed"] });
-      queryClient.invalidateQueries({ queryKey: ["my-blessings"] });
+      void invalidateGuildBlessingQueries(queryClient, {
+        userId: user?.id,
+        epicId,
+        communityId,
+        includeChargesAll: true,
+        includeFeedAll: true,
+        includeMyBlessingsAll: true,
+      });
     },
     onError: (error: Error) => {
       toast({

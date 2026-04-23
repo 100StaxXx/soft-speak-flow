@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { invalidateTaskQueryFamilies } from '@/lib/taskQueryCache';
 import { useToast } from '@/hooks/use-toast';
 
 export type Priority = 'low' | 'medium' | 'high' | 'urgent';
@@ -42,7 +43,7 @@ export function usePriorityTasks() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
+      void invalidateTaskQueryFamilies(queryClient, ["daily"]);
     },
     onError: (error) => {
       console.error('Failed to update priority:', error);
@@ -67,7 +68,7 @@ export function usePriorityTasks() {
       return data;
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
+      void invalidateTaskQueryFamilies(queryClient, ["daily"]);
       if (data.is_top_three) {
         toast({
           title: "Added to Top 3 🎯",
@@ -108,7 +109,7 @@ export function usePriorityTasks() {
       return taskIds;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
+      void invalidateTaskQueryFamilies(queryClient, ["daily"]);
       toast({
         title: "Top 3 updated! 🎯",
         description: "Focus on these priorities today",

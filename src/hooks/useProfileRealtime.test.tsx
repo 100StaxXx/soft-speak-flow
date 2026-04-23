@@ -80,6 +80,7 @@ describe("useProfileRealtime", () => {
 
     await act(async () => {
       mocks.state.callback?.();
+      await Promise.resolve();
     });
 
     expect(mocks.invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: ["profile"] });

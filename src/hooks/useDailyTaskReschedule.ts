@@ -2,6 +2,12 @@ import { useState, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { format, addDays } from 'date-fns';
+import { queryKeys } from '@/lib/queryKeys';
+import {
+  invalidateTaskQueryFamilies,
+  setTaskQueryFamiliesData,
+  taskQueryFamilyGroups,
+} from '@/lib/taskQueryCache';
 import { toast } from "@/components/ui/sonner";
 import { useQueryClient } from '@tanstack/react-query';
 import { normalizeTaskSchedulingState } from '@/utils/taskSchedulingRules';
@@ -125,7 +131,7 @@ export function useDailyTaskReschedule(tasks: any[], selectedDate: Date) {
 
     // Optimistically remove moved tasks from today's view
     const moveIds = new Set(toMove.map(t => t.id));
-    queryClient.setQueriesData({ queryKey: ['daily-tasks'] }, (old: any) => {
+    setTaskQueryFamiliesData(queryClient, ["daily"], (old) => {
       if (!Array.isArray(old)) return old;
       return old.filter(t => !moveIds.has(t.id) || t.completed);
     });
@@ -158,8 +164,7 @@ export function useDailyTaskReschedule(tasks: any[], selectedDate: Date) {
         if (error) throw error;
       }
 
-      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
-      queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
+      void invalidateTaskQueryFamilies(queryClient, taskQueryFamilyGroups.planner);
       
       const kept = incompleteTasks.length - toMove.length;
       toast.success(
@@ -169,7 +174,7 @@ export function useDailyTaskReschedule(tasks: any[], selectedDate: Date) {
       );
     } catch (error) {
       console.error('Error prioritizing tasks:', error);
-      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
+      void invalidateTaskQueryFamilies(queryClient, ["daily"]);
       toast.error('Failed to prioritize quests');
     } finally {
       setIsRescheduling(false);
@@ -186,7 +191,7 @@ export function useDailyTaskReschedule(tasks: any[], selectedDate: Date) {
     const moveIds = new Set(incompleteTasks.map(t => t.id));
 
     // Optimistically remove from today's view immediately
-    queryClient.setQueriesData({ queryKey: ['daily-tasks'] }, (old: any) => {
+    setTaskQueryFamiliesData(queryClient, ["daily"], (old) => {
       if (!Array.isArray(old)) return old;
       return old.filter(t => !moveIds.has(t.id));
     });
@@ -219,8 +224,7 @@ export function useDailyTaskReschedule(tasks: any[], selectedDate: Date) {
         if (error) throw error;
       }
 
-      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
-      queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
+      void invalidateTaskQueryFamilies(queryClient, taskQueryFamilyGroups.planner);
       toast.success(
         normalizedToInboxCount > 0
           ? `Moved ${incompleteTasks.length} quests (${normalizedToInboxCount} stayed in Inbox)`
@@ -228,7 +232,7 @@ export function useDailyTaskReschedule(tasks: any[], selectedDate: Date) {
       );
     } catch (error) {
       console.error('Error moving tasks:', error);
-      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
+      void invalidateTaskQueryFamilies(queryClient, ["daily"]);
       toast.error('Failed to move quests');
     } finally {
       setIsRescheduling(false);

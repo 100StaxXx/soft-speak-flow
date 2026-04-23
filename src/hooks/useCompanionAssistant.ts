@@ -17,6 +17,7 @@ import { useCompanionVoiceSettings } from "@/hooks/useCompanionVoiceSettings";
 import { useVoiceInput } from "@/hooks/useVoiceInput";
 import { supabase } from "@/integrations/supabase/client";
 import { stripMarkdown } from "@/lib/utils";
+import { invalidateCompanionChatThreadsQuery } from "@/lib/companionConversationQueryCache";
 import {
   buildCompanionThreadPreview,
   buildCompanionThreadTitle,
@@ -461,8 +462,10 @@ export function useCompanionAssistant({
   }, []);
 
   const invalidateThreads = useCallback(() => {
-    return queryClient.invalidateQueries({
-      queryKey: getCompanionChatThreadsQueryKey(user?.id, companion?.id, surface),
+    return invalidateCompanionChatThreadsQuery(queryClient, {
+      userId: user?.id,
+      companionId: companion?.id,
+      surface,
     });
   }, [companion?.id, queryClient, surface, user?.id]);
 

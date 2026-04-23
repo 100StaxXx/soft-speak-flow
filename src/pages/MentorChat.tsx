@@ -16,6 +16,8 @@ import { useState } from "react";
 import { useHapticFeedback } from "@/hooks/useHapticFeedback";
 import { PageTransition } from "@/components/PageTransition";
 import { useMentorConnection } from "@/contexts/MentorConnectionContext";
+import { invalidateMentorContextQueries } from "@/lib/mentorContextQueryCache";
+import { queryKeys } from "@/lib/queryKeys";
 import {
   getConsultMentorIdFromState,
   withConsultMentorState,
@@ -83,7 +85,7 @@ export default function MentorChat() {
   const currentChatMentorId = isConsultMode ? consultMentorId : resolvedMentorId;
 
   const { data: mentor, isLoading: mentorLoading, isFetching: mentorFetching, error: mentorError, refetch: refetchMentor } = useQuery({
-    queryKey: ['mentor', currentChatMentorId],
+    queryKey: queryKeys.mentor.detail(currentChatMentorId ?? undefined),
     queryFn: async () => {
       if (!currentChatMentorId) return null;
       const { data, error } = await supabase
@@ -99,7 +101,7 @@ export default function MentorChat() {
   });
 
   const { data: primaryMentor } = useQuery({
-    queryKey: ['mentor-primary', resolvedMentorId],
+    queryKey: queryKeys.mentor.primary(resolvedMentorId ?? undefined),
     queryFn: async () => {
       if (!resolvedMentorId) return null;
       const { data, error } = await supabase
@@ -119,10 +121,10 @@ export default function MentorChat() {
     try {
       await refetchProfile();
       await refreshConnection();
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['mentor'] }),
-        queryClient.invalidateQueries({ queryKey: ['selected-mentor'] }),
-      ]);
+      await invalidateMentorContextQueries(queryClient, {
+        includeMentorPageData: false,
+        includeMentorPersonality: false,
+      });
       if (resolvedMentorId) {
         await refetchMentor();
       }

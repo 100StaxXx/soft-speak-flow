@@ -2,6 +2,9 @@ import { useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { invalidateTaskQueryFamilies, taskQueryFamilyGroups } from '@/lib/taskQueryCache';
+import { invalidateCalendarIntegrationQueries } from '@/lib/calendarIntegrationQueryCache';
+import { queryKeys } from '@/lib/queryKeys';
 import { NativeCalendar } from '@/plugins/NativeCalendarPlugin';
 import { useCalendarIntegrations, type CalendarProvider, type ConnectedCalendar } from '@/hooks/useCalendarIntegrations';
 import { parseScheduledTime } from '@/utils/scheduledTime';
@@ -176,7 +179,7 @@ export function useQuestCalendarSync(options: QuestCalendarSyncOptions = {}) {
   const { connections, defaultProvider } = useCalendarIntegrations({ enabled });
 
   const linksQuery = useQuery({
-    queryKey: ['quest-calendar-links', user?.id],
+    queryKey: queryKeys.calendar.questLinks(user?.id),
     enabled: enabled && !!user?.id,
     queryFn: async () => {
       if (!user?.id) return [];
@@ -204,7 +207,7 @@ export function useQuestCalendarSync(options: QuestCalendarSyncOptions = {}) {
   }, [links]);
 
   const outlookTaskLinksQuery = useQuery({
-    queryKey: ['quest-outlook-task-links', user?.id],
+    queryKey: queryKeys.calendar.outlookTaskLinks(user?.id),
     enabled: enabled && !!user?.id,
     queryFn: async () => {
       if (!user?.id) return [];
@@ -237,13 +240,15 @@ export function useQuestCalendarSync(options: QuestCalendarSyncOptions = {}) {
 
   const invalidateSyncQueries = async () => {
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['quest-calendar-links'] }),
-      queryClient.invalidateQueries({ queryKey: ['quest-outlook-task-links'] }),
-      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] }),
-      queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] }),
-      queryClient.invalidateQueries({ queryKey: ['inbox-tasks'] }),
-      queryClient.invalidateQueries({ queryKey: ['inbox-count'] }),
-      queryClient.invalidateQueries({ queryKey: ['external-calendar-events'] }),
+      invalidateCalendarIntegrationQueries(queryClient, {
+        userId: user?.id,
+        includeQuestLinksAll: true,
+        includeQuestLinksDetail: true,
+        includeOutlookTaskLinksAll: true,
+        includeOutlookTaskLinksDetail: true,
+        includeExternalEventsAll: true,
+      }),
+      invalidateTaskQueryFamilies(queryClient, taskQueryFamilyGroups.plannerAndInbox),
     ]);
   };
 
@@ -270,20 +275,28 @@ export function useQuestCalendarSync(options: QuestCalendarSyncOptions = {}) {
       .eq('id', taskId)
       .eq('user_id', user.id)
       .single();
-    let { data, error } = await queryTask(TASK_SELECT_WITH_MONTH_RECURRENCE);
+    const initialResult = await queryTask(TASK_SELECT_WITH_MONTH_RECURRENCE);
+    let data = (initialResult.data as unknown) as TaskLite | null;
+    let error = (initialResult.error as SupabaseLikeError | null) ?? null;
 
     if (isDailyTasksRecurrenceColumnsMissingError(error)) {
       const fallback = await queryTask(TASK_SELECT_LEGACY_RECURRENCE);
-      data = fallback.data ? {
-        ...(fallback.data as Record<string, unknown>),
-        recurrence_month_days: null,
-        recurrence_custom_period: null,
-      } : null;
-      error = fallback.error;
+      const fallbackTaskData = (fallback.data as unknown) as Omit<
+        TaskLite,
+        'recurrence_month_days' | 'recurrence_custom_period'
+      > | null;
+      data = fallbackTaskData
+        ? {
+          ...fallbackTaskData,
+          recurrence_month_days: null,
+          recurrence_custom_period: null,
+        }
+        : null;
+      error = (fallback.error as SupabaseLikeError | null) ?? null;
     }
 
     if (error || !data) throw new Error('Task not found');
-    return data as TaskLite;
+    return data;
   };
 
   const applyTaskTimingOverride = async (taskId: string, options: SendOptions) => {

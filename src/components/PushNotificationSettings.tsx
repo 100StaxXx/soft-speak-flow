@@ -11,6 +11,10 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { useToast } from "@/hooks/use-toast";
+import {
+  invalidateProfileQueries,
+  setProfileDetailQueryData,
+} from "@/lib/profileQueryCache";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { NotificationPreview } from "@/components/NotificationPreview";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -187,15 +191,15 @@ export const PushNotificationSettings = memo(() => {
 
     if (error) throw error;
 
-    queryClient.setQueryData<Profile | null | undefined>(["profile", user.id], (currentProfile) => {
+    setProfileDetailQueryData<Profile | null>(queryClient, user.id, (currentProfile) => {
       if (currentProfile == null) {
-        return profile ? { ...profile, ...updates } : currentProfile;
+        return profile ? { ...profile, ...updates } as Profile : currentProfile;
       }
 
-      return { ...currentProfile, ...updates };
+      return { ...currentProfile, ...updates } as Profile;
     });
 
-    void queryClient.invalidateQueries({ queryKey: ["profile"] });
+    void invalidateProfileQueries(queryClient, { includeAll: true });
   };
 
   const handleTogglePushPermission = async (enabled: boolean) => {

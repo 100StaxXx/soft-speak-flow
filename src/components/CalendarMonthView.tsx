@@ -3,9 +3,10 @@ import { ChevronLeft, ChevronRight, Clock, AlertCircle, Star } from "lucide-reac
 import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
 import { Badge } from "./ui/badge";
+import type { CalendarMilestone } from "@/features/epics/types";
+import type { CalendarQuest } from "@/features/quests/display";
 import { useState } from "react";
 import { playSound } from "@/utils/soundEffects";
-import { CalendarTask, CalendarMilestone } from "@/types/quest";
 import {
   Select,
   SelectContent,
@@ -24,14 +25,14 @@ interface CalendarMonthViewProps {
   selectedDate: Date;
   onDateSelect: (date: Date) => void;
   onMonthChange?: (date: Date) => void;
-  tasks: CalendarTask[];
+  quests: CalendarQuest[];
   milestones?: CalendarMilestone[];
-  onTaskClick: (task: CalendarTask) => void;
+  onQuestClick: (quest: CalendarQuest) => void;
   onMilestoneClick?: (milestone: CalendarMilestone) => void;
   onDateLongPress?: (date: Date) => void;
 }
 
-export const CalendarMonthView = ({ selectedDate, onDateSelect, onMonthChange, tasks, milestones = [], onTaskClick, onMilestoneClick, onDateLongPress }: CalendarMonthViewProps) => {
+export const CalendarMonthView = ({ selectedDate, onDateSelect, onMonthChange, quests, milestones = [], onQuestClick, onMilestoneClick, onDateLongPress }: CalendarMonthViewProps) => {
   const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
 
   const monthStart = startOfMonth(selectedDate);
@@ -74,12 +75,9 @@ export const CalendarMonthView = ({ selectedDate, onDateSelect, onMonthChange, t
     }
   };
   
-  const getTasksForDate = (date: Date) => {
+  const getQuestsForDate = (date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
-    return tasks.filter(task => {
-      // task_date is already in 'yyyy-MM-dd' format from database
-      return task.task_date === dateStr;
-    });
+    return quests.filter((quest) => quest.taskDate === dateStr);
   };
 
   const getMilestonesForDate = (date: Date) => {
@@ -88,16 +86,16 @@ export const CalendarMonthView = ({ selectedDate, onDateSelect, onMonthChange, t
   };
 
   const hasTimeConflict = (date: Date) => {
-    const dateTasks = getTasksForDate(date);
-    const scheduledTasks = dateTasks.filter(t => t.scheduled_time && t.estimated_duration);
+    const dateQuests = getQuestsForDate(date);
+    const scheduledQuests = dateQuests.filter((quest) => quest.scheduledTime && quest.estimatedDuration);
     
-    for (let i = 0; i < scheduledTasks.length; i++) {
-      for (let j = i + 1; j < scheduledTasks.length; j++) {
-        const task1Start = parseScheduledTime(scheduledTasks[i].scheduled_time, new Date("2000-01-01T00:00:00"));
-        const task2Start = parseScheduledTime(scheduledTasks[j].scheduled_time, new Date("2000-01-01T00:00:00"));
+    for (let i = 0; i < scheduledQuests.length; i++) {
+      for (let j = i + 1; j < scheduledQuests.length; j++) {
+        const task1Start = parseScheduledTime(scheduledQuests[i].scheduledTime, new Date("2000-01-01T00:00:00"));
+        const task2Start = parseScheduledTime(scheduledQuests[j].scheduledTime, new Date("2000-01-01T00:00:00"));
         if (!task1Start || !task2Start) continue;
-        const task1End = new Date(task1Start.getTime() + (scheduledTasks[i].estimated_duration! * 60000));
-        const task2End = new Date(task2Start.getTime() + (scheduledTasks[j].estimated_duration! * 60000));
+        const task1End = new Date(task1Start.getTime() + (scheduledQuests[i].estimatedDuration! * 60000));
+        const task2End = new Date(task2Start.getTime() + (scheduledQuests[j].estimatedDuration! * 60000));
         
         if (task1Start < task2End && task2Start < task1End) {
           return true;
@@ -177,14 +175,14 @@ export const CalendarMonthView = ({ selectedDate, onDateSelect, onMonthChange, t
         {/* Calendar grid */}
         <div className="grid grid-cols-7">
           {days.map((day, index) => {
-            const dayTasks = getTasksForDate(day);
+            const dayQuests = getQuestsForDate(day);
             const dayMilestones = getMilestonesForDate(day);
             const isSelected = isSameDay(day, selectedDate);
             const isToday = isSameDay(day, new Date());
             const hasConflict = hasTimeConflict(day);
             const isLastInRow = (index + 1) % 7 === 0;
             const isInLastRow = index >= days.length - 7;
-            const totalItems = dayTasks.length + dayMilestones.length;
+            const totalItems = dayQuests.length + dayMilestones.length;
             const maxVisibleItems = 3;
             
             return (
@@ -240,27 +238,27 @@ export const CalendarMonthView = ({ selectedDate, onDateSelect, onMonthChange, t
                     </div>
                   ))}
                   
-                  {/* Then show tasks */}
-                  {dayTasks.slice(0, Math.max(0, maxVisibleItems - dayMilestones.length)).map(task => (
+                  {/* Then show quests */}
+                  {dayQuests.slice(0, Math.max(0, maxVisibleItems - dayMilestones.length)).map((quest) => (
                     <div
-                      key={task.id}
+                      key={quest.id}
                       onClick={(e) => {
                         e.stopPropagation();
-                        onTaskClick(task);
+                        onQuestClick(quest);
                       }}
                       className={cn(
                         "text-xs p-1 border-l-2 truncate transition-all hover:bg-muted/50",
-                        task.completed && "opacity-50 line-through",
-                        task.is_main_quest && "border-l-amber-500 bg-amber-500/5",
-                        !task.is_main_quest && task.difficulty === "easy" && "border-l-emerald-500 bg-emerald-500/5",
-                        !task.is_main_quest && task.difficulty === "medium" && "border-l-amber-500 bg-amber-500/5",
-                        !task.is_main_quest && task.difficulty === "hard" && "border-l-rose-500 bg-rose-500/5"
+                        quest.completed && "opacity-50 line-through",
+                        quest.isMainQuest && "border-l-amber-500 bg-amber-500/5",
+                        !quest.isMainQuest && quest.difficulty === "easy" && "border-l-emerald-500 bg-emerald-500/5",
+                        !quest.isMainQuest && quest.difficulty === "medium" && "border-l-amber-500 bg-amber-500/5",
+                        !quest.isMainQuest && quest.difficulty === "hard" && "border-l-rose-500 bg-rose-500/5"
                       )}
                     >
-                      {task.scheduled_time && (
+                      {quest.scheduledTime && (
                         <Clock className="h-2 w-2 inline mr-1" />
                       )}
-                      {task.task_text}
+                      {quest.title}
                     </div>
                   ))}
                   {totalItems > maxVisibleItems && (

@@ -12,6 +12,7 @@ import { FeaturedQuoteCard } from "@/components/library/FeaturedQuoteCard";
 import { FeaturedPepTalkCard } from "@/components/library/FeaturedPepTalkCard";
 import { SearchTutorialModal } from "@/components/SearchTutorialModal";
 import { supabase } from "@/integrations/supabase/client";
+import { queryKeys } from "@/lib/queryKeys";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useFirstTimeModal } from "@/hooks/useFirstTimeModal";
@@ -25,7 +26,7 @@ const Search = () => {
   const { showModal: showTutorial, dismissModal: dismissTutorial } = useFirstTimeModal('search');
 
   const { data: featuredQuotes, isLoading: quotesLoading } = useQuery({
-    queryKey: ["featured-quotes"],
+    queryKey: queryKeys.search.featuredQuotes(),
     queryFn: async () => {
       const { data } = await supabase
         .from("quotes")
@@ -37,7 +38,7 @@ const Search = () => {
   });
 
   const { data: featuredPepTalks, isLoading: pepTalksLoading } = useQuery({
-    queryKey: ["featured-pep-talks"],
+    queryKey: queryKeys.search.featuredPepTalks(),
     queryFn: async () => {
       const { data } = await supabase
         .from("pep_talks")

@@ -7,7 +7,7 @@ import {
   normalizeQuestTemplateTitleForDisplay,
   normalizeQuestTemplateTitleForIdentity,
 } from "@/features/quests/utils/questTemplateNormalization";
-import { isValidDifficulty } from "@/types/quest";
+import { isValidQuestDifficulty } from "@/features/quests/validation";
 
 type PersonalQuestTemplateRow = Tables<"personal_quest_templates">;
 type PersonalQuestTemplateInsert = TablesInsert<"personal_quest_templates">;
@@ -25,7 +25,7 @@ export interface UpsertPersonalQuestTemplateInput {
 }
 
 const normalizeDifficulty = (difficulty: string | null): QuestDifficulty =>
-  isValidDifficulty(difficulty) ? difficulty : "medium";
+  isValidQuestDifficulty(difficulty) ? difficulty : "medium";
 
 export const mapExplicitPersonalQuestTemplate = (
   row: PersonalQuestTemplateRow,

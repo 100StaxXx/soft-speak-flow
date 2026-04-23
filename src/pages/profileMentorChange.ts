@@ -1,6 +1,9 @@
 import type { QueryClient } from "@tanstack/react-query";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { invalidateMentorContextQueries } from "@/lib/mentorContextQueryCache";
+import { invalidateProfileQueries, refetchProfileQueries } from "@/lib/profileQueryCache";
+
 type ProfileMentorChangeOptions = {
   mentorId: string;
   onboardingData: Record<string, unknown>;
@@ -36,15 +39,17 @@ export async function applyMentorChange({
 
   if (error) throw error;
 
-  await queryClient.invalidateQueries({ queryKey: ["profile", userId] });
-  await queryClient.refetchQueries({ queryKey: ["profile", userId] });
-  await Promise.all([
-    queryClient.invalidateQueries({ queryKey: ["mentor-page-data"] }),
-    queryClient.invalidateQueries({ queryKey: ["mentor-personality"] }),
-    queryClient.invalidateQueries({ queryKey: ["mentor"] }),
-    queryClient.invalidateQueries({ queryKey: ["selected-mentor"] }),
-    queryClient.invalidateQueries({ queryKey: ["morning-check-in"] }),
-  ]);
+  await invalidateProfileQueries(queryClient, {
+    userId,
+    includeDetail: true,
+  });
+  await refetchProfileQueries(queryClient, {
+    userId,
+    includeDetail: true,
+  });
+  await invalidateMentorContextQueries(queryClient, {
+    includeMorningCheckIn: true,
+  });
 
   if (navigate && destinationPath) {
     navigate(destinationPath, { replace: true });

@@ -26,6 +26,10 @@ import { isMacSession } from '@/utils/platformTargets';
 import { toast } from "@/components/ui/sonner";
 import { useLivingCompanionSafe } from '@/hooks/useLivingCompanion';
 import { useCompanionAttributes } from "@/hooks/useCompanionAttributes";
+import { invalidateCompanionQueries } from "@/lib/companionContextQueryCache";
+import { invalidateAstralResistQueries } from "@/lib/astralResistQueryCache";
+import { invalidateEpicRewardQueries } from "@/lib/epicRewardQueryCache";
+import { queryKeys } from "@/lib/queryKeys";
 
 export type EncounterTriggerReason =
   | 'not_authenticated'
@@ -70,8 +74,8 @@ type EncounterUnsupportedPlatformError = Error & {
 
 const createUnsupportedPlatformError = (): EncounterUnsupportedPlatformError =>
   Object.assign(new Error('Astral Encounters are only available on iPhone and iPad.'), {
-    code: UNSUPPORTED_PLATFORM_ERROR_CODE as const,
-  });
+    code: UNSUPPORTED_PLATFORM_ERROR_CODE,
+  }) as EncounterUnsupportedPlatformError;
 
 const isUnsupportedPlatformError = (error: unknown): error is EncounterUnsupportedPlatformError => {
   if (!error || typeof error !== 'object') {
@@ -88,6 +92,8 @@ export const useAstralEncounters = () => {
   const { awardCustomXP } = useXPRewards();
   const { checkAdversaryDefeatAchievements } = useAchievements();
   const queryClient = useQueryClient();
+  const now = new Date();
+  const startOfTodayIso = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
 
   // Living companion reaction system - safe hook returns no-op when outside provider
   const { triggerResistVictory } = useLivingCompanionSafe();
@@ -119,7 +125,7 @@ export const useAstralEncounters = () => {
 
   // Fetch user's encounter history
   const { data: encounters, isLoading: encountersLoading } = useQuery({
-    queryKey: ['astral-encounters', user?.id],
+    queryKey: queryKeys.astral.encounters(user?.id),
     queryFn: async () => {
       if (!user?.id) return [];
       const { data, error } = await supabase
@@ -137,7 +143,7 @@ export const useAstralEncounters = () => {
 
   // Fetch collected essences
   const { data: essences, isLoading: essencesLoading } = useQuery({
-    queryKey: ['adversary-essences', user?.id],
+    queryKey: queryKeys.astral.essences(user?.id),
     queryFn: async () => {
       if (!user?.id) return [];
       const { data, error } = await supabase
@@ -154,7 +160,7 @@ export const useAstralEncounters = () => {
 
   // Fetch cosmic codex entries
   const { data: codexEntries, isLoading: codexLoading } = useQuery({
-    queryKey: ['cosmic-codex', user?.id],
+    queryKey: queryKeys.astral.codex(user?.id),
     queryFn: async () => {
       if (!user?.id) return [];
       const { data, error } = await supabase
@@ -243,7 +249,11 @@ export const useAstralEncounters = () => {
     onSuccess: ({ encounter, adversary, questInterval }) => {
       setActiveEncounter({ encounter, adversary, questInterval });
       setShowEncounterModal(false);
-      queryClient.invalidateQueries({ queryKey: ['astral-encounters'] });
+      void invalidateAstralResistQueries(queryClient, {
+        userId: user?.id,
+        includeEncountersAll: true,
+        includeEncountersDetail: true,
+      });
     },
     onError: (error) => {
       if (isUnsupportedPlatformError(error)) {
@@ -522,14 +532,28 @@ export const useAstralEncounters = () => {
       return { result, xpAwarded, xpCapApplied };
     },
     onSuccess: ({ result }) => {
-      queryClient.invalidateQueries({ queryKey: ['astral-encounters'] });
-      queryClient.invalidateQueries({ queryKey: ['astral-encounter-xp-today'] });
-      queryClient.invalidateQueries({ queryKey: ['adversary-essences'] });
-      queryClient.invalidateQueries({ queryKey: ['cosmic-codex'] });
-      queryClient.invalidateQueries({ queryKey: ['user-epic-rewards'] });
-      queryClient.invalidateQueries({ queryKey: ['companion'] });
-      queryClient.invalidateQueries({ queryKey: ['bad-habits'] });
-      queryClient.invalidateQueries({ queryKey: ['resist-log'] });
+      void invalidateAstralResistQueries(queryClient, {
+        userId: user?.id,
+        startOfTodayIso,
+        includeEncountersAll: true,
+        includeEncountersDetail: true,
+        includeXpTodayAll: true,
+        includeXpTodayDetail: true,
+        includeEssencesAll: true,
+        includeEssencesDetail: true,
+        includeCodexAll: true,
+        includeCodexDetail: true,
+        includeBadHabitsAll: true,
+        includeBadHabitsDetail: true,
+        includeResistLogAll: true,
+        includeResistLogDetail: true,
+      });
+      void invalidateEpicRewardQueries(queryClient, {
+        userId: user?.id,
+        includeUserRewardsAll: true,
+        includeUserRewardsDetail: true,
+      });
+      void invalidateCompanionQueries(queryClient, { includeAll: true });
 
       // Trigger companion reaction on resist victory
       if (result !== 'fail' && activeEncounter?.encounter.trigger_type === 'urge_resist') {
@@ -699,7 +723,11 @@ export const useAstralEncounters = () => {
       setActiveEncounter(null);
       setShowEncounterModal(false);
       
-      queryClient.invalidateQueries({ queryKey: ['astral-encounters'] });
+      void invalidateAstralResistQueries(queryClient, {
+        userId: user?.id,
+        includeEncountersAll: true,
+        includeEncountersDetail: true,
+      });
       return true;
     } catch (error) {
       console.error('Failed to pass encounter:', error);

@@ -49,7 +49,7 @@ vi.mock("@/integrations/supabase/client", () => ({
   },
 }));
 
-import { useCalendarTasks } from "./useCalendarTasks";
+import { useLegacyCalendarTaskRange } from "./useLegacyCalendarTaskRange";
 
 const createWrapper = () => {
   const queryClient = new QueryClient({
@@ -63,7 +63,7 @@ const createWrapper = () => {
     React.createElement(QueryClientProvider, { client: queryClient }, children);
 };
 
-describe("useCalendarTasks", () => {
+describe("useLegacyCalendarTaskRange", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.canSyncPlannerFromRemoteMock.mockResolvedValue(false);
@@ -107,7 +107,7 @@ describe("useCalendarTasks", () => {
     ]);
 
     const { result } = renderHook(
-      () => useCalendarTasks(new Date("2026-02-10T12:00:00.000Z"), "week"),
+      () => useLegacyCalendarTaskRange(new Date("2026-02-10T12:00:00.000Z"), "week"),
       { wrapper: createWrapper() },
     );
 

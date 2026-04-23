@@ -1,8 +1,10 @@
 import { motion } from "framer-motion";
+import { useQueryClient } from "@tanstack/react-query";
 import { Quote, Heart } from "lucide-react";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { invalidateLibraryQueries } from "@/lib/libraryQueryCache";
 
 interface FeaturedQuoteCardProps {
   quote: {
@@ -17,6 +19,7 @@ export const FeaturedQuoteCard = ({ quote, index }: FeaturedQuoteCardProps) => {
   const [isFavorited, setIsFavorited] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const handleFavorite = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -46,6 +49,13 @@ export const FeaturedQuoteCard = ({ quote, index }: FeaturedQuoteCardProps) => {
         });
         setIsFavorited(true);
       }
+
+      await invalidateLibraryQueries(queryClient, {
+        userId: session.user.id,
+        includeFavoritesAll: true,
+        includeFavoritesDetail: true,
+        includeFavoriteQuotesAll: true,
+      });
     } catch (error) {
       console.error("Error toggling favorite:", error);
     } finally {

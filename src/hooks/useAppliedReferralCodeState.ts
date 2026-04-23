@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { queryKeys } from "@/lib/queryKeys";
 import { useAuth } from "./useAuth";
 
 export interface AppliedReferralCodeState {
@@ -28,7 +29,7 @@ export const useAppliedReferralCodeState = () => {
   const { user } = useAuth();
 
   const query = useQuery({
-    queryKey: ["applied-referral-code-state", user?.id],
+    queryKey: queryKeys.referrals.appliedCodeState(user?.id),
     enabled: !!user?.id,
     staleTime: 60 * 1000,
     queryFn: async () => {

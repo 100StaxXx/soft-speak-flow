@@ -2,6 +2,7 @@ import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { queryKeys } from "@/lib/queryKeys";
 
 const mocks = vi.hoisted(() => {
   const fromMock = vi.fn();
@@ -53,11 +54,7 @@ vi.mock("@/contexts/ResilienceContext", () => ({
   }),
 }));
 
-import {
-  INBOX_COUNT_QUERY_KEY,
-  INBOX_TASKS_QUERY_KEY,
-  useInboxTasks,
-} from "./useInboxTasks";
+import { useInboxTasks } from "./useInboxTasks";
 
 const createHarness = () => {
   const queryClient = new QueryClient({
@@ -145,9 +142,9 @@ describe("useInboxTasks", () => {
     });
 
     await waitFor(() => {
-      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: [INBOX_TASKS_QUERY_KEY] });
-      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: [INBOX_COUNT_QUERY_KEY] });
-      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["daily-tasks"] });
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.inbox.tasksAll });
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.inbox.countAll });
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.dailyTasks.all });
     });
   });
 
@@ -167,9 +164,9 @@ describe("useInboxTasks", () => {
     });
 
     await waitFor(() => {
-      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: [INBOX_TASKS_QUERY_KEY] });
-      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: [INBOX_COUNT_QUERY_KEY] });
-      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["daily-tasks"] });
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.inbox.tasksAll });
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.inbox.countAll });
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.dailyTasks.all });
     });
   });
 

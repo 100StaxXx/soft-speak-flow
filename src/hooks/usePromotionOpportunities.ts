@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { queryKeys } from '@/lib/queryKeys';
 
 interface SuggestedHabit {
   title: string;
@@ -39,7 +40,7 @@ export function usePromotionOpportunities() {
     error,
     refetch,
   } = useQuery({
-    queryKey: ['promotion-opportunities', user?.id],
+    queryKey: queryKeys.promotion.opportunities(user?.id),
     queryFn: async (): Promise<PromotionOpportunitiesResponse> => {
       if (!user) {
         return { opportunities: [], analyzedCounts: { tasks: 0, habits: 0, quests: 0 } };

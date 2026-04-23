@@ -2,6 +2,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { toast } from "@/components/ui/sonner";
+import { invalidateCommunityQueries } from "@/lib/communityQueryCache";
+import { queryKeys } from "@/lib/queryKeys";
 
 export interface Community {
   id: string;
@@ -60,7 +62,7 @@ export const useCommunity = (communityId?: string) => {
 
   // Fetch user's communities (ones they own or are members of)
   const { data: myCommunities, isLoading: isLoadingMyCommunities } = useQuery<CommunityWithMembership[]>({
-    queryKey: ["communities", "my", user?.id],
+    queryKey: queryKeys.communities.my(user?.id),
     queryFn: async () => {
       if (!user) return [];
 
@@ -88,7 +90,7 @@ export const useCommunity = (communityId?: string) => {
 
   // Fetch a single community by ID
   const { data: community, isLoading: isLoadingCommunity } = useQuery<Community | null>({
-    queryKey: ["community", communityId],
+    queryKey: queryKeys.community.detail(communityId),
     queryFn: async () => {
       if (!communityId) return null;
 
@@ -106,7 +108,7 @@ export const useCommunity = (communityId?: string) => {
 
   // Fetch public communities (for discovery)
   const { data: publicCommunities, isLoading: isLoadingPublic } = useQuery<Community[]>({
-    queryKey: ["communities", "public"],
+    queryKey: queryKeys.communities.public(),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("communities")
@@ -148,7 +150,9 @@ export const useCommunity = (communityId?: string) => {
     },
     onSuccess: (data) => {
       toast.success(`${data.name} created!`);
-      queryClient.invalidateQueries({ queryKey: ["communities"] });
+      void invalidateCommunityQueries(queryClient, {
+        includeCommunitiesAll: true,
+      });
     },
     onError: (error) => {
       console.error("Create community error:", error);
@@ -174,8 +178,11 @@ export const useCommunity = (communityId?: string) => {
     },
     onSuccess: () => {
       toast.success("Guild updated");
-      queryClient.invalidateQueries({ queryKey: ["communities"] });
-      queryClient.invalidateQueries({ queryKey: ["community", communityId] });
+      void invalidateCommunityQueries(queryClient, {
+        communityId,
+        includeCommunitiesAll: true,
+        includeCommunityDetail: true,
+      });
     },
     onError: (error) => {
       console.error("Update community error:", error);
@@ -210,9 +217,12 @@ export const useCommunity = (communityId?: string) => {
     },
     onSuccess: () => {
       toast.success("Guild ownership transferred");
-      queryClient.invalidateQueries({ queryKey: ["communities"] });
-      queryClient.invalidateQueries({ queryKey: ["community", communityId] });
-      queryClient.invalidateQueries({ queryKey: ["community-members", communityId] });
+      void invalidateCommunityQueries(queryClient, {
+        communityId,
+        includeCommunitiesAll: true,
+        includeCommunityDetail: true,
+        includeMembersDetail: true,
+      });
     },
     onError: (error) => {
       console.error("Transfer ownership error:", error);
@@ -234,7 +244,9 @@ export const useCommunity = (communityId?: string) => {
     },
     onSuccess: () => {
       toast.success("Guild deleted");
-      queryClient.invalidateQueries({ queryKey: ["communities"] });
+      void invalidateCommunityQueries(queryClient, {
+        includeCommunitiesAll: true,
+      });
     },
     onError: (error) => {
       console.error("Delete community error:", error);

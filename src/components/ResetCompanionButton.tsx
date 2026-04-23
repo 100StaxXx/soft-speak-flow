@@ -22,6 +22,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { CompanionPersonalization } from "@/components/CompanionPersonalization";
 import { useCompanion } from "@/hooks/useCompanion";
+import { invalidateCompanionQueries } from "@/lib/companionContextQueryCache";
 
 export const ResetCompanionButton = memo(() => {
   const [alertOpen, setAlertOpen] = useState(false);
@@ -37,7 +38,7 @@ export const ResetCompanionButton = memo(() => {
       if (error) throw error;
       if (data?.success) {
         // Invalidate companion queries
-        await queryClient.invalidateQueries({ queryKey: ['companion'] });
+        await invalidateCompanionQueries(queryClient, { includeAll: true });
         
         toast.success('Companion reset! Create your new companion now.');
         setAlertOpen(false);

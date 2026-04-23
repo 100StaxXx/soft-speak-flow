@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { usePendingMentorMood } from "./usePendingMentorMood";
+import { queryKeys } from "@/lib/queryKeys";
 
 const formatLocalDate = (date: Date): string => {
   const year = date.getFullYear();
@@ -25,7 +26,7 @@ export const useCompanionMoodSignal = (now: Date = new Date()): CompanionMoodSig
   const today = useMemo(() => formatLocalDate(now), [now]);
 
   const { data: todayCheckIn } = useQuery({
-    queryKey: ["morning-check-in", today, user?.id],
+    queryKey: queryKeys.checkIns.morningByDate(today, user?.id),
     enabled: Boolean(user?.id),
     queryFn: async () => {
       if (!user?.id) return null;
@@ -44,7 +45,7 @@ export const useCompanionMoodSignal = (now: Date = new Date()): CompanionMoodSig
   });
 
   const { data: latestCheckIn } = useQuery({
-    queryKey: ["morning-check-in-latest", user?.id],
+    queryKey: queryKeys.checkIns.morningLatest(user?.id),
     enabled: Boolean(user?.id),
     queryFn: async () => {
       if (!user?.id) return null;

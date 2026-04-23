@@ -5,10 +5,11 @@ import { cn } from "@/lib/utils";
 import { ScrollArea } from "./ui/scroll-area";
 import { QuestDragCard } from "./QuestDragCard";
 import { MilestoneCalendarCard } from "./MilestoneCalendarCard";
+import type { CalendarMilestone } from "@/features/epics/types";
+import type { CalendarQuest } from "@/features/quests/display";
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { playSound } from "@/utils/soundEffects";
 import { Card } from "./ui/card";
-import { CalendarTask, CalendarMilestone } from "@/types/quest";
 import { CALENDAR_BONUS_XP } from "@/config/xpRewards";
 import { getScheduledTimeParts, parseScheduledTime } from "@/utils/scheduledTime";
 import { bucketTaskToHalfHourSlot, computeDynamicWindow } from "./calendar/timeWindow";
@@ -50,7 +51,7 @@ const nowMs = () => (typeof performance !== "undefined" ? performance.now() : Da
 interface CalendarDayViewProps {
   selectedDate: Date;
   onDateSelect: (date: Date) => void;
-  tasks: CalendarTask[];
+  quests: CalendarQuest[];
   milestones?: CalendarMilestone[];
   onTaskDrop: (taskId: string, newDate: Date, newTime?: string) => void;
   onTimeSlotLongPress?: (date: Date, time: string) => void;
@@ -63,7 +64,7 @@ interface CalendarDayViewProps {
 export const CalendarDayView = ({
   selectedDate,
   onDateSelect,
-  tasks,
+  quests,
   milestones = [],
   onTaskDrop,
   onTimeSlotLongPress,
@@ -94,11 +95,17 @@ export const CalendarDayView = ({
   const [showAllUnscheduled, setShowAllUnscheduled] = useState(false);
   const adaptiveSnapConfig = useMemo(() => resolveAdaptiveSnapConfig(), []);
 
-  // Calculate date string and day tasks first
+  // Calculate date string and day quests first
   const dateStr = format(selectedDate, 'yyyy-MM-dd');
-  const dayTasks = tasks.filter(t => t.task_date === dateStr);
+  const dayQuests = quests.filter((quest) => quest.taskDate === dateStr);
 
-  const dynamicWindow = useMemo(() => computeDynamicWindow(dayTasks), [dayTasks]);
+  const dynamicWindow = useMemo(
+    () => computeDynamicWindow(dayQuests.map((quest) => ({
+      scheduled_time: quest.scheduledTime,
+      estimated_duration: quest.estimatedDuration,
+    }))),
+    [dayQuests],
+  );
 
   const standardTimeSlots = useMemo(
     () => generateHalfHourSlots(dynamicWindow.startMinute, dynamicWindow.endMinute),
@@ -112,16 +119,16 @@ export const CalendarDayView = ({
 
   const timeSlots = fullDayMode ? fullDayTimeSlots : standardTimeSlots;
 
-  const getTasksForTimeSlot = useCallback((slotStartMinute: number) => {
-    return dayTasks.filter(task => bucketTaskToHalfHourSlot(task.scheduled_time) === slotStartMinute);
-  }, [dayTasks]);
+  const getQuestsForTimeSlot = useCallback((slotStartMinute: number) => {
+    return dayQuests.filter((quest) => bucketTaskToHalfHourSlot(quest.scheduledTime) === slotStartMinute);
+  }, [dayQuests]);
 
-  const getUnscheduledTasks = () => {
-    return dayTasks.filter(task => !task.scheduled_time && !task.completed);
+  const getUnscheduledQuests = () => {
+    return dayQuests.filter((quest) => !quest.scheduledTime && !quest.completed);
   };
 
-  const getCompletedTasks = () => {
-    return dayTasks.filter(task => task.completed);
+  const getCompletedQuests = () => {
+    return dayQuests.filter((quest) => quest.completed);
   };
 
   const getDayMilestones = () => {
@@ -327,33 +334,33 @@ export const CalendarDayView = ({
     clearTransientDragState();
   }, [clearTransientDragState, extractTaskIdFromDataTransfer, getDropTimeForSlot, onTaskDrop, selectedDate]);
 
-  const unscheduledTasks = getUnscheduledTasks();
+  const unscheduledQuests = getUnscheduledQuests();
   const dayMilestones = getDayMilestones();
-  const scheduledTasksCount = dayTasks.length - unscheduledTasks.length;
+  const scheduledQuestsCount = dayQuests.length - unscheduledQuests.length;
   const MAX_UNSCHEDULED_PREVIEW = 3;
-  const visibleUnscheduledTasks = showAllUnscheduled
-    ? unscheduledTasks
-    : unscheduledTasks.slice(0, MAX_UNSCHEDULED_PREVIEW);
-  const hiddenUnscheduledCount = Math.max(unscheduledTasks.length - visibleUnscheduledTasks.length, 0);
-  const shouldShowPreviewToggle = unscheduledTasks.length > MAX_UNSCHEDULED_PREVIEW;
+  const visibleUnscheduledQuests = showAllUnscheduled
+    ? unscheduledQuests
+    : unscheduledQuests.slice(0, MAX_UNSCHEDULED_PREVIEW);
+  const hiddenUnscheduledCount = Math.max(unscheduledQuests.length - visibleUnscheduledQuests.length, 0);
+  const shouldShowPreviewToggle = unscheduledQuests.length > MAX_UNSCHEDULED_PREVIEW;
   const isToday = isSameDay(selectedDate, new Date());
 
   // Calculate stats
-  const completedCount = dayTasks.filter(t => t.completed).length;
-  const totalCount = dayTasks.length;
-  const totalXP = dayTasks.reduce((sum, t) => sum + (t.completed ? t.xp_reward : 0), 0);
+  const completedCount = dayQuests.filter((quest) => quest.completed).length;
+  const totalCount = dayQuests.length;
+  const totalXP = dayQuests.reduce((sum, quest) => sum + (quest.completed ? quest.xpReward : 0), 0);
 
   // Check for time conflicts
   const checkConflicts = () => {
-    const scheduledTasks = dayTasks.filter(t => t.scheduled_time && t.estimated_duration);
+    const scheduledQuests = dayQuests.filter((quest) => quest.scheduledTime && quest.estimatedDuration);
     let conflicts = 0;
-    for (let i = 0; i < scheduledTasks.length; i++) {
-      for (let j = i + 1; j < scheduledTasks.length; j++) {
-        const task1Start = parseScheduledTime(scheduledTasks[i].scheduled_time, new Date("2000-01-01T00:00:00"));
-        const task2Start = parseScheduledTime(scheduledTasks[j].scheduled_time, new Date("2000-01-01T00:00:00"));
+    for (let i = 0; i < scheduledQuests.length; i++) {
+      for (let j = i + 1; j < scheduledQuests.length; j++) {
+        const task1Start = parseScheduledTime(scheduledQuests[i].scheduledTime, new Date("2000-01-01T00:00:00"));
+        const task2Start = parseScheduledTime(scheduledQuests[j].scheduledTime, new Date("2000-01-01T00:00:00"));
         if (!task1Start || !task2Start) continue;
-        const task1End = new Date(task1Start.getTime() + (scheduledTasks[i].estimated_duration! * 60000));
-        const task2End = new Date(task2Start.getTime() + (scheduledTasks[j].estimated_duration! * 60000));
+        const task1End = new Date(task1Start.getTime() + (scheduledQuests[i].estimatedDuration! * 60000));
+        const task2End = new Date(task2Start.getTime() + (scheduledQuests[j].estimatedDuration! * 60000));
         if (task1Start < task2End && task2Start < task1End) conflicts++;
       }
     }
@@ -362,19 +369,19 @@ export const CalendarDayView = ({
 
   // Check for power-ups
   const checkPowerUps = () => {
-    const scheduledTasks = dayTasks.filter(t => t.scheduled_time && t.estimated_duration && !t.completed);
+    const scheduledQuests = dayQuests.filter((quest) => quest.scheduledTime && quest.estimatedDuration && !quest.completed);
     let powerUpXP = 0;
 
     // Power Hour bonus (3+ consecutive hours)
     // Morning Warrior (before 9am)
-    const morningTasks = scheduledTasks.filter(t => {
-      const parts = getScheduledTimeParts(t.scheduled_time);
+    const morningTasks = scheduledQuests.filter((quest) => {
+      const parts = getScheduledTimeParts(quest.scheduledTime);
       return !!parts && parts.hour < 9;
     });
     powerUpXP += morningTasks.length * CALENDAR_BONUS_XP.MORNING_WARRIOR;
 
     // Deep Work Blocks (90+ min)
-    const deepWorkTasks = scheduledTasks.filter(t => t.estimated_duration! >= 90);
+    const deepWorkTasks = scheduledQuests.filter((quest) => quest.estimatedDuration! >= 90);
     powerUpXP += deepWorkTasks.length * CALENDAR_BONUS_XP.DEEP_WORK;
 
     return powerUpXP;
@@ -470,9 +477,9 @@ export const CalendarDayView = ({
         <Card className="space-y-3 border-dashed border-border/60 bg-background/80 p-3">
           {totalCount > 0 && (
             <div className="text-sm text-muted-foreground">
-              <span className="font-medium text-foreground">{scheduledTasksCount}</span> of{" "}
+              <span className="font-medium text-foreground">{scheduledQuestsCount}</span> of{" "}
               <span className="font-medium text-foreground">{totalCount}</span> quests scheduled •{" "}
-              <span className="font-medium text-foreground">{unscheduledTasks.length}</span> waiting to place
+              <span className="font-medium text-foreground">{unscheduledQuests.length}</span> waiting to place
             </div>
           )}
 
@@ -524,20 +531,20 @@ export const CalendarDayView = ({
       )}
 
       {/* Unscheduled Tasks - Full section in normal mode */}
-      {!fullDayMode && unscheduledTasks.length > 0 && (
+      {!fullDayMode && unscheduledQuests.length > 0 && (
         <div className="rounded-lg border border-dashed border-border/70 bg-muted/20 p-3">
           <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
             <Clock className="h-4 w-4 text-muted-foreground" />
-            Unscheduled ({unscheduledTasks.length})
+            Unscheduled ({unscheduledQuests.length})
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
-            {visibleUnscheduledTasks.map((task) => (
+            {visibleUnscheduledQuests.map((quest) => (
               <QuestDragCard
-                key={task.id}
-                task={task}
-                isDragging={draggedTask === task.id}
+                key={quest.id}
+                quest={quest}
+                isDragging={draggedTask === quest.id}
                 compact
-                onDragStart={(e) => handleTaskDragStart(e, task.id)}
+                onDragStart={(e) => handleTaskDragStart(e, quest.id)}
                 onDragEnd={handleTaskDragEnd}
               />
             ))}
@@ -566,18 +573,18 @@ export const CalendarDayView = ({
       )}
 
       {/* Floating unscheduled count in fullDayMode */}
-      {fullDayMode && unscheduledTasks.length > 0 && (
+      {fullDayMode && unscheduledQuests.length > 0 && (
         <div className="flex justify-center">
           <div className="rounded-full bg-muted/90 backdrop-blur-sm px-4 py-1.5 text-xs font-medium text-muted-foreground shadow-sm border border-border/50">
-            You have {unscheduledTasks.length} unscheduled quest{unscheduledTasks.length !== 1 ? 's' : ''}
+            You have {unscheduledQuests.length} unscheduled quest{unscheduledQuests.length !== 1 ? 's' : ''}
           </div>
         </div>
       )}
 
       {/* Empty State Prompt */}
-      {dayTasks.filter(t => t.scheduled_time).length === 0 && unscheduledTasks.length > 0 && (
+      {dayQuests.filter((quest) => quest.scheduledTime).length === 0 && unscheduledQuests.length > 0 && (
         <div className="rounded-lg border border-dashed border-border/60 bg-background/70 p-3 text-center text-sm text-muted-foreground">
-          You have {unscheduledTasks.length} unscheduled quest{unscheduledTasks.length > 1 ? "s" : ""}. Drag a chip into
+          You have {unscheduledQuests.length} unscheduled quest{unscheduledQuests.length > 1 ? "s" : ""}. Drag a chip into
           the timeline or long press any slot to place it.
         </div>
       )}
@@ -588,7 +595,7 @@ export const CalendarDayView = ({
         <div className="rounded-lg border border-border">
           <div className="relative">
             {timeSlots.map((slotStartMinute) => {
-              const slotTasks = getTasksForTimeSlot(slotStartMinute);
+              const slotQuests = getQuestsForTimeSlot(slotStartMinute);
               const isHourMark = slotStartMinute % 60 === 0;
 
               return (
@@ -627,27 +634,27 @@ export const CalendarDayView = ({
 
                   {/* Task Area */}
                   <div className="flex-1 p-2 relative">
-                    {slotTasks.length === 0 ? (
+                    {slotQuests.length === 0 ? (
                       <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2 text-xs text-muted-foreground">
                         <Plus className="h-3 w-3" />
                         <span>Long press to add quest</span>
                       </div>
                     ) : (
                       <div className="space-y-2">
-                        {slotTasks.map(task => (
+                        {slotQuests.map((quest) => (
                           <div
-                            key={task.id}
+                            key={quest.id}
                             style={{
-                              height: `${calculateTaskHeight(task.estimated_duration)}px`,
+                              height: `${calculateTaskHeight(quest.estimatedDuration)}px`,
                               minHeight: `${SLOT_ROW_HEIGHT_PX}px`
                             }}
                           >
                             <QuestDragCard
-                              task={task}
-                              isDragging={draggedTask === task.id}
-                              onDragStart={(e) => handleTaskDragStart(e, task.id)}
+                              quest={quest}
+                              isDragging={draggedTask === quest.id}
+                              onDragStart={(e) => handleTaskDragStart(e, quest.id)}
                               onDragEnd={handleTaskDragEnd}
-                              onLongPress={() => onTaskLongPress?.(task.id)}
+                              onLongPress={() => onTaskLongPress?.(quest.id)}
                               showTime
                             />
                           </div>
@@ -665,7 +672,7 @@ export const CalendarDayView = ({
         <ScrollArea className="rounded-lg border border-border max-h-[520px] min-h-[320px]">
           <div className="relative">
             {timeSlots.map((slotStartMinute) => {
-              const slotTasks = getTasksForTimeSlot(slotStartMinute);
+              const slotQuests = getQuestsForTimeSlot(slotStartMinute);
               const isHourMark = slotStartMinute % 60 === 0;
 
               return (
@@ -703,25 +710,25 @@ export const CalendarDayView = ({
 
                   {/* Task Area */}
                   <div className="flex-1 p-2 relative">
-                    {slotTasks.length === 0 ? (
+                    {slotQuests.length === 0 ? (
                       <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2 text-xs text-muted-foreground">
                         <Plus className="h-3 w-3" />
                         <span>Long press to add quest</span>
                       </div>
                     ) : (
                       <div className="space-y-2">
-                        {slotTasks.map(task => (
+                        {slotQuests.map((quest) => (
                           <div
-                            key={task.id}
+                            key={quest.id}
                             style={{
-                              height: `${calculateTaskHeight(task.estimated_duration)}px`,
+                              height: `${calculateTaskHeight(quest.estimatedDuration)}px`,
                               minHeight: `${SLOT_ROW_HEIGHT_PX}px`
                             }}
                           >
                             <QuestDragCard
-                              task={task}
-                              isDragging={draggedTask === task.id}
-                              onDragStart={(e) => handleTaskDragStart(e, task.id)}
+                              quest={quest}
+                              isDragging={draggedTask === quest.id}
+                              onDragStart={(e) => handleTaskDragStart(e, quest.id)}
                               onDragEnd={handleTaskDragEnd}
                               showTime
                             />
@@ -740,24 +747,24 @@ export const CalendarDayView = ({
       <DragTimeZoomRail rail={gridZoomRail} />
 
       {/* Completed Today Section */}
-      {getCompletedTasks().length > 0 && (
+      {getCompletedQuests().length > 0 && (
         <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
           <div className="flex items-center gap-2 text-sm font-medium text-primary">
             <CheckCircle2 className="h-4 w-4" />
-            Completed Today ({getCompletedTasks().length})
+            Completed Today ({getCompletedQuests().length})
           </div>
           <div className="mt-2 flex flex-wrap gap-2">
-            {getCompletedTasks().slice(0, 5).map((task) => (
+            {getCompletedQuests().slice(0, 5).map((quest) => (
               <div
-                key={task.id}
+                key={quest.id}
                 className="rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary line-through opacity-70"
               >
-                {task.task_text}
+                {quest.title}
               </div>
             ))}
-            {getCompletedTasks().length > 5 && (
+            {getCompletedQuests().length > 5 && (
               <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
-                +{getCompletedTasks().length - 5} more
+                +{getCompletedQuests().length - 5} more
               </span>
             )}
           </div>
@@ -765,7 +772,7 @@ export const CalendarDayView = ({
       )}
 
       {/* Long Press Hint */}
-      {dayTasks.length > 0 && (
+      {dayQuests.length > 0 && (
         <div className="text-center text-xs text-muted-foreground">
           💡 Drag unscheduled quests or long press on a time to add a new quest
         </div>

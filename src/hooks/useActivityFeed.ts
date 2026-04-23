@@ -1,6 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
+import { invalidateActivityFeedQueries } from "@/lib/activityFeedQueryCache";
+import { queryKeys } from "@/lib/queryKeys";
 import type { Json } from "@/integrations/supabase/types";
 
 // Define activity data types based on activity types
@@ -49,7 +51,7 @@ export const useActivityFeed = () => {
   const queryClient = useQueryClient();
 
   const { data: activities, isLoading } = useQuery({
-    queryKey: ['activity-feed', user?.id],
+    queryKey: queryKeys.activityFeed.byUser(user?.id),
     queryFn: async () => {
       if (!user) return [];
       const { data, error } = await supabase
@@ -102,7 +104,10 @@ export const useActivityFeed = () => {
       return activity;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['activity-feed'] });
+      void invalidateActivityFeedQueries(queryClient, {
+        userId: user?.id,
+        includeAll: true,
+      });
     },
   });
 
@@ -118,7 +123,10 @@ export const useActivityFeed = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['activity-feed'] });
+      void invalidateActivityFeedQueries(queryClient, {
+        userId: user?.id,
+        includeAll: true,
+      });
     },
   });
 

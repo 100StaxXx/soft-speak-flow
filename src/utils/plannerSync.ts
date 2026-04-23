@@ -1,5 +1,6 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { queryKeys } from "@/lib/queryKeys";
 import { fetchEpics, getEpicsQueryKey, type EpicRecord } from "@/hooks/epicsQuery";
 import type { Habit, HabitCompletion } from "@/features/habits/types";
 import {
@@ -35,7 +36,7 @@ import { resolveEpicEndDate } from "@/utils/epicDates";
 export const PLANNER_SYNC_EVENT = "planner-sync-finished";
 
 export const getDailyTasksQueryKey = (userId: string | undefined, taskDate: string) =>
-  ["daily-tasks", userId, taskDate] as const;
+  queryKeys.dailyTasks.byDate(userId, taskDate);
 
 const plannerRemoteSyncLockCounts = new Map<string, number>();
 

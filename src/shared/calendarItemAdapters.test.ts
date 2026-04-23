@@ -1,51 +1,43 @@
 import { describe, expect, it } from "vitest";
 
-import type { DailyTask } from "@/services/dailyTasksRemote";
+import type { Quest } from "@/types/domain";
 
 import {
   toCalendarItemFromExternalEvent,
   toCalendarItemFromQuest,
 } from "./calendarItemAdapters";
 
-const buildTask = (): DailyTask => ({
+const buildQuest = (): Quest => ({
   id: "task-1",
-  user_id: "user-1",
-  task_text: "Deep work block",
+  userId: "user-1",
+  title: "Deep work block",
   difficulty: "medium",
-  xp_reward: 20,
-  task_date: "2026-04-22",
+  xpReward: 20,
+  taskDate: "2026-04-22",
   completed: false,
-  completed_at: null,
-  is_main_quest: true,
-  scheduled_time: "10:15",
-  estimated_duration: 50,
-  recurrence_pattern: null,
-  recurrence_days: null,
-  recurrence_month_days: null,
-  recurrence_custom_period: null,
-  recurrence_end_date: null,
-  is_recurring: false,
-  reminder_enabled: false,
-  reminder_minutes_before: null,
-  reminder_sent: false,
-  parent_template_id: null,
+  completedAt: null,
+  isMainQuest: true,
+  scheduledTime: "10:15",
+  estimatedDuration: 50,
+  recurrencePattern: null,
+  recurrenceDays: [],
+  recurrenceMonthDays: [],
+  recurrenceCustomPeriod: null,
+  recurrenceEndDate: null,
+  isRecurring: false,
+  reminderEnabled: false,
+  reminderMinutesBefore: null,
   category: null,
-  is_bonus: false,
-  created_at: "2026-04-22T08:00:00.000Z",
   priority: null,
-  is_top_three: false,
-  actual_time_spent: null,
-  ai_generated: false,
-  context_id: null,
+  aiGenerated: false,
   source: "manual",
-  habit_source_id: null,
-  epic_id: null,
-  epic_title: null,
-  sort_order: null,
-  contact_id: null,
-  auto_log_interaction: false,
-  contact: null,
-  image_url: null,
+  habitSourceId: null,
+  campaignId: null,
+  campaignTitle: null,
+  sortOrder: null,
+  contactId: null,
+  autoLogInteraction: false,
+  imageUrl: null,
   attachments: [],
   notes: null,
   location: null,
@@ -90,7 +82,7 @@ describe("calendar item adapters", () => {
   });
 
   it("maps scheduled quests into user-owned calendar items with sync metadata", () => {
-    expect(toCalendarItemFromQuest(buildTask(), {
+    expect(toCalendarItemFromQuest(buildQuest(), {
       calendarLinks: [
         {
           connection_id: "connection-1",
@@ -116,10 +108,10 @@ describe("calendar item adapters", () => {
   });
 
   it("projects date-only quests as all-day calendar items for Outlook To Do compatibility", () => {
-    const task = buildTask();
-    task.scheduled_time = null;
+    const quest = buildQuest();
+    quest.scheduledTime = null;
 
-    expect(toCalendarItemFromQuest(task, {
+    expect(toCalendarItemFromQuest(quest, {
       outlookTaskLinks: [
         {
           connection_id: "connection-2",

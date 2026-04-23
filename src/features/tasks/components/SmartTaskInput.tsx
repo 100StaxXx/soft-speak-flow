@@ -43,7 +43,7 @@ import { TaskBatchPreview } from './TaskBatchPreview';
 import { EpicClarificationFlow } from './EpicClarificationFlow';
 import { Pathfinder } from '@/components/Pathfinder/Pathfinder';
 import { CapacityWarningBanner } from '@/components/CapacityWarningBanner';
-import { useEpics } from '@/hooks/useEpics';
+import { useCampaigns } from '@/hooks/useCampaigns';
 import { useHabits } from '@/features/habits';
 import { useAIInteractionTracker } from '@/hooks/useAIInteractionTracker';
 import { format, parseISO } from 'date-fns';
@@ -91,7 +91,7 @@ export function SmartTaskInput({
   const { decompose, isLoading: isBreakingDown } = useTaskDecomposition();
 
   const { medium, success, light, tap } = useHapticFeedback();
-  const { createEpic, isCreating: isCreatingEpic } = useEpics();
+  const { createCampaign, isCreating: isCreatingEpic } = useCampaigns();
   const { addHabit, isAddingHabit, habits } = useHabits();
   
   // Intent classification for detecting epics/habits/brain-dumps
@@ -367,9 +367,9 @@ export function SmartTaskInput({
     resetClassification();
   };
 
-  const handleEpicCreated = async (data: Parameters<typeof createEpic>[0]) => {
+  const handleEpicCreated = async (data: Parameters<typeof createCampaign>[0]) => {
     try {
-      await createEpic(data);
+      await createCampaign(data);
       setShowEpicWizard(false);
       reset();
       resetClassification();

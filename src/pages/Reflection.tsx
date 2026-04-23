@@ -4,7 +4,6 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useActivityFeed } from "@/hooks/useActivityFeed";
-import { JOURNAL_ENTRIES_QUERY_KEY } from "@/hooks/useJournalEntries";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
@@ -13,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { MoodSelector } from "@/components/MoodSelector";
 import { PageTransition } from "@/components/PageTransition";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
+import { invalidateJournalEntryQueries } from "@/lib/journalEntryQueryCache";
 import { formatDisplayLabel } from "@/lib/utils";
 
 
@@ -109,7 +109,7 @@ export default function Reflection() {
       });
 
       setTodayReflection(reflection);
-      void queryClient.invalidateQueries({ queryKey: JOURNAL_ENTRIES_QUERY_KEY });
+      void invalidateJournalEntryQueries(queryClient);
     } catch (error) {
       console.error('Error saving reflection:', error);
       toast({

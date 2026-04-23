@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { invalidateAdminReferralQueries } from "@/lib/adminReferralQueryCache";
+import { queryKeys } from "@/lib/queryKeys";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -77,7 +79,7 @@ export const AdminPayouts = () => {
 
   // Fetch all payouts with referral code and referee info
   const { data: payouts, isLoading: payoutsLoading } = useQuery({
-    queryKey: ["admin-referral-payouts"],
+    queryKey: queryKeys.adminReferral.payouts(),
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke(
         "manage-referral-payouts",
@@ -161,7 +163,7 @@ export const AdminPayouts = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-referral-payouts"] });
+      void invalidateAdminReferralQueries(queryClient, { includePayouts: true });
       toast.success("Payout approved");
       setAdminNotes("");
     },
@@ -194,7 +196,7 @@ export const AdminPayouts = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-referral-payouts"] });
+      void invalidateAdminReferralQueries(queryClient, { includePayouts: true });
       toast.success("Payout rejected");
       setAdminNotes("");
     },
@@ -220,7 +222,7 @@ export const AdminPayouts = () => {
       return data;
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["admin-referral-payouts"] });
+      void invalidateAdminReferralQueries(queryClient, { includePayouts: true });
       toast.success(`Payout processed! PayPal Batch ID: ${data.payout_batch_id}`);
       setProcessingId(null);
     },
@@ -244,7 +246,7 @@ export const AdminPayouts = () => {
       return data;
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["admin-referral-payouts"] });
+      void invalidateAdminReferralQueries(queryClient, { includePayouts: true });
       toast.success(`Retried ${data.processed || 0} failed payouts`);
     },
     onError: (error) => {
@@ -275,7 +277,7 @@ export const AdminPayouts = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-referral-payouts"] });
+      void invalidateAdminReferralQueries(queryClient, { includePayouts: true });
       toast.success("All pending payouts approved");
     },
     onError: (error) => {

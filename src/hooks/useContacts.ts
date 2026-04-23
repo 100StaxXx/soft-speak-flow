@@ -1,6 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import {
+  cancelContactsByUserQuery,
+  invalidateContactsQueryFamily,
+  restoreContactsByUserQuery,
+  setContactsByUserQueryData,
+  snapshotContactsByUserQuery,
+} from '@/lib/contactQueryCache';
 import { queryKeys } from '@/lib/queryKeys';
 import { toast } from "@/components/ui/sonner";
 
@@ -54,7 +61,7 @@ export function useContacts() {
       return data as Contact;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.contacts.all });
+      void invalidateContactsQueryFamily(queryClient);
       toast.success('Contact created');
     },
     onError: (error) => {
@@ -76,7 +83,7 @@ export function useContacts() {
       return data as Contact;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.contacts.all });
+      void invalidateContactsQueryFamily(queryClient);
       toast.success('Contact updated');
     },
     onError: (error) => {
@@ -95,7 +102,7 @@ export function useContacts() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.contacts.all });
+      void invalidateContactsQueryFamily(queryClient);
       toast.success('Contact deleted');
     },
     onError: (error) => {
@@ -114,22 +121,23 @@ export function useContacts() {
       if (error) throw error;
     },
     onMutate: async ({ id, is_favorite }) => {
-      await queryClient.cancelQueries({ queryKey: queryKeys.contacts.byUser(user?.id ?? '') });
-      const previous = queryClient.getQueryData<Contact[]>(queryKeys.contacts.byUser(user?.id ?? ''));
+      await cancelContactsByUserQuery(queryClient, user?.id);
+      const previous = snapshotContactsByUserQuery<Contact[]>(queryClient, user?.id);
       
-      queryClient.setQueryData<Contact[]>(
-        queryKeys.contacts.byUser(user?.id ?? ''),
+      setContactsByUserQueryData<Contact[]>(
+        queryClient,
+        user?.id,
         (old) => old?.map((c) => (c.id === id ? { ...c, is_favorite } : c))
       );
       
       return { previous };
     },
     onError: (_, __, context) => {
-      queryClient.setQueryData(queryKeys.contacts.byUser(user?.id ?? ''), context?.previous);
+      restoreContactsByUserQuery(queryClient, user?.id, context?.previous);
       toast.error('Failed to update favorite');
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.contacts.all });
+      void invalidateContactsQueryFamily(queryClient);
     },
   });
 

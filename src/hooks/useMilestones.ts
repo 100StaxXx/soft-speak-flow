@@ -3,6 +3,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useCallback, useMemo } from "react";
 import { toast } from "@/components/ui/sonner";
+import { invalidateCampaignContextQueryFamilies } from "@/lib/campaignContextQueryCache";
+import { invalidateEpicMilestonesQuery } from "@/lib/epicResourceQueryCache";
+import { queryKeys } from "@/lib/queryKeys";
 import { differenceInDays } from "date-fns";
 
 export interface Milestone {
@@ -60,7 +63,7 @@ export const useMilestones = (epicId?: string) => {
 
   // Fetch milestones for a specific epic
   const { data: milestones = [], isLoading, error } = useQuery({
-    queryKey: ["milestones", epicId],
+    queryKey: queryKeys.milestones.byEpic(epicId),
     queryFn: async () => {
       if (!user || !epicId) return [];
 
@@ -307,8 +310,8 @@ export const useMilestones = (epicId?: string) => {
       return { milestone, onPostcardTrigger };
     },
     onSuccess: ({ milestone, onPostcardTrigger }) => {
-      queryClient.invalidateQueries({ queryKey: ["milestones", epicId] });
-      queryClient.invalidateQueries({ queryKey: ["epics"] });
+      void invalidateEpicMilestonesQuery(queryClient, epicId);
+      void invalidateCampaignContextQueryFamilies(queryClient, ["epics"]);
       
       toast.success(`Milestone completed: ${milestone.title}`);
 
@@ -340,8 +343,8 @@ export const useMilestones = (epicId?: string) => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["milestones", epicId] });
-      queryClient.invalidateQueries({ queryKey: ["epics"] });
+      void invalidateEpicMilestonesQuery(queryClient, epicId);
+      void invalidateCampaignContextQueryFamilies(queryClient, ["epics"]);
       toast.success("Milestone unmarked");
     },
     onError: (error) => {
@@ -395,8 +398,8 @@ export const useMilestones = (epicId?: string) => {
       return milestonesToInsert;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['milestones', epicId] });
-      queryClient.invalidateQueries({ queryKey: ['epics'] });
+      void invalidateEpicMilestonesQuery(queryClient, epicId);
+      void invalidateCampaignContextQueryFamilies(queryClient, ["epics"]);
     },
     onError: (error) => {
       console.error("Failed to backfill milestones:", error);

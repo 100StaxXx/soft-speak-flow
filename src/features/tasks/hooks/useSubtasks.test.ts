@@ -15,7 +15,9 @@ const mocks = vi.hoisted(() => {
   const createOfflinePlannerIdMock = vi.fn(() => "subtask-local");
   const getLocalSubtasksForTaskMock = vi.fn();
   const upsertPlannerRecordMock = vi.fn();
+  const upsertPlannerRecordsMock = vi.fn();
   const removePlannerRecordMock = vi.fn();
+  const removePlannerRecordsMock = vi.fn();
 
   return {
     fromMock,
@@ -29,7 +31,9 @@ const mocks = vi.hoisted(() => {
     createOfflinePlannerIdMock,
     getLocalSubtasksForTaskMock,
     upsertPlannerRecordMock,
+    upsertPlannerRecordsMock,
     removePlannerRecordMock,
+    removePlannerRecordsMock,
   };
 });
 
@@ -57,7 +61,9 @@ vi.mock("@/utils/plannerLocalStore", () => ({
   createOfflinePlannerId: (...args: unknown[]) => mocks.createOfflinePlannerIdMock(...args),
   getLocalSubtasksForTask: (...args: unknown[]) => mocks.getLocalSubtasksForTaskMock(...args),
   removePlannerRecord: (...args: unknown[]) => mocks.removePlannerRecordMock(...args),
+  removePlannerRecords: (...args: unknown[]) => mocks.removePlannerRecordsMock(...args),
   upsertPlannerRecord: (...args: unknown[]) => mocks.upsertPlannerRecordMock(...args),
+  upsertPlannerRecords: (...args: unknown[]) => mocks.upsertPlannerRecordsMock(...args),
 }));
 
 import { useSubtasks } from "./useSubtasks";
@@ -84,7 +90,9 @@ describe("useSubtasks", () => {
     ]);
     mocks.insertMock.mockResolvedValue({ error: null });
     mocks.upsertPlannerRecordMock.mockResolvedValue(undefined);
+    mocks.upsertPlannerRecordsMock.mockResolvedValue(undefined);
     mocks.removePlannerRecordMock.mockResolvedValue(undefined);
+    mocks.removePlannerRecordsMock.mockResolvedValue(undefined);
     mocks.queueActionMock.mockResolvedValue(undefined);
     mocks.retryNowMock.mockResolvedValue(undefined);
     mocks.createOfflinePlannerIdMock.mockReturnValue("subtask-local");
@@ -219,11 +227,19 @@ describe("useSubtasks", () => {
       expect(result.current.isLoading).toBe(false);
     });
 
-    act(() => {
+    await act(async () => {
       result.current.addSubtask("Call uncle Derrick");
     });
 
     await waitFor(() => {
+      expect(mocks.upsertPlannerRecordMock).toHaveBeenCalledWith(
+        "subtasks",
+        expect.objectContaining({
+          id: normalizedSubtaskId,
+          task_id: normalizedParentTaskId,
+          title: "Call uncle Derrick",
+        }),
+      );
       expect(mocks.insertMock).toHaveBeenCalledWith(expect.objectContaining({
         id: normalizedSubtaskId,
         task_id: normalizedParentTaskId,

@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { MentorGrid } from "@/components/MentorGrid";
 import { useToast } from "@/hooks/use-toast";
+import { invalidateProfileQueries, refetchProfileQueries } from "@/lib/profileQueryCache";
 import { MentorSelectionSkeleton } from "@/components/skeletons/MentorSelectionSkeleton";
 import { buildBrowseMentorCatalog, type MentorBrowseEntry } from "@/lib/mentorCatalog";
 import { sortMentorsForDisplay } from "@/lib/mentorRoster";
@@ -42,7 +43,7 @@ const MentorSelection = () => {
         primary_color: mentor.primary_color || "#7B68EE",
         avatar_url: mentor.avatar_url,
         themes: mentor.themes || [],
-        availability: "active",
+        availability: "active" as const,
       })));
       setMentors(buildBrowseMentorCatalog(displayMentors));
 
@@ -119,8 +120,14 @@ const MentorSelection = () => {
       if (error) throw error;
 
       // Invalidate and refetch profile cache so mentor shows immediately
-      await queryClient.invalidateQueries({ queryKey: ["profile", user.id] });
-      await queryClient.refetchQueries({ queryKey: ["profile", user.id] });
+      await invalidateProfileQueries(queryClient, {
+        userId: user.id,
+        includeDetail: true,
+      });
+      await refetchProfileQueries(queryClient, {
+        userId: user.id,
+        includeDetail: true,
+      });
 
       toast({
         title: "Guide Selected!",

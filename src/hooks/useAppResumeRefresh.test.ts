@@ -1,6 +1,31 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("@/lib/mentorContextQueryCache", () => ({
+  invalidateMentorContextQueries: async (
+    queryClient: {
+      invalidateQueries: (input: { queryKey: readonly string[] }) => Promise<unknown>;
+    },
+    options?: {
+      includeTodayPepTalk?: boolean;
+      includeStreakFreezes?: boolean;
+    },
+  ) => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["mentor-page-data"] }),
+      queryClient.invalidateQueries({ queryKey: ["mentor-personality"] }),
+      queryClient.invalidateQueries({ queryKey: ["mentor"] }),
+      queryClient.invalidateQueries({ queryKey: ["selected-mentor"] }),
+      ...(options?.includeTodayPepTalk
+        ? [queryClient.invalidateQueries({ queryKey: ["today-pep-talk"] })]
+        : []),
+      ...(options?.includeStreakFreezes
+        ? [queryClient.invalidateQueries({ queryKey: ["streak-freezes"] })]
+        : []),
+    ]);
+  },
+}));
+
 const mocks = vi.hoisted(() => {
   const refetchQueriesMock = vi.fn().mockResolvedValue(undefined);
   const invalidateQueriesMock = vi.fn().mockResolvedValue(undefined);

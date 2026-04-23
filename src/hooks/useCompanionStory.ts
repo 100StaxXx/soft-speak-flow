@@ -2,6 +2,11 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { toast } from "@/components/ui/sonner";
+import {
+  companionContextQueryFamilyGroups,
+  invalidateCompanionContextQueryFamilies,
+} from "@/lib/companionContextQueryCache";
+import { queryKeys } from "@/lib/queryKeys";
 
 export interface CompanionStory {
   id: string;
@@ -20,7 +25,7 @@ export interface CompanionStory {
 }
 
 export const getCompanionStoriesAllQueryKey = (companionId?: string) =>
-  ["companion-stories-all", companionId] as const;
+  queryKeys.companion.storiesAll(companionId);
 
 export const fetchCompanionStoriesAll = async (companionId: string): Promise<CompanionStory[]> => {
   const { data, error } = await supabase
@@ -38,7 +43,7 @@ export const useCompanionStory = (companionId?: string, stage?: number) => {
   const queryClient = useQueryClient();
 
   const { data: story, isLoading } = useQuery<CompanionStory | null>({
-    queryKey: ["companion-story", companionId, stage],
+    queryKey: queryKeys.companion.story(companionId, stage),
     queryFn: async () => {
       if (!companionId || stage === undefined) return null;
 
@@ -100,8 +105,10 @@ export const useCompanionStory = (companionId?: string, stage?: number) => {
     },
     onSuccess: () => {
       toast.success("📖 New chapter unlocked!");
-      queryClient.invalidateQueries({ queryKey: ["companion-story"] });
-      queryClient.invalidateQueries({ queryKey: ["companion-stories-all"] });
+      void invalidateCompanionContextQueryFamilies(
+        queryClient,
+        companionContextQueryFamilyGroups.storyContent,
+      );
     },
     onError: (error) => {
       console.error("Story generation failed:", error);

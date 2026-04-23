@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
+import { invalidateProfileQueries } from "@/lib/profileQueryCache";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -44,7 +45,10 @@ export const DisplayNameSetting = memo(() => {
       
       if (error) throw error;
       
-      await queryClient.invalidateQueries({ queryKey: ["profile", user.id] });
+      await invalidateProfileQueries(queryClient, {
+        userId: user.id,
+        includeDetail: true,
+      });
       
       toast({
         title: "Display name updated",

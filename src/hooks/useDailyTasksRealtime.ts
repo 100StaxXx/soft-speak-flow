@@ -5,6 +5,13 @@
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { invalidateCampaignContextQueryFamilies } from "@/lib/campaignContextQueryCache";
+import { invalidateQuestAutocompleteQueries } from "@/lib/questAutocompleteQueryCache";
+import {
+  invalidatePlannerRuntimeTasksQuery,
+  invalidateTaskQueryFamilies,
+  taskQueryFamilyGroups,
+} from "@/lib/taskQueryCache";
 import { useAuth } from "./useAuth";
 import { logger } from "@/utils/logger";
 import {
@@ -57,10 +64,14 @@ export const useDailyTasksRealtime = () => {
           );
 
           dispatchPlannerSyncFinished();
-          queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
-          queryClient.invalidateQueries({ queryKey: ['tasks'] });
-          queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
-          queryClient.invalidateQueries({ queryKey: ['habit-surfacing'] });
+          void invalidateTaskQueryFamilies(queryClient, taskQueryFamilyGroups.planner);
+          void invalidateQuestAutocompleteQueries(queryClient, {
+            userId: user.id,
+            includeTaskHistoryAll: true,
+            includeTaskHistoryDetail: true,
+          });
+          void invalidatePlannerRuntimeTasksQuery(queryClient);
+          void invalidateCampaignContextQueryFamilies(queryClient, ["habitSurfacing"]);
         }
       )
       .on(
@@ -73,7 +84,7 @@ export const useDailyTasksRealtime = () => {
         },
         () => {
           dispatchPlannerSyncFinished();
-          queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
+          void invalidateTaskQueryFamilies(queryClient, ["daily"]);
         }
       )
       .subscribe((status, err) => {

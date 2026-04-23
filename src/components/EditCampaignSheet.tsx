@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Calendar, Loader2, Pencil, Plus, Repeat, Target, Trash2, Wand2 } from "lucide-react";
+import { invalidateCampaignContextQueryFamilies } from "@/lib/campaignContextQueryCache";
+import { invalidateTaskQueryFamilies } from "@/lib/taskQueryCache";
 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
@@ -14,10 +16,11 @@ import { FrequencyPicker } from "@/components/FrequencyPicker";
 import { EditRitualSheet, type RitualData } from "@/components/EditRitualSheet";
 import { RescheduleDrawer } from "@/components/RescheduleDrawer";
 import { useAuth } from "@/hooks/useAuth";
-import { useEpics } from "@/hooks/useEpics";
+import { useCampaigns } from "@/hooks/useCampaigns";
 import { supabase } from "@/integrations/supabase/client";
 import { resolveEpicEndDate } from "@/utils/epicDates";
 import { toast } from "@/components/ui/sonner";
+import type { Campaign } from "@/types/domain";
 
 type CampaignHabit = {
   habit_id: string;
@@ -31,7 +34,7 @@ type CampaignHabit = {
     preferred_time?: string | null;
     custom_days?: number[] | null;
     custom_month_days?: number[] | null;
-    category?: "mind" | "body" | "soul" | null;
+    category?: string | null;
   } | null;
 };
 
@@ -55,6 +58,40 @@ interface EditCampaignSheetProps {
 
 const DEFAULT_RITUAL_DAYS = [0, 1, 2, 3, 4, 5, 6];
 
+const normalizeRitualCategory = (value: string | null | undefined): "mind" | "body" | "soul" | null => {
+  if (value === "mind" || value === "body" || value === "soul") {
+    return value;
+  }
+  return null;
+};
+
+const toEditCampaignSheetEpic = (campaign: Campaign): EditCampaignSheetEpic => ({
+  id: campaign.id,
+  title: campaign.title,
+  description: campaign.description,
+  target_days: campaign.targetDays,
+  start_date: campaign.startDate,
+  end_date: campaign.endDate,
+  status: campaign.status,
+  epic_habits: campaign.rituals.map((ritual) => ({
+    habit_id: ritual.habitId,
+    habits: ritual.habit
+      ? {
+          id: ritual.habit.id,
+          title: ritual.habit.title,
+          difficulty: ritual.habit.difficulty ?? "medium",
+          description: ritual.habit.description,
+          frequency: ritual.habit.frequency,
+          estimated_minutes: ritual.habit.estimatedMinutes,
+          preferred_time: ritual.habit.preferredTime,
+          custom_days: ritual.habit.customDays,
+          custom_month_days: ritual.habit.customMonthDays,
+          category: ritual.habit.category,
+        }
+      : null,
+  })),
+});
+
 export function EditCampaignSheet({
   epic,
   open,
@@ -64,15 +101,18 @@ export function EditCampaignSheet({
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const {
-    activeEpics,
-    updateEpic,
-    deleteEpic,
+    activeCampaigns,
+    updateCampaign,
+    deleteCampaign,
     createCampaignRitual,
-  } = useEpics();
+  } = useCampaigns();
 
   const currentEpic = useMemo(
-    () => activeEpics.find((candidate) => candidate.id === epic?.id) ?? epic,
-    [activeEpics, epic],
+    () => {
+      const refreshedCampaign = activeCampaigns.find((candidate) => candidate.id === epic?.id);
+      return refreshedCampaign ? toEditCampaignSheetEpic(refreshedCampaign) : epic;
+    },
+    [activeCampaigns, epic],
   );
 
   const [title, setTitle] = useState("");
@@ -92,7 +132,7 @@ export function EditCampaignSheet({
     if (!open || !currentEpic) return;
     setTitle(currentEpic.title);
     setDescription(currentEpic.description ?? "");
-  }, [currentEpic, open]);
+  }, [currentEpic?.id, open]);
 
   useEffect(() => {
     if (!open) {
@@ -138,7 +178,7 @@ export function EditCampaignSheet({
 
     setIsSaving(true);
     try {
-      await updateEpic({
+      await updateCampaign({
         epicId: currentEpic.id,
         updates: {
           title: trimmedTitle,
@@ -155,7 +195,7 @@ export function EditCampaignSheet({
 
     setIsDeletingCampaign(true);
     try {
-      await deleteEpic({ epicId: currentEpic.id });
+      await deleteCampaign({ epicId: currentEpic.id });
       setShowDeleteConfirm(false);
       onOpenChange(false);
       onDeleted?.();
@@ -188,9 +228,8 @@ export function EditCampaignSheet({
         console.error("Error deleting linked tasks:", tasksError);
       }
 
-      queryClient.invalidateQueries({ queryKey: ["habits"] });
-      queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
-      queryClient.invalidateQueries({ queryKey: ["epics"] });
+      void invalidateCampaignContextQueryFamilies(queryClient, ["habits", "epics"]);
+      void invalidateTaskQueryFamilies(queryClient, ["daily"]);
 
       toast.success("Ritual deleted");
     } catch (error) {
@@ -366,7 +405,7 @@ export function EditCampaignSheet({
                             frequency: ritual.frequency ?? undefined,
                             estimated_minutes: ritual.estimated_minutes ?? null,
                             preferred_time: ritual.preferred_time ?? null,
-                            category: ritual.category ?? null,
+                            category: normalizeRitualCategory(ritual.category),
                             custom_days: ritual.custom_days ?? null,
                             custom_month_days: ritual.custom_month_days ?? null,
                           });

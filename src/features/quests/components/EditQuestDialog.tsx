@@ -33,6 +33,7 @@ import {
 } from "@/components/quest-shared";
 import { DurationPickerField, TimePickerField, formatDurationLabel, getNextTimeForStep } from "@/components/scheduling";
 import type { QuestDifficulty } from "../types";
+import type { EditableQuest, QuestUpdateDraft } from "../editing";
 import {
   normalizeQuestDifficulty,
   normalizeScheduledTime,
@@ -43,61 +44,22 @@ import { parseScheduledTime } from "@/utils/scheduledTime";
 import type { QuestAttachmentInput, TaskAttachment } from "@/types/questAttachments";
 import { recurrenceRequiresScheduledTime } from "@/utils/recurrenceValidation";
 
-interface Task {
-  id: string;
-  task_text: string;
-  task_date?: string | null;
-  difficulty?: string | null;
-  scheduled_time?: string | null;
-  estimated_duration?: number | null;
-  recurrence_pattern?: string | null;
-  recurrence_days?: number[] | null;
-  recurrence_month_days?: number[] | null;
-  recurrence_custom_period?: "week" | "month" | null;
-  reminder_enabled?: boolean | null;
-  reminder_minutes_before?: number | null;
-  category?: string | null;
-  notes?: string | null;
-  habit_source_id?: string | null;
-  image_url?: string | null;
-  attachments?: TaskAttachment[] | null;
-  location?: string | null;
-}
-
 interface EditQuestDialogProps {
-  task: Task | null;
+  quest: EditableQuest | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSave: (taskId: string, updates: {
-    task_text: string;
-    task_date: string | null;
-    difficulty: string;
-    scheduled_time: string | null;
-    estimated_duration: number | null;
-    recurrence_pattern: string | null;
-    recurrence_days: number[];
-    recurrence_month_days: number[];
-    recurrence_custom_period: "week" | "month" | null;
-    reminder_enabled: boolean;
-    reminder_minutes_before: number;
-    notes: string | null;
-    category: string | null;
-    image_url: string | null;
-    location: string | null;
-    attachments?: QuestAttachmentInput[];
-    subtasks?: string[];
-  }) => Promise<void>;
+  onSave: (questId: string, updates: QuestUpdateDraft) => Promise<void>;
   isSaving: boolean;
-  onDelete?: (taskId: string) => Promise<void>;
+  onDelete?: (questId: string) => Promise<void>;
   isDeleting?: boolean;
-  onSendToCalendar?: (taskId: string) => Promise<void> | void;
+  onSendToCalendar?: (questId: string) => Promise<void> | void;
   hasCalendarLink?: boolean;
   isSendingToCalendar?: boolean;
   presentation?: QuestComposerPresentation;
 }
 
 export function EditQuestDialog({
-  task,
+  quest,
   open,
   onOpenChange,
   onSave,
@@ -127,25 +89,25 @@ export function EditQuestDialog({
   const [location, setLocation] = useState<string | null>(null);
   const [newSubtaskText, setNewSubtaskText] = useState("");
 
-  const { subtasks, addSubtask, toggleSubtask, deleteSubtask } = useSubtasks(task?.id ?? null);
+  const { subtasks, addSubtask, toggleSubtask, deleteSubtask } = useSubtasks(quest?.id ?? null);
 
-  // Initialize state from task
+  // Initialize state from quest
   useEffect(() => {
-    if (task && open) {
-      setTaskText(task.task_text);
-      setTaskDate(normalizeTaskDate(task.task_date));
-      setDifficulty(normalizeQuestDifficulty(task.difficulty));
-      setScheduledTime(normalizeScheduledTime(task.scheduled_time));
-      setEstimatedDuration(task.estimated_duration ?? 30);
-      const normalizedRecurrenceDays = Array.isArray(task.recurrence_days) ? task.recurrence_days : [];
-      const normalizedRecurrenceMonthDays = Array.isArray(task.recurrence_month_days) ? task.recurrence_month_days : [];
-      const fallbackMonthDay = task.task_date ? new Date(`${normalizeTaskDate(task.task_date) ?? "2000-01-01"}T00:00:00`).getDate() : 1;
-      const normalizedCustomPeriod = task.recurrence_pattern === "custom"
-        ? (task.recurrence_custom_period ?? "week")
-        : (task.recurrence_custom_period ?? null);
-      const normalizedRecurrencePattern = task.recurrence_pattern === "weekly" && normalizedRecurrenceDays.length > 1
+    if (quest && open) {
+      setTaskText(quest.title);
+      setTaskDate(normalizeTaskDate(quest.taskDate));
+      setDifficulty(normalizeQuestDifficulty(quest.difficulty));
+      setScheduledTime(normalizeScheduledTime(quest.scheduledTime));
+      setEstimatedDuration(quest.estimatedDuration ?? 30);
+      const normalizedRecurrenceDays = Array.isArray(quest.recurrenceDays) ? quest.recurrenceDays : [];
+      const normalizedRecurrenceMonthDays = Array.isArray(quest.recurrenceMonthDays) ? quest.recurrenceMonthDays : [];
+      const fallbackMonthDay = quest.taskDate ? new Date(`${normalizeTaskDate(quest.taskDate) ?? "2000-01-01"}T00:00:00`).getDate() : 1;
+      const normalizedCustomPeriod = quest.recurrencePattern === "custom"
+        ? (quest.recurrenceCustomPeriod ?? "week")
+        : (quest.recurrenceCustomPeriod ?? null);
+      const normalizedRecurrencePattern = quest.recurrencePattern === "weekly" && normalizedRecurrenceDays.length > 1
         ? "custom"
-        : (task.recurrence_pattern || null);
+        : (quest.recurrencePattern || null);
       setRecurrencePattern(normalizedRecurrencePattern);
       setRecurrenceDays(normalizedRecurrenceDays);
       setRecurrenceMonthDays(
@@ -158,14 +120,14 @@ export function EditQuestDialog({
           ? normalizedCustomPeriod
           : null
       );
-      setReminderEnabled(Boolean(task.reminder_enabled));
+      setReminderEnabled(Boolean(quest.reminderEnabled));
       setReminderMinutesBefore(
-        typeof task.reminder_minutes_before === "number" && task.reminder_minutes_before > 0
-          ? task.reminder_minutes_before
+        typeof quest.reminderMinutesBefore === "number" && quest.reminderMinutesBefore > 0
+          ? quest.reminderMinutesBefore
           : 15,
       );
-      setMoreInformation(task.notes || null);
-      const taskAttachments = (task.attachments ?? []).map((attachment, index) => ({
+      setMoreInformation(quest.notes || null);
+      const questAttachments = (quest.attachments ?? []).map((attachment: TaskAttachment, index) => ({
         fileUrl: attachment.fileUrl,
         filePath: attachment.filePath,
         fileName: attachment.fileName,
@@ -174,11 +136,11 @@ export function EditQuestDialog({
         isImage: attachment.isImage,
         sortOrder: attachment.sortOrder ?? index,
       }));
-      if (taskAttachments.length > 0) {
-        setAttachments(taskAttachments);
-      } else if (task.image_url) {
+      if (questAttachments.length > 0) {
+        setAttachments(questAttachments);
+      } else if (quest.imageUrl) {
         setAttachments([{
-          fileUrl: task.image_url,
+          fileUrl: quest.imageUrl,
           filePath: "",
           fileName: "image",
           mimeType: "image/jpeg",
@@ -189,13 +151,13 @@ export function EditQuestDialog({
       } else {
         setAttachments([]);
       }
-      setLocation(task.location || null);
+      setLocation(quest.location || null);
       setShowAdvanced(
-        !!task.recurrence_pattern ||
-        !!task.location
+        !!quest.recurrencePattern ||
+        !!quest.location
       );
     }
-  }, [task, open]);
+  }, [quest, open]);
 
   const endTime = useMemo(() => {
     if (!scheduledTime || !estimatedDuration) return null;
@@ -231,28 +193,28 @@ export function EditQuestDialog({
   ];
 
   const handleSave = useCallback(async () => {
-    if (!task || !taskText.trim() || hasRecurrenceWithoutTime) return;
-    await onSave(task.id, {
-      task_text: taskText.trim(),
-      task_date: normalizeTaskDate(taskDate),
+    if (!quest || !taskText.trim() || hasRecurrenceWithoutTime) return;
+    await onSave(quest.id, {
+      title: taskText.trim(),
+      taskDate: normalizeTaskDate(taskDate),
       difficulty,
-      scheduled_time: normalizeScheduledTime(scheduledTime),
-      estimated_duration: estimatedDuration,
-      recurrence_pattern: recurrencePattern,
-      recurrence_days: Array.isArray(recurrenceDays) ? recurrenceDays : [],
-      recurrence_month_days: Array.isArray(recurrenceMonthDays) ? recurrenceMonthDays : [],
-      recurrence_custom_period: recurrencePattern === "custom" ? (recurrenceCustomPeriod ?? "week") : null,
-      reminder_enabled: reminderEnabled,
-      reminder_minutes_before: Number.isFinite(reminderMinutesBefore) && reminderMinutesBefore > 0 ? reminderMinutesBefore : 15,
+      scheduledTime: normalizeScheduledTime(scheduledTime),
+      estimatedDuration,
+      recurrencePattern,
+      recurrenceDays: Array.isArray(recurrenceDays) ? recurrenceDays : [],
+      recurrenceMonthDays: Array.isArray(recurrenceMonthDays) ? recurrenceMonthDays : [],
+      recurrenceCustomPeriod: recurrencePattern === "custom" ? (recurrenceCustomPeriod ?? "week") : null,
+      reminderEnabled,
+      reminderMinutesBefore: Number.isFinite(reminderMinutesBefore) && reminderMinutesBefore > 0 ? reminderMinutesBefore : 15,
       notes: moreInformation,
-      category: task.category || null,
-      image_url: attachments.find((attachment) => attachment.isImage)?.fileUrl ?? null,
+      category: quest.category || null,
+      imageUrl: attachments.find((attachment) => attachment.isImage)?.fileUrl ?? null,
       location,
       attachments,
     });
     onOpenChange(false);
   }, [
-    task,
+    quest,
     taskText,
     taskDate,
     difficulty,
@@ -273,8 +235,8 @@ export function EditQuestDialog({
   ]);
 
   const handleDelete = async () => {
-    if (!task || !onDelete) return;
-    await onDelete(task.id);
+    if (!quest || !onDelete) return;
+    await onDelete(quest.id);
     setShowDeleteConfirm(false);
     onOpenChange(false);
   };
@@ -622,8 +584,8 @@ export function EditQuestDialog({
           {onSendToCalendar && (
             <Button
               variant="outline"
-              onClick={() => onSendToCalendar(task?.id || "")}
-              disabled={isSendingToCalendar || !task?.id}
+              onClick={() => onSendToCalendar(quest?.id || "")}
+              disabled={isSendingToCalendar || !quest?.id}
               className={cn("h-12 w-full rounded-[26px] border font-semibold disabled:opacity-45", QUEST_FORM_STYLES.secondaryButton)}
             >
               <CalendarPlus className="w-4 h-4 mr-2" />
@@ -654,7 +616,7 @@ export function EditQuestDialog({
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this quest?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete "{task?.task_text}".
+              This action cannot be undone. This will permanently delete "{quest?.title}".
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -4,6 +4,17 @@ import { Capacitor } from '@capacitor/core';
 import { App } from '@capacitor/app';
 import { format } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
+import {
+  campaignContextQueryFamilyGroups,
+  invalidateCampaignContextQueryFamilies,
+} from "@/lib/campaignContextQueryCache";
+import {
+  companionContextQueryFamilyGroups,
+  invalidateCompanionQueries,
+  invalidateCompanionContextQueryFamilies,
+} from "@/lib/companionContextQueryCache";
+import { invalidateMentorContextQueries } from "@/lib/mentorContextQueryCache";
+import { refetchProfileQueries } from "@/lib/profileQueryCache";
 import { logger } from '@/utils/logger';
 import {
   dispatchPlannerSyncFinished,
@@ -37,32 +48,20 @@ export const useAppResumeRefresh = ({ enabled = true }: UseAppResumeRefreshOptio
     logger.debug(`${source} - refreshing critical data`);
 
     // Refetch profile first (mentor ID depends on it)
-    await queryClient.refetchQueries({ queryKey: ['profile'] });
+    await refetchProfileQueries(queryClient, { includeAll: true });
 
-    // Invalidate mentor queries used across mentor tab/chat/profile/nav
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['mentor-page-data'] }),
-      queryClient.invalidateQueries({ queryKey: ['mentor-personality'] }),
-      queryClient.invalidateQueries({ queryKey: ['mentor'] }),
-      queryClient.invalidateQueries({ queryKey: ['selected-mentor'] }),
-      queryClient.invalidateQueries({ queryKey: ['today-pep-talk'] }),
-      queryClient.invalidateQueries({ queryKey: ['streak-freezes'] }),
-    ]);
+    await invalidateMentorContextQueries(queryClient, {
+      includeTodayPepTalk: true,
+      includeStreakFreezes: true,
+    });
 
     // Invalidate companion-driven UI so backgrounded devices catch up immediately.
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['companion'] }),
-      queryClient.invalidateQueries({ queryKey: ['companion-health'] }),
-      queryClient.invalidateQueries({ queryKey: ['companion-care-signals'] }),
-      queryClient.invalidateQueries({ queryKey: ['companion-attributes'] }),
-      queryClient.invalidateQueries({ queryKey: ['companion-story'] }),
-      queryClient.invalidateQueries({ queryKey: ['companion-stories-all'] }),
-      queryClient.invalidateQueries({ queryKey: ['companion-memories'] }),
-      queryClient.invalidateQueries({ queryKey: ['companion-bond'] }),
-      queryClient.invalidateQueries({ queryKey: ['companion-evolution-image'] }),
-      queryClient.invalidateQueries({ queryKey: ['current-evolution-card'] }),
-      queryClient.invalidateQueries({ queryKey: ['evolution-cards'] }),
-      queryClient.invalidateQueries({ queryKey: ['wallpapers'] }),
+      invalidateCompanionQueries(queryClient, { includeAll: true }),
+      invalidateCompanionContextQueryFamilies(
+        queryClient,
+        companionContextQueryFamilyGroups.appResume,
+      ),
     ]);
 
     if (user?.id) {
@@ -74,12 +73,10 @@ export const useAppResumeRefresh = ({ enabled = true }: UseAppResumeRefreshOptio
     }
 
     // Invalidate planner-derived UI after local caches are warmed.
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['habits'] }),
-      queryClient.invalidateQueries({ queryKey: ['habit-surfacing'] }),
-      queryClient.invalidateQueries({ queryKey: ['epic-progress'] }),
-      queryClient.invalidateQueries({ queryKey: ['user-ai-context'] }),
-    ]);
+    await invalidateCampaignContextQueryFamilies(
+      queryClient,
+      campaignContextQueryFamilyGroups.campaignPlanner,
+    );
 
     dispatchPlannerSyncFinished();
   }, [enabled, queryClient, user?.id]);

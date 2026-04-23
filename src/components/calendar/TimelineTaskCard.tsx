@@ -1,14 +1,14 @@
 import { format } from "date-fns";
 import type { PointerEventHandler, TouchEventHandler } from "react";
+import type { DisplayQuest } from "@/features/quests/display";
 import { cn } from "@/lib/utils";
 import { Check, RotateCcw, Brain, Dumbbell, Heart, Sparkles, Sun } from "lucide-react";
-import { CalendarTask } from "@/types/quest";
 import { normalizeScheduledTime, parseScheduledTime } from "@/utils/scheduledTime";
 
 interface TimelineTaskCardProps {
-  task: CalendarTask;
-  onTaskClick?: (task: CalendarTask) => void;
-  onTaskLongPress?: (taskId: string) => void;
+  quest: DisplayQuest;
+  onQuestClick?: () => void;
+  onQuestLongPress?: (questId: string) => void;
   isDragging?: boolean;
   previewTime?: string | null;
   rowDragProps?: {
@@ -52,26 +52,26 @@ function getDurationText(durationMinutes: number | null): string {
 }
 
 export function TimelineTaskCard({ 
-  task, 
-  onTaskClick, 
-  onTaskLongPress,
+  quest,
+  onQuestClick,
+  onQuestLongPress,
   isDragging,
   previewTime,
   rowDragProps,
 }: TimelineTaskCardProps) {
-  const categoryConfig = CATEGORY_CONFIG[task.category || "default"] || CATEGORY_CONFIG.default;
+  const categoryConfig = CATEGORY_CONFIG[quest.category || "default"] || CATEGORY_CONFIG.default;
   const IconComponent = categoryConfig.icon;
 
   const handleClick = () => {
-    onTaskClick?.(task);
+    onQuestClick?.();
   };
 
   const handleLongPress = () => {
-    onTaskLongPress?.(task.id);
+    onQuestLongPress?.(quest.id);
   };
 
   // Display time (show preview if dragging)
-  const displayTime = previewTime || task.scheduled_time;
+  const displayTime = previewTime || quest.scheduledTime;
   const parsedDisplayTime = displayTime ? parseScheduledTime(displayTime) : null;
   const isMorning = !!(parsedDisplayTime && parsedDisplayTime.getHours() < 12);
 
@@ -85,7 +85,7 @@ export function TimelineTaskCard({
       }}
       className={cn(
         "flex items-center gap-4 py-3 cursor-pointer transition-all select-none",
-        task.completed && "opacity-50",
+        quest.completed && "opacity-50",
         isDragging && "scale-[1.02] z-10"
       )}
       style={{ touchAction: isDragging ? "none" : "pan-y" }}
@@ -111,13 +111,13 @@ export function TimelineTaskCard({
               {formatTimeDisplay(displayTime)}
             </span>
           )}
-          {task.estimated_duration && (
+          {quest.estimatedDuration && (
             <>
               <span className="text-muted-foreground/50">•</span>
-              <span>{getDurationText(task.estimated_duration)}</span>
+              <span>{getDurationText(quest.estimatedDuration)}</span>
             </>
           )}
-          {task.is_main_quest && (
+          {quest.isMainQuest && (
             <RotateCcw className="h-3.5 w-3.5 text-primary" />
           )}
         </div>
@@ -125,9 +125,9 @@ export function TimelineTaskCard({
         {/* Task Title */}
         <p className={cn(
           "font-semibold text-lg text-foreground truncate",
-          task.completed && "line-through text-muted-foreground"
+          quest.completed && "line-through text-muted-foreground"
         )}>
-          {task.task_text}
+          {quest.title}
         </p>
       </div>
 
@@ -141,12 +141,12 @@ export function TimelineTaskCard({
           }}
           className={cn(
             "flex-shrink-0 w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all",
-            task.completed
+            quest.completed
               ? "bg-coral-500 border-coral-500"
               : "border-coral-500/50 hover:border-coral-500"
           )}
         >
-          {task.completed && <Check className="h-5 w-5 text-white" />}
+          {quest.completed && <Check className="h-5 w-5 text-white" />}
         </button>
       </div>
     </div>

@@ -2,6 +2,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { invalidateProfileQueries } from "@/lib/profileQueryCache";
+import { queryKeys } from "@/lib/queryKeys";
+import { invalidateStreakQueries } from "@/lib/streakQueryCache";
 
 interface StreakAtRiskData {
   streak_at_risk: boolean;
@@ -16,7 +19,7 @@ export function useStreakAtRisk() {
   const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery({
-    queryKey: ["streak-at-risk", user?.id],
+    queryKey: queryKeys.streaks.atRisk(user?.id),
     queryFn: async (): Promise<StreakAtRiskData | null> => {
       if (!user?.id) return null;
 
@@ -52,8 +55,16 @@ export function useStreakAtRisk() {
       return data;
     },
     onSuccess: (result, action) => {
-      queryClient.invalidateQueries({ queryKey: ["streak-at-risk"] });
-      queryClient.invalidateQueries({ queryKey: ["profile"] });
+      void invalidateStreakQueries(queryClient, {
+        userId: user?.id,
+        includeAtRiskAll: true,
+        includeAtRiskDetail: true,
+      });
+      void invalidateProfileQueries(queryClient, {
+        userId: user?.id,
+        includeAll: true,
+        includeDetail: true,
+      });
 
       if (action === "use_freeze") {
         toast({

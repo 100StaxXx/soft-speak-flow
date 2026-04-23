@@ -12,14 +12,16 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/components/ui/sonner";
+import { invalidateCampaignContextQueryFamilies } from "@/lib/campaignContextQueryCache";
 import { format } from "date-fns";
 import { motion } from "framer-motion";
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
+import { invalidateTaskQueryFamilies } from "@/lib/taskQueryCache";
 import { playStrikethrough } from "@/utils/soundEffects";
 import { useHabitSurfacing } from "@/hooks/useHabitSurfacing";
-import { useTaskMutations } from "@/hooks/useTaskMutations";
+import { useQuestMutations } from "@/hooks/useQuestMutations";
 import { useLivingCompanionSafe } from "@/hooks/useLivingCompanion";
-import { useEpics } from "@/hooks/useEpics";
+import { useCampaigns } from "@/hooks/useCampaigns";
 import { getClampedMonthDays, isHabitScheduledForDate } from "@/utils/habitSchedule";
 interface Habit {
   id: string;
@@ -100,7 +102,7 @@ interface EpicCheckInDrawerProps {
 export const EpicCheckInDrawer = memo(function EpicCheckInDrawer({ epicId, habits, isActive, onAdjustPlan, showAdjustPlan, renderTrigger }: EpicCheckInDrawerProps) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const { createCampaignRitual } = useEpics({ enabled: false });
+  const { createCampaignRitual } = useCampaigns({ enabled: false });
   const [open, setOpen] = useState(false);
   const [expandedHabit, setExpandedHabit] = useState<string | null>(null);
   const [editingRitual, setEditingRitual] = useState<RitualData | null>(null);
@@ -122,7 +124,7 @@ export const EpicCheckInDrawer = memo(function EpicCheckInDrawer({ epicId, habit
   // Get habit surfacing data and mutations for syncing with Quests tab
   const taskDate = format(new Date(), 'yyyy-MM-dd');
   const { surfacedHabits, surfaceHabit } = useHabitSurfacing();
-  const { toggleTask } = useTaskMutations(taskDate);
+  const { toggleQuest } = useQuestMutations(taskDate);
    
    // Living companion reaction system - safe hook returns no-op when outside provider
    const { triggerRitualComplete } = useLivingCompanionSafe();
@@ -182,8 +184,8 @@ export const EpicCheckInDrawer = memo(function EpicCheckInDrawer({ epicId, habit
         // The surfaceHabit will create the task and invalidate queries
         // The UI will update via realtime sync
       } else {
-        // Toggle the task to completed - toggleTask is already the mutate function
-        toggleTask({ 
+        // Toggle the quest to completed - toggleQuest is already the mutate function
+        toggleQuest({
           taskId, 
           completed: true, 
           xpReward: 25 
@@ -241,9 +243,8 @@ export const EpicCheckInDrawer = memo(function EpicCheckInDrawer({ epicId, habit
       }
 
       // Invalidate queries
-      queryClient.invalidateQueries({ queryKey: ['habits'] });
-      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
-      queryClient.invalidateQueries({ queryKey: ['epics'] });
+      void invalidateCampaignContextQueryFamilies(queryClient, ["habits", "epics"]);
+      void invalidateTaskQueryFamilies(queryClient, ["daily"]);
       
       toast.success('Ritual deleted');
     } catch (error) {

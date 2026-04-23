@@ -29,6 +29,7 @@ import { StoryJournalInfoTooltip } from "./StoryJournalInfoTooltip";
 import { CompanionImage } from "./CompanionImage";
 import { cn } from "@/lib/utils";
 import type { CompanionLayoutMode } from "@/hooks/useCompanionLayoutMode";
+import { queryKeys } from "@/lib/queryKeys";
 
 interface CompanionStoryJournalProps {
   layoutMode?: CompanionLayoutMode;
@@ -60,7 +61,7 @@ export const CompanionStoryJournal = ({ layoutMode = "mobile" }: CompanionStoryJ
   );
 
   const { data: chapterImage } = useQuery<string | null>({
-    queryKey: ["companion-story-image", companion?.id, debouncedLevel],
+    queryKey: queryKeys.companion.storyImage(companion?.id, debouncedLevel),
     queryFn: async () => {
       if (!companion) return null;
 

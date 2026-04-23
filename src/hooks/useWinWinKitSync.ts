@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useStoreKit } from "@/hooks/useStoreKit";
+import { invalidateProfileAccessQueries } from "@/lib/profileAccessQueryCache";
 import { WinWinKit } from "@/plugins/WinWinKitPlugin";
 import { isNativeIOSHandheld } from "@/utils/platformTargets";
 
@@ -64,9 +65,12 @@ export function useWinWinKitSync() {
         syncedReferralCode !== (profile.referral_code ?? null) ||
         syncedReferredByCode !== (profile.referred_by_code ?? null)
       ) {
-        queryClient.invalidateQueries({ queryKey: ["profile", user.id] });
-        queryClient.invalidateQueries({ queryKey: ["referral-stats", user.id] });
-        queryClient.invalidateQueries({ queryKey: ["applied-referral-code-state", user.id] });
+        void invalidateProfileAccessQueries(queryClient, {
+          userId: user.id,
+          includeProfileDetail: true,
+          includeReferralStatsDetail: true,
+          includeAppliedReferralCodeStateDetail: true,
+        });
       }
 
       lastSyncKeyRef.current = syncKey;

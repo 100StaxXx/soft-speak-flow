@@ -41,5 +41,16 @@ export interface EpicTemplate {
   created_at: string | null;
 }
 
+export interface CalendarMilestone {
+  id: string;
+  title: string;
+  target_date: string;
+  milestone_percent: number;
+  completed_at: string | null;
+  epic_id: string;
+  epic_title?: string;
+  phase_name?: string | null;
+}
+
 // Canonical app-boundary noun: Campaign. `Epic` remains the storage-era shape.
 export type CanonicalCampaign = Campaign;

@@ -1,6 +1,6 @@
 import { Star, CheckCircle2, Target } from "lucide-react";
+import type { CalendarMilestone } from "@/features/epics/types";
 import { cn } from "@/lib/utils";
-import type { CalendarMilestone } from "@/hooks/useCalendarMilestones";
 
 interface MilestoneCalendarCardProps {
   milestone: CalendarMilestone;

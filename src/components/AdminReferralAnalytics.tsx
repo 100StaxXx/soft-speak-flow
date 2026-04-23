@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { queryKeys } from "@/lib/queryKeys";
 import { Card } from "@/components/ui/card";
 import { Loader2, TrendingUp, Users, DollarSign, BarChart3, ArrowUpRight, ArrowDownRight } from "lucide-react";
 
@@ -28,7 +29,7 @@ interface AnalyticsData {
 
 export const AdminReferralAnalytics = () => {
   const { data: analytics, isLoading } = useQuery({
-    queryKey: ["admin-referral-analytics"],
+    queryKey: queryKeys.adminReferral.analytics(),
     queryFn: async (): Promise<AnalyticsData> => {
       const [{ data: codeResponse, error: codeError }, { data: payoutResponse, error: payoutError }] = await Promise.all([
         supabase.functions.invoke("manage-referral-codes", {

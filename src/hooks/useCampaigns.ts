@@ -5,11 +5,14 @@ type UseEpicsOptions = Parameters<typeof useEpics>[0];
 
 export const useCampaigns = (options: UseEpicsOptions = {}) => {
   const legacyEpics = useEpics(options);
+  const campaigns = legacyEpics.epics ?? [];
+  const activeCampaigns = legacyEpics.activeEpics ?? [];
+  const completedCampaigns = legacyEpics.completedEpics ?? [];
 
   return {
-    campaigns: legacyEpics.epics.map(toCampaign),
-    activeCampaigns: legacyEpics.activeEpics.map(toCampaign),
-    completedCampaigns: legacyEpics.completedEpics.map(toCampaign),
+    campaigns: campaigns.map(toCampaign),
+    activeCampaigns: activeCampaigns.map(toCampaign),
+    completedCampaigns: completedCampaigns.map(toCampaign),
     isLoading: legacyEpics.isLoading,
     error: legacyEpics.error,
     createCampaign: legacyEpics.createEpic,

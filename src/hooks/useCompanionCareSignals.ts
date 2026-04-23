@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { useMemo } from "react";
+import { queryKeys } from "@/lib/queryKeys";
 
 /**
  * INTERNAL hook for hidden care signals - these values drive behavior
@@ -67,7 +68,7 @@ export const useCompanionCareSignals = (
   const { enabled = true } = options;
 
   const { data: careData, isLoading } = useQuery({
-    queryKey: ['companion-care-signals', user?.id],
+    queryKey: queryKeys.companion.careSignals(user?.id),
     queryFn: async () => {
       if (!user?.id) return null;
       

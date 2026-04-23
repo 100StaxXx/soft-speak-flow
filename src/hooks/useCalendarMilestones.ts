@@ -1,18 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
+import type { CalendarMilestone } from "@/features/epics/types";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { queryKeys } from "@/lib/queryKeys";
 import { startOfMonth, endOfMonth, format } from "date-fns";
-
-export interface CalendarMilestone {
-  id: string;
-  title: string;
-  target_date: string;
-  milestone_percent: number;
-  completed_at: string | null;
-  epic_id: string;
-  epic_title?: string;
-  phase_name?: string | null;
-}
 
 export function useCalendarMilestones(selectedDate: Date) {
   const { user } = useAuth();
@@ -21,7 +12,7 @@ export function useCalendarMilestones(selectedDate: Date) {
   const endDate = format(endOfMonth(selectedDate), 'yyyy-MM-dd');
 
   const { data: milestones = [], isLoading } = useQuery({
-    queryKey: ['calendar-milestones', user?.id, startDate, endDate],
+    queryKey: queryKeys.calendarMilestones.byRange(user?.id, startDate, endDate),
     queryFn: async () => {
       if (!user?.id) return [];
 

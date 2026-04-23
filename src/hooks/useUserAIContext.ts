@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { ACTIVE_CAMPAIGN_LIMIT_WARNING } from '@/features/epics/constants';
+import { queryKeys } from '@/lib/queryKeys';
 
 interface EnrichedContext {
   activeEpics: Array<{
@@ -75,7 +76,7 @@ export function useUserAIContext(options: UseUserAIContextOptions = {}) {
     isLoading: isContextLoading,
     refetch: refetchContext,
   } = useQuery({
-    queryKey: ['user-ai-context', user?.id],
+    queryKey: queryKeys.userAiContext.detail(user?.id),
     queryFn: async (): Promise<EnrichedContext | null> => {
       if (!user) return null;
 

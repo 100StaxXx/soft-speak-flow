@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { invalidateAdminReferralQueries } from "@/lib/adminReferralQueryCache";
+import { queryKeys } from "@/lib/queryKeys";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -59,7 +61,7 @@ export const AdminReferralConfig = () => {
 
   // Fetch all configs
   const { data: configs, isLoading } = useQuery({
-    queryKey: ["admin-referral-config"],
+    queryKey: queryKeys.adminReferral.config(),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("referral_config")
@@ -113,7 +115,7 @@ export const AdminReferralConfig = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-referral-config"] });
+      void invalidateAdminReferralQueries(queryClient, { includeConfig: true });
       toast.success("Configuration saved");
     },
     onError: (error) => {

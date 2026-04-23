@@ -8,6 +8,7 @@ import type {
   PlannerHorizon,
 } from "@/types/companionPlanner";
 import { supabase } from "@/integrations/supabase/client";
+import { queryKeys } from "@/lib/queryKeys";
 
 interface UseExternalCalendarEventsOptions {
   enabled?: boolean;
@@ -41,7 +42,7 @@ export function useExternalCalendarEvents(
   }, [horizon, selectedDate]);
 
   const query = useQuery({
-    queryKey: ["external-calendar-events", user?.id, range.startKey, range.endKey, horizon],
+    queryKey: queryKeys.calendar.externalEvents(user?.id, range.startKey, range.endKey, horizon),
     enabled: enabled && !!user?.id,
     staleTime: 2 * 60 * 1000,
     queryFn: async (): Promise<PlannerContextCalendarEvent[]> => {

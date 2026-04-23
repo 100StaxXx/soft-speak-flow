@@ -1,5 +1,6 @@
 import type { JourneyPathPromptContext } from "@/shared/journeyPathConfig";
 import { supabase } from "@/integrations/supabase/client";
+import { queryKeys } from "@/lib/queryKeys";
 
 export interface EpicHabitRecord {
   habit_id: string;
@@ -23,10 +24,13 @@ export interface EpicRecord {
   title: string;
   description: string | null;
   status: string;
+  xp_reward?: number | null;
   progress_percentage: number | null;
   target_days: number;
   start_date: string;
   end_date: string | null;
+  story_type_slug?: string | null;
+  created_at?: string | null;
   epic_habits?: EpicHabitRecord[] | null;
   latest_journey_path_generated_at?: string | null;
   latest_journey_path_milestone_index?: number | null;
@@ -38,7 +42,7 @@ export interface EpicRecord {
 export const EPICS_QUERY_STALE_TIME = 3 * 60 * 1000;
 
 export const getEpicsQueryKey = (userId: string | undefined) =>
-  ["epics", userId] as const;
+  queryKeys.epics.byUser(userId);
 
 export const fetchEpics = async (userId: string): Promise<EpicRecord[]> => {
   const { data, error } = await supabase

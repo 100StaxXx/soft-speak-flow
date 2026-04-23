@@ -14,6 +14,16 @@ import {
   startOfDay,
 } from "date-fns";
 import { toast } from "@/components/ui/sonner";
+import { queryKeys } from "@/lib/queryKeys";
+import {
+  invalidateRecurringTemplateQueries,
+  setRecurringTemplateQueryData,
+} from "@/lib/recurringTemplateQueryCache";
+import {
+  invalidatePlannerRuntimeTasksQuery,
+  invalidateTaskQueryFamilies,
+  taskQueryFamilyGroups,
+} from "@/lib/taskQueryCache";
 import { getClampedMonthDays } from "@/utils/habitSchedule";
 import { hasScheduledTimeValue } from "@/utils/recurrenceValidation";
 import type { DailyTask } from "@/services/dailyTasksRemote";
@@ -185,11 +195,13 @@ async function fetchRecurringTemplatesRemote(userId: string): Promise<RecurringT
     .eq("is_recurring", true)
     .not("recurrence_pattern", "is", null);
 
-  let { data: templates, error } = await fetchTemplates(RECURRING_TEMPLATE_SELECT_WITH_MONTH_RECURRENCE);
+  let { data: rawTemplates, error } = await fetchTemplates(RECURRING_TEMPLATE_SELECT_WITH_MONTH_RECURRENCE);
+  let templates = (rawTemplates ?? []) as unknown as RecurringTask[];
 
   if (isDailyTasksRecurrenceColumnsMissingError(error)) {
     const fallback = await fetchTemplates(RECURRING_TEMPLATE_SELECT_LEGACY_RECURRENCE);
-    templates = (fallback.data || []).map((template) => ({
+    const fallbackTemplates = (fallback.data ?? []) as unknown as RecurringTask[];
+    templates = fallbackTemplates.map((template) => ({
       ...template,
       recurrence_month_days: null,
       recurrence_custom_period: null,
@@ -199,7 +211,7 @@ async function fetchRecurringTemplatesRemote(userId: string): Promise<RecurringT
 
   if (error) throw error;
 
-  return (templates ?? []) as RecurringTask[];
+  return templates;
 }
 
 function toLocalRecurringTemplateRow(userId: string, template: RecurringTask): DailyTask {
@@ -391,7 +403,7 @@ export function useRecurringTaskSpawner(selectedDate?: Date) {
   const appDayOfWeek = toAppDayIndex(getDay(effectiveTargetDate));
 
   const query = useQuery({
-    queryKey: ["recurring-templates", user?.id, today],
+    queryKey: queryKeys.recurringTemplates.pending(user?.id, today),
     queryFn: async () => {
       if (!user?.id) return [];
       return loadPendingRecurringTemplates(user.id, today, appDayOfWeek, effectiveTargetDate);
@@ -414,10 +426,11 @@ export function useRecurringTaskSpawner(selectedDate?: Date) {
 
         if (disposed) return;
 
-        queryClient.setQueryData(
-          ["recurring-templates", user.id, today],
-          await loadPendingRecurringTemplates(user.id, today, appDayOfWeek, effectiveTargetDate),
-        );
+        setRecurringTemplateQueryData(queryClient, {
+          userId: user.id,
+          date: today,
+          templates: await loadPendingRecurringTemplates(user.id, today, appDayOfWeek, effectiveTargetDate),
+        });
       } catch (error) {
         console.warn("[RecurringSpawner] Failed to refresh local recurring templates:", error);
       }
@@ -629,10 +642,14 @@ export function useRecurringTaskSpawner(selectedDate?: Date) {
       failedTemplateCount,
       queuedCount,
     }) => {
-      queryClient.invalidateQueries({ queryKey: ["recurring-templates"] });
-      queryClient.invalidateQueries({ queryKey: ["tasks"] });
-      queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
-      queryClient.invalidateQueries({ queryKey: ["calendar-tasks"] });
+      void invalidateRecurringTemplateQueries(queryClient, {
+        userId: user?.id,
+        date: today,
+        includeAll: true,
+        includePending: true,
+      });
+      void invalidatePlannerRuntimeTasksQuery(queryClient);
+      void invalidateTaskQueryFamilies(queryClient, taskQueryFamilyGroups.planner);
 
       if (skippedMissingTimeCount > 0) {
         toast.error("Set a time on recurring quest templates to resume auto-creation.");

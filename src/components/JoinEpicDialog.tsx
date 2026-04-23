@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/components/ui/sonner";
+import { invalidateCampaignContextQueryFamilies } from "@/lib/campaignContextQueryCache";
 import { supabase } from "@/integrations/supabase/client";
 import { ACTIVE_CAMPAIGN_LIMIT_MESSAGE } from "@/features/epics/constants";
 
@@ -86,8 +87,7 @@ export const JoinEpicDialog = memo(function JoinEpicDialog({ open, onOpenChange 
       setInviteCode("");
       
       // Refresh epics and habits queries
-      queryClient.invalidateQueries({ queryKey: ["epics"] });
-      queryClient.invalidateQueries({ queryKey: ["habits"] });
+      void invalidateCampaignContextQueryFamilies(queryClient, ["epics", "habits"]);
     } catch (error) {
       console.error('Error joining epic:', error);
       toast.error("Failed to join guild. Please try again.");

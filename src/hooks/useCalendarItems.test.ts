@@ -3,8 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   useExternalCalendarEventsMock: vi.fn(),
-  useDailyTasksMock: vi.fn(),
-  useCalendarTasksMock: vi.fn(),
+  useQuestsMock: vi.fn(),
+  useCalendarQuestsMock: vi.fn(),
   useQuestCalendarSyncMock: vi.fn(),
 }));
 
@@ -13,12 +13,12 @@ vi.mock("@/hooks/useExternalCalendarEvents", () => ({
     mocks.useExternalCalendarEventsMock(...args),
 }));
 
-vi.mock("@/hooks/useDailyTasks", () => ({
-  useDailyTasks: (...args: unknown[]) => mocks.useDailyTasksMock(...args),
+vi.mock("@/hooks/useQuests", () => ({
+  useQuests: (...args: unknown[]) => mocks.useQuestsMock(...args),
 }));
 
-vi.mock("@/hooks/useCalendarTasks", () => ({
-  useCalendarTasks: (...args: unknown[]) => mocks.useCalendarTasksMock(...args),
+vi.mock("@/hooks/useCalendarQuests", () => ({
+  useCalendarQuests: (...args: unknown[]) => mocks.useCalendarQuestsMock(...args),
 }));
 
 vi.mock("@/hooks/useQuestCalendarSync", () => ({
@@ -46,47 +46,47 @@ describe("useCalendarItems", () => {
       ],
       isLoading: false,
     });
-    mocks.useDailyTasksMock.mockReturnValue({
-      tasks: [
+    mocks.useQuestsMock.mockReturnValue({
+      quests: [
         {
           id: "task-1",
-          user_id: "user-1",
-          task_text: "Deep work block",
+          userId: "user-1",
+          title: "Deep work block",
           difficulty: "medium",
-          xp_reward: 20,
-          task_date: "2026-04-22",
+          xpReward: 20,
+          taskDate: "2026-04-22",
           completed: false,
-          completed_at: null,
-          is_main_quest: true,
-          scheduled_time: "10:15",
-          estimated_duration: 45,
-          recurrence_pattern: null,
-          recurrence_days: null,
-          recurrence_month_days: null,
-          recurrence_custom_period: null,
-          recurrence_end_date: null,
-          is_recurring: false,
-          reminder_enabled: false,
-          reminder_minutes_before: null,
-          reminder_sent: false,
-          parent_template_id: null,
+          completedAt: null,
+          isMainQuest: true,
+          scheduledTime: "10:15",
+          estimatedDuration: 45,
+          recurrencePattern: null,
+          recurrenceDays: null,
+          recurrenceMonthDays: null,
+          recurrenceCustomPeriod: null,
+          recurrenceEndDate: null,
+          isRecurring: false,
+          reminderEnabled: false,
+          reminderMinutesBefore: null,
+          reminderSent: false,
+          parentTemplateId: null,
           category: null,
-          is_bonus: false,
-          created_at: "2026-04-22T07:00:00.000Z",
+          isBonus: false,
+          createdAt: "2026-04-22T07:00:00.000Z",
           priority: null,
-          is_top_three: false,
-          actual_time_spent: null,
-          ai_generated: false,
-          context_id: null,
+          isTopThree: false,
+          actualTimeSpent: null,
+          aiGenerated: false,
+          contextId: null,
           source: "manual",
-          habit_source_id: null,
-          epic_id: null,
-          epic_title: null,
-          sort_order: null,
-          contact_id: null,
-          auto_log_interaction: false,
+          habitSourceId: null,
+          campaignId: null,
+          campaignTitle: null,
+          sortOrder: null,
+          contactId: null,
+          autoLogInteraction: false,
           contact: null,
-          image_url: null,
+          imageUrl: null,
           attachments: [],
           notes: null,
           location: null,
@@ -95,8 +95,8 @@ describe("useCalendarItems", () => {
       ],
       isLoading: false,
     });
-    mocks.useCalendarTasksMock.mockReturnValue({
-      tasks: [],
+    mocks.useCalendarQuestsMock.mockReturnValue({
+      quests: [],
       isLoading: false,
     });
     mocks.useQuestCalendarSyncMock.mockReturnValue({
@@ -125,10 +125,10 @@ describe("useCalendarItems", () => {
       "day",
       { enabled: false },
     );
-    expect(mocks.useDailyTasksMock).toHaveBeenCalledWith(selectedDate, {
+    expect(mocks.useQuestsMock).toHaveBeenCalledWith(selectedDate, {
       enabled: false,
     });
-    expect(mocks.useCalendarTasksMock).toHaveBeenCalledWith(selectedDate, "week", {
+    expect(mocks.useCalendarQuestsMock).toHaveBeenCalledWith(selectedDate, "week", {
       enabled: false,
     });
     expect(mocks.useQuestCalendarSyncMock).toHaveBeenCalledWith({
@@ -170,12 +170,12 @@ describe("useCalendarItems", () => {
       ],
       isLoading: true,
     });
-    mocks.useDailyTasksMock.mockReturnValue({
-      tasks: [],
+    mocks.useQuestsMock.mockReturnValue({
+      quests: [],
       isLoading: false,
     });
-    mocks.useCalendarTasksMock.mockReturnValue({
-      tasks: [],
+    mocks.useCalendarQuestsMock.mockReturnValue({
+      quests: [],
       isLoading: false,
     });
     mocks.useQuestCalendarSyncMock.mockReturnValue({
@@ -190,10 +190,10 @@ describe("useCalendarItems", () => {
       }),
     );
 
-    expect(mocks.useDailyTasksMock).toHaveBeenCalledWith(selectedDate, {
+    expect(mocks.useQuestsMock).toHaveBeenCalledWith(selectedDate, {
       enabled: false,
     });
-    expect(mocks.useCalendarTasksMock).toHaveBeenCalledWith(selectedDate, "month", {
+    expect(mocks.useCalendarQuestsMock).toHaveBeenCalledWith(selectedDate, "month", {
       enabled: false,
     });
     expect(mocks.useQuestCalendarSyncMock).toHaveBeenCalledWith({

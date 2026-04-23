@@ -1,6 +1,8 @@
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { invalidateMentorContextQueries } from "@/lib/mentorContextQueryCache";
+import { invalidateProfileAccessQueries } from "@/lib/profileAccessQueryCache";
 import { useAuth } from "./useAuth";
 import { logger } from "@/utils/logger";
 
@@ -22,14 +24,14 @@ export const useProfileRealtime = () => {
           filter: `id=eq.${user.id}`,
         },
         () => {
-          queryClient.invalidateQueries({ queryKey: ["profile"] });
-          queryClient.invalidateQueries({ queryKey: ["mentor"] });
-          queryClient.invalidateQueries({ queryKey: ["mentor-page-data"] });
-          queryClient.invalidateQueries({ queryKey: ["mentor-personality"] });
-          queryClient.invalidateQueries({ queryKey: ["selected-mentor"] });
-          queryClient.invalidateQueries({ queryKey: ["streak-freezes"] });
-          queryClient.invalidateQueries({ queryKey: ["subscription"] });
-          queryClient.invalidateQueries({ queryKey: ["referral-stats"] });
+          void invalidateProfileAccessQueries(queryClient, {
+            includeProfileAll: true,
+            includeSubscriptionAll: true,
+            includeReferralStatsAll: true,
+          });
+          void invalidateMentorContextQueries(queryClient, {
+            includeStreakFreezes: true,
+          });
         },
       )
       .subscribe((status, err) => {

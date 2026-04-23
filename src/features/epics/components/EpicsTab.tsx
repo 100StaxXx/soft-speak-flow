@@ -5,19 +5,57 @@ import { JoinEpicDialog } from "@/components/JoinEpicDialog";
 import { EpicsTutorialModal } from "@/components/EpicsTutorialModal";
 import { CampaignEmptyStateModal } from "./CampaignEmptyStateModal";
 import { CampaignCreatedAnimation } from "@/components/CampaignCreatedAnimation";
-import { useEpics } from "@/hooks/useEpics";
+import { useCampaigns } from "@/hooks/useCampaigns";
 import { useFirstTimeModal } from "@/hooks/useFirstTimeModal";
 import { Plus } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ACTIVE_CAMPAIGN_LIMIT, hasReachedActiveCampaignLimit } from "@/features/epics/constants";
+import type { Campaign } from "@/types/domain";
 
 interface CreatedCampaignData {
   title: string;
   habits: Array<{ title: string }>;
 }
 
+const toCampaignCardModel = (campaign: Campaign) => ({
+  id: campaign.id,
+  user_id: campaign.userId,
+  title: campaign.title,
+  description: campaign.description ?? undefined,
+  target_days: campaign.targetDays,
+  start_date: campaign.startDate,
+  end_date: campaign.endDate,
+  status: campaign.status,
+  xp_reward: campaign.xpReward ?? 0,
+  progress_percentage: campaign.progressPercentage ?? 0,
+  is_public: campaign.isPublic ?? undefined,
+  invite_code: campaign.inviteCode ?? undefined,
+  theme_color: campaign.themeColor ?? undefined,
+  story_type_slug: campaign.storyTypeSlug ?? null,
+  epic_habits: campaign.rituals.map((ritual) => ({
+    habit_id: ritual.habitId,
+    habits: ritual.habit ? {
+      id: ritual.habit.id,
+      title: ritual.habit.title,
+      difficulty: ritual.habit.difficulty ?? "medium",
+      description: ritual.habit.description ?? undefined,
+      frequency: ritual.habit.frequency ?? undefined,
+      estimated_minutes: ritual.habit.estimatedMinutes ?? undefined,
+      custom_days: ritual.habit.customDays ?? null,
+      custom_month_days: ritual.habit.customMonthDays ?? null,
+    } : null,
+  })),
+});
+
 export const EpicsTab = memo(function EpicsTab() {
-  const { activeEpics, completedEpics, isLoading, createEpic, isCreating, updateEpicStatus } = useEpics();
+  const {
+    activeCampaigns,
+    completedCampaigns,
+    isLoading,
+    createCampaign,
+    isCreating,
+    updateCampaignStatus,
+  } = useCampaigns();
   const [wizardOpen, setWizardOpen] = useState(false);
   const [showTemplatesFirst, setShowTemplatesFirst] = useState(false);
   const [joinEpicDialogOpen, setJoinEpicDialogOpen] = useState(false);
@@ -25,17 +63,17 @@ export const EpicsTab = memo(function EpicsTab() {
   const [createdCampaignData, setCreatedCampaignData] = useState<CreatedCampaignData | null>(null);
   const { showModal: showTutorial, dismissModal: dismissTutorial } = useFirstTimeModal('epics');
 
-  const hasCampaigns = activeEpics.length > 0 || completedEpics.length > 0;
+  const hasCampaigns = activeCampaigns.length > 0 || completedCampaigns.length > 0;
 
   const handleAddCampaign = useCallback(() => {
     setShowTemplatesFirst(false);
     setWizardOpen(true);
   }, []);
 
-  const handleCreateEpic = useCallback(async (data: Parameters<typeof createEpic>[0]) => {
+  const handleCreateEpic = useCallback(async (data: Parameters<typeof createCampaign>[0]) => {
     try {
       // Wait for mutation to complete
-      await createEpic(data);
+      await createCampaign(data);
       // Close wizard after successful creation
       setWizardOpen(false);
       // Store data for celebration animation
@@ -49,7 +87,7 @@ export const EpicsTab = memo(function EpicsTab() {
       // Error is already handled by the mutation's onError
       console.error('Failed to create campaign:', error);
     }
-  }, [createEpic]);
+  }, [createCampaign]);
 
   const handleAnimationComplete = useCallback(() => {
     setShowCreatedAnimation(false);
@@ -94,35 +132,35 @@ export const EpicsTab = memo(function EpicsTab() {
             />
 
             {/* Active Campaigns */}
-            {activeEpics.map((epic, index) => (
+            {activeCampaigns.map((campaign, index) => (
               <motion.div
-                key={epic.id}
+                key={campaign.id}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
               >
                 <CampaignCard
-                  campaign={epic}
-                  onComplete={() => updateEpicStatus({ epicId: epic.id, status: "completed" })}
-                  onAbandon={() => updateEpicStatus({ epicId: epic.id, status: "abandoned" })}
+                  campaign={toCampaignCardModel(campaign)}
+                  onComplete={() => updateCampaignStatus({ epicId: campaign.id, status: "completed" })}
+                  onAbandon={() => updateCampaignStatus({ epicId: campaign.id, status: "abandoned" })}
                 />
               </motion.div>
             ))}
 
             {/* Completed Campaigns */}
-            {completedEpics.map((epic, index) => (
+            {completedCampaigns.map((campaign, index) => (
               <motion.div
-                key={epic.id}
+                key={campaign.id}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: (activeEpics.length + index) * 0.05 }}
+                transition={{ delay: (activeCampaigns.length + index) * 0.05 }}
               >
-                <CampaignCard campaign={epic} />
+                <CampaignCard campaign={toCampaignCardModel(campaign)} />
               </motion.div>
             ))}
 
             {/* Subtle Add Button - Only when has campaigns and under limit */}
-            {hasCampaigns && !hasReachedActiveCampaignLimit(activeEpics.length) && (
+            {hasCampaigns && !hasReachedActiveCampaignLimit(activeCampaigns.length) && (
               <motion.button
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}

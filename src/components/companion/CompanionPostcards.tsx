@@ -12,6 +12,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { StoryTypeSlug } from "@/types/narrativeTypes";
 import type { CompanionLayoutMode } from "@/hooks/useCompanionLayoutMode";
+import { queryKeys } from "@/lib/queryKeys";
 
 const storyTypeIcons: Record<StoryTypeSlug, string> = {
   treasure_hunt: "🗺️",
@@ -47,9 +48,10 @@ export const CompanionPostcards = ({ layoutMode = "mobile" }: CompanionPostcards
     [...new Set(postcards.map(p => p.epic_id).filter(Boolean))] as string[],
     [postcards]
   );
+  const epicIdsKey = useMemo(() => epicIds.join(","), [epicIds]);
 
   const { data: epics } = useQuery({
-    queryKey: ["postcards-epics", epicIds],
+    queryKey: queryKeys.companion.postcardEpics(epicIdsKey),
     queryFn: async () => {
       if (epicIds.length === 0) return [];
       const { data, error } = await supabase

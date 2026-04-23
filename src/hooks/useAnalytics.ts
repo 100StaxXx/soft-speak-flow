@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
+import { queryKeys } from "@/lib/queryKeys";
 import { subDays, format } from "date-fns";
 
 export const useAnalytics = () => {
@@ -8,7 +9,7 @@ export const useAnalytics = () => {
 
   // Habit completion trends (last 30 days)
   const { data: habitTrends, isLoading: habitsLoading } = useQuery({
-    queryKey: ['analytics-habits', user?.id],
+    queryKey: queryKeys.analytics.habits(user?.id),
     queryFn: async () => {
       if (!user) return [];
       
@@ -47,7 +48,7 @@ export const useAnalytics = () => {
 
   // Mood patterns (last 30 days)
   const { data: moodTrends, isLoading: moodsLoading } = useQuery({
-    queryKey: ['analytics-moods', user?.id],
+    queryKey: queryKeys.analytics.moods(user?.id),
     queryFn: async () => {
       if (!user) return [];
       
@@ -79,7 +80,7 @@ export const useAnalytics = () => {
 
   // Streak stats
   const { data: streakStats, isLoading: streaksLoading } = useQuery({
-    queryKey: ['analytics-streaks', user?.id],
+    queryKey: queryKeys.analytics.streaks(user?.id),
     queryFn: async () => {
       if (!user) return { current: 0, longest: 0, total: 0 };
       
@@ -102,7 +103,7 @@ export const useAnalytics = () => {
 
   // Check-in frequency
   const { data: checkInStats, isLoading: checkInsLoading } = useQuery({
-    queryKey: ['analytics-checkins', user?.id],
+    queryKey: queryKeys.analytics.checkins(user?.id),
     queryFn: async () => {
       if (!user) return { total: 0, thisWeek: 0, lastWeek: 0 };
       

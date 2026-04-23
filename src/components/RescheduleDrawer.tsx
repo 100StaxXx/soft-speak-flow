@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { invalidateCampaignContextQueryFamilies } from "@/lib/campaignContextQueryCache";
+import { invalidateEpicMilestonesQuery } from "@/lib/epicResourceQueryCache";
 import {
   Drawer,
   DrawerContent,
@@ -178,8 +180,8 @@ export const RescheduleDrawer = ({
       }
 
       // Invalidate queries
-      queryClient.invalidateQueries({ queryKey: ["milestones", epicId] });
-      queryClient.invalidateQueries({ queryKey: ["epics"] });
+      void invalidateEpicMilestonesQuery(queryClient, epicId);
+      void invalidateCampaignContextQueryFamilies(queryClient, ["epics"]);
 
       toast.success("Journey rescheduled!", {
         description: `${schedule.milestones.length} milestones updated`,

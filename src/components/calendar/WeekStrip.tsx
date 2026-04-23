@@ -1,21 +1,21 @@
 import { format, startOfWeek, addDays, isSameDay } from "date-fns";
+import type { CalendarQuest } from "@/features/quests/display";
 import { cn } from "@/lib/utils";
-import { CalendarTask } from "@/types/quest";
 
 interface WeekStripProps {
   selectedDate: Date;
   onDateSelect: (date: Date) => void;
-  tasks?: CalendarTask[];
+  quests?: CalendarQuest[];
 }
 
-export function WeekStrip({ selectedDate, onDateSelect, tasks = [] }: WeekStripProps) {
+export function WeekStrip({ selectedDate, onDateSelect, quests = [] }: WeekStripProps) {
   const weekStart = startOfWeek(selectedDate, { weekStartsOn: 0 });
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   const today = new Date();
 
-  const getTasksForDate = (date: Date) => {
+  const getQuestsForDate = (date: Date) => {
     const dateStr = format(date, "yyyy-MM-dd");
-    return tasks.filter(t => t.task_date === dateStr);
+    return quests.filter((quest) => quest.taskDate === dateStr);
   };
 
   return (
@@ -23,9 +23,9 @@ export function WeekStrip({ selectedDate, onDateSelect, tasks = [] }: WeekStripP
       {weekDays.map((day) => {
         const isSelected = isSameDay(day, selectedDate);
         const isToday = isSameDay(day, today);
-        const dayTasks = getTasksForDate(day);
-        const incompleteTasks = dayTasks.filter(t => !t.completed).length;
-        const completedTasks = dayTasks.filter(t => t.completed).length;
+        const dayQuests = getQuestsForDate(day);
+        const incompleteTasks = dayQuests.filter((quest) => !quest.completed).length;
+        const completedTasks = dayQuests.filter((quest) => quest.completed).length;
 
         return (
           <button

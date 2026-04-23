@@ -4,6 +4,15 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useResilience } from "@/contexts/ResilienceContext";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  campaignContextQueryFamilyGroups,
+  invalidateCampaignContextQueryFamilies,
+} from "@/lib/campaignContextQueryCache";
+import {
+  invalidatePlannerRuntimeTasksQuery,
+  invalidateTaskQueryFamilies,
+  taskQueryFamilyGroups,
+} from "@/lib/taskQueryCache";
 import type { DailyTask } from "@/services/dailyTasksRemote";
 import {
   getPlannerRecord,
@@ -142,7 +151,7 @@ async function removeLocalTasksAndSubtasks(tasks: DailyTask[]): Promise<void> {
   if (tasks.length === 0) return;
 
   for (const task of tasks) {
-    const subtasks = await getLocalSubtasksForTask<{ id: string; task_id: string }>(task.id);
+    const subtasks = await getLocalSubtasksForTask<{ id: string; task_id: string; user_id: string }>(task.id);
     if (subtasks.length > 0) {
       await removePlannerRecords("subtasks", subtasks.map((subtask) => subtask.id));
     }
@@ -345,13 +354,12 @@ export function useRitualUpdate() {
       }
 
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["habits"] }),
-        queryClient.invalidateQueries({ queryKey: ["epics"] }),
-        queryClient.invalidateQueries({ queryKey: ["epic-progress"] }),
-        queryClient.invalidateQueries({ queryKey: ["habit-surfacing"] }),
-        queryClient.invalidateQueries({ queryKey: ["daily-tasks"] }),
-        queryClient.invalidateQueries({ queryKey: ["calendar-tasks"] }),
-        queryClient.invalidateQueries({ queryKey: ["tasks"] }),
+        invalidateCampaignContextQueryFamilies(
+          queryClient,
+          campaignContextQueryFamilyGroups.campaignPlanner,
+        ),
+        invalidateTaskQueryFamilies(queryClient, taskQueryFamilyGroups.planner),
+        invalidatePlannerRuntimeTasksQuery(queryClient),
       ]);
       dispatchPlannerSyncFinished();
 

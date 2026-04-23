@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { CalendarQuest } from "@/features/quests/display";
 
 import { CalendarMonthView } from "./CalendarMonthView";
 
@@ -17,6 +18,29 @@ const getDayCell = (dayNumber: string) => {
   }
   return cell;
 };
+
+const buildQuest = (overrides: Partial<CalendarQuest> = {}): CalendarQuest => ({
+  id: "quest-1",
+  title: "Month quest",
+  taskDate: "2026-03-15",
+  scheduledTime: "09:00",
+  estimatedDuration: 30,
+  completed: false,
+  isMainQuest: false,
+  difficulty: "medium",
+  xpReward: 20,
+  category: null,
+  habitSourceId: null,
+  notes: null,
+  priority: null,
+  isRecurring: false,
+  recurrencePattern: null,
+  imageUrl: null,
+  attachments: [],
+  subtasks: [],
+  location: null,
+  ...overrides,
+});
 
 describe("CalendarMonthView", () => {
   beforeEach(() => {
@@ -36,9 +60,9 @@ describe("CalendarMonthView", () => {
       <CalendarMonthView
         selectedDate={selectedDate}
         onDateSelect={onDateSelect}
-        tasks={[]}
+        quests={[]}
         milestones={[]}
-        onTaskClick={vi.fn()}
+        onQuestClick={vi.fn()}
         onDateLongPress={onDateLongPress}
       />,
     );
@@ -69,9 +93,9 @@ describe("CalendarMonthView", () => {
       <CalendarMonthView
         selectedDate={selectedDate}
         onDateSelect={onDateSelect}
-        tasks={[]}
+        quests={[]}
         milestones={[]}
-        onTaskClick={vi.fn()}
+        onQuestClick={vi.fn()}
         onDateLongPress={onDateLongPress}
       />,
     );
@@ -99,9 +123,9 @@ describe("CalendarMonthView", () => {
       <CalendarMonthView
         selectedDate={selectedDate}
         onDateSelect={vi.fn()}
-        tasks={[]}
+        quests={[]}
         milestones={[]}
-        onTaskClick={vi.fn()}
+        onQuestClick={vi.fn()}
         onDateLongPress={onDateLongPress}
       />,
     );
@@ -118,5 +142,24 @@ describe("CalendarMonthView", () => {
     });
 
     expect(onDateLongPress).not.toHaveBeenCalled();
+  });
+
+  it("renders canonical quest titles in the day cell and returns canonical quest payloads", () => {
+    const onQuestClick = vi.fn();
+    const quest = buildQuest({ title: "Canonical month quest" });
+
+    render(
+      <CalendarMonthView
+        selectedDate={selectedDate}
+        onDateSelect={vi.fn()}
+        quests={[quest]}
+        milestones={[]}
+        onQuestClick={onQuestClick}
+      />,
+    );
+
+    fireEvent.click(screen.getByText("Canonical month quest"));
+
+    expect(onQuestClick).toHaveBeenCalledWith(quest);
   });
 });

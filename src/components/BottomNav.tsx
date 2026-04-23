@@ -17,6 +17,7 @@ import {
   warmDailyTasksQueryFromRemote,
 } from "@/utils/plannerSync";
 import { useMentorConnection } from "@/contexts/MentorConnectionContext";
+import { queryKeys } from "@/lib/queryKeys";
 
 type PrefetchTarget = "mentor" | "journeys" | "companion";
 
@@ -121,7 +122,7 @@ export const BottomNav = memo(() => {
   });
 
   const { data: selectedMentor, isLoading: mentorLoading } = useQuery({
-    queryKey: ["selected-mentor", resolvedMentorId],
+    queryKey: queryKeys.mentor.selected(resolvedMentorId ?? undefined),
     enabled: !!resolvedMentorId,
     staleTime: 10 * 60 * 1000, // Cache mentor data for 10 minutes
     queryFn: async () => {

@@ -1,7 +1,8 @@
 import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "./useAuth";
+import { useAuth } from "@/hooks/useAuth";
+import { queryKeys } from "@/lib/queryKeys";
 import {
   addDays,
   eachDayOfInterval,
@@ -21,14 +22,14 @@ import {
   replaceLocalTasksForDate,
 } from "@/utils/plannerLocalStore";
 
-interface CalendarTasksOptions {
+interface LegacyCalendarTaskRangeOptions {
   enabled?: boolean;
 }
 
-export const useCalendarTasks = (
+export const useLegacyCalendarTaskRange = (
   selectedDate: Date,
   view: "list" | "month" | "week",
-  options: CalendarTasksOptions = {},
+  options: LegacyCalendarTaskRangeOptions = {},
 ) => {
   const { user } = useAuth();
   const { enabled = true } = options;
@@ -41,27 +42,23 @@ export const useCalendarTasks = (
       const calendarStart = startOfWeek(monthStart, { weekStartsOn: 0 });
       const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
       return { start: calendarStart, end: calendarEnd };
-    } else if (view === "week") {
-      const weekStart = startOfWeek(selectedDate, { weekStartsOn: 0 });
-      const weekEnd = addDays(weekStart, 6);
-      return { start: weekStart, end: weekEnd };
-    } else {
-      // For list view, just get the week
-      const weekStart = startOfWeek(selectedDate, { weekStartsOn: 0 });
-      const weekEnd = addDays(weekStart, 6);
-      return { start: weekStart, end: weekEnd };
     }
+
+    const weekStart = startOfWeek(selectedDate, { weekStartsOn: 0 });
+    const weekEnd = addDays(weekStart, 6);
+    return { start: weekStart, end: weekEnd };
   };
 
   const { start, end } = getDateRange();
-  const startDate = format(start, 'yyyy-MM-dd');
-  const endDate = format(end, 'yyyy-MM-dd');
+  const startDate = format(start, "yyyy-MM-dd");
+  const endDate = format(end, "yyyy-MM-dd");
+  const calendarQueryKey = queryKeys.dailyTasks.calendar(user?.id, startDate, endDate, view);
 
   const query = useQuery({
-    queryKey: ['calendar-tasks', user?.id, startDate, endDate, view],
+    queryKey: calendarQueryKey,
     queryFn: async () => {
       if (!user?.id) {
-        throw new Error('User not authenticated');
+        throw new Error("User not authenticated");
       }
 
       const tasks = await getAllLocalTasksForUser<DailyTask>(user.id);
@@ -80,7 +77,7 @@ export const useCalendarTasks = (
         });
     },
     enabled: enabled && !!user,
-    staleTime: 2 * 60 * 1000, // 2 minutes - calendar data changes infrequently
+    staleTime: 2 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
 
@@ -129,7 +126,7 @@ export const useCalendarTasks = (
         if (disposed) return;
 
         queryClient.setQueryData(
-          ['calendar-tasks', user.id, startDate, endDate, view],
+          calendarQueryKey,
           await getAllLocalTasksForUser<DailyTask>(user.id).then((tasks) =>
             tasks
               .filter((task) => task.task_date && task.task_date >= startDate && task.task_date <= endDate)
@@ -162,7 +159,7 @@ export const useCalendarTasks = (
       disposed = true;
       window.removeEventListener(PLANNER_SYNC_EVENT, handlePlannerSync);
     };
-  }, [enabled, end, endDate, queryClient, start, startDate, user?.id, view]);
+  }, [calendarQueryKey, enabled, end, endDate, queryClient, start, startDate, user?.id, view]);
 
   return { tasks: query.data ?? [], isLoading: query.isLoading };
 };

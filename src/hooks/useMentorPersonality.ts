@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useMentorConnection } from "@/contexts/MentorConnectionContext";
 import { resolveActiveMentorSlug } from "@/lib/mentorRoster";
+import { queryKeys } from "@/lib/queryKeys";
 
 interface MentorPersonality {
   name: string;
@@ -65,7 +66,7 @@ export const useMentorPersonality = (): MentorPersonality | null => {
   const { mentorId: resolvedMentorId } = useMentorConnection();
 
   const { data: mentor } = useQuery({
-    queryKey: ['mentor-personality', resolvedMentorId],
+    queryKey: queryKeys.mentor.personality(resolvedMentorId),
     queryFn: async () => {
       if (!resolvedMentorId) return null;
       const { data, error } = await supabase

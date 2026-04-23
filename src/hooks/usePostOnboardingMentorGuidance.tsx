@@ -11,9 +11,11 @@ import {
 import { useLocation, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useXPRewards } from "@/hooks/useXPRewards";
+import { invalidateProfileQueries } from "@/lib/profileQueryCache";
 import { getCompanionQueryKey, type Companion } from "@/hooks/useCompanion";
 import { useMentorPersonality } from "@/hooks/useMentorPersonality";
 import {
@@ -976,12 +978,15 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
           onboarding_data: {
             ...baseData,
             guided_tutorial: remoteNext,
-          },
+          } as unknown as Json,
         })
         .eq("id", user.id);
 
       if (!error) {
-        queryClient.invalidateQueries({ queryKey: ["profile", user.id] });
+        void invalidateProfileQueries(queryClient, {
+          userId: user.id,
+          includeDetail: true,
+        });
       }
     },
     [profile?.onboarding_data, queryClient, user?.id]

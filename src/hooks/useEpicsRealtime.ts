@@ -5,6 +5,10 @@
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  campaignContextQueryFamilyGroups,
+  invalidateCampaignContextQueryFamilies,
+} from "@/lib/campaignContextQueryCache";
 import { useAuth } from "./useAuth";
 import { logger } from "@/utils/logger";
 import { warmEpicsQueryFromRemote } from "@/utils/plannerSync";
@@ -32,9 +36,10 @@ export const useEpicsRealtime = () => {
               error: error instanceof Error ? error.message : String(error),
             });
           });
-          queryClient.invalidateQueries({ queryKey: ['epics'] });
-          queryClient.invalidateQueries({ queryKey: ['epic-progress'] });
-          queryClient.invalidateQueries({ queryKey: ['habit-surfacing'] });
+          void invalidateCampaignContextQueryFamilies(
+            queryClient,
+            campaignContextQueryFamilyGroups.epicPlannerState,
+          );
         }
       )
       .subscribe((status, err) => {

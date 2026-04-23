@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { useAuth } from "@/hooks/useAuth";
+import { invalidateMentorContextQueries } from "@/lib/mentorContextQueryCache";
+import { refetchProfileQueries } from "@/lib/profileQueryCache";
 import { useProfile } from "@/hooks/useProfile";
 import { supabase } from "@/integrations/supabase/client";
 import { ACTIVE_MENTOR_SLUGS, resolveActiveMentorSlug } from "@/lib/mentorRoster";
@@ -54,13 +56,9 @@ export function useMentorConnectionHealth(): {
   );
 
   const invalidateMentorQueries = useCallback(async () => {
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ["mentor-page-data"] }),
-      queryClient.invalidateQueries({ queryKey: ["mentor-personality"] }),
-      queryClient.invalidateQueries({ queryKey: ["mentor"] }),
-      queryClient.invalidateQueries({ queryKey: ["selected-mentor"] }),
-      queryClient.invalidateQueries({ queryKey: ["morning-check-in"] }),
-    ]);
+    await invalidateMentorContextQueries(queryClient, {
+      includeMorningCheckIn: true,
+    });
   }, [queryClient]);
 
   const getOnboardingDataRecord = useCallback((candidateProfile: LightweightProfile): Record<string, unknown> => {
@@ -144,7 +142,10 @@ export function useMentorConnectionHealth(): {
         throw updateError;
       }
 
-      await queryClient.refetchQueries({ queryKey: ["profile", userId] });
+      await refetchProfileQueries(queryClient, {
+        userId,
+        includeDetail: true,
+      });
       await invalidateMentorQueries();
       return mentorId;
     },
@@ -254,7 +255,10 @@ export function useMentorConnectionHealth(): {
           break;
         }
 
-        await queryClient.refetchQueries({ queryKey: ["profile", user.id] });
+        await refetchProfileQueries(queryClient, {
+          userId: user.id,
+          includeDetail: true,
+        });
 
         const { data: latestProfile, error: latestProfileError } = await supabase
           .from("profiles")

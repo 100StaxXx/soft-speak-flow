@@ -4,6 +4,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { requestJourneyPathGeneration } from "@/utils/journeyPathCache";
 import { toast } from "@/components/ui/sonner";
 import { useCallback, useState } from "react";
+import { invalidateCompanionPostcardsQuery } from "@/lib/companionConversationQueryCache";
+import { queryKeys } from "@/lib/queryKeys";
 
 export interface CompanionPostcard {
   id: string;
@@ -48,7 +50,7 @@ type CompanionSnapshot = CompanionPostcardData & {
 };
 
 export const getCompanionPostcardsQueryKey = (userId?: string) =>
-  ["companion-postcards", userId] as const;
+  queryKeys.companion.postcards(userId);
 
 export const fetchCompanionPostcards = async (userId: string): Promise<CompanionPostcard[]> => {
   const { data, error } = await supabase
@@ -164,7 +166,7 @@ export const useCompanionPostcards = () => {
     onSuccess: async (data) => {
       const postcardAlreadyExisted = Boolean(data?.existing || data?.cached);
 
-      await queryClient.invalidateQueries({ queryKey: getCompanionPostcardsQueryKey(user?.id) });
+      await invalidateCompanionPostcardsQuery(queryClient, user?.id);
 
       if (postcardAlreadyExisted) {
         return;

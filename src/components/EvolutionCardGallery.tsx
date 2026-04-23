@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Sparkles } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { EvolutionCardFlip } from "./EvolutionCardFlip";
+import { queryKeys } from "@/lib/queryKeys";
 
 interface EvolutionCard {
   id: string;
@@ -27,7 +28,7 @@ export const EvolutionCardGallery = memo(() => {
   const { user } = useAuth();
 
   const { data: cards, isLoading } = useQuery({
-    queryKey: ["evolution-cards", user?.id],
+    queryKey: queryKeys.evolution.cards(user?.id),
     queryFn: async () => {
       if (!user) return [];
       

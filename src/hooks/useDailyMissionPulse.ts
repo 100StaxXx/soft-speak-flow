@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
+import { queryKeys } from "@/lib/queryKeys";
 
 export interface DailyMissionPulse {
   mission_date: string;
@@ -19,7 +20,7 @@ export const useDailyMissionPulse = ({ missionDate, enabled = true }: UseDailyMi
   const { user } = useAuth();
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ["daily-mission-pulse", missionDate, user?.id],
+    queryKey: queryKeys.dailyMissionPulse.byDate(missionDate, user?.id),
     queryFn: async () => {
       const { data, error } = await supabase.rpc("get_daily_mission_pulse", {
         p_mission_date: missionDate,

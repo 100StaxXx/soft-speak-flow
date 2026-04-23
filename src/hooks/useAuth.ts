@@ -14,6 +14,9 @@ import { Capacitor } from "@capacitor/core";
 import { useQueryClient } from "@tanstack/react-query";
 import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import { refetchCompanionQueries } from "@/lib/companionContextQueryCache";
+import { invalidateMentorContextQueries } from "@/lib/mentorContextQueryCache";
+import { refetchProfileQueries } from "@/lib/profileQueryCache";
 import { clearAuthScopedClientState } from "@/services/authScopedClientState";
 import { getUserTimezone } from "@/utils/timezone";
 import { isNetworkLikeError } from "@/utils/networkErrors";
@@ -80,15 +83,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const syncAuthenticatedQueries = useCallback(async () => {
     await Promise.all([
-      queryClient.refetchQueries({ queryKey: ["profile"] }),
-      queryClient.refetchQueries({ queryKey: ["companion"] }),
+      refetchProfileQueries(queryClient, { includeAll: true }),
+      refetchCompanionQueries(queryClient, { includeAll: true }),
     ]);
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ["mentor-page-data"] }),
-      queryClient.invalidateQueries({ queryKey: ["mentor-personality"] }),
-      queryClient.invalidateQueries({ queryKey: ["mentor"] }),
-      queryClient.invalidateQueries({ queryKey: ["selected-mentor"] }),
-    ]);
+    await invalidateMentorContextQueries(queryClient);
   }, [queryClient]);
 
   const clearAuthScopedState = useCallback(

@@ -21,6 +21,7 @@ import { useRescheduleIntelligence, RescheduleInsight } from '@/hooks/useResched
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { queryKeys } from '@/lib/queryKeys';
 import { format, subDays } from 'date-fns';
 
 interface SmartRescheduleAdvisorProps {
@@ -52,7 +53,7 @@ export function SmartRescheduleAdvisor({
   
   // Fetch epic details for date range
   const { data: epicData } = useQuery({
-    queryKey: ['epic-details', epicId],
+    queryKey: queryKeys.epics.details(epicId),
     queryFn: async () => {
       const { data, error } = await supabase
         .from('epics')
@@ -68,7 +69,7 @@ export function SmartRescheduleAdvisor({
   
   // Fetch habit completions for this epic's habits
   const { data: habitCompletions } = useQuery({
-    queryKey: ['epic-habit-completions', epicId, user?.id],
+    queryKey: queryKeys.epics.habitCompletions(epicId, user?.id),
     queryFn: async () => {
       if (!user?.id || !epicData?.epic_habits?.length) return [];
       
@@ -95,7 +96,7 @@ export function SmartRescheduleAdvisor({
   
   // Get last check-in date
   const { data: lastCheckIn } = useQuery({
-    queryKey: ['last-epic-activity', epicId, user?.id],
+    queryKey: queryKeys.epics.lastActivity(epicId, user?.id),
     queryFn: async () => {
       if (!user?.id) return null;
       

@@ -1,18 +1,19 @@
 import { useState } from "react";
 import { format, setYear } from "date-fns";
 import { X } from "lucide-react";
+import type { CalendarMilestone } from "@/features/epics/types";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { CalendarMonthView } from "./CalendarMonthView";
 import { YearView } from "./calendar/YearViewModal";
-import { CalendarTask, CalendarMilestone } from "@/types/quest";
+import type { CalendarQuest } from "@/features/quests/display";
 
 interface HourlyViewModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   selectedDate: Date;
   onDateSelect: (date: Date) => void;
-  tasks: CalendarTask[];
+  quests: CalendarQuest[];
   milestones?: CalendarMilestone[];
   onTaskDrop: (taskId: string, newDate: Date, newTime?: string) => void;
   onTimeSlotLongPress?: (date: Date, time: string) => void;
@@ -22,7 +23,8 @@ interface HourlyViewModalProps {
 
 const parseValidDate = (dateString?: string | null) => {
   if (!dateString) return null;
-  const parsed = new Date(`${dateString}T00:00:00`);
+  const normalizedDate = dateString.includes("T") ? dateString : `${dateString}T00:00:00`;
+  const parsed = new Date(normalizedDate);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 
@@ -40,7 +42,7 @@ export function HourlyViewModal({
   onOpenChange,
   selectedDate,
   onDateSelect,
-  tasks,
+  quests,
   milestones = [],
   onTimeSlotLongPress,
 }: HourlyViewModalProps) {
@@ -55,8 +57,8 @@ export function HourlyViewModal({
     onDateSelect(date);
   };
 
-  const handleTaskClick = (task: CalendarTask) => {
-    const taskDate = parseValidDate(task.task_date);
+  const handleQuestClick = (quest: CalendarQuest) => {
+    const taskDate = parseValidDate(quest.taskDate);
     if (!taskDate) return;
     onDateSelect(taskDate);
     onOpenChange(false);
@@ -113,7 +115,7 @@ export function HourlyViewModal({
               onBack={() => setShowYearView(false)}
               onClose={() => onOpenChange(false)}
               onYearChange={handleYearSelect}
-              tasks={tasks}
+              quests={quests}
               milestones={milestones}
             />
           ) : (
@@ -121,9 +123,9 @@ export function HourlyViewModal({
               selectedDate={selectedDate}
               onDateSelect={handleDateSelectFromMonth}
               onMonthChange={handleMonthChange}
-              tasks={tasks}
+              quests={quests}
               milestones={milestones}
-              onTaskClick={handleTaskClick}
+              onQuestClick={handleQuestClick}
               onMilestoneClick={handleMilestoneClick}
               onDateLongPress={(date) => onTimeSlotLongPress?.(date, '09:00')}
             />

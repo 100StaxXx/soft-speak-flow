@@ -4,6 +4,8 @@ import { useAuth } from "./useAuth";
 import { toast } from "@/components/ui/sonner";
 import { useEffect } from "react";
 import { getShoutByKey, ShoutType } from "@/data/shoutMessages";
+import { invalidateGuildShoutQueries } from "@/lib/guildQueryCache";
+import { queryKeys } from "@/lib/queryKeys";
 import { getUserDisplayName } from "@/utils/getUserDisplayName";
 import { logger } from "@/utils/logger";
 
@@ -46,7 +48,7 @@ export const useGuildShouts = (options: UseGuildShoutsOptions | string = {}) => 
 
   // Fetch shouts for an epic or community
   const { data: shouts, isLoading } = useQuery<GuildShout[]>({
-    queryKey: ["guild-shouts", queryKeyType, queryKeyId],
+    queryKey: queryKeys.guild.shouts(queryKeyType, queryKeyId),
     queryFn: async () => {
       if (!epicId && !communityId) return [];
 
@@ -140,7 +142,11 @@ export const useGuildShouts = (options: UseGuildShoutsOptions | string = {}) => 
     onSuccess: (_, variables) => {
       const message = getShoutByKey(variables.messageKey);
       toast.success(`Shout sent! ${message?.emoji || '📢'}`);
-      queryClient.invalidateQueries({ queryKey: ["guild-shouts", queryKeyType, queryKeyId] });
+      void invalidateGuildShoutQueries(queryClient, {
+        scopeType: queryKeyType,
+        scopeId: queryKeyId,
+        includeDetail: true,
+      });
     },
     onError: (error) => {
       toast.error("Failed to send shout");
@@ -162,7 +168,11 @@ export const useGuildShouts = (options: UseGuildShoutsOptions | string = {}) => 
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["guild-shouts", queryKeyType, queryKeyId] });
+      void invalidateGuildShoutQueries(queryClient, {
+        scopeType: queryKeyType,
+        scopeId: queryKeyId,
+        includeDetail: true,
+      });
     },
   });
 
@@ -184,7 +194,11 @@ export const useGuildShouts = (options: UseGuildShoutsOptions | string = {}) => 
           filter: `${filterColumn}=eq.${filterValue}`,
         },
         (payload) => {
-          queryClient.invalidateQueries({ queryKey: ["guild-shouts", queryKeyType, queryKeyId] });
+          void invalidateGuildShoutQueries(queryClient, {
+            scopeType: queryKeyType,
+            scopeId: queryKeyId,
+            includeDetail: true,
+          });
           
           // Show toast for received shouts
           if (payload.new && (payload.new as GuildShout).recipient_id === user?.id) {

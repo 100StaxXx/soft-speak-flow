@@ -2,6 +2,25 @@ import { describe, expect, it, vi } from "vitest";
 import type { QueryClient } from "@tanstack/react-query";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+vi.mock("@/lib/mentorContextQueryCache", () => ({
+  invalidateMentorContextQueries: async (
+    queryClient: {
+      invalidateQueries: (input: { queryKey: readonly string[] }) => Promise<unknown>;
+    },
+    options?: { includeMorningCheckIn?: boolean },
+  ) => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["mentor-page-data"] }),
+      queryClient.invalidateQueries({ queryKey: ["mentor-personality"] }),
+      queryClient.invalidateQueries({ queryKey: ["mentor"] }),
+      queryClient.invalidateQueries({ queryKey: ["selected-mentor"] }),
+      ...(options?.includeMorningCheckIn
+        ? [queryClient.invalidateQueries({ queryKey: ["morning-check-in"] })]
+        : []),
+    ]);
+  },
+}));
+
 import { applyMentorChange } from "./profileMentorChange";
 
 describe("applyMentorChange", () => {

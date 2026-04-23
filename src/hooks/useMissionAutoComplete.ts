@@ -12,6 +12,9 @@ import {
   MissionCompletionError,
   showMissionRewardFeedback,
 } from "@/lib/dailyMissionCompletion";
+import { invalidateCompanionQueries } from "@/lib/companionContextQueryCache";
+import { invalidateDailyMissionQueries } from "@/lib/dailyMissionQueryCache";
+import { queryKeys } from "@/lib/queryKeys";
 import { playMissionComplete } from "@/utils/soundEffects";
 import { logger } from "@/utils/logger";
 import confetti from "canvas-confetti";
@@ -103,7 +106,11 @@ export const useMissionAutoComplete = () => {
               .eq('user_id', user.id);
 
             if (!progressError) {
-              queryClient.invalidateQueries({ queryKey: ['daily-missions'] });
+              void invalidateDailyMissionQueries(queryClient, {
+                missionDate: today,
+                userId: user.id,
+                includeMissionsAll: true,
+              });
             }
           }
 
@@ -121,7 +128,7 @@ export const useMissionAutoComplete = () => {
                 showXPToast,
                 `Mission Complete! ${mission.mission_text}`,
               );
-              await queryClient.invalidateQueries({ queryKey: ["companion"] });
+              await invalidateCompanionQueries(queryClient, { includeAll: true });
 
               toast({
                 title: "Mission Auto-Completed! 🎯",
@@ -137,7 +144,12 @@ export const useMissionAutoComplete = () => {
                 colors: ['#A76CFF', '#C084FC', '#E879F9'],
               });
 
-              queryClient.invalidateQueries({ queryKey: ['daily-missions'] });
+              void invalidateDailyMissionQueries(queryClient, {
+                missionDate: today,
+                userId: user.id,
+                includeMissionsAll: true,
+                includePulseAll: true,
+              });
             } else if (completionResult.status !== "already_completed") {
               throw getMissionCompletionError(completionResult);
             }

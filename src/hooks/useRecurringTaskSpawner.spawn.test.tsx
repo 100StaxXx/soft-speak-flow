@@ -227,6 +227,7 @@ describe("useRecurringTaskSpawner spawn behavior", () => {
 
     expect(mocks.toastErrorMock).toHaveBeenCalledWith(
       "Set a time on recurring quest templates to resume auto-creation.",
+      expect.objectContaining({ duration: expect.any(Number) }),
     );
     expect(mocks.toastErrorMock).not.toHaveBeenCalledWith("Failed to create recurring quests");
     expect(mocks.withPlannerRemoteSyncLockMock).toHaveBeenCalledWith(
@@ -337,6 +338,7 @@ describe("useRecurringTaskSpawner spawn behavior", () => {
     }));
     expect(mocks.toastErrorMock).toHaveBeenCalledWith(
       "Some recurring quests were not created. Open and re-save those templates.",
+      expect.objectContaining({ duration: expect.any(Number) }),
     );
   });
 });

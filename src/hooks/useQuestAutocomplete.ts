@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { queryKeys } from '@/lib/queryKeys';
 
 export interface AutocompleteSuggestion {
   text: string;
@@ -20,7 +21,7 @@ export function useQuestAutocomplete(input: string) {
 
   // Fetch past task texts with frequency
   const { data: taskHistory = [] } = useQuery({
-    queryKey: ['quest-autocomplete-tasks', user?.id],
+    queryKey: queryKeys.questAutocomplete.taskHistory(user?.id),
     queryFn: async () => {
       if (!user?.id) return [];
 
@@ -58,7 +59,7 @@ export function useQuestAutocomplete(input: string) {
 
   // Fetch user's habits
   const { data: habits = [] } = useQuery({
-    queryKey: ['quest-autocomplete-habits', user?.id],
+    queryKey: queryKeys.questAutocomplete.habits(user?.id),
     queryFn: async () => {
       if (!user?.id) return [];
 

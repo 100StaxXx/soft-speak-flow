@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { invalidateTaskQueryFamilies, taskQueryFamilyGroups } from "@/lib/taskQueryCache";
 import { safeLocalStorage } from "@/utils/storage";
 
 const ONBOARDING_TASK_CLEANUP_VERSION = 2;
@@ -78,8 +79,7 @@ export function useOnboardingTaskCleanup(
         }
 
         safeLocalStorage.setItem(cleanupKey, "true");
-        queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
-        queryClient.invalidateQueries({ queryKey: ["calendar-tasks"] });
+        void invalidateTaskQueryFamilies(queryClient, taskQueryFamilyGroups.planner);
       } finally {
         cleanupInFlightRef.current = false;
       }

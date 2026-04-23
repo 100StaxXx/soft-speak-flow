@@ -5,6 +5,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/components/ui/sonner";
+import { invalidateCampaignContextQueryFamilies } from "@/lib/campaignContextQueryCache";
+import { invalidatePublicEpicsQuery } from "@/lib/epicResourceQueryCache";
+import { queryKeys } from "@/lib/queryKeys";
 import { Share2, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
@@ -20,7 +23,7 @@ export default function SharedEpics() {
   const navigate = useNavigate();
 
   const { data: publicEpics, isLoading } = useQuery({
-    queryKey: ['public-epics'],
+    queryKey: queryKeys.publicEpics.all,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('epics')
@@ -137,9 +140,8 @@ export default function SharedEpics() {
       return epic;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['epics'] });
-      queryClient.invalidateQueries({ queryKey: ['habits'] });
-      queryClient.invalidateQueries({ queryKey: ['public-epics'] });
+      void invalidateCampaignContextQueryFamilies(queryClient, ["epics", "habits"]);
+      void invalidatePublicEpicsQuery(queryClient);
       toast.success('Guild joined! 🎯', {
         description: "You're now part of this guild and can compete on the leaderboard!"
       });

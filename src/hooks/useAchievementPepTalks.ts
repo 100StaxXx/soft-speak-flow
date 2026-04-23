@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
+import { queryKeys } from "@/lib/queryKeys";
 
 interface AchievementPepTalk {
   id: string;
@@ -16,7 +17,7 @@ export const useAchievementPepTalks = () => {
   const { user } = useAuth();
 
   const { data: unlockedPepTalks = [], isLoading } = useQuery({
-    queryKey: ["achievement-pep-talks", user?.id],
+    queryKey: queryKeys.mentor.pepTalks(user?.id),
     queryFn: async () => {
       if (!user) return [];
 

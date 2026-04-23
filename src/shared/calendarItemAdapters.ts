@@ -1,7 +1,6 @@
 import { addMinutes, endOfDay, format } from "date-fns";
 
 import type { Tables } from "@/integrations/supabase/types";
-import type { DailyTask } from "@/services/dailyTasksRemote";
 import type { CalendarItem } from "@/types/domain";
 import { parseScheduledTime } from "@/utils/scheduledTime";
 
@@ -25,12 +24,16 @@ const formatLocalDateTime = (value: Date) =>
   format(value, "yyyy-MM-dd'T'HH:mm:ss");
 
 const buildQuestWindow = (
-  task: Pick<DailyTask, "task_date" | "scheduled_time" | "estimated_duration">,
+  quest: {
+    taskDate: string | null;
+    scheduledTime: string | null;
+    estimatedDuration: number | null;
+  },
 ) => {
-  if (!task.task_date) return null;
+  if (!quest.taskDate) return null;
 
-  const baseDate = new Date(`${task.task_date}T00:00:00`);
-  const scheduledStart = parseScheduledTime(task.scheduled_time, baseDate);
+  const baseDate = new Date(`${quest.taskDate}T00:00:00`);
+  const scheduledStart = parseScheduledTime(quest.scheduledTime, baseDate);
 
   if (!scheduledStart) {
     return {
@@ -40,8 +43,8 @@ const buildQuestWindow = (
     };
   }
 
-  const durationMinutes = task.estimated_duration && task.estimated_duration > 0
-    ? task.estimated_duration
+  const durationMinutes = quest.estimatedDuration && quest.estimatedDuration > 0
+    ? quest.estimatedDuration
     : 30;
   const scheduledEnd = addMinutes(scheduledStart, durationMinutes);
 
@@ -74,34 +77,40 @@ export const toCalendarItemFromExternalEvent = (
 });
 
 export const toCalendarItemFromQuest = (
-  task: DailyTask,
+  quest: {
+    id: string;
+    title: string;
+    taskDate: string | null;
+    scheduledTime: string | null;
+    estimatedDuration: number | null;
+  },
   options: {
     calendarLinks?: CalendarItemQuestLink[] | null;
     outlookTaskLinks?: CalendarItemQuestOutlookLink[] | null;
   } = {},
 ): CalendarItem | null => {
-  const window = buildQuestWindow(task);
+  const window = buildQuestWindow(quest);
   if (!window) return null;
 
   const calendarLink = options.calendarLinks?.[0] ?? null;
   const outlookTaskLink = options.outlookTaskLinks?.[0] ?? null;
 
   return {
-    id: `quest:${task.id}`,
+    id: `quest:${quest.id}`,
     source: "quest",
-    title: task.task_text,
+    title: quest.title,
     startsAt: window.startsAt,
     endsAt: window.endsAt,
     isAllDay: window.isAllDay,
     provider: calendarLink?.provider ?? outlookTaskLink?.provider ?? null,
     readOnly: false,
-    questId: task.id,
+    questId: quest.id,
     syncMode: calendarLink?.sync_mode ?? outlookTaskLink?.sync_mode ?? null,
     sourceTable: "daily_tasks",
     externalEventId: calendarLink?.external_event_id ?? outlookTaskLink?.external_task_id ?? null,
     connectionId: calendarLink?.connection_id ?? outlookTaskLink?.connection_id ?? null,
-    taskDate: task.task_date,
-    scheduledTime: task.scheduled_time ?? null,
-    estimatedDuration: task.estimated_duration ?? null,
+    taskDate: quest.taskDate,
+    scheduledTime: quest.scheduledTime ?? null,
+    estimatedDuration: quest.estimatedDuration ?? null,
   };
 };

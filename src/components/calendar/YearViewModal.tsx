@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, setMonth, setYear } from "date-fns";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import type { CalendarMilestone } from "@/features/epics/types";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 import { cn } from "@/lib/utils";
-import { CalendarTask, CalendarMilestone } from "@/types/quest";
+import type { CalendarQuest } from "@/features/quests/display";
 
 interface YearViewProps {
   selectedDate: Date;
@@ -13,7 +14,7 @@ interface YearViewProps {
   onBack: () => void;
   onClose: () => void;
   onYearChange: (year: number) => void;
-  tasks: CalendarTask[];
+  quests: CalendarQuest[];
   milestones?: CalendarMilestone[];
 }
 
@@ -24,7 +25,8 @@ const MONTHS = [
 
 const parseValidDate = (dateString?: string | null) => {
   if (!dateString) return null;
-  const parsed = new Date(dateString);
+  const normalizedDate = dateString.includes("T") ? dateString : `${dateString}T00:00:00`;
+  const parsed = new Date(normalizedDate);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 
@@ -34,7 +36,7 @@ export function YearView({
   onBack: _onBack,
   onClose,
   onYearChange,
-  tasks,
+  quests,
   milestones = []
 }: YearViewProps) {
   const [showYearDropdown, setShowYearDropdown] = useState(false);
@@ -63,13 +65,13 @@ export function YearView({
     onMonthSelect(newDate);
   };
 
-  const getTasksForMonth = (monthIndex: number) => {
+  const getQuestsForMonth = (monthIndex: number) => {
     const monthStart = startOfMonth(setMonth(setYear(new Date(), currentYear), monthIndex));
     const monthEnd = endOfMonth(monthStart);
     const monthDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
     
-    return tasks.filter(task => {
-      const taskDate = parseValidDate(task.task_date);
+    return quests.filter((quest) => {
+      const taskDate = parseValidDate(quest.taskDate);
       if (!taskDate) return false;
       return monthDays.some(day => 
         format(day, 'yyyy-MM-dd') === format(taskDate, 'yyyy-MM-dd')
@@ -170,12 +172,12 @@ export function YearView({
       <div className="p-4 overflow-y-auto flex-1">
         <div className="grid grid-cols-3 gap-3">
           {MONTHS.map((month, index) => {
-            const monthTasks = getTasksForMonth(index);
+            const monthQuests = getQuestsForMonth(index);
             const monthMilestones = getMilestonesForMonth(index);
             const isCurrentMonth = today.getMonth() === index && today.getFullYear() === currentYear;
             const isSelectedMonth = selectedDate.getMonth() === index && selectedDate.getFullYear() === currentYear;
-            const incompleteTasks = monthTasks.filter(t => !t.completed).length;
-            const completedTasks = monthTasks.filter(t => t.completed).length;
+            const incompleteTasks = monthQuests.filter((quest) => !quest.completed).length;
+            const completedTasks = monthQuests.filter((quest) => quest.completed).length;
             const hasMilestones = monthMilestones.length > 0;
 
             return (

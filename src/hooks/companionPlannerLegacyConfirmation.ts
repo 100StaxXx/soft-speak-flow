@@ -1,12 +1,16 @@
 import type { QueryClient } from "@tanstack/react-query";
 
 import { toast } from "@/components/ui/sonner";
-import type { AddTaskParams } from "@/hooks/useTaskMutations";
+import type { CreateQuestParams } from "@/hooks/useQuestMutations";
 import {
   applySubtaskTitlePlan,
   type QueueSubtaskAction,
 } from "@/features/tasks/lib/subtaskWrites";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  invalidateTaskQueryFamilies,
+  invalidateTaskSubtasksQuery,
+} from "@/lib/taskQueryCache";
 import {
   getPlannerProposalPendingActionMetadata,
   type PlannerPendingActionSupportedProposalKind,
@@ -15,12 +19,11 @@ import type {
   CompanionPlannerProposal,
   CompanionPlannerQuestSubtaskPlan,
 } from "@/types/companionPlanner";
-import { normalizeUuidLikeId } from "@/utils/offlineId";
 
 type CampaignsHookResult =
   ReturnType<typeof import("@/hooks/useCampaigns")["useCampaigns"]>;
-type TaskMutationsHookResult =
-  ReturnType<typeof import("@/hooks/useTaskMutations")["useTaskMutations"]>;
+type QuestMutationsHookResult =
+  ReturnType<typeof import("@/hooks/useQuestMutations")["useQuestMutations"]>;
 type RitualUpdateHookResult =
   ReturnType<typeof import("@/hooks/useRitualUpdate")["useRitualUpdate"]>;
 type SchedulingLearnerHookResult =
@@ -78,8 +81,8 @@ export interface CreateLegacyPlannerConfirmationHandlersInput {
   activeTasks: LegacyPlannerTaskSnapshot[];
   inboxTasks: LegacyPlannerTaskSnapshot[];
   userId: string | null | undefined;
-  addTask: TaskMutationsHookResult["addTask"];
-  updateTask: TaskMutationsHookResult["updateTask"];
+  createQuest: QuestMutationsHookResult["createQuest"];
+  updateQuest: QuestMutationsHookResult["updateQuest"];
   createCampaign: CampaignsHookResult["createCampaign"];
   renameCampaign: CampaignsHookResult["renameCampaign"];
   createCampaignRitual: CampaignsHookResult["createCampaignRitual"];
@@ -134,7 +137,7 @@ const extractQuestSubtaskPlan = (
 
 const sanitizeCreateQuestProposalPayload = (
   payload: Record<string, unknown>,
-): AddTaskParams => {
+): CreateQuestParams => {
   const reminderMinutesBefore =
     typeof payload.reminderMinutesBefore === "number"
       ? payload.reminderMinutesBefore
@@ -269,12 +272,8 @@ const applyQuestSubtaskPlan = async (
   });
 
   await Promise.all([
-    input.queryClient.invalidateQueries({
-      queryKey: ["subtasks", normalizeUuidLikeId(taskId)],
-    }),
-    input.queryClient.invalidateQueries({ queryKey: ["daily-tasks"] }),
-    input.queryClient.invalidateQueries({ queryKey: ["calendar-tasks"] }),
-    input.queryClient.invalidateQueries({ queryKey: ["inbox-tasks"] }),
+    invalidateTaskSubtasksQuery(input.queryClient, taskId),
+    invalidateTaskQueryFamilies(input.queryClient, ["daily", "calendar", "inboxTasks"]),
   ]);
 };
 
@@ -283,7 +282,7 @@ export const createLegacyPlannerConfirmationHandlers = (
 ): LegacyPlannerConfirmationHandlers => ({
   create_quest: async (proposal) => {
     const payload = sanitizeCreateQuestProposalPayload(proposal.payload);
-    const createResult = await input.addTask(payload);
+    const createResult = await input.createQuest(payload);
     const localTaskId = typeof createResult?.id === "string"
       ? createResult.id
       : null;
@@ -311,19 +310,19 @@ export const createLegacyPlannerConfirmationHandlers = (
     }
 
     const updates = asUnknownRecord(payload.updates) as
-      | Parameters<typeof input.updateTask>[0]["updates"]
+      | Parameters<typeof input.updateQuest>[0]["updates"]
       | null;
     const taskUpdatePayload = {
       taskId,
       updates: updates ?? {},
-    } satisfies Parameters<typeof input.updateTask>[0];
+    } satisfies Parameters<typeof input.updateQuest>[0];
     const subtaskPlan = extractQuestSubtaskPlan(proposal.payload);
     const previousTask = input.activeTasks.find((task) => task.id === taskId) ??
       input.inboxTasks.find((task) => task.id === taskId);
 
     let confirmationResult = createLegacyPlannerConfirmationResult(proposal, {
       localTaskId: taskId,
-      mutationResult: await input.updateTask(taskUpdatePayload) as {
+      mutationResult: await input.updateQuest(taskUpdatePayload) as {
         queued?: boolean;
       } | null,
     });
@@ -421,9 +420,9 @@ export const createLegacyPlannerConfirmationHandlers = (
   },
   suggest_reminder: async (proposal) => {
     const payload = proposal.payload as unknown as Parameters<
-      typeof input.updateTask
+      typeof input.updateQuest
     >[0];
-    const mutationResult = await input.updateTask(payload) as
+    const mutationResult = await input.updateQuest(payload) as
       | { queued?: boolean }
       | null;
 

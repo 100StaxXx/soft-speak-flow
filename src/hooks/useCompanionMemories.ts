@@ -3,6 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { useCompanion } from "./useCompanion";
 import { useMemo, useCallback } from "react";
+import { invalidateCompanionQueries } from "@/lib/companionContextQueryCache";
+import { queryKeys } from "@/lib/queryKeys";
 
 export type MemoryType = 
   | 'first_meeting'       // When companion was created
@@ -78,7 +80,7 @@ export function useCompanionMemories() {
 
   // Fetch all memories for the companion
   const { data: memories, isLoading: memoriesLoading } = useQuery({
-    queryKey: ['companion-memories', companion?.id],
+    queryKey: queryKeys.companion.memories(companion?.id),
     queryFn: async (): Promise<CompanionMemory[]> => {
       if (!companion?.id) return [];
 
@@ -102,7 +104,7 @@ export function useCompanionMemories() {
 
   // Fetch current bond level
   const { data: bondData, isLoading: bondLoading } = useQuery({
-    queryKey: ['companion-bond', companion?.id],
+    queryKey: queryKeys.companion.bond(companion?.id),
     queryFn: async () => {
       if (!companion?.id || !user?.id) return null;
 
@@ -150,7 +152,10 @@ export function useCompanionMemories() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['companion-memories', companion?.id] });
+      void invalidateCompanionQueries(queryClient, {
+        companionId: companion?.id,
+        includeMemoriesDetail: true,
+      });
     },
   });
 

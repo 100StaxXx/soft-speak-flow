@@ -8,6 +8,10 @@ import { logger } from "@/utils/logger";
 import { useStreakMultiplier } from "@/hooks/useStreakMultiplier";
 import { useLivingCompanionSafe } from "@/hooks/useLivingCompanion";
 import {
+  companionContextQueryFamilyGroups,
+  invalidateCompanionContextQueryFamilies,
+} from "@/lib/companionContextQueryCache";
+import {
   FOCUS_XP_REWARDS,
   SUBTASK_XP_REWARDS,
   PRIORITY_XP_REWARDS,
@@ -130,7 +134,10 @@ export const useXPRewards = () => {
       // Mark user as active (resets companion decay)
       if (user?.id) {
         markUserActive().then(() => {
-          queryClient.invalidateQueries({ queryKey: ['companion-health'] });
+          void invalidateCompanionContextQueryFamilies(
+            queryClient,
+            companionContextQueryFamilyGroups.healthStatus,
+          );
         });
       }
       
@@ -187,7 +194,10 @@ export const useXPRewards = () => {
     // Mark user as active (resets companion decay)
     if (user?.id) {
       markUserActive().then(() => {
-        queryClient.invalidateQueries({ queryKey: ['companion-health'] });
+        void invalidateCompanionContextQueryFamilies(
+          queryClient,
+          companionContextQueryFamilyGroups.healthStatus,
+        );
       });
     }
     
@@ -202,7 +212,10 @@ export const useXPRewards = () => {
     // Mark user as active (resets companion decay)
     if (user?.id) {
       markUserActive().then(() => {
-        queryClient.invalidateQueries({ queryKey: ['companion-health'] });
+        void invalidateCompanionContextQueryFamilies(
+          queryClient,
+          companionContextQueryFamilyGroups.healthStatus,
+        );
       });
     }
     
@@ -247,7 +260,10 @@ export const useXPRewards = () => {
       // Mark user as active (resets companion decay)
       if (user?.id) {
         markUserActive().then(() => {
-          queryClient.invalidateQueries({ queryKey: ['companion-health'] });
+          void invalidateCompanionContextQueryFamilies(
+            queryClient,
+            companionContextQueryFamilyGroups.healthStatus,
+          );
         });
       }
       

@@ -30,6 +30,7 @@ import { useNavigate } from "react-router-dom";
 import paywallPrimaryBackground from "@/assets/backgrounds/paywall-primary.webp";
 import { trackPaywallEvent } from "@/utils/paywallTelemetry";
 import { PREMIUM_BENEFITS, PREMIUM_BENEFITS_SUMMARY, PREMIUM_PLAN_NOTE } from "@/config/premiumBenefits";
+import { invalidateProfileAccessQueries } from "@/lib/profileAccessQueryCache";
 
 type PlanType = "monthly" | "yearly";
 export type PaywallVariant = "pre_trial_signup" | "trial_expired";
@@ -126,10 +127,11 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
         offerCode: sanitized,
       });
       await applyReferralCode.mutateAsync(sanitized);
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["profile", user.id] }),
-        queryClient.invalidateQueries({ queryKey: ["referral-stats", user.id] }),
-      ]);
+      await invalidateProfileAccessQueries(queryClient, {
+        userId: user.id,
+        includeProfileDetail: true,
+        includeReferralStatsDetail: true,
+      });
       setOfferCode("");
       toast({
         title: "Creator code applied",

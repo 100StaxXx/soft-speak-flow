@@ -3,6 +3,7 @@ import { parseISO, format, isValid } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { queryKeys } from "@/lib/queryKeys";
 import { SearchBar } from "./SearchBar";
 import { Card } from "./ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
@@ -58,7 +59,7 @@ export const GlobalSearch = ({
   };
 
   const { data: quotes, isLoading: quotesLoading } = useQuery({
-    queryKey: ["search-quotes", currentQuery],
+    queryKey: queryKeys.search.quotes(currentQuery),
     enabled: currentQuery.length >= 2,
     queryFn: async () => {
       const { data, error } = await supabase
@@ -73,7 +74,7 @@ export const GlobalSearch = ({
   });
 
   const { data: pepTalks, isLoading: pepTalksLoading } = useQuery({
-    queryKey: ["search-pep-talks", currentQuery],
+    queryKey: queryKeys.search.pepTalks(currentQuery),
     enabled: currentQuery.length >= 2,
     queryFn: async () => {
       const { data, error } = await supabase
@@ -88,7 +89,7 @@ export const GlobalSearch = ({
   });
 
   const { data: challenges, isLoading: challengesLoading } = useQuery({
-    queryKey: ["search-challenges", currentQuery],
+    queryKey: queryKeys.search.challenges(currentQuery),
     enabled: currentQuery.length >= 2,
     queryFn: async () => {
       const { data, error } = await supabase
@@ -103,7 +104,7 @@ export const GlobalSearch = ({
   });
 
   const { data: tasks, isLoading: tasksLoading } = useQuery({
-    queryKey: ['search-tasks', currentQuery, user?.id],
+    queryKey: queryKeys.search.quests(currentQuery, user?.id),
     queryFn: async () => {
       if (!user?.id) {
         throw new Error('User not authenticated');
@@ -124,7 +125,7 @@ export const GlobalSearch = ({
   });
 
   const { data: epics, isLoading: epicsLoading } = useQuery({
-    queryKey: ['search-epics', currentQuery, user?.id],
+    queryKey: queryKeys.search.epics(currentQuery, user?.id),
     queryFn: async () => {
       if (!user?.id) {
         throw new Error('User not authenticated');

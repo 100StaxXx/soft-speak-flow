@@ -22,49 +22,21 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { QuestLocationLink } from "@/components/QuestLocationLink";
+import type { DisplayQuest } from "@/features/quests/display";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import { cn, formatDisplayLabel, stripMarkdown } from "@/lib/utils";
-import type { TaskAttachment } from "@/types/questAttachments";
 
-export interface DesktopQuestSubtask {
-  id: string;
-  title: string;
-  completed: boolean | null;
-  sort_order?: number | null;
-}
-
-export interface DesktopQuestDetailsTask {
-  id: string;
-  task_text: string;
-  completed: boolean | null;
-  xp_reward: number;
-  scheduled_time?: string | null;
-  estimated_duration?: number | null;
-  is_main_quest?: boolean | null;
-  habit_source_id?: string | null;
-  notes?: string | null;
-  priority?: string | null;
-  difficulty?: string | null;
-  category?: string | null;
-  is_recurring?: boolean | null;
-  recurrence_pattern?: string | null;
-  image_url?: string | null;
-  attachments?: TaskAttachment[] | null;
-  subtasks?: DesktopQuestSubtask[];
-  location?: string | null;
-}
-
-interface DesktopQuestDetailsPopoverProps<T extends DesktopQuestDetailsTask> {
-  task: T;
+export interface DesktopQuestDetailsPopoverProps {
+  quest: DisplayQuest;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   anchor: ReactElement;
   hasCalendarLink?: boolean;
-  onEdit?: (task: T) => void;
-  onSendToCalendar?: (taskId: string) => void;
-  onMoveQuestToNextDay?: (task: T) => void;
-  onDelete?: (task: T) => void;
-  onToggleSubtask?: (taskId: string, subtaskId: string, completed: boolean) => void;
+  onEdit?: () => void;
+  onSendToCalendar?: (questId: string) => void;
+  onMoveQuestToNextDay?: () => void;
+  onDelete?: () => void;
+  onToggleSubtask?: (questId: string, subtaskId: string, completed: boolean) => void;
 }
 
 const FALLBACK_ATTACHMENT_NAME = "Photo attachment";
@@ -89,9 +61,9 @@ const formatDuration = (minutes: number | null | undefined) => {
 };
 
 const normalizeDisplayAttachments = (
-  task: Pick<DesktopQuestDetailsTask, "attachments" | "image_url">,
+  quest: Pick<DisplayQuest, "attachments" | "imageUrl">,
 ) => {
-  const normalized = (task.attachments ?? [])
+  const normalized = (quest.attachments ?? [])
     .filter((attachment) => typeof attachment.fileUrl === "string" && attachment.fileUrl.trim().length > 0)
     .map((attachment) => ({
       fileUrl: attachment.fileUrl,
@@ -101,10 +73,10 @@ const normalizeDisplayAttachments = (
 
   if (normalized.length > 0) return normalized;
 
-  if (task.image_url) {
+  if (quest.imageUrl) {
     return [
       {
-        fileUrl: task.image_url,
+        fileUrl: quest.imageUrl,
         fileName: FALLBACK_ATTACHMENT_NAME,
         isImage: true,
       },
@@ -173,8 +145,8 @@ export function useDesktopQuestCardClickHandlers<T>(
   };
 }
 
-export function DesktopQuestDetailsPopover<T extends DesktopQuestDetailsTask>({
-  task,
+export function DesktopQuestDetailsPopover({
+  quest,
   open,
   onOpenChange,
   anchor,
@@ -184,12 +156,12 @@ export function DesktopQuestDetailsPopover<T extends DesktopQuestDetailsTask>({
   onMoveQuestToNextDay,
   onDelete,
   onToggleSubtask,
-}: DesktopQuestDetailsPopoverProps<T>) {
-  const attachments = normalizeDisplayAttachments(task);
-  const duration = formatDuration(task.estimated_duration);
-  const categoryMeta = CATEGORY_META[task.category as keyof typeof CATEGORY_META] ?? CATEGORY_META.default;
+}: DesktopQuestDetailsPopoverProps) {
+  const attachments = normalizeDisplayAttachments(quest);
+  const duration = formatDuration(quest.estimatedDuration);
+  const categoryMeta = CATEGORY_META[quest.category as keyof typeof CATEGORY_META] ?? CATEGORY_META.default;
   const CategoryIcon = categoryMeta.icon;
-  const subtasks = task.subtasks ?? [];
+  const subtasks = quest.subtasks ?? [];
 
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
@@ -201,7 +173,7 @@ export function DesktopQuestDetailsPopover<T extends DesktopQuestDetailsTask>({
       >
         <div
           className="space-y-4"
-          data-testid={`desktop-quest-popover-${task.id}`}
+          data-testid={`desktop-quest-popover-${quest.id}`}
         >
           <div className="space-y-3">
             <div className="flex items-start justify-between gap-3">
@@ -209,15 +181,15 @@ export function DesktopQuestDetailsPopover<T extends DesktopQuestDetailsTask>({
                 <p
                   className={cn(
                     "text-base font-semibold leading-tight text-foreground",
-                    task.completed && "text-muted-foreground line-through",
+                    quest.completed && "text-muted-foreground line-through",
                   )}
                 >
-                  {task.task_text}
+                  {quest.title}
                 </p>
                 <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                   <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.05] px-2 py-1">
                     <Clock className="h-3 w-3" />
-                    {formatTime(task.scheduled_time)}
+                    {formatTime(quest.scheduledTime)}
                   </span>
                   {duration ? (
                     <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.05] px-2 py-1">
@@ -226,7 +198,7 @@ export function DesktopQuestDetailsPopover<T extends DesktopQuestDetailsTask>({
                     </span>
                   ) : null}
                   <span className="rounded-full border border-stardust-gold/25 bg-stardust-gold/10 px-2 py-1 font-semibold text-stardust-gold">
-                    +{task.xp_reward} XP
+                    +{quest.xpReward} XP
                   </span>
                 </div>
               </div>
@@ -237,57 +209,57 @@ export function DesktopQuestDetailsPopover<T extends DesktopQuestDetailsTask>({
             </div>
 
             <div className="flex flex-wrap gap-1.5">
-              {task.is_main_quest ? (
+              {quest.isMainQuest ? (
                 <Badge variant="outline" className="border-primary/35 bg-primary/10 text-primary">
                   Main quest
                 </Badge>
               ) : null}
-              {task.habit_source_id ? (
+              {quest.habitSourceId ? (
                 <Badge variant="outline" className="border-accent/35 bg-accent/10 text-accent">
                   <Repeat className="mr-1 h-3 w-3" />
                   Ritual
                 </Badge>
               ) : null}
-              {task.category ? (
+              {quest.category ? (
                 <Badge variant="outline" className="border-white/10 bg-white/[0.04] text-foreground">
                   <CategoryIcon className="mr-1 h-3 w-3" />
                   {categoryMeta.label}
                 </Badge>
               ) : null}
-              {task.difficulty ? (
+              {quest.difficulty ? (
                 <Badge variant="outline" className="border-white/10 bg-white/[0.04] text-foreground capitalize">
-                  {task.difficulty}
+                  {quest.difficulty}
                 </Badge>
               ) : null}
-              {task.priority ? (
+              {quest.priority ? (
                 <Badge variant="outline" className="border-white/10 bg-white/[0.04] text-foreground capitalize">
-                  {task.priority} priority
+                  {quest.priority} priority
                 </Badge>
               ) : null}
-              {task.is_recurring && task.recurrence_pattern ? (
+              {quest.isRecurring && quest.recurrencePattern ? (
                 <Badge variant="outline" className="border-white/10 bg-white/[0.04] text-foreground">
                   <Repeat className="mr-1 h-3 w-3" />
-                  {formatDisplayLabel(task.recurrence_pattern)}
+                  {formatDisplayLabel(quest.recurrencePattern)}
                 </Badge>
               ) : null}
             </div>
           </div>
 
-          {task.notes ? (
+          {quest.notes ? (
             <div className="rounded-[18px] border border-white/10 bg-white/[0.04] p-3">
               <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/80">
                 <FileText className="h-3.5 w-3.5" />
                 Notes
               </div>
               <p className="text-sm leading-relaxed text-muted-foreground whitespace-pre-line">
-                {stripMarkdown(task.notes)}
+                {stripMarkdown(quest.notes)}
               </p>
             </div>
           ) : null}
 
-          {task.location ? (
+          {quest.location ? (
             <QuestLocationLink
-              location={task.location}
+              location={quest.location}
               label="Address"
               className="bg-white/[0.04]"
               textClassName="text-muted-foreground"
@@ -313,7 +285,7 @@ export function DesktopQuestDetailsPopover<T extends DesktopQuestDetailsTask>({
                     {onToggleSubtask ? (
                       <Checkbox
                         checked={!!subtask.completed}
-                        onCheckedChange={(checked) => onToggleSubtask(task.id, subtask.id, !!checked)}
+                        onCheckedChange={(checked) => onToggleSubtask(quest.id, subtask.id, !!checked)}
                         className="h-4 w-4"
                       />
                     ) : subtask.completed ? (
@@ -369,7 +341,7 @@ export function DesktopQuestDetailsPopover<T extends DesktopQuestDetailsTask>({
                   className="rounded-2xl border-white/10 bg-white/[0.04] hover:bg-white/[0.08]"
                   onClick={() => {
                     onOpenChange(false);
-                    onEdit(task);
+                    onEdit();
                   }}
                 >
                   <Pencil className="h-3.5 w-3.5" />
@@ -384,7 +356,7 @@ export function DesktopQuestDetailsPopover<T extends DesktopQuestDetailsTask>({
                   className="rounded-2xl border-white/10 bg-white/[0.04] hover:bg-white/[0.08]"
                   onClick={() => {
                     onOpenChange(false);
-                    onSendToCalendar(task.id);
+                    onSendToCalendar(quest.id);
                   }}
                 >
                   <CalendarPlus className="h-3.5 w-3.5" />
@@ -399,7 +371,7 @@ export function DesktopQuestDetailsPopover<T extends DesktopQuestDetailsTask>({
                   className="rounded-2xl border-white/10 bg-white/[0.04] hover:bg-white/[0.08]"
                   onClick={() => {
                     onOpenChange(false);
-                    onMoveQuestToNextDay(task);
+                    onMoveQuestToNextDay();
                   }}
                 >
                   <CalendarArrowUp className="h-3.5 w-3.5" />
@@ -414,7 +386,7 @@ export function DesktopQuestDetailsPopover<T extends DesktopQuestDetailsTask>({
                   className="rounded-2xl border-destructive/30 bg-destructive/10 text-destructive hover:bg-destructive/15 hover:text-destructive"
                   onClick={() => {
                     onOpenChange(false);
-                    onDelete(task);
+                    onDelete();
                   }}
                 >
                   <Trash2 className="h-3.5 w-3.5" />

@@ -18,6 +18,12 @@ import {
   getProgressionTierLabelForLevel,
 } from "@/config/progression";
 import { useCompanionMotionSafe } from "@/contexts/CompanionMotionContext";
+import {
+  companionContextQueryFamilyGroups,
+  invalidateCompanionQueries,
+  invalidateCompanionContextQueryFamilies,
+} from "@/lib/companionContextQueryCache";
+import { queryKeys } from "@/lib/queryKeys";
 
 const EVOLUTION_RECORD_RETRY_DELAYS_MS = [0, 75, 150] as const;
 const LOCAL_HATCH_DEDUPE_WINDOW_MS = 15000;
@@ -258,18 +264,12 @@ export const GlobalEvolutionListener = () => {
   useEffect(() => {
     if (!user) return;
 
-    const invalidateCompanionQueries = () => {
-      queryClient.invalidateQueries({ queryKey: ["companion"] });
-      queryClient.invalidateQueries({ queryKey: ["companion-health"] });
-      queryClient.invalidateQueries({ queryKey: ["companion-care-signals"] });
-      queryClient.invalidateQueries({ queryKey: ["companion-attributes"] });
-      queryClient.invalidateQueries({ queryKey: ["companion-story"] });
-      queryClient.invalidateQueries({ queryKey: ["companion-stories-all"] });
-      queryClient.invalidateQueries({ queryKey: ["companion-memories"] });
-      queryClient.invalidateQueries({ queryKey: ["companion-bond"] });
-      queryClient.invalidateQueries({ queryKey: ["companion-evolution-image"] });
-      queryClient.invalidateQueries({ queryKey: ["current-evolution-card"] });
-      queryClient.invalidateQueries({ queryKey: ["evolution-cards"] });
+    const invalidateLiveEvolutionQueries = () => {
+      void invalidateCompanionQueries(queryClient, { includeAll: true });
+      void invalidateCompanionContextQueryFamilies(
+        queryClient,
+        companionContextQueryFamilyGroups.liveEvolution,
+      );
     };
 
     const channel = supabase
@@ -283,7 +283,7 @@ export const GlobalEvolutionListener = () => {
           filter: `user_id=eq.${user.id}`,
         },
         async (payload) => {
-          invalidateCompanionQueries();
+          invalidateLiveEvolutionQueries();
 
           if (payload.eventType !== "UPDATE") {
             return;

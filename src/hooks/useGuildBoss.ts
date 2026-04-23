@@ -8,6 +8,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
+import { invalidateGuildBossQueries } from "@/lib/guildCombatQueryCache";
+import { queryKeys } from "@/lib/queryKeys";
 
 export interface BossEncounter {
   id: string;
@@ -54,7 +56,7 @@ export const useGuildBoss = ({ epicId, communityId }: UseGuildBossOptions) => {
 
   // Fetch active boss encounter
   const { data: activeBoss, isLoading: isLoadingBoss } = useQuery({
-    queryKey: ["guild-boss", epicId, communityId],
+    queryKey: queryKeys.guild.boss(epicId, communityId),
     queryFn: async () => {
       let query = supabase
         .from("guild_boss_encounters")
@@ -107,8 +109,10 @@ export const useGuildBoss = ({ epicId, communityId }: UseGuildBossOptions) => {
               title: "🎉 Boss Defeated!",
               description: `${updated.boss_name} has been vanquished!`,
             });
-            queryClient.invalidateQueries({ queryKey: ["guild-boss"] });
-            queryClient.invalidateQueries({ queryKey: ["guild-legends"] });
+            void invalidateGuildBossQueries(queryClient, {
+              includeBossAll: true,
+              includeLegendsAll: true,
+            });
           }
         }
       )
@@ -121,7 +125,7 @@ export const useGuildBoss = ({ epicId, communityId }: UseGuildBossOptions) => {
 
   // Fetch damage log
   const { data: damageLog } = useQuery({
-    queryKey: ["boss-damage-log", activeBoss?.id],
+    queryKey: queryKeys.guild.bossDamageLog(activeBoss?.id),
     queryFn: async () => {
       if (!activeBoss) return [];
 
@@ -216,7 +220,9 @@ export const useGuildBoss = ({ epicId, communityId }: UseGuildBossOptions) => {
           description: "Your contribution weakens the boss!",
         });
       }
-      queryClient.invalidateQueries({ queryKey: ["boss-damage-log"] });
+      void invalidateGuildBossQueries(queryClient, {
+        includeDamageLogAll: true,
+      });
     },
     onError: (error: Error) => {
       console.error("Failed to deal damage:", error);

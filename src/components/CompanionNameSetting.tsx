@@ -9,6 +9,7 @@ import {
   normalizeCompanionCustomName,
   persistCompanionCustomName,
 } from "@/lib/companionName";
+import { invalidateCompanionQueries } from "@/lib/companionContextQueryCache";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -51,7 +52,7 @@ export const CompanionNameSetting = memo(() => {
     setIsSaving(true);
     try {
       const nextName = await persistCompanionCustomName(companion.id, draftName);
-      await queryClient.invalidateQueries({ queryKey: ["companion"] });
+      await invalidateCompanionQueries(queryClient, { includeAll: true });
 
       toast({
         title: nextName ? "Companion name updated" : "Companion name cleared",

@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { queryKeys } from "@/lib/queryKeys";
 import { useAuth } from "./useAuth";
 
 import { ProfilePreferences } from "@/types/profile";
@@ -50,7 +51,7 @@ export const useProfile = () => {
   const { user } = useAuth();
 
   const { data: profile, isLoading: loading, error, refetch } = useQuery({
-    queryKey: ["profile", user?.id],
+    queryKey: queryKeys.profile.detail(user?.id ?? ""),
     queryFn: async () => {
       if (!user) return null;
 

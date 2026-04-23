@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { CalendarTask } from "@/types/quest";
+import type { CalendarQuest } from "@/features/quests/display";
 import type { ComponentProps, ReactNode } from "react";
 
 vi.mock("./ui/scroll-area", () => ({
@@ -11,22 +11,22 @@ vi.mock("./ui/scroll-area", () => ({
 
 vi.mock("./QuestDragCard", () => ({
   QuestDragCard: ({
-    task,
+    quest,
     onDragStart,
     onDragEnd,
   }: {
-    task: { id: string; task_text: string };
+    quest: { id: string; title: string };
     onDragStart?: (e: React.DragEvent<HTMLDivElement>) => void;
     onDragEnd?: (e: React.DragEvent<HTMLDivElement>) => void;
   }) => (
     <div
-      data-testid={`quest-card-${task.id}`}
+      data-testid={`quest-card-${quest.id}`}
       data-quest-card="true"
       draggable={Boolean(onDragStart)}
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
     >
-      {task.task_text}
+      {quest.title}
     </div>
   ),
 }));
@@ -43,21 +43,30 @@ import { CalendarDayView } from "./CalendarDayView";
 
 const selectedDate = new Date("2026-02-13T09:00:00.000Z");
 
-const baseTask = (overrides: Partial<CalendarTask> = {}): CalendarTask => ({
-  id: "task-1",
-  task_text: "Scheduled quest",
-  task_date: "2026-02-13",
-  scheduled_time: "09:00",
-  estimated_duration: 30,
+const baseQuest = (overrides: Partial<CalendarQuest> = {}): CalendarQuest => ({
+  id: "quest-1",
+  title: "Scheduled quest",
+  taskDate: "2026-02-13",
+  scheduledTime: "09:00",
+  estimatedDuration: 30,
   completed: false,
-  is_main_quest: false,
+  isMainQuest: false,
   difficulty: "medium",
-  xp_reward: 20,
+  xpReward: 20,
   category: null,
+  habitSourceId: null,
+  notes: null,
+  priority: null,
+  isRecurring: false,
+  recurrencePattern: null,
+  imageUrl: null,
+  attachments: [],
+  subtasks: [],
+  location: null,
   ...overrides,
 });
 
-const setup = (tasks: CalendarTask[], overrides?: Partial<ComponentProps<typeof CalendarDayView>>) => {
+const setup = (quests: CalendarQuest[], overrides?: Partial<ComponentProps<typeof CalendarDayView>>) => {
   const onTaskDrop = vi.fn();
   const onTimeSlotLongPress = vi.fn();
 
@@ -65,7 +74,7 @@ const setup = (tasks: CalendarTask[], overrides?: Partial<ComponentProps<typeof 
     <CalendarDayView
       selectedDate={selectedDate}
       onDateSelect={vi.fn()}
-      tasks={tasks}
+      quests={quests}
       onTaskDrop={onTaskDrop}
       onTimeSlotLongPress={onTimeSlotLongPress}
       {...overrides}
@@ -131,10 +140,10 @@ describe("CalendarDayView interactions", () => {
   });
 
   it("snaps standard-view drop time to 15-minute increments before fine mode", () => {
-    const { onTaskDrop } = setup([baseTask()]);
+    const { onTaskDrop } = setup([baseQuest()]);
 
     const label = screen.getByText("8:30 AM");
-    const row = label.closest("div.flex");
+    const row = label.closest("div.flex") as HTMLElement | null;
     expect(row).toBeTruthy();
     mockRowBounds(row!, 100);
 
@@ -149,10 +158,10 @@ describe("CalendarDayView interactions", () => {
   });
 
   it("enters fine mode after dwell and allows 5-minute drop precision", () => {
-    const { onTaskDrop } = setup([baseTask()]);
+    const { onTaskDrop } = setup([baseQuest()]);
 
     const label = screen.getByText("8:30 AM");
-    const row = label.closest("div.flex");
+    const row = label.closest("div.flex") as HTMLElement | null;
     expect(row).toBeTruthy();
     mockRowBounds(row!, 100);
 
@@ -172,10 +181,10 @@ describe("CalendarDayView interactions", () => {
   });
 
   it("ignores drop when payload does not include a task id", () => {
-    const { onTaskDrop } = setup([baseTask()]);
+    const { onTaskDrop } = setup([baseQuest()]);
 
     const label = screen.getByText("8:30 AM");
-    const row = label.closest("div.flex");
+    const row = label.closest("div.flex") as HTMLElement | null;
     expect(row).toBeTruthy();
     mockRowBounds(row!, 100);
 
@@ -187,34 +196,34 @@ describe("CalendarDayView interactions", () => {
   });
 
   it("uses one unscheduled quest id for drag start and performs one drop action", () => {
-    const unscheduledTask = baseTask({
-      id: "task-unscheduled",
-      task_text: "Unscheduled quest",
-      scheduled_time: null,
+    const unscheduledQuest = baseQuest({
+      id: "quest-unscheduled",
+      title: "Unscheduled quest",
+      scheduledTime: null,
     });
-    const { onTaskDrop } = setup([baseTask(), unscheduledTask]);
+    const { onTaskDrop } = setup([baseQuest(), unscheduledQuest]);
 
-    const card = screen.getByTestId("quest-card-task-unscheduled");
+    const card = screen.getByTestId("quest-card-quest-unscheduled");
     const dataTransfer = createDataTransfer();
     fireEvent.dragStart(card, { dataTransfer });
 
     const label = screen.getByText("8:30 AM");
-    const row = label.closest("div.flex");
+    const row = label.closest("div.flex") as HTMLElement | null;
     expect(row).toBeTruthy();
     mockRowBounds(row!, 100);
     fireEvent(row!, createDropEvent(122, dataTransfer));
 
     expect(dataTransfer.setData).toHaveBeenCalledTimes(1);
-    expect(dataTransfer.setData).toHaveBeenCalledWith("taskId", "task-unscheduled");
+    expect(dataTransfer.setData).toHaveBeenCalledWith("taskId", "quest-unscheduled");
     expect(onTaskDrop).toHaveBeenCalledTimes(1);
-    expect(onTaskDrop.mock.calls[0]?.[0]).toBe("task-unscheduled");
+    expect(onTaskDrop.mock.calls[0]?.[0]).toBe("quest-unscheduled");
   });
 
   it("snaps long-press add time to 5-minute increments in standard view", () => {
-    const { onTimeSlotLongPress } = setup([baseTask()]);
+    const { onTimeSlotLongPress } = setup([baseQuest()]);
 
     const label = screen.getByText("8:30 AM");
-    const row = label.closest("div.flex");
+    const row = label.closest("div.flex") as HTMLElement | null;
     expect(row).toBeTruthy();
     mockRowBounds(row!, 100);
 

@@ -111,5 +111,7 @@ describe("useHabitsRealtime", () => {
     expect(mocks.dispatchPlannerSyncFinishedMock).toHaveBeenCalledTimes(1);
     expect(mocks.invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: ["epics"] });
     expect(mocks.invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: ["habit-surfacing"] });
+    expect(mocks.invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: ["quest-autocomplete-habits"] });
+    expect(mocks.invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: ["quest-autocomplete-habits", "user-123"] });
   });
 });

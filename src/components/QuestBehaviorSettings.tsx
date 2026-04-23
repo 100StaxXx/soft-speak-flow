@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
+import { invalidateProfileQueries } from "@/lib/profileQueryCache";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -32,7 +33,10 @@ export const QuestBehaviorSettings = () => {
       if (error) throw error;
 
       // Invalidate profile cache to reflect the change
-      queryClient.invalidateQueries({ queryKey: ["profile", user.id] });
+      void invalidateProfileQueries(queryClient, {
+        userId: user.id,
+        includeDetail: true,
+      });
       
       toast({
         title: "Preference Updated",

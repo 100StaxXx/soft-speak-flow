@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { CalendarTask } from "@/types/quest";
+import type { CalendarQuest } from "@/features/quests/display";
 
 vi.mock("@/hooks/useAutoscroll", () => ({
   useAutoscroll: () => ({
@@ -33,17 +33,26 @@ vi.mock("../MilestoneCalendarCard", () => ({
 
 import { TimelineView } from "./TimelineView";
 
-const baseTask = (overrides: Partial<CalendarTask> = {}): CalendarTask => ({
+const baseQuest = (overrides: Partial<CalendarQuest> = {}): CalendarQuest => ({
   id: "task-1",
-  task_text: "Focus block",
-  task_date: "2026-02-13",
-  scheduled_time: "09:00",
-  estimated_duration: 30,
+  title: "Focus block",
+  taskDate: "2026-02-13",
+  scheduledTime: "09:00",
+  estimatedDuration: 30,
   completed: false,
-  is_main_quest: false,
+  isMainQuest: false,
   difficulty: "medium",
-  xp_reward: 20,
+  xpReward: 20,
   category: null,
+  habitSourceId: null,
+  notes: null,
+  priority: null,
+  isRecurring: false,
+  recurrencePattern: null,
+  imageUrl: null,
+  attachments: [],
+  subtasks: [],
+  location: null,
   ...overrides,
 });
 
@@ -83,7 +92,7 @@ describe("TimelineView drag integration", () => {
       <TimelineView
         selectedDate={new Date("2026-02-13T09:00:00.000Z")}
         onDateSelect={vi.fn()}
-        tasks={[baseTask()]}
+        quests={[baseQuest()]}
         onTaskReschedule={onTaskReschedule}
       />,
     );
@@ -109,7 +118,7 @@ describe("TimelineView drag integration", () => {
       <TimelineView
         selectedDate={new Date("2026-02-13T09:00:00.000Z")}
         onDateSelect={vi.fn()}
-        tasks={[baseTask()]}
+        quests={[baseQuest()]}
         onTaskReschedule={onTaskReschedule}
       />,
     );
@@ -131,7 +140,7 @@ describe("TimelineView drag integration", () => {
       <TimelineView
         selectedDate={new Date("2026-02-13T09:00:00.000Z")}
         onDateSelect={vi.fn()}
-        tasks={[baseTask()]}
+        quests={[baseQuest()]}
         onTaskReschedule={onTaskReschedule}
       />,
     );
@@ -155,7 +164,7 @@ describe("TimelineView drag integration", () => {
       <TimelineView
         selectedDate={new Date("2026-02-13T09:00:00.000Z")}
         onDateSelect={vi.fn()}
-        tasks={[baseTask()]}
+        quests={[baseQuest()]}
         onTaskReschedule={onTaskReschedule}
       />,
     );
@@ -177,7 +186,7 @@ describe("TimelineView drag integration", () => {
       <TimelineView
         selectedDate={new Date("2026-02-13T09:00:00.000Z")}
         onDateSelect={vi.fn()}
-        tasks={[baseTask()]}
+        quests={[baseQuest()]}
         onTaskReschedule={onTaskReschedule}
       />,
     );
@@ -209,7 +218,7 @@ describe("TimelineView drag integration", () => {
       <TimelineView
         selectedDate={new Date("2026-02-13T09:00:00.000Z")}
         onDateSelect={vi.fn()}
-        tasks={[baseTask()]}
+        quests={[baseQuest()]}
         onTaskReschedule={onTaskReschedule}
       />,
     );

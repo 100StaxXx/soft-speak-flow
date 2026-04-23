@@ -33,7 +33,7 @@ import { cn } from '@/lib/utils';
 import { useEpicSuggestions, type EpicSuggestion, type ClarificationAnswers } from '@/hooks/useEpicSuggestions';
 import { useEpicTemplates, EpicTemplate } from '@/hooks/useEpicTemplates';
 import { useUserAIContext } from '@/hooks/useUserAIContext';
-import { useEpics } from '@/hooks/useEpics';
+import { useCampaigns } from '@/hooks/useCampaigns';
 import { useAIInteractionTracker } from '@/hooks/useAIInteractionTracker';
 import { useHapticFeedback } from '@/hooks/useHapticFeedback';
 import { useJourneySchedule, type JourneyRitual } from '@/hooks/useJourneySchedule';
@@ -147,8 +147,8 @@ export function Pathfinder({
   const [timelineContext, setTimelineContext] = useState('');
   
   const { preferences } = useUserAIContext();
-  const { activeEpics } = useEpics({ enabled: open });
-  const hasReachedCampaignLimit = hasReachedActiveCampaignLimit(activeEpics.length);
+  const { activeCampaigns } = useCampaigns({ enabled: open });
+  const hasReachedCampaignLimit = hasReachedActiveCampaignLimit(activeCampaigns.length);
   const {
     companionLabel,
     imageUrl,

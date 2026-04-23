@@ -14,6 +14,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "@/components/ui/sonner";
 import { PageTransition } from "@/components/PageTransition";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
+import { queryKeys } from "@/lib/queryKeys";
 import { formatDisplayLabel } from "@/lib/utils";
 
 type ChallengeTab = "active" | "available";
@@ -27,7 +28,7 @@ export default function Challenges() {
 
   // Fetch available challenges
   const { data: availableChallenges } = useQuery({
-    queryKey: ["challenges"],
+    queryKey: queryKeys.challenges.all,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("challenges")
@@ -41,7 +42,7 @@ export default function Challenges() {
 
   // Fetch user's active challenges
   const { data: userChallenges, refetch: refetchUserChallenges } = useQuery({
-    queryKey: ["user-challenges", user?.id],
+    queryKey: queryKeys.challenges.user(user?.id),
     enabled: !!user,
     queryFn: async () => {
       if (!user?.id) {
@@ -64,7 +65,7 @@ export default function Challenges() {
 
   // Fetch challenge progress
   const { data: challengeProgress, refetch: refetchChallengeProgress } = useQuery({
-    queryKey: ["challenge-progress", user?.id],
+    queryKey: queryKeys.challenges.progress(user?.id),
     enabled: !!user && !!userChallenges,
     queryFn: async () => {
       if (!userChallenges || userChallenges.length === 0) return [];

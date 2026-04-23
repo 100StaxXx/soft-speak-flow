@@ -3,12 +3,12 @@ import { addDays, addWeeks, format, isSameDay, isToday, startOfWeek, subWeeks } 
 import { CalendarDays, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import type { CalendarQuest } from "@/features/quests/display";
 import { cn } from "@/lib/utils";
-import type { CalendarTask } from "@/types/quest";
 
 interface DesktopWeekStripProps {
   selectedDate: Date;
-  tasks?: CalendarTask[];
+  quests?: CalendarQuest[];
   onDateSelect: (date: Date) => void;
   onOpenMonthView: () => void;
   onAddQuest?: () => void;
@@ -24,7 +24,7 @@ interface DayStats {
 
 export function DesktopWeekStrip({
   selectedDate,
-  tasks = [],
+  quests = [],
   onDateSelect,
   onOpenMonthView,
   onAddQuest,
@@ -44,20 +44,20 @@ export function DesktopWeekStrip({
       stats.set(format(day, "yyyy-MM-dd"), { total: 0, completed: 0, scheduled: 0 });
     });
 
-    tasks.forEach((task) => {
-      const dateKey = task.task_date;
+    quests.forEach((quest) => {
+      const dateKey = quest.taskDate;
       const existing = stats.get(dateKey);
       if (!existing) return;
       existing.total += 1;
-      if (task.completed) existing.completed += 1;
-      if (task.scheduled_time) existing.scheduled += 1;
+      if (quest.completed) existing.completed += 1;
+      if (quest.scheduledTime) existing.scheduled += 1;
     });
 
     return stats;
-  }, [tasks, weekDays]);
+  }, [quests, weekDays]);
 
-  const weekCompleted = tasks.filter((task) => task.completed).length;
-  const weekTotal = tasks.length;
+  const weekCompleted = quests.filter((quest) => quest.completed).length;
+  const weekTotal = quests.length;
 
   return (
     <section>

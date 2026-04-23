@@ -5,6 +5,7 @@ import { useAuth } from "./useAuth";
 import { toast } from "@/components/ui/sonner";
 import { ECHO_MAP, AttributeType } from "@/config/attributeDescriptions";
 import { useAchievements } from "./useAchievements";
+import { invalidateCompanionQueries } from "@/lib/companionContextQueryCache";
 import {
   COMPANION_ATTRIBUTE_EVENT_CONFIG,
   type CompanionAttributeSourceEvent,
@@ -24,6 +25,7 @@ interface UpdateAttributeParams {
 }
 
 interface AwardCompanionAttributeParams {
+  companionId?: string;
   attribute: AttributeType;
   sourceEvent: CompanionAttributeSourceEvent;
   sourceKey: string;
@@ -236,7 +238,7 @@ export const useCompanionAttributes = () => {
       return { attribute, newValue, change: amount, companionId };
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["companion"] });
+      void invalidateCompanionQueries(queryClient, { includeAll: true });
 
       if (Math.abs(data.change) >= 50) {
         const emoji = data.change > 0 ? "⬆️" : "⬇️";
@@ -290,10 +292,12 @@ export const useCompanionAttributes = () => {
     },
     onSuccess: (data, variables) => {
       if (data.awardedAmount > 0) {
-        queryClient.invalidateQueries({ queryKey: ["companion"] });
-        void syncDerivedAttributeAchievements(variables.companionId).catch((error) => {
-          console.error("Attribute badge sync failed:", error);
-        });
+        void invalidateCompanionQueries(queryClient, { includeAll: true });
+        if (variables.companionId) {
+          void syncDerivedAttributeAchievements(variables.companionId).catch((error) => {
+            console.error("Attribute badge sync failed:", error);
+          });
+        }
       }
     },
     onError: (error) => {

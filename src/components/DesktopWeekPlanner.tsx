@@ -15,6 +15,7 @@ import {
 
 import { JourneysCompanionLauncher } from "@/components/journeys/JourneysCompanionLauncher";
 import { ProgressRing } from "@/features/tasks/components/ProgressRing";
+import { toDisplayQuestFromLegacyTask } from "@/features/quests/display";
 import type { DailyTask } from "@/services/dailyTasksRemote";
 import { MAIN_QUEST_XP_MULTIPLIER } from "@/config/xpRewards";
 import { cn } from "@/lib/utils";
@@ -251,6 +252,7 @@ function WeekPlannerTaskCard({
 }: WeekPlannerTaskCardProps) {
   const effectiveTaskXP = getEffectiveTaskXP(task);
   const isComplete = !!task.completed;
+  const detailQuest = toDisplayQuestFromLegacyTask(task);
   const { handleClick, handleDoubleClick } = useDesktopQuestCardClickHandlers(task, {
     onSingleClick: (clickedTask) => onOpenChange(clickedTask.id === task.id),
     onDoubleClick: onEditQuest
@@ -297,13 +299,17 @@ function WeekPlannerTaskCard({
         </button>
 
         <DesktopQuestDetailsPopover
-          task={task}
+          quest={detailQuest}
           open={isOpen}
           onOpenChange={onOpenChange}
           hasCalendarLink={hasCalendarLink?.(task.id)}
-          onEdit={onEditQuest}
-          onDelete={onDeleteQuest}
-          onMoveQuestToNextDay={!task.habit_source_id ? onMoveQuestToNextDay : undefined}
+          onEdit={onEditQuest ? () => onEditQuest(task) : undefined}
+          onDelete={onDeleteQuest ? () => onDeleteQuest(task) : undefined}
+          onMoveQuestToNextDay={
+            onMoveQuestToNextDay && !task.habit_source_id
+              ? () => onMoveQuestToNextDay(task)
+              : undefined
+          }
           onSendToCalendar={onSendToCalendar}
           anchor={(
             <button

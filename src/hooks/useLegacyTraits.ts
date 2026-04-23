@@ -1,5 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { invalidateCompanionQueries } from "@/lib/companionContextQueryCache";
+import { invalidateLegacyTraitQueries } from "@/lib/legacyTraitQueryCache";
+import { queryKeys } from "@/lib/queryKeys";
 import { useAuth } from './useAuth';
 import { toast } from "@/components/ui/sonner";
 
@@ -21,7 +24,7 @@ export const useLegacyTraits = () => {
 
   // Fetch current companion's legacy traits
   const { data: legacyTraits = [], isLoading } = useQuery({
-    queryKey: ['legacy-traits', user?.id],
+    queryKey: queryKeys.legacyTraits.current(user?.id),
     queryFn: async () => {
       if (!user?.id) return [];
 
@@ -65,6 +68,13 @@ export const useLegacyTraits = () => {
     onError: (error) => {
       console.error('Failed to pass legacy traits:', error);
     },
+    onSuccess: () => {
+      void invalidateLegacyTraitQueries(queryClient, {
+        userId: user?.id,
+        includeInheritableAll: true,
+        includeInheritableDetail: true,
+      });
+    },
   });
 
   // Apply legacy traits to a new companion
@@ -101,14 +111,18 @@ export const useLegacyTraits = () => {
       return combinedTraits;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['legacy-traits'] });
-      queryClient.invalidateQueries({ queryKey: ['companion'] });
+      void invalidateLegacyTraitQueries(queryClient, {
+        userId: user?.id,
+        includeCurrentAll: true,
+        includeCurrentDetail: true,
+      });
+      void invalidateCompanionQueries(queryClient, { includeAll: true });
     },
   });
 
   // Fetch most recent deceased companion's legacy traits for inheritance
   const { data: inheritableTraits = [] } = useQuery({
-    queryKey: ['inheritable-legacy-traits', user?.id],
+    queryKey: queryKeys.legacyTraits.inheritable(user?.id),
     queryFn: async () => {
       if (!user?.id) return [];
 

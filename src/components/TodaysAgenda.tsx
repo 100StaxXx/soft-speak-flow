@@ -38,13 +38,21 @@ import {
 } from "lucide-react";
 import { JourneysCompanionLauncher } from "@/components/journeys/JourneysCompanionLauncher";
 import {
+  cancelTaskQueryFamilies,
+  invalidateTaskQueryFamilies,
+  restoreTaskQueryFamilies,
+  setTaskQueryFamiliesData,
+  snapshotTaskQueryFamilies,
+} from "@/lib/taskQueryCache";
+import { queryKeys } from "@/lib/queryKeys";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { DragTimeZoomRail } from "@/components/calendar/DragTimeZoomRail";
-import { CalendarTask } from "@/types/quest";
+import type { CalendarQuest } from "@/features/quests/display";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -63,6 +71,7 @@ import { MarqueeText } from "@/components/ui/marquee-text";
 import { JourneyPathDrawer } from "@/components/JourneyPathDrawer";
 import { TimelineTaskRow } from "@/components/TimelineTaskRow";
 import { ProgressRing } from "@/features/tasks/components/ProgressRing";
+import { toDisplayQuestFromLegacyTask } from "@/features/quests/display";
 import { useMotionProfile } from "@/hooks/useMotionProfile";
 import type { JourneysLayoutMode } from "@/hooks/useJourneysLayoutMode";
 import { buildTaskConflictMap, getTaskConflictSetForTask } from "@/utils/taskTimeConflicts";
@@ -212,7 +221,7 @@ interface TodaysAgendaProps {
   currentStreak?: number;
   onUndoToggle?: (taskId: string, xpReward: number) => void;
   onEditQuest?: (task: Task) => void;
-  weekTasks?: CalendarTask[];
+  weekQuests?: CalendarQuest[];
   activeEpics?: Array<{
     id: string;
     title: string;
@@ -654,7 +663,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   currentStreak = 0,
   onUndoToggle,
   onEditQuest,
-  weekTasks = [],
+  weekQuests = [],
   activeEpics = [],
   isCampaignsLoading = false,
   onDeleteQuest,
@@ -721,7 +730,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   const { profile } = useProfile();
   const queryClient = useQueryClient();
   const habitsQuery = useQuery({
-    queryKey: ["habits", user?.id],
+    queryKey: queryKeys.habits.byUser(user?.id),
     queryFn: async () => {
       if (!user?.id) throw new Error("User not authenticated");
       return loadLocalHabits(user.id) as Promise<HabitWithDescription[]>;
@@ -780,26 +789,29 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       if (error) throw error;
     },
     onMutate: async ({ taskId, subtaskId, completed }) => {
-      await queryClient.cancelQueries({ queryKey: ["daily-tasks"] });
-      const previousDailyTasks = queryClient.getQueriesData<Task[]>({
-        queryKey: ["daily-tasks"],
-      });
+      await cancelTaskQueryFamilies(queryClient, ["daily"]);
+      const previousTaskQueries = snapshotTaskQueryFamilies(queryClient, ["daily"]);
 
-      queryClient.setQueriesData<Task[]>(
-        { queryKey: ["daily-tasks"] },
-        (currentTasks) => patchSubtaskCompletionInTaskList(currentTasks, taskId, subtaskId, completed)
+      setTaskQueryFamiliesData(
+        queryClient,
+        ["daily"],
+        (currentTasks) => Array.isArray(currentTasks)
+          ? patchSubtaskCompletionInTaskList(
+            currentTasks as Array<{ id: string; subtasks?: TaskSubtask[] }>,
+            taskId,
+            subtaskId,
+            completed,
+          )
+          : currentTasks
       );
 
-      return { previousDailyTasks };
+      return { previousTaskQueries };
     },
     onError: (_error, _variables, context) => {
-      if (!context?.previousDailyTasks) return;
-      context.previousDailyTasks.forEach(([queryKey, data]) => {
-        queryClient.setQueryData(queryKey, data);
-      });
+      restoreTaskQueryFamilies(queryClient, context?.previousTaskQueries);
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
+      void invalidateTaskQueryFamilies(queryClient, ["daily"]);
     },
   });
 
@@ -1522,18 +1534,16 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         minute: marker.minute,
         sortKey: `0-${marker.minute}-${marker.id}`,
       })),
-      ...flowOrderedScheduledItems
-        .map((task) => {
+      ...flowOrderedScheduledItems.flatMap((task) => {
           const minute = parseTimeToMinute(task.scheduled_time);
-          if (minute === null) return null;
-          return {
+          if (minute === null) return [];
+          return [{
             kind: "task" as const,
             task,
             minute,
             sortKey: `1-${minute}-${task.id}`,
-          };
-        })
-        .filter((row): row is TimelineRow & { minute: number; sortKey: string } => !!row),
+          }];
+        }),
     ].sort((a, b) => {
       if (a.minute !== b.minute) return a.minute - b.minute;
       return a.sortKey.localeCompare(b.sortKey);
@@ -1875,15 +1885,15 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   }, 0);
   const progressPercent = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
   const allComplete = totalCount > 0 && completedCount === totalCount;
-  const weekCompletedCount = weekTasks.filter((task) => task.completed).length;
-  const weekTotalCount = weekTasks.length;
-  const weekScheduledCount = weekTasks.filter((task) => !!task.scheduled_time).length;
-  const weekActiveDays = new Set(weekTasks.map((task) => task.task_date)).size;
-  const weekXP = weekTasks.reduce((sum, task) => {
-    if (!task.completed) return sum;
-    const taskXP = task.is_main_quest
-      ? Math.round(task.xp_reward * MAIN_QUEST_XP_MULTIPLIER)
-      : task.xp_reward;
+  const weekCompletedCount = weekQuests.filter((quest) => quest.completed).length;
+  const weekTotalCount = weekQuests.length;
+  const weekScheduledCount = weekQuests.filter((quest) => !!quest.scheduledTime).length;
+  const weekActiveDays = new Set(weekQuests.map((quest) => quest.taskDate)).size;
+  const weekXP = weekQuests.reduce((sum, quest) => {
+    if (!quest.completed) return sum;
+    const taskXP = quest.isMainQuest
+      ? Math.round(quest.xpReward * MAIN_QUEST_XP_MULTIPLIER)
+      : quest.xpReward;
     return sum + taskXP;
   }, 0);
   const selectedScheduledCount = scheduledItems.length;
@@ -2067,17 +2077,17 @@ export const TodaysAgenda = memo(function TodaysAgenda({
           </button>
 
           <DesktopQuestDetailsPopover
-            task={task}
+            quest={toDisplayQuestFromLegacyTask(task)}
             open={isDesktopDetailOpen}
             onOpenChange={(open) => {
               setOpenDesktopDetailTaskId(open ? task.id : null);
             }}
             hasCalendarLink={hasCalendarLink?.(task.id)}
-            onEdit={onEditQuest}
-            onDelete={onDeleteQuest ? (currentTask) => onDeleteQuest(currentTask.id) : undefined}
+            onEdit={onEditQuest ? () => onEditQuest(task) : undefined}
+            onDelete={onDeleteQuest ? () => onDeleteQuest(task.id) : undefined}
             onMoveQuestToNextDay={
               onMoveQuestToNextDay && !isRitual
-                ? (currentTask) => onMoveQuestToNextDay(currentTask.id)
+                ? () => onMoveQuestToNextDay(task.id)
                 : undefined
             }
             onSendToCalendar={onSendToCalendar}

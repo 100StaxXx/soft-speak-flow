@@ -19,6 +19,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { refetchMentorContextQueries } from "@/lib/mentorContextQueryCache";
+import { queryKeys } from "@/lib/queryKeys";
 import {
   normalizeMentorSlug,
   sortCanonicalMentors,
@@ -244,7 +246,7 @@ export const MentorSwitcher = ({
   const today = useMemo(() => formatDateInTimezone(new Date(), timezone), [timezone]);
 
   const { data: mentors = [], isLoading: mentorsLoading } = useQuery({
-    queryKey: ["mentors", "active"],
+    queryKey: queryKeys.mentor.activeMentors(),
     staleTime: 10 * 60 * 1000,
     queryFn: async (): Promise<ActiveMentorRecord[]> => {
       const { data, error } = await supabase
@@ -261,7 +263,7 @@ export const MentorSwitcher = ({
   });
 
   const { data: todayCheckIn } = useQuery({
-    queryKey: ["morning-check-in", today, user?.id],
+    queryKey: queryKeys.checkIns.morningByDate(today, user?.id),
     enabled: Boolean(user?.id),
     queryFn: async () => {
       if (!user?.id) return null;
@@ -280,7 +282,7 @@ export const MentorSwitcher = ({
   });
 
   const { data: latestCheckIn } = useQuery({
-    queryKey: ["morning-check-in-latest", user?.id],
+    queryKey: queryKeys.checkIns.morningLatest(user?.id),
     enabled: Boolean(user?.id),
     queryFn: async () => {
       if (!user?.id) return null;
@@ -389,13 +391,9 @@ export const MentorSwitcher = ({
         userId: user.id,
       });
 
-      await Promise.all([
-        queryClient.refetchQueries({ queryKey: ["mentor-page-data"] }),
-        queryClient.refetchQueries({ queryKey: ["mentor-personality"] }),
-        queryClient.refetchQueries({ queryKey: ["mentor"] }),
-        queryClient.refetchQueries({ queryKey: ["selected-mentor"] }),
-        queryClient.refetchQueries({ queryKey: ["morning-check-in"] }),
-      ]);
+      await refetchMentorContextQueries(queryClient, {
+        includeMorningCheckIn: true,
+      });
 
       if (consultMentorId === mentor.id) {
         navigate("/mentor-chat", {

@@ -23,6 +23,11 @@ import { createIOSOptimizedAudio, isIOS, iosAudioManager, safePlay } from "@/uti
 import { logger } from "@/utils/logger";
 import { toast } from "@/components/ui/sonner";
 import { useAchievements } from "@/hooks/useAchievements";
+import {
+  invalidateTodayPepTalkQueries,
+  refetchTodayPepTalkQueries,
+} from "@/lib/mentorContextQueryCache";
+import { queryKeys } from "@/lib/queryKeys";
 
 interface CaptionWord {
   word: string;
@@ -58,12 +63,7 @@ type InlineAudioElement = HTMLAudioElement & {
 
 const log = logger.scope("TodaysPepTalk");
 const AUDIO_READY_TIMEOUT_MS = 5000;
-const TODAY_PEP_TALK_QUERY_ROOT = ["today-pep-talk"] as const;
 const transparentShellClassName = "bg-transparent backdrop-blur-none shadow-none border-white/[0.08]";
-
-function buildTodayPepTalkQueryKey(mentorId: string | null | undefined, effectiveDate: string) {
-  return [...TODAY_PEP_TALK_QUERY_ROOT, mentorId ?? null, effectiveDate] as const;
-}
 
 function isCaptionWord(word: unknown): word is CaptionWord {
   if (!word || typeof word !== "object") {
@@ -212,7 +212,7 @@ export const TodaysPepTalk = memo(() => {
     [profile?.timezone],
   );
   const pepTalkQueryKey = useMemo(
-    () => buildTodayPepTalkQueryKey(resolvedMentorId, effectiveDate),
+    () => queryKeys.mentor.todayPepTalk(resolvedMentorId, effectiveDate),
     [resolvedMentorId, effectiveDate],
   );
 
@@ -229,7 +229,6 @@ export const TodaysPepTalk = memo(() => {
   const isFallback = pepTalkQuery.data?.isFallback ?? false;
   const loading = pepTalkQuery.isPending || (pepTalkQuery.isFetching && !pepTalkQuery.data);
   const error = pepTalkQuery.isError && !pepTalk;
-  const { refetch: refetchPepTalk } = pepTalkQuery;
   const backdropSource = pepTalkWallpaper ? "remote" : "fallback";
 
   useEffect(() => {
@@ -254,9 +253,13 @@ export const TodaysPepTalk = memo(() => {
 
     if (!resolvedMentorId || !becameActive) return;
 
-    void queryClient.invalidateQueries({ queryKey: TODAY_PEP_TALK_QUERY_ROOT });
-    void refetchPepTalk();
-  }, [isTabActive, queryClient, refetchPepTalk, resolvedMentorId]);
+    void invalidateTodayPepTalkQueries(queryClient, { includeAll: true });
+    void refetchTodayPepTalkQueries(queryClient, {
+      mentorId: resolvedMentorId,
+      pepTalkDate: effectiveDate,
+      includeDetail: true,
+    });
+  }, [effectiveDate, isTabActive, queryClient, resolvedMentorId]);
 
   useEffect(() => {
     if (!pepTalk?.audio_url || isAudioReady) return;
@@ -456,8 +459,16 @@ export const TodaysPepTalk = memo(() => {
     },
     onSettled: async () => {
       try {
-        await queryClient.invalidateQueries({ queryKey: pepTalkQueryKey });
-        await queryClient.refetchQueries({ queryKey: pepTalkQueryKey });
+        await invalidateTodayPepTalkQueries(queryClient, {
+          mentorId: resolvedMentorId,
+          pepTalkDate: effectiveDate,
+          includeDetail: true,
+        });
+        await refetchTodayPepTalkQueries(queryClient, {
+          mentorId: resolvedMentorId,
+          pepTalkDate: effectiveDate,
+          includeDetail: true,
+        });
       } finally {
         setGenerationStage("idle");
       }

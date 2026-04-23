@@ -5,20 +5,20 @@ import { cn } from "@/lib/utils";
 import { ScrollArea } from "./ui/scroll-area";
 import { QuestDragCard } from "./QuestDragCard";
 import { QuestDropZone } from "./QuestDropZone";
+import type { CalendarQuest } from "@/features/quests/display";
 import { useCallback, useState } from "react";
 import { playSound } from "@/utils/soundEffects";
 import { toast } from "@/components/ui/sonner";
-import { CalendarTask } from "@/types/quest";
 
 interface CalendarWeekViewProps {
   selectedDate: Date;
   onDateSelect: (date: Date) => void;
-  tasks: CalendarTask[];
+  quests: CalendarQuest[];
   onTaskDrop: (taskId: string, newDate: Date, newTime?: string) => void;
   onTimeSlotLongPress?: (date: Date, time: string) => void;
 }
 
-export const CalendarWeekView = ({ selectedDate, onDateSelect, tasks, onTaskDrop, onTimeSlotLongPress }: CalendarWeekViewProps) => {
+export const CalendarWeekView = ({ selectedDate, onDateSelect, quests, onTaskDrop, onTimeSlotLongPress }: CalendarWeekViewProps) => {
   const [draggedTask, setDraggedTask] = useState<string | null>(null);
   const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
 
@@ -69,25 +69,25 @@ export const CalendarWeekView = ({ selectedDate, onDateSelect, tasks, onTaskDrop
     }
   };
 
-  const getTasksForDateTime = (date: Date, hour: number) => {
+  const getQuestsForDateTime = (date: Date, hour: number) => {
     const dateStr = format(date, 'yyyy-MM-dd');
-    return tasks.filter(task => {
-      if (!task.scheduled_time) return false;
-      const taskHour = parseInt(task.scheduled_time.split(':')[0]);
-      return task.task_date === dateStr && taskHour === hour;
+    return quests.filter((quest) => {
+      if (!quest.scheduledTime) return false;
+      const taskHour = parseInt(quest.scheduledTime.split(':')[0]);
+      return quest.taskDate === dateStr && taskHour === hour;
     });
   };
 
-  const getUnscheduledTasksForDate = (date: Date) => {
+  const getUnscheduledQuestsForDate = (date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
-    return tasks.filter(task => {
-      return task.task_date === dateStr && !task.scheduled_time;
+    return quests.filter((quest) => {
+      return quest.taskDate === dateStr && !quest.scheduledTime;
     });
   };
 
   const checkTimeConflict = (date: Date, hour: number) => {
-    const hourTasks = getTasksForDateTime(date, hour);
-    return hourTasks.length > 1;
+    const hourQuests = getQuestsForDateTime(date, hour);
+    return hourQuests.length > 1;
   };
 
   return (
@@ -124,7 +124,7 @@ export const CalendarWeekView = ({ selectedDate, onDateSelect, tasks, onTaskDrop
             {weekDays.map((day, i) => {
               const isToday = isSameDay(day, new Date());
               const isSelected = isSameDay(day, selectedDate);
-              const unscheduledTasks = getUnscheduledTasksForDate(day);
+              const unscheduledQuests = getUnscheduledQuestsForDate(day);
               const isLast = i === weekDays.length - 1;
 
               return (
@@ -148,9 +148,9 @@ export const CalendarWeekView = ({ selectedDate, onDateSelect, tasks, onTaskDrop
                     )}>
                       {format(day, 'd')}
                     </div>
-                    {unscheduledTasks.length > 0 && (
+                    {unscheduledQuests.length > 0 && (
                       <div className="text-[10px] text-muted-foreground">
-                        {unscheduledTasks.length} unscheduled
+                        {unscheduledQuests.length} unscheduled
                       </div>
                     )}
                   </div>
@@ -178,7 +178,7 @@ export const CalendarWeekView = ({ selectedDate, onDateSelect, tasks, onTaskDrop
                 
                 {/* Day cells for this hour */}
                 {weekDays.map((day, dayIndex) => {
-                  const hourTasks = getTasksForDateTime(day, hour);
+                  const hourQuests = getQuestsForDateTime(day, hour);
                   const hasConflict = checkTimeConflict(day, hour);
                   const isLast = dayIndex === weekDays.length - 1;
 
@@ -217,16 +217,16 @@ export const CalendarWeekView = ({ selectedDate, onDateSelect, tasks, onTaskDrop
                       onMouseUp={handleLongPressEnd}
                       onMouseLeave={handleLongPressEnd}
                     >
-                      {hourTasks.map(task => (
+                      {hourQuests.map((quest) => (
                         <QuestDragCard
-                          key={task.id}
-                          task={task}
-                          isDragging={draggedTask === task.id}
-                          onDragStart={(e) => handleTaskDragStart(e, task.id)}
+                          key={quest.id}
+                          quest={quest}
+                          isDragging={draggedTask === quest.id}
+                          onDragStart={(e) => handleTaskDragStart(e, quest.id)}
                           onDragEnd={handleTaskDragEnd}
                         />
                       ))}
-                      {hasConflict && hourTasks.length > 1 && (
+                      {hasConflict && hourQuests.length > 1 && (
                         <div className="flex items-center gap-1 text-[10px] text-destructive mt-1 animate-pulse">
                           <AlertTriangle className="h-3 w-3" />
                           Resolve conflict for +10 XP

@@ -10,6 +10,12 @@ import { PageTransition } from "@/components/PageTransition";
 import { CinematicPageBackground } from "@/components/CinematicPageBackground";
 import { TodaysAgenda } from "@/components/TodaysAgenda";
 import { DesktopWeekPlanner } from "@/components/DesktopWeekPlanner";
+import { invalidateCampaignContextQueryFamilies } from "@/lib/campaignContextQueryCache";
+import {
+  invalidateTaskSubtasksQuery,
+  invalidateTaskQueryFamilies,
+  taskQueryFamilyGroups,
+} from "@/lib/taskQueryCache";
 import { cn } from "@/lib/utils";
 
 import { DatePillsScroller } from "@/components/DatePillsScroller";
@@ -24,10 +30,18 @@ import { toast } from "@/components/ui/sonner";
 
 import { EditQuestDialog } from "@/features/quests/components/EditQuestDialog";
 import type { QuestComposerPrefillDraft } from "@/features/quests/types";
+import {
+  toInboxQuestFromLegacyTask,
+  toEditableQuestFromLegacyTask,
+  toLegacyQuestUpdateInput,
+  type EditableQuest,
+  type QuestUpdateDraft,
+} from "@/features/quests/editing";
+import { toCalendarQuestFromLegacyTask } from "@/features/quests/display";
 import { applySubtaskTitlePlan, type QueueSubtaskAction } from "@/features/tasks/lib/subtaskWrites";
 import { EditRitualSheet, RitualData } from "@/components/EditRitualSheet";
 import { useResilience } from "@/contexts/ResilienceContext";
-import { useCalendarTasks } from "@/hooks/useCalendarTasks";
+import { useCalendarQuests } from "@/hooks/useCalendarQuests";
 import type { DailyTask } from "@/services/dailyTasksRemote";
 import { useStreakMultiplier } from "@/hooks/useStreakMultiplier";
 import { useHabitSurfacing } from "@/hooks/useHabitSurfacing";
@@ -66,7 +80,6 @@ import { isMacDesignedForIPadIOSApp, isMacSession } from "@/utils/platformTarget
 import { QuestInboxSection, type InboxQuestItem } from "@/components/QuestInboxSection";
 import { QUEST_ACTION_TOAST_DURATION_MS } from "@/constants/questToast";
 import { trackResilienceEvent } from "@/utils/resilienceTelemetry";
-import { normalizeUuidLikeId } from "@/utils/offlineId";
 import { parseNaturalLanguage } from "@/features/tasks/hooks/useNaturalLanguageParser";
 import { buildVoiceQuestPrefillFromTranscript } from "@/features/quests/utils/voiceQuestPrefill";
 import { resolveCampaignBuilderInitialGoal } from "@/shared/bigGoalIntent";
@@ -82,11 +95,6 @@ import type {
 
 const TIME_24H_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const DATE_INPUT_REGEX = /^\d{4}-\d{2}-\d{2}$/;
-const normalizeRecurrenceCustomPeriod = (
-  value: string | null | undefined,
-): "week" | "month" | null => (
-  value === "week" || value === "month" ? value : null
-);
 const isQueuedTaskMutationResult = (
   value: unknown,
 ): value is { queued: true } => (
@@ -171,57 +179,10 @@ const toLegacyActiveEpic = (campaign: Campaign) => ({
   })),
 });
 
-const toEditableQuestTask = (
-  task: Pick<DailyTask, "id" | "task_text"> & Partial<EditableQuestTask>,
-): EditableQuestTask => ({
-  id: task.id,
-  task_text: task.task_text,
-  task_date: task.task_date ?? null,
-  difficulty: task.difficulty ?? "medium",
-  scheduled_time: task.scheduled_time ?? null,
-  estimated_duration: task.estimated_duration ?? 30,
-  recurrence_pattern: task.recurrence_pattern ?? null,
-  recurrence_days: task.recurrence_days ?? [],
-  recurrence_month_days: task.recurrence_month_days ?? [],
-  recurrence_custom_period: task.recurrence_custom_period ?? null,
-  reminder_enabled: task.reminder_enabled ?? false,
-  reminder_minutes_before: task.reminder_minutes_before ?? 15,
-  category: task.category ?? null,
-  notes: task.notes ?? null,
-  habit_source_id: task.habit_source_id ?? null,
-  image_url: task.image_url ?? null,
-  attachments: task.attachments ?? [],
-  location: task.location ?? null,
-  subtasks: task.subtasks ?? [],
-});
-
 interface CreatedCampaignData {
   title: string;
   habits: Array<{ title: string }>;
 }
-
-type EditableQuestTask = Pick<
-  DailyTask,
-  | "id"
-  | "task_text"
-  | "task_date"
-  | "difficulty"
-  | "scheduled_time"
-  | "estimated_duration"
-  | "recurrence_pattern"
-  | "recurrence_days"
-  | "recurrence_month_days"
-  | "recurrence_custom_period"
-  | "reminder_enabled"
-  | "reminder_minutes_before"
-  | "category"
-  | "notes"
-  | "habit_source_id"
-  | "image_url"
-  | "attachments"
-  | "location"
-  | "subtasks"
->;
 
 type DesktopPlannerMode = "week" | "day";
 const MAC_TIMED_TASK_DURATION_FALLBACK_MINUTES = 30;
@@ -292,7 +253,7 @@ const Journeys = () => {
   } = useStreakAtRisk();
 
   // Edit quest state (for regular quests)
-  const [editingTask, setEditingTask] = useState<EditableQuestTask | null>(null);
+  const [editingTask, setEditingTask] = useState<EditableQuest | null>(null);
 
   // Edit ritual state (for tasks linked to habits)
   const [editingRitual, setEditingRitual] = useState<RitualData | null>(null);
@@ -524,26 +485,7 @@ const Journeys = () => {
     deleteInboxTask,
   } = useInboxTasks({ enabled: isTabActive });
   const inboxQuestItems = useMemo<InboxQuestItem[]>(
-    () => inboxTasks.map((task) => ({
-      id: task.id,
-      task_text: task.task_text,
-      completed: !!task.completed,
-      task_date: task.task_date ?? null,
-      difficulty: task.difficulty ?? null,
-      scheduled_time: task.scheduled_time ?? null,
-      estimated_duration: task.estimated_duration ?? null,
-      recurrence_pattern: task.recurrence_pattern ?? null,
-      recurrence_days: task.recurrence_days ?? null,
-      recurrence_month_days: task.recurrence_month_days ?? null,
-      recurrence_custom_period: normalizeRecurrenceCustomPeriod(task.recurrence_custom_period),
-      reminder_enabled: task.reminder_enabled ?? null,
-      reminder_minutes_before: task.reminder_minutes_before ?? null,
-      category: task.category ?? null,
-      notes: task.notes ?? null,
-      habit_source_id: task.habit_source_id ?? null,
-      image_url: task.image_url ?? null,
-      location: task.location ?? null,
-    })),
+    () => inboxTasks.map(toInboxQuestFromLegacyTask),
     [inboxTasks],
   );
   
@@ -569,8 +511,12 @@ const Journeys = () => {
     ].join("|"),
     [desktopPlannerMode, editingRitual?.taskId, editingTask?.id, selectedDate, showAddSheet, showMonthView],
   );
-  const { tasks: allCalendarTasks } = useCalendarTasks(selectedDate, "month", { enabled: isTabActive });
-  const { tasks: weekCalendarTasks } = useCalendarTasks(selectedDate, "week", { enabled: isTabActive });
+  const { quests: monthViewQuests } = useCalendarQuests(selectedDate, "month", { enabled: isTabActive });
+  const { quests: weekViewQuests } = useCalendarQuests(selectedDate, "week", { enabled: isTabActive });
+  const weekViewLegacyTasks = useMemo(
+    () => weekViewQuests.map(toLegacyDailyTask),
+    [weekViewQuests],
+  );
 
   useEffect(() => {
     if (hasInitializedInboxVisibilityRef.current) return;
@@ -800,9 +746,32 @@ const Journeys = () => {
       });
     } else {
       // Regular quest - use the standard edit dialog
-      setEditingTask(toEditableQuestTask(task));
+      setEditingTask(toEditableQuestFromLegacyTask(task));
     }
   }, []);
+
+  const handleEditInboxQuest = useCallback(async (quest: InboxQuestItem) => {
+    await handleEditQuest({
+      id: quest.id,
+      task_text: quest.title,
+      task_date: quest.taskDate,
+      difficulty: quest.difficulty,
+      scheduled_time: quest.scheduledTime,
+      estimated_duration: quest.estimatedDuration,
+      recurrence_pattern: quest.recurrencePattern,
+      recurrence_days: quest.recurrenceDays,
+      recurrence_month_days: quest.recurrenceMonthDays,
+      recurrence_custom_period: quest.recurrenceCustomPeriod,
+      reminder_enabled: quest.reminderEnabled,
+      reminder_minutes_before: quest.reminderMinutesBefore,
+      category: quest.category,
+      notes: quest.notes,
+      habit_source_id: quest.habitSourceId,
+      image_url: quest.imageUrl,
+      attachments: quest.attachments,
+      location: quest.location,
+    });
+  }, [handleEditQuest]);
 
   // Deep link handling - open task from widget tap
   const { pendingTaskId, clearPendingTask } = useDeepLink();
@@ -838,12 +807,12 @@ const Journeys = () => {
   
   const tasksPerDay = useMemo(() => {
     const map: Record<string, number> = {};
-    allCalendarTasks.forEach((task: { task_date?: string | null }) => {
-      if (!task.task_date) return;
-      map[task.task_date] = (map[task.task_date] || 0) + 1;
+    monthViewQuests.forEach((quest) => {
+      if (!quest.taskDate) return;
+      map[quest.taskDate] = (map[quest.taskDate] || 0) + 1;
     });
     return map;
-  }, [allCalendarTasks]);
+  }, [monthViewQuests]);
 
   const handleSendTaskToCalendar = useCallback(async (taskId: string) => {
     const routeToCalendarPreferences = () => {
@@ -1030,27 +999,12 @@ const Journeys = () => {
     toggleQuest({ taskId, completed: false, xpReward, forceUndo: true });
   }, [toggleQuest]);
   
-  const handleSaveEdit = useCallback(async (taskId: string, updates: {
-    task_text: string;
-    task_date: string | null;
-    difficulty: string;
-    scheduled_time: string | null;
-    estimated_duration: number | null;
-    recurrence_pattern: string | null;
-    recurrence_days: number[];
-    recurrence_month_days: number[];
-    recurrence_custom_period: "week" | "month" | null;
-    reminder_enabled: boolean;
-    reminder_minutes_before: number;
-    notes: string | null;
-    category: string | null;
-    image_url: string | null;
-    location: string | null;
-    attachments?: QuestAttachmentInput[];
-    subtasks?: string[];
-  }) => {
-    const { subtasks: nextSubtasks, ...taskUpdates } = updates;
-    const updateResult = await updateQuest({ taskId, updates: taskUpdates });
+  const handleSaveEdit = useCallback(async (taskId: string, updates: QuestUpdateDraft) => {
+    const { subtasks: nextSubtasks, ...questUpdateDraft } = updates;
+    const updateResult = await updateQuest({
+      taskId,
+      updates: toLegacyQuestUpdateInput(questUpdateDraft),
+    });
     if (!isQueuedTaskMutationResult(updateResult)) {
       await syncTaskUpdate.mutateAsync({ taskId }).catch((error) => {
         const message = error instanceof Error ? error.message : "";
@@ -1071,13 +1025,10 @@ const Journeys = () => {
         queueAction: queueSubtaskAction,
         retryNow,
       });
-      queryClient.invalidateQueries({ queryKey: ["subtasks", normalizeUuidLikeId(taskId)] });
-      queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
-      queryClient.invalidateQueries({ queryKey: ["calendar-tasks"] });
-      queryClient.invalidateQueries({ queryKey: ["inbox-tasks"] });
+      void invalidateTaskSubtasksQuery(queryClient, taskId);
+      void invalidateTaskQueryFamilies(queryClient, ["daily", "calendar", "inboxTasks"]);
     }
-    queryClient.invalidateQueries({ queryKey: ["inbox-tasks"] });
-    queryClient.invalidateQueries({ queryKey: ["inbox-count"] });
+    void invalidateTaskQueryFamilies(queryClient, taskQueryFamilyGroups.inbox);
     setEditingTask(null);
   }, [
     queryClient,
@@ -1233,13 +1184,13 @@ const Journeys = () => {
   }, [deleteInboxTask, syncTaskDelete]);
 
   const handleDeleteEditingQuest = useCallback(async (taskId: string) => {
-    if (editingTask?.task_date == null) {
+    if (editingTask?.taskDate == null) {
       await handleDeleteInboxQuest(taskId);
       return;
     }
 
     await handleDeleteQuest(taskId);
-  }, [editingTask?.task_date, handleDeleteInboxQuest, handleDeleteQuest]);
+  }, [editingTask?.taskDate, handleDeleteInboxQuest, handleDeleteQuest]);
 
   const handleDeleteRitual = useCallback(async (habitId: string) => {
     if (!user?.id) return;
@@ -1266,9 +1217,8 @@ const Journeys = () => {
       }
 
       // Invalidate queries
-      queryClient.invalidateQueries({ queryKey: ['habits'] });
-      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
-      queryClient.invalidateQueries({ queryKey: ['epics'] });
+      void invalidateCampaignContextQueryFamilies(queryClient, ["habits", "epics"]);
+      void invalidateTaskQueryFamilies(queryClient, ["daily"]);
       
       toast.success('Ritual deleted');
     } catch (error) {
@@ -1409,14 +1359,14 @@ const Journeys = () => {
               className="mb-4"
             >
               <QuestInboxSection
-                tasks={inboxQuestItems}
+                quests={inboxQuestItems}
                 isLoading={inboxLoading}
                 isExpanded={isInboxExpanded}
                 onExpandedChange={setIsInboxExpanded}
                 onAddQuest={() => openAddQuestSheet()}
                 onOpenCompanionPlanner={openCompanionPlanner}
                 onToggleQuest={handleToggleInboxQuest}
-                onEditQuest={handleEditQuest}
+                onEditQuest={handleEditInboxQuest}
                 onDeleteQuest={handleDeleteInboxQuest}
                 sectionRef={inboxSectionRef}
               />
@@ -1432,7 +1382,7 @@ const Journeys = () => {
             {isDesktopLayout && desktopPlannerMode === "week" ? (
               <DesktopWeekPlanner
                 selectedDate={selectedDate}
-                tasks={weekCalendarTasks}
+                tasks={weekViewLegacyTasks}
                 currentStreak={currentStreak}
                 activeEpics={activeEpics}
                 isCampaignsLoading={campaignsLoading}
@@ -1481,7 +1431,7 @@ const Journeys = () => {
                 useMacDurationSizedDesktopTimelineRows={isMacDesktopSession}
                 onUndoToggle={handleUndoToggle}
                 onEditQuest={handleEditQuest}
-                weekTasks={weekCalendarTasks}
+                weekQuests={weekViewQuests}
                 activeEpics={activeEpics}
                 isCampaignsLoading={campaignsLoading}
                 onDeleteQuest={handleSwipeDeleteQuest}
@@ -1537,8 +1487,8 @@ const Journeys = () => {
         
         {/* Edit Quest Dialog (for regular quests) */}
         <EditQuestDialog
-          task={editingTask}
-          open={!!editingTask && !editingTask.habit_source_id}
+          quest={editingTask}
+          open={!!editingTask && !editingTask.habitSourceId}
           onOpenChange={handleEditQuestDialogOpenChange}
           onSave={handleSaveEdit}
           isSaving={isUpdating}
@@ -1563,7 +1513,7 @@ const Journeys = () => {
           onOpenChange={setShowMonthView}
           selectedDate={selectedDate}
           onDateSelect={setSelectedDate}
-          tasks={allCalendarTasks}
+          quests={monthViewQuests}
           milestones={[]}
           onTaskDrop={() => {}}
           onTimeSlotLongPress={(date, time) => {

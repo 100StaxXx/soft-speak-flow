@@ -7,7 +7,7 @@ import { EpicCheckInDrawer } from "./EpicCheckInDrawer";
 const mocks = vi.hoisted(() => ({
   createCampaignRitualMock: vi.fn(),
   surfaceHabitMock: vi.fn(),
-  toggleTaskMock: vi.fn(),
+  toggleQuestMock: vi.fn(),
   triggerRitualCompleteMock: vi.fn().mockResolvedValue(undefined),
 }));
 
@@ -32,9 +32,9 @@ vi.mock("@/hooks/useHabitSurfacing", () => ({
   }),
 }));
 
-vi.mock("@/hooks/useTaskMutations", () => ({
-  useTaskMutations: () => ({
-    toggleTask: mocks.toggleTaskMock,
+vi.mock("@/hooks/useQuestMutations", () => ({
+  useQuestMutations: () => ({
+    toggleQuest: mocks.toggleQuestMock,
   }),
 }));
 

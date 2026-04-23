@@ -3,6 +3,8 @@ import { useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { PlanMyDayAnswers } from '@/features/tasks/components/PlanMyDayClarification';
+import { queryKeys } from '@/lib/queryKeys';
+import { invalidateTaskQueryFamilies, taskQueryFamilyGroups } from '@/lib/taskQueryCache';
 
 interface DailyInsight {
   type: 'optimization' | 'warning' | 'encouragement' | 'suggestion';
@@ -61,7 +63,7 @@ export function useDailyPlanOptimization() {
     error,
     refetch,
   } = useQuery({
-    queryKey: ['daily-plan-optimization', user?.id],
+    queryKey: queryKeys.dailyPlanOptimization.byUser(user?.id),
     queryFn: async (): Promise<DailyPlanOptimization | null> => {
       if (!user) return null;
 
@@ -98,8 +100,7 @@ export function useDailyPlanOptimization() {
     },
     onSuccess: () => {
       // Invalidate task queries to refresh the UI
-      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
-      queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
+      void invalidateTaskQueryFamilies(queryClient, taskQueryFamilyGroups.planner);
     },
   });
 

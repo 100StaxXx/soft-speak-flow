@@ -135,6 +135,25 @@ vi.mock("@/pages/profileMentorChange", () => ({
   applyMentorChange: mocks.applyMentorChange,
 }));
 
+vi.mock("@/lib/mentorContextQueryCache", () => ({
+  refetchMentorContextQueries: async (
+    queryClient: {
+      refetchQueries: (input: { queryKey: readonly string[] }) => Promise<unknown>;
+    },
+    options?: { includeMorningCheckIn?: boolean },
+  ) => {
+    await Promise.all([
+      queryClient.refetchQueries({ queryKey: ["mentor-page-data"] }),
+      queryClient.refetchQueries({ queryKey: ["mentor-personality"] }),
+      queryClient.refetchQueries({ queryKey: ["mentor"] }),
+      queryClient.refetchQueries({ queryKey: ["selected-mentor"] }),
+      ...(options?.includeMorningCheckIn
+        ? [queryClient.refetchQueries({ queryKey: ["morning-check-in"] })]
+        : []),
+    ]);
+  },
+}));
+
 vi.mock("@/components/MentorAvatar", () => ({
   MentorAvatar: ({ mentorName }: { mentorName: string }) => <div>{mentorName} Avatar</div>,
 }));
