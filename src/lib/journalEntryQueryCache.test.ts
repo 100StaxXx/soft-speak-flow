@@ -1,8 +1,8 @@
 import { QueryClient } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
 
-import { JOURNAL_ENTRIES_QUERY_KEY } from "@/hooks/useJournalEntries";
 import { invalidateJournalEntryQueries } from "@/lib/journalEntryQueryCache";
+import { queryKeys } from "@/lib/queryKeys";
 
 describe("journalEntryQueryCache", () => {
   it("invalidates the canonical journal entry query family", async () => {
@@ -13,7 +13,7 @@ describe("journalEntryQueryCache", () => {
 
     expect(invalidateSpy).toHaveBeenCalledTimes(1);
     expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: JOURNAL_ENTRIES_QUERY_KEY,
+      queryKey: queryKeys.journalEntries.all,
     });
   });
 });

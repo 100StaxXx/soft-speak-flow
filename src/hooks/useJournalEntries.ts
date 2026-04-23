@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { queryKeys } from "@/lib/queryKeys";
 import {
   toJournalEntryFromDailyCheckIn,
   toJournalEntryFromEveningReflection,
@@ -18,7 +19,7 @@ interface UseJournalEntriesOptions {
   checkInType?: string;
 }
 
-export const JOURNAL_ENTRIES_QUERY_KEY = ["journal-entries"] as const;
+export const JOURNAL_ENTRIES_QUERY_KEY = queryKeys.journalEntries.all;
 
 export const useJournalEntries = (options: UseJournalEntriesOptions = {}) => {
   const { user } = useAuth();
@@ -40,15 +41,14 @@ export const useJournalEntries = (options: UseJournalEntriesOptions = {}) => {
   const includeDailyCheckIns = normalizedEntryTypes.includes("daily_check_in");
 
   const query = useQuery({
-    queryKey: [
-      ...JOURNAL_ENTRIES_QUERY_KEY,
+    queryKey: queryKeys.journalEntries.list(
       user?.id,
-      startDate ?? "all",
-      endDate ?? "all",
-      limit ?? "all",
+      startDate,
+      endDate,
+      limit,
       normalizedEntryTypes.join(","),
-      checkInType ?? "all",
-    ],
+      checkInType,
+    ),
     enabled: enabled && !!user?.id,
     queryFn: async () => {
       if (!user?.id) return [];

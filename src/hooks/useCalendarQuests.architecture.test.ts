@@ -673,7 +673,7 @@ describe("useCalendarQuests architecture guardrails", () => {
 
   it("keeps raw daily reflection cache literals isolated to queryKeys", () => {
     const rawLiteralFiles = collectRuntimeSourceFiles(srcRoot)
-      .filter((filePath) => /["'](morning-check-in|morning-check-in-latest|evening-reflection)["']/.test(
+      .filter((filePath) => /["'](morning-check-in|morning-check-in-latest|evening-reflection|journal-entries)["']/.test(
         fs.readFileSync(filePath, "utf8"),
       ))
       .sort();
@@ -1095,6 +1095,10 @@ describe("useCalendarQuests architecture guardrails", () => {
           'queryClient.invalidateQueries({ queryKey: ["morning-check-in-latest"]',
           "queryClient.invalidateQueries({ queryKey: ['evening-reflection']",
           'queryClient.invalidateQueries({ queryKey: ["evening-reflection"]',
+          "queryClient.invalidateQueries({ queryKey: queryKeys.journalEntries.all",
+          "queryClient.invalidateQueries({ queryKey: queryKeys.journalEntries.list(",
+          "queryClient.refetchQueries({ queryKey: queryKeys.journalEntries.all",
+          "queryClient.refetchQueries({ queryKey: queryKeys.journalEntries.list(",
           "queryClient.invalidateQueries({ queryKey: JOURNAL_ENTRIES_QUERY_KEY",
           "queryClient.refetchQueries({ queryKey: JOURNAL_ENTRIES_QUERY_KEY",
         ].some((pattern) => source.includes(pattern));

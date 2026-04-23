@@ -8,6 +8,7 @@ import {
   getTaskSubtasksQueryKey,
   invalidateTaskQueryFamilies,
   invalidateTaskSubtasksQuery,
+  taskQueryFamilyGroups,
 } from "@/lib/taskQueryCache";
 import {
   createOfflinePlannerId,
@@ -143,7 +144,7 @@ export const useSubtasks = (parentTaskId: string | null) => {
     },
     onSuccess: () => {
       void invalidateTaskSubtasksQuery(queryClient, normalizedParentTaskId);
-      void invalidateTaskQueryFamilies(queryClient, ["daily"]);
+      void invalidateTaskQueryFamilies(queryClient, taskQueryFamilyGroups.plannerAndInboxTasks);
     },
     onError: () => {
       toast.error("Failed to add subtask");
@@ -206,7 +207,7 @@ export const useSubtasks = (parentTaskId: string | null) => {
     },
     onSuccess: () => {
       void invalidateTaskSubtasksQuery(queryClient, normalizedParentTaskId);
-      void invalidateTaskQueryFamilies(queryClient, ["daily"]);
+      void invalidateTaskQueryFamilies(queryClient, taskQueryFamilyGroups.plannerAndInboxTasks);
     },
   });
 
@@ -245,7 +246,7 @@ export const useSubtasks = (parentTaskId: string | null) => {
     },
     onSuccess: () => {
       void invalidateTaskSubtasksQuery(queryClient, normalizedParentTaskId);
-      void invalidateTaskQueryFamilies(queryClient, ["daily"]);
+      void invalidateTaskQueryFamilies(queryClient, taskQueryFamilyGroups.plannerAndInboxTasks);
     },
   });
 
@@ -293,7 +294,7 @@ export const useSubtasks = (parentTaskId: string | null) => {
     },
     onSuccess: () => {
       void invalidateTaskSubtasksQuery(queryClient, normalizedParentTaskId);
-      void invalidateTaskQueryFamilies(queryClient, ["daily"]);
+      void invalidateTaskQueryFamilies(queryClient, taskQueryFamilyGroups.plannerAndInboxTasks);
     },
     onError: () => {
       toast.error("Failed to update subtask");
@@ -315,7 +316,7 @@ export const useSubtasks = (parentTaskId: string | null) => {
     },
     onSuccess: () => {
       void invalidateTaskSubtasksQuery(queryClient, normalizedParentTaskId);
-      void invalidateTaskQueryFamilies(queryClient, ["daily"]);
+      void invalidateTaskQueryFamilies(queryClient, taskQueryFamilyGroups.plannerAndInboxTasks);
       toast.success("Subtasks added!");
     },
     onError: () => {

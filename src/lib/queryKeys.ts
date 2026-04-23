@@ -179,6 +179,26 @@ export const queryKeys = {
     evening: (userId: string | undefined, date: string) => ['evening-reflection', userId, date] as const,
   },
 
+  journalEntries: {
+    all: ['journal-entries'] as const,
+    list: (
+      userId: string | undefined,
+      startDate: string | undefined,
+      endDate: string | undefined,
+      limit: number | undefined,
+      entryTypesKey: string,
+      checkInType: string | undefined,
+    ) => [
+      'journal-entries',
+      userId,
+      startDate ?? 'all',
+      endDate ?? 'all',
+      limit ?? 'all',
+      entryTypesKey,
+      checkInType ?? 'all',
+    ] as const,
+  },
+
   weeklyRecaps: {
     currentAll: ['weekly-recap'] as const,
     current: (userId: string | undefined, weekStart: string) => ['weekly-recap', userId, weekStart] as const,

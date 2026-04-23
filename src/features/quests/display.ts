@@ -1,7 +1,7 @@
 import type { Quest, Subtask } from "@/types/domain";
 import type { TaskAttachment } from "@/types/questAttachments";
 
-export interface DisplayQuestSubtask extends Pick<Subtask, "id" | "title" | "completed" | "sortOrder"> {}
+export type DisplayQuestSubtask = Pick<Subtask, "id" | "title" | "completed" | "sortOrder">;
 
 export interface DisplayQuest extends Pick<
   Quest,

@@ -15,6 +15,14 @@ import {
 } from "@/lib/taskQueryCache";
 
 describe("taskQueryCache", () => {
+  it("keeps the subtask-facing planner group aligned with all quest presentation surfaces", () => {
+    expect(taskQueryFamilyGroups.plannerAndInboxTasks).toEqual([
+      "daily",
+      "calendar",
+      "inboxTasks",
+    ]);
+  });
+
   it("snapshots and restores planner task query families", () => {
     const queryClient = new QueryClient();
     const dailyKey = queryKeys.dailyTasks.byDate("user-1", "2026-04-22");

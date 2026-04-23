@@ -73,12 +73,15 @@ describe("mentorContextQueryCache", () => {
 
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: queryKeys.mentor.todayPepTalkAll,
+      exact: true,
     });
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: queryKeys.mentor.todayPepTalk("mentor-123", "2026-04-23"),
+      exact: true,
     });
     expect(refetchSpy).toHaveBeenCalledWith({
       queryKey: queryKeys.mentor.todayPepTalk("mentor-123", "2026-04-23"),
+      exact: true,
     });
   });
 });

@@ -12,6 +12,7 @@ export const taskQueryFamilies = {
 
 export const taskQueryFamilyGroups = {
   planner: ["daily", "calendar"] as const,
+  plannerAndInboxTasks: ["daily", "calendar", "inboxTasks"] as const,
   plannerAndInbox: ["daily", "calendar", "inboxTasks", "inboxCount"] as const,
   inbox: ["inboxTasks", "inboxCount"] as const,
 } as const;

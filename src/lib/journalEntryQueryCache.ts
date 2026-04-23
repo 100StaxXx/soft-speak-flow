@@ -1,7 +1,7 @@
 import type { QueryClient } from "@tanstack/react-query";
 
-import { JOURNAL_ENTRIES_QUERY_KEY } from "@/hooks/useJournalEntries";
+import { queryKeys } from "@/lib/queryKeys";
 
 export const invalidateJournalEntryQueries = async (
   queryClient: QueryClient,
-) => queryClient.invalidateQueries({ queryKey: JOURNAL_ENTRIES_QUERY_KEY });
+) => queryClient.invalidateQueries({ queryKey: queryKeys.journalEntries.all });

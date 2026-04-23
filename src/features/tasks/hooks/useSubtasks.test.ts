@@ -157,6 +157,8 @@ describe("useSubtasks", () => {
     await waitFor(() => {
       expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["subtasks", "task-1"] });
       expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["daily-tasks"] });
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["calendar-tasks"] });
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["inbox-tasks"] });
     });
   });
 
