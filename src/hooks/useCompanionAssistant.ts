@@ -56,6 +56,7 @@ export interface CompanionAssistantMessage {
   inputMode?: CompanionChatInputMode;
   source: CompanionChatSource;
   isSeed?: boolean;
+  structuredResponse?: CompanionAgentResponse["structuredResponse"];
   pendingAction?: PendingActionView;
   receipt?: ActionReceiptView;
 }
@@ -176,6 +177,9 @@ export function useCompanionAssistant({
     setActiveSessionId(nextSessionId);
   }, []);
   const [messages, setMessages] = useState<CompanionAssistantMessage[]>([]);
+  const [structuredResponse, setStructuredResponse] = useState<
+    CompanionAgentResponse["structuredResponse"]
+  >(null);
   const [pendingAction, setPendingAction] = useState<PendingActionView | null>(null);
   const [draftInput, setDraftInput] = useState("");
   const [interimText, setInterimText] = useState("");
@@ -243,6 +247,7 @@ export function useCompanionAssistant({
     applyActiveSessionId(nextSessionId);
     setDraftInput("");
     setInterimText("");
+    setStructuredResponse(null);
     setPendingAction(null);
     setMessages(
       greetingText
@@ -267,6 +272,7 @@ export function useCompanionAssistant({
       threadMessages[0]?.createdAt ?? new Date().toISOString();
     applyActiveSessionId(sessionId);
     setMessages(threadMessages.map(mapLoadedMessage));
+    setStructuredResponse(null);
     setPendingAction(loadedPendingAction);
     setDraftInput("");
     setInterimText("");
@@ -416,10 +422,12 @@ export function useCompanionAssistant({
       ...previous,
       createMessage("assistant", stripMarkdown(response.reply), {
         source: "agent",
+        structuredResponse: response.structuredResponse ?? null,
         pendingAction: response.pendingAction,
         receipt: response.receipt,
       }),
     ]);
+    setStructuredResponse(response.structuredResponse ?? null);
     setPendingAction(response.pendingAction ?? null);
     void speakAssistantReply(response.reply, response.threadState.sessionId);
   }, [speakAssistantReply]);
@@ -534,9 +542,11 @@ export function useCompanionAssistant({
         }),
         createMessage("assistant", stripMarkdown(response.reply), {
           source: "agent",
+          structuredResponse: response.structuredResponse ?? null,
           receipt: response.receipt,
         }),
       ]);
+      setStructuredResponse(response.structuredResponse ?? null);
       void speakAssistantReply(response.reply, response.threadState.sessionId);
       void invalidateThreads();
     } catch (error) {
@@ -680,6 +690,7 @@ export function useCompanionAssistant({
       todayLabel: legacyAssistant.todayLabel,
       placeholder: legacyAssistant.placeholder,
       messages: legacyAssistant.messages,
+      structuredResponse: legacyAssistant.structuredResponse,
       pendingAction: legacyAssistant.pendingAction,
       draftInput,
       setDraftInput,
@@ -722,6 +733,7 @@ export function useCompanionAssistant({
     todayLabel,
     placeholder,
     messages,
+    structuredResponse,
     pendingAction,
     draftInput,
     setDraftInput,

@@ -6,6 +6,7 @@ import type {
   CompanionStatNeed,
   CompanionStatProfileSummary,
 } from "@/shared/companionStatSignals";
+import type { CompanionStructuredResponse } from "@/shared/companionStructuredOutput";
 
 export type PlannerHorizon = "day" | "week" | "month";
 
@@ -16,6 +17,7 @@ export type CompanionPlannerResponseMode = "conversational" | "schedule_read" | 
 export type CompanionPlannerStarterIntent =
   | "general"
   | "plan_day"
+  | "right_now_start"
   | "make_room"
   | "what_matters"
   | "relationship_touch"
@@ -92,6 +94,7 @@ export interface CompanionPlannerMessage {
   inputMode?: CompanionPlannerInputMode;
   questions?: CompanionPlannerQuestion[];
   proposalIds?: string[];
+  structuredResponse?: CompanionStructuredResponse | null;
 }
 
 export interface CompanionPlannerDraftState {
@@ -382,6 +385,7 @@ export interface CompanionPlannerResponse {
   followUpQuestions: CompanionPlannerQuestion[];
   proposals: CompanionPlannerProposal[];
   suggestedReminders: CompanionPlannerProposal[];
+  structuredResponse?: CompanionStructuredResponse | null;
   memoryUpdates: {
     preferredTimeOfDay?: string | null;
     preferredTimeReason?: string | null;

@@ -5,6 +5,7 @@ const PLANNER_INTENT_TYPES = ["quest", "epic", "habit", "brain-dump"] as const;
 const PLANNER_STARTER_INTENTS = [
   "general",
   "plan_day",
+  "right_now_start",
   "make_room",
   "what_matters",
   "relationship_touch",

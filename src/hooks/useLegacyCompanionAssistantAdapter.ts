@@ -18,6 +18,7 @@ import {
   isGoalBreakdownStarterMessage,
   looksLikeBigGoal,
 } from "@/shared/bigGoalIntent";
+import type { CompanionStructuredResponse } from "@/shared/companionStructuredOutput";
 import type { PendingActionView } from "@/types/companionAgent";
 import type {
   CompanionChatInputMode,
@@ -34,6 +35,7 @@ export type LegacyCompanionAssistantMessage = {
   inputMode?: CompanionChatInputMode;
   source: "chat" | "plan";
   isSeed?: boolean;
+  structuredResponse?: CompanionStructuredResponse | null;
 };
 
 type CompanionAssistantSurface = "companion" | "journeys";
@@ -74,6 +76,7 @@ const normalizePlannerMessages = (
     content: string;
     createdAt: string;
     inputMode?: CompanionChatInputMode;
+    structuredResponse?: CompanionStructuredResponse | null;
   }>,
 ): LegacyCompanionAssistantMessage[] =>
   messages.map((message) => ({
@@ -86,6 +89,7 @@ const normalizePlannerMessages = (
     inputMode: message.inputMode,
     source: "plan",
     isSeed: false,
+    structuredResponse: message.structuredResponse ?? null,
   }));
 
 const sortMessages = (messages: LegacyCompanionAssistantMessage[]) =>
@@ -301,6 +305,7 @@ export function useLegacyCompanionAssistantAdapter({
       ? journeysConversation.greeting
       : companionChat.greeting ?? greeting,
     messages,
+    structuredResponse: planner.structuredResponse,
     pendingAction,
     placeholder,
     todayLabel: planner.todayLabel,

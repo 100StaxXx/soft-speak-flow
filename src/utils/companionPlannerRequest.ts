@@ -96,6 +96,7 @@ const isPlannerStarterIntent = (
 ): value is NonNullable<PlannerContext["starterIntent"]> => [
   "general",
   "plan_day",
+  "right_now_start",
   "make_room",
   "what_matters",
   "relationship_touch",

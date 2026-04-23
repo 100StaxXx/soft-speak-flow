@@ -1032,6 +1032,9 @@ export function useCompanionPlanner({
   }, []);
   const sessionIdRef = useRef<string>(generateCompanionThreadSessionId());
   const [messages, setMessages] = useState<CompanionPlannerMessage[]>([]);
+  const [structuredResponse, setStructuredResponse] = useState<
+    CompanionPlannerResponse["structuredResponse"]
+  >(null);
   const [proposals, setProposals] = useState<CompanionPlannerProposal[]>([]);
   const [questions, setQuestions] = useState<CompanionPlannerQuestion[]>([]);
   const [sessionState, setSessionState] = useState<
@@ -1737,10 +1740,12 @@ export function useCompanionPlanner({
           questions: response.followUpQuestions,
           proposalIds: [...response.proposals, ...response.suggestedReminders]
             .map((proposal) => proposal.id),
+          structuredResponse: response.structuredResponse ?? null,
         },
       );
 
       setQuestions(response.followUpQuestions);
+      setStructuredResponse(response.structuredResponse ?? null);
       setProposals((previous) => {
         const settled = previous.filter((proposal) =>
           proposal.status !== "pending"
@@ -1770,8 +1775,10 @@ export function useCompanionPlanner({
       createMessage("companion", trimmedPrompt, {
         questions: [],
         proposalIds: [],
+        structuredResponse: null,
       }),
     ]);
+    setStructuredResponse(null);
     setProposals([]);
     setQuestions([]);
     setSessionState((previous) => ({
@@ -2699,10 +2706,12 @@ export function useCompanionPlanner({
           createMessage("companion", plannerGreeting, {
             questions: [],
             proposalIds: [],
+            structuredResponse: null,
           }),
         ]
         : [],
     );
+    setStructuredResponse(null);
     setProposals([]);
     setQuestions([]);
     setSessionState(createInitialSessionState(storedPreferences));
@@ -2726,6 +2735,7 @@ export function useCompanionPlanner({
       createdAt: message.createdAt,
       inputMode: message.inputMode,
     })));
+    setStructuredResponse(null);
     setProposals([]);
     setQuestions([]);
     setSessionState(createInitialSessionState(storedPreferences));
@@ -2746,6 +2756,7 @@ export function useCompanionPlanner({
     horizon,
     setHorizon,
     messages,
+    structuredResponse,
     hasRealMessages: messages.length > 0,
     questions,
     proposals,
