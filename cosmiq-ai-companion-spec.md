@@ -8,7 +8,7 @@ This spec defines how the AI companion and planner should work inside Cosmiq usi
 
 - normalized domain concepts such as Campaign, Quest, and Ritual
 - adapter and read-model layers
-- `companion-agent` as the orchestration layer
+- `companion-agent` as the orchestration layer and only AI-originated write path
 - `companion_pending_actions` as the confirmation boundary
 - Supabase as the system of record
 
@@ -63,6 +63,9 @@ It should not:
 6. User control stays intact.
    The user steers. The AI recommends. All writes flow through confirmation and server validation.
 
+7. Consistency beats creativity.
+   The planner should behave predictably under load. A reliable decision engine is more valuable than a clever but inconsistent assistant.
+
 ## 1. Core Assistant Behavior
 
 ### Primary role
@@ -108,6 +111,55 @@ Companion tone can vary by mode or personality, but planning logic should stay c
 - what requires confirmation
 - what will happen if confirmed
 
+Tone rule:
+
+- clarity > personality
+
+### Hard Output Constraints
+
+#### Quest recommendation rules
+
+When suggesting quests:
+
+- usually return 3 to 5 quests
+- never return more than 5
+- return fewer when honest capacity is low
+- every suggested quest must fit real available time
+- every suggested quest must map to a campaign, maintenance task, or recovery action
+- never return vague tasks such as "work on project"
+
+Suggested quests should be concrete enough to act on immediately, for example:
+
+- bad: `Work on project`
+- good: `Outline onboarding flow for Cosmiq landing page`
+
+#### Planner decision rules
+
+Planner decisions should use two layers:
+
+- hard constraints first
+- weighted scoring second
+
+Hard constraints should filter what is even possible:
+
+- current time
+- calendar commitments
+- required slack buffer
+- already committed quest load
+- chosen day mode
+
+Weighted scoring should then rank candidates using:
+
+1. time constraints and schedule reality
+2. campaign leverage
+3. effort versus slot fit
+4. energy fit, if known
+5. momentum recovery
+
+If everything feels important, the planner should resolve conflicts in that same order.
+
+If nothing fits honestly, the assistant should say so and switch to recovery or make-room guidance instead of inventing a fake productive plan.
+
 ## 2. Daily Ritual Loops
 
 These loops should connect into one continuous system, not operate as isolated features.
@@ -120,7 +172,7 @@ The flow:
 
 - User opens Cosmiq and starts `Plan My Day`
 - AI reads calendar, active campaigns, unfinished quests, rituals, reflection signals, planner memory, and current time
-- AI returns a realistic plan for today with 3 to 5 recommended quests
+- AI returns a realistic plan for today with usually 3 to 5 recommended quests, and fewer when honest capacity is low
 
 Each recommended quest should answer:
 
@@ -184,7 +236,8 @@ The current surfaces are directionally right. They should be refined into a tigh
 | --- | --- | --- |
 | `Plan My Day` | Main morning ritual | Daily priorities, suggested quest set, schedule shape, fallback plan |
 | `What Do I Have Coming Up` | Fast situational awareness | Next event, remaining day, missed items, free windows, next best move |
-| `Quest` | Fast capture | Turn natural language into a quest draft with minimal friction |
+| `What Should I Do Right Now` | Zero-friction action | One best task for the next 30 to 60 minutes |
+| `Capture Quest` | Fast capture | Turn natural language into a quest draft with minimal friction |
 | `Adjust My Day` | Midday rescue | Reprioritize, reschedule, lighten, or make room |
 | `Advance My Campaign` | Goal translation | Break a campaign into next steps, supporting ritual, or campaign adjustment |
 | `Evening Reflection` | Learning + closure | Capture wins, misses, tomorrow adjustment, and emotional state |
@@ -200,9 +253,10 @@ It should return:
 
 - a short day framing message
 - one clear "today's win condition"
-- 3 to 5 suggested quests
+- usually 3 to 5 suggested quests, never more than 5, and fewer when capacity is honestly low
 - a schedule shape, not just a list
 - a backup plan if the day is overloaded or energy is low
+- visible reasoning for why each suggested quest belongs today
 
 #### `What Do I Have Coming Up`
 
@@ -215,10 +269,20 @@ It should answer:
 - what I already missed
 - where I have room
 - what the next best quest is between now and the next hard commitment
+- what I should do right now before the next hard commitment
 
-#### `Quest`
+#### `What Should I Do Right Now`
 
-Refine this into `Capture Quest`.
+Add this as a first-class, lightweight surface.
+
+It should:
+
+- look at the next 30 to 60 minutes
+- return exactly one task
+- optimize for minimal thinking and immediate action
+- fall back to a recovery or setup action if no meaningful quest fits cleanly
+
+#### `Capture Quest`
 
 This surface should excel at:
 
@@ -226,6 +290,8 @@ This surface should excel at:
 - turning intent into one clean quest draft
 - optionally linking to a campaign
 - asking at most one follow-up if timing or campaign-link matters
+
+This surface should stay focused on creation, not full-day planning.
 
 #### `Adjust My Day`
 
@@ -239,6 +305,14 @@ It maps well to existing planner intents like:
 - `make_room`
 
 This is where the planner proves it understands reality.
+
+It must explicitly decide:
+
+- what stays
+- what moves
+- what gets dropped
+- what gets shrunk
+- when the pattern points to a campaign problem instead of a one-day scheduling problem
 
 #### `Advance My Campaign`
 
@@ -301,6 +375,7 @@ Capacity should be shaped by:
 
 - available minutes between wake and wind-down
 - occupied time from calendar and scheduled quests
+- a required slack buffer so the planner never fills 100 percent of the day
 - existing conflicts or overload
 - current time, not just the full day
 - intensity of existing work
@@ -309,7 +384,16 @@ Capacity should be shaped by:
 
 ### 3. Rank what matters
 
-Candidate work should be ranked across multiple dimensions, not just deadline urgency:
+The planner should not jump directly into scoring. It should first filter out work that does not fit the day, then score the remaining candidates.
+
+Hard constraints:
+
+- calendar and current-time reality
+- available capacity after slack
+- task duration versus real slot size
+- whether the day mode can support the task intensity
+
+Weighted scoring dimensions:
 
 - hard commitments and overdue tasks
 - campaign leverage: what most meaningfully moves a campaign forward
@@ -318,6 +402,14 @@ Candidate work should be ranked across multiple dimensions, not just deadline ur
 - energy fit: deep work when strong, admin when tired
 - momentum recovery: what gets the user unstuck
 - relationship or life-admin pressure when relevant
+
+If multiple candidates are close, tie-break using:
+
+1. time reality
+2. campaign leverage
+3. slot fit
+4. energy fit
+5. momentum recovery
 
 ### 4. Shape the day
 
@@ -330,10 +422,28 @@ The planner should build a day with layers:
 
 Good daily plans should:
 
-- cap visible recommended work at 3 to 5 quests
+- cap visible recommended work at no more than 5 quests
+- usually land in the 3 to 5 range
+- allow fewer when the day is constrained
 - avoid stacking too many hard tasks back to back
 - reserve slack so one slip does not destroy the full plan
 - protect the most meaningful work before filling in low-value tasks
+
+### Scheduling model
+
+Cosmiq should use a single scheduling rule:
+
+- suggest + confirm
+
+The AI should:
+
+- suggest concrete time blocks
+- create pending actions when the user wants the suggested schedule applied
+- never auto-schedule without confirmation
+
+Example:
+
+- `Best slot is 10:30–11:15. Want me to schedule that quest there?`
 
 ### 5. Adapt when reality changes
 
@@ -369,10 +479,17 @@ Campaigns are the long-term guidance system. The assistant should make every act
 
 For each active campaign, the planner should be able to infer:
 
-- current momentum: moving, drifting, blocked, or at risk
+- current state: moving, drifting, stalled, or at risk
 - next meaningful step
 - whether progress is best driven by a one-off quest, a ritual, or a plan adjustment
 - whether the campaign is realistic relative to the user's actual time and follow-through
+
+Campaign state should also control recommendation intensity:
+
+- moving: reinforce and protect momentum
+- drifting: nudge toward the next concrete step
+- stalled: shrink the step and reduce activation energy
+- at risk: warn clearly and recommend an adjustment, not fake optimism
 
 ### Campaign breakdown behavior
 
@@ -390,11 +507,14 @@ When useful, it should also propose:
 
 The assistant should proactively fight stagnation by detecting patterns such as:
 
-- no campaign-linked progress in several days
+- no campaign-linked progress in 5 days
 - campaign deadline approaching with weak momentum
-- repeated reschedules of the same quest
+- the same quest being rescheduled 2 or more times within 7 days
 - quests that are too vague or too large to start
-- too many active campaigns competing for limited capacity
+- quests estimated above 90 minutes with no subtask breakdown
+- more than 3 active campaigns competing for limited capacity
+
+These thresholds can be tuned later, but v1 should use concrete defaults instead of leaving stagnation open-ended.
 
 When stagnation is detected, the assistant should favor:
 
@@ -453,6 +573,8 @@ These should remain within the current write boundary:
 - create reminder
 - save journal entry
 
+All AI-originated writes should enter through `companion-agent` and cross the `companion_pending_actions` confirmation boundary before execution.
+
 ### Confirmation rules
 
 Every domain write requires explicit confirmation.
@@ -505,6 +627,14 @@ At a high level, the AI should be grounded with:
 
 The model should prefer normalized read-model context, not raw storage complexity.
 
+### Memory and learning boundaries
+
+To avoid muddying product truth and AI behavior:
+
+- `user_ai_learning`, `user_ai_preferences`, and `ai_interactions` should be treated as learned signals or telemetry, not durable human memory
+- `companion_memories` should remain its own narrow memory layer
+- planner memory should be used as context for better suggestions, not treated as canonical user truth
+
 ### Output shape
 
 The assistant should continue returning:
@@ -538,6 +668,10 @@ Recommended direction:
   - missed items
   - free windows
   - next best quest
+- `rightNow`
+  - one recommended task
+  - why it wins now
+  - fallback recovery action
 - future optional blocks
   - `dayAdjust`
   - `campaignMomentum`
@@ -559,7 +693,7 @@ If the UI shows XP, stat impact, or schedule placement, it should come from vali
 
 ## 8. Overall System Flow
 
-1. User enters through a surface such as `Plan My Day`, `Coming Up`, `Capture Quest`, `Adjust My Day`, or `Advance My Campaign`.
+1. User enters through a surface such as `Plan My Day`, `Coming Up`, `What Should I Do Right Now`, `Capture Quest`, `Adjust My Day`, or `Advance My Campaign`.
 2. Client sends message, surface, time context, visible horizon, and selected entity ids to `companion-agent`.
 3. Server loads normalized context from Supabase and read models: quests, campaigns, rituals, calendar, reflections, planner memory, pending action state, and recent thread messages.
 4. Planner logic computes schedule insights, open slots, overload signals, and priority scores.
@@ -583,7 +717,8 @@ Default output pattern:
 
 - one sentence that frames the day
 - one "today's win" objective
-- 3 to 5 suggested quests, each with meaning and timing guidance
+- usually 3 to 5 suggested quests, each with meaning and timing guidance
+- fewer when capacity is low
 - a lighter fallback if the day is already overloaded
 
 ### `Coming Up`
@@ -595,6 +730,22 @@ Default output pattern:
 - what is at risk later today
 - what the user should do next if they have room now
 
+### `What Should I Do Right Now`
+
+Default output pattern:
+
+- one best task for the next 30 to 60 minutes
+- one sentence explaining why it wins right now
+- one fallback recovery action if no real quest fits
+
+### `Capture Quest`
+
+Default output pattern:
+
+- one clean quest draft
+- at most one important clarification
+- optional campaign link
+
 ### `Adjust My Day`
 
 Default output pattern:
@@ -603,6 +754,7 @@ Default output pattern:
 - move
 - drop or shrink
 - confirmable updates for any concrete changes
+- escalate to a campaign-level problem when repeated misses suggest the plan itself is wrong
 
 ### `Advance My Campaign`
 
@@ -620,21 +772,44 @@ Default output pattern:
 - capture one win, one friction point, one tomorrow adjustment
 - feed tomorrow-adjustment signal back into planning
 
-## 10. Build Priority
+## 10. Implementation Priority
 
-If this is built in stages, the recommended order is:
+Build this in phases, with the daily loop first.
 
-1. Nail the daily loop.
-   `Plan My Day`, `Coming Up`, `Adjust My Day`, and per-quest confirmations should feel excellent first.
+### Phase A
 
-2. Make campaigns feel alive.
-   Add campaign-next-step logic, stagnation detection, and campaign-adjust suggestions.
+Ship the core loop:
 
-3. Tighten the learning loop.
-   Make reflection signals and planner memory materially improve tomorrow's plan.
+- `Plan My Day` v1
+- `Adjust My Day` v1
+- `What Should I Do Right Now`
 
-4. Add weekly realignment.
-   `Plan My Week` should become the bridge between campaigns and daily execution.
+These three features define whether Cosmiq feels like a real decision engine.
+
+### Phase B
+
+Tighten execution quality:
+
+- campaign intelligence
+- stagnation handling
+- quest quality improvements
+
+### Phase C
+
+Deepen the learning loop:
+
+- evening reflection integration
+- weekly planning and realignment
+
+## 11. Success Metrics
+
+The first useful product metrics should track whether the daily loop is becoming a habit:
+
+- percent of active users who start a daily planning loop
+- percent of AI-suggested quests that get confirmed
+- percent of confirmed AI quests completed the same day
+- percent of users who use `Adjust My Day` after missing work
+- 7-day repeat usage of `Plan My Day`
 
 ## Final Product Standard
 
