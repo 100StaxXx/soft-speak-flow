@@ -811,6 +811,173 @@ The first useful product metrics should track whether the daily loop is becoming
 - percent of users who use `Adjust My Day` after missing work
 - 7-day repeat usage of `Plan My Day`
 
+## 12. Locked Implementation Decisions
+
+These decisions are locked to reduce ambiguity between the spec and the current codebase.
+
+### 12.1 Orchestration ownership
+
+Cosmiq should have one user-facing AI orchestrator:
+
+- `companion-agent` is the single user-facing AI orchestration layer
+- `companion-agent` remains the only AI-originated write path
+- all new AI surfaces should route through `companion-agent`
+
+`companion-planner-chat` may remain in the codebase in the near term, but its role should be constrained:
+
+- it should function as an internal planner engine or legacy compatibility layer
+- it should not become a second product-facing orchestration system
+- no new user-facing behavior should be implemented only in `companion-planner-chat`
+
+Practical rule:
+
+- one planner core can be shared
+- one orchestration entrypoint owns the product behavior
+
+### 12.2 Naming policy
+
+To avoid expensive churn before launch:
+
+- keep storage and schema names as-is: `daily_tasks`, `epics`, `habits`, and related legacy table names
+- use Campaign, Quest, and Ritual in product copy, domain types, and adapter-layer naming
+- do not perform schema renames before launch
+
+Practical rule:
+
+- storage can stay legacy
+- the product language should not
+
+### 12.3 Operational fallback rules
+
+The planner must fail safely.
+
+If the LLM times out, returns malformed structured output, or produces a proposal that cannot be normalized:
+
+- do not create a pending action
+- fall back to a deterministic, read-only answer built from available planner context
+- prefer a simple schedule summary or one clear next action over a brittle AI response
+
+If action validation or execution fails:
+
+- do not mutate source-of-truth data
+- return a clear failure receipt
+- explain what did not happen
+- give the user the next best manual step
+
+If the planner lacks enough context to make a reliable recommendation:
+
+- reduce confidence
+- ask one concise clarification if it materially changes the answer
+- otherwise degrade to a lighter suggestion, schedule summary, or recovery guidance
+
+### 12.4 Latency and reliability targets
+
+The assistant should optimize for useful speed, not maximum complexity.
+
+Target experience:
+
+- `What Should I Do Right Now`: clear answer in under 3 seconds when possible
+- `Plan My Day`: useful plan in under 5 seconds when possible
+- `Adjust My Day`: useful recovery plan in under 5 seconds when possible
+
+If those targets are missed:
+
+- show a deterministic fallback instead of waiting indefinitely for a perfect AI result
+
+### 12.5 Phase-A data discipline
+
+Before Phase A ships:
+
+- do not introduce new write paths
+- do not rename schema objects
+- do not expand surfaces beyond the core daily loop
+- do not rely on campaign-state inference that has no concrete backing signal yet
+
+## 13. Pre-Launch Execution Plan
+
+Potential is not the goal. Reliable daily usefulness is the goal.
+
+The product should be treated as high-potential, not finished magic.
+
+### 13.1 Pre-launch focus
+
+Do not expand features before the core daily loop feels consistently useful.
+
+The pre-launch focus is:
+
+1. `Plan My Day`
+2. `Adjust My Day`
+3. `What Should I Do Right Now`
+
+Everything else is secondary until these three feel strong in real daily use.
+
+### 13.2 Quality bar for Phase A
+
+#### `Plan My Day`
+
+This should feel accurate, calm, and obvious.
+
+Quality bar:
+
+- the plan returns usually 3 to 5 quests, or fewer when capacity is low
+- the quests feel obviously right for the day
+- the schedule does not feel overloaded or fake
+- the user can understand the day's direction in under 5 seconds
+
+#### `Adjust My Day`
+
+This is the trust engine.
+
+Quality bar:
+
+- when the day breaks, the assistant reduces stress instead of adding more planning overhead
+- the user gets a believable keep, move, and drop-or-shrink answer
+- the plan recovery feels simpler than replanning manually
+
+#### `What Should I Do Right Now`
+
+This is the clarity engine.
+
+Quality bar:
+
+- the user gets one clear action quickly
+- the suggestion feels useful without extra thinking
+- when no meaningful quest fits, the fallback still helps the user move
+
+### 13.3 Daily dogfooding loop
+
+Before launch, the product should be tested against real days, not hypothetical prompt cases alone.
+
+Daily questions:
+
+1. Did it help me decide what to do?
+2. Did it help me recover when things changed?
+3. Did I trust it enough to follow it?
+
+If the answer is no, fix the planner behavior before adding more scope.
+
+### 13.4 What to defer
+
+Until the daily loop is strong, defer:
+
+- deeper campaign-state modeling beyond what current signals can support
+- new AI surfaces outside the core loop
+- prompt polish that does not materially improve usefulness
+- UI polish that does not improve clarity, trust, or speed
+
+### 13.5 Ship standard
+
+The launch standard is not perfection.
+
+The launch standard is:
+
+- consistently useful
+- realistically grounded
+- emotionally calming under pressure
+- trustworthy enough that a user does not want to plan elsewhere
+
+If the system helps users decide what to do next, recover when plans break, and trust the suggestions after a few interactions, it is ready to ship and iterate.
+
 ## Final Product Standard
 
 Cosmiq should feel like a system that knows:
