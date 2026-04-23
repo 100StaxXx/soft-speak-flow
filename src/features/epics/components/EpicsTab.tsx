@@ -10,42 +10,11 @@ import { useFirstTimeModal } from "@/hooks/useFirstTimeModal";
 import { Plus } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ACTIVE_CAMPAIGN_LIMIT, hasReachedActiveCampaignLimit } from "@/features/epics/constants";
-import type { Campaign } from "@/types/domain";
 
 interface CreatedCampaignData {
   title: string;
   habits: Array<{ title: string }>;
 }
-
-const toCampaignCardModel = (campaign: Campaign) => ({
-  id: campaign.id,
-  user_id: campaign.userId,
-  title: campaign.title,
-  description: campaign.description ?? undefined,
-  target_days: campaign.targetDays,
-  start_date: campaign.startDate,
-  end_date: campaign.endDate,
-  status: campaign.status,
-  xp_reward: campaign.xpReward ?? 0,
-  progress_percentage: campaign.progressPercentage ?? 0,
-  is_public: campaign.isPublic ?? undefined,
-  invite_code: campaign.inviteCode ?? undefined,
-  theme_color: campaign.themeColor ?? undefined,
-  story_type_slug: campaign.storyTypeSlug ?? null,
-  epic_habits: campaign.rituals.map((ritual) => ({
-    habit_id: ritual.habitId,
-    habits: ritual.habit ? {
-      id: ritual.habit.id,
-      title: ritual.habit.title,
-      difficulty: ritual.habit.difficulty ?? "medium",
-      description: ritual.habit.description ?? undefined,
-      frequency: ritual.habit.frequency ?? undefined,
-      estimated_minutes: ritual.habit.estimatedMinutes ?? undefined,
-      custom_days: ritual.habit.customDays ?? null,
-      custom_month_days: ritual.habit.customMonthDays ?? null,
-    } : null,
-  })),
-});
 
 export const EpicsTab = memo(function EpicsTab() {
   const {
@@ -140,7 +109,7 @@ export const EpicsTab = memo(function EpicsTab() {
                 transition={{ delay: index * 0.05 }}
               >
                 <CampaignCard
-                  campaign={toCampaignCardModel(campaign)}
+                  campaign={campaign}
                   onComplete={() => updateCampaignStatus({ epicId: campaign.id, status: "completed" })}
                   onAbandon={() => updateCampaignStatus({ epicId: campaign.id, status: "abandoned" })}
                 />
@@ -155,7 +124,7 @@ export const EpicsTab = memo(function EpicsTab() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: (activeCampaigns.length + index) * 0.05 }}
               >
-                <CampaignCard campaign={toCampaignCardModel(campaign)} />
+                <CampaignCard campaign={campaign} />
               </motion.div>
             ))}
 

@@ -21,7 +21,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Trophy, Flame, Target, Calendar, Zap, Share2, Check, X, Flag, Star, Pencil, Loader2 } from "lucide-react";
-import type { StorySeed } from "@/types/narrativeTypes";
 import { motion } from "framer-motion";
 import { toast } from "@/components/ui/sonner";
 import { ConstellationTrail } from "./ConstellationTrail";
@@ -37,39 +36,7 @@ import { getEpicDaysRemaining, resolveEpicEndDate } from "@/utils/epicDates";
 import { safeClipboardWrite, getClipboardErrorMessage } from "@/utils/clipboard";
 import { buildEpicInviteLink, buildEpicInviteShareText } from "@/utils/epicInviteShare";
 import { getStoredCompanionCustomName } from "@/lib/companionName";
-
-interface Campaign {
-  id: string;
-  user_id: string;
-  title: string;
-  description?: string;
-  target_days: number;
-  start_date: string;
-  end_date: string | null;
-  status: string;
-  xp_reward: number;
-  progress_percentage: number;
-  is_public?: boolean;
-  invite_code?: string;
-  theme_color?: string;
-  story_seed?: unknown;
-  story_type_slug?: string | null;
-  book_title?: string | null;
-  total_chapters?: number | null;
-  epic_habits?: Array<{
-    habit_id: string;
-    habits: {
-      id: string;
-      title: string;
-      difficulty: string;
-      description?: string;
-      frequency?: string;
-      estimated_minutes?: number;
-      custom_days?: number[] | null;
-      custom_month_days?: number[] | null;
-    };
-  }>;
-}
+import type { Campaign } from "@/types/domain";
 
 interface CampaignCardProps {
   campaign: Campaign;
@@ -88,7 +55,7 @@ export const CampaignCard = memo(function CampaignCard({ campaign, onRename, onC
   
   const { companion } = useCompanion();
   const { health } = useCompanionHealth();
-  const { 
+  const {
     milestones,
     isLoading: milestonesLoading,
     getProgressToNextPostcard,
@@ -97,14 +64,18 @@ export const CampaignCard = memo(function CampaignCard({ campaign, onRename, onC
     isBackfilling,
   } = useMilestones(campaign.id);
   
-  const resolvedEndDate = useMemo(() => resolveEpicEndDate(campaign), [campaign]);
+  const resolvedEndDate = useMemo(() => resolveEpicEndDate({
+    start_date: campaign.startDate,
+    target_days: campaign.targetDays,
+    end_date: campaign.endDate,
+  }), [campaign.endDate, campaign.startDate, campaign.targetDays]);
   const daysRemaining = useMemo(
     () => getEpicDaysRemaining({
-      start_date: campaign.start_date,
-      target_days: campaign.target_days,
+      start_date: campaign.startDate,
+      target_days: campaign.targetDays,
       end_date: resolvedEndDate,
     }),
-    [resolvedEndDate, campaign.start_date, campaign.target_days],
+    [resolvedEndDate, campaign.startDate, campaign.targetDays],
   );
   const isCompleted = campaign.status === "completed";
   const isActive = campaign.status === "active";
@@ -116,7 +87,7 @@ export const CampaignCard = memo(function CampaignCard({ campaign, onRename, onC
   useEffect(() => {
     if (
       isActive && 
-      campaign.story_type_slug && 
+      campaign.storyTypeSlug && 
       milestones?.length === 0 && 
       !milestonesLoading &&
       !isBackfilling &&
@@ -125,14 +96,14 @@ export const CampaignCard = memo(function CampaignCard({ campaign, onRename, onC
       backfillAttempted.current = true;
       backfillLegacyMilestones.mutate({
         epicId: campaign.id,
-        targetDays: campaign.target_days,
-        startDate: campaign.start_date,
+        targetDays: campaign.targetDays,
+        startDate: campaign.startDate,
       });
     }
-  }, [campaign.id, campaign.story_type_slug, campaign.target_days, campaign.start_date, milestones?.length, isActive, milestonesLoading, isBackfilling, backfillLegacyMilestones]);
+  }, [campaign.id, campaign.storyTypeSlug, campaign.targetDays, campaign.startDate, milestones?.length, isActive, milestonesLoading, isBackfilling, backfillLegacyMilestones]);
   
   const postcardProgress = getProgressToNextPostcard();
-  const campaignHealth = getJourneyHealth(campaign.start_date, resolvedEndDate ?? undefined);
+  const campaignHealth = getJourneyHealth(campaign.startDate, resolvedEndDate ?? undefined);
   const companionDisplayName = useMemo(() => {
     const customName = getStoredCompanionCustomName(companion);
     if (customName) return customName;
@@ -159,10 +130,10 @@ export const CampaignCard = memo(function CampaignCard({ campaign, onRename, onC
   }, [milestones]);
 
   const handleShareCampaign = useCallback(async () => {
-    if (!campaign.invite_code || !campaign.is_public) return;
+    if (!campaign.inviteCode || !campaign.isPublic) return;
 
-    const inviteLink = buildEpicInviteLink(campaign.invite_code);
-    const shareText = buildEpicInviteShareText(campaign.title, campaign.invite_code);
+    const inviteLink = buildEpicInviteLink(campaign.inviteCode);
+    const shareText = buildEpicInviteShareText(campaign.title, campaign.inviteCode);
 
     try {
       if (navigator.share) {
@@ -191,7 +162,7 @@ export const CampaignCard = memo(function CampaignCard({ campaign, onRename, onC
 
       toast.error(getClipboardErrorMessage(error));
     }
-  }, [campaign.invite_code, campaign.title]);
+  }, [campaign.inviteCode, campaign.isPublic, campaign.title]);
 
   const openRenameDialog = useCallback(() => {
     setRenameTitle(campaign.title);
@@ -216,7 +187,7 @@ export const CampaignCard = memo(function CampaignCard({ campaign, onRename, onC
   }, [campaign.title, onRename, renameTitle]);
 
   // Count valid rituals linked to this campaign
-  const ritualCount = campaign.epic_habits?.filter(eh => eh.habits)?.length || 0;
+  const ritualCount = campaign.rituals.filter((ritual) => ritual.habit).length;
   const trimmedRenameTitle = renameTitle.trim();
   const isRenameSaveDisabled = isRenaming || trimmedRenameTitle.length === 0 || trimmedRenameTitle === campaign.title;
 
@@ -238,7 +209,7 @@ export const CampaignCard = memo(function CampaignCard({ campaign, onRename, onC
                   <Target className="w-5 h-5 text-primary" />
                 )}
                 <h3 className="text-lg font-bold">{campaign.title}</h3>
-                {campaign.invite_code && campaign.is_public && (
+                {campaign.inviteCode && campaign.isPublic && (
                   <Button
                     variant="ghost"
                     size="sm"
@@ -290,8 +261,8 @@ export const CampaignCard = memo(function CampaignCard({ campaign, onRename, onC
 
           {/* Constellation Trail Progress */}
           <ConstellationTrail 
-            progress={campaign.progress_percentage} 
-            targetDays={campaign.target_days}
+            progress={campaign.progressPercentage ?? 0} 
+            targetDays={campaign.targetDays}
             className="mb-3"
             companionImageUrl={health?.imageUrl || companion?.current_image_url}
             companionImageFocalX={health?.imageFocalX ?? companion?.current_image_focal_x ?? null}
@@ -307,7 +278,7 @@ export const CampaignCard = memo(function CampaignCard({ campaign, onRename, onC
           <div className="flex items-center gap-3 text-xs text-muted-foreground mb-3 px-1">
           <span className="flex items-center gap-1">
             <Calendar className="w-3 h-3" />
-            {campaign.target_days}d total
+            {campaign.targetDays}d total
           </span>
           <span className="text-muted-foreground/30">•</span>
           <span className="flex items-center gap-1">
@@ -332,8 +303,8 @@ export const CampaignCard = memo(function CampaignCard({ campaign, onRename, onC
           ) : (
             <span className="flex items-center gap-1">
               <Zap className="w-3 h-3 text-stardust-gold" />
-              <span className="text-stardust-gold font-medium">{campaign.xp_reward} XP</span>
-            </span>
+            <span className="text-stardust-gold font-medium">{campaign.xpReward ?? 0} XP</span>
+          </span>
           )}
           </div>
 
@@ -347,12 +318,12 @@ export const CampaignCard = memo(function CampaignCard({ campaign, onRename, onC
               className="col-span-2"
             >
               <MilestonePostcardPreview
-                currentProgress={campaign.progress_percentage}
+                currentProgress={campaign.progressPercentage ?? 0}
                 targetPercent={postcardProgress.target}
                 milestoneTitle={postcardProgress.milestone.title}
                 chapterNumber={postcardProgress.milestone.chapter_number || 1}
-                storySeed={campaign.story_seed as StorySeed | null}
-                totalChapters={campaign.total_chapters}
+                storySeed={null}
+                totalChapters={null}
                 companionDisplayName={companionDisplayName}
                 isExpanded={true}
               />
@@ -388,20 +359,20 @@ export const CampaignCard = memo(function CampaignCard({ campaign, onRename, onC
           </JourneyDetailDrawer>
           
           {/* Rituals Tile - Magical and special */}
-          {campaign.epic_habits && ritualCount > 0 && (
+          {ritualCount > 0 && (
             <EpicCheckInDrawer
               epicId={campaign.id}
-              habits={campaign.epic_habits
-                .filter(eh => eh.habits)
-                .map(eh => ({
-                  id: eh.habit_id,
-                  title: eh.habits?.title || 'Untitled',
-                  difficulty: eh.habits?.difficulty || 'medium',
-                  description: eh.habits?.description,
-                  frequency: eh.habits?.frequency,
-                  estimated_minutes: eh.habits?.estimated_minutes,
-                  custom_days: eh.habits?.custom_days,
-                  custom_month_days: eh.habits?.custom_month_days,
+              habits={campaign.rituals
+                .filter((ritual) => ritual.habit)
+                .map((ritual) => ({
+                  id: ritual.habitId,
+                  title: ritual.habit?.title || 'Untitled',
+                  difficulty: ritual.habit?.difficulty || 'medium',
+                  description: ritual.habit?.description ?? undefined,
+                  frequency: ritual.habit?.frequency ?? undefined,
+                  estimated_minutes: ritual.habit?.estimatedMinutes ?? undefined,
+                  custom_days: ritual.habit?.customDays,
+                  custom_month_days: ritual.habit?.customMonthDays,
                 }))}
               isActive={isActive}
               showAdjustPlan={isActive}
@@ -432,7 +403,7 @@ export const CampaignCard = memo(function CampaignCard({ campaign, onRename, onC
           </div>
 
           {/* Complete Button (only at 100%) */}
-          {isActive && campaign.progress_percentage >= 100 && onComplete && (
+          {isActive && (campaign.progressPercentage ?? 0) >= 100 && onComplete && (
             <Button
               onClick={onComplete}
               className="w-full bg-gradient-to-r from-stardust-gold to-amber-500 hover:from-stardust-gold/90 hover:to-amber-500/90 text-black font-bold"
@@ -472,15 +443,15 @@ export const CampaignCard = memo(function CampaignCard({ campaign, onRename, onC
             onOpenChange={setShowAdjustDialog}
             epicId={campaign.id}
             epicTitle={campaign.title}
-            habits={campaign.epic_habits
-              ?.filter(eh => eh.habits)
-              .map(eh => ({
-                id: eh.habit_id,
-                title: eh.habits?.title || 'Untitled',
-                difficulty: eh.habits?.difficulty,
-                frequency: eh.habits?.frequency,
-                estimated_minutes: eh.habits?.estimated_minutes,
-              })) || []}
+            habits={campaign.rituals
+              .filter((ritual) => ritual.habit)
+              .map((ritual) => ({
+                id: ritual.habitId,
+                title: ritual.habit?.title || 'Untitled',
+                difficulty: ritual.habit?.difficulty,
+                frequency: ritual.habit?.frequency,
+                estimated_minutes: ritual.habit?.estimatedMinutes,
+              }))}
           />
         </div>
       </motion.div>

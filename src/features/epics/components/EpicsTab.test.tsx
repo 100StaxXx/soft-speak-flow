@@ -2,12 +2,12 @@ import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  useEpicsMock: vi.fn(),
+  useCampaignsMock: vi.fn(),
   dismissTutorialMock: vi.fn(),
 }));
 
-vi.mock("@/hooks/useEpics", () => ({
-  useEpics: () => mocks.useEpicsMock(),
+vi.mock("@/hooks/useCampaigns", () => ({
+  useCampaigns: () => mocks.useCampaignsMock(),
 }));
 
 vi.mock("@/hooks/useFirstTimeModal", () => ({
@@ -53,26 +53,26 @@ const buildCampaign = (id: string) => ({
 describe("EpicsTab", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.useEpicsMock.mockReturnValue({
-      activeEpics: [],
-      completedEpics: [],
+    mocks.useCampaignsMock.mockReturnValue({
+      activeCampaigns: [],
+      completedCampaigns: [],
       isLoading: false,
-      createEpic: vi.fn(),
+      createCampaign: vi.fn(),
       isCreating: false,
-      updateEpicStatus: vi.fn(),
+      updateCampaignStatus: vi.fn(),
     });
   });
 
   it("keeps the add-campaign affordance visible when the user is one campaign under the limit", () => {
-    mocks.useEpicsMock.mockReturnValue({
-      activeEpics: Array.from({ length: ACTIVE_CAMPAIGN_LIMIT - 1 }, (_, index) =>
+    mocks.useCampaignsMock.mockReturnValue({
+      activeCampaigns: Array.from({ length: ACTIVE_CAMPAIGN_LIMIT - 1 }, (_, index) =>
         buildCampaign(String(index + 1))
       ),
-      completedEpics: [],
+      completedCampaigns: [],
       isLoading: false,
-      createEpic: vi.fn(),
+      createCampaign: vi.fn(),
       isCreating: false,
-      updateEpicStatus: vi.fn(),
+      updateCampaignStatus: vi.fn(),
     });
 
     render(<EpicsTab />);
@@ -81,15 +81,15 @@ describe("EpicsTab", () => {
   });
 
   it("hides the add-campaign affordance once the user reaches the active campaign limit", () => {
-    mocks.useEpicsMock.mockReturnValue({
-      activeEpics: Array.from({ length: ACTIVE_CAMPAIGN_LIMIT }, (_, index) =>
+    mocks.useCampaignsMock.mockReturnValue({
+      activeCampaigns: Array.from({ length: ACTIVE_CAMPAIGN_LIMIT }, (_, index) =>
         buildCampaign(String(index + 1))
       ),
-      completedEpics: [],
+      completedCampaigns: [],
       isLoading: false,
-      createEpic: vi.fn(),
+      createCampaign: vi.fn(),
       isCreating: false,
-      updateEpicStatus: vi.fn(),
+      updateCampaignStatus: vi.fn(),
     });
 
     render(<EpicsTab />);

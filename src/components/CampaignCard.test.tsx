@@ -1,6 +1,7 @@
 import type { HTMLAttributes, ReactNode } from "react";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { Campaign } from "@/types/domain";
 
 vi.mock("framer-motion", () => ({
   motion: {
@@ -94,18 +95,29 @@ vi.mock("@/hooks/useMilestones", () => ({
 
 import { CampaignCard } from "./CampaignCard";
 
-const baseJourney = {
+const baseJourney: Campaign = {
   id: "epic-1",
-  user_id: "user-1",
+  userId: "user-1",
   title: "Campaign Alpha",
   description: "A meaningful campaign",
-  target_days: 14,
-  start_date: "2026-02-10",
-  end_date: null,
+  startDate: "2026-02-10",
+  endDate: null,
+  targetDays: 14,
   status: "active",
-  xp_reward: 140,
-  progress_percentage: 25,
-  epic_habits: [],
+  progressPercentage: 25,
+  themeColor: null,
+  habitCount: 0,
+  milestoneCount: 0,
+  latestJourneyPathUrl: null,
+  latestJourneyPathGeneratedAt: null,
+  latestJourneyPathMilestoneIndex: null,
+  createdAt: null,
+  completedAt: null,
+  xpReward: 140,
+  isPublic: null,
+  inviteCode: null,
+  storyTypeSlug: null,
+  rituals: [],
 };
 
 afterEach(() => {
@@ -177,8 +189,8 @@ describe("CampaignCard rename", () => {
       <CampaignCard
         campaign={{
           ...baseJourney,
-          invite_code: "EPIC-QUEST-1234",
-          is_public: true,
+          inviteCode: "EPIC-QUEST-1234",
+          isPublic: true,
         }}
         onRename={vi.fn()}
       />,

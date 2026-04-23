@@ -14,7 +14,6 @@ import { ACTIVE_CAMPAIGN_LIMIT_MESSAGE, hasReachedActiveCampaignLimit } from "@/
 import { useCampaigns } from "@/hooks/useCampaigns";
 import { useMainTabVisibility } from "@/contexts/MainTabVisibilityContext";
 import { cn } from "@/lib/utils";
-import type { Campaign } from "@/types/domain";
 
 interface CreatedCampaignData {
   title: string;
@@ -26,36 +25,6 @@ const CAMPAIGN_PANEL_CLASS = cn(
   "rounded-[32px] border border-celestial-blue/18",
   clearShellCardClassName,
 );
-
-const toCampaignCardModel = (campaign: Campaign) => ({
-  id: campaign.id,
-  user_id: campaign.userId,
-  title: campaign.title,
-  description: campaign.description ?? undefined,
-  target_days: campaign.targetDays,
-  start_date: campaign.startDate,
-  end_date: campaign.endDate,
-  status: campaign.status,
-  xp_reward: campaign.xpReward ?? 0,
-  progress_percentage: campaign.progressPercentage ?? 0,
-  is_public: campaign.isPublic ?? undefined,
-  invite_code: campaign.inviteCode ?? undefined,
-  theme_color: campaign.themeColor ?? undefined,
-  story_type_slug: campaign.storyTypeSlug ?? null,
-  epic_habits: campaign.rituals.map((ritual) => ({
-    habit_id: ritual.habitId,
-    habits: ritual.habit ? {
-      id: ritual.habit.id,
-      title: ritual.habit.title,
-      difficulty: ritual.habit.difficulty ?? "medium",
-      description: ritual.habit.description ?? undefined,
-      frequency: ritual.habit.frequency ?? undefined,
-      estimated_minutes: ritual.habit.estimatedMinutes ?? undefined,
-      custom_days: ritual.habit.customDays ?? null,
-      custom_month_days: ritual.habit.customMonthDays ?? null,
-    } : null,
-  })),
-});
 
 const Campaigns = () => {
   const prefersReducedMotion = useReducedMotion();
@@ -194,7 +163,7 @@ const Campaigns = () => {
                       activeCampaigns.map((campaign) => (
                         <CampaignCard
                           key={campaign.id}
-                          campaign={toCampaignCardModel(campaign)}
+                          campaign={campaign}
                           onRename={async (title) => {
                             await renameCampaign({ epicId: campaign.id, title });
                           }}
@@ -218,7 +187,7 @@ const Campaigns = () => {
                   <div className="space-y-4">
                     {completedCampaigns.length > 0 ? (
                       completedCampaigns.map((campaign) => (
-                        <CampaignCard key={campaign.id} campaign={toCampaignCardModel(campaign)} />
+                        <CampaignCard key={campaign.id} campaign={campaign} />
                       ))
                     ) : (
                       <div className="rounded-[24px] border border-celestial-blue/18 bg-celestial-blue/[0.08] px-4 py-6 text-sm text-muted-foreground backdrop-blur-xl">

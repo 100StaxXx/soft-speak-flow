@@ -85,4 +85,13 @@ describe("normalization wrapper boundaries", () => {
       allowedLegacyAssistantImporters,
     );
   });
+
+  it("keeps campaign card consumers on canonical campaign props instead of legacy bridge models", () => {
+    const bridgeFiles = runtimeBoundaryRoots
+      .flatMap(collectRuntimeSourceFiles)
+      .filter((filePath) => fs.readFileSync(filePath, "utf8").includes("toCampaignCardModel"))
+      .sort();
+
+    expect(bridgeFiles).toEqual([]);
+  });
 });
