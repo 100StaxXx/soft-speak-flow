@@ -30,6 +30,13 @@ import {
   normalizePlannerClassificationHint,
   PlannerRequestSchema,
 } from "./request.ts";
+import {
+  PLAN_DAY_AI_TIMEOUT_MS,
+  PLANNER_ORCHESTRATION_TIMEOUT_MS,
+  QUEST_ENRICHMENT_TIMEOUT_MS,
+  runPlannerStageWithTimeout,
+  UPCOMING_AI_TIMEOUT_MS,
+} from "./latencyBudget.ts";
 
 const getClassificationHint = async (
   req: Request,
@@ -71,6 +78,14 @@ const getClassificationHint = async (
     return null;
   }
 };
+
+const shouldReturnDeterministicStarterImmediately = (
+  starterIntent: PlannerBuildInput["plannerContext"]["starterIntent"] | null | undefined,
+) =>
+  starterIntent === "right_now_start" ||
+  starterIntent === "adjust_today" ||
+  starterIntent === "low_energy_adjust" ||
+  starterIntent === "advance_campaign_start";
 
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
@@ -167,10 +182,23 @@ serve(async (req) => {
     const starterIntent = plannerInput.plannerContext.starterIntent;
 
     if (starterIntent === "plan_day") {
-      const aiResult = await buildPlanDayAIResponse({
-        guardedFetch,
-        input: plannerInput,
-        baseResult: result,
+      const aiResult = await runPlannerStageWithTimeout({
+        work: () =>
+          buildPlanDayAIResponse({
+            guardedFetch,
+            input: plannerInput,
+            baseResult: result,
+          }),
+        timeoutMs: PLAN_DAY_AI_TIMEOUT_MS,
+        operation: "companion planner plan_day ai response",
+        timeoutCode: "PLANNER_PLAN_DAY_TIMEOUT",
+        fallbackValue: null,
+        onTimeout: () => {
+          console.warn(
+            "[companion-planner-chat] plan_day AI timed out, falling back to deterministic",
+            { requestId, timeoutMs: PLAN_DAY_AI_TIMEOUT_MS },
+          );
+        },
       });
       if (aiResult) {
         const responseResult = sanitizeReadyQuestProposalResponse(
@@ -191,10 +219,23 @@ serve(async (req) => {
     }
 
     if (starterIntent === "upcoming_start") {
-      const aiResult = await buildUpcomingAIResponse({
-        guardedFetch,
-        input: plannerInput,
-        baseResult: result,
+      const aiResult = await runPlannerStageWithTimeout({
+        work: () =>
+          buildUpcomingAIResponse({
+            guardedFetch,
+            input: plannerInput,
+            baseResult: result,
+          }),
+        timeoutMs: UPCOMING_AI_TIMEOUT_MS,
+        operation: "companion planner upcoming ai response",
+        timeoutCode: "PLANNER_UPCOMING_TIMEOUT",
+        fallbackValue: null,
+        onTimeout: () => {
+          console.warn(
+            "[companion-planner-chat] upcoming_start AI timed out, falling back to deterministic",
+            { requestId, timeoutMs: UPCOMING_AI_TIMEOUT_MS },
+          );
+        },
       });
       if (aiResult) {
         const responseResult = sanitizeReadyQuestProposalResponse(
@@ -214,16 +255,56 @@ serve(async (req) => {
       );
     }
 
-    const enrichedResult = await enrichQuestPlannerResult({
-      fetchImpl: guardedFetch,
-      input: plannerInput,
-      baseResult: result,
+    if (shouldReturnDeterministicStarterImmediately(starterIntent)) {
+      const responseResult = sanitizeReadyQuestProposalResponse(
+        normalizePlannerBuildResultText(result),
+      );
+
+      return new Response(JSON.stringify(responseResult), {
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+          "X-Request-Id": requestId,
+        },
+      });
+    }
+
+    const enrichedResult = await runPlannerStageWithTimeout({
+      work: () =>
+        enrichQuestPlannerResult({
+          fetchImpl: guardedFetch,
+          input: plannerInput,
+          baseResult: result,
+        }),
+      timeoutMs: QUEST_ENRICHMENT_TIMEOUT_MS,
+      operation: "companion planner quest enrichment",
+      timeoutCode: "PLANNER_ENRICHMENT_TIMEOUT",
+      fallbackValue: result,
+      onTimeout: () => {
+        console.warn(
+          "[companion-planner-chat] quest enrichment timed out, using base result",
+          { requestId, timeoutMs: QUEST_ENRICHMENT_TIMEOUT_MS },
+        );
+      },
     });
 
-    const orchestratedResult = await buildOrchestratedPlannerResponse({
-      guardedFetch,
-      input: plannerInput,
-      baseResult: enrichedResult,
+    const orchestratedResult = await runPlannerStageWithTimeout({
+      work: () =>
+        buildOrchestratedPlannerResponse({
+          guardedFetch,
+          input: plannerInput,
+          baseResult: enrichedResult,
+        }),
+      timeoutMs: PLANNER_ORCHESTRATION_TIMEOUT_MS,
+      operation: "companion planner reply orchestration",
+      timeoutCode: "PLANNER_ORCHESTRATION_TIMEOUT",
+      fallbackValue: enrichedResult,
+      onTimeout: () => {
+        console.warn(
+          "[companion-planner-chat] reply orchestration timed out, using deterministic result",
+          { requestId, timeoutMs: PLANNER_ORCHESTRATION_TIMEOUT_MS },
+        );
+      },
     });
     const responseResult = sanitizeReadyQuestProposalResponse(
       normalizePlannerBuildResultText(orchestratedResult),

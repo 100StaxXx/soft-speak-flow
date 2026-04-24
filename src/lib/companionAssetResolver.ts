@@ -18,6 +18,10 @@ import {
   type CompanionVisualState,
 } from "@/config/companionCatalog";
 import { getCompanionPresetImageAssetKey } from "@/lib/companionImageFocal";
+import {
+  isAiGeneratedCompanion,
+  isPresetEggCompanion,
+} from "@/lib/companionPredicates";
 
 const UNIVERSAL_EGG_ASSET_DIR = "companion-eggs";
 const COMPANION_PRESET_PUBLIC_PATH_SEGMENT = `/storage/v1/object/public/${COMPANION_PRESET_BUCKET}/`;
@@ -27,6 +31,7 @@ interface CompanionAssetSource {
   current_stage?: number | null;
   core_element?: string | null;
   current_image_url?: string | null;
+  initial_image_url?: string | null;
   dormant_image_url?: string | null;
   neglected_image_url?: string | null;
 }
@@ -94,6 +99,7 @@ export const normalizeCompanionStoredImageUrl = (
 export const normalizeCompanionAssetSourceUrls = <T extends CompanionAssetSource>(companion: T): T => ({
   ...companion,
   current_image_url: normalizeCompanionStoredImageUrl(companion.current_image_url),
+  initial_image_url: normalizeCompanionStoredImageUrl(companion.initial_image_url),
   dormant_image_url: normalizeCompanionStoredImageUrl(companion.dormant_image_url),
   neglected_image_url: normalizeCompanionStoredImageUrl(companion.neglected_image_url),
 });
@@ -241,16 +247,17 @@ export const resolveCompanionVisualAssetUrl = (
   if (!companion) return null;
 
   const normalizedCurrentImageUrl = normalizeCompanionStoredImageUrl(companion.current_image_url);
+  const normalizedInitialImageUrl = normalizeCompanionStoredImageUrl(companion.initial_image_url);
   const normalizedDormantImageUrl = normalizeCompanionStoredImageUrl(companion.dormant_image_url);
   const normalizedNeglectedImageUrl = normalizeCompanionStoredImageUrl(companion.neglected_image_url);
 
   const normalizedElement = companion.core_element ?? "fire";
-  const isStageZeroEgg = (companion.current_stage ?? 0) <= 0;
-
-  // Level 0 always renders the shared elemental egg art. Persisted stage-0 URLs
-  // can be stale or point at preset art that does not exist yet.
-  if (isStageZeroEgg && state === "normal") {
+  if (state === "normal" && isPresetEggCompanion(companion)) {
     return getUniversalEggAssetUrl(normalizedElement);
+  }
+
+  if (state === "normal" && isAiGeneratedCompanion(companion) && (companion.current_stage ?? 0) <= 0) {
+    return normalizedCurrentImageUrl ?? normalizedInitialImageUrl ?? getUniversalEggAssetUrl(normalizedElement);
   }
 
   const presetUrl = companion.preset_id
@@ -270,5 +277,5 @@ export const resolveCompanionVisualAssetUrl = (
   if (state === "neglected") {
     return normalizedNeglectedImageUrl ?? normalizedCurrentImageUrl ?? null;
   }
-  return normalizedCurrentImageUrl ?? null;
+  return normalizedCurrentImageUrl ?? normalizedInitialImageUrl ?? null;
 };

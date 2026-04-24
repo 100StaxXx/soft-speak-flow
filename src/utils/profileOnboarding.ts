@@ -1,4 +1,5 @@
 import { getResolvedMentorId } from "./mentor";
+import { hasValidCompanionStage } from "@/lib/companionPredicates";
 
 type OnboardingAwareProfile = {
   selected_mentor_id?: string | null;
@@ -64,17 +65,23 @@ export const getOnboardingGateState = ({
   hasCompanion = false,
   hasPresetCompanion = false,
   companionStage = null,
+  hasCompanionImages = false,
 }: {
   profile: OnboardingAwareProfile;
   hasCompanion?: boolean;
   hasPresetCompanion?: boolean;
   companionStage?: number | null;
+  hasCompanionImages?: boolean;
 }): OnboardingGateState => {
   const walkthroughCompleted = hasWalkthroughCompleted(profile?.onboarding_data);
   const hasGuidedTutorial = hasGuidedTutorialProgress(profile?.onboarding_data);
   const needsProgressionReset = hasProgressionResetPending(profile?.onboarding_data);
   const hasStageZeroEggCompanion = hasCompanion && companionStage === 0;
-  const needsCompanionMigration = hasCompanion && !hasPresetCompanion && companionStage !== 0;
+  const hasInvalidCompanionStage = hasCompanion && !hasValidCompanionStage({ current_stage: companionStage });
+  const needsCompanionMigration = hasCompanion && (
+    hasInvalidCompanionStage
+    || (!hasPresetCompanion && !hasCompanionImages)
+  );
   const onboardingStep = normalizeOnboardingStep(profile?.onboarding_step);
   const isCompletionStep = onboardingStep === "complete";
   const needsJourneyBeginsRecovery =
@@ -100,7 +107,7 @@ export const getOnboardingGateState = ({
     reason = "onboarding_completed";
   } else if (walkthroughCompleted) {
     reason = "walkthrough_completed";
-  } else if (hasPresetCompanion && !hasStageZeroEggCompanion) {
+  } else if (hasCompanion && !hasStageZeroEggCompanion) {
     reason = "companion_exists";
   } else if (profile?.onboarding_completed == null && getResolvedMentorId(profile)) {
     reason = "legacy_resolved_mentor";
@@ -125,12 +132,18 @@ export const getOnboardingGateState = ({
 
 export const isReturningProfile = (
   profile: OnboardingAwareProfile,
-  options: { hasCompanion?: boolean; hasPresetCompanion?: boolean; companionStage?: number | null } = {},
+  options: {
+    hasCompanion?: boolean;
+    hasPresetCompanion?: boolean;
+    companionStage?: number | null;
+    hasCompanionImages?: boolean;
+  } = {},
 ): boolean => getOnboardingGateState({
   profile,
   hasCompanion: options.hasCompanion,
   hasPresetCompanion: options.hasPresetCompanion,
   companionStage: options.companionStage,
+  hasCompanionImages: options.hasCompanionImages,
 }).isEstablished;
 
 export const buildEstablishedProfileSelfHealPatch = ({
@@ -138,13 +151,21 @@ export const buildEstablishedProfileSelfHealPatch = ({
   hasCompanion = false,
   hasPresetCompanion = false,
   companionStage = null,
+  hasCompanionImages = false,
 }: {
   profile: OnboardingAwareProfile;
   hasCompanion?: boolean;
   hasPresetCompanion?: boolean;
   companionStage?: number | null;
+  hasCompanionImages?: boolean;
 }): { onboarding_completed: true; onboarding_data: Record<string, unknown> } | null => {
-  const gate = getOnboardingGateState({ profile, hasCompanion, hasPresetCompanion, companionStage });
+  const gate = getOnboardingGateState({
+    profile,
+    hasCompanion,
+    hasPresetCompanion,
+    companionStage,
+    hasCompanionImages,
+  });
   if (!gate.shouldSelfHeal) return null;
 
   const existingData = normalizeOnboardingData(profile?.onboarding_data);

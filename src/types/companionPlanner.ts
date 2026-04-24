@@ -1,4 +1,5 @@
 import type { IntentClassification } from "@/hooks/useIntentClassifier";
+import type { CompanionPlanningMode } from "@/shared/companionPlanningMode";
 import type {
   CompanionMissInterpretation,
   CompanionMomentumState,
@@ -17,6 +18,7 @@ export type CompanionPlannerResponseMode = "conversational" | "schedule_read" | 
 export type CompanionPlannerStarterIntent =
   | "general"
   | "plan_day"
+  | "advance_campaign_start"
   | "right_now_start"
   | "make_room"
   | "what_matters"
@@ -221,6 +223,7 @@ export interface CompanionPlannerLaunchIntent {
   starterIntent: CompanionPlannerStarterIntent;
   target?: CompanionPlannerLaunchTarget;
   briefingContext?: PlannerBriefingContext | null;
+  planningMode?: CompanionPlanningMode | null;
 }
 
 export interface PlannerContextCalendarEvent {

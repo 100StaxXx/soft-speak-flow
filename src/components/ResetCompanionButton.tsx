@@ -20,7 +20,7 @@ import {
 import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
-import { CompanionPersonalization } from "@/components/CompanionPersonalization";
+import { AICompanionCreator } from "@/components/AICompanionCreator";
 import { useCompanion } from "@/hooks/useCompanion";
 
 export const ResetCompanionButton = memo(() => {
@@ -56,16 +56,18 @@ export const ResetCompanionButton = memo(() => {
   };
 
   const handleCreateCompanion = async (data: {
-    presetId: string | null;
     favoriteColor: string;
     spiritAnimal: string;
     coreElement: string;
     storyTone: string;
     companionName?: string | null;
   }) => {
-    await createCompanion.mutateAsync(data);
+    await createCompanion.mutateAsync({
+      creationMode: "ai",
+      ...data,
+    });
     setCreateDialogOpen(false);
-    toast.success(data.presetId ? 'Your new egg and species are locked in!' : 'Your new egg has been chosen!');
+    toast.success("Your new AI egg has been chosen!");
   };
 
   return (
@@ -98,14 +100,16 @@ export const ResetCompanionButton = memo(() => {
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-2xl font-heading font-black">
-              Choose Your New Egg And Species
+              Shape Your New Companion Egg
             </DialogTitle>
           </DialogHeader>
-          <CompanionPersonalization
+          <AICompanionCreator
             onComplete={handleCreateCompanion}
+            storyTone="epic_adventure"
+            allowToneSelection
             isLoading={createCompanion.isPending}
             layout="compact"
-            mode="reset"
+            description="Choose the hidden lineage traits for the new AI-generated egg you want to begin with."
           />
         </DialogContent>
       </Dialog>

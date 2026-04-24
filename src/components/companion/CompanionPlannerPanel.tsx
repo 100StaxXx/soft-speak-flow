@@ -11,6 +11,8 @@ import {
 } from "lucide-react";
 
 import { AudioReactiveWaveform } from "@/components/AudioReactiveWaveform";
+import { CompanionPlanningModeSelector } from "@/components/companion/CompanionPlanningModeSelector";
+import { CompanionStructuredResponseCards } from "@/components/companion/CompanionStructuredResponseCards";
 import { PermissionRequestDialog } from "@/components/PermissionRequestDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,6 +30,7 @@ import { useCompanionAssistant } from "@/hooks/useCompanionAssistant";
 import { useCompanionModeSettings } from "@/hooks/useCompanionModeSettings";
 import { cn, stripMarkdown } from "@/lib/utils";
 import { COMPANION_MODE_OPTIONS } from "@/shared/companionModes";
+import { COMPANION_PLANNER_SURFACE_ACTIONS } from "@/shared/companionPlannerSurfaceActions";
 
 export const CompanionPlannerPanel = memo(() => {
   const assistant = useCompanionAssistant({
@@ -35,6 +38,9 @@ export const CompanionPlannerPanel = memo(() => {
     conversationEnabled: true,
   });
   const modeSettings = useCompanionModeSettings();
+  const quickActionsDisabled = assistant.isSubmitting ||
+    assistant.isResolvingAction ||
+    Boolean(assistant.pendingAction);
 
   const handleComposerKeyDown = useCallback(
     (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -57,7 +63,8 @@ export const CompanionPlannerPanel = memo(() => {
               Cosmiq Companion
             </div>
             <h2 className="text-base font-semibold text-white sm:text-lg">
-              Talk naturally, ask what your schedule looks like, or prepare one confirmable action.
+              Talk naturally, ask what your schedule looks like, or prepare one
+              confirmable action.
             </h2>
             <p className="text-sm text-white/60">
               Nothing changes until you confirm it.
@@ -112,6 +119,55 @@ export const CompanionPlannerPanel = memo(() => {
       </div>
 
       <div className="space-y-4 px-4 py-4 sm:px-5">
+        <CompanionPlanningModeSelector
+          mode={assistant.planningMode}
+          onChange={assistant.setPlanningMode}
+          variant="companion"
+        />
+
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/45">
+            Quick Starts
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {COMPANION_PLANNER_SURFACE_ACTIONS.filter((action) =>
+              [
+                "plan-day",
+                "advance-campaign",
+                "adjust-day",
+                "right-now",
+                "upcoming",
+              ].includes(
+                action.id,
+              )
+            ).map((action) => (
+              <Button
+                key={action.id}
+                type="button"
+                variant="outline"
+                className="h-9 rounded-full border-white/10 bg-white/[0.04] px-4 text-[0.68rem] font-black uppercase tracking-[0.16em] text-white/80 hover:bg-white/[0.08]"
+                disabled={quickActionsDisabled}
+                data-testid={`companion-quick-action-${action.id}`}
+                onClick={() => {
+                  void assistant.submitMessage(action.message, "text", {
+                    starterIntent: action.starterIntent,
+                  });
+                }}
+              >
+                {action.id === "plan-day"
+                  ? "Plan My Day"
+                  : action.id === "advance-campaign"
+                  ? "Advance My Campaign"
+                  : action.id === "adjust-day"
+                  ? "Adjust My Day"
+                  : action.id === "right-now"
+                  ? "Right Now"
+                  : "Coming Up"}
+              </Button>
+            ))}
+          </div>
+        </div>
+
         {assistant.isRecording || assistant.interimText || assistant.isSpeaking
           ? (
             <div className="rounded-[26px] border border-white/10 bg-black/20 p-4">
@@ -119,7 +175,8 @@ export const CompanionPlannerPanel = memo(() => {
                 ? (
                   <>
                     <AudioReactiveWaveform
-                      isActive={assistant.isRecording && !assistant.isAutoStopping}
+                      isActive={assistant.isRecording &&
+                        !assistant.isAutoStopping}
                       className="justify-start"
                     />
                     <p className="mt-2 text-sm text-white/80">
@@ -133,7 +190,9 @@ export const CompanionPlannerPanel = memo(() => {
                   <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-emerald-300/20 bg-emerald-400/10 px-4 py-3">
                     <div className="flex items-center gap-2 text-sm text-emerald-50">
                       <Waves className="h-4 w-4" />
-                      Speaking {assistant.speechProvider === "cloud" ? "with fallback audio" : "on-device"}.
+                      Speaking {assistant.speechProvider === "cloud"
+                        ? "with fallback audio"
+                        : "on-device"}.
                     </div>
                     <Button
                       type="button"
@@ -179,6 +238,16 @@ export const CompanionPlannerPanel = memo(() => {
           </div>
         </ScrollArea>
 
+        <CompanionStructuredResponseCards
+          structuredResponse={assistant.structuredResponse}
+          variant="companion"
+          onConfirmSuggestion={assistant.confirmSuggestedQuest}
+          savedProposalIds={assistant.savedSuggestionProposalIds}
+          pendingProposalId={assistant.pendingSuggestionProposalId}
+          actionDisabled={assistant.isSubmitting ||
+            assistant.isResolvingAction || Boolean(assistant.pendingAction)}
+        />
+
         {assistant.pendingAction
           ? (
             <div
@@ -192,11 +261,21 @@ export const CompanionPlannerPanel = memo(() => {
                 >
                   Pending confirmation
                 </Badge>
+                {assistant.readyPendingActionCount > 1
+                  ? (
+                    <Badge
+                      variant="outline"
+                      className="border-amber-300/25 bg-amber-400/10 text-amber-50"
+                    >
+                      {assistant.readyPendingActionCount} ready
+                    </Badge>
+                  )
+                  : null}
                 <Badge
                   variant="outline"
                   className="border-white/10 bg-white/5 text-white/70"
                 >
-                  {assistant.pendingAction.actionType.replaceAll("_", " ")}
+                  {assistant.pendingAction.actionType.replace(/_/g, " ")}
                 </Badge>
               </div>
               <p className="mt-3 text-sm font-medium text-white">
@@ -209,11 +288,34 @@ export const CompanionPlannerPanel = memo(() => {
                   </p>
                 )
                 : null}
+              {assistant.readyPendingActionCount > 1
+                ? (
+                  <p className="mt-2 text-sm text-white/70">
+                    {assistant.readyPendingActionCount}{" "}
+                    planner actions are ready. Confirm all to save the batch, or
+                    confirm them one at a time.
+                  </p>
+                )
+                : null}
               <div className="mt-4 flex flex-wrap gap-2">
+                {assistant.readyPendingActionCount > 1
+                  ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={assistant.confirmAllPendingActions}
+                      disabled={assistant.isResolvingAction ||
+                        assistant.isSubmitting}
+                    >
+                      Confirm All ({assistant.readyPendingActionCount})
+                    </Button>
+                  )
+                  : null}
                 <Button
                   type="button"
                   onClick={assistant.confirmPendingAction}
-                  disabled={assistant.isResolvingAction || assistant.isSubmitting}
+                  disabled={assistant.isResolvingAction ||
+                    assistant.isSubmitting}
                 >
                   <Check className="mr-2 h-4 w-4" />
                   Confirm
@@ -222,7 +324,8 @@ export const CompanionPlannerPanel = memo(() => {
                   type="button"
                   variant="outline"
                   onClick={assistant.cancelPendingAction}
-                  disabled={assistant.isResolvingAction || assistant.isSubmitting}
+                  disabled={assistant.isResolvingAction ||
+                    assistant.isSubmitting}
                 >
                   <X className="mr-2 h-4 w-4" />
                   Cancel
@@ -269,7 +372,8 @@ export const CompanionPlannerPanel = memo(() => {
             <Button
               type="button"
               onClick={assistant.submitTypedMessage}
-              disabled={assistant.isSubmitting || assistant.isResolvingAction || !assistant.draftInput.trim()}
+              disabled={assistant.isSubmitting || assistant.isResolvingAction ||
+                !assistant.draftInput.trim()}
               className="min-w-[8rem]"
               data-testid="companion-assistant-send-button"
             >

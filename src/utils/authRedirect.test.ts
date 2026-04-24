@@ -66,15 +66,43 @@ import { getAuthRedirectPath, getProfileAwareAuthFallbackPath } from "./authRedi
 
 const noCompanion = { data: null, error: null };
 const existingCompanion = {
-  data: { id: "companion-1", preset_id: "dragon", current_stage: 1 },
+  data: {
+    id: "companion-1",
+    preset_id: "dragon",
+    current_stage: 1,
+    current_image_url: "https://example.com/stage-1.png",
+    initial_image_url: "https://example.com/egg.png",
+  },
+  error: null,
+};
+const presetCompanionWithoutStoredImages = {
+  data: {
+    id: "companion-1",
+    preset_id: "dragon",
+    current_stage: 1,
+    current_image_url: null,
+    initial_image_url: null,
+  },
   error: null,
 };
 const stageZeroEggCompanion = {
-  data: { id: "companion-egg", preset_id: null, current_stage: 0 },
+  data: {
+    id: "companion-egg",
+    preset_id: null,
+    current_stage: 0,
+    current_image_url: "https://example.com/ai-egg.png",
+    initial_image_url: "https://example.com/ai-egg.png",
+  },
   error: null,
 };
 const stageZeroPresetCompanion = {
-  data: { id: "companion-egg", preset_id: "dragon", current_stage: 0 },
+  data: {
+    id: "companion-egg",
+    preset_id: "dragon",
+    current_stage: 0,
+    current_image_url: "https://example.com/preset-egg.png",
+    initial_image_url: "https://example.com/preset-egg.png",
+  },
   error: null,
 };
 
@@ -155,6 +183,20 @@ describe("getAuthRedirectPath", () => {
         walkthrough_completed: true,
       },
     });
+  });
+
+  it("keeps preset-backed established accounts on /tasks even when stored image urls are blank", async () => {
+    mocks.profilesMaybeSingleMock.mockResolvedValueOnce({
+      data: {
+        selected_mentor_id: "mentor-2",
+        onboarding_completed: false,
+        onboarding_data: {},
+      },
+      error: null,
+    });
+    mocks.companionMaybeSingleMock.mockResolvedValueOnce(presetCompanionWithoutStoredImages);
+
+    await expect(getAuthRedirectPath("preset-no-image-user")).resolves.toBe("/tasks");
   });
 
   it("routes to /onboarding when onboarding is explicitly incomplete, even with mentor", async () => {

@@ -21,6 +21,30 @@ export const COMPANION_AGENT_INTENTS = [
   "unknown",
 ] as const;
 
+export const COMPANION_AGENT_STARTER_INTENTS = [
+  "general",
+  "plan_day",
+  "advance_campaign_start",
+  "right_now_start",
+  "make_room",
+  "what_matters",
+  "relationship_touch",
+  "adjust_today",
+  "low_energy_adjust",
+  "briefing_followup",
+  "goal_breakdown",
+  "free_talk_start",
+  "upcoming_start",
+  "quest_capture",
+  "goal_breakdown_start",
+] as const;
+
+export const COMPANION_PLANNING_MODES = [
+  "lock_in",
+  "balanced",
+  "recovery",
+] as const;
+
 export const COMPANION_PENDING_ACTION_TYPES = [
   "task_create",
   "task_update",
@@ -92,6 +116,7 @@ const CompanionStructuredResponseSchema = z.object({
   comingUp: z.object({
     message: z.string().min(1).max(4000),
     nextEvent: CompanionScheduleItemSchema.nullable(),
+    nextBestAction: CompanionSuggestedQuestSchema.nullable(),
     remainingToday: z.array(CompanionScheduleItemSchema).max(24),
     tomorrowSummary: z.enum(["busy", "light", "open"]),
     missedItems: z.array(CompanionMissedItemSchema).max(24),
@@ -108,14 +133,27 @@ const CompanionStructuredResponseSchema = z.object({
     move: z.array(CompanionSuggestedQuestSchema).max(5),
     dropOrShrink: z.array(CompanionSuggestedQuestSchema).max(5),
   }).nullable().optional(),
+  campaignMomentum: z.object({
+    message: z.string().min(1).max(4000),
+    campaignId: z.string().min(1).max(200).nullable(),
+    campaignTitle: z.string().min(1).max(200).nullable(),
+    status: z.enum(["moving", "drifting", "stalled", "at_risk"]).nullable(),
+    statusReason: z.string().min(1).max(2000).nullable(),
+    nextStep: CompanionSuggestedQuestSchema.nullable(),
+    supportActions: z.array(CompanionSuggestedQuestSchema).max(5),
+  }).nullable().optional(),
 });
 
 export const SurfaceSchema = z.enum(["companion", "journeys"]);
 export const InputModeSchema = z.enum(["text", "voice"]);
 export const ModeSchema = z.enum(COMPANION_AGENT_MODES);
 export const IntentSchema = z.enum(COMPANION_AGENT_INTENTS);
+export const StarterIntentSchema = z.enum(COMPANION_AGENT_STARTER_INTENTS);
+export const PlanningModeSchema = z.enum(COMPANION_PLANNING_MODES);
 export const PendingActionTypeSchema = z.enum(COMPANION_PENDING_ACTION_TYPES);
-export const PendingActionStatusSchema = z.enum(COMPANION_PENDING_ACTION_STATUSES);
+export const PendingActionStatusSchema = z.enum(
+  COMPANION_PENDING_ACTION_STATUSES,
+);
 
 export const SelectedEntityIdsSchema = z.object({
   taskIds: z.array(z.string().uuid()).max(12).optional(),
@@ -131,6 +169,9 @@ export const CompanionAgentRequestSchema = z.object({
   message: z.string().min(1).max(4000).trim(),
   inputMode: InputModeSchema.default("text"),
   currentDateTime: z.string().datetime({ offset: true }),
+  starterIntent: StarterIntentSchema.optional(),
+  planningMode: PlanningModeSchema.optional(),
+  selectedProposalId: z.string().min(1).max(200).optional(),
   visibleDateStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   visibleDateEnd: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   horizonDays: z.number().int().min(1).max(31).optional(),
@@ -153,11 +194,17 @@ export const SubmitCompanionResultSchema = z.object({
 });
 
 export type CompanionAgentRequest = z.infer<typeof CompanionAgentRequestSchema>;
-export type CompanionAgentActionRequest = z.infer<typeof CompanionAgentActionRequestSchema>;
+export type CompanionAgentActionRequest = z.infer<
+  typeof CompanionAgentActionRequestSchema
+>;
 export type CompanionAgentMode = z.infer<typeof ModeSchema>;
 export type CompanionAgentIntent = z.infer<typeof IntentSchema>;
-export type CompanionPendingActionType = z.infer<typeof PendingActionTypeSchema>;
-export type CompanionPendingActionStatus = z.infer<typeof PendingActionStatusSchema>;
+export type CompanionPendingActionType = z.infer<
+  typeof PendingActionTypeSchema
+>;
+export type CompanionPendingActionStatus = z.infer<
+  typeof PendingActionStatusSchema
+>;
 export type SubmitCompanionResult = z.infer<typeof SubmitCompanionResultSchema>;
 
 export interface PendingActionCandidate {

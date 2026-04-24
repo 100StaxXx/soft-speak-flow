@@ -36,11 +36,13 @@ export default function Onboarding() {
   const hasCompanion = Boolean(companion);
   const hasPresetCompanion = Boolean(companion?.preset_id);
   const companionStage = companion?.current_stage ?? null;
+  const hasCompanionImages = Boolean(companion?.current_image_url || companion?.initial_image_url);
   const onboardingGate = getOnboardingGateState({
     profile,
     hasCompanion,
     hasPresetCompanion,
     companionStage,
+    hasCompanionImages,
   });
   const onboardingGateReady =
     status !== "loading" &&
@@ -57,10 +59,11 @@ export default function Onboarding() {
       ? getCompanionPreset(companion.preset_id)?.displayName ?? null
       : null;
     const elementalEggLabel = getCompanionEggLabel(companion?.core_element);
+    const isStageZeroEgg = companion?.current_stage === 0;
     const companionLabel =
       getStoredCompanionCustomName(companion)
-      || 
-      presetName
+      || (isStageZeroEgg ? elementalEggLabel : null)
+      || presetName
       || (spiritAnimal.length > 0 && spiritAnimal !== "Egg" ? spiritAnimal : elementalEggLabel);
 
     return {
@@ -85,6 +88,7 @@ export default function Onboarding() {
       hasCompanion,
       hasPresetCompanion,
       companionStage,
+      hasCompanionImages,
     });
     if (!patch) return;
 
@@ -100,7 +104,7 @@ export default function Onboarding() {
           console.warn("Failed to self-heal established profile flags:", error);
         }
       });
-  }, [user, onboardingGateReady, profile, hasCompanion, hasPresetCompanion, companionStage]);
+  }, [user, onboardingGateReady, profile, hasCompanion, hasPresetCompanion, companionStage, hasCompanionImages]);
 
   useEffect(() => {
     if (!user || !onboardingGateReady || !onboardingGate.needsCompanionMigration) return;

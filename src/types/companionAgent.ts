@@ -1,10 +1,12 @@
 import type { Json } from "@/integrations/supabase/types";
+import type { CompanionPlanningMode } from "@/shared/companionPlanningMode";
 import type { CompanionStructuredResponse } from "@/shared/companionStructuredOutput";
 import type {
   CompanionChatInputMode,
   CompanionChatRole,
   CompanionChatSurface,
 } from "@/types/companionConversation";
+import type { CompanionPlannerStarterIntent } from "@/types/companionPlanner";
 
 export type CompanionAgentMode =
   | "conversation"
@@ -54,6 +56,7 @@ export interface PendingActionView {
   status: CompanionAgentActionStatus;
   intent: CompanionAgentIntent;
   actionType: CompanionPendingActionType;
+  proposalId?: string | null;
   summary: string;
   confirmationMessage: string | null;
   normalizedPayload: Json;
@@ -64,7 +67,11 @@ export interface PendingActionView {
 
 export interface ActionReceiptView {
   actionId: string;
-  status: Extract<CompanionAgentActionStatus, "cancelled" | "failed" | "executed">;
+  status: Extract<
+    CompanionAgentActionStatus,
+    "cancelled" | "failed" | "executed"
+  >;
+  proposalId?: string | null;
   message: string;
   summary?: string | null;
   createdAt: string;
@@ -86,6 +93,9 @@ export interface CompanionAgentRequest {
   message: string;
   inputMode: CompanionChatInputMode;
   currentDateTime: string;
+  starterIntent?: CompanionPlannerStarterIntent;
+  planningMode?: CompanionPlanningMode;
+  selectedProposalId?: string;
   visibleDateStart?: string;
   visibleDateEnd?: string;
   horizonDays?: number;

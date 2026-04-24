@@ -38,6 +38,11 @@ import {
   resolveProgressionLevelFromXp,
 } from "@/config/progression";
 import { persistCompanionCustomName } from "@/lib/companionName";
+import {
+  hasCompanionStoredVisual,
+  isAiGeneratedCompanion,
+  isPresetEggCompanion,
+} from "@/lib/companionPredicates";
 
 export interface Companion {
   id: string;
@@ -78,6 +83,8 @@ export interface Companion {
   neglected_image_focal_x?: number | null;
   neglected_image_focal_y?: number | null;
   image_regenerations_used?: number;
+  visual_identity_profile?: Record<string, unknown> | null;
+  image_lineage_metadata?: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
 }
@@ -430,6 +437,35 @@ interface HatchCompanionMutationResult extends HatchCompanionResponse {
   previous_image_url: string;
 }
 
+interface GeneratedCompanionImageResponse {
+  imageUrl?: string;
+  imageFocalX?: number | null;
+  imageFocalY?: number | null;
+  visualIdentityProfile?: Record<string, unknown> | null;
+  imageLineageMetadata?: Record<string, unknown> | null;
+}
+
+type CreateAiCompanionInput = {
+  creationMode: "ai";
+  favoriteColor: string;
+  spiritAnimal: string;
+  coreElement: string;
+  storyTone: string;
+  companionName?: string | null;
+};
+
+type CreatePresetCompanionInput = {
+  creationMode: "preset";
+  presetId: string | null;
+  favoriteColor?: string;
+  spiritAnimal?: string;
+  coreElement: string;
+  storyTone: string;
+  companionName?: string | null;
+};
+
+type CreateCompanionInput = CreateAiCompanionInput | CreatePresetCompanionInput;
+
 type EvolutionFailureClass = "terminal" | "retryable_infrastructure" | "non_retryable";
 
 interface EvolutionResolvedFailure {
@@ -477,7 +513,15 @@ type SupabaseRpcError = {
   hint?: string | null;
 };
 
-type CreateCompanionRpcArgs = Record<string, string | number | null>;
+type CreateCompanionRpcValue =
+  | string
+  | number
+  | boolean
+  | null
+  | Record<string, unknown>
+  | Array<unknown>;
+
+type CreateCompanionRpcArgs = Record<string, CreateCompanionRpcValue>;
 
 type CreateCompanionRpcResult = {
   data: CreateCompanionIfNotExistsResult[] | null;
@@ -495,11 +539,25 @@ const getCreateCompanionArgsWithoutFocalPoints = ({
   ...legacyCreateCompanionRpcArgs
 }: CreateCompanionRpcArgs): CreateCompanionRpcArgs => legacyCreateCompanionRpcArgs;
 
+const getCreateCompanionArgsWithoutVisualIdentityProfile = ({
+  p_visual_identity_profile: _ignoredVisualIdentityProfile,
+  ...legacyCreateCompanionRpcArgs
+}: CreateCompanionRpcArgs): CreateCompanionRpcArgs => legacyCreateCompanionRpcArgs;
+
+const getCreateCompanionArgsWithoutImageLineageMetadata = ({
+  p_image_lineage_metadata: _ignoredImageLineageMetadata,
+  ...legacyCreateCompanionRpcArgs
+}: CreateCompanionRpcArgs): CreateCompanionRpcArgs => legacyCreateCompanionRpcArgs;
+
 const getCreateCompanionArgsWithoutPresetOrFocalPoints = ({
   p_preset_id: _ignoredPresetId,
   ...createCompanionRpcArgsWithoutPreset
 }: CreateCompanionRpcArgs): CreateCompanionRpcArgs =>
-  getCreateCompanionArgsWithoutFocalPoints(createCompanionRpcArgsWithoutPreset);
+  getCreateCompanionArgsWithoutImageLineageMetadata(
+    getCreateCompanionArgsWithoutVisualIdentityProfile(
+      getCreateCompanionArgsWithoutFocalPoints(createCompanionRpcArgsWithoutPreset),
+    ),
+  );
 
 const normalizeEvolutionErrorCode = (value: string | null | undefined): string | null => {
   if (!value) return null;
@@ -877,14 +935,7 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
   ]);
 
   const createCompanion = useMutation({
-    mutationFn: async (data: {
-      presetId?: string | null;
-      favoriteColor: string;
-      spiritAnimal: string;
-      coreElement: string;
-      storyTone: string;
-      companionName?: string | null;
-    }) => {
+    mutationFn: async (data: CreateCompanionInput) => {
       const creationStartedAt = Date.now();
       if (!user) throw new Error("Not authenticated");
 
@@ -896,29 +947,69 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
 
       try {
         logger.log("Starting companion creation process...");
-        logger.info("Companion creation started", {
-          userId: user.id,
-          presetId: data.presetId ?? null,
-          spiritAnimal: data.spiritAnimal,
-          coreElement: data.coreElement,
-          stage: 0,
-        });
-
-        const preset = data.presetId ? getCompanionPreset(data.presetId) : null;
-        if (data.presetId && !preset) {
+        const isAiCreation = data.creationMode === "ai";
+        const preset = data.creationMode === "preset" && data.presetId
+          ? getCompanionPreset(data.presetId)
+          : null;
+        if (data.creationMode === "preset" && data.presetId && !preset) {
           throw new Error("Unknown companion preset");
         }
 
         const normalizedElement = coerceCompanionElementId(data.coreElement);
-        const resolvedFavoriteColor = getCompanionElementAnchorColor(normalizedElement);
-        const resolvedSpiritAnimal = data.spiritAnimal?.trim() || preset?.displayName || "Egg";
+        const resolvedFavoriteColor = isAiCreation
+          ? data.favoriteColor?.trim() || getCompanionElementAnchorColor(normalizedElement)
+          : getCompanionElementAnchorColor(normalizedElement);
+        const resolvedSpiritAnimal = isAiCreation
+          ? data.spiritAnimal?.trim() || "Dragon"
+          : data.spiritAnimal?.trim() || preset?.displayName || "Egg";
+
+        logger.info("Companion creation started", {
+          userId: user.id,
+          creationMode: data.creationMode,
+          presetId: preset?.id ?? null,
+          spiritAnimal: resolvedSpiritAnimal,
+          coreElement: data.coreElement,
+          stage: 0,
+        });
 
         const eyeColor = "";
         const furColor = "";
-        // Stage 0 always uses the shared elemental egg art. A locked preset only
-        // determines the future hatch result, not the egg's visual at creation time.
-        const currentImageUrl = getUniversalEggAssetUrl(normalizedElement);
-        const currentImageFocal = getBundledCompanionImageFocalPoint(currentImageUrl);
+        let currentImageUrl = getUniversalEggAssetUrl(normalizedElement);
+        let currentImageFocal = getBundledCompanionImageFocalPoint(currentImageUrl);
+        let visualIdentityProfile: Record<string, unknown> | null = null;
+        let imageLineageMetadata: Record<string, unknown> | null = null;
+
+        if (isAiCreation) {
+          const { data: generatedImageData, error: generatedImageError } =
+            await supabase.functions.invoke("generate-companion-image", {
+              body: {
+                spiritAnimal: resolvedSpiritAnimal,
+                element: normalizedElement,
+                stage: 0,
+                favoriteColor: resolvedFavoriteColor,
+                storyTone: data.storyTone,
+                flowType: "ai_onboarding_egg",
+              },
+            });
+
+          if (generatedImageError) {
+            const parsed = await parseFunctionInvokeError(generatedImageError);
+            throw new Error(toUserFacingFunctionError(parsed, { action: "create your AI companion egg" }));
+          }
+
+          const generatedImage = (generatedImageData ?? null) as GeneratedCompanionImageResponse | null;
+          if (!generatedImage?.imageUrl) {
+            throw new Error("AI companion image generation did not return an egg portrait.");
+          }
+
+          currentImageUrl = generatedImage.imageUrl;
+          currentImageFocal = {
+            x: typeof generatedImage.imageFocalX === "number" ? generatedImage.imageFocalX : 0.5,
+            y: typeof generatedImage.imageFocalY === "number" ? generatedImage.imageFocalY : 0.5,
+          };
+          visualIdentityProfile = generatedImage.visualIdentityProfile ?? null;
+          imageLineageMetadata = generatedImage.imageLineageMetadata ?? null;
+        }
 
         logger.log("Stage 0 asset resolved successfully, creating companion record...");
 
@@ -933,7 +1024,7 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
 
         const createCompanionRpcArgs: CreateCompanionRpcArgs = {
           p_user_id: user.id,
-          p_preset_id: preset?.id ?? null,
+          p_preset_id: isAiCreation ? null : preset?.id ?? null,
           p_favorite_color: resolvedFavoriteColor,
           p_spirit_animal: resolvedSpiritAnimal,
           p_core_element: normalizedElement,
@@ -946,19 +1037,25 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
           p_initial_image_focal_y: currentImageFocal?.y ?? null,
           p_eye_color: eyeColor,
           p_fur_color: furColor,
+          p_visual_identity_profile: visualIdentityProfile,
+          p_image_lineage_metadata: imageLineageMetadata,
         };
 
         // Use atomic database function to create companion (prevents duplicates)
         let result = await invokeCreateCompanionRpc(createCompanionRpcArgs);
 
         if (result.error && isLegacyCreateCompanionRpcSignatureError(result.error)) {
-          logger.warn("Create companion RPC signature mismatch; retrying legacy preset-aware call without focal points", {
+          logger.warn("Create companion RPC signature mismatch; retrying legacy call without visual profile and focal points", {
             userId: user.id,
             presetId: preset?.id ?? null,
             coreElement: normalizedElement,
           });
           result = await invokeCreateCompanionRpc(
-            getCreateCompanionArgsWithoutFocalPoints(createCompanionRpcArgs),
+            getCreateCompanionArgsWithoutImageLineageMetadata(
+              getCreateCompanionArgsWithoutVisualIdentityProfile(
+                getCreateCompanionArgsWithoutFocalPoints(createCompanionRpcArgs),
+              ),
+            ),
           );
         }
 
@@ -1104,7 +1201,8 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
 
         logger.info("Companion creation completed", {
           userId: user.id,
-          presetId: data.presetId ?? null,
+          creationMode: data.creationMode,
+          presetId: data.creationMode === "preset" ? data.presetId ?? null : null,
           durationMs: Date.now() - creationStartedAt,
         });
         return companionData;
@@ -1572,7 +1670,13 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
   });
 
   const requiresHatchSelection = useMemo(
-    () => Boolean(companion && companion.current_stage === 0 && !companion.preset_id),
+    () => Boolean(
+      companion
+      && companion.current_stage === 0
+      && !isPresetEggCompanion(companion)
+      && !isAiGeneratedCompanion(companion)
+      && !hasCompanionStoredVisual(companion),
+    ),
     [companion],
   );
 
@@ -1664,9 +1768,7 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
       return;
     }
 
-    if (latestCompanion.current_stage === 0) {
-      if (!latestCompanion.preset_id) return;
-
+    if (isPresetEggCompanion(latestCompanion)) {
       setIsEvolvingLoading(true);
       window.dispatchEvent(new CustomEvent("evolution-loading-start"));
       hatchCompanion.mutate({

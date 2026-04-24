@@ -56,6 +56,8 @@ export interface CreateCompanionIfNotExistsArgs {
   p_initial_image_focal_y: number | null;
   p_eye_color: string;
   p_fur_color: string;
+  p_visual_identity_profile: Record<string, unknown> | null;
+  p_image_lineage_metadata?: Record<string, unknown> | null;
 }
 
 export interface CreateCompanionIfNotExistsResult {
@@ -76,6 +78,8 @@ export interface CreateCompanionIfNotExistsResult {
   initial_image_focal_y: number | null;
   eye_color: string;
   fur_color: string;
+  visual_identity_profile: Record<string, unknown> | null;
+  image_lineage_metadata?: Record<string, unknown> | null;
   mind: number;
   body: number;
   soul: number;

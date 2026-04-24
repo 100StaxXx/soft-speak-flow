@@ -1,13 +1,14 @@
 import {
-  getCompanionBehaviorAwardIntent,
-  shouldAwardHardTaskResolve,
   type CompanionStatAttribute,
   type CompanionStatNeed,
+  getCompanionBehaviorAwardIntent,
+  shouldAwardHardTaskResolve,
 } from "./companionStatSignals.ts";
 
 export type PlannerPriorityStarterIntent =
   | "general"
   | "plan_day"
+  | "advance_campaign_start"
   | "right_now_start"
   | "make_room"
   | "what_matters"
@@ -28,6 +29,7 @@ export interface PlannerPriorityTaskInput {
   category?: string | null;
   scheduledTime: string | null;
   estimatedDuration: number | null;
+  subtaskTitles?: string[];
   difficulty?: string | null;
   recurrencePattern: string | null;
   completed?: boolean | null;
@@ -227,7 +229,10 @@ const getDayPart = (time: string | null | undefined): string | null => {
   return "night";
 };
 
-const getDaysUntil = (fromDateKey: string, toDateKey: string | null | undefined): number | null => {
+const getDaysUntil = (
+  fromDateKey: string,
+  toDateKey: string | null | undefined,
+): number | null => {
   const from = parseDateKey(fromDateKey);
   const to = parseDateKey(toDateKey);
   if (!from || !to) return null;
@@ -242,11 +247,17 @@ const inferEnergy = (
   starterIntent: PlannerPriorityStarterIntent | null | undefined,
   reflectionSignals: PlannerPriorityReflectionSignalInput[] | undefined,
   briefingContext: PlannerPriorityBriefingContextInput | null | undefined,
+  plannerMemory: PlannerPriorityMemoryInput | undefined,
+  aiSignals: PlannerPriorityAISignalsInput | undefined,
 ): "low" | "medium" | "high" => {
   if (starterIntent === "low_energy_adjust") return "low";
+  if (plannerMemory?.workloadTolerance === "light") return "low";
+  if (plannerMemory?.workloadTolerance === "heavy") return "high";
 
   const latestSignal = reflectionSignals?.[0];
   if (latestSignal?.energy) return latestSignal.energy;
+  if (aiSignals?.suggestedWorkload === "light") return "low";
+  if (aiSignals?.suggestedWorkload === "heavy") return "high";
 
   const moodHaystack = [
     latestSignal?.mood,
@@ -255,16 +266,24 @@ const inferEnergy = (
     briefingContext?.actionPrompt,
     briefingContext?.focus,
   ]
-    .filter((value): value is string => typeof value === "string" && value.length > 0)
+    .filter((value): value is string =>
+      typeof value === "string" && value.length > 0
+    )
     .join(" ")
     .toLowerCase();
 
-  if (LOW_ENERGY_HINTS.some((hint) => moodHaystack.includes(hint))) return "low";
-  if (HIGH_ENERGY_HINTS.some((hint) => moodHaystack.includes(hint))) return "high";
+  if (LOW_ENERGY_HINTS.some((hint) => moodHaystack.includes(hint))) {
+    return "low";
+  }
+  if (HIGH_ENERGY_HINTS.some((hint) => moodHaystack.includes(hint))) {
+    return "high";
+  }
   return "medium";
 };
 
-const getPreferredDayPart = (plannerMemory: PlannerPriorityMemoryInput | undefined): string | null => {
+const getPreferredDayPart = (
+  plannerMemory: PlannerPriorityMemoryInput | undefined,
+): string | null => {
   const preferredWindow = plannerMemory?.preferredWindows?.[0];
   if (preferredWindow?.timeOfDay) return preferredWindow.timeOfDay;
   return plannerMemory?.preferredTimeOfDay ?? null;
@@ -276,11 +295,15 @@ const getSuggestedSlot = (
   preferredDayPart: string | null,
 ) => {
   if (!scheduleInsights || !targetDate) return null;
-  const matchingSlots = scheduleInsights.suggestedSlots.filter((slot) => slot.date === targetDate);
+  const matchingSlots = scheduleInsights.suggestedSlots.filter((slot) =>
+    slot.date === targetDate
+  );
   if (matchingSlots.length === 0) return null;
 
   if (preferredDayPart) {
-    const preferredSlot = matchingSlots.find((slot) => getDayPart(slot.time) === preferredDayPart);
+    const preferredSlot = matchingSlots.find((slot) =>
+      getDayPart(slot.time) === preferredDayPart
+    );
     if (preferredSlot) return preferredSlot;
   }
 
@@ -299,7 +322,9 @@ const pushReason = (reasons: string[], condition: boolean, reason: string) => {
 const getNeedWeight = (level: CompanionStatNeed["level"]) =>
   level === "high" ? 18 : level === "medium" ? 10 : 0;
 
-const getTaskStatMatch = (task: PlannerPriorityTaskInput): CompanionStatAttribute | null => {
+const getTaskStatMatch = (
+  task: PlannerPriorityTaskInput,
+): CompanionStatAttribute | null => {
   const intent = getCompanionBehaviorAwardIntent({
     title: task.title,
     category: task.category,
@@ -310,7 +335,12 @@ const getTaskStatMatch = (task: PlannerPriorityTaskInput): CompanionStatAttribut
   });
 
   if (intent) return intent.attribute;
-  if (shouldAwardHardTaskResolve({ difficulty: task.difficulty, priority: task.priority })) {
+  if (
+    shouldAwardHardTaskResolve({
+      difficulty: task.difficulty,
+      priority: task.priority,
+    })
+  ) {
     return "resolve";
   }
 
@@ -330,12 +360,19 @@ const scoreTask = (
   const daysUntil = getDaysUntil(input.currentDate, task.taskDate);
   const epic = getEpicById(input.activeEpics, task.epicId);
   const dayLoad = task.taskDate
-    ? input.scheduleInsights?.dayLoads.find((entry) => entry.date === task.taskDate)
+    ? input.scheduleInsights?.dayLoads.find((entry) =>
+      entry.date === task.taskDate
+    )
     : null;
-  const suggestedSlot = getSuggestedSlot(input.scheduleInsights, task.taskDate, preferredDayPart);
-  const hasConflict = input.scheduleInsights?.conflicts.some((conflict) =>
-    conflict.taskAId === task.id || conflict.taskBId === task.id
-  ) ?? false;
+  const suggestedSlot = getSuggestedSlot(
+    input.scheduleInsights,
+    task.taskDate,
+    preferredDayPart,
+  );
+  const hasConflict =
+    input.scheduleInsights?.conflicts.some((conflict) =>
+      conflict.taskAId === task.id || conflict.taskBId === task.id
+    ) ?? false;
   const statMatch = getTaskStatMatch(task);
 
   if (daysUntil !== null) {
@@ -369,7 +406,8 @@ const scoreTask = (
 
   if (epic) {
     const progress = epic.progressPercentage ?? 0;
-    const epicDaysRemaining = epic.daysRemaining ?? getDaysUntil(input.currentDate, epic.endDate);
+    const epicDaysRemaining = epic.daysRemaining ??
+      getDaysUntil(input.currentDate, epic.endDate);
     if (epicDaysRemaining !== null && epicDaysRemaining <= 7 && progress < 80) {
       score += 12;
       reasons.push("supports a deadline-sensitive epic");
@@ -380,7 +418,9 @@ const scoreTask = (
   }
 
   if (task.contactId) {
-    const relatedContact = input.contactsNeedingAttention?.find((contact) => contact.id === task.contactId);
+    const relatedContact = input.contactsNeedingAttention?.find((contact) =>
+      contact.id === task.contactId
+    );
     if (relatedContact) {
       score += relatedContact.hasOverdueReminder ? 16 : 10;
       reasons.push("helps a relationship that is getting cold");
@@ -428,7 +468,10 @@ const scoreTask = (
     reasons.push("fits a higher-energy window");
   }
 
-  if (input.starterIntent === "make_room" || input.starterIntent === "what_matters") {
+  if (
+    input.starterIntent === "make_room" ||
+    input.starterIntent === "what_matters"
+  ) {
     if (task.priority === "high" || daysUntil === 0 || daysUntil === 1) {
       score += 8;
     } else {
@@ -446,10 +489,15 @@ const scoreTask = (
   }
 
   if (
-    input.statInterpretation?.statNeeds?.resolve
-    && shouldAwardHardTaskResolve({ difficulty: task.difficulty, priority: task.priority })
+    input.statInterpretation?.statNeeds?.resolve &&
+    shouldAwardHardTaskResolve({
+      difficulty: task.difficulty,
+      priority: task.priority,
+    })
   ) {
-    const resolveWeight = getNeedWeight(input.statInterpretation.statNeeds.resolve.level);
+    const resolveWeight = getNeedWeight(
+      input.statInterpretation.statNeeds.resolve.level,
+    );
     if (resolveWeight > 0) {
       score += Math.max(4, Math.round(resolveWeight / 2));
       reasons.push("helps rebuild resolve through a bounded hard move");
@@ -491,14 +539,21 @@ const scoreRitual = (
     reasons.push("keeps your ritual base steady");
   }
 
-  if (ritual.preferredTime && preferredDayPart && getDayPart(ritual.preferredTime) === preferredDayPart) {
+  if (
+    ritual.preferredTime && preferredDayPart &&
+    getDayPart(ritual.preferredTime) === preferredDayPart
+  ) {
     score += 6;
     reasons.push(`fits your usual ${preferredDayPart} rhythm`);
   }
 
   const epic = getEpicById(input.activeEpics, ritual.epicId);
-  if ((epic?.daysRemaining ?? getDaysUntil(input.currentDate, epic?.endDate)) !== null) {
-    const daysRemaining = epic?.daysRemaining ?? getDaysUntil(input.currentDate, epic?.endDate);
+  if (
+    (epic?.daysRemaining ?? getDaysUntil(input.currentDate, epic?.endDate)) !==
+      null
+  ) {
+    const daysRemaining = epic?.daysRemaining ??
+      getDaysUntil(input.currentDate, epic?.endDate);
     if (daysRemaining !== null && daysRemaining <= 7) {
       score += 6;
       reasons.push("supports an epic with a close horizon");
@@ -506,7 +561,8 @@ const scoreRitual = (
   }
 
   if (ritualIntent) {
-    const statNeed = input.statInterpretation?.statNeeds?.[ritualIntent.attribute];
+    const statNeed = input.statInterpretation?.statNeeds
+      ?.[ritualIntent.attribute];
     const statNeedWeight = statNeed ? getNeedWeight(statNeed.level) : 0;
     if (statNeedWeight > 0) {
       score += statNeedWeight;
@@ -533,8 +589,25 @@ const scoreEpic = (
 ): PlannerPriorityScore => {
   let score = 14;
   const reasons: string[] = [];
-  const daysRemaining = epic.daysRemaining ?? getDaysUntil(input.currentDate, epic.endDate);
+  const daysRemaining = epic.daysRemaining ??
+    getDaysUntil(input.currentDate, epic.endDate);
   const progress = epic.progressPercentage ?? 0;
+  const linkedTasks = [...input.tasks, ...input.inboxTasks].filter((task) =>
+    task.completed !== true && task.epicId === epic.id
+  );
+  const overdueLinkedTaskCount = linkedTasks.filter((task) =>
+    Boolean(task.taskDate) && (task.taskDate as string) < input.currentDate
+  ).length;
+  const scheduledTodayCount = linkedTasks.filter((task) =>
+    task.taskDate === input.currentDate
+  ).length;
+  const unscheduledTaskCount = linkedTasks.filter((task) =>
+    !task.taskDate && !task.scheduledTime
+  ).length;
+  const oversizedUndefinedTaskCount = linkedTasks.filter((task) =>
+    (task.estimatedDuration ?? 0) >= 90 &&
+    (!task.subtaskTitles || task.subtaskTitles.length === 0)
+  ).length;
 
   if (daysRemaining !== null) {
     if (daysRemaining < 0) {
@@ -557,9 +630,40 @@ const scoreEpic = (
     reasons.push("still needs momentum");
   }
 
+  if (linkedTasks.length === 0) {
+    score += 14;
+    reasons.push("no concrete next step is attached yet");
+  } else {
+    if (overdueLinkedTaskCount >= 2) {
+      score += 16;
+      reasons.push("linked work is already slipping");
+    } else if (overdueLinkedTaskCount === 1) {
+      score += 10;
+      reasons.push("a linked task is already overdue");
+    }
+
+    if (scheduledTodayCount > 0) {
+      score += 6;
+      reasons.push("already has live work today");
+    } else if (unscheduledTaskCount === linkedTasks.length) {
+      score += 8;
+      reasons.push("linked work is still unscheduled");
+    }
+  }
+
   if ((epic.habitCount ?? 0) > 0) {
     score += 4;
     reasons.push("has rituals ready to support it");
+  }
+
+  if (oversizedUndefinedTaskCount > 0) {
+    score += 10;
+    reasons.push("linked work is still too large to start cleanly");
+  }
+
+  if (input.activeEpics.length > 3 && progress < 60) {
+    score += 6;
+    reasons.push("competes with several active campaigns");
   }
 
   return {
@@ -602,7 +706,9 @@ const buildRecoveryScore = (
   input: ComputePlannerPriorityScoresInput,
   inferredEnergy: "low" | "medium" | "high",
 ): PlannerPriorityScore | null => {
-  const todaysLoad = input.scheduleInsights?.dayLoads.find((entry) => entry.date === input.currentDate);
+  const todaysLoad = input.scheduleInsights?.dayLoads.find((entry) =>
+    entry.date === input.currentDate
+  );
   const selectedDateLoad = input.scheduleInsights?.dayLoads.find((entry) =>
     entry.date === input.scheduleInsights?.selectedDate
   );
@@ -610,20 +716,53 @@ const buildRecoveryScore = (
   const recoveryReasons: string[] = [];
   let score = 0;
 
-  pushReason(recoveryReasons, input.starterIntent === "low_energy_adjust", "you explicitly asked for a lighter day");
-  pushReason(recoveryReasons, input.starterIntent === "make_room", "you asked to make room for what matters");
-  pushReason(recoveryReasons, input.starterIntent === "adjust_today", "today needs active reshuffling");
-  pushReason(recoveryReasons, inferredEnergy === "low", "energy looks low today");
-  pushReason(recoveryReasons, load?.status === "overloaded", "the selected day is overloaded");
-  pushReason(recoveryReasons, Boolean(input.careSignals?.hasDormancyWarning), "your companion care state suggests keeping the day realistic");
-  pushReason(recoveryReasons, input.statInterpretation?.statNeeds?.vitality?.level === "high", "Vitality needs active protection right now");
+  pushReason(
+    recoveryReasons,
+    input.starterIntent === "low_energy_adjust",
+    "you explicitly asked for a lighter day",
+  );
+  pushReason(
+    recoveryReasons,
+    input.starterIntent === "make_room",
+    "you asked to make room for what matters",
+  );
+  pushReason(
+    recoveryReasons,
+    input.starterIntent === "adjust_today",
+    "today needs active reshuffling",
+  );
+  pushReason(
+    recoveryReasons,
+    inferredEnergy === "low",
+    "energy looks low today",
+  );
+  pushReason(
+    recoveryReasons,
+    load?.status === "overloaded",
+    "the selected day is overloaded",
+  );
+  pushReason(
+    recoveryReasons,
+    Boolean(input.careSignals?.hasDormancyWarning),
+    "your companion care state suggests keeping the day realistic",
+  );
+  pushReason(
+    recoveryReasons,
+    input.statInterpretation?.statNeeds?.vitality?.level === "high",
+    "Vitality needs active protection right now",
+  );
 
   if (input.starterIntent === "low_energy_adjust") score += 28;
-  if (input.starterIntent === "make_room" || input.starterIntent === "adjust_today") score += 18;
+  if (
+    input.starterIntent === "make_room" ||
+    input.starterIntent === "adjust_today"
+  ) score += 18;
   if (inferredEnergy === "low") score += 12;
   if (load?.status === "overloaded") score += 16;
   if (input.careSignals?.hasDormancyWarning) score += 8;
-  score += getNeedWeight(input.statInterpretation?.statNeeds?.vitality?.level ?? "low");
+  score += getNeedWeight(
+    input.statInterpretation?.statNeeds?.vitality?.level ?? "low",
+  );
 
   if (score === 0) return null;
 
@@ -634,16 +773,23 @@ const buildRecoveryScore = (
     score,
     reasons: recoveryReasons.slice(0, 4),
     targetDate: (load?.date ?? input.currentDate) || null,
-    suggestedTime: input.scheduleInsights?.suggestedSlots.find((slot) =>
-      slot.date === (load?.date ?? input.currentDate)
-    )?.time ?? null,
+    suggestedTime:
+      input.scheduleInsights?.suggestedSlots.find((slot) =>
+        slot.date === (load?.date ?? input.currentDate)
+      )?.time ?? null,
   };
 };
 
 export const computePlannerPriorityScores = (
   input: ComputePlannerPriorityScoresInput,
 ): PlannerPriorityScore[] => {
-  const inferredEnergy = inferEnergy(input.starterIntent, input.reflectionSignals, input.briefingContext);
+  const inferredEnergy = inferEnergy(
+    input.starterIntent,
+    input.reflectionSignals,
+    input.briefingContext,
+    input.plannerMemory,
+    input.aiSignals,
+  );
   const preferredDayPart = getPreferredDayPart(input.plannerMemory);
 
   const ranked: PlannerPriorityScore[] = [];
@@ -669,6 +815,8 @@ export const computePlannerPriorityScores = (
 
   return ranked
     .filter((entry) => entry.score > 0)
-    .sort((left, right) => right.score - left.score || left.title.localeCompare(right.title))
+    .sort((left, right) =>
+      right.score - left.score || left.title.localeCompare(right.title)
+    )
     .slice(0, 16);
 };

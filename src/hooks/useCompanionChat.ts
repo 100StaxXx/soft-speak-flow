@@ -100,6 +100,7 @@ export function useCompanionChat({ enabled = true }: UseCompanionChatOptions = {
   const { trackInteraction } = useAIInteractionTracker();
   const queryClient = useQueryClient();
   const initialisedRef = useRef(false);
+  const hydratedExternallyRef = useRef(false);
   const sessionIdRef = useRef<string>(generateId());
   const {
     autoplayVoice,
@@ -153,14 +154,17 @@ export function useCompanionChat({ enabled = true }: UseCompanionChatOptions = {
 
   useEffect(() => {
     initialisedRef.current = false;
+    hydratedExternallyRef.current = false;
     setMessages([]);
     sessionIdRef.current = generateId();
   }, [companion?.id]);
 
   useEffect(() => {
     if (!enabled) {
-      initialisedRef.current = true;
-      setMessages([]);
+      initialisedRef.current = false;
+      if (!hydratedExternallyRef.current) {
+        setMessages([]);
+      }
       return;
     }
 
@@ -189,6 +193,46 @@ export function useCompanionChat({ enabled = true }: UseCompanionChatOptions = {
 
   useEffect(() => () => {
     stopCompanionSpeech();
+  }, []);
+
+  const resetThread = useCallback((options?: {
+    sessionId?: string;
+    greetingText?: string;
+  }) => {
+    initialisedRef.current = true;
+    hydratedExternallyRef.current = true;
+    sessionIdRef.current = options?.sessionId ?? generateId();
+    setMessages(
+      options?.greetingText
+        ? [createMessage("assistant", options.greetingText)]
+        : [],
+    );
+    setDraftInput("");
+    setInterimText("");
+    setShowPermissionDialog(false);
+    setIsRequestingPermission(false);
+    setIsSubmitting(false);
+    setIsSpeaking(false);
+    setSpeechProvider("none");
+    setHandoffToPlanner(false);
+  }, []);
+
+  const hydrateThread = useCallback((options: {
+    sessionId: string;
+    messages: CompanionChatMessage[];
+  }) => {
+    initialisedRef.current = true;
+    hydratedExternallyRef.current = true;
+    sessionIdRef.current = options.sessionId;
+    setMessages(options.messages);
+    setDraftInput("");
+    setInterimText("");
+    setShowPermissionDialog(false);
+    setIsRequestingPermission(false);
+    setIsSubmitting(false);
+    setIsSpeaking(false);
+    setSpeechProvider("none");
+    setHandoffToPlanner(false);
   }, []);
 
   const speakReplyIfNeeded = useCallback(async (response: CompanionChatResponse) => {
@@ -350,6 +394,7 @@ export function useCompanionChat({ enabled = true }: UseCompanionChatOptions = {
 
   return {
     greeting,
+    sessionId: sessionIdRef.current,
     messages,
     draftInput,
     setDraftInput,
@@ -364,6 +409,8 @@ export function useCompanionChat({ enabled = true }: UseCompanionChatOptions = {
     speechProvider,
     handoffToPlanner,
     clearPlannerHandoff,
+    resetThread,
+    hydrateThread,
     isRecording,
     isAutoStopping,
     isVoiceSupported: isSupported,

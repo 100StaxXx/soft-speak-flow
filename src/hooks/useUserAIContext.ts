@@ -61,8 +61,15 @@ interface UserAILearning {
   last_interaction_at: string | null;
 }
 
-export function useUserAIContext() {
+interface UseUserAIContextOptions {
+  enabled?: boolean;
+}
+
+export function useUserAIContext(
+  options: UseUserAIContextOptions = {},
+) {
   const { user } = useAuth();
+  const { enabled = true } = options;
 
   // Fetch enriched context from edge function
   const { 
@@ -83,7 +90,7 @@ export function useUserAIContext() {
 
       return data as EnrichedContext;
     },
-    enabled: !!user,
+    enabled: enabled && !!user,
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
   });

@@ -65,10 +65,12 @@ const renderJourneysThreads = (overrides?: Partial<Parameters<typeof useJourneys
         hasPendingPlannerWork: false,
         isBusy: false,
         conversation: {
+          sessionId: null,
           resetThread: mocks.resetConversationThread,
           hydrateThread: mocks.hydrateConversationThread,
         },
         planner: {
+          sessionId: null,
           resetThread: mocks.resetPlannerThread,
           hydrateThread: mocks.hydratePlannerThread,
         },
@@ -210,6 +212,133 @@ describe("useJourneysCompanionThreads", () => {
         sessionId: "archived-session-1",
       }),
     ]);
+  });
+
+  it("hydrates agent-originated planner turns into the planner thread when structured output exists", async () => {
+    mocks.loadCompanionChatThreadMessages.mockResolvedValue([
+      {
+        id: "active-chat-1",
+        sessionId: "active-session-1",
+        role: "assistant" as const,
+        content: "Let's plan today.",
+        createdAt: "2026-04-18T08:00:00.000Z",
+        source: "chat" as const,
+      },
+      {
+        id: "active-agent-plan-1",
+        sessionId: "active-session-1",
+        role: "assistant" as const,
+        content: "I drafted a focused day for you.",
+        createdAt: "2026-04-18T08:03:00.000Z",
+        source: "agent" as const,
+        structuredResponse: {
+          intent: {
+            intentType: "quest" as const,
+            timeHorizon: "today" as const,
+            isRecurring: false,
+            shouldCreateQuest: true,
+            shouldPromptCampaign: false,
+          },
+          planDay: {
+            message: "I drafted a focused day for you.",
+            dayAssessment: "balanced" as const,
+            suggestedQuests: [],
+          },
+        },
+      },
+    ]);
+
+    renderJourneysThreads();
+
+    await waitFor(() => {
+      expect(mocks.hydratePlannerThread).toHaveBeenCalledWith({
+        sessionId: "active-session-1",
+        messages: [
+          expect.objectContaining({
+            id: "active-agent-plan-1",
+            content: "I drafted a focused day for you.",
+            structuredResponse: expect.objectContaining({
+              planDay: expect.objectContaining({
+                message: "I drafted a focused day for you.",
+              }),
+            }),
+          }),
+        ],
+      });
+    });
+  });
+
+  it("preserves externally hydrated thread state when the fallback thread manager wakes up", async () => {
+    const { result, rerender } = renderHook(
+      (props: {
+        enabled: boolean;
+        messages: Array<{
+          role: "assistant" | "user";
+          content: string;
+          createdAt: string;
+          source: "chat" | "plan";
+          isSeed?: boolean;
+        }>;
+        sessionId: string | null;
+      }) =>
+        useJourneysCompanionThreads({
+          enabled: props.enabled,
+          userId: "user-1",
+          companionId: "companion-1",
+          messages: props.messages,
+          persistenceReady: true,
+          persistenceUnavailableReason: null,
+          hasPendingPlannerWork: false,
+          isBusy: false,
+          conversation: {
+            sessionId: props.sessionId,
+            resetThread: mocks.resetConversationThread,
+            hydrateThread: mocks.hydrateConversationThread,
+          },
+          planner: {
+            sessionId: props.sessionId,
+            resetThread: mocks.resetPlannerThread,
+            hydrateThread: mocks.hydratePlannerThread,
+          },
+        }),
+      {
+        initialProps: {
+          enabled: false,
+          sessionId: "fallback-session-1",
+          messages: [
+            {
+              role: "assistant" as const,
+              content: "We already have a hydrated fallback thread.",
+              createdAt: "2026-04-18T08:00:00.000Z",
+              source: "chat" as const,
+            },
+          ],
+        },
+        wrapper: createWrapper(),
+      },
+    );
+
+    rerender({
+      enabled: true,
+      sessionId: "fallback-session-1",
+      messages: [
+        {
+          role: "assistant" as const,
+          content: "We already have a hydrated fallback thread.",
+          createdAt: "2026-04-18T08:00:00.000Z",
+          source: "chat" as const,
+        },
+      ],
+    });
+
+    await waitFor(() => {
+      expect(result.current.activeThread?.sessionId).toBe("fallback-session-1");
+    });
+
+    expect(mocks.resetConversationThread).not.toHaveBeenCalled();
+    expect(mocks.resetPlannerThread).not.toHaveBeenCalled();
+    expect(mocks.hydrateConversationThread).not.toHaveBeenCalled();
+    expect(mocks.hydratePlannerThread).not.toHaveBeenCalled();
   });
 
   it("seeds a fresh local thread when no persisted active thread exists", async () => {

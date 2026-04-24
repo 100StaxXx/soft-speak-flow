@@ -1363,6 +1363,7 @@ export type Database = {
         Row: {
           companion_id: string
           evolved_at: string
+          generation_metadata: Json | null
           id: string
           image_url: string
           stage: number
@@ -1371,6 +1372,7 @@ export type Database = {
         Insert: {
           companion_id: string
           evolved_at?: string
+          generation_metadata?: Json | null
           id?: string
           image_url: string
           stage: number
@@ -1379,6 +1381,7 @@ export type Database = {
         Update: {
           companion_id?: string
           evolved_at?: string
+          generation_metadata?: Json | null
           id?: string
           image_url?: string
           stage?: number
@@ -1655,6 +1658,7 @@ export type Database = {
           created_at: string
           id: string
           input_mode: string | null
+          metadata: Json
           role: "assistant" | "user"
           session_id: string
           source: string
@@ -1667,6 +1671,7 @@ export type Database = {
           created_at?: string
           id?: string
           input_mode?: string | null
+          metadata?: Json
           role: "assistant" | "user"
           session_id: string
           source?: string
@@ -1679,6 +1684,7 @@ export type Database = {
           created_at?: string
           id?: string
           input_mode?: string | null
+          metadata?: Json
           role?: "assistant" | "user"
           session_id?: string
           source?: string
@@ -7480,6 +7486,7 @@ export type Database = {
           happiness: number | null
           hunger: number | null
           id: string
+          image_lineage_metadata: Json | null
           image_regenerations_used: number
           inactive_days: number | null
           initial_image_focal_x: number | null
@@ -7514,6 +7521,7 @@ export type Database = {
           updated_at: string
           user_id: string
           vitality: number | null
+          visual_identity_profile: Json | null
           wisdom: number | null
         }
         Insert: {
@@ -7558,6 +7566,7 @@ export type Database = {
           happiness?: number | null
           hunger?: number | null
           id?: string
+          image_lineage_metadata?: Json | null
           image_regenerations_used?: number
           inactive_days?: number | null
           initial_image_focal_x?: number | null
@@ -7592,6 +7601,7 @@ export type Database = {
           updated_at?: string
           user_id: string
           vitality?: number | null
+          visual_identity_profile?: Json | null
           wisdom?: number | null
         }
         Update: {
@@ -7636,6 +7646,7 @@ export type Database = {
           happiness?: number | null
           hunger?: number | null
           id?: string
+          image_lineage_metadata?: Json | null
           image_regenerations_used?: number
           inactive_days?: number | null
           initial_image_focal_x?: number | null
@@ -7670,6 +7681,7 @@ export type Database = {
           updated_at?: string
           user_id?: string
           vitality?: number | null
+          visual_identity_profile?: Json | null
           wisdom?: number | null
         }
         Relationships: [
@@ -8824,6 +8836,8 @@ export type Database = {
           p_spirit_animal: string
           p_story_tone: string
           p_user_id: string
+          p_image_lineage_metadata: Json | null
+          p_visual_identity_profile: Json | null
         }
         Returns: {
           body: number
@@ -8839,6 +8853,7 @@ export type Database = {
           favorite_color: string
           fur_color: string
           id: string
+          image_lineage_metadata: Json | null
           initial_image_focal_x: number | null
           initial_image_focal_y: number | null
           initial_image_url: string
@@ -8852,6 +8867,7 @@ export type Database = {
           story_tone: string
           updated_at: string
           user_id: string
+          visual_identity_profile: Json | null
         }[]
       }
       delete_user_account: { Args: { p_user_id: string }; Returns: undefined }

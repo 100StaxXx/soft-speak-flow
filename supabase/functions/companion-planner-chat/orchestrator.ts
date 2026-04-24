@@ -330,6 +330,39 @@ const isPlanDayDeterministicResponse = (
     )
   );
 
+const isPhaseADeterministicStarterResponse = (
+  input: PlannerBuildInput,
+  baseResult: PlannerBuildResult,
+) => {
+  const starterIntent = input.plannerContext.starterIntent ??
+    input.sessionState.pendingStarterIntent ??
+    null;
+  if (starterIntent === "advance_campaign_start") {
+    return baseResult.followUpQuestions.length === 0 &&
+      (
+        baseResult.mode === "proposal" ||
+        baseResult.mode === "schedule_read"
+      );
+  }
+  if (starterIntent === "right_now_start") {
+    return baseResult.mode === "schedule_read" &&
+      baseResult.followUpQuestions.length === 0;
+  }
+
+  if (
+    starterIntent === "adjust_today" ||
+    starterIntent === "low_energy_adjust"
+  ) {
+    return baseResult.followUpQuestions.length === 0 &&
+      (
+        baseResult.mode === "proposal" ||
+        baseResult.mode === "schedule_read"
+      );
+  }
+
+  return false;
+};
+
 const getReadyQuestProposalDrafts = (
   baseResult: PlannerBuildResult,
 ) =>
@@ -340,7 +373,9 @@ const getReadyQuestProposalDrafts = (
 
 const hasReadyQuestProposalResponse = (
   baseResult: PlannerBuildResult,
-) => baseResult.mode === "proposal" && getReadyQuestProposalDrafts(baseResult).length > 0;
+) =>
+  baseResult.mode === "proposal" &&
+  getReadyQuestProposalDrafts(baseResult).length > 0;
 
 const extractPreservedProposalReplyNotes = (
   reply: string,
@@ -371,12 +406,11 @@ type PlanDayAIOutput = {
 };
 
 const buildPlanDaySystemPrompt = (tonePack: PlannerTonePack): string => {
-  const toneInstruction =
-    tonePack === "witty_sassy"
-      ? "Voice: bold and a bit cheeky, but always supportive underneath."
-      : tonePack === "playful"
-      ? "Voice: lightly playful and friendly."
-      : "Voice: warm, grounded, and supportive.";
+  const toneInstruction = tonePack === "witty_sassy"
+    ? "Voice: bold and a bit cheeky, but always supportive underneath."
+    : tonePack === "playful"
+    ? "Voice: lightly playful and friendly."
+    : "Voice: warm, grounded, and supportive.";
 
   return [
     "You are Cosmiq, a context-aware AI companion inside an app called Cosmiq.",
@@ -470,10 +504,9 @@ const buildPlanDayUserPrompt = (input: PlannerBuildInput): string => {
         narrativeBrief: ctx.statInterpretation.narrativeBrief,
       }
       : null,
-    scheduleLoad:
-      ctx.scheduleInsights?.dayLoads.find(
-        (d) => d.date === input.currentDate,
-      ) ?? null,
+    scheduleLoad: ctx.scheduleInsights?.dayLoads.find(
+      (d) => d.date === input.currentDate,
+    ) ?? null,
   });
 };
 
@@ -503,31 +536,36 @@ const normalizePlanDayOutput = (value: unknown): PlanDayAIOutput | null => {
       (q): q is Record<string, unknown> =>
         typeof q === "object" && q !== null && !Array.isArray(q),
     )
-    .map((q) => ({
-      title: typeof q.title === "string" ? q.title.trim() : "",
-      type:
+    .map((q): PlanDayQuestSuggestion => {
+      const type: PlanDayQuestSuggestion["type"] =
         q.type === "must" || q.type === "should" || q.type === "nice"
           ? q.type
-          : "should",
-      estimated_duration:
-        typeof q.estimated_duration === "string"
-          ? q.estimated_duration
-          : "30 min",
-      source:
+          : "should";
+      const source: PlanDayQuestSuggestion["source"] =
         q.source === "campaign" ||
           q.source === "habit" ||
           q.source === "recovery" ||
           q.source === "optimization"
           ? q.source
-          : "optimization",
-      reason: typeof q.reason === "string" ? q.reason.trim() : "",
-    }))
+          : "optimization";
+
+      return {
+        title: typeof q.title === "string" ? q.title.trim() : "",
+        type,
+        estimated_duration: typeof q.estimated_duration === "string"
+          ? q.estimated_duration
+          : "30 min",
+        source,
+        reason: typeof q.reason === "string" ? q.reason.trim() : "",
+      };
+    })
     .filter((q) => q.title.length > 0);
 
   return {
     message,
-    day_assessment:
-      typeof obj.day_assessment === "string" ? obj.day_assessment : "open",
+    day_assessment: typeof obj.day_assessment === "string"
+      ? obj.day_assessment
+      : "open",
     suggested_quests,
   };
 };
@@ -587,8 +625,7 @@ export async function buildPlanDayAIResponse(params: {
   const openAIApiKey = params.openAIApiKey ?? Deno.env.get("OPENAI_API_KEY");
   if (!openAIApiKey) return null;
 
-  const model =
-    params.model ??
+  const model = params.model ??
     Deno.env.get("OPENAI_COMPANION_PLANNER_MODEL") ??
     "gpt-4.1";
 
@@ -626,8 +663,7 @@ export async function buildPlanDayAIResponse(params: {
     }
 
     const data = await response.json();
-    const rawContent =
-      data?.choices?.[0]?.message?.content?.trim() ?? "";
+    const rawContent = data?.choices?.[0]?.message?.content?.trim() ?? "";
     if (!rawContent) return null;
 
     const aiOutput = normalizePlanDayOutput(JSON.parse(rawContent));
@@ -697,10 +733,9 @@ const buildUpcomingUserPrompt = (input: PlannerBuildInput): string => {
       .slice(0, 6)
       .map((e) => ({ title: e.title, start: e.start })),
     missedToday: missedTasks,
-    scheduleLoad:
-      ctx.scheduleInsights?.dayLoads.find(
-        (d) => d.date === input.currentDate,
-      ) ?? null,
+    scheduleLoad: ctx.scheduleInsights?.dayLoads.find(
+      (d) => d.date === input.currentDate,
+    ) ?? null,
   });
 };
 
@@ -714,8 +749,7 @@ export async function buildUpcomingAIResponse(params: {
   const openAIApiKey = params.openAIApiKey ?? Deno.env.get("OPENAI_API_KEY");
   if (!openAIApiKey) return null;
 
-  const model =
-    params.model ??
+  const model = params.model ??
     Deno.env.get("OPENAI_COMPANION_PLANNER_MODEL") ??
     "gpt-4.1";
 
@@ -747,8 +781,7 @@ export async function buildUpcomingAIResponse(params: {
     }
 
     const data = await response.json();
-    const rawContent =
-      data?.choices?.[0]?.message?.content?.trim() ?? "";
+    const rawContent = data?.choices?.[0]?.message?.content?.trim() ?? "";
     if (!rawContent) return null;
 
     const parsed = JSON.parse(rawContent);
@@ -830,6 +863,12 @@ export async function buildOrchestratedPlannerResponse(params: {
   }
 
   if (isPlanDayDeterministicResponse(params.input, params.baseResult)) {
+    return normalizedBaseResult;
+  }
+
+  if (
+    isPhaseADeterministicStarterResponse(params.input, normalizedBaseResult)
+  ) {
     return normalizedBaseResult;
   }
 

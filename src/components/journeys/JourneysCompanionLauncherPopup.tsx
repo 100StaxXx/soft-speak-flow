@@ -98,6 +98,10 @@ export function JourneysCompanionLauncherPopup({
                     "flex w-full items-center justify-between gap-3 rounded-[1.6rem] border-[3px] border-[#4b2612] px-4 py-3 text-left text-[#3c1f10] shadow-[0_8px_0_#7a3a14,0_14px_22px_rgba(74,31,8,0.22)] transition-transform hover:-translate-y-0.5 hover:shadow-[0_10px_0_#7a3a14,0_16px_24px_rgba(74,31,8,0.24)]",
                     option.id === "free-talk"
                       ? "bg-[linear-gradient(180deg,#fffdf7_0%,#fff1cb_100%)]"
+                      : option.id === "advance-campaign"
+                        ? "border-[#224c52] bg-[linear-gradient(180deg,#cffff3_0%,#6fded2_100%)] text-[#08333a] shadow-[0_8px_0_rgba(34,76,82,0.8),0_14px_22px_rgba(34,76,82,0.24)] hover:shadow-[0_10px_0_rgba(34,76,82,0.82),0_16px_24px_rgba(34,76,82,0.28)]"
+                      : option.id === "adjust-day"
+                        ? "border-[#7a3b14] bg-[linear-gradient(180deg,#ffd7aa_0%,#ffae52_100%)] text-[#5b2608] shadow-[0_8px_0_rgba(122,59,20,0.8),0_14px_22px_rgba(122,59,20,0.24)] hover:shadow-[0_10px_0_rgba(122,59,20,0.82),0_16px_24px_rgba(122,59,20,0.28)]"
                       : option.id === "upcoming"
                         ? "border-[#315114] bg-[linear-gradient(180deg,#d7ff86_0%,#9fda3f_100%)] text-[#183304] shadow-[0_8px_0_rgba(49,81,20,0.8),0_14px_22px_rgba(49,81,20,0.24)] hover:shadow-[0_10px_0_rgba(49,81,20,0.82),0_16px_24px_rgba(49,81,20,0.28)]"
                         : "bg-[linear-gradient(180deg,#fff8e5_0%,#ffd77d_100%)]",
@@ -111,6 +115,10 @@ export function JourneysCompanionLauncherPopup({
                       "shrink-0 rounded-full border-2 px-2 py-1 text-[0.65rem] font-black uppercase tracking-[0.18em]",
                       option.id === "upcoming"
                         ? "border-[#315114] bg-white/35 text-[#183304]"
+                        : option.id === "advance-campaign"
+                          ? "border-[#224c52] bg-white/35 text-[#08333a]"
+                        : option.id === "adjust-day"
+                          ? "border-[#7a3b14] bg-white/35 text-[#5b2608]"
                         : "border-[#6b3416] bg-white/60 text-[#b04b12]",
                     )}
                   >

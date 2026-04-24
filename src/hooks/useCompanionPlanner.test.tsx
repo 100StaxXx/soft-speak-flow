@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   externalCalendarHorizons: [] as string[],
   classify: vi.fn(),
   invoke: vi.fn(),
+  persistCompanionThreadMessages: vi.fn().mockResolvedValue(undefined),
   upsertPlannerPreferences: vi.fn(),
   invalidateQueries: vi.fn(),
   addTask: vi.fn(),
@@ -24,6 +25,9 @@ const mocks = vi.hoisted(() => ({
   enrichedContext: null as Record<string, unknown> | null,
   user: {
     id: "user-1",
+  } as { id: string } | null,
+  companion: {
+    id: "companion-1",
   } as { id: string } | null,
 }));
 
@@ -48,6 +52,22 @@ vi.mock("@/integrations/supabase/client", () => ({
   },
 }));
 
+vi.mock("@/services/companionChatThreads", () => ({
+  generateCompanionThreadSessionId: () => "planner-session-1",
+  getCompanionChatThreadsQueryKey: (
+    userId: string | null | undefined,
+    companionId: string | null | undefined,
+    surface: string,
+  ) => [
+    "companion-chat-threads",
+    userId ?? "anon",
+    companionId ?? "none",
+    surface,
+  ],
+  persistCompanionThreadMessages: (...args: unknown[]) =>
+    mocks.persistCompanionThreadMessages(...args),
+}));
+
 vi.mock("@/hooks/useAuth", () => ({
   useAuth: () => ({
     user: mocks.user,
@@ -56,7 +76,7 @@ vi.mock("@/hooks/useAuth", () => ({
 
 vi.mock("@/hooks/useCompanion", () => ({
   useCompanion: () => ({
-    companion: null,
+    companion: mocks.companion,
   }),
 }));
 
@@ -205,6 +225,7 @@ describe("useCompanionPlanner", () => {
     mocks.externalCalendarHorizons.length = 0;
     mocks.classify.mockResolvedValue(null);
     mocks.user = { id: "user-1" };
+    mocks.companion = { id: "companion-1" };
     mocks.upsertPlannerPreferences.mockResolvedValue({ error: null });
     mocks.addTask.mockResolvedValue(undefined);
     mocks.updateTask.mockResolvedValue(undefined);
@@ -254,6 +275,516 @@ describe("useCompanionPlanner", () => {
     );
   });
 
+  it("stays dormant when disabled until fallback actually needs it", async () => {
+    const { result } = renderHook(() =>
+      useCompanionPlanner({
+        enabled: false,
+        bootstrapGreeting: true,
+      })
+    );
+
+    expect(result.current.messages).toEqual([]);
+
+    await act(async () => {
+      await result.current.submitMessage("Plan my day", "text");
+    });
+
+    expect(mocks.invoke).not.toHaveBeenCalled();
+    expect(result.current.messages).toEqual([]);
+  });
+
+  it("preserves hydrated fallback planner state when re-enabled", async () => {
+    const { result, rerender } = renderHook(
+      ({ enabled }: { enabled: boolean }) =>
+        useCompanionPlanner({
+          enabled,
+          bootstrapGreeting: true,
+        }),
+      {
+        initialProps: { enabled: false },
+      },
+    );
+
+    act(() => {
+      result.current.hydrateThread({
+        sessionId: "fallback-planner-session",
+        messages: [
+          {
+            id: "planner-assistant-1",
+            sessionId: "fallback-planner-session",
+            role: "assistant",
+            content: "I drafted a lighter day for you.",
+            createdAt: "2026-04-18T08:00:01.000Z",
+            source: "agent",
+            structuredResponse: {
+              intent: {
+                intentType: "quest",
+                timeHorizon: "today",
+                isRecurring: false,
+                shouldCreateQuest: true,
+                shouldPromptCampaign: false,
+              },
+              planDay: {
+                message: "I drafted a lighter day for you.",
+                dayAssessment: "light",
+                suggestedQuests: [
+                  {
+                    suggestionId: "plan-1",
+                    proposalId: "proposal-plan-1",
+                    title: "Triage inbox priorities",
+                    type: "must",
+                    estimatedDuration: "20 min",
+                    estimatedDurationMinutes: 20,
+                    source: "maintenance",
+                    reason: "It gives you a calm starting point.",
+                  },
+                ],
+              },
+            },
+          },
+        ],
+      });
+    });
+
+    rerender({ enabled: true });
+
+    await waitFor(() => {
+      expect(result.current.sessionId).toBe("fallback-planner-session");
+      expect(result.current.messages).toEqual([
+        expect.objectContaining({
+          id: "planner-assistant-1",
+          content: "I drafted a lighter day for you.",
+        }),
+      ]);
+      expect(result.current.structuredResponse?.planDay?.message).toBe(
+        "I drafted a lighter day for you.",
+      );
+    });
+  });
+
+  it("hydrates persisted planner messages with structured output", async () => {
+    const { result } = renderHook(() =>
+      useCompanionPlanner({ bootstrapGreeting: false })
+    );
+
+    act(() => {
+      result.current.hydrateThread({
+        sessionId: "persisted-planner-session",
+        messages: [
+          {
+            id: "planner-user-1",
+            sessionId: "persisted-planner-session",
+            role: "user",
+            content: "Plan my day",
+            createdAt: "2026-04-18T08:00:00.000Z",
+            source: "agent",
+          },
+          {
+            id: "planner-assistant-1",
+            sessionId: "persisted-planner-session",
+            role: "assistant",
+            content: "I drafted a focused day for you.",
+            createdAt: "2026-04-18T08:00:01.000Z",
+            source: "agent",
+            structuredResponse: {
+              intent: {
+                intentType: "quest",
+                timeHorizon: "today",
+                isRecurring: false,
+                shouldCreateQuest: true,
+                shouldPromptCampaign: false,
+              },
+              planDay: {
+                message: "I drafted a focused day for you.",
+                dayAssessment: "balanced",
+                suggestedQuests: [
+                  {
+                    suggestionId: "plan-1",
+                    proposalId: "proposal-plan-1",
+                    title: "Outline launch checklist",
+                    type: "must",
+                    estimatedDuration: "45 min",
+                    estimatedDurationMinutes: 45,
+                    source: "campaign",
+                    reason: "It keeps launch moving.",
+                  },
+                ],
+              },
+            },
+            metadata: {
+              structuredResponse: {
+                intent: {
+                  intentType: "quest",
+                  timeHorizon: "today",
+                  isRecurring: false,
+                  shouldCreateQuest: true,
+                  shouldPromptCampaign: false,
+                },
+                planDay: {
+                  message: "I drafted a focused day for you.",
+                  dayAssessment: "balanced",
+                  suggestedQuests: [
+                    {
+                      suggestionId: "plan-1",
+                      proposalId: "proposal-plan-1",
+                      title: "Outline launch checklist",
+                      type: "must",
+                      estimatedDuration: "45 min",
+                      estimatedDurationMinutes: 45,
+                      source: "campaign",
+                      reason: "It keeps launch moving.",
+                    },
+                  ],
+                },
+              },
+              followUpQuestions: [],
+              proposals: [
+                {
+                  id: "proposal-plan-1",
+                  kind: "create_quest",
+                  title: "Outline launch checklist",
+                  summary:
+                    "Create a focused quest for Outline launch checklist.",
+                  reasoning: "It fits your first open work block.",
+                  payload: {
+                    taskText: "Outline launch checklist",
+                    taskDate: "2026-04-18",
+                    scheduledTime: "09:00",
+                    estimatedDuration: 45,
+                  },
+                  status: "pending",
+                  readyToConfirm: true,
+                  missingFields: [],
+                },
+              ],
+              suggestedReminders: [],
+              sessionState: {
+                draft: {},
+                openQuestionIds: [],
+                preferredTimeOfDay: null,
+                preferredTimeReason: null,
+                reminderPreference: null,
+                pendingStarterIntent: null,
+                lastClassification: "quest",
+              },
+            },
+          },
+        ],
+      });
+    });
+
+    expect(result.current.sessionId).toBe("persisted-planner-session");
+    expect(result.current.messages).toHaveLength(2);
+    expect(result.current.messages[1]?.role).toBe("companion");
+    expect(result.current.messages[1]?.structuredResponse?.planDay?.message).toBe(
+      "I drafted a focused day for you.",
+    );
+    expect(result.current.structuredResponse?.planDay?.suggestedQuests).toHaveLength(1);
+    expect(result.current.proposals).toEqual([
+      expect.objectContaining({
+        id: "proposal-plan-1",
+        kind: "create_quest",
+        status: "pending",
+      }),
+    ]);
+  });
+
+  it("restores persisted planner proposals so reloaded suggestions stay actionable", async () => {
+    const { result } = renderHook(() =>
+      useCompanionPlanner({ bootstrapGreeting: false })
+    );
+
+    act(() => {
+      result.current.hydrateThread({
+        sessionId: "persisted-planner-session",
+        messages: [
+          {
+            id: "planner-user-1",
+            sessionId: "persisted-planner-session",
+            role: "user",
+            content: "Plan my day",
+            createdAt: "2026-04-18T08:00:00.000Z",
+            source: "plan",
+          },
+          {
+            id: "planner-assistant-1",
+            sessionId: "persisted-planner-session",
+            role: "assistant",
+            content: "I drafted a focused day for you.",
+            createdAt: "2026-04-18T08:00:01.000Z",
+            source: "plan",
+            structuredResponse: {
+              intent: {
+                intentType: "quest",
+                timeHorizon: "today",
+                isRecurring: false,
+                shouldCreateQuest: true,
+                shouldPromptCampaign: false,
+              },
+              planDay: {
+                message: "I drafted a focused day for you.",
+                dayAssessment: "balanced",
+                suggestedQuests: [
+                  {
+                    suggestionId: "plan-1",
+                    proposalId: "proposal-plan-1",
+                    title: "Outline launch checklist",
+                    type: "must",
+                    estimatedDuration: "45 min",
+                    estimatedDurationMinutes: 45,
+                    source: "campaign",
+                    reason: "It keeps launch moving.",
+                  },
+                ],
+              },
+            },
+            metadata: {
+              followUpQuestions: [],
+              proposals: [
+                {
+                  id: "proposal-plan-1",
+                  kind: "create_quest",
+                  title: "Outline launch checklist",
+                  summary:
+                    "Create a focused quest for Outline launch checklist.",
+                  reasoning: "It fits your first open work block.",
+                  payload: {
+                    taskText: "Outline launch checklist",
+                    taskDate: "2026-04-18",
+                    scheduledTime: "09:00",
+                    estimatedDuration: 45,
+                  },
+                  status: "pending",
+                  readyToConfirm: true,
+                  missingFields: [],
+                },
+              ],
+              suggestedReminders: [],
+              sessionState: {
+                draft: {},
+                openQuestionIds: [],
+                preferredTimeOfDay: null,
+                preferredTimeReason: null,
+                reminderPreference: null,
+                pendingStarterIntent: null,
+                lastClassification: "quest",
+              },
+            },
+          },
+        ],
+      });
+    });
+
+    await act(async () => {
+      await result.current.confirmProposal("proposal-plan-1");
+    });
+
+    expect(mocks.addTask).toHaveBeenCalledWith(
+      expect.objectContaining({
+        taskText: "Outline launch checklist",
+        taskDate: "2026-04-18",
+        scheduledTime: "09:00",
+        estimatedDuration: 45,
+      }),
+    );
+  });
+
+  it("replays persisted proposal decisions so saved suggestions stay marked after reload", async () => {
+    const { result } = renderHook(() =>
+      useCompanionPlanner({ bootstrapGreeting: false })
+    );
+
+    act(() => {
+      result.current.hydrateThread({
+        sessionId: "persisted-planner-session",
+        messages: [
+          {
+            id: "planner-user-1",
+            sessionId: "persisted-planner-session",
+            role: "user",
+            content: "Plan my day",
+            createdAt: "2026-04-18T08:00:00.000Z",
+            source: "plan",
+          },
+          {
+            id: "planner-assistant-1",
+            sessionId: "persisted-planner-session",
+            role: "assistant",
+            content: "I drafted a focused day for you.",
+            createdAt: "2026-04-18T08:00:01.000Z",
+            source: "plan",
+            structuredResponse: {
+              intent: {
+                intentType: "quest",
+                timeHorizon: "today",
+                isRecurring: false,
+                shouldCreateQuest: true,
+                shouldPromptCampaign: false,
+              },
+              planDay: {
+                message: "I drafted a focused day for you.",
+                dayAssessment: "balanced",
+                suggestedQuests: [
+                  {
+                    suggestionId: "plan-1",
+                    proposalId: "proposal-plan-1",
+                    title: "Outline launch checklist",
+                    type: "must",
+                    estimatedDuration: "45 min",
+                    estimatedDurationMinutes: 45,
+                    source: "campaign",
+                    reason: "It keeps launch moving.",
+                  },
+                ],
+              },
+            },
+            metadata: {
+              followUpQuestions: [],
+              proposals: [
+                {
+                  id: "proposal-plan-1",
+                  kind: "create_quest",
+                  title: "Outline launch checklist",
+                  summary:
+                    "Create a focused quest for Outline launch checklist.",
+                  reasoning: "It fits your first open work block.",
+                  payload: {
+                    taskText: "Outline launch checklist",
+                    taskDate: "2026-04-18",
+                    scheduledTime: "09:00",
+                    estimatedDuration: 45,
+                  },
+                  status: "pending",
+                  readyToConfirm: true,
+                  missingFields: [],
+                },
+              ],
+              suggestedReminders: [],
+              sessionState: {
+                draft: {},
+                openQuestionIds: [],
+                preferredTimeOfDay: null,
+                preferredTimeReason: null,
+                reminderPreference: null,
+                pendingStarterIntent: null,
+                lastClassification: "quest",
+              },
+            },
+          },
+          {
+            id: "planner-assistant-2",
+            sessionId: "persisted-planner-session",
+            role: "assistant",
+            content: "Saved: Outline launch checklist.",
+            createdAt: "2026-04-18T08:05:00.000Z",
+            source: "plan",
+            metadata: {
+              proposalDecision: {
+                proposalId: "proposal-plan-1",
+                status: "confirmed",
+              },
+            },
+          },
+        ],
+      });
+    });
+
+    expect(result.current.proposals).toEqual([
+      expect.objectContaining({
+        id: "proposal-plan-1",
+        status: "confirmed",
+      }),
+    ]);
+  });
+
+  it("persists planner structured output metadata for journeys thread history", async () => {
+    mocks.invoke.mockResolvedValue({
+      data: {
+        mode: "schedule_read",
+        reply: "I drafted a focused day for you.",
+        followUpQuestions: [],
+        proposals: [],
+        suggestedReminders: [],
+        structuredResponse: {
+          intent: {
+            intentType: "quest",
+            timeHorizon: "today",
+            isRecurring: false,
+            shouldCreateQuest: true,
+            shouldPromptCampaign: false,
+          },
+          planDay: {
+            message: "I drafted a focused day for you.",
+            dayAssessment: "balanced",
+            suggestedQuests: [
+              {
+                suggestionId: "plan-1",
+                proposalId: "proposal-plan-1",
+                title: "Outline launch checklist",
+                type: "must",
+                estimatedDuration: "45 min",
+                estimatedDurationMinutes: 45,
+                source: "campaign",
+                reason: "It keeps launch moving.",
+              },
+            ],
+          },
+        },
+        memoryUpdates: {},
+        sessionState: {
+          draft: {},
+          openQuestionIds: [],
+          preferredTimeOfDay: null,
+          preferredTimeReason: null,
+          reminderPreference: null,
+          pendingStarterIntent: null,
+          lastClassification: "quest",
+        },
+      },
+      error: null,
+    });
+
+    const { result } = renderHook(() =>
+      useCompanionPlanner({
+        bootstrapGreeting: false,
+        threadPersistence: {
+          enabled: true,
+          surface: "journeys",
+        },
+      })
+    );
+
+    await act(async () => {
+      await result.current.submitMessage("Plan my day", "text");
+    });
+
+    expect(mocks.persistCompanionThreadMessages).toHaveBeenCalledWith(
+      expect.objectContaining({
+        surface: "journeys",
+        source: "plan",
+        rows: expect.arrayContaining([
+          expect.objectContaining({
+            role: "assistant",
+            content: "I drafted a focused day for you.",
+            metadata: expect.objectContaining({
+              structuredResponse: expect.objectContaining({
+                planDay: expect.objectContaining({
+                  message: "I drafted a focused day for you.",
+                }),
+              }),
+              proposals: [],
+              suggestedReminders: [],
+              followUpQuestions: [],
+              sessionState: expect.objectContaining({
+                lastClassification: "quest",
+              }),
+            }),
+          }),
+        ]),
+      }),
+    );
+  });
+
   it("primes quest capture locally and keeps the planner idle", async () => {
     Object.defineProperty(window, "localStorage", {
       configurable: true,
@@ -297,6 +828,47 @@ describe("useCompanionPlanner", () => {
     );
     expect(result.current.sessionState.reminderPreference).toBe("15 minutes");
     expect(mocks.invoke).not.toHaveBeenCalled();
+  });
+
+  it("persists quest capture seeds for journeys thread reloads", async () => {
+    const { result } = renderHook(() =>
+      useCompanionPlanner({
+        bootstrapGreeting: false,
+        threadPersistence: {
+          enabled: true,
+          surface: "journeys",
+        },
+      })
+    );
+
+    act(() => {
+      result.current.primeQuestCapture();
+    });
+
+    expect(mocks.persistCompanionThreadMessages).toHaveBeenCalledWith(
+      expect.objectContaining({
+        surface: "journeys",
+        source: "plan",
+        rows: expect.arrayContaining([
+          expect.objectContaining({
+            role: "assistant",
+            content: "Quest?",
+            metadata: expect.objectContaining({
+              structuredResponse: null,
+              followUpQuestions: [],
+              proposals: [],
+              suggestedReminders: [],
+              sessionState: expect.objectContaining({
+                pendingStarterIntent: "quest_capture",
+                draft: expect.objectContaining({
+                  draftKind: "create_quest",
+                }),
+              }),
+            }),
+          }),
+        ]),
+      }),
+    );
   });
 
   it("continues quest capture follow-ups through the normal planner request", async () => {

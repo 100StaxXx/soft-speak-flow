@@ -12,7 +12,8 @@ import type {
 } from "./types.ts";
 
 const DEFAULT_PENDING_ACTION_TTL_MS = Number(
-  Deno.env.get("COMPANION_PENDING_ACTION_TTL_MS") ?? String(1000 * 60 * 60 * 12),
+  Deno.env.get("COMPANION_PENDING_ACTION_TTL_MS") ??
+    String(1000 * 60 * 60 * 12),
 );
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
@@ -20,7 +21,9 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
     ? value as Record<string, unknown>
     : null;
 
-const mapPendingActionRow = (row: Record<string, unknown> | null): PendingActionRow | null => {
+const mapPendingActionRow = (
+  row: Record<string, unknown> | null,
+): PendingActionRow | null => {
   if (!row) return null;
 
   return {
@@ -40,8 +43,12 @@ const mapPendingActionRow = (row: Record<string, unknown> | null): PendingAction
       : null,
     created_at: String(row.created_at),
     expires_at: String(row.expires_at),
-    confirmed_at: typeof row.confirmed_at === "string" ? row.confirmed_at : null,
-    cancelled_at: typeof row.cancelled_at === "string" ? row.cancelled_at : null,
+    confirmed_at: typeof row.confirmed_at === "string"
+      ? row.confirmed_at
+      : null,
+    cancelled_at: typeof row.cancelled_at === "string"
+      ? row.cancelled_at
+      : null,
     executed_at: typeof row.executed_at === "string" ? row.executed_at : null,
     execution_result: asRecord(row.execution_result),
     execution_error: asRecord(row.execution_error),
@@ -51,6 +58,38 @@ const mapPendingActionRow = (row: Record<string, unknown> | null): PendingAction
       : null,
     metadata: asRecord(row.metadata),
   };
+};
+
+const buildAssistantMessageMetadata = (params: {
+  assistantMode?: string | null;
+  assistantIntent?: string | null;
+  structuredResponse?: unknown;
+  pendingAction?: unknown;
+  receipt?: unknown;
+}) => {
+  const metadata: Record<string, unknown> = {};
+
+  if (typeof params.assistantMode === "string" && params.assistantMode.length > 0) {
+    metadata.mode = params.assistantMode;
+  }
+
+  if (typeof params.assistantIntent === "string" && params.assistantIntent.length > 0) {
+    metadata.intent = params.assistantIntent;
+  }
+
+  if ("structuredResponse" in params) {
+    metadata.structuredResponse = params.structuredResponse ?? null;
+  }
+
+  if ("pendingAction" in params && params.pendingAction) {
+    metadata.pendingAction = params.pendingAction;
+  }
+
+  if ("receipt" in params && params.receipt) {
+    metadata.receipt = params.receipt;
+  }
+
+  return metadata;
 };
 
 export async function loadThread(
@@ -77,7 +116,9 @@ export async function loadRecentMessages(
 ): Promise<ChatRow[]> {
   const { data, error } = await supabase
     .from("companion_chats")
-    .select("id, role, content, created_at, input_mode, source, surface, session_id")
+    .select(
+      "id, role, content, created_at, input_mode, source, surface, session_id",
+    )
     .eq("session_id", sessionId)
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
@@ -194,26 +235,34 @@ export async function persistAgentTurn(params: {
   companionId: string;
   sessionId: string;
   surface: "companion" | "journeys";
-  userMessage: string;
+  userMessage?: string | null;
   assistantReply: string;
   inputMode: "text" | "voice";
   createdAt?: string;
   openaiConversationId?: string | null;
   lastOpenAIResponseId?: string | null;
+  assistantMode?: string | null;
+  assistantIntent?: string | null;
+  structuredResponse?: unknown;
+  pendingAction?: unknown;
+  receipt?: unknown;
 }) {
   const createdAt = params.createdAt ?? new Date().toISOString();
   const rows = [
-    {
-      user_id: params.userId,
-      companion_id: params.companionId,
-      role: "user",
-      content: params.userMessage,
-      input_mode: params.inputMode,
-      session_id: params.sessionId,
-      surface: params.surface,
-      source: "agent",
-      created_at: createdAt,
-    },
+    ...(params.userMessage
+      ? [{
+        user_id: params.userId,
+        companion_id: params.companionId,
+        role: "user",
+        content: params.userMessage,
+        input_mode: params.inputMode,
+        session_id: params.sessionId,
+        surface: params.surface,
+        source: "agent",
+        created_at: createdAt,
+        metadata: {},
+      }]
+      : []),
     {
       user_id: params.userId,
       companion_id: params.companionId,
@@ -224,6 +273,13 @@ export async function persistAgentTurn(params: {
       surface: params.surface,
       source: "agent",
       created_at: createdAt,
+      metadata: buildAssistantMessageMetadata({
+        assistantMode: params.assistantMode ?? null,
+        assistantIntent: params.assistantIntent ?? null,
+        structuredResponse: params.structuredResponse,
+        pendingAction: params.pendingAction,
+        receipt: params.receipt,
+      }),
     },
   ];
 
@@ -239,7 +295,7 @@ export async function persistAgentTurn(params: {
     companionId: params.companionId,
     sessionId: params.sessionId,
     surface: params.surface,
-    firstUserMessage: params.userMessage,
+    firstUserMessage: params.userMessage ?? params.assistantReply,
     previewText: buildCompanionChatThreadPreview(params.assistantReply),
     lastMessageAt: createdAt,
     openaiConversationId: params.openaiConversationId ?? null,
@@ -257,6 +313,7 @@ export async function persistActionReceipt(params: {
   assistantReply: string;
   createdAt?: string;
   inputMode?: "text" | "voice";
+  receipt?: unknown;
 }) {
   const createdAt = params.createdAt ?? new Date().toISOString();
   const { error } = await params.supabase
@@ -272,6 +329,7 @@ export async function persistActionReceipt(params: {
         surface: params.surface,
         source: "agent",
         created_at: createdAt,
+        metadata: {},
       },
       {
         user_id: params.userId,
@@ -283,6 +341,10 @@ export async function persistActionReceipt(params: {
         surface: params.surface,
         source: "agent",
         created_at: createdAt,
+        metadata: buildAssistantMessageMetadata({
+          assistantMode: "receipt",
+          receipt: params.receipt ?? null,
+        }),
       },
     ]);
 
@@ -311,8 +373,8 @@ export async function replacePendingAction(params: {
   expiresAt?: string;
 }) {
   const now = new Date().toISOString();
-  const expiresAt = params.expiresAt
-    ?? new Date(Date.now() + DEFAULT_PENDING_ACTION_TTL_MS).toISOString();
+  const expiresAt = params.expiresAt ??
+    new Date(Date.now() + DEFAULT_PENDING_ACTION_TTL_MS).toISOString();
 
   const { data: expiredRows, error: expireError } = await params.supabase
     .from("companion_pending_actions")

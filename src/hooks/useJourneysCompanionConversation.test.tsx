@@ -85,6 +85,68 @@ describe("useJourneysCompanionConversation", () => {
     expect(JOURNEYS_COMPANION_OPENERS).toContain(expectedOpener);
   });
 
+  it("stays dormant when disabled until the fallback path needs it", async () => {
+    const { result } = renderHook(() =>
+      useJourneysCompanionConversation({ enabled: false })
+    );
+
+    expect(result.current.messages).toEqual([]);
+
+    await act(async () => {
+      await result.current.submitMessage("Keep me grounded.", "text");
+    });
+
+    expect(mocks.invoke).not.toHaveBeenCalled();
+    expect(result.current.messages).toEqual([]);
+  });
+
+  it("preserves hydrated fallback thread state when re-enabled", async () => {
+    const { result, rerender } = renderHook(
+      ({ enabled }: { enabled: boolean }) =>
+        useJourneysCompanionConversation({ enabled }),
+      {
+        initialProps: { enabled: false },
+      },
+    );
+
+    await act(async () => {
+      result.current.hydrateThread({
+        sessionId: "fallback-journeys-session",
+        messages: [
+          {
+            id: "journeys-1",
+            role: "assistant",
+            content: "Let's keep this thread going.",
+            createdAt: "2026-04-18T08:00:00.000Z",
+          },
+          {
+            id: "journeys-2",
+            role: "user",
+            content: "I need a calmer plan.",
+            createdAt: "2026-04-18T08:00:10.000Z",
+            inputMode: "text",
+          },
+        ],
+      });
+    });
+
+    rerender({ enabled: true });
+
+    await waitFor(() => {
+      expect(result.current.sessionId).toBe("fallback-journeys-session");
+      expect(result.current.messages).toEqual([
+        expect.objectContaining({
+          id: "journeys-1",
+          content: "Let's keep this thread going.",
+        }),
+        expect.objectContaining({
+          id: "journeys-2",
+          content: "I need a calmer plan.",
+        }),
+      ]);
+    });
+  });
+
   it("injects an explicit assistant opening into a blank thread", async () => {
     const { result } = renderHook(() => useJourneysCompanionConversation());
 

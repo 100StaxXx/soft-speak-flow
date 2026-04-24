@@ -254,6 +254,32 @@ describe("DraggableFAB", () => {
     }));
   });
 
+  it("routes the right-now option through the planner as an immediate next-action starter", () => {
+    render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
+
+    fireEvent.click(screen.getByTestId("journeys-companion-launcher-floating"));
+    fireEvent.click(screen.getByTestId("journeys-companion-launcher-option-right-now"));
+
+    expect(mocks.onOpenCompanionPlanner).toHaveBeenCalledWith(expect.objectContaining({
+      target: "planner",
+      starterIntent: "right_now_start",
+      message: "What should I do right now?",
+    }));
+  });
+
+  it("routes the adjust-day option through the planner as a recovery-and-replan starter", () => {
+    render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
+
+    fireEvent.click(screen.getByTestId("journeys-companion-launcher-floating"));
+    fireEvent.click(screen.getByTestId("journeys-companion-launcher-option-adjust-day"));
+
+    expect(mocks.onOpenCompanionPlanner).toHaveBeenCalledWith(expect.objectContaining({
+      target: "planner",
+      starterIntent: "adjust_today",
+      message: "Adjust my day",
+    }));
+  });
+
   it("routes the quest option through the planner as a one-prompt quest capture starter", () => {
     render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
 

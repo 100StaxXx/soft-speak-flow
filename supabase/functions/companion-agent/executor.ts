@@ -6,6 +6,20 @@ import {
 } from "./persistence.ts";
 import type { PendingActionRow } from "./types.ts";
 
+const readSelectedProposalId = (metadata: PendingActionRow["metadata"]) => {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+    return null;
+  }
+
+  const selectedProposalId = "selectedProposalId" in metadata
+    ? metadata.selectedProposalId
+    : null;
+
+  return typeof selectedProposalId === "string" && selectedProposalId.length > 0
+    ? selectedProposalId
+    : null;
+};
+
 function buildReceipt(params: {
   action: PendingActionRow;
   status: "cancelled" | "failed" | "executed";
@@ -16,6 +30,7 @@ function buildReceipt(params: {
   return {
     actionId: params.action.id,
     status: params.status,
+    proposalId: readSelectedProposalId(params.action.metadata),
     message: params.message,
     summary: params.action.summary,
     createdAt: new Date().toISOString(),
@@ -351,6 +366,7 @@ export async function confirmPendingAction(params: {
       surface: thread.surface,
       userMessage: "Confirm",
       assistantReply: receipt.message,
+      receipt,
     });
 
     return {
@@ -383,6 +399,7 @@ export async function confirmPendingAction(params: {
       surface: thread.surface,
       userMessage: "Confirm",
       assistantReply: receipt.message,
+      receipt,
     });
 
     return {
@@ -440,6 +457,7 @@ export async function cancelPendingAction(params: {
     surface: thread.surface,
     userMessage: "Cancel",
     assistantReply: receipt.message,
+    receipt,
   });
 
   return {

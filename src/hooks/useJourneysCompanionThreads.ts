@@ -39,6 +39,7 @@ interface UseJourneysCompanionThreadsOptions {
   hasPendingPlannerWork: boolean;
   isBusy: boolean;
   conversation: {
+    sessionId?: string | null;
     resetThread: (options?: { sessionId?: string; greetingText?: string }) => void;
     hydrateThread: (options: {
       sessionId: string;
@@ -52,6 +53,7 @@ interface UseJourneysCompanionThreadsOptions {
     }) => void;
   };
   planner: {
+    sessionId?: string | null;
     resetThread: (options?: { sessionId?: string }) => void;
     hydrateThread: (options: {
       sessionId: string;
@@ -74,7 +76,15 @@ const isRealThreadMessage = (message: JourneysAssistantMessage) => !message.isSe
 
 const mapChatMessages = (messages: CompanionChatThreadMessage[]) =>
   messages
-    .filter((message) => message.source === "chat")
+    .filter((message) =>
+      message.source === "chat" ||
+      (
+        message.source === "agent" &&
+        !message.structuredResponse &&
+        !message.pendingAction &&
+        !message.receipt
+      )
+    )
     .map((message) => ({
       id: message.id,
       role: message.role,
@@ -84,7 +94,17 @@ const mapChatMessages = (messages: CompanionChatThreadMessage[]) =>
     }));
 
 const mapPlannerMessages = (messages: CompanionChatThreadMessage[]) =>
-  messages.filter((message) => message.source === "plan");
+  messages.filter((message) =>
+    message.source === "plan" ||
+    (
+      message.source === "agent" &&
+      (
+        message.structuredResponse !== undefined ||
+        Boolean(message.pendingAction) ||
+        Boolean(message.receipt)
+      )
+    )
+  );
 
 export function useJourneysCompanionThreads({
   enabled,
@@ -99,8 +119,16 @@ export function useJourneysCompanionThreads({
   planner,
 }: UseJourneysCompanionThreadsOptions) {
   const queryClient = useQueryClient();
-  const { resetThread: resetConversationThread, hydrateThread: hydrateConversationThread } = conversation;
-  const { resetThread: resetPlannerThread, hydrateThread: hydratePlannerThread } = planner;
+  const {
+    sessionId: conversationSessionId,
+    resetThread: resetConversationThread,
+    hydrateThread: hydrateConversationThread,
+  } = conversation;
+  const {
+    sessionId: plannerSessionId,
+    resetThread: resetPlannerThread,
+    hydrateThread: hydratePlannerThread,
+  } = planner;
   const [activeSessionId, setActiveSessionId] = useState("");
   const [isHydratingThread, setIsHydratingThread] = useState(false);
   const [locallyArchivedSessionId, setLocallyArchivedSessionId] = useState<string | null>(null);
@@ -116,6 +144,18 @@ export function useJourneysCompanionThreads({
     () => messages.some(isRealThreadMessage),
     [messages],
   );
+  const externallyHydratedSessionId = useMemo(() => {
+    const normalizedConversationSessionId = typeof conversationSessionId === "string" &&
+        conversationSessionId.length > 0
+      ? conversationSessionId
+      : null;
+    const normalizedPlannerSessionId = typeof plannerSessionId === "string" &&
+        plannerSessionId.length > 0
+      ? plannerSessionId
+      : null;
+
+    return normalizedConversationSessionId ?? normalizedPlannerSessionId;
+  }, [conversationSessionId, plannerSessionId]);
 
   const scopeKey = `${userId ?? "anon"}:${companionId ?? "none"}`;
   const threadsQueryKey = getCompanionChatThreadsQueryKey(
@@ -190,8 +230,25 @@ export function useJourneysCompanionThreads({
 
     scopeKeyRef.current = scopeKey;
     bootstrappedScopeKeyRef.current = null;
+    if (hasRealThreadMessages && externallyHydratedSessionId) {
+      threadMutationVersionRef.current += 1;
+      localThreadCreatedAtRef.current =
+        messages.find(isRealThreadMessage)?.createdAt ?? new Date().toISOString();
+      setIsHydratingThread(false);
+      setLocallyArchivedSessionId(null);
+      setActiveSessionId(externallyHydratedSessionId);
+      bootstrappedScopeKeyRef.current = scopeKey;
+      return;
+    }
     openFreshThread();
-  }, [enabled, openFreshThread, scopeKey]);
+  }, [
+    enabled,
+    externallyHydratedSessionId,
+    hasRealThreadMessages,
+    messages,
+    openFreshThread,
+    scopeKey,
+  ]);
 
   useEffect(() => {
     if (!enabled) return;

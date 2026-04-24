@@ -9,7 +9,7 @@ import {
   getProgressionTierLabelForLevel,
   resolveProgressionLevelFromXp,
   type ProgressionTier,
-} from "./progression";
+} from "./progression.ts";
 
 export const COMPANION_PRESET_BUCKET = "companion-presets";
 export const COMPANION_PREVIEW_TIER = "t1_hatchling" as const;

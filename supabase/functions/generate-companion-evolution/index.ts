@@ -10,29 +10,40 @@ import {
   createCostGuardrailSession,
   isCostGuardrailBlockedError,
 } from "../_shared/costGuardrails.ts";
+import { buildSpiritLockPromptBlock, resolveCompanionSpiritLockProfile } from "../_shared/companionSpiritLock.ts";
 import {
-  SYSTEM_PROMPT_STAGE1_COLOR_DISTRIBUTION,
-  STAGE1_COVERAGE_TARGETS,
-  buildStageOneColorPlacementGuidance,
-  buildStageOnePalette,
-  formatStageOnePaletteInstructions,
-} from "../_shared/stage1Palette.ts";
-import {
-  buildSpiritLockPromptBlock,
-  buildSpiritLockRetryFeedback,
-  resolveCompanionSpiritLockProfile,
-} from "../_shared/companionSpiritLock.ts";
+  buildBoundaryEvolutionEditPrompt,
+  buildCompanionGenerationMetadata,
+  buildStage1BootstrapPrompt,
+  coerceImageLineageMetadata,
+  getEvolutionDifferenceFloor,
+  getHiddenBoundaryAnchor,
+  shouldGeneratePortraitForStage,
+  synthesizeVisualIdentityProfile,
+  updateLineageMetadataAfterBoundaryEvolution,
+  updateLineageMetadataAfterReveal,
+} from "../_shared/companionLineage.ts";
+import { generateCompanionImage, editCompanionImage } from "../_shared/openaiCompanionImageClient.ts";
+import { judgeCompanionImage } from "../_shared/companionImageJudge.ts";
 import {
   COMPANION_PRESET_BUCKET,
   coerceCompanionElementId,
   coerceCompanionPresetId,
   resolveCompanionAssetPath,
 } from "../../../src/config/companionCatalog.ts";
+import { isPresetBackedCompanion } from "../../../src/lib/companionPredicates.ts";
 import { registerUserStorageAsset } from "../_shared/storageAssetLedger.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-internal-key",
+};
+
+const IMAGE_BUCKET = "evolution-cards";
+const JUDGE_MINIMUMS = {
+  overall: 7,
+  continuity: 6,
+  anatomy: 6,
 };
 
 const normalizeErrorCode = (value: string) =>
@@ -58,142 +69,138 @@ const resolveServerErrorCode = (message: string) => {
   return normalizeErrorCode(message);
 };
 
-// Evolution thresholds are now loaded from database (single source of truth)
-// No more hardcoded values!
+const parseDataUrl = (dataUrl: string): Uint8Array => {
+  const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, "");
+  return Uint8Array.from(atob(base64Data), (char) => char.charCodeAt(0));
+};
 
-// Stage-specific system prompts for different creative freedom levels
-const SYSTEM_PROMPT_REALISTIC = `You generate evolved versions of a user's personal creature companion. 
-Your TOP PRIORITY is absolute visual continuity with the previous evolution.
+const uploadGeneratedImage = async ({
+  supabase,
+  userId,
+  companionId,
+  nextStage,
+  generatedImageDataUrl,
+}: {
+  supabase: ReturnType<typeof createClient>;
+  userId: string;
+  companionId: string;
+  nextStage: number;
+  generatedImageDataUrl: string;
+}): Promise<{ fileName: string; publicUrl: string }> => {
+  const buffer = parseDataUrl(generatedImageDataUrl);
+  const fileName = `${userId}/evolutions/${companionId}_stage_${nextStage}_${Date.now()}.png`;
 
-You must preserve the creature so it looks like the SAME INDIVIDUAL evolving, not a new design.
+  const { error: uploadError } = await supabase.storage
+    .from(IMAGE_BUCKET)
+    .upload(fileName, buffer, {
+      contentType: "image/png",
+      upsert: false,
+    });
 
-STRICT RULES — DO NOT BREAK:
-1. Preserve 95% of the previous color palette. 
-   - Same main colors, same accents, same patterns.
-   - Only allow slight increases in glow, detail, or saturation.
+  if (uploadError) {
+    const uploadMessage =
+      typeof uploadError.message === "string" && uploadError.message.trim().length > 0
+        ? uploadError.message
+        : "unknown_storage_error";
+    throw new Error(`Failed to upload image: ${uploadMessage}`);
+  }
 
-2. Preserve 90% of the previous silhouette.
-   - Same body type, head shape, limbs, tail, wings (if any).
-   - NO new anatomy.
-   - NO redesign—only refinements or slight growth.
+  const { data: urlData } = supabase.storage.from(IMAGE_BUCKET).getPublicUrl(fileName);
+  return { fileName, publicUrl: urlData.publicUrl };
+};
 
-3. Preserve 100% of the animal type and inspiration.
-   - If fox-like → always fox-like.
-   - If dragon-like → always dragon-like.
-   - If mixed → same mix, no changes.
+const upsertEvolutionRecord = async ({
+  supabase,
+  companionId,
+  stage,
+  imageUrl,
+  xpAtEvolution,
+  generationMetadata,
+}: {
+  supabase: ReturnType<typeof createClient>;
+  companionId: string;
+  stage: number;
+  imageUrl: string;
+  xpAtEvolution: number;
+  generationMetadata?: Record<string, unknown> | null;
+}) => {
+  const { data, error } = await supabase
+    .from("companion_evolutions")
+    .upsert(
+      {
+        companion_id: companionId,
+        stage,
+        image_url: imageUrl,
+        xp_at_evolution: xpAtEvolution,
+        evolved_at: new Date().toISOString(),
+        generation_metadata: generationMetadata ?? null,
+      },
+      { onConflict: "companion_id,stage" },
+    )
+    .select()
+    .single();
 
-4. Preserve all signature features.
-   - Eye shape, markings, horns, tail, textures, elemental aura.
-   - These traits MUST appear in the evolved form.
+  if (error) {
+    throw new Error("Failed to save evolution record");
+  }
 
-5. Elemental identity is fixed.
-   - Fire, water, earth, lightning, air, frost, shadow, light.
-   - You may intensify it, but it cannot change or move locations.
+  return data;
+};
 
-ALLOWED EVOLUTION CHANGES:
-- Slight increase in size or maturity.
-- Enhanced detail, texture, energy, or elegance.
-- Strengthened elemental effects (subtle, not overwhelming).
-- More heroic or confident posture.
-- Evolved versions of EXISTING features only.
+const judgeScoresPass = ({
+  mode,
+  scores,
+  previousLevel,
+  nextLevel,
+}: {
+  mode: "bootstrap" | "egg" | "evolution";
+  scores: Awaited<ReturnType<typeof judgeCompanionImage>>;
+  previousLevel?: number;
+  nextLevel?: number;
+}): boolean => {
+  if (!scores) return true;
 
-DO NOT:
-- Change species.
-- Change silhouette dramatically.
-- Invent new features.
-- Change colors.
-- Change style drastically.
+  if (
+    scores.overall < JUDGE_MINIMUMS.overall
+    || scores.continuity < JUDGE_MINIMUMS.continuity
+    || scores.anatomy < JUDGE_MINIMUMS.anatomy
+  ) {
+    return false;
+  }
 
-Your output must be an image that tightly adheres to these continuity rules with 95% visual continuity.`;
+  if (
+    mode === "evolution"
+    && typeof previousLevel === "number"
+    && typeof nextLevel === "number"
+    && scores.difference < getEvolutionDifferenceFloor(previousLevel, nextLevel)
+  ) {
+    return false;
+  }
 
-const SYSTEM_PROMPT_MYTHIC = `You generate evolved versions of a user's personal creature companion.
-Your goal is to balance CONTINUITY with MYTHIC ENHANCEMENT as the creature enters legendary status.
+  return true;
+};
 
-CONTINUITY RULES (80% preservation):
-1. Preserve 85% of the previous color palette.
-   - Same dominant colors, but can add divine/cosmiq accent colors.
-   - Allow increased glow, luminosity, and ethereal effects.
+const rankJudgeScores = (scores: Awaited<ReturnType<typeof judgeCompanionImage>>): number => {
+  if (!scores) return 0;
+  return (
+    scores.overall * 4
+    + scores.continuity * 3
+    + scores.anatomy * 2
+    + scores.centering
+    + scores.difference
+  );
+};
 
-2. Preserve 80% of the previous silhouette.
-   - Core body type, head shape, and limb structure maintained.
-   - Can add divine enhancements: ethereal wings, halos, energy constructs.
-   - Proportions can shift toward heroic/idealized.
+const resolveJudgeFocalValue = (value: number | null | undefined): number =>
+  typeof value === "number" && Number.isFinite(value)
+    ? Math.max(0, Math.min(1, value))
+    : 0.5;
 
-3. Preserve species recognition (80%).
-   - Must be recognizable as same species at first glance.
-   - Can add mythic features (divine horns, cosmiq patterns, reality effects).
-   - Base anatomy remains but enhanced with legendary elements.
-
-4. Signature features evolve but persist.
-   - Core markings, eye style, and defining traits preserved.
-   - Can become more elaborate, divine, or cosmiq versions.
-
-5. Elemental identity can expand.
-   - Core element remains but can manifest in grander ways.
-   - Can add secondary cosmiq/divine elemental effects.
-
-MYTHIC ENHANCEMENTS NOW ALLOWED:
-- Divine horns, antlers, or crowns (even if species didn't have them).
-- Ethereal energy wings or appendages.
-- Cosmiq patterns, runes, or sacred geometry.
-- Halos, auras, or divine light effects.
-- Larger-than-life heroic proportions.
-- Reality-bending atmospheric effects.
-
-You are creating a LEGENDARY version while maintaining the companion's core identity.`;
-
-const SYSTEM_PROMPT_LEGENDARY = `You generate evolved versions of a user's personal creature companion.
-This is the ULTIMATE EVOLUTION - a cosmiq god-tier entity. Your goal is GRANDIOSE CREATIVITY while maintaining species ESSENCE.
-
-CREATIVE FREEDOM (Essence-Based):
-1. Color evolution is fluid.
-   - Core color theme should echo through cosmiq form.
-   - Full freedom to add stellar, nebula, cosmiq colors.
-   - Original palette visible in overall composition.
-
-2. Form transcends but echoes origin.
-   - Species essence recognizable (this came from a wolf/eagle/dragon).
-   - Can add: multiple forms, dimensional echoes, reality fragments.
-   - Silhouette can be broken by cosmiq scale and divine additions.
-
-3. Species soul is the anchor.
-   - Viewer should sense what species this evolved from.
-   - Core "spirit" of the animal maintained through chaos.
-   - Can be abstract, cosmiq, reality-bending.
-
-4. All features are malleable.
-   - Signature features can transcend physical form.
-   - Can become cosmiq constructs, energy patterns, dimensional rifts.
-   - Original traits visible in divine/cosmiq interpretation.
-
-5. Elements become cosmiq forces.
-   - Element manifests at universe-scale.
-   - Can combine with stellar/cosmiq phenomena.
-   - Original element evident in the chaos.
-
-LEGENDARY FREEDOM GRANTED:
-- Multiple forms or dimensional echoes (but SINGLE HEAD only - no multi-headed creatures).
-- Cosmiq appendages: star-matter limbs, nebula wings, galaxy constructs.
-- Reality-warping anatomy: impossible geometry, dimensional rifts, spacetime breaks.
-- Planet/universe scale: colossal beyond comprehension.
-- CRITICAL: Even at legendary tier, the creature must have ONE HEAD ONLY. No multi-headed creatures.
-- Divine constructs: halos of galaxies, crowns of stars, armor of reality itself.
-- Transcendent features: the creature IS the environment, IS the cosmiq.
-
-GRANDIOSE MANDATE: Push creative boundaries. Make this LARGER THAN LIFE. A living god, a force of nature, 
-an entity that births universes. This is the pinnacle - absolute divine manifestation.
-
-Maintain the SOUL of the species while achieving cosmiq transcendence.`;
-
-const stripOrganicPromptLanguageForMechanicalCompanion = (prompt: string): string =>
-  prompt
-    .replace(/\bflesh\b/gi, "engineered chassis")
-    .replace(/\bfleshy\b/gi, "engineered")
-    .replace(/\bskin\b/gi, "alloy plating")
-    .replace(/\bfur\b/gi, "plating")
-    .replace(/\btissue\b/gi, "internal systems")
-    .replace(/\bmuscle\b/gi, "mechanical drive");
-
+const appendJudgeCritique = (prompt: string, notes: string | null | undefined): string => {
+  const critique = typeof notes === "string" ? notes.trim() : "";
+  if (!critique) return prompt;
+  return `${prompt}\n\nRetry critique:\n- ${critique}`;
+};
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -220,7 +227,7 @@ serve(async (req) => {
       if (!requestedUserId) {
         return new Response(
           JSON.stringify({ error: "userId is required for internal evolution calls" }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
       }
       resolvedUserId = requestedUserId;
@@ -228,7 +235,7 @@ serve(async (req) => {
       if (!authHeader) {
         return new Response(
           JSON.stringify({ error: "Missing Authorization header" }),
-          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
       }
 
@@ -248,7 +255,7 @@ serve(async (req) => {
       if (authError || !user) {
         return new Response(
           JSON.stringify({ error: "Unauthorized" }),
-          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
       }
 
@@ -256,7 +263,7 @@ serve(async (req) => {
       if (resolvedUserId !== user.id) {
         return new Response(
           JSON.stringify({ error: "User mismatch" }),
-          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
       }
     }
@@ -264,15 +271,12 @@ serve(async (req) => {
     if (!resolvedUserId) {
       return new Response(
         JSON.stringify({ error: "Unable to resolve user for evolution request" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    console.log("Fetching companion for user:", resolvedUserId);
-
-    // 1. Load current companion
     const { data: companion, error: companionError } = await supabase
       .from("user_companion")
       .select("*")
@@ -282,92 +286,78 @@ serve(async (req) => {
       .maybeSingle();
 
     if (companionError) {
-      console.error("Companion fetch error:", companionError);
       throw new Error(`Failed to fetch companion: ${companionError.message}`);
     }
 
     if (!companion) {
-      console.error("No companion found for user:", resolvedUserId);
       throw new Error("Companion not found");
     }
 
     const currentStage = companion.current_stage;
     const currentXP = companion.current_xp;
 
-    console.log("Current stage:", currentStage, "XP:", currentXP);
-
-    // 2. Load evolution thresholds from database
     const { data: thresholds, error: thresholdsError } = await supabase
       .from("evolution_thresholds")
       .select("*")
       .order("stage", { ascending: true });
 
-    if (thresholdsError || !thresholds) {
-      console.error("Failed to load evolution thresholds:", thresholdsError);
+    if (thresholdsError || !thresholds?.length) {
       throw new Error("Evolution thresholds not available");
     }
 
     const maxStage = thresholds[thresholds.length - 1].stage;
-    
-    // 3. Determine if evolution is needed
     if (currentStage >= maxStage) {
       return new Response(
-        JSON.stringify({ evolved: false, message: "Max stage reached", current_stage: currentStage, xp: currentXP }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({
+          evolved: false,
+          message: "Max stage reached",
+          current_stage: currentStage,
+          xp: currentXP,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    const nextThresholdData = thresholds.find(t => t.stage === currentStage + 1);
+    const nextThresholdData = thresholds.find((threshold) => threshold.stage === currentStage + 1);
     if (!nextThresholdData) {
       throw new Error(`No threshold found for stage ${currentStage + 1}`);
     }
 
-    const nextThreshold = nextThresholdData.xp_required;
-    
-    if (currentXP < nextThreshold) {
+    if (currentXP < nextThresholdData.xp_required) {
       return new Response(
-        JSON.stringify({ 
-          evolved: false, 
-          message: "Not enough XP", 
-          current_stage: currentStage, 
+        JSON.stringify({
+          evolved: false,
+          message: "Not enough XP",
+          current_stage: currentStage,
           xp: currentXP,
-          next_threshold: nextThreshold 
+          next_threshold: nextThresholdData.xp_required,
         }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
     const nextStage = currentStage + 1;
-    console.log("Evolution triggered! Moving to stage:", nextStage);
 
-    const normalizedPresetId = coerceCompanionPresetId(companion.preset_id);
-    if (normalizedPresetId) {
+    if (isPresetBackedCompanion(companion)) {
+      const normalizedPresetId = coerceCompanionPresetId(companion.preset_id);
+      if (!normalizedPresetId) {
+        throw new Error("Companion preset could not be resolved");
+      }
+
       const assetPath = resolveCompanionAssetPath({
         presetId: normalizedPresetId,
         stage: nextStage,
         state: "normal",
         element: coerceCompanionElementId(companion.core_element),
       });
-      const newImageUrl = supabase.storage
-        .from(COMPANION_PRESET_BUCKET)
-        .getPublicUrl(assetPath).data.publicUrl;
-
-      const { data: evolutionRecord, error: evolutionError } = await supabase
-        .from("companion_evolutions")
-        .insert({
-          companion_id: companion.id,
-          stage: nextStage,
-          image_url: newImageUrl,
-          xp_at_evolution: currentXP,
-          evolved_at: new Date().toISOString(),
-        })
-        .select()
-        .single();
-
-      if (evolutionError) {
-        console.error("Preset evolution record error:", evolutionError);
-        throw new Error("Failed to save evolution record");
-      }
+      const newImageUrl = supabase.storage.from(COMPANION_PRESET_BUCKET).getPublicUrl(assetPath).data.publicUrl;
+      const evolutionRecord = await upsertEvolutionRecord({
+        supabase,
+        companionId: companion.id,
+        stage: nextStage,
+        imageUrl: newImageUrl,
+        xpAtEvolution: currentXP,
+      });
 
       const { error: updateError } = await supabase
         .from("user_companion")
@@ -379,7 +369,6 @@ serve(async (req) => {
         .eq("id", companion.id);
 
       if (updateError) {
-        console.error("Preset companion update error:", updateError);
         throw new Error("Failed to update companion");
       }
 
@@ -391,23 +380,145 @@ serve(async (req) => {
           image_url: newImageUrl,
           xp_at_evolution: currentXP,
           evolution_id: evolutionRecord.id,
+          portrait_regenerated: true,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    const visualIdentityProfile = synthesizeVisualIdentityProfile(companion.visual_identity_profile, {
+      spiritAnimal: companion.spirit_animal,
+      coreElement: companion.core_element,
+      favoriteColor: companion.favorite_color,
+      storyTone: companion.story_tone,
+    });
+    const imageLineageMetadata = coerceImageLineageMetadata(companion.image_lineage_metadata);
+
+    if (nextStage === 1) {
+      const hiddenStageOneAnchor = getHiddenBoundaryAnchor(companion.image_lineage_metadata, 1);
+      if (hiddenStageOneAnchor?.imageUrl) {
+        const lineageMetadataAfterReveal = updateLineageMetadataAfterReveal({
+          existing: companion.image_lineage_metadata,
+          revealedLevel: 1,
+          imageUrl: hiddenStageOneAnchor.imageUrl,
+          focalX: hiddenStageOneAnchor.focalX,
+          focalY: hiddenStageOneAnchor.focalY,
+        });
+        const generationMetadata = buildCompanionGenerationMetadata({
+          sourceType: "reveal",
+          boundaryLevel: 1,
+          portraitRegenerated: false,
+          reusedFromStage: 1,
+        });
+
+        const evolutionRecord = await upsertEvolutionRecord({
+          supabase,
+          companionId: companion.id,
+          stage: nextStage,
+          imageUrl: hiddenStageOneAnchor.imageUrl,
+          xpAtEvolution: currentXP,
+          generationMetadata,
+        });
+
+        const { error: updateError } = await supabase
+          .from("user_companion")
+          .update({
+            current_stage: nextStage,
+            current_image_url: hiddenStageOneAnchor.imageUrl,
+            current_image_focal_x: hiddenStageOneAnchor.focalX,
+            current_image_focal_y: hiddenStageOneAnchor.focalY,
+            visual_identity_profile: visualIdentityProfile,
+            image_lineage_metadata: lineageMetadataAfterReveal,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", companion.id);
+
+        if (updateError) {
+          throw new Error("Failed to update companion");
+        }
+
+        return new Response(
+          JSON.stringify({
+            evolved: true,
+            previous_stage: currentStage,
+            new_stage: nextStage,
+            image_url: hiddenStageOneAnchor.imageUrl,
+            xp_at_evolution: currentXP,
+            evolution_id: evolutionRecord.id,
+            portrait_regenerated: false,
+            visual_identity_profile: visualIdentityProfile,
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+    }
+
+    if (!shouldGeneratePortraitForStage(nextStage)) {
+      const reusedImageUrl =
+        companion.current_image_url
+        ?? companion.initial_image_url
+        ?? "";
+
+      if (!reusedImageUrl) {
+        throw new Error("Companion is missing a portrait to reuse");
+      }
+
+      const evolutionRecord = await upsertEvolutionRecord({
+        supabase,
+        companionId: companion.id,
+        stage: nextStage,
+        imageUrl: reusedImageUrl,
+        xpAtEvolution: currentXP,
+        generationMetadata: buildCompanionGenerationMetadata({
+          sourceType: "reuse",
+          boundaryLevel: currentStage,
+          portraitRegenerated: false,
+          reusedFromStage: currentStage,
+        }),
+      });
+
+      const { error: updateError } = await supabase
+        .from("user_companion")
+        .update({
+          current_stage: nextStage,
+          current_image_url: reusedImageUrl,
+          visual_identity_profile: visualIdentityProfile,
+          image_lineage_metadata: imageLineageMetadata,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", companion.id);
+
+      if (updateError) {
+        throw new Error("Failed to update companion");
+      }
+
+      return new Response(
+        JSON.stringify({
+          evolved: true,
+          previous_stage: currentStage,
+          new_stage: nextStage,
+          image_url: reusedImageUrl,
+          xp_at_evolution: currentXP,
+          evolution_id: evolutionRecord.id,
+          portrait_regenerated: false,
+          visual_identity_profile: visualIdentityProfile,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
     if (!openAIApiKey) {
-      return new Response(JSON.stringify({
-        error: "OPENAI_API_KEY not configured",
-        code: "openai_api_key_missing",
-      }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({
+          error: "OPENAI_API_KEY not configured",
+          code: "openai_api_key_missing",
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
     }
-
-    const imageSize = resolveCompanionImageSizeForUser(resolvedUserId);
-    console.log(`[CompanionEvolutionPolicy] user=${resolvedUserId} image_size=${imageSize}`);
 
     const costGuardrails = createCostGuardrailSession({
       supabase,
@@ -421,794 +532,294 @@ serve(async (req) => {
       providers: ["openai"],
     });
 
-    // Rate limiting check - evolution is expensive
-    const rateLimit = await checkRateLimit(supabase, resolvedUserId, 'companion-evolution', RATE_LIMITS['companion-evolution']);
+    const rateLimit = await checkRateLimit(
+      supabase,
+      resolvedUserId,
+      "companion-evolution",
+      RATE_LIMITS["companion-evolution"],
+    );
     if (!rateLimit.allowed) {
       return createRateLimitResponse(rateLimit, corsHeaders);
     }
 
+    const imageSize = resolveCompanionImageSizeForUser(resolvedUserId);
     const spiritLockProfile = resolveCompanionSpiritLockProfile(companion.spirit_animal);
     const spiritLockPromptBlock = spiritLockProfile
       ? buildSpiritLockPromptBlock(spiritLockProfile, "image")
       : null;
-    console.log("[SpiritLock]", {
-      species: companion.spirit_animal,
-      profile_match: spiritLockProfile?.id ?? null,
-      function: "generate-companion-evolution",
-      stage_from: currentStage,
-      stage_to: nextStage,
-    });
-
-    // Stage 0 = egg destiny preview, Stage 1 = hatchling emerging
-    let userPrompt: string;
-    let systemPrompt: string = SYSTEM_PROMPT_REALISTIC; // Default, will be set for stages 2+
-    
-    if (nextStage === 0) {
-      // Stage 0: Show the FULLY EVOLVED champion form sealed inside the egg
-      const crackDescription = 'perfectly intact and pristine, sealing the potential within.';
-      
-      console.log(`Creating stage 0 champion destiny preview`);
-      
-      userPrompt = `STYLIZED FANTASY ART - Stage 0 Divine Egg:
-
-SUBJECT: A monumental crystalline egg suspended in cosmiq realm, containing the destiny of a legendary ${companion.spirit_animal} champion.
-
-EGG CONSTRUCTION:
-- Massive scale suggesting the colossal being within
-- Semi-translucent opalescent shell with iridescent shimmer
-- Crystalline structure with visible depth and refraction
-- ${crackDescription}
-- Surface catching and refracting divine light with realistic material physics
-- Subsurface scattering showing thickness and translucency
-
-CRITICAL SILHOUETTE WITHIN (MUST BE VISIBLE):
-Through the mystical shell, a dark shadowy form of a FULLY EVOLVED ${companion.spirit_animal.toUpperCase()}:
-- THIS IS A PURE ${companion.spirit_animal} - NOT a hybrid, NOT a dragon, NOT any other species
-- ADULT peak form at maximum power (Stage 15+ appearance)
-- 100% anatomically correct ${companion.spirit_animal} silhouette following real animal anatomy
-- Recognizable as a real ${companion.spirit_animal} from silhouette alone
-- Correct limb count for ${companion.spirit_animal} species (real animals have specific number of legs)
-- Heroic regal pose: standing tall, dominant, wings ONLY if ${companion.spirit_animal} naturally has them, commanding stance
-- Muscular god-tier physique visible in shadow form
-- The outline suggests IMMENSE SIZE and MAJESTIC PRESENCE
-- Shadow is intentionally blurred/out of focus - we see EPIC SHAPE not details
-- This is what the creature will become at ultimate evolution
-- Properly proportioned: correct limb structure, head size, body shape matching real-world ${companion.spirit_animal}
-- Species-defining features visible in outline: ${companion.spirit_animal}-specific ears, tail, body type
-
-ELEMENTAL & COLOR:
-- ${companion.core_element} energy radiating with realistic physics and particle effects
-- Divine ${companion.favorite_color} glow pulsing rhythmically like a cosmiq heartbeat
-- Energy wisps and particles swirling with volumetric rendering
-- Light bleeding through shell showing internal power
-
-ENVIRONMENT & ATMOSPHERE:
-- Floating in ethereal cosmiq realm with ${companion.favorite_color} nebula clouds
-- Distant stars and cosmiq phenomena in background
-- Divine volumetric god rays (Sistine Chapel-style) piercing through mystical atmosphere
-- Atmospheric depth and scale perspective
-
-COMPOSITION:
-- Low-angle heroic shot looking UP at the colossal egg
-- Dramatic perspective emphasizing scale and grandeur
-- Cinematic depth of field with bokeh effects
-- Rule of thirds composition with egg as dominant focal point
-
-LIGHTING:
-- Divine backlight creating rim glow around egg
-- Dramatic ${companion.favorite_color} radiance from within
-- Motivated light sources showing dimensional depth
-- Controlled contrast for an epic mood with readable shadows and no underexposed midtones
-
-STYLE & QUALITY:
-- Stylized fantasy digital painting style (high-quality game art)
-- Cinematic composition and lighting
-- Slightly lifted midtones with clean, readable highlights
-- Awe-inspiring larger-than-life scale
-- Professional concept art mastery
-- 8K detail with perfect materials
-
-MOOD: Legendary destiny sealed within, unstoppable divine potential, the champion awaits`;
-
-    } else if (nextStage === 1) {
-      // Stage 1: Hatchling emerging from the egg - NEW LIFE!
-      console.log("Creating stage 1 hatchling emergence");
-      systemPrompt = SYSTEM_PROMPT_STAGE1_COLOR_DISTRIBUTION;
-
-      const stageOnePalette = buildStageOnePalette({
-        companionId: companion.id,
-        favoriteColor: companion.favorite_color,
-        coreElement: companion.core_element,
-      });
-      const stageOnePaletteInstructions = formatStageOnePaletteInstructions(stageOnePalette);
-      const stageOnePlacementGuidance = buildStageOneColorPlacementGuidance();
-
-      console.log("[Stage1Palette]", JSON.stringify({
-        stage: 1,
-        anchor: stageOnePalette.anchor,
-        elementAccent: stageOnePalette.elementAccent,
-        contrastAccent: stageOnePalette.contrastAccent,
-        secondaryAccent: stageOnePalette.secondaryAccent,
-        neutralBalance: stageOnePalette.neutralBalance,
-        targetRatios: STAGE1_COVERAGE_TARGETS,
-        distinctHueGroups: stageOnePalette.distinctHueGroups,
-        hasWarmHue: stageOnePalette.hasWarmHue,
-        hasCoolHue: stageOnePalette.hasCoolHue,
-        hueDistances: stageOnePalette.hueDistances,
-      }));
-      console.log("[Stage1PromptShaping] aggressive_mode=enabled scope=creature_plus_scene static_color_bias_removed=true");
-
-      // Special handling for aquatic creatures to prevent legs
-      const aquaticCreatures = ['shark', 'whale', 'dolphin', 'fish', 'orca', 'manta ray', 'stingray', 'seahorse', 'jellyfish', 'octopus', 'squid', 'sea turtle', 'kraken', 'leviathan'];
-      const isAquatic = aquaticCreatures.some(creature => companion.spirit_animal.toLowerCase().includes(creature));
-      const aquaticNote = isAquatic ? '\n\nCRITICAL AQUATIC ANATOMY:\n- This is a baby aquatic creature - NO LEGS OR LIMBS of any kind\n- Only fins, tail, and streamlined hydrodynamic body\n- Absolutely no legs, arms, feet, hands, or terrestrial limbs\n- Underwater environment with water physics and bubbles' : '';
-      
-      userPrompt = `STYLIZED FANTASY CREATURE - Stage 1 Hatchling:
-
-SUBJECT: A tiny newborn baby ${companion.spirit_animal} at the sacred moment of hatching.
-
-SPECIES IDENTITY (ABSOLUTELY NON-NEGOTIABLE):
-THIS IS A BABY ${companion.spirit_animal.toUpperCase()} - Pure species, no hybrids, no creative liberties.
-
-CREATURE DETAILS (ANATOMICALLY ACCURATE):
-- Species: 100% pure ${companion.spirit_animal} - perfect baby anatomy for this specific species
-- NOT a hybrid: This is a real ${companion.spirit_animal} baby, not mixed with dragon/human/other species
-- Correct limb count: Baby ${companion.spirit_animal} have the same number of legs as adult ${companion.spirit_animal}
-- Species-accurate features: Baby ${companion.spirit_animal} ears, snout/beak, tail, paws/hooves/claws matching real animals
-- Size: NEWBORN tiny scale - small, fragile, precious
-- Proportions: Realistic hatchling proportions for ${companion.spirit_animal} species (large head-to-body ratio, short stubby limbs, oversized features)
-- Eyes: Big curious infant eyes with proper iris detail, light reflection, innocent wonder
-- Body: Soft vulnerable form with visible baby features (chubby, round, delicate)
-- Posture: Wobbly, uncertain stance - first moments discovering balance and movement
-- Expression: Pure innocence and wonder, slightly confused but curious
-- Still glistening wet from egg with subtle sheen
-- Reference real baby ${companion.spirit_animal} from nature documentaries for anatomy${aquaticNote}
-
-HATCHING SCENE:
-- Broken eggshell pieces scattered around showing recent emergence
-- Egg fragments still glowing with residual magical energy
-- Some shells stuck to the hatchling's back/head (cute detail)
-- Clear evidence this just happened - wet, fresh, brand new life
-
-${stageOnePaletteInstructions}
-
-${stageOnePlacementGuidance}
-
-COLOR CONTEXT:
-- Animal species: ${companion.spirit_animal}
-- Elemental affinity: ${companion.core_element}
-- Favorite color anchor: ${companion.favorite_color}
-
-ELEMENTAL MANIFESTATION:
-- Small delicate wisps of ${companion.core_element} elemental energy beginning to manifest
-- Energy tentative and gentle, just awakening
-- Mixed glow particles should use element/contrast/secondary accents while keeping anchor visibility
-- Elemental aura flickering uncertainly like a candle flame
-
-ENVIRONMENT:
-- Mystical nursery realm with soft ethereal lighting
-- Ambient glow should preserve swatch separation; avoid collapsing hues into a single tint
-- Gentle floating particles and magical dust motes
-- Soft ground with natural materials (moss, petals, soft earth, or water)
-- Background slightly out of focus creating dreamy depth
-
-LIGHTING:
-- Warm soft key light from above (motherly protective feel)
-- Gentle rim lighting defining the tiny form
-- Glow from broken egg illuminating from below
-- Subsurface scattering through delicate baby skin/scales
-- Magical sparkle in eyes catching light
-
-COMPOSITION:
-- Eye-level perspective with the tiny hatchling (we see the world from its view)
-- Shallow depth of field focusing on the baby creature
-- Rule of thirds with creature slightly off-center
-- Negative space emphasizing vulnerability and small scale
-- Environmental elements framing the subject
-
-STYLE & QUALITY:
-- Stylized fantasy art with tender softness
-- Studio Ghibli emotional resonance meets fantasy illustration
-- Charming yet detailed creature design
-- Subtle creature-collecting RPG cartoon charm (Neopets/P&D-adjacent) while staying anatomically grounded
-- Cinematic newborn portrait quality
-- Rich detail with expressive features
-- Color separation should remain readable in midtones and shadows
-
-MOOD: Pure wonder, new beginning, innocent potential, sacred first breath, protective tenderness, hope incarnate`;
-    } else {
-      // Stages 2+: ALWAYS use image analysis for strict color continuity
-      console.log("Using existing evolution logic with image reference");
-      
-      // 3. Fetch previous evolution image
-      let previousImageUrl = companion.current_image_url;
-
-      if (!previousImageUrl) {
-        const { data: latestEvolution } = await supabase
-          .from("companion_evolutions")
-          .select("image_url")
-          .eq("companion_id", companion.id)
-          .order("evolved_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        previousImageUrl = latestEvolution?.image_url;
-      }
-
-      console.log("Previous image URL:", previousImageUrl);
-
-      const previousFeatures: Record<string, unknown> = {};
-
-      // 4a. Extract features from previous image using vision AI
-      if (previousImageUrl) {
-        console.log("Analyzing previous image with vision AI...");
-        
-        try {
-          const visionResponse = await guardedFetch("https://api.openai.com/v1/chat/completions", {
-            method: "POST",
-            headers: {
-              "Authorization": `Bearer ${openAIApiKey}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              model: "google/gemini-2.5-flash",
-              messages: [
-                {
-                  role: "user",
-                  content: [
-                    {
-                      type: "text",
-                      text: `Analyze this creature companion image in extreme detail. List:
-1. Main color palette (exact colors, hex if possible)
-2. Secondary colors and accents
-3. Body silhouette (shape, proportions)
-4. Animal type/species
-5. Signature features (eyes, markings, horns, tail, wings, etc.)
-6. Elemental effects (type, location, intensity)
-7. Texture details (fur/scales/feathers)
-8. Unique identifying marks or patterns
-
-Be extremely specific and detailed. This will be used to maintain 95% continuity in the next evolution.`
-                    },
-                    {
-                      type: "image_url",
-                      image_url: {
-                        url: previousImageUrl
-                      }
-                    }
-                  ]
-                }
-              ]
-            })
-          });
-
-          if (visionResponse.ok) {
-            const visionData = await visionResponse.json();
-            const analysisText = visionData.choices[0]?.message?.content;
-            previousFeatures.vision_analysis = analysisText;
-            console.log("Vision analysis complete");
-          }
-        } catch (visionError) {
-          console.warn("Vision analysis failed, continuing with metadata only:", visionError);
+    const renderAttempts = 3;
+    const runJudgedRender = async ({
+      mode,
+      basePrompt,
+      referenceImageUrl,
+      previousLevel,
+      nextLevel,
+      render,
+    }: {
+      mode: "bootstrap" | "egg" | "evolution";
+      basePrompt: string;
+      referenceImageUrl?: string | null;
+      previousLevel?: number;
+      nextLevel?: number;
+      render: (prompt: string) => Promise<{ imageDataUrl: string; revisedPrompt: string | null }>;
+    }) => {
+      let promptForAttempt = basePrompt;
+      let bestAttempt:
+        | {
+          imageDataUrl: string;
+          revisedPrompt: string | null;
+          scores: Awaited<ReturnType<typeof judgeCompanionImage>>;
+          retryCount: number;
         }
-      }
+        | null = null;
 
-      // 4b. Load stored metadata from database
-      const { data: metadata } = await supabase
-        .from("companion_evolutions")
-        .select("*")
-        .eq("companion_id", companion.id)
-        .eq("stage", currentStage)
-        .single();
+      for (let attempt = 0; attempt < renderAttempts; attempt += 1) {
+        const rendered = await render(promptForAttempt);
+        const scores = await judgeCompanionImage({
+          guardedFetch,
+          openAIApiKey,
+          profile: visualIdentityProfile,
+          mode,
+          candidateImageUrl: rendered.imageDataUrl,
+          referenceImageUrl,
+          previousLevel,
+          nextLevel,
+        });
 
-      if (metadata) {
-        previousFeatures.stored_metadata = metadata;
-      }
+        const attemptResult = {
+          imageDataUrl: rendered.imageDataUrl,
+          revisedPrompt: rendered.revisedPrompt,
+          scores,
+          retryCount: attempt,
+        };
 
-      // 5. Build evolution prompt with ultra-strict continuity
-      // Progressive creative freedom based on the 15-stage ladder
-      // Early stages (2-7): Strict realism
-      // Mid stages (8-11): Allow mythic enhancements
-      // Late stages (12-14): Full grandiose creativity
-      const stageLevel = nextStage <= 7 ? 'realistic' : nextStage <= 11 ? 'mythic' : 'legendary';
-      
-      // Special handling for aquatic creatures to prevent legs (applies to ALL tiers including legendary)
-      const aquaticCreatures = ['shark', 'whale', 'dolphin', 'fish', 'orca', 'manta ray', 'stingray', 'seahorse', 'jellyfish', 'octopus', 'squid', 'sea turtle', 'kraken', 'leviathan'];
-      const isAquatic = aquaticCreatures.some(creature => companion.spirit_animal.toLowerCase().includes(creature));
-      
-      // Stage-appropriate aquatic enforcement
-      let aquaticNote = '';
-      if (isAquatic) {
-        if (stageLevel === 'realistic' || stageLevel === 'mythic') {
-          aquaticNote = '\n\nCRITICAL AQUATIC ANATOMY: This is an aquatic creature. NO LEGS OR LIMBS of any kind. Only fins, tail, and streamlined body. Absolutely no legs, arms, or terrestrial limbs. Maintain purely aquatic anatomy.';
-        } else {
-          // Legendary tier - aquatic still maintained even at cosmiq scale
-          aquaticNote = '\n\nCRITICAL AQUATIC ESSENCE: Even at cosmiq/divine scale, this remains an AQUATIC entity. NO LEGS OR TERRESTRIAL LIMBS even in legendary form. Cosmiq fins, nebula tail flukes, stellar streamlined form - but NEVER legs. The creature can be universe-scale but must remain recognizably aquatic in nature (fins, not limbs; flowing, not walking; oceanic movement even through space).';
+        if (!bestAttempt || rankJudgeScores(scores) >= rankJudgeScores(bestAttempt.scores)) {
+          bestAttempt = attemptResult;
         }
-      }
-      
-      // Select appropriate system prompt based on stage
-      if (stageLevel === 'mythic') {
-        systemPrompt = SYSTEM_PROMPT_MYTHIC;
-      } else if (stageLevel === 'legendary') {
-        systemPrompt = SYSTEM_PROMPT_LEGENDARY;
-      } else {
-        systemPrompt = SYSTEM_PROMPT_REALISTIC;
-      }
-      
-      // Stage-appropriate species requirements
-      let speciesRequirements = '';
-      if (stageLevel === 'realistic') {
-        speciesRequirements = `
-1. SPECIES ANATOMY (100% PRESERVATION - ABSOLUTELY NON-NEGOTIABLE):
-   THIS IS A ${companion.spirit_animal.toUpperCase()} - Not a hybrid, not a dragon, not any other species.
-   
-   - Maintain EXACT ${companion.spirit_animal} skeletal structure following real animal anatomy
-   - Same bone structure, joint placement, limb configuration as real ${companion.spirit_animal}
-   - Correct number of legs: ${companion.spirit_animal} have a specific number - DO NOT CHANGE THIS
-   - Same facial structure, skull shape, feature placement as real ${companion.spirit_animal}
-   - Same body type and natural physique for this species
-   - Species-defining features: ${companion.spirit_animal} ears/horns/antlers/snout/beak are distinct - keep them exact
-   - NO species changes, NO hybrid features (no dragon wings unless naturally present)
-   - NO added limbs, NO removed limbs, NO anatomical redesigns
-   - Reference: This should look like a real ${companion.spirit_animal} from a nature documentary with magical enhancements`;
-      } else if (stageLevel === 'mythic') {
-        speciesRequirements = `
-1. SPECIES ANATOMY (MYTHIC ENHANCEMENT ALLOWED):
-   THIS IS A ${companion.spirit_animal.toUpperCase()} - Core identity preserved, mythic features now permitted.
-   
-   - Core ${companion.spirit_animal} anatomy maintained: recognizable silhouette and proportions
-   - Species recognizable: Should be identifiable as ${companion.spirit_animal} at first glance
-   - Base limb structure: Original limb configuration preserved
-   - Mythic additions allowed: Divine horns, ethereal wings, cosmiq patterns, energy constructs
-   - Size can exceed natural limits: Larger-than-life scale permitted
-   - Proportions can be heroic/idealized while maintaining species characteristics
-   - Elemental manifestations: Can add energy wings, particle limbs, astral features
-   - Core features (head shape, body type, tail) maintained but can be enhanced
-   - Reference: A ${companion.spirit_animal} that has transcended into legend while remaining recognizable`;
-      } else {
-        speciesRequirements = `
-1. SPECIES ANATOMY (LEGENDARY CREATIVE FREEDOM):
-   THIS IS THE ULTIMATE ${companion.spirit_animal.toUpperCase()} - A cosmiq god-entity with full creative liberty.
-   
-   - Base species recognition: ${companion.spirit_animal} essence visible through divine form
-   - FULL CREATIVE FREEDOM: Add cosmiq wings, multiple forms, reality fragments, divine constructs
-   - Can transcend anatomy: Ethereal limbs, dimensional echoes, astral projections, ghost forms
-   - Scale: Colossal, planetary, universe-breaking presence
-   - Divine enhancements unlimited: Halos, crowns, armor, cosmiq appendages, energy constructs
-   - Reality-bending features: Spacetime distortions, dimensional rifts, universe-birthing energy
-   - CRITICAL ANATOMY RULE: SINGLE HEAD ONLY - even at god-tier, never generate multiple heads or extra faces. One head, one face.
-         - Soul of ${companion.spirit_animal} maintained: Core identity recognizable in the chaos
-         - GRANDIOSE MANDATE: Push boundaries - this is a living god, force of nature, legend incarnate`;
-      }
-      
-      // Get evolution path modifiers for visual styling
-      const evolutionPath = companion.evolution_path;
-      const pathModifiers = getEvolutionPathModifiers(evolutionPath);
-      const hasPathModifiers = pathModifiers.visualStyle.length > 0;
-      
-      userPrompt = `STYLIZED FANTASY EVOLUTION - Stage ${currentStage} to ${nextStage}:
 
-=== PREVIOUS EVOLUTION ANALYSIS ===
-${previousFeatures.vision_analysis || "No previous image available - using core identity as foundation"}
+        if (judgeScoresPass({ mode, scores, previousLevel, nextLevel })) {
+          return attemptResult;
+        }
 
-=== CORE IDENTITY (100% PRESERVATION REQUIRED) ===
-THESE ARE ABSOLUTE UNCHANGEABLE FACTS ABOUT THIS CREATURE:
-- Species: ${companion.spirit_animal}
-- Primary Color Theme: ${companion.favorite_color}
-- Elemental Affinity: ${companion.core_element}
-${companion.eye_color ? `- Eye Color: ${companion.eye_color} (exact match required)` : ''}
-${companion.fur_color ? `- Fur/Scale/Feather Color: ${companion.fur_color} (exact match required)` : ''}${aquaticNote}
-
-=== EVOLUTION PATH: ${evolutionPath ? evolutionPath.toUpperCase().replace('_', ' ') : 'UNDETERMINED'} ===
-${hasPathModifiers ? `This companion's care patterns have shaped their evolution path.
-
-${pathModifiers.visualStyle}
-
-PATH-SPECIFIC AURA: ${pathModifiers.auraDescription}
-PERSONALITY EXPRESSION: ${pathModifiers.personalityExpression}
-COLOR INFLUENCE: ${pathModifiers.colorModifier}
-` : 'Evolution path not yet determined - use neutral evolution style.'}
-
-=== EVOLUTION STAGE CONTEXT ===
-- Previous Stage: ${currentStage}
-- New Stage: ${nextStage}
-- Evolution Theme: ${getStageGuidance(nextStage)}
-
-=== CRITICAL CONTINUITY REQUIREMENTS (DO NOT BREAK) ===
-${speciesRequirements}
-
-2. COLOR PALETTE (95% MATCH):
-   - ${companion.favorite_color} MUST remain the dominant color
-   - Exact same primary, secondary, and accent colors
-   - Same color placement and distribution patterns
-   - Same hue, saturation relationships
-   - Only allow subtle increases in luminosity/glow intensity
-   ${hasPathModifiers ? `- PATH INFLUENCE: ${pathModifiers.colorModifier}` : ''}
-
-3. FACIAL FEATURES (100% PRESERVATION):
-   - EXACT same eye color (${companion.eye_color || companion.favorite_color})
-   - Same eye shape, size, and placement
-   - Same iris patterns and pupil shape
-   - Same facial markings and patterns
-   - Same expression capability and character
-   ${hasPathModifiers ? `- Expression should reflect: ${pathModifiers.personalityExpression}` : ''}
-
-4. SIGNATURE MARKINGS (100% MATCH):
-   - Every stripe, spot, pattern MUST be in exact same location
-   - Same marking colors and contrast
-   - Same pattern complexity and style
-   - Markings can become more defined but NOT relocated or redesigned
-
-5. ELEMENTAL EFFECTS (SAME LOCATION, ENHANCED INTENSITY):
-   - ${companion.core_element} energy in EXACT same locations as previous stage
-   - Same elemental manifestation style (aura/wisps/glow/particles)
-   - Enhanced intensity and detail but same placement
-   - Energy follows same anatomical contours
-   ${hasPathModifiers ? `- PATH AURA OVERLAY: ${pathModifiers.auraDescription}` : ''}
-
-6. SIGNATURE FEATURES:
-   - Same horns/antlers (if present) - location and base shape unchanged
-   - Same wings (if present) - structure and attachment unchanged  
-   - Same tail structure and length ratio
-   - Same claws/talons - shape and configuration
-   - Same unique identifying characteristics
-
-=== ALLOWED EVOLUTION CHANGES ===
-You MAY enhance these aspects while maintaining continuity:
-- Size and scale increase (growth)
-- Muscle definition and anatomical detail
-- Texture quality and material rendering
-- Pose confidence and dynamic energy
-- Elemental effect intensity and particle count
-- Environmental interaction scope
-- Detail level and rendering quality
-- Battle scars or experience marks that ADD to the design
-
-=== EVOLUTION GENERATION INSTRUCTIONS ===
-
-Create the Stage ${nextStage} evolution showing:
-${getStageGuidance(nextStage)}
-
-This creature MUST look like the SAME INDIVIDUAL growing more powerful.
-Think: "This is my companion, my friend, more mature and stronger"
-NOT: "This is a redesign" or "This is a different creature"
-
-The viewer should immediately recognize this as THE SAME companion from Stage ${currentStage}.
-
-=== TECHNICAL RENDERING REQUIREMENTS ===
-- Stylized fantasy art quality (high-quality game illustrations)
-- Anatomically accurate ${companion.spirit_animal} at Stage ${nextStage} maturity
-- Detailed but stylized biological rendering
-- Cinematic three-point lighting
-- Proper subsurface scattering and material response
-- Atmospheric volumetric effects
-- Dynamic heroic composition
-- Slightly brighter exposure with lifted midtones to avoid dark or muddy mids
-- Subtle cartoon readability touch (not chibi, not exaggerated)
-- 8K ultra-detail resolution
-
-Focus on these continuity percentages for Stage ${nextStage}:
-${stageLevel === 'realistic' ? `✓ Species Identity: 100% match
-✓ Markings & Patterns: 100% match
-✓ Eye Features: 100% match
-✓ Color Palette: 95% match
-✓ Silhouette: 90% match (growth allowed)
-✓ Elemental Style: 95% match (intensity increase allowed)
-
-Generate an evolution that preserves the companion's exact identity while showing clear growth.` : stageLevel === 'mythic' ? `✓ Species Recognition: 80% match (mythic enhancements allowed)
-✓ Core Markings: 80% match (can become divine versions)
-✓ Eye Character: 80% match (can gain cosmiq properties)
-✓ Color Palette: 85% match (can add divine/cosmiq accents)
-✓ Silhouette: 80% match (heroic proportions and divine additions allowed)
-✓ Elemental Style: 80% match (can expand into cosmiq manifestations)
-
-Generate a LEGENDARY evolution that maintains core identity while adding mythic grandeur.` : `✓ Species Essence: Recognizable through cosmiq form
-✓ Signature Elements: Visible in divine/cosmiq interpretation
-✓ Eye Soul: Core character maintained in transcendent form
-✓ Color Theme: Original palette echoes through stellar composition
-✓ Form Echo: Species origin evident in god-tier manifestation
-✓ Elemental Soul: Core element visible in universe-scale phenomena
-
-Generate an ULTIMATE COSMIQ EVOLUTION that achieves grandiose divinity while maintaining species essence.`}`;
-    }
-
-    if (spiritLockPromptBlock) {
-      userPrompt = stripOrganicPromptLanguageForMechanicalCompanion(userPrompt);
-      userPrompt = `${userPrompt}\n\n${spiritLockPromptBlock}\nCRITICAL: This companion must remain mechanically engineered. Reject organic traits and reinforce all required mechanical anchors.`;
-    }
-
-    console.log("Generating evolution image...");
-
-    // 6. Generate new evolution image with Nano Banana
-    // Stage 0 remains user-only; Stage 1 and above use a system prompt.
-    const shouldUseSystemPrompt = nextStage !== 0;
-
-    const generateEvolutionImage = async (prompt: string): Promise<string> => {
-      const imageResponse = await guardedFetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${openAIApiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-2.5-flash-image-preview",
-          messages: shouldUseSystemPrompt ? [
-            {
-              role: "system",
-              content: systemPrompt
-            },
-            {
-              role: "user",
-              content: prompt
-            }
-          ] : [
-            {
-              role: "user",
-              content: prompt
-            }
-          ],
-          modalities: ["image", "text"],
-          image_size: imageSize,
-        })
-      });
-
-      if (!imageResponse.ok) {
-        const errorText = await imageResponse.text();
-        console.error("Image generation failed:", imageResponse.status, errorText);
-        throw new Error(`Image generation failed: ${errorText}`);
+        promptForAttempt = appendJudgeCritique(basePrompt, scores?.notes);
       }
 
-      const imageData = await imageResponse.json();
-      const generatedImage = imageData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-
-      if (!generatedImage) {
-        throw new Error("No image returned from AI");
+      if (!bestAttempt) {
+        throw new Error("No companion evolution render attempt succeeded");
       }
 
-      return generatedImage;
+      return bestAttempt;
     };
 
-    const evaluateSpiritLockImage = async (imageDataUrl: string) => {
-      if (!spiritLockProfile) {
-        return {
-          isCompliant: true,
-          forbiddenHits: [] as string[],
-          missingAnchors: [] as string[],
-          matchedAnchors: [] as string[],
-          violations: [] as string[],
-        };
+    if (nextStage === 1) {
+      const starterPromptBase = buildStage1BootstrapPrompt(visualIdentityProfile);
+      const starterPrompt = spiritLockPromptBlock
+        ? `${starterPromptBase}\n\nMechanical spirit-lock:\n${spiritLockPromptBlock}`
+        : starterPromptBase;
+
+      const stageOneAttempt = await runJudgedRender({
+        mode: "bootstrap",
+        basePrompt: starterPrompt,
+        previousLevel: 0,
+        nextLevel: 1,
+        render: async (prompt) =>
+          await generateCompanionImage({
+            guardedFetch,
+            openAIApiKey,
+            prompt,
+            size: imageSize,
+            quality: "high",
+            userId: resolvedUserId,
+          }),
+      });
+
+      const { fileName, publicUrl: newImageUrl } = await uploadGeneratedImage({
+        supabase,
+        userId: resolvedUserId,
+        companionId: companion.id,
+        nextStage,
+        generatedImageDataUrl: stageOneAttempt.imageDataUrl,
+      });
+      const stageOneFocalX = resolveJudgeFocalValue(stageOneAttempt.scores?.subjectCenterX);
+      const stageOneFocalY = resolveJudgeFocalValue(stageOneAttempt.scores?.subjectCenterY);
+
+      const lineageMetadataAfterReveal = updateLineageMetadataAfterReveal({
+        existing: companion.image_lineage_metadata,
+        revealedLevel: 1,
+        imageUrl: newImageUrl,
+        focalX: stageOneFocalX,
+        focalY: stageOneFocalY,
+      });
+      const generationMetadata = buildCompanionGenerationMetadata({
+        sourceType: "generation",
+        boundaryLevel: 1,
+        portraitRegenerated: true,
+        retryCount: stageOneAttempt.retryCount,
+        scores: stageOneAttempt.scores ?? undefined,
+        notes: stageOneAttempt.scores?.notes ?? stageOneAttempt.revisedPrompt,
+      });
+
+      const evolutionRecord = await upsertEvolutionRecord({
+        supabase,
+        companionId: companion.id,
+        stage: nextStage,
+        imageUrl: newImageUrl,
+        xpAtEvolution: currentXP,
+        generationMetadata,
+      });
+
+      await registerUserStorageAsset({
+        supabase,
+        userId: resolvedUserId,
+        bucketId: IMAGE_BUCKET,
+        storagePath: fileName,
+        sourceKind: "companion_evolution",
+        sourceRecordTable: "companion_evolutions",
+        sourceRecordId: typeof evolutionRecord?.id === "string" ? evolutionRecord.id : undefined,
+      });
+
+      const { error: updateError } = await supabase
+        .from("user_companion")
+        .update({
+          current_stage: nextStage,
+          current_image_url: newImageUrl,
+          current_image_focal_x: stageOneFocalX,
+          current_image_focal_y: stageOneFocalY,
+          dormant_image_url: null,
+          dormant_image_focal_x: null,
+          dormant_image_focal_y: null,
+          neglected_image_url: null,
+          neglected_image_focal_x: null,
+          neglected_image_focal_y: null,
+          visual_identity_profile: visualIdentityProfile,
+          image_lineage_metadata: lineageMetadataAfterReveal,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", companion.id);
+
+      if (updateError) {
+        throw new Error("Failed to update companion");
       }
 
-      const complianceResponse = await guardedFetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${openAIApiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
-          messages: [
-            {
-              role: "user",
-              content: [
-                {
-                  type: "text",
-                  text: `Validate whether this image preserves the Mechanical Dragon spirit-lock.
-Return JSON only:
-{
-  "compliant": boolean,
-  "forbidden_terms": string[],
-  "missing_anchors": string[],
-  "notes": string
-}
+      return new Response(
+        JSON.stringify({
+          evolved: true,
+          previous_stage: currentStage,
+          new_stage: nextStage,
+          image_url: newImageUrl,
+          xp_at_evolution: currentXP,
+          evolution_id: evolutionRecord.id,
+          portrait_regenerated: true,
+          visual_identity_profile: visualIdentityProfile,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
 
-Rules:
-- Required anchors: metallic scales, articulated joints, gear/clockwork motifs, engineered energy core.
-- Forbidden drift: flesh, skin, fur, tissue, muscle, blood, biological descriptors.
-- If any forbidden drift or missing anchor exists, compliant must be false.`,
-                },
-                {
-                  type: "image_url",
-                  image_url: {
-                    url: imageDataUrl
-                  }
-                }
-              ]
-            }
+    const previousImageUrl = companion.current_image_url ?? companion.initial_image_url ?? null;
+    if (!previousImageUrl) {
+      throw new Error("Companion is missing a portrait to evolve from");
+    }
+
+    const evolutionPromptBase = buildBoundaryEvolutionEditPrompt({
+      profile: visualIdentityProfile,
+      previousLevel: currentStage,
+      nextLevel: nextStage,
+    });
+    const evolutionPrompt = spiritLockPromptBlock
+      ? `${evolutionPromptBase}\n\nMechanical spirit-lock:\n${spiritLockPromptBlock}`
+      : evolutionPromptBase;
+
+    const evolutionAttempt = await runJudgedRender({
+      mode: "evolution",
+      basePrompt: evolutionPrompt,
+      previousLevel: currentStage,
+      nextLevel: nextStage,
+      referenceImageUrl: previousImageUrl,
+      render: async (prompt) =>
+        await editCompanionImage({
+          guardedFetch,
+          openAIApiKey,
+          prompt,
+          size: imageSize,
+          quality: "high",
+          userId: resolvedUserId,
+          referenceImages: [
+            {
+              imageUrl: previousImageUrl,
+            },
           ],
         }),
-      });
+    });
 
-      if (!complianceResponse.ok) {
-        const fallbackError = await complianceResponse.text();
-        throw new Error(`Spirit-lock validation failed: ${fallbackError}`);
-      }
+    const { fileName, publicUrl: newImageUrl } = await uploadGeneratedImage({
+      supabase,
+      userId: resolvedUserId,
+      companionId: companion.id,
+      nextStage,
+      generatedImageDataUrl: evolutionAttempt.imageDataUrl,
+    });
+    const evolutionFocalX = resolveJudgeFocalValue(evolutionAttempt.scores?.subjectCenterX);
+    const evolutionFocalY = resolveJudgeFocalValue(evolutionAttempt.scores?.subjectCenterY);
 
-      const complianceData = await complianceResponse.json();
-      const content = complianceData.choices?.[0]?.message?.content ?? "";
-      const textPayload = typeof content === "string" ? content : JSON.stringify(content);
-      const jsonMatch = textPayload.match(/\{[\s\S]*\}/);
-      let parsed: Record<string, unknown> = {};
-      if (jsonMatch) {
-        try {
-          parsed = JSON.parse(jsonMatch[0]);
-        } catch (_parseError) {
-          parsed = {
-            compliant: false,
-            forbidden_terms: [],
-            missing_anchors: ["validator_parse_error"],
-            notes: "validator_response_parse_error",
-          };
-        }
-      }
-      const forbiddenHits = Array.isArray(parsed.forbidden_terms)
-        ? parsed.forbidden_terms.map((value: unknown) => String(value))
-        : [];
-      const missingAnchors = Array.isArray(parsed.missing_anchors)
-        ? parsed.missing_anchors.map((value: unknown) => String(value))
-        : [];
+    const lineageMetadataAfterEvolution = updateLineageMetadataAfterBoundaryEvolution({
+      existing: companion.image_lineage_metadata,
+      boundaryLevel: nextStage,
+      imageUrl: newImageUrl,
+      focalX: evolutionFocalX,
+      focalY: evolutionFocalY,
+    });
+    const generationMetadata = buildCompanionGenerationMetadata({
+      sourceType: "edit",
+      boundaryLevel: nextStage,
+      portraitRegenerated: true,
+      retryCount: evolutionAttempt.retryCount,
+      scores: evolutionAttempt.scores ?? undefined,
+      notes: evolutionAttempt.scores?.notes ?? evolutionAttempt.revisedPrompt,
+    });
 
-      const complianceFromVision = {
-        isCompliant: parsed.compliant === true && forbiddenHits.length === 0 && missingAnchors.length === 0,
-        forbiddenHits,
-        missingAnchors,
-        matchedAnchors: [] as string[],
-        violations: [] as string[],
-      };
-
-      return {
-        ...complianceFromVision,
-        violations: !complianceFromVision.isCompliant
-          ? [
-            ...(forbiddenHits.length > 0 ? [`Forbidden terms found: ${forbiddenHits.join(", ")}`] : []),
-            ...(missingAnchors.length > 0 ? [`Missing required anchors: ${missingAnchors.join(", ")}`] : []),
-          ]
-          : [],
-      };
-    };
-
-    let base64Image = await generateEvolutionImage(userPrompt);
-
-    if (spiritLockProfile) {
-      let compliance = await evaluateSpiritLockImage(base64Image);
-      console.log("[SpiritLock]", {
-        species: companion.spirit_animal,
-        profile_match: spiritLockProfile.id,
-        function: "generate-companion-evolution",
-        stage_to: nextStage,
-        phase: "first_pass",
-        compliant: compliance.isCompliant,
-        violations: compliance.violations,
-      });
-
-      if (!compliance.isCompliant) {
-        const retryPrompt = `${userPrompt}\n\n${buildSpiritLockRetryFeedback(spiritLockProfile, compliance)}`;
-        console.log("[SpiritLock]", {
-          species: companion.spirit_animal,
-          profile_match: spiritLockProfile.id,
-          function: "generate-companion-evolution",
-          stage_to: nextStage,
-          phase: "retry_start",
-          violations: compliance.violations,
-        });
-        base64Image = await generateEvolutionImage(retryPrompt);
-        compliance = await evaluateSpiritLockImage(base64Image);
-        console.log("[SpiritLock]", {
-          species: companion.spirit_animal,
-          profile_match: spiritLockProfile.id,
-          function: "generate-companion-evolution",
-          stage_to: nextStage,
-          phase: "retry_result",
-          compliant: compliance.isCompliant,
-          violations: compliance.violations,
-        });
-
-        if (!compliance.isCompliant) {
-          throw new Error(`Spirit-lock compliance failed after retry: ${compliance.violations.join("; ") || "unknown drift"}`);
-        }
-      }
-    }
-
-    console.log("Image generated successfully");
-
-    // 7. Upload to storage
-    const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, "");
-    const buffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
-    
-    const fileName = `${resolvedUserId}/evolutions/${companion.id}_stage_${nextStage}_${Date.now()}.png`;
-    const { error: uploadError } = await supabase.storage
-      .from("evolution-cards")
-      .upload(fileName, buffer, {
-        contentType: "image/png",
-        upsert: false
-      });
-
-    if (uploadError) {
-      console.error("Upload error:", uploadError);
-      const uploadMessage =
-        typeof uploadError.message === "string" && uploadError.message.trim().length > 0
-          ? uploadError.message
-          : "unknown_storage_error";
-      throw new Error(`Failed to upload image: ${uploadMessage}`);
-    }
-
-    const { data: urlData } = supabase.storage
-      .from("evolution-cards")
-      .getPublicUrl(fileName);
-
-    const newImageUrl = urlData.publicUrl;
-    console.log("Image uploaded:", newImageUrl);
-
-    // 8. Save evolution to database using service role client (bypasses RLS)
-    const supabaseAdmin = createClient(supabaseUrl, supabaseKey);
-    
-    const { data: evolutionRecord, error: evolutionError } = await supabaseAdmin
-      .from("companion_evolutions")
-      .insert({
-        companion_id: companion.id,
-        stage: nextStage,
-        image_url: newImageUrl,
-        xp_at_evolution: currentXP,
-        evolved_at: new Date().toISOString()
-      })
-      .select()
-      .single();
-
-    if (evolutionError) {
-      console.error("Evolution record error:", evolutionError);
-      throw new Error("Failed to save evolution record");
-    }
+    const evolutionRecord = await upsertEvolutionRecord({
+      supabase,
+      companionId: companion.id,
+      stage: nextStage,
+      imageUrl: newImageUrl,
+      xpAtEvolution: currentXP,
+      generationMetadata,
+    });
 
     await registerUserStorageAsset({
-      supabase: supabaseAdmin,
+      supabase,
       userId: resolvedUserId,
-      bucketId: "evolution-cards",
+      bucketId: IMAGE_BUCKET,
       storagePath: fileName,
       sourceKind: "companion_evolution",
       sourceRecordTable: "companion_evolutions",
       sourceRecordId: typeof evolutionRecord?.id === "string" ? evolutionRecord.id : undefined,
     });
 
-    // 9. Update companion current state
     const { error: updateError } = await supabase
       .from("user_companion")
       .update({
         current_stage: nextStage,
         current_image_url: newImageUrl,
-        updated_at: new Date().toISOString()
+        current_image_focal_x: evolutionFocalX,
+        current_image_focal_y: evolutionFocalY,
+        dormant_image_url: null,
+        dormant_image_focal_x: null,
+        dormant_image_focal_y: null,
+        neglected_image_url: null,
+        neglected_image_focal_x: null,
+        neglected_image_focal_y: null,
+        visual_identity_profile: visualIdentityProfile,
+        image_lineage_metadata: lineageMetadataAfterEvolution,
+        updated_at: new Date().toISOString(),
       })
       .eq("id", companion.id);
 
     if (updateError) {
-      console.error("Companion update error:", updateError);
       throw new Error("Failed to update companion");
     }
 
-    if (currentStage < 5 && nextStage >= 5) {
-      const { data: profileData, error: profileError } = await supabaseAdmin
-        .from("profiles")
-        .select("referred_by")
-        .eq("id", resolvedUserId)
-        .maybeSingle();
-
-      if (profileError) {
-        console.warn("Referral lookup failed during companion evolution:", profileError);
-      } else if (profileData?.referred_by) {
-        const { error: referralError } = await supabaseAdmin.rpc("complete_referral_stage3", {
-          p_referee_id: resolvedUserId,
-          p_referrer_id: profileData.referred_by,
-        });
-
-        if (referralError) {
-          console.warn("Referral completion failed during companion evolution:", referralError);
-        }
-      }
-    }
-
-    console.log("Evolution complete!");
-
-    // 10. Return success response
     return new Response(
       JSON.stringify({
         evolved: true,
@@ -1216,15 +827,17 @@ Rules:
         new_stage: nextStage,
         image_url: newImageUrl,
         xp_at_evolution: currentXP,
-        evolution_id: evolutionRecord.id
+        evolution_id: evolutionRecord.id,
+        portrait_regenerated: true,
+        visual_identity_profile: visualIdentityProfile,
       }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
-
   } catch (error) {
     if (isCostGuardrailBlockedError(error)) {
       return buildCostGuardrailBlockedResponse(error, corsHeaders);
     }
+
     console.error("Error in generate-companion-evolution:", error);
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
     const errorCode = resolveServerErrorCode(errorMessage);
@@ -1236,110 +849,9 @@ Rules:
       {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      },
     );
   } finally {
     console.log(`[CompanionEvolutionTiming] total_ms=${Date.now() - requestStartedAt}`);
   }
 });
-
-function getStageGuidance(stage: number): string {
-  const guidance: Record<number, string> = {
-    0: "Pristine mystical egg containing the champion's divine destiny, silhouette of ultimate form barely visible within",
-    1: "Newborn hatchling emerging with first breath of life, tiny and vulnerable yet radiating pure potential",
-    2: "Youngling form finding balance, oversized features softening into a confident exploratory silhouette",
-    3: "Juvenile form with longer proportions, agile movement, and signature features clearly emerging",
-    4: "Scout stage with athletic readiness, keen posture, and a sharper sense of purpose",
-    5: "Warrior presence taking shape, stronger frame, bolder stance, and fully readable elemental identity",
-    6: "Guardian maturity with disciplined strength, protective energy, and polished anatomical confidence",
-    7: "Champion form radiating heroic mastery, refined proportions, and unmistakable earned power",
-    8: "Ascended presence with elevated grace, luminous aura, and controlled mythic momentum",
-    9: "Titan form carrying immense scale and gravity, awe-inspiring while staying anatomically true",
-    10: "Mythic being with legendary detail, sacred energy, and species perfection pushed beyond mortal limits",
-    11: "Prime mastery with immaculate balance, sovereign poise, and elemental force woven into every feature",
-    12: "Transcendent form hovering at the edge of reality, ethereal power amplifying the core identity",
-    13: "Apex incarnation with reality-bending grandeur, divine confidence, and perfect continuity of form",
-    14: "Ultimate form, the final perfected expression of this companion's destiny, vast and transcendent yet unmistakably the same being"
-  };
-
-  return guidance[stage] || "Continued evolution with enhanced power and presence";
-}
-
-// Evolution Path visual modifiers - these shape HOW the companion evolves visually
-function getEvolutionPathModifiers(path: string | null): { 
-  visualStyle: string; 
-  auraDescription: string; 
-  personalityExpression: string;
-  colorModifier: string;
-} {
-  switch (path) {
-    case 'steady_guardian':
-      return {
-        visualStyle: `GUARDIAN EVOLUTION STYLE:
-- Calm, protective stance with grounded posture
-- Warm, nurturing energy radiating steadily
-- Shield-like aura or protective glow surrounding form
-- Wise, knowing eyes with gentle but unwavering gaze
-- Serene expression showing deep inner peace
-- Soft golden or amber energy accents
-- Stable, symmetrical composition suggesting reliability`,
-        auraDescription: 'warm protective golden glow, shield-like energy barrier, steady unwavering light',
-        personalityExpression: 'calm confidence, protective warmth, wise serenity, patient strength',
-        colorModifier: 'Add warm amber/gold undertones to the existing palette, emphasizing stability and warmth'
-      };
-    
-    case 'volatile_ascendant':
-      return {
-        visualStyle: `ASCENDANT EVOLUTION STYLE:
-- Dynamic, powerful stance crackling with barely contained energy
-- Intense, piercing eyes showing passion and fire
-- Unstable but beautiful energy arcs and lightning effects
-- Dramatic poses suggesting explosive power ready to unleash
-- Sharp, angular energy patterns around the form
-- Purple, electric blue, or storm-colored energy accents
-- Asymmetric composition suggesting unpredictability and raw power`,
-        auraDescription: 'crackling unstable energy, electric arcs, storm clouds, barely contained power bursts',
-        personalityExpression: 'intense passion, fierce determination, volatile power, untamed spirit',
-        colorModifier: 'Add electric purple/storm blue accents suggesting volatile energy and passion'
-      };
-    
-    case 'neglected_wanderer':
-      return {
-        visualStyle: `WANDERER EVOLUTION STYLE:
-- Distant, independent stance with weathered appearance
-- Melancholic but resilient eyes showing survival wisdom
-- Subtle scars or wear marks telling stories of solitude
-- Slightly withdrawn posture suggesting self-reliance
-- Muted, dusty energy effects suggesting long journeys alone
-- Silver, gray, or twilight-colored energy accents
-- Atmospheric composition with sense of vast distance traveled`,
-        auraDescription: 'faded ethereal glow, dust motes, distant starlight, solitary aurora',
-        personalityExpression: 'distant melancholy, quiet resilience, independent strength, survivor wisdom',
-        colorModifier: 'Add weathered silver/twilight tones, slightly desaturated, with distant ethereal quality'
-      };
-    
-    case 'balanced_architect':
-      return {
-        visualStyle: `ARCHITECT EVOLUTION STYLE:
-- Perfect equilibrium stance with harmonious proportions
-- Transcendent, enlightened eyes containing deep wisdom
-- Sacred geometry patterns naturally forming in energy effects
-- Graceful, deliberate pose suggesting mastery over all elements
-- Crystalline or prismatic energy showing perfect balance
-- Rainbow/prismatic or pure white light accents
-- Symmetrical yet dynamic composition suggesting cosmic order`,
-        auraDescription: 'sacred geometry, perfect crystalline patterns, prismatic light, cosmic harmony, mandala formations',
-        personalityExpression: 'transcendent calm, perfect balance, cosmic wisdom, harmonious power',
-        colorModifier: 'Add prismatic/crystalline highlights showing perfect balance of all elements'
-      };
-    
-    default:
-      // No path yet - neutral evolution
-      return {
-        visualStyle: '',
-        auraDescription: '',
-        personalityExpression: '',
-        colorModifier: ''
-      };
-  }
-}

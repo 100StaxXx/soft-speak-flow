@@ -19,6 +19,17 @@ import {
   buildSpiritLockPromptBlock,
   resolveCompanionSpiritLockProfile,
 } from "../_shared/companionSpiritLock.ts";
+import {
+  buildAiEggPrompt,
+  buildAiEvolutionPrompt,
+  buildInitialImageLineageMetadata,
+  buildStage1BootstrapPrompt,
+  buildEggFromStage1Prompt,
+  buildCompanionFamilyBible,
+  getEvolutionDifferenceFloor,
+} from "../_shared/companionLineage.ts";
+import { generateCompanionImage, editCompanionImage } from "../_shared/openaiCompanionImageClient.ts";
+import { judgeCompanionImage } from "../_shared/companionImageJudge.ts";
 import { registerUserStorageAsset } from "../_shared/storageAssetLedger.ts";
 
 // ============================================================================
@@ -376,7 +387,7 @@ const MAX_ALLOWED_RETRIES = 3;
 const GENERATION_FETCH_TIMEOUT_MS = 75_000;
 const AUXILIARY_FETCH_TIMEOUT_MS = 25_000;
 
-type CompanionImageFlowType = "onboarding" | "regenerate" | "evolution" | "background" | "admin";
+type CompanionImageFlowType = "onboarding" | "regenerate" | "evolution" | "background" | "admin" | "ai_onboarding_egg";
 
 type TimeoutCode = "AI_TIMEOUT" | "GENERATION_TIMEOUT";
 
@@ -451,8 +462,110 @@ function normalizeFlowType(value: unknown): CompanionImageFlowType {
   if (normalized === "regenerate") return "regenerate";
   if (normalized === "evolution") return "evolution";
   if (normalized === "admin") return "admin";
+  if (normalized === "ai_onboarding_egg") return "ai_onboarding_egg";
   return "background";
 }
+
+const COMPANION_IMAGE_BUCKET = "mentors-avatars";
+const JUDGE_MINIMUMS = {
+  overall: 7,
+  continuity: 6,
+  anatomy: 6,
+};
+
+const parseDataUrl = (dataUrl: string): Uint8Array => {
+  const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, "");
+  return Uint8Array.from(atob(base64Data), (char) => char.charCodeAt(0));
+};
+
+const uploadGeneratedDataUrl = async ({
+  supabase,
+  userId,
+  dataUrl,
+  filePath,
+  sourceKind,
+}: {
+  supabase: ReturnType<typeof createClient>;
+  userId: string;
+  dataUrl: string;
+  filePath: string;
+  sourceKind: string;
+}): Promise<{ filePath: string; publicUrl: string }> => {
+  const binaryData = parseDataUrl(dataUrl);
+  const { error: uploadError } = await supabase.storage
+    .from(COMPANION_IMAGE_BUCKET)
+    .upload(filePath, binaryData, { contentType: "image/png", upsert: false });
+
+  if (uploadError) {
+    throw new Error(`Storage upload failed: ${uploadError.message ?? "unknown_storage_error"}`);
+  }
+
+  const { data: { publicUrl } } = supabase.storage.from(COMPANION_IMAGE_BUCKET).getPublicUrl(filePath);
+  await registerUserStorageAsset({
+    supabase,
+    userId,
+    bucketId: COMPANION_IMAGE_BUCKET,
+    storagePath: filePath,
+    sourceKind,
+  });
+
+  return { filePath, publicUrl };
+};
+
+const judgeScoresPass = ({
+  mode,
+  scores,
+  previousLevel,
+  nextLevel,
+}: {
+  mode: "bootstrap" | "egg" | "evolution";
+  scores: Awaited<ReturnType<typeof judgeCompanionImage>>;
+  previousLevel?: number;
+  nextLevel?: number;
+}): boolean => {
+  if (!scores) return true;
+
+  if (
+    scores.overall < JUDGE_MINIMUMS.overall
+    || scores.continuity < JUDGE_MINIMUMS.continuity
+    || scores.anatomy < JUDGE_MINIMUMS.anatomy
+  ) {
+    return false;
+  }
+
+  if (
+    mode === "evolution"
+    && typeof previousLevel === "number"
+    && typeof nextLevel === "number"
+    && scores.difference < getEvolutionDifferenceFloor(previousLevel, nextLevel)
+  ) {
+    return false;
+  }
+
+  return true;
+};
+
+const rankJudgeScores = (scores: Awaited<ReturnType<typeof judgeCompanionImage>>): number => {
+  if (!scores) return 0;
+  return (
+    scores.overall * 4
+    + scores.continuity * 3
+    + scores.anatomy * 2
+    + scores.centering
+    + scores.difference
+  );
+};
+
+const resolveJudgeFocalValue = (value: number | null | undefined): number =>
+  typeof value === "number" && Number.isFinite(value)
+    ? Math.max(0, Math.min(1, value))
+    : 0.5;
+
+const appendJudgeCritique = (prompt: string, notes: string | null | undefined): string => {
+  const critique = typeof notes === "string" ? notes.trim() : "";
+  if (!critique) return prompt;
+  return `${prompt}\n\nRetry critique:\n- ${critique}`;
+};
 
 function generateCharacterDNA(spiritAnimal: string, element: string, favoriteColor: string, eyeColor: string | undefined, furColor: string | undefined, stage: number): string {
   const anatomy = getCreatureAnatomy(spiritAnimal);
@@ -619,10 +732,209 @@ serve(async (req) => {
     const normalizedFlowType = normalizeFlowType(flowType);
     const fastPathEligible = isCompanionFastPathEligible(user.id);
     const imageSize = resolveCompanionImageSizeForUser(user.id, image_size);
+    const visualIdentityProfile = buildCompanionFamilyBible({
+      spiritAnimal,
+      coreElement: element,
+      favoriteColor,
+      storyTone,
+    });
     const fastRetryLimits = getCompanionFastRetryLimits();
     console.log(
       `[CompanionImagePolicy] user=${user.id} flow=${normalizedFlowType} fast_path=${fastPathEligible} image_size=${imageSize} stage0_fast_retries=${fastRetryLimits.stage0} non_stage0_fast_retries=${fastRetryLimits.nonStage0}`,
     );
+
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+    if (!OPENAI_API_KEY) {
+      console.error("OPENAI_API_KEY not configured");
+      return timedResponse(
+        new Response(JSON.stringify({ error: "AI service not configured.", code: "AI_SERVICE_NOT_CONFIGURED" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }),
+        "ai_key_missing",
+      );
+    }
+
+    if (normalizedFlowType === "ai_onboarding_egg" && Number(stage) === 0) {
+      const promptBuildStartedAt = Date.now();
+      const starterPromptBase = buildStage1BootstrapPrompt(visualIdentityProfile);
+      const starterPrompt = spiritLockPromptBlock
+        ? `${starterPromptBase}\n\nMechanical spirit-lock:\n${spiritLockPromptBlock}`
+        : starterPromptBase;
+      const eggPromptBase = buildEggFromStage1Prompt(visualIdentityProfile);
+      const eggPrompt = spiritLockPromptBlock
+        ? `${eggPromptBase}\n\nMechanical spirit-lock:\n${spiritLockPromptBlock}`
+        : eggPromptBase;
+      promptBuildDurationMs = Date.now() - promptBuildStartedAt;
+
+      const bootstrapAttempts = Math.max(
+        1,
+        Math.min(
+          MAX_ALLOWED_RETRIES + 1,
+          (fastPathEligible ? fastRetryLimits.stage0 : STAGE_ZERO_INTERNAL_RETRIES) + 1,
+        ),
+      );
+
+      const runJudgedRender = async ({
+        mode,
+        basePrompt,
+        referenceImageUrl,
+        previousLevel,
+        nextLevel,
+        render,
+      }: {
+        mode: "bootstrap" | "egg" | "evolution";
+        basePrompt: string;
+        referenceImageUrl?: string | null;
+        previousLevel?: number;
+        nextLevel?: number;
+        render: (prompt: string) => Promise<{ imageDataUrl: string; revisedPrompt: string | null }>;
+      }) => {
+        let promptForAttempt = basePrompt;
+        let bestAttempt:
+          | {
+            imageDataUrl: string;
+            revisedPrompt: string | null;
+            scores: Awaited<ReturnType<typeof judgeCompanionImage>>;
+            retryCount: number;
+          }
+          | null = null;
+
+        for (let attempt = 0; attempt < bootstrapAttempts; attempt += 1) {
+          const generationStartedAt = Date.now();
+          const rendered = await render(promptForAttempt);
+          generationCallDurationMs += Date.now() - generationStartedAt;
+
+          const judgeStartedAt = Date.now();
+          const scores = await judgeCompanionImage({
+            guardedFetch,
+            openAIApiKey: OPENAI_API_KEY,
+            profile: visualIdentityProfile,
+            mode,
+            candidateImageUrl: rendered.imageDataUrl,
+            referenceImageUrl,
+            previousLevel,
+            nextLevel,
+          });
+          qualityCallDurationMs += Date.now() - judgeStartedAt;
+
+          const attemptResult = {
+            imageDataUrl: rendered.imageDataUrl,
+            revisedPrompt: rendered.revisedPrompt,
+            scores,
+            retryCount: attempt,
+          };
+
+          if (!bestAttempt || rankJudgeScores(scores) >= rankJudgeScores(bestAttempt.scores)) {
+            bestAttempt = attemptResult;
+          }
+
+          if (judgeScoresPass({ mode, scores, previousLevel, nextLevel })) {
+            return attemptResult;
+          }
+
+          promptForAttempt = appendJudgeCritique(basePrompt, scores?.notes);
+        }
+
+        if (!bestAttempt) {
+          throw new Error("No companion image attempt succeeded");
+        }
+
+        return bestAttempt;
+      };
+
+      const stageOneAttempt = await runJudgedRender({
+        mode: "bootstrap",
+        basePrompt: starterPrompt,
+        previousLevel: 0,
+        nextLevel: 1,
+        render: async (prompt) =>
+          await generateCompanionImage({
+            guardedFetch,
+            openAIApiKey: OPENAI_API_KEY,
+            prompt,
+            size: imageSize,
+            quality: "high",
+            userId: user.id,
+          }),
+      });
+
+      const stageOneUploadStartedAt = Date.now();
+      const hiddenStageOne = await uploadGeneratedDataUrl({
+        supabase,
+        userId: user.id,
+        dataUrl: stageOneAttempt.imageDataUrl,
+        filePath: `${user.id}/companions/bootstrap/stage1_hidden_${Date.now()}.png`,
+        sourceKind: "companion_image_hidden_stage1",
+      });
+      storageUploadDurationMs += Date.now() - stageOneUploadStartedAt;
+
+      const eggAttempt = await runJudgedRender({
+        mode: "egg",
+        basePrompt: eggPrompt,
+        referenceImageUrl: stageOneAttempt.imageDataUrl,
+        render: async (prompt) =>
+          await editCompanionImage({
+            guardedFetch,
+            openAIApiKey: OPENAI_API_KEY,
+            prompt,
+            size: imageSize,
+            quality: "high",
+            userId: user.id,
+            referenceImages: [
+              {
+                imageUrl: hiddenStageOne.publicUrl,
+              },
+            ],
+          }),
+      });
+
+      const eggUploadStartedAt = Date.now();
+      const eggUpload = await uploadGeneratedDataUrl({
+        supabase,
+        userId: user.id,
+        dataUrl: eggAttempt.imageDataUrl,
+        filePath: `${user.id}/companions/bootstrap/stage0_egg_${Date.now()}.png`,
+        sourceKind: "companion_image",
+      });
+      storageUploadDurationMs += Date.now() - eggUploadStartedAt;
+
+      const hiddenStageOneFocalX = resolveJudgeFocalValue(stageOneAttempt.scores?.subjectCenterX);
+      const hiddenStageOneFocalY = resolveJudgeFocalValue(stageOneAttempt.scores?.subjectCenterY);
+      const eggFocalX = resolveJudgeFocalValue(eggAttempt.scores?.subjectCenterX);
+      const eggFocalY = resolveJudgeFocalValue(eggAttempt.scores?.subjectCenterY);
+
+      const imageLineageMetadata = buildInitialImageLineageMetadata({
+        eggImageUrl: eggUpload.publicUrl,
+        hiddenStageOneImageUrl: hiddenStageOne.publicUrl,
+        eggFocalX,
+        eggFocalY,
+        hiddenStageOneFocalX,
+        hiddenStageOneFocalY,
+      });
+
+      const responseData: Record<string, unknown> = {
+        imageUrl: eggUpload.publicUrl,
+        imageFocalX: eggFocalX,
+        imageFocalY: eggFocalY,
+        visualIdentityProfile,
+        imageLineageMetadata,
+        hiddenStageOneImageUrl: hiddenStageOne.publicUrl,
+      };
+
+      if (debug === true) {
+        responseData.bootstrap = {
+          starterPrompt,
+          eggPrompt,
+          starterRevisedPrompt: stageOneAttempt.revisedPrompt,
+          eggRevisedPrompt: eggAttempt.revisedPrompt,
+        };
+      }
+
+      return timedResponse(
+        new Response(JSON.stringify(responseData),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }),
+        "success_bootstrap_stage1_first",
+      );
+    }
 
     // ========================================================================
     // VISUAL METADATA EXTRACTION FOR CONSISTENCY (Stages 2-14)
@@ -645,16 +957,6 @@ serve(async (req) => {
       distinctiveFeatures: string;
       overallDescription: string;
     } | null = null;
-
-    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
-    if (!OPENAI_API_KEY) {
-      console.error("OPENAI_API_KEY not configured");
-      return timedResponse(
-        new Response(JSON.stringify({ error: "AI service not configured.", code: "AI_SERVICE_NOT_CONFIGURED" }), 
-          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }),
-        "ai_key_missing",
-      );
-    }
 
     if (stage >= 2 && stage <= 14) {
       if (previousStageImageUrl) {
@@ -826,9 +1128,14 @@ serve(async (req) => {
 
     let fullPrompt: string;
 
-    if (stage === 0 || stage === 1) {
-      // Egg stages
-      fullPrompt = `STYLIZED FANTASY ART - Digital painting:\n\n${stagePrompt}\n\n${characterDNA}\n${storyToneStyle}\n${elementOverlay}${spiritLockPromptAddendum}\nRENDERING: Stylized digital fantasy art, painterly, rich colors, magical atmosphere, slightly brighter exposure with lifted midtones and readable highlights, with a very subtle creature-collecting game illustration charm (not chibi). Use a varied multi-color palette; keep ${favoriteColor} clearly visible as the identity anchor while allowing secondary/tertiary accents; avoid monochrome single-hue output.`;
+    if (stage === 0) {
+      fullPrompt = buildAiEggPrompt(visualIdentityProfile);
+    } else if (stage === 1) {
+      fullPrompt = `${buildAiEvolutionPrompt({
+        profile: visualIdentityProfile,
+        previousLevel: 0,
+        nextLevel: 1,
+      })}\n\n${storyToneStyle}\n${elementOverlay}${spiritLockPromptAddendum}`;
 
     } else if (extractedMetadata && stage >= 2 && stage <= 14) {
       // Text-to-image with extracted visual metadata from previous stage
@@ -1276,6 +1583,7 @@ Score each aspect from 0-100 and list any issues.`;
       imageUrl: publicUrl,
       imageFocalX: qualityScore?.subjectCenterX ?? 0.5,
       imageFocalY: qualityScore?.subjectCenterY ?? 0.5,
+      visualIdentityProfile,
     };
     if (debug === true) {
       responseData.prompt = fullPrompt;

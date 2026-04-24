@@ -58,12 +58,20 @@ const createMessage = (
 const createSeedAssistantMessage = (content: string) =>
   createMessage("assistant", content, { isSeed: true });
 
-export function useJourneysCompanionConversation() {
+interface UseJourneysCompanionConversationOptions {
+  enabled?: boolean;
+}
+
+export function useJourneysCompanionConversation(
+  options: UseJourneysCompanionConversationOptions = {},
+) {
   const { user } = useAuth();
   const { companion } = useCompanion();
   const { trackInteraction } = useAIInteractionTracker();
   const queryClient = useQueryClient();
+  const { enabled = true } = options;
   const sessionIdRef = useRef<string>(generateId());
+  const skipAutoResetOnEnableRef = useRef(false);
   const greeting = useMemo(
     () => getCompanionPlannerOpener({ userId: user?.id ?? null }),
     [user?.id],
@@ -113,26 +121,15 @@ export function useJourneysCompanionConversation() {
     setInterimText("");
   }, []);
 
-  const resetThread = useCallback((options?: {
+  const applyThreadState = useCallback((options: {
     sessionId?: string;
-    greetingText?: string;
-  }) => {
-    const greetingText = options?.greetingText?.trim();
-    sessionIdRef.current = options?.sessionId ?? generateId();
-    setMessages(greetingText ? [createSeedAssistantMessage(greetingText)] : []);
-    setDraftInput("");
-    setInterimText("");
-    setShowPermissionDialog(false);
-    setIsRequestingPermission(false);
-    setIsSubmitting(false);
-    setPendingPlannerHandoffMessage(null);
-  }, []);
-
-  const hydrateThread = useCallback((options: {
-    sessionId: string;
     messages: JourneysCompanionMessage[];
+    preserveOnNextEnable?: boolean;
   }) => {
-    sessionIdRef.current = options.sessionId;
+    if (options.preserveOnNextEnable) {
+      skipAutoResetOnEnableRef.current = true;
+    }
+    sessionIdRef.current = options.sessionId ?? generateId();
     setMessages(options.messages);
     setDraftInput("");
     setInterimText("");
@@ -142,9 +139,39 @@ export function useJourneysCompanionConversation() {
     setPendingPlannerHandoffMessage(null);
   }, []);
 
+  const resetThread = useCallback((options?: {
+    sessionId?: string;
+    greetingText?: string;
+  }) => {
+    const greetingText = options?.greetingText?.trim();
+    applyThreadState({
+      sessionId: options?.sessionId,
+      messages: greetingText ? [createSeedAssistantMessage(greetingText)] : [],
+      preserveOnNextEnable: true,
+    });
+  }, [applyThreadState]);
+
+  const hydrateThread = useCallback((options: {
+    sessionId: string;
+    messages: JourneysCompanionMessage[];
+  }) => {
+    applyThreadState({
+      sessionId: options.sessionId,
+      messages: options.messages,
+      preserveOnNextEnable: true,
+    });
+  }, [applyThreadState]);
+
   useEffect(() => {
-    resetThread();
-  }, [companion?.id, resetThread]);
+    if (!enabled) return;
+    if (skipAutoResetOnEnableRef.current) {
+      skipAutoResetOnEnableRef.current = false;
+      return;
+    }
+    applyThreadState({
+      messages: [],
+    });
+  }, [applyThreadState, companion?.id, enabled]);
 
   const submitMessage = useCallback(async (
     rawMessage: string,
@@ -155,6 +182,7 @@ export function useJourneysCompanionConversation() {
       journeysContext?: CompanionChatJourneysContext | null;
     },
   ) => {
+    if (!enabled) return;
     const message = rawMessage.trim();
     if (!message || isSubmitting) return;
 
@@ -241,7 +269,7 @@ export function useJourneysCompanionConversation() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [companion?.id, conversationHistory, isSubmitting, queryClient, trackInteraction, user?.id]);
+  }, [companion?.id, conversationHistory, enabled, isSubmitting, queryClient, trackInteraction, user?.id]);
 
   const { isRecording, isAutoStopping, isSupported, permissionStatus, toggleRecording, requestPermission } = useVoiceInput({
     onInterimResult: (text) => {

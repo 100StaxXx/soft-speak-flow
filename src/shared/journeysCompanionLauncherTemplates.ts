@@ -1,10 +1,16 @@
-import type {
-  CompanionPlannerLaunchTarget,
-  CompanionPlannerStarterIntent,
-} from "@/types/companionPlanner";
+import { COMPANION_PLANNER_SURFACE_ACTIONS } from "@/shared/companionPlannerSurfaceActions";
+import type { CompanionPlannerLaunchTarget, CompanionPlannerStarterIntent } from "@/types/companionPlanner";
 
 export interface JourneysCompanionLauncherTemplate {
-  id: "free-talk" | "plan-day" | "upcoming" | "quest" | "goal";
+  id:
+    | "free-talk"
+    | "plan-day"
+    | "advance-campaign"
+    | "adjust-day"
+    | "right-now"
+    | "upcoming"
+    | "quest"
+    | "goal";
   label: string;
   message: string;
   target: CompanionPlannerLaunchTarget;
@@ -77,33 +83,6 @@ export const getJourneysCompanionLauncherTemplates = ({
       target: "conversation",
       starterIntent: "free_talk_start",
     },
-    {
-      id: "plan-day",
-      label: "Plan my day",
-      message: "Plan my day",
-      target: "planner",
-      starterIntent: "plan_day",
-    },
-    {
-      id: "upcoming",
-      label: "What do I have coming up?",
-      message: "What do I have coming up?",
-      target: "planner",
-      starterIntent: "upcoming_start",
-    },
-    {
-      id: "quest",
-      label: "Quest?",
-      message: "Quest?",
-      target: "planner",
-      starterIntent: "quest_capture",
-    },
-    {
-      id: "goal",
-      label: "Let's lock in a new goal",
-      message: "Let's lock in a new goal",
-      target: "campaign_builder",
-      starterIntent: "goal_breakdown_start",
-    },
+    ...COMPANION_PLANNER_SURFACE_ACTIONS,
   ];
 };

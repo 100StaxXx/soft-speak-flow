@@ -3,6 +3,10 @@ import { addDays, format, parseISO } from "https://esm.sh/date-fns@3.6.0";
 import { computePlannerPriorityScores } from "../../../src/shared/companionPlannerPriority.ts";
 import { getCompanionModeConfig } from "../../../src/shared/companionModes.ts";
 import {
+  mapPlanningModeToWorkloadTolerance,
+  type CompanionPlanningMode,
+} from "../../../src/shared/companionPlanningMode.ts";
+import {
   buildPlannerResponse,
   type PlannerBuildInput,
   type PlannerContextCalendarEvent,
@@ -18,7 +22,9 @@ import {
   type PlannerScheduleConflict,
   type PlannerScheduleInsights,
   type PlannerSessionState,
+  type PlannerStarterIntent,
 } from "../companion-planner-chat/planner.ts";
+import type { CompanionStructuredResponse } from "../../../src/shared/companionStructuredOutput.ts";
 import type {
   CompanionAgentIntent,
   CompanionPendingActionType,
@@ -61,6 +67,7 @@ export interface PlannerAssistResult {
   questions: PlannerQuestion[];
   actionHints: PlannerActionHint[];
   scheduleInsights: PlannerScheduleInsights;
+  structuredResponse: CompanionStructuredResponse | null;
 }
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
@@ -746,16 +753,52 @@ const mapPlannerProposal = (
   }
 };
 
+const normalizePlannerStarterIntent = (
+  starterIntent: string | null | undefined,
+): PlannerStarterIntent | null => {
+  switch (starterIntent) {
+    case "general":
+    case "plan_day":
+    case "advance_campaign_start":
+    case "right_now_start":
+    case "make_room":
+    case "what_matters":
+    case "relationship_touch":
+    case "adjust_today":
+    case "low_energy_adjust":
+    case "briefing_followup":
+    case "goal_breakdown":
+    case "free_talk_start":
+    case "upcoming_start":
+    case "quest_capture":
+    case "goal_breakdown_start":
+      return starterIntent;
+    default:
+      return null;
+  }
+};
+
 export function consultPlannerForAgent(params: {
   message: string;
   currentDateTime: string;
   surface: "companion" | "journeys";
   horizon?: PlannerHorizon;
+  starterIntent?: string | null;
+  planningMode?: CompanionPlanningMode | null;
   context: LoadedCompanionAgentContext;
 }): PlannerAssistResult {
   const normalizedMessage = normalizeScheduleReadMessage(params.message);
   const currentDate = params.currentDateTime.slice(0, 10);
   const plannerMemory = buildPlannerMemory(params.context);
+  const plannerStarterIntent = normalizePlannerStarterIntent(
+    params.starterIntent,
+  );
+  const plannerMemoryForPlanning: Record<string, unknown> = {
+    ...(plannerMemory ?? {}),
+    workloadTolerance: params.planningMode
+      ? mapPlanningModeToWorkloadTolerance(params.planningMode)
+      : asString(plannerMemory?.workloadTolerance),
+  };
   const tasks = params.context.tasks.map(mapTask);
   const scheduledTasks = tasks.filter((task) => task.taskDate !== null);
   const inboxTasks = tasks.filter((task) => task.taskDate === null);
@@ -769,7 +812,7 @@ export function consultPlannerForAgent(params: {
     horizon,
     selectedDate: currentDate,
     currentDateTime: params.currentDateTime,
-    plannerMemory,
+    plannerMemory: plannerMemoryForPlanning,
   });
   const priorityScores = computePlannerPriorityScores({
     currentDate,
@@ -780,19 +823,19 @@ export function consultPlannerForAgent(params: {
     calendarEvents,
     scheduleInsights,
     plannerMemory: {
-      preferredTimeOfDay: asString(plannerMemory?.preferredTimeOfDay),
-      wakeTime: asString(plannerMemory?.wakeTime),
-      windDownTime: asString(plannerMemory?.windDownTime),
-      peakProductivityTimes: asStringArray(plannerMemory?.peakProductivityTimes),
-      preferredWindows: Array.isArray(plannerMemory?.preferredWindows)
-        ? plannerMemory.preferredWindows as Array<{
+      preferredTimeOfDay: asString(plannerMemoryForPlanning?.preferredTimeOfDay),
+      wakeTime: asString(plannerMemoryForPlanning?.wakeTime),
+      windDownTime: asString(plannerMemoryForPlanning?.windDownTime),
+      peakProductivityTimes: asStringArray(plannerMemoryForPlanning?.peakProductivityTimes),
+      preferredWindows: Array.isArray(plannerMemoryForPlanning?.preferredWindows)
+        ? plannerMemoryForPlanning.preferredWindows as Array<{
           timeOfDay: string;
           time?: string | null;
           reason?: string | null;
           sourceCount?: number;
         }>
         : [],
-      workloadTolerance: asString(plannerMemory?.workloadTolerance) as
+      workloadTolerance: asString(plannerMemoryForPlanning?.workloadTolerance) as
         | "light"
         | "normal"
         | "heavy"
@@ -835,24 +878,30 @@ export function consultPlannerForAgent(params: {
       activeEpics,
       rituals,
       calendarEvents,
+      starterIntent: plannerStarterIntent ?? undefined,
       priorityScores,
       scheduleInsights,
       plannerMemory: {
         tonePack: modeConfig.tonePack,
-        preferredTimeOfDay: asString(plannerMemory?.preferredTimeOfDay),
-        preferredTimeReason: asString(plannerMemory?.preferredTimeReason),
-        reminderMinutesBefore: asNumber(plannerMemory?.reminderMinutesBefore),
-        wakeTime: asString(plannerMemory?.wakeTime),
-        windDownTime: asString(plannerMemory?.windDownTime),
-        peakProductivityTimes: asStringArray(plannerMemory?.peakProductivityTimes),
-        preferredWindows: Array.isArray(plannerMemory?.preferredWindows)
-          ? plannerMemory.preferredWindows as Array<{
+        preferredTimeOfDay: asString(plannerMemoryForPlanning?.preferredTimeOfDay),
+        preferredTimeReason: asString(plannerMemoryForPlanning?.preferredTimeReason),
+        reminderMinutesBefore: asNumber(plannerMemoryForPlanning?.reminderMinutesBefore),
+        wakeTime: asString(plannerMemoryForPlanning?.wakeTime),
+        windDownTime: asString(plannerMemoryForPlanning?.windDownTime),
+        peakProductivityTimes: asStringArray(plannerMemoryForPlanning?.peakProductivityTimes),
+        preferredWindows: Array.isArray(plannerMemoryForPlanning?.preferredWindows)
+          ? plannerMemoryForPlanning.preferredWindows as Array<{
             timeOfDay: string;
             time?: string | null;
             reason?: string | null;
             sourceCount?: number;
           }>
           : [],
+        workloadTolerance: asString(plannerMemoryForPlanning?.workloadTolerance) as
+          | "light"
+          | "normal"
+          | "heavy"
+          | null,
       },
       aiSignals: {
         commonContexts: asStringArray(asRecord(params.context.recentMemory.ai_learning)?.common_contexts),
@@ -871,5 +920,6 @@ export function consultPlannerForAgent(params: {
     questions: plannerResult.followUpQuestions,
     actionHints: plannerResult.proposals.map(mapPlannerProposal),
     scheduleInsights,
+    structuredResponse: plannerResult.structuredResponse ?? null,
   };
 }

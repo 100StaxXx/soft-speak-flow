@@ -1,3 +1,11 @@
+import type { Json } from "@/integrations/supabase/types";
+import type {
+  ActionReceiptView,
+  CompanionAgentIntent,
+  CompanionAgentMode,
+  PendingActionView,
+} from "@/types/companionAgent";
+import type { CompanionStructuredResponse } from "@/shared/companionStructuredOutput";
 import type {
   PlannerContextCalendarEvent,
   PlannerContextEpic,
@@ -91,4 +99,10 @@ export interface CompanionChatThreadMessage {
   createdAt: string;
   inputMode?: CompanionChatInputMode;
   source: CompanionChatSource;
+  metadata?: Json | null;
+  mode?: CompanionAgentMode | null;
+  intent?: CompanionAgentIntent | null;
+  structuredResponse?: CompanionStructuredResponse | null;
+  pendingAction?: PendingActionView;
+  receipt?: ActionReceiptView;
 }

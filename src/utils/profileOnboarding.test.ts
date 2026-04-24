@@ -18,6 +18,7 @@ describe("getOnboardingGateState", () => {
         hasCompanion: true,
         hasPresetCompanion: true,
         companionStage: 1,
+        hasCompanionImages: true,
       }),
     ).toMatchObject({
       isEstablished: true,
@@ -38,6 +39,7 @@ describe("getOnboardingGateState", () => {
         hasCompanion: true,
         hasPresetCompanion: true,
         companionStage: 0,
+        hasCompanionImages: true,
       }),
     ).toMatchObject({
       isEstablished: false,
@@ -60,6 +62,7 @@ describe("getOnboardingGateState", () => {
         hasCompanion: true,
         hasPresetCompanion: false,
         companionStage: 0,
+        hasCompanionImages: true,
       }),
     ).toMatchObject({
       isEstablished: false,
@@ -83,6 +86,7 @@ describe("getOnboardingGateState", () => {
         hasCompanion: true,
         hasPresetCompanion: true,
         companionStage: 1,
+        hasCompanionImages: true,
       }),
     ).toMatchObject({
       isEstablished: false,
@@ -106,6 +110,7 @@ describe("getOnboardingGateState", () => {
         hasCompanion: true,
         hasPresetCompanion: false,
         companionStage: 0,
+        hasCompanionImages: true,
       }),
     ).toMatchObject({
       isEstablished: true,
@@ -116,7 +121,29 @@ describe("getOnboardingGateState", () => {
     });
   });
 
-  it("keeps post-stage-0 companions without presets in migration", () => {
+  it("treats valid post-stage-0 AI companions as established", () => {
+    expect(
+      getOnboardingGateState({
+        profile: {
+          onboarding_completed: false,
+          selected_mentor_id: "mentor-1",
+          onboarding_data: {},
+        },
+        hasCompanion: true,
+        hasPresetCompanion: false,
+        companionStage: 2,
+        hasCompanionImages: true,
+      }),
+    ).toMatchObject({
+      isEstablished: true,
+      needsOnboarding: false,
+      reason: "companion_exists",
+      needsCompanionMigration: false,
+      shouldSelfHeal: true,
+    });
+  });
+
+  it("keeps structurally broken post-stage-0 AI companions in migration", () => {
     expect(
       getOnboardingGateState({
         profile: {
@@ -134,6 +161,28 @@ describe("getOnboardingGateState", () => {
       reason: null,
       needsCompanionMigration: true,
       shouldSelfHeal: false,
+    });
+  });
+
+  it("keeps preset-backed post-stage companions established even when image urls are missing", () => {
+    expect(
+      getOnboardingGateState({
+        profile: {
+          onboarding_completed: false,
+          selected_mentor_id: "mentor-1",
+          onboarding_data: {},
+        },
+        hasCompanion: true,
+        hasPresetCompanion: true,
+        companionStage: 5,
+        hasCompanionImages: false,
+      }),
+    ).toMatchObject({
+      isEstablished: true,
+      needsOnboarding: false,
+      reason: "companion_exists",
+      needsCompanionMigration: false,
+      shouldSelfHeal: true,
     });
   });
 
@@ -277,7 +326,7 @@ describe("isReturningProfile", () => {
           selected_mentor_id: "mentor-1",
           onboarding_data: {},
         },
-        { hasCompanion: true, hasPresetCompanion: true },
+        { hasCompanion: true, hasPresetCompanion: true, companionStage: 1, hasCompanionImages: true },
       ),
     ).toBe(true);
   });
@@ -290,7 +339,7 @@ describe("isReturningProfile", () => {
           selected_mentor_id: "mentor-1",
           onboarding_data: {},
         },
-        { hasCompanion: true, hasPresetCompanion: false, companionStage: 0 },
+        { hasCompanion: true, hasPresetCompanion: false, companionStage: 0, hasCompanionImages: true },
       ),
     ).toBe(false);
   });
@@ -304,7 +353,7 @@ describe("isReturningProfile", () => {
           selected_mentor_id: "mentor-1",
           onboarding_data: {},
         },
-        { hasCompanion: true, hasPresetCompanion: true, companionStage: 1 },
+        { hasCompanion: true, hasPresetCompanion: true, companionStage: 1, hasCompanionImages: true },
       ),
     ).toBe(false);
   });
@@ -326,6 +375,8 @@ describe("buildEstablishedProfileSelfHealPatch", () => {
         },
         hasCompanion: true,
         hasPresetCompanion: true,
+        companionStage: 1,
+        hasCompanionImages: true,
       }),
     ).toEqual({
       onboarding_completed: true,
@@ -365,6 +416,7 @@ describe("buildEstablishedProfileSelfHealPatch", () => {
         hasCompanion: true,
         hasPresetCompanion: false,
         companionStage: 0,
+        hasCompanionImages: true,
       }),
     ).toBeNull();
   });
@@ -380,6 +432,7 @@ describe("buildEstablishedProfileSelfHealPatch", () => {
         hasCompanion: true,
         hasPresetCompanion: true,
         companionStage: 1,
+        hasCompanionImages: true,
       }),
     ).toBeNull();
   });

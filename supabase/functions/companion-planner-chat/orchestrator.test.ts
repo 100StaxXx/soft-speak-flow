@@ -130,8 +130,7 @@ Deno.test("skips orchestration for confirm-ready proposal responses", async () =
         choices: [{
           message: {
             content: JSON.stringify({
-              reply:
-                "What makes this timing the right fit today?",
+              reply: "What makes this timing the right fit today?",
               mode: "proposal",
             }),
           },
@@ -141,7 +140,8 @@ Deno.test("skips orchestration for confirm-ready proposal responses", async () =
     input: baseInput(),
     baseResult: {
       ...baseResult("proposal"),
-      reply: "I drafted this as a quest update. Review it and confirm when it looks right.",
+      reply:
+        "I drafted this as a quest update. Review it and confirm when it looks right.",
       proposals: [{
         id: "proposal-1",
         kind: "update_quest",
@@ -163,6 +163,63 @@ Deno.test("skips orchestration for confirm-ready proposal responses", async () =
   assertEquals(
     response.reply,
     "I drafted this as a quest update. Review it and confirm when it looks right.",
+  );
+});
+
+Deno.test("skips orchestration for right-now starter schedule reads", async () => {
+  let fetchCalled = false;
+  const response = await buildOrchestratedPlannerResponse({
+    guardedFetch: async (_input: RequestInfo | URL, _init?: RequestInit) => {
+      fetchCalled = true;
+      return new Response(JSON.stringify({
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              reply: "Try the intense task first.",
+              mode: "schedule_read",
+            }),
+          },
+        }],
+      }));
+    },
+    input: {
+      ...baseInput(),
+      message: "What should I do right now?",
+      plannerContext: {
+        ...baseInput().plannerContext,
+        starterIntent: "right_now_start",
+      },
+    },
+    baseResult: {
+      ...baseResult("schedule_read"),
+      reply: "For the next hour, do Reply to landlord email.",
+      structuredResponse: {
+        intent: {
+          intentType: "quest",
+          timeHorizon: "today",
+          isRecurring: false,
+          shouldCreateQuest: false,
+          shouldPromptCampaign: false,
+        },
+        planDay: null,
+        comingUp: null,
+        rightNow: {
+          message: "For the next hour, do Reply to landlord email.",
+          currentWindow: "10:30 am-11:00 am",
+          recommendedAction: null,
+          fallbackAction: null,
+        },
+        dayAdjust: null,
+      },
+    },
+    openAIApiKey: "test-openai-key",
+    model: "test-model",
+  });
+
+  assertEquals(fetchCalled, false);
+  assertEquals(
+    response.reply,
+    "For the next hour, do Reply to landlord email.",
   );
 });
 
@@ -229,6 +286,148 @@ Deno.test("skips orchestration when a ready quest proposal is present in a mixed
   assertEquals(
     response.reply,
     "I drafted this quest for you. Review it and confirm if it fits.",
+  );
+});
+
+Deno.test("skips orchestration for adjust-day starter proposals", async () => {
+  let fetchCalled = false;
+  const response = await buildOrchestratedPlannerResponse({
+    guardedFetch: async (_input: RequestInfo | URL, _init?: RequestInit) => {
+      fetchCalled = true;
+      return new Response(JSON.stringify({
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              reply: "Move everything and keep only the hard thing.",
+              mode: "proposal",
+            }),
+          },
+        }],
+      }));
+    },
+    input: {
+      ...baseInput(),
+      message: "Adjust my day",
+      plannerContext: {
+        ...baseInput().plannerContext,
+        starterIntent: "adjust_today",
+      },
+    },
+    baseResult: {
+      ...baseResult("proposal"),
+      reply:
+        "I'm tightening today by protecting the strongest moves and shifting 2 tasks.",
+      proposals: [{
+        id: "proposal-1",
+        kind: "update_quest",
+        title: "Move Inbox cleanup",
+        summary: "Move Inbox cleanup to tomorrow.",
+        payload: { taskId: "task-1" },
+        status: "pending",
+        readyToConfirm: true,
+        missingFields: [],
+      }],
+      structuredResponse: {
+        intent: {
+          intentType: "quest",
+          timeHorizon: "today",
+          isRecurring: false,
+          shouldCreateQuest: true,
+          shouldPromptCampaign: false,
+        },
+        planDay: null,
+        comingUp: null,
+        rightNow: null,
+        dayAdjust: {
+          message:
+            "I'm tightening today by protecting the strongest moves and shifting 2 tasks.",
+          keep: [],
+          move: [],
+          dropOrShrink: [],
+        },
+      },
+    },
+    openAIApiKey: "test-openai-key",
+    model: "test-model",
+  });
+
+  assertEquals(fetchCalled, false);
+  assertEquals(
+    response.reply,
+    "I'm tightening today by protecting the strongest moves and shifting 2 tasks.",
+  );
+});
+
+Deno.test("skips orchestration for advance-campaign starter responses", async () => {
+  let fetchCalled = false;
+  const response = await buildOrchestratedPlannerResponse({
+    guardedFetch: async (_input: RequestInfo | URL, _init?: RequestInit) => {
+      fetchCalled = true;
+      return new Response(JSON.stringify({
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              reply: "Push the campaign harder.",
+              mode: "proposal",
+            }),
+          },
+        }],
+      }));
+    },
+    input: {
+      ...baseInput(),
+      message: "Advance my campaign",
+      plannerContext: {
+        ...baseInput().plannerContext,
+        starterIntent: "advance_campaign_start",
+      },
+    },
+    baseResult: {
+      ...baseResult("proposal"),
+      reply:
+        "Launch prep looks stalled. I drafted the cleanest next step so you can confirm it without overthinking it.",
+      proposals: [{
+        id: "proposal-1",
+        kind: "create_quest",
+        title: "Create Progress Launch prep",
+        summary: "Create a quest for progress.",
+        payload: { taskText: "Progress Launch prep", epicId: "epic-1" },
+        status: "pending",
+        readyToConfirm: true,
+        missingFields: [],
+      }],
+      structuredResponse: {
+        intent: {
+          intentType: "campaign",
+          timeHorizon: "long_term",
+          isRecurring: false,
+          shouldCreateQuest: true,
+          shouldPromptCampaign: false,
+        },
+        planDay: null,
+        comingUp: null,
+        rightNow: null,
+        dayAdjust: null,
+        campaignMomentum: {
+          message:
+            "Launch prep looks stalled. I drafted the cleanest next step so you can confirm it without overthinking it.",
+          campaignId: "epic-1",
+          campaignTitle: "Launch prep",
+          status: "stalled",
+          statusReason: "There is no concrete next step tied to this campaign right now.",
+          nextStep: null,
+          supportActions: [],
+        },
+      },
+    },
+    openAIApiKey: "test-openai-key",
+    model: "test-model",
+  });
+
+  assertEquals(fetchCalled, false);
+  assertEquals(
+    response.reply,
+    "Launch prep looks stalled. I drafted the cleanest next step so you can confirm it without overthinking it.",
   );
 });
 

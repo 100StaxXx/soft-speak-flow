@@ -16,9 +16,9 @@ import { MentorCalculating } from "./MentorCalculating";
 import { OnboardingStoryToneSelection } from "./OnboardingStoryToneSelection";
 import type { OnboardingStoryToneSelectionValue } from "./OnboardingStoryToneSelection";
 import { EggSelectionPrelude } from "./EggSelectionPrelude";
-import { OnboardingEggSelection } from "./OnboardingEggSelection";
 import { OnboardingCosmicBackdrop, type OnboardingBackdropStage } from "./OnboardingCosmicBackdrop";
 import { CompanionPersonalization } from "@/components/CompanionPersonalization";
+import { AICompanionCreator } from "@/components/AICompanionCreator";
 import { JourneyBegins } from "./JourneyBegins";
 import { MentorGrid } from "@/components/MentorGrid";
 import { MentorResult } from "@/components/MentorResult";
@@ -279,7 +279,6 @@ export const StoryOnboarding = ({
   const [mentorExplanation, setMentorExplanation] = useState<MentorExplanation | null>(null);
   const [companionAnimal, setCompanionAnimal] = useState(resumeState?.companionLabel ?? "");
   const [selectedStoryTone, setSelectedStoryTone] = useState<CompanionStoryTone>("epic_adventure");
-  const [selectedPresetId, setSelectedPresetId] = useState<CompanionPresetId | null>(null);
   const [isCreatingCompanion, setIsCreatingCompanion] = useState(false);
   const [companionSetupStatus, setCompanionSetupStatus] = useState<CompanionSetupStatus>(
     resumesAtJourneyBegins ? "ready" : "idle",
@@ -637,7 +636,6 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
 
   const handleStoryToneComplete = useCallback((selection: OnboardingStoryToneSelectionValue) => {
     setSelectedStoryTone(selection.storyTone);
-    setSelectedPresetId(selection.presetId);
     setStage("egg-prelude");
   }, []);
 
@@ -919,6 +917,7 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
       let companionData: Awaited<ReturnType<typeof createCompanion.mutateAsync>>;
       try {
         companionData = await createCompanion.mutateAsync({
+          creationMode: preferences.presetId ? "preset" : "ai",
           presetId: preset?.id ?? null,
           favoriteColor: preferences.favoriteColor,
           spiritAnimal: preferences.spiritAnimal,
@@ -1243,7 +1242,6 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
           >
             <OnboardingStoryToneSelection
               initialTone={selectedStoryTone}
-              initialPresetId={selectedPresetId}
               onComplete={handleStoryToneComplete}
               onBack={isResetMode ? undefined : handleStoryToneBack}
             />
@@ -1260,7 +1258,7 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
           >
             <EggSelectionPrelude
               storyTone={selectedStoryTone}
-              speciesName={getCompanionPreset(selectedPresetId)?.displayName ?? "companion"}
+              speciesName="companion"
               onComplete={handleEggPreludeComplete}
               onBack={handleEggPreludeBack}
             />
@@ -1283,12 +1281,16 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
                 initialCompanionName={existingCompanion?.companion_name ?? null}
               />
             ) : (
-              <OnboardingEggSelection
+              <AICompanionCreator
                 onComplete={handleCompanionComplete}
-                isLoading={isCreatingCompanion}
                 storyTone={selectedStoryTone}
-                presetId={selectedPresetId ?? "dragon"}
-                spiritAnimal={getCompanionPreset(selectedPresetId)?.displayName ?? "Dragon"}
+                isLoading={isCreatingCompanion}
+                title={isResetMode ? "Shape Your New Companion Egg" : "Shape Your Companion Egg"}
+                description={
+                  isResetMode
+                    ? "Pick the lineage traits for the new AI-generated egg that will carry your fresh start."
+                    : "Choose the hidden lineage traits that will define your AI-generated companion egg."
+                }
                 onBack={handleCompanionBack}
               />
             )}

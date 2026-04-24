@@ -22,9 +22,16 @@ import type { CompanionStructuredResponse } from "@/shared/companionStructuredOu
 import type { PendingActionView } from "@/types/companionAgent";
 import type {
   CompanionChatInputMode,
+  CompanionChatMessage,
+  CompanionChatThreadMessage,
   CompanionChatThreadSummary,
 } from "@/types/companionConversation";
-import type { CompanionPlannerLaunchIntent } from "@/types/companionPlanner";
+import type {
+  CompanionPlannerLaunchIntent,
+  CompanionPlannerProposal,
+  CompanionPlannerSessionState,
+  CompanionPlannerStarterIntent,
+} from "@/types/companionPlanner";
 import { formatCurrentDateTimeWithOffset } from "@/utils/currentDateTime";
 
 export type LegacyCompanionAssistantMessage = {
@@ -45,6 +52,26 @@ type UseLegacyCompanionAssistantAdapterOptions = {
   surface: CompanionAssistantSurface;
   conversationEnabled?: boolean;
   onOpenCampaignBuilder?: (message: string) => void;
+};
+
+type LegacyFallbackHydrationMessage = {
+  id: string;
+  role: "assistant" | "user";
+  content: string;
+  createdAt: string;
+  inputMode?: CompanionChatInputMode;
+  source: "chat" | "plan" | "agent";
+  isSeed?: boolean;
+  structuredResponse?: CompanionStructuredResponse | null;
+  pendingAction?: PendingActionView | null;
+  receipt?: { proposalId?: string | null; status?: string | null } | null;
+};
+
+type LegacyFallbackHydrationInput = {
+  sessionId: string;
+  messages: LegacyFallbackHydrationMessage[];
+  savedSuggestionProposalIds?: string[];
+  pendingSuggestionProposalId?: string | null;
 };
 
 const normalizeConversationMessages = (
@@ -96,8 +123,8 @@ const sortMessages = (messages: LegacyCompanionAssistantMessage[]) =>
   messages
     .slice()
     .sort((left, right) => (
-      left.createdAt.localeCompare(right.createdAt)
-      || left.id.localeCompare(right.id)
+      left.createdAt.localeCompare(right.createdAt) ||
+      left.id.localeCompare(right.id)
     ));
 
 const shouldRouteToLegacyPlanner = (
@@ -121,6 +148,15 @@ const isExactQuestCaptureStarterMessage = (message: string): boolean =>
 const isExactPlanDayStarterMessage = (message: string): boolean =>
   message.trim().toLowerCase() === "plan my day";
 
+const isExactUpcomingStarterMessage = (message: string): boolean =>
+  message.trim().toLowerCase() === "what do i have coming up?";
+
+const isExactRightNowStarterMessage = (message: string): boolean =>
+  message.trim().toLowerCase() === "what should i do right now?";
+
+const isExactAdjustDayStarterMessage = (message: string): boolean =>
+  message.trim().toLowerCase() === "adjust my day";
+
 const mapLegacyProposalToPendingAction = (
   proposal: {
     id: string;
@@ -135,23 +171,24 @@ const mapLegacyProposalToPendingAction = (
   const actionType = proposal.kind === "create_quest"
     ? "task_create"
     : proposal.kind === "update_quest"
-      ? "task_update"
-      : proposal.kind === "create_ritual"
-        ? "ritual_create"
-        : proposal.kind === "suggest_reminder"
-          ? "reminder_create"
-          : "campaign_update";
+    ? "task_update"
+    : proposal.kind === "create_ritual"
+    ? "ritual_create"
+    : proposal.kind === "suggest_reminder"
+    ? "reminder_create"
+    : "campaign_update";
   const intent = proposal.kind === "create_quest"
     ? "schedule_task"
     : proposal.kind === "update_quest" || proposal.kind === "suggest_reminder"
-      ? "update_existing_plan"
-      : "goal_setting";
+    ? "update_existing_plan"
+    : "goal_setting";
 
   return {
     id: proposal.id,
     status: "pending",
     intent,
     actionType,
+    proposalId: proposal.id,
     summary: proposal.summary,
     confirmationMessage: proposal.reasoning ?? "Want me to lock that in?",
     normalizedPayload: proposal.payload,
@@ -160,6 +197,189 @@ const mapLegacyProposalToPendingAction = (
     createdAt: new Date().toISOString(),
   };
 };
+
+const DEFAULT_FALLBACK_PLANNER_SESSION_STATE: CompanionPlannerSessionState = {
+  draft: {},
+  openQuestionIds: [],
+  preferredTimeOfDay: null,
+  preferredTimeReason: null,
+  reminderPreference: null,
+  pendingStarterIntent: null,
+  lastClassification: null,
+};
+
+const inferPlannerStarterIntentFromStructuredResponse = (
+  response: CompanionStructuredResponse | null | undefined,
+): CompanionPlannerStarterIntent | null => {
+  if (response?.planDay) return "plan_day";
+  if (response?.campaignMomentum) return "advance_campaign_start";
+  if (response?.dayAdjust) return "adjust_today";
+  if (response?.rightNow) return "right_now_start";
+  if (response?.comingUp) return "upcoming_start";
+  return null;
+};
+
+const collectFallbackStructuredSuggestions = (
+  response: CompanionStructuredResponse | null | undefined,
+) => {
+  const suggestions: Array<{
+    proposalId: string;
+    title: string;
+    estimatedDurationMinutes: number | null;
+    reason: string;
+    source: string;
+  }> = [];
+  const collectSuggestion = (suggestion: {
+    proposalId?: string | null;
+    title: string;
+    estimatedDurationMinutes?: number | null;
+    reason: string;
+    source: string;
+  } | null | undefined) => {
+    if (!suggestion?.proposalId) return;
+    suggestions.push({
+      proposalId: suggestion.proposalId,
+      title: suggestion.title,
+      estimatedDurationMinutes: suggestion.estimatedDurationMinutes ?? null,
+      reason: suggestion.reason,
+      source: suggestion.source,
+    });
+  };
+
+  response?.planDay?.suggestedQuests.forEach(collectSuggestion);
+  collectSuggestion(response?.rightNow?.recommendedAction);
+  collectSuggestion(response?.rightNow?.fallbackAction);
+  response?.dayAdjust?.keep.forEach(collectSuggestion);
+  response?.dayAdjust?.move.forEach(collectSuggestion);
+  response?.dayAdjust?.dropOrShrink.forEach(collectSuggestion);
+  collectSuggestion(response?.comingUp?.nextBestAction);
+  collectSuggestion(response?.campaignMomentum?.nextStep);
+  response?.campaignMomentum?.supportActions.forEach(collectSuggestion);
+
+  return suggestions;
+};
+
+const buildFallbackPlannerProposals = (input: {
+  response: CompanionStructuredResponse | null | undefined;
+  savedSuggestionProposalIds?: string[];
+  pendingSuggestionProposalId?: string | null;
+}): CompanionPlannerProposal[] =>
+  collectFallbackStructuredSuggestions(input.response).map((suggestion) => ({
+    id: suggestion.proposalId,
+    kind: "create_quest",
+    title: suggestion.title,
+    summary: suggestion.reason,
+    reasoning: suggestion.reason,
+    payload: {
+      taskText: suggestion.title,
+      estimatedDuration: suggestion.estimatedDurationMinutes,
+      notes: suggestion.reason,
+      questSource: suggestion.source,
+      taskDate: null,
+      scheduledTime: null,
+    },
+    status: input.savedSuggestionProposalIds?.includes(suggestion.proposalId)
+      ? "confirmed"
+      : "pending",
+    readyToConfirm: true,
+    missingFields: [],
+  }));
+
+const mapUnifiedMessagesToLegacyChatMessages = (
+  messages: LegacyFallbackHydrationMessage[],
+): CompanionChatMessage[] =>
+  messages
+    .filter((message) =>
+      message.source === "chat" ||
+      (
+        message.source === "agent" &&
+        !message.structuredResponse &&
+        !message.pendingAction &&
+        !message.receipt
+      )
+    )
+    .map((message) => ({
+      id: message.id,
+      role: message.role,
+      content: message.content,
+      createdAt: message.createdAt,
+      inputMode: message.inputMode,
+    }));
+
+const mapUnifiedMessagesToLegacyPlannerMessages = (
+  input: LegacyFallbackHydrationInput,
+): CompanionChatThreadMessage[] =>
+  input.messages
+    .filter((message) =>
+      message.source === "plan" ||
+      (
+        message.source === "agent" &&
+        (
+          message.structuredResponse !== undefined ||
+          Boolean(message.pendingAction) ||
+          Boolean(message.receipt)
+        )
+      )
+    )
+    .map((message) => {
+      const fallbackProposals = buildFallbackPlannerProposals({
+        response: message.structuredResponse,
+        savedSuggestionProposalIds: input.savedSuggestionProposalIds,
+        pendingSuggestionProposalId: input.pendingSuggestionProposalId,
+      });
+      const fallbackSessionState = {
+        ...DEFAULT_FALLBACK_PLANNER_SESSION_STATE,
+        pendingStarterIntent: inferPlannerStarterIntentFromStructuredResponse(
+          message.structuredResponse,
+        ),
+      };
+      const proposalDecision = message.receipt?.proposalId &&
+          (
+            message.receipt.status === "executed" ||
+            message.receipt.status === "cancelled"
+          )
+        ? {
+          proposalId: message.receipt.proposalId,
+          status: message.receipt.status === "executed"
+            ? "confirmed"
+            : "rejected",
+        }
+        : null;
+
+      return {
+        id: message.id,
+        sessionId: input.sessionId,
+        role: message.role,
+        content: message.content,
+        createdAt: message.createdAt,
+        inputMode: message.inputMode,
+        source: "agent",
+        structuredResponse: message.structuredResponse ?? null,
+        pendingAction: message.pendingAction ?? undefined,
+        receipt: message.receipt
+          ? {
+            actionId: message.id,
+            status: message.receipt.status === "executed"
+              ? "executed"
+              : "cancelled",
+            proposalId: message.receipt.proposalId ?? null,
+            message: message.content,
+            summary: null,
+            createdAt: message.createdAt,
+            executionResult: null,
+            executionError: null,
+          }
+          : undefined,
+        metadata: {
+          structuredResponse: message.structuredResponse ?? null,
+          followUpQuestions: [],
+          proposals: fallbackProposals,
+          suggestedReminders: [],
+          sessionState: fallbackSessionState,
+          ...(proposalDecision ? { proposalDecision } : {}),
+        },
+      };
+    });
 
 export function useLegacyCompanionAssistantAdapter({
   enabled,
@@ -173,8 +393,11 @@ export function useLegacyCompanionAssistantAdapter({
   const companionChat = useCompanionChat({
     enabled: enabled && surface === "companion" && conversationEnabled,
   });
-  const journeysConversation = useJourneysCompanionConversation();
+  const journeysConversation = useJourneysCompanionConversation({
+    enabled,
+  });
   const planner = useCompanionPlanner({
+    enabled,
     bootstrapGreeting: false,
     threadPersistence: surface === "journeys"
       ? {
@@ -183,7 +406,9 @@ export function useLegacyCompanionAssistantAdapter({
       }
       : undefined,
   });
-  const conversation = surface === "journeys" ? journeysConversation : companionChat;
+  const conversation = surface === "journeys"
+    ? journeysConversation
+    : companionChat;
 
   const messages = useMemo(() => (
     sortMessages([
@@ -192,9 +417,11 @@ export function useLegacyCompanionAssistantAdapter({
     ])
   ), [conversation.messages, planner.messages]);
 
-  const hasOpenPlannerThread = planner.questions.length > 0
-    || planner.pendingProposals.some((proposal) => proposal.status === "pending")
-    || Boolean(planner.sessionState.pendingStarterIntent);
+  const hasOpenPlannerThread = planner.questions.length > 0 ||
+    planner.pendingProposals.some((proposal) =>
+      proposal.status === "pending"
+    ) ||
+    Boolean(planner.sessionState.pendingStarterIntent);
 
   const journeysThreads = useJourneysCompanionThreads({
     enabled: enabled && surface === "journeys",
@@ -202,47 +429,103 @@ export function useLegacyCompanionAssistantAdapter({
     companionId: companion?.id,
     messages: surface === "journeys" ? messages : [],
     persistenceReady: journeysConversation.threadPersistenceReady,
-    persistenceUnavailableReason: journeysConversation.threadPersistenceUnavailableReason,
+    persistenceUnavailableReason:
+      journeysConversation.threadPersistenceUnavailableReason,
     hasPendingPlannerWork: hasOpenPlannerThread,
-    isBusy: planner.isSubmitting || planner.isClassifying || conversation.isSubmitting,
+    isBusy: planner.isSubmitting || planner.isClassifying ||
+      conversation.isSubmitting,
     conversation: {
+      sessionId: journeysConversation.sessionId,
       resetThread: journeysConversation.resetThread,
       hydrateThread: journeysConversation.hydrateThread,
     },
     planner: {
+      sessionId: planner.sessionId,
       resetThread: planner.resetThread,
       hydrateThread: planner.hydrateThread,
     },
   });
 
   const activePendingProposal = useMemo(
-    () => planner.pendingProposals.find((proposal) => proposal.status === "pending") ?? null,
+    () =>
+      planner.pendingProposals.find((proposal) =>
+        proposal.status === "pending"
+      ) ?? null,
     [planner.pendingProposals],
   );
+  const pendingActionCount = planner.pendingProposals.length;
+  const readyPendingActionCount = planner.readyProposalCount;
   const pendingAction = useMemo(
     () => mapLegacyProposalToPendingAction(activePendingProposal),
     [activePendingProposal],
   );
+  const savedSuggestionProposalIds = useMemo(
+    () =>
+      planner.proposals
+        .filter((proposal) =>
+          proposal.status === "confirmed" || proposal.status === "modified"
+        )
+        .map((proposal) => proposal.id),
+    [planner.proposals],
+  );
+  const pendingSuggestionProposalId = activePendingProposal?.id ?? null;
 
   const placeholder = hasOpenPlannerThread
     ? "Reply here..."
     : surface === "journeys"
-      ? "Talk to Cosmiq"
-      : "Talk to Cosmiq naturally.";
+    ? "Talk to Cosmiq"
+    : "Talk to Cosmiq naturally.";
+
+  const hydrateFromUnifiedState = useCallback((
+    input: LegacyFallbackHydrationInput,
+  ) => {
+    const nextChatMessages = mapUnifiedMessagesToLegacyChatMessages(
+      input.messages,
+    );
+    const nextPlannerMessages = mapUnifiedMessagesToLegacyPlannerMessages(
+      input,
+    );
+
+    if (surface === "journeys") {
+      journeysConversation.hydrateThread({
+        sessionId: input.sessionId,
+        messages: nextChatMessages,
+      });
+    } else {
+      companionChat.hydrateThread({
+        sessionId: input.sessionId,
+        messages: nextChatMessages,
+      });
+    }
+
+    planner.hydrateThread({
+      sessionId: input.sessionId,
+      messages: nextPlannerMessages,
+    });
+  }, [
+    companionChat,
+    journeysConversation,
+    planner,
+    surface,
+  ]);
 
   const submitMessage = useCallback(async (
     rawMessage: string,
     inputMode: CompanionChatInputMode = "text",
+    options?: {
+      starterIntent?: CompanionPlannerLaunchIntent["starterIntent"];
+    },
   ) => {
     const message = rawMessage.trim();
     if (!enabled || !message) return;
+    const starterIntent = options?.starterIntent;
 
     const parsed = parseNaturalLanguage(message);
-    const shouldOpenCampaignBuilder = surface === "journeys"
-      && Boolean(onOpenCampaignBuilder)
-      && (
-        isGoalBreakdownStarterMessage(message)
-        || looksLikeBigGoal(
+    const shouldOpenCampaignBuilder = surface === "journeys" &&
+      Boolean(onOpenCampaignBuilder) &&
+      (
+        isGoalBreakdownStarterMessage(message) ||
+        looksLikeBigGoal(
           parsed.text || message,
           parsed.estimatedDuration,
           parsed.scheduledDate,
@@ -254,6 +537,23 @@ export function useLegacyCompanionAssistantAdapter({
       hasOpenPlannerThread,
     );
 
+    if (starterIntent === "goal_breakdown_start" && onOpenCampaignBuilder) {
+      onOpenCampaignBuilder(message);
+      return;
+    }
+
+    if (
+      starterIntent &&
+      starterIntent !== "general" &&
+      starterIntent !== "free_talk_start" &&
+      starterIntent !== "thread_history"
+    ) {
+      await planner.submitMessage(message, inputMode, {
+        starterIntent,
+      });
+      return;
+    }
+
     if (isExactQuestCaptureStarterMessage(message)) {
       planner.primeQuestCapture(message);
       return;
@@ -264,8 +564,31 @@ export function useLegacyCompanionAssistantAdapter({
       return;
     }
 
+    if (isExactUpcomingStarterMessage(message)) {
+      await planner.submitMessage(message, inputMode, {
+        starterIntent: "upcoming_start",
+      });
+      return;
+    }
+
+    if (isExactRightNowStarterMessage(message)) {
+      await planner.submitMessage(message, inputMode, {
+        starterIntent: "right_now_start",
+      });
+      return;
+    }
+
+    if (isExactAdjustDayStarterMessage(message)) {
+      await planner.submitMessage(message, inputMode, {
+        starterIntent: "adjust_today",
+      });
+      return;
+    }
+
     if (!routeToPlanner && surface === "companion" && !conversationEnabled) {
-      toast.error("Companion Talk is a Premium feature. Planning and scheduling still work here.");
+      toast.error(
+        "Companion Talk is a Premium feature. Planning and scheduling still work here.",
+      );
       return;
     }
 
@@ -306,7 +629,13 @@ export function useLegacyCompanionAssistantAdapter({
       : companionChat.greeting ?? greeting,
     messages,
     structuredResponse: planner.structuredResponse,
+    planningMode: planner.planningMode,
+    setPlanningMode: planner.setPlanningMode,
     pendingAction,
+    savedSuggestionProposalIds,
+    pendingSuggestionProposalId,
+    pendingActionCount,
+    readyPendingActionCount,
     placeholder,
     todayLabel: planner.todayLabel,
     isSubmitting: planner.isSubmitting || conversation.isSubmitting,
@@ -318,24 +647,54 @@ export function useLegacyCompanionAssistantAdapter({
     cancelPendingAction: activePendingProposal
       ? () => planner.rejectProposal(activePendingProposal.id)
       : async () => undefined,
+    confirmSuggestedQuest: (proposalId: string) =>
+      planner.confirmProposal(proposalId),
+    confirmAllPendingActions: readyPendingActionCount > 0
+      ? planner.confirmAll
+      : async () => undefined,
     isSpeaking: companionChat.isSpeaking,
     speechProvider: companionChat.speechProvider,
     stopSpeaking: companionChat.stopSpeaking ?? (() => undefined),
     activeThread: surface === "journeys" ? journeysThreads.activeThread : null,
-    historyThreads: surface === "journeys" ? journeysThreads.historyThreads : [],
-    isLoadingThreads: surface === "journeys" ? journeysThreads.isLoadingThreads : false,
-    hasPersistedActiveThread: surface === "journeys" ? journeysThreads.hasPersistedActiveThread : false,
-    canOpenThreadPicker: surface === "journeys" ? journeysThreads.canOpenThreadPicker : false,
+    historyThreads: surface === "journeys"
+      ? journeysThreads.historyThreads
+      : [],
+    isLoadingThreads: surface === "journeys"
+      ? journeysThreads.isLoadingThreads
+      : false,
+    hasPersistedActiveThread: surface === "journeys"
+      ? journeysThreads.hasPersistedActiveThread
+      : false,
+    canOpenThreadPicker: surface === "journeys"
+      ? journeysThreads.canOpenThreadPicker
+      : false,
     threadHistoryEmptyStateMessage: surface === "journeys"
       ? journeysThreads.threadHistoryEmptyStateMessage
       : "Past chats will show up here after at least one real exchange.",
-    resumeThread: surface === "journeys" ? journeysThreads.resumeThread : (async () => undefined),
-    archiveCurrentThread: surface === "journeys" ? journeysThreads.archiveCurrentThread : (async () => undefined),
-    canArchiveThread: surface === "journeys" ? journeysThreads.canArchiveThread : false,
-    archiveDisabledReason: surface === "journeys" ? journeysThreads.archiveDisabledReason : null,
-    startNewChat: surface === "journeys" ? journeysThreads.startNewChat : (async () => undefined),
-    canStartNewChat: surface === "journeys" ? journeysThreads.canStartNewChat : false,
-    newChatDisabledReason: surface === "journeys" ? journeysThreads.newChatDisabledReason : null,
-    startTemplateThread: surface === "journeys" ? journeysThreads.startTemplateThread : () => "",
+    resumeThread: surface === "journeys"
+      ? journeysThreads.resumeThread
+      : (async () => undefined),
+    archiveCurrentThread: surface === "journeys"
+      ? journeysThreads.archiveCurrentThread
+      : (async () => undefined),
+    canArchiveThread: surface === "journeys"
+      ? journeysThreads.canArchiveThread
+      : false,
+    archiveDisabledReason: surface === "journeys"
+      ? journeysThreads.archiveDisabledReason
+      : null,
+    startNewChat: surface === "journeys"
+      ? journeysThreads.startNewChat
+      : (async () => undefined),
+    canStartNewChat: surface === "journeys"
+      ? journeysThreads.canStartNewChat
+      : false,
+    newChatDisabledReason: surface === "journeys"
+      ? journeysThreads.newChatDisabledReason
+      : null,
+    startTemplateThread: surface === "journeys"
+      ? journeysThreads.startTemplateThread
+      : () => "",
+    hydrateFromUnifiedState,
   };
 }

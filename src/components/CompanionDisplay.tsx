@@ -46,6 +46,11 @@ import {
 } from "@/lib/companionAssetResolver";
 import { getCompanionEggLabel } from "@/config/companionCatalog";
 import { isCompanionPresetImageSource } from "@/lib/companionImageFocal";
+import {
+  hasCompanionStoredVisual,
+  isAiGeneratedCompanion,
+  isPresetEggCompanion,
+} from "@/lib/companionPredicates";
 import { useMotionProfile } from "@/hooks/useMotionProfile";
 import { useCompanionMotionSafe } from "@/contexts/CompanionMotionContext";
 import {
@@ -216,7 +221,11 @@ export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDispla
     [canEvolve, companion, isPreHatchCompanionStep, nextEvolutionXP, progressToNext],
   );
   const displayRequiresHatchSelection = Boolean(
-    displayCompanion && displayCompanion.current_stage === 0 && !displayCompanion.preset_id,
+    displayCompanion
+    && displayCompanion.current_stage === 0
+    && !isPresetEggCompanion(displayCompanion)
+    && !isAiGeneratedCompanion(displayCompanion)
+    && !hasCompanionStoredVisual(displayCompanion),
   );
 
   const handlePressStart = useCallback((

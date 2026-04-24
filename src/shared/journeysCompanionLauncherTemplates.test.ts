@@ -67,5 +67,29 @@ describe("journeys companion launcher greetings", () => {
       target: "planner",
       starterIntent: "plan_day",
     });
+
+    expect(templates[2]).toMatchObject({
+      id: "advance-campaign",
+      label: "Advance my campaign",
+      message: "Advance my campaign",
+      target: "planner",
+      starterIntent: "advance_campaign_start",
+    });
+
+    expect(templates[3]).toMatchObject({
+      id: "adjust-day",
+      label: "Adjust my day",
+      message: "Adjust my day",
+      target: "planner",
+      starterIntent: "adjust_today",
+    });
+
+    expect(templates[4]).toMatchObject({
+      id: "right-now",
+      label: "What should I do right now?",
+      message: "What should I do right now?",
+      target: "planner",
+      starterIntent: "right_now_start",
+    });
   });
 });

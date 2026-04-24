@@ -198,4 +198,143 @@ describe("useCompanionChat", () => {
       expect(companion.result.current.muteSpokenReplies).toBe(true);
     });
   });
+
+  it("can reset into a seeded fallback thread without waiting for history bootstrap", async () => {
+    const { result } = renderHook(() => useCompanionChat({ enabled: false }), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      result.current.resetThread({
+        sessionId: "fallback-chat-session",
+        greetingText: "Picking up where we left off.",
+      });
+    });
+
+    expect(result.current.sessionId).toBe("fallback-chat-session");
+    expect(result.current.messages).toEqual([
+      expect.objectContaining({
+        role: "assistant",
+        content: "Picking up where we left off.",
+      }),
+    ]);
+  });
+
+  it("can hydrate an existing fallback transcript directly", async () => {
+    const { result } = renderHook(() => useCompanionChat({ enabled: false }), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      result.current.hydrateThread({
+        sessionId: "fallback-chat-session",
+        messages: [
+          {
+            id: "chat-1",
+            role: "assistant",
+            content: "Let's keep going.",
+            createdAt: "2026-04-18T08:00:00.000Z",
+          },
+          {
+            id: "chat-2",
+            role: "user",
+            content: "I need a calmer plan.",
+            createdAt: "2026-04-18T08:00:10.000Z",
+            inputMode: "text",
+          },
+        ],
+      });
+    });
+
+    expect(result.current.sessionId).toBe("fallback-chat-session");
+    expect(result.current.messages).toEqual([
+      expect.objectContaining({
+        id: "chat-1",
+        role: "assistant",
+        content: "Let's keep going.",
+      }),
+      expect.objectContaining({
+        id: "chat-2",
+        role: "user",
+        content: "I need a calmer plan.",
+        inputMode: "text",
+      }),
+    ]);
+  });
+
+  it("bootstraps greeting and history when re-enabled after being dormant", async () => {
+    mocks.historyResponse.data = [
+      {
+        id: "hist-1",
+        role: "assistant",
+        content: "History comes back online.",
+        input_mode: null,
+        created_at: "2026-04-18T08:00:00.000Z",
+      },
+    ];
+
+    const { result, rerender } = renderHook(
+      ({ enabled }: { enabled: boolean }) => useCompanionChat({ enabled }),
+      {
+        initialProps: { enabled: false },
+        wrapper: createWrapper(),
+      },
+    );
+
+    expect(result.current.messages).toEqual([]);
+
+    rerender({ enabled: true });
+
+    await waitFor(() => {
+      expect(result.current.messages[0]?.content).toBe(
+        "History comes back online.",
+      );
+    });
+  });
+
+  it("preserves externally hydrated fallback chat state when re-enabled", async () => {
+    mocks.historyResponse.data = [
+      {
+        id: "hist-1",
+        role: "assistant",
+        content: "Older persisted history.",
+        input_mode: null,
+        created_at: "2026-04-18T07:55:00.000Z",
+      },
+    ];
+
+    const { result, rerender } = renderHook(
+      ({ enabled }: { enabled: boolean }) => useCompanionChat({ enabled }),
+      {
+        initialProps: { enabled: false },
+        wrapper: createWrapper(),
+      },
+    );
+
+    await act(async () => {
+      result.current.hydrateThread({
+        sessionId: "fallback-chat-session",
+        messages: [
+          {
+            id: "chat-1",
+            role: "assistant",
+            content: "Hydrated fallback thread.",
+            createdAt: "2026-04-18T08:00:00.000Z",
+          },
+        ],
+      });
+    });
+
+    rerender({ enabled: true });
+
+    await waitFor(() => {
+      expect(result.current.sessionId).toBe("fallback-chat-session");
+      expect(result.current.messages).toEqual([
+        expect.objectContaining({
+          id: "chat-1",
+          content: "Hydrated fallback thread.",
+        }),
+      ]);
+    });
+  });
 });

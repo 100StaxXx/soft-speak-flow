@@ -31,7 +31,17 @@ const mocks = vi.hoisted(() => {
       onboarding_data: {},
     } as Record<string, unknown> | null,
     profileLoading: false,
-    companion: null as { id: string; preset_id?: string | null; current_stage?: number | null } | null,
+    companion: null as {
+      id: string;
+      preset_id?: string | null;
+      current_stage?: number | null;
+      current_image_url?: string | null;
+      initial_image_url?: string | null;
+      core_element?: string | null;
+      spirit_animal?: string | null;
+      companion_name?: string | null;
+      cached_creature_name?: string | null;
+    } | null,
     companionLoading: false,
     profilesUpdateEqMock,
     profilesUpdateMock,
@@ -152,7 +162,13 @@ describe("Onboarding route guard", () => {
   });
 
   it("redirects companion-backed established accounts away from onboarding", async () => {
-    mocks.companion = { id: "companion-1", preset_id: "dragon", current_stage: 1 };
+    mocks.companion = {
+      id: "companion-1",
+      preset_id: "dragon",
+      current_stage: 1,
+      current_image_url: "https://example.com/stage-1.png",
+      initial_image_url: "https://example.com/egg.png",
+    };
 
     renderOnboarding();
 
@@ -191,6 +207,8 @@ describe("Onboarding route guard", () => {
       current_stage: 0,
       core_element: "ice",
       spirit_animal: "Egg",
+      current_image_url: "https://example.com/ai-egg.png",
+      initial_image_url: "https://example.com/ai-egg.png",
       cached_creature_name: null,
     } as {
       id: string;
@@ -198,6 +216,8 @@ describe("Onboarding route guard", () => {
       current_stage: number;
       core_element: string;
       spirit_animal: string;
+      current_image_url: string;
+      initial_image_url: string;
       cached_creature_name: string | null;
     };
 
@@ -230,6 +250,8 @@ describe("Onboarding route guard", () => {
       current_stage: 0,
       core_element: "fire",
       spirit_animal: "Dragon",
+      current_image_url: "https://example.com/preset-egg.png",
+      initial_image_url: "https://example.com/preset-egg.png",
       cached_creature_name: "Ignisyl",
     } as {
       id: string;
@@ -237,6 +259,8 @@ describe("Onboarding route guard", () => {
       current_stage: number;
       core_element: string;
       spirit_animal: string;
+      current_image_url: string;
+      initial_image_url: string;
       cached_creature_name: string | null;
     };
 
@@ -247,7 +271,7 @@ describe("Onboarding route guard", () => {
       resumeState: {
         stage: "journey-begins",
         userName: "Nova",
-        companionLabel: "Dragon",
+        companionLabel: "Ember Egg",
       },
     });
   });
@@ -267,6 +291,8 @@ describe("Onboarding route guard", () => {
       current_stage: 1,
       core_element: "ice",
       spirit_animal: "Dragon",
+      current_image_url: "https://example.com/stage-1.png",
+      initial_image_url: "https://example.com/egg.png",
       cached_creature_name: "Frostbite",
     } as {
       id: string;
@@ -274,6 +300,8 @@ describe("Onboarding route guard", () => {
       current_stage: number;
       core_element: string;
       spirit_animal: string;
+      current_image_url: string;
+      initial_image_url: string;
       cached_creature_name: string | null;
     };
 
@@ -306,6 +334,8 @@ describe("Onboarding route guard", () => {
       current_stage: 0,
       core_element: "ice",
       spirit_animal: "Dragon",
+      current_image_url: "https://example.com/preset-egg.png",
+      initial_image_url: "https://example.com/preset-egg.png",
       companion_name: "Lyra",
       cached_creature_name: "Frostbite",
     } as {
@@ -314,6 +344,8 @@ describe("Onboarding route guard", () => {
       current_stage: number;
       core_element: string;
       spirit_animal: string;
+      current_image_url: string;
+      initial_image_url: string;
       companion_name: string;
       cached_creature_name: string | null;
     };
@@ -371,7 +403,13 @@ describe("Onboarding route guard", () => {
         walkthrough_completed: true,
       },
     };
-    mocks.companion = { id: "companion-egg", preset_id: null, current_stage: 0 };
+    mocks.companion = {
+      id: "companion-egg",
+      preset_id: null,
+      current_stage: 0,
+      current_image_url: "https://example.com/ai-egg.png",
+      initial_image_url: "https://example.com/ai-egg.png",
+    };
 
     view.rerender(
       <MemoryRouter initialEntries={["/onboarding"]}>

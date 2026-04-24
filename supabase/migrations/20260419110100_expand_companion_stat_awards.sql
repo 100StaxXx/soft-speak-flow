@@ -241,6 +241,5 @@ BEGIN
     v_echo_amount;
 END;
 $$;
-
 REVOKE EXECUTE ON FUNCTION public.award_companion_attribute(TEXT, TEXT, TEXT, INTEGER, BOOLEAN) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.award_companion_attribute(TEXT, TEXT, TEXT, INTEGER, BOOLEAN) TO authenticated;

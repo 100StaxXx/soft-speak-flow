@@ -87,3 +87,48 @@ Deno.test("consultPlannerForAgent converts planner proposals into v1 task action
   assertGreater(result.actionHints.length, 0);
   assertEquals(result.actionHints[0]?.actionType, "task_update");
 });
+
+Deno.test("consultPlannerForAgent converts at-risk campaign adjustments into campaign action hints", () => {
+  const result = consultPlannerForAgent({
+    message: "Advance my campaign",
+    currentDateTime: "2026-04-18T08:00:00-07:00",
+    surface: "journeys",
+    horizon: "week",
+    context: buildContext({
+      tasks: [
+        {
+          id: "task-1",
+          task_text: "Rewrite relaunch offer",
+          task_date: "2026-04-16",
+          scheduled_time: null,
+          estimated_duration: 60,
+          completed: false,
+          epic_id: "epic-1",
+          priority: "high",
+        },
+        {
+          id: "task-2",
+          task_text: "Tighten launch CTA",
+          task_date: "2026-04-17",
+          scheduled_time: null,
+          estimated_duration: 45,
+          completed: false,
+          epic_id: "epic-1",
+          priority: "medium",
+        },
+      ],
+      campaigns: [
+        {
+          id: "epic-1",
+          title: "Founder relaunch",
+          end_date: "2026-04-21",
+          progress_percentage: 22,
+        },
+      ],
+    }),
+  });
+
+  assertEquals(result.mode, "proposal");
+  assertGreater(result.actionHints.length, 0);
+  assertEquals(result.actionHints[0]?.actionType, "campaign_update");
+});

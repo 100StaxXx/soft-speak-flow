@@ -493,6 +493,8 @@ describe("CompanionDisplay overlay stack", () => {
       current_xp: 14,
       preset_id: null,
       spirit_animal: "Egg",
+      current_image_url: null,
+      initial_image_url: null,
       cached_creature_name: null,
     };
 

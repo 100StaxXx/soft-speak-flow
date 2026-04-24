@@ -1,7 +1,13 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 import { stripMarkdown } from "@/lib/utils";
-import type { PendingActionView } from "@/types/companionAgent";
+import type {
+  ActionReceiptView,
+  CompanionAgentIntent,
+  CompanionAgentMode,
+  PendingActionView,
+} from "@/types/companionAgent";
+import type { CompanionStructuredResponse } from "@/shared/companionStructuredOutput";
 import type {
   CompanionChatInputMode,
   CompanionChatRole,
@@ -20,6 +26,23 @@ type PersistableThreadMessage = {
   content: string;
   createdAt: string;
   inputMode?: CompanionChatInputMode | null;
+  metadata?: CompanionChatRow["metadata"];
+};
+
+const readSelectedProposalId = (
+  metadata: CompanionPendingActionRow["metadata"],
+) => {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+    return null;
+  }
+
+  const selectedProposalId = "selectedProposalId" in metadata
+    ? metadata.selectedProposalId
+    : null;
+
+  return typeof selectedProposalId === "string" && selectedProposalId.length > 0
+    ? selectedProposalId
+    : null;
 };
 
 const THREAD_TITLE_MAX_LENGTH = 72;
@@ -55,15 +78,104 @@ const mapThreadSummary = (
 
 const mapThreadMessage = (
   row: CompanionChatRow,
-): CompanionChatThreadMessage => ({
-  id: row.id,
-  sessionId: row.session_id,
-  role: row.role,
-  content: row.content,
-  createdAt: row.created_at,
-  inputMode: row.input_mode as CompanionChatInputMode | null ?? undefined,
-  source: row.source as CompanionChatSource,
-});
+): CompanionChatThreadMessage => {
+  const metadata = row.metadata && typeof row.metadata === "object" &&
+      !Array.isArray(row.metadata)
+    ? row.metadata as Record<string, unknown>
+    : null;
+
+  const parsePendingAction = (value: unknown): PendingActionView | undefined => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+    const pendingAction = value as Record<string, unknown>;
+    if (
+      typeof pendingAction.id !== "string" ||
+      typeof pendingAction.status !== "string" ||
+      typeof pendingAction.intent !== "string" ||
+      typeof pendingAction.actionType !== "string" ||
+      typeof pendingAction.summary !== "string" ||
+      typeof pendingAction.createdAt !== "string" ||
+      typeof pendingAction.expiresAt !== "string"
+    ) {
+      return undefined;
+    }
+
+    return {
+      id: pendingAction.id,
+      status: pendingAction.status as PendingActionView["status"],
+      intent: pendingAction.intent as PendingActionView["intent"],
+      actionType: pendingAction.actionType as PendingActionView["actionType"],
+      proposalId: typeof pendingAction.proposalId === "string"
+        ? pendingAction.proposalId
+        : null,
+      summary: pendingAction.summary,
+      confirmationMessage: typeof pendingAction.confirmationMessage === "string"
+        ? pendingAction.confirmationMessage
+        : null,
+      normalizedPayload: pendingAction.normalizedPayload ?? {},
+      affectedEntities: pendingAction.affectedEntities ?? null,
+      expiresAt: pendingAction.expiresAt,
+      createdAt: pendingAction.createdAt,
+    };
+  };
+
+  const parseReceipt = (value: unknown): ActionReceiptView | undefined => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+    const receipt = value as Record<string, unknown>;
+    if (
+      typeof receipt.actionId !== "string" ||
+      typeof receipt.status !== "string" ||
+      typeof receipt.message !== "string" ||
+      typeof receipt.createdAt !== "string"
+    ) {
+      return undefined;
+    }
+
+    return {
+      actionId: receipt.actionId,
+      status: receipt.status as ActionReceiptView["status"],
+      proposalId: typeof receipt.proposalId === "string"
+        ? receipt.proposalId
+        : null,
+      message: receipt.message,
+      summary: typeof receipt.summary === "string" ? receipt.summary : null,
+      createdAt: receipt.createdAt,
+      executionResult: receipt.executionResult ?? null,
+      executionError: receipt.executionError ?? null,
+    };
+  };
+
+  return {
+    id: row.id,
+    sessionId: row.session_id,
+    role: row.role,
+    content: row.content,
+    createdAt: row.created_at,
+    inputMode: row.input_mode as CompanionChatInputMode | null ?? undefined,
+    source: row.source as CompanionChatSource,
+    metadata: row.metadata,
+    mode: typeof metadata?.mode === "string"
+      ? metadata.mode as CompanionAgentMode
+      : null,
+    intent: typeof metadata?.intent === "string"
+      ? metadata.intent as CompanionAgentIntent
+      : null,
+    structuredResponse: metadata && "structuredResponse" in metadata
+      ? metadata.structuredResponse as CompanionStructuredResponse | null
+      : undefined,
+    pendingAction: parsePendingAction(metadata?.pendingAction),
+    receipt: parseReceipt(metadata?.receipt),
+  };
+};
+
+export const readCompanionThreadReceiptProposalId = (
+  receipt: ActionReceiptView | null | undefined,
+) => {
+  if (typeof receipt?.proposalId === "string" && receipt.proposalId.length > 0) {
+    return receipt.proposalId;
+  }
+
+  return null;
+};
 
 const mapPendingAction = (
   row: CompanionPendingActionRow,
@@ -72,6 +184,7 @@ const mapPendingAction = (
   status: row.status as PendingActionView["status"],
   intent: row.intent as PendingActionView["intent"],
   actionType: row.action_type as PendingActionView["actionType"],
+  proposalId: readSelectedProposalId(row.metadata),
   summary: row.summary,
   confirmationMessage: row.confirmation_message,
   normalizedPayload: row.normalized_payload,
@@ -186,7 +299,7 @@ export const loadCompanionChatThreadMessages = async (
 ) => {
   const { data, error } = await supabase
     .from("companion_chats")
-    .select("id, session_id, role, content, created_at, input_mode, source")
+    .select("id, session_id, role, content, created_at, input_mode, source, metadata")
     .eq("session_id", sessionId)
     .eq("surface", surface)
     .order("created_at", { ascending: true });
@@ -227,6 +340,7 @@ export const persistCompanionThreadMessages = async (params: {
     role: row.role,
     content: row.content,
     input_mode: row.inputMode ?? null,
+    metadata: row.metadata ?? {},
     session_id: params.sessionId,
     surface: params.surface,
     source: params.source,

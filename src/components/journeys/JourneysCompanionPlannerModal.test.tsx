@@ -11,10 +11,15 @@ const mocks = vi.hoisted(() => ({
     setShowPermissionDialog: vi.fn(),
     confirmPendingAction: vi.fn(),
     cancelPendingAction: vi.fn(),
+    confirmSuggestedQuest: vi.fn(),
+    confirmAllPendingActions: vi.fn(),
     stopSpeaking: vi.fn(),
     startNewChat: vi.fn().mockResolvedValue(undefined),
     archiveCurrentThread: vi.fn().mockResolvedValue(undefined),
     resumeThread: vi.fn().mockResolvedValue(undefined),
+  },
+  planningMode: {
+    setPlanningMode: vi.fn(),
   },
   drawerRootProps: [] as Array<Record<string, unknown>>,
   state: {
@@ -22,7 +27,8 @@ const mocks = vi.hoisted(() => ({
       {
         id: "m1",
         role: "assistant" as const,
-        content: "I can help you shape that into something concrete when you're ready.",
+        content:
+          "I can help you shape that into something concrete when you're ready.",
         createdAt: "2026-04-18T08:01:00.000Z",
         source: "agent" as const,
       },
@@ -33,8 +39,10 @@ const mocks = vi.hoisted(() => ({
       status: "pending" as const,
       intent: "schedule_task" as const,
       actionType: "task_create" as const,
+      proposalId: null,
       summary: 'Add "Focus block" for 2026-04-19 at 14:00.',
-      confirmationMessage: 'Want me to add "Focus block" for 2026-04-19 at 14:00?',
+      confirmationMessage:
+        'Want me to add "Focus block" for 2026-04-19 at 14:00?',
       normalizedPayload: {},
       affectedEntities: null,
       expiresAt: "2026-04-19T20:00:00.000Z",
@@ -45,7 +53,8 @@ const mocks = vi.hoisted(() => ({
       companionId: "companion-1",
       surface: "journeys" as const,
       title: "Current thread",
-      previewText: "I can help you shape that into something concrete when you're ready.",
+      previewText:
+        "I can help you shape that into something concrete when you're ready.",
       createdAt: "2026-04-18T08:00:00.000Z",
       lastMessageAt: "2026-04-18T08:01:00.000Z",
       archivedAt: null,
@@ -64,6 +73,34 @@ const mocks = vi.hoisted(() => ({
         messageCount: 4,
       },
     ],
+    structuredResponse: {
+      intent: {
+        intentType: "conversation" as const,
+        timeHorizon: "today" as const,
+        isRecurring: false,
+        shouldCreateQuest: false,
+        shouldPromptCampaign: false,
+      },
+      planDay: {
+        message: "Today is best as a balanced push with one clear focus block.",
+        dayAssessment: "balanced" as const,
+        suggestedQuests: [
+          {
+            suggestionId: "plan-1",
+            proposalId: "proposal-plan-1",
+            title: "Outline the launch checklist",
+            type: "must" as const,
+            estimatedDuration: "45 min",
+            estimatedDurationMinutes: 45,
+            source: "campaign" as const,
+            reason:
+              "It keeps the launch campaign moving without crowding the afternoon.",
+          },
+        ],
+      },
+    },
+    savedSuggestionProposalIds: ["proposal-plan-1"],
+    pendingSuggestionProposalId: null as string | null,
   },
 }));
 
@@ -83,7 +120,14 @@ vi.mock("@/hooks/useCompanionAssistant", () => ({
     todayLabel: "Saturday, April 18",
     placeholder: "Talk to Cosmiq",
     messages: mocks.state.messages,
+    structuredResponse: mocks.state.structuredResponse,
+    planningMode: "balanced" as const,
+    setPlanningMode: mocks.planningMode.setPlanningMode,
     pendingAction: mocks.state.pendingAction,
+    savedSuggestionProposalIds: mocks.state.savedSuggestionProposalIds,
+    pendingSuggestionProposalId: mocks.state.pendingSuggestionProposalId,
+    pendingActionCount: 3,
+    readyPendingActionCount: 3,
     draftInput: mocks.state.draftInput,
     setDraftInput: mocks.assistant.setDraftInput,
     interimText: "",
@@ -92,6 +136,8 @@ vi.mock("@/hooks/useCompanionAssistant", () => ({
     submitTypedMessage: mocks.assistant.submitTypedMessage,
     confirmPendingAction: mocks.assistant.confirmPendingAction,
     cancelPendingAction: mocks.assistant.cancelPendingAction,
+    confirmSuggestedQuest: mocks.assistant.confirmSuggestedQuest,
+    confirmAllPendingActions: mocks.assistant.confirmAllPendingActions,
     isRecording: false,
     isAutoStopping: false,
     isVoiceSupported: true,
@@ -108,7 +154,8 @@ vi.mock("@/hooks/useCompanionAssistant", () => ({
     historyThreads: mocks.state.historyThreads,
     isLoadingThreads: false,
     canOpenThreadPicker: true,
-    threadHistoryEmptyStateMessage: "Past chats will show up here after at least one real exchange.",
+    threadHistoryEmptyStateMessage:
+      "Past chats will show up here after at least one real exchange.",
     hasPersistedActiveThread: true,
     canStartNewChat: true,
     newChatDisabledReason: null,
@@ -121,11 +168,19 @@ vi.mock("@/hooks/useCompanionAssistant", () => ({
 }));
 
 vi.mock("@/components/ui/dialog", () => ({
-  Dialog: ({ open, children }: { open: boolean; children: ReactNode }) => (open ? <div>{children}</div> : null),
-  DialogContent: ({ children, className }: { children: ReactNode; className?: string }) => <div className={className}>{children}</div>,
-  DialogHeader: ({ children, className }: { children: ReactNode; className?: string }) => <div className={className}>{children}</div>,
+  Dialog: (
+    { open, children }: { open: boolean; children: ReactNode },
+  ) => (open ? <div>{children}</div> : null),
+  DialogContent: (
+    { children, className }: { children: ReactNode; className?: string },
+  ) => <div className={className}>{children}</div>,
+  DialogHeader: (
+    { children, className }: { children: ReactNode; className?: string },
+  ) => <div className={className}>{children}</div>,
   DialogTitle: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-  DialogDescription: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  DialogDescription: ({ children }: { children: ReactNode }) => (
+    <div>{children}</div>
+  ),
 }));
 
 vi.mock("@/components/ui/drawer", () => ({
@@ -147,16 +202,22 @@ vi.mock("@/components/ui/drawer", () => ({
   }: HTMLAttributes<HTMLDivElement> & { children: ReactNode }) => (
     <div className={className} {...props}>{children}</div>
   ),
-  DrawerHeader: ({ children, className }: { children: ReactNode; className?: string }) => <div className={className}>{children}</div>,
+  DrawerHeader: (
+    { children, className }: { children: ReactNode; className?: string },
+  ) => <div className={className}>{children}</div>,
   DrawerTitle: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-  DrawerDescription: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  DrawerDescription: ({ children }: { children: ReactNode }) => (
+    <div>{children}</div>
+  ),
 }));
 
 vi.mock("@/components/ui/tooltip", () => ({
   TooltipProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
   Tooltip: ({ children }: { children: ReactNode }) => <>{children}</>,
   TooltipTrigger: ({ children }: { children: ReactNode }) => <>{children}</>,
-  TooltipContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  TooltipContent: ({ children }: { children: ReactNode }) => (
+    <div>{children}</div>
+  ),
 }));
 
 import { JourneysCompanionPlannerModal } from "./JourneysCompanionPlannerModal";
@@ -209,8 +270,19 @@ describe("JourneysCompanionPlannerModal", () => {
       />,
     );
 
-    expect(screen.getByText("I can help you shape that into something concrete when you're ready.")).toBeInTheDocument();
-    expect(screen.getByText('Add "Focus block" for 2026-04-19 at 14:00.')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "I can help you shape that into something concrete when you're ready.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("structured-plan-day")).toBeInTheDocument();
+    expect(screen.getByText("Outline the launch checklist"))
+      .toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Saved" })).toBeInTheDocument();
+    expect(screen.getByText('Add "Focus block" for 2026-04-19 at 14:00.'))
+      .toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Confirm All (3)" }))
+      .toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Confirm" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
   });
@@ -235,13 +307,18 @@ describe("JourneysCompanionPlannerModal", () => {
     expect(onLaunchIntentConsumed).toHaveBeenCalledWith("launch-1");
 
     await waitFor(() => {
-      expect(screen.getByTestId("journeys-companion-thread-picker")).toBeInTheDocument();
+      expect(screen.getByTestId("journeys-companion-thread-picker"))
+        .toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByTestId("journeys-companion-thread-resume-archived-session-1"));
+    fireEvent.click(
+      screen.getByTestId("journeys-companion-thread-resume-archived-session-1"),
+    );
 
     await waitFor(() => {
-      expect(mocks.assistant.resumeThread).toHaveBeenCalledWith("archived-session-1");
+      expect(mocks.assistant.resumeThread).toHaveBeenCalledWith(
+        "archived-session-1",
+      );
     });
   });
 
@@ -254,10 +331,51 @@ describe("JourneysCompanionPlannerModal", () => {
       />,
     );
 
+    fireEvent.click(screen.getByRole("button", { name: "Confirm All (3)" }));
     fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
+    expect(mocks.assistant.confirmAllPendingActions).toHaveBeenCalledTimes(1);
     expect(mocks.assistant.confirmPendingAction).toHaveBeenCalledTimes(1);
     expect(mocks.assistant.cancelPendingAction).toHaveBeenCalledTimes(1);
+  });
+
+  it("lets the user confirm a specific structured quest suggestion", () => {
+    const previousPendingAction = mocks.state.pendingAction;
+    const previousSavedSuggestionProposalIds =
+      mocks.state.savedSuggestionProposalIds;
+    mocks.state.pendingAction = null;
+    mocks.state.savedSuggestionProposalIds = [];
+
+    render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        presentation="dialog"
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("structured-suggestion-confirm-plan-1"));
+
+    expect(mocks.assistant.confirmSuggestedQuest).toHaveBeenCalledWith(
+      "proposal-plan-1",
+    );
+
+    mocks.state.pendingAction = previousPendingAction;
+    mocks.state.savedSuggestionProposalIds = previousSavedSuggestionProposalIds;
+  });
+
+  it("lets the user switch the day mode inside the journeys planner shell", () => {
+    render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        presentation="dialog"
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("companion-planning-mode-lock_in"));
+
+    expect(mocks.planningMode.setPlanningMode).toHaveBeenCalledWith("lock_in");
   });
 });

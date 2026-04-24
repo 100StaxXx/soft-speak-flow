@@ -14,10 +14,36 @@ const companionFixture = {
   current_stage: 0,
   current_xp: 14,
   current_image_url: "https://example.com/stage0.png",
+  initial_image_url: "https://example.com/stage0.png",
   current_image_focal_x: 0.5,
   current_image_focal_y: 0.5,
+  initial_image_focal_x: 0.5,
+  initial_image_focal_y: 0.5,
   created_at: "2026-02-19T00:00:00.000Z",
   updated_at: "2026-02-19T00:00:00.000Z",
+};
+
+const aiEggGenerationFixture = {
+  imageUrl: "https://example.com/generated-ai-egg.png",
+  imageFocalX: 0.42,
+  imageFocalY: 0.58,
+  visualIdentityProfile: {
+    schemaVersion: 1,
+    spiritAnimal: "Wolf",
+    coreElement: "ice",
+    favoriteColor: "#000000",
+  },
+  imageLineageMetadata: {
+    schemaVersion: 1,
+    provider: "openai",
+    model: "gpt-image-2",
+    hiddenBoundaryAnchors: {
+      "1": {
+        imageUrl: "https://example.com/generated-hidden-stage1.png",
+        visibility: "hidden_until_reached",
+      },
+    },
+  },
 };
 
 const mocks = vi.hoisted(() => {
@@ -968,6 +994,7 @@ describe("useCompanion evolveCompanion", () => {
 
     await act(async () => {
       await result.current.createCompanion.mutateAsync({
+        creationMode: "preset",
         presetId: "wolf",
         favoriteColor: "#FF6B35",
         spiritAnimal: "Wolf",
@@ -1017,6 +1044,7 @@ describe("useCompanion evolveCompanion", () => {
     let createdCompanion: Awaited<ReturnType<typeof result.current.createCompanion.mutateAsync>>;
     await act(async () => {
       createdCompanion = await result.current.createCompanion.mutateAsync({
+        creationMode: "preset",
         presetId: "wolf",
         favoriteColor: "#FF6B35",
         spiritAnimal: "Wolf",
@@ -1033,15 +1061,20 @@ describe("useCompanion evolveCompanion", () => {
     });
   });
 
-  it("creates an egg-first companion without a preset", async () => {
+  it("creates an AI-generated egg companion without a preset", async () => {
+    mocks.invokeMock.mockResolvedValueOnce({
+      data: aiEggGenerationFixture,
+      error: null,
+    });
     mocks.rpcMock.mockResolvedValueOnce({
       data: [
         {
           ...companionFixture,
           preset_id: null,
-          spirit_animal: "Egg",
-          core_element: "void",
-          current_image_url: "/companion-eggs/egg__t0_egg__normal__void.png",
+          spirit_animal: "Wolf",
+          core_element: "ice",
+          current_image_url: aiEggGenerationFixture.imageUrl,
+          initial_image_url: aiEggGenerationFixture.imageUrl,
           is_new: false,
         },
       ],
@@ -1052,31 +1085,47 @@ describe("useCompanion evolveCompanion", () => {
 
     await act(async () => {
       await result.current.createCompanion.mutateAsync({
-        presetId: null,
+        creationMode: "ai",
         favoriteColor: "#000000",
-        spiritAnimal: "Egg",
-        coreElement: "void",
+        spiritAnimal: "Wolf",
+        coreElement: "ice",
         storyTone: "epic_adventure",
       });
     });
 
+    expect(mocks.invokeMock).toHaveBeenCalledWith("generate-companion-image", {
+      body: {
+        spiritAnimal: "Wolf",
+        element: "ice",
+        stage: 0,
+        favoriteColor: "#000000",
+        storyTone: "epic_adventure",
+        flowType: "ai_onboarding_egg",
+      },
+    });
     expect(mocks.rpcMock).toHaveBeenCalledWith(
       "create_companion_if_not_exists",
       expect.objectContaining({
         p_preset_id: null,
-        p_spirit_animal: "Egg",
-        p_core_element: "void",
-        p_current_image_url: "/companion-eggs/egg__t0_egg__normal__void.png",
-        p_current_image_focal_x: 0.486804,
-        p_current_image_focal_y: 0.429688,
-        p_initial_image_url: "/companion-eggs/egg__t0_egg__normal__void.png",
-        p_initial_image_focal_x: 0.486804,
-        p_initial_image_focal_y: 0.429688,
+        p_spirit_animal: "Wolf",
+        p_core_element: "ice",
+        p_current_image_url: aiEggGenerationFixture.imageUrl,
+        p_current_image_focal_x: aiEggGenerationFixture.imageFocalX,
+        p_current_image_focal_y: aiEggGenerationFixture.imageFocalY,
+        p_initial_image_url: aiEggGenerationFixture.imageUrl,
+        p_initial_image_focal_x: aiEggGenerationFixture.imageFocalX,
+        p_initial_image_focal_y: aiEggGenerationFixture.imageFocalY,
+        p_visual_identity_profile: aiEggGenerationFixture.visualIdentityProfile,
+        p_image_lineage_metadata: aiEggGenerationFixture.imageLineageMetadata,
       }),
     );
   });
 
   it("retries egg-first creation against the preset-aware legacy RPC signature when focal args are unavailable", async () => {
+    mocks.invokeMock.mockResolvedValueOnce({
+      data: aiEggGenerationFixture,
+      error: null,
+    });
     mocks.rpcMock
       .mockResolvedValueOnce({
         data: null,
@@ -1091,10 +1140,10 @@ describe("useCompanion evolveCompanion", () => {
         data: [
           {
             ...companionFixture,
-            spirit_animal: "Egg",
-            core_element: "void",
-            current_image_url: "/companion-eggs/egg__t0_egg__normal__void.png",
-            initial_image_url: "/companion-eggs/egg__t0_egg__normal__void.png",
+            spirit_animal: "Wolf",
+            core_element: "ice",
+            current_image_url: aiEggGenerationFixture.imageUrl,
+            initial_image_url: aiEggGenerationFixture.imageUrl,
             is_new: true,
           },
         ],
@@ -1106,10 +1155,10 @@ describe("useCompanion evolveCompanion", () => {
     let createdCompanion: Awaited<ReturnType<typeof result.current.createCompanion.mutateAsync>>;
     await act(async () => {
       createdCompanion = await result.current.createCompanion.mutateAsync({
-        presetId: null,
+        creationMode: "ai",
         favoriteColor: "#000000",
-        spiritAnimal: "Egg",
-        coreElement: "void",
+        spiritAnimal: "Wolf",
+        coreElement: "ice",
         storyTone: "epic_adventure",
       });
     });
@@ -1117,7 +1166,7 @@ describe("useCompanion evolveCompanion", () => {
     expect(createdCompanion!).toMatchObject({
       id: companionFixture.id,
       preset_id: null,
-      spirit_animal: "Egg",
+      spirit_animal: "Wolf",
     });
     expect(mocks.rpcMock).toHaveBeenCalledTimes(2);
     expect(mocks.rpcMock).toHaveBeenNthCalledWith(
@@ -1125,7 +1174,9 @@ describe("useCompanion evolveCompanion", () => {
       "create_companion_if_not_exists",
       expect.objectContaining({
         p_preset_id: null,
-        p_spirit_animal: "Egg",
+        p_spirit_animal: "Wolf",
+        p_visual_identity_profile: aiEggGenerationFixture.visualIdentityProfile,
+        p_image_lineage_metadata: aiEggGenerationFixture.imageLineageMetadata,
       }),
     );
     expect(mocks.rpcMock).toHaveBeenNthCalledWith(
@@ -1133,16 +1184,22 @@ describe("useCompanion evolveCompanion", () => {
       "create_companion_if_not_exists",
       expect.objectContaining({
         p_preset_id: null,
-        p_spirit_animal: "Egg",
+        p_spirit_animal: "Wolf",
       }),
     );
     expect(mocks.rpcMock.mock.calls[1]?.[1]).not.toHaveProperty("p_current_image_focal_x");
     expect(mocks.rpcMock.mock.calls[1]?.[1]).not.toHaveProperty("p_current_image_focal_y");
     expect(mocks.rpcMock.mock.calls[1]?.[1]).not.toHaveProperty("p_initial_image_focal_x");
     expect(mocks.rpcMock.mock.calls[1]?.[1]).not.toHaveProperty("p_initial_image_focal_y");
+    expect(mocks.rpcMock.mock.calls[1]?.[1]).not.toHaveProperty("p_visual_identity_profile");
+    expect(mocks.rpcMock.mock.calls[1]?.[1]).not.toHaveProperty("p_image_lineage_metadata");
   });
 
   it("retries egg-first creation against the pre-preset legacy RPC signature when preset-aware creation is unavailable", async () => {
+    mocks.invokeMock.mockResolvedValueOnce({
+      data: aiEggGenerationFixture,
+      error: null,
+    });
     mocks.rpcMock
       .mockResolvedValueOnce({
         data: null,
@@ -1166,10 +1223,10 @@ describe("useCompanion evolveCompanion", () => {
         data: [
           {
             ...companionFixture,
-            spirit_animal: "Egg",
-            core_element: "void",
-            current_image_url: "/companion-eggs/egg__t0_egg__normal__void.png",
-            initial_image_url: "/companion-eggs/egg__t0_egg__normal__void.png",
+            spirit_animal: "Wolf",
+            core_element: "ice",
+            current_image_url: aiEggGenerationFixture.imageUrl,
+            initial_image_url: aiEggGenerationFixture.imageUrl,
             is_new: true,
           },
         ],
@@ -1181,16 +1238,16 @@ describe("useCompanion evolveCompanion", () => {
     await act(async () => {
       await expect(
         result.current.createCompanion.mutateAsync({
-          presetId: null,
+          creationMode: "ai",
           favoriteColor: "#000000",
-          spiritAnimal: "Egg",
-          coreElement: "void",
+          spiritAnimal: "Wolf",
+          coreElement: "ice",
           storyTone: "epic_adventure",
         }),
       ).resolves.toMatchObject({
         id: companionFixture.id,
         preset_id: null,
-        spirit_animal: "Egg",
+        spirit_animal: "Wolf",
       });
     });
 
@@ -1200,11 +1257,15 @@ describe("useCompanion evolveCompanion", () => {
     expect(mocks.rpcMock.mock.calls[1]?.[1]).not.toHaveProperty("p_current_image_focal_y");
     expect(mocks.rpcMock.mock.calls[1]?.[1]).not.toHaveProperty("p_initial_image_focal_x");
     expect(mocks.rpcMock.mock.calls[1]?.[1]).not.toHaveProperty("p_initial_image_focal_y");
+    expect(mocks.rpcMock.mock.calls[1]?.[1]).not.toHaveProperty("p_visual_identity_profile");
+    expect(mocks.rpcMock.mock.calls[1]?.[1]).not.toHaveProperty("p_image_lineage_metadata");
     expect(mocks.rpcMock.mock.calls[2]?.[1]).not.toHaveProperty("p_preset_id");
     expect(mocks.rpcMock.mock.calls[2]?.[1]).not.toHaveProperty("p_current_image_focal_x");
     expect(mocks.rpcMock.mock.calls[2]?.[1]).not.toHaveProperty("p_current_image_focal_y");
     expect(mocks.rpcMock.mock.calls[2]?.[1]).not.toHaveProperty("p_initial_image_focal_x");
     expect(mocks.rpcMock.mock.calls[2]?.[1]).not.toHaveProperty("p_initial_image_focal_y");
+    expect(mocks.rpcMock.mock.calls[2]?.[1]).not.toHaveProperty("p_visual_identity_profile");
+    expect(mocks.rpcMock.mock.calls[2]?.[1]).not.toHaveProperty("p_image_lineage_metadata");
   });
 
   it("retries preset-based creation against the preset-aware legacy RPC signature when focal args are unavailable", async () => {
@@ -1238,6 +1299,7 @@ describe("useCompanion evolveCompanion", () => {
     await act(async () => {
       await expect(
         result.current.createCompanion.mutateAsync({
+          creationMode: "preset",
           presetId: "wolf",
           favoriteColor: "#FF6B35",
           spiritAnimal: "Wolf",
@@ -1285,6 +1347,7 @@ describe("useCompanion evolveCompanion", () => {
     await act(async () => {
       await expect(
         result.current.createCompanion.mutateAsync({
+          creationMode: "preset",
           presetId: "wolf",
           favoriteColor: "#FF6B35",
           spiritAnimal: "Wolf",
@@ -1303,15 +1366,19 @@ describe("useCompanion evolveCompanion", () => {
   });
 
   it("does not fail onboarding when stage 0 evolution is not readable yet", async () => {
+    mocks.invokeMock.mockResolvedValueOnce({
+      data: aiEggGenerationFixture,
+      error: null,
+    });
     mocks.rpcMock.mockResolvedValueOnce({
       data: [
         {
           ...companionFixture,
           preset_id: null,
-          spirit_animal: "Egg",
-          core_element: "void",
-          current_image_url: "/companion-eggs/egg__t0_egg__normal__void.png",
-          initial_image_url: "/companion-eggs/egg__t0_egg__normal__void.png",
+          spirit_animal: "Wolf",
+          core_element: "ice",
+          current_image_url: aiEggGenerationFixture.imageUrl,
+          initial_image_url: aiEggGenerationFixture.imageUrl,
           is_new: true,
         },
       ],
@@ -1324,10 +1391,10 @@ describe("useCompanion evolveCompanion", () => {
     let createdCompanion: Awaited<ReturnType<typeof result.current.createCompanion.mutateAsync>>;
     await act(async () => {
       createdCompanion = await result.current.createCompanion.mutateAsync({
-        presetId: null,
+        creationMode: "ai",
         favoriteColor: "#000000",
-        spiritAnimal: "Egg",
-        coreElement: "void",
+        spiritAnimal: "Wolf",
+        coreElement: "ice",
         storyTone: "epic_adventure",
       });
     });
@@ -1335,7 +1402,7 @@ describe("useCompanion evolveCompanion", () => {
     expect(createdCompanion!).toMatchObject({
       id: companionFixture.id,
       preset_id: null,
-      spirit_animal: "Egg",
+      spirit_animal: "Wolf",
     });
     expect(mocks.loggerWarnMock).toHaveBeenCalledWith(
       "Stage 0 evolution missing after companion creation",
@@ -1345,7 +1412,20 @@ describe("useCompanion evolveCompanion", () => {
     );
   });
 
-  it("holds manual evolution until hatch selection is completed", async () => {
+  it("holds manual evolution until hatch selection is completed for structurally incomplete legacy eggs", async () => {
+    mocks.userCompanionResponses.length = 0;
+    mocks.userCompanionResponses.push({
+      data: {
+        ...companionFixture,
+        preset_id: null,
+        spirit_animal: "Egg",
+        current_stage: 0,
+        current_image_url: null,
+        initial_image_url: null,
+      },
+      error: null,
+    });
+
     const { result } = await renderUseCompanion();
 
     expect(result.current.requiresHatchSelection).toBe(true);
@@ -1780,8 +1860,8 @@ describe("useCompanion evolveCompanion", () => {
         p_companion_id: companionFixture.id,
         p_preset_id: "dragon",
         p_initial_image_url: companionFixture.current_image_url,
-        p_initial_image_focal_x: null,
-        p_initial_image_focal_y: null,
+        p_initial_image_focal_x: 0.5,
+        p_initial_image_focal_y: 0.5,
         p_current_image_url: "/companion-presets/dragon/t1_youth/normal/dragon__t1_youth__normal__fire.png",
         p_current_image_focal_x: expect.any(Number),
         p_current_image_focal_y: expect.any(Number),

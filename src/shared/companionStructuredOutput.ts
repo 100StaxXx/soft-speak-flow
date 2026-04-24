@@ -61,6 +61,22 @@ export interface CompanionDayAdjustStructuredOutput {
   dropOrShrink: CompanionSuggestedQuest[];
 }
 
+export type CompanionCampaignStatus =
+  | "moving"
+  | "drifting"
+  | "stalled"
+  | "at_risk";
+
+export interface CompanionCampaignMomentumStructuredOutput {
+  message: string;
+  campaignId: string | null;
+  campaignTitle: string | null;
+  status: CompanionCampaignStatus | null;
+  statusReason: string | null;
+  nextStep: CompanionSuggestedQuest | null;
+  supportActions: CompanionSuggestedQuest[];
+}
+
 export interface CompanionScheduleItem {
   id: string;
   title: string;
@@ -83,6 +99,7 @@ export interface CompanionMissedItem {
 export interface CompanionComingUpStructuredOutput {
   message: string;
   nextEvent: CompanionScheduleItem | null;
+  nextBestAction: CompanionSuggestedQuest | null;
   remainingToday: CompanionScheduleItem[];
   tomorrowSummary: CompanionTomorrowSummary;
   missedItems: CompanionMissedItem[];
@@ -94,4 +111,5 @@ export interface CompanionStructuredResponse {
   comingUp?: CompanionComingUpStructuredOutput | null;
   rightNow?: CompanionRightNowStructuredOutput | null;
   dayAdjust?: CompanionDayAdjustStructuredOutput | null;
+  campaignMomentum?: CompanionCampaignMomentumStructuredOutput | null;
 }
