@@ -1058,7 +1058,7 @@ export function useCompanionAssistant({
 
       await submitMessage(launchMessage, "text", {
         starterIntent: launchIntent.starterIntent,
-        planningMode: launchIntent.planningMode ?? null,
+        planningMode: launchIntent.planningMode,
       });
       onLaunchIntentConsumed?.(intentId);
     })();
