@@ -4721,7 +4721,7 @@ Deno.test("plan_week returns a structured weekly summary with priorities and loa
           id: "event-1",
           title: "Launch workshop",
           start: "2026-04-20T17:00:00.000Z",
-          end: "2026-04-20T20:30:00.000Z",
+          end: "2026-04-20T22:30:00.000Z",
           isAllDay: false,
           provider: "google",
           readOnly: true,
