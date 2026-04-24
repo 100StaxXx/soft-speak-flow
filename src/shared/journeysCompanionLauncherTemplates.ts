@@ -1,4 +1,5 @@
 import { COMPANION_PLANNER_SURFACE_ACTIONS } from "@/shared/companionPlannerSurfaceActions";
+import type { CompanionPlanningMode } from "@/shared/companionPlanningMode";
 import type { CompanionPlannerLaunchTarget, CompanionPlannerStarterIntent } from "@/types/companionPlanner";
 
 export interface JourneysCompanionLauncherTemplate {
@@ -7,6 +8,8 @@ export interface JourneysCompanionLauncherTemplate {
     | "plan-day"
     | "advance-campaign"
     | "adjust-day"
+    | "low-energy"
+    | "what-matters"
     | "right-now"
     | "upcoming"
     | "quest"
@@ -15,6 +18,7 @@ export interface JourneysCompanionLauncherTemplate {
   message: string;
   target: CompanionPlannerLaunchTarget;
   starterIntent: CompanionPlannerStarterIntent;
+  planningMode?: CompanionPlanningMode | null;
 }
 
 const FREE_TALK_GREETINGS = [

@@ -2,12 +2,15 @@ import type {
   CompanionPlannerLaunchTarget,
   CompanionPlannerStarterIntent,
 } from "@/types/companionPlanner";
+import type { CompanionPlanningMode } from "@/shared/companionPlanningMode";
 
 export interface CompanionPlannerSurfaceAction {
   id:
     | "plan-day"
     | "advance-campaign"
     | "adjust-day"
+    | "low-energy"
+    | "what-matters"
     | "right-now"
     | "upcoming"
     | "quest"
@@ -16,6 +19,7 @@ export interface CompanionPlannerSurfaceAction {
   message: string;
   target: CompanionPlannerLaunchTarget;
   starterIntent: CompanionPlannerStarterIntent;
+  planningMode?: CompanionPlanningMode | null;
 }
 
 export const COMPANION_PLANNER_SURFACE_ACTIONS: CompanionPlannerSurfaceAction[] =
@@ -40,6 +44,21 @@ export const COMPANION_PLANNER_SURFACE_ACTIONS: CompanionPlannerSurfaceAction[] 
       message: "Adjust my day",
       target: "planner",
       starterIntent: "adjust_today",
+    },
+    {
+      id: "low-energy",
+      label: "I'm low energy",
+      message: "I'm low energy today",
+      target: "planner",
+      starterIntent: "low_energy_adjust",
+      planningMode: "recovery",
+    },
+    {
+      id: "what-matters",
+      label: "What matters most?",
+      message: "What matters most today?",
+      target: "planner",
+      starterIntent: "what_matters",
     },
     {
       id: "right-now",

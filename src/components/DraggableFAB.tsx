@@ -165,6 +165,7 @@ export const DraggableFAB = ({ onOpenCompanionPlanner, onTap }: DraggableFABProp
       starterIntent: template.starterIntent,
       target: template.target,
       briefingContext: null,
+      planningMode: template.planningMode ?? null,
     };
     onOpenCompanionPlanner(launchIntent);
   }, [closeMenu, launcherTemplates, onOpenCompanionPlanner]);

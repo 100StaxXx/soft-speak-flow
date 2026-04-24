@@ -60,7 +60,7 @@ describe("journeys companion launcher greetings", () => {
     });
     expect(templates[0]?.label).toBe(templates[0]?.message);
 
-    expect(templates[1]).toMatchObject({
+    expect(templates.find((template) => template.id === "plan-day")).toMatchObject({
       id: "plan-day",
       label: "Plan my day",
       message: "Plan my day",
@@ -68,7 +68,7 @@ describe("journeys companion launcher greetings", () => {
       starterIntent: "plan_day",
     });
 
-    expect(templates[2]).toMatchObject({
+    expect(templates.find((template) => template.id === "advance-campaign")).toMatchObject({
       id: "advance-campaign",
       label: "Advance my campaign",
       message: "Advance my campaign",
@@ -76,7 +76,7 @@ describe("journeys companion launcher greetings", () => {
       starterIntent: "advance_campaign_start",
     });
 
-    expect(templates[3]).toMatchObject({
+    expect(templates.find((template) => template.id === "adjust-day")).toMatchObject({
       id: "adjust-day",
       label: "Adjust my day",
       message: "Adjust my day",
@@ -84,7 +84,24 @@ describe("journeys companion launcher greetings", () => {
       starterIntent: "adjust_today",
     });
 
-    expect(templates[4]).toMatchObject({
+    expect(templates.find((template) => template.id === "low-energy")).toMatchObject({
+      id: "low-energy",
+      label: "I'm low energy",
+      message: "I'm low energy today",
+      target: "planner",
+      starterIntent: "low_energy_adjust",
+      planningMode: "recovery",
+    });
+
+    expect(templates.find((template) => template.id === "what-matters")).toMatchObject({
+      id: "what-matters",
+      label: "What matters most?",
+      message: "What matters most today?",
+      target: "planner",
+      starterIntent: "what_matters",
+    });
+
+    expect(templates.find((template) => template.id === "right-now")).toMatchObject({
       id: "right-now",
       label: "What should I do right now?",
       message: "What should I do right now?",

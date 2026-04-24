@@ -75,6 +75,16 @@ const existingCompanion = {
   },
   error: null,
 };
+const existingAiCompanion = {
+  data: {
+    id: "companion-1",
+    preset_id: null,
+    current_stage: 2,
+    current_image_url: "https://example.com/ai-stage-2.png",
+    initial_image_url: "https://example.com/ai-egg.png",
+  },
+  error: null,
+};
 const presetCompanionWithoutStoredImages = {
   data: {
     id: "companion-1",
@@ -180,6 +190,29 @@ describe("getAuthRedirectPath", () => {
       onboarding_completed: true,
       onboarding_data: {
         guided_tutorial: { completed: false },
+        walkthrough_completed: true,
+      },
+    });
+  });
+
+  it("routes established AI companions to /tasks and self-heals stale onboarding flags", async () => {
+    mocks.profilesMaybeSingleMock.mockResolvedValueOnce({
+      data: {
+        selected_mentor_id: "mentor-2",
+        onboarding_completed: false,
+        onboarding_data: {},
+      },
+      error: null,
+    });
+    mocks.companionMaybeSingleMock.mockResolvedValueOnce(existingAiCompanion);
+
+    await expect(getAuthRedirectPath("ai-companion-user")).resolves.toBe("/tasks");
+    await flushMicrotasks();
+
+    expect(mocks.profilesUpdateEqMock).toHaveBeenCalledWith("id", "ai-companion-user");
+    expect(mocks.profilesUpdateMock).toHaveBeenCalledWith({
+      onboarding_completed: true,
+      onboarding_data: {
         walkthrough_completed: true,
       },
     });

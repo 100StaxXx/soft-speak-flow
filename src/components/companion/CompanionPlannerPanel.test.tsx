@@ -189,6 +189,8 @@ describe("CompanionPlannerPanel", () => {
 
     fireEvent.click(screen.getByTestId("companion-quick-action-plan-day"));
     fireEvent.click(screen.getByTestId("companion-quick-action-advance-campaign"));
+    fireEvent.click(screen.getByTestId("companion-quick-action-low-energy"));
+    fireEvent.click(screen.getByTestId("companion-quick-action-what-matters"));
     fireEvent.click(screen.getByTestId("companion-quick-action-upcoming"));
 
     expect(mocks.assistant.submitMessage).toHaveBeenNthCalledWith(
@@ -205,10 +207,23 @@ describe("CompanionPlannerPanel", () => {
     );
     expect(mocks.assistant.submitMessage).toHaveBeenNthCalledWith(
       3,
+      "I'm low energy today",
+      "text",
+      { starterIntent: "low_energy_adjust" },
+    );
+    expect(mocks.assistant.submitMessage).toHaveBeenNthCalledWith(
+      4,
+      "What matters most today?",
+      "text",
+      { starterIntent: "what_matters" },
+    );
+    expect(mocks.assistant.submitMessage).toHaveBeenNthCalledWith(
+      5,
       "What do I have coming up?",
       "text",
       { starterIntent: "upcoming_start" },
     );
+    expect(mocks.planningMode.setPlanningMode).toHaveBeenCalledWith("recovery");
 
     mocks.state.pendingAction = previousPendingAction;
   });

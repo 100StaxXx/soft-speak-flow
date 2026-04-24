@@ -47,7 +47,7 @@ export interface CompanionImageLineageMetadata {
 export interface CompanionGenerationMetadata {
   provider: string;
   model: string;
-  sourceType: "generation" | "edit" | "reveal" | "reuse";
+  sourceType: "generation" | "edit" | "reveal" | "reuse" | "legacy_backfill";
   promptVersion: string;
   boundaryLevel: number;
   portraitRegenerated: boolean;

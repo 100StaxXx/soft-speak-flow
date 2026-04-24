@@ -937,6 +937,20 @@ serve(async (req) => {
     }
 
     // ========================================================================
+    // LEGACY COMPATIBILITY PIPELINE
+    // The modern AI onboarding flow returns early above with the stage-1-first
+    // OpenAI Image API bootstrap. The code below is intentionally kept for
+    // admin/testing/sample-card callers that still rely on the older
+    // metadata-extraction + Gemini-backed rendering path.
+    // ========================================================================
+    console.info("[CompanionImage] Using legacy compatibility render pipeline", {
+      flowType: normalizedFlowType,
+      stage,
+      hasPreviousStageImageUrl: Boolean(previousStageImageUrl),
+      companionId: companionId ?? null,
+    });
+
+    // ========================================================================
     // VISUAL METADATA EXTRACTION FOR CONSISTENCY (Stages 2-14)
     // Instead of I2I (too similar), we analyze the previous image and inject
     // the extracted visual metadata into the T2I prompt for consistency

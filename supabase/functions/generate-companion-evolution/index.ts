@@ -394,9 +394,11 @@ serve(async (req) => {
     });
     const imageLineageMetadata = coerceImageLineageMetadata(companion.image_lineage_metadata);
 
-    if (nextStage === 1) {
-      const hiddenStageOneAnchor = getHiddenBoundaryAnchor(companion.image_lineage_metadata, 1);
-      if (hiddenStageOneAnchor?.imageUrl) {
+    const hiddenStageOneAnchor = nextStage === 1
+      ? getHiddenBoundaryAnchor(companion.image_lineage_metadata, 1)
+      : null;
+
+    if (nextStage === 1 && hiddenStageOneAnchor?.imageUrl) {
         const lineageMetadataAfterReveal = updateLineageMetadataAfterReveal({
           existing: companion.image_lineage_metadata,
           revealedLevel: 1,
@@ -450,7 +452,15 @@ serve(async (req) => {
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
-      }
+    }
+
+    const isLegacyStageOneBackfill = nextStage === 1 && !hiddenStageOneAnchor?.imageUrl;
+    if (isLegacyStageOneBackfill) {
+      console.info("[CompanionEvolution] Missing hidden stage-1 anchor for AI companion; generating legacy backfill stage 1", {
+        companionId: companion.id,
+        currentStage,
+        nextStage,
+      });
     }
 
     if (!shouldGeneratePortraitForStage(nextStage)) {
@@ -651,12 +661,14 @@ serve(async (req) => {
         focalY: stageOneFocalY,
       });
       const generationMetadata = buildCompanionGenerationMetadata({
-        sourceType: "generation",
+        sourceType: isLegacyStageOneBackfill ? "legacy_backfill" : "generation",
         boundaryLevel: 1,
         portraitRegenerated: true,
         retryCount: stageOneAttempt.retryCount,
         scores: stageOneAttempt.scores ?? undefined,
-        notes: stageOneAttempt.scores?.notes ?? stageOneAttempt.revisedPrompt,
+        notes: isLegacyStageOneBackfill
+          ? "Legacy AI companion missing hidden stage-1 anchor; generated stage-1 backfill from traits."
+          : stageOneAttempt.scores?.notes ?? stageOneAttempt.revisedPrompt,
       });
 
       const evolutionRecord = await upsertEvolutionRecord({

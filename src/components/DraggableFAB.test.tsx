@@ -280,6 +280,20 @@ describe("DraggableFAB", () => {
     }));
   });
 
+  it("routes the low-energy option through the planner with recovery mode preselected", () => {
+    render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
+
+    fireEvent.click(screen.getByTestId("journeys-companion-launcher-floating"));
+    fireEvent.click(screen.getByTestId("journeys-companion-launcher-option-low-energy"));
+
+    expect(mocks.onOpenCompanionPlanner).toHaveBeenCalledWith(expect.objectContaining({
+      target: "planner",
+      starterIntent: "low_energy_adjust",
+      message: "I'm low energy today",
+      planningMode: "recovery",
+    }));
+  });
+
   it("routes the quest option through the planner as a one-prompt quest capture starter", () => {
     render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
 

@@ -1510,6 +1510,61 @@ describe("useCompanion evolveCompanion", () => {
     expect(mocks.setIsEvolvingLoadingMock).toHaveBeenCalledWith(true);
   });
 
+  it("routes AI eggs through generate-companion-evolution instead of the preset hatch RPC", async () => {
+    mocks.userCompanionResponses.length = 0;
+    mocks.userCompanionResponses.push(
+      {
+        data: {
+          ...companionFixture,
+          preset_id: null,
+          spirit_animal: "Wolf",
+          core_element: "ice",
+          current_stage: 0,
+          current_xp: 14,
+          current_image_url: aiEggGenerationFixture.imageUrl,
+          initial_image_url: aiEggGenerationFixture.imageUrl,
+        },
+        error: null,
+      },
+      {
+        data: {
+          ...companionFixture,
+          preset_id: null,
+          spirit_animal: "Wolf",
+          core_element: "ice",
+          current_stage: 0,
+          current_xp: 14,
+          current_image_url: aiEggGenerationFixture.imageUrl,
+          initial_image_url: aiEggGenerationFixture.imageUrl,
+        },
+        error: null,
+      },
+    );
+    mocks.invokeMock.mockResolvedValueOnce({
+      data: { evolved: true, new_stage: 1 },
+      error: null,
+    });
+
+    const { result } = await renderUseCompanion();
+
+    expect(result.current.requiresHatchSelection).toBe(false);
+    expect(result.current.canEvolve).toBe(true);
+
+    act(() => {
+      result.current.triggerManualEvolution();
+    });
+
+    await waitFor(() => {
+      expect(mocks.invokeMock).toHaveBeenCalledWith("generate-companion-evolution", { body: {} });
+    });
+
+    expect(mocks.rpcMock).not.toHaveBeenCalledWith(
+      "hatch_companion_with_preset",
+      expect.anything(),
+    );
+    expect(mocks.setIsEvolvingLoadingMock).toHaveBeenCalledWith(true);
+  });
+
   it("emits a local hatch-start event before invalidating companion queries", async () => {
     const dispatchSpy = vi.spyOn(window, "dispatchEvent");
     mocks.invokeMock.mockImplementation((fnName: string) => {

@@ -135,6 +135,8 @@ export const CompanionPlannerPanel = memo(() => {
                 "plan-day",
                 "advance-campaign",
                 "adjust-day",
+                "low-energy",
+                "what-matters",
                 "right-now",
                 "upcoming",
               ].includes(
@@ -149,6 +151,9 @@ export const CompanionPlannerPanel = memo(() => {
                 disabled={quickActionsDisabled}
                 data-testid={`companion-quick-action-${action.id}`}
                 onClick={() => {
+                  if (action.planningMode) {
+                    assistant.setPlanningMode(action.planningMode);
+                  }
                   void assistant.submitMessage(action.message, "text", {
                     starterIntent: action.starterIntent,
                   });
@@ -160,6 +165,10 @@ export const CompanionPlannerPanel = memo(() => {
                   ? "Advance My Campaign"
                   : action.id === "adjust-day"
                   ? "Adjust My Day"
+                  : action.id === "low-energy"
+                  ? "Low Energy"
+                  : action.id === "what-matters"
+                  ? "What Matters"
                   : action.id === "right-now"
                   ? "Right Now"
                   : "Coming Up"}

@@ -3562,11 +3562,11 @@ const buildComingUpNextBestAction = (
     );
   }
 
-  const campaignCandidate = buildComingUpCampaignNextBestAction(
-    input,
+  const campaignCandidate = buildCampaignWindowNextBestAction(input, {
+    availableMinutes: minutesUntilNextEvent,
+    context: "coming_up",
     nextEvent,
-    minutesUntilNextEvent,
-  );
+  });
   if (entries.length === 0) {
     return campaignCandidate?.suggestion ?? null;
   }
@@ -3611,11 +3611,15 @@ const buildComingUpNextBestAction = (
   );
 };
 
-const buildComingUpCampaignNextBestAction = (
+const buildCampaignWindowNextBestAction = (
   input: PlannerBuildInput,
-  nextEvent: CompanionScheduleItem | null,
-  minutesUntilNextEvent: number | null,
+  options: {
+    availableMinutes: number | null;
+    context: "coming_up" | "right_now";
+    nextEvent?: CompanionScheduleItem | null;
+  },
 ): { suggestion: CompanionSuggestedQuest; priorityScore: number } | null => {
+  const nextEvent = options.nextEvent ?? null;
   for (const score of getResolvedPriorityScores(input)) {
     if (score.kind !== "epic" || !score.epicId) continue;
 
@@ -3631,8 +3635,8 @@ const buildComingUpCampaignNextBestAction = (
     if (linkedTask) {
       const duration = getTaskDuration(linkedTask);
       if (
-        minutesUntilNextEvent !== null &&
-        duration > Math.max(15, minutesUntilNextEvent)
+        options.availableMinutes !== null &&
+        duration > Math.max(15, options.availableMinutes)
       ) {
         continue;
       }
@@ -3640,11 +3644,15 @@ const buildComingUpCampaignNextBestAction = (
       return {
         suggestion: buildSuggestedQuestFromTask(
           linkedTask,
-          nextEvent
+          options.context === "coming_up" && nextEvent
             ? campaignMomentum.tooManyCampaigns
               ? `This protects the clearest campaign move before ${nextEvent.title} while too many active campaigns are competing for attention.`
               : `This is the cleanest campaign move you can finish before ${nextEvent.title}.`
-            : campaignMomentum.statusReason,
+            : campaignMomentum.tooManyCampaigns
+            ? "Too many active campaigns are competing for attention, and this is the cleanest move to stop the drift right now."
+            : campaignMomentum.status === "at_risk"
+            ? "This is the clearest concrete move to stop the campaign from slipping right now."
+            : "This is the cleanest campaign move to use this window well.",
           {
             type: mapPriorityScoreToSuggestedQuestType(score.score, linkedTask),
           },
@@ -3655,8 +3663,8 @@ const buildComingUpCampaignNextBestAction = (
 
     const suggestionDuration = campaignMomentum.oversizedTask ? 20 : 15;
     if (
-      minutesUntilNextEvent !== null &&
-      suggestionDuration > Math.max(15, minutesUntilNextEvent)
+      options.availableMinutes !== null &&
+      suggestionDuration > Math.max(15, options.availableMinutes)
     ) {
       continue;
     }
@@ -3674,8 +3682,10 @@ const buildComingUpCampaignNextBestAction = (
         estimatedDuration: formatEstimatedDurationLabel(suggestionDuration),
         estimatedDurationMinutes: suggestionDuration,
         source: "campaign",
-        reason: nextEvent
+        reason: options.context === "coming_up" && nextEvent
           ? `This gives ${epic.title} a clean foothold before ${nextEvent.title} instead of letting the campaign keep drifting.`
+          : campaignMomentum.oversizedTask
+          ? `This campaign needs a smaller restart move, and breaking down ${campaignMomentum.oversizedTask.title} is the cleanest use of this window.`
           : `${campaignMomentum.statusReason} This is the cleanest restart move right now.`,
       },
       priorityScore: score.score,
@@ -6262,24 +6272,36 @@ const buildRightNowStarterResponse = (
     ) ??
       entries.find(({ task }) => getTaskDuration(task) <= availableMinutes) ??
       null;
+  const campaignCandidate = buildCampaignWindowNextBestAction(input, {
+    availableMinutes,
+    context: "right_now",
+  });
 
-  const chosen = inProgress ?? upcoming ?? fitCandidate;
-  const recommendedAction = chosen
+  const chosenTask = inProgress ?? upcoming ??
+    (
+      campaignCandidate &&
+        (!fitCandidate || campaignCandidate.priorityScore > fitCandidate.score.score)
+      ? null
+      : fitCandidate
+    );
+  const recommendedAction = chosenTask
     ? buildSuggestedQuestFromTask(
-      chosen.task,
+      chosenTask.task,
       inProgress
         ? "It's already in your active window, so sticking with it is the cleanest move."
         : upcoming
         ? "It's the next scheduled move, so starting there keeps the day on track."
-        : chosen.score.reasons[0] ??
+        : chosenTask.score.reasons[0] ??
           "It fits the current window without crowding the rest of the day.",
       {
         type: mapPriorityScoreToSuggestedQuestType(
-          chosen.score.score,
-          chosen.task,
+          chosenTask.score.score,
+          chosenTask.task,
         ),
       },
     )
+    : campaignCandidate
+    ? campaignCandidate.suggestion
     : null;
 
   const missedTask = collectMissedTasksForToday(input)[0];
@@ -6377,6 +6399,48 @@ const buildDayAdjustStructuredOutput = (
   },
 });
 
+const getDayAdjustCampaignProtectedTask = (
+  input: PlannerBuildInput,
+  entries: { score: PlannerPriorityScore; task: PlannerContextTask }[],
+): {
+  taskId: string;
+  campaignTitle: string;
+  status: CompanionCampaignStatus;
+  reason: string;
+} | null => {
+  const todayTaskIds = new Set(entries.map((entry) => entry.task.id));
+
+  for (const score of getResolvedPriorityScores(input)) {
+    if (score.kind !== "epic" || !score.epicId) continue;
+
+    const epic = input.plannerContext.activeEpics.find((candidate) =>
+      candidate.id === score.epicId
+    );
+    if (!epic) continue;
+
+    const campaignMomentum = buildCampaignMomentumCandidate(input, epic);
+    if (campaignMomentum.status === "moving") continue;
+
+    const linkedTask = selectCampaignNextTask(input, campaignMomentum);
+    if (!linkedTask || !todayTaskIds.has(linkedTask.id)) continue;
+
+    return {
+      taskId: linkedTask.id,
+      campaignTitle: epic.title,
+      status: campaignMomentum.status,
+      reason: campaignMomentum.tooManyCampaigns
+        ? `This is the campaign move to protect while too many active campaigns are competing for attention.`
+        : campaignMomentum.status === "at_risk"
+        ? `This is the clearest move to stop ${epic.title} from slipping today.`
+        : campaignMomentum.status === "stalled"
+        ? `This is the concrete restart move ${epic.title} needs today.`
+        : `This keeps ${epic.title} from drifting further today.`,
+    };
+  }
+
+  return null;
+};
+
 const buildDayAdjustResponse = (
   input: PlannerBuildInput,
   sessionState: PlannerSessionState,
@@ -6387,15 +6451,29 @@ const buildDayAdjustResponse = (
 ): PlannerBuildResult => {
   const entries = getTodayScoredTaskEntries(input);
   const protectCount = options?.lowEnergy ? 1 : 2;
+  const protectedCampaignTask = getDayAdjustCampaignProtectedTask(
+    input,
+    entries,
+  );
   const protectedIds = new Set(
     entries
       .filter((entry, index) =>
         index < protectCount || entry.task.habitSourceId ||
-        entry.task.priority === "high"
+        entry.task.priority === "high" ||
+        entry.task.id === protectedCampaignTask?.taskId
       )
       .map((entry) => entry.task.id),
   );
-  const keepEntries = entries.filter((entry) => protectedIds.has(entry.task.id))
+  const keepEntries = entries
+    .filter((entry) => protectedIds.has(entry.task.id))
+    .sort((left, right) => {
+      const leftProtected = left.task.id === protectedCampaignTask?.taskId ? 1 : 0;
+      const rightProtected = right.task.id === protectedCampaignTask?.taskId ? 1 : 0;
+      if (rightProtected !== leftProtected) {
+        return rightProtected - leftProtected;
+      }
+      return right.score.score - left.score.score;
+    })
     .slice(0, 3);
   const moveEntries = entries.filter((entry) =>
     !protectedIds.has(entry.task.id)
@@ -6413,7 +6491,9 @@ const buildDayAdjustResponse = (
   const keep = keepEntries.map((entry) =>
     buildSuggestedQuestFromTask(
       entry.task,
-      entry.score.reasons[0] ??
+      entry.task.id === protectedCampaignTask?.taskId
+        ? protectedCampaignTask.reason
+        : entry.score.reasons[0] ??
         "This is one of the strongest moves left for today.",
       {
         type: mapPriorityScoreToSuggestedQuestType(
@@ -6439,23 +6519,33 @@ const buildDayAdjustResponse = (
       input,
       proposal,
       options?.lowEnergy
-        ? "Move this out so today's core plan stays light."
+        ? protectedCampaignTask
+          ? `Move this out so today's core plan stays light while ${protectedCampaignTask.campaignTitle} keeps its foothold.`
+          : "Move this out so today's core plan stays light."
+        : protectedCampaignTask
+        ? `Move this out so ${protectedCampaignTask.campaignTitle} keeps the cleaner slot in today's plan.`
         : "Move this out so today's core plan stays realistic.",
     )
   );
   const dropOrShrink = dropEntries.map((entry) =>
     buildSuggestedQuestFromTask(
       entry.task,
-      "If time still feels tight, shrink this to a 15-minute pass or let it go today.",
+      protectedCampaignTask
+        ? `If time still feels tight, shrink this to a 15-minute pass or let it go so ${protectedCampaignTask.campaignTitle} keeps the space it needs.`
+        : "If time still feels tight, shrink this to a 15-minute pass or let it go today.",
       { type: "nice" },
     )
   );
 
   const reply = moveProposals.length > 0
     ? options?.lowEnergy
-      ? `I'm lightening today by protecting ${keep.length || 1} core move${
-        keep.length === 1 ? "" : "s"
-      }, shifting ${moveProposals.length}, and giving you permission to shrink the rest.`
+      ? protectedCampaignTask
+        ? `I'm lightening today by protecting the move that keeps ${protectedCampaignTask.campaignTitle} alive, shifting ${moveProposals.length}, and giving you permission to shrink the rest.`
+        : `I'm lightening today by protecting ${keep.length || 1} core move${
+          keep.length === 1 ? "" : "s"
+        }, shifting ${moveProposals.length}, and giving you permission to shrink the rest.`
+      : protectedCampaignTask
+      ? `I'm tightening today by protecting the move that keeps ${protectedCampaignTask.campaignTitle} from slipping, shifting ${moveProposals.length}, and trimming what doesn't need to stay.`
       : `I'm tightening today by protecting the strongest move${
         keep.length === 1 ? "" : "s"
       }, shifting ${moveProposals.length}, and trimming what doesn't need to stay.`

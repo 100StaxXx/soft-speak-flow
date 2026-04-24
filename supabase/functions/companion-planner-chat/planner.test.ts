@@ -2441,6 +2441,112 @@ Deno.test("right_now_start shifts between lighter and deeper work based on day m
   );
 });
 
+Deno.test("right_now_start can elevate a slipping campaign move over a generic task", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "What should I do right now?",
+    currentDate: "2026-04-18",
+    currentDateTime: "2026-04-18T10:30:00-07:00",
+    plannerContext: {
+      starterIntent: "right_now_start",
+      tasks: [
+        {
+          id: "task-admin",
+          title: "Reply to landlord email",
+          taskDate: "2026-04-18",
+          scheduledTime: null,
+          estimatedDuration: 20,
+          difficulty: "easy",
+          recurrencePattern: null,
+          completed: false,
+          priority: "medium",
+        },
+        {
+          id: "task-campaign",
+          title: "Outline launch email",
+          taskDate: null,
+          scheduledTime: null,
+          estimatedDuration: 30,
+          difficulty: "medium",
+          recurrencePattern: null,
+          completed: false,
+          priority: "high",
+          epicId: "epic-launch",
+          epicTitle: "Launch prep",
+        },
+      ],
+      activeEpics: [
+        {
+          id: "epic-launch",
+          title: "Launch prep",
+          progressPercentage: 28,
+          daysRemaining: 5,
+          endDate: "2026-04-23",
+        },
+      ],
+      priorityScores: [
+        {
+          id: "epic:epic-launch",
+          kind: "epic",
+          title: "Launch prep",
+          score: 86,
+          reasons: ["This campaign is starting to slip and needs a concrete move."],
+          epicId: "epic-launch",
+        },
+        {
+          id: "task:task-admin",
+          kind: "task",
+          title: "Reply to landlord email",
+          score: 42,
+          reasons: ["Useful admin cleanup, but not the highest-leverage move."],
+          taskId: "task-admin",
+          targetDate: "2026-04-18",
+          suggestedTime: null,
+        },
+      ],
+      scheduleInsights: {
+        horizon: "day",
+        selectedDate: "2026-04-18",
+        dayLoads: [
+          {
+            date: "2026-04-18",
+            totalMinutes: 20,
+            taskCount: 1,
+            status: "open",
+          },
+        ],
+        overloadedDates: [],
+        emptyDates: [],
+        conflicts: [],
+        suggestedSlots: [
+          {
+            date: "2026-04-18",
+            time: "10:30",
+            endTime: "11:00",
+            score: 90,
+            reason: "Open focus slot before lunch.",
+          },
+        ],
+        moveSuggestions: [],
+        summary: "You have a clean window for a meaningful move.",
+      },
+    },
+  }));
+
+  assertEquals(result.mode, "schedule_read");
+  assertEquals(
+    result.structuredResponse?.rightNow?.recommendedAction?.title,
+    "Outline launch email",
+  );
+  assertEquals(
+    result.structuredResponse?.rightNow?.recommendedAction?.source,
+    "campaign",
+  );
+  assertEquals(
+    result.structuredResponse?.rightNow?.fallbackAction ?? null,
+    null,
+  );
+});
+
 Deno.test("adjust_today returns structured keep-move-trim guidance", () => {
   const result = buildPlannerResponse(baseInput({
     message: "Adjust my day",
@@ -2530,6 +2636,145 @@ Deno.test("adjust_today returns structured keep-move-trim guidance", () => {
   assertEquals(
     (result.structuredResponse?.dayAdjust?.move.length ?? 0) > 0,
     true,
+  );
+});
+
+Deno.test("adjust_today protects a slipping campaign move before lower-leverage work", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Adjust my day",
+    currentDate: "2026-04-18",
+    plannerContext: {
+      starterIntent: "adjust_today",
+      tasks: [
+        {
+          id: "task-1",
+          title: "Finish investor memo",
+          taskDate: "2026-04-18",
+          scheduledTime: "13:00",
+          estimatedDuration: 90,
+          difficulty: "hard",
+          recurrencePattern: null,
+          completed: false,
+          priority: "high",
+        },
+        {
+          id: "task-2",
+          title: "Inbox cleanup",
+          taskDate: "2026-04-18",
+          scheduledTime: "16:00",
+          estimatedDuration: 30,
+          difficulty: "easy",
+          recurrencePattern: null,
+          completed: false,
+          priority: "medium",
+        },
+        {
+          id: "task-3",
+          title: "Renew insurance form",
+          taskDate: "2026-04-18",
+          scheduledTime: "17:00",
+          estimatedDuration: 30,
+          difficulty: "easy",
+          recurrencePattern: null,
+          completed: false,
+          priority: "medium",
+        },
+        {
+          id: "task-4",
+          title: "Outline launch email",
+          taskDate: "2026-04-18",
+          scheduledTime: "18:00",
+          estimatedDuration: 30,
+          difficulty: "medium",
+          recurrencePattern: null,
+          completed: false,
+          priority: "medium",
+          epicId: "epic-launch",
+          epicTitle: "Launch prep",
+        },
+      ],
+      activeEpics: [
+        {
+          id: "epic-launch",
+          title: "Launch prep",
+          progressPercentage: 28,
+          daysRemaining: 5,
+          endDate: "2026-04-23",
+        },
+      ],
+      priorityScores: [
+        {
+          id: "task:task-1",
+          kind: "task",
+          title: "Finish investor memo",
+          score: 88,
+          reasons: ["This is the strongest leverage move left today."],
+          taskId: "task-1",
+          targetDate: "2026-04-18",
+          suggestedTime: "13:00",
+        },
+        {
+          id: "task:task-2",
+          kind: "task",
+          title: "Inbox cleanup",
+          score: 74,
+          reasons: ["Useful, but not the highest-leverage move."],
+          taskId: "task-2",
+          targetDate: "2026-04-18",
+          suggestedTime: "16:00",
+        },
+        {
+          id: "task:task-3",
+          kind: "task",
+          title: "Renew insurance form",
+          score: 66,
+          reasons: ["This can move without breaking the day."],
+          taskId: "task-3",
+          targetDate: "2026-04-18",
+          suggestedTime: "17:00",
+        },
+        {
+          id: "epic:epic-launch",
+          kind: "epic",
+          title: "Launch prep",
+          score: 84,
+          reasons: ["This campaign is starting to slip and needs a concrete move."],
+          epicId: "epic-launch",
+        },
+        {
+          id: "task:task-4",
+          kind: "task",
+          title: "Outline launch email",
+          score: 48,
+          reasons: ["Helpful, but easy to postpone if you only rank raw tasks."],
+          taskId: "task-4",
+          targetDate: "2026-04-18",
+          suggestedTime: "18:00",
+        },
+      ],
+    },
+  }));
+
+  assertEquals(result.mode, "proposal");
+  assertStringIncludes(result.reply, "Launch prep");
+  assertEquals(result.structuredResponse?.dayAdjust !== null, true);
+  assertEquals(
+    result.structuredResponse?.dayAdjust?.keep.some((quest) =>
+      quest.title === "Outline launch email"
+    ),
+    true,
+  );
+  assertEquals(
+    result.structuredResponse?.dayAdjust?.move.some((quest) =>
+      quest.title === "Outline launch email"
+    ),
+    false,
+  );
+  assertStringIncludes(
+    result.structuredResponse?.dayAdjust?.keep.find((quest) =>
+      quest.title === "Outline launch email"
+    )?.reason ?? "",
+    "Launch prep",
   );
 });
 

@@ -720,6 +720,37 @@ describe("useCompanionAssistant", () => {
     });
   });
 
+  it("applies launcher planning modes before submitting the starter intent", async () => {
+    const { wrapper } = createWrapper();
+
+    renderHook(
+      () =>
+        useCompanionAssistant({
+          surface: "journeys",
+          launchIntent: {
+            id: "launch-recovery-1",
+            message: "I'm low energy today",
+            starterIntent: "low_energy_adjust",
+            planningMode: "recovery",
+          },
+        }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(mocks.supabaseInvoke).toHaveBeenCalledWith(
+        "companion-agent",
+        expect.objectContaining({
+          body: expect.objectContaining({
+            message: "I'm low energy today",
+            starterIntent: "low_energy_adjust",
+            planningMode: "recovery",
+          }),
+        }),
+      );
+    });
+  });
+
   it("keeps unified thread history dormant when the legacy fallback is active from the start", async () => {
     mocks.agentSurfaceEnabled = false;
 
