@@ -41,6 +41,7 @@ export type CompanionPendingActionType =
   | "ritual_create"
   | "reminder_create"
   | "campaign_update"
+  | "campaign_adjust"
   | "journal_entry";
 
 export interface CompanionAgentSelectedEntityIds {

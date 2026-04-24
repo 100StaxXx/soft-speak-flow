@@ -93,6 +93,7 @@ export interface PlannerProposal {
   title: string;
   summary: string;
   reasoning?: string | null;
+  suggestedType?: CompanionSuggestedQuest["type"];
   payload: Record<string, unknown>;
   status: "pending" | "confirmed" | "rejected";
   readyToConfirm: boolean;
@@ -482,6 +483,12 @@ export const normalizePlannerBuildResultText = (
           weeklyTheme: normalizePlannerDisplayText(
             result.structuredResponse.weeklyPlan.weeklyTheme,
           ),
+          focusCampaignTitle: normalizePlannerDisplayText(
+            result.structuredResponse.weeklyPlan.focusCampaignTitle,
+          ),
+          focusCampaignReason: normalizePlannerDisplayText(
+            result.structuredResponse.weeklyPlan.focusCampaignReason,
+          ),
           topPriorities: result.structuredResponse.weeklyPlan.topPriorities.map(
             (quest) => ({
               ...quest,
@@ -500,6 +507,62 @@ export const normalizePlannerBuildResultText = (
           ),
         }
         : result.structuredResponse.weeklyPlan,
+      priorityOverview: result.structuredResponse.priorityOverview
+        ? {
+          ...result.structuredResponse.priorityOverview,
+          title: normalizePlannerDisplayText(
+            result.structuredResponse.priorityOverview.title,
+          ),
+          message: normalizePlannerDisplayText(result.reply),
+          campaignPressure: normalizePlannerDisplayText(
+            result.structuredResponse.priorityOverview.campaignPressure,
+          ),
+          focusCampaignTitle: normalizePlannerDisplayText(
+            result.structuredResponse.priorityOverview.focusCampaignTitle,
+          ),
+          topPriorities: result.structuredResponse.priorityOverview.topPriorities
+            .map((quest) => ({
+              ...quest,
+              title: normalizePlannerDisplayText(quest.title),
+              estimatedDuration: normalizePlannerDisplayText(
+                quest.estimatedDuration,
+              ),
+              reason: normalizePlannerDisplayText(quest.reason),
+            })),
+        }
+        : result.structuredResponse.priorityOverview,
+      reflectionBridge: result.structuredResponse.reflectionBridge
+        ? {
+          ...result.structuredResponse.reflectionBridge,
+          message: normalizePlannerDisplayText(result.reply),
+          carryForward: normalizePlannerDisplayText(
+            result.structuredResponse.reflectionBridge.carryForward,
+          ),
+          firstAction: result.structuredResponse.reflectionBridge.firstAction
+            ? {
+              ...result.structuredResponse.reflectionBridge.firstAction,
+              title: normalizePlannerDisplayText(
+                result.structuredResponse.reflectionBridge.firstAction.title,
+              ),
+              estimatedDuration: normalizePlannerDisplayText(
+                result.structuredResponse.reflectionBridge.firstAction
+                  .estimatedDuration,
+              ),
+              reason: normalizePlannerDisplayText(
+                result.structuredResponse.reflectionBridge.firstAction.reason,
+              ),
+            }
+            : null,
+          tomorrowSchedule:
+            result.structuredResponse.reflectionBridge.tomorrowSchedule.map(
+              (item) => ({
+                ...item,
+                title: normalizePlannerDisplayText(item.title),
+                label: normalizePlannerDisplayText(item.label),
+              }),
+            ),
+        }
+        : result.structuredResponse.reflectionBridge,
       comingUp: result.structuredResponse.comingUp
         ? {
           ...result.structuredResponse.comingUp,
@@ -989,6 +1052,15 @@ const addDaysToDateKey = (value: string, days: number): string => {
   return formatDateKey(next);
 };
 
+const diffDateKeys = (start: string, end: string): number | null => {
+  const startDate = parseDateKey(start);
+  const endDate = parseDateKey(end);
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+    return null;
+  }
+  return Math.round((endDate.getTime() - startDate.getTime()) / 86_400_000);
+};
+
 const resolveWeekdayDate = (
   currentDate: string,
   weekday: string,
@@ -1244,6 +1316,13 @@ const inferPlannerStarterIntentFromMessage = (
     )
   ) {
     return "what_matters";
+  }
+  if (
+    !isScheduleQuestion(normalizedMessage) &&
+    /\b(prepare me for tomorrow|prep me for tomorrow|help me prepare for tomorrow|set me up for tomorrow|tomorrow prep)\b/
+      .test(normalizedMessage)
+  ) {
+    return "briefing_followup";
   }
   if (
     !isScheduleQuestion(normalizedMessage) &&
@@ -3680,17 +3759,28 @@ const buildCampaignWindowNextBestAction = (
           options.context === "coming_up" && nextEvent
             ? campaignMomentum.tooManyCampaigns
               ? `This protects the clearest campaign move before ${nextEvent.title} while too many active campaigns are competing for attention.`
+              : campaignMomentum.interventionLevel === "reset"
+              ? `${getCampaignPressureLead(campaignMomentum, {
+                preferRepeatedSlip: true,
+              })} ${linkedTask.title} is the reset move to protect before ${nextEvent.title}.`
               : `This is the cleanest campaign move you can finish before ${nextEvent.title}.`
             : campaignMomentum.tooManyCampaigns
             ? "Too many active campaigns are competing for attention, and this is the cleanest move to stop the drift right now."
+            : campaignMomentum.interventionLevel === "reset"
+            ? `${getCampaignPressureLead(campaignMomentum, {
+              preferRepeatedSlip: true,
+            })} This is the reset move to protect right now.`
             : campaignMomentum.status === "at_risk"
             ? "This is the clearest concrete move to stop the campaign from slipping right now."
             : "This is the cleanest campaign move to use this window well.",
           {
-            type: mapPriorityScoreToSuggestedQuestType(score.score, linkedTask),
+            type: campaignMomentum.interventionLevel === "reset"
+              ? "must"
+              : mapPriorityScoreToSuggestedQuestType(score.score, linkedTask),
           },
         ),
-        priorityScore: score.score,
+        priorityScore: score.score +
+          (campaignMomentum.interventionLevel === "reset" ? 18 : 0),
       };
     }
 
@@ -3708,20 +3798,33 @@ const buildCampaignWindowNextBestAction = (
         proposalId: null,
         title: campaignMomentum.oversizedTask
           ? `Break down ${campaignMomentum.oversizedTask.title}`
+          : campaignMomentum.interventionLevel === "reset"
+          ? `Reset ${epic.title}`
           : campaignMomentum.status === "at_risk"
           ? `Stabilize ${epic.title}`
           : `Define next step for ${epic.title}`,
-        type: mapPriorityScoreToSuggestedQuestType(score.score),
+        type: campaignMomentum.interventionLevel === "reset"
+          ? "must"
+          : mapPriorityScoreToSuggestedQuestType(score.score),
         estimatedDuration: formatEstimatedDurationLabel(suggestionDuration),
         estimatedDurationMinutes: suggestionDuration,
         source: "campaign",
         reason: options.context === "coming_up" && nextEvent
-          ? `This gives ${epic.title} a clean foothold before ${nextEvent.title} instead of letting the campaign keep drifting.`
+          ? campaignMomentum.interventionLevel === "reset"
+            ? `This campaign needs a reset move before ${nextEvent.title}, not another vague intention.`
+            : `This gives ${epic.title} a clean foothold before ${nextEvent.title} instead of letting the campaign keep drifting.`
           : campaignMomentum.oversizedTask
-          ? `This campaign needs a smaller restart move, and breaking down ${campaignMomentum.oversizedTask.title} is the cleanest use of this window.`
+          ? `${getCampaignPressureLead(campaignMomentum, {
+            preferRepeatedSlip: true,
+          })} Breaking down ${campaignMomentum.oversizedTask.title} is the cleanest reset move right now.`
+          : campaignMomentum.interventionLevel === "reset"
+          ? `${getCampaignPressureLead(campaignMomentum, {
+            preferRepeatedSlip: true,
+          })} This campaign needs a reset move right now.`
           : `${campaignMomentum.statusReason} This is the cleanest restart move right now.`,
       },
-      priorityScore: score.score,
+      priorityScore: score.score +
+        (campaignMomentum.interventionLevel === "reset" ? 18 : 0),
     };
   }
 
@@ -3831,6 +3934,33 @@ const mapPriorityScoreToSuggestedQuestType = (
   if (task?.priority === "high") return "must";
   if ((score ?? 0) >= 80) return "must";
   if ((score ?? 0) >= 55) return "should";
+  return "nice";
+};
+
+const elevateSuggestedQuestType = (
+  baseType: CompanionSuggestedQuest["type"],
+  minimumType: CompanionSuggestedQuest["type"],
+): CompanionSuggestedQuest["type"] => {
+  const rank = (type: CompanionSuggestedQuest["type"]) =>
+    type === "must" ? 3 : type === "should" ? 2 : 1;
+  return rank(baseType) >= rank(minimumType) ? baseType : minimumType;
+};
+
+const getCampaignInterventionSuggestedType = (
+  candidate: Pick<CampaignMomentumCandidate, "interventionLevel">,
+  fallbackType: CompanionSuggestedQuest["type"],
+): CompanionSuggestedQuest["type"] =>
+  candidate.interventionLevel === "reset"
+    ? "must"
+    : candidate.interventionLevel === "protect"
+    ? elevateSuggestedQuestType(fallbackType, "should")
+    : fallbackType;
+
+const mapDraftPriorityToSuggestedQuestType = (
+  priority: number | null | undefined,
+): CompanionSuggestedQuest["type"] => {
+  if ((priority ?? 0) >= 5) return "must";
+  if ((priority ?? 0) >= 3) return "should";
   return "nice";
 };
 
@@ -3958,7 +4088,8 @@ const buildSuggestedQuestFromProposal = (
     suggestionId: proposal.id,
     proposalId: proposal.id,
     title: getSuggestedQuestTitleFromProposal(proposal, task),
-    type: mapPriorityScoreToSuggestedQuestType(null, task),
+    type: proposal.suggestedType ??
+      mapPriorityScoreToSuggestedQuestType(null, task),
     estimatedDuration: formatEstimatedDurationLabel(
       getProposalEstimatedDuration(proposal, task),
     ),
@@ -3979,11 +4110,14 @@ type CampaignMomentumCandidate = {
   unscheduledTaskCount: number;
   oversizedTask: PlannerContextTask | null;
   noRecentMomentum: boolean;
+  daysWithoutMomentum: number | null;
   tooManyCampaigns: boolean;
   highestTaskScore: number;
   epicPriorityScore: number;
   status: CompanionCampaignStatus;
   statusReason: string;
+  pressureSignals: string[];
+  interventionLevel: "steady" | "nudge" | "protect" | "reset";
   selectionScore: number;
 };
 
@@ -4023,6 +4157,18 @@ const getEpicDaysRemaining = (
   return Math.ceil((target.getTime() - current.getTime()) / 86_400_000);
 };
 
+const REPEATED_CAMPAIGN_SLIP_SIGNAL =
+  "This campaign has slipped repeatedly without a protected recovery move.";
+
+const hasRepeatedCampaignSlip = (params: {
+  overdueTaskCount: number;
+  scheduledTodayCount: number;
+  noRecentMomentum: boolean;
+}): boolean =>
+  params.overdueTaskCount > 0 &&
+  params.scheduledTodayCount === 0 &&
+  params.noRecentMomentum;
+
 const classifyCampaignMomentum = (params: {
   daysRemaining: number | null;
   progressPercentage: number;
@@ -4033,6 +4179,7 @@ const classifyCampaignMomentum = (params: {
   unscheduledTaskCount: number;
   oversizedTask: PlannerContextTask | null;
   noRecentMomentum: boolean;
+  daysWithoutMomentum: number | null;
   tooManyCampaigns: boolean;
 }): {
   status: CompanionCampaignStatus;
@@ -4105,6 +4252,149 @@ const classifyCampaignMomentum = (params: {
   };
 };
 
+const getCampaignPressureSignals = (
+  input: PlannerBuildInput,
+  params: {
+    linkedTasks: PlannerContextTask[];
+    daysRemaining: number | null;
+    overdueTaskCount: number;
+    scheduledTodayCount: number;
+    unscheduledTaskCount: number;
+    oversizedTask: PlannerContextTask | null;
+    noRecentMomentum: boolean;
+    daysWithoutMomentum: number | null;
+    tooManyCampaigns: boolean;
+  },
+): string[] => {
+  const signals: string[] = [];
+
+  if (params.daysRemaining !== null && params.daysRemaining <= 7) {
+    signals.push(
+      params.daysRemaining <= 0
+        ? "Deadline is due now."
+        : `Deadline in ${params.daysRemaining} ${
+          params.daysRemaining === 1 ? "day" : "days"
+        }.`,
+    );
+  }
+
+  if (params.overdueTaskCount > 0) {
+    signals.push(
+      `${params.overdueTaskCount} overdue ${
+        params.overdueTaskCount === 1 ? "quest" : "quests"
+      } ${
+        params.overdueTaskCount === 1 ? "is" : "are"
+      } already slipping.`,
+    );
+  }
+
+  if (hasRepeatedCampaignSlip(params)) {
+    signals.push(REPEATED_CAMPAIGN_SLIP_SIGNAL);
+  }
+
+  if (params.linkedTasks.length === 0) {
+    signals.push("No concrete next quest is linked yet.");
+  } else if (params.scheduledTodayCount === 0) {
+    if (params.unscheduledTaskCount === params.linkedTasks.length) {
+      signals.push("No linked campaign work is scheduled yet.");
+    } else {
+      signals.push("No campaign step is protected today.");
+    }
+  }
+
+  if (params.oversizedTask) {
+    signals.push(`"${params.oversizedTask.title}" is still too large to start cleanly.`);
+  }
+
+  if (params.noRecentMomentum) {
+    signals.push(
+      params.daysWithoutMomentum !== null
+        ? `No visible campaign movement in the last ${params.daysWithoutMomentum} ${
+          params.daysWithoutMomentum === 1 ? "day" : "days"
+        }.`
+        : "No visible campaign movement recently.",
+    );
+  }
+
+  if (params.tooManyCampaigns) {
+    signals.push(
+      `Attention is split across ${input.plannerContext.activeEpics.length} active campaigns.`,
+    );
+  }
+
+  return [...new Set(signals)].slice(0, 5);
+};
+
+const getCampaignPressureLead = (
+  candidate: Pick<
+    CampaignMomentumCandidate,
+    "pressureSignals" | "statusReason" | "overdueTaskCount" | "scheduledTodayCount" | "noRecentMomentum"
+  >,
+  options?: {
+    preferRepeatedSlip?: boolean;
+  },
+): string =>
+  options?.preferRepeatedSlip &&
+      hasRepeatedCampaignSlip(candidate)
+    ? REPEATED_CAMPAIGN_SLIP_SIGNAL
+    : candidate.pressureSignals[0] ?? candidate.statusReason;
+
+const getCampaignInterventionLevel = (params: {
+  status: CompanionCampaignStatus;
+  progressPercentage: number;
+  linkedTaskCount: number;
+  overdueTaskCount: number;
+  scheduledTodayCount: number;
+  unscheduledTaskCount: number;
+  oversizedTask: PlannerContextTask | null;
+  noRecentMomentum: boolean;
+  daysWithoutMomentum: number | null;
+  tooManyCampaigns: boolean;
+}): CampaignMomentumCandidate["interventionLevel"] => {
+  if (params.status === "moving") return "steady";
+
+  if (
+    hasRepeatedCampaignSlip(params) ||
+    (params.daysWithoutMomentum !== null && params.daysWithoutMomentum >= 10) ||
+    (params.tooManyCampaigns && params.progressPercentage < 60) ||
+    (params.status === "at_risk" && (
+      params.overdueTaskCount >= 2 ||
+      params.noRecentMomentum ||
+      params.oversizedTask !== null ||
+      params.linkedTaskCount === 0
+    )) ||
+    (params.status === "stalled" && (
+      params.noRecentMomentum ||
+      params.oversizedTask !== null ||
+      params.linkedTaskCount === 0 ||
+      (
+        params.overdueTaskCount > 0 &&
+        params.unscheduledTaskCount === params.linkedTaskCount
+      )
+    ))
+  ) {
+    return "reset";
+  }
+
+  if (params.status === "at_risk" || params.status === "stalled") {
+    return "protect";
+  }
+
+  return "nudge";
+};
+
+const getTaskCampaignMomentum = (
+  input: PlannerBuildInput,
+  task: PlannerContextTask,
+): CampaignMomentumCandidate | null => {
+  if (!task.epicId) return null;
+  const epic = input.plannerContext.activeEpics.find((candidate) =>
+    candidate.id === task.epicId
+  );
+  if (!epic) return null;
+  return buildCampaignMomentumCandidate(input, epic);
+};
+
 const buildCampaignMomentumCandidate = (
   input: PlannerBuildInput,
   epic: PlannerContextEpic,
@@ -4145,6 +4435,16 @@ const buildCampaignMomentumCandidate = (
       (right.estimatedDuration ?? 0) - (left.estimatedDuration ?? 0)
     )[0] ?? null;
   const recentMomentumThreshold = addDaysToDateKey(input.currentDate, -5);
+  const latestAnchoredMomentumDate = linkedTasks
+    .map((task) => task.taskDate)
+    .filter((date): date is string =>
+      typeof date === "string" && date <= input.currentDate
+    )
+    .sort()
+    .at(-1) ?? null;
+  const daysWithoutMomentum = latestAnchoredMomentumDate
+    ? diffDateKeys(latestAnchoredMomentumDate, input.currentDate)
+    : null;
   const noRecentMomentum = linkedTasks.length > 0 &&
     linkedTasks.every((task) =>
       !task.taskDate || task.taskDate < recentMomentumThreshold
@@ -4167,9 +4467,33 @@ const buildCampaignMomentumCandidate = (
     unscheduledTaskCount,
     oversizedTask,
     noRecentMomentum,
+    daysWithoutMomentum,
     tooManyCampaigns: input.plannerContext.activeEpics.length > 3,
   });
   const tooManyCampaigns = input.plannerContext.activeEpics.length > 3;
+  const pressureSignals = getCampaignPressureSignals(input, {
+    linkedTasks,
+    daysRemaining,
+    overdueTaskCount,
+    scheduledTodayCount,
+    unscheduledTaskCount,
+    oversizedTask,
+    noRecentMomentum,
+    daysWithoutMomentum,
+    tooManyCampaigns,
+  });
+  const interventionLevel = getCampaignInterventionLevel({
+    status,
+    progressPercentage,
+    linkedTaskCount: linkedTasks.length,
+    overdueTaskCount,
+    scheduledTodayCount,
+    unscheduledTaskCount,
+    oversizedTask,
+    noRecentMomentum,
+    daysWithoutMomentum,
+    tooManyCampaigns,
+  });
 
   let selectionScore = epicPriorityScore + (highestTaskScore * 0.45) +
     (linkedRituals.length * 4);
@@ -4185,7 +4509,13 @@ const buildCampaignMomentumCandidate = (
   if (linkedTasks.length === 0) selectionScore += 12;
   if (oversizedTask) selectionScore += 12;
   if (noRecentMomentum) selectionScore += 10;
+  if (daysWithoutMomentum !== null && daysWithoutMomentum >= 10) {
+    selectionScore += 8;
+  }
   if (tooManyCampaigns) selectionScore += 6;
+  if (interventionLevel === "reset") selectionScore += 24;
+  else if (interventionLevel === "protect") selectionScore += 10;
+  else if (interventionLevel === "nudge") selectionScore += 4;
 
   return {
     epic,
@@ -4198,11 +4528,14 @@ const buildCampaignMomentumCandidate = (
     unscheduledTaskCount,
     oversizedTask,
     noRecentMomentum,
+    daysWithoutMomentum,
     tooManyCampaigns,
     highestTaskScore,
     epicPriorityScore,
     status,
     statusReason,
+    pressureSignals,
+    interventionLevel,
     selectionScore,
   };
 };
@@ -4341,6 +4674,15 @@ const shouldDraftCampaignAdjustment = (
   candidate: CampaignMomentumCandidate,
 ): boolean =>
   (
+    candidate.interventionLevel === "reset" &&
+    (
+      hasRepeatedCampaignSlip(candidate) ||
+      (candidate.noRecentMomentum && candidate.overdueTaskCount > 0) ||
+      candidate.linkedTasks.length === 0 ||
+      candidate.tooManyCampaigns
+    )
+  ) ||
+  (
     candidate.status === "at_risk" &&
     (
       candidate.overdueTaskCount >= 2 ||
@@ -4358,11 +4700,51 @@ const shouldDraftCampaignAdjustment = (
     candidate.progressPercentage < 60
   );
 
+const shouldSuggestStrategicCampaignAdjustment = (
+  candidate: CampaignMomentumCandidate,
+): boolean =>
+  shouldDraftCampaignAdjustment(candidate) &&
+  (
+    hasRepeatedCampaignSlip(candidate) ||
+    candidate.linkedTasks.length === 0
+  );
+
+const buildCampaignAdjustmentSuggestedQuest = (
+  candidate: CampaignMomentumCandidate,
+  options?: {
+    type?: CompanionSuggestedQuest["type"];
+    reason?: string | null;
+    suggestionIdPrefix?: string;
+  },
+): CompanionSuggestedQuest => {
+  const pressureLead = getCampaignPressureLead(candidate, {
+    preferRepeatedSlip: true,
+  });
+
+  return {
+    suggestionId: `${
+      options?.suggestionIdPrefix ?? "campaign-adjust"
+    }:${candidate.epic.id}`,
+    proposalId: null,
+    title: `Adjust ${candidate.epic.title}`,
+    type: options?.type ??
+      getCampaignInterventionSuggestedType(candidate, "must"),
+    estimatedDuration: "20 min",
+    estimatedDurationMinutes: 20,
+    source: "campaign",
+    reason: options?.reason ??
+      `${pressureLead} This needs a reset plan, not another isolated task.`,
+  };
+};
+
 const buildCampaignAdjustmentProposalForMomentum = (
   candidate: CampaignMomentumCandidate,
 ): PlannerProposal => {
+  const repeatedSlip = hasRepeatedCampaignSlip(candidate);
   const adjustmentType = candidate.tooManyCampaigns
     ? "reduce_scope"
+    : repeatedSlip
+    ? "reschedule"
     : candidate.progressPercentage < 35
     ? "reduce_scope"
     : candidate.overdueTaskCount >= 2
@@ -4373,17 +4755,24 @@ const buildCampaignAdjustmentProposalForMomentum = (
     id: createId(),
     kind: "adjust_campaign_plan",
     title: `Adjust ${candidate.epic.title}`,
+    suggestedType: getCampaignInterventionSuggestedType(candidate, "must"),
     summary: `Generate a revised plan for "${candidate.epic.title}" so the next step is realistic again before the current deadline.`,
     reasoning:
-      "This campaign is under enough pressure that it needs a plan adjustment, not just another optimistic task draft.",
+      repeatedSlip
+        ? "This campaign has slipped more than once, so it needs a reset plan instead of another isolated task draft."
+        : "This campaign is under enough pressure that it needs a plan adjustment, not just another optimistic task draft.",
     payload: {
       epicId: candidate.epic.id,
       epicTitle: candidate.epic.title,
       adjustmentType,
       reason: candidate.tooManyCampaigns
         ? `${candidate.statusReason} You have too many active campaigns competing for attention right now.`
+        : repeatedSlip
+        ? `${candidate.statusReason} This campaign has slipped repeatedly and needs a reset plan, not another isolated task.`
         : candidate.statusReason,
-      requestedSummary: candidate.daysRemaining !== null
+      requestedSummary: repeatedSlip
+        ? `Reset ${candidate.epic.title} by shrinking the overdue work and protecting one smaller recovery move this week.`
+        : candidate.daysRemaining !== null
         ? `Rework ${candidate.epic.title} so it can still move cleanly within ${candidate.daysRemaining} day${candidate.daysRemaining === 1 ? "" : "s"}.`
         : candidate.tooManyCampaigns
         ? `Rework ${candidate.epic.title} with a smaller scope or a cleaner priority order because too many active campaigns are competing at once.`
@@ -4399,6 +4788,17 @@ const formatCampaignMomentumStatusLabel = (
   status: CompanionCampaignStatus,
 ): string =>
   status === "at_risk" ? "at risk" : status;
+
+const formatCampaignInterventionLabel = (
+  level: CampaignMomentumCandidate["interventionLevel"],
+): string =>
+  level === "reset"
+    ? "reset"
+    : level === "protect"
+    ? "protect"
+    : level === "nudge"
+    ? "nudge"
+    : "steady";
 
 const buildPriorityOverviewCampaignPressureLine = (
   input: PlannerBuildInput,
@@ -4416,10 +4816,17 @@ const buildPriorityOverviewCampaignPressureLine = (
     if (campaignMomentum.status === "moving") continue;
 
     const linkedTask = selectCampaignNextTask(input, campaignMomentum);
+    const pressureLead = getCampaignPressureLead(campaignMomentum, {
+      preferRepeatedSlip: true,
+    });
     const lead =
       `Campaign pressure: ${epic.title} is ${
         formatCampaignMomentumStatusLabel(campaignMomentum.status)
-      }. ${campaignMomentum.statusReason}`;
+      }. ${pressureLead}`;
+
+    if (shouldSuggestStrategicCampaignAdjustment(campaignMomentum)) {
+      return `${lead} The honest next move is to adjust the campaign plan before adding more work.`;
+    }
 
     if (campaignMomentum.tooManyCampaigns) {
       return linkedTask
@@ -4441,6 +4848,347 @@ const buildPriorityOverviewCampaignPressureLine = (
   return null;
 };
 
+const getPriorityOverviewFocusCampaign = (
+  input: PlannerBuildInput,
+  priorityScores: PlannerPriorityScore[],
+): CampaignMomentumCandidate | null => {
+  const seenEpicIds = new Set<string>();
+  const candidates: CampaignMomentumCandidate[] = [];
+
+  for (const score of priorityScores) {
+    let candidate: CampaignMomentumCandidate | null = null;
+
+    if (score.kind === "epic" && score.epicId) {
+      const epic = input.plannerContext.activeEpics.find((activeEpic) =>
+        activeEpic.id === score.epicId
+      );
+      if (epic) {
+        candidate = buildCampaignMomentumCandidate(input, epic);
+      }
+    } else if (score.kind === "task" && score.taskId) {
+      const task = findPlannerTaskById(input, score.taskId);
+      if (task) {
+        candidate = getTaskCampaignMomentum(input, task);
+      }
+    }
+
+    if (!candidate || candidate.status === "moving" ||
+      seenEpicIds.has(candidate.epic.id)) {
+      continue;
+    }
+
+    seenEpicIds.add(candidate.epic.id);
+    candidates.push(candidate);
+  }
+
+  return candidates.sort((left, right) =>
+    right.selectionScore - left.selectionScore
+  )[0] ?? null;
+};
+
+const buildPriorityOverviewSummary = (
+  input: PlannerBuildInput,
+  score: PlannerPriorityScore,
+): string => {
+  if (score.kind === "epic" && score.epicId) {
+    const epic = input.plannerContext.activeEpics.find((candidate) =>
+      candidate.id === score.epicId
+    );
+    if (epic) {
+      const campaignMomentum = buildCampaignMomentumCandidate(input, epic);
+      if (campaignMomentum.status !== "moving") {
+        const pressureLead = getCampaignPressureLead(campaignMomentum, {
+          preferRepeatedSlip: true,
+        });
+        if (shouldSuggestStrategicCampaignAdjustment(campaignMomentum)) {
+          return `${epic.title} because ${pressureLead} The honest next move is to adjust the campaign plan before adding more work.`;
+        }
+        const linkedTask = selectCampaignNextTask(input, campaignMomentum);
+        if (linkedTask) {
+          return `${epic.title} because ${pressureLead} Protect ${linkedTask.title} next.`;
+        }
+        return `${epic.title} because ${pressureLead}.`;
+      }
+    }
+  }
+
+  if (score.kind === "task" && score.taskId) {
+    const task = findPlannerTaskById(input, score.taskId);
+    const campaignMomentum = task ? getTaskCampaignMomentum(input, task) : null;
+    if (task && campaignMomentum && campaignMomentum.status !== "moving") {
+      const pressureLead = getCampaignPressureLead(campaignMomentum, {
+        preferRepeatedSlip: true,
+      });
+      if (shouldSuggestStrategicCampaignAdjustment(campaignMomentum)) {
+        return `${task.title} because ${pressureLead} The honest next move is to adjust the campaign plan before adding more work.`;
+      }
+      return `${task.title} because ${pressureLead} This is the clearest move to protect next.`;
+    }
+  }
+
+  if (score.reasons.length === 0) return score.title;
+  if (score.reasons.length === 1) {
+    return `${score.title} because ${score.reasons[0]}.`;
+  }
+  return `${score.title} because ${score.reasons[0]} and ${score.reasons[1]}.`;
+};
+
+const buildPriorityOverviewSuggestion = (
+  input: PlannerBuildInput,
+  score: PlannerPriorityScore,
+): CompanionSuggestedQuest | null => {
+  if (score.kind === "task" && score.taskId) {
+    const task = findPlannerTaskById(input, score.taskId);
+    if (!task || task.completed === true) return null;
+
+    const campaignMomentum = getTaskCampaignMomentum(input, task);
+    const pressureLead = campaignMomentum
+      ? getCampaignPressureLead(campaignMomentum, {
+        preferRepeatedSlip: true,
+      })
+      : null;
+    const baseType = mapPriorityScoreToSuggestedQuestType(score.score, task);
+
+    if (
+      campaignMomentum &&
+      shouldSuggestStrategicCampaignAdjustment(campaignMomentum)
+    ) {
+      return buildCampaignAdjustmentSuggestedQuest(campaignMomentum, {
+        suggestionIdPrefix: "priority:campaign-adjust",
+        type: getCampaignInterventionSuggestedType(campaignMomentum, baseType),
+      });
+    }
+
+    if (
+      campaignMomentum?.oversizedTask?.id === task.id &&
+      campaignMomentum.interventionLevel === "reset"
+    ) {
+      return {
+        suggestionId: `priority:campaign-breakdown:${task.id}`,
+        proposalId: null,
+        title: `Break down ${task.title}`,
+        type: getCampaignInterventionSuggestedType(campaignMomentum, baseType),
+        estimatedDuration: "20 min",
+        estimatedDurationMinutes: 20,
+        source: "campaign",
+        reason: `${pressureLead} This needs a smaller reset move right now.`,
+      };
+    }
+
+    return buildSuggestedQuestFromTask(
+      task,
+      campaignMomentum && campaignMomentum.status !== "moving"
+        ? campaignMomentum.interventionLevel === "reset"
+          ? `${pressureLead} This needs a reset move right now.`
+          : `${pressureLead} This is one of the clearest moves to protect right now.`
+        : score.reasons[0] ??
+          "This is one of the clearest moves to protect right now.",
+      {
+        type: campaignMomentum && campaignMomentum.status !== "moving"
+          ? getCampaignInterventionSuggestedType(campaignMomentum, baseType)
+          : baseType,
+      },
+    );
+  }
+
+  if (score.kind === "epic" && score.epicId) {
+    const epic = input.plannerContext.activeEpics.find((candidate) =>
+      candidate.id === score.epicId
+    );
+    if (!epic) return null;
+
+    const campaignMomentum = buildCampaignMomentumCandidate(input, epic);
+    const pressureLead = getCampaignPressureLead(campaignMomentum, {
+      preferRepeatedSlip: true,
+    });
+    const linkedTask = selectCampaignNextTask(input, campaignMomentum);
+
+    if (shouldSuggestStrategicCampaignAdjustment(campaignMomentum)) {
+      return buildCampaignAdjustmentSuggestedQuest(campaignMomentum, {
+        suggestionIdPrefix: "priority:campaign-adjust",
+        type: getCampaignInterventionSuggestedType(
+          campaignMomentum,
+          campaignMomentum.status === "at_risk" ? "must" : "should",
+        ),
+      });
+    }
+
+    if (
+      campaignMomentum.oversizedTask &&
+      campaignMomentum.interventionLevel === "reset" &&
+      (!linkedTask || linkedTask.id === campaignMomentum.oversizedTask.id)
+    ) {
+      return {
+        suggestionId: `priority:campaign-breakdown:${campaignMomentum.oversizedTask.id}`,
+        proposalId: null,
+        title: `Break down ${campaignMomentum.oversizedTask.title}`,
+        type: getCampaignInterventionSuggestedType(campaignMomentum, "should"),
+        estimatedDuration: "20 min",
+        estimatedDurationMinutes: 20,
+        source: "campaign",
+        reason: `${pressureLead} This needs a smaller reset move right now.`,
+      };
+    }
+
+    if (linkedTask && linkedTask.completed !== true) {
+      return buildSuggestedQuestFromTask(
+        linkedTask,
+        campaignMomentum.interventionLevel === "reset"
+          ? `${pressureLead} This needs a reset move right now.`
+          : pressureLead,
+        {
+          type: getCampaignInterventionSuggestedType(
+            campaignMomentum,
+            campaignMomentum.status === "at_risk"
+              ? "must"
+              : campaignMomentum.status === "stalled"
+              ? "should"
+              : mapPriorityScoreToSuggestedQuestType(score.score, linkedTask),
+          ),
+        },
+      );
+    }
+
+    return {
+      suggestionId: `priority:campaign:${epic.id}`,
+      proposalId: null,
+      title: campaignMomentum.interventionLevel === "reset"
+        ? `Reset ${epic.title}`
+        : campaignMomentum.status === "at_risk"
+        ? `Protect ${epic.title}`
+        : campaignMomentum.status === "stalled"
+        ? `Define next step for ${epic.title}`
+        : `Move ${epic.title} forward`,
+      type: getCampaignInterventionSuggestedType(
+        campaignMomentum,
+        campaignMomentum.status === "at_risk"
+          ? "must"
+          : campaignMomentum.status === "stalled"
+          ? "should"
+          : "nice",
+      ),
+      estimatedDuration: campaignMomentum.oversizedTask ? "20 min" : "30 min",
+      estimatedDurationMinutes: campaignMomentum.oversizedTask ? 20 : 30,
+      source: "campaign",
+      reason: campaignMomentum.interventionLevel === "reset"
+        ? `${pressureLead} This needs a reset move right now.`
+        : pressureLead,
+    };
+  }
+
+  if (score.kind === "ritual" && score.ritualId) {
+    const ritual = input.plannerContext.rituals.find((candidate) =>
+      candidate.id === score.ritualId
+    );
+    if (!ritual) return null;
+
+    return {
+      suggestionId: `priority:ritual:${ritual.id}`,
+      proposalId: null,
+      title: `Keep ${ritual.title}`,
+      type: "nice",
+      estimatedDuration: "20 min",
+      estimatedDurationMinutes: 20,
+      source: "habit",
+      reason: ritual.preferredTime
+        ? `${ritual.title} stays easiest when you protect its usual ${ritual.preferredTime} slot.`
+        : `${ritual.title} is a lighter support move worth keeping alive.`,
+    };
+  }
+
+  if (score.kind === "contact") {
+    return {
+      suggestionId: `priority:contact:${score.contactId ?? normalizeText(score.title)}`,
+      proposalId: null,
+      title: `Reach out to ${score.title}`,
+      type: "should",
+      estimatedDuration: "15 min",
+      estimatedDurationMinutes: 15,
+      source: "optimization",
+      reason: score.reasons[0] ??
+        "This is the clearest relationship move worth protecting right now.",
+    };
+  }
+
+  if (score.kind === "recovery") {
+    return {
+      suggestionId: `priority:recovery:${score.id}`,
+      proposalId: null,
+      title: "Recovery reset",
+      type: "should",
+      estimatedDuration: "20 min",
+      estimatedDurationMinutes: 20,
+      source: "recovery",
+      reason: score.reasons[0] ??
+        "Your energy needs protecting before you add more pressure.",
+    };
+  }
+
+  return null;
+};
+
+const buildPriorityOverviewItem = (
+  input: PlannerBuildInput,
+  score: PlannerPriorityScore,
+): {
+  quest: CompanionSuggestedQuest;
+  proposal: PlannerProposal | null;
+} | null => {
+  if (score.kind === "task" && score.taskId) {
+    const task = findPlannerTaskById(input, score.taskId);
+    if (!task || task.completed === true) return null;
+
+    const campaignMomentum = getTaskCampaignMomentum(input, task);
+    if (
+      campaignMomentum &&
+      shouldSuggestStrategicCampaignAdjustment(campaignMomentum)
+    ) {
+      const proposal = buildCampaignAdjustmentProposalForMomentum(
+        campaignMomentum,
+      );
+      return {
+        quest: buildSuggestedQuestFromProposal(
+          input,
+          proposal,
+          buildPriorityOverviewSuggestion(input, score)?.reason ?? proposal.reasoning,
+        ),
+        proposal,
+      };
+    }
+  }
+
+  if (score.kind === "epic" && score.epicId) {
+    const epic = input.plannerContext.activeEpics.find((candidate) =>
+      candidate.id === score.epicId
+    );
+    if (epic) {
+      const campaignMomentum = buildCampaignMomentumCandidate(input, epic);
+      if (shouldSuggestStrategicCampaignAdjustment(campaignMomentum)) {
+        const proposal = buildCampaignAdjustmentProposalForMomentum(
+          campaignMomentum,
+        );
+        return {
+          quest: buildSuggestedQuestFromProposal(
+            input,
+            proposal,
+            buildPriorityOverviewSuggestion(input, score)?.reason ??
+              proposal.reasoning,
+          ),
+          proposal,
+        };
+      }
+    }
+  }
+
+  const quest = buildPriorityOverviewSuggestion(input, score);
+  if (!quest) return null;
+
+  return {
+    quest,
+    proposal: null,
+  };
+};
+
 const buildCampaignMomentumStructuredOutput = (
   input: PlannerBuildInput,
   reply: string,
@@ -4449,7 +5197,15 @@ const buildCampaignMomentumStructuredOutput = (
     campaignId: string | null;
     campaignTitle: string | null;
     status: CompanionCampaignStatus | null;
+    interventionLevel: CampaignMomentumCandidate["interventionLevel"] | null;
     statusReason: string | null;
+    healthSnapshot: {
+      overdueQuestCount: number;
+      protectedTodayCount: number;
+      daysWithoutMomentum: number | null;
+      activeCampaignCount: number;
+    } | null;
+    pressureSignals: string[];
     nextStep: CompanionSuggestedQuest | null;
     supportActions: CompanionSuggestedQuest[];
     shouldCreateQuest: boolean;
@@ -4470,10 +5226,61 @@ const buildCampaignMomentumStructuredOutput = (
     campaignId: options.campaignId,
     campaignTitle: options.campaignTitle,
     status: options.status,
+    interventionLevel: options.interventionLevel,
     statusReason: options.statusReason,
+    healthSnapshot: options.healthSnapshot,
+    pressureSignals: options.pressureSignals,
     nextStep: options.nextStep,
     supportActions: options.supportActions,
   },
+});
+
+const buildCampaignHealthSnapshot = (
+  input: PlannerBuildInput,
+  candidate: CampaignMomentumCandidate,
+) => ({
+  overdueQuestCount: candidate.overdueTaskCount,
+  protectedTodayCount: candidate.scheduledTodayCount,
+  daysWithoutMomentum: candidate.daysWithoutMomentum,
+  activeCampaignCount: input.plannerContext.activeEpics.length,
+});
+
+const buildPriorityOverviewStructuredOutput = (
+  input: PlannerBuildInput,
+  reply: string,
+  classificationHint: ClassificationHint,
+  options: {
+    title: string;
+    campaignPressure: string | null;
+    focusCampaign: CampaignMomentumCandidate | null;
+    topPriorities: CompanionSuggestedQuest[];
+  },
+): CompanionStructuredResponse => ({
+  intent: mapPlannerIntentMetadata(input, classificationHint, {
+    forceIntentType: "quest",
+    shouldCreateQuest: false,
+    shouldPromptCampaign: false,
+  }),
+  planDay: null,
+  weeklyPlan: null,
+  priorityOverview: {
+    title: options.title,
+    message: reply,
+    campaignPressure: options.campaignPressure,
+    focusCampaignTitle: options.focusCampaign?.epic.title ?? null,
+    focusCampaignStatus: options.focusCampaign?.status ?? null,
+    focusCampaignInterventionLevel:
+      options.focusCampaign?.interventionLevel ?? null,
+    focusCampaignHealth: options.focusCampaign
+      ? buildCampaignHealthSnapshot(input, options.focusCampaign)
+      : null,
+    topPriorities: options.topPriorities,
+  },
+  reflectionBridge: null,
+  comingUp: null,
+  rightNow: null,
+  dayAdjust: null,
+  campaignMomentum: null,
 });
 
 const buildAdvanceCampaignResponse = (
@@ -4505,7 +5312,10 @@ const buildAdvanceCampaignResponse = (
           campaignId: null,
           campaignTitle: null,
           status: null,
+          interventionLevel: null,
           statusReason: null,
+          healthSnapshot: null,
+          pressureSignals: [],
           nextStep: null,
           supportActions: [],
           shouldCreateQuest: false,
@@ -4517,6 +5327,18 @@ const buildAdvanceCampaignResponse = (
   const nextTask = selectedCampaign.oversizedTask
     ? null
     : selectCampaignNextTask(input, selectedCampaign);
+  const interventionLabel = formatCampaignInterventionLabel(
+    selectedCampaign.interventionLevel,
+  );
+  const interventionLead = hasRepeatedCampaignSlip(selectedCampaign)
+    ? "This has slipped more than once, so it needs a reset, not another blind push."
+    : selectedCampaign.interventionLevel === "reset"
+    ? "This needs a reset, not another blind push."
+    : selectedCampaign.interventionLevel === "protect"
+    ? "This needs a protected move next."
+    : selectedCampaign.interventionLevel === "nudge"
+    ? "This could use a cleaner nudge before it drifts further."
+    : "Momentum is already steady.";
   const taskScoreMap = getTaskPriorityScoreMap(input);
   const nextTaskSuggestion = nextTask
     ? buildSuggestedQuestFromTask(
@@ -4578,7 +5400,7 @@ const buildAdvanceCampaignResponse = (
       selectedCampaign.epic.title
     } looks ${selectedCampaign.status.replace(/_/g, " ")}. ${
       selectedCampaign.statusReason
-    } This needs a campaign adjustment more than another blind push, so I drafted that first.`;
+    } ${interventionLead} I drafted the campaign adjustment first.`;
 
     return {
       mode: "proposal",
@@ -4594,7 +5416,10 @@ const buildAdvanceCampaignResponse = (
           campaignId: selectedCampaign.epic.id,
           campaignTitle: selectedCampaign.epic.title,
           status: selectedCampaign.status,
+          interventionLevel: selectedCampaign.interventionLevel,
           statusReason: selectedCampaign.statusReason,
+          healthSnapshot: buildCampaignHealthSnapshot(input, selectedCampaign),
+          pressureSignals: selectedCampaign.pressureSignals,
           nextStep: adjustmentSuggestion,
           supportActions,
           shouldCreateQuest: false,
@@ -4626,7 +5451,7 @@ const buildAdvanceCampaignResponse = (
       selectedCampaign.epic.title
     } looks ${selectedCampaign.status.replace(/_/g, " ")}. ${
       selectedCampaign.statusReason
-    } The clearest next step is ${nextTaskSuggestion.title}.`;
+    } ${interventionLead} The clearest ${interventionLabel} move is ${nextTaskSuggestion.title}.`;
 
     return buildReadOnlyResponse(
       reply,
@@ -4643,7 +5468,10 @@ const buildAdvanceCampaignResponse = (
           campaignId: selectedCampaign.epic.id,
           campaignTitle: selectedCampaign.epic.title,
           status: selectedCampaign.status,
+          interventionLevel: selectedCampaign.interventionLevel,
           statusReason: selectedCampaign.statusReason,
+          healthSnapshot: buildCampaignHealthSnapshot(input, selectedCampaign),
+          pressureSignals: selectedCampaign.pressureSignals,
           nextStep: nextTaskSuggestion,
           supportActions,
           shouldCreateQuest: false,
@@ -4664,7 +5492,7 @@ const buildAdvanceCampaignResponse = (
     selectedCampaign.epic.title
   } looks ${selectedCampaign.status.replace(/_/g, " ")}. ${
     selectedCampaign.statusReason
-  } I drafted the cleanest next step so you can confirm it without overthinking it.`;
+  } ${interventionLead} I drafted the cleanest ${interventionLabel} move so you can confirm it without overthinking it.`;
 
   return {
     mode: "proposal",
@@ -4680,7 +5508,10 @@ const buildAdvanceCampaignResponse = (
         campaignId: selectedCampaign.epic.id,
         campaignTitle: selectedCampaign.epic.title,
         status: selectedCampaign.status,
+        interventionLevel: selectedCampaign.interventionLevel,
         statusReason: selectedCampaign.statusReason,
+        healthSnapshot: buildCampaignHealthSnapshot(input, selectedCampaign),
+        pressureSignals: selectedCampaign.pressureSignals,
         nextStep: proposedNextStep,
         supportActions,
         shouldCreateQuest: true,
@@ -5003,14 +5834,6 @@ const buildBatchQuestProposals = (
   }));
 };
 
-const summarizePriorityScore = (score: PlannerPriorityScore): string => {
-  if (score.reasons.length === 0) return score.title;
-  if (score.reasons.length === 1) {
-    return `${score.title} because ${score.reasons[0]}.`;
-  }
-  return `${score.title} because ${score.reasons[0]} and ${score.reasons[1]}.`;
-};
-
 const STAT_LABELS: Record<
   NonNullable<PlannerStatInterpretation["statProfile"]>["dominantStat"],
   string
@@ -5168,25 +5991,89 @@ const buildPriorityOverviewResponse = (
     input,
     priorityScores,
   );
+  const topPriorityItems = priorityScores
+    .map((score) => buildPriorityOverviewItem(input, score))
+    .filter((
+      item,
+    ): item is { quest: CompanionSuggestedQuest; proposal: PlannerProposal | null } =>
+      item !== null
+    );
+  const topPriorities = topPriorityItems
+    .map((item) => item.quest)
+    .slice(0, 5);
+  const proposals = topPriorityItems
+    .map((item) => item.proposal)
+    .filter((proposal): proposal is PlannerProposal => proposal !== null)
+    .filter((proposal, index, all) =>
+      all.findIndex((candidate) => candidate.id === proposal.id) === index
+    );
   const rankedLead = priorityScores
     .slice(0, 3)
-    .map((score, index) => `${index + 1}. ${summarizePriorityScore(score)}`)
+    .map((score, index) =>
+      `${index + 1}. ${buildPriorityOverviewSummary(input, score)}`
+    )
     .join("\n");
+  const focusCampaign = getPriorityOverviewFocusCampaign(input, priorityScores);
+  const title = starterIntent === "what_matters"
+    ? "What Matters"
+    : starterIntent === "make_room"
+    ? "Make Room"
+    : "Priority Overview";
+  const reply = [
+    interpretationLead,
+    lead,
+    focusLead,
+    buildDayDigest(input, input.currentDate, "Today", true),
+    campaignPressureLine,
+    `Top ranked next moves:\n${rankedLead}`,
+  ].filter(Boolean).join("\n\n");
+  const structuredResponse = buildPriorityOverviewStructuredOutput(
+    input,
+    reply,
+    classificationHint,
+    {
+      title,
+      campaignPressure: campaignPressureLine,
+      focusCampaign,
+      topPriorities,
+    },
+  );
+
+  if (proposals.length > 0) {
+    return {
+      mode: "proposal",
+      reply,
+      followUpQuestions: [],
+      proposals,
+      suggestedReminders: [],
+      structuredResponse,
+      memoryUpdates: {
+        preferredTimeOfDay: sessionState.preferredTimeOfDay ??
+          input.plannerContext.plannerMemory?.preferredTimeOfDay ??
+          null,
+        preferredTimeReason: sessionState.preferredTimeReason ??
+          input.plannerContext.plannerMemory?.preferredTimeReason ??
+          null,
+        reminderPreference: sessionState.reminderPreference ??
+          (input.plannerContext.plannerMemory?.reminderMinutesBefore
+            ? `${input.plannerContext.plannerMemory.reminderMinutesBefore} minutes`
+            : null),
+      },
+      sessionState: {
+        ...sessionState,
+        lastClassification: classificationHint.type,
+      },
+    };
+  }
 
   return buildReadOnlyResponse(
-    [
-      interpretationLead,
-      lead,
-      focusLead,
-      buildDayDigest(input, input.currentDate, "Today", true),
-      campaignPressureLine,
-      `Top ranked next moves:\n${rankedLead}`,
-    ].filter(Boolean).join("\n\n"),
+    reply,
     {
       ...sessionState,
       lastClassification: classificationHint.type,
     },
     "schedule_read",
+    structuredResponse,
   );
 };
 
@@ -5925,6 +6812,35 @@ const buildPlanDayConcreteCandidate = (
   };
 };
 
+const buildPlanDayStrategicAdjustmentProposal = (
+  input: PlannerBuildInput,
+): PlannerProposal | null => {
+  const seenCampaignIds = new Set<string>();
+
+  for (const score of getPlanDayRankedScores(input)) {
+    const epicId = score.kind === "epic"
+      ? score.epicId
+      : score.kind === "task"
+      ? score.epicId ?? findPlannerTaskById(input, score.taskId)?.epicId ?? null
+      : null;
+    if (!epicId || seenCampaignIds.has(epicId)) continue;
+    seenCampaignIds.add(epicId);
+
+    const epic = input.plannerContext.activeEpics.find((candidate) =>
+      candidate.id === epicId
+    );
+    if (!epic) continue;
+
+    const campaignMomentum = buildCampaignMomentumCandidate(input, epic);
+    if (!hasRepeatedCampaignSlip(campaignMomentum)) continue;
+    if (!shouldSuggestStrategicCampaignAdjustment(campaignMomentum)) continue;
+
+    return buildCampaignAdjustmentProposalForMomentum(campaignMomentum);
+  }
+
+  return null;
+};
+
 const buildPlanDayPriorityCandidate = (
   input: PlannerBuildInput,
   score: PlannerPriorityScore,
@@ -5944,6 +6860,24 @@ const buildPlanDayPriorityCandidate = (
     if (!task || task.completed === true || task.taskDate === targetDate) {
       return null;
     }
+    const campaignMomentum = getTaskCampaignMomentum(input, task);
+    const campaignPressureLead = campaignMomentum
+      ? getCampaignPressureLead(campaignMomentum, {
+        preferRepeatedSlip: true,
+      })
+      : null;
+    const priorityBase = normalizePlannerScorePriority(score.score);
+    const boostedPriority = campaignMomentum?.status === "at_risk"
+      ? 5
+      : campaignMomentum?.status === "stalled"
+      ? Math.max(priorityBase, 4)
+      : campaignMomentum?.status === "drifting"
+      ? Math.max(priorityBase, 3)
+      : priorityBase;
+    const reasoning = campaignPressureLead &&
+        campaignMomentum?.status !== "moving"
+      ? `${campaignPressureLead} This is the clearest move to protect that campaign today.`
+      : reason;
 
     return {
       id: score.taskId,
@@ -5952,17 +6886,21 @@ const buildPlanDayPriorityCandidate = (
       scheduledDate: targetDate,
       scheduledTime: null,
       estimatedDuration: getTaskDuration(task),
-      reasoning: reason,
+      reasoning,
       epicId: task.epicId ?? null,
       category: task.category ?? null,
-      notes: task.notes ?? null,
+      notes: task.notes ?? campaignPressureLead ?? null,
       timingPreferenceLabel: inferTimingLabelFromClock(
         score.suggestedTime ?? null,
       ),
       energyType: inferEnergyTypeFromTitle(task.title),
-      confidence: 0.84,
+      confidence: campaignMomentum?.status === "at_risk"
+        ? 0.9
+        : campaignMomentum?.status === "stalled"
+        ? 0.87
+        : 0.84,
       derivedFromMessage: task.title,
-      priority: normalizePlannerScorePriority(score.score),
+      priority: boostedPriority,
     };
   }
 
@@ -6004,6 +6942,17 @@ const buildPlanDayPriorityCandidate = (
     }
 
     if (linkedTask) {
+      const campaignPressureLead = getCampaignPressureLead(campaignMomentum, {
+        preferRepeatedSlip: true,
+      });
+      const priorityBase = normalizePlannerScorePriority(score.score);
+      const boostedPriority = campaignMomentum.status === "at_risk"
+        ? 5
+        : campaignMomentum.status === "stalled"
+        ? Math.max(priorityBase, 4)
+        : campaignMomentum.status === "drifting"
+        ? Math.max(priorityBase, 3)
+        : priorityBase;
       return {
         id: linkedTask.id,
         dedupeKey: `campaign-focus:${normalizeText(linkedTask.title)}`,
@@ -6011,19 +6960,19 @@ const buildPlanDayPriorityCandidate = (
         scheduledDate: targetDate,
         scheduledTime: null,
         estimatedDuration: getTaskDuration(linkedTask),
-        reasoning: campaignMomentum.status === "at_risk"
-          ? campaignMomentum.statusReason
-          : reason,
+        reasoning: campaignMomentum.status === "moving"
+          ? reason
+          : `${campaignPressureLead} This is the clearest move to protect that campaign today.`,
         epicId: epic.id,
         category: linkedTask.category ?? null,
-        notes: linkedTask.notes ?? campaignMomentum.statusReason,
+        notes: linkedTask.notes ?? campaignPressureLead,
         timingPreferenceLabel: inferTimingLabelFromClock(
           score.suggestedTime ?? null,
         ),
         energyType: inferEnergyTypeFromTitle(linkedTask.title),
         confidence: campaignMomentum.status === "at_risk" ? 0.88 : 0.82,
         derivedFromMessage: linkedTask.title,
-        priority: normalizePlannerScorePriority(score.score),
+        priority: boostedPriority,
       };
     }
 
@@ -6117,6 +7066,7 @@ const buildOptimizerQuestProposal = (
     title: `Create ${candidate.title}`,
     summary: `Create a quest for "${candidate.title}".`,
     reasoning: candidate.reasoning,
+    suggestedType: mapDraftPriorityToSuggestedQuestType(candidate.priority),
     payload: {
       taskText: candidate.title,
       difficulty: input.plannerContext.aiSignals?.preferredDifficulty ??
@@ -6144,10 +7094,17 @@ const buildOptimizerReply = (
   dateLabel: string,
   proposals: PlannerProposal[],
 ): string => {
+  const usesPlannerMoves = proposals.some((proposal) =>
+    proposal.kind !== "create_quest"
+  );
   const body = [
-    `I drafted ${proposals.length} quest${
-      proposals.length === 1 ? "" : "s"
-    } for ${dateLabel}.`,
+    usesPlannerMoves
+      ? `I drafted ${proposals.length} planner move${
+        proposals.length === 1 ? "" : "s"
+      } for ${dateLabel}.`
+      : `I drafted ${proposals.length} quest${
+        proposals.length === 1 ? "" : "s"
+      } for ${dateLabel}.`,
     "Review them and confirm what fits.",
   ];
 
@@ -6262,13 +7219,63 @@ const buildWeeklyPrioritySuggestions = (
       const task = findPlannerTaskById(input, score.taskId);
       if (!task || task.completed === true) continue;
       if (task.taskDate && task.taskDate > rangeEnd) continue;
+      const campaignMomentum = getTaskCampaignMomentum(input, task);
+      const campaignPressureLead = campaignMomentum
+        ? getCampaignPressureLead(campaignMomentum, {
+          preferRepeatedSlip: true,
+        })
+        : null;
+
+      if (
+        campaignMomentum &&
+        shouldSuggestStrategicCampaignAdjustment(campaignMomentum)
+      ) {
+        addSuggestion(buildCampaignAdjustmentSuggestedQuest(campaignMomentum, {
+          suggestionIdPrefix: "week:campaign-adjust",
+          type: getCampaignInterventionSuggestedType(
+            campaignMomentum,
+            mapPriorityScoreToSuggestedQuestType(score.score, task),
+          ),
+          reason: `${campaignPressureLead} This needs a reset plan this week, not another isolated task.`,
+        }));
+        continue;
+      }
+
+      if (
+        campaignMomentum?.oversizedTask?.id === task.id &&
+        campaignMomentum.interventionLevel === "reset"
+      ) {
+        addSuggestion({
+          suggestionId: `week:campaign-breakdown:${task.id}`,
+          proposalId: null,
+          title: `Break down ${task.title}`,
+          type: getCampaignInterventionSuggestedType(
+            campaignMomentum,
+            mapPriorityScoreToSuggestedQuestType(score.score, task),
+          ),
+          estimatedDuration: "20 min",
+          estimatedDurationMinutes: 20,
+          source: "campaign",
+          reason: `${campaignPressureLead} This needs a smaller reset move this week.`,
+        });
+        continue;
+      }
 
       addSuggestion(buildSuggestedQuestFromTask(
         task,
-        score.reasons[0] ??
-          "This is one of the clearest moves to protect this week.",
+        campaignMomentum && campaignMomentum.status !== "moving"
+          ? campaignMomentum.interventionLevel === "reset"
+            ? `${campaignPressureLead} This needs a reset move this week.`
+            : `${campaignPressureLead} This is one of the clearest campaign moves to protect this week.`
+          : score.reasons[0] ??
+            "This is one of the clearest moves to protect this week.",
         {
-          type: mapPriorityScoreToSuggestedQuestType(score.score, task),
+          type: campaignMomentum && campaignMomentum.status !== "moving"
+            ? getCampaignInterventionSuggestedType(
+              campaignMomentum,
+              mapPriorityScoreToSuggestedQuestType(score.score, task),
+            )
+            : mapPriorityScoreToSuggestedQuestType(score.score, task),
         },
       ));
       continue;
@@ -6282,19 +7289,57 @@ const buildWeeklyPrioritySuggestions = (
 
       const momentum = buildCampaignMomentumCandidate(input, epic);
       const linkedTask = selectCampaignNextTask(input, momentum);
+      const campaignPressureLead = getCampaignPressureLead(momentum, {
+        preferRepeatedSlip: true,
+      });
+
+      if (shouldSuggestStrategicCampaignAdjustment(momentum)) {
+        addSuggestion(buildCampaignAdjustmentSuggestedQuest(momentum, {
+          suggestionIdPrefix: "week:campaign-adjust",
+          type: getCampaignInterventionSuggestedType(
+            momentum,
+            momentum.status === "at_risk" ? "must" : "should",
+          ),
+          reason: `${campaignPressureLead} This needs a reset plan this week, not another isolated task.`,
+        }));
+        continue;
+      }
+
+      if (
+        momentum.oversizedTask &&
+        momentum.interventionLevel === "reset" &&
+        (!linkedTask || linkedTask.id === momentum.oversizedTask.id)
+      ) {
+        addSuggestion({
+          suggestionId: `week:campaign-breakdown:${momentum.oversizedTask.id}`,
+          proposalId: null,
+          title: `Break down ${momentum.oversizedTask.title}`,
+          type: getCampaignInterventionSuggestedType(momentum, "should"),
+          estimatedDuration: "20 min",
+          estimatedDurationMinutes: 20,
+          source: "campaign",
+          reason: `${campaignPressureLead} This needs a smaller reset move this week.`,
+        });
+        continue;
+      }
 
       if (linkedTask && linkedTask.completed !== true && (
         !linkedTask.taskDate || linkedTask.taskDate <= rangeEnd
       )) {
         addSuggestion(buildSuggestedQuestFromTask(
           linkedTask,
-          momentum.statusReason,
+          momentum.interventionLevel === "reset"
+            ? `${campaignPressureLead} This needs a reset move this week.`
+            : momentum.statusReason,
           {
-            type: momentum.status === "at_risk"
-              ? "must"
-              : momentum.status === "stalled"
-              ? "should"
-              : mapPriorityScoreToSuggestedQuestType(score.score, linkedTask),
+            type: getCampaignInterventionSuggestedType(
+              momentum,
+              momentum.status === "at_risk"
+                ? "must"
+                : momentum.status === "stalled"
+                ? "should"
+                : mapPriorityScoreToSuggestedQuestType(score.score, linkedTask),
+            ),
           },
         ));
         continue;
@@ -6305,20 +7350,29 @@ const buildWeeklyPrioritySuggestions = (
         proposalId: null,
         title: momentum.oversizedTask
           ? `Break down ${momentum.oversizedTask.title}`
+          : momentum.interventionLevel === "reset"
+          ? `Reset ${epic.title}`
           : momentum.status === "at_risk"
           ? `Protect ${epic.title}`
           : momentum.status === "stalled"
           ? `Define next step for ${epic.title}`
           : `Move ${epic.title} forward`,
-        type: momentum.status === "at_risk"
-          ? "must"
-          : momentum.status === "stalled"
-          ? "should"
-          : "nice",
+        type: getCampaignInterventionSuggestedType(
+          momentum,
+          momentum.status === "at_risk"
+            ? "must"
+            : momentum.status === "stalled"
+            ? "should"
+            : "nice",
+        ),
         estimatedDuration: momentum.oversizedTask ? "20 min" : "30 min",
         estimatedDurationMinutes: momentum.oversizedTask ? 20 : 30,
         source: "campaign",
-        reason: momentum.statusReason,
+        reason: momentum.interventionLevel === "reset"
+          ? `${getCampaignPressureLead(momentum, {
+            preferRepeatedSlip: true,
+          })} This needs a reset move this week.`
+          : momentum.statusReason,
       });
       continue;
     }
@@ -6353,6 +7407,7 @@ const buildWeeklyPlanStructuredOutput = (
   reply: string,
   classificationHint: ClassificationHint,
   weeklyTheme: string | null,
+  focusCampaign: CampaignMomentumCandidate | null,
   topPriorities: CompanionSuggestedQuest[],
   busyDays: string[],
   openDays: string[],
@@ -6366,6 +7421,17 @@ const buildWeeklyPlanStructuredOutput = (
   weeklyPlan: {
     message: reply,
     weeklyTheme,
+    focusCampaignTitle: focusCampaign?.epic.title ?? null,
+    focusCampaignStatus: focusCampaign?.status ?? null,
+    focusCampaignInterventionLevel: focusCampaign?.interventionLevel ?? null,
+    focusCampaignReason: focusCampaign
+      ? getCampaignPressureLead(focusCampaign, {
+        preferRepeatedSlip: true,
+      })
+      : null,
+    focusCampaignHealth: focusCampaign
+      ? buildCampaignHealthSnapshot(input, focusCampaign)
+      : null,
     topPriorities,
     busyDays,
     openDays,
@@ -6391,13 +7457,34 @@ const buildPlanWeekStarterResponse = (
     .filter((day) => day.status === "open")
     .map((day) => day.label);
   const selectedCampaign = selectCampaignMomentumCandidate(input);
+  const campaignPressureLead = selectedCampaign
+    ? getCampaignPressureLead(selectedCampaign, {
+      preferRepeatedSlip: true,
+    })
+    : null;
+  const weeklyAdjustmentProposal = selectedCampaign &&
+      shouldSuggestStrategicCampaignAdjustment(selectedCampaign)
+    ? buildCampaignAdjustmentProposalForMomentum(selectedCampaign)
+    : null;
   const weeklyTheme = input.plannerContext.statInterpretation?.weeklyNarrative ??
     (selectedCampaign
-      ? `${selectedCampaign.epic.title} is the campaign to protect this week.`
+      ? campaignPressureLead
+        ? `${selectedCampaign.epic.title} is the campaign to protect this week: ${campaignPressureLead}`
+        : `${selectedCampaign.epic.title} is the campaign to protect this week.`
       : busyDays.length > 0
       ? "Protect the high-leverage moves early and keep the crowded days lighter."
       : "You have room for a focused, realistic week.");
-  const topPriorities = buildWeeklyPrioritySuggestions(input);
+  const topPriorities = buildWeeklyPrioritySuggestions(input).map((quest) =>
+    weeklyAdjustmentProposal &&
+        selectedCampaign &&
+        quest.title === `Adjust ${selectedCampaign.epic.title}`
+      ? buildSuggestedQuestFromProposal(
+        input,
+        weeklyAdjustmentProposal,
+        quest.reason,
+      )
+      : quest
+  );
   const busyDaySummary = busyDays.length > 0
     ? `${busyDays.slice(0, 2).join(" and ")} ${
       busyDays.length === 1 ? "looks" : "look"
@@ -6409,6 +7496,44 @@ const buildPlanWeekStarterResponse = (
     : "The week is fairly even, so the main job is protecting the few moves that matter most.";
   const reply = `${weeklyTheme} ${busyDaySummary}`.trim();
 
+  const structuredResponse = buildWeeklyPlanStructuredOutput(
+    input,
+    reply,
+    classificationHint,
+    weeklyTheme,
+    selectedCampaign,
+    topPriorities,
+    busyDays,
+    openDays,
+  );
+
+  if (weeklyAdjustmentProposal) {
+    return {
+      mode: "proposal",
+      reply,
+      followUpQuestions: [],
+      proposals: [weeklyAdjustmentProposal],
+      suggestedReminders: [],
+      structuredResponse,
+      memoryUpdates: {
+        preferredTimeOfDay: sessionState.preferredTimeOfDay ??
+          input.plannerContext.plannerMemory?.preferredTimeOfDay ??
+          null,
+        preferredTimeReason: sessionState.preferredTimeReason ??
+          input.plannerContext.plannerMemory?.preferredTimeReason ??
+          null,
+        reminderPreference: sessionState.reminderPreference ??
+          (input.plannerContext.plannerMemory?.reminderMinutesBefore
+            ? `${input.plannerContext.plannerMemory.reminderMinutesBefore} minutes`
+            : null),
+      },
+      sessionState: {
+        ...sessionState,
+        lastClassification: classificationHint.type,
+      },
+    };
+  }
+
   return buildReadOnlyResponse(
     reply,
     {
@@ -6416,15 +7541,289 @@ const buildPlanWeekStarterResponse = (
       lastClassification: classificationHint.type,
     },
     "schedule_read",
-    buildWeeklyPlanStructuredOutput(
-      input,
+    structuredResponse,
+  );
+};
+
+const getDateSummary = (
+  input: PlannerBuildInput,
+  date: string,
+): CompanionTomorrowSummary => {
+  const dayLoad = input.plannerContext.scheduleInsights?.dayLoads.find((day) =>
+    day.date === date
+  );
+  if (!dayLoad || dayLoad.status === "open") return "open";
+  if (dayLoad.status === "balanced") return "light";
+  return "busy";
+};
+
+const buildTomorrowFirstAction = (
+  input: PlannerBuildInput,
+  tomorrow: string,
+  carryForward: string | null,
+): {
+  firstAction: CompanionSuggestedQuest | null;
+  proposal: PlannerProposal | null;
+} => {
+  const tomorrowTaskEntries = getResolvedPriorityScores(input)
+    .filter((score) => score.kind === "task" && score.taskId)
+    .map((score) => ({
+      score,
+      task: findPlannerTaskById(input, score.taskId ?? null),
+    }))
+    .filter((
+      entry,
+    ): entry is { score: PlannerPriorityScore; task: PlannerContextTask } =>
+      entry.task !== null &&
+      entry.task.completed !== true &&
+      entry.task.taskDate === tomorrow
+    )
+    .sort((left, right) => right.score.score - left.score.score);
+
+  const bestTomorrowTask = tomorrowTaskEntries[0] ?? null;
+  if (bestTomorrowTask) {
+    return {
+      firstAction: buildSuggestedQuestFromTask(
+        bestTomorrowTask.task,
+        carryForward
+          ? `${carryForward} This is the cleanest first move already on tomorrow's board.`
+          : bestTomorrowTask.score.reasons[0] ??
+            "This is the clearest move to protect first tomorrow.",
+        {
+          type: mapPriorityScoreToSuggestedQuestType(
+            bestTomorrowTask.score.score,
+            bestTomorrowTask.task,
+          ),
+        },
+      ),
+      proposal: null,
+    };
+  }
+
+  const selectedCampaign = selectCampaignMomentumCandidate(input);
+  if (!selectedCampaign) {
+    return {
+      firstAction: null,
+      proposal: null,
+    };
+  }
+  const campaignPressureLead = getCampaignPressureLead(selectedCampaign, {
+    preferRepeatedSlip: true,
+  });
+  const interventionType = getCampaignInterventionSuggestedType(
+    selectedCampaign,
+    selectedCampaign.status === "at_risk" ? "must" : "should",
+  );
+  const adjustmentProposal = shouldSuggestStrategicCampaignAdjustment(
+      selectedCampaign,
+    )
+    ? buildCampaignAdjustmentProposalForMomentum(selectedCampaign)
+    : null;
+
+  if (adjustmentProposal) {
+    return {
+      firstAction: buildSuggestedQuestFromProposal(
+        input,
+        adjustmentProposal,
+        carryForward
+          ? `${carryForward} The honest first move tomorrow is resetting ${selectedCampaign.epic.title} before you pile on more work.`
+          : `${campaignPressureLead} The honest first move tomorrow is resetting ${selectedCampaign.epic.title} before you pile on more work.`,
+      ),
+      proposal: adjustmentProposal,
+    };
+  }
+
+  const linkedTask = selectCampaignNextTask(input, selectedCampaign);
+  if (
+    selectedCampaign.oversizedTask &&
+    selectedCampaign.interventionLevel === "reset" &&
+    (!linkedTask || linkedTask.id === selectedCampaign.oversizedTask.id)
+  ) {
+    return {
+      firstAction: {
+        suggestionId: `tomorrow:campaign-breakdown:${selectedCampaign.oversizedTask.id}`,
+        proposalId: null,
+        title: `Break down ${selectedCampaign.oversizedTask.title}`,
+        type: interventionType,
+        estimatedDuration: "20 min",
+        estimatedDurationMinutes: 20,
+        source: "campaign",
+        reason: carryForward
+          ? `${carryForward} The smartest way to restart this campaign tomorrow is to make the next move smaller first.`
+          : `${campaignPressureLead} The smartest way to restart this campaign tomorrow is to make the next move smaller first.`,
+      },
+      proposal: null,
+    };
+  }
+
+  if (
+    linkedTask &&
+    linkedTask.completed !== true &&
+    (!linkedTask.taskDate || linkedTask.taskDate <= input.currentDate)
+  ) {
+    return {
+      firstAction: buildSuggestedQuestFromTask(
+        linkedTask,
+        carryForward
+          ? `${carryForward} This is the strongest campaign move to carry into tomorrow.`
+          : selectedCampaign.interventionLevel === "reset"
+          ? `${campaignPressureLead} This needs a reset move first tomorrow.`
+          : campaignPressureLead,
+        {
+          type: interventionType,
+        },
+      ),
+      proposal: null,
+    };
+  }
+
+  if (selectedCampaign.oversizedTask) {
+    return {
+      firstAction: {
+        suggestionId: `tomorrow:campaign:${selectedCampaign.epic.id}`,
+        proposalId: null,
+        title: `Break down ${selectedCampaign.oversizedTask.title}`,
+        type: interventionType,
+        estimatedDuration: "20 min",
+        estimatedDurationMinutes: 20,
+        source: "campaign",
+        reason: carryForward
+          ? `${carryForward} The smartest way to protect this campaign tomorrow is to make the next move smaller first.`
+          : selectedCampaign.interventionLevel === "reset"
+          ? `${campaignPressureLead} The smartest way to restart this campaign tomorrow is to make the next move smaller first.`
+          : campaignPressureLead,
+      },
+      proposal: null,
+    };
+  }
+
+  return {
+    firstAction: null,
+    proposal: null,
+  };
+};
+
+const buildReflectionBridgeStructuredOutput = (
+  input: PlannerBuildInput,
+  reply: string,
+  classificationHint: ClassificationHint,
+  options: {
+    carryForward: string | null;
+    tomorrowSummary: CompanionTomorrowSummary;
+    firstAction: CompanionSuggestedQuest | null;
+    tomorrowSchedule: CompanionScheduleItem[];
+  },
+): CompanionStructuredResponse => ({
+  intent: mapPlannerIntentMetadata(input, classificationHint, {
+    forceIntentType: "conversation",
+    shouldCreateQuest: false,
+    shouldPromptCampaign: false,
+  }),
+  planDay: null,
+  weeklyPlan: null,
+  reflectionBridge: {
+    message: reply,
+    carryForward: options.carryForward,
+    tomorrowSummary: options.tomorrowSummary,
+    firstAction: options.firstAction,
+    tomorrowSchedule: options.tomorrowSchedule,
+  },
+  comingUp: null,
+  rightNow: null,
+  dayAdjust: null,
+});
+
+const buildReflectionBridgeResponse = (
+  input: PlannerBuildInput,
+  sessionState: PlannerSessionState,
+  classificationHint: ClassificationHint,
+): PlannerBuildResult => {
+  const tomorrow = addDaysToDateKey(input.currentDate, 1);
+  const latestReflection = input.plannerContext.reflectionSignals?.[0] ?? null;
+  const carryForward = latestReflection?.tomorrowAdjustment ?? null;
+  const tomorrowSummary = getDateSummary(input, tomorrow);
+  const tomorrowSchedule = collectStructuredScheduleItemsForDate(
+    input,
+    tomorrow,
+    false,
+  );
+  const tomorrowActionState = buildTomorrowFirstAction(
+    input,
+    tomorrow,
+    carryForward,
+  );
+  const firstAction = tomorrowActionState.firstAction;
+  const selectedCampaign = carryForward ? null : selectCampaignMomentumCandidate(input);
+  const campaignPressureLead = selectedCampaign
+    ? getCampaignPressureLead(selectedCampaign, {
+      preferRepeatedSlip: true,
+    })
+    : null;
+
+  const openingLine = carryForward
+    ? `You wanted to carry this into tomorrow: ${carryForward}`
+    : selectedCampaign && campaignPressureLead
+    ? selectedCampaign.interventionLevel === "reset"
+      ? `The campaign to reset tomorrow is ${selectedCampaign.epic.title}: ${campaignPressureLead}`
+      : `The campaign to protect tomorrow is ${selectedCampaign.epic.title}: ${campaignPressureLead}`
+    : "Here's the cleanest planner handoff into tomorrow.";
+  const scheduleLine = tomorrowSummary === "busy"
+    ? "Tomorrow already looks busy, so keep the first move focused and realistic."
+    : tomorrowSummary === "light"
+    ? "Tomorrow has some room, so the goal is starting with the right move instead of adding more noise."
+    : "Tomorrow looks open, so the main job is choosing a strong first move before the day fills itself.";
+  const actionLine = firstAction
+    ? `First move: ${firstAction.title}. ${firstAction.reason}`
+    : "I don't see one obvious tomorrow move on the board yet, so keeping the first hour light and deliberate will matter more than overcommitting tonight.";
+  const reply = [openingLine, scheduleLine, actionLine].join(" ");
+
+  const structuredResponse = buildReflectionBridgeStructuredOutput(
+    input,
+    reply,
+    classificationHint,
+    {
+      carryForward,
+      tomorrowSummary,
+      firstAction,
+      tomorrowSchedule,
+    },
+  );
+
+  if (tomorrowActionState.proposal) {
+    return {
+      mode: "proposal",
       reply,
-      classificationHint,
-      weeklyTheme,
-      topPriorities,
-      busyDays,
-      openDays,
-    ),
+      followUpQuestions: [],
+      proposals: [tomorrowActionState.proposal],
+      suggestedReminders: [],
+      structuredResponse,
+      memoryUpdates: {
+        preferredTimeOfDay: sessionState.preferredTimeOfDay ??
+          input.plannerContext.plannerMemory?.preferredTimeOfDay ??
+          null,
+        preferredTimeReason: sessionState.preferredTimeReason ??
+          input.plannerContext.plannerMemory?.preferredTimeReason ??
+          null,
+        reminderPreference: sessionState.reminderPreference ??
+          (input.plannerContext.plannerMemory?.reminderMinutesBefore
+            ? `${input.plannerContext.plannerMemory.reminderMinutesBefore} minutes`
+            : null),
+      },
+      sessionState: {
+        ...sessionState,
+        lastClassification: classificationHint.type,
+      },
+    };
+  }
+
+  return buildReadOnlyResponse(
+    reply,
+    {
+      ...sessionState,
+      lastClassification: classificationHint.type,
+    },
+    "schedule_read",
+    structuredResponse,
   );
 };
 
@@ -6693,11 +8092,52 @@ const getDayAdjustCampaignProtectedTask = (
       status: campaignMomentum.status,
       reason: campaignMomentum.tooManyCampaigns
         ? `This is the campaign move to protect while too many active campaigns are competing for attention.`
+        : campaignMomentum.interventionLevel === "reset"
+        ? `${getCampaignPressureLead(campaignMomentum, {
+          preferRepeatedSlip: true,
+        })} This is the reset move to protect today.`
         : campaignMomentum.status === "at_risk"
         ? `This is the clearest move to stop ${epic.title} from slipping today.`
         : campaignMomentum.status === "stalled"
         ? `This is the concrete restart move ${epic.title} needs today.`
         : `This keeps ${epic.title} from drifting further today.`,
+    };
+  }
+
+  return null;
+};
+
+const getDayAdjustStrategicCampaignSuggestion = (
+  input: PlannerBuildInput,
+): {
+  campaignTitle: string;
+  momentum: CampaignMomentumCandidate;
+} | null => {
+  const seenCampaignIds = new Set<string>();
+
+  for (const score of getResolvedPriorityScores(input)) {
+    const epicId = score.kind === "epic"
+      ? score.epicId
+      : score.kind === "task"
+      ? score.epicId ?? findPlannerTaskById(input, score.taskId)?.epicId ?? null
+      : null;
+    if (!epicId || seenCampaignIds.has(epicId)) continue;
+    seenCampaignIds.add(epicId);
+
+    const epic = input.plannerContext.activeEpics.find((candidate) =>
+      candidate.id === epicId
+    );
+    if (!epic) continue;
+
+    const campaignMomentum = buildCampaignMomentumCandidate(input, epic);
+    const linkedTask = selectCampaignNextTask(input, campaignMomentum);
+    if (linkedTask?.taskDate === input.currentDate) continue;
+    if (!hasRepeatedCampaignSlip(campaignMomentum)) continue;
+    if (!shouldSuggestStrategicCampaignAdjustment(campaignMomentum)) continue;
+
+    return {
+      campaignTitle: epic.title,
+      momentum: campaignMomentum,
     };
   }
 
@@ -6718,6 +8158,12 @@ const buildDayAdjustResponse = (
     input,
     entries,
   );
+  const protectedCampaignReset = protectedCampaignTask
+    ? null
+    : getDayAdjustStrategicCampaignSuggestion(input);
+  const protectedCampaignResetProposal = protectedCampaignReset
+    ? buildCampaignAdjustmentProposalForMomentum(protectedCampaignReset.momentum)
+    : null;
   const protectedIds = new Set(
     entries
       .filter((entry, index) =>
@@ -6751,21 +8197,41 @@ const buildDayAdjustResponse = (
     )
     .slice(0, 2);
 
-  const keep = keepEntries.map((entry) =>
-    buildSuggestedQuestFromTask(
-      entry.task,
-      entry.task.id === protectedCampaignTask?.taskId
-        ? protectedCampaignTask.reason
-        : entry.score.reasons[0] ??
-        "This is one of the strongest moves left for today.",
-      {
-        type: mapPriorityScoreToSuggestedQuestType(
-          entry.score.score,
-          entry.task,
+  const keep = [
+    ...(protectedCampaignResetProposal
+      ? [
+        buildSuggestedQuestFromProposal(
+          input,
+          protectedCampaignResetProposal,
+          `${
+            getCampaignPressureLead(protectedCampaignReset!.momentum, {
+              preferRepeatedSlip: true,
+            })
+          } Protect a reset move for ${
+            protectedCampaignReset!.campaignTitle
+          } today instead of crowding in more low-leverage work.`,
         ),
-      },
-    )
-  );
+      ]
+      : []),
+    ...keepEntries.map((entry) =>
+      buildSuggestedQuestFromTask(
+        entry.task,
+        entry.task.id === protectedCampaignTask?.taskId
+          ? protectedCampaignTask.reason
+          : entry.score.reasons[0] ??
+          "This is one of the strongest moves left for today.",
+        {
+          type: mapPriorityScoreToSuggestedQuestType(
+            entry.score.score,
+            entry.task,
+          ),
+        },
+      )
+    ),
+  ].slice(0, 3);
+  const protectedCampaignTitle = protectedCampaignTask?.campaignTitle ??
+    protectedCampaignReset?.campaignTitle ??
+    null;
   const nextDate = addDaysToDateKey(input.currentDate, 1);
   const moveProposals = moveEntries.map((entry) =>
     buildMoveProposalForTask(
@@ -6784,9 +8250,13 @@ const buildDayAdjustResponse = (
       options?.lowEnergy
         ? protectedCampaignTask
           ? `Move this out so today's core plan stays light while ${protectedCampaignTask.campaignTitle} keeps its foothold.`
+          : protectedCampaignReset
+          ? `Move this out so ${protectedCampaignReset.campaignTitle} gets the reset space it needs today.`
           : "Move this out so today's core plan stays light."
         : protectedCampaignTask
         ? `Move this out so ${protectedCampaignTask.campaignTitle} keeps the cleaner slot in today's plan.`
+        : protectedCampaignReset
+        ? `Move this out so ${protectedCampaignReset.campaignTitle} gets the reset space it needs today.`
         : "Move this out so today's core plan stays realistic.",
     )
   );
@@ -6795,6 +8265,8 @@ const buildDayAdjustResponse = (
       entry.task,
       protectedCampaignTask
         ? `If time still feels tight, shrink this to a 15-minute pass or let it go so ${protectedCampaignTask.campaignTitle} keeps the space it needs.`
+        : protectedCampaignReset
+        ? `If time still feels tight, shrink this to a 15-minute pass or let it go so ${protectedCampaignReset.campaignTitle} has room for a reset move.`
         : "If time still feels tight, shrink this to a 15-minute pass or let it go today.",
       { type: "nice" },
     )
@@ -6804,23 +8276,34 @@ const buildDayAdjustResponse = (
     ? options?.lowEnergy
       ? protectedCampaignTask
         ? `I'm lightening today by protecting the move that keeps ${protectedCampaignTask.campaignTitle} alive, shifting ${moveProposals.length}, and giving you permission to shrink the rest.`
+        : protectedCampaignReset
+        ? `I'm lightening today by protecting the reset move ${protectedCampaignReset.campaignTitle} needs, shifting ${moveProposals.length}, and giving you permission to shrink the rest.`
         : `I'm lightening today by protecting ${keep.length || 1} core move${
           keep.length === 1 ? "" : "s"
         }, shifting ${moveProposals.length}, and giving you permission to shrink the rest.`
       : protectedCampaignTask
       ? `I'm tightening today by protecting the move that keeps ${protectedCampaignTask.campaignTitle} from slipping, shifting ${moveProposals.length}, and trimming what doesn't need to stay.`
+      : protectedCampaignReset
+      ? `I'm tightening today by protecting the reset move ${protectedCampaignReset.campaignTitle} needs, shifting ${moveProposals.length}, and trimming what doesn't need to stay.`
       : `I'm tightening today by protecting the strongest move${
         keep.length === 1 ? "" : "s"
       }, shifting ${moveProposals.length}, and trimming what doesn't need to stay.`
     : keep.length > 0
-    ? "Today is already fairly lean. I'd keep the strongest move or two and avoid adding more."
+    ? protectedCampaignTitle
+      ? `Today is already fairly lean. I'd protect the reset move ${protectedCampaignTitle} needs and avoid crowding the day.`
+      : "Today is already fairly lean. I'd keep the strongest move or two and avoid adding more."
     : "There's not much cleanly schedulable work left today. The best move is to keep the day light and avoid forcing it.";
 
   return {
-    mode: moveProposals.length > 0 ? "proposal" : "schedule_read",
+    mode: moveProposals.length > 0 || protectedCampaignResetProposal
+      ? "proposal"
+      : "schedule_read",
     reply,
     followUpQuestions: [],
-    proposals: moveProposals,
+    proposals: [
+      ...(protectedCampaignResetProposal ? [protectedCampaignResetProposal] : []),
+      ...moveProposals,
+    ],
     suggestedReminders: [],
     structuredResponse: buildDayAdjustStructuredOutput(
       input,
@@ -6859,6 +8342,9 @@ const buildPlanDayDraftResponse = (
   const targetDate = getPlanDayTargetDate(input);
   const existingWorkItems = countPlanDayExistingWorkItems(input, targetDate);
   const targetTotal = getPlanDayTargetTotal(input, targetDate);
+  const strategicAdjustmentProposal = buildPlanDayStrategicAdjustmentProposal(
+    input,
+  );
   const existingTitleKeys = new Set(
     [...input.plannerContext.tasks, ...input.plannerContext.inboxTasks]
       .filter((task) => task.completed !== true && task.taskDate === targetDate)
@@ -6866,7 +8352,7 @@ const buildPlanDayDraftResponse = (
   );
   const candidates: OptimizerDraftCandidate[] = [];
   const proposalTarget = Math.min(
-    4,
+    Math.max(0, 4 - (strategicAdjustmentProposal ? 1 : 0)),
     Math.max(
       buildPlanDayConcreteCandidate(input, targetDate) ? 1 : 0,
       targetTotal - existingWorkItems,
@@ -6888,9 +8374,13 @@ const buildPlanDayDraftResponse = (
       addCandidate(buildPlanDayPriorityCandidate(input, score, targetDate));
     }
   }
-  const proposals = candidates
+  const questProposals = candidates
     .slice(0, Math.min(4, proposalTarget))
     .map((candidate) => buildOptimizerQuestProposal(input, candidate));
+  const proposals = [
+    ...(strategicAdjustmentProposal ? [strategicAdjustmentProposal] : []),
+    ...questProposals,
+  ].slice(0, 4);
   const conflictNotes = proposals
     .map((proposal) => {
       const payload = proposal.payload as {
@@ -7353,6 +8843,14 @@ export function buildPlannerResponse(
       );
     }
 
+    if (starterIntent === "briefing_followup") {
+      return buildReflectionBridgeResponse(
+        resolvedInput,
+        resolvedInput.sessionState,
+        classificationHint,
+      );
+    }
+
     if (isScheduleQuestion(resolvedInput.message)) {
       const reply = buildReadOnlyScheduleReply(
         resolvedInput,
@@ -7386,8 +8884,7 @@ export function buildPlannerResponse(
 
     if (
       starterIntent === "make_room" ||
-      starterIntent === "what_matters" ||
-      starterIntent === "briefing_followup"
+      starterIntent === "what_matters"
     ) {
       return buildPriorityOverviewResponse(
         resolvedInput,

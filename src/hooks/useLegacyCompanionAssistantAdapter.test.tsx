@@ -205,7 +205,7 @@ describe("useLegacyCompanionAssistantAdapter", () => {
               },
               planDay: {
                 message: "I drafted a lighter day for you.",
-                dayAssessment: "light",
+                dayAssessment: "low_energy",
                 suggestedQuests: [],
               },
             },
@@ -244,5 +244,67 @@ describe("useLegacyCompanionAssistantAdapter", () => {
         }),
       ],
     });
+  });
+
+  it("exposes planner suggestions as read-only guidance in fallback mode", async () => {
+    mocks.planner.structuredResponse = {
+      intent: {
+        intentType: "quest",
+        timeHorizon: "today",
+        isRecurring: false,
+        shouldCreateQuest: true,
+        shouldPromptCampaign: false,
+      },
+      planDay: {
+        message: "Here is the clearest day shape.",
+        dayAssessment: "balanced",
+        suggestedQuests: [
+          {
+            suggestionId: "plan-1",
+            proposalId: "proposal-1",
+            title: "Outline launch checklist",
+            type: "must",
+            estimatedDuration: "45 min",
+            estimatedDurationMinutes: 45,
+            source: "campaign",
+            reason: "It keeps launch moving.",
+          },
+        ],
+      },
+    };
+    mocks.planner.pendingProposals = [
+      {
+        id: "proposal-1",
+        kind: "create_quest",
+        title: "Outline launch checklist",
+        summary: "It keeps launch moving.",
+        payload: {},
+        status: "pending",
+        readyToConfirm: true,
+        missingFields: [],
+      },
+    ];
+    mocks.planner.readyProposalCount = 1;
+
+    const { result } = renderHook(() =>
+      useLegacyCompanionAssistantAdapter({
+        enabled: true,
+        surface: "journeys",
+        plannerFallbackMode: "read_only",
+      })
+    );
+
+    expect(
+      result.current.structuredResponse?.planDay?.suggestedQuests[0]?.proposalId,
+    ).toBeNull();
+    expect(result.current.pendingAction).toBeNull();
+    expect(result.current.pendingActionCount).toBe(0);
+    expect(result.current.readyPendingActionCount).toBe(0);
+
+    await act(async () => {
+      await result.current.confirmSuggestedQuest("proposal-1");
+    });
+
+    expect(mocks.planner.confirmProposal).not.toHaveBeenCalled();
   });
 });

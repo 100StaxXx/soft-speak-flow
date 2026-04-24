@@ -326,7 +326,7 @@ describe("useCompanionPlanner", () => {
               },
               planDay: {
                 message: "I drafted a lighter day for you.",
-                dayAssessment: "light",
+                dayAssessment: "low_energy",
                 suggestedQuests: [
                   {
                     suggestionId: "plan-1",
@@ -335,7 +335,7 @@ describe("useCompanionPlanner", () => {
                     type: "must",
                     estimatedDuration: "20 min",
                     estimatedDurationMinutes: 20,
-                    source: "maintenance",
+                    source: "optimization",
                     reason: "It gives you a calm starting point.",
                   },
                 ],
@@ -1934,7 +1934,7 @@ describe("useCompanionPlanner", () => {
       userId: "user-1",
       titles: ["Warm up", "Cooldown walk"],
       shouldQueueWrites: false,
-      queueAction: mocks.queueAction,
+      queueAction: expect.any(Function),
       retryNow: mocks.retryNow,
     });
     expect(mocks.invalidateQueries).toHaveBeenCalledWith({

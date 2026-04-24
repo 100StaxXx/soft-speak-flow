@@ -6,6 +6,8 @@ import {
 import { TimeoutError, withTimeout } from "../../../src/utils/asyncTimeout.ts";
 import { withCompanionChatPersistenceCapability } from "../companion-chat/persistenceCapability.ts";
 import {
+  CampaignLifecycleStatusSchema,
+  COMPANION_CAMPAIGN_LIFECYCLE_STATUSES,
   type CompanionAgentIntent,
   type CompanionAgentMode,
   type CompanionAgentRequest,
@@ -84,12 +86,12 @@ const PrepareReminderCreateSchema = z.object({
     .nullable(),
 });
 
-const PrepareCampaignUpdateSchema = z.object({
+export const PrepareCampaignUpdateSchema = z.object({
   campaign_id: z.string().uuid(),
   title: z.string().min(1).max(200).optional().nullable(),
   description: z.string().max(2000).optional().nullable(),
   end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
-  status: z.string().max(60).optional().nullable(),
+  status: CampaignLifecycleStatusSchema.optional().nullable(),
   target_days: z.number().int().min(1).max(365).optional().nullable(),
 });
 
@@ -894,7 +896,10 @@ function buildToolDefinitions() {
           title: { type: "string" },
           description: { type: "string" },
           end_date: { type: "string" },
-          status: { type: "string" },
+          status: {
+            type: "string",
+            enum: [...COMPANION_CAMPAIGN_LIFECYCLE_STATUSES],
+          },
           target_days: { type: "number" },
         },
       },
@@ -1254,7 +1259,8 @@ function buildPreparedCandidateFromPlannerHint(
   const affectedEntities = hint.actionType === "task_update" &&
       typeof normalizedPayload.task_id === "string"
     ? { task_id: normalizedPayload.task_id }
-    : hint.actionType === "campaign_update" &&
+    : (hint.actionType === "campaign_update" ||
+        hint.actionType === "campaign_adjust") &&
         typeof normalizedPayload.campaign_id === "string"
     ? { campaign_id: normalizedPayload.campaign_id }
     : hint.actionType === "reminder_create" &&

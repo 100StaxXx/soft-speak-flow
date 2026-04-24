@@ -348,6 +348,10 @@ const isPhaseADeterministicStarterResponse = (
     return baseResult.mode === "schedule_read" &&
       baseResult.followUpQuestions.length === 0;
   }
+  if (starterIntent === "briefing_followup") {
+    return baseResult.mode === "schedule_read" &&
+      baseResult.followUpQuestions.length === 0;
+  }
   if (starterIntent === "right_now_start") {
     return baseResult.mode === "schedule_read" &&
       baseResult.followUpQuestions.length === 0;

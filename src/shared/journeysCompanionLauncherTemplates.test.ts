@@ -68,6 +68,14 @@ describe("journeys companion launcher greetings", () => {
       starterIntent: "plan_day",
     });
 
+    expect(templates.find((template) => template.id === "prepare-tomorrow")).toMatchObject({
+      id: "prepare-tomorrow",
+      label: "Prepare me for tomorrow",
+      message: "Prepare me for tomorrow",
+      target: "planner",
+      starterIntent: "briefing_followup",
+    });
+
     expect(templates.find((template) => template.id === "plan-week")).toMatchObject({
       id: "plan-week",
       label: "Plan my week",

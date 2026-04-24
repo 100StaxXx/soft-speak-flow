@@ -134,6 +134,7 @@ export const CompanionPlannerPanel = memo(() => {
               [
                 "plan-week",
                 "plan-day",
+                "prepare-tomorrow",
                 "advance-campaign",
                 "adjust-day",
                 "make-room",
@@ -158,6 +159,7 @@ export const CompanionPlannerPanel = memo(() => {
                   }
                   void assistant.submitMessage(action.message, "text", {
                     starterIntent: action.starterIntent,
+                    planningMode: action.planningMode ?? null,
                   });
                 }}
               >
@@ -165,6 +167,8 @@ export const CompanionPlannerPanel = memo(() => {
                   ? "Plan My Week"
                   : action.id === "plan-day"
                   ? "Plan My Day"
+                  : action.id === "prepare-tomorrow"
+                  ? "Tomorrow"
                   : action.id === "advance-campaign"
                   ? "Advance My Campaign"
                   : action.id === "adjust-day"

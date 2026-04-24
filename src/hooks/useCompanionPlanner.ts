@@ -49,6 +49,10 @@ import { parseFunctionInvokeError } from "@/utils/supabaseFunctionErrors";
 import type { Json } from "@/integrations/supabase/types";
 import type { EpicRecord } from "@/hooks/epicsQuery";
 import { stripMarkdown } from "@/lib/utils";
+import type {
+  CompanionChatSurface,
+  CompanionChatThreadMessage,
+} from "@/types/companionConversation";
 import {
   generateCompanionThreadSessionId,
   getCompanionChatThreadsQueryKey,
@@ -71,9 +75,7 @@ import { buildCompanionStatInterpretation } from "@/shared/companionStatSignals"
 import { withTimeout } from "@/utils/asyncTimeout";
 import { normalizeUuidLikeId } from "@/utils/offlineId";
 import type {
-  CompanionChatSurface,
   CompanionPlannerContextStarterIntent,
-  CompanionChatThreadMessage,
   CompanionPlannerMessage,
   CompanionPlannerProposal,
   CompanionPlannerProposalKind,
@@ -234,7 +236,7 @@ const asNumberRecord = (
     Object.entries(value).filter(([, entry]) =>
       typeof entry === "number" && Number.isFinite(entry)
     ),
-  );
+  ) as Record<string, number>;
 };
 
 const parseReminderPreferenceMinutes = (
@@ -558,7 +560,7 @@ const mapMoodToEnergy = (
 
 const deriveStarterIntentFromMessage = (
   message: string,
-): CompanionPlannerStarterIntent => {
+): CompanionPlannerContextStarterIntent => {
   const normalizedMessage = message.trim().toLowerCase();
 
   if (normalizedMessage === "quest?") {
@@ -1121,7 +1123,7 @@ export function useCompanionPlanner({
   const { inboxTasks } = useInboxTasks({ enabled });
   const { activeEpics, createEpic, renameEpic, createCampaignRitual } =
     useEpics({ enabled });
-  const { addTask, updateTask } = useTaskMutations();
+  const { addTask, updateTask } = useTaskMutations(todayIso);
   const { saveRitual } = useRitualUpdate();
   const { connectedByProvider, defaultProvider } = useCalendarIntegrations({
     enabled,
@@ -1564,12 +1566,16 @@ export function useCompanionPlanner({
       recentEvents: (recentStatSignalsQuery.data?.recentEvents ?? []).map((
         event,
       ) => ({
-        attribute: event.attribute,
+        attribute: event.attribute as Parameters<
+          typeof buildCompanionStatInterpretation
+        >[0]["recentEvents"][number]["attribute"],
         sourceEvent: event.source_event,
         amountAwarded: event.amount_awarded,
         echoAmount: event.echo_amount,
         createdAt: event.created_at,
-      })),
+      })) as Parameters<
+        typeof buildCompanionStatInterpretation
+      >[0]["recentEvents"],
       recentTasks: (recentStatSignalsQuery.data?.recentTasks ?? []).map((
         task,
       ) => ({
@@ -2146,7 +2152,8 @@ export function useCompanionPlanner({
     const message = rawMessage.trim();
     if (!message || isSubmitting) return;
 
-    const resolvedStarterIntent = normalizeStarterIntentForPlanner(
+    const resolvedStarterIntent: CompanionPlannerContextStarterIntent =
+      normalizeStarterIntentForPlanner(
       options?.starterIntent,
     ) ?? deriveStarterIntentFromMessage(message);
     if (resolvedStarterIntent === "quest_capture" && !options?.skipUserEcho) {
@@ -2308,7 +2315,7 @@ export function useCompanionPlanner({
         sessionState: nextSession,
       });
 
-      await persistPlannerThreadRows([
+      const persistedRows: Parameters<typeof persistPlannerThreadRows>[0] = [
         ...(
           options?.skipUserEcho ? [] : [{
             role: "user" as const,
@@ -2318,7 +2325,7 @@ export function useCompanionPlanner({
           }]
         ),
         {
-          role: "assistant",
+          role: "assistant" as const,
           content: assistantMessage.content,
           createdAt: assistantMessage.createdAt,
           metadata: {
@@ -2327,9 +2334,10 @@ export function useCompanionPlanner({
             proposals: response.proposals,
             suggestedReminders: response.suggestedReminders,
             sessionState: response.sessionState,
-          },
+          } as unknown as Json,
         },
-      ]);
+      ];
+      await persistPlannerThreadRows(persistedRows);
 
       await trackInteraction({
         interactionType: "companion_planner",
@@ -2509,7 +2517,16 @@ export function useCompanionPlanner({
                 userId: user.id,
                 titles: subtaskPlan.titles,
                 shouldQueueWrites,
-                queueAction,
+                queueAction: async (action) => {
+                  await queueAction({
+                    ...action,
+                    payload: (typeof action.payload === "object" &&
+                        action.payload !== null &&
+                        !Array.isArray(action.payload))
+                      ? action.payload as Record<string, unknown>
+                      : {},
+                  });
+                },
                 retryNow,
               });
 
@@ -2606,7 +2623,7 @@ export function useCompanionPlanner({
           break;
         }
         case "create_ritual": {
-          const payload = proposal.payload as Parameters<
+          const payload = proposal.payload as unknown as Parameters<
             typeof createCampaignRitual
           >[0];
           await createCampaignRitual(payload);
@@ -2621,7 +2638,9 @@ export function useCompanionPlanner({
           break;
         }
         case "update_ritual": {
-          const payload = proposal.payload as Parameters<typeof saveRitual>[0];
+          const payload = proposal.payload as unknown as Parameters<
+            typeof saveRitual
+          >[0];
           await saveRitual(payload);
           if (payload.preferredTime) {
             await trackTaskCreation(
@@ -2634,7 +2653,9 @@ export function useCompanionPlanner({
           break;
         }
         case "suggest_reminder": {
-          const payload = proposal.payload as Parameters<typeof updateTask>[0];
+          const payload = proposal.payload as unknown as Parameters<
+            typeof updateTask
+          >[0];
           mutationResult = await updateTask(payload) as
             | { queued?: boolean }
             | null;
@@ -2952,7 +2973,9 @@ export function useCompanionPlanner({
   }) => {
     bootstrappedGreetingRef.current = true;
     sessionIdRef.current = options.sessionId;
-    const nextMessages = options.messages.map((message) => ({
+    const nextMessages: CompanionPlannerMessage[] = options.messages.map((
+      message,
+    ) => ({
       id: message.id,
       role: message.role === "assistant" ? "companion" : "user",
       content: message.content,

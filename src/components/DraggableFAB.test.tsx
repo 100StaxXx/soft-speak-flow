@@ -254,6 +254,19 @@ describe("DraggableFAB", () => {
     }));
   });
 
+  it("routes the prepare-tomorrow option through the planner as the reflection bridge starter", () => {
+    render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
+
+    fireEvent.click(screen.getByTestId("journeys-companion-launcher-floating"));
+    fireEvent.click(screen.getByTestId("journeys-companion-launcher-option-prepare-tomorrow"));
+
+    expect(mocks.onOpenCompanionPlanner).toHaveBeenCalledWith(expect.objectContaining({
+      target: "planner",
+      starterIntent: "briefing_followup",
+      message: "Prepare me for tomorrow",
+    }));
+  });
+
   it("routes the plan-week option through the planner as the weekly planning starter", () => {
     render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
 

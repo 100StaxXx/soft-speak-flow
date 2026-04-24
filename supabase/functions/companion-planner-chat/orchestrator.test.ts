@@ -223,6 +223,65 @@ Deno.test("skips orchestration for right-now starter schedule reads", async () =
   );
 });
 
+Deno.test("skips orchestration for reflection bridge starter schedule reads", async () => {
+  let fetchCalled = false;
+  const response = await buildOrchestratedPlannerResponse({
+    guardedFetch: async (_input: RequestInfo | URL, _init?: RequestInit) => {
+      fetchCalled = true;
+      return new Response(JSON.stringify({
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              reply: "Tomorrow needs a whole new plan.",
+              mode: "schedule_read",
+            }),
+          },
+        }],
+      }));
+    },
+    input: {
+      ...baseInput(),
+      message: "Prepare me for tomorrow",
+      plannerContext: {
+        ...baseInput().plannerContext,
+        starterIntent: "briefing_followup",
+      },
+    },
+    baseResult: {
+      ...baseResult("schedule_read"),
+      reply:
+        "You wanted to carry this into tomorrow: Take a short walk before jumping back into messages. Tomorrow has some room, so the goal is starting with the right move instead of adding more noise. First move: Finalize launch checklist.",
+      structuredResponse: {
+        intent: {
+          intentType: "conversation",
+          timeHorizon: "short_term",
+          isRecurring: false,
+          shouldCreateQuest: false,
+          shouldPromptCampaign: false,
+        },
+        planDay: null,
+        weeklyPlan: null,
+        reflectionBridge: {
+          message:
+            "You wanted to carry this into tomorrow: Take a short walk before jumping back into messages. Tomorrow has some room, so the goal is starting with the right move instead of adding more noise. First move: Finalize launch checklist.",
+          carryForward: "Take a short walk before jumping back into messages.",
+          tomorrowSummary: "light",
+          firstAction: null,
+          tomorrowSchedule: [],
+        },
+        comingUp: null,
+        rightNow: null,
+        dayAdjust: null,
+      },
+    },
+    openAIApiKey: "test-openai-key",
+    model: "test-model",
+  });
+
+  assertEquals(fetchCalled, false);
+  assertStringIncludes(response.reply, "Take a short walk before jumping back into messages.");
+});
+
 Deno.test("skips orchestration when a ready quest proposal is present in a mixed proposal turn", async () => {
   let fetchCalled = false;
   const response = await buildOrchestratedPlannerResponse({
@@ -414,7 +473,12 @@ Deno.test("skips orchestration for advance-campaign starter responses", async ()
           campaignId: "epic-1",
           campaignTitle: "Launch prep",
           status: "stalled",
+          interventionLevel: "protect",
           statusReason: "There is no concrete next step tied to this campaign right now.",
+          healthSnapshot: null,
+          pressureSignals: [
+            "No concrete next quest is linked yet.",
+          ],
           nextStep: null,
           supportActions: [],
         },

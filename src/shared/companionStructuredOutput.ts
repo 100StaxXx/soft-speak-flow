@@ -57,9 +57,33 @@ export interface CompanionRightNowStructuredOutput {
 export interface CompanionWeeklyPlanStructuredOutput {
   message: string;
   weeklyTheme: string | null;
+  focusCampaignTitle: string | null;
+  focusCampaignStatus: CompanionCampaignStatus | null;
+  focusCampaignInterventionLevel: CompanionCampaignInterventionLevel | null;
+  focusCampaignReason: string | null;
+  focusCampaignHealth: CompanionCampaignHealthSnapshot | null;
   topPriorities: CompanionSuggestedQuest[];
   busyDays: string[];
   openDays: string[];
+}
+
+export interface CompanionPriorityOverviewStructuredOutput {
+  title: string;
+  message: string;
+  campaignPressure: string | null;
+  focusCampaignTitle?: string | null;
+  focusCampaignStatus?: CompanionCampaignStatus | null;
+  focusCampaignInterventionLevel?: CompanionCampaignInterventionLevel | null;
+  focusCampaignHealth?: CompanionCampaignHealthSnapshot | null;
+  topPriorities: CompanionSuggestedQuest[];
+}
+
+export interface CompanionReflectionBridgeStructuredOutput {
+  message: string;
+  carryForward: string | null;
+  tomorrowSummary: CompanionTomorrowSummary;
+  firstAction: CompanionSuggestedQuest | null;
+  tomorrowSchedule: CompanionScheduleItem[];
 }
 
 export interface CompanionDayAdjustStructuredOutput {
@@ -75,12 +99,28 @@ export type CompanionCampaignStatus =
   | "stalled"
   | "at_risk";
 
+export type CompanionCampaignInterventionLevel =
+  | "steady"
+  | "nudge"
+  | "protect"
+  | "reset";
+
+export interface CompanionCampaignHealthSnapshot {
+  overdueQuestCount: number;
+  protectedTodayCount: number;
+  daysWithoutMomentum: number | null;
+  activeCampaignCount: number;
+}
+
 export interface CompanionCampaignMomentumStructuredOutput {
   message: string;
   campaignId: string | null;
   campaignTitle: string | null;
   status: CompanionCampaignStatus | null;
+  interventionLevel: CompanionCampaignInterventionLevel | null;
   statusReason: string | null;
+  healthSnapshot: CompanionCampaignHealthSnapshot | null;
+  pressureSignals: string[];
   nextStep: CompanionSuggestedQuest | null;
   supportActions: CompanionSuggestedQuest[];
 }
@@ -117,6 +157,8 @@ export interface CompanionStructuredResponse {
   intent: CompanionIntentMetadata;
   planDay?: CompanionPlanDayStructuredOutput | null;
   weeklyPlan?: CompanionWeeklyPlanStructuredOutput | null;
+  priorityOverview?: CompanionPriorityOverviewStructuredOutput | null;
+  reflectionBridge?: CompanionReflectionBridgeStructuredOutput | null;
   comingUp?: CompanionComingUpStructuredOutput | null;
   rightNow?: CompanionRightNowStructuredOutput | null;
   dayAdjust?: CompanionDayAdjustStructuredOutput | null;

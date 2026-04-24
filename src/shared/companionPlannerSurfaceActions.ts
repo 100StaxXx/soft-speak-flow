@@ -8,6 +8,7 @@ export interface CompanionPlannerSurfaceAction {
   id:
     | "plan-week"
     | "plan-day"
+    | "prepare-tomorrow"
     | "advance-campaign"
     | "adjust-day"
     | "make-room"
@@ -39,6 +40,13 @@ export const COMPANION_PLANNER_SURFACE_ACTIONS: CompanionPlannerSurfaceAction[] 
       message: "Plan my day",
       target: "planner",
       starterIntent: "plan_day",
+    },
+    {
+      id: "prepare-tomorrow",
+      label: "Prepare me for tomorrow",
+      message: "Prepare me for tomorrow",
+      target: "planner",
+      starterIntent: "briefing_followup",
     },
     {
       id: "advance-campaign",

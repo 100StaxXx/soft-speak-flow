@@ -7,6 +7,7 @@ export interface JourneysCompanionLauncherTemplate {
     | "free-talk"
     | "plan-week"
     | "plan-day"
+    | "prepare-tomorrow"
     | "advance-campaign"
     | "adjust-day"
     | "make-room"

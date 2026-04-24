@@ -29,6 +29,34 @@ type PersistableThreadMessage = {
   metadata?: CompanionChatRow["metadata"];
 };
 
+const isJsonValue = (value: unknown): value is CompanionChatRow["metadata"] => {
+  if (
+    value === null ||
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  ) {
+    return true;
+  }
+
+  if (Array.isArray(value)) {
+    return value.every((entry) => isJsonValue(entry));
+  }
+
+  if (typeof value === "object") {
+    const prototype = Object.getPrototypeOf(value);
+    if (prototype !== Object.prototype && prototype !== null) {
+      return false;
+    }
+
+    return Object.values(value as Record<string, unknown>).every((entry) =>
+      entry === undefined || isJsonValue(entry)
+    );
+  }
+
+  return false;
+};
+
 const readSelectedProposalId = (
   metadata: CompanionPendingActionRow["metadata"],
 ) => {
@@ -111,8 +139,12 @@ const mapThreadMessage = (
       confirmationMessage: typeof pendingAction.confirmationMessage === "string"
         ? pendingAction.confirmationMessage
         : null,
-      normalizedPayload: pendingAction.normalizedPayload ?? {},
-      affectedEntities: pendingAction.affectedEntities ?? null,
+      normalizedPayload: isJsonValue(pendingAction.normalizedPayload)
+        ? pendingAction.normalizedPayload
+        : {},
+      affectedEntities: isJsonValue(pendingAction.affectedEntities)
+        ? pendingAction.affectedEntities
+        : null,
       expiresAt: pendingAction.expiresAt,
       createdAt: pendingAction.createdAt,
     };
@@ -139,8 +171,12 @@ const mapThreadMessage = (
       message: receipt.message,
       summary: typeof receipt.summary === "string" ? receipt.summary : null,
       createdAt: receipt.createdAt,
-      executionResult: receipt.executionResult ?? null,
-      executionError: receipt.executionError ?? null,
+      executionResult: isJsonValue(receipt.executionResult)
+        ? receipt.executionResult
+        : null,
+      executionError: isJsonValue(receipt.executionError)
+        ? receipt.executionError
+        : null,
     };
   };
 

@@ -722,12 +722,13 @@ const mapPlannerProposal = (
         proposalId: proposal.id,
         title: proposal.title,
         summary: proposal.summary,
-        actionType: "campaign_update",
+        actionType: "campaign_adjust",
         intent: "goal_setting",
         normalizedPayload: {
           campaign_id: asString(payload.epicId),
+          adjustment_type: asString(payload.adjustmentType) ?? "custom",
           description: asString(payload.reason) ?? asString(payload.requestedSummary),
-          status: "needs_adjustment",
+          requested_summary: asString(payload.requestedSummary),
         },
       };
     case "create_campaign":

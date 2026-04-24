@@ -7,7 +7,10 @@ import type {
   CompanionStatNeed,
   CompanionStatProfileSummary,
 } from "@/shared/companionStatSignals";
-import type { CompanionStructuredResponse } from "@/shared/companionStructuredOutput";
+import type {
+  CompanionStructuredResponse,
+  CompanionSuggestedQuest,
+} from "@/shared/companionStructuredOutput";
 
 export type PlannerHorizon = "day" | "week" | "month";
 
@@ -83,6 +86,7 @@ export interface CompanionPlannerProposal {
   title: string;
   summary: string;
   reasoning?: string | null;
+  suggestedType?: CompanionSuggestedQuest["type"];
   payload: Record<string, unknown>;
   status: CompanionPlannerProposalStatus;
   readyToConfirm: boolean;

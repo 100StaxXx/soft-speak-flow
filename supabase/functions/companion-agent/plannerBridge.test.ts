@@ -130,5 +130,5 @@ Deno.test("consultPlannerForAgent converts at-risk campaign adjustments into cam
 
   assertEquals(result.mode, "proposal");
   assertGreater(result.actionHints.length, 0);
-  assertEquals(result.actionHints[0]?.actionType, "campaign_update");
+  assertEquals(result.actionHints[0]?.actionType, "campaign_adjust");
 });

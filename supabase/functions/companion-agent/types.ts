@@ -46,12 +46,19 @@ export const COMPANION_PLANNING_MODES = [
   "recovery",
 ] as const;
 
+export const COMPANION_CAMPAIGN_LIFECYCLE_STATUSES = [
+  "active",
+  "completed",
+  "abandoned",
+] as const;
+
 export const COMPANION_PENDING_ACTION_TYPES = [
   "task_create",
   "task_update",
   "ritual_create",
   "reminder_create",
   "campaign_update",
+  "campaign_adjust",
   "journal_entry",
 ] as const;
 
@@ -100,6 +107,13 @@ const CompanionMissedItemSchema = z.object({
   source: z.literal("task"),
 });
 
+const CompanionCampaignHealthSnapshotSchema = z.object({
+  overdueQuestCount: z.number().int().min(0).max(999),
+  protectedTodayCount: z.number().int().min(0).max(999),
+  daysWithoutMomentum: z.number().int().min(0).max(3650).nullable(),
+  activeCampaignCount: z.number().int().min(0).max(999),
+});
+
 const CompanionStructuredResponseSchema = z.object({
   intent: CompanionIntentMetadataSchema,
   planDay: z.object({
@@ -117,9 +131,31 @@ const CompanionStructuredResponseSchema = z.object({
   weeklyPlan: z.object({
     message: z.string().min(1).max(4000),
     weeklyTheme: z.string().min(1).max(2000).nullable(),
+    focusCampaignTitle: z.string().min(1).max(200).nullable(),
+    focusCampaignStatus: z.enum(["moving", "drifting", "stalled", "at_risk"]).nullable(),
+    focusCampaignInterventionLevel: z.enum(["steady", "nudge", "protect", "reset"]).nullable(),
+    focusCampaignReason: z.string().min(1).max(2000).nullable(),
+    focusCampaignHealth: CompanionCampaignHealthSnapshotSchema.nullable(),
     topPriorities: z.array(CompanionSuggestedQuestSchema).max(5),
     busyDays: z.array(z.string().min(1).max(40)).max(7),
     openDays: z.array(z.string().min(1).max(40)).max(7),
+  }).nullable().optional(),
+  priorityOverview: z.object({
+    title: z.string().min(1).max(80),
+    message: z.string().min(1).max(4000),
+    campaignPressure: z.string().min(1).max(2000).nullable(),
+    focusCampaignTitle: z.string().min(1).max(200).nullable().optional(),
+    focusCampaignStatus: z.enum(["moving", "drifting", "stalled", "at_risk"]).nullable().optional(),
+    focusCampaignInterventionLevel: z.enum(["steady", "nudge", "protect", "reset"]).nullable().optional(),
+    focusCampaignHealth: CompanionCampaignHealthSnapshotSchema.nullable().optional(),
+    topPriorities: z.array(CompanionSuggestedQuestSchema).max(5),
+  }).nullable().optional(),
+  reflectionBridge: z.object({
+    message: z.string().min(1).max(4000),
+    carryForward: z.string().min(1).max(2000).nullable(),
+    tomorrowSummary: z.enum(["busy", "light", "open"]),
+    firstAction: CompanionSuggestedQuestSchema.nullable(),
+    tomorrowSchedule: z.array(CompanionScheduleItemSchema).max(24),
   }).nullable().optional(),
   comingUp: z.object({
     message: z.string().min(1).max(4000),
@@ -146,7 +182,10 @@ const CompanionStructuredResponseSchema = z.object({
     campaignId: z.string().min(1).max(200).nullable(),
     campaignTitle: z.string().min(1).max(200).nullable(),
     status: z.enum(["moving", "drifting", "stalled", "at_risk"]).nullable(),
+    interventionLevel: z.enum(["steady", "nudge", "protect", "reset"]).nullable(),
     statusReason: z.string().min(1).max(2000).nullable(),
+    healthSnapshot: CompanionCampaignHealthSnapshotSchema.nullable(),
+    pressureSignals: z.array(z.string().min(1).max(200)).max(5),
     nextStep: CompanionSuggestedQuestSchema.nullable(),
     supportActions: z.array(CompanionSuggestedQuestSchema).max(5),
   }).nullable().optional(),
@@ -161,6 +200,9 @@ export const PlanningModeSchema = z.enum(COMPANION_PLANNING_MODES);
 export const PendingActionTypeSchema = z.enum(COMPANION_PENDING_ACTION_TYPES);
 export const PendingActionStatusSchema = z.enum(
   COMPANION_PENDING_ACTION_STATUSES,
+);
+export const CampaignLifecycleStatusSchema = z.enum(
+  COMPANION_CAMPAIGN_LIFECYCLE_STATUSES,
 );
 
 export const SelectedEntityIdsSchema = z.object({
@@ -213,7 +255,16 @@ export type CompanionPendingActionType = z.infer<
 export type CompanionPendingActionStatus = z.infer<
   typeof PendingActionStatusSchema
 >;
+export type CompanionCampaignLifecycleStatus = z.infer<
+  typeof CampaignLifecycleStatusSchema
+>;
 export type SubmitCompanionResult = z.infer<typeof SubmitCompanionResultSchema>;
+
+export const isCompanionCampaignLifecycleStatus = (
+  value: unknown,
+): value is CompanionCampaignLifecycleStatus =>
+  typeof value === "string" &&
+  (COMPANION_CAMPAIGN_LIFECYCLE_STATUSES as readonly string[]).includes(value);
 
 export interface PendingActionCandidate {
   id: string;

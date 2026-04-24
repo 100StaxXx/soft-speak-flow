@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/components/ui/sonner";
 import { isCompanionAgentSurfaceEnabled } from "@/config/companionAgentRollout";
+import { useAIInteractionTracker } from "@/hooks/useAIInteractionTracker";
 import { useAuth } from "@/hooks/useAuth";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionDialogue } from "@/hooks/useCompanionDialogue";
@@ -9,6 +10,7 @@ import { useLegacyCompanionAssistantAdapter } from "@/hooks/useLegacyCompanionAs
 import { useCompanionVoiceSettings } from "@/hooks/useCompanionVoiceSettings";
 import { useVoiceInput } from "@/hooks/useVoiceInput";
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
 import { stripMarkdown } from "@/lib/utils";
 import {
   buildCompanionThreadPreview,
@@ -108,6 +110,31 @@ const createMessage = (
   ...extras,
 });
 
+const isJsonValue = (value: unknown): value is Json => {
+  if (
+    value === null ||
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  ) {
+    return true;
+  }
+
+  if (Array.isArray(value)) {
+    return value.every((entry) => isJsonValue(entry));
+  }
+
+  if (typeof value === "object") {
+    if (Object.getPrototypeOf(value) !== Object.prototype) {
+      return false;
+    }
+
+    return Object.values(value).every((entry) => isJsonValue(entry));
+  }
+
+  return false;
+};
+
 const mapLoadedMessage = (
   message: Awaited<ReturnType<typeof loadCompanionChatThreadMessages>>[number],
 ): CompanionAssistantMessage => {
@@ -143,8 +170,12 @@ const mapLoadedMessage = (
       confirmationMessage: typeof pendingAction.confirmationMessage === "string"
         ? pendingAction.confirmationMessage
         : null,
-      normalizedPayload: pendingAction.normalizedPayload ?? {},
-      affectedEntities: pendingAction.affectedEntities ?? null,
+      normalizedPayload: isJsonValue(pendingAction.normalizedPayload)
+        ? pendingAction.normalizedPayload
+        : {},
+      affectedEntities: isJsonValue(pendingAction.affectedEntities)
+        ? pendingAction.affectedEntities
+        : null,
       expiresAt: pendingAction.expiresAt,
       createdAt: pendingAction.createdAt,
     };
@@ -171,8 +202,12 @@ const mapLoadedMessage = (
       message: receipt.message,
       summary: typeof receipt.summary === "string" ? receipt.summary : null,
       createdAt: receipt.createdAt,
-      executionResult: receipt.executionResult ?? null,
-      executionError: receipt.executionError ?? null,
+      executionResult: isJsonValue(receipt.executionResult)
+        ? receipt.executionResult
+        : null,
+      executionError: isJsonValue(receipt.executionError)
+        ? receipt.executionError
+        : null,
     };
   };
 
@@ -205,11 +240,34 @@ const inferStarterIntentFromStructuredResponse = (
 ): CompanionPlannerLaunchIntent["starterIntent"] | null => {
   if (response?.planDay) return "plan_day";
   if (response?.weeklyPlan) return "plan_week";
+  if (response?.priorityOverview) {
+    return response.priorityOverview.title.toLowerCase().includes("make room")
+      ? "make_room"
+      : "what_matters";
+  }
+  if (response?.reflectionBridge) return "briefing_followup";
   if (response?.campaignMomentum) return "advance_campaign_start";
   if (response?.dayAdjust) return "adjust_today";
   if (response?.rightNow) return "right_now_start";
   if (response?.comingUp) return "upcoming_start";
   return null;
+};
+
+const collectStructuredResponseSectionKeys = (
+  response: CompanionAgentResponse["structuredResponse"],
+) => {
+  if (!response) return [] as string[];
+
+  return [
+    response.planDay ? "planDay" : null,
+    response.weeklyPlan ? "weeklyPlan" : null,
+    response.priorityOverview ? "priorityOverview" : null,
+    response.reflectionBridge ? "reflectionBridge" : null,
+    response.comingUp ? "comingUp" : null,
+    response.rightNow ? "rightNow" : null,
+    response.dayAdjust ? "dayAdjust" : null,
+    response.campaignMomentum ? "campaignMomentum" : null,
+  ].filter((section): section is string => Boolean(section));
 };
 
 const collectProposalIdsFromStructuredResponse = (
@@ -224,6 +282,10 @@ const collectProposalIdsFromStructuredResponse = (
 
   response?.planDay?.suggestedQuests.forEach(collectQuest);
   response?.weeklyPlan?.topPriorities.forEach(collectQuest);
+  response?.priorityOverview?.topPriorities.forEach(collectQuest);
+  if (response?.reflectionBridge?.firstAction) {
+    collectQuest(response.reflectionBridge.firstAction);
+  }
   if (response?.rightNow?.recommendedAction) {
     collectQuest(response.rightNow.recommendedAction);
   }
@@ -337,6 +399,7 @@ export function useCompanionAssistant({
   const { user } = useAuth();
   const { companion } = useCompanion();
   const { greeting, voiceStyle } = useCompanionDialogue();
+  const { trackInteraction } = useAIInteractionTracker();
   const { autoplayVoice, muteSpokenReplies } = useCompanionVoiceSettings();
   const queryClient = useQueryClient();
   const agentSurfaceEnabled = isCompanionAgentSurfaceEnabled(surface);
@@ -350,6 +413,7 @@ export function useCompanionAssistant({
     surface,
     conversationEnabled,
     onOpenCampaignBuilder,
+    plannerFallbackMode: "read_only",
   });
 
   const [activeSessionId, setActiveSessionId] = useState(() =>
@@ -695,8 +759,13 @@ export function useCompanionAssistant({
 
   const appendAssistantResponse = useCallback((
     response: CompanionAgentResponse,
+    options?: {
+      pendingProposalId?: string | null;
+    },
   ) => {
-    const nextStructuredResponse = response.structuredResponse ?? null;
+    const nextStructuredResponse = response.structuredResponse === undefined
+      ? structuredResponse ?? null
+      : response.structuredResponse ?? null;
     setMessages((previous) => [
       ...previous,
       createMessage("assistant", stripMarkdown(response.reply), {
@@ -711,9 +780,13 @@ export function useCompanionAssistant({
     setSavedSuggestionProposalIds((previous) =>
       pruneProposalIdsToStructuredResponse(previous, nextStructuredResponse)
     );
-    setPendingSuggestionProposalId(response.pendingAction?.proposalId ?? null);
+    setPendingSuggestionProposalId(
+      response.pendingAction
+        ? response.pendingAction.proposalId ?? options?.pendingProposalId ?? null
+        : null,
+    );
     void speakAssistantReply(response.reply, response.threadState.sessionId);
-  }, [speakAssistantReply]);
+  }, [speakAssistantReply, structuredResponse]);
 
   const submitMessage = useCallback(async (
     rawMessage: string,
@@ -770,6 +843,27 @@ export function useCompanionAssistant({
       const response = data as CompanionAgentResponse;
       applyActiveSessionId(response.threadState.sessionId);
       appendAssistantResponse(response);
+      await trackInteraction({
+        interactionType: "companion_agent",
+        inputText: message,
+        detectedIntent: response.intent,
+        aiResponse: {
+          mode: response.mode,
+          structuredSections: collectStructuredResponseSectionKeys(
+            response.structuredResponse ?? null,
+          ),
+          hasPendingAction: Boolean(response.pendingAction),
+          pendingActionType: response.pendingAction?.actionType ?? null,
+          hasReceipt: Boolean(response.receipt),
+        },
+        userAction: "accepted",
+        modifications: {
+          surface,
+          starterIntent: options?.starterIntent ?? null,
+          planningMode: options?.planningMode ?? planningMode,
+          proposalId: response.pendingAction?.proposalId ?? null,
+        },
+      });
       void invalidateThreads();
     } catch (error) {
       console.error("Failed to submit companion agent message:", error);
@@ -806,6 +900,7 @@ export function useCompanionAssistant({
     isSubmitting,
     legacyAssistant,
     planningMode,
+    trackInteraction,
     pendingSuggestionProposalId,
     savedSuggestionProposalIds,
     surface,
@@ -873,6 +968,25 @@ export function useCompanionAssistant({
           );
         });
         setPendingSuggestionProposalId(null);
+        await trackInteraction({
+          interactionType: "companion_agent_confirmation",
+          inputText: pendingAction.summary,
+          detectedIntent: pendingAction.actionType,
+          aiResponse: {
+            mode: response.mode,
+            receiptStatus: response.receipt?.status ?? null,
+            actionType: pendingAction.actionType,
+          },
+          userAction: mode === "confirm" ? "accepted" : "rejected",
+          modifications: {
+            actionId: pendingAction.id,
+            proposalId: resolvedProposalId ?? null,
+            confirmationMode: mode,
+            surface,
+            planningMode,
+            starterIntent: lastStarterIntentRef.current,
+          },
+        });
         void speakAssistantReply(
           response.reply,
           response.threadState.sessionId,
@@ -896,8 +1010,11 @@ export function useCompanionAssistant({
       legacyAssistant,
       pendingAction,
       pendingSuggestionProposalId,
+      planningMode,
       speakAssistantReply,
       structuredResponse,
+      surface,
+      trackInteraction,
       useLegacyFallback,
     ],
   );
@@ -926,6 +1043,16 @@ export function useCompanionAssistant({
         ? "Plan my day"
         : structuredResponse?.weeklyPlan
         ? "Plan my week"
+        : structuredResponse?.priorityOverview
+        ? structuredResponse.priorityOverview.title.toLowerCase().includes(
+            "make room",
+          )
+          ? "Help me make room for what matters."
+          : "What matters most today?"
+        : structuredResponse?.reflectionBridge
+        ? "Prepare me for tomorrow"
+        : structuredResponse?.campaignMomentum
+        ? "Advance my campaign"
         : structuredResponse?.dayAdjust
         ? "Adjust my day"
         : structuredResponse?.rightNow
@@ -967,9 +1094,26 @@ export function useCompanionAssistant({
 
       const response = data as CompanionAgentResponse;
       applyActiveSessionId(response.threadState.sessionId);
-      setPendingSuggestionProposalId(response.pendingAction?.proposalId ??
-        proposalId);
-      appendAssistantResponse(response);
+      appendAssistantResponse(response, {
+        pendingProposalId: proposalId,
+      });
+      await trackInteraction({
+        interactionType: "companion_agent_suggestion_prepare",
+        inputText: latestUserMessage,
+        detectedIntent: response.intent,
+        aiResponse: {
+          mode: response.mode,
+          actionType: response.pendingAction?.actionType ?? null,
+          proposalId: response.pendingAction?.proposalId ?? proposalId,
+        },
+        userAction: "accepted",
+        modifications: {
+          proposalId,
+          starterIntent: starterIntent ?? null,
+          planningMode,
+          surface,
+        },
+      });
       void invalidateThreads();
     } catch (error) {
       console.error("Failed to prepare planner suggestion:", error);
@@ -989,6 +1133,7 @@ export function useCompanionAssistant({
     planningMode,
     structuredResponse,
     surface,
+    trackInteraction,
     useLegacyFallback,
   ]);
 

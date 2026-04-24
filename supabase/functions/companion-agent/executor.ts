@@ -4,7 +4,10 @@ import {
   persistActionReceipt,
   updatePendingAction,
 } from "./persistence.ts";
-import type { PendingActionRow } from "./types.ts";
+import {
+  isCompanionCampaignLifecycleStatus,
+  type PendingActionRow,
+} from "./types.ts";
 
 const readSelectedProposalId = (metadata: PendingActionRow["metadata"]) => {
   if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
@@ -73,6 +76,12 @@ function taskScheduleLabel(task: Record<string, unknown>) {
   const scheduledTime = typeof task.scheduled_time === "string" ? task.scheduled_time : null;
   if (taskDate && scheduledTime) return `${taskDate} at ${scheduledTime}`;
   return taskDate ?? "your schedule";
+}
+
+function readCampaignLifecycleStatus(value: unknown) {
+  if (value === undefined || value === null) return undefined;
+  if (isCompanionCampaignLifecycleStatus(value)) return value;
+  throw new Error("Unsupported campaign status");
 }
 
 async function executeAction(params: {
@@ -224,12 +233,13 @@ async function executeAction(params: {
     }
     case "campaign_update": {
       const campaignId = String(payload.campaign_id ?? "");
+      const status = readCampaignLifecycleStatus(payload.status);
       const patch = Object.fromEntries(
         Object.entries({
           title: payload.title,
           description: payload.description,
           end_date: payload.end_date,
-          status: payload.status,
+          status,
           target_days: payload.target_days,
           updated_at: new Date().toISOString(),
         }).filter(([, value]) => value !== undefined),
@@ -250,6 +260,79 @@ async function executeAction(params: {
         executionResult: {
           campaign_id: data.id,
           campaign: data,
+        },
+      };
+    }
+    case "campaign_adjust": {
+      const campaignId = String(payload.campaign_id ?? "");
+      if (!campaignId) {
+        throw new Error("Missing campaign id for adjustment");
+      }
+
+      const adjustmentType = typeof payload.adjustment_type === "string" &&
+          payload.adjustment_type.length > 0
+        ? payload.adjustment_type
+        : "custom";
+      const reason = typeof payload.description === "string" &&
+          payload.description.length > 0
+        ? payload.description
+        : typeof payload.requested_summary === "string" &&
+            payload.requested_summary.length > 0
+        ? payload.requested_summary
+        : undefined;
+
+      const { data: adjustmentResult, error: adjustmentError } =
+        await params.supabase.functions.invoke("adjust-epic-plan", {
+          body: {
+            epicId: campaignId,
+            adjustmentType,
+            reason,
+            customRequest: reason,
+          },
+        });
+
+      if (adjustmentError) throw adjustmentError;
+
+      const suggestions = Array.isArray(
+          (adjustmentResult as { suggestions?: unknown[] } | null)
+            ?.suggestions,
+        )
+        ? (adjustmentResult as { suggestions: unknown[] }).suggestions
+        : [];
+
+      if (suggestions.length === 0) {
+        throw new Error("No campaign adjustments were generated.");
+      }
+
+      const { error: applyError } = await params.supabase.functions.invoke(
+        "apply-epic-adjustments",
+        {
+          body: {
+            epicId: campaignId,
+            adjustments: suggestions,
+            adjustmentType,
+            reason,
+          },
+        },
+      );
+
+      if (applyError) throw applyError;
+
+      const { data: campaign, error: campaignError } = await params.supabase
+        .from("epics")
+        .select("id, title")
+        .eq("id", campaignId)
+        .eq("user_id", params.userId)
+        .single();
+
+      if (campaignError) throw campaignError;
+
+      return {
+        receiptMessage: `Got it — I adjusted "${campaign.title}" so the next move is more realistic.`,
+        executionResult: {
+          campaign_id: campaign.id,
+          campaign,
+          adjustment_count: suggestions.length,
         },
       };
     }

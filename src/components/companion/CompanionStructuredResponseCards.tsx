@@ -3,6 +3,7 @@ import { memo } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type {
+  CompanionCampaignHealthSnapshot,
   CompanionStructuredResponse,
   CompanionSuggestedQuest,
 } from "@/shared/companionStructuredOutput";
@@ -45,6 +46,53 @@ const variantStyles = {
       "rounded-full border border-white/10 bg-white/[0.06] px-2 py-1 text-[0.62rem] font-black uppercase tracking-[0.18em] text-white/70",
   },
 } as const;
+
+const formatCampaignInterventionLabel = (
+  level: NonNullable<
+    NonNullable<CompanionStructuredResponse["campaignMomentum"]>["interventionLevel"]
+  >,
+): string =>
+  level === "reset"
+    ? "reset"
+    : level === "protect"
+    ? "protect"
+    : level === "nudge"
+    ? "nudge"
+    : "steady";
+
+const renderCampaignHealthSnapshot = (
+  snapshot: CompanionCampaignHealthSnapshot,
+  styles: (typeof variantStyles)[CompanionStructuredResponseCardsVariant],
+  testId?: string,
+) => {
+  const chips = [
+    `${snapshot.overdueQuestCount} overdue`,
+    `${snapshot.protectedTodayCount} protected today`,
+    snapshot.daysWithoutMomentum !== null
+      ? `${snapshot.daysWithoutMomentum} ${
+        snapshot.daysWithoutMomentum === 1 ? "day" : "days"
+      } quiet`
+      : null,
+    snapshot.activeCampaignCount > 1
+      ? `${snapshot.activeCampaignCount} active campaigns`
+      : null,
+  ].filter((value): value is string => Boolean(value));
+
+  if (chips.length === 0) return null;
+
+  return (
+    <div className="mt-3" data-testid={testId}>
+      <p className={styles.title}>Health Snapshot</p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {chips.map((chip) => (
+          <span key={chip} className={styles.accent}>
+            {chip}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 const renderQuestRow = (
   quest: CompanionSuggestedQuest,
@@ -184,6 +232,51 @@ export const CompanionStructuredResponseCards = memo(
                   </div>
                 )
                 : null}
+              {structuredResponse.weeklyPlan.focusCampaignTitle
+                ? (
+                  <div className={cn("mt-4", styles.item)}>
+                    <p className={styles.title}>Campaign Focus</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <span className={styles.accent}>
+                        {structuredResponse.weeklyPlan.focusCampaignTitle}
+                      </span>
+                      {structuredResponse.weeklyPlan.focusCampaignStatus
+                        ? (
+                          <span className={styles.accent}>
+                            {structuredResponse.weeklyPlan.focusCampaignStatus.replace(
+                              /_/g,
+                              " ",
+                            )}
+                          </span>
+                        )
+                        : null}
+                      {structuredResponse.weeklyPlan.focusCampaignInterventionLevel
+                        ? (
+                          <span className={styles.accent}>
+                            {formatCampaignInterventionLabel(
+                              structuredResponse.weeklyPlan.focusCampaignInterventionLevel,
+                            )}
+                          </span>
+                        )
+                        : null}
+                    </div>
+                    {structuredResponse.weeklyPlan.focusCampaignReason
+                      ? (
+                        <p className={cn("mt-2", styles.subtext)}>
+                          {structuredResponse.weeklyPlan.focusCampaignReason}
+                        </p>
+                      )
+                      : null}
+                    {structuredResponse.weeklyPlan.focusCampaignHealth
+                      ? renderCampaignHealthSnapshot(
+                        structuredResponse.weeklyPlan.focusCampaignHealth,
+                        styles,
+                        "structured-weekly-campaign-health",
+                      )
+                      : null}
+                  </div>
+                )
+                : null}
               <div className="mt-4">
                 <p className={styles.title}>Top Priorities</p>
                 <div className="mt-2 space-y-3">
@@ -235,6 +328,160 @@ export const CompanionStructuredResponseCards = memo(
                         </p>
                       )}
                   </div>
+                </div>
+              </div>
+            </section>
+          )
+          : null}
+
+        {structuredResponse.priorityOverview
+          ? (
+            <section
+              className={cn("p-4", styles.card)}
+              data-testid="structured-priority-overview"
+            >
+              <p className={styles.title}>
+                {structuredResponse.priorityOverview.title}
+              </p>
+              <p className={cn("mt-2", styles.body)}>
+                {structuredResponse.priorityOverview.message}
+              </p>
+              {structuredResponse.priorityOverview.focusCampaignTitle
+                ? (
+                  <div className={cn("mt-4", styles.item)}>
+                    <p className={styles.title}>Focus Campaign</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <span className={styles.accent}>
+                        {structuredResponse.priorityOverview.focusCampaignTitle}
+                      </span>
+                      {structuredResponse.priorityOverview.focusCampaignStatus
+                        ? (
+                          <span className={styles.accent}>
+                            {structuredResponse.priorityOverview.focusCampaignStatus.replace(
+                              /_/g,
+                              " ",
+                            )}
+                          </span>
+                        )
+                        : null}
+                      {structuredResponse.priorityOverview.focusCampaignInterventionLevel
+                        ? (
+                          <span className={styles.accent}>
+                            {formatCampaignInterventionLabel(
+                              structuredResponse.priorityOverview.focusCampaignInterventionLevel,
+                            )}
+                          </span>
+                        )
+                        : null}
+                    </div>
+                    {structuredResponse.priorityOverview.focusCampaignHealth
+                      ? renderCampaignHealthSnapshot(
+                        structuredResponse.priorityOverview.focusCampaignHealth,
+                        styles,
+                        "structured-priority-campaign-health",
+                      )
+                      : null}
+                  </div>
+                )
+                : null}
+              {structuredResponse.priorityOverview.campaignPressure
+                ? (
+                  <div className={cn("mt-4", styles.item)}>
+                    <p className={styles.title}>Campaign Pressure</p>
+                    <p className={cn("mt-1", styles.subtext)}>
+                      {structuredResponse.priorityOverview.campaignPressure}
+                    </p>
+                  </div>
+                )
+                : null}
+              <div className="mt-4">
+                <p className={styles.title}>Top Priorities</p>
+                <div className="mt-2 space-y-3">
+                  {structuredResponse.priorityOverview.topPriorities.length > 0
+                    ? structuredResponse.priorityOverview.topPriorities.map(
+                      (quest) =>
+                        renderQuestRow(quest, variant, styles, {
+                          onConfirmSuggestion,
+                          actionDisabled,
+                          savedProposalIds,
+                          pendingProposalId,
+                        })
+                    )
+                    : (
+                      <p className={styles.subtext}>
+                        Nothing needs a strong push right now.
+                      </p>
+                    )}
+                </div>
+              </div>
+            </section>
+          )
+          : null}
+
+        {structuredResponse.reflectionBridge
+          ? (
+            <section
+              className={cn("p-4", styles.card)}
+              data-testid="structured-reflection-bridge"
+            >
+              <p className={styles.title}>Prepare Tomorrow</p>
+              <p className={cn("mt-2", styles.body)}>
+                {structuredResponse.reflectionBridge.message}
+              </p>
+              {structuredResponse.reflectionBridge.carryForward
+                ? (
+                  <div className={cn("mt-4", styles.item)}>
+                    <p className={styles.title}>Carry Forward</p>
+                    <p className="mt-1 text-sm font-semibold">
+                      {structuredResponse.reflectionBridge.carryForward}
+                    </p>
+                  </div>
+                )
+                : null}
+              <div className="mt-4 flex flex-wrap gap-2">
+                <span className={styles.accent}>
+                  Tomorrow looks {structuredResponse.reflectionBridge.tomorrowSummary}
+                </span>
+              </div>
+              {structuredResponse.reflectionBridge.firstAction
+                ? (
+                  <div className="mt-4">
+                    <p className={styles.title}>First Move</p>
+                    <div className="mt-2">
+                      {renderQuestRow(
+                        structuredResponse.reflectionBridge.firstAction,
+                        variant,
+                        styles,
+                        {
+                          onConfirmSuggestion,
+                          actionDisabled,
+                          savedProposalIds,
+                          pendingProposalId,
+                        },
+                      )}
+                    </div>
+                  </div>
+                )
+                : null}
+              <div className="mt-4">
+                <p className={styles.title}>Tomorrow</p>
+                <div className="mt-2 space-y-2">
+                  {structuredResponse.reflectionBridge.tomorrowSchedule.length > 0
+                    ? structuredResponse.reflectionBridge.tomorrowSchedule.map(
+                      (item) => (
+                        <div key={item.id} className={styles.item}>
+                          <p className="text-sm font-semibold">{item.title}</p>
+                          <p className={cn("mt-1", styles.subtext)}>
+                            {item.label}
+                          </p>
+                        </div>
+                      ),
+                    )
+                    : (
+                      <p className={styles.subtext}>
+                        Nothing is locked onto tomorrow yet.
+                      </p>
+                    )}
                 </div>
               </div>
             </section>
@@ -500,6 +747,18 @@ export const CompanionStructuredResponseCards = memo(
                         </span>
                       )
                       : null}
+                    {structuredResponse.campaignMomentum.interventionLevel
+                      ? (
+                        <span
+                          className={styles.accent}
+                          data-testid="structured-campaign-intervention"
+                        >
+                          {formatCampaignInterventionLabel(
+                            structuredResponse.campaignMomentum.interventionLevel,
+                          )}
+                        </span>
+                      )
+                      : null}
                   </div>
                 )
                 : null}
@@ -508,6 +767,29 @@ export const CompanionStructuredResponseCards = memo(
                   <p className={cn("mt-3", styles.subtext)}>
                     {structuredResponse.campaignMomentum.statusReason}
                   </p>
+                )
+                : null}
+              {structuredResponse.campaignMomentum.healthSnapshot
+                ? renderCampaignHealthSnapshot(
+                  structuredResponse.campaignMomentum.healthSnapshot,
+                  styles,
+                  "structured-campaign-health",
+                )
+                : null}
+              {structuredResponse.campaignMomentum.pressureSignals.length > 0
+                ? (
+                  <div className="mt-3">
+                    <p className={styles.title}>Pressure Signals</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {structuredResponse.campaignMomentum.pressureSignals.map(
+                        (signal) => (
+                          <span key={signal} className={styles.accent}>
+                            {signal}
+                          </span>
+                        ),
+                      )}
+                    </div>
+                  </div>
                 )
                 : null}
               {structuredResponse.campaignMomentum.nextStep

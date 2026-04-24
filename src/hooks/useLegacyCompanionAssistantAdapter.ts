@@ -53,6 +53,7 @@ type UseLegacyCompanionAssistantAdapterOptions = {
   surface: CompanionAssistantSurface;
   conversationEnabled?: boolean;
   onOpenCampaignBuilder?: (message: string) => void;
+  plannerFallbackMode?: "interactive" | "read_only";
 };
 
 type LegacyFallbackHydrationMessage = {
@@ -152,6 +153,9 @@ const isExactPlanDayStarterMessage = (message: string): boolean =>
 const isExactPlanWeekStarterMessage = (message: string): boolean =>
   message.trim().toLowerCase() === "plan my week";
 
+const isExactPrepareTomorrowStarterMessage = (message: string): boolean =>
+  message.trim().toLowerCase() === "prepare me for tomorrow";
+
 const isExactUpcomingStarterMessage = (message: string): boolean =>
   message.trim().toLowerCase() === "what do i have coming up?";
 
@@ -180,6 +184,8 @@ const mapLegacyProposalToPendingAction = (
     ? "ritual_create"
     : proposal.kind === "suggest_reminder"
     ? "reminder_create"
+    : proposal.kind === "adjust_campaign_plan"
+    ? "campaign_adjust"
     : "campaign_update";
   const intent = proposal.kind === "create_quest"
     ? "schedule_task"
@@ -195,10 +201,89 @@ const mapLegacyProposalToPendingAction = (
     proposalId: proposal.id,
     summary: proposal.summary,
     confirmationMessage: proposal.reasoning ?? "Want me to lock that in?",
-    normalizedPayload: proposal.payload,
+    normalizedPayload: proposal.payload as PendingActionView["normalizedPayload"],
     affectedEntities: null,
     expiresAt: new Date(Date.now() + (1000 * 60 * 60 * 12)).toISOString(),
     createdAt: new Date().toISOString(),
+  };
+};
+
+const toReadOnlySuggestion = <T extends { proposalId?: string | null }>(
+  suggestion: T | null | undefined,
+): T | null => suggestion ? { ...suggestion, proposalId: null } : null;
+
+const toReadOnlySuggestions = <T extends { proposalId?: string | null }>(
+  suggestions: T[] | null | undefined,
+): T[] => (suggestions ?? []).map((suggestion) => ({
+  ...suggestion,
+  proposalId: null,
+}));
+
+const buildReadOnlyStructuredResponse = (
+  response: CompanionStructuredResponse | null | undefined,
+): CompanionStructuredResponse | null => {
+  if (!response) return null;
+
+  return {
+    ...response,
+    planDay: response.planDay
+      ? {
+        ...response.planDay,
+        suggestedQuests: toReadOnlySuggestions(response.planDay.suggestedQuests),
+      }
+      : null,
+    weeklyPlan: response.weeklyPlan
+      ? {
+        ...response.weeklyPlan,
+        topPriorities: toReadOnlySuggestions(response.weeklyPlan.topPriorities),
+      }
+      : null,
+    priorityOverview: response.priorityOverview
+      ? {
+        ...response.priorityOverview,
+        topPriorities: toReadOnlySuggestions(
+          response.priorityOverview.topPriorities,
+        ),
+      }
+      : null,
+    reflectionBridge: response.reflectionBridge
+      ? {
+        ...response.reflectionBridge,
+        firstAction: toReadOnlySuggestion(response.reflectionBridge.firstAction),
+      }
+      : null,
+    comingUp: response.comingUp
+      ? {
+        ...response.comingUp,
+        nextBestAction: toReadOnlySuggestion(response.comingUp.nextBestAction),
+      }
+      : null,
+    rightNow: response.rightNow
+      ? {
+        ...response.rightNow,
+        recommendedAction: toReadOnlySuggestion(
+          response.rightNow.recommendedAction,
+        ),
+        fallbackAction: toReadOnlySuggestion(response.rightNow.fallbackAction),
+      }
+      : null,
+    dayAdjust: response.dayAdjust
+      ? {
+        ...response.dayAdjust,
+        keep: toReadOnlySuggestions(response.dayAdjust.keep),
+        move: toReadOnlySuggestions(response.dayAdjust.move),
+        dropOrShrink: toReadOnlySuggestions(response.dayAdjust.dropOrShrink),
+      }
+      : null,
+    campaignMomentum: response.campaignMomentum
+      ? {
+        ...response.campaignMomentum,
+        nextStep: toReadOnlySuggestion(response.campaignMomentum.nextStep),
+        supportActions: toReadOnlySuggestions(
+          response.campaignMomentum.supportActions,
+        ),
+      }
+      : null,
   };
 };
 
@@ -381,7 +466,7 @@ const mapUnifiedMessagesToLegacyPlannerMessages = (
           suggestedReminders: [],
           sessionState: fallbackSessionState,
           ...(proposalDecision ? { proposalDecision } : {}),
-        },
+        } as unknown as CompanionChatThreadMessage["metadata"],
       };
     });
 
@@ -390,6 +475,7 @@ export function useLegacyCompanionAssistantAdapter({
   surface,
   conversationEnabled = true,
   onOpenCampaignBuilder,
+  plannerFallbackMode = "interactive",
 }: UseLegacyCompanionAssistantAdapterOptions) {
   const { user } = useAuth();
   const { companion } = useCompanion();
@@ -457,6 +543,7 @@ export function useLegacyCompanionAssistantAdapter({
       ) ?? null,
     [planner.pendingProposals],
   );
+  const plannerSuggestionsReadOnly = plannerFallbackMode === "read_only";
   const pendingActionCount = planner.pendingProposals.length;
   const readyPendingActionCount = planner.readyProposalCount;
   const pendingAction = useMemo(
@@ -473,6 +560,15 @@ export function useLegacyCompanionAssistantAdapter({
     [planner.proposals],
   );
   const pendingSuggestionProposalId = activePendingProposal?.id ?? null;
+  const structuredResponse = plannerSuggestionsReadOnly
+    ? buildReadOnlyStructuredResponse(planner.structuredResponse)
+    : planner.structuredResponse;
+
+  const toastPlannerFallbackReadOnly = useCallback(() => {
+    toast.error(
+      "Cosmiq is in read-only fallback right now. Nothing will change until the main assistant path is back.",
+    );
+  }, []);
 
   const placeholder = hasOpenPlannerThread
     ? "Reply here..."
@@ -578,6 +674,14 @@ export function useLegacyCompanionAssistantAdapter({
       return;
     }
 
+    if (isExactPrepareTomorrowStarterMessage(message)) {
+      await planner.submitMessage(message, inputMode, {
+        starterIntent: "briefing_followup",
+        planningMode: options?.planningMode ?? null,
+      });
+      return;
+    }
+
     if (isExactUpcomingStarterMessage(message)) {
       await planner.submitMessage(message, inputMode, {
         starterIntent: "upcoming_start",
@@ -645,28 +749,46 @@ export function useLegacyCompanionAssistantAdapter({
       ? journeysConversation.greeting
       : companionChat.greeting ?? greeting,
     messages,
-    structuredResponse: planner.structuredResponse,
+    structuredResponse,
     planningMode: planner.planningMode,
     setPlanningMode: planner.setPlanningMode,
-    pendingAction,
+    pendingAction: plannerSuggestionsReadOnly ? null : pendingAction,
     savedSuggestionProposalIds,
     pendingSuggestionProposalId,
-    pendingActionCount,
-    readyPendingActionCount,
+    pendingActionCount: plannerSuggestionsReadOnly ? 0 : pendingActionCount,
+    readyPendingActionCount: plannerSuggestionsReadOnly
+      ? 0
+      : readyPendingActionCount,
     placeholder,
     todayLabel: planner.todayLabel,
     isSubmitting: planner.isSubmitting || conversation.isSubmitting,
     isResolvingAction: planner.isSubmitting,
     submitMessage,
-    confirmPendingAction: activePendingProposal
+    confirmPendingAction: plannerSuggestionsReadOnly
+      ? async () => {
+        toastPlannerFallbackReadOnly();
+      }
+      : activePendingProposal
       ? () => planner.confirmProposal(activePendingProposal.id)
       : async () => undefined,
-    cancelPendingAction: activePendingProposal
+    cancelPendingAction: plannerSuggestionsReadOnly
+      ? async () => {
+        toastPlannerFallbackReadOnly();
+      }
+      : activePendingProposal
       ? () => planner.rejectProposal(activePendingProposal.id)
       : async () => undefined,
-    confirmSuggestedQuest: (proposalId: string) =>
-      planner.confirmProposal(proposalId),
-    confirmAllPendingActions: readyPendingActionCount > 0
+    confirmSuggestedQuest: plannerSuggestionsReadOnly
+      ? async () => {
+        toastPlannerFallbackReadOnly();
+      }
+      : (proposalId: string) =>
+        planner.confirmProposal(proposalId),
+    confirmAllPendingActions: plannerSuggestionsReadOnly
+      ? async () => {
+        toastPlannerFallbackReadOnly();
+      }
+      : readyPendingActionCount > 0
       ? planner.confirmAll
       : async () => undefined,
     isSpeaking: companionChat.isSpeaking,

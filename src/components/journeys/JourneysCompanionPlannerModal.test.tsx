@@ -1,6 +1,7 @@
 import type { HTMLAttributes, ReactNode } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { CompanionStructuredResponse } from "@/shared/companionStructuredOutput";
 
 const mocks = vi.hoisted(() => ({
   assistant: {
@@ -98,7 +99,7 @@ const mocks = vi.hoisted(() => ({
           },
         ],
       },
-    },
+    } as CompanionStructuredResponse,
     savedSuggestionProposalIds: ["proposal-plan-1"],
     pendingSuggestionProposalId: null as string | null,
   },
@@ -377,5 +378,126 @@ describe("JourneysCompanionPlannerModal", () => {
     fireEvent.click(screen.getByTestId("companion-planning-mode-lock_in"));
 
     expect(mocks.planningMode.setPlanningMode).toHaveBeenCalledWith("lock_in");
+  });
+
+  it("keeps proposal-backed weekly, tomorrow, and priority cards actionable in the journeys shell", () => {
+    const previousStructuredResponse = mocks.state.structuredResponse;
+    const previousPendingAction = mocks.state.pendingAction;
+    const previousSavedSuggestionProposalIds =
+      mocks.state.savedSuggestionProposalIds;
+    const previousPendingSuggestionProposalId =
+      mocks.state.pendingSuggestionProposalId;
+
+    mocks.state.pendingAction = null;
+    mocks.state.savedSuggestionProposalIds = ["proposal-priority-reset-1"];
+    mocks.state.pendingSuggestionProposalId = "proposal-tomorrow-reset-1";
+    mocks.state.structuredResponse = {
+      intent: {
+        intentType: "quest" as const,
+        timeHorizon: "short_term" as const,
+        isRecurring: false,
+        shouldCreateQuest: false,
+        shouldPromptCampaign: false,
+      },
+      weeklyPlan: {
+        message: "Launch prep needs a reset move this week.",
+        weeklyTheme: "Reset the launch path before adding more work.",
+        focusCampaignTitle: "Launch prep",
+        focusCampaignStatus: "stalled" as const,
+        focusCampaignInterventionLevel: "reset" as const,
+        focusCampaignReason:
+          "This campaign has slipped repeatedly without a protected recovery move.",
+        focusCampaignHealth: {
+          overdueQuestCount: 2,
+          protectedTodayCount: 0,
+          daysWithoutMomentum: 8,
+          activeCampaignCount: 4,
+        },
+        topPriorities: [
+          {
+            suggestionId: "journeys-weekly-reset-1",
+            proposalId: "proposal-weekly-reset-1",
+            title: "Adjust Launch prep",
+            type: "must" as const,
+            estimatedDuration: "20 min",
+            estimatedDurationMinutes: 20,
+            source: "campaign" as const,
+            reason: "This campaign has slipped repeatedly and needs a reset plan this week.",
+          },
+        ],
+        busyDays: [],
+        openDays: ["Wed"],
+      },
+      priorityOverview: {
+        title: "What Matters",
+        message: "The honest next move is to reset the campaign first.",
+        campaignPressure:
+          "Campaign pressure: Launch prep is stalled. The honest next move is to adjust the campaign plan before adding more work.",
+        topPriorities: [
+          {
+            suggestionId: "journeys-priority-reset-1",
+            proposalId: "proposal-priority-reset-1",
+            title: "Adjust Launch prep",
+            type: "must" as const,
+            estimatedDuration: "20 min",
+            estimatedDurationMinutes: 20,
+            source: "campaign" as const,
+            reason: "This campaign has slipped repeatedly and needs a reset plan right now.",
+          },
+        ],
+      },
+      reflectionBridge: {
+        message: "Tomorrow should start with a reset move before you add more pressure.",
+        carryForward: null,
+        tomorrowSummary: "light" as const,
+        firstAction: {
+          suggestionId: "journeys-tomorrow-reset-1",
+          proposalId: "proposal-tomorrow-reset-1",
+          title: "Adjust Launch prep",
+          type: "must" as const,
+          estimatedDuration: "20 min",
+          estimatedDurationMinutes: 20,
+          source: "campaign" as const,
+          reason: "This campaign has slipped repeatedly without a protected recovery move. The honest first move tomorrow is resetting Launch prep before you pile on more work.",
+        },
+        tomorrowSchedule: [],
+      },
+    };
+
+    render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        presentation="dialog"
+      />,
+    );
+
+    const weeklySaveButton = screen.getByTestId(
+      "structured-suggestion-confirm-journeys-weekly-reset-1",
+    );
+    const prioritySavedButton = screen.getByTestId(
+      "structured-suggestion-confirm-journeys-priority-reset-1",
+    );
+    const reflectionPendingButton = screen.getByTestId(
+      "structured-suggestion-confirm-journeys-tomorrow-reset-1",
+    );
+
+    expect(weeklySaveButton).toHaveTextContent("Save");
+    expect(prioritySavedButton).toHaveTextContent("Saved");
+    expect(reflectionPendingButton).toHaveTextContent("Saving");
+    expect(prioritySavedButton).toBeDisabled();
+    expect(reflectionPendingButton).toBeDisabled();
+
+    fireEvent.click(weeklySaveButton);
+
+    expect(mocks.assistant.confirmSuggestedQuest).toHaveBeenCalledWith(
+      "proposal-weekly-reset-1",
+    );
+
+    mocks.state.structuredResponse = previousStructuredResponse;
+    mocks.state.pendingAction = previousPendingAction;
+    mocks.state.savedSuggestionProposalIds = previousSavedSuggestionProposalIds;
+    mocks.state.pendingSuggestionProposalId =
+      previousPendingSuggestionProposalId;
   });
 });

@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => ({
     status: 500,
     backendMessage: null,
   }),
+  trackInteraction: vi.fn().mockResolvedValue(undefined),
   legacySubmitMessage: vi.fn().mockResolvedValue(undefined),
   legacyConfirmPendingAction: vi.fn().mockResolvedValue(undefined),
   legacyCancelPendingAction: vi.fn().mockResolvedValue(undefined),
@@ -59,6 +60,15 @@ vi.mock("@/hooks/useCompanionDialogue", () => ({
 
 vi.mock("@/config/companionAgentRollout", () => ({
   isCompanionAgentSurfaceEnabled: () => mocks.agentSurfaceEnabled,
+}));
+
+vi.mock("@/hooks/useAIInteractionTracker", () => ({
+  useAIInteractionTracker: () => ({
+    trackInteraction: mocks.trackInteraction,
+    updatePreferenceWeights: vi.fn(),
+    trackEpicOutcome: vi.fn(),
+    trackDailyPlanOutcome: vi.fn(),
+  }),
 }));
 
 vi.mock("@/hooks/useCompanionVoiceSettings", () => ({
@@ -517,6 +527,19 @@ describe("useCompanionAssistant", () => {
     expect(result.current.messages.at(-1)?.content).toBe(
       "Tomorrow is pretty light.",
     );
+    expect(mocks.trackInteraction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        interactionType: "companion_agent",
+        inputText: "What does tomorrow look like?",
+        detectedIntent: "check_calendar",
+        userAction: "accepted",
+        modifications: expect.objectContaining({
+          surface: "journeys",
+          starterIntent: null,
+          planningMode: "balanced",
+        }),
+      }),
+    );
   });
 
   it("confirms the active pending action through the deterministic executor path", async () => {
@@ -583,6 +606,87 @@ describe("useCompanionAssistant", () => {
     expect(result.current.pendingAction).toBeNull();
     expect(result.current.messages.at(-1)?.content).toBe(
       'Got it — "Gym" added for 3:00 PM.',
+    );
+    expect(mocks.trackInteraction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        interactionType: "companion_agent_confirmation",
+        inputText: 'Add "Gym" for 2026-04-18 at 15:00.',
+        detectedIntent: "task_create",
+        userAction: "accepted",
+        modifications: expect.objectContaining({
+          actionId: "action-1",
+          confirmationMode: "confirm",
+          surface: "journeys",
+          planningMode: "balanced",
+        }),
+      }),
+    );
+  });
+
+  it("tracks cancelled pending actions as rejected companion-agent decisions", async () => {
+    mocks.loadPendingAction.mockResolvedValue({
+      id: "action-2",
+      status: "pending",
+      intent: "schedule_task",
+      actionType: "task_update",
+      summary: 'Move "Gym" to 2026-04-19 at 15:00.',
+      confirmationMessage: 'Want me to move "Gym" to tomorrow at 3:00 PM?',
+      normalizedPayload: {},
+      affectedEntities: null,
+      expiresAt: "2026-04-18T20:00:00.000Z",
+      createdAt: "2026-04-18T08:02:00.000Z",
+    });
+    mocks.supabaseInvoke.mockResolvedValueOnce({
+      data: {
+        reply: "Okay, I left that alone.",
+        mode: "receipt",
+        intent: "update_existing_plan",
+        confidence: 1,
+        receipt: {
+          actionId: "action-2",
+          status: "cancelled",
+          message: "Okay, I left that alone.",
+          summary: 'Move "Gym" to 2026-04-19 at 15:00.',
+          createdAt: "2026-04-18T08:04:00.000Z",
+        },
+        threadState: {
+          threadId: "persisted-session",
+          sessionId: "persisted-session",
+          openaiConversationId: "conv_123",
+          lastOpenAIResponseId: "resp_124",
+          hasPendingAction: false,
+        },
+      },
+      error: null,
+    });
+
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(
+      () => useCompanionAssistant({ surface: "journeys" }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(result.current.pendingAction?.id).toBe("action-2");
+    });
+
+    await act(async () => {
+      await result.current.cancelPendingAction();
+    });
+
+    expect(mocks.trackInteraction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        interactionType: "companion_agent_confirmation",
+        inputText: 'Move "Gym" to 2026-04-19 at 15:00.',
+        detectedIntent: "task_update",
+        userAction: "rejected",
+        modifications: expect.objectContaining({
+          actionId: "action-2",
+          confirmationMode: "cancel",
+          surface: "journeys",
+          planningMode: "balanced",
+        }),
+      }),
     );
   });
 
@@ -1008,6 +1112,20 @@ describe("useCompanionAssistant", () => {
         }),
       }),
     );
+    expect(mocks.trackInteraction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        interactionType: "companion_agent_suggestion_prepare",
+        inputText: "Plan my day",
+        detectedIntent: "schedule_task",
+        userAction: "accepted",
+        modifications: expect.objectContaining({
+          proposalId: "proposal-plan-1",
+          starterIntent: "plan_day",
+          planningMode: "balanced",
+          surface: "journeys",
+        }),
+      }),
+    );
 
     await act(async () => {
       await result.current.confirmPendingAction();
@@ -1042,6 +1160,1088 @@ describe("useCompanionAssistant", () => {
       }),
     );
     expect(result.current.pendingAction?.id).toBe("action-prepare-2");
+  });
+
+  it("keeps the pending suggestion id when the prepare response omits proposalId", async () => {
+    mocks.loadThreadMessages.mockResolvedValue([
+      {
+        id: "m1",
+        sessionId: "persisted-session",
+        role: "assistant",
+        content: "I drafted a focused day for you.",
+        createdAt: "2026-04-18T08:00:01.000Z",
+        source: "agent",
+        metadata: {
+          mode: "schedule_read",
+          intent: "plan_day",
+          structuredResponse: {
+            intent: {
+              intentType: "quest",
+              timeHorizon: "today",
+              isRecurring: false,
+              shouldCreateQuest: true,
+              shouldPromptCampaign: false,
+            },
+            planDay: {
+              message: "I drafted a focused day for you.",
+              dayAssessment: "balanced",
+              suggestedQuests: [
+                {
+                  suggestionId: "plan-1",
+                  proposalId: "proposal-plan-1",
+                  title: "Outline launch checklist",
+                  type: "must",
+                  estimatedDuration: "45 min",
+                  estimatedDurationMinutes: 45,
+                  source: "campaign",
+                  reason: "It keeps launch moving.",
+                },
+              ],
+            },
+          },
+        },
+      },
+    ]);
+    mocks.supabaseInvoke.mockResolvedValueOnce({
+      data: {
+        reply:
+          "I pulled that suggestion into a confirmable action. Review it and confirm if it fits.",
+        mode: "pending_confirmation",
+        intent: "schedule_task",
+        confidence: 0.82,
+        pendingAction: {
+          id: "action-prepare-1",
+          status: "pending",
+          intent: "schedule_task",
+          actionType: "task_create",
+          summary: 'Create a quest for "Outline launch checklist".',
+          confirmationMessage: "Want me to lock that in?",
+          normalizedPayload: {
+            title: "Outline launch checklist",
+          },
+          affectedEntities: null,
+          expiresAt: "2026-04-18T20:00:00.000Z",
+          createdAt: "2026-04-18T08:10:00.000Z",
+        },
+        threadState: {
+          threadId: "persisted-session",
+          sessionId: "persisted-session",
+          openaiConversationId: "conv_123",
+          lastOpenAIResponseId: "resp_123",
+          hasPendingAction: true,
+        },
+      },
+      error: null,
+    });
+
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(
+      () => useCompanionAssistant({ surface: "journeys" }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(result.current.structuredResponse?.planDay?.suggestedQuests[0]?.proposalId)
+        .toBe("proposal-plan-1");
+    });
+
+    await act(async () => {
+      await result.current.confirmSuggestedQuest("proposal-plan-1");
+    });
+
+    expect(result.current.pendingSuggestionProposalId).toBe(
+      "proposal-plan-1",
+    );
+    expect(result.current.pendingAction?.id).toBe("action-prepare-1");
+  });
+
+  it("recovers tomorrow-bridge suggestions after reload without needing a fresh user turn", async () => {
+    mocks.loadThreadMessages.mockResolvedValue([
+      {
+        id: "m1",
+        sessionId: "persisted-session",
+        role: "assistant",
+        content: "Tomorrow should start with a cleaner reset move.",
+        createdAt: "2026-04-18T08:00:01.000Z",
+        source: "agent",
+        metadata: {
+          mode: "schedule_read",
+          intent: "reflect",
+          structuredResponse: {
+            intent: {
+              intentType: "conversation",
+              timeHorizon: "short_term",
+              isRecurring: false,
+              shouldCreateQuest: false,
+              shouldPromptCampaign: false,
+            },
+            reflectionBridge: {
+              message: "Tomorrow should start with a cleaner reset move.",
+              carryForward: "Keep launch pressure contained.",
+              tomorrowSummary: "light",
+              firstAction: {
+                suggestionId: "tomorrow-1",
+                proposalId: "proposal-tomorrow-1",
+                title: "Adjust Course launch",
+                type: "must",
+                estimatedDuration: "20 min",
+                estimatedDurationMinutes: 20,
+                source: "campaign",
+                reason:
+                  "The honest first move tomorrow is resetting the campaign before adding more work.",
+              },
+              tomorrowSchedule: [],
+            },
+          },
+        },
+      },
+    ]);
+    mocks.supabaseInvoke.mockResolvedValueOnce({
+      data: {
+        reply:
+          "I pulled that tomorrow move into a confirmable action. Review it and confirm if it fits.",
+        mode: "pending_confirmation",
+        intent: "schedule_task",
+        confidence: 0.82,
+        pendingAction: {
+          id: "action-tomorrow-1",
+          status: "pending",
+          intent: "schedule_task",
+          actionType: "campaign_update",
+          proposalId: "proposal-tomorrow-1",
+          summary: 'Adjust "Course launch".',
+          confirmationMessage: "Want me to lock that in?",
+          normalizedPayload: {
+            title: "Adjust Course launch",
+          },
+          affectedEntities: null,
+          expiresAt: "2026-04-18T20:20:00.000Z",
+          createdAt: "2026-04-18T08:20:00.000Z",
+        },
+        threadState: {
+          threadId: "persisted-session",
+          sessionId: "persisted-session",
+          openaiConversationId: "conv_123",
+          lastOpenAIResponseId: "resp_125",
+          hasPendingAction: true,
+        },
+      },
+      error: null,
+    });
+
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(
+      () => useCompanionAssistant({ surface: "journeys" }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(result.current.structuredResponse?.reflectionBridge?.firstAction?.proposalId)
+        .toBe("proposal-tomorrow-1");
+    });
+
+    await act(async () => {
+      await result.current.confirmSuggestedQuest("proposal-tomorrow-1");
+    });
+
+    expect(mocks.supabaseInvoke).toHaveBeenCalledWith(
+      "companion-agent",
+      expect.objectContaining({
+        body: expect.objectContaining({
+          message: "Prepare me for tomorrow",
+          starterIntent: "briefing_followup",
+          selectedProposalId: "proposal-tomorrow-1",
+        }),
+      }),
+    );
+    expect(result.current.pendingAction?.id).toBe("action-tomorrow-1");
+  });
+
+  it("recovers what-matters suggestions after reload and keeps them saved after confirmation", async () => {
+    mocks.loadThreadMessages.mockResolvedValue([
+      {
+        id: "m1",
+        sessionId: "persisted-session",
+        role: "assistant",
+        content: "The honest next move is to reset the campaign first.",
+        createdAt: "2026-04-18T08:00:01.000Z",
+        source: "agent",
+        metadata: {
+          mode: "schedule_read",
+          intent: "explore",
+          structuredResponse: {
+            intent: {
+              intentType: "quest",
+              timeHorizon: "today",
+              isRecurring: false,
+              shouldCreateQuest: false,
+              shouldPromptCampaign: false,
+            },
+            priorityOverview: {
+              title: "What Matters",
+              message: "The honest next move is to reset the campaign first.",
+              campaignPressure:
+                "Campaign pressure: Course launch is stalled. Reset the plan before adding more work.",
+              topPriorities: [
+                {
+                  suggestionId: "priority-1",
+                  proposalId: "proposal-priority-1",
+                  title: "Adjust Course launch",
+                  type: "must",
+                  estimatedDuration: "20 min",
+                  estimatedDurationMinutes: 20,
+                  source: "campaign",
+                  reason:
+                    "The campaign has slipped repeatedly, so the honest next move is to reset it before adding more work.",
+                },
+              ],
+            },
+          },
+        },
+      },
+    ]);
+    mocks.supabaseInvoke
+      .mockResolvedValueOnce({
+        data: {
+          reply:
+            "I pulled that priority move into a confirmable action. Review it and confirm if it fits.",
+          mode: "pending_confirmation",
+          intent: "schedule_task",
+          confidence: 0.82,
+          pendingAction: {
+            id: "action-priority-1",
+            status: "pending",
+            intent: "schedule_task",
+            actionType: "campaign_update",
+            proposalId: "proposal-priority-1",
+            summary: 'Adjust "Course launch".',
+            confirmationMessage: "Want me to lock that in?",
+            normalizedPayload: {
+              title: "Adjust Course launch",
+            },
+            affectedEntities: null,
+            expiresAt: "2026-04-18T20:20:00.000Z",
+            createdAt: "2026-04-18T08:20:00.000Z",
+          },
+          threadState: {
+            threadId: "persisted-session",
+            sessionId: "persisted-session",
+            openaiConversationId: "conv_123",
+            lastOpenAIResponseId: "resp_125",
+            hasPendingAction: true,
+          },
+        },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: {
+          reply: 'Got it — "Course launch" was adjusted.',
+          mode: "receipt",
+          intent: "update_existing_plan",
+          confidence: 1,
+          receipt: {
+            actionId: "action-priority-1",
+            status: "executed",
+            proposalId: "proposal-priority-1",
+            message: 'Got it — "Course launch" was adjusted.',
+            summary: 'Adjust "Course launch".',
+            createdAt: "2026-04-18T08:22:00.000Z",
+          },
+          threadState: {
+            threadId: "persisted-session",
+            sessionId: "persisted-session",
+            openaiConversationId: "conv_123",
+            lastOpenAIResponseId: "resp_126",
+            hasPendingAction: false,
+          },
+        },
+        error: null,
+      });
+
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(
+      () => useCompanionAssistant({ surface: "journeys" }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(result.current.structuredResponse?.priorityOverview?.topPriorities[0]?.proposalId)
+        .toBe("proposal-priority-1");
+    });
+
+    await act(async () => {
+      await result.current.confirmSuggestedQuest("proposal-priority-1");
+    });
+
+    expect(mocks.supabaseInvoke).toHaveBeenCalledWith(
+      "companion-agent",
+      expect.objectContaining({
+        body: expect.objectContaining({
+          message: "What matters most today?",
+          starterIntent: "what_matters",
+          selectedProposalId: "proposal-priority-1",
+        }),
+      }),
+    );
+    expect(result.current.pendingAction?.id).toBe("action-priority-1");
+
+    await act(async () => {
+      await result.current.confirmPendingAction();
+    });
+
+    expect(result.current.savedSuggestionProposalIds).toEqual([
+      "proposal-priority-1",
+    ]);
+  });
+
+  it("recovers make-room suggestions after reload with the right starter intent", async () => {
+    mocks.loadThreadMessages.mockResolvedValue([
+      {
+        id: "m1",
+        sessionId: "persisted-session",
+        role: "assistant",
+        content: "Here is what I would protect first so we can make room.",
+        createdAt: "2026-04-18T08:00:01.000Z",
+        source: "agent",
+        metadata: {
+          mode: "schedule_read",
+          intent: "explore",
+          structuredResponse: {
+            intent: {
+              intentType: "quest",
+              timeHorizon: "today",
+              isRecurring: false,
+              shouldCreateQuest: false,
+              shouldPromptCampaign: false,
+            },
+            priorityOverview: {
+              title: "Make Room",
+              message:
+                "Here is what I would protect first so we can make room.",
+              campaignPressure: null,
+              topPriorities: [
+                {
+                  suggestionId: "make-room-1",
+                  proposalId: "proposal-make-room-1",
+                  title: "Adjust Course launch",
+                  type: "must",
+                  estimatedDuration: "20 min",
+                  estimatedDurationMinutes: 20,
+                  source: "campaign",
+                  reason:
+                    "Resetting this campaign is the cleanest way to free up the rest of the week.",
+                },
+              ],
+            },
+          },
+        },
+      },
+    ]);
+    mocks.supabaseInvoke.mockResolvedValueOnce({
+      data: {
+        reply:
+          "I pulled that make-room move into a confirmable action. Review it and confirm if it fits.",
+        mode: "pending_confirmation",
+        intent: "schedule_task",
+        confidence: 0.82,
+        pendingAction: {
+          id: "action-make-room-1",
+          status: "pending",
+          intent: "schedule_task",
+          actionType: "campaign_update",
+          proposalId: "proposal-make-room-1",
+          summary: 'Adjust "Course launch".',
+          confirmationMessage: "Want me to lock that in?",
+          normalizedPayload: {
+            title: "Adjust Course launch",
+          },
+          affectedEntities: null,
+          expiresAt: "2026-04-18T20:20:00.000Z",
+          createdAt: "2026-04-18T08:20:00.000Z",
+        },
+        threadState: {
+          threadId: "persisted-session",
+          sessionId: "persisted-session",
+          openaiConversationId: "conv_123",
+          lastOpenAIResponseId: "resp_125",
+          hasPendingAction: true,
+        },
+      },
+      error: null,
+    });
+
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(
+      () => useCompanionAssistant({ surface: "journeys" }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(result.current.structuredResponse?.priorityOverview?.title)
+        .toBe("Make Room");
+    });
+
+    await act(async () => {
+      await result.current.confirmSuggestedQuest("proposal-make-room-1");
+    });
+
+    expect(mocks.supabaseInvoke).toHaveBeenCalledWith(
+      "companion-agent",
+      expect.objectContaining({
+        body: expect.objectContaining({
+          message: "Help me make room for what matters.",
+          starterIntent: "make_room",
+          selectedProposalId: "proposal-make-room-1",
+        }),
+      }),
+    );
+    expect(result.current.pendingAction?.id).toBe("action-make-room-1");
+  });
+
+  it("recovers advance-campaign suggestions after reload and keeps them saved after confirmation", async () => {
+    mocks.loadThreadMessages.mockResolvedValue([
+      {
+        id: "m1",
+        sessionId: "persisted-session",
+        role: "assistant",
+        content: "Course launch needs a cleaner next move.",
+        createdAt: "2026-04-18T08:00:01.000Z",
+        source: "agent",
+        metadata: {
+          mode: "schedule_read",
+          intent: "goal_setting",
+          structuredResponse: {
+            intent: {
+              intentType: "campaign",
+              timeHorizon: "short_term",
+              isRecurring: false,
+              shouldCreateQuest: false,
+              shouldPromptCampaign: false,
+            },
+            campaignMomentum: {
+              message: "Course launch needs a cleaner next move.",
+              campaignId: "campaign-1",
+              campaignTitle: "Course launch",
+              status: "stalled",
+              interventionLevel: "reset",
+              statusReason:
+                "The current launch move is still too large to start cleanly.",
+              healthSnapshot: {
+                overdueQuestCount: 2,
+                protectedTodayCount: 0,
+                daysWithoutMomentum: 7,
+                activeCampaignCount: 4,
+              },
+              pressureSignals: [
+                "Repeated slip on the launch move.",
+              ],
+              nextStep: {
+                suggestionId: "campaign-1",
+                proposalId: "proposal-campaign-1",
+                title: "Adjust Course launch",
+                type: "must",
+                estimatedDuration: "20 min",
+                estimatedDurationMinutes: 20,
+                source: "campaign",
+                reason:
+                  "Resetting the plan is the honest next move before adding more work.",
+              },
+              supportActions: [],
+            },
+          },
+        },
+      },
+    ]);
+    mocks.supabaseInvoke
+      .mockResolvedValueOnce({
+        data: {
+          reply:
+            "I pulled that campaign move into a confirmable action. Review it and confirm if it fits.",
+          mode: "pending_confirmation",
+          intent: "schedule_task",
+          confidence: 0.82,
+          pendingAction: {
+            id: "action-campaign-1",
+            status: "pending",
+            intent: "schedule_task",
+            actionType: "campaign_update",
+            proposalId: "proposal-campaign-1",
+            summary: 'Adjust "Course launch".',
+            confirmationMessage: "Want me to lock that in?",
+            normalizedPayload: {
+              title: "Adjust Course launch",
+            },
+            affectedEntities: null,
+            expiresAt: "2026-04-18T20:20:00.000Z",
+            createdAt: "2026-04-18T08:20:00.000Z",
+          },
+          threadState: {
+            threadId: "persisted-session",
+            sessionId: "persisted-session",
+            openaiConversationId: "conv_123",
+            lastOpenAIResponseId: "resp_125",
+            hasPendingAction: true,
+          },
+        },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: {
+          reply: 'Got it — "Course launch" was adjusted.',
+          mode: "receipt",
+          intent: "update_existing_plan",
+          confidence: 1,
+          receipt: {
+            actionId: "action-campaign-1",
+            status: "executed",
+            proposalId: "proposal-campaign-1",
+            message: 'Got it — "Course launch" was adjusted.',
+            summary: 'Adjust "Course launch".',
+            createdAt: "2026-04-18T08:22:00.000Z",
+          },
+          threadState: {
+            threadId: "persisted-session",
+            sessionId: "persisted-session",
+            openaiConversationId: "conv_123",
+            lastOpenAIResponseId: "resp_126",
+            hasPendingAction: false,
+          },
+        },
+        error: null,
+      });
+
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(
+      () => useCompanionAssistant({ surface: "journeys" }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(result.current.structuredResponse?.campaignMomentum?.nextStep?.proposalId)
+        .toBe("proposal-campaign-1");
+    });
+
+    await act(async () => {
+      await result.current.confirmSuggestedQuest("proposal-campaign-1");
+    });
+
+    expect(mocks.supabaseInvoke).toHaveBeenCalledWith(
+      "companion-agent",
+      expect.objectContaining({
+        body: expect.objectContaining({
+          message: "Advance my campaign",
+          starterIntent: "advance_campaign_start",
+          selectedProposalId: "proposal-campaign-1",
+        }),
+      }),
+    );
+    expect(result.current.pendingAction?.id).toBe("action-campaign-1");
+
+    await act(async () => {
+      await result.current.confirmPendingAction();
+    });
+
+    expect(result.current.savedSuggestionProposalIds).toEqual([
+      "proposal-campaign-1",
+    ]);
+  });
+
+  it("recovers right-now suggestions after reload with the right starter intent", async () => {
+    mocks.loadThreadMessages.mockResolvedValue([
+      {
+        id: "m1",
+        sessionId: "persisted-session",
+        role: "assistant",
+        content: "You have a clean 20-minute window right now.",
+        createdAt: "2026-04-18T08:00:01.000Z",
+        source: "agent",
+        metadata: {
+          mode: "schedule_read",
+          intent: "check_calendar",
+          structuredResponse: {
+            intent: {
+              intentType: "conversation",
+              timeHorizon: "today",
+              isRecurring: false,
+              shouldCreateQuest: false,
+              shouldPromptCampaign: false,
+            },
+            rightNow: {
+              message: "You have a clean 20-minute window right now.",
+              currentWindow: "Next 20 minutes",
+              recommendedAction: {
+                suggestionId: "right-now-1",
+                proposalId: "proposal-right-now-1",
+                title: "Adjust Course launch",
+                type: "must",
+                estimatedDuration: "20 min",
+                estimatedDurationMinutes: 20,
+                source: "campaign",
+                reason:
+                  "The cleanest use of this gap is resetting the slipping campaign before the next block.",
+              },
+              fallbackAction: null,
+            },
+          },
+        },
+      },
+    ]);
+    mocks.supabaseInvoke.mockResolvedValueOnce({
+      data: {
+        reply:
+          "I pulled that right-now move into a confirmable action. Review it and confirm if it fits.",
+        mode: "pending_confirmation",
+        intent: "schedule_task",
+        confidence: 0.82,
+        pendingAction: {
+          id: "action-right-now-1",
+          status: "pending",
+          intent: "schedule_task",
+          actionType: "campaign_update",
+          proposalId: "proposal-right-now-1",
+          summary: 'Adjust "Course launch".',
+          confirmationMessage: "Want me to lock that in?",
+          normalizedPayload: {
+            title: "Adjust Course launch",
+          },
+          affectedEntities: null,
+          expiresAt: "2026-04-18T20:20:00.000Z",
+          createdAt: "2026-04-18T08:20:00.000Z",
+        },
+        threadState: {
+          threadId: "persisted-session",
+          sessionId: "persisted-session",
+          openaiConversationId: "conv_123",
+          lastOpenAIResponseId: "resp_125",
+          hasPendingAction: true,
+        },
+      },
+      error: null,
+    });
+
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(
+      () => useCompanionAssistant({ surface: "journeys" }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(result.current.structuredResponse?.rightNow?.recommendedAction?.proposalId)
+        .toBe("proposal-right-now-1");
+    });
+
+    await act(async () => {
+      await result.current.confirmSuggestedQuest("proposal-right-now-1");
+    });
+
+    expect(mocks.supabaseInvoke).toHaveBeenCalledWith(
+      "companion-agent",
+      expect.objectContaining({
+        body: expect.objectContaining({
+          message: "What should I do right now?",
+          starterIntent: "right_now_start",
+          selectedProposalId: "proposal-right-now-1",
+        }),
+      }),
+    );
+    expect(result.current.pendingAction?.id).toBe("action-right-now-1");
+  });
+
+  it("recovers weekly-plan suggestions after reload and keeps them saved after confirmation", async () => {
+    mocks.loadThreadMessages.mockResolvedValue([
+      {
+        id: "m1",
+        sessionId: "persisted-session",
+        role: "assistant",
+        content: "Protect the launch path this week before adding more work.",
+        createdAt: "2026-04-18T08:00:01.000Z",
+        source: "agent",
+        metadata: {
+          mode: "schedule_read",
+          intent: "plan_week",
+          structuredResponse: {
+            intent: {
+              intentType: "quest",
+              timeHorizon: "short_term",
+              isRecurring: false,
+              shouldCreateQuest: false,
+              shouldPromptCampaign: false,
+            },
+            weeklyPlan: {
+              message:
+                "Protect the launch path this week before adding more work.",
+              weeklyTheme: "Protect the launch path first.",
+              focusCampaignTitle: "Course launch",
+              focusCampaignStatus: "stalled",
+              focusCampaignInterventionLevel: "reset",
+              focusCampaignReason:
+                "The campaign has slipped repeatedly without a protected reset move.",
+              focusCampaignHealth: {
+                overdueQuestCount: 2,
+                protectedTodayCount: 0,
+                daysWithoutMomentum: 7,
+                activeCampaignCount: 4,
+              },
+              topPriorities: [
+                {
+                  suggestionId: "weekly-1",
+                  proposalId: "proposal-weekly-1",
+                  title: "Adjust Course launch",
+                  type: "must",
+                  estimatedDuration: "20 min",
+                  estimatedDurationMinutes: 20,
+                  source: "campaign",
+                  reason:
+                    "Resetting the campaign this week is the clearest way to stop the slip.",
+                },
+              ],
+              busyDays: [],
+              openDays: ["Wednesday"],
+            },
+          },
+        },
+      },
+    ]);
+    mocks.supabaseInvoke
+      .mockResolvedValueOnce({
+        data: {
+          reply:
+            "I pulled that weekly priority into a confirmable action. Review it and confirm if it fits.",
+          mode: "pending_confirmation",
+          intent: "schedule_task",
+          confidence: 0.82,
+          pendingAction: {
+            id: "action-weekly-1",
+            status: "pending",
+            intent: "schedule_task",
+            actionType: "campaign_update",
+            proposalId: "proposal-weekly-1",
+            summary: 'Adjust "Course launch".',
+            confirmationMessage: "Want me to lock that in?",
+            normalizedPayload: {
+              title: "Adjust Course launch",
+            },
+            affectedEntities: null,
+            expiresAt: "2026-04-18T20:20:00.000Z",
+            createdAt: "2026-04-18T08:20:00.000Z",
+          },
+          threadState: {
+            threadId: "persisted-session",
+            sessionId: "persisted-session",
+            openaiConversationId: "conv_123",
+            lastOpenAIResponseId: "resp_125",
+            hasPendingAction: true,
+          },
+        },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: {
+          reply: 'Got it — "Course launch" was adjusted.',
+          mode: "receipt",
+          intent: "update_existing_plan",
+          confidence: 1,
+          receipt: {
+            actionId: "action-weekly-1",
+            status: "executed",
+            proposalId: "proposal-weekly-1",
+            message: 'Got it — "Course launch" was adjusted.',
+            summary: 'Adjust "Course launch".',
+            createdAt: "2026-04-18T08:22:00.000Z",
+          },
+          threadState: {
+            threadId: "persisted-session",
+            sessionId: "persisted-session",
+            openaiConversationId: "conv_123",
+            lastOpenAIResponseId: "resp_126",
+            hasPendingAction: false,
+          },
+        },
+        error: null,
+      });
+
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(
+      () => useCompanionAssistant({ surface: "journeys" }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(result.current.structuredResponse?.weeklyPlan?.topPriorities[0]?.proposalId)
+        .toBe("proposal-weekly-1");
+    });
+
+    await act(async () => {
+      await result.current.confirmSuggestedQuest("proposal-weekly-1");
+    });
+
+    expect(mocks.supabaseInvoke).toHaveBeenCalledWith(
+      "companion-agent",
+      expect.objectContaining({
+        body: expect.objectContaining({
+          message: "Plan my week",
+          starterIntent: "plan_week",
+          selectedProposalId: "proposal-weekly-1",
+        }),
+      }),
+    );
+    expect(result.current.pendingAction?.id).toBe("action-weekly-1");
+
+    await act(async () => {
+      await result.current.confirmPendingAction();
+    });
+
+    expect(result.current.savedSuggestionProposalIds).toEqual([
+      "proposal-weekly-1",
+    ]);
+  });
+
+  it("recovers coming-up suggestions after reload with the right starter intent", async () => {
+    mocks.loadThreadMessages.mockResolvedValue([
+      {
+        id: "m1",
+        sessionId: "persisted-session",
+        role: "assistant",
+        content: "You have one clean move before your next event.",
+        createdAt: "2026-04-18T08:00:01.000Z",
+        source: "agent",
+        metadata: {
+          mode: "schedule_read",
+          intent: "check_calendar",
+          structuredResponse: {
+            intent: {
+              intentType: "conversation",
+              timeHorizon: "today",
+              isRecurring: false,
+              shouldCreateQuest: false,
+              shouldPromptCampaign: false,
+            },
+            comingUp: {
+              message: "You have one clean move before your next event.",
+              nextEvent: {
+                id: "event-1",
+                title: "Call",
+                label: "Call at 2:00 PM",
+                startsAt: "2026-04-18T21:00:00.000Z",
+                endsAt: "2026-04-18T21:30:00.000Z",
+                isAllDay: false,
+                source: "calendar",
+              },
+              nextBestAction: {
+                suggestionId: "coming-up-1",
+                proposalId: "proposal-coming-up-1",
+                title: "Adjust Course launch",
+                type: "must",
+                estimatedDuration: "20 min",
+                estimatedDurationMinutes: 20,
+                source: "campaign",
+                reason:
+                  "This fits before the call and is the clearest move to reduce campaign pressure.",
+              },
+              remainingToday: [],
+              tomorrowSummary: "light",
+              missedItems: [],
+            },
+          },
+        },
+      },
+    ]);
+    mocks.supabaseInvoke.mockResolvedValueOnce({
+      data: {
+        reply:
+          "I pulled that before-the-call move into a confirmable action. Review it and confirm if it fits.",
+        mode: "pending_confirmation",
+        intent: "schedule_task",
+        confidence: 0.82,
+        pendingAction: {
+          id: "action-coming-up-1",
+          status: "pending",
+          intent: "schedule_task",
+          actionType: "campaign_update",
+          proposalId: "proposal-coming-up-1",
+          summary: 'Adjust "Course launch".',
+          confirmationMessage: "Want me to lock that in?",
+          normalizedPayload: {
+            title: "Adjust Course launch",
+          },
+          affectedEntities: null,
+          expiresAt: "2026-04-18T20:20:00.000Z",
+          createdAt: "2026-04-18T08:20:00.000Z",
+        },
+        threadState: {
+          threadId: "persisted-session",
+          sessionId: "persisted-session",
+          openaiConversationId: "conv_123",
+          lastOpenAIResponseId: "resp_125",
+          hasPendingAction: true,
+        },
+        error: null,
+      },
+      error: null,
+    });
+
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(
+      () => useCompanionAssistant({ surface: "journeys" }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(result.current.structuredResponse?.comingUp?.nextBestAction?.proposalId)
+        .toBe("proposal-coming-up-1");
+    });
+
+    await act(async () => {
+      await result.current.confirmSuggestedQuest("proposal-coming-up-1");
+    });
+
+    expect(mocks.supabaseInvoke).toHaveBeenCalledWith(
+      "companion-agent",
+      expect.objectContaining({
+        body: expect.objectContaining({
+          message: "What do I have coming up?",
+          starterIntent: "upcoming_start",
+          selectedProposalId: "proposal-coming-up-1",
+        }),
+      }),
+    );
+    expect(result.current.pendingAction?.id).toBe("action-coming-up-1");
+  });
+
+  it("recovers adjust-day suggestions after reload and keeps them saved after confirmation", async () => {
+    mocks.loadThreadMessages.mockResolvedValue([
+      {
+        id: "m1",
+        sessionId: "persisted-session",
+        role: "assistant",
+        content: "Keep the launch reset, move the rest, and trim one thing.",
+        createdAt: "2026-04-18T08:00:01.000Z",
+        source: "agent",
+        metadata: {
+          mode: "schedule_read",
+          intent: "update_existing_plan",
+          structuredResponse: {
+            intent: {
+              intentType: "quest",
+              timeHorizon: "today",
+              isRecurring: false,
+              shouldCreateQuest: false,
+              shouldPromptCampaign: false,
+            },
+            dayAdjust: {
+              message: "Keep the launch reset, move the rest, and trim one thing.",
+              keep: [
+                {
+                  suggestionId: "adjust-1",
+                  proposalId: "proposal-adjust-1",
+                  title: "Adjust Course launch",
+                  type: "must",
+                  estimatedDuration: "20 min",
+                  estimatedDurationMinutes: 20,
+                  source: "campaign",
+                  reason:
+                    "This reset move should stay protected even if the rest of the day shifts.",
+                },
+              ],
+              move: [],
+              dropOrShrink: [],
+            },
+          },
+        },
+      },
+    ]);
+    mocks.supabaseInvoke
+      .mockResolvedValueOnce({
+        data: {
+          reply:
+            "I pulled that adjustment into a confirmable action. Review it and confirm if it fits.",
+          mode: "pending_confirmation",
+          intent: "schedule_task",
+          confidence: 0.82,
+          pendingAction: {
+            id: "action-adjust-1",
+            status: "pending",
+            intent: "schedule_task",
+            actionType: "campaign_update",
+            proposalId: "proposal-adjust-1",
+            summary: 'Adjust "Course launch".',
+            confirmationMessage: "Want me to lock that in?",
+            normalizedPayload: {
+              title: "Adjust Course launch",
+            },
+            affectedEntities: null,
+            expiresAt: "2026-04-18T20:20:00.000Z",
+            createdAt: "2026-04-18T08:20:00.000Z",
+          },
+          threadState: {
+            threadId: "persisted-session",
+            sessionId: "persisted-session",
+            openaiConversationId: "conv_123",
+            lastOpenAIResponseId: "resp_125",
+            hasPendingAction: true,
+          },
+        },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: {
+          reply: 'Got it — "Course launch" was adjusted.',
+          mode: "receipt",
+          intent: "update_existing_plan",
+          confidence: 1,
+          receipt: {
+            actionId: "action-adjust-1",
+            status: "executed",
+            proposalId: "proposal-adjust-1",
+            message: 'Got it — "Course launch" was adjusted.',
+            summary: 'Adjust "Course launch".',
+            createdAt: "2026-04-18T08:22:00.000Z",
+          },
+          threadState: {
+            threadId: "persisted-session",
+            sessionId: "persisted-session",
+            openaiConversationId: "conv_123",
+            lastOpenAIResponseId: "resp_126",
+            hasPendingAction: false,
+          },
+        },
+        error: null,
+      });
+
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(
+      () => useCompanionAssistant({ surface: "journeys" }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(result.current.structuredResponse?.dayAdjust?.keep[0]?.proposalId)
+        .toBe("proposal-adjust-1");
+    });
+
+    await act(async () => {
+      await result.current.confirmSuggestedQuest("proposal-adjust-1");
+    });
+
+    expect(mocks.supabaseInvoke).toHaveBeenCalledWith(
+      "companion-agent",
+      expect.objectContaining({
+        body: expect.objectContaining({
+          message: "Adjust my day",
+          starterIntent: "adjust_today",
+          selectedProposalId: "proposal-adjust-1",
+        }),
+      }),
+    );
+    expect(result.current.pendingAction?.id).toBe("action-adjust-1");
+
+    await act(async () => {
+      await result.current.confirmPendingAction();
+    });
+
+    expect(result.current.savedSuggestionProposalIds).toEqual([
+      "proposal-adjust-1",
+    ]);
   });
 
   it("restores cached planner state when switching back to a thread in the same session", async () => {
