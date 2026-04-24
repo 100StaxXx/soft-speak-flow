@@ -344,6 +344,10 @@ const isPhaseADeterministicStarterResponse = (
         baseResult.mode === "schedule_read"
       );
   }
+  if (starterIntent === "plan_week") {
+    return baseResult.mode === "schedule_read" &&
+      baseResult.followUpQuestions.length === 0;
+  }
   if (starterIntent === "right_now_start") {
     return baseResult.mode === "schedule_read" &&
       baseResult.followUpQuestions.length === 0;

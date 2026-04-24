@@ -5,9 +5,11 @@ import type { CompanionPlannerLaunchTarget, CompanionPlannerStarterIntent } from
 export interface JourneysCompanionLauncherTemplate {
   id:
     | "free-talk"
+    | "plan-week"
     | "plan-day"
     | "advance-campaign"
     | "adjust-day"
+    | "make-room"
     | "low-energy"
     | "what-matters"
     | "right-now"

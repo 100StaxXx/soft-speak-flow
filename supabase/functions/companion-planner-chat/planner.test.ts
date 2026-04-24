@@ -4667,6 +4667,130 @@ Deno.test("upcoming_start returns the today-and-tomorrow digest immediately", ()
   );
 });
 
+Deno.test("plan_week returns a structured weekly summary with priorities and load signals", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Plan my week",
+    horizon: "week",
+    plannerContext: {
+      starterIntent: "plan_week",
+      activeEpics: [
+        {
+          id: "epic-1",
+          title: "Launch prep",
+          endDate: "2026-04-24",
+          progressPercentage: 58,
+          daysRemaining: 6,
+        },
+      ],
+      tasks: [
+        {
+          id: "task-1",
+          title: "Finalize launch checklist",
+          taskDate: "2026-04-20",
+          scheduledTime: "09:00",
+          estimatedDuration: 45,
+          recurrencePattern: null,
+          completed: false,
+          priority: "high",
+          epicId: "epic-1",
+          epicTitle: "Launch prep",
+        },
+        {
+          id: "task-2",
+          title: "Prep investor notes",
+          taskDate: null,
+          scheduledTime: null,
+          estimatedDuration: 60,
+          recurrencePattern: null,
+          completed: false,
+          priority: "high",
+        },
+      ],
+      rituals: [
+        {
+          id: "ritual-1",
+          epicId: "epic-1",
+          epicTitle: "Launch prep",
+          title: "Morning review",
+          frequency: "daily",
+          preferredTime: "08:00",
+        },
+      ],
+      calendarEvents: [
+        {
+          id: "event-1",
+          title: "Launch workshop",
+          start: "2026-04-20T17:00:00.000Z",
+          end: "2026-04-20T20:30:00.000Z",
+          isAllDay: false,
+          provider: "google",
+          readOnly: true,
+        },
+      ],
+      priorityScores: [
+        {
+          id: "epic:epic-1",
+          kind: "epic",
+          title: "Launch prep",
+          score: 88,
+          reasons: ["Launch prep is the campaign to protect this week."],
+          epicId: "epic-1",
+        },
+        {
+          id: "task:task-1",
+          kind: "task",
+          title: "Finalize launch checklist",
+          score: 82,
+          reasons: ["It keeps launch prep moving before the deadline hits."],
+          taskId: "task-1",
+          epicId: "epic-1",
+        },
+        {
+          id: "task:task-2",
+          kind: "task",
+          title: "Prep investor notes",
+          score: 79,
+          reasons: ["It's important work that still needs a clean slot this week."],
+          taskId: "task-2",
+        },
+        {
+          id: "ritual:ritual-1",
+          kind: "ritual",
+          title: "Morning review",
+          score: 61,
+          reasons: ["It keeps the campaign from drifting."],
+          ritualId: "ritual-1",
+          epicId: "epic-1",
+        },
+      ],
+    },
+  }));
+
+  assertEquals(result.mode, "schedule_read");
+  assertEquals(result.proposals.length, 0);
+  assertEquals(result.followUpQuestions.length, 0);
+  assertEquals(result.structuredResponse?.weeklyPlan !== null, true);
+  assertEquals(
+    result.structuredResponse?.weeklyPlan?.topPriorities[0]?.title,
+    "Finalize launch checklist",
+  );
+  assertEquals(
+    result.structuredResponse?.weeklyPlan?.topPriorities.some((quest) =>
+      quest.title === "Prep investor notes"
+    ),
+    true,
+  );
+  assertEquals(
+    result.structuredResponse?.weeklyPlan?.busyDays.includes("Mon"),
+    true,
+  );
+  assertEquals(
+    (result.structuredResponse?.weeklyPlan?.openDays.length ?? 0) > 0,
+    true,
+  );
+  assertStringIncludes(result.reply, "Launch prep");
+});
+
 Deno.test("upcoming_start can surface a campaign move before the next event", () => {
   const result = buildPlannerResponse(baseInput({
     message: "What do I have coming up?",

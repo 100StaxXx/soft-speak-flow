@@ -54,6 +54,14 @@ export interface CompanionRightNowStructuredOutput {
   fallbackAction: CompanionSuggestedQuest | null;
 }
 
+export interface CompanionWeeklyPlanStructuredOutput {
+  message: string;
+  weeklyTheme: string | null;
+  topPriorities: CompanionSuggestedQuest[];
+  busyDays: string[];
+  openDays: string[];
+}
+
 export interface CompanionDayAdjustStructuredOutput {
   message: string;
   keep: CompanionSuggestedQuest[];
@@ -108,6 +116,7 @@ export interface CompanionComingUpStructuredOutput {
 export interface CompanionStructuredResponse {
   intent: CompanionIntentMetadata;
   planDay?: CompanionPlanDayStructuredOutput | null;
+  weeklyPlan?: CompanionWeeklyPlanStructuredOutput | null;
   comingUp?: CompanionComingUpStructuredOutput | null;
   rightNow?: CompanionRightNowStructuredOutput | null;
   dayAdjust?: CompanionDayAdjustStructuredOutput | null;

@@ -164,6 +164,83 @@ export const CompanionStructuredResponseCards = memo(
           )
           : null}
 
+        {structuredResponse.weeklyPlan
+          ? (
+            <section
+              className={cn("p-4", styles.card)}
+              data-testid="structured-weekly-plan"
+            >
+              <p className={styles.title}>Plan My Week</p>
+              <p className={cn("mt-2", styles.body)}>
+                {structuredResponse.weeklyPlan.message}
+              </p>
+              {structuredResponse.weeklyPlan.weeklyTheme
+                ? (
+                  <div className={cn("mt-4", styles.item)}>
+                    <p className={styles.title}>Theme</p>
+                    <p className="mt-1 text-sm font-semibold">
+                      {structuredResponse.weeklyPlan.weeklyTheme}
+                    </p>
+                  </div>
+                )
+                : null}
+              <div className="mt-4">
+                <p className={styles.title}>Top Priorities</p>
+                <div className="mt-2 space-y-3">
+                  {structuredResponse.weeklyPlan.topPriorities.length > 0
+                    ? structuredResponse.weeklyPlan.topPriorities.map((quest) =>
+                      renderQuestRow(quest, variant, styles, {
+                        onConfirmSuggestion,
+                        actionDisabled,
+                        savedProposalIds,
+                        pendingProposalId,
+                      })
+                    )
+                    : (
+                      <p className={styles.subtext}>
+                        Nothing needs heavy planning here yet.
+                      </p>
+                    )}
+                </div>
+              </div>
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <div>
+                  <p className={styles.title}>Busy Days</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {structuredResponse.weeklyPlan.busyDays.length > 0
+                      ? structuredResponse.weeklyPlan.busyDays.map((day) => (
+                        <span key={day} className={styles.accent}>
+                          {day}
+                        </span>
+                      ))
+                      : (
+                        <p className={styles.subtext}>
+                          No heavy pinch points yet.
+                        </p>
+                      )}
+                  </div>
+                </div>
+                <div>
+                  <p className={styles.title}>Open Days</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {structuredResponse.weeklyPlan.openDays.length > 0
+                      ? structuredResponse.weeklyPlan.openDays.map((day) => (
+                        <span key={day} className={styles.accent}>
+                          {day}
+                        </span>
+                      ))
+                      : (
+                        <p className={styles.subtext}>
+                          No wide-open days right now.
+                        </p>
+                      )}
+                  </div>
+                </div>
+              </div>
+            </section>
+          )
+          : null}
+
         {structuredResponse.rightNow
           ? (
             <section

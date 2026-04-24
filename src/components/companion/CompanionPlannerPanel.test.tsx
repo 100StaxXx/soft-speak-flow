@@ -187,38 +187,52 @@ describe("CompanionPlannerPanel", () => {
 
     render(<CompanionPlannerPanel />);
 
+    fireEvent.click(screen.getByTestId("companion-quick-action-plan-week"));
     fireEvent.click(screen.getByTestId("companion-quick-action-plan-day"));
     fireEvent.click(screen.getByTestId("companion-quick-action-advance-campaign"));
+    fireEvent.click(screen.getByTestId("companion-quick-action-make-room"));
     fireEvent.click(screen.getByTestId("companion-quick-action-low-energy"));
     fireEvent.click(screen.getByTestId("companion-quick-action-what-matters"));
     fireEvent.click(screen.getByTestId("companion-quick-action-upcoming"));
 
     expect(mocks.assistant.submitMessage).toHaveBeenNthCalledWith(
       1,
+      "Plan my week",
+      "text",
+      { starterIntent: "plan_week" },
+    );
+    expect(mocks.assistant.submitMessage).toHaveBeenNthCalledWith(
+      2,
       "Plan my day",
       "text",
       { starterIntent: "plan_day" },
     );
     expect(mocks.assistant.submitMessage).toHaveBeenNthCalledWith(
-      2,
+      3,
       "Advance my campaign",
       "text",
       { starterIntent: "advance_campaign_start" },
     );
     expect(mocks.assistant.submitMessage).toHaveBeenNthCalledWith(
-      3,
+      4,
+      "Help me make room for what matters.",
+      "text",
+      { starterIntent: "make_room" },
+    );
+    expect(mocks.assistant.submitMessage).toHaveBeenNthCalledWith(
+      5,
       "I'm low energy today",
       "text",
       { starterIntent: "low_energy_adjust" },
     );
     expect(mocks.assistant.submitMessage).toHaveBeenNthCalledWith(
-      4,
+      6,
       "What matters most today?",
       "text",
       { starterIntent: "what_matters" },
     );
     expect(mocks.assistant.submitMessage).toHaveBeenNthCalledWith(
-      5,
+      7,
       "What do I have coming up?",
       "text",
       { starterIntent: "upcoming_start" },

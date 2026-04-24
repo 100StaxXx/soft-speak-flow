@@ -68,6 +68,14 @@ describe("journeys companion launcher greetings", () => {
       starterIntent: "plan_day",
     });
 
+    expect(templates.find((template) => template.id === "plan-week")).toMatchObject({
+      id: "plan-week",
+      label: "Plan my week",
+      message: "Plan my week",
+      target: "planner",
+      starterIntent: "plan_week",
+    });
+
     expect(templates.find((template) => template.id === "advance-campaign")).toMatchObject({
       id: "advance-campaign",
       label: "Advance my campaign",
@@ -82,6 +90,14 @@ describe("journeys companion launcher greetings", () => {
       message: "Adjust my day",
       target: "planner",
       starterIntent: "adjust_today",
+    });
+
+    expect(templates.find((template) => template.id === "make-room")).toMatchObject({
+      id: "make-room",
+      label: "Make room",
+      message: "Help me make room for what matters.",
+      target: "planner",
+      starterIntent: "make_room",
     });
 
     expect(templates.find((template) => template.id === "low-energy")).toMatchObject({

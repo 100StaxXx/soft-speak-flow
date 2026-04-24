@@ -18,6 +18,7 @@ export type CompanionPlannerResponseMode = "conversational" | "schedule_read" | 
 export type CompanionPlannerStarterIntent =
   | "general"
   | "plan_day"
+  | "plan_week"
   | "advance_campaign_start"
   | "right_now_start"
   | "make_room"

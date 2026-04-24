@@ -102,6 +102,8 @@ export function JourneysCompanionLauncherPopup({
                         ? "border-[#224c52] bg-[linear-gradient(180deg,#cffff3_0%,#6fded2_100%)] text-[#08333a] shadow-[0_8px_0_rgba(34,76,82,0.8),0_14px_22px_rgba(34,76,82,0.24)] hover:shadow-[0_10px_0_rgba(34,76,82,0.82),0_16px_24px_rgba(34,76,82,0.28)]"
                       : option.id === "adjust-day"
                         ? "border-[#7a3b14] bg-[linear-gradient(180deg,#ffd7aa_0%,#ffae52_100%)] text-[#5b2608] shadow-[0_8px_0_rgba(122,59,20,0.8),0_14px_22px_rgba(122,59,20,0.24)] hover:shadow-[0_10px_0_rgba(122,59,20,0.82),0_16px_24px_rgba(122,59,20,0.28)]"
+                      : option.id === "make-room"
+                        ? "border-[#6b3f11] bg-[linear-gradient(180deg,#ffe8c8_0%,#f0b167_100%)] text-[#4d2607] shadow-[0_8px_0_rgba(107,63,17,0.8),0_14px_22px_rgba(107,63,17,0.24)] hover:shadow-[0_10px_0_rgba(107,63,17,0.82),0_16px_24px_rgba(107,63,17,0.28)]"
                       : option.id === "low-energy"
                         ? "border-[#35528a] bg-[linear-gradient(180deg,#dfe9ff_0%,#9dc0ff_100%)] text-[#102a57] shadow-[0_8px_0_rgba(53,82,138,0.8),0_14px_22px_rgba(53,82,138,0.24)] hover:shadow-[0_10px_0_rgba(53,82,138,0.82),0_16px_24px_rgba(53,82,138,0.28)]"
                       : option.id === "upcoming"
@@ -121,6 +123,8 @@ export function JourneysCompanionLauncherPopup({
                           ? "border-[#224c52] bg-white/35 text-[#08333a]"
                         : option.id === "adjust-day"
                           ? "border-[#7a3b14] bg-white/35 text-[#5b2608]"
+                        : option.id === "make-room"
+                          ? "border-[#6b3f11] bg-white/35 text-[#4d2607]"
                         : option.id === "low-energy"
                           ? "border-[#35528a] bg-white/35 text-[#102a57]"
                         : "border-[#6b3416] bg-white/60 text-[#b04b12]",

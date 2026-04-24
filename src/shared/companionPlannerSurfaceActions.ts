@@ -6,9 +6,11 @@ import type { CompanionPlanningMode } from "@/shared/companionPlanningMode";
 
 export interface CompanionPlannerSurfaceAction {
   id:
+    | "plan-week"
     | "plan-day"
     | "advance-campaign"
     | "adjust-day"
+    | "make-room"
     | "low-energy"
     | "what-matters"
     | "right-now"
@@ -24,6 +26,13 @@ export interface CompanionPlannerSurfaceAction {
 
 export const COMPANION_PLANNER_SURFACE_ACTIONS: CompanionPlannerSurfaceAction[] =
   [
+    {
+      id: "plan-week",
+      label: "Plan my week",
+      message: "Plan my week",
+      target: "planner",
+      starterIntent: "plan_week",
+    },
     {
       id: "plan-day",
       label: "Plan my day",
@@ -44,6 +53,13 @@ export const COMPANION_PLANNER_SURFACE_ACTIONS: CompanionPlannerSurfaceAction[] 
       message: "Adjust my day",
       target: "planner",
       starterIntent: "adjust_today",
+    },
+    {
+      id: "make-room",
+      label: "Make room",
+      message: "Help me make room for what matters.",
+      target: "planner",
+      starterIntent: "make_room",
     },
     {
       id: "low-energy",

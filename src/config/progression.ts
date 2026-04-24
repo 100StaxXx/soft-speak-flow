@@ -191,8 +191,12 @@ export const getProgressionLevelLabel = (level: number): string =>
 export const getProgressionLevelAndTierDisplay = (level: number): string =>
   `${getProgressionLevelLabel(level)} • ${getProgressionTierLabelForLevel(level)}`;
 
+const getThresholdKey = (
+  level: number,
+): keyof typeof PROGRESSION_XP_THRESHOLDS => clampProgressionLevel(level) as keyof typeof PROGRESSION_XP_THRESHOLDS;
+
 export const getProgressionThreshold = (level: number): number | null =>
-  PROGRESSION_XP_THRESHOLDS[clampProgressionLevel(level)] ?? null;
+  PROGRESSION_XP_THRESHOLDS[getThresholdKey(level)] ?? null;
 
 export const getProgressionLevelDisplay = (level: number): string =>
   `Stage ${clampProgressionLevel(level)} • ${getProgressionTierLabelForLevel(level)}`;
@@ -274,7 +278,7 @@ export const PROGRESSION_THRESHOLDS: readonly ProgressionThreshold[] = Array.fro
   { length: PROGRESSION_LEVEL_CAP + 1 },
   (_, level) => ({
     level,
-    xpRequired: PROGRESSION_XP_THRESHOLDS[level] ?? 0,
+    xpRequired: PROGRESSION_XP_THRESHOLDS[getThresholdKey(level)] ?? 0,
     tier: getProgressionTier(level),
     evolvesAtBoundary: isTierBoundaryLevel(level),
   }),

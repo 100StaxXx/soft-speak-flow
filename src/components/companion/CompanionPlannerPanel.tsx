@@ -132,9 +132,11 @@ export const CompanionPlannerPanel = memo(() => {
           <div className="flex flex-wrap gap-2">
             {COMPANION_PLANNER_SURFACE_ACTIONS.filter((action) =>
               [
+                "plan-week",
                 "plan-day",
                 "advance-campaign",
                 "adjust-day",
+                "make-room",
                 "low-energy",
                 "what-matters",
                 "right-now",
@@ -159,12 +161,16 @@ export const CompanionPlannerPanel = memo(() => {
                   });
                 }}
               >
-                {action.id === "plan-day"
+                {action.id === "plan-week"
+                  ? "Plan My Week"
+                  : action.id === "plan-day"
                   ? "Plan My Day"
                   : action.id === "advance-campaign"
                   ? "Advance My Campaign"
                   : action.id === "adjust-day"
                   ? "Adjust My Day"
+                  : action.id === "make-room"
+                  ? "Make Room"
                   : action.id === "low-energy"
                   ? "Low Energy"
                   : action.id === "what-matters"

@@ -204,6 +204,7 @@ const inferStarterIntentFromStructuredResponse = (
   response: CompanionAgentResponse["structuredResponse"],
 ): CompanionPlannerLaunchIntent["starterIntent"] | null => {
   if (response?.planDay) return "plan_day";
+  if (response?.weeklyPlan) return "plan_week";
   if (response?.campaignMomentum) return "advance_campaign_start";
   if (response?.dayAdjust) return "adjust_today";
   if (response?.rightNow) return "right_now_start";
@@ -222,6 +223,7 @@ const collectProposalIdsFromStructuredResponse = (
   };
 
   response?.planDay?.suggestedQuests.forEach(collectQuest);
+  response?.weeklyPlan?.topPriorities.forEach(collectQuest);
   if (response?.rightNow?.recommendedAction) {
     collectQuest(response.rightNow.recommendedAction);
   }
@@ -922,6 +924,8 @@ export function useCompanionAssistant({
         ?.trim() ||
       (structuredResponse?.planDay
         ? "Plan my day"
+        : structuredResponse?.weeklyPlan
+        ? "Plan my week"
         : structuredResponse?.dayAdjust
         ? "Adjust my day"
         : structuredResponse?.rightNow

@@ -56,6 +56,7 @@ export type IntentType = "quest" | "epic" | "habit" | "brain-dump";
 export type PlannerStarterIntent =
   | "general"
   | "plan_day"
+  | "plan_week"
   | "advance_campaign_start"
   | "right_now_start"
   | "make_room"
@@ -474,6 +475,31 @@ export const normalizePlannerBuildResultText = (
             })),
         }
         : result.structuredResponse.planDay,
+      weeklyPlan: result.structuredResponse.weeklyPlan
+        ? {
+          ...result.structuredResponse.weeklyPlan,
+          message: normalizePlannerDisplayText(result.reply),
+          weeklyTheme: normalizePlannerDisplayText(
+            result.structuredResponse.weeklyPlan.weeklyTheme,
+          ),
+          topPriorities: result.structuredResponse.weeklyPlan.topPriorities.map(
+            (quest) => ({
+              ...quest,
+              title: normalizePlannerDisplayText(quest.title),
+              estimatedDuration: normalizePlannerDisplayText(
+                quest.estimatedDuration,
+              ),
+              reason: normalizePlannerDisplayText(quest.reason),
+            }),
+          ),
+          busyDays: result.structuredResponse.weeklyPlan.busyDays.map(
+            normalizePlannerDisplayText,
+          ),
+          openDays: result.structuredResponse.weeklyPlan.openDays.map(
+            normalizePlannerDisplayText,
+          ),
+        }
+        : result.structuredResponse.weeklyPlan,
       comingUp: result.structuredResponse.comingUp
         ? {
           ...result.structuredResponse.comingUp,
@@ -1218,6 +1244,13 @@ const inferPlannerStarterIntentFromMessage = (
     )
   ) {
     return "what_matters";
+  }
+  if (
+    !isScheduleQuestion(normalizedMessage) &&
+    /\b(plan my week|help me plan this week|plan the week|what does this week look like|what(?:'s| is) my week like)\b/
+      .test(normalizedMessage)
+  ) {
+    return "plan_week";
   }
   if (
     !isScheduleQuestion(normalizedMessage) &&
@@ -4428,6 +4461,7 @@ const buildCampaignMomentumStructuredOutput = (
     shouldPromptCampaign: options.campaignId === null,
   }),
   planDay: null,
+  weeklyPlan: null,
   comingUp: null,
   rightNow: null,
   dayAdjust: null,
@@ -4761,6 +4795,7 @@ const buildComingUpStructuredOutput = (
       shouldPromptCampaign: false,
     }),
     planDay: null,
+    weeklyPlan: null,
     comingUp: {
       message,
       nextEvent,
@@ -6162,10 +6197,236 @@ const buildPlanDayStructuredOutput = (
       buildSuggestedQuestFromProposal(input, proposal)
     ),
   },
+  weeklyPlan: null,
   comingUp: null,
   rightNow: null,
   dayAdjust: null,
 });
+
+const WEEKDAY_SHORT_FORMATTER = new Intl.DateTimeFormat("en-US", {
+  weekday: "short",
+});
+
+const getWeeklyRangeDates = (currentDate: string): string[] =>
+  Array.from({ length: 7 }, (_, index) => addDaysToDateKey(currentDate, index));
+
+const formatWeeklyDayLabel = (date: string): string =>
+  WEEKDAY_SHORT_FORMATTER.format(new Date(`${date}T12:00:00`));
+
+const getWeeklyLoadStatus = (
+  input: PlannerBuildInput,
+  date: string,
+): "open" | "balanced" | "busy" | "overloaded" => {
+  const insightStatus = input.plannerContext.scheduleInsights?.dayLoads.find((
+    day,
+  ) => day.date === date)?.status;
+  if (insightStatus) return insightStatus;
+
+  const intervals = buildIntervalsForDate(input, date);
+  if (intervals.length === 0) return "open";
+
+  const totalMinutes = intervals.reduce(
+    (sum, interval) =>
+      sum + Math.max(0, interval.endMinutes - interval.startMinutes),
+    0,
+  );
+
+  if (totalMinutes >= 480 || intervals.length >= 6) return "overloaded";
+  if (totalMinutes >= 300 || intervals.length >= 4) return "busy";
+  return "balanced";
+};
+
+const buildWeeklyPrioritySuggestions = (
+  input: PlannerBuildInput,
+): CompanionSuggestedQuest[] => {
+  const rangeDates = getWeeklyRangeDates(input.currentDate);
+  const rangeEnd = rangeDates[rangeDates.length - 1] ?? input.currentDate;
+  const suggestions: CompanionSuggestedQuest[] = [];
+  const seen = new Set<string>();
+
+  const addSuggestion = (suggestion: CompanionSuggestedQuest | null) => {
+    if (!suggestion) return;
+    const dedupeKey = suggestion.proposalId ?? suggestion.suggestionId;
+    if (seen.has(dedupeKey)) return;
+    seen.add(dedupeKey);
+    suggestions.push(suggestion);
+  };
+
+  for (const score of [...getResolvedPriorityScores(input)].sort((
+    left,
+    right,
+  ) => right.score - left.score)) {
+    if (suggestions.length >= 5) break;
+
+    if (score.kind === "task" && score.taskId) {
+      const task = findPlannerTaskById(input, score.taskId);
+      if (!task || task.completed === true) continue;
+      if (task.taskDate && task.taskDate > rangeEnd) continue;
+
+      addSuggestion(buildSuggestedQuestFromTask(
+        task,
+        score.reasons[0] ??
+          "This is one of the clearest moves to protect this week.",
+        {
+          type: mapPriorityScoreToSuggestedQuestType(score.score, task),
+        },
+      ));
+      continue;
+    }
+
+    if (score.kind === "epic" && score.epicId) {
+      const epic = input.plannerContext.activeEpics.find((candidate) =>
+        candidate.id === score.epicId
+      );
+      if (!epic) continue;
+
+      const momentum = buildCampaignMomentumCandidate(input, epic);
+      const linkedTask = selectCampaignNextTask(input, momentum);
+
+      if (linkedTask && linkedTask.completed !== true && (
+        !linkedTask.taskDate || linkedTask.taskDate <= rangeEnd
+      )) {
+        addSuggestion(buildSuggestedQuestFromTask(
+          linkedTask,
+          momentum.statusReason,
+          {
+            type: momentum.status === "at_risk"
+              ? "must"
+              : momentum.status === "stalled"
+              ? "should"
+              : mapPriorityScoreToSuggestedQuestType(score.score, linkedTask),
+          },
+        ));
+        continue;
+      }
+
+      addSuggestion({
+        suggestionId: `week:campaign:${epic.id}`,
+        proposalId: null,
+        title: momentum.oversizedTask
+          ? `Break down ${momentum.oversizedTask.title}`
+          : momentum.status === "at_risk"
+          ? `Protect ${epic.title}`
+          : momentum.status === "stalled"
+          ? `Define next step for ${epic.title}`
+          : `Move ${epic.title} forward`,
+        type: momentum.status === "at_risk"
+          ? "must"
+          : momentum.status === "stalled"
+          ? "should"
+          : "nice",
+        estimatedDuration: momentum.oversizedTask ? "20 min" : "30 min",
+        estimatedDurationMinutes: momentum.oversizedTask ? 20 : 30,
+        source: "campaign",
+        reason: momentum.statusReason,
+      });
+      continue;
+    }
+
+    if (score.kind === "ritual" && score.ritualId) {
+      const ritual = input.plannerContext.rituals.find((candidate) =>
+        candidate.id === score.ritualId
+      );
+      if (!ritual) continue;
+
+      addSuggestion({
+        suggestionId: `week:ritual:${ritual.id}`,
+        proposalId: null,
+        title: `Keep ${ritual.title}`,
+        type: "nice",
+        estimatedDuration: "20 min",
+        estimatedDurationMinutes: 20,
+        source: "habit",
+        reason: ritual.preferredTime
+          ? `${ritual.title} stays easiest when you protect its usual ${ritual.preferredTime} slot.`
+          : `${ritual.title} is a lighter weekly support move worth keeping alive.`,
+      });
+      continue;
+    }
+  }
+
+  return suggestions.slice(0, 5);
+};
+
+const buildWeeklyPlanStructuredOutput = (
+  input: PlannerBuildInput,
+  reply: string,
+  classificationHint: ClassificationHint,
+  weeklyTheme: string | null,
+  topPriorities: CompanionSuggestedQuest[],
+  busyDays: string[],
+  openDays: string[],
+): CompanionStructuredResponse => ({
+  intent: mapPlannerIntentMetadata(input, classificationHint, {
+    forceIntentType: "quest",
+    shouldCreateQuest: false,
+    shouldPromptCampaign: false,
+  }),
+  planDay: null,
+  weeklyPlan: {
+    message: reply,
+    weeklyTheme,
+    topPriorities,
+    busyDays,
+    openDays,
+  },
+  comingUp: null,
+  rightNow: null,
+  dayAdjust: null,
+});
+
+const buildPlanWeekStarterResponse = (
+  input: PlannerBuildInput,
+  sessionState: PlannerSessionState,
+  classificationHint: ClassificationHint,
+): PlannerBuildResult => {
+  const dayLabels = getWeeklyRangeDates(input.currentDate).map((date) => ({
+    label: formatWeeklyDayLabel(date),
+    status: getWeeklyLoadStatus(input, date),
+  }));
+  const busyDays = dayLabels
+    .filter((day) => day.status === "busy" || day.status === "overloaded")
+    .map((day) => day.label);
+  const openDays = dayLabels
+    .filter((day) => day.status === "open")
+    .map((day) => day.label);
+  const selectedCampaign = selectCampaignMomentumCandidate(input);
+  const weeklyTheme = input.plannerContext.statInterpretation?.weeklyNarrative ??
+    (selectedCampaign
+      ? `${selectedCampaign.epic.title} is the campaign to protect this week.`
+      : busyDays.length > 0
+      ? "Protect the high-leverage moves early and keep the crowded days lighter."
+      : "You have room for a focused, realistic week.");
+  const topPriorities = buildWeeklyPrioritySuggestions(input);
+  const busyDaySummary = busyDays.length > 0
+    ? `${busyDays.slice(0, 2).join(" and ")} ${
+      busyDays.length === 1 ? "looks" : "look"
+    } tight, so avoid stacking extra hard work there.`
+    : openDays.length > 0
+    ? `${openDays.slice(0, 2).join(" and ")} ${
+      openDays.length === 1 ? "is" : "are"
+    } your best deeper-work opening${openDays.length === 1 ? "" : "s"}.`
+    : "The week is fairly even, so the main job is protecting the few moves that matter most.";
+  const reply = `${weeklyTheme} ${busyDaySummary}`.trim();
+
+  return buildReadOnlyResponse(
+    reply,
+    {
+      ...sessionState,
+      lastClassification: classificationHint.type,
+    },
+    "schedule_read",
+    buildWeeklyPlanStructuredOutput(
+      input,
+      reply,
+      classificationHint,
+      weeklyTheme,
+      topPriorities,
+      busyDays,
+      openDays,
+    ),
+  );
+};
 
 const buildCurrentWindowLabel = (input: PlannerBuildInput): string => {
   const currentMinutes = getLocalMinutesFromDateTime(input.currentDateTime);
@@ -6224,6 +6485,7 @@ const buildRightNowStructuredOutput = (
     shouldPromptCampaign: false,
   }),
   planDay: null,
+  weeklyPlan: null,
   comingUp: null,
   rightNow: {
     message: reply,
@@ -6389,6 +6651,7 @@ const buildDayAdjustStructuredOutput = (
     shouldPromptCampaign: false,
   }),
   planDay: null,
+  weeklyPlan: null,
   comingUp: null,
   rightNow: null,
   dayAdjust: {
@@ -6984,6 +7247,14 @@ export function buildPlannerResponse(
 
     if (starterIntent === "plan_day") {
       return buildPlanDayStarterResponse(
+        resolvedInput,
+        resolvedInput.sessionState,
+        classificationHint,
+      );
+    }
+
+    if (starterIntent === "plan_week") {
+      return buildPlanWeekStarterResponse(
         resolvedInput,
         resolvedInput.sessionState,
         classificationHint,

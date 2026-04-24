@@ -759,6 +759,7 @@ const normalizePlannerStarterIntent = (
   switch (starterIntent) {
     case "general":
     case "plan_day":
+    case "plan_week":
     case "advance_campaign_start":
     case "right_now_start":
     case "make_room":

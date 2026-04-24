@@ -81,7 +81,7 @@ const uploadGeneratedImage = async ({
   nextStage,
   generatedImageDataUrl,
 }: {
-  supabase: ReturnType<typeof createClient>;
+  supabase: any;
   userId: string;
   companionId: string;
   nextStage: number;
@@ -117,12 +117,12 @@ const upsertEvolutionRecord = async ({
   xpAtEvolution,
   generationMetadata,
 }: {
-  supabase: ReturnType<typeof createClient>;
+  supabase: any;
   companionId: string;
   stage: number;
   imageUrl: string;
   xpAtEvolution: number;
-  generationMetadata?: Record<string, unknown> | null;
+  generationMetadata?: unknown;
 }) => {
   const { data, error } = await supabase
     .from("companion_evolutions")
@@ -144,7 +144,7 @@ const upsertEvolutionRecord = async ({
     throw new Error("Failed to save evolution record");
   }
 
-  return data;
+  return (data ?? {}) as Record<string, unknown>;
 };
 
 const judgeScoresPass = ({
@@ -202,12 +202,62 @@ const appendJudgeCritique = (prompt: string, notes: string | null | undefined): 
   return `${prompt}\n\nRetry critique:\n- ${critique}`;
 };
 
-serve(async (req) => {
+export interface GenerateCompanionEvolutionDeps {
+  createClient: typeof createClient;
+  checkRateLimit: typeof checkRateLimit;
+  createRateLimitResponse: typeof createRateLimitResponse;
+  resolveCompanionImageSizeForUser: typeof resolveCompanionImageSizeForUser;
+  createCostGuardrailSession: typeof createCostGuardrailSession;
+  generateCompanionImage: typeof generateCompanionImage;
+  editCompanionImage: typeof editCompanionImage;
+  judgeCompanionImage: typeof judgeCompanionImage;
+  registerUserStorageAsset: typeof registerUserStorageAsset;
+  uploadGeneratedImage: typeof uploadGeneratedImage;
+  upsertEvolutionRecord: typeof upsertEvolutionRecord;
+  info: typeof console.info;
+  error: typeof console.error;
+}
+
+const defaultGenerateCompanionEvolutionDeps: GenerateCompanionEvolutionDeps = {
+  createClient,
+  checkRateLimit,
+  createRateLimitResponse,
+  resolveCompanionImageSizeForUser,
+  createCostGuardrailSession,
+  generateCompanionImage,
+  editCompanionImage,
+  judgeCompanionImage,
+  registerUserStorageAsset,
+  uploadGeneratedImage,
+  upsertEvolutionRecord,
+  info: console.info,
+  error: console.error,
+};
+
+export const handleGenerateCompanionEvolution = async (
+  req: Request,
+  deps: GenerateCompanionEvolutionDeps = defaultGenerateCompanionEvolutionDeps,
+) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   const requestStartedAt = Date.now();
+  const {
+    createClient: createSupabaseClient,
+    checkRateLimit: checkRateLimitFn,
+    createRateLimitResponse: createRateLimitResponseFn,
+    resolveCompanionImageSizeForUser: resolveCompanionImageSizeForUserFn,
+    createCostGuardrailSession: createCostGuardrailSessionFn,
+    generateCompanionImage: generateCompanionImageFn,
+    editCompanionImage: editCompanionImageFn,
+    judgeCompanionImage: judgeCompanionImageFn,
+    registerUserStorageAsset: registerUserStorageAssetFn,
+    uploadGeneratedImage: uploadGeneratedImageFn,
+    upsertEvolutionRecord: upsertEvolutionRecordFn,
+    info: infoLog,
+    error: errorLog,
+  } = deps;
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -239,7 +289,7 @@ serve(async (req) => {
         );
       }
 
-      const authClient = createClient(supabaseUrl, supabaseAnonKey, {
+      const authClient = createSupabaseClient(supabaseUrl, supabaseAnonKey, {
         global: {
           headers: {
             Authorization: authHeader,
@@ -275,7 +325,7 @@ serve(async (req) => {
       );
     }
 
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabase = createSupabaseClient(supabaseUrl, supabaseKey);
 
     const { data: companion, error: companionError } = await supabase
       .from("user_companion")
@@ -351,7 +401,7 @@ serve(async (req) => {
         element: coerceCompanionElementId(companion.core_element),
       });
       const newImageUrl = supabase.storage.from(COMPANION_PRESET_BUCKET).getPublicUrl(assetPath).data.publicUrl;
-      const evolutionRecord = await upsertEvolutionRecord({
+      const evolutionRecord = await upsertEvolutionRecordFn({
         supabase,
         companionId: companion.id,
         stage: nextStage,
@@ -413,7 +463,7 @@ serve(async (req) => {
           reusedFromStage: 1,
         });
 
-        const evolutionRecord = await upsertEvolutionRecord({
+        const evolutionRecord = await upsertEvolutionRecordFn({
           supabase,
           companionId: companion.id,
           stage: nextStage,
@@ -456,7 +506,7 @@ serve(async (req) => {
 
     const isLegacyStageOneBackfill = nextStage === 1 && !hiddenStageOneAnchor?.imageUrl;
     if (isLegacyStageOneBackfill) {
-      console.info("[CompanionEvolution] Missing hidden stage-1 anchor for AI companion; generating legacy backfill stage 1", {
+      infoLog("[CompanionEvolution] Missing hidden stage-1 anchor for AI companion; generating legacy backfill stage 1", {
         companionId: companion.id,
         currentStage,
         nextStage,
@@ -473,7 +523,7 @@ serve(async (req) => {
         throw new Error("Companion is missing a portrait to reuse");
       }
 
-      const evolutionRecord = await upsertEvolutionRecord({
+      const evolutionRecord = await upsertEvolutionRecordFn({
         supabase,
         companionId: companion.id,
         stage: nextStage,
@@ -530,7 +580,7 @@ serve(async (req) => {
       );
     }
 
-    const costGuardrails = createCostGuardrailSession({
+    const costGuardrails = createCostGuardrailSessionFn({
       supabase,
       endpointKey: "generate-companion-evolution",
       featureKey: "ai_companion_evolution",
@@ -542,17 +592,17 @@ serve(async (req) => {
       providers: ["openai"],
     });
 
-    const rateLimit = await checkRateLimit(
+    const rateLimit = await checkRateLimitFn(
       supabase,
       resolvedUserId,
       "companion-evolution",
       RATE_LIMITS["companion-evolution"],
     );
     if (!rateLimit.allowed) {
-      return createRateLimitResponse(rateLimit, corsHeaders);
+      return createRateLimitResponseFn(rateLimit, corsHeaders);
     }
 
-    const imageSize = resolveCompanionImageSizeForUser(resolvedUserId);
+    const imageSize = resolveCompanionImageSizeForUserFn(resolvedUserId);
     const spiritLockProfile = resolveCompanionSpiritLockProfile(companion.spirit_animal);
     const spiritLockPromptBlock = spiritLockProfile
       ? buildSpiritLockPromptBlock(spiritLockProfile, "image")
@@ -585,7 +635,7 @@ serve(async (req) => {
 
       for (let attempt = 0; attempt < renderAttempts; attempt += 1) {
         const rendered = await render(promptForAttempt);
-        const scores = await judgeCompanionImage({
+        const scores = await judgeCompanionImageFn({
           guardedFetch,
           openAIApiKey,
           profile: visualIdentityProfile,
@@ -633,7 +683,7 @@ serve(async (req) => {
         previousLevel: 0,
         nextLevel: 1,
         render: async (prompt) =>
-          await generateCompanionImage({
+          await generateCompanionImageFn({
             guardedFetch,
             openAIApiKey,
             prompt,
@@ -643,7 +693,7 @@ serve(async (req) => {
           }),
       });
 
-      const { fileName, publicUrl: newImageUrl } = await uploadGeneratedImage({
+      const { fileName, publicUrl: newImageUrl } = await uploadGeneratedImageFn({
         supabase,
         userId: resolvedUserId,
         companionId: companion.id,
@@ -671,7 +721,7 @@ serve(async (req) => {
           : stageOneAttempt.scores?.notes ?? stageOneAttempt.revisedPrompt,
       });
 
-      const evolutionRecord = await upsertEvolutionRecord({
+      const evolutionRecord = await upsertEvolutionRecordFn({
         supabase,
         companionId: companion.id,
         stage: nextStage,
@@ -680,7 +730,7 @@ serve(async (req) => {
         generationMetadata,
       });
 
-      await registerUserStorageAsset({
+      await registerUserStorageAssetFn({
         supabase,
         userId: resolvedUserId,
         bucketId: IMAGE_BUCKET,
@@ -749,7 +799,7 @@ serve(async (req) => {
       nextLevel: nextStage,
       referenceImageUrl: previousImageUrl,
       render: async (prompt) =>
-        await editCompanionImage({
+        await editCompanionImageFn({
           guardedFetch,
           openAIApiKey,
           prompt,
@@ -764,7 +814,7 @@ serve(async (req) => {
         }),
     });
 
-    const { fileName, publicUrl: newImageUrl } = await uploadGeneratedImage({
+    const { fileName, publicUrl: newImageUrl } = await uploadGeneratedImageFn({
       supabase,
       userId: resolvedUserId,
       companionId: companion.id,
@@ -790,7 +840,7 @@ serve(async (req) => {
       notes: evolutionAttempt.scores?.notes ?? evolutionAttempt.revisedPrompt,
     });
 
-    const evolutionRecord = await upsertEvolutionRecord({
+    const evolutionRecord = await upsertEvolutionRecordFn({
       supabase,
       companionId: companion.id,
       stage: nextStage,
@@ -799,7 +849,7 @@ serve(async (req) => {
       generationMetadata,
     });
 
-    await registerUserStorageAsset({
+    await registerUserStorageAssetFn({
       supabase,
       userId: resolvedUserId,
       bucketId: IMAGE_BUCKET,
@@ -850,7 +900,7 @@ serve(async (req) => {
       return buildCostGuardrailBlockedResponse(error, corsHeaders);
     }
 
-    console.error("Error in generate-companion-evolution:", error);
+    errorLog("Error in generate-companion-evolution:", error);
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
     const errorCode = resolveServerErrorCode(errorMessage);
     return new Response(
@@ -866,4 +916,8 @@ serve(async (req) => {
   } finally {
     console.log(`[CompanionEvolutionTiming] total_ms=${Date.now() - requestStartedAt}`);
   }
-});
+};
+
+if (Deno.env.get("SUPABASE_FUNCTIONS_TEST") !== "1") {
+  serve((req) => handleGenerateCompanionEvolution(req));
+}

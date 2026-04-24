@@ -24,6 +24,7 @@ export const COMPANION_AGENT_INTENTS = [
 export const COMPANION_AGENT_STARTER_INTENTS = [
   "general",
   "plan_day",
+  "plan_week",
   "advance_campaign_start",
   "right_now_start",
   "make_room",
@@ -112,6 +113,13 @@ const CompanionStructuredResponseSchema = z.object({
       "low_energy",
     ]),
     suggestedQuests: z.array(CompanionSuggestedQuestSchema).max(5),
+  }).nullable().optional(),
+  weeklyPlan: z.object({
+    message: z.string().min(1).max(4000),
+    weeklyTheme: z.string().min(1).max(2000).nullable(),
+    topPriorities: z.array(CompanionSuggestedQuestSchema).max(5),
+    busyDays: z.array(z.string().min(1).max(40)).max(7),
+    openDays: z.array(z.string().min(1).max(40)).max(7),
   }).nullable().optional(),
   comingUp: z.object({
     message: z.string().min(1).max(4000),
