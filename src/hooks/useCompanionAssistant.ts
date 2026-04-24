@@ -718,6 +718,7 @@ export function useCompanionAssistant({
     inputMode: CompanionChatInputMode = "text",
     options?: {
       starterIntent?: CompanionPlannerLaunchIntent["starterIntent"];
+      planningMode?: CompanionPlanningMode | null;
     },
   ) => {
     const message = rawMessage.trim();
@@ -757,7 +758,7 @@ export function useCompanionAssistant({
             inputMode,
             currentDateTime: formatCurrentDateTimeWithOffset(new Date()),
             starterIntent: options?.starterIntent,
-            planningMode,
+            planningMode: options?.planningMode ?? planningMode,
           },
         },
       );
@@ -1057,6 +1058,7 @@ export function useCompanionAssistant({
 
       await submitMessage(launchMessage, "text", {
         starterIntent: launchIntent.starterIntent,
+        planningMode: launchIntent.planningMode ?? null,
       });
       onLaunchIntentConsumed?.(intentId);
     })();

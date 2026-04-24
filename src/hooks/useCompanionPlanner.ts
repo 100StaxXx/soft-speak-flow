@@ -2139,6 +2139,7 @@ export function useCompanionPlanner({
       skipUserEcho?: boolean;
       starterIntent?: CompanionPlannerStarterIntent;
       briefingContext?: PlannerBriefingContext | null;
+      planningMode?: CompanionPlanningMode | null;
     },
   ) => {
     if (!enabled) return;
@@ -2187,6 +2188,14 @@ export function useCompanionPlanner({
 
     try {
       const resolvedBriefingContext = options?.briefingContext ?? null;
+      const resolvedPlanningMode = options?.planningMode ?? null;
+      const resolvedWorkloadTolerance = resolvedPlanningMode
+        ? mapPlanningModeToWorkloadTolerance(resolvedPlanningMode)
+        : effectiveWorkloadTolerance;
+      const resolvedPlannerMemory: PlannerMemoryProfile = {
+        ...plannerMemory,
+        workloadTolerance: resolvedWorkloadTolerance,
+      };
       const outlookSyncPromise = withTimeout(
         () => syncOutlookPlanningContext(),
         {
@@ -2238,7 +2247,7 @@ export function useCompanionPlanner({
         briefingContext: resolvedBriefingContext,
         starterIntent: resolvedStarterIntent,
         scheduleInsights,
-        plannerMemory: effectivePlannerMemory,
+        plannerMemory: resolvedPlannerMemory,
         aiSignals: plannerAISignals?.suggestedWorkload
           ? {
             suggestedWorkload: plannerAISignals.suggestedWorkload,
@@ -2255,7 +2264,7 @@ export function useCompanionPlanner({
         starterIntent: resolvedStarterIntent,
         briefingContext: resolvedBriefingContext,
         priorityScores: requestPriorityScores,
-        plannerMemory: effectivePlannerMemory,
+        plannerMemory: resolvedPlannerMemory,
       });
       requestBody = {
         message,

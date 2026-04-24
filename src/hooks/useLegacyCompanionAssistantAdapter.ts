@@ -10,6 +10,7 @@ import { useCompanionPlanner } from "@/hooks/useCompanionPlanner";
 import { useJourneysCompanionConversation } from "@/hooks/useJourneysCompanionConversation";
 import { useJourneysCompanionThreads } from "@/hooks/useJourneysCompanionThreads";
 import { stripMarkdown } from "@/lib/utils";
+import type { CompanionPlanningMode } from "@/shared/companionPlanningMode";
 import {
   analyzeSchedulingIntent,
   shouldRouteMessageToPlanner,
@@ -514,6 +515,7 @@ export function useLegacyCompanionAssistantAdapter({
     inputMode: CompanionChatInputMode = "text",
     options?: {
       starterIntent?: CompanionPlannerLaunchIntent["starterIntent"];
+      planningMode?: CompanionPlanningMode | null;
     },
   ) => {
     const message = rawMessage.trim();
@@ -550,6 +552,7 @@ export function useLegacyCompanionAssistantAdapter({
     ) {
       await planner.submitMessage(message, inputMode, {
         starterIntent,
+        planningMode: options?.planningMode ?? null,
       });
       return;
     }
@@ -567,6 +570,7 @@ export function useLegacyCompanionAssistantAdapter({
     if (isExactUpcomingStarterMessage(message)) {
       await planner.submitMessage(message, inputMode, {
         starterIntent: "upcoming_start",
+        planningMode: options?.planningMode ?? null,
       });
       return;
     }
@@ -574,6 +578,7 @@ export function useLegacyCompanionAssistantAdapter({
     if (isExactRightNowStarterMessage(message)) {
       await planner.submitMessage(message, inputMode, {
         starterIntent: "right_now_start",
+        planningMode: options?.planningMode ?? null,
       });
       return;
     }
@@ -581,6 +586,7 @@ export function useLegacyCompanionAssistantAdapter({
     if (isExactAdjustDayStarterMessage(message)) {
       await planner.submitMessage(message, inputMode, {
         starterIntent: "adjust_today",
+        planningMode: options?.planningMode ?? null,
       });
       return;
     }
