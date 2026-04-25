@@ -81,8 +81,9 @@ Deno.test("companion image bootstrap cleans up hidden stage-one assets and recor
   assert(
     idempotencyTuningMigration.includes("interval '3 minutes'") &&
       idempotencyTuningMigration.includes("interval '30 minutes'") &&
+      idempotencyTuningMigration.includes("expires_at = LEAST(expires_at, now() + interval '30 minutes')") &&
       idempotencyTuningMigration.includes("DELETE FROM public.companion_image_generation_requests"),
-    "Expected idempotency tuning migration to shorten stale/replay windows and clean expired rows",
+    "Expected idempotency tuning migration to shorten stale/replay windows, cap legacy rows, and clean expired rows",
   );
   assert(
     source.includes("isReplayImagePayloadUsable") &&

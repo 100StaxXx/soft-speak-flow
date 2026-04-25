@@ -1,6 +1,12 @@
 ALTER TABLE public.companion_image_generation_requests
   ALTER COLUMN expires_at SET DEFAULT (now() + interval '30 minutes');
 
+UPDATE public.companion_image_generation_requests
+SET
+  expires_at = LEAST(expires_at, now() + interval '30 minutes'),
+  updated_at = now()
+WHERE expires_at > now() + interval '30 minutes';
+
 CREATE OR REPLACE FUNCTION public.begin_companion_image_generation_request(
   p_user_id uuid,
   p_request_key text,
