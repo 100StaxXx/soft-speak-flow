@@ -441,6 +441,9 @@ interface GeneratedCompanionImageResponse {
   imageUrl?: string;
   imageFocalX?: number | null;
   imageFocalY?: number | null;
+  // Provider fallback may return a different aspect ratio than requested.
+  requestedImageSize?: string | null;
+  imageSize?: string | null;
   visualIdentityProfile?: Record<string, unknown> | null;
   imageLineageMetadata?: Record<string, unknown> | null;
   qualityWarning?: Record<string, unknown> | null;
@@ -1064,6 +1067,17 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
               idempotencyReplay: generatedImage.idempotencyReplay === true,
               qualityWarning: generatedImage.qualityWarning ?? null,
               judgeUnavailable: generatedImage.judgeUnavailable === true,
+            });
+          }
+          if (
+            generatedImage.requestedImageSize &&
+            generatedImage.imageSize &&
+            generatedImage.requestedImageSize !== generatedImage.imageSize
+          ) {
+            logger.warn("AI companion image returned with provider size fallback", {
+              userId: user.id,
+              requestedImageSize: generatedImage.requestedImageSize,
+              imageSize: generatedImage.imageSize,
             });
           }
         }

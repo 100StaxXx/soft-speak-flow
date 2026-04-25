@@ -30,6 +30,7 @@ import {
 } from "../_shared/companionLineage.ts";
 import { generateCompanionImage, editCompanionImage } from "../_shared/openaiCompanionImageClient.ts";
 import { judgeCompanionImage } from "../_shared/companionImageJudge.ts";
+import { runCompanionJudgedRender } from "../_shared/companionJudgedRender.ts";
 import { registerUserStorageAsset } from "../_shared/storageAssetLedger.ts";
 
 // ============================================================================
@@ -386,7 +387,9 @@ const STAGE_ZERO_INTERNAL_RETRIES = 2;
 const MAX_ALLOWED_RETRIES = 3;
 const GENERATION_FETCH_TIMEOUT_MS = 75_000;
 const AUXILIARY_FETCH_TIMEOUT_MS = 25_000;
+const REPLAY_IMAGE_HEAD_TIMEOUT_MS = 2_500;
 const COMPANION_IMAGE_REQUEST_IN_PROGRESS_STATUS = 409;
+const IDEMPOTENCY_KEY_MAX_LENGTH = 160;
 
 type CompanionImageFlowType = "onboarding" | "regenerate" | "evolution" | "background" | "admin" | "ai_onboarding_egg";
 
@@ -525,7 +528,59 @@ type CompanionImageRequestState =
 const normalizeIdempotencyKey = (value: unknown): string | null => {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
-  return trimmed.length > 0 && trimmed.length <= 160 ? trimmed : null;
+  if (trimmed.length === 0) return null;
+  if (trimmed.length > IDEMPOTENCY_KEY_MAX_LENGTH) {
+    console.warn("[CompanionImageIdempotency] Rejected oversized idempotency key", {
+      length: trimmed.length,
+      maxLength: IDEMPOTENCY_KEY_MAX_LENGTH,
+    });
+    return null;
+  }
+  return trimmed;
+};
+
+const isReplayImagePayloadUsable = async (
+  responsePayload: Record<string, unknown>,
+): Promise<boolean> => {
+  const imageUrl = typeof responsePayload.imageUrl === "string"
+    ? responsePayload.imageUrl.trim()
+    : "";
+  if (!imageUrl) {
+    console.warn("[CompanionImageIdempotency] Completed replay payload has no imageUrl");
+    return false;
+  }
+
+  try {
+    const response = await fetchWithTimeout(
+      imageUrl,
+      { method: "HEAD" },
+      REPLAY_IMAGE_HEAD_TIMEOUT_MS,
+      "AI_TIMEOUT",
+    );
+
+    if (response.status === 404 || response.status === 410) {
+      console.warn("[CompanionImageIdempotency] Completed replay image is missing", {
+        imageUrl,
+        status: response.status,
+      });
+      return false;
+    }
+
+    if (!response.ok) {
+      console.warn("[CompanionImageIdempotency] Completed replay image HEAD was inconclusive; reusing cached response", {
+        imageUrl,
+        status: response.status,
+      });
+    }
+
+    return true;
+  } catch (error) {
+    console.warn("[CompanionImageIdempotency] Completed replay image HEAD threw; reusing cached response", {
+      imageUrl,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return true;
+  }
 };
 
 const appendRetrySuffixToPath = (filePath: string): string => {
@@ -905,11 +960,13 @@ serve(async (req) => {
   let idempotencyRequestKey: string | null = null;
   let idempotencyUserId: string | null = null;
   let idempotencyStarted = false;
+  let idempotencySupabase: SupabaseServiceClient | null = null;
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    idempotencySupabase = supabase as unknown as SupabaseServiceClient;
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
@@ -1025,19 +1082,50 @@ serve(async (req) => {
     }
 
     if (normalizedFlowType === "ai_onboarding_egg" && Number(stage) === 0) {
-      const idempotencyState = await beginCompanionImageRequest({
+      let idempotencyState = await beginCompanionImageRequest({
         supabase,
         userId: user.id,
         idempotencyKey,
       });
       if (idempotencyState.action === "completed") {
-        return timedResponse(
-          new Response(JSON.stringify({
-            ...idempotencyState.responsePayload,
-            idempotencyReplay: true,
-          }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }),
-          "success_bootstrap_stage1_first_idempotent_replay",
-        );
+        if (await isReplayImagePayloadUsable(idempotencyState.responsePayload)) {
+          return timedResponse(
+            new Response(JSON.stringify({
+              ...idempotencyState.responsePayload,
+              idempotencyReplay: true,
+            }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }),
+            "success_bootstrap_stage1_first_idempotent_replay",
+          );
+        }
+
+        await completeCompanionImageRequestBestEffort({
+          supabase,
+          userId: user.id,
+          requestKey: idempotencyState.requestKey,
+          status: "failed",
+          errorMessage: "Completed replay image URL was unavailable",
+        });
+        idempotencyState = await beginCompanionImageRequest({
+          supabase,
+          userId: user.id,
+          idempotencyKey: idempotencyState.requestKey,
+        });
+      }
+      if (idempotencyState.action === "completed") {
+        if (await isReplayImagePayloadUsable(idempotencyState.responsePayload)) {
+          return timedResponse(
+            new Response(JSON.stringify({
+              ...idempotencyState.responsePayload,
+              idempotencyReplay: true,
+            }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }),
+            "success_bootstrap_stage1_first_idempotent_replay",
+          );
+        }
+
+        console.warn("[CompanionImageIdempotency] Completed replay remained unusable after restart attempt; continuing without idempotency", {
+          requestKey: idempotencyState.requestKey,
+        });
+        idempotencyState = { action: "disabled", requestKey: null };
       }
       if (idempotencyState.action === "in_progress") {
         return timedResponse(
@@ -1093,65 +1181,33 @@ serve(async (req) => {
         previousLevel?: number;
         nextLevel?: number;
         render: (prompt: string) => Promise<{ imageDataUrl: string; revisedPrompt: string | null; size?: string | null }>;
-      }) => {
-        let promptForAttempt = basePrompt;
-        let bestAttempt:
-          | {
-            imageDataUrl: string;
-            revisedPrompt: string | null;
-            scores: Awaited<ReturnType<typeof judgeCompanionImage>>;
-            retryCount: number;
-            size: string | null;
-            passed: boolean;
-            judgeUnavailable: boolean;
-          }
-          | null = null;
-
-        for (let attempt = 0; attempt < bootstrapAttempts; attempt += 1) {
-          const generationStartedAt = Date.now();
-          const rendered = await render(promptForAttempt);
-          generationCallDurationMs += Date.now() - generationStartedAt;
-
-          const judgeStartedAt = Date.now();
-          const scores = await judgeCompanionImage({
-            guardedFetch,
-            openAIApiKey: OPENAI_API_KEY,
-            profile: visualIdentityProfile,
-            mode,
-            candidateImageUrl: rendered.imageDataUrl,
-            referenceImageUrl,
-            previousLevel,
-            nextLevel,
-          });
-          qualityCallDurationMs += Date.now() - judgeStartedAt;
-
-          const attemptResult = {
-            imageDataUrl: rendered.imageDataUrl,
-            revisedPrompt: rendered.revisedPrompt,
-            scores,
-            retryCount: attempt,
-            size: "size" in rendered && typeof rendered.size === "string" ? rendered.size : null,
-            passed: judgeScoresPass({ mode, scores, previousLevel, nextLevel }),
-            judgeUnavailable: !scores,
-          };
-
-          if (!bestAttempt || rankJudgeScores(scores) >= rankJudgeScores(bestAttempt.scores)) {
-            bestAttempt = attemptResult;
-          }
-
-          if (attemptResult.passed) {
-            return attemptResult;
-          }
-
-          promptForAttempt = appendJudgeCritique(basePrompt, scores?.notes);
-        }
-
-        if (!bestAttempt) {
-          throw new Error("No companion image attempt succeeded");
-        }
-
-        return bestAttempt;
-      };
+      }) =>
+        await runCompanionJudgedRender({
+          basePrompt,
+          attempts: bootstrapAttempts,
+          maxAttempts: Math.min(MAX_ALLOWED_RETRIES + 2, bootstrapAttempts + 1),
+          render: async (prompt) => await render(prompt),
+          judge: async (rendered) =>
+            await judgeCompanionImage({
+              guardedFetch,
+              openAIApiKey: OPENAI_API_KEY,
+              profile: visualIdentityProfile,
+              mode,
+              candidateImageUrl: rendered.imageDataUrl,
+              referenceImageUrl,
+              previousLevel,
+              nextLevel,
+            }),
+          scoresPass: (scores) => judgeScoresPass({ mode, scores, previousLevel, nextLevel }),
+          rankScores: (scores) => rankJudgeScores(scores),
+          appendCritique: (prompt, notes) => appendJudgeCritique(prompt, notes),
+          onGenerationDurationMs: (durationMs) => {
+            generationCallDurationMs += durationMs;
+          },
+          onJudgeDurationMs: (durationMs) => {
+            qualityCallDurationMs += durationMs;
+          },
+        });
 
       const stageOneAttempt = await runJudgedRender({
         mode: "bootstrap",
@@ -2062,12 +2118,9 @@ Score each aspect from 0-100 and list any issues.`;
     );
 
   } catch (error) {
-    if (idempotencyStarted && idempotencyUserId) {
+    if (idempotencyStarted && idempotencyUserId && idempotencySupabase) {
       await completeCompanionImageRequestBestEffort({
-        supabase: createClient(
-          Deno.env.get("SUPABASE_URL")!,
-          Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-        ) as unknown as SupabaseServiceClient,
+        supabase: idempotencySupabase,
         userId: idempotencyUserId,
         requestKey: idempotencyRequestKey,
         status: "failed",

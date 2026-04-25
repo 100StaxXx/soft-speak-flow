@@ -53,6 +53,9 @@ Deno.test("companion image bootstrap cleans up hidden stage-one assets and recor
   const migration = await Deno.readTextFile(
     new URL("../migrations/20260425150000_add_companion_image_generation_idempotency.sql", import.meta.url),
   );
+  const idempotencyTuningMigration = await Deno.readTextFile(
+    new URL("../migrations/20260425170000_tune_companion_image_generation_idempotency.sql", import.meta.url),
+  );
 
   assert(
     source.includes("deleteUploadedAssetBestEffort") &&
@@ -74,6 +77,21 @@ Deno.test("companion image bootstrap cleans up hidden stage-one assets and recor
       migration.includes("begin_companion_image_generation_request") &&
       migration.includes("complete_companion_image_generation_request"),
     "Expected migration to provision companion image generation idempotency helpers",
+  );
+  assert(
+    idempotencyTuningMigration.includes("interval '3 minutes'") &&
+      idempotencyTuningMigration.includes("interval '30 minutes'") &&
+      idempotencyTuningMigration.includes("DELETE FROM public.companion_image_generation_requests"),
+    "Expected idempotency tuning migration to shorten stale/replay windows and clean expired rows",
+  );
+  assert(
+    source.includes("isReplayImagePayloadUsable") &&
+      source.includes("Completed replay image URL was unavailable"),
+    "Expected completed idempotency replays to validate cached image URLs before returning",
+  );
+  assert(
+    source.includes("Rejected oversized idempotency key"),
+    "Expected oversized idempotency keys to be logged",
   );
 });
 

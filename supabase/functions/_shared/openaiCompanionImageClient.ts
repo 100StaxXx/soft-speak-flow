@@ -1,5 +1,6 @@
 const OPENAI_IMAGE_GENERATIONS_URL = "https://api.openai.com/v1/images/generations";
 const OPENAI_IMAGE_EDITS_URL = "https://api.openai.com/v1/images/edits";
+// Provider fallback can change aspect ratio; callers persist the returned size and render without stretching.
 const FALLBACK_IMAGE_SIZE = "1024x1024";
 const REFERENCE_IMAGE_MAX_DOWNLOAD_ATTEMPTS = 2;
 const DEFAULT_REFERENCE_IMAGE_RETRY_BACKOFF_MS = 500;
