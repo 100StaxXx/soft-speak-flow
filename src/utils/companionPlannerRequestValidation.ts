@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import type { CompanionPlannerRequest } from "@/types/companionPlanner";
+import { normalizePlannerDurationBucket } from "@/shared/plannerDurationBuckets";
 
 const PLANNER_INTENT_TYPES = ["quest", "epic", "habit", "brain-dump"] as const;
 const PLANNER_STARTER_INTENTS = [
@@ -114,6 +115,13 @@ const PlannerClassificationHintSchema = z.object({
   reasoning: z.string(),
   suggestedDeadline: z.string().optional(),
   suggestedDuration: z.number().optional(),
+  suggestedActivityDurationMinutes: z.preprocess(
+    (value) =>
+      typeof value === "number"
+        ? normalizePlannerDurationBucket(value) ?? undefined
+        : value,
+    z.number().optional(),
+  ),
   timelineAnalysis: PlannerClassificationTimelineSchema,
 }).nullable().optional();
 
@@ -174,12 +182,14 @@ const CompanionPlannerRequestValidationSchema = z.object({
       category: z.string().nullable().optional(),
       scheduledTime: z.string().nullable(),
       estimatedDuration: z.number().nullable(),
+      actualTimeSpent: z.number().nullable().optional(),
       notes: z.string().nullable().optional(),
       subtaskTitles: z.array(z.string()).optional(),
       difficulty: z.string().nullable().optional(),
       recurrencePattern: z.string().nullable(),
       recurrenceEndDate: z.string().nullable().optional(),
       completed: z.boolean().nullable().optional(),
+      completedAt: z.string().nullable().optional(),
       priority: z.string().nullable().optional(),
       source: z.string().nullable().optional(),
       habitSourceId: z.string().nullable().optional(),
@@ -194,12 +204,14 @@ const CompanionPlannerRequestValidationSchema = z.object({
       category: z.string().nullable().optional(),
       scheduledTime: z.string().nullable(),
       estimatedDuration: z.number().nullable(),
+      actualTimeSpent: z.number().nullable().optional(),
       notes: z.string().nullable().optional(),
       subtaskTitles: z.array(z.string()).optional(),
       difficulty: z.string().nullable().optional(),
       recurrencePattern: z.string().nullable(),
       recurrenceEndDate: z.string().nullable().optional(),
       completed: z.boolean().nullable().optional(),
+      completedAt: z.string().nullable().optional(),
       priority: z.string().nullable().optional(),
       source: z.string().nullable().optional(),
       habitSourceId: z.string().nullable().optional(),
@@ -207,6 +219,28 @@ const CompanionPlannerRequestValidationSchema = z.object({
       epicTitle: z.string().nullable().optional(),
       contactId: z.string().nullable().optional(),
     })),
+    recentCompletedTasks: z.array(z.object({
+      id: z.string(),
+      title: z.string(),
+      taskDate: z.string().nullable(),
+      category: z.string().nullable().optional(),
+      scheduledTime: z.string().nullable(),
+      estimatedDuration: z.number().nullable(),
+      actualTimeSpent: z.number().nullable().optional(),
+      notes: z.string().nullable().optional(),
+      subtaskTitles: z.array(z.string()).optional(),
+      difficulty: z.string().nullable().optional(),
+      recurrencePattern: z.string().nullable(),
+      recurrenceEndDate: z.string().nullable().optional(),
+      completed: z.boolean().nullable().optional(),
+      completedAt: z.string().nullable().optional(),
+      priority: z.string().nullable().optional(),
+      source: z.string().nullable().optional(),
+      habitSourceId: z.string().nullable().optional(),
+      epicId: z.string().nullable().optional(),
+      epicTitle: z.string().nullable().optional(),
+      contactId: z.string().nullable().optional(),
+    })).optional(),
     activeEpics: z.array(z.object({
       id: z.string(),
       title: z.string(),
@@ -222,6 +256,7 @@ const CompanionPlannerRequestValidationSchema = z.object({
       title: z.string(),
       frequency: z.string().nullable(),
       preferredTime: z.string().nullable(),
+      estimatedMinutes: z.number().nullable().optional(),
       currentStreak: z.number().nullable().optional(),
     })),
     calendarEvents: z.array(z.object({

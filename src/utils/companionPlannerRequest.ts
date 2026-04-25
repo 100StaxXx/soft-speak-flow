@@ -215,12 +215,14 @@ const sanitizeTaskLikeEntry = (
     category: asNullableString(entry.category),
     scheduledTime: asNullableString(entry.scheduledTime),
     estimatedDuration: asNullableNumber(entry.estimatedDuration),
+    actualTimeSpent: asNullableNumber(entry.actualTimeSpent),
     notes: asNullableString(entry.notes),
     subtaskTitles: asStringArray(entry.subtaskTitles),
     difficulty: asNullableString(entry.difficulty),
     recurrencePattern: asNullableString(entry.recurrencePattern),
     recurrenceEndDate: asNullableString(entry.recurrenceEndDate),
     completed: asNullableBoolean(entry.completed),
+    completedAt: asNullableString(entry.completedAt),
     priority: asNullableString(entry.priority),
     source: asNullableString(entry.source),
     habitSourceId: asNullableString(entry.habitSourceId),
@@ -263,6 +265,7 @@ const sanitizeRitual = (
     title,
     frequency: asNullableString(entry.frequency),
     preferredTime: asNullableString(entry.preferredTime),
+    estimatedMinutes: asNullableNumber(entry.estimatedMinutes),
     currentStreak: asNullableNumber(entry.currentStreak),
   };
 };
@@ -497,7 +500,9 @@ const sanitizeScheduleInsights = (
         PlannerContext["scheduleInsights"]
       >["suggestedSlots"][number] => Boolean(slot)),
     moveSuggestions: entry.moveSuggestions
-      .map((suggestion) => {
+      .map((suggestion): NonNullable<
+        PlannerContext["scheduleInsights"]
+      >["moveSuggestions"][number] | null => {
         const fromDate = asNonEmptyString(suggestion.fromDate);
         const toDate = asNonEmptyString(suggestion.toDate);
         const reason = asNonEmptyString(suggestion.reason);
@@ -540,7 +545,9 @@ const sanitizePlannerMemory = (
   nextMemory.peakProductivityTimes =
     asStringArray(entry.peakProductivityTimes) ?? [];
   nextMemory.preferredWindows = (entry.preferredWindows ?? [])
-    .map((window) => {
+    .map((window): NonNullable<
+      NonNullable<PlannerContext["plannerMemory"]>["preferredWindows"]
+    >[number] | null => {
       const timeOfDay = asNonEmptyString(window.timeOfDay);
       if (!timeOfDay) return null;
 
@@ -670,6 +677,12 @@ export const sanitizePlannerSessionState = (
         "string"
       ? sessionState.lastClassification.trim().toLowerCase()
       : null;
+  const normalizedClassificationAlias = normalizedLastClassification ===
+        "brain_dump" ||
+      normalizedLastClassification === "brain dump" ||
+      normalizedLastClassification === "braindump"
+    ? "brain-dump"
+    : normalizedLastClassification;
 
   return {
     draft: sanitizeSessionDraft(sessionState.draft),
@@ -684,12 +697,8 @@ export const sanitizePlannerSessionState = (
       : sessionState.pendingStarterIntent === null
       ? null
       : undefined,
-    lastClassification: isClassificationType(normalizedLastClassification)
-      ? normalizedLastClassification === "brain_dump" ||
-          normalizedLastClassification === "brain dump" ||
-          normalizedLastClassification === "braindump"
-        ? "brain-dump"
-        : normalizedLastClassification
+    lastClassification: isClassificationType(normalizedClassificationAlias)
+      ? normalizedClassificationAlias
       : sessionState.lastClassification === null
       ? null
       : undefined,
@@ -754,6 +763,11 @@ export const sanitizePlannerContext = (
       .filter((entry): entry is PlannerContext["inboxTasks"][number] =>
         Boolean(entry)
       ),
+    recentCompletedTasks: (context.recentCompletedTasks ?? [])
+      .map(sanitizeTaskLikeEntry)
+      .filter((entry): entry is NonNullable<
+        PlannerContext["recentCompletedTasks"]
+      >[number] => Boolean(entry)),
     activeEpics: context.activeEpics
       .map(sanitizeEpic)
       .filter((entry): entry is PlannerContext["activeEpics"][number] =>
@@ -785,6 +799,7 @@ export const sanitizePlannerContext = (
 export const summarizePlannerContextForDebug = (context: PlannerContext) => ({
   tasks: context.tasks.length,
   inboxTasks: context.inboxTasks.length,
+  recentCompletedTasks: context.recentCompletedTasks?.length ?? 0,
   activeEpics: context.activeEpics.length,
   rituals: context.rituals.length,
   calendarEvents: context.calendarEvents.length,

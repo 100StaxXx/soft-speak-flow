@@ -3,8 +3,8 @@ import { addDays, format, parseISO } from "https://esm.sh/date-fns@3.6.0";
 import { computePlannerPriorityScores } from "../../../src/shared/companionPlannerPriority.ts";
 import { getCompanionModeConfig } from "../../../src/shared/companionModes.ts";
 import {
-  mapPlanningModeToWorkloadTolerance,
   type CompanionPlanningMode,
+  mapPlanningModeToWorkloadTolerance,
 } from "../../../src/shared/companionPlanningMode.ts";
 import {
   buildPlannerResponse,
@@ -88,7 +88,9 @@ const asStringArray = (value: unknown): string[] =>
 
 const isReminderEnabled = (value: unknown) => value === true;
 
-const parseTimeToMinutes = (value: string | null | undefined): number | null => {
+const parseTimeToMinutes = (
+  value: string | null | undefined,
+): number | null => {
   if (!value) return null;
   const match = value.match(/^(\d{1,2}):(\d{2})/);
   if (!match) return null;
@@ -112,7 +114,10 @@ const getTaskDuration = (task: PlannerContextTask): number =>
     ? Number(task.estimatedDuration)
     : DEFAULT_DURATION_MINUTES;
 
-const getRangeDates = (selectedDate: string, horizon: PlannerHorizon): string[] => {
+const getRangeDates = (
+  selectedDate: string,
+  horizon: PlannerHorizon,
+): string[] => {
   const start = parseISO(selectedDate);
   const totalDays = horizon === "day" ? 1 : horizon === "week" ? 7 : 30;
   return Array.from(
@@ -131,7 +136,9 @@ const toTimeOfDay = (time: string | null | undefined): string | null => {
   return "night";
 };
 
-const getPreferredWindows = (plannerMemory?: Record<string, unknown> | null): PreferredWindow[] => {
+const getPreferredWindows = (
+  plannerMemory?: Record<string, unknown> | null,
+): PreferredWindow[] => {
   const rawWindows = Array.isArray(plannerMemory?.preferredWindows)
     ? plannerMemory?.preferredWindows
     : [];
@@ -159,10 +166,13 @@ const getPreferredWindows = (plannerMemory?: Record<string, unknown> | null): Pr
 };
 
 const getWakeMinutes = (plannerMemory?: Record<string, unknown> | null) =>
-  parseTimeToMinutes(asString(plannerMemory?.wakeTime) ?? DEFAULT_WAKE_TIME) ?? 8 * 60;
+  parseTimeToMinutes(asString(plannerMemory?.wakeTime) ?? DEFAULT_WAKE_TIME) ??
+    8 * 60;
 
 const getWindDownMinutes = (plannerMemory?: Record<string, unknown> | null) =>
-  parseTimeToMinutes(asString(plannerMemory?.windDownTime) ?? DEFAULT_WIND_DOWN_TIME) ?? 21 * 60;
+  parseTimeToMinutes(
+    asString(plannerMemory?.windDownTime) ?? DEFAULT_WIND_DOWN_TIME,
+  ) ?? 21 * 60;
 
 const getLocalDateKeyFromDateTime = (value: string): string => {
   const match = value.match(/^(\d{4}-\d{2}-\d{2})T/);
@@ -195,7 +205,9 @@ const normalizeScheduleReadMessage = (message: string): string => {
 
 const buildTaskIntervals = (tasks: PlannerContextTask[]): TimelineInterval[] =>
   tasks
-    .filter((task) => task.completed !== true && task.taskDate && task.scheduledTime)
+    .filter((task) =>
+      task.completed !== true && task.taskDate && task.scheduledTime
+    )
     .map((task) => {
       const startMinutes = parseTimeToMinutes(task.scheduledTime);
       if (startMinutes === null) return null;
@@ -237,7 +249,8 @@ const buildCalendarIntervals = (
 
       const localStart = eventStart < dayStart ? dayStart : eventStart;
       const localEnd = eventEnd > dayEnd ? dayEnd : eventEnd;
-      const startMinutes = (localStart.getHours() * 60) + localStart.getMinutes();
+      const startMinutes = (localStart.getHours() * 60) +
+        localStart.getMinutes();
       const endMinutes = (localEnd.getHours() * 60) + localEnd.getMinutes();
       if (endMinutes <= startMinutes) return null;
 
@@ -258,15 +271,16 @@ const buildIntervalsForDate = (params: {
   calendarEvents: PlannerContextCalendarEvent[];
   wakeMinutes: number;
   windDownMinutes: number;
-}) => [
-  ...buildTaskIntervals(params.tasks),
-  ...buildCalendarIntervals(
-    params.date,
-    params.calendarEvents,
-    params.wakeMinutes,
-    params.windDownMinutes,
-  ),
-].sort((left, right) => left.startMinutes - right.startMinutes);
+}) =>
+  [
+    ...buildTaskIntervals(params.tasks),
+    ...buildCalendarIntervals(
+      params.date,
+      params.calendarEvents,
+      params.wakeMinutes,
+      params.windDownMinutes,
+    ),
+  ].sort((left, right) => left.startMinutes - right.startMinutes);
 
 const getDayLoadStatus = (
   totalMinutes: number,
@@ -288,9 +302,15 @@ const scoreSlot = (params: {
 }): { score: number; reason: string } => {
   const slotTime = formatMinutesAsTime(params.slotStart);
   const slotTimeOfDay = toTimeOfDay(slotTime);
-  const exactMatch = params.preferredWindows.find((window) => window.time === slotTime);
-  const windowMatch = params.preferredWindows.find((window) => window.timeOfDay === slotTimeOfDay);
-  const peakMatch = params.peakHours.some((hour) => Math.abs((hour * 60) - params.slotStart) <= 60);
+  const exactMatch = params.preferredWindows.find((window) =>
+    window.time === slotTime
+  );
+  const windowMatch = params.preferredWindows.find((window) =>
+    window.timeOfDay === slotTimeOfDay
+  );
+  const peakMatch = params.peakHours.some((hour) =>
+    Math.abs((hour * 60) - params.slotStart) <= 60
+  );
 
   let score = 50;
   let reason = "Open time in your schedule.";
@@ -315,7 +335,8 @@ const scoreSlot = (params: {
     score += 12;
     reason = "Near one of your stronger focus hours.";
   } else if (params.load.status === "open") {
-    reason = "This day is light, so it has room without crowding anything else.";
+    reason =
+      "This day is light, so it has room without crowding anything else.";
   } else if (params.load.status === "balanced") {
     reason = "This window keeps the day balanced without creating a pileup.";
   }
@@ -337,7 +358,11 @@ const buildSuggestedSlots = (params: {
 }): PlannerOpenSlot[] => {
   const preferredWindows = getPreferredWindows(params.plannerMemory);
   const peakHours = asStringArray(params.plannerMemory?.peakProductivityTimes)
-    .map((value) => value.includes(":") ? parseTimeToMinutes(value) : parseTimeToMinutes(`${value.padStart(2, "0")}:00`))
+    .map((value) =>
+      value.includes(":")
+        ? parseTimeToMinutes(value)
+        : parseTimeToMinutes(`${value.padStart(2, "0")}:00`)
+    )
     .filter((minutes): minutes is number => minutes !== null)
     .map((minutes) => Math.floor(minutes / 60));
   const wakeMinutes = getWakeMinutes(params.plannerMemory);
@@ -379,7 +404,10 @@ const buildSuggestedSlots = (params: {
           minutes + 30 <= slotEnd
         );
       const chosenStart = preferredStart ?? slotStart;
-      const chosenEnd = Math.min(slotEnd, chosenStart + Math.max(30, Math.min(duration, 90)));
+      const chosenEnd = Math.min(
+        slotEnd,
+        chosenStart + Math.max(30, Math.min(duration, 90)),
+      );
       const scored = scoreSlot({
         slotStart: chosenStart,
         selectedDate: params.selectedDate,
@@ -422,8 +450,12 @@ const buildMoveSuggestions = (params: {
   dayLoads: PlannerDayLoad[];
   suggestedSlots: PlannerOpenSlot[];
 }): PlannerMoveSuggestion[] => {
-  const openTargets = params.dayLoads.filter((load) => load.status === "open" || load.status === "balanced");
-  const overloadedLoads = params.dayLoads.filter((load) => load.status === "overloaded");
+  const openTargets = params.dayLoads.filter((load) =>
+    load.status === "open" || load.status === "balanced"
+  );
+  const overloadedLoads = params.dayLoads.filter((load) =>
+    load.status === "overloaded"
+  );
   const suggestions: PlannerMoveSuggestion[] = [];
 
   overloadedLoads.forEach((load) => {
@@ -433,10 +465,14 @@ const buildMoveSuggestions = (params: {
       .sort((left, right) => getTaskDuration(right) - getTaskDuration(left));
 
     const moveTask = tasks[0];
-    const targetDay = openTargets.find((candidate) => candidate.date !== load.date);
+    const targetDay = openTargets.find((candidate) =>
+      candidate.date !== load.date
+    );
     if (!moveTask || !targetDay) return;
 
-    const targetSlot = params.suggestedSlots.find((slot) => slot.date === targetDay.date);
+    const targetSlot = params.suggestedSlots.find((slot) =>
+      slot.date === targetDay.date
+    );
     suggestions.push({
       fromDate: load.date,
       toDate: targetDay.date,
@@ -452,17 +488,24 @@ const buildMoveSuggestions = (params: {
   return suggestions.slice(0, Math.min(params.rangeDates.length, 3));
 };
 
-const buildConflicts = (intervals: TimelineInterval[]): PlannerScheduleConflict[] => {
+const buildConflicts = (
+  intervals: TimelineInterval[],
+): PlannerScheduleConflict[] => {
   if (intervals.length < 2) return [];
 
   const conflicts: PlannerScheduleConflict[] = [];
   for (let index = 0; index < intervals.length - 1; index += 1) {
     const current = intervals[index];
-    for (let nextIndex = index + 1; nextIndex < intervals.length; nextIndex += 1) {
+    for (
+      let nextIndex = index + 1;
+      nextIndex < intervals.length;
+      nextIndex += 1
+    ) {
       const next = intervals[nextIndex];
       if (next.startMinutes >= current.endMinutes) break;
 
-      const overlapMinutes = Math.min(current.endMinutes, next.endMinutes) - next.startMinutes;
+      const overlapMinutes = Math.min(current.endMinutes, next.endMinutes) -
+        next.startMinutes;
       if (overlapMinutes <= 0) continue;
 
       conflicts.push({
@@ -503,13 +546,16 @@ const buildScheduleInsights = (params: {
   const dayLoads = rangeDates.map((date) => {
     const intervals = buildIntervalsForDate({
       date,
-      tasks: (tasksByDate.get(date) ?? []).filter((task) => task.completed !== true),
+      tasks: (tasksByDate.get(date) ?? []).filter((task) =>
+        task.completed !== true
+      ),
       calendarEvents: params.calendarEvents,
       wakeMinutes,
       windDownMinutes,
     });
     const totalMinutes = intervals.reduce(
-      (sum, interval) => sum + Math.max(0, interval.endMinutes - interval.startMinutes),
+      (sum, interval) =>
+        sum + Math.max(0, interval.endMinutes - interval.startMinutes),
       0,
     );
 
@@ -548,8 +594,11 @@ const buildScheduleInsights = (params: {
     horizon: params.horizon,
     selectedDate: params.selectedDate,
     dayLoads,
-    overloadedDates: dayLoads.filter((load) => load.status === "overloaded").map((load) => load.date),
-    emptyDates: dayLoads.filter((load) => load.status === "open").map((load) => load.date),
+    overloadedDates: dayLoads.filter((load) => load.status === "overloaded")
+      .map((load) => load.date),
+    emptyDates: dayLoads.filter((load) => load.status === "open").map((load) =>
+      load.date
+    ),
     conflicts,
     suggestedSlots,
     moveSuggestions: buildMoveSuggestions({
@@ -565,19 +614,24 @@ const mapTask = (task: Record<string, unknown>): PlannerContextTask => ({
   id: String(task.id),
   title: asString(task.task_text) ?? "Untitled task",
   taskDate: asString(task.task_date),
+  category: asString(task.category),
   scheduledTime: asString(task.scheduled_time),
   estimatedDuration: asNumber(task.estimated_duration),
+  actualTimeSpent: asNumber(task.actual_time_spent),
   notes: asString(task.notes),
   recurrencePattern: asString(task.recurrence_pattern),
   recurrenceEndDate: asString(task.recurrence_end_date),
   completed: task.completed === true,
+  completedAt: asString(task.completed_at),
   priority: asString(task.priority),
   source: asString(task.source),
   epicId: asString(task.epic_id),
   epicTitle: asString(task.epic_title),
 });
 
-const mapCampaign = (campaign: Record<string, unknown>): PlannerContextEpic => ({
+const mapCampaign = (
+  campaign: Record<string, unknown>,
+): PlannerContextEpic => ({
   id: String(campaign.id),
   title: asString(campaign.title) ?? "Untitled campaign",
   endDate: asString(campaign.end_date),
@@ -591,9 +645,12 @@ const mapRitual = (ritual: Record<string, unknown>): PlannerContextRitual => ({
   title: asString(ritual.title) ?? "Untitled ritual",
   frequency: asString(ritual.frequency),
   preferredTime: asString(ritual.preferred_time),
+  estimatedMinutes: asNumber(ritual.estimated_minutes),
 });
 
-const mapCalendarEvent = (event: Record<string, unknown>): PlannerContextCalendarEvent => ({
+const mapCalendarEvent = (
+  event: Record<string, unknown>,
+): PlannerContextCalendarEvent => ({
   id: String(event.id),
   title: asString(event.title) ?? "Calendar event",
   start: asString(event.start_time) ?? "",
@@ -607,15 +664,20 @@ const buildPlannerMemory = (
   context: LoadedCompanionAgentContext,
 ): Record<string, unknown> | null => {
   const plannerPreferences = asRecord(context.recentMemory.planner_preferences);
-  const preferredWorkBlocks = asRecord(plannerPreferences?.preferred_work_blocks);
+  const preferredWorkBlocks = asRecord(
+    plannerPreferences?.preferred_work_blocks,
+  );
   const profile = asRecord(preferredWorkBlocks?.planner_profile) ?? {};
 
   return {
     ...profile,
-    wakeTime: asString(plannerPreferences?.wake_time) ?? asString(profile.wakeTime),
-    windDownTime: asString(plannerPreferences?.wind_down_time) ?? asString(profile.windDownTime),
+    wakeTime: asString(plannerPreferences?.wake_time) ??
+      asString(profile.wakeTime),
+    windDownTime: asString(plannerPreferences?.wind_down_time) ??
+      asString(profile.windDownTime),
     peakProductivityTimes: asStringArray(
-      profile.peakProductivityTimes ?? context.recentMemory.ai_learning_peak_productivity_times,
+      profile.peakProductivityTimes ??
+        context.recentMemory.ai_learning_peak_productivity_times,
     ),
   };
 };
@@ -634,7 +696,8 @@ const mapPlannerProposal = (
         actionType: "task_create",
         intent: "schedule_task",
         normalizedPayload: {
-          title: asString(payload.taskText) ?? proposal.title.replace(/^Create\s+/i, ""),
+          title: asString(payload.taskText) ??
+            proposal.title.replace(/^Create\s+/i, ""),
           task_date: asString(payload.taskDate),
           scheduled_time: asString(payload.scheduledTime),
           estimated_duration: asNumber(payload.estimatedDuration),
@@ -661,7 +724,11 @@ const mapPlannerProposal = (
           estimated_duration: asNumber(updates.estimated_duration),
           notes: asString(updates.notes),
           priority: asString(updates.priority),
-          completed: updates.completed === true ? true : updates.completed === false ? false : undefined,
+          completed: updates.completed === true
+            ? true
+            : updates.completed === false
+            ? false
+            : undefined,
           reminder_enabled: updates.reminder_enabled === true
             ? true
             : updates.reminder_enabled === false
@@ -679,7 +746,8 @@ const mapPlannerProposal = (
         actionType: "ritual_create",
         intent: "goal_setting",
         normalizedPayload: {
-          title: asString(payload.title) ?? proposal.title.replace(/^Add\s+/i, ""),
+          title: asString(payload.title) ??
+            proposal.title.replace(/^Add\s+/i, ""),
           frequency: asString(payload.frequency) ?? "daily",
           preferred_time: asString(payload.preferredTime),
           estimated_minutes: asNumber(payload.estimatedMinutes),
@@ -727,7 +795,8 @@ const mapPlannerProposal = (
         normalizedPayload: {
           campaign_id: asString(payload.epicId),
           adjustment_type: asString(payload.adjustmentType) ?? "custom",
-          description: asString(payload.reason) ?? asString(payload.requestedSummary),
+          description: asString(payload.reason) ??
+            asString(payload.requestedSummary),
           requested_summary: asString(payload.requestedSummary),
         },
       };
@@ -749,7 +818,8 @@ const mapPlannerProposal = (
         actionType: null,
         intent: "update_existing_plan",
         normalizedPayload: null,
-        unsupportedReason: "Ritual updates are not exposed as direct writes in v1.",
+        unsupportedReason:
+          "Ritual updates are not exposed as direct writes in v1.",
       };
   }
 };
@@ -802,12 +872,14 @@ export function consultPlannerForAgent(params: {
       : asString(plannerMemory?.workloadTolerance),
   };
   const tasks = params.context.tasks.map(mapTask);
+  const recentCompletedTasks = params.context.recentCompletedTasks.map(mapTask);
   const scheduledTasks = tasks.filter((task) => task.taskDate !== null);
   const inboxTasks = tasks.filter((task) => task.taskDate === null);
   const activeEpics = params.context.campaigns.map(mapCampaign);
   const rituals = params.context.rituals.map(mapRitual);
   const calendarEvents = params.context.calendarEvents.map(mapCalendarEvent);
-  const horizon = params.horizon ?? (params.context.visibleDateEnd > currentDate ? "week" : "day");
+  const horizon = params.horizon ??
+    (params.context.visibleDateEnd > currentDate ? "week" : "day");
   const scheduleInsights = buildScheduleInsights({
     tasks: scheduledTasks,
     calendarEvents,
@@ -825,26 +897,35 @@ export function consultPlannerForAgent(params: {
     calendarEvents,
     scheduleInsights,
     plannerMemory: {
-      preferredTimeOfDay: asString(plannerMemoryForPlanning?.preferredTimeOfDay),
+      preferredTimeOfDay: asString(
+        plannerMemoryForPlanning?.preferredTimeOfDay,
+      ),
       wakeTime: asString(plannerMemoryForPlanning?.wakeTime),
       windDownTime: asString(plannerMemoryForPlanning?.windDownTime),
-      peakProductivityTimes: asStringArray(plannerMemoryForPlanning?.peakProductivityTimes),
-      preferredWindows: Array.isArray(plannerMemoryForPlanning?.preferredWindows)
-        ? plannerMemoryForPlanning.preferredWindows as Array<{
-          timeOfDay: string;
-          time?: string | null;
-          reason?: string | null;
-          sourceCount?: number;
-        }>
-        : [],
-      workloadTolerance: asString(plannerMemoryForPlanning?.workloadTolerance) as
+      peakProductivityTimes: asStringArray(
+        plannerMemoryForPlanning?.peakProductivityTimes,
+      ),
+      preferredWindows:
+        Array.isArray(plannerMemoryForPlanning?.preferredWindows)
+          ? plannerMemoryForPlanning.preferredWindows as Array<{
+            timeOfDay: string;
+            time?: string | null;
+            reason?: string | null;
+            sourceCount?: number;
+          }>
+          : [],
+      workloadTolerance: asString(
+        plannerMemoryForPlanning?.workloadTolerance,
+      ) as
         | "light"
         | "normal"
         | "heavy"
         | null,
     },
     aiSignals: {
-      suggestedWorkload: asString(asRecord(params.context.recentMemory.ai_learning)?.suggested_workload) as
+      suggestedWorkload: asString(
+        asRecord(params.context.recentMemory.ai_learning)?.suggested_workload,
+      ) as
         | "light"
         | "normal"
         | "heavy"
@@ -877,6 +958,7 @@ export function consultPlannerForAgent(params: {
     plannerContext: {
       tasks: scheduledTasks,
       inboxTasks,
+      recentCompletedTasks,
       activeEpics,
       rituals,
       calendarEvents,
@@ -885,28 +967,41 @@ export function consultPlannerForAgent(params: {
       scheduleInsights,
       plannerMemory: {
         tonePack: modeConfig.tonePack,
-        preferredTimeOfDay: asString(plannerMemoryForPlanning?.preferredTimeOfDay),
-        preferredTimeReason: asString(plannerMemoryForPlanning?.preferredTimeReason),
-        reminderMinutesBefore: asNumber(plannerMemoryForPlanning?.reminderMinutesBefore),
+        preferredTimeOfDay: asString(
+          plannerMemoryForPlanning?.preferredTimeOfDay,
+        ),
+        preferredTimeReason: asString(
+          plannerMemoryForPlanning?.preferredTimeReason,
+        ),
+        reminderMinutesBefore: asNumber(
+          plannerMemoryForPlanning?.reminderMinutesBefore,
+        ),
         wakeTime: asString(plannerMemoryForPlanning?.wakeTime),
         windDownTime: asString(plannerMemoryForPlanning?.windDownTime),
-        peakProductivityTimes: asStringArray(plannerMemoryForPlanning?.peakProductivityTimes),
-        preferredWindows: Array.isArray(plannerMemoryForPlanning?.preferredWindows)
-          ? plannerMemoryForPlanning.preferredWindows as Array<{
-            timeOfDay: string;
-            time?: string | null;
-            reason?: string | null;
-            sourceCount?: number;
-          }>
-          : [],
-        workloadTolerance: asString(plannerMemoryForPlanning?.workloadTolerance) as
+        peakProductivityTimes: asStringArray(
+          plannerMemoryForPlanning?.peakProductivityTimes,
+        ),
+        preferredWindows:
+          Array.isArray(plannerMemoryForPlanning?.preferredWindows)
+            ? plannerMemoryForPlanning.preferredWindows as Array<{
+              timeOfDay: string;
+              time?: string | null;
+              reason?: string | null;
+              sourceCount?: number;
+            }>
+            : [],
+        workloadTolerance: asString(
+          plannerMemoryForPlanning?.workloadTolerance,
+        ) as
           | "light"
           | "normal"
           | "heavy"
           | null,
       },
       aiSignals: {
-        commonContexts: asStringArray(asRecord(params.context.recentMemory.ai_learning)?.common_contexts),
+        commonContexts: asStringArray(
+          asRecord(params.context.recentMemory.ai_learning)?.common_contexts,
+        ),
       },
     },
     currentDate,

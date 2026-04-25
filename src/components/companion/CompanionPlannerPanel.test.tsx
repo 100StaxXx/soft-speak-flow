@@ -204,6 +204,7 @@ describe("CompanionPlannerPanel", () => {
         healthSnapshot: {
           overdueQuestCount: 2,
           protectedTodayCount: 0,
+          recentCompletedQuestCount: 1,
           daysWithoutMomentum: 8,
           activeCampaignCount: 4,
         },
@@ -224,6 +225,8 @@ describe("CompanionPlannerPanel", () => {
       .toHaveTextContent("reset");
     expect(screen.getByTestId("structured-campaign-health"))
       .toHaveTextContent("2 overdue");
+    expect(screen.getByTestId("structured-campaign-health"))
+      .toHaveTextContent("1 recent win");
     expect(screen.getByTestId("structured-campaign-health"))
       .toHaveTextContent("8 days quiet");
     expect(screen.getByText("Pressure Signals")).toBeInTheDocument();
@@ -257,6 +260,7 @@ describe("CompanionPlannerPanel", () => {
         focusCampaignHealth: {
           overdueQuestCount: 1,
           protectedTodayCount: 0,
+          recentCompletedQuestCount: 0,
           daysWithoutMomentum: 6,
           activeCampaignCount: 3,
         },
@@ -310,6 +314,7 @@ describe("CompanionPlannerPanel", () => {
         focusCampaignHealth: {
           overdueQuestCount: 1,
           protectedTodayCount: 0,
+          recentCompletedQuestCount: 0,
           daysWithoutMomentum: 6,
           activeCampaignCount: 3,
         },
@@ -528,6 +533,7 @@ describe("CompanionPlannerPanel", () => {
         focusCampaignHealth: {
           overdueQuestCount: 2,
           protectedTodayCount: 0,
+          recentCompletedQuestCount: 1,
           daysWithoutMomentum: 9,
           activeCampaignCount: 4,
         },

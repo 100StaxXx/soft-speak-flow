@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { normalizePlannerDurationBucket } from '@/shared/plannerDurationBuckets';
 
 export interface ExtractedTask {
   title: string;
@@ -56,6 +57,7 @@ export interface IntentClassification {
   reasoning: string;
   suggestedDeadline?: string;
   suggestedDuration?: number;
+  suggestedActivityDurationMinutes?: number;
   // Brain-dump specific fields
   needsClarification?: boolean;
   clarifyingQuestion?: string;
@@ -79,6 +81,27 @@ interface UseIntentClassifierOptions {
   minInputLength?: number;
   useOrchestrator?: boolean;
 }
+
+const normalizeIntentClassification = (
+  classification: IntentClassification,
+): IntentClassification => ({
+  ...classification,
+  suggestedActivityDurationMinutes:
+    normalizePlannerDurationBucket(
+      classification.suggestedActivityDurationMinutes ??
+        (classification.type === "epic" ? null : classification.suggestedDuration),
+    ) ?? undefined,
+  extractedTasks: classification.extractedTasks?.map((task) => ({
+    ...task,
+    estimatedDuration:
+      normalizePlannerDurationBucket(task.estimatedDuration) ?? undefined,
+  })),
+  suggestedTasks: classification.suggestedTasks?.map((task) => ({
+    ...task,
+    estimatedDuration:
+      normalizePlannerDurationBucket(task.estimatedDuration) ?? undefined,
+  })),
+});
 
 export function useIntentClassifier(options: UseIntentClassifierOptions = {}) {
   const { debounceMs = 500, minInputLength = 10, useOrchestrator = false } = options;
@@ -166,8 +189,9 @@ export function useIntentClassifier(options: UseIntentClassifierOptions = {}) {
         result = data as IntentClassification;
       }
       
-      setClassification(result);
-      return result;
+      const normalizedResult = normalizeIntentClassification(result);
+      setClassification(normalizedResult);
+      return normalizedResult;
     } catch (err) {
       console.error('Intent classification error:', err);
       setError(err instanceof Error ? err.message : 'Classification failed');
@@ -207,9 +231,11 @@ export function useIntentClassifier(options: UseIntentClassifierOptions = {}) {
         throw new Error(data.error);
       }
 
-      const result = data as IntentClassification;
-      setClassification(result);
-      return result;
+      const normalizedResult = normalizeIntentClassification(
+        data as IntentClassification,
+      );
+      setClassification(normalizedResult);
+      return normalizedResult;
     } catch (err) {
       console.error('Intent clarification error:', err);
       setError(err instanceof Error ? err.message : 'Clarification failed');

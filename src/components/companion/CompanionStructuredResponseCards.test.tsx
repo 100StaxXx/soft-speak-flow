@@ -231,6 +231,7 @@ describe("CompanionStructuredResponseCards", () => {
         focusCampaignHealth: {
           overdueQuestCount: 1,
           protectedTodayCount: 0,
+          recentCompletedQuestCount: 0,
           daysWithoutMomentum: 6,
           activeCampaignCount: 3,
         },
@@ -283,6 +284,7 @@ describe("CompanionStructuredResponseCards", () => {
         focusCampaignHealth: {
           overdueQuestCount: 0,
           protectedTodayCount: 0,
+          recentCompletedQuestCount: 1,
           daysWithoutMomentum: 5,
           activeCampaignCount: 3,
         },
@@ -311,6 +313,8 @@ describe("CompanionStructuredResponseCards", () => {
       "structured-suggestion-confirm-priority-1",
     );
 
+    expect(screen.getByTestId("structured-priority-campaign-health"))
+      .toHaveTextContent("1 recent win");
     expect(screen.getByTestId("structured-priority-campaign-health"))
       .toHaveTextContent("5 days quiet");
     expect(button).toHaveTextContent("Saved");
@@ -383,6 +387,7 @@ describe("CompanionStructuredResponseCards", () => {
         healthSnapshot: {
           overdueQuestCount: 2,
           protectedTodayCount: 0,
+          recentCompletedQuestCount: 1,
           daysWithoutMomentum: 8,
           activeCampaignCount: 4,
         },
@@ -412,6 +417,8 @@ describe("CompanionStructuredResponseCards", () => {
 
     expect(screen.getByTestId("structured-campaign-momentum"))
       .toBeInTheDocument();
+    expect(screen.getByTestId("structured-campaign-health"))
+      .toHaveTextContent("1 recent win");
     expect(screen.getByTestId("structured-campaign-health"))
       .toHaveTextContent("8 days quiet");
     expect(screen.getByTestId("structured-campaign-intervention"))

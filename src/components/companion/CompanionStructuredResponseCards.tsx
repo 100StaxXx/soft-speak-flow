@@ -68,6 +68,11 @@ const renderCampaignHealthSnapshot = (
   const chips = [
     `${snapshot.overdueQuestCount} overdue`,
     `${snapshot.protectedTodayCount} protected today`,
+    snapshot.recentCompletedQuestCount > 0
+      ? `${snapshot.recentCompletedQuestCount} recent ${
+        snapshot.recentCompletedQuestCount === 1 ? "win" : "wins"
+      }`
+      : null,
     snapshot.daysWithoutMomentum !== null
       ? `${snapshot.daysWithoutMomentum} ${
         snapshot.daysWithoutMomentum === 1 ? "day" : "days"

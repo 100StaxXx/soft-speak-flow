@@ -101,6 +101,250 @@ Deno.test("turns a one-off request into a quest without forcing schedule details
   assertStringIncludes(result.reply, "quest");
 });
 
+Deno.test("uses the AI-estimated activity duration for new quest drafts when no duration is specified", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Draft investor memo",
+    parsedInput: {
+      text: "Draft investor memo",
+      estimatedDuration: null,
+    },
+    classificationHint: {
+      type: "quest",
+      confidence: 0.93,
+      reasoning: "One-off work block",
+      suggestedActivityDurationMinutes: 60,
+    },
+  }));
+
+  assertEquals(result.mode, "proposal");
+  assertEquals(result.proposals[0]?.kind, "create_quest");
+  assertEquals(
+    (
+      result.proposals[0]?.payload as {
+        estimatedDuration?: number | null;
+      }
+    ).estimatedDuration,
+    60,
+  );
+});
+
+Deno.test("prefers a historical quest duration over the generic AI estimate for new drafts", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Workout tomorrow",
+    currentDate: "2026-04-18",
+    currentDateTime: "2026-04-18T10:30:00-07:00",
+    parsedInput: {
+      text: "Workout",
+      scheduledTime: null,
+      scheduledDate: "2026-04-19",
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: "body",
+      newTitle: null,
+    },
+    classificationHint: {
+      type: "quest",
+      confidence: 0.93,
+      reasoning: "One-off work block",
+      suggestedActivityDurationMinutes: 30,
+    },
+    plannerContext: {
+      tasks: [],
+      inboxTasks: [],
+      recentCompletedTasks: [
+        {
+          id: "task-workout-history-1",
+          title: "Workout",
+          taskDate: "2026-04-16",
+          scheduledTime: "17:00",
+          estimatedDuration: 45,
+          recurrencePattern: null,
+          completed: true,
+          completedAt: "2026-04-16T18:00:00.000Z",
+          priority: "medium",
+        },
+      ],
+      activeEpics: [],
+      rituals: [],
+      aiSignals: {
+        preferredDifficulty: "medium",
+        preferredHabitFrequency: "daily",
+        preferredEpicDuration: 45,
+        suggestedWorkload: "normal",
+        commonContexts: [],
+      },
+    },
+  }));
+
+  assertEquals(result.proposals[0].kind, "create_quest");
+  assertEquals(
+    (
+      result.proposals[0]?.payload as {
+        estimatedDuration?: number | null;
+      }
+    ).estimatedDuration,
+    45,
+  );
+});
+
+Deno.test("prefers actual historical time spent over estimated duration", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Workout tomorrow",
+    currentDate: "2026-04-18",
+    currentDateTime: "2026-04-18T10:30:00-07:00",
+    parsedInput: {
+      text: "Workout",
+      scheduledTime: null,
+      scheduledDate: "2026-04-19",
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: "body",
+      newTitle: null,
+    },
+    classificationHint: {
+      type: "quest",
+      confidence: 0.93,
+      reasoning: "One-off work block",
+      suggestedActivityDurationMinutes: 30,
+    },
+    plannerContext: {
+      tasks: [],
+      inboxTasks: [],
+      recentCompletedTasks: [
+        {
+          id: "task-workout-actual-history-1",
+          title: "Workout",
+          taskDate: "2026-04-16",
+          scheduledTime: "17:00",
+          estimatedDuration: 45,
+          actualTimeSpent: 60,
+          recurrencePattern: null,
+          completed: true,
+          completedAt: "2026-04-16T18:00:00.000Z",
+          priority: "medium",
+          category: "body",
+        },
+      ],
+      activeEpics: [],
+      rituals: [],
+    },
+  }));
+
+  assertEquals(result.proposals[0].kind, "create_quest");
+  assertEquals(
+    (
+      result.proposals[0]?.payload as {
+        estimatedDuration?: number | null;
+      }
+    ).estimatedDuration,
+    60,
+  );
+});
+
+Deno.test("uses fuzzy title history before the generic AI duration", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Draft investor memo",
+    parsedInput: {
+      text: "Draft investor memo",
+      estimatedDuration: null,
+      category: "work",
+    },
+    classificationHint: {
+      type: "quest",
+      confidence: 0.93,
+      reasoning: "One-off work block",
+      suggestedActivityDurationMinutes: 30,
+    },
+    plannerContext: {
+      tasks: [],
+      inboxTasks: [],
+      recentCompletedTasks: [
+        {
+          id: "task-investor-memo-history-1",
+          title: "Write investor memo",
+          taskDate: "2026-04-16",
+          scheduledTime: "10:00",
+          estimatedDuration: 90,
+          recurrencePattern: null,
+          completed: true,
+          completedAt: "2026-04-16T11:30:00.000Z",
+          priority: "high",
+          category: "work",
+        },
+      ],
+      activeEpics: [],
+      rituals: [],
+    },
+  }));
+
+  assertEquals(result.proposals[0].kind, "create_quest");
+  assertEquals(
+    (
+      result.proposals[0]?.payload as {
+        estimatedDuration?: number | null;
+      }
+    ).estimatedDuration,
+    90,
+  );
+});
+
+Deno.test("uses category duration history when the title is new", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Book dentist appointment",
+    parsedInput: {
+      text: "Book dentist appointment",
+      estimatedDuration: null,
+      category: "admin",
+    },
+    classificationHint: {
+      type: "quest",
+      confidence: 0.9,
+      reasoning: "One-off admin block",
+      suggestedActivityDurationMinutes: 60,
+    },
+    plannerContext: {
+      tasks: [],
+      inboxTasks: [],
+      recentCompletedTasks: [
+        {
+          id: "task-admin-history-1",
+          title: "Email receipts",
+          taskDate: "2026-04-16",
+          scheduledTime: "09:00",
+          estimatedDuration: 20,
+          recurrencePattern: null,
+          completed: true,
+          completedAt: "2026-04-16T09:20:00.000Z",
+          priority: "medium",
+          category: "admin",
+        },
+      ],
+      activeEpics: [],
+      rituals: [],
+    },
+  }));
+
+  assertEquals(result.proposals[0].kind, "create_quest");
+  assertEquals(
+    (
+      result.proposals[0]?.payload as {
+        estimatedDuration?: number | null;
+      }
+    ).estimatedDuration,
+    20,
+  );
+});
+
 Deno.test("uses the cleaned workout title for planner-created quest proposals", () => {
   const result = buildPlannerResponse(baseInput({
     message: "Add workout to today's schedule for 3pm",
@@ -829,6 +1073,369 @@ Deno.test("plan_day trims draft count in recovery mode when the day has room", (
   assertEquals(result.structuredResponse?.planDay?.suggestedQuests.length, 3);
 });
 
+Deno.test("plan_day relationship touch drafts shrink to fit a short suggested slot", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Plan my day",
+    parsedInput: {
+      text: "Plan my day",
+      scheduledTime: null,
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+    plannerContext: {
+      starterIntent: "plan_day",
+      tasks: [],
+      inboxTasks: [],
+      activeEpics: [],
+      rituals: [],
+      contactsNeedingAttention: [
+        {
+          id: "contact-1",
+          name: "Mom",
+          daysSinceContact: 9,
+          hasOverdueReminder: true,
+          reminderReason: "Check in this week",
+        },
+      ],
+      priorityScores: [
+        {
+          id: "contact:contact-1",
+          kind: "contact",
+          title: "Mom",
+          score: 68,
+          reasons: ["A quick touch keeps an overdue relationship warm."],
+          contactId: "contact-1",
+          targetDate: "2026-04-18",
+          suggestedTime: "17:00",
+        },
+      ],
+      scheduleInsights: {
+        horizon: "day",
+        selectedDate: "2026-04-18",
+        dayLoads: [
+          {
+            date: "2026-04-18",
+            totalMinutes: 60,
+            taskCount: 0,
+            status: "open",
+          },
+        ],
+        overloadedDates: [],
+        emptyDates: ["2026-04-18"],
+        conflicts: [],
+        suggestedSlots: [
+          {
+            date: "2026-04-18",
+            time: "17:00",
+            endTime: "17:10",
+            score: 76,
+            reason: "Quick open check-in window",
+          },
+        ],
+        moveSuggestions: [],
+        summary: "Today has one short check-in window.",
+      },
+    },
+  }));
+
+  assertEquals(result.mode, "proposal");
+  assertEquals(result.proposals[0]?.kind, "create_quest");
+  assertEquals(
+    (
+      result.proposals[0]?.payload as {
+        estimatedDuration?: number | null;
+      }
+    ).estimatedDuration,
+    10,
+  );
+});
+
+Deno.test("plan_day ritual keep drafts shrink to fit a short suggested slot", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Plan my day",
+    parsedInput: {
+      text: "Plan my day",
+      scheduledTime: null,
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+    plannerContext: {
+      starterIntent: "plan_day",
+      tasks: [],
+      inboxTasks: [],
+      activeEpics: [
+        {
+          id: "epic-1",
+          title: "Website relaunch",
+          endDate: "2026-04-20",
+          progressPercentage: 35,
+          daysRemaining: 2,
+          habitCount: 1,
+        },
+      ],
+      rituals: [
+        {
+          id: "ritual-1",
+          epicId: "epic-1",
+          epicTitle: "Website relaunch",
+          title: "Morning review",
+          frequency: "daily",
+          preferredTime: "10:30",
+          currentStreak: 3,
+        },
+      ],
+      priorityScores: [
+        {
+          id: "ritual:ritual-1",
+          kind: "ritual",
+          title: "Morning review",
+          score: 88,
+          reasons: ["Keeps the relaunch moving early."],
+          ritualId: "ritual-1",
+          epicId: "epic-1",
+          targetDate: "2026-04-18",
+          suggestedTime: "10:30",
+        },
+      ],
+      scheduleInsights: {
+        horizon: "day",
+        selectedDate: "2026-04-18",
+        dayLoads: [
+          {
+            date: "2026-04-18",
+            totalMinutes: 60,
+            taskCount: 0,
+            status: "open",
+          },
+        ],
+        overloadedDates: [],
+        emptyDates: ["2026-04-18"],
+        conflicts: [],
+        suggestedSlots: [
+          {
+            date: "2026-04-18",
+            time: "10:30",
+            endTime: "10:50",
+            score: 86,
+            reason: "Short mid-morning ritual window",
+          },
+        ],
+        moveSuggestions: [],
+        summary: "Today has one short ritual window.",
+      },
+    },
+  }));
+
+  assertEquals(result.mode, "proposal");
+  assertEquals(result.proposals[0]?.kind, "create_quest");
+  assertEquals(
+    (
+      result.proposals[0]?.payload as {
+        estimatedDuration?: number | null;
+      }
+    ).estimatedDuration,
+    20,
+  );
+});
+
+Deno.test("plan_day ritual keep drafts use the ritual's estimated duration when the slot fits", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Plan my day",
+    parsedInput: {
+      text: "Plan my day",
+      scheduledTime: null,
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+    plannerContext: {
+      starterIntent: "plan_day",
+      tasks: [],
+      inboxTasks: [],
+      activeEpics: [
+        {
+          id: "epic-ritual-duration-1",
+          title: "Website relaunch",
+          endDate: "2026-04-20",
+          progressPercentage: 35,
+          daysRemaining: 2,
+          habitCount: 1,
+        },
+      ],
+      rituals: [
+        {
+          id: "ritual-duration-1",
+          epicId: "epic-ritual-duration-1",
+          epicTitle: "Website relaunch",
+          title: "Morning review",
+          frequency: "daily",
+          preferredTime: "10:30",
+          currentStreak: 3,
+          estimatedMinutes: 45,
+        },
+      ],
+      priorityScores: [
+        {
+          id: "ritual:ritual-duration-1",
+          kind: "ritual",
+          title: "Morning review",
+          score: 88,
+          reasons: ["Keeps the relaunch moving early."],
+          ritualId: "ritual-duration-1",
+          epicId: "epic-ritual-duration-1",
+          targetDate: "2026-04-18",
+          suggestedTime: "10:30",
+        },
+      ],
+      scheduleInsights: {
+        horizon: "day",
+        selectedDate: "2026-04-18",
+        dayLoads: [
+          {
+            date: "2026-04-18",
+            totalMinutes: 60,
+            taskCount: 0,
+            status: "open",
+          },
+        ],
+        overloadedDates: [],
+        emptyDates: ["2026-04-18"],
+        conflicts: [],
+        suggestedSlots: [
+          {
+            date: "2026-04-18",
+            time: "10:30",
+            endTime: "11:30",
+            score: 86,
+            reason: "Open mid-morning ritual window",
+          },
+        ],
+        moveSuggestions: [],
+        summary: "Today has room for a full ritual block.",
+      },
+    },
+  }));
+
+  assertEquals(result.mode, "proposal");
+  assertEquals(result.proposals[0]?.kind, "create_quest");
+  assertEquals(
+    (
+      result.proposals[0]?.payload as {
+        estimatedDuration?: number | null;
+      }
+    ).estimatedDuration,
+    45,
+  );
+});
+
+Deno.test("plan_day campaign fallback drafts shrink to fit a short suggested slot", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Plan my day",
+    parsedInput: {
+      text: "Plan my day",
+      scheduledTime: null,
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+    plannerContext: {
+      starterIntent: "plan_day",
+      tasks: [],
+      inboxTasks: [],
+      activeEpics: [
+        {
+          id: "epic-fallback-1",
+          title: "Founder relaunch",
+          endDate: "2026-05-10",
+          progressPercentage: 30,
+          daysRemaining: 22,
+        },
+      ],
+      rituals: [],
+      priorityScores: [
+        {
+          id: "epic:epic-fallback-1",
+          kind: "epic",
+          title: "Founder relaunch",
+          score: 84,
+          reasons: ["A concrete campaign move would keep momentum alive."],
+          epicId: "epic-fallback-1",
+          targetDate: "2026-04-18",
+          suggestedTime: "10:30",
+        },
+      ],
+      scheduleInsights: {
+        horizon: "day",
+        selectedDate: "2026-04-18",
+        dayLoads: [
+          {
+            date: "2026-04-18",
+            totalMinutes: 60,
+            taskCount: 0,
+            status: "open",
+          },
+        ],
+        overloadedDates: [],
+        emptyDates: ["2026-04-18"],
+        conflicts: [],
+        suggestedSlots: [
+          {
+            date: "2026-04-18",
+            time: "10:30",
+            endTime: "10:50",
+            score: 90,
+            reason: "Short focus window for campaign planning.",
+          },
+        ],
+        moveSuggestions: [],
+        summary: "Today has one short campaign-planning window.",
+      },
+    },
+  }));
+
+  assertEquals(result.mode, "proposal");
+  assertEquals(result.proposals[0]?.kind, "create_quest");
+  assertStringIncludes(result.proposals[0]?.title ?? "", "Define next step");
+  assertEquals(
+    (
+      result.proposals[0]?.payload as {
+        estimatedDuration?: number | null;
+      }
+    ).estimatedDuration,
+    20,
+  );
+});
+
 Deno.test("plan_day turns campaign pressure into a linked concrete quest draft", () => {
   const result = buildPlannerResponse(baseInput({
     message: "Plan my day",
@@ -877,7 +1484,9 @@ Deno.test("plan_day turns campaign pressure into a linked concrete quest draft",
           kind: "epic",
           title: "Founder relaunch",
           score: 91,
-          reasons: ["This campaign needs a concrete push before the deadline tightens."],
+          reasons: [
+            "This campaign needs a concrete push before the deadline tightens.",
+          ],
           epicId: "epic-plan-1",
         },
       ],
@@ -916,7 +1525,10 @@ Deno.test("plan_day turns campaign pressure into a linked concrete quest draft",
     (result.proposals[0].payload as { epicId?: string | null }).epicId,
     "epic-plan-1",
   );
-  assertEquals(result.structuredResponse?.planDay?.suggestedQuests[0]?.type, "must");
+  assertEquals(
+    result.structuredResponse?.planDay?.suggestedQuests[0]?.type,
+    "must",
+  );
   assertStringIncludes(
     result.structuredResponse?.planDay?.suggestedQuests[0]?.reason ?? "",
     "Deadline in 6 days",
@@ -1006,12 +1618,115 @@ Deno.test("plan_day keeps task-scored campaign work urgent when the campaign is 
   }));
 
   assertEquals(result.mode, "proposal");
-  assertEquals(result.structuredResponse?.planDay?.suggestedQuests[0]?.type, "must");
+  assertEquals(
+    result.structuredResponse?.planDay?.suggestedQuests[0]?.type,
+    "must",
+  );
   assertStringIncludes(
     result.structuredResponse?.planDay?.suggestedQuests[0]?.reason ?? "",
     "Deadline in 3 days",
   );
   assertStringIncludes(result.proposals[0].title, "Outline webinar promise");
+});
+
+Deno.test("plan_day defines the next step when a campaign has a recent win but no linked follow-up quest", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Plan my day",
+    parsedInput: {
+      text: "Plan my day",
+      scheduledTime: null,
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+    plannerContext: {
+      starterIntent: "plan_day",
+      activeEpics: [
+        {
+          id: "epic-plan-followup-1",
+          title: "Podcast launch",
+          endDate: "2026-05-06",
+          progressPercentage: 52,
+          daysRemaining: 18,
+        },
+      ],
+      tasks: [],
+      recentCompletedTasks: [
+        {
+          id: "task-plan-followup-done-1",
+          title: "Pick launch artwork",
+          taskDate: "2026-04-17",
+          scheduledTime: "11:00",
+          estimatedDuration: 30,
+          recurrencePattern: null,
+          completed: true,
+          completedAt: "2026-04-17T18:00:00.000Z",
+          priority: "medium",
+          epicId: "epic-plan-followup-1",
+          epicTitle: "Podcast launch",
+        },
+      ],
+      priorityScores: [
+        {
+          id: "epic:epic-plan-followup-1",
+          kind: "epic",
+          title: "Podcast launch",
+          score: 79,
+          reasons: [
+            "This campaign has momentum, but the next move is still undefined.",
+          ],
+          epicId: "epic-plan-followup-1",
+        },
+      ],
+      scheduleInsights: {
+        horizon: "day",
+        selectedDate: "2026-04-18",
+        dayLoads: [
+          {
+            date: "2026-04-18",
+            totalMinutes: 0,
+            taskCount: 0,
+            status: "open",
+          },
+        ],
+        overloadedDates: [],
+        emptyDates: ["2026-04-18"],
+        conflicts: [],
+        suggestedSlots: [
+          {
+            date: "2026-04-18",
+            time: "10:30",
+            endTime: "11:00",
+            score: 84,
+            reason: "Open slot for a concrete next move.",
+          },
+        ],
+        moveSuggestions: [],
+        summary: "Today has room for one clean campaign move.",
+      },
+    },
+  }));
+
+  assertEquals(result.mode, "proposal");
+  assertStringIncludes(
+    result.proposals[0]?.title ?? "",
+    "Define next step for Podcast launch",
+  );
+  assertEquals(
+    result.structuredResponse?.planDay?.suggestedQuests[0]?.title,
+    "Define next step for Podcast launch",
+  );
+  assertStringIncludes(
+    result.structuredResponse?.planDay?.suggestedQuests[0]?.reason ?? "",
+    "no concrete follow-up quest linked yet",
+  );
 });
 
 Deno.test("plan_day can lead with a strategic campaign adjustment when repeated slip makes more tasks dishonest", () => {
@@ -1495,6 +2210,272 @@ Deno.test("drafts from a vague directional plan-day reply without asking a secon
     "Recovery reset",
   );
 });
+
+Deno.test("plan_day recovery drafts shrink to fit a short suggested slot", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Something active",
+    parsedInput: {
+      text: "Something active",
+      scheduledTime: null,
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+    sessionState: {
+      pendingStarterIntent: "plan_day",
+      openQuestionIds: ["details"],
+    },
+    plannerContext: {
+      tasks: [],
+      inboxTasks: [],
+      activeEpics: [],
+      rituals: [],
+      priorityScores: [
+        {
+          id: "recovery:reset",
+          kind: "recovery",
+          title: "Recovery reset",
+          score: 72,
+          reasons: ["A movement block would help today."],
+          targetDate: "2026-04-18",
+          suggestedTime: "18:00",
+        },
+      ],
+      scheduleInsights: {
+        horizon: "day",
+        selectedDate: "2026-04-18",
+        dayLoads: [
+          {
+            date: "2026-04-18",
+            totalMinutes: 0,
+            taskCount: 0,
+            status: "open",
+          },
+        ],
+        overloadedDates: [],
+        emptyDates: ["2026-04-18"],
+        conflicts: [],
+        suggestedSlots: [
+          {
+            date: "2026-04-18",
+            time: "18:00",
+            endTime: "18:20",
+            score: 80,
+            reason: "Open evening movement block",
+          },
+        ],
+        moveSuggestions: [],
+        summary: "Today is open.",
+      },
+    },
+  }));
+
+  assertEquals(result.mode, "proposal");
+  assertEquals(result.proposals[0]?.kind, "create_quest");
+  assertEquals(
+    (result.proposals[0]?.payload as { estimatedDuration?: number | null })
+      .estimatedDuration,
+    20,
+  );
+});
+
+Deno.test(
+  "plan_day recovery drafts prefer historical duration before slot fit",
+  () => {
+    const result = buildPlannerResponse(baseInput({
+      message: "Something active",
+      parsedInput: {
+        text: "Something active",
+        scheduledTime: null,
+        scheduledDate: null,
+        estimatedDuration: null,
+        recurrencePattern: null,
+        recurrenceDays: [],
+        recurrenceMonthDays: [],
+        recurrenceCustomPeriod: null,
+        recurrenceEndDate: null,
+        notes: null,
+        category: null,
+        newTitle: null,
+      },
+      sessionState: {
+        pendingStarterIntent: "plan_day",
+        openQuestionIds: ["details"],
+      },
+      plannerContext: {
+        tasks: [],
+        inboxTasks: [],
+        recentCompletedTasks: [
+          {
+            id: "task-recovery-history-1",
+            title: "Recovery reset",
+            taskDate: "2026-04-16",
+            scheduledTime: "18:00",
+            estimatedDuration: 45,
+            recurrencePattern: null,
+            completed: true,
+            completedAt: "2026-04-16T18:45:00.000Z",
+            priority: "medium",
+          },
+        ],
+        activeEpics: [],
+        rituals: [],
+        priorityScores: [
+          {
+            id: "recovery:reset",
+            kind: "recovery",
+            title: "Recovery reset",
+            score: 72,
+            reasons: ["A movement block would help today."],
+            targetDate: "2026-04-18",
+            suggestedTime: "18:00",
+          },
+        ],
+        scheduleInsights: {
+          horizon: "day",
+          selectedDate: "2026-04-18",
+          dayLoads: [
+            {
+              date: "2026-04-18",
+              totalMinutes: 0,
+              taskCount: 0,
+              status: "open",
+            },
+          ],
+          overloadedDates: [],
+          emptyDates: ["2026-04-18"],
+          conflicts: [],
+          suggestedSlots: [
+            {
+              date: "2026-04-18",
+              time: "18:00",
+              endTime: "18:45",
+              score: 80,
+              reason: "Long enough recovery slot",
+            },
+          ],
+          moveSuggestions: [],
+          summary: "Today is open.",
+        },
+      },
+    }));
+
+    assertEquals(result.mode, "proposal");
+    assertEquals(result.proposals[0]?.kind, "create_quest");
+    assertEquals(
+      (result.proposals[0]?.payload as { estimatedDuration?: number | null })
+        .estimatedDuration,
+      45,
+    );
+  },
+);
+
+Deno.test(
+  "plan_day relationship touch drafts prefer historical duration before slot fit",
+  () => {
+    const result = buildPlannerResponse(baseInput({
+      message: "People",
+      parsedInput: {
+        text: "People",
+        scheduledTime: null,
+        scheduledDate: null,
+        estimatedDuration: null,
+        recurrencePattern: null,
+        recurrenceDays: [],
+        recurrenceMonthDays: [],
+        recurrenceCustomPeriod: null,
+        recurrenceEndDate: null,
+        notes: null,
+        category: null,
+        newTitle: null,
+      },
+      sessionState: {
+        pendingStarterIntent: "plan_day",
+        openQuestionIds: ["details"],
+      },
+      plannerContext: {
+        tasks: [],
+        inboxTasks: [],
+        recentCompletedTasks: [
+          {
+            id: "task-contact-history-1",
+            title: "Reach out to Mom",
+            taskDate: "2026-04-16",
+            scheduledTime: "17:30",
+            estimatedDuration: 30,
+            recurrencePattern: null,
+            completed: true,
+            completedAt: "2026-04-16T18:00:00.000Z",
+            priority: "medium",
+          },
+        ],
+        activeEpics: [],
+        rituals: [],
+        contactsNeedingAttention: [
+          {
+            id: "contact-1",
+            name: "Mom",
+            daysSinceContact: 9,
+            hasOverdueReminder: true,
+          },
+        ],
+        priorityScores: [
+          {
+            id: "contact:contact-1",
+            kind: "contact",
+            title: "Mom",
+            score: 70,
+            reasons: ["A quick relationship touch fits today."],
+            contactId: "contact-1",
+            targetDate: "2026-04-18",
+            suggestedTime: "17:30",
+          },
+        ],
+        scheduleInsights: {
+          horizon: "day",
+          selectedDate: "2026-04-18",
+          dayLoads: [
+            {
+              date: "2026-04-18",
+              totalMinutes: 0,
+              taskCount: 0,
+              status: "open",
+            },
+          ],
+          overloadedDates: [],
+          emptyDates: ["2026-04-18"],
+          conflicts: [],
+          suggestedSlots: [
+            {
+              date: "2026-04-18",
+              time: "17:30",
+              endTime: "18:00",
+              score: 80,
+              reason: "Open call window",
+            },
+          ],
+          moveSuggestions: [],
+          summary: "Today is open.",
+        },
+      },
+    }));
+
+    assertEquals(result.mode, "proposal");
+    assertEquals(result.proposals[0]?.kind, "create_quest");
+    assertEquals(
+      (result.proposals[0]?.payload as { estimatedDuration?: number | null })
+        .estimatedDuration,
+      30,
+    );
+  },
+);
 
 Deno.test("raises the plan-day target for coasting users on a normal day", () => {
   const result = buildPlannerResponse(baseInput({
@@ -2672,7 +3653,9 @@ Deno.test("right_now_start can elevate a slipping campaign move over a generic t
           kind: "epic",
           title: "Launch prep",
           score: 86,
-          reasons: ["This campaign is starting to slip and needs a concrete move."],
+          reasons: [
+            "This campaign is starting to slip and needs a concrete move.",
+          ],
           epicId: "epic-launch",
         },
         {
@@ -2767,7 +3750,9 @@ Deno.test("right_now_start treats a deeply stuck campaign reset move as a must",
           kind: "epic",
           title: "Launch prep",
           score: 64,
-          reasons: ["This campaign has gone quiet and needs a concrete reset move."],
+          reasons: [
+            "This campaign has gone quiet and needs a concrete reset move.",
+          ],
           epicId: "epic-reset-1",
         },
       ],
@@ -2812,6 +3797,466 @@ Deno.test("right_now_start treats a deeply stuck campaign reset move as a must",
   assertStringIncludes(
     result.structuredResponse?.rightNow?.recommendedAction?.reason ?? "",
     "slipped repeatedly without a protected recovery move",
+  );
+});
+
+Deno.test("right_now_start defines the next step when recent campaign progress has no linked follow-up quest", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "What should I do right now?",
+    currentDate: "2026-04-18",
+    currentDateTime: "2026-04-18T10:30:00-07:00",
+    plannerContext: {
+      starterIntent: "right_now_start",
+      tasks: [
+        {
+          id: "task-admin-followup-1",
+          title: "Reply to landlord email",
+          taskDate: "2026-04-18",
+          scheduledTime: null,
+          estimatedDuration: 20,
+          difficulty: "easy",
+          recurrencePattern: null,
+          completed: false,
+          priority: "medium",
+        },
+      ],
+      recentCompletedTasks: [
+        {
+          id: "task-done-followup-1",
+          title: "Pick launch artwork",
+          taskDate: "2026-04-17",
+          scheduledTime: "11:00",
+          estimatedDuration: 30,
+          recurrencePattern: null,
+          completed: true,
+          completedAt: "2026-04-17T18:00:00.000Z",
+          priority: "medium",
+          epicId: "epic-followup-right-now-1",
+          epicTitle: "Podcast launch",
+        },
+      ],
+      activeEpics: [
+        {
+          id: "epic-followup-right-now-1",
+          title: "Podcast launch",
+          progressPercentage: 52,
+          daysRemaining: 18,
+          endDate: "2026-05-06",
+        },
+      ],
+      priorityScores: [
+        {
+          id: "epic:epic-followup-right-now-1",
+          kind: "epic",
+          title: "Podcast launch",
+          score: 80,
+          reasons: [
+            "This campaign has momentum, but the next move is still undefined.",
+          ],
+          epicId: "epic-followup-right-now-1",
+        },
+        {
+          id: "task:task-admin-followup-1",
+          kind: "task",
+          title: "Reply to landlord email",
+          score: 42,
+          reasons: ["Useful admin cleanup, but not the highest-leverage move."],
+          taskId: "task-admin-followup-1",
+          targetDate: "2026-04-18",
+          suggestedTime: null,
+        },
+      ],
+      scheduleInsights: {
+        horizon: "day",
+        selectedDate: "2026-04-18",
+        dayLoads: [
+          {
+            date: "2026-04-18",
+            totalMinutes: 20,
+            taskCount: 1,
+            status: "open",
+          },
+        ],
+        overloadedDates: [],
+        emptyDates: [],
+        conflicts: [],
+        suggestedSlots: [
+          {
+            date: "2026-04-18",
+            time: "10:30",
+            endTime: "10:45",
+            score: 88,
+            reason: "Open slot for a quick campaign follow-up.",
+          },
+        ],
+        moveSuggestions: [],
+        summary: "You have a clean window for one useful move.",
+      },
+    },
+  }));
+
+  assertEquals(result.mode, "proposal");
+  assertEquals(result.proposals[0]?.kind, "create_quest");
+  assertEquals(result.structuredResponse?.intent.intentType, "quest");
+  assertEquals(result.structuredResponse?.intent.shouldCreateQuest, true);
+  assertEquals(
+    result.structuredResponse?.rightNow?.recommendedAction?.title,
+    "Define next step for Podcast launch",
+  );
+  assertEquals(
+    result.structuredResponse?.rightNow?.recommendedAction
+      ?.estimatedDurationMinutes,
+    15,
+  );
+  assertEquals(
+    (result.proposals[0]?.payload as { taskDate?: string }).taskDate,
+    "2026-04-18",
+  );
+  assertEquals(
+    (result.proposals[0]?.payload as { scheduledTime?: string | null })
+      .scheduledTime,
+    "10:30",
+  );
+  assertEquals(
+    Boolean(result.structuredResponse?.rightNow?.recommendedAction?.proposalId),
+    true,
+  );
+  assertStringIncludes(
+    result.structuredResponse?.rightNow?.recommendedAction?.reason ?? "",
+    "keep that momentum alive right now",
+  );
+});
+
+Deno.test("right_now_start keeps a campaign follow-up read-only when there is no clean slot in the current window", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "What should I do right now?",
+    currentDate: "2026-04-18",
+    currentDateTime: "2026-04-18T10:30:00-07:00",
+    plannerContext: {
+      starterIntent: "right_now_start",
+      recentCompletedTasks: [
+        {
+          id: "task-done-followup-readonly-1",
+          title: "Pick launch artwork",
+          taskDate: "2026-04-17",
+          scheduledTime: "11:00",
+          estimatedDuration: 30,
+          recurrencePattern: null,
+          completed: true,
+          completedAt: "2026-04-17T18:00:00.000Z",
+          priority: "medium",
+          epicId: "epic-followup-readonly-right-now-1",
+          epicTitle: "Podcast launch",
+        },
+      ],
+      activeEpics: [
+        {
+          id: "epic-followup-readonly-right-now-1",
+          title: "Podcast launch",
+          progressPercentage: 52,
+          daysRemaining: 18,
+          endDate: "2026-05-06",
+        },
+      ],
+      priorityScores: [
+        {
+          id: "epic:epic-followup-readonly-right-now-1",
+          kind: "epic",
+          title: "Podcast launch",
+          score: 80,
+          reasons: [
+            "This campaign has momentum, but the next move is still undefined.",
+          ],
+          epicId: "epic-followup-readonly-right-now-1",
+        },
+      ],
+      scheduleInsights: {
+        horizon: "day",
+        selectedDate: "2026-04-18",
+        dayLoads: [
+          {
+            date: "2026-04-18",
+            totalMinutes: 20,
+            taskCount: 1,
+            status: "open",
+          },
+        ],
+        overloadedDates: [],
+        emptyDates: [],
+        conflicts: [],
+        suggestedSlots: [],
+        moveSuggestions: [],
+        summary: "You have some room, but no clean slot is pinned down.",
+      },
+    },
+  }));
+
+  assertEquals(result.mode, "schedule_read");
+  assertEquals(result.proposals.length, 0);
+  assertEquals(
+    result.structuredResponse?.rightNow?.recommendedAction?.title,
+    "Define next step for Podcast launch",
+  );
+  assertEquals(
+    result.structuredResponse?.rightNow?.recommendedAction?.proposalId ?? null,
+    null,
+  );
+  assertStringIncludes(
+    result.structuredResponse?.rightNow?.recommendedAction?.reason ?? "",
+    "there isn't a clean slot to schedule it automatically",
+  );
+});
+
+Deno.test("right_now_start resets the campaign plan when there is no concrete next step at all", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "What should I do right now?",
+    currentDate: "2026-04-18",
+    currentDateTime: "2026-04-18T10:30:00-07:00",
+    plannerContext: {
+      starterIntent: "right_now_start",
+      tasks: [
+        {
+          id: "task-admin-reset-1",
+          title: "Reply to landlord email",
+          taskDate: "2026-04-18",
+          scheduledTime: null,
+          estimatedDuration: 20,
+          difficulty: "easy",
+          recurrencePattern: null,
+          completed: false,
+          priority: "medium",
+        },
+      ],
+      recentCompletedTasks: [],
+      activeEpics: [
+        {
+          id: "epic-reset-right-now-2",
+          title: "Podcast launch",
+          progressPercentage: 24,
+          daysRemaining: 18,
+          endDate: "2026-05-06",
+        },
+      ],
+      priorityScores: [
+        {
+          id: "epic:epic-reset-right-now-2",
+          kind: "epic",
+          title: "Podcast launch",
+          score: 82,
+          reasons: [
+            "This campaign has no concrete next step and needs a reset move.",
+          ],
+          epicId: "epic-reset-right-now-2",
+        },
+        {
+          id: "task:task-admin-reset-1",
+          kind: "task",
+          title: "Reply to landlord email",
+          score: 42,
+          reasons: ["Useful admin cleanup, but not the highest-leverage move."],
+          taskId: "task-admin-reset-1",
+          targetDate: "2026-04-18",
+          suggestedTime: null,
+        },
+      ],
+      scheduleInsights: {
+        horizon: "day",
+        selectedDate: "2026-04-18",
+        dayLoads: [
+          {
+            date: "2026-04-18",
+            totalMinutes: 20,
+            taskCount: 1,
+            status: "open",
+          },
+        ],
+        overloadedDates: [],
+        emptyDates: [],
+        conflicts: [],
+        suggestedSlots: [
+          {
+            date: "2026-04-18",
+            time: "10:30",
+            endTime: "11:00",
+            score: 90,
+            reason: "Open focus slot for a campaign reset.",
+          },
+        ],
+        moveSuggestions: [],
+        summary: "You have room for one honest recovery move.",
+      },
+    },
+  }));
+
+  assertEquals(result.mode, "proposal");
+  assertEquals(result.proposals[0]?.kind, "adjust_campaign_plan");
+  assertEquals(result.structuredResponse?.intent.intentType, "campaign");
+  assertEquals(result.structuredResponse?.intent.shouldCreateQuest, false);
+  assertEquals(
+    result.structuredResponse?.rightNow?.recommendedAction?.title,
+    "Adjust Podcast launch",
+  );
+  assertEquals(
+    result.structuredResponse?.rightNow?.recommendedAction
+      ?.estimatedDurationMinutes,
+    20,
+  );
+  assertEquals(
+    Boolean(result.structuredResponse?.rightNow?.recommendedAction?.proposalId),
+    true,
+  );
+  assertStringIncludes(
+    result.structuredResponse?.rightNow?.recommendedAction?.reason ?? "",
+    "resetting the campaign plan",
+  );
+});
+
+Deno.test("right_now_start does not overfill a too-short gap before the next event", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "What should I do right now?",
+    currentDate: "2026-04-18",
+    currentDateTime: "2026-04-18T09:50:00-07:00",
+    plannerContext: {
+      starterIntent: "right_now_start",
+      tasks: [],
+      recentCompletedTasks: [
+        {
+          id: "task-right-now-short-gap-done-1",
+          title: "Pick launch artwork",
+          taskDate: "2026-04-17",
+          scheduledTime: "11:00",
+          estimatedDuration: 30,
+          recurrencePattern: null,
+          completed: true,
+          completedAt: "2026-04-17T18:00:00.000Z",
+          priority: "medium",
+          epicId: "epic-right-now-short-gap-1",
+          epicTitle: "Podcast launch",
+        },
+      ],
+      activeEpics: [
+        {
+          id: "epic-right-now-short-gap-1",
+          title: "Podcast launch",
+          progressPercentage: 52,
+          daysRemaining: 18,
+          endDate: "2026-05-06",
+        },
+      ],
+      calendarEvents: [
+        {
+          id: "event-right-now-short-gap-1",
+          title: "Therapy",
+          start: "2026-04-18T10:00:00-07:00",
+          end: "2026-04-18T11:00:00-07:00",
+          isAllDay: false,
+          provider: "google",
+          readOnly: true,
+        },
+      ],
+      priorityScores: [
+        {
+          id: "epic:epic-right-now-short-gap-1",
+          kind: "epic",
+          title: "Podcast launch",
+          score: 80,
+          reasons: [
+            "This campaign has momentum, but the next move is still undefined.",
+          ],
+          epicId: "epic-right-now-short-gap-1",
+        },
+      ],
+      scheduleInsights: {
+        horizon: "day",
+        selectedDate: "2026-04-18",
+        dayLoads: [],
+        overloadedDates: [],
+        emptyDates: [],
+        conflicts: [],
+        suggestedSlots: [
+          {
+            date: "2026-04-18",
+            time: "10:30",
+            endTime: "10:45",
+            score: 88,
+            reason: "Open slot for a quick campaign follow-up.",
+          },
+        ],
+        moveSuggestions: [],
+        summary: "You only have a short gap before Therapy.",
+      },
+    },
+  }));
+
+  assertEquals(result.mode, "schedule_read");
+  assertEquals(result.proposals.length, 0);
+  assertEquals(result.structuredResponse?.rightNow?.recommendedAction, null);
+  assertEquals(
+    result.structuredResponse?.rightNow?.fallbackAction?.title,
+    "Take a 10-minute reset and clear one quick blocker",
+  );
+});
+
+Deno.test("right_now_start fallback reset can use historical duration", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "What should I do right now?",
+    currentDate: "2026-04-18",
+    currentDateTime: "2026-04-18T10:00:00-07:00",
+    plannerContext: {
+      starterIntent: "right_now_start",
+      tasks: [],
+      recentCompletedTasks: [
+        {
+          id: "task-right-now-reset-history-1",
+          title: "Recovery reset",
+          taskDate: "2026-04-16",
+          scheduledTime: "16:00",
+          estimatedDuration: 20,
+          recurrencePattern: null,
+          completed: true,
+          completedAt: "2026-04-16T16:20:00.000Z",
+          priority: "medium",
+        },
+      ],
+      priorityScores: [],
+      calendarEvents: [
+        {
+          id: "event-right-now-reset-history-1",
+          title: "Design review",
+          start: "2026-04-18T10:20:00-07:00",
+          end: "2026-04-18T11:00:00-07:00",
+          isAllDay: false,
+          provider: "google",
+          readOnly: true,
+        },
+      ],
+      scheduleInsights: {
+        horizon: "day",
+        selectedDate: "2026-04-18",
+        dayLoads: [],
+        overloadedDates: [],
+        emptyDates: [],
+        conflicts: [],
+        suggestedSlots: [],
+        moveSuggestions: [],
+        summary: "You have a short reset window.",
+      },
+    },
+  }));
+
+  assertEquals(result.mode, "schedule_read");
+  assertEquals(
+    result.structuredResponse?.rightNow?.fallbackAction?.title,
+    "Take a 20-minute reset and clear one quick blocker",
+  );
+  assertEquals(
+    result.structuredResponse?.rightNow?.fallbackAction
+      ?.estimatedDurationMinutes,
+    20,
+  );
+  assertEquals(
+    result.structuredResponse?.rightNow?.fallbackAction?.estimatedDuration,
+    "20 min",
   );
 });
 
@@ -3006,7 +4451,9 @@ Deno.test("adjust_today protects a slipping campaign move before lower-leverage 
           kind: "epic",
           title: "Launch prep",
           score: 84,
-          reasons: ["This campaign is starting to slip and needs a concrete move."],
+          reasons: [
+            "This campaign is starting to slip and needs a concrete move.",
+          ],
           epicId: "epic-launch",
         },
         {
@@ -3014,7 +4461,9 @@ Deno.test("adjust_today protects a slipping campaign move before lower-leverage 
           kind: "task",
           title: "Outline launch email",
           score: 48,
-          reasons: ["Helpful, but easy to postpone if you only rank raw tasks."],
+          reasons: [
+            "Helpful, but easy to postpone if you only rank raw tasks.",
+          ],
           taskId: "task-4",
           targetDate: "2026-04-18",
           suggestedTime: "18:00",
@@ -3125,7 +4574,9 @@ Deno.test("adjust_today can protect a campaign reset move when repeated slip mak
           kind: "epic",
           title: "Launch prep",
           score: 86,
-          reasons: ["This campaign has slipped repeatedly and needs a reset move."],
+          reasons: [
+            "This campaign has slipped repeatedly and needs a reset move.",
+          ],
           epicId: "epic-launch",
         },
         {
@@ -3189,6 +4640,115 @@ Deno.test("adjust_today can protect a campaign reset move when repeated slip mak
   );
 });
 
+Deno.test("adjust_today can protect a campaign next-step move when recent progress has no linked follow-up quest", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Adjust my day",
+    currentDate: "2026-04-18",
+    plannerContext: {
+      starterIntent: "adjust_today",
+      tasks: [
+        {
+          id: "task-adjust-followup-1",
+          title: "Finish investor memo",
+          taskDate: "2026-04-18",
+          scheduledTime: "13:00",
+          estimatedDuration: 90,
+          difficulty: "hard",
+          recurrencePattern: null,
+          completed: false,
+          priority: "high",
+        },
+        {
+          id: "task-adjust-followup-2",
+          title: "Inbox cleanup",
+          taskDate: "2026-04-18",
+          scheduledTime: "16:00",
+          estimatedDuration: 30,
+          difficulty: "easy",
+          recurrencePattern: null,
+          completed: false,
+          priority: "medium",
+        },
+      ],
+      activeEpics: [
+        {
+          id: "epic-adjust-followup-1",
+          title: "Podcast launch",
+          progressPercentage: 52,
+          daysRemaining: 18,
+          endDate: "2026-05-06",
+        },
+      ],
+      recentCompletedTasks: [
+        {
+          id: "task-adjust-followup-done-1",
+          title: "Pick launch artwork",
+          taskDate: "2026-04-17",
+          scheduledTime: "11:00",
+          estimatedDuration: 30,
+          recurrencePattern: null,
+          completed: true,
+          completedAt: "2026-04-17T18:00:00.000Z",
+          priority: "medium",
+          epicId: "epic-adjust-followup-1",
+          epicTitle: "Podcast launch",
+        },
+      ],
+      priorityScores: [
+        {
+          id: "task:task-adjust-followup-1",
+          kind: "task",
+          title: "Finish investor memo",
+          score: 88,
+          reasons: ["This is the strongest leverage move left today."],
+          taskId: "task-adjust-followup-1",
+          targetDate: "2026-04-18",
+          suggestedTime: "13:00",
+        },
+        {
+          id: "task:task-adjust-followup-2",
+          kind: "task",
+          title: "Inbox cleanup",
+          score: 62,
+          reasons: ["This can move if the day needs more room."],
+          taskId: "task-adjust-followup-2",
+          targetDate: "2026-04-18",
+          suggestedTime: "16:00",
+        },
+        {
+          id: "epic:epic-adjust-followup-1",
+          kind: "epic",
+          title: "Podcast launch",
+          score: 80,
+          reasons: [
+            "This campaign has momentum, but the next move is still undefined.",
+          ],
+          epicId: "epic-adjust-followup-1",
+        },
+      ],
+    },
+  }));
+
+  assertEquals(result.mode, "proposal");
+  assertEquals(result.proposals[0]?.kind, "create_quest");
+  assertEquals(result.structuredResponse?.intent.intentType, "quest");
+  assertEquals(result.structuredResponse?.intent.shouldCreateQuest, true);
+  assertStringIncludes(result.reply, "Podcast launch");
+  assertEquals(result.structuredResponse?.dayAdjust !== null, true);
+  assertEquals(
+    result.structuredResponse?.dayAdjust?.keep.some((quest) =>
+      quest.title === "Define next step for Podcast launch"
+    ),
+    true,
+  );
+  assertStringIncludes(
+    result.structuredResponse?.dayAdjust?.keep.find((quest) =>
+      quest.title === "Define next step for Podcast launch"
+    )?.reason ?? "",
+    "concrete next step",
+  );
+});
+
 Deno.test("creates a relationship touch proposal with contact context", () => {
   const result = buildPlannerResponse(baseInput({
     message: "Relationship touch",
@@ -3232,7 +4792,127 @@ Deno.test("creates a relationship touch proposal with contact context", () => {
     "contact-1",
   );
   assertStringIncludes(result.proposals[0].title, "Mom");
+  assertEquals(
+    (result.proposals[0].payload as { estimatedDuration?: number | null })
+      .estimatedDuration,
+    15,
+  );
 });
+
+Deno.test("relationship touch shrinks to fit a shorter open slot", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Relationship touch",
+    plannerContext: {
+      contactsNeedingAttention: [
+        {
+          id: "contact-1",
+          name: "Mom",
+          daysSinceContact: 9,
+          hasOverdueReminder: true,
+          reminderReason: "Call back this week",
+        },
+      ],
+      starterIntent: "relationship_touch",
+      scheduleInsights: {
+        horizon: "day",
+        selectedDate: "2026-04-18",
+        dayLoads: [],
+        overloadedDates: [],
+        emptyDates: [],
+        conflicts: [],
+        suggestedSlots: [
+          {
+            date: "2026-04-18",
+            time: "18:00",
+            endTime: "18:10",
+            score: 88,
+            reason: "Quick open slot",
+          },
+        ],
+        moveSuggestions: [],
+        summary: "The evening has one short gap.",
+      },
+    },
+  }));
+
+  assertEquals(result.mode, "proposal");
+  assertEquals(result.proposals[0].kind, "create_quest");
+  assertEquals(
+    (result.proposals[0].payload as { estimatedDuration?: number | null })
+      .estimatedDuration,
+    10,
+  );
+  assertStringIncludes(
+    result.proposals[0]?.summary ?? "",
+    'Create a quest to reach out to "Mom" at 6:00 pm.',
+  );
+  assertEquals(
+    (result.proposals[0].payload as { scheduledTime?: string | null })
+      .scheduledTime,
+    "18:00",
+  );
+});
+
+Deno.test(
+  "relationship touch prefers historical duration before slot fit",
+  () => {
+    const result = buildPlannerResponse(baseInput({
+      message: "Relationship touch",
+      plannerContext: {
+        contactsNeedingAttention: [
+          {
+            id: "contact-1",
+            name: "Mom",
+            daysSinceContact: 9,
+            hasOverdueReminder: true,
+            reminderReason: "Call back this week",
+          },
+        ],
+        recentCompletedTasks: [
+          {
+            id: "task-contact-history-2",
+            title: "Reach out to Mom",
+            taskDate: "2026-04-16",
+            scheduledTime: "18:00",
+            estimatedDuration: 30,
+            recurrencePattern: null,
+            completed: true,
+            completedAt: "2026-04-16T18:30:00.000Z",
+            priority: "medium",
+          },
+        ],
+        starterIntent: "relationship_touch",
+        scheduleInsights: {
+          horizon: "day",
+          selectedDate: "2026-04-18",
+          dayLoads: [],
+          overloadedDates: [],
+          emptyDates: [],
+          conflicts: [],
+          suggestedSlots: [
+            {
+              date: "2026-04-18",
+              time: "18:00",
+              endTime: "18:30",
+              score: 88,
+              reason: "Open after work",
+            },
+          ],
+          moveSuggestions: [],
+          summary: "The evening is pretty open.",
+        },
+      },
+    }));
+
+    assertEquals(result.mode, "proposal");
+    assertEquals(result.proposals[0].kind, "create_quest");
+    assertEquals(
+      (result.proposals[0].payload as { estimatedDuration?: number | null })
+        .estimatedDuration,
+      30,
+    );
+  },
+);
 
 Deno.test("turns high vitality need into a confirmable recovery block", () => {
   const result = buildPlannerResponse(baseInput({
@@ -3310,6 +4990,177 @@ Deno.test("turns high vitality need into a confirmable recovery block", () => {
   assertEquals(
     (result.proposals[0].payload as { taskText: string }).taskText,
     "Recovery reset",
+  );
+});
+
+Deno.test("recovery block shrinks to fit a shorter open slot", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Please lighten today",
+    plannerContext: {
+      starterIntent: "low_energy_adjust",
+      statInterpretation: {
+        statProfile: {
+          scores: {
+            vitality: 320,
+            wisdom: 510,
+            discipline: 560,
+            resolve: 430,
+            creativity: 380,
+            alignment: 470,
+          },
+          dominantStat: "discipline",
+          secondaryStat: "wisdom",
+        },
+        statNeeds: {
+          vitality: {
+            level: "high",
+            reasons: ["You've been pushing output harder than recovery."],
+          },
+          wisdom: { level: "low", reasons: [] },
+          discipline: { level: "low", reasons: [] },
+          resolve: { level: "low", reasons: [] },
+          creativity: { level: "low", reasons: [] },
+          alignment: { level: "low", reasons: [] },
+        },
+        momentumState: "slipping",
+        recentMissInterpretation: "low_energy",
+        narrativeBrief:
+          "This looks more strained than lazy. I'm protecting the essentials and rebuilding vitality first.",
+        dailyNarrative: "Vitality protection day",
+      },
+      scheduleInsights: {
+        horizon: "day",
+        selectedDate: "2026-04-18",
+        dayLoads: [
+          {
+            date: "2026-04-18",
+            totalMinutes: 240,
+            taskCount: 4,
+            status: "overloaded",
+          },
+        ],
+        overloadedDates: ["2026-04-18"],
+        emptyDates: [],
+        conflicts: [],
+        suggestedSlots: [
+          {
+            date: "2026-04-18",
+            time: "15:00",
+            endTime: "15:20",
+            score: 82,
+            reason: "Open afternoon space",
+          },
+        ],
+        moveSuggestions: [],
+        summary: "Today is overloaded.",
+      },
+      tasks: [],
+      inboxTasks: [],
+    },
+  }));
+
+  assertEquals(result.mode, "proposal");
+  assertEquals(result.proposals[0].kind, "create_quest");
+  assertStringIncludes(
+    result.proposals[0]?.summary ?? "",
+    "Create a 20-minute recovery reset at 3:00 pm.",
+  );
+  assertEquals(
+    (result.proposals[0].payload as { estimatedDuration?: number | null })
+      .estimatedDuration,
+    20,
+  );
+});
+
+Deno.test("recovery block prefers historical duration before slot fit", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Please lighten today",
+    plannerContext: {
+      starterIntent: "low_energy_adjust",
+      recentCompletedTasks: [
+        {
+          id: "task-recovery-history-2",
+          title: "Recovery reset",
+          taskDate: "2026-04-16",
+          scheduledTime: "15:00",
+          estimatedDuration: 45,
+          recurrencePattern: null,
+          completed: true,
+          completedAt: "2026-04-16T15:45:00.000Z",
+          priority: "medium",
+        },
+      ],
+      statInterpretation: {
+        statProfile: {
+          scores: {
+            vitality: 320,
+            wisdom: 510,
+            discipline: 560,
+            resolve: 430,
+            creativity: 380,
+            alignment: 470,
+          },
+          dominantStat: "discipline",
+          secondaryStat: "wisdom",
+        },
+        statNeeds: {
+          vitality: {
+            level: "high",
+            reasons: ["You've been pushing output harder than recovery."],
+          },
+          wisdom: { level: "low", reasons: [] },
+          discipline: { level: "low", reasons: [] },
+          resolve: { level: "low", reasons: [] },
+          creativity: { level: "low", reasons: [] },
+          alignment: { level: "low", reasons: [] },
+        },
+        momentumState: "slipping",
+        recentMissInterpretation: "low_energy",
+        narrativeBrief:
+          "This looks more strained than lazy. I'm protecting the essentials and rebuilding vitality first.",
+        dailyNarrative: "Vitality protection day",
+      },
+      scheduleInsights: {
+        horizon: "day",
+        selectedDate: "2026-04-18",
+        dayLoads: [
+          {
+            date: "2026-04-18",
+            totalMinutes: 240,
+            taskCount: 4,
+            status: "overloaded",
+          },
+        ],
+        overloadedDates: ["2026-04-18"],
+        emptyDates: [],
+        conflicts: [],
+        suggestedSlots: [
+          {
+            date: "2026-04-18",
+            time: "15:00",
+            endTime: "15:45",
+            score: 82,
+            reason: "Open afternoon space",
+          },
+        ],
+        moveSuggestions: [],
+        summary: "Today is overloaded.",
+      },
+      tasks: [],
+      inboxTasks: [],
+    },
+  }));
+
+  assertEquals(result.mode, "proposal");
+  assertEquals(result.proposals[0].kind, "create_quest");
+  assertStringIncludes(
+    result.proposals[0]?.summary ?? "",
+    "Create a 45-minute recovery reset at 3:00 pm.",
+  );
+  assertEquals(
+    (result.proposals[0].payload as { estimatedDuration?: number | null })
+      .estimatedDuration,
+    45,
   );
 });
 
@@ -3473,6 +5324,130 @@ Deno.test("promotes multi-step goals to campaigns", () => {
   assertEquals(result.sessionState.lastClassification, "epic");
 });
 
+Deno.test("uses separate AI estimates for campaign target days and starter session duration", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Prepare for the bar exam",
+    parsedInput: {
+      text: "Prepare for the bar exam",
+      scheduledTime: null,
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: "mind",
+      newTitle: null,
+    },
+    classificationHint: {
+      type: "epic",
+      confidence: 0.95,
+      reasoning: "Long-term exam prep",
+      suggestedDuration: 84,
+      suggestedActivityDurationMinutes: 60,
+    },
+  }));
+
+  assertEquals(result.proposals[0].kind, "create_campaign");
+  assertEquals(
+    (
+      result.proposals[0]?.payload as {
+        target_days?: number | null;
+        habits?: Array<{
+          estimated_minutes?: number | null;
+        }>;
+      }
+    ).target_days,
+    84,
+  );
+  assertEquals(
+    (
+      result.proposals[0]?.payload as {
+        target_days?: number | null;
+        habits?: Array<{
+          estimated_minutes?: number | null;
+        }>;
+      }
+    ).habits?.[0]?.estimated_minutes,
+    60,
+  );
+});
+
+Deno.test("prefers a historical starter ritual duration over the generic AI estimate for new campaigns", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "I want to launch a new campaign for Launch Sprint",
+    parsedInput: {
+      text: "Launch Sprint",
+      scheduledTime: null,
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: "mind",
+      newTitle: null,
+    },
+    classificationHint: {
+      type: "epic",
+      confidence: 0.91,
+      reasoning: "Multi-step outcome",
+      suggestedDuration: 84,
+      suggestedActivityDurationMinutes: 60,
+    },
+    plannerContext: {
+      tasks: [],
+      inboxTasks: [],
+      activeEpics: [],
+      rituals: [
+        {
+          id: "ritual-campaign-history-1",
+          epicId: "old-epic-1",
+          epicTitle: "Old Launch Sprint",
+          title: "Work on Launch Sprint",
+          frequency: "daily",
+          preferredTime: "09:00",
+          estimatedMinutes: 90,
+        },
+      ],
+      aiSignals: {
+        preferredDifficulty: "medium",
+        preferredHabitFrequency: "daily",
+        preferredEpicDuration: 60,
+        suggestedWorkload: "normal",
+        commonContexts: [],
+      },
+    },
+  }));
+
+  assertEquals(result.proposals[0].kind, "create_campaign");
+  assertEquals(
+    (
+      result.proposals[0]?.payload as {
+        target_days?: number | null;
+        habits?: Array<{
+          estimated_minutes?: number | null;
+        }>;
+      }
+    ).target_days,
+    84,
+  );
+  assertEquals(
+    (
+      result.proposals[0]?.payload as {
+        habits?: Array<{
+          estimated_minutes?: number | null;
+        }>;
+      }
+    ).habits?.[0]?.estimated_minutes,
+    90,
+  );
+});
+
 Deno.test("ties repeated campaign work to a ritual when an active campaign is referenced", () => {
   const result = buildPlannerResponse(baseInput({
     message: "Practice interview answers every weekday for Launch Sprint",
@@ -3516,6 +5491,67 @@ Deno.test("ties repeated campaign work to a ritual when an active campaign is re
 
   assertEquals(result.proposals[0].kind, "create_ritual");
   assertStringIncludes(result.proposals[0].summary, "Launch Sprint");
+  assertEquals(
+    (
+      result.proposals[0]?.payload as {
+        estimatedMinutes?: number | null;
+      }
+    ).estimatedMinutes,
+    25,
+  );
+});
+
+Deno.test("uses the AI-estimated activity duration for ritual drafts when no duration is specified", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Practice interview answers every weekday for Launch Sprint",
+    parsedInput: {
+      text: "Practice interview answers",
+      scheduledTime: null,
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: "weekdays",
+      recurrenceDays: [0, 1, 2, 3, 4],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: "mind",
+      newTitle: null,
+    },
+    classificationHint: {
+      type: "habit",
+      confidence: 0.9,
+      reasoning: "Repeated work tied to an active campaign",
+      suggestedActivityDurationMinutes: 60,
+    },
+    plannerContext: {
+      tasks: [],
+      inboxTasks: [],
+      activeEpics: [{
+        id: "epic-ritual-estimate-1",
+        title: "Launch Sprint",
+        endDate: "2026-06-15",
+      }],
+      rituals: [],
+      aiSignals: {
+        preferredDifficulty: "medium",
+        preferredHabitFrequency: "daily",
+        preferredEpicDuration: 60,
+        suggestedWorkload: "normal",
+        commonContexts: [],
+      },
+    },
+  }));
+
+  assertEquals(result.proposals[0].kind, "create_ritual");
+  assertEquals(
+    (
+      result.proposals[0]?.payload as {
+        estimatedMinutes?: number | null;
+      }
+    ).estimatedMinutes,
+    60,
+  );
 });
 
 Deno.test("uses suggest_reminder for reminder-only tweaks on existing quests", () => {
@@ -3574,6 +5610,60 @@ Deno.test("uses suggest_reminder for reminder-only tweaks on existing quests", (
   );
 });
 
+Deno.test("does not overwrite an existing quest duration from an inferred AI estimate alone", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Move workout to tomorrow",
+    parsedInput: {
+      text: "workout",
+      scheduledTime: null,
+      scheduledDate: "2026-04-19",
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+    classificationHint: {
+      type: "quest",
+      confidence: 0.91,
+      reasoning: "Existing one-off quest",
+      suggestedActivityDurationMinutes: 60,
+    },
+    plannerContext: {
+      tasks: [{
+        id: "task-update-duration-1",
+        title: "Workout",
+        taskDate: "2026-04-18",
+        scheduledTime: "15:00",
+        estimatedDuration: 30,
+        recurrencePattern: null,
+        completed: false,
+        priority: "medium",
+      }],
+      inboxTasks: [],
+      activeEpics: [],
+      rituals: [],
+      calendarEvents: [],
+    },
+  }));
+
+  assertEquals(result.proposals[0].kind, "update_quest");
+  assertEquals(
+    (
+      result.proposals[0]?.payload as {
+        updates?: {
+          estimated_duration?: number | null;
+        };
+      }
+    ).updates?.estimated_duration,
+    undefined,
+  );
+});
+
 Deno.test("uses update_ritual for reminder-only tweaks on existing rituals", () => {
   const result = buildPlannerResponse(baseInput({
     message: "remind me 10 minutes before morning pages",
@@ -3627,6 +5717,60 @@ Deno.test("uses update_ritual for reminder-only tweaks on existing rituals", () 
       reminderMinutesBefore?: number | null;
     }).reminderMinutesBefore,
     10,
+  );
+});
+
+Deno.test("does not overwrite an existing ritual duration from an inferred AI estimate alone", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Move Morning review to 9am",
+    parsedInput: {
+      text: "Morning review",
+      scheduledTime: "09:00",
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+    classificationHint: {
+      type: "habit",
+      confidence: 0.9,
+      reasoning: "Existing ritual adjustment",
+      suggestedActivityDurationMinutes: 60,
+    },
+    plannerContext: {
+      tasks: [],
+      inboxTasks: [],
+      activeEpics: [{
+        id: "epic-ritual-update-1",
+        title: "Launch Sprint",
+        endDate: "2026-06-15",
+      }],
+      rituals: [{
+        id: "ritual-update-duration-1",
+        epicId: "epic-ritual-update-1",
+        epicTitle: "Launch Sprint",
+        title: "Morning review",
+        frequency: "daily",
+        preferredTime: "08:00",
+      }],
+      calendarEvents: [],
+    },
+  }));
+
+  assertEquals(result.proposals[0].kind, "update_ritual");
+  assertEquals(
+    (
+      result.proposals[0]?.payload as {
+        estimatedMinutes?: number | null;
+      }
+    ).estimatedMinutes,
+    undefined,
   );
 });
 
@@ -4056,6 +6200,98 @@ Deno.test("answers schedule questions with quests and connected calendar events 
   assertEquals(
     result.reply.includes("Tell me what feels most important"),
     false,
+  );
+});
+
+Deno.test("schedule questions can return a proposal-backed campaign follow-up when the next move does not exist yet", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "What do I have scheduled today?",
+    plannerContext: {
+      tasks: [],
+      inboxTasks: [],
+      recentCompletedTasks: [
+        {
+          id: "task-schedule-followup-done-1",
+          title: "Pick launch artwork",
+          taskDate: "2026-04-17",
+          scheduledTime: "11:00",
+          estimatedDuration: 30,
+          recurrencePattern: null,
+          completed: true,
+          completedAt: "2026-04-17T18:00:00.000Z",
+          priority: "medium",
+          epicId: "epic-schedule-followup-1",
+          epicTitle: "Podcast launch",
+        },
+      ],
+      activeEpics: [
+        {
+          id: "epic-schedule-followup-1",
+          title: "Podcast launch",
+          endDate: "2026-05-06",
+          progressPercentage: 52,
+          daysRemaining: 18,
+        },
+      ],
+      rituals: [],
+      calendarEvents: [
+        {
+          id: "event-schedule-followup-1",
+          title: "Therapy",
+          start: "2026-04-18T21:00:00.000Z",
+          end: "2026-04-18T22:00:00.000Z",
+          isAllDay: false,
+          provider: "google",
+          readOnly: true,
+        },
+      ],
+      scheduleInsights: {
+        horizon: "day",
+        selectedDate: "2026-04-18",
+        dayLoads: [],
+        overloadedDates: [],
+        emptyDates: [],
+        conflicts: [],
+        suggestedSlots: [
+          {
+            date: "2026-04-18",
+            time: "13:30",
+            endTime: "13:45",
+            score: 88,
+            reason: "Open slot for a quick campaign follow-up before Therapy.",
+          },
+        ],
+        moveSuggestions: [],
+        summary: "Today has room before the afternoon.",
+      },
+      priorityScores: [
+        {
+          id: "epic:epic-schedule-followup-1",
+          kind: "epic",
+          title: "Podcast launch",
+          score: 80,
+          reasons: [
+            "This campaign has momentum, but the next move is still undefined.",
+          ],
+          epicId: "epic-schedule-followup-1",
+        },
+      ],
+    },
+  }));
+
+  assertEquals(result.mode, "proposal");
+  assertEquals(result.proposals[0]?.kind, "create_quest");
+  assertEquals(result.structuredResponse?.intent.intentType, "quest");
+  assertEquals(result.structuredResponse?.intent.shouldCreateQuest, true);
+  assertStringIncludes(result.reply, "Today:");
+  assertStringIncludes(result.reply, "Therapy");
+  assertEquals(
+    result.structuredResponse?.comingUp?.nextBestAction?.title,
+    "Define next step for Podcast launch",
+  );
+  assertEquals(
+    Boolean(result.structuredResponse?.comingUp?.nextBestAction?.proposalId),
+    true,
   );
 });
 
@@ -5161,7 +7397,9 @@ Deno.test("plan_week returns a structured weekly summary with priorities and loa
           kind: "task",
           title: "Prep investor notes",
           score: 79,
-          reasons: ["It's important work that still needs a clean slot this week."],
+          reasons: [
+            "It's important work that still needs a clean slot this week.",
+          ],
           taskId: "task-2",
         },
         {
@@ -5180,6 +7418,8 @@ Deno.test("plan_week returns a structured weekly summary with priorities and loa
   assertEquals(result.mode, "schedule_read");
   assertEquals(result.proposals.length, 0);
   assertEquals(result.followUpQuestions.length, 0);
+  assertEquals(result.structuredResponse?.intent.intentType, "campaign");
+  assertEquals(result.structuredResponse?.intent.shouldCreateQuest, false);
   assertEquals(result.structuredResponse?.weeklyPlan !== null, true);
   assertEquals(
     result.structuredResponse?.weeklyPlan?.focusCampaignTitle,
@@ -5190,11 +7430,13 @@ Deno.test("plan_week returns a structured weekly summary with priorities and loa
     "protect",
   );
   assertEquals(
-    result.structuredResponse?.weeklyPlan?.focusCampaignHealth?.overdueQuestCount,
+    result.structuredResponse?.weeklyPlan?.focusCampaignHealth
+      ?.overdueQuestCount,
     0,
   );
   assertEquals(
-    result.structuredResponse?.weeklyPlan?.focusCampaignHealth?.protectedTodayCount,
+    result.structuredResponse?.weeklyPlan?.focusCampaignHealth
+      ?.protectedTodayCount,
     0,
   );
   assertEquals(
@@ -5217,6 +7459,408 @@ Deno.test("plan_week returns a structured weekly summary with priorities and loa
   );
   assertStringIncludes(result.reply, "Launch prep");
   assertStringIncludes(result.reply, "Deadline in 6 days");
+});
+
+Deno.test("plan_week uses recent completed campaign work to back quiet-day health", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Plan my week",
+    horizon: "week",
+    plannerContext: {
+      starterIntent: "plan_week",
+      activeEpics: [
+        {
+          id: "epic-1",
+          title: "Podcast launch",
+          endDate: "2026-05-06",
+          progressPercentage: 52,
+          daysRemaining: 18,
+        },
+      ],
+      tasks: [
+        {
+          id: "task-1",
+          title: "Draft episode teaser",
+          taskDate: null,
+          scheduledTime: null,
+          estimatedDuration: 45,
+          recurrencePattern: null,
+          completed: false,
+          priority: "high",
+          epicId: "epic-1",
+          epicTitle: "Podcast launch",
+        },
+      ],
+      recentCompletedTasks: [
+        {
+          id: "task-done-1",
+          title: "Pick launch artwork",
+          taskDate: "2026-04-17",
+          scheduledTime: "11:00",
+          estimatedDuration: 30,
+          recurrencePattern: null,
+          completed: true,
+          completedAt: "2026-04-17T18:00:00.000Z",
+          priority: "medium",
+          epicId: "epic-1",
+          epicTitle: "Podcast launch",
+        },
+      ],
+      priorityScores: [
+        {
+          id: "epic:epic-1",
+          kind: "epic",
+          title: "Podcast launch",
+          score: 81,
+          reasons: ["This is the campaign to keep alive this week."],
+          epicId: "epic-1",
+        },
+        {
+          id: "task:task-1",
+          kind: "task",
+          title: "Draft episode teaser",
+          score: 77,
+          reasons: ["It is the clearest follow-up after the recent progress."],
+          taskId: "task-1",
+          epicId: "epic-1",
+        },
+      ],
+    },
+  }));
+
+  assertEquals(result.mode, "schedule_read");
+  assertEquals(
+    result.structuredResponse?.weeklyPlan?.focusCampaignTitle,
+    "Podcast launch",
+  );
+  assertEquals(
+    result.structuredResponse?.weeklyPlan?.focusCampaignStatus,
+    "drifting",
+  );
+  assertEquals(
+    result.structuredResponse?.weeklyPlan?.focusCampaignInterventionLevel,
+    "nudge",
+  );
+  assertEquals(
+    result.structuredResponse?.weeklyPlan?.focusCampaignHealth
+      ?.daysWithoutMomentum,
+    1,
+  );
+});
+
+Deno.test("plan_week defines the next step when recent campaign progress has no linked follow-up quest", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Plan my week",
+    horizon: "week",
+    plannerContext: {
+      starterIntent: "plan_week",
+      activeEpics: [
+        {
+          id: "epic-week-followup-1",
+          title: "Podcast launch",
+          endDate: "2026-05-06",
+          progressPercentage: 52,
+          daysRemaining: 18,
+        },
+      ],
+      tasks: [],
+      recentCompletedTasks: [
+        {
+          id: "task-week-followup-done-1",
+          title: "Pick launch artwork",
+          taskDate: "2026-04-17",
+          scheduledTime: "11:00",
+          estimatedDuration: 30,
+          recurrencePattern: null,
+          completed: true,
+          completedAt: "2026-04-17T18:00:00.000Z",
+          priority: "medium",
+          epicId: "epic-week-followup-1",
+          epicTitle: "Podcast launch",
+        },
+        {
+          id: "task-week-followup-history-1",
+          title: "Define next step for Podcast launch",
+          taskDate: "2026-04-10",
+          scheduledTime: "10:00",
+          estimatedDuration: 30,
+          recurrencePattern: null,
+          completed: true,
+          completedAt: "2026-04-10T18:00:00.000Z",
+          priority: "medium",
+          epicId: "epic-week-followup-1",
+          epicTitle: "Podcast launch",
+        },
+      ],
+      priorityScores: [
+        {
+          id: "epic:epic-week-followup-1",
+          kind: "epic",
+          title: "Podcast launch",
+          score: 81,
+          reasons: [
+            "This campaign has momentum, but it needs its next step defined.",
+          ],
+          epicId: "epic-week-followup-1",
+        },
+      ],
+      scheduleInsights: {
+        horizon: "week",
+        selectedDate: "2026-04-18",
+        dayLoads: [
+          {
+            date: "2026-04-21",
+            totalMinutes: 45,
+            taskCount: 1,
+            status: "open",
+          },
+        ],
+        overloadedDates: [],
+        emptyDates: ["2026-04-21"],
+        conflicts: [],
+        suggestedSlots: [
+          {
+            date: "2026-04-21",
+            time: "11:00",
+            endTime: "11:30",
+            score: 88,
+            reason: "Good weekly slot for defining the next move.",
+          },
+        ],
+        moveSuggestions: [],
+        summary: "Monday has room for one campaign-defining move.",
+      },
+    },
+  }));
+
+  assertEquals(result.mode, "proposal");
+  assertEquals(result.proposals[0]?.kind, "create_quest");
+  assertEquals(result.structuredResponse?.intent.intentType, "quest");
+  assertEquals(result.structuredResponse?.intent.shouldCreateQuest, true);
+  assertEquals(
+    result.structuredResponse?.weeklyPlan?.topPriorities[0]?.title,
+    "Define next step for Podcast launch",
+  );
+  assertEquals(
+    Boolean(
+      result.structuredResponse?.weeklyPlan?.topPriorities[0]?.proposalId,
+    ),
+    true,
+  );
+  assertEquals(
+    result.structuredResponse?.weeklyPlan?.topPriorities[0]
+      ?.estimatedDurationMinutes,
+    30,
+  );
+  assertEquals(
+    result.structuredResponse?.weeklyPlan?.focusCampaignStatus,
+    "drifting",
+  );
+  assertEquals(
+    (
+      result.proposals[0]?.payload as {
+        estimatedDuration?: number | null;
+        difficulty?: string | null;
+        taskDate?: string | null;
+        scheduledTime?: string | null;
+      }
+    ).estimatedDuration,
+    30,
+  );
+  assertEquals(
+    (
+      result.proposals[0]?.payload as {
+        estimatedDuration?: number | null;
+        difficulty?: string | null;
+        taskDate?: string | null;
+        scheduledTime?: string | null;
+      }
+    ).difficulty,
+    "medium",
+  );
+  assertEquals(
+    (
+      result.proposals[0]?.payload as {
+        estimatedDuration?: number | null;
+        difficulty?: string | null;
+        taskDate?: string | null;
+        scheduledTime?: string | null;
+      }
+    ).taskDate,
+    "2026-04-21",
+  );
+  assertEquals(
+    (
+      result.proposals[0]?.payload as {
+        estimatedDuration?: number | null;
+        difficulty?: string | null;
+        taskDate?: string | null;
+        scheduledTime?: string | null;
+      }
+    ).scheduledTime,
+    "11:00",
+  );
+});
+
+Deno.test("plan_week keeps read-only secondary follow-up-definition moves small", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Plan my week",
+    horizon: "week",
+    plannerContext: {
+      starterIntent: "plan_week",
+      activeEpics: [
+        {
+          id: "epic-week-focus-1",
+          title: "Client pipeline",
+          endDate: "2026-05-02",
+          progressPercentage: 66,
+          daysRemaining: 14,
+        },
+        {
+          id: "epic-week-secondary-1",
+          title: "Podcast launch",
+          endDate: "2026-05-06",
+          progressPercentage: 52,
+          daysRemaining: 18,
+        },
+      ],
+      tasks: [
+        {
+          id: "task-week-focus-1",
+          title: "Send proposal follow-up",
+          taskDate: "2026-04-21",
+          scheduledTime: "10:00",
+          estimatedDuration: 30,
+          recurrencePattern: null,
+          completed: false,
+          priority: "high",
+          epicId: "epic-week-focus-1",
+          epicTitle: "Client pipeline",
+        },
+      ],
+      recentCompletedTasks: [
+        {
+          id: "task-week-secondary-done-1",
+          title: "Pick launch artwork",
+          taskDate: "2026-04-17",
+          scheduledTime: "11:00",
+          estimatedDuration: 30,
+          recurrencePattern: null,
+          completed: true,
+          completedAt: "2026-04-17T18:00:00.000Z",
+          priority: "medium",
+          epicId: "epic-week-secondary-1",
+          epicTitle: "Podcast launch",
+        },
+      ],
+      priorityScores: [
+        {
+          id: "epic:epic-week-focus-1",
+          kind: "epic",
+          title: "Client pipeline",
+          score: 90,
+          reasons: ["This is the campaign to protect first this week."],
+          epicId: "epic-week-focus-1",
+        },
+        {
+          id: "task:task-week-focus-1",
+          kind: "task",
+          title: "Send proposal follow-up",
+          score: 86,
+          reasons: [
+            "It is already the clearest move attached to the focus campaign.",
+          ],
+          taskId: "task-week-focus-1",
+          epicId: "epic-week-focus-1",
+          targetDate: "2026-04-21",
+          suggestedTime: "10:00",
+        },
+        {
+          id: "epic:epic-week-secondary-1",
+          kind: "epic",
+          title: "Podcast launch",
+          score: 72,
+          reasons: [
+            "This still needs the next step defined after recent progress.",
+          ],
+          epicId: "epic-week-secondary-1",
+        },
+      ],
+    },
+  }));
+
+  assertEquals(result.mode, "schedule_read");
+  const secondaryFollowUp = result.structuredResponse?.weeklyPlan?.topPriorities
+    .find(
+      (quest) => quest.title === "Define next step for Podcast launch",
+    );
+  assertEquals(Boolean(secondaryFollowUp), true);
+  assertEquals(secondaryFollowUp?.proposalId ?? null, null);
+  assertEquals(secondaryFollowUp?.estimatedDurationMinutes, 20);
+  assertEquals(secondaryFollowUp?.estimatedDuration, "20 min");
+});
+
+Deno.test("plan_week keeps ritual priorities at the ritual's estimated duration", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Plan my week",
+    horizon: "week",
+    plannerContext: {
+      starterIntent: "plan_week",
+      activeEpics: [],
+      rituals: [
+        {
+          id: "ritual-week-1",
+          epicId: "epic-week-ritual-1",
+          epicTitle: "Website relaunch",
+          title: "Morning review",
+          frequency: "daily",
+          preferredTime: "10:30",
+          currentStreak: 3,
+          estimatedMinutes: 45,
+        },
+      ],
+      priorityScores: [
+        {
+          id: "ritual:ritual-week-1",
+          kind: "ritual",
+          title: "Morning review",
+          score: 78,
+          reasons: [
+            "This ritual is the easiest way to keep the relaunch alive.",
+          ],
+          ritualId: "ritual-week-1",
+          epicId: "epic-week-ritual-1",
+          targetDate: "2026-04-21",
+          suggestedTime: "10:30",
+        },
+      ],
+      scheduleInsights: {
+        horizon: "week",
+        selectedDate: "2026-04-18",
+        dayLoads: [],
+        overloadedDates: [],
+        emptyDates: ["2026-04-21"],
+        conflicts: [],
+        suggestedSlots: [],
+        moveSuggestions: [],
+        summary: "The week has room to keep the ritual alive.",
+      },
+    },
+  }));
+
+  assertEquals(result.mode, "schedule_read");
+  assertEquals(
+    result.structuredResponse?.weeklyPlan?.topPriorities[0]?.title,
+    "Keep Morning review",
+  );
+  assertEquals(
+    result.structuredResponse?.weeklyPlan?.topPriorities[0]
+      ?.estimatedDurationMinutes,
+    45,
+  );
+  assertEquals(
+    result.structuredResponse?.weeklyPlan?.topPriorities[0]?.estimatedDuration,
+    "45 min",
+  );
 });
 
 Deno.test("plan_week escalates a deeply stuck campaign into a must-priority reset move", () => {
@@ -5279,7 +7923,9 @@ Deno.test("plan_week escalates a deeply stuck campaign into a must-priority rese
     "Adjust Course launch",
   );
   assertEquals(
-    Boolean(result.structuredResponse?.weeklyPlan?.topPriorities[0]?.proposalId),
+    Boolean(
+      result.structuredResponse?.weeklyPlan?.topPriorities[0]?.proposalId,
+    ),
     true,
   );
   assertEquals(
@@ -5350,6 +7996,8 @@ Deno.test("plan_week calls out repeated slip when a campaign has overdue work an
 
   assertEquals(result.mode, "proposal");
   assertEquals(result.proposals[0]?.kind, "adjust_campaign_plan");
+  assertEquals(result.structuredResponse?.intent.intentType, "campaign");
+  assertEquals(result.structuredResponse?.intent.shouldCreateQuest, false);
   assertEquals(
     result.structuredResponse?.weeklyPlan?.focusCampaignReason,
     "This campaign has slipped repeatedly without a protected recovery move.",
@@ -5359,7 +8007,9 @@ Deno.test("plan_week calls out repeated slip when a campaign has overdue work an
     "Adjust Course launch",
   );
   assertEquals(
-    Boolean(result.structuredResponse?.weeklyPlan?.topPriorities[0]?.proposalId),
+    Boolean(
+      result.structuredResponse?.weeklyPlan?.topPriorities[0]?.proposalId,
+    ),
     true,
   );
   assertStringIncludes(
@@ -5444,6 +8094,8 @@ Deno.test("briefing_followup returns a reflection bridge into tomorrow", () => {
   assertEquals(result.mode, "schedule_read");
   assertEquals(result.proposals.length, 0);
   assertEquals(result.followUpQuestions.length, 0);
+  assertEquals(result.structuredResponse?.intent.intentType, "quest");
+  assertEquals(result.structuredResponse?.intent.shouldCreateQuest, false);
   assertEquals(result.structuredResponse?.reflectionBridge !== null, true);
   assertEquals(
     result.structuredResponse?.reflectionBridge?.carryForward,
@@ -5571,6 +8223,21 @@ Deno.test("briefing_followup treats a deeply stuck campaign as a reset move for 
           subtaskTitles: [],
         },
       ],
+      recentCompletedTasks: [
+        {
+          id: "task-tomorrow-reset-history-1",
+          title: "Break down Build full course sales page",
+          taskDate: "2026-04-16",
+          scheduledTime: "09:00",
+          estimatedDuration: 30,
+          recurrencePattern: null,
+          completed: true,
+          completedAt: "2026-04-16T17:00:00.000Z",
+          priority: "medium",
+          epicId: "epic-tomorrow-reset-1",
+          epicTitle: "Course launch",
+        },
+      ],
       priorityScores: [
         {
           id: "epic:epic-tomorrow-reset-1",
@@ -5609,6 +8276,11 @@ Deno.test("briefing_followup treats a deeply stuck campaign as a reset move for 
   assertEquals(
     result.structuredResponse?.reflectionBridge?.firstAction?.type,
     "must",
+  );
+  assertEquals(
+    result.structuredResponse?.reflectionBridge?.firstAction
+      ?.estimatedDurationMinutes,
+    30,
   );
   assertStringIncludes(result.reply, "campaign to reset tomorrow");
   assertStringIncludes(
@@ -5678,12 +8350,16 @@ Deno.test("briefing_followup carries repeated slip into tomorrow when overdue ca
 
   assertEquals(result.mode, "proposal");
   assertEquals(result.proposals[0]?.kind, "adjust_campaign_plan");
+  assertEquals(result.structuredResponse?.intent.intentType, "campaign");
+  assertEquals(result.structuredResponse?.intent.shouldCreateQuest, false);
   assertEquals(
     result.structuredResponse?.reflectionBridge?.firstAction?.title,
     "Adjust Course launch",
   );
   assertEquals(
-    Boolean(result.structuredResponse?.reflectionBridge?.firstAction?.proposalId),
+    Boolean(
+      result.structuredResponse?.reflectionBridge?.firstAction?.proposalId,
+    ),
     true,
   );
   assertStringIncludes(
@@ -5693,6 +8369,101 @@ Deno.test("briefing_followup carries repeated slip into tomorrow when overdue ca
   assertStringIncludes(
     result.structuredResponse?.reflectionBridge?.firstAction?.reason ?? "",
     "slipped repeatedly without a protected recovery move",
+  );
+});
+
+Deno.test("briefing_followup drafts a tomorrow follow-up quest when recent campaign progress has no linked next step", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Prepare me for tomorrow",
+    currentDateTime: "2026-04-18T20:30:00-07:00",
+    plannerContext: {
+      starterIntent: "briefing_followup",
+      activeEpics: [
+        {
+          id: "epic-tomorrow-followup-1",
+          title: "Podcast launch",
+          endDate: "2026-05-06",
+          progressPercentage: 52,
+          daysRemaining: 18,
+        },
+      ],
+      tasks: [],
+      recentCompletedTasks: [
+        {
+          id: "task-tomorrow-followup-done-1",
+          title: "Pick launch artwork",
+          taskDate: "2026-04-17",
+          scheduledTime: "11:00",
+          estimatedDuration: 30,
+          recurrencePattern: null,
+          completed: true,
+          completedAt: "2026-04-17T18:00:00.000Z",
+          priority: "medium",
+          epicId: "epic-tomorrow-followup-1",
+          epicTitle: "Podcast launch",
+        },
+      ],
+      priorityScores: [
+        {
+          id: "epic:epic-tomorrow-followup-1",
+          kind: "epic",
+          title: "Podcast launch",
+          score: 80,
+          reasons: [
+            "This campaign has momentum, but tomorrow needs a clear follow-up move.",
+          ],
+          epicId: "epic-tomorrow-followup-1",
+        },
+      ],
+      scheduleInsights: {
+        horizon: "week",
+        selectedDate: "2026-04-18",
+        dayLoads: [
+          {
+            date: "2026-04-19",
+            totalMinutes: 0,
+            taskCount: 0,
+            status: "open",
+          },
+        ],
+        overloadedDates: [],
+        emptyDates: ["2026-04-19"],
+        conflicts: [],
+        suggestedSlots: [
+          {
+            date: "2026-04-19",
+            time: "09:30",
+            endTime: "10:00",
+            score: 84,
+            reason: "Open slot for a clean next-step definition.",
+          },
+        ],
+        moveSuggestions: [],
+      },
+    },
+  }));
+
+  assertEquals(result.mode, "proposal");
+  assertEquals(result.proposals[0]?.kind, "create_quest");
+  assertEquals(result.structuredResponse?.intent.intentType, "quest");
+  assertEquals(result.structuredResponse?.intent.shouldCreateQuest, true);
+  assertEquals(
+    result.structuredResponse?.reflectionBridge?.firstAction?.title,
+    "Define next step for Podcast launch",
+  );
+  assertEquals(
+    Boolean(
+      result.structuredResponse?.reflectionBridge?.firstAction?.proposalId,
+    ),
+    true,
+  );
+  assertEquals(
+    (result.proposals[0]?.payload as { taskDate?: string }).taskDate,
+    "2026-04-19",
+  );
+  assertStringIncludes(
+    result.structuredResponse?.reflectionBridge?.firstAction?.reason ?? "",
+    "define the next step before the momentum fades",
   );
 });
 
@@ -5785,6 +8556,429 @@ Deno.test("upcoming_start can surface a campaign move before the next event", ()
     result.structuredResponse?.comingUp?.nextBestAction?.reason ?? "",
     "before Therapy",
   );
+});
+
+Deno.test("upcoming_start defines the next step before the next event when recent campaign progress has no linked follow-up quest", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "What do I have coming up?",
+    currentDateTime: "2026-04-18T09:00:00-07:00",
+    parsedInput: {
+      text: "What do I have coming up?",
+      scheduledTime: null,
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+    plannerContext: {
+      tasks: [],
+      inboxTasks: [],
+      recentCompletedTasks: [
+        {
+          id: "task-upcoming-followup-done-1",
+          title: "Pick launch artwork",
+          taskDate: "2026-04-17",
+          scheduledTime: "11:00",
+          estimatedDuration: 30,
+          recurrencePattern: null,
+          completed: true,
+          completedAt: "2026-04-17T18:00:00.000Z",
+          priority: "medium",
+          epicId: "epic-upcoming-followup-1",
+          epicTitle: "Podcast launch",
+        },
+      ],
+      activeEpics: [
+        {
+          id: "epic-upcoming-followup-1",
+          title: "Podcast launch",
+          endDate: "2026-05-06",
+          progressPercentage: 52,
+          daysRemaining: 18,
+        },
+      ],
+      rituals: [],
+      calendarEvents: [
+        {
+          id: "event-followup-1",
+          title: "Therapy",
+          start: "2026-04-18T18:00:00.000Z",
+          end: "2026-04-18T19:00:00.000Z",
+          isAllDay: false,
+          provider: "google",
+          readOnly: true,
+        },
+      ],
+      scheduleInsights: {
+        horizon: "day",
+        selectedDate: "2026-04-18",
+        dayLoads: [],
+        overloadedDates: [],
+        emptyDates: [],
+        conflicts: [],
+        suggestedSlots: [
+          {
+            date: "2026-04-18",
+            time: "10:30",
+            endTime: "10:45",
+            score: 88,
+            reason: "Open slot for a quick campaign follow-up before Therapy.",
+          },
+        ],
+        moveSuggestions: [],
+        summary: "Today has room before the afternoon.",
+      },
+      priorityScores: [
+        {
+          id: "epic:epic-upcoming-followup-1",
+          kind: "epic",
+          title: "Podcast launch",
+          score: 80,
+          reasons: [
+            "This campaign has momentum, but the next move is still undefined.",
+          ],
+          epicId: "epic-upcoming-followup-1",
+        },
+      ],
+      starterIntent: "upcoming_start",
+    },
+  }));
+
+  assertEquals(result.mode, "proposal");
+  assertEquals(result.proposals[0]?.kind, "create_quest");
+  assertEquals(
+    result.structuredResponse?.comingUp?.nextBestAction
+      ?.estimatedDurationMinutes,
+    15,
+  );
+  assertEquals(
+    (result.proposals[0]?.payload as { taskDate?: string }).taskDate,
+    "2026-04-18",
+  );
+  assertEquals(
+    (result.proposals[0]?.payload as { scheduledTime?: string | null })
+      .scheduledTime,
+    "10:30",
+  );
+  assertEquals(
+    result.structuredResponse?.comingUp?.nextBestAction?.title,
+    "Define next step for Podcast launch",
+  );
+  assertEquals(
+    Boolean(result.structuredResponse?.comingUp?.nextBestAction?.proposalId),
+    true,
+  );
+  assertStringIncludes(
+    result.structuredResponse?.comingUp?.nextBestAction?.reason ?? "",
+    "before Therapy",
+  );
+});
+
+Deno.test("upcoming_start keeps a campaign follow-up read-only when there is no clean slot before the next event", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "What do I have coming up?",
+    currentDateTime: "2026-04-18T09:00:00-07:00",
+    parsedInput: {
+      text: "What do I have coming up?",
+      scheduledTime: null,
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+    plannerContext: {
+      tasks: [],
+      inboxTasks: [],
+      recentCompletedTasks: [
+        {
+          id: "task-upcoming-followup-readonly-done-1",
+          title: "Pick launch artwork",
+          taskDate: "2026-04-17",
+          scheduledTime: "11:00",
+          estimatedDuration: 30,
+          recurrencePattern: null,
+          completed: true,
+          completedAt: "2026-04-17T18:00:00.000Z",
+          priority: "medium",
+          epicId: "epic-upcoming-followup-readonly-1",
+          epicTitle: "Podcast launch",
+        },
+      ],
+      activeEpics: [
+        {
+          id: "epic-upcoming-followup-readonly-1",
+          title: "Podcast launch",
+          endDate: "2026-05-06",
+          progressPercentage: 52,
+          daysRemaining: 18,
+        },
+      ],
+      rituals: [],
+      calendarEvents: [
+        {
+          id: "event-followup-readonly-1",
+          title: "Therapy",
+          start: "2026-04-18T18:00:00.000Z",
+          end: "2026-04-18T19:00:00.000Z",
+          isAllDay: false,
+          provider: "google",
+          readOnly: true,
+        },
+      ],
+      scheduleInsights: {
+        horizon: "day",
+        selectedDate: "2026-04-18",
+        dayLoads: [],
+        overloadedDates: [],
+        emptyDates: [],
+        conflicts: [],
+        suggestedSlots: [],
+        moveSuggestions: [],
+        summary:
+          "Today has room before the afternoon, but no clean slot is pinned down.",
+      },
+      priorityScores: [
+        {
+          id: "epic:epic-upcoming-followup-readonly-1",
+          kind: "epic",
+          title: "Podcast launch",
+          score: 80,
+          reasons: [
+            "This campaign has momentum, but the next move is still undefined.",
+          ],
+          epicId: "epic-upcoming-followup-readonly-1",
+        },
+      ],
+      starterIntent: "upcoming_start",
+    },
+  }));
+
+  assertEquals(result.mode, "schedule_read");
+  assertEquals(result.proposals.length, 0);
+  assertEquals(result.structuredResponse?.intent.intentType, "quest");
+  assertEquals(result.structuredResponse?.intent.shouldCreateQuest, false);
+  assertEquals(
+    result.structuredResponse?.comingUp?.nextBestAction?.title,
+    "Define next step for Podcast launch",
+  );
+  assertEquals(
+    result.structuredResponse?.comingUp?.nextBestAction?.proposalId ?? null,
+    null,
+  );
+  assertStringIncludes(
+    result.structuredResponse?.comingUp?.nextBestAction?.reason ?? "",
+    "before Therapy",
+  );
+  assertStringIncludes(
+    result.structuredResponse?.comingUp?.nextBestAction?.reason ?? "",
+    "there isn't a clean slot to schedule it automatically",
+  );
+});
+
+Deno.test("upcoming_start resets the campaign plan before the next event when there is no concrete next step at all", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "What do I have coming up?",
+    currentDateTime: "2026-04-18T09:00:00-07:00",
+    parsedInput: {
+      text: "What do I have coming up?",
+      scheduledTime: null,
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+    plannerContext: {
+      tasks: [],
+      inboxTasks: [],
+      recentCompletedTasks: [],
+      activeEpics: [
+        {
+          id: "epic-upcoming-reset-1",
+          title: "Podcast launch",
+          endDate: "2026-05-06",
+          progressPercentage: 24,
+          daysRemaining: 18,
+        },
+      ],
+      rituals: [],
+      calendarEvents: [
+        {
+          id: "event-reset-1",
+          title: "Therapy",
+          start: "2026-04-18T18:00:00.000Z",
+          end: "2026-04-18T19:00:00.000Z",
+          isAllDay: false,
+          provider: "google",
+          readOnly: true,
+        },
+      ],
+      scheduleInsights: {
+        horizon: "day",
+        selectedDate: "2026-04-18",
+        dayLoads: [],
+        overloadedDates: [],
+        emptyDates: [],
+        conflicts: [],
+        suggestedSlots: [],
+        moveSuggestions: [],
+        summary: "Today has room before the afternoon.",
+      },
+      priorityScores: [
+        {
+          id: "epic:epic-upcoming-reset-1",
+          kind: "epic",
+          title: "Podcast launch",
+          score: 82,
+          reasons: [
+            "This campaign has no concrete next step and needs a reset move.",
+          ],
+          epicId: "epic-upcoming-reset-1",
+        },
+      ],
+      starterIntent: "upcoming_start",
+    },
+  }));
+
+  assertEquals(result.mode, "proposal");
+  assertEquals(result.proposals[0]?.kind, "adjust_campaign_plan");
+  assertEquals(
+    result.structuredResponse?.comingUp?.nextBestAction?.title,
+    "Adjust Podcast launch",
+  );
+  assertEquals(
+    result.structuredResponse?.comingUp?.nextBestAction
+      ?.estimatedDurationMinutes,
+    20,
+  );
+  assertEquals(
+    Boolean(result.structuredResponse?.comingUp?.nextBestAction?.proposalId),
+    true,
+  );
+  assertStringIncludes(
+    result.structuredResponse?.comingUp?.nextBestAction?.reason ?? "",
+    "before Therapy",
+  );
+  assertStringIncludes(
+    result.structuredResponse?.comingUp?.nextBestAction?.reason ?? "",
+    "resetting the campaign plan",
+  );
+});
+
+Deno.test("upcoming_start does not overfill a too-short gap before the next event", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "What do I have coming up?",
+    currentDateTime: "2026-04-18T09:50:00-07:00",
+    parsedInput: {
+      text: "What do I have coming up?",
+      scheduledTime: null,
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+    plannerContext: {
+      tasks: [],
+      inboxTasks: [],
+      recentCompletedTasks: [
+        {
+          id: "task-upcoming-short-gap-done-1",
+          title: "Pick launch artwork",
+          taskDate: "2026-04-17",
+          scheduledTime: "11:00",
+          estimatedDuration: 30,
+          recurrencePattern: null,
+          completed: true,
+          completedAt: "2026-04-17T18:00:00.000Z",
+          priority: "medium",
+          epicId: "epic-upcoming-short-gap-1",
+          epicTitle: "Podcast launch",
+        },
+      ],
+      activeEpics: [
+        {
+          id: "epic-upcoming-short-gap-1",
+          title: "Podcast launch",
+          endDate: "2026-05-06",
+          progressPercentage: 52,
+          daysRemaining: 18,
+        },
+      ],
+      rituals: [],
+      calendarEvents: [
+        {
+          id: "event-upcoming-short-gap-1",
+          title: "Therapy",
+          start: "2026-04-18T10:00:00-07:00",
+          end: "2026-04-18T11:00:00-07:00",
+          isAllDay: false,
+          provider: "google",
+          readOnly: true,
+        },
+      ],
+      scheduleInsights: {
+        horizon: "day",
+        selectedDate: "2026-04-18",
+        dayLoads: [],
+        overloadedDates: [],
+        emptyDates: [],
+        conflicts: [],
+        suggestedSlots: [
+          {
+            date: "2026-04-18",
+            time: "10:30",
+            endTime: "10:45",
+            score: 88,
+            reason: "Open slot for a quick campaign follow-up.",
+          },
+        ],
+        moveSuggestions: [],
+        summary: "You only have a short gap before Therapy.",
+      },
+      priorityScores: [
+        {
+          id: "epic:epic-upcoming-short-gap-1",
+          kind: "epic",
+          title: "Podcast launch",
+          score: 80,
+          reasons: [
+            "This campaign has momentum, but the next move is still undefined.",
+          ],
+          epicId: "epic-upcoming-short-gap-1",
+        },
+      ],
+      starterIntent: "upcoming_start",
+    },
+  }));
+
+  assertEquals(result.mode, "schedule_read");
+  assertEquals(result.proposals.length, 0);
+  assertEquals(result.structuredResponse?.comingUp?.nextBestAction, null);
+  assertStringIncludes(result.reply, "Today:");
+  assertStringIncludes(result.reply, "Therapy");
 });
 
 Deno.test("treats the make-room starter like a read-only prioritization view", () => {
@@ -5929,7 +9123,9 @@ Deno.test("make_room surfaces campaign pressure when too many campaigns are comp
           kind: "epic",
           title: "Course launch",
           score: 80,
-          reasons: ["This campaign matters, but your attention is split too many ways."],
+          reasons: [
+            "This campaign matters, but your attention is split too many ways.",
+          ],
           epicId: "epic-a",
         },
       ],
@@ -5937,6 +9133,8 @@ Deno.test("make_room surfaces campaign pressure when too many campaigns are comp
   }));
 
   assertEquals(result.mode, "schedule_read");
+  assertEquals(result.structuredResponse?.intent.intentType, "campaign");
+  assertEquals(result.structuredResponse?.intent.shouldCreateQuest, false);
   assertStringIncludes(result.reply, "Campaign pressure: Course launch is");
   assertStringIncludes(
     result.reply,
@@ -6024,11 +9222,16 @@ Deno.test("what_matters keeps slipping campaign task urgency in the ranked summa
   }));
 
   assertEquals(result.mode, "schedule_read");
+  assertEquals(result.structuredResponse?.intent.intentType, "campaign");
+  assertEquals(result.structuredResponse?.intent.shouldCreateQuest, false);
   assertStringIncludes(result.reply, "here's what matters most");
   assertStringIncludes(result.reply, "Outline webinar promise");
   assertStringIncludes(result.reply, "Deadline in 3 days");
   assertStringIncludes(result.reply, "clearest move to protect next");
-  assertEquals(result.structuredResponse?.priorityOverview?.title, "What Matters");
+  assertEquals(
+    result.structuredResponse?.priorityOverview?.title,
+    "What Matters",
+  );
   assertEquals(
     result.structuredResponse?.priorityOverview?.topPriorities[0]?.title,
     "Outline webinar promise",
@@ -6076,6 +9279,21 @@ Deno.test("what_matters recommends adjusting the campaign when repeated slip mak
           epicTitle: "Course launch",
         },
       ],
+      recentCompletedTasks: [
+        {
+          id: "task-what-adjust-history-1",
+          title: "Adjust Course launch",
+          taskDate: "2026-04-08",
+          scheduledTime: "09:00",
+          estimatedDuration: 30,
+          recurrencePattern: null,
+          completed: true,
+          completedAt: "2026-04-08T17:00:00.000Z",
+          priority: "medium",
+          epicId: "epic-what-adjust-1",
+          epicTitle: "Course launch",
+        },
+      ],
       priorityScores: [
         {
           id: "epic:epic-what-adjust-1",
@@ -6092,6 +9310,8 @@ Deno.test("what_matters recommends adjusting the campaign when repeated slip mak
 
   assertEquals(result.mode, "proposal");
   assertEquals(result.proposals[0]?.kind, "adjust_campaign_plan");
+  assertEquals(result.structuredResponse?.intent.intentType, "campaign");
+  assertEquals(result.structuredResponse?.intent.shouldCreateQuest, false);
   assertStringIncludes(
     result.structuredResponse?.priorityOverview?.campaignPressure ?? "",
     "adjust the campaign plan before adding more work",
@@ -6105,7 +9325,8 @@ Deno.test("what_matters recommends adjusting the campaign when repeated slip mak
     "reset",
   );
   assertEquals(
-    result.structuredResponse?.priorityOverview?.focusCampaignHealth?.daysWithoutMomentum,
+    result.structuredResponse?.priorityOverview?.focusCampaignHealth
+      ?.daysWithoutMomentum,
     8,
   );
   assertEquals(
@@ -6113,12 +9334,278 @@ Deno.test("what_matters recommends adjusting the campaign when repeated slip mak
     "Adjust Course launch",
   );
   assertEquals(
-    Boolean(result.structuredResponse?.priorityOverview?.topPriorities[0]?.proposalId),
+    Boolean(
+      result.structuredResponse?.priorityOverview?.topPriorities[0]?.proposalId,
+    ),
     true,
+  );
+  assertEquals(
+    result.structuredResponse?.priorityOverview?.topPriorities[0]
+      ?.estimatedDurationMinutes,
+    30,
+  );
+  assertEquals(
+    (
+      result.proposals[0]?.payload as {
+        estimatedDuration?: number | null;
+      }
+    ).estimatedDuration,
+    30,
   );
   assertStringIncludes(
     result.structuredResponse?.priorityOverview?.topPriorities[0]?.reason ?? "",
     "reset plan",
+  );
+});
+
+Deno.test("what_matters drafts a next-step quest when recent campaign progress has no linked follow-up quest", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "What matters most today?",
+    parsedInput: {
+      text: "What matters most today?",
+      scheduledTime: null,
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+    plannerContext: {
+      activeEpics: [
+        {
+          id: "epic-what-followup-1",
+          title: "Podcast launch",
+          endDate: "2026-05-06",
+          progressPercentage: 52,
+          daysRemaining: 18,
+        },
+      ],
+      tasks: [],
+      recentCompletedTasks: [
+        {
+          id: "task-what-followup-done-1",
+          title: "Pick launch artwork",
+          taskDate: "2026-04-17",
+          scheduledTime: "11:00",
+          estimatedDuration: 30,
+          recurrencePattern: null,
+          completed: true,
+          completedAt: "2026-04-17T18:00:00.000Z",
+          priority: "medium",
+          epicId: "epic-what-followup-1",
+          epicTitle: "Podcast launch",
+        },
+      ],
+      priorityScores: [
+        {
+          id: "epic:epic-what-followup-1",
+          kind: "epic",
+          title: "Podcast launch",
+          score: 80,
+          reasons: [
+            "This campaign has momentum, but the next move is still undefined.",
+          ],
+          epicId: "epic-what-followup-1",
+        },
+      ],
+      starterIntent: "what_matters",
+    },
+  }));
+
+  assertEquals(result.mode, "proposal");
+  assertEquals(result.proposals[0]?.kind, "create_quest");
+  assertEquals(result.structuredResponse?.intent.shouldCreateQuest, true);
+  assertEquals(
+    result.structuredResponse?.priorityOverview?.topPriorities[0]?.title,
+    "Define next step for Podcast launch",
+  );
+  assertEquals(
+    Boolean(
+      result.structuredResponse?.priorityOverview?.topPriorities[0]?.proposalId,
+    ),
+    true,
+  );
+  assertStringIncludes(
+    result.structuredResponse?.priorityOverview?.topPriorities[0]?.reason ?? "",
+    "Recent campaign progress needs a concrete follow-up quest",
+  );
+});
+
+Deno.test("make_room drafts a next-step quest when recent campaign progress has no linked follow-up quest", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Help me make room for what matters.",
+    parsedInput: {
+      text: "Help me make room for what matters.",
+      scheduledTime: null,
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+    plannerContext: {
+      activeEpics: [
+        {
+          id: "epic-make-room-followup-1",
+          title: "Podcast launch",
+          endDate: "2026-05-06",
+          progressPercentage: 52,
+          daysRemaining: 18,
+        },
+      ],
+      tasks: [],
+      recentCompletedTasks: [
+        {
+          id: "task-make-room-followup-done-1",
+          title: "Pick launch artwork",
+          taskDate: "2026-04-17",
+          scheduledTime: "11:00",
+          estimatedDuration: 30,
+          recurrencePattern: null,
+          completed: true,
+          completedAt: "2026-04-17T18:00:00.000Z",
+          priority: "medium",
+          epicId: "epic-make-room-followup-1",
+          epicTitle: "Podcast launch",
+        },
+      ],
+      priorityScores: [
+        {
+          id: "epic:epic-make-room-followup-1",
+          kind: "epic",
+          title: "Podcast launch",
+          score: 80,
+          reasons: [
+            "This campaign has momentum, but the next move is still undefined.",
+          ],
+          epicId: "epic-make-room-followup-1",
+        },
+      ],
+      starterIntent: "make_room",
+    },
+  }));
+
+  assertEquals(result.mode, "proposal");
+  assertEquals(result.proposals[0]?.kind, "create_quest");
+  assertEquals(result.structuredResponse?.intent.shouldCreateQuest, true);
+  assertEquals(result.structuredResponse?.priorityOverview?.title, "Make Room");
+  assertEquals(
+    result.structuredResponse?.priorityOverview?.topPriorities[0]?.title,
+    "Define next step for Podcast launch",
+  );
+  assertEquals(
+    Boolean(
+      result.structuredResponse?.priorityOverview?.topPriorities[0]?.proposalId,
+    ),
+    true,
+  );
+  assertStringIncludes(
+    result.structuredResponse?.priorityOverview?.topPriorities[0]?.reason ?? "",
+    "Recent campaign progress needs a concrete follow-up quest",
+  );
+});
+
+Deno.test("make_room follow-up proposals shrink to fit a short suggested slot", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Help me make room for what matters.",
+    parsedInput: {
+      text: "Help me make room for what matters.",
+      scheduledTime: null,
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: null,
+      newTitle: null,
+    },
+    plannerContext: {
+      activeEpics: [
+        {
+          id: "epic-make-room-slot-followup-1",
+          title: "Podcast launch",
+          endDate: "2026-05-06",
+          progressPercentage: 52,
+          daysRemaining: 18,
+        },
+      ],
+      tasks: [],
+      recentCompletedTasks: [
+        {
+          id: "task-make-room-slot-followup-done-1",
+          title: "Pick launch artwork",
+          taskDate: "2026-04-17",
+          scheduledTime: "11:00",
+          estimatedDuration: 30,
+          recurrencePattern: null,
+          completed: true,
+          completedAt: "2026-04-17T18:00:00.000Z",
+          priority: "medium",
+          epicId: "epic-make-room-slot-followup-1",
+          epicTitle: "Podcast launch",
+        },
+      ],
+      priorityScores: [
+        {
+          id: "epic:epic-make-room-slot-followup-1",
+          kind: "epic",
+          title: "Podcast launch",
+          score: 80,
+          reasons: [
+            "This campaign has momentum, but the next move is still undefined.",
+          ],
+          epicId: "epic-make-room-slot-followup-1",
+        },
+      ],
+      scheduleInsights: {
+        horizon: "day",
+        selectedDate: "2026-04-18",
+        dayLoads: [
+          {
+            date: "2026-04-18",
+            totalMinutes: 10,
+            taskCount: 0,
+            status: "open",
+          },
+        ],
+        overloadedDates: [],
+        emptyDates: ["2026-04-18"],
+        conflicts: [],
+        suggestedSlots: [
+          {
+            date: "2026-04-18",
+            time: "10:30",
+            endTime: "10:40",
+            score: 83,
+            reason: "Tiny opening for a quick next-step anchor.",
+          },
+        ],
+        moveSuggestions: [],
+        summary: "Today has one short opening.",
+      },
+      starterIntent: "make_room",
+    },
+  }));
+
+  assertEquals(result.mode, "proposal");
+  assertEquals(result.proposals[0]?.kind, "create_quest");
+  assertEquals(
+    (result.proposals[0]?.payload as { estimatedDuration?: number | null })
+      .estimatedDuration,
+    10,
   );
 });
 
@@ -6589,13 +10076,290 @@ Deno.test("advance_campaign_start surfaces the clearest existing campaign step w
 
   assertEquals(result.mode, "schedule_read");
   assertEquals(result.proposals.length, 0);
-  assertEquals(result.structuredResponse?.campaignMomentum?.campaignTitle, "Launch prep");
+  assertEquals(result.structuredResponse?.intent.intentType, "campaign");
+  assertEquals(result.structuredResponse?.intent.shouldCreateQuest, false);
+  assertEquals(
+    result.structuredResponse?.campaignMomentum?.campaignTitle,
+    "Launch prep",
+  );
   assertEquals(result.structuredResponse?.campaignMomentum?.status, "moving");
-  assertEquals(result.structuredResponse?.campaignMomentum?.interventionLevel, "steady");
+  assertEquals(
+    result.structuredResponse?.campaignMomentum?.interventionLevel,
+    "steady",
+  );
   assertEquals(
     result.structuredResponse?.campaignMomentum?.nextStep?.title,
     "Finalize launch checklist",
   );
+});
+
+Deno.test("advance_campaign_start uses recent completed campaign work as real momentum", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Advance my campaign",
+    plannerContext: {
+      starterIntent: "advance_campaign_start",
+      activeEpics: [
+        {
+          id: "epic-1",
+          title: "Launch prep",
+          endDate: "2026-05-05",
+          progressPercentage: 58,
+          daysRemaining: 17,
+        },
+      ],
+      tasks: [
+        {
+          id: "task-1",
+          title: "Finalize launch checklist",
+          taskDate: null,
+          scheduledTime: null,
+          estimatedDuration: 45,
+          recurrencePattern: null,
+          completed: false,
+          priority: "high",
+          epicId: "epic-1",
+          epicTitle: "Launch prep",
+        },
+      ],
+      recentCompletedTasks: [
+        {
+          id: "task-done-1",
+          title: "Outline launch sequence",
+          taskDate: "2026-04-16",
+          scheduledTime: "10:00",
+          estimatedDuration: 30,
+          recurrencePattern: null,
+          completed: true,
+          completedAt: "2026-04-16T15:00:00.000Z",
+          priority: "medium",
+          epicId: "epic-1",
+          epicTitle: "Launch prep",
+        },
+      ],
+      priorityScores: [
+        {
+          id: "epic:epic-1",
+          kind: "epic",
+          title: "Launch prep",
+          score: 84,
+          reasons: ["Launch prep is still worth protecting this week."],
+          epicId: "epic-1",
+        },
+        {
+          id: "task:task-1",
+          kind: "task",
+          title: "Finalize launch checklist",
+          score: 78,
+          reasons: ["It is the cleanest follow-up after the recent progress."],
+          taskId: "task-1",
+          epicId: "epic-1",
+        },
+      ],
+    },
+  }));
+
+  assertEquals(result.mode, "schedule_read");
+  assertEquals(result.proposals.length, 0);
+  assertEquals(result.structuredResponse?.intent.intentType, "campaign");
+  assertEquals(result.structuredResponse?.intent.shouldCreateQuest, false);
+  assertEquals(result.structuredResponse?.campaignMomentum?.status, "drifting");
+  assertEquals(
+    result.structuredResponse?.campaignMomentum?.interventionLevel,
+    "nudge",
+  );
+  assertEquals(
+    result.structuredResponse?.campaignMomentum?.healthSnapshot
+      ?.daysWithoutMomentum,
+    2,
+  );
+});
+
+Deno.test("advance_campaign_start treats a recent win without a linked follow-up as drifting, not stalled", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Advance my campaign",
+    plannerContext: {
+      starterIntent: "advance_campaign_start",
+      activeEpics: [
+        {
+          id: "epic-1",
+          title: "Launch prep",
+          endDate: "2026-05-05",
+          progressPercentage: 54,
+          daysRemaining: 17,
+        },
+      ],
+      recentCompletedTasks: [
+        {
+          id: "task-done-1",
+          title: "Finalize launch checklist",
+          taskDate: "2026-04-17",
+          scheduledTime: "09:00",
+          estimatedDuration: 45,
+          recurrencePattern: null,
+          completed: true,
+          completedAt: "2026-04-17T16:00:00.000Z",
+          priority: "high",
+          epicId: "epic-1",
+          epicTitle: "Launch prep",
+        },
+      ],
+      priorityScores: [
+        {
+          id: "epic:epic-1",
+          kind: "epic",
+          title: "Launch prep",
+          score: 82,
+          reasons: [
+            "This campaign still matters and needs a clean follow-up move.",
+          ],
+          epicId: "epic-1",
+        },
+      ],
+      scheduleInsights: {
+        horizon: "day",
+        selectedDate: "2026-04-18",
+        dayLoads: [
+          {
+            date: "2026-04-18",
+            totalMinutes: 0,
+            taskCount: 0,
+            status: "open",
+          },
+        ],
+        overloadedDates: [],
+        emptyDates: ["2026-04-18"],
+        conflicts: [],
+        suggestedSlots: [
+          {
+            date: "2026-04-18",
+            time: "11:00",
+            endTime: "11:30",
+            score: 88,
+            reason: "Open slot for a clean follow-up move.",
+          },
+        ],
+        moveSuggestions: [],
+        summary: "Today has room for one follow-up move.",
+      },
+    },
+  }));
+
+  assertEquals(result.mode, "proposal");
+  assertEquals(result.structuredResponse?.intent.intentType, "quest");
+  assertEquals(result.structuredResponse?.intent.shouldCreateQuest, true);
+  assertEquals(result.structuredResponse?.campaignMomentum?.status, "drifting");
+  assertEquals(
+    result.structuredResponse?.campaignMomentum?.interventionLevel,
+    "nudge",
+  );
+  assertStringIncludes(
+    result.structuredResponse?.campaignMomentum?.statusReason ?? "",
+    "recent progress",
+  );
+  assertEquals(result.proposals[0]?.kind, "create_quest");
+  assertStringIncludes(result.proposals[0]?.summary ?? "", "Define next step");
+  assertEquals(
+    (
+      result.proposals[0]?.payload as {
+        estimatedDuration?: number | null;
+        difficulty?: string | null;
+      }
+    ).estimatedDuration,
+    20,
+  );
+  assertEquals(
+    (
+      result.proposals[0]?.payload as {
+        estimatedDuration?: number | null;
+        difficulty?: string | null;
+      }
+    ).difficulty,
+    "medium",
+  );
+});
+
+Deno.test("advance_campaign_start protects a near-deadline recent win with a next step instead of resetting the campaign", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Advance my campaign",
+    plannerContext: {
+      starterIntent: "advance_campaign_start",
+      activeEpics: [
+        {
+          id: "epic-1",
+          title: "Launch prep",
+          endDate: "2026-04-23",
+          progressPercentage: 64,
+          daysRemaining: 5,
+        },
+      ],
+      recentCompletedTasks: [
+        {
+          id: "task-done-1",
+          title: "Finalize webinar outline",
+          taskDate: "2026-04-17",
+          scheduledTime: "10:00",
+          estimatedDuration: 45,
+          recurrencePattern: null,
+          completed: true,
+          completedAt: "2026-04-17T18:00:00.000Z",
+          priority: "high",
+          epicId: "epic-1",
+          epicTitle: "Launch prep",
+        },
+      ],
+      priorityScores: [
+        {
+          id: "epic:epic-1",
+          kind: "epic",
+          title: "Launch prep",
+          score: 87,
+          reasons: [
+            "The deadline is close and this campaign still needs a protected follow-up step.",
+          ],
+          epicId: "epic-1",
+        },
+      ],
+      scheduleInsights: {
+        horizon: "day",
+        selectedDate: "2026-04-18",
+        dayLoads: [
+          {
+            date: "2026-04-18",
+            totalMinutes: 90,
+            taskCount: 1,
+            status: "balanced",
+          },
+        ],
+        overloadedDates: [],
+        emptyDates: [],
+        conflicts: [],
+        suggestedSlots: [
+          {
+            date: "2026-04-18",
+            time: "14:00",
+            endTime: "14:30",
+            score: 90,
+            reason: "Clean slot for the campaign follow-up move.",
+          },
+        ],
+        moveSuggestions: [],
+        summary: "There is still room to protect one launch move today.",
+      },
+    },
+  }));
+
+  assertEquals(result.mode, "proposal");
+  assertEquals(result.structuredResponse?.campaignMomentum?.status, "at_risk");
+  assertEquals(
+    result.structuredResponse?.campaignMomentum?.interventionLevel,
+    "protect",
+  );
+  assertStringIncludes(
+    result.structuredResponse?.campaignMomentum?.statusReason ?? "",
+    "recent progress",
+  );
+  assertEquals(result.proposals[0]?.kind, "create_quest");
+  assertStringIncludes(result.proposals[0]?.summary ?? "", "Define next step");
 });
 
 Deno.test("advance_campaign_start drafts a next quest when a campaign is stalled", () => {
@@ -6620,6 +10384,7 @@ Deno.test("advance_campaign_start drafts a next quest when a campaign is stalled
           title: "Morning weigh-in",
           frequency: "daily",
           preferredTime: "08:00",
+          estimatedMinutes: 45,
         },
       ],
       priorityScores: [
@@ -6663,9 +10428,15 @@ Deno.test("advance_campaign_start drafts a next quest when a campaign is stalled
 
   assertEquals(result.mode, "proposal");
   assertEquals(result.proposals.length, 1);
-  assertEquals(result.structuredResponse?.campaignMomentum?.campaignTitle, "Summer cut");
+  assertEquals(
+    result.structuredResponse?.campaignMomentum?.campaignTitle,
+    "Summer cut",
+  );
   assertEquals(result.structuredResponse?.campaignMomentum?.status, "stalled");
-  assertEquals(result.structuredResponse?.campaignMomentum?.interventionLevel, "reset");
+  assertEquals(
+    result.structuredResponse?.campaignMomentum?.interventionLevel,
+    "reset",
+  );
   assertStringIncludes(result.proposals[0].title, "Summer cut");
   assertEquals(
     (result.proposals[0].payload as { epicId?: string | null }).epicId,
@@ -6674,6 +10445,95 @@ Deno.test("advance_campaign_start drafts a next quest when a campaign is stalled
   assertEquals(
     result.structuredResponse?.campaignMomentum?.supportActions[0]?.title,
     "Keep Morning weigh-in",
+  );
+  assertEquals(
+    result.structuredResponse?.campaignMomentum?.supportActions[0]
+      ?.estimatedDurationMinutes,
+    45,
+  );
+  assertEquals(
+    result.structuredResponse?.campaignMomentum?.supportActions[0]
+      ?.estimatedDuration,
+    "45 min",
+  );
+});
+
+Deno.test("advance_campaign_start shrinks follow-up proposals to fit a short suggested slot", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "Advance my campaign",
+    plannerContext: {
+      starterIntent: "advance_campaign_start",
+      activeEpics: [
+        {
+          id: "epic-advance-slot-1",
+          title: "Podcast launch",
+          endDate: "2026-05-06",
+          progressPercentage: 52,
+          daysRemaining: 18,
+        },
+      ],
+      recentCompletedTasks: [
+        {
+          id: "task-advance-slot-done-1",
+          title: "Pick launch artwork",
+          taskDate: "2026-04-17",
+          scheduledTime: "11:00",
+          estimatedDuration: 30,
+          recurrencePattern: null,
+          completed: true,
+          completedAt: "2026-04-17T18:00:00.000Z",
+          priority: "medium",
+          epicId: "epic-advance-slot-1",
+          epicTitle: "Podcast launch",
+        },
+      ],
+      priorityScores: [
+        {
+          id: "epic:epic-advance-slot-1",
+          kind: "epic",
+          title: "Podcast launch",
+          score: 79,
+          reasons: [
+            "This campaign has momentum, but the next move is still undefined.",
+          ],
+          epicId: "epic-advance-slot-1",
+        },
+      ],
+      scheduleInsights: {
+        horizon: "day",
+        selectedDate: "2026-04-18",
+        dayLoads: [
+          {
+            date: "2026-04-18",
+            totalMinutes: 10,
+            taskCount: 0,
+            status: "open",
+          },
+        ],
+        overloadedDates: [],
+        emptyDates: ["2026-04-18"],
+        conflicts: [],
+        suggestedSlots: [
+          {
+            date: "2026-04-18",
+            time: "11:00",
+            endTime: "11:10",
+            score: 91,
+            reason: "Tiny opening for a quick next-step anchor.",
+          },
+        ],
+        moveSuggestions: [],
+        summary: "Today is open enough for one very short next-step move.",
+      },
+    },
+  }));
+
+  assertEquals(result.mode, "proposal");
+  assertEquals(result.proposals[0]?.kind, "create_quest");
+  assertEquals(
+    (result.proposals[0]?.payload as { estimatedDuration?: number | null })
+      .estimatedDuration,
+    10,
   );
 });
 
@@ -6733,7 +10593,9 @@ Deno.test("advance_campaign_start drafts a campaign adjustment when pressure is 
           kind: "epic",
           title: "Founder relaunch",
           score: 93,
-          reasons: ["The deadline is extremely close and this campaign is slipping."],
+          reasons: [
+            "The deadline is extremely close and this campaign is slipping.",
+          ],
           epicId: "epic-3",
         },
         {
@@ -6751,19 +10613,24 @@ Deno.test("advance_campaign_start drafts a campaign adjustment when pressure is 
   }));
 
   assertEquals(result.mode, "proposal");
+  assertEquals(result.structuredResponse?.intent.intentType, "campaign");
+  assertEquals(result.structuredResponse?.intent.shouldCreateQuest, false);
   assertEquals(result.proposals[0].kind, "adjust_campaign_plan");
   assertEquals(result.structuredResponse?.campaignMomentum?.status, "at_risk");
-  assertEquals(result.structuredResponse?.campaignMomentum?.interventionLevel, "reset");
   assertEquals(
-    result.structuredResponse?.campaignMomentum?.pressureSignals.some((signal) =>
-      signal === "Deadline in 3 days."
-    ),
+    result.structuredResponse?.campaignMomentum?.interventionLevel,
+    "reset",
+  );
+  assertEquals(
+    result.structuredResponse?.campaignMomentum?.pressureSignals.some((
+      signal,
+    ) => signal === "Deadline in 3 days."),
     true,
   );
   assertEquals(
-    result.structuredResponse?.campaignMomentum?.pressureSignals.some((signal) =>
-      signal.includes("overdue quests")
-    ),
+    result.structuredResponse?.campaignMomentum?.pressureSignals.some((
+      signal,
+    ) => signal.includes("overdue quests")),
     true,
   );
   assertStringIncludes(
@@ -6846,14 +10713,20 @@ Deno.test("advance_campaign_start shrinks oversized campaign work into a smaller
 
   assertEquals(result.mode, "proposal");
   assertEquals(result.structuredResponse?.campaignMomentum?.status, "stalled");
-  assertEquals(result.structuredResponse?.campaignMomentum?.interventionLevel, "reset");
   assertEquals(
-    result.structuredResponse?.campaignMomentum?.pressureSignals.some((signal) =>
-      signal.includes("too large to start cleanly")
-    ),
+    result.structuredResponse?.campaignMomentum?.interventionLevel,
+    "reset",
+  );
+  assertEquals(
+    result.structuredResponse?.campaignMomentum?.pressureSignals.some((
+      signal,
+    ) => signal.includes("too large to start cleanly")),
     true,
   );
-  assertStringIncludes(result.proposals[0].title, "Break down Build full course sales page");
+  assertStringIncludes(
+    result.proposals[0].title,
+    "Break down Build full course sales page",
+  );
 });
 
 Deno.test("advance_campaign_start can recommend a campaign adjustment when too many campaigns are competing", () => {
@@ -6911,7 +10784,9 @@ Deno.test("advance_campaign_start can recommend a campaign adjustment when too m
           kind: "epic",
           title: "Course launch",
           score: 80,
-          reasons: ["This campaign matters, but your attention is split too many ways."],
+          reasons: [
+            "This campaign matters, but your attention is split too many ways.",
+          ],
           epicId: "epic-a",
         },
       ],
@@ -6920,11 +10795,14 @@ Deno.test("advance_campaign_start can recommend a campaign adjustment when too m
 
   assertEquals(result.mode, "proposal");
   assertEquals(result.proposals[0].kind, "adjust_campaign_plan");
-  assertEquals(result.structuredResponse?.campaignMomentum?.interventionLevel, "reset");
   assertEquals(
-    result.structuredResponse?.campaignMomentum?.pressureSignals.some((signal) =>
-      signal.includes("4 active campaigns")
-    ),
+    result.structuredResponse?.campaignMomentum?.interventionLevel,
+    "reset",
+  );
+  assertEquals(
+    result.structuredResponse?.campaignMomentum?.pressureSignals.some((
+      signal,
+    ) => signal.includes("4 active campaigns")),
     true,
   );
   assertStringIncludes(
@@ -6968,7 +10846,9 @@ Deno.test("advance_campaign_start escalates a deeply stalled campaign into a pla
           kind: "epic",
           title: "Course launch",
           score: 78,
-          reasons: ["This campaign has been stuck and needs a reset, not a bigger push."],
+          reasons: [
+            "This campaign has been stuck and needs a reset, not a bigger push.",
+          ],
           epicId: "epic-reset-2",
         },
       ],
@@ -6978,32 +10858,39 @@ Deno.test("advance_campaign_start escalates a deeply stalled campaign into a pla
   assertEquals(result.mode, "proposal");
   assertEquals(result.proposals[0].kind, "adjust_campaign_plan");
   assertEquals(result.structuredResponse?.campaignMomentum?.status, "stalled");
-  assertEquals(result.structuredResponse?.campaignMomentum?.interventionLevel, "reset");
   assertEquals(
-    result.structuredResponse?.campaignMomentum?.healthSnapshot?.daysWithoutMomentum,
+    result.structuredResponse?.campaignMomentum?.interventionLevel,
+    "reset",
+  );
+  assertEquals(
+    result.structuredResponse?.campaignMomentum?.healthSnapshot
+      ?.daysWithoutMomentum,
     8,
   );
   assertEquals(
-    result.structuredResponse?.campaignMomentum?.pressureSignals.some((signal) =>
-      signal.includes("last 8 days")
-    ),
+    result.structuredResponse?.campaignMomentum?.pressureSignals.some((
+      signal,
+    ) => signal.includes("last 8 days")),
     true,
   );
   assertEquals(
-    result.structuredResponse?.campaignMomentum?.pressureSignals.some((signal) =>
+    result.structuredResponse?.campaignMomentum?.pressureSignals.some((
+      signal,
+    ) =>
       signal.includes("slipped repeatedly without a protected recovery move")
     ),
     true,
   );
   assertEquals(
-    result.structuredResponse?.campaignMomentum?.pressureSignals.some((signal) =>
-      signal.includes("too large to start cleanly")
-    ),
+    result.structuredResponse?.campaignMomentum?.pressureSignals.some((
+      signal,
+    ) => signal.includes("too large to start cleanly")),
     true,
   );
   assertStringIncludes(result.reply, "slipped more than once");
   assertStringIncludes(
-    (result.proposals[0].payload as { requestedSummary?: string }).requestedSummary ?? "",
+    (result.proposals[0].payload as { requestedSummary?: string })
+      .requestedSummary ?? "",
     "smaller recovery move this week",
   );
   assertStringIncludes(

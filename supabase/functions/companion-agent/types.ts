@@ -110,6 +110,7 @@ const CompanionMissedItemSchema = z.object({
 const CompanionCampaignHealthSnapshotSchema = z.object({
   overdueQuestCount: z.number().int().min(0).max(999),
   protectedTodayCount: z.number().int().min(0).max(999),
+  recentCompletedQuestCount: z.number().int().min(0).max(999),
   daysWithoutMomentum: z.number().int().min(0).max(3650).nullable(),
   activeCampaignCount: z.number().int().min(0).max(999),
 });
@@ -132,8 +133,14 @@ const CompanionStructuredResponseSchema = z.object({
     message: z.string().min(1).max(4000),
     weeklyTheme: z.string().min(1).max(2000).nullable(),
     focusCampaignTitle: z.string().min(1).max(200).nullable(),
-    focusCampaignStatus: z.enum(["moving", "drifting", "stalled", "at_risk"]).nullable(),
-    focusCampaignInterventionLevel: z.enum(["steady", "nudge", "protect", "reset"]).nullable(),
+    focusCampaignStatus: z.enum(["moving", "drifting", "stalled", "at_risk"])
+      .nullable(),
+    focusCampaignInterventionLevel: z.enum([
+      "steady",
+      "nudge",
+      "protect",
+      "reset",
+    ]).nullable(),
     focusCampaignReason: z.string().min(1).max(2000).nullable(),
     focusCampaignHealth: CompanionCampaignHealthSnapshotSchema.nullable(),
     topPriorities: z.array(CompanionSuggestedQuestSchema).max(5),
@@ -145,9 +152,16 @@ const CompanionStructuredResponseSchema = z.object({
     message: z.string().min(1).max(4000),
     campaignPressure: z.string().min(1).max(2000).nullable(),
     focusCampaignTitle: z.string().min(1).max(200).nullable().optional(),
-    focusCampaignStatus: z.enum(["moving", "drifting", "stalled", "at_risk"]).nullable().optional(),
-    focusCampaignInterventionLevel: z.enum(["steady", "nudge", "protect", "reset"]).nullable().optional(),
-    focusCampaignHealth: CompanionCampaignHealthSnapshotSchema.nullable().optional(),
+    focusCampaignStatus: z.enum(["moving", "drifting", "stalled", "at_risk"])
+      .nullable().optional(),
+    focusCampaignInterventionLevel: z.enum([
+      "steady",
+      "nudge",
+      "protect",
+      "reset",
+    ]).nullable().optional(),
+    focusCampaignHealth: CompanionCampaignHealthSnapshotSchema.nullable()
+      .optional(),
     topPriorities: z.array(CompanionSuggestedQuestSchema).max(5),
   }).nullable().optional(),
   reflectionBridge: z.object({
@@ -182,7 +196,8 @@ const CompanionStructuredResponseSchema = z.object({
     campaignId: z.string().min(1).max(200).nullable(),
     campaignTitle: z.string().min(1).max(200).nullable(),
     status: z.enum(["moving", "drifting", "stalled", "at_risk"]).nullable(),
-    interventionLevel: z.enum(["steady", "nudge", "protect", "reset"]).nullable(),
+    interventionLevel: z.enum(["steady", "nudge", "protect", "reset"])
+      .nullable(),
     statusReason: z.string().min(1).max(2000).nullable(),
     healthSnapshot: CompanionCampaignHealthSnapshotSchema.nullable(),
     pressureSignals: z.array(z.string().min(1).max(200)).max(5),
@@ -331,6 +346,7 @@ export interface LoadedCompanionAgentContext {
   thread: ThreadRow | null;
   messages: ChatRow[];
   tasks: Array<Record<string, unknown>>;
+  recentCompletedTasks: Array<Record<string, unknown>>;
   rituals: Array<Record<string, unknown>>;
   campaigns: Array<Record<string, unknown>>;
   calendarEvents: Array<Record<string, unknown>>;

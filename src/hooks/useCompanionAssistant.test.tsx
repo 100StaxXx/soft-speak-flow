@@ -1629,6 +1629,7 @@ describe("useCompanionAssistant", () => {
               healthSnapshot: {
                 overdueQuestCount: 2,
                 protectedTodayCount: 0,
+                recentCompletedQuestCount: 1,
                 daysWithoutMomentum: 7,
                 activeCampaignCount: 4,
               },
@@ -1879,6 +1880,7 @@ describe("useCompanionAssistant", () => {
               focusCampaignHealth: {
                 overdueQuestCount: 2,
                 protectedTodayCount: 0,
+                recentCompletedQuestCount: 1,
                 daysWithoutMomentum: 7,
                 activeCampaignCount: 4,
               },

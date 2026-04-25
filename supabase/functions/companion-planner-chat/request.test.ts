@@ -62,6 +62,57 @@ Deno.test("accepts nullable timelineAnalysis and normalizes it away", () => {
   });
 });
 
+Deno.test("normalizes non-epic legacy suggestedDuration into bounded activity minutes", () => {
+  const normalized = normalizePlannerClassificationHint({
+    type: "quest",
+    confidence: 0.88,
+    reasoning: "Legacy duration estimate",
+    suggestedDuration: 52,
+  });
+
+  assertEquals(normalized, {
+    type: "quest",
+    confidence: 0.88,
+    reasoning: "Legacy duration estimate",
+    suggestedDuration: 52,
+    suggestedActivityDurationMinutes: 45,
+  });
+});
+
+Deno.test("keeps epic suggestedDuration as target days without deriving activity minutes", () => {
+  const normalized = normalizePlannerClassificationHint({
+    type: "epic",
+    confidence: 0.91,
+    reasoning: "Long-running goal",
+    suggestedDuration: 52,
+  });
+
+  assertEquals(normalized, {
+    type: "epic",
+    confidence: 0.91,
+    reasoning: "Long-running goal",
+    suggestedDuration: 52,
+  });
+});
+
+Deno.test("keeps explicit epic activity minutes separate from target days", () => {
+  const normalized = normalizePlannerClassificationHint({
+    type: "epic",
+    confidence: 0.9,
+    reasoning: "Long-term goal with a clear work block size",
+    suggestedDuration: 75,
+    suggestedActivityDurationMinutes: 52,
+  });
+
+  assertEquals(normalized, {
+    type: "epic",
+    confidence: 0.9,
+    reasoning: "Long-term goal with a clear work block size",
+    suggestedDuration: 75,
+    suggestedActivityDurationMinutes: 45,
+  });
+});
+
 Deno.test("accepts quest notes and subtask titles in planner task context", () => {
   const parsed = PlannerRequestSchema.parse({
     ...baseRequest(),
@@ -73,6 +124,7 @@ Deno.test("accepts quest notes and subtask titles in planner task context", () =
         taskDate: "2026-04-18",
         scheduledTime: "18:00",
         estimatedDuration: 45,
+        actualTimeSpent: 52,
         notes: "Leg day with extra stretching.",
         subtaskTitles: ["Warm up", "Cooldown walk"],
         difficulty: "medium",
@@ -85,6 +137,7 @@ Deno.test("accepts quest notes and subtask titles in planner task context", () =
     parsed.plannerContext.tasks[0]?.notes,
     "Leg day with extra stretching.",
   );
+  assertEquals(parsed.plannerContext.tasks[0]?.actualTimeSpent, 52);
   assertEquals(parsed.plannerContext.tasks[0]?.subtaskTitles, [
     "Warm up",
     "Cooldown walk",

@@ -5,7 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { useXPRewards } from '@/hooks/useXPRewards';
 import { FOCUS_XP_REWARDS } from '@/config/xpRewards';
- import { useLivingCompanionSafe } from '@/hooks/useLivingCompanion';
+import { useLivingCompanionSafe } from '@/hooks/useLivingCompanion';
 
 export interface FocusSession {
   id: string;
@@ -51,9 +51,9 @@ export function useFocusSession() {
   const { awardFocusSessionComplete } = useXPRewards();
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const cooldownIntervalRef = useRef<NodeJS.Timeout | null>(null);
- 
-   // Living companion reaction system - safe hook returns no-op when outside provider
-   const { triggerPomodoroComplete } = useLivingCompanionSafe();
+
+  // Living companion reaction system - safe hook returns no-op when outside provider
+  const { triggerPomodoroComplete } = useLivingCompanionSafe();
 
   const [timerState, setTimerState] = useState<FocusTimerState>({
     isRunning: false,
@@ -148,6 +148,45 @@ export function useFocusSession() {
   const isUnderDailyCap = completedSessionsToday < FOCUS_XP_REWARDS.DAILY_SESSION_CAP;
   const sessionsUntilCap = Math.max(0, FOCUS_XP_REWARDS.DAILY_SESSION_CAP - completedSessionsToday);
 
+  const syncTaskActualTimeSpent = useCallback(async (session: FocusSession) => {
+    if (
+      !user?.id ||
+      !session.task_id ||
+      !session.actual_duration ||
+      session.actual_duration <= 0
+    ) {
+      return;
+    }
+
+    const actualDuration = Math.max(1, Math.round(session.actual_duration));
+    const { data: task, error: readError } = await supabase
+      .from('daily_tasks')
+      .select('actual_time_spent')
+      .eq('id', session.task_id)
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (readError) throw readError;
+
+    const currentActualTimeSpent =
+      typeof task?.actual_time_spent === 'number' && task.actual_time_spent > 0
+        ? task.actual_time_spent
+        : 0;
+    const { error: updateError } = await supabase
+      .from('daily_tasks')
+      .update({ actual_time_spent: currentActualTimeSpent + actualDuration })
+      .eq('id', session.task_id)
+      .eq('user_id', user.id);
+
+    if (updateError) throw updateError;
+
+    queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
+    queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    queryClient.invalidateQueries({
+      queryKey: ['companion-planner-recent-completed-tasks'],
+    });
+  }, [queryClient, user?.id]);
+
   // Complete session mutation
   const completeSessionMutation = useMutation({
     mutationFn: async ({ 
@@ -192,16 +231,19 @@ export function useFocusSession() {
     },
     onSuccess: ({ session, isPerfect, underCap }) => {
       queryClient.invalidateQueries({ queryKey: ['focus-sessions'] });
+      void syncTaskActualTimeSpent(session).catch((error) => {
+        console.warn('Failed to sync focus duration to task actual time:', error);
+      });
       
       // Award XP through centralized system
       awardFocusSessionComplete(isPerfect, underCap);
       
-       // Trigger companion reaction for sessions >= 15 minutes
-       if (session.planned_duration >= 15) {
-         triggerPomodoroComplete(session.planned_duration).catch(err => 
-           console.log('[LivingCompanion] Pomodoro trigger failed:', err)
-         );
-       }
+      // Trigger companion reaction for sessions >= 15 minutes
+      if (session.planned_duration >= 15) {
+        triggerPomodoroComplete(session.planned_duration).catch(err =>
+          console.log('[LivingCompanion] Pomodoro trigger failed:', err)
+        );
+      }
        
       // Start cooldown
       startCooldown();

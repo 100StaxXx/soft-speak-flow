@@ -187,6 +187,7 @@ describe("companionChatThreads service", () => {
                 focusCampaignHealth: {
                   overdueQuestCount: 2,
                   protectedTodayCount: 0,
+                  recentCompletedQuestCount: 1,
                   daysWithoutMomentum: 7,
                   activeCampaignCount: 4,
                 },
@@ -272,6 +273,7 @@ describe("companionChatThreads service", () => {
                 healthSnapshot: {
                   overdueQuestCount: 2,
                   protectedTodayCount: 0,
+                  recentCompletedQuestCount: 1,
                   daysWithoutMomentum: 7,
                   activeCampaignCount: 4,
                 },

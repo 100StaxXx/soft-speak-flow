@@ -108,6 +108,7 @@ export type CompanionCampaignInterventionLevel =
 export interface CompanionCampaignHealthSnapshot {
   overdueQuestCount: number;
   protectedTodayCount: number;
+  recentCompletedQuestCount: number;
   daysWithoutMomentum: number | null;
   activeCampaignCount: number;
 }

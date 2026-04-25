@@ -1,4 +1,8 @@
-import { assertEquals, assertGreater, assertMatch } from "https://deno.land/std@0.224.0/assert/mod.ts";
+import {
+  assertEquals,
+  assertGreater,
+  assertMatch,
+} from "https://deno.land/std@0.224.0/assert/mod.ts";
 
 import { consultPlannerForAgent } from "./plannerBridge.ts";
 import type { LoadedCompanionAgentContext } from "./types.ts";
@@ -9,6 +13,7 @@ const buildContext = (
   thread: null,
   messages: [],
   tasks: [],
+  recentCompletedTasks: [],
   rituals: [],
   campaigns: [],
   calendarEvents: [],
@@ -86,6 +91,37 @@ Deno.test("consultPlannerForAgent converts planner proposals into v1 task action
   assertEquals(result.mode, "proposal");
   assertGreater(result.actionHints.length, 0);
   assertEquals(result.actionHints[0]?.actionType, "task_update");
+});
+
+Deno.test("consultPlannerForAgent uses actual completed time for learned quest duration", () => {
+  const result = consultPlannerForAgent({
+    message: "Workout tomorrow",
+    currentDateTime: "2026-04-18T08:00:00-07:00",
+    surface: "journeys",
+    horizon: "week",
+    context: buildContext({
+      recentCompletedTasks: [
+        {
+          id: "task-history-1",
+          task_text: "Workout",
+          task_date: "2026-04-16",
+          scheduled_time: "17:00",
+          estimated_duration: 30,
+          actual_time_spent: 60,
+          completed: true,
+          completed_at: "2026-04-16T18:00:00.000Z",
+          category: "body",
+        },
+      ],
+    }),
+  });
+
+  assertEquals(result.mode, "proposal");
+  assertEquals(result.actionHints[0]?.actionType, "task_create");
+  assertEquals(
+    result.actionHints[0]?.normalizedPayload?.estimated_duration,
+    60,
+  );
 });
 
 Deno.test("consultPlannerForAgent converts at-risk campaign adjustments into campaign action hints", () => {

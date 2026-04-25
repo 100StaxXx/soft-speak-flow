@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { format } from "date-fns";
+import { addDays, format } from "date-fns";
 
 import { useAuth } from "@/hooks/useAuth";
 import { useCalendarTasks } from "@/hooks/useCalendarTasks";
@@ -84,7 +84,9 @@ const asNumberRecord = (value: Json | null | undefined): Record<string, number> 
   if (!isRecord(value)) return {};
 
   return Object.fromEntries(
-    Object.entries(value).filter(([, entry]) => typeof entry === "number" && Number.isFinite(entry)),
+    Object.entries(value).filter((entry): entry is [string, number] =>
+      typeof entry[1] === "number" && Number.isFinite(entry[1])
+    ),
   );
 };
 
@@ -262,11 +264,13 @@ export const serializeTaskToPlannerContext = (task: {
   task_date: string | null;
   scheduled_time: string | null;
   estimated_duration?: number | null;
+  actual_time_spent?: number | null;
   notes?: string | null;
   subtasks?: Array<{ title: string | null } | null> | null;
   recurrence_pattern: string | null;
   recurrence_end_date?: string | null;
   completed?: boolean | null;
+  completed_at?: string | null;
   priority?: string | null;
   source?: string | null;
   epic_id?: string | null;
@@ -277,6 +281,7 @@ export const serializeTaskToPlannerContext = (task: {
   taskDate: task.task_date,
   scheduledTime: task.scheduled_time,
   estimatedDuration: task.estimated_duration ?? null,
+  actualTimeSpent: task.actual_time_spent ?? null,
   notes: task.notes ?? null,
   subtaskTitles: (task.subtasks ?? [])
     .map((subtask) => subtask?.title?.trim() ?? "")
@@ -284,6 +289,7 @@ export const serializeTaskToPlannerContext = (task: {
   recurrencePattern: task.recurrence_pattern,
   recurrenceEndDate: task.recurrence_end_date ?? null,
   completed: task.completed ?? null,
+  completedAt: task.completed_at ?? null,
   priority: task.priority ?? null,
   source: task.source ?? null,
   epicId: task.epic_id ?? null,
@@ -308,6 +314,7 @@ export const mapRitualsToPlannerContext = (epics: EpicRecord[]): PlannerContextR
         title: link.habits?.title ?? "Untitled ritual",
         frequency: link.habits?.frequency ?? null,
         preferredTime: link.habits?.preferred_time ?? null,
+        estimatedMinutes: link.habits?.estimated_minutes ?? null,
       })),
   );
 
@@ -384,6 +391,30 @@ export function useCompanionPlanningContext({
         schedulingPatterns: learningRow?.scheduling_patterns ?? null,
         successfulPatterns: learningRow?.successful_patterns ?? null,
       };
+    },
+  });
+
+  const recentCompletedTasksQuery = useQuery({
+    queryKey: ["companion-planner-recent-completed-tasks", user?.id, todayIso],
+    enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      if (!user?.id) return [];
+
+      const startDate = format(addDays(today, -13), "yyyy-MM-dd");
+      const { data, error } = await supabase
+        .from("daily_tasks")
+        .select(
+          "id, task_text, task_date, scheduled_time, estimated_duration, actual_time_spent, notes, recurrence_pattern, recurrence_end_date, completed, completed_at, priority, source, epic_id, contact_id, habit_source_id",
+        )
+        .eq("user_id", user.id)
+        .eq("completed", true)
+        .not("completed_at", "is", null)
+        .gte("completed_at", `${startDate}T00:00:00.000Z`)
+        .lte("completed_at", `${todayIso}T23:59:59.999Z`);
+
+      if (error) throw error;
+      return data ?? [];
     },
   });
 
@@ -482,13 +513,16 @@ export function useCompanionPlanningContext({
     sanitizePlannerContext({
       tasks: mapTasksToPlannerContext(contextTasks.map(serializeTaskToPlannerContext)),
       inboxTasks: mapTasksToPlannerContext(inboxTasks.map(serializeTaskToPlannerContext)),
+      recentCompletedTasks: mapTasksToPlannerContext(
+        (recentCompletedTasksQuery.data ?? []).map(serializeTaskToPlannerContext),
+      ),
       activeEpics: mapEpicsToPlannerContext(activeEpics),
       rituals: mapRitualsToPlannerContext(activeEpics),
       calendarEvents: contextEventsQuery.events,
       scheduleInsights,
       plannerMemory,
       aiSignals: enrichedContext,
-    }), [activeEpics, contextEventsQuery.events, contextTasks, enrichedContext, inboxTasks, plannerMemory, scheduleInsights]);
+    }), [activeEpics, contextEventsQuery.events, contextTasks, enrichedContext, inboxTasks, plannerMemory, recentCompletedTasksQuery.data, scheduleInsights]);
 
   return {
     today,
@@ -510,6 +544,7 @@ export function useCompanionPlanningContext({
       || monthTasksQuery.isLoading
       || activeEventsQuery.isLoading
       || contextEventsQuery.isLoading
-      || plannerMemoryQuery.isLoading,
+      || plannerMemoryQuery.isLoading
+      || recentCompletedTasksQuery.isLoading,
   };
 }

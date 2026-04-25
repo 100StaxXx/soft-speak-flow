@@ -31,6 +31,7 @@ const OPENAI_CONVERSATIONS_URL = "https://api.openai.com/v1/conversations";
 const MAX_TOOL_LOOPS = 6;
 const MAX_TASKS = 18;
 const MAX_INBOX_TASKS = 8;
+const MAX_RECENT_COMPLETED_TASKS = 24;
 const MAX_RITUALS = 10;
 const MAX_CAMPAIGNS = 8;
 const MAX_CALENDAR_EVENTS = 16;
@@ -288,6 +289,7 @@ async function loadCompanionAgentContext(params: {
     activePendingAction,
     datedTasksResult,
     inboxTasksResult,
+    recentCompletedTasksResult,
     ritualsResult,
     campaignsResult,
     calendarResult,
@@ -304,7 +306,7 @@ async function loadCompanionAgentContext(params: {
     params.supabase
       .from("daily_tasks")
       .select(
-        "id, task_text, task_date, scheduled_time, estimated_duration, completed, epic_id, priority, location, notes, reminder_enabled, reminder_minutes_before, recurrence_pattern, recurrence_end_date",
+        "id, task_text, task_date, category, scheduled_time, estimated_duration, actual_time_spent, completed, completed_at, epic_id, priority, location, notes, reminder_enabled, reminder_minutes_before, recurrence_pattern, recurrence_end_date",
       )
       .eq("user_id", params.userId)
       .gte("task_date", range.start)
@@ -315,12 +317,32 @@ async function loadCompanionAgentContext(params: {
     params.supabase
       .from("daily_tasks")
       .select(
-        "id, task_text, task_date, scheduled_time, estimated_duration, completed, epic_id, priority, location, notes, reminder_enabled, reminder_minutes_before, recurrence_pattern, recurrence_end_date",
+        "id, task_text, task_date, category, scheduled_time, estimated_duration, actual_time_spent, completed, completed_at, epic_id, priority, location, notes, reminder_enabled, reminder_minutes_before, recurrence_pattern, recurrence_end_date",
       )
       .eq("user_id", params.userId)
       .is("task_date", null)
       .order("created_at", { ascending: false })
       .limit(MAX_INBOX_TASKS),
+    params.supabase
+      .from("daily_tasks")
+      .select(
+        "id, task_text, task_date, category, scheduled_time, estimated_duration, actual_time_spent, completed, completed_at, epic_id, priority, location, notes, reminder_enabled, reminder_minutes_before, recurrence_pattern, recurrence_end_date",
+      )
+      .eq("user_id", params.userId)
+      .eq("completed", true)
+      .not("completed_at", "is", null)
+      .gte(
+        "completed_at",
+        `${
+          addDays(toDateOnly(params.request.currentDateTime), -13)
+        }T00:00:00.000Z`,
+      )
+      .lte(
+        "completed_at",
+        `${toDateOnly(params.request.currentDateTime)}T23:59:59.999Z`,
+      )
+      .order("completed_at", { ascending: false })
+      .limit(MAX_RECENT_COMPLETED_TASKS),
     params.supabase
       .from("habits")
       .select(
@@ -395,6 +417,7 @@ async function loadCompanionAgentContext(params: {
   [
     datedTasksResult,
     inboxTasksResult,
+    recentCompletedTasksResult,
     ritualsResult,
     campaignsResult,
     calendarResult,
@@ -409,6 +432,9 @@ async function loadCompanionAgentContext(params: {
     Record<string, unknown>
   >;
   const inboxTasks = (inboxTasksResult.data ?? []) as Array<
+    Record<string, unknown>
+  >;
+  const recentCompletedTasks = (recentCompletedTasksResult.data ?? []) as Array<
     Record<string, unknown>
   >;
   const tasks = [...datedTasks, ...inboxTasks];
@@ -489,6 +515,7 @@ async function loadCompanionAgentContext(params: {
     thread,
     messages,
     tasks,
+    recentCompletedTasks,
     rituals,
     campaigns,
     calendarEvents,
@@ -1330,8 +1357,9 @@ export async function runCompanionAgent(params: RunAgentParams) {
 
       const persistenceReady = await withCompanionChatPersistenceCapability(
         async () => {
-          const responsePendingAction =
-            mapPendingActionForResponse(persistedPendingAction);
+          const responsePendingAction = mapPendingActionForResponse(
+            persistedPendingAction,
+          );
           await persistAgentTurn({
             supabase: params.supabase,
             userId: params.userId,

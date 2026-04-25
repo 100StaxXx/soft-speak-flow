@@ -29,6 +29,7 @@ import {
   useQuestCalendarSync,
 } from "@/hooks/useQuestCalendarSync";
 import { parseNaturalLanguage } from "@/features/tasks/hooks/useNaturalLanguageParser";
+import { normalizePlannerDurationBucket } from "@/shared/plannerDurationBuckets";
 import { buildPlannerAISignals } from "@/utils/companionPlannerAiSignals";
 import {
   sanitizePlannerContext,
@@ -821,12 +822,14 @@ const serializeTaskContext = (task: {
   category?: string | null;
   scheduled_time: string | null;
   estimated_duration?: number | null;
+  actual_time_spent?: number | null;
   notes?: string | null;
   subtasks?: Array<{ title: string | null } | null> | null;
   difficulty?: string | null;
   recurrence_pattern: string | null;
   recurrence_end_date?: string | null;
   completed?: boolean | null;
+  completed_at?: string | null;
   priority?: string | null;
   source?: string | null;
   habit_source_id?: string | null;
@@ -840,6 +843,7 @@ const serializeTaskContext = (task: {
   category: task.category ?? null,
   scheduledTime: task.scheduled_time,
   estimatedDuration: task.estimated_duration ?? null,
+  actualTimeSpent: task.actual_time_spent ?? null,
   notes: task.notes ?? null,
   subtaskTitles: (task.subtasks ?? [])
     .map((subtask) => subtask?.title?.trim() ?? "")
@@ -848,6 +852,7 @@ const serializeTaskContext = (task: {
   recurrencePattern: task.recurrence_pattern,
   recurrenceEndDate: task.recurrence_end_date ?? null,
   completed: task.completed ?? null,
+  completedAt: task.completed_at ?? null,
   priority: task.priority ?? null,
   source: task.source ?? null,
   habitSourceId: task.habit_source_id ?? null,
@@ -945,6 +950,7 @@ const mapRitualsToContext = (epics: EpicRecord[]): PlannerContextRitual[] =>
         title: link.habits?.title ?? "Untitled ritual",
         frequency: link.habits?.frequency ?? null,
         preferredTime: link.habits?.preferred_time ?? null,
+        estimatedMinutes: link.habits?.estimated_minutes ?? null,
         currentStreak: null,
       }))
   );
@@ -1010,6 +1016,14 @@ const normalizeClassificationHint = (
 
   if (typeof classification.suggestedDuration === "number") {
     normalized.suggestedDuration = classification.suggestedDuration;
+  }
+
+  const normalizedActivityDuration = normalizePlannerDurationBucket(
+    classification.suggestedActivityDurationMinutes ??
+      (normalizedType === "epic" ? null : classification.suggestedDuration),
+  );
+  if (normalizedActivityDuration !== null) {
+    normalized.suggestedActivityDurationMinutes = normalizedActivityDuration;
   }
 
   if (
@@ -1391,7 +1405,7 @@ export function useCompanionPlanner({
         supabase
           .from("daily_tasks")
           .select(
-            "id, task_text, task_date, category, difficulty, priority, completed, scheduled_time, completed_at, contact_id, habit_source_id",
+            "id, task_text, task_date, category, difficulty, priority, completed, scheduled_time, completed_at, actual_time_spent, contact_id, habit_source_id",
           )
           .eq("user_id", user.id)
           .gte("task_date", tasksStartDate)
@@ -1405,6 +1419,30 @@ export function useCompanionPlanner({
         recentEvents: recentEvents ?? [],
         recentTasks: recentTasks ?? [],
       };
+    },
+  });
+
+  const recentCompletedTasksQuery = useQuery({
+    queryKey: ["companion-planner-recent-completed-tasks", user?.id, todayIso],
+    enabled: enabled && !!user?.id,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      if (!user?.id) return [];
+
+      const startDate = format(addDays(today, -13), "yyyy-MM-dd");
+      const { data, error } = await supabase
+        .from("daily_tasks")
+        .select(
+          "id, task_text, task_date, category, difficulty, priority, completed, scheduled_time, completed_at, estimated_duration, actual_time_spent, notes, recurrence_pattern, recurrence_end_date, source, contact_id, habit_source_id, epic_id",
+        )
+        .eq("user_id", user.id)
+        .eq("completed", true)
+        .not("completed_at", "is", null)
+        .gte("completed_at", `${startDate}T00:00:00.000Z`)
+        .lte("completed_at", `${todayIso}T23:59:59.999Z`);
+
+      if (error) throw error;
+      return data ?? [];
     },
   });
 
@@ -1707,6 +1745,10 @@ export function useCompanionPlanner({
     () => sanitizePlannerContext({
       tasks: mapTasksToContext(contextTasks.map(serializeTaskContext)),
       inboxTasks: mapTasksToContext(inboxTasks.map(serializeTaskContext)),
+      recentCompletedTasks: mapTasksToContext(
+        (recentCompletedTasksQuery.data ?? [])
+          .map(serializeTaskContext),
+      ),
       activeEpics: mapEpicsToContext(activeEpics, todayIso),
       rituals: mapRitualsToContext(activeEpics),
       calendarEvents: contextEventsQuery
@@ -1730,6 +1772,7 @@ export function useCompanionPlanner({
       inboxTasks,
       plannerAISignals,
       priorityScores,
+      recentCompletedTasksQuery.data,
       statInterpretation,
       reflectionSignalsQuery.data,
       scheduleInsights,
@@ -3090,6 +3133,7 @@ export function useCompanionPlanner({
       plannerMemoryQuery.isLoading ||
       contactsAttentionQuery.isLoading ||
       reflectionSignalsQuery.isLoading ||
-      recentStatSignalsQuery.isLoading,
+      recentStatSignalsQuery.isLoading ||
+      recentCompletedTasksQuery.isLoading,
   };
 }

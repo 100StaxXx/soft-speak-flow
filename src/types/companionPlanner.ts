@@ -141,12 +141,14 @@ export interface PlannerContextTask {
   category?: string | null;
   scheduledTime: string | null;
   estimatedDuration: number | null;
+  actualTimeSpent?: number | null;
   notes?: string | null;
   subtaskTitles?: string[];
   difficulty?: string | null;
   recurrencePattern: string | null;
   recurrenceEndDate?: string | null;
   completed?: boolean | null;
+  completedAt?: string | null;
   priority?: string | null;
   source?: string | null;
   habitSourceId?: string | null;
@@ -171,6 +173,7 @@ export interface PlannerContextRitual {
   title: string;
   frequency: string | null;
   preferredTime: string | null;
+  estimatedMinutes?: number | null;
   currentStreak?: number | null;
 }
 
@@ -355,11 +358,13 @@ export interface CompanionPlannerRequest {
     | "reasoning"
     | "suggestedDeadline"
     | "suggestedDuration"
+    | "suggestedActivityDurationMinutes"
     | "timelineAnalysis"
   > | null;
   plannerContext: {
     tasks: PlannerContextTask[];
     inboxTasks: PlannerContextTask[];
+    recentCompletedTasks?: PlannerContextTask[];
     activeEpics: PlannerContextEpic[];
     rituals: PlannerContextRitual[];
     calendarEvents: PlannerContextCalendarEvent[];

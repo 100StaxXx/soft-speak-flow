@@ -410,6 +410,7 @@ describe("JourneysCompanionPlannerModal", () => {
         focusCampaignHealth: {
           overdueQuestCount: 2,
           protectedTodayCount: 0,
+          recentCompletedQuestCount: 1,
           daysWithoutMomentum: 8,
           activeCampaignCount: 4,
         },

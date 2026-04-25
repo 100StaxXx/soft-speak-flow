@@ -3,11 +3,16 @@ installOpenAICompatibilityShim();
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
-import { createSafeErrorResponse, requireProtectedRequest } from "../_shared/abuseProtection.ts";
+import {
+  createSafeErrorResponse,
+  requireProtectedRequest,
+} from "../_shared/abuseProtection.ts";
+import { normalizePlannerDurationBucket } from "../../../src/shared/plannerDurationBuckets.ts";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
 };
 
 // Input validation schema
@@ -21,8 +26,8 @@ const ClassifyTaskIntentSchema = z.object({
 interface ExtractedTask {
   title: string;
   estimatedDuration?: number;
-  energyLevel?: 'low' | 'medium' | 'high';
-  suggestedTimeOfDay?: 'morning' | 'afternoon' | 'evening';
+  energyLevel?: "low" | "medium" | "high";
+  suggestedTimeOfDay?: "morning" | "afternoon" | "evening";
   category?: string;
 }
 
@@ -33,7 +38,7 @@ interface SuggestedTask extends ExtractedTask {
 interface ClarifyingQuestion {
   id: string;
   question: string;
-  type: 'text' | 'select' | 'date' | 'number';
+  type: "text" | "select" | "date" | "number";
   options?: string[];
   placeholder?: string;
   required: boolean;
@@ -43,16 +48,17 @@ interface ClarifyingQuestion {
 interface TimelineAnalysis {
   statedDays: number;
   typicalDays: number;
-  feasibility: 'realistic' | 'aggressive' | 'very_aggressive';
+  feasibility: "realistic" | "aggressive" | "very_aggressive";
   adjustmentFactors: string[];
 }
 
 interface IntentClassification {
-  type: 'quest' | 'epic' | 'habit' | 'brain-dump';
+  type: "quest" | "epic" | "habit" | "brain-dump";
   confidence: number;
   reasoning: string;
   suggestedDeadline?: string;
   suggestedDuration?: number;
+  suggestedActivityDurationMinutes?: number;
   // Brain-dump specific fields
   needsClarification?: boolean;
   clarifyingQuestion?: string;
@@ -78,8 +84,58 @@ interface IntentClassification {
   timelineAnalysis?: TimelineAnalysis;
 }
 
+const normalizeActivityDurationMinutes = (
+  value: unknown,
+): number | undefined => {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return undefined;
+  }
+
+  return normalizePlannerDurationBucket(value) ?? undefined;
+};
+
+const normalizeExtractedTask = <T extends ExtractedTask>(task: T): T => {
+  const normalizedDuration = normalizeActivityDurationMinutes(
+    task.estimatedDuration,
+  );
+
+  return {
+    ...task,
+    ...(normalizedDuration === undefined
+      ? { estimatedDuration: undefined }
+      : { estimatedDuration: normalizedDuration }),
+  };
+};
+
+const normalizeIntentClassification = (
+  classification: IntentClassification,
+): IntentClassification => {
+  const normalized: IntentClassification = {
+    ...classification,
+    extractedTasks: classification.extractedTasks?.map(normalizeExtractedTask),
+    suggestedTasks: classification.suggestedTasks?.map((task) =>
+      normalizeExtractedTask(task)
+    ),
+  };
+
+  const normalizedActivityDuration = normalizeActivityDurationMinutes(
+    classification.suggestedActivityDurationMinutes ??
+      (classification.type === "epic"
+        ? undefined
+        : classification.suggestedDuration),
+  );
+
+  if (normalizedActivityDuration !== undefined) {
+    normalized.suggestedActivityDurationMinutes = normalizedActivityDuration;
+  } else {
+    normalized.suggestedActivityDurationMinutes = undefined;
+  }
+
+  return normalized;
+};
+
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
@@ -100,9 +156,12 @@ serve(async (req) => {
     // Parse and validate input
     const rawInput = await req.json();
     const parseResult = ClassifyTaskIntentSchema.safeParse(rawInput);
-    
+
     if (!parseResult.success) {
-      console.error("[classify-task-intent] Validation error:", parseResult.error.errors);
+      console.error(
+        "[classify-task-intent] Validation error:",
+        parseResult.error.errors,
+      );
       return createSafeErrorResponse(req, {
         status: 400,
         code: "INVALID_INPUT",
@@ -111,14 +170,16 @@ serve(async (req) => {
       });
     }
 
-    const { input, clarification, previousContext, epicAnswers } = parseResult.data;
+    const { input, clarification, previousContext, epicAnswers } =
+      parseResult.data;
 
-    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
     if (!OPENAI_API_KEY) {
-      throw new Error('OPENAI_API_KEY is not configured');
+      throw new Error("OPENAI_API_KEY is not configured");
     }
 
-    const systemPrompt = `You are an intent classifier for a productivity app. Analyze the user's input and classify it as one of:
+    const systemPrompt =
+      `You are an intent classifier for a productivity app. Analyze the user's input and classify it as one of:
 
 1. **quest** - A single, specific task that can be completed in one sitting or one day
    - Examples: "buy groceries", "call mom", "finish report", "clean room"
@@ -360,7 +421,7 @@ For brain-dump type:
    - Example: "Which rooms need cleaning - kitchen, bathroom, bedroom, or all of them?"
    
 3. Extract individual tasks with metadata:
-   - estimatedDuration (in minutes)
+   - estimatedDuration (in minutes, using only these buckets: 10, 15, 20, 30, 45, 60, 90, 120)
    - energyLevel: low/medium/high
    - suggestedTimeOfDay: morning/afternoon/evening
    - category: cleaning, errands, self-care, work, etc.
@@ -379,6 +440,7 @@ Respond ONLY with valid JSON matching this schema:
   "reasoning": "brief explanation",
   "suggestedDeadline": "ISO date or null",
   "suggestedDuration": number or null,
+  "suggestedActivityDurationMinutes": number or null,
   "needsClarification": boolean,
   "clarifyingQuestion": "question string or null (for brain-dump)",
   "clarificationContext": "what info is needed (for brain-dump)",
@@ -390,7 +452,14 @@ Respond ONLY with valid JSON matching this schema:
   "epicContext": "exam_preparation|fitness_goal|learning|project|other",
   "epicDetails": { "subjects": array, "targetDate": string, "hoursPerDay": number, "currentStatus": string, "suggestedTargetDays": number },
   "timelineAnalysis": { "statedDays": number, "typicalDays": number, "feasibility": string, "adjustmentFactors": array } | null
-}`;
+}
+
+DURATION RULES:
+- For epics, use "suggestedDuration" for target days when helpful. You may also use "suggestedActivityDurationMinutes" for a realistic starter work block if that session length is clear; otherwise return null.
+- For quests, habits, and brain-dumps, use "suggestedActivityDurationMinutes" for the best activity estimate.
+- For extractedTasks and suggestedTasks, use only these minute buckets: 10, 15, 20, 30, 45, 60, 90, 120.
+- Never return arbitrary minute values like 37 or 52.
+- If you are unsure, choose the closest sensible bucket or null.`;
 
     // Build user message - include clarification if provided
     let userMessage = input;
@@ -403,22 +472,25 @@ Now extract the tasks based on this additional context.`;
     } else if (epicAnswers && Object.keys(epicAnswers).length > 0) {
       userMessage = `Original goal: "${input}"
 User provided these details:
-${Object.entries(epicAnswers).map(([key, value]) => `- ${key}: ${value}`).join('\n')}
+${
+        Object.entries(epicAnswers).map(([key, value]) => `- ${key}: ${value}`)
+          .join("\n")
+      }
 
 Now provide epic details with suggestedTargetDays calculated from their answers. Set needsClarification to false.`;
     }
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
       headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
-        'Content-Type': 'application/json',
+        "Authorization": `Bearer ${OPENAI_API_KEY}`,
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: "google/gemini-2.5-flash",
         messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userMessage }
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userMessage },
         ],
         temperature: 0.2,
       }),
@@ -427,81 +499,96 @@ Now provide epic details with suggestedTargetDays calculated from their answers.
     if (!response.ok) {
       if (response.status === 429) {
         return new Response(
-          JSON.stringify({ error: 'Rate limit exceeded, please try again later' }),
-          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          JSON.stringify({
+            error: "Rate limit exceeded, please try again later",
+          }),
+          {
+            status: 429,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
         );
       }
       if (response.status === 402) {
         return new Response(
-          JSON.stringify({ error: 'Payment required' }),
-          { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          JSON.stringify({ error: "Payment required" }),
+          {
+            status: 402,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
         );
       }
       const errorText = await response.text();
-      console.error('AI gateway error:', response.status, errorText);
-      throw new Error('AI gateway error');
+      console.error("AI gateway error:", response.status, errorText);
+      throw new Error("AI gateway error");
     }
 
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content;
 
     if (!content) {
-      throw new Error('No content in AI response');
+      throw new Error("No content in AI response");
     }
 
     // Parse the JSON response
     let classification: IntentClassification;
     try {
       // Extract JSON from potential markdown code blocks
-      const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, content];
+      const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/) ||
+        [null, content];
       const jsonStr = jsonMatch[1]?.trim() || content.trim();
       classification = JSON.parse(jsonStr);
     } catch (parseError) {
-      console.error('Failed to parse AI response:', content);
+      console.error("Failed to parse AI response:", content);
       // Default to quest if parsing fails
       classification = {
-        type: 'quest',
+        type: "quest",
         confidence: 0.5,
-        reasoning: 'Could not parse AI response, defaulting to quest',
+        reasoning: "Could not parse AI response, defaulting to quest",
       };
     }
 
     // Validate the classification
-    if (!['quest', 'epic', 'habit', 'brain-dump'].includes(classification.type)) {
-      classification.type = 'quest';
+    if (
+      !["quest", "epic", "habit", "brain-dump"].includes(classification.type)
+    ) {
+      classification.type = "quest";
     }
-    if (typeof classification.confidence !== 'number') {
+    if (typeof classification.confidence !== "number") {
       classification.confidence = 0.5;
     }
 
     // For brain-dump, ensure arrays exist
-    if (classification.type === 'brain-dump') {
+    if (classification.type === "brain-dump") {
       classification.extractedTasks = classification.extractedTasks || [];
       classification.suggestedTasks = classification.suggestedTasks || [];
-      classification.needsClarification = classification.needsClarification ?? false;
+      classification.needsClarification = classification.needsClarification ??
+        false;
     }
 
     // For epic, ensure clarification fields exist - always enable clarification for epics
-    if (classification.type === 'epic') {
+    if (classification.type === "epic") {
       classification.needsClarification = true; // Always show clarification for epics
-      classification.epicClarifyingQuestions = classification.epicClarifyingQuestions || [];
+      classification.epicClarifyingQuestions =
+        classification.epicClarifyingQuestions || [];
     }
 
-    console.log('Classified intent:', { 
-      input, 
-      clarification: !!clarification, 
+    classification = normalizeIntentClassification(classification);
+
+    console.log("Classified intent:", {
+      input,
+      clarification: !!clarification,
       epicAnswers: !!epicAnswers,
       type: classification.type,
       needsClarification: classification.needsClarification,
-      epicQuestionsCount: classification.epicClarifyingQuestions?.length
+      epicQuestionsCount: classification.epicClarifyingQuestions?.length,
     });
 
     return new Response(
       JSON.stringify(classification),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (error) {
-    console.error('classify-task-intent error:', error);
+    console.error("classify-task-intent error:", error);
     return createSafeErrorResponse(req, {
       status: 500,
       code: "INTERNAL_ERROR",
