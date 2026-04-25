@@ -70,6 +70,8 @@ type OnboardingStage =
   | "companion"
   | "journey-begins";
 
+type MentorCatalogStatus = "loading" | "ready" | "unavailable";
+
 export const resolveOnboardingBackdropStage = (
   stage: OnboardingStage,
 ): OnboardingBackdropStage | null => {
@@ -357,6 +359,7 @@ export const StoryOnboarding = ({
   const [faction, setFaction] = useState<FactionType | null>(resumeFaction);
   const [answers, setAnswers] = useState<OnboardingAnswer[]>(resumeAnswers);
   const [mentors, setMentors] = useState<Mentor[]>([]);
+  const [mentorCatalogStatus, setMentorCatalogStatus] = useState<MentorCatalogStatus>("loading");
   const [recommendedMentor, setRecommendedMentor] = useState<Mentor | null>(null);
   const [mentorExplanation, setMentorExplanation] = useState<MentorExplanation | null>(null);
   const [companionAnimal, setCompanionAnimal] = useState(resumeState?.companionLabel ?? "");
@@ -367,9 +370,14 @@ export const StoryOnboarding = ({
   );
   const [pendingCompanionSetup, setPendingCompanionSetup] = useState<CompanionSelectionPreferences | null>(null);
   const [isSubmittingQuestionnaire, setIsSubmittingQuestionnaire] = useState(false);
+  const [isPersistingOnboardingStep, setIsPersistingOnboardingStep] = useState(false);
+  const [isContinuingLater, setIsContinuingLater] = useState(false);
   const [compatibilityScore, setCompatibilityScore] = useState<number | null>(null);
   const mentorRevealTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const journeyCinematicStartedRef = useRef(false);
+  const persistStepInFlightRef = useRef(false);
+  const continueLaterInFlightRef = useRef(false);
+  const mentorResultRecoveryNotifiedRef = useRef(false);
   const backdropStage = resolveOnboardingBackdropStage(stage);
 
   const clearMentorRevealTimeout = useCallback(() => {
@@ -473,6 +481,33 @@ export const StoryOnboarding = ({
     });
   }, [persistOnboardingProgress, user?.id]);
 
+  const persistStageBeforeAdvance = useCallback(async (
+    nextStep: OnboardingResumeStep,
+    dataPatch: Record<string, unknown> = {},
+    nextStage: OnboardingStage = nextStep,
+  ) => {
+    if (persistStepInFlightRef.current) return false;
+
+    persistStepInFlightRef.current = true;
+    setIsPersistingOnboardingStep(true);
+    try {
+      await persistOnboardingProgress(nextStep, dataPatch);
+      setStage(nextStage);
+      return true;
+    } catch (error) {
+      onboardingLog.warn("Failed to persist onboarding step before advancing", {
+        userId: user?.id,
+        nextStep,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      toast.error("We couldn't save your progress right now. Please try again.");
+      return false;
+    } finally {
+      persistStepInFlightRef.current = false;
+      setIsPersistingOnboardingStep(false);
+    }
+  }, [persistOnboardingProgress, user?.id]);
+
   const fetchActiveMentors = useCallback(async (): Promise<Mentor[]> => {
     const { data, error } = await supabase
       .from("mentors")
@@ -517,6 +552,7 @@ export const StoryOnboarding = ({
       const activeMentors = await fetchActiveMentors();
       if (cancelled) return;
       setMentors(activeMentors);
+      setMentorCatalogStatus(activeMentors.length > 0 ? "ready" : "unavailable");
     };
     void loadMentors();
     return () => {
@@ -525,12 +561,26 @@ export const StoryOnboarding = ({
   }, [fetchActiveMentors]);
 
   useEffect(() => {
-    if (!resumeData || mentors.length === 0 || recommendedMentor) return;
+    if (!resumeData || recommendedMentor) return;
     const mentorId = typeof resumeData.mentorId === "string" ? resumeData.mentorId : null;
     if (!mentorId) return;
 
     const mentor = mentors.find((candidate) => candidate.id === mentorId);
-    if (!mentor) return;
+    if (!mentor) {
+      if (stage !== "mentor-result" || mentorCatalogStatus === "loading") return;
+
+      if (!mentorResultRecoveryNotifiedRef.current) {
+        mentorResultRecoveryNotifiedRef.current = true;
+        if (mentorCatalogStatus === "ready") {
+          toast.error("We couldn't reload your saved guide. Please choose one from the guide list.");
+        } else {
+          toast.error("We couldn't reload the guide catalog. Please retry your guide match.");
+        }
+      }
+
+      setStage(mentorCatalogStatus === "ready" ? "mentor-grid" : "questionnaire");
+      return;
+    }
 
     setRecommendedMentor(mentor);
     setMentorExplanation(
@@ -539,7 +589,7 @@ export const StoryOnboarding = ({
           answers.map((answer) => [answer.questionId, answer.tags[0] || ""]),
         )),
     );
-  }, [answers, mentors, recommendedMentor, resumeData]);
+  }, [answers, mentorCatalogStatus, mentors, recommendedMentor, resumeData, stage]);
 
   const handlePrologueComplete = async (name: string) => {
     setUserName(name);
@@ -579,8 +629,7 @@ export const StoryOnboarding = ({
   };
 
   const handleDestinyComplete = () => {
-    setStage("faction");
-    persistOnboardingProgressSafely("faction", { userName });
+    void persistStageBeforeAdvance("faction", { userName });
   };
 
   const handleFactionComplete = async (selectedFaction: FactionType) => {
@@ -655,6 +704,7 @@ export const StoryOnboarding = ({
       if (mentors.length === 0 && mentorPool.length > 0) {
         setMentors(mentorPool);
       }
+      setMentorCatalogStatus(mentorPool.length > 0 ? "ready" : "unavailable");
 
       if (mentorPool.length === 0) {
         onboardingLog.error("Mentor recommendation aborted: no active mentors available");
@@ -825,15 +875,13 @@ export const StoryOnboarding = ({
   };
 
   const handleCompanionBack = useCallback(() => {
-    setStage("story-tone");
-    persistOnboardingProgressSafely("story-tone", { story_tone: selectedStoryTone });
-  }, [persistOnboardingProgressSafely, selectedStoryTone]);
+    void persistStageBeforeAdvance("story-tone", { story_tone: selectedStoryTone });
+  }, [persistStageBeforeAdvance, selectedStoryTone]);
 
   const handleStoryToneComplete = useCallback((selection: OnboardingStoryToneSelectionValue) => {
     setSelectedStoryTone(selection.storyTone);
-    setStage("egg-prelude");
-    persistOnboardingProgressSafely("egg-prelude", { story_tone: selection.storyTone });
-  }, [persistOnboardingProgressSafely]);
+    void persistStageBeforeAdvance("egg-prelude", { story_tone: selection.storyTone });
+  }, [persistStageBeforeAdvance]);
 
   const handleStoryToneBack = useCallback(() => {
     if (isResetMode) {
@@ -851,14 +899,12 @@ export const StoryOnboarding = ({
   }, [isResetMode, mentorExplanation, mentors.length, recommendedMentor]);
 
   const handleEggPreludeComplete = useCallback(() => {
-    setStage("companion");
-    persistOnboardingProgressSafely("companion", { story_tone: selectedStoryTone });
-  }, [persistOnboardingProgressSafely, selectedStoryTone]);
+    void persistStageBeforeAdvance("companion", { story_tone: selectedStoryTone });
+  }, [persistStageBeforeAdvance, selectedStoryTone]);
 
   const handleEggPreludeBack = useCallback(() => {
-    setStage("story-tone");
-    persistOnboardingProgressSafely("story-tone", { story_tone: selectedStoryTone });
-  }, [persistOnboardingProgressSafely, selectedStoryTone]);
+    void persistStageBeforeAdvance("story-tone", { story_tone: selectedStoryTone });
+  }, [persistStageBeforeAdvance, selectedStoryTone]);
 
   const getCompanionSelectionDisplayName = useCallback((preferences: CompanionSelectionPreferences) => {
     if (preferences.companionName?.trim()) {
@@ -868,9 +914,9 @@ export const StoryOnboarding = ({
     return preferences.presetId ? preferences.spiritAnimal : eggDisplayName;
   }, []);
 
-  const persistJourneyBeginsStep = useCallback(() => {
-    persistOnboardingProgressSafely("journey-begins", { story_tone: selectedStoryTone });
-  }, [persistOnboardingProgressSafely, selectedStoryTone]);
+  const persistJourneyBeginsStep = useCallback(async () => {
+    await persistOnboardingProgress("journey-begins", { story_tone: selectedStoryTone });
+  }, [persistOnboardingProgress, selectedStoryTone]);
 
   const runCompanionSetup = useCallback(async (
     preferences: CompanionSelectionPreferences,
@@ -888,8 +934,18 @@ export const StoryOnboarding = ({
     setCompanionSetupStatus("pending");
     if (enterJourneyImmediately) {
       setCompanionAnimal(selectionDisplayName);
+      try {
+        await persistJourneyBeginsStep();
+      } catch (error) {
+        setCompanionSetupStatus("idle");
+        onboardingLog.warn("Failed to persist journey-begins before companion setup", {
+          userId: user.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        toast.error("We couldn't save your progress right now. Please try again.");
+        return false;
+      }
       setStage("journey-begins");
-      persistJourneyBeginsStep();
     }
     setIsCreatingCompanion(true);
 
@@ -1314,17 +1370,42 @@ export const StoryOnboarding = ({
   };
 
   const handleContinueLater = async () => {
+    if (continueLaterInFlightRef.current) return;
+
     const persistedStage: OnboardingResumeStep = stage === "calculating" ? "questionnaire" : stage;
-    persistOnboardingProgressSafely(persistedStage, {
-      userName,
-      faction,
-      questionnaireAnswers: serializeOnboardingAnswers(answers),
-      story_tone: selectedStoryTone,
-    });
+    continueLaterInFlightRef.current = true;
+    setIsContinuingLater(true);
+    try {
+      await persistOnboardingProgress(persistedStage, {
+        userName,
+        faction,
+        questionnaireAnswers: serializeOnboardingAnswers(answers),
+        story_tone: selectedStoryTone,
+      });
+    } catch (error) {
+      onboardingLog.warn("Failed to continue onboarding later", {
+        userId: user?.id,
+        persistedStage,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      toast.error("We couldn't save your progress right now. Please try again.");
+      continueLaterInFlightRef.current = false;
+      setIsContinuingLater(false);
+      return;
+    }
+
     try {
       await signOut?.();
-    } finally {
       safeNavigate(navigate, "/auth");
+    } catch (error) {
+      onboardingLog.warn("Saved onboarding progress but failed to sign out", {
+        userId: user?.id,
+        persistedStage,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      toast.error("We saved your progress, but couldn't sign you out. Please try again.");
+      continueLaterInFlightRef.current = false;
+      setIsContinuingLater(false);
     }
   };
 
@@ -1336,9 +1417,10 @@ export const StoryOnboarding = ({
         <button
           type="button"
           onClick={handleContinueLater}
-          className="fixed right-4 top-[calc(env(safe-area-inset-top,0px)+1rem)] z-30 rounded-full border border-white/12 bg-black/30 px-4 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-white/72 backdrop-blur-md transition-colors hover:bg-black/45 hover:text-white"
+          disabled={isContinuingLater || isPersistingOnboardingStep}
+          className="fixed right-4 top-[calc(env(safe-area-inset-top,0px)+1rem)] z-30 rounded-full border border-white/12 bg-black/30 px-4 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-white/72 backdrop-blur-md transition-colors hover:bg-black/45 hover:text-white disabled:cursor-not-allowed disabled:opacity-55"
         >
-          Continue Later
+          {isContinuingLater ? "Saving..." : "Continue Later"}
         </button>
       ) : null}
       
@@ -1392,6 +1474,7 @@ export const StoryOnboarding = ({
               faction={faction}
               onComplete={handleQuestionnaireComplete}
               isSubmitting={isSubmittingQuestionnaire}
+              initialAnswers={answers}
             />
           </motion.div>
         )}
@@ -1424,6 +1507,39 @@ export const StoryOnboarding = ({
               onSeeAll={handleSeeAllMentors}
               seeAllLabel="See All Guides"
             />
+          </motion.div>
+        )}
+
+        {stage === "mentor-result" && (!recommendedMentor || !mentorExplanation) && (
+          <motion.div
+            key="mentor-result-recovery"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="relative z-10 flex min-h-screen items-center justify-center px-6"
+          >
+            <div className="max-w-md rounded-3xl border border-white/10 bg-black/35 p-6 text-center text-white shadow-2xl backdrop-blur-xl">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.22em] text-white/50">
+                Guide Match
+              </p>
+              <h1 className="mb-3 text-2xl font-bold">
+                {mentorCatalogStatus === "loading" ? "Restoring your guide..." : "Let's reconnect your guide"}
+              </h1>
+              <p className="text-sm leading-6 text-white/70">
+                {mentorCatalogStatus === "loading"
+                  ? "We saved your progress. Give us a moment to reload the guide catalog."
+                  : "We couldn't restore that exact guide from your saved progress, so we'll help you pick or rematch safely."}
+              </p>
+              {mentorCatalogStatus !== "loading" ? (
+                <button
+                  type="button"
+                  onClick={() => setStage(mentors.length > 0 ? "mentor-grid" : "questionnaire")}
+                  className="mt-6 rounded-full bg-white px-5 py-2 text-sm font-semibold text-black transition-transform hover:scale-[1.02]"
+                >
+                  {mentors.length > 0 ? "Choose a Guide" : "Retry Guide Match"}
+                </button>
+              ) : null}
+            </div>
           </motion.div>
         )}
 

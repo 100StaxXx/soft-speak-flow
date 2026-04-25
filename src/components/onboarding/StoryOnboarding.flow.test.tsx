@@ -76,6 +76,7 @@ const mocks = vi.hoisted(() => ({
   loggerError: vi.fn(),
   loggerWarn: vi.fn(),
   loggerInfo: vi.fn(),
+  signOut: vi.fn(),
 }));
 
 const storageMocks = vi.hoisted(() => {
@@ -125,6 +126,7 @@ vi.mock("framer-motion", async () => {
 vi.mock("@/hooks/useAuth", () => ({
   useAuth: () => ({
     user: { id: "user-1" },
+    signOut: mocks.signOut,
   }),
 }));
 
@@ -281,12 +283,15 @@ vi.mock("./StoryQuestionnaire", () => ({
   StoryQuestionnaire: ({
     onComplete,
     isSubmitting,
+    initialAnswers = [],
   }: {
     onComplete: (answers: typeof QUESTIONNAIRE_ANSWERS) => void;
     isSubmitting?: boolean;
+    initialAnswers?: typeof QUESTIONNAIRE_ANSWERS;
   }) => (
     <div>
       <div data-testid="questionnaire-stage">{isSubmitting ? "submitting" : "idle"}</div>
+      <div data-testid="questionnaire-initial-count">{initialAnswers.length}</div>
       <button type="button" onClick={() => onComplete(QUESTIONNAIRE_ANSWERS)} disabled={isSubmitting}>
         questionnaire-submit
       </button>
@@ -485,9 +490,11 @@ describe("StoryOnboarding questionnaire submission flow", () => {
     mocks.loggerError.mockReset();
     mocks.loggerWarn.mockReset();
     mocks.loggerInfo.mockReset();
+    mocks.signOut.mockReset();
 
     mocks.profilesMaybeSingle.mockResolvedValue({ data: { onboarding_data: {} }, error: null });
     mocks.profilesUpdateEq.mockResolvedValue({ error: null });
+    mocks.signOut.mockResolvedValue(undefined);
     mocks.mentorsEq.mockResolvedValue({ data: [ACTIVE_MENTOR], error: null });
     mocks.questionnaireUpsert.mockResolvedValue({ error: null });
     mocks.createCompanionMutateAsync.mockResolvedValue({ id: "companion-1" });
@@ -852,6 +859,7 @@ describe("StoryOnboarding questionnaire submission flow", () => {
       fireEvent.click(screen.getByRole("button", { name: "mentor-confirm" }));
       fireEvent.click(await screen.findByRole("button", { name: "story-tone-next" }));
 
+      expect(await screen.findByTestId("egg-prelude-stage")).toBeInTheDocument();
       expect(screen.getByTestId("egg-prelude-tone")).toHaveTextContent("dark_intense");
       expect(screen.getByTestId("egg-prelude-species")).toHaveTextContent("companion");
 
@@ -1090,6 +1098,229 @@ describe("StoryOnboarding questionnaire submission flow", () => {
     expect(mocks.profilesUpdateEq).toHaveBeenCalled();
     expect(mocks.toastSuccess).toHaveBeenCalledWith(
       "Welcome to Cosmiq! Your journey begins.",
+      expect.objectContaining({ duration: expect.any(Number) }),
+    );
+  });
+
+  it("awaits progress persistence before continuing onboarding later", async () => {
+    let resolveSave: ((value: { error: null }) => void) | null = null;
+    mocks.profilesUpdateEq.mockImplementationOnce(
+      () => new Promise((resolve) => {
+        resolveSave = resolve as (value: { error: null }) => void;
+      }),
+    );
+
+    renderOnboarding({
+      resumeState: {
+        stage: "story-tone",
+        userName: "Nova",
+        onboardingData: {
+          story_tone: "dark_intense",
+          questionnaireAnswers: QUESTIONNAIRE_ANSWERS,
+        },
+      },
+    });
+
+    await screen.findByTestId("story-tone-stage");
+    fireEvent.click(screen.getByRole("button", { name: "Continue Later" }));
+
+    await waitFor(() => {
+      expect(mocks.profilesUpdateEq).toHaveBeenCalled();
+    });
+    expect(mocks.signOut).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolveSave?.({ error: null });
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(mocks.signOut).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("keeps the current stage visible when Continue Later cannot save", async () => {
+    mocks.profilesUpdateEq.mockResolvedValueOnce({
+      error: new Error("network down"),
+    });
+
+    renderOnboarding({
+      resumeState: {
+        stage: "story-tone",
+        userName: "Nova",
+        onboardingData: {
+          story_tone: "dark_intense",
+          questionnaireAnswers: QUESTIONNAIRE_ANSWERS,
+        },
+      },
+    });
+
+    await screen.findByTestId("story-tone-stage");
+    fireEvent.click(screen.getByRole("button", { name: "Continue Later" }));
+
+    await waitFor(() => {
+      expect(mocks.toastError).toHaveBeenCalledWith(
+        "We couldn't save your progress right now. Please try again.",
+        expect.objectContaining({ duration: expect.any(Number) }),
+      );
+    });
+    expect(screen.getByTestId("story-tone-stage")).toBeInTheDocument();
+    expect(mocks.signOut).not.toHaveBeenCalled();
+  });
+
+  it("does not advance from story tone until the next step is persisted", async () => {
+    let resolveSave: ((value: { error: null }) => void) | null = null;
+    mocks.profilesUpdateEq.mockImplementationOnce(
+      () => new Promise((resolve) => {
+        resolveSave = resolve as (value: { error: null }) => void;
+      }),
+    );
+
+    renderOnboarding({
+      resumeState: {
+        stage: "story-tone",
+        userName: "Nova",
+        onboardingData: {
+          story_tone: "epic_adventure",
+          questionnaireAnswers: QUESTIONNAIRE_ANSWERS,
+        },
+      },
+    });
+
+    await screen.findByTestId("story-tone-stage");
+    fireEvent.click(screen.getByRole("button", { name: "story-tone-next" }));
+
+    await waitFor(() => {
+      expect(mocks.profilesUpdateEq).toHaveBeenCalled();
+    });
+    expect(screen.getByTestId("story-tone-stage")).toBeInTheDocument();
+    expect(screen.queryByTestId("egg-prelude-stage")).not.toBeInTheDocument();
+
+    await act(async () => {
+      resolveSave?.({ error: null });
+      await Promise.resolve();
+    });
+
+    expect(await screen.findByTestId("egg-prelude-stage")).toBeInTheDocument();
+  });
+
+  it.each([
+    ["story-tone", "story-tone-stage"],
+    ["egg-prelude", "egg-prelude-stage"],
+    ["companion", "companion-stage"],
+    ["mentor-grid", "mentor-grid-stage"],
+  ] as const)("resumes the %s onboarding stage", async (stage, testId) => {
+    renderOnboarding({
+      resumeState: {
+        stage,
+        userName: "Nova",
+        faction: "starfall",
+        onboardingData: {
+          story_tone: "dark_intense",
+          questionnaireAnswers: QUESTIONNAIRE_ANSWERS,
+        },
+      },
+    });
+
+    expect(await screen.findByTestId(testId)).toBeTruthy();
+  });
+
+  it("resumes questionnaire with saved answers available to the questionnaire", async () => {
+    renderOnboarding({
+      resumeState: {
+        stage: "questionnaire",
+        userName: "Nova",
+        faction: "starfall",
+        onboardingData: {
+          questionnaireAnswers: QUESTIONNAIRE_ANSWERS.slice(0, 2),
+        },
+      },
+    });
+
+    expect(await screen.findByTestId("questionnaire-stage")).toBeTruthy();
+    expect(screen.getByTestId("questionnaire-initial-count")).toHaveTextContent("2");
+  });
+
+  it("resumes mentor result with the saved mentor and explanation", async () => {
+    renderOnboarding({
+      resumeState: {
+        stage: "mentor-result",
+        userName: "Nova",
+        faction: "starfall",
+        onboardingData: {
+          mentorId: ACTIVE_MENTOR.id,
+          questionnaireAnswers: QUESTIONNAIRE_ANSWERS,
+          explanation: {
+            title: "Your Guide is: The Sage",
+            subtitle: "Quiet Clarity",
+            paragraph: "A fit for focused builders.",
+            bullets: ["Clear guidance"],
+          },
+        },
+      },
+    });
+
+    expect(await screen.findByTestId("mentor-result-stage")).toBeInTheDocument();
+  });
+
+  it("falls back to the mentor grid when the saved mentor is no longer active", async () => {
+    mocks.mentorsEq.mockResolvedValueOnce({
+      data: [{ ...ACTIVE_MENTOR, id: "mentor-2", name: "The Navigator" }],
+      error: null,
+    });
+
+    renderOnboarding({
+      resumeState: {
+        stage: "mentor-result",
+        userName: "Nova",
+        faction: "starfall",
+        onboardingData: {
+          mentorId: ACTIVE_MENTOR.id,
+          questionnaireAnswers: QUESTIONNAIRE_ANSWERS,
+          explanation: {
+            title: "Your Guide is: The Sage",
+            subtitle: "Quiet Clarity",
+            paragraph: "A fit for focused builders.",
+            bullets: ["Clear guidance"],
+          },
+        },
+      },
+    });
+
+    expect(await screen.findByTestId("mentor-grid-stage")).toBeInTheDocument();
+    expect(mocks.toastError).toHaveBeenCalledWith(
+      "We couldn't reload your saved guide. Please choose one from the guide list.",
+      expect.objectContaining({ duration: expect.any(Number) }),
+    );
+  });
+
+  it("returns to the questionnaire when mentor-result resume cannot reload the guide catalog", async () => {
+    mocks.mentorsEq.mockResolvedValueOnce({ data: [], error: null });
+
+    renderOnboarding({
+      resumeState: {
+        stage: "mentor-result",
+        userName: "Nova",
+        faction: "starfall",
+        onboardingData: {
+          mentorId: ACTIVE_MENTOR.id,
+          questionnaireAnswers: QUESTIONNAIRE_ANSWERS,
+          explanation: {
+            title: "Your Guide is: The Sage",
+            subtitle: "Quiet Clarity",
+            paragraph: "A fit for focused builders.",
+            bullets: ["Clear guidance"],
+          },
+        },
+      },
+    });
+
+    expect(await screen.findByTestId("questionnaire-stage")).toBeInTheDocument();
+    expect(screen.getByTestId("questionnaire-initial-count")).toHaveTextContent(
+      String(QUESTIONNAIRE_ANSWERS.length),
+    );
+    expect(mocks.toastError).toHaveBeenCalledWith(
+      "We couldn't reload the guide catalog. Please retry your guide match.",
       expect.objectContaining({ duration: expect.any(Number) }),
     );
   });

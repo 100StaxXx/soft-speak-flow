@@ -3,6 +3,7 @@ import { safeLocalStorage } from "@/utils/storage";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/components/ui/sonner";
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -14,6 +15,17 @@ const getDismissedTabIntros = (onboardingData: unknown): Record<string, boolean>
       .filter((entry): entry is [string, boolean] => typeof entry[1] === "boolean"),
   );
 };
+
+type MarkTabIntroDismissedRpc = (
+  functionName: "mark_profile_tab_intro_dismissed",
+  args: { p_tab_name: string },
+) => Promise<{ error: { message?: string } | null }>;
+
+const markTabIntroDismissed = (tabName: string) =>
+  (supabase.rpc as unknown as MarkTabIntroDismissedRpc)(
+    "mark_profile_tab_intro_dismissed",
+    { p_tab_name: tabName },
+  );
 
 /**
  * Hook to manage first-time modal display per tab/section
@@ -72,21 +84,24 @@ export function useFirstTimeModal(tabName: string) {
     setShowModal(false);
     if (userId) {
       const storageKey = `tab_intro_${tabName}_${userId}`;
-      safeLocalStorage.setItem(storageKey, 'true');
-      void supabase
-        .from("profiles")
-        .update({
-          onboarding_data: {
-            ...onboardingData,
-            tab_intros: {
-              ...dismissedTabIntros,
-              [tabName]: true,
-            },
-          } as any,
+      safeLocalStorage.setItem(storageKey, "true");
+      if (hasSeenServerModal) return;
+
+      void markTabIntroDismissed(tabName)
+        .then(({ error }) => {
+          if (error) throw error;
         })
-        .eq("id", userId);
+        .catch((error: unknown) => {
+          console.warn("Failed to persist tab intro dismissal", {
+            tabName,
+            error: error instanceof Error ? error.message : String(error),
+          });
+          safeLocalStorage.removeItem(storageKey);
+          setShowModal(true);
+          toast.error("We couldn't save that tutorial dismissal. Please try again.");
+        });
     }
-  }, [dismissedTabIntros, onboardingData, userId, tabName]);
+  }, [hasSeenServerModal, userId, tabName]);
 
   const openModal = useCallback(() => {
     setShowModal(true);

@@ -124,15 +124,25 @@ interface StoryQuestionnaireProps {
   faction: FactionType;
   onComplete: (answers: OnboardingAnswer[]) => void;
   isSubmitting?: boolean;
+  initialAnswers?: OnboardingAnswer[];
 }
 
 export const StoryQuestionnaire = ({
   faction,
   onComplete,
   isSubmitting = false,
+  initialAnswers = [],
 }: StoryQuestionnaireProps) => {
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [answers, setAnswers] = useState<OnboardingAnswer[]>([]);
+  const seededAnswers = useMemo(
+    () => initialAnswers.slice(0, questions.length),
+    [initialAnswers],
+  );
+  const initialQuestionIndex = useMemo(
+    () => Math.min(seededAnswers.length, questions.length - 1),
+    [seededAnswers.length],
+  );
+  const [currentIndex, setCurrentIndex] = useState(initialQuestionIndex);
+  const [answers, setAnswers] = useState<OnboardingAnswer[]>(seededAnswers);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const continueLockRef = useRef(false);
   const recentNativePressRef = useRef<{ key: string; at: number } | null>(null);

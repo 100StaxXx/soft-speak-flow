@@ -6,7 +6,8 @@ const mocks = vi.hoisted(() => ({
   profile: {
     onboarding_data: {},
   } as Record<string, unknown> | null,
-  updatePayloads: [] as Array<Record<string, unknown>>,
+  rpc: vi.fn(),
+  toastError: vi.fn(),
 }));
 
 const storageMocks = vi.hoisted(() => {
@@ -52,14 +53,13 @@ vi.mock("@/utils/storage", () => ({
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
-    from: vi.fn(() => ({
-      update: vi.fn((payload: Record<string, unknown>) => ({
-        eq: vi.fn(async () => {
-          mocks.updatePayloads.push(payload);
-          return { error: null };
-        }),
-      })),
-    })),
+    rpc: mocks.rpc,
+  },
+}));
+
+vi.mock("@/components/ui/sonner", () => ({
+  toast: {
+    error: mocks.toastError,
   },
 }));
 
@@ -71,7 +71,7 @@ describe("useFirstTimeModal", () => {
     storageMocks.reset();
     mocks.user = { id: "user-1" };
     mocks.profile = { onboarding_data: {} };
-    mocks.updatePayloads = [];
+    mocks.rpc.mockResolvedValue({ error: null });
   });
 
   it("shows once and persists dismissal locally plus remotely", async () => {
@@ -91,13 +91,10 @@ describe("useFirstTimeModal", () => {
       "true",
     );
     await waitFor(() => {
-      expect(mocks.updatePayloads[0]).toMatchObject({
-        onboarding_data: {
-          tab_intros: {
-            search: true,
-          },
-        },
-      });
+      expect(mocks.rpc).toHaveBeenCalledWith(
+        "mark_profile_tab_intro_dismissed",
+        { p_tab_name: "search" },
+      );
     });
   });
 
@@ -119,5 +116,31 @@ describe("useFirstTimeModal", () => {
     });
 
     expect(result.current.showModal).toBe(true);
+    expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+
+  it("restores the modal when remote dismissal persistence fails", async () => {
+    mocks.rpc.mockResolvedValueOnce({ error: new Error("network down") });
+    const { result } = renderHook(() => useFirstTimeModal("search"));
+
+    await waitFor(() => {
+      expect(result.current.showModal).toBe(true);
+    });
+
+    act(() => {
+      result.current.dismissModal();
+    });
+
+    expect(result.current.showModal).toBe(false);
+
+    await waitFor(() => {
+      expect(result.current.showModal).toBe(true);
+    });
+    expect(storageMocks.safeLocalStorage.removeItem).toHaveBeenCalledWith(
+      "tab_intro_search_user-1",
+    );
+    expect(mocks.toastError).toHaveBeenCalledWith(
+      "We couldn't save that tutorial dismissal. Please try again.",
+    );
   });
 });

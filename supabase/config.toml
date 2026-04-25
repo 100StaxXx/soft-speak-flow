@@ -55,9 +55,6 @@ verify_jwt = false
 [functions.auth-gateway]
 verify_jwt = false
 
-[functions.generate-tutorial-tts]
-verify_jwt = false
-
 [functions.generate-quote-image]
 verify_jwt = true
 

@@ -62,7 +62,6 @@ Medium:
 - `generate-memorial-image`
 - `generate-quote-image`
 - `generate-zodiac-images`
-- `generate-tutorial-tts`
 
 Secondary scripted or workflow-driven spend sources:
 

@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { StoryQuestionnaire } from "./StoryQuestionnaire";
+import { StoryQuestionnaire, type OnboardingAnswer } from "./StoryQuestionnaire";
 
 vi.mock("framer-motion", async () => {
   const React = await import("react");
@@ -22,13 +22,17 @@ vi.mock("framer-motion", async () => {
   };
 });
 
-const renderQuestionnaire = (isSubmitting = false) => {
+const renderQuestionnaire = (
+  isSubmitting = false,
+  initialAnswers: OnboardingAnswer[] = [],
+) => {
   const onComplete = vi.fn();
   render(
     <StoryQuestionnaire
       faction="stellar"
       onComplete={onComplete}
       isSubmitting={isSubmitting}
+      initialAnswers={initialAnswers}
     />,
   );
 
@@ -92,6 +96,28 @@ describe("StoryQuestionnaire", () => {
     expect(screen.getByText(/what do you want to work on right now/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /emotions & healing/i })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("button", { name: /continue/i })).not.toBeDisabled();
+  });
+
+  it("resumes at the next unanswered question when initial answers are provided", () => {
+    renderQuestionnaire(false, [
+      {
+        questionId: "mentor_energy",
+        optionId: "feminine_presence",
+        answer: "Woman",
+        tags: ["feminine_preference"],
+      },
+      {
+        questionId: "focus_area",
+        optionId: "clarity_mindset",
+        answer: "Clarity & mindset",
+        tags: ["calm", "discipline"],
+      },
+    ]);
+
+    expect(screen.getByText(/how do you want guidance to feel/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /back/i }));
+    expect(screen.getByText(/what do you want to work on right now/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /clarity & mindset/i })).toHaveAttribute("aria-pressed", "true");
   });
 
   it("dedupes touchstart and click on the final continue action", () => {
