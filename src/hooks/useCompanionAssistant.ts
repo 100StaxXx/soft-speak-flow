@@ -356,8 +356,11 @@ const isSyntheticResolutionMessage = (message: string) => {
   return normalized === "confirm" || normalized === "cancel";
 };
 
-const shouldFallbackToLegacyAgent = (parsed: ParsedFunctionInvokeError) => {
-  const source = [
+const getParsedFunctionCode = (parsed: ParsedFunctionInvokeError) =>
+  parsed.responsePayload?.code ?? parsed.code;
+
+const getCompanionAgentErrorSource = (parsed: ParsedFunctionInvokeError) =>
+  [
     parsed.name,
     parsed.message,
     parsed.backendMessage,
@@ -371,18 +374,89 @@ const shouldFallbackToLegacyAgent = (parsed: ParsedFunctionInvokeError) => {
     .join(" ")
     .toLowerCase();
 
+const hasCompanionAgentSchemaSignal = (source: string) =>
+  source.includes("does not exist") ||
+  source.includes("undefined_table") ||
+  source.includes("undefined_column") ||
+  source.includes("undefined_function") ||
+  source.includes("schema cache") ||
+  source.includes("relation") ||
+  source.includes("column");
+
+const isMissingCompanionAgentFunctionError = (
+  parsed: ParsedFunctionInvokeError,
+) => {
+  const code = getParsedFunctionCode(parsed)?.toLowerCase() ?? "";
+  const source = getCompanionAgentErrorSource(parsed);
+
+  return code.includes("function_not_found") ||
+    source.includes("function not found") ||
+    source.includes("no route matched") ||
+    source.includes("could not find function") ||
+    source.includes("could not find the function") ||
+    (parsed.status === 404 && !parsed.backendMessage);
+};
+
+const isCompanionAgentSetupError = (parsed: ParsedFunctionInvokeError) => {
+  const code = getParsedFunctionCode(parsed)?.toLowerCase() ?? "";
+  const source = getCompanionAgentErrorSource(parsed);
+
+  if (
+    code === "service_misconfigured" ||
+    code === "abuse_check_failed"
+  ) {
+    return true;
+  }
+
+  if (!hasCompanionAgentSchemaSignal(source)) return false;
+
+  return [
+    "companion_chats",
+    "companion_chat_threads",
+    "companion_pending_actions",
+    "openai_conversation_id",
+    "last_openai_response_id",
+    "companion_mode",
+    "companion_mode_adaptation_enabled",
+    "consume_abuse_protection",
+    "abuse_protection_config",
+    "cost_guardrail_config",
+    "cost_guardrail_state",
+  ].some((token) => source.includes(token));
+};
+
+const toUserFacingCompanionAgentError = (
+  parsed: ParsedFunctionInvokeError,
+) => {
+  const code = getParsedFunctionCode(parsed)?.toUpperCase();
+
+  if (code === "COST_GUARDRAIL_BLOCKED") {
+    return "Companion Agent is temporarily paused in this environment. Please try again later.";
+  }
+
+  if (isMissingCompanionAgentFunctionError(parsed)) {
+    return "Companion Agent isn't live in this environment yet. Please try again after the backend is updated.";
+  }
+
+  if (isCompanionAgentSetupError(parsed)) {
+    return "Companion Agent is still being set up here. Please try again after the latest backend update.";
+  }
+
+  return toUserFacingFunctionError(parsed, { action: "send your message" });
+};
+
+const shouldFallbackToLegacyAgent = (parsed: ParsedFunctionInvokeError) => {
+  const source = getCompanionAgentErrorSource(parsed);
+
   const hasSchemaSignal = source.includes("does not exist") ||
     source.includes("undefined_table") ||
     source.includes("undefined_column") ||
+    source.includes("undefined_function") ||
     source.includes("schema cache") ||
     source.includes("relation") ||
     source.includes("column");
 
-  return source.includes("function not found") ||
-    source.includes("no route matched") ||
-    source.includes("could not find function") ||
-    source.includes("could not find the function") ||
-    (parsed.status === 404 && !parsed.backendMessage) ||
+  return isMissingCompanionAgentFunctionError(parsed) ||
     (hasSchemaSignal && (
       source.includes("companion_pending_actions") ||
       source.includes("openai_conversation_id") ||
@@ -902,9 +976,19 @@ export function useCompanionAssistant({
       void invalidateThreads();
       return true;
     } catch (error) {
-      console.error("Failed to submit companion agent message:", error);
       const parsed = await parseFunctionInvokeError(error);
-      if (shouldFallbackToLegacyAgent(parsed)) {
+      const shouldFallback = shouldFallbackToLegacyAgent(parsed);
+      console.error("Failed to submit companion agent message:", {
+        status: parsed.status ?? null,
+        code: getParsedFunctionCode(parsed) ?? null,
+        requestId: parsed.requestId ?? null,
+        category: parsed.category ?? "unknown",
+        surface,
+        sessionId: activeSessionIdRef.current,
+        fallbackToLegacy: shouldFallback,
+      });
+
+      if (shouldFallback) {
         legacyAssistant.hydrateFromUnifiedState?.({
           sessionId: activeSessionIdRef.current,
           messages: nextUnifiedMessages,
@@ -917,7 +1001,7 @@ export function useCompanionAssistant({
       }
 
       toast.error(
-        toUserFacingFunctionError(parsed, { action: "send your message" }),
+        toUserFacingCompanionAgentError(parsed),
       );
       return false;
     } finally {

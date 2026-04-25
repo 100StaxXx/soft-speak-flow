@@ -149,6 +149,27 @@ const neglectedImageModule = await import(
 );
 const mentorAudioModule = await import("./generate-mentor-audio/index.ts");
 
+const EXPECTED_MENTOR_VOICE_IDS = [
+  ["sage", "sage", "mcuuWJIofmzgKEGk3EMA"],
+  ["lyra", "lyra", "fgDJOgmENIR82PueQrVs"],
+  ["icon", "icon", "6p0P6gezgvY1v6xbLzmU"],
+  ["charles", "charles", "wGkprrTXgBM5EC3Znt6U"],
+  ["princess", "princess", "nBKdbSdaLWZTX0tYSgvZ"],
+  ["operator", "operator", "pNInz6obpgDQGcFmaJgB"],
+  ["rival", "rival", "V33LkP9pVLdcjeB2y5Na"],
+  ["reign", "reign", "GTQ4ImqrRljZAa9VJX6B"],
+] as const;
+
+const EXPECTED_ALIAS_VOICE_IDS = [
+  ["atlas", "sage", "mcuuWJIofmzgKEGk3EMA"],
+  ["carmen", "icon", "6p0P6gezgvY1v6xbLzmU"],
+  ["solace", "charles", "wGkprrTXgBM5EC3Znt6U"],
+  ["elizabeth", "charles", "wGkprrTXgBM5EC3Znt6U"],
+  ["sienna", "princess", "nBKdbSdaLWZTX0tYSgvZ"],
+  ["stryker", "operator", "pNInz6obpgDQGcFmaJgB"],
+  ["eli", "rival", "V33LkP9pVLdcjeB2y5Na"],
+] as const;
+
 Deno.test("retry-failed-payouts rejects unauthenticated callers", async () => {
   const response = await retryModule.handleRetryFailedPayouts(
     new Request("https://example.com"),
@@ -703,6 +724,100 @@ Deno.test("generate-mentor-audio succeeds for authenticated users and records us
     Boolean(logEntry?.payload),
     "Expected mentor audio usage to be logged",
   );
+});
+
+Deno.test("generate-mentor-audio resolves every supported mentor voice", async () => {
+  Deno.env.set("ELEVENLABS_API_KEY", "test-elevenlabs-key");
+
+  for (
+    const [mentorSlug, resolvedMentorSlug, voiceId] of EXPECTED_MENTOR_VOICE_IDS
+  ) {
+    const fetchedUrls: string[] = [];
+    const supabase = createMockSupabase({}, {
+      publicUrl: `https://example.com/${mentorSlug}-audio.mp3`,
+    });
+
+    const response = await mentorAudioModule.handleGenerateMentorAudio(
+      new Request("https://example.com", {
+        method: "POST",
+        body: JSON.stringify({ mentorSlug, script: "Keep going." }),
+      }),
+      {
+        authorize: async () => ({ isInternal: true }),
+        createSupabaseClient: () => supabase,
+        fetchImpl: async (input) => {
+          fetchedUrls.push(String(input));
+          return new Response(new Uint8Array([1, 2, 3]), { status: 200 });
+        },
+        now: () => 1000,
+      },
+    );
+
+    const body = await response.json();
+    assertEquals(
+      response.status,
+      200,
+      `Expected ${mentorSlug} mentor audio request to succeed`,
+    );
+    assertEquals(
+      body.provider,
+      "elevenlabs",
+      `Expected ${mentorSlug} to use ElevenLabs`,
+    );
+    assertEquals(
+      body.storagePath,
+      `${resolvedMentorSlug}_1000.mp3`,
+      `Expected ${mentorSlug} storage path to use the resolved slug`,
+    );
+    assert(
+      fetchedUrls.some((url) => url.includes(voiceId)),
+      `Expected ${mentorSlug} to use ElevenLabs voice ${voiceId}`,
+    );
+  }
+});
+
+Deno.test("generate-mentor-audio resolves legacy aliases to canonical voices", async () => {
+  Deno.env.set("ELEVENLABS_API_KEY", "test-elevenlabs-key");
+
+  for (const [alias, resolvedMentorSlug, voiceId] of EXPECTED_ALIAS_VOICE_IDS) {
+    const fetchedUrls: string[] = [];
+    const response = await mentorAudioModule.handleGenerateMentorAudio(
+      new Request("https://example.com", {
+        method: "POST",
+        body: JSON.stringify({ mentorSlug: alias, script: "Keep going." }),
+      }),
+      {
+        authorize: async () => ({ isInternal: true }),
+        createSupabaseClient: () => createMockSupabase({}),
+        fetchImpl: async (input) => {
+          fetchedUrls.push(String(input));
+          return new Response(new Uint8Array([1, 2, 3]), { status: 200 });
+        },
+        now: () => 1000,
+      },
+    );
+
+    const body = await response.json();
+    assertEquals(
+      response.status,
+      200,
+      `Expected ${alias} alias audio request to succeed`,
+    );
+    assertEquals(
+      body.provider,
+      "elevenlabs",
+      `Expected ${alias} to use ElevenLabs`,
+    );
+    assertEquals(
+      body.storagePath,
+      `${resolvedMentorSlug}_1000.mp3`,
+      `Expected ${alias} storage path to use ${resolvedMentorSlug}`,
+    );
+    assert(
+      fetchedUrls.some((url) => url.includes(voiceId)),
+      `Expected ${alias} to use canonical ${resolvedMentorSlug} voice ${voiceId}`,
+    );
+  }
 });
 
 Deno.test("generate-mentor-audio falls back to OpenAI TTS when ElevenLabs fails", async () => {

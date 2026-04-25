@@ -11,10 +11,13 @@ import type {
   ThreadRow,
 } from "./types.ts";
 
-const DEFAULT_PENDING_ACTION_TTL_MS = Number(
-  Deno.env.get("COMPANION_PENDING_ACTION_TTL_MS") ??
-    String(1000 * 60 * 60 * 12),
-);
+const DEFAULT_PENDING_ACTION_TTL_MS = 1000 * 60 * 60 * 12;
+
+const getPendingActionTtlMs = () =>
+  Number(
+    Deno.env.get("COMPANION_PENDING_ACTION_TTL_MS") ??
+      String(DEFAULT_PENDING_ACTION_TTL_MS),
+  );
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value)
@@ -374,7 +377,7 @@ export async function replacePendingAction(params: {
 }) {
   const now = new Date().toISOString();
   const expiresAt = params.expiresAt ??
-    new Date(Date.now() + DEFAULT_PENDING_ACTION_TTL_MS).toISOString();
+    new Date(Date.now() + getPendingActionTtlMs()).toISOString();
 
   const { data: expiredRows, error: expireError } = await params.supabase
     .from("companion_pending_actions")

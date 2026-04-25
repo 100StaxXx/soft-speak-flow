@@ -38,6 +38,18 @@ const MAX_CALENDAR_EVENTS = 16;
 const MAX_REFLECTIONS = 8;
 const AGENT_RESPONSE_TIMEOUT_MS = 5_000;
 
+const getOptionalEnv = (name: string): string | null => {
+  try {
+    return Deno.env.get(name) ?? null;
+  } catch (error) {
+    if (error instanceof Error && error.name === "NotCapable") {
+      return null;
+    }
+
+    throw error;
+  }
+};
+
 const medianDuration = (durations: number[]): number | null => {
   if (durations.length === 0) return null;
 
@@ -765,24 +777,31 @@ async function createOpenAIConversation(params: {
   sessionId: string;
   surface: "companion" | "journeys";
 }) {
-  const openAIApiKey = Deno.env.get("OPENAI_API_KEY");
+  const openAIApiKey = getOptionalEnv("OPENAI_API_KEY");
   if (!openAIApiKey) throw new Error("OPENAI_API_KEY not configured");
 
-  const response = await params.guardedFetch(OPENAI_CONVERSATIONS_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${openAIApiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      metadata: {
-        scope: "cosmiq_companion_agent",
-        user_id: params.userId,
-        session_id: params.sessionId,
-        surface: params.surface,
+  let response: Response;
+  try {
+    response = await params.guardedFetch(OPENAI_CONVERSATIONS_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${openAIApiKey}`,
+        "Content-Type": "application/json",
       },
-    }),
-  });
+      body: JSON.stringify({
+        metadata: {
+          scope: "cosmiq_companion_agent",
+          user_id: params.userId,
+          session_id: params.sessionId,
+          surface: params.surface,
+        },
+      }),
+    });
+  } catch (error) {
+    throw new Error(
+      `OpenAI conversation create failed: ${getErrorMessage(error)}`,
+    );
+  }
 
   if (!response.ok) {
     throw new Error(
@@ -803,12 +822,12 @@ async function createOpenAIResponse(params: {
   previousResponseId?: string | null;
   tools: Array<Record<string, unknown>>;
 }) {
-  const openAIApiKey = Deno.env.get("OPENAI_API_KEY");
+  const openAIApiKey = getOptionalEnv("OPENAI_API_KEY");
   if (!openAIApiKey) throw new Error("OPENAI_API_KEY not configured");
 
   const body: Record<string, unknown> = {
-    model: Deno.env.get("OPENAI_COMPANION_AGENT_MODEL") ??
-      Deno.env.get("OPENAI_TEXT_MODEL") ??
+    model: getOptionalEnv("OPENAI_COMPANION_AGENT_MODEL") ??
+      getOptionalEnv("OPENAI_TEXT_MODEL") ??
       "gpt-4.1",
     instructions: params.instructions,
     input: params.input,
@@ -825,14 +844,19 @@ async function createOpenAIResponse(params: {
     body.previous_response_id = params.previousResponseId;
   }
 
-  const response = await params.guardedFetch(OPENAI_RESPONSES_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${openAIApiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
+  let response: Response;
+  try {
+    response = await params.guardedFetch(OPENAI_RESPONSES_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${openAIApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+  } catch (error) {
+    throw new Error(`OpenAI responses call failed: ${getErrorMessage(error)}`);
+  }
 
   if (!response.ok) {
     const errorText = await response.text();
@@ -1398,9 +1422,51 @@ function isLinkageError(error: unknown) {
     message.includes("invalid");
 }
 
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function isOpenAIProviderFallbackError(error: unknown) {
+  const message = getErrorMessage(error).toLowerCase();
+  const isOpenAIError =
+    message.includes("openai_api_key not configured") ||
+    message.includes("openai conversation create failed") ||
+    message.includes("openai responses call failed") ||
+    message.includes("openai conversation id missing");
+
+  const hasProviderFailureSignal =
+    message.includes("failed to fetch") ||
+    message.includes("network") ||
+    message.includes("timeout") ||
+    message.includes("timed out") ||
+    message.includes("econnreset") ||
+    message.includes("connection") ||
+    message.includes("fetcherror") ||
+    message.includes("rate limit") ||
+    message.includes("too many requests") ||
+    message.includes("insufficient_quota") ||
+    message.includes("exceeded your current quota") ||
+    message.includes("service unavailable") ||
+    message.includes("temporarily unavailable") ||
+    message.includes("server error") ||
+    message.includes("internal server error") ||
+    message.includes("bad gateway") ||
+    message.includes("gateway timeout") ||
+    message.includes("invalid api key") ||
+    message.includes("incorrect api key") ||
+    message.includes("model_not_found") ||
+    message.includes("does not have access to model") ||
+    /\b(408|429|500|502|503|504)\b/.test(message);
+
+  return message.includes("openai_api_key not configured") ||
+    message.includes("openai conversation id missing") ||
+    (isOpenAIError && hasProviderFailureSignal);
+}
+
 function isPlannerFallbackError(error: unknown) {
   return error instanceof TimeoutError || error instanceof SyntaxError ||
-    error instanceof z.ZodError;
+    error instanceof z.ZodError ||
+    isOpenAIProviderFallbackError(error);
 }
 
 function mapPlannerFallbackIntent(

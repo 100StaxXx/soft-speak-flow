@@ -597,6 +597,103 @@ describe("useCompanionAssistant", () => {
     ).toBe(false);
   });
 
+  it("logs parsed companion-agent HTTP failures with safe diagnostic metadata", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const httpError = Object.assign(
+      new Error("Edge Function returned a non-2xx status code"),
+      { name: "FunctionsHttpError" },
+    );
+    mocks.supabaseInvoke.mockRejectedValueOnce(httpError);
+    mocks.parseFunctionInvokeError.mockResolvedValueOnce({
+      name: "FunctionsHttpError",
+      message: "Edge Function returned a non-2xx status code",
+      status: 503,
+      code: "ABUSE_CHECK_FAILED",
+      requestId: "req-companion-agent-1",
+      responsePayload: {
+        code: "ABUSE_CHECK_FAILED",
+        error: "Request could not be processed right now",
+        requestId: "req-companion-agent-1",
+      },
+      backendMessage: "Request could not be processed right now",
+      isOffline: false,
+      category: "http",
+    });
+
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(
+      () => useCompanionAssistant({ surface: "journeys" }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(result.current.activeThread?.sessionId).toBe("persisted-session");
+    });
+
+    await act(async () => {
+      await result.current.submitMessage("Plan my day", "text");
+    });
+
+    expect(consoleError).toHaveBeenCalledWith(
+      "Failed to submit companion agent message:",
+      expect.objectContaining({
+        status: 503,
+        code: "ABUSE_CHECK_FAILED",
+        requestId: "req-companion-agent-1",
+        category: "http",
+        surface: "journeys",
+        sessionId: "persisted-session",
+        fallbackToLegacy: false,
+      }),
+    );
+
+    consoleError.mockRestore();
+  });
+
+  it("shows a companion-agent setup message for backend setup failures", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    mocks.supabaseInvoke.mockRejectedValueOnce(
+      Object.assign(new Error("Edge Function returned a non-2xx status code"), {
+        name: "FunctionsHttpError",
+      }),
+    );
+    mocks.parseFunctionInvokeError.mockResolvedValueOnce({
+      name: "FunctionsHttpError",
+      message: "Edge Function returned a non-2xx status code",
+      status: 503,
+      code: "ABUSE_CHECK_FAILED",
+      responsePayload: {
+        code: "ABUSE_CHECK_FAILED",
+        error: "Request could not be processed right now",
+      },
+      backendMessage: "Request could not be processed right now",
+      isOffline: false,
+      category: "http",
+    });
+
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(
+      () => useCompanionAssistant({ surface: "journeys" }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(result.current.activeThread?.sessionId).toBe("persisted-session");
+    });
+
+    let submitted: boolean | undefined;
+    await act(async () => {
+      submitted = await result.current.submitMessage("Plan my day", "text");
+    });
+
+    expect(submitted).toBe(false);
+    expect(mocks.legacySubmitMessage).not.toHaveBeenCalled();
+    expect(mocks.toastError).toHaveBeenCalledWith(
+      "Companion Agent is still being set up here. Please try again after the latest backend update.",
+    );
+    consoleError.mockRestore();
+  });
+
   it("confirms the active pending action through the deterministic executor path", async () => {
     mocks.loadPendingAction.mockResolvedValue({
       id: "action-1",

@@ -403,4 +403,69 @@ describe("WallpaperManifestProvider", () => {
     expect(screen.getByTestId("wallpaper-source")).toHaveTextContent("none");
     expect(screen.getByTestId("wallpaper-url")).toHaveTextContent("none");
   });
+
+  it("keeps one native app-state listener across wallpaper refetch rerenders", async () => {
+    mocks.isNativePlatform = true;
+    const remove = vi.fn().mockResolvedValue(undefined);
+    mocks.addListener.mockResolvedValue({ remove });
+    mocks.from.mockImplementation(() => ({
+      select: () => ({
+        in: async () => ({
+          data: [
+            {
+              for_date: "2026-04-08",
+              page_key: "guide",
+              assignment_source: "auto",
+              image_url: "https://example.com/today.png",
+              mobile_focus_x: 51,
+              mobile_focus_y: 31,
+              desktop_focus_x: 53,
+              desktop_focus_y: 35,
+              updated_at: "2026-04-08T10:00:00.000Z",
+            },
+          ],
+          error: null,
+        }),
+      }),
+    }));
+
+    const queryClient = makeQueryClient();
+    const tree = (
+      <QueryClientProvider client={queryClient}>
+        <WallpaperManifestProvider enabled userTimezone="America/Los_Angeles">
+          <TestConsumer />
+        </WallpaperManifestProvider>
+      </QueryClientProvider>
+    );
+
+    let rendered: ReturnType<typeof render>;
+    await act(async () => {
+      rendered = render(tree);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await settleProvider();
+
+    expect(mocks.addListener).toHaveBeenCalledTimes(1);
+
+    const appStateCallback = mocks.addListener.mock.calls[0]?.[1];
+    await act(async () => {
+      appStateCallback?.({ isActive: true });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await settleProvider();
+
+    rendered!.rerender(tree);
+    await settleProvider();
+
+    expect(mocks.addListener).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      rendered!.unmount();
+      await Promise.resolve();
+    });
+
+    expect(remove).toHaveBeenCalledTimes(1);
+  });
 });

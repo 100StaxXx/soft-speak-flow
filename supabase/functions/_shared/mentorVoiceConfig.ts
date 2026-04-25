@@ -1,4 +1,5 @@
 import {
+  normalizeMentorSlug,
   resolveSupportedMentorSlug,
   type SupportedMentorSlug,
 } from "./mentorRoster.ts";
@@ -11,7 +12,10 @@ export interface MentorVoiceConfig {
   use_speaker_boost?: boolean;
 }
 
-export const ELEVENLABS_MENTOR_VOICES: Record<SupportedMentorSlug, MentorVoiceConfig> = {
+export const ELEVENLABS_MENTOR_VOICES: Record<
+  SupportedMentorSlug,
+  MentorVoiceConfig
+> = {
   sage: {
     voiceId: "mcuuWJIofmzgKEGk3EMA",
     stability: 0.72,
@@ -84,11 +88,27 @@ export const OPENAI_TUTORIAL_VOICE_MAP: Record<SupportedMentorSlug, string> = {
 export const resolveMentorVoiceConfig = (
   mentorSlug?: string | null,
 ): MentorVoiceConfig | null => {
-  const resolved = resolveSupportedMentorSlug(mentorSlug);
+  const normalized = normalizeMentorSlug(mentorSlug);
+  if (
+    normalized &&
+    Object.hasOwn(ELEVENLABS_MENTOR_VOICES, normalized)
+  ) {
+    return ELEVENLABS_MENTOR_VOICES[normalized as SupportedMentorSlug];
+  }
+
+  const resolved = resolveSupportedMentorSlug(normalized);
   return resolved ? ELEVENLABS_MENTOR_VOICES[resolved] ?? null : null;
 };
 
 export const resolveTutorialVoice = (mentorSlug?: string | null): string => {
-  const resolved = resolveSupportedMentorSlug(mentorSlug);
+  const normalized = normalizeMentorSlug(mentorSlug);
+  if (
+    normalized &&
+    Object.hasOwn(OPENAI_TUTORIAL_VOICE_MAP, normalized)
+  ) {
+    return OPENAI_TUTORIAL_VOICE_MAP[normalized as SupportedMentorSlug];
+  }
+
+  const resolved = resolveSupportedMentorSlug(normalized);
   return resolved ? OPENAI_TUTORIAL_VOICE_MAP[resolved] ?? "alloy" : "alloy";
 };

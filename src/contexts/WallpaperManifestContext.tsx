@@ -301,6 +301,16 @@ export const WallpaperManifestProvider = ({
     gcTime: 1000 * 60 * 60 * 24,
     refetchOnWindowFocus: false,
   });
+  const manifestRefetchRef = useRef(manifestQuery.refetch);
+
+  useEffect(() => {
+    manifestRefetchRef.current = manifestQuery.refetch;
+  }, [manifestQuery.refetch]);
+
+  const refreshForVisibility = useCallback(() => {
+    setClockMs(Date.now());
+    void manifestRefetchRef.current();
+  }, []);
 
   useEffect(() => {
     if (!manifestQuery.data) return;
@@ -384,22 +394,16 @@ export const WallpaperManifestProvider = ({
     const nextBoundary = getNextWallpaperBoundary(userTimezone, new Date(clockMs));
     const delay = Math.max(1000, nextBoundary.getTime() - Date.now());
     const timeoutId = window.setTimeout(() => {
-      setClockMs(Date.now());
-      void manifestQuery.refetch();
+      refreshForVisibility();
     }, delay);
 
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [clockMs, enabled, manifestQuery, userTimezone]);
+  }, [clockMs, enabled, refreshForVisibility, userTimezone]);
 
   useEffect(() => {
     if (!enabled) return;
-
-    const refreshForVisibility = () => {
-      setClockMs(Date.now());
-      void manifestQuery.refetch();
-    };
 
     if (!Capacitor.isNativePlatform()) {
       const handleVisibilityChange = () => {
@@ -438,7 +442,7 @@ export const WallpaperManifestProvider = ({
         void handle.remove();
       }
     };
-  }, [enabled, manifestQuery]);
+  }, [enabled, refreshForVisibility]);
 
   const reportWallpaperRenderError = useCallback((pageKey: WallpaperPageKey, imageUrl: string) => {
     const failedKey = `${currentDateKey}:${pageKey}:${imageUrl}`;
