@@ -25,6 +25,37 @@ import {
   replacePendingAction,
 } from "./persistence.ts";
 
+type AgentRunSubStage = "context_load" | "openai" | "persistence";
+
+export class AgentRunSubStageError extends Error {
+  readonly subStage: AgentRunSubStage;
+  readonly originalError: unknown;
+
+  constructor(subStage: AgentRunSubStage, originalError: unknown) {
+    const message = originalError instanceof Error
+      ? originalError.message
+      : typeof originalError === "string"
+      ? originalError
+      : `companion agent sub-stage ${subStage} failed`;
+    super(message, { cause: originalError });
+    this.name = "AgentRunSubStageError";
+    this.subStage = subStage;
+    this.originalError = originalError;
+  }
+}
+
+const wrapSubStage = async <T>(
+  subStage: AgentRunSubStage,
+  fn: () => Promise<T>,
+): Promise<T> => {
+  try {
+    return await fn();
+  } catch (error) {
+    if (error instanceof AgentRunSubStageError) throw error;
+    throw new AgentRunSubStageError(subStage, error);
+  }
+};
+
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 const OPENAI_CONVERSATIONS_URL = "https://api.openai.com/v1/conversations";
 
@@ -1530,14 +1561,18 @@ function buildPreparedCandidateFromPlannerHint(
 }
 
 export async function runCompanionAgent(params: RunAgentParams) {
-  const companion = await loadCompanionId(params.supabase, params.userId);
-  const context = await loadCompanionAgentContext({
-    supabase: params.supabase,
-    userId: params.userId,
-    companionId: companion.id,
-    sessionId: params.request.sessionId,
-    request: params.request,
-  });
+  const companion = await wrapSubStage(
+    "context_load",
+    () => loadCompanionId(params.supabase, params.userId),
+  );
+  const context = await wrapSubStage("context_load", () =>
+    loadCompanionAgentContext({
+      supabase: params.supabase,
+      userId: params.userId,
+      companionId: companion.id,
+      sessionId: params.request.sessionId,
+      request: params.request,
+    }));
 
   const preparedActions = new Map<string, PendingActionCandidate>();
 
@@ -1557,23 +1592,24 @@ export async function runCompanionAgent(params: RunAgentParams) {
     const candidate = buildPreparedCandidateFromPlannerHint(matchingHint);
 
     if (candidate) {
-      const persistedPendingAction = await replacePendingAction({
-        supabase: params.supabase,
-        userId: params.userId,
-        companionId: companion.id,
-        sessionId: params.request.sessionId,
-        intent: candidate.intent,
-        candidate,
-        metadata: {
-          source: "companion-agent",
-          selectedProposalId: params.request.selectedProposalId,
-          visibleDateStart: context.visibleDateStart,
-          visibleDateEnd: context.visibleDateEnd,
-        },
-      });
+      const persistedPendingAction = await wrapSubStage("persistence", () =>
+        replacePendingAction({
+          supabase: params.supabase,
+          userId: params.userId,
+          companionId: companion.id,
+          sessionId: params.request.sessionId,
+          intent: candidate.intent,
+          candidate,
+          metadata: {
+            source: "companion-agent",
+            selectedProposalId: params.request.selectedProposalId,
+            visibleDateStart: context.visibleDateStart,
+            visibleDateEnd: context.visibleDateEnd,
+          },
+        }));
 
-      const persistenceReady = await withCompanionChatPersistenceCapability(
-        async () => {
+      const persistenceReady = await wrapSubStage("persistence", () =>
+        withCompanionChatPersistenceCapability(async () => {
           const responsePendingAction = mapPendingActionForResponse(
             persistedPendingAction,
           );
@@ -1596,8 +1632,7 @@ export async function runCompanionAgent(params: RunAgentParams) {
             structuredResponse: plannerResult.structuredResponse ?? null,
             pendingAction: responsePendingAction,
           });
-        },
-      );
+        }));
 
       console.log("[companion-agent] prepared planner suggestion", {
         sessionId: params.request.sessionId,
@@ -1775,59 +1810,60 @@ export async function runCompanionAgent(params: RunAgentParams) {
     };
   };
 
-  let agentResult: AgentRunResult;
-  try {
-    if (context.thread?.openai_conversation_id) {
-      agentResult = await runResponseLoopWithTimeout({
-        conversationId: context.thread.openai_conversation_id,
-        manualHistory: false,
-      });
-    } else if (context.thread?.last_openai_response_id) {
-      agentResult = await runResponseLoopWithTimeout({
-        previousResponseId: context.thread.last_openai_response_id,
-        manualHistory: false,
-      });
-    } else {
+  const agentResult: AgentRunResult = await wrapSubStage("openai", async () => {
+    try {
+      if (context.thread?.openai_conversation_id) {
+        return await runResponseLoopWithTimeout({
+          conversationId: context.thread.openai_conversation_id,
+          manualHistory: false,
+        });
+      }
+      if (context.thread?.last_openai_response_id) {
+        return await runResponseLoopWithTimeout({
+          previousResponseId: context.thread.last_openai_response_id,
+          manualHistory: false,
+        });
+      }
       const conversationId = await createOpenAIConversation({
         guardedFetch: params.guardedFetch,
         userId: params.userId,
         sessionId: params.request.sessionId,
         surface: params.request.surface,
       });
-      agentResult = await runResponseLoopWithTimeout({
+      return await runResponseLoopWithTimeout({
         conversationId,
         manualHistory: false,
       });
-    }
-  } catch (error) {
-    if (isLinkageError(error)) {
-      console.warn("[companion-agent] linkage fallback", {
-        sessionId: params.request.sessionId,
-        message: error instanceof Error ? error.message : String(error),
-      });
-
-      try {
-        agentResult = await runResponseLoopWithTimeout({
-          manualHistory: true,
+    } catch (error) {
+      if (isLinkageError(error)) {
+        console.warn("[companion-agent] linkage fallback", {
+          sessionId: params.request.sessionId,
+          message: error instanceof Error ? error.message : String(error),
         });
-      } catch (manualHistoryError) {
-        if (!isPlannerFallbackError(manualHistoryError)) {
-          throw manualHistoryError;
+
+        try {
+          return await runResponseLoopWithTimeout({
+            manualHistory: true,
+          });
+        } catch (manualHistoryError) {
+          if (!isPlannerFallbackError(manualHistoryError)) {
+            throw manualHistoryError;
+          }
+          return buildPlannerFallbackResult(
+            manualHistoryError instanceof Error
+              ? manualHistoryError.message
+              : String(manualHistoryError),
+          );
         }
-        agentResult = buildPlannerFallbackResult(
-          manualHistoryError instanceof Error
-            ? manualHistoryError.message
-            : String(manualHistoryError),
+      }
+      if (isPlannerFallbackError(error)) {
+        return buildPlannerFallbackResult(
+          error instanceof Error ? error.message : String(error),
         );
       }
-    } else if (isPlannerFallbackError(error)) {
-      agentResult = buildPlannerFallbackResult(
-        error instanceof Error ? error.message : String(error),
-      );
-    } else {
       throw error;
     }
-  }
+  });
 
   let persistedPendingAction: PendingActionRow | null =
     context.activePendingAction;
@@ -1837,24 +1873,25 @@ export async function runCompanionAgent(params: RunAgentParams) {
   ) {
     const candidate = preparedActions.get(agentResult.result.preparedActionId);
     if (candidate) {
-      persistedPendingAction = await replacePendingAction({
-        supabase: params.supabase,
-        userId: params.userId,
-        companionId: companion.id,
-        sessionId: params.request.sessionId,
-        intent: agentResult.result.intent,
-        candidate,
-        metadata: {
-          source: "companion-agent",
-          visibleDateStart: context.visibleDateStart,
-          visibleDateEnd: context.visibleDateEnd,
-        },
-      });
+      persistedPendingAction = await wrapSubStage("persistence", () =>
+        replacePendingAction({
+          supabase: params.supabase,
+          userId: params.userId,
+          companionId: companion.id,
+          sessionId: params.request.sessionId,
+          intent: agentResult.result.intent,
+          candidate,
+          metadata: {
+            source: "companion-agent",
+            visibleDateStart: context.visibleDateStart,
+            visibleDateEnd: context.visibleDateEnd,
+          },
+        }));
     }
   }
 
-  const persistenceReady = await withCompanionChatPersistenceCapability(
-    async () => {
+  const persistenceReady = await wrapSubStage("persistence", () =>
+    withCompanionChatPersistenceCapability(async () => {
       const responsePendingAction = persistedPendingAction
         ? mapPendingActionForResponse(persistedPendingAction)
         : null;
@@ -1874,8 +1911,7 @@ export async function runCompanionAgent(params: RunAgentParams) {
         structuredResponse: agentResult.result.structuredResponse ?? null,
         pendingAction: responsePendingAction,
       });
-    },
-  );
+    }));
 
   console.log("[companion-agent] turn", {
     sessionId: params.request.sessionId,
