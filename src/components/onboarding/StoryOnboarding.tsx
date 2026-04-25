@@ -316,7 +316,7 @@ export const StoryOnboarding = ({
   onJourneyCinematicComplete,
 }: StoryOnboardingProps) => {
   const navigate = useNavigate();
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const { createCompanion } = useCompanion();
   const isMigrationMode = mode === "migration";
@@ -386,13 +386,10 @@ export const StoryOnboarding = ({
   const [pendingCompanionSetup, setPendingCompanionSetup] = useState<CompanionSelectionPreferences | null>(null);
   const [isAwaitingJourneyCompletion, setIsAwaitingJourneyCompletion] = useState(false);
   const [isSubmittingQuestionnaire, setIsSubmittingQuestionnaire] = useState(false);
-  const [isPersistingOnboardingStep, setIsPersistingOnboardingStep] = useState(false);
-  const [isContinuingLater, setIsContinuingLater] = useState(false);
   const [compatibilityScore, setCompatibilityScore] = useState<number | null>(null);
   const mentorRevealTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const journeyCinematicStartedRef = useRef(false);
   const persistStepInFlightRef = useRef(false);
-  const continueLaterInFlightRef = useRef(false);
   const mentorResultRecoveryNotifiedRef = useRef(false);
   const backdropStage = resolveOnboardingBackdropStage(stage);
 
@@ -514,7 +511,6 @@ export const StoryOnboarding = ({
     if (persistStepInFlightRef.current) return false;
 
     persistStepInFlightRef.current = true;
-    setIsPersistingOnboardingStep(true);
     try {
       await persistOnboardingProgress(nextStep, dataPatch);
       setStage(nextStage);
@@ -529,7 +525,6 @@ export const StoryOnboarding = ({
       return false;
     } finally {
       persistStepInFlightRef.current = false;
-      setIsPersistingOnboardingStep(false);
     }
   }, [persistOnboardingProgress, user?.id]);
 
@@ -1500,70 +1495,11 @@ export const StoryOnboarding = ({
     };
   }, [companionSetupStatus, isAwaitingJourneyCompletion, recoverOrCompleteJourney]);
 
-  const handleContinueLater = async () => {
-    if (continueLaterInFlightRef.current) return;
-
-    const persistedStage: OnboardingResumeStep = stage === "calculating" ? "questionnaire" : stage;
-    continueLaterInFlightRef.current = true;
-    setIsContinuingLater(true);
-    try {
-      await persistOnboardingProgress(persistedStage, {
-        userName,
-        faction,
-        questionnaireAnswers: serializeOnboardingAnswers(answers),
-        story_tone: selectedStoryTone,
-      });
-      trackOnboardingTutorialEvent("onboarding_continue_later_saved", {
-        userId: user?.id ?? null,
-        stage: persistedStage,
-      });
-    } catch (error) {
-      onboardingLog.warn("Failed to continue onboarding later", {
-        userId: user?.id,
-        persistedStage,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      toast.error("We couldn't save your progress right now. Please try again.");
-      trackOnboardingTutorialEvent("onboarding_continue_later_failed", {
-        userId: user?.id ?? null,
-        stage: persistedStage,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      continueLaterInFlightRef.current = false;
-      setIsContinuingLater(false);
-      return;
-    }
-
-    try {
-      await signOut?.();
-      safeNavigate(navigate, "/auth");
-    } catch (error) {
-      onboardingLog.warn("Saved onboarding progress but failed to sign out", {
-        userId: user?.id,
-        persistedStage,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      toast.error("We saved your progress, but couldn't sign you out. Please try again.");
-      continueLaterInFlightRef.current = false;
-      setIsContinuingLater(false);
-    }
-  };
-
   return (
     <div className="min-h-screen relative overflow-hidden bg-background">
       <StarfieldBackground />
       {backdropStage && <OnboardingCosmicBackdrop stage={backdropStage} faction={faction} motionLevel="balanced" />}
-      {!isResetMode && stage !== "journey-begins" ? (
-        <button
-          type="button"
-          onClick={handleContinueLater}
-          disabled={isContinuingLater || isPersistingOnboardingStep}
-          className="fixed right-4 top-[calc(env(safe-area-inset-top,0px)+1rem)] z-30 rounded-full border border-white/12 bg-black/30 px-4 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-white/72 backdrop-blur-md transition-colors hover:bg-black/45 hover:text-white disabled:cursor-not-allowed disabled:opacity-55"
-        >
-          {isContinuingLater ? "Saving..." : "Continue Later"}
-        </button>
-      ) : null}
-      
+
       <AnimatePresence mode="wait">
         {stage === "prologue" && (
           <motion.div

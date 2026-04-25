@@ -402,6 +402,9 @@ const Journeys = () => {
   }, [finishPlannerQuestEdit, plannerQuestEditSession?.editor]);
 
   const openCampaignBuilder = useCallback((initialGoal?: string | null) => {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("campaign-builder-opened"));
+    }
     setPathfinderInitialGoal(initialGoal?.trim() ?? "");
     setPathfinderSessionKey((currentKey) => currentKey + 1);
     setShowPathfinder(true);
@@ -410,7 +413,7 @@ const Journeys = () => {
   const openCompanionPlanner = useCallback((intent?: CompanionPlannerLaunchIntent | null) => {
     if (intent) {
       if (intent.target === "campaign_builder") {
-        openCampaignBuilder(resolveCampaignBuilderInitialGoal(intent.message));
+        openCampaignBuilder(resolveCampaignBuilderInitialGoal(intent.message, undefined));
         return;
       }
       setPlannerLaunchIntent(intent);

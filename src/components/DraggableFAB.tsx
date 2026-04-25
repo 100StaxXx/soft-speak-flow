@@ -224,6 +224,7 @@ export const DraggableFAB = ({ onOpenCompanionPlanner, onTap }: DraggableFABProp
         usesPortraitShellOverride={isMenuOpen ? undefined : launcherAwayUsesPortraitShell}
         aria-label="Open companion quick actions"
         data-tour="add-quest-fab"
+        data-planner-tour="companion-quick-actions"
         data-testid="journeys-companion-launcher-floating"
         onClick={() => {
           if (suppressTapRef.current) {

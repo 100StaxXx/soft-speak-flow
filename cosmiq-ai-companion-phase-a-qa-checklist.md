@@ -16,7 +16,6 @@ Validate that the core daily ritual loop feels:
 - Create a fresh test account and enter `/onboarding`.
 - Complete prologue, destiny, faction, questionnaire, story tone, and companion color/species dropdowns.
 - Refresh after each major stage and verify the flow resumes from the saved step instead of restarting at prologue.
-- Use `Continue Later`, sign back in, and verify the saved stage resumes.
 - Confirm questionnaire failures are visible and do not silently advance to mentor result.
 
 ### Legacy / Broken Companion Recovery

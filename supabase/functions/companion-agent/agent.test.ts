@@ -3,7 +3,10 @@ import {
   assertEquals,
 } from "https://deno.land/std@0.224.0/assert/mod.ts";
 
-import { runCompanionAgent } from "./agent.ts";
+import {
+  buildToolDefinitions,
+  runCompanionAgent,
+} from "./agent.ts";
 
 type QueryResult = {
   data?: unknown;
@@ -101,6 +104,16 @@ function createMockSupabase() {
     },
   };
 }
+
+Deno.test("companion agent tools explicitly opt out of strict Responses schemas", () => {
+  const tools = buildToolDefinitions();
+
+  assert(tools.length > 0);
+  for (const tool of tools) {
+    assertEquals(tool.type, "function");
+    assertEquals(tool.strict, false);
+  }
+});
 
 Deno.test("runCompanionAgent falls back to deterministic planner when OpenAI is not configured", async () => {
   const supabase = createMockSupabase();

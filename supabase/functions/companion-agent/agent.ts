@@ -878,7 +878,7 @@ function getFunctionCalls(response: OpenAIResponseBody): ToolCall[] {
     }));
 }
 
-function buildToolDefinitions() {
+export function buildToolDefinitions() {
   const functionTool = (
     name: string,
     description: string,
@@ -887,6 +887,7 @@ function buildToolDefinitions() {
     type: "function",
     name,
     description,
+    strict: false,
     parameters,
   });
 

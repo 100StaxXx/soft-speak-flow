@@ -2,6 +2,7 @@ import type { ButtonHTMLAttributes } from "react";
 import { CompanionImage, CompanionPortraitShell } from "@/components/CompanionImage";
 import { cn } from "@/lib/utils";
 import { useJourneysCompanionVisual } from "@/hooks/useJourneysCompanionVisual";
+import { useCompanionImageBackgroundCutout } from "@/hooks/useCompanionImageBackgroundCutout";
 
 type JourneysCompanionLauncherVariant = "floating" | "inline";
 type JourneysCompanionLauncherFaceDirection = "front" | "away";
@@ -49,6 +50,16 @@ export function JourneysCompanionLauncher({
   const resolvedUsesPortraitShell = usesPortraitShellOverride ?? usesPortraitShell;
   const resolvedText = text ?? `Chat with ${companionLabel}`;
   const isFloatingHero = variant === "floating" && floatingSize === "hero";
+  const shouldCutOutHeroBackground = isFloatingHero && !resolvedUsesPortraitShell;
+  const {
+    cutoutSrc: heroCutoutSrc,
+    status: heroCutoutStatus,
+  } = useCompanionImageBackgroundCutout(resolvedImageUrl, {
+    enabled: shouldCutOutHeroBackground,
+  });
+  const resolvedHeroImageUrl = heroCutoutSrc ?? resolvedImageUrl;
+  const isWaitingForHeroCutout = shouldCutOutHeroBackground
+    && (heroCutoutStatus === "idle" || heroCutoutStatus === "processing");
   const portraitClassName = variant === "floating"
     ? isFloatingHero
       ? "h-[7.75rem] w-[7.75rem]"
@@ -63,14 +74,18 @@ export function JourneysCompanionLauncher({
       style={{ filter: "drop-shadow(0 10px 24px rgba(0, 0, 0, 0.24))" }}
     >
       <CompanionImage
-        src={resolvedImageUrl}
+        src={resolvedHeroImageUrl}
         alt={companionLabel}
         fit={resolvedUsesPortraitShell ? "portrait" : "contain"}
         element={element}
         focalX={resolvedFocalX}
         focalY={resolvedFocalY}
-        className="pointer-events-none select-none"
+        className={cn(
+          "pointer-events-none select-none transition-opacity duration-150",
+          isWaitingForHeroCutout && "opacity-0",
+        )}
         draggable={false}
+        data-companion-background-cutout={shouldCutOutHeroBackground ? heroCutoutStatus : undefined}
       />
     </div>
   ) : resolvedUsesPortraitShell ? (

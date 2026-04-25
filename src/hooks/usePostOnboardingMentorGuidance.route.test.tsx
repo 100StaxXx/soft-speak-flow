@@ -9,7 +9,7 @@ import {
 
 const createFreshTutorial = () => ({
   version: 2,
-  flowVersion: 4,
+  flowVersion: 5,
   eligible: true,
   dismissed: false,
   completed: false,
@@ -26,19 +26,20 @@ const createPlanStepTutorial = () => ({
 
 const createCloseoutTutorial = () => ({
   ...createFreshTutorial(),
-  completedSteps: ["meet_companion", "plan_my_day"],
+  completedSteps: ["meet_companion", "plan_my_day", "create_campaign"],
   xpAwardedSteps: ["plan_my_day"],
   milestonesCompleted: [
     "mentor_intro_hello",
     "meet_companion_intro",
     "start_plan_my_day",
+    "open_campaign_builder",
   ],
 });
 
 const mocks = vi.hoisted(() => ({
   guidedTutorial: {
     version: 2,
-    flowVersion: 4,
+    flowVersion: 5,
     eligible: true,
     dismissed: false,
     completed: false,
@@ -128,7 +129,7 @@ describe("guided tutorial route restoration", () => {
     mocks.guidedTutorial = createFreshTutorial();
     globalThis.localStorage?.removeItem?.("guided_tutorial_progress_user-1");
     document
-      .querySelectorAll('[data-tour="companion-plan-my-day-action"]')
+      .querySelectorAll('[data-tour="companion-launcher-option-plan-day"], [data-tour="campaign-builder-launcher"]')
       .forEach((element) => element.remove());
   });
 
@@ -173,6 +174,10 @@ describe("guided tutorial route restoration", () => {
   });
 
   it("advances from intro to Plan My Day on the companion route", async () => {
+    const target = document.createElement("button");
+    target.setAttribute("data-tour", "companion-launcher-option-plan-day");
+    document.body.appendChild(target);
+
     renderWithProviders("/companion");
 
     await waitFor(() => {
@@ -191,6 +196,7 @@ describe("guided tutorial route restoration", () => {
     fireEvent.click(screen.getByRole("button", { name: "intro-action" }));
 
     await waitFor(() => {
+      expect(screen.getByTestId("path")).toHaveTextContent("/journeys");
       expect(screen.getByTestId("step")).toHaveTextContent("plan_my_day");
       expect(screen.getByTestId("intro-action")).toHaveTextContent("");
       expect(screen.getByTestId("secondary-action")).toHaveTextContent(
@@ -199,23 +205,41 @@ describe("guided tutorial route restoration", () => {
     });
   });
 
-  it("targets Plan My Day and reaches the final closeout after the planner starts", async () => {
+  it("targets Plan My Day, opens campaign builder, and reaches the final closeout", async () => {
     mocks.guidedTutorial = createPlanStepTutorial();
-    const target = document.createElement("button");
-    target.setAttribute("data-tour", "companion-plan-my-day-action");
-    document.body.appendChild(target);
+    const planTarget = document.createElement("button");
+    planTarget.setAttribute("data-tour", "companion-launcher-option-plan-day");
+    document.body.appendChild(planTarget);
+    const campaignTarget = document.createElement("button");
+    campaignTarget.setAttribute("data-tour", "campaign-builder-launcher");
+    document.body.appendChild(campaignTarget);
 
     renderWithProviders("/companion");
 
     await waitFor(() => {
+      expect(screen.getByTestId("path")).toHaveTextContent("/journeys");
       expect(screen.getByTestId("step")).toHaveTextContent("plan_my_day");
       expect(screen.getByTestId("target")).toHaveTextContent(
-        '[data-tour="companion-plan-my-day-action"]',
+        '[data-tour="companion-launcher-option-plan-day"]',
       );
     });
 
     await act(async () => {
       window.dispatchEvent(new CustomEvent("companion-plan-my-day-started"));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("step")).toHaveTextContent(
+        "create_campaign",
+      );
+      expect(screen.getByTestId("path")).toHaveTextContent("/campaigns");
+      expect(screen.getByTestId("target")).toHaveTextContent(
+        '[data-tour="campaign-builder-launcher"]',
+      );
+    });
+
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent("campaign-builder-opened"));
     });
 
     await waitFor(() => {

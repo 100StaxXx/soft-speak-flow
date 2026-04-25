@@ -11,6 +11,7 @@ import {
 import { useLocation, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useXPRewards } from "@/hooks/useXPRewards";
@@ -34,7 +35,9 @@ import type {
 const TARGET_RESOLVE_POLL_MS = 250;
 const TARGET_MISSING_FALLBACK_MS = 1400;
 const CLOSEOUT_AUTO_COMPLETE_MS = 2600;
-const PLAN_MY_DAY_SELECTOR = '[data-tour="companion-plan-my-day-action"]';
+const PLAN_MY_DAY_SELECTOR = '[data-tour="companion-launcher-option-plan-day"]';
+const COMPANION_QUICK_ACTIONS_SELECTOR = '[data-planner-tour="companion-quick-actions"]';
+const CAMPAIGN_BUILDER_SELECTOR = '[data-tour="campaign-builder-launcher"]';
 const EVOLVE_AUTOSCROLL_SELECTOR = '[data-tour="evolve-companion-button"]';
 const EVOLVE_AUTOSCROLL_VIEWPORT_MARGIN_PX = 72;
 
@@ -55,11 +58,15 @@ const GUIDED_STEPS: GuidedStep[] = [
   },
   {
     id: "plan_my_day",
-    route: "/companion",
+    route: "/journeys",
+  },
+  {
+    id: "create_campaign",
+    route: "/campaigns",
   },
   {
     id: "first_plan_closeout",
-    route: "/companion",
+    route: "/campaigns",
   },
 ];
 
@@ -109,6 +116,7 @@ const MILESTONE_ID_SET = new Set<GuidedMilestoneId>([
   "mentor_intro_hello",
   "meet_companion_intro",
   "start_plan_my_day",
+  "open_campaign_builder",
   "first_plan_closeout_message",
   "stay_on_quests",
   "quests_campaigns_intro",
@@ -153,7 +161,9 @@ const getTargetSelectorsForMilestone = (milestoneId: GuidedMilestoneId): string[
     case "first_plan_closeout_message":
       return [];
     case "start_plan_my_day":
-      return [PLAN_MY_DAY_SELECTOR];
+      return [PLAN_MY_DAY_SELECTOR, COMPANION_QUICK_ACTIONS_SELECTOR];
+    case "open_campaign_builder":
+      return [CAMPAIGN_BUILDER_SELECTOR];
     case "quests_campaigns_intro":
     case "companion_tab_intro":
     case "post_evolution_companion_intro":
@@ -405,17 +415,24 @@ const migrateGuidedTutorialProgress = ({
     rawCompletedSet.has("mentor_closeout") ||
     rawMilestoneSet.has("companion_tab_intro") ||
     rawMilestoneSet.has("post_evolution_companion_intro");
+  const shouldMarkCreateCampaignComplete =
+    rawCompletedSet.has("create_campaign") ||
+    rawMilestoneSet.has("open_campaign_builder");
 
   if (isLegacyTutorialComplete) {
     GUIDED_STEPS.forEach((step) => migratedCompletedSet.add(step.id));
   } else if (shouldMarkMeetCompanionComplete) {
     migratedCompletedSet.add("meet_companion");
   }
+  if (shouldMarkCreateCampaignComplete) {
+    migratedCompletedSet.add("create_campaign");
+  }
 
   const currentFlowMilestones = new Set<GuidedMilestoneId>([
     "mentor_intro_hello",
     "meet_companion_intro",
     "start_plan_my_day",
+    "open_campaign_builder",
     "first_plan_closeout_message",
   ]);
   const migratedMilestoneSet = new Set<GuidedMilestoneId>(
@@ -424,9 +441,13 @@ const migrateGuidedTutorialProgress = ({
   if (migratedCompletedSet.has("meet_companion")) {
     migratedMilestoneSet.add("meet_companion_intro");
   }
+  if (migratedCompletedSet.has("create_campaign")) {
+    migratedMilestoneSet.add("open_campaign_builder");
+  }
   if (isLegacyTutorialComplete) {
     migratedMilestoneSet.add("meet_companion_intro");
     migratedMilestoneSet.add("start_plan_my_day");
+    migratedMilestoneSet.add("open_campaign_builder");
     migratedMilestoneSet.add("first_plan_closeout_message");
   }
 
@@ -583,12 +604,16 @@ export const getMentorInstructionLines = (
   }
 
   if (currentStep === "plan_my_day") {
-    return ["Tap Plan My Day."];
+    return ["Open the companion quick actions and choose Plan day."];
+  }
+
+  if (currentStep === "create_campaign") {
+    return ["Tap Launch campaign builder."];
   }
 
   if (currentStep === "first_plan_closeout") {
     return [
-      "You're ready. Start with the plan, and use Right Now or Adjust My Day when the day changes.",
+      "You're ready. Use Plan day for today, and the campaign builder when a goal needs a longer arc.",
     ];
   }
 
@@ -600,7 +625,7 @@ export const getMentorInstructionLines = (
 
   if (currentStep === "create_quest") {
     if (currentSubstep === "open_add_quest") {
-      return ["Tap the + in the bottom right."];
+      return ["Open the campaign builder when a goal needs structure beyond a single day."];
     }
 
     if (currentSubstep === "enter_title") {
@@ -646,13 +671,18 @@ const getMilestoneDialogue = (
       return getMeetCompanionIntroDialogue();
     case "start_plan_my_day":
       return {
-        text: "Tap Plan My Day.",
+        text: "Choose Plan day.",
         support: "This gives you the first real value: a focused, realistic plan for today.",
+      };
+    case "open_campaign_builder":
+      return {
+        text: "Tap Launch campaign builder.",
+        support: "Campaigns turn bigger goals into rituals, milestones, and a path you can keep returning to.",
       };
     case "first_plan_closeout_message":
       return {
-        text: "That's the loop: open Cosmiq, get clarity, take action.",
-        support: "If your day breaks, use Adjust My Day. If you're stuck, ask Right Now.",
+        text: "That's the loop: plan today, shape the bigger goal, then take action.",
+        support: "Use Plan day for daily clarity. Use Campaigns when the work needs rituals and momentum over time.",
       };
     case "quests_campaigns_intro":
       return getQuestsCampaignsIntroDialogue();
@@ -663,8 +693,8 @@ const getMilestoneDialogue = (
       };
     case "open_add_quest":
       return {
-        text: "Tap the + in the bottom right.",
-        support: "This opens your Create a Quest Menu.",
+        text: "Open the campaign builder.",
+        support: "Campaigns are the current path for turning bigger goals into repeatable action.",
       };
     case "enter_title":
       return {
@@ -992,13 +1022,15 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
         lastUpdatedAt: nowIso,
       };
 
+      const nextOnboardingData = {
+        ...baseData,
+        guided_tutorial: remoteNext,
+      } as unknown as Json;
+
       const { error } = await supabase
         .from("profiles")
         .update({
-          onboarding_data: {
-            ...baseData,
-            guided_tutorial: remoteNext,
-          },
+          onboarding_data: nextOnboardingData,
         })
         .eq("id", user.id);
 
@@ -1182,8 +1214,12 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
       return;
     }
 
+    if (currentStep.id === "create_campaign") {
+      return;
+    }
+
     if (currentStep.id === "first_plan_closeout") {
-      if (location.pathname !== "/companion") return;
+      if (location.pathname !== "/campaigns") return;
 
       if (milestoneSet.has("first_plan_closeout_message")) {
         markStepComplete("first_plan_closeout");
@@ -1321,9 +1357,20 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
       listeners.push({
         eventName: "companion-plan-my-day-started",
         handler: () => {
-          if (location.pathname !== "/companion") return;
+          if (location.pathname !== "/journeys") return;
           markMilestoneComplete("start_plan_my_day");
           markStepComplete("plan_my_day");
+        },
+      });
+    }
+
+    if (currentStep.id === "create_campaign") {
+      listeners.push({
+        eventName: "campaign-builder-opened",
+        handler: () => {
+          if (location.pathname !== "/campaigns") return;
+          markMilestoneComplete("open_campaign_builder");
+          markStepComplete("create_campaign");
         },
       });
     }
@@ -1451,6 +1498,10 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
 
     if (currentStep.id === "plan_my_day") {
       return "start_plan_my_day";
+    }
+
+    if (currentStep.id === "create_campaign") {
+      return "open_campaign_builder";
     }
 
     if (currentStep.id === "first_plan_closeout") {

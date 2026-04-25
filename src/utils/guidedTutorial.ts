@@ -3,7 +3,7 @@ import type { GuidedTutorialProgress } from "@/types/profile";
 // Data schema version: bump when the persisted shape changes.
 export const GUIDED_TUTORIAL_VERSION = 2;
 // User-facing route/step graph version: bump when active steps or milestones change.
-export const GUIDED_TUTORIAL_FLOW_VERSION = 4;
+export const GUIDED_TUTORIAL_FLOW_VERSION = 5;
 
 export const getGuidedTutorialLocalProgressKey = (userId: string) =>
   `guided_tutorial_progress_${userId}`;

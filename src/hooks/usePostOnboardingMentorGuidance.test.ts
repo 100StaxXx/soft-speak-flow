@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const createFreshTutorial = () => ({
   version: 2,
-  flowVersion: 4,
+  flowVersion: 5,
   eligible: true,
   dismissed: false,
   completed: false,
@@ -22,12 +22,13 @@ const createPlanStepTutorial = () => ({
 
 const createCloseoutTutorial = () => ({
   ...createFreshTutorial(),
-  completedSteps: ["meet_companion", "plan_my_day"],
+  completedSteps: ["meet_companion", "plan_my_day", "create_campaign"],
   xpAwardedSteps: ["plan_my_day"],
   milestonesCompleted: [
     "mentor_intro_hello",
     "meet_companion_intro",
     "start_plan_my_day",
+    "open_campaign_builder",
   ],
 });
 
@@ -37,7 +38,7 @@ const mocks = vi.hoisted(() => ({
     profileLoading: false,
     guidedTutorial: {
       version: 2,
-      flowVersion: 4,
+      flowVersion: 5,
       eligible: true,
       dismissed: false,
       completed: false,
@@ -163,6 +164,7 @@ describe("guided tutorial helpers", () => {
     const result = safeCompletedSteps([
       "meet_companion",
       "plan_my_day",
+      "create_campaign",
       "first_plan_closeout",
       "create_quest",
       "invalid-step",
@@ -172,6 +174,7 @@ describe("guided tutorial helpers", () => {
     expect(result).toEqual([
       "meet_companion",
       "plan_my_day",
+      "create_campaign",
       "first_plan_closeout",
       "create_quest",
     ]);
@@ -203,30 +206,34 @@ describe("guided tutorial helpers", () => {
     });
   });
 
-  it("describes the new companion plus Plan My Day tutorial", () => {
+  it("describes the new companion plus Plan My Day and campaign tutorial", () => {
     expect(getMentorInstructionLines("meet_companion", null)[0]).toContain(
       "companion is already created",
     );
     expect(getMentorInstructionLines("plan_my_day", null)[0]).toContain(
-      "Plan My Day",
+      "Plan day",
+    );
+    expect(getMentorInstructionLines("create_campaign", null)[0]).toContain(
+      "campaign builder",
     );
     expect(
       getMentorInstructionLines("first_plan_closeout", null)[0],
-    ).toContain("Adjust My Day");
+    ).toContain("campaign builder");
   });
 
-  it("strict-locks only the actionable Plan My Day target in the new loop", () => {
+  it("strict-locks the actionable Plan day and campaign builder targets in the new loop", () => {
     expect(milestoneUsesStrictLock("mentor_intro_hello")).toBe(false);
     expect(milestoneUsesStrictLock("meet_companion_intro")).toBe(false);
     expect(milestoneUsesStrictLock("start_plan_my_day")).toBe(true);
+    expect(milestoneUsesStrictLock("open_campaign_builder")).toBe(true);
     expect(milestoneUsesStrictLock("first_plan_closeout_message")).toBe(false);
   });
 
-  it("restores current tutorial work to the companion route", () => {
+  it("restores current tutorial work to the active feature route", () => {
     expect(
       shouldRestoreTutorialRoute({
-        pathname: "/journeys",
-        stepRoute: "/companion",
+        pathname: "/companion",
+        stepRoute: "/journeys",
         tutorialReady: true,
         tutorialComplete: false,
         currentStepId: "plan_my_day",
@@ -236,8 +243,8 @@ describe("guided tutorial helpers", () => {
 
     expect(
       shouldRestoreTutorialRoute({
-        pathname: "/companion",
-        stepRoute: "/companion",
+        pathname: "/journeys",
+        stepRoute: "/journeys",
         tutorialReady: true,
         tutorialComplete: false,
         currentStepId: "plan_my_day",
@@ -261,7 +268,7 @@ describe("guided tutorial first-value loop", () => {
 
   afterEach(() => {
     document
-      .querySelectorAll('[data-tour="companion-plan-my-day-action"]')
+      .querySelectorAll('[data-tour="companion-launcher-option-plan-day"], [data-tour="campaign-builder-launcher"]')
       .forEach((element) => element.remove());
   });
 
@@ -296,10 +303,13 @@ describe("guided tutorial first-value loop", () => {
     });
   });
 
-  it("advances from companion intro to Plan My Day and then closeout", async () => {
-    const target = document.createElement("button");
-    target.setAttribute("data-tour", "companion-plan-my-day-action");
-    document.body.appendChild(target);
+  it("advances from companion intro to Plan day, campaign builder, and then closeout", async () => {
+    const planTarget = document.createElement("button");
+    planTarget.setAttribute("data-tour", "companion-launcher-option-plan-day");
+    document.body.appendChild(planTarget);
+    const campaignTarget = document.createElement("button");
+    campaignTarget.setAttribute("data-tour", "campaign-builder-launcher");
+    document.body.appendChild(campaignTarget);
 
     const { result } = renderHook(() => usePostOnboardingMentorGuidance(), {
       wrapper: createWrapper(),
@@ -321,10 +331,11 @@ describe("guided tutorial first-value loop", () => {
     await waitFor(() => {
       expect(result.current.currentStep).toBe("plan_my_day");
       expect(result.current.activeTargetSelectors).toEqual([
-        '[data-tour="companion-plan-my-day-action"]',
+        '[data-tour="companion-launcher-option-plan-day"]',
+        '[data-planner-tour="companion-quick-actions"]',
       ]);
       expect(result.current.activeTargetSelector).toBe(
-        '[data-tour="companion-plan-my-day-action"]',
+        '[data-tour="companion-launcher-option-plan-day"]',
       );
     });
 
@@ -333,8 +344,13 @@ describe("guided tutorial first-value loop", () => {
     });
 
     await waitFor(() => {
-      expect(result.current.currentStep).toBe("first_plan_closeout");
-      expect(result.current.dialogueActionLabel).toBe("Finish");
+      expect(result.current.currentStep).toBe("create_campaign");
+      expect(result.current.activeTargetSelectors).toEqual([
+        '[data-tour="campaign-builder-launcher"]',
+      ]);
+      expect(result.current.activeTargetSelector).toBe(
+        '[data-tour="campaign-builder-launcher"]',
+      );
       expect(mocks.state.awardCustomXP).toHaveBeenCalledWith(
         3,
         "guided_tutorial_step_complete",
@@ -344,6 +360,15 @@ describe("guided tutorial first-value loop", () => {
           source: "guided_tutorial",
         }),
       );
+    });
+
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent("campaign-builder-opened"));
+    });
+
+    await waitFor(() => {
+      expect(result.current.currentStep).toBe("first_plan_closeout");
+      expect(result.current.dialogueActionLabel).toBe("Finish");
     });
 
     await act(async () => {

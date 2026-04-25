@@ -686,7 +686,7 @@ describe("StoryOnboarding questionnaire submission flow", () => {
       const guidedTutorial = JSON.parse(rawProgress ?? "{}");
       expect(guidedTutorial).toMatchObject({
         version: 2,
-        flowVersion: 4,
+        flowVersion: 5,
         eligible: true,
         completed: false,
         dismissed: false,
@@ -1109,13 +1109,11 @@ describe("StoryOnboarding questionnaire submission flow", () => {
     );
   });
 
-  it("awaits progress persistence before continuing onboarding later", async () => {
-    let resolveSave: ((value: { error: null }) => void) | null = null;
-    mocks.profilesUpdateEq.mockImplementationOnce(
-      () => new Promise((resolve) => {
-        resolveSave = resolve as (value: { error: null }) => void;
-      }),
-    );
+  it("does not render Continue Later during onboarding", async () => {
+    const { unmount } = renderOnboarding();
+
+    expect(screen.queryByRole("button", { name: "Continue Later" })).not.toBeInTheDocument();
+    unmount();
 
     renderOnboarding({
       resumeState: {
@@ -1129,50 +1127,7 @@ describe("StoryOnboarding questionnaire submission flow", () => {
     });
 
     await screen.findByTestId("story-tone-stage");
-    fireEvent.click(screen.getByRole("button", { name: "Continue Later" }));
-
-    await waitFor(() => {
-      expect(mocks.profilesUpdateEq).toHaveBeenCalled();
-    });
-    expect(mocks.signOut).not.toHaveBeenCalled();
-
-    await act(async () => {
-      resolveSave?.({ error: null });
-      await Promise.resolve();
-    });
-
-    await waitFor(() => {
-      expect(mocks.signOut).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  it("keeps the current stage visible when Continue Later cannot save", async () => {
-    mocks.profilesUpdateEq.mockResolvedValueOnce({
-      error: new Error("network down"),
-    });
-
-    renderOnboarding({
-      resumeState: {
-        stage: "story-tone",
-        userName: "Nova",
-        onboardingData: {
-          story_tone: "dark_intense",
-          questionnaireAnswers: QUESTIONNAIRE_ANSWERS,
-        },
-      },
-    });
-
-    await screen.findByTestId("story-tone-stage");
-    fireEvent.click(screen.getByRole("button", { name: "Continue Later" }));
-
-    await waitFor(() => {
-      expect(mocks.toastError).toHaveBeenCalledWith(
-        "We couldn't save your progress right now. Please try again.",
-        expect.objectContaining({ duration: expect.any(Number) }),
-      );
-    });
-    expect(screen.getByTestId("story-tone-stage")).toBeInTheDocument();
-    expect(mocks.signOut).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: "Continue Later" })).not.toBeInTheDocument();
   });
 
   it("does not advance from story tone until the next step is persisted", async () => {

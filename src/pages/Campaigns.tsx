@@ -46,6 +46,13 @@ const Campaigns = () => {
   const hasCampaigns = activeEpics.length > 0 || completedEpics.length > 0;
   const hasReachedLimit = hasReachedActiveCampaignLimit(activeEpics.length);
 
+  const openCampaignBuilder = useCallback(() => {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("campaign-builder-opened"));
+    }
+    setShowPathfinder(true);
+  }, []);
+
   const handleCreateCampaign = useCallback(async (data: Parameters<typeof createEpic>[0]) => {
     try {
       await createEpic(data);
@@ -119,8 +126,9 @@ const Campaigns = () => {
                   variant="outline"
                   size="lg"
                   data-testid="campaigns-empty-state-button"
+                  data-tour="campaign-builder-launcher"
                   className={cn("mt-6", CAMPAIGN_CTA_CLASS)}
-                  onClick={() => setShowPathfinder(true)}
+                  onClick={openCampaignBuilder}
                 >
                   <Sparkles className="h-4 w-4" />
                   Launch campaign builder
@@ -140,9 +148,10 @@ const Campaigns = () => {
                         size="lg"
                         variant="outline"
                         data-testid="campaigns-create-button"
+                        data-tour="campaign-builder-launcher"
                         className={CAMPAIGN_CTA_CLASS}
                         disabled={hasReachedLimit}
-                        onClick={() => setShowPathfinder(true)}
+                        onClick={openCampaignBuilder}
                       >
                         <Plus className="h-4 w-4" />
                         Create campaign
