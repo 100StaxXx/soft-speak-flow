@@ -1,54 +1,50 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes, useLocation, useNavigate } from "react-router-dom";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   PostOnboardingMentorGuidanceProvider,
   usePostOnboardingMentorGuidance,
 } from "./usePostOnboardingMentorGuidance";
 
-const createGuidedTutorial = () => ({
+const createFreshTutorial = () => ({
   version: 2,
+  flowVersion: 4,
   eligible: true,
+  dismissed: false,
   completed: false,
-  completedSteps: ["create_quest", "meet_companion"] as const,
+  completedSteps: [] as string[],
   xpAwardedSteps: [] as string[],
-  milestonesCompleted: ["open_mentor_tab"] as const,
+  milestonesCompleted: [] as string[],
 });
 
-const createEvolveStepTutorial = () => ({
-  version: 2,
-  eligible: true,
-  completed: false,
-  completedSteps: ["create_quest", "meet_companion", "morning_checkin", "companion_tab_intro"] as const,
-  xpAwardedSteps: [] as string[],
-  milestonesCompleted: ["mentor_intro_hello", "companion_tab_intro"] as const,
+const createPlanStepTutorial = () => ({
+  ...createFreshTutorial(),
+  completedSteps: ["meet_companion"],
+  milestonesCompleted: ["mentor_intro_hello", "meet_companion_intro"],
 });
 
 const createCloseoutTutorial = () => ({
-  version: 2,
-  eligible: true,
-  completed: false,
-  completedSteps: [
-    "quests_campaigns_intro",
-    "create_quest",
-    "morning_checkin",
-    "companion_tab_intro",
-    "evolve_companion",
-    "post_evolution_companion_intro",
-  ] as const,
-  xpAwardedSteps: ["create_quest", "morning_checkin"] as const,
-  milestonesCompleted: ["mentor_intro_hello", "post_evolution_companion_intro"] as const,
+  ...createFreshTutorial(),
+  completedSteps: ["meet_companion", "plan_my_day"],
+  xpAwardedSteps: ["plan_my_day"],
+  milestonesCompleted: [
+    "mentor_intro_hello",
+    "meet_companion_intro",
+    "start_plan_my_day",
+  ],
 });
 
 const mocks = vi.hoisted(() => ({
   guidedTutorial: {
     version: 2,
+    flowVersion: 4,
     eligible: true,
+    dismissed: false,
     completed: false,
-    completedSteps: ["create_quest", "meet_companion"],
-    xpAwardedSteps: [] as string[],
-    milestonesCompleted: ["open_mentor_tab"],
+    completedSteps: [],
+    xpAwardedSteps: [],
+    milestonesCompleted: [],
   } as Record<string, unknown>,
 }));
 
@@ -100,6 +96,7 @@ const RouteProbe = () => {
     currentStep,
     secondaryActionLabel,
     onSecondaryAction,
+    activeTargetSelector,
   } = usePostOnboardingMentorGuidance();
 
   return (
@@ -109,6 +106,7 @@ const RouteProbe = () => {
       <div data-testid="intro-active">{String(isIntroDialogueActive)}</div>
       <div data-testid="intro-action">{dialogueActionLabel || ""}</div>
       <div data-testid="secondary-action">{secondaryActionLabel || ""}</div>
+      <div data-testid="target">{activeTargetSelector || ""}</div>
       <button type="button" onClick={() => onDialogueAction?.()}>
         intro-action
       </button>
@@ -126,70 +124,15 @@ const RouteProbe = () => {
 };
 
 describe("guided tutorial route restoration", () => {
-  const originalMatchMedia = window.matchMedia;
-  let scrollIntoViewMock: ReturnType<typeof vi.fn>;
-
-  const createTargetRect = ({
-    top,
-    bottom,
-    left = 0,
-    right = 320,
-  }: {
-    top: number;
-    bottom: number;
-    left?: number;
-    right?: number;
-  }) => ({
-    top,
-    bottom,
-    left,
-    right,
-    width: right - left,
-    height: bottom - top,
-    x: left,
-    y: top,
-    toJSON: () => ({}),
-  });
-
-  const mountEvolveTarget = (rect: ReturnType<typeof createTargetRect>) => {
-    const target = document.createElement("button");
-    target.setAttribute("data-tour", "evolve-companion-button");
-    document.body.appendChild(target);
-    vi.spyOn(target, "getBoundingClientRect").mockReturnValue(
-      rect as unknown as DOMRect
-    );
-    return target;
-  };
-
   beforeEach(() => {
-    mocks.guidedTutorial = createGuidedTutorial();
+    mocks.guidedTutorial = createFreshTutorial();
     globalThis.localStorage?.removeItem?.("guided_tutorial_progress_user-1");
-    scrollIntoViewMock = vi.fn();
-    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
-      configurable: true,
-      writable: true,
-      value: scrollIntoViewMock,
-    });
-    window.matchMedia = originalMatchMedia;
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
-    window.matchMedia = originalMatchMedia;
     document
-      .querySelectorAll('[data-tour="evolve-companion-button"]')
+      .querySelectorAll('[data-tour="companion-plan-my-day-action"]')
       .forEach((element) => element.remove());
   });
 
-  const renderWithProviders = (
-    initialPath = "/journeys",
-    options?: {
-      seedCompanion?: {
-        id: string;
-        current_stage: number;
-      } | null;
-    },
-  ) => {
+  const renderWithProviders = (initialPath = "/journeys") => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: {
@@ -198,149 +141,103 @@ describe("guided tutorial route restoration", () => {
       },
     });
 
-    if (options?.seedCompanion) {
-      queryClient.setQueryData(["companion", "user-1"], options.seedCompanion);
-    }
-
-    return {
-      queryClient,
-      ...render(
-        <QueryClientProvider client={queryClient}>
-          <MemoryRouter initialEntries={[initialPath]}>
-            <PostOnboardingMentorGuidanceProvider>
-              <Routes>
-                <Route path="*" element={<RouteProbe />} />
-              </Routes>
-            </PostOnboardingMentorGuidanceProvider>
-          </MemoryRouter>
-        </QueryClientProvider>
-      ),
-    };
+    return render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={[initialPath]}>
+          <PostOnboardingMentorGuidanceProvider>
+            <Routes>
+              <Route path="*" element={<RouteProbe />} />
+            </Routes>
+          </PostOnboardingMentorGuidanceProvider>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
   };
 
-  it("redirects to the active tutorial route using replace semantics", async () => {
-    renderWithProviders();
+  it("restores a fresh tutorial to the companion route", async () => {
+    renderWithProviders("/journeys");
 
     await waitFor(() => {
-      expect(screen.getByTestId("path")).toHaveTextContent("/mentor");
+      expect(screen.getByTestId("path")).toHaveTextContent("/companion");
+      expect(screen.getByTestId("step")).toHaveTextContent("meet_companion");
+      expect(screen.getByTestId("intro-action")).toHaveTextContent(
+        "Start Tutorial",
+      );
     });
 
     fireEvent.click(screen.getByRole("button", { name: "back" }));
 
     await waitFor(() => {
-      expect(screen.getByTestId("path")).toHaveTextContent("/mentor");
-    });
-  });
-
-  it("keeps route restoration active while intro dialogue is pending", async () => {
-    renderWithProviders();
-
-    await waitFor(() => {
-      expect(screen.getByTestId("path")).toHaveTextContent("/mentor");
-      expect(screen.getByTestId("intro-active")).toHaveTextContent("true");
-      expect(screen.getByTestId("intro-action")).toHaveTextContent("Start Tutorial");
-      expect(screen.getByTestId("secondary-action")).toHaveTextContent("");
-    });
-  });
-
-  it("advances intro dialogue on route and then exits intro mode", async () => {
-    renderWithProviders();
-
-    await waitFor(() => {
-      expect(screen.getByTestId("intro-action")).toHaveTextContent("Start Tutorial");
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "intro-action" }));
-
-    await waitFor(() => {
-      expect(screen.getByTestId("intro-active")).toHaveTextContent("false");
-      expect(screen.getByTestId("intro-action")).toHaveTextContent("");
-      expect(screen.getByTestId("path")).toHaveTextContent("/mentor");
-      expect(screen.getByTestId("step")).toHaveTextContent("morning_checkin");
-    });
-  });
-
-  it("routes from morning check-in to companion intro, then evolve, then post-evolution explainer", async () => {
-    renderWithProviders("/mentor");
-
-    await waitFor(() => {
-      expect(screen.getByTestId("path")).toHaveTextContent("/mentor");
-      expect(screen.getByTestId("intro-action")).toHaveTextContent("Start Tutorial");
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "intro-action" }));
-
-    await act(async () => {
-      window.dispatchEvent(new CustomEvent("morning-checkin-completed"));
-    });
-
-    await waitFor(() => {
       expect(screen.getByTestId("path")).toHaveTextContent("/companion");
-      expect(screen.getByTestId("step")).toHaveTextContent("companion_tab_intro");
-      expect(screen.getByTestId("intro-action")).toHaveTextContent("Continue");
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "intro-action" }));
-
-    await waitFor(() => {
-      expect(screen.getByTestId("step")).toHaveTextContent("evolve_companion");
-    });
-
-    await act(async () => {
-      window.dispatchEvent(new CustomEvent("evolution-loading-start"));
-      window.dispatchEvent(new CustomEvent("companion-evolved"));
-    });
-
-    await waitFor(() => {
-      expect(screen.getByTestId("path")).toHaveTextContent("/companion");
-      expect(screen.getByTestId("step")).toHaveTextContent("post_evolution_companion_intro");
-      expect(screen.getByTestId("intro-action")).toHaveTextContent("Continue");
     });
   });
 
-  it("allows leaving during in-flight evolution, then returns to companion after completion", async () => {
-    mocks.guidedTutorial = createEvolveStepTutorial();
+  it("advances from intro to Plan My Day on the companion route", async () => {
     renderWithProviders("/companion");
 
     await waitFor(() => {
-      expect(screen.getByTestId("path")).toHaveTextContent("/companion");
-      expect(screen.getByTestId("intro-active")).toHaveTextContent("false");
-      expect(screen.getByTestId("step")).toHaveTextContent("evolve_companion");
+      expect(screen.getByTestId("intro-action")).toHaveTextContent(
+        "Start Tutorial",
+      );
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "intro-action" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("step")).toHaveTextContent("meet_companion");
+      expect(screen.getByTestId("intro-action")).toHaveTextContent("Continue");
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "intro-action" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("step")).toHaveTextContent("plan_my_day");
+      expect(screen.getByTestId("intro-action")).toHaveTextContent("");
+      expect(screen.getByTestId("secondary-action")).toHaveTextContent(
+        "Skip tutorial",
+      );
+    });
+  });
+
+  it("targets Plan My Day and reaches the final closeout after the planner starts", async () => {
+    mocks.guidedTutorial = createPlanStepTutorial();
+    const target = document.createElement("button");
+    target.setAttribute("data-tour", "companion-plan-my-day-action");
+    document.body.appendChild(target);
+
+    renderWithProviders("/companion");
+
+    await waitFor(() => {
+      expect(screen.getByTestId("step")).toHaveTextContent("plan_my_day");
+      expect(screen.getByTestId("target")).toHaveTextContent(
+        '[data-tour="companion-plan-my-day-action"]',
+      );
     });
 
     await act(async () => {
-      window.dispatchEvent(new CustomEvent("evolution-loading-start"));
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "go-journeys" }));
-
-    await waitFor(() => {
-      expect(screen.getByTestId("path")).toHaveTextContent("/journeys");
-    });
-
-    await act(async () => {
-      window.dispatchEvent(new CustomEvent("companion-evolved"));
+      window.dispatchEvent(new CustomEvent("companion-plan-my-day-started"));
     });
 
     await waitFor(() => {
-      expect(screen.getByTestId("path")).toHaveTextContent("/companion");
+      expect(screen.getByTestId("step")).toHaveTextContent(
+        "first_plan_closeout",
+      );
+      expect(screen.getByTestId("intro-action")).toHaveTextContent("Finish");
     });
   });
 
   it("stops restoring tutorial routes after the tutorial is skipped", async () => {
-    renderWithProviders();
+    mocks.guidedTutorial = {
+      ...createFreshTutorial(),
+      milestonesCompleted: ["mentor_intro_hello"],
+    };
+    renderWithProviders("/journeys");
 
     await waitFor(() => {
-      expect(screen.getByTestId("path")).toHaveTextContent("/mentor");
-      expect(screen.getByTestId("step")).toHaveTextContent("morning_checkin");
-      expect(screen.getByTestId("intro-action")).toHaveTextContent("Start Tutorial");
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "intro-action" }));
-
-    await waitFor(() => {
-      expect(screen.getByTestId("intro-action")).toHaveTextContent("");
-      expect(screen.getByTestId("secondary-action")).toHaveTextContent("Skip tutorial");
+      expect(screen.getByTestId("path")).toHaveTextContent("/companion");
+      expect(screen.getByTestId("secondary-action")).toHaveTextContent(
+        "Skip tutorial",
+      );
     });
 
     fireEvent.click(screen.getByRole("button", { name: "secondary" }));
@@ -357,166 +254,25 @@ describe("guided tutorial route restoration", () => {
     });
   });
 
-  it("shows a complete tutorial action on the final closeout step", async () => {
+  it("completes the tutorial from the final closeout action", async () => {
     mocks.guidedTutorial = createCloseoutTutorial();
     renderWithProviders("/companion");
 
     await waitFor(() => {
-      expect(screen.getByTestId("path")).toHaveTextContent("/companion");
-      expect(screen.getByTestId("step")).toHaveTextContent("mentor_closeout");
-      expect(screen.getByTestId("secondary-action")).toHaveTextContent("Complete tutorial");
+      expect(screen.getByTestId("step")).toHaveTextContent(
+        "first_plan_closeout",
+      );
+      expect(screen.getByTestId("intro-action")).toHaveTextContent("Finish");
+      expect(screen.getByTestId("secondary-action")).toHaveTextContent(
+        "Complete tutorial",
+      );
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "secondary" }));
+    fireEvent.click(screen.getByRole("button", { name: "intro-action" }));
 
     await waitFor(() => {
       expect(screen.getByTestId("step")).toHaveTextContent("");
       expect(screen.getByTestId("secondary-action")).toHaveTextContent("");
-    });
-  });
-
-  it("auto-scrolls to evolve button on evolve tutorial milestone", async () => {
-    mocks.guidedTutorial = createEvolveStepTutorial();
-    mountEvolveTarget(createTargetRect({ top: 1200, bottom: 1260 }));
-    renderWithProviders("/companion");
-
-    await waitFor(() => {
-      expect(screen.getByTestId("path")).toHaveTextContent("/companion");
-      expect(scrollIntoViewMock).toHaveBeenCalledTimes(1);
-    });
-
-    expect(scrollIntoViewMock).toHaveBeenCalledWith({
-      block: "center",
-      inline: "nearest",
-      behavior: "smooth",
-    });
-  });
-
-  it("does not auto-scroll when tutorial is not on evolve milestone", async () => {
-    renderWithProviders("/journeys");
-
-    await waitFor(() => {
-      expect(screen.getByTestId("path")).toHaveTextContent("/mentor");
-    });
-
-    expect(scrollIntoViewMock).not.toHaveBeenCalled();
-  });
-
-  it("dedupes evolve auto-scroll while staying in the same milestone entry", async () => {
-    mocks.guidedTutorial = createEvolveStepTutorial();
-    mountEvolveTarget(createTargetRect({ top: 1200, bottom: 1260 }));
-    renderWithProviders("/companion");
-
-    await waitFor(() => {
-      expect(scrollIntoViewMock).toHaveBeenCalledTimes(1);
-    });
-
-    await act(async () => {
-      window.dispatchEvent(new Event("resize"));
-      window.dispatchEvent(new Event("orientationchange"));
-      window.dispatchEvent(new Event("scroll"));
-    });
-
-    await new Promise((resolve) => window.setTimeout(resolve, 300));
-    expect(scrollIntoViewMock).toHaveBeenCalledTimes(1);
-  });
-
-  it("uses non-animated auto-scroll when reduced motion is enabled", async () => {
-    mocks.guidedTutorial = createEvolveStepTutorial();
-    mountEvolveTarget(createTargetRect({ top: 1200, bottom: 1260 }));
-    window.matchMedia = vi.fn((query: string) => ({
-      matches: query === "(prefers-reduced-motion: reduce)",
-      media: query,
-      onchange: null,
-      addListener: () => {},
-      removeListener: () => {},
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      dispatchEvent: () => false,
-    })) as unknown as typeof window.matchMedia;
-
-    renderWithProviders("/companion");
-
-    await waitFor(() => {
-      expect(scrollIntoViewMock).toHaveBeenCalledTimes(1);
-    });
-
-    expect(scrollIntoViewMock).toHaveBeenCalledWith({
-      block: "center",
-      inline: "nearest",
-      behavior: "auto",
-    });
-  });
-
-  it("does not skip evolve step from companion cache alone before the hatch starts", async () => {
-    mocks.guidedTutorial = createEvolveStepTutorial();
-    renderWithProviders("/companion", {
-      seedCompanion: {
-        id: "companion-1",
-        current_stage: 1,
-      },
-    });
-
-    await waitFor(() => {
-      expect(screen.getByTestId("path")).toHaveTextContent("/companion");
-      expect(screen.getByTestId("step")).toHaveTextContent("evolve_companion");
-    });
-  });
-
-  it("requires an explicit evolution start before the completion event advances the step", async () => {
-    mocks.guidedTutorial = createEvolveStepTutorial();
-    renderWithProviders("/companion");
-
-    await waitFor(() => {
-      expect(screen.getByTestId("path")).toHaveTextContent("/companion");
-      expect(screen.getByTestId("step")).toHaveTextContent("evolve_companion");
-    });
-
-    await act(async () => {
-      window.dispatchEvent(new CustomEvent("companion-evolved"));
-    });
-
-    await waitFor(() => {
-      expect(screen.getByTestId("step")).toHaveTextContent("evolve_companion");
-    });
-
-    await act(async () => {
-      window.dispatchEvent(new CustomEvent("evolution-loading-start"));
-      window.dispatchEvent(new CustomEvent("companion-evolved"));
-    });
-
-    await waitFor(() => {
-      expect(screen.getByTestId("step")).toHaveTextContent("post_evolution_companion_intro");
-    });
-  });
-
-  it("recovers to the post-evolution step when hatch had already started and companion state updates after mount", async () => {
-    mocks.guidedTutorial = {
-      ...createEvolveStepTutorial(),
-      milestonesCompleted: [
-        "mentor_intro_hello",
-        "companion_tab_intro",
-        "tap_evolve_companion",
-      ],
-      evolutionInFlight: true,
-    };
-
-    const { queryClient } = renderWithProviders("/companion");
-
-    await waitFor(() => {
-      expect(screen.getByTestId("path")).toHaveTextContent("/companion");
-      expect(screen.getByTestId("step")).toHaveTextContent("evolve_companion");
-    });
-
-    await act(async () => {
-      queryClient.setQueryData(["companion", "user-1"], {
-        id: "companion-1",
-        current_stage: 1,
-      });
-    });
-
-    await waitFor(() => {
-      expect(screen.getByTestId("step")).toHaveTextContent("post_evolution_companion_intro");
     });
   });
 });

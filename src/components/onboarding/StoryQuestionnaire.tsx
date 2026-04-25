@@ -7,6 +7,10 @@ import { type FactionType } from "./FactionSelector";
 import { cn } from "@/lib/utils";
 import { logger } from "@/utils/logger";
 import { isNativeIOSHandheld } from "@/utils/platformTargets";
+import {
+  ONBOARDING_SCHEDULE_ARCHETYPE_OPTIONS,
+  ONBOARDING_SCHEDULE_ARCHETYPE_QUESTION_ID,
+} from "@/shared/onboardingScheduleArchetype";
 
 interface QuestionOption {
   optionId: string;
@@ -34,18 +38,21 @@ const getFactionNarrative = (faction: FactionType, questionIndex: number): strin
       "As flames dance in the distance, your ship awaits its next destination...",
       "The engines hum with potential energy. Your crew looks to you for direction...",
       "Your path grows clearer with each choice...",
+      "One last calibration: the map needs to know the terrain of your real days...",
     ],
     void: [
       "In the stillness, a presence awaits. What form does it take?",
       "In the silent depths between stars, clarity emerges from stillness...",
       "The void speaks to those who listen. A whisper guides your path...",
       "The shadows reveal what light cannot...",
+      "The void studies the shape of your time before it offers a path...",
     ],
     stellar: [
       "The stars align to reveal your guide. Who do you see among them?",
       "Nebulas paint the cosmos in infinite colors. Each holds a dream...",
       "Your companion gazes at the stars with wonder. What do you see?",
       "The constellations align to show your way...",
+      "The stars ask what kind of orbit your days usually follow...",
     ],
   };
   return narratives[faction][questionIndex] || narratives[faction][0];
@@ -94,6 +101,15 @@ const questions: StoryQuestion[] = [
       { optionId: "belief_support", text: "Someone who believes in me", tags: ["confidence", "supportive"] },
       { optionId: "pressure_standards", text: "Pressure and high standards", tags: ["discipline", "momentum"] },
     ],
+  },
+  {
+    id: ONBOARDING_SCHEDULE_ARCHETYPE_QUESTION_ID,
+    narrative: "",
+    question: "What kind of schedule are we planning around?",
+    options: ONBOARDING_SCHEDULE_ARCHETYPE_OPTIONS.map((option) => ({
+      ...option,
+      tags: [...option.tags],
+    })),
   },
 ];
 

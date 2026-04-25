@@ -21,7 +21,7 @@ import { computePlannerPriorityScores } from "../../../src/shared/companionPlann
 import {
   fitPlannerDurationBucketWithin,
   normalizePlannerDurationBucket,
-} from "../../../src/shared/plannerDurationBuckets.ts";
+} from "../_shared/plannerDurationBuckets.ts";
 import {
   buildAssistantEventScheduleLabel,
   buildAssistantTaskScheduleLabel,
@@ -141,6 +141,7 @@ export interface PlannerContextTask {
   category?: string | null;
   scheduledTime: string | null;
   estimatedDuration: number | null;
+  actualDurationMinutes?: number | null;
   actualTimeSpent?: number | null;
   notes?: string | null;
   subtaskTitles?: string[];
@@ -174,6 +175,7 @@ export interface PlannerContextRitual {
   frequency: string | null;
   preferredTime: string | null;
   estimatedMinutes?: number | null;
+  actualDurationMinutes?: number | null;
   currentStreak?: number | null;
 }
 
@@ -288,6 +290,16 @@ export interface PlannerScheduleInsights {
 
 export interface PlannerMemoryProfile {
   tonePack?: PlannerTonePack;
+  scheduleArchetype?:
+    | "nine_to_five"
+    | "business_owner"
+    | "after_work_builder"
+    | "student"
+    | "variable_schedule"
+    | "flexible_transition"
+    | null;
+  scheduleArchetypeLabel?: string | null;
+  scheduleArchetypePlanningHint?: string | null;
   preferredTimeOfDay?: string | null;
   preferredTimeReason?: string | null;
   reminderMinutesBefore?: number | null;
@@ -1297,7 +1309,9 @@ const getHistoricalActivityDurationMinutes = (
   const toTaskCandidate = (
     task: PlannerContextTask,
   ): HistoricalDurationCandidate | null => {
-    const actualMinutes = normalizePlannerDurationBucket(task.actualTimeSpent);
+    const actualMinutes = normalizePlannerDurationBucket(
+      task.actualDurationMinutes,
+    );
     const estimatedMinutes = normalizePlannerDurationBucket(
       task.estimatedDuration,
     );
@@ -1315,13 +1329,19 @@ const getHistoricalActivityDurationMinutes = (
   const toRitualCandidate = (
     ritual: PlannerContextRitual,
   ): HistoricalDurationCandidate | null => {
-    const minutes = normalizePlannerDurationBucket(ritual.estimatedMinutes);
+    const actualMinutes = normalizePlannerDurationBucket(
+      ritual.actualDurationMinutes,
+    );
+    const estimatedMinutes = normalizePlannerDurationBucket(
+      ritual.estimatedMinutes,
+    );
+    const minutes = actualMinutes ?? estimatedMinutes;
     if (minutes === null) return null;
     return {
       title: ritual.title,
       kind: "ritual",
-      actualMinutes: null,
-      estimatedMinutes: minutes,
+      actualMinutes,
+      estimatedMinutes,
       minutes,
     };
   };
@@ -1401,7 +1421,8 @@ const getHistoricalActivityDurationMinutes = (
       const sortedDurations = categoryMatches
         .map((candidate) => candidate.minutes)
         .sort((left, right) => left - right);
-      return sortedDurations[Math.floor(sortedDurations.length / 2)] ?? null;
+      return sortedDurations[Math.floor((sortedDurations.length - 1) / 2)] ??
+        null;
     }
   }
 
@@ -2064,6 +2085,13 @@ const hasExplicitActivityDurationMention = (message: string): boolean =>
   /\bhalf an hour\b/i.test(message) ||
   /\bquarter of an hour\b/i.test(message);
 
+const getExplicitParsedActivityDuration = (
+  input: PlannerBuildInput,
+): number | null =>
+  hasExplicitActivityDurationMention(input.message)
+    ? input.parsedInput?.estimatedDuration ?? null
+    : null;
+
 const inferReminderMinutes = (
   kind: PlannerProposalKind,
   scheduledTime: string | null | undefined,
@@ -2597,17 +2625,16 @@ const mergeDraft = (
           category: parsed?.category ?? null,
         },
       );
+      const explicitDuration = getExplicitParsedActivityDuration(input);
       const inferredDuration = parsed?.estimatedDuration ??
         getClassificationActivityDurationMinutes(input.classificationHint) ??
         base.durationMinutes ??
         null;
 
-      return hasExplicitActivityDurationMention(input.message)
-        ? parsed?.estimatedDuration ??
-          historicalDuration ??
-          inferredDuration
-        : historicalDuration ??
-          inferredDuration;
+      // Duration precedence: explicit user duration, learned history, then inferred estimates.
+      return explicitDuration ??
+        historicalDuration ??
+        inferredDuration;
     })(),
     reminderMinutesBefore: isReminderRemovalIntent(input.message)
       ? null
@@ -7618,11 +7645,13 @@ const buildPlanDayConcreteCandidate = (
     title,
     scheduledDate: input.parsedInput?.scheduledDate ?? targetDate,
     scheduledTime: input.parsedInput?.scheduledTime ?? null,
-    estimatedDuration: input.parsedInput?.estimatedDuration ??
+    // Duration precedence: explicit user duration, learned history, then inferred estimates.
+    estimatedDuration: getExplicitParsedActivityDuration(input) ??
       getHistoricalActivityDurationMinutes(input, title, "quest", {
         category: input.parsedInput?.category ?? null,
       }) ??
-      getClassificationActivityDurationMinutes(input.classificationHint) ?? 30,
+      getClassificationActivityDurationMinutes(input.classificationHint) ??
+      input.parsedInput?.estimatedDuration ?? 30,
     reasoning:
       "You named this block directly, so I'm treating it as a real quest instead of leaving it vague.",
     category: input.parsedInput?.category ?? null,

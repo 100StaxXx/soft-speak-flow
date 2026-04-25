@@ -1,5 +1,6 @@
 import type { IntentClassification } from "@/hooks/useIntentClassifier";
 import type { CompanionPlanningMode } from "@/shared/companionPlanningMode";
+import type { OnboardingScheduleArchetype } from "@/shared/onboardingScheduleArchetype";
 import type {
   CompanionMissInterpretation,
   CompanionMomentumState,
@@ -141,6 +142,7 @@ export interface PlannerContextTask {
   category?: string | null;
   scheduledTime: string | null;
   estimatedDuration: number | null;
+  actualDurationMinutes?: number | null;
   actualTimeSpent?: number | null;
   notes?: string | null;
   subtaskTitles?: string[];
@@ -174,6 +176,7 @@ export interface PlannerContextRitual {
   frequency: string | null;
   preferredTime: string | null;
   estimatedMinutes?: number | null;
+  actualDurationMinutes?: number | null;
   currentStreak?: number | null;
 }
 
@@ -291,6 +294,9 @@ export interface PlannerScheduleInsights {
 
 export interface PlannerMemoryProfile {
   tonePack?: PlannerTonePack;
+  scheduleArchetype?: OnboardingScheduleArchetype | null;
+  scheduleArchetypeLabel?: string | null;
+  scheduleArchetypePlanningHint?: string | null;
   preferredTimeOfDay?: string | null;
   preferredTimeReason?: string | null;
   reminderMinutesBefore?: number | null;

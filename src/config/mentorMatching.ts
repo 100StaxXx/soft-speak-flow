@@ -80,6 +80,7 @@ export const canonicalizeTags = (tags: Array<string | null | undefined>): Canoni
 
 export const MENTOR_FALLBACK_TAGS: Record<string, CanonicalTrait[]> = {
   sage: ["calm", "healing"],
+  lyra: ["calm", "supportive"],
   icon: ["confidence", "discipline"],
   charles: ["momentum", "discipline"],
   princess: ["supportive", "healing"],

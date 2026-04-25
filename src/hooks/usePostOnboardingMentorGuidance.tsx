@@ -33,12 +33,12 @@ import type {
 const TARGET_RESOLVE_POLL_MS = 250;
 const TARGET_MISSING_FALLBACK_MS = 1400;
 const CLOSEOUT_AUTO_COMPLETE_MS = 2600;
+const PLAN_MY_DAY_SELECTOR = '[data-tour="companion-plan-my-day-action"]';
 const EVOLVE_AUTOSCROLL_SELECTOR = '[data-tour="evolve-companion-button"]';
 const EVOLVE_AUTOSCROLL_VIEWPORT_MARGIN_PX = 72;
 
 const STEP_XP_REWARDS: Partial<Record<GuidedTutorialStepId, number>> = {
-  create_quest: 3,
-  morning_checkin: 3,
+  plan_my_day: 3,
 };
 
 interface GuidedStep {
@@ -48,31 +48,15 @@ interface GuidedStep {
 
 const GUIDED_STEPS: GuidedStep[] = [
   {
-    id: "quests_campaigns_intro",
-    route: "/journeys",
-  },
-  {
-    id: "create_quest",
-    route: "/journeys",
-  },
-  {
-    id: "morning_checkin",
-    route: "/mentor",
-  },
-  {
-    id: "companion_tab_intro",
+    id: "meet_companion",
     route: "/companion",
   },
   {
-    id: "evolve_companion",
+    id: "plan_my_day",
     route: "/companion",
   },
   {
-    id: "post_evolution_companion_intro",
-    route: "/companion",
-  },
-  {
-    id: "mentor_closeout",
+    id: "first_plan_closeout",
     route: "/companion",
   },
 ];
@@ -90,9 +74,18 @@ const QUEST_ADD_LAUNCHER_SELECTORS = [
 ];
 
 const ACTIVE_GUIDED_STEP_ID_SET = new Set<GuidedTutorialStepId>(GUIDED_STEPS.map((step) => step.id));
+const LEGACY_GUIDED_STEP_ID_SET = new Set<GuidedTutorialStepId>([
+  "quests_campaigns_intro",
+  "create_quest",
+  "morning_checkin",
+  "companion_tab_intro",
+  "evolve_companion",
+  "post_evolution_companion_intro",
+  "mentor_closeout",
+]);
 const GUIDED_STEP_ID_SET = new Set<GuidedTutorialStepId>([
   ...GUIDED_STEPS.map((step) => step.id),
-  "meet_companion",
+  ...LEGACY_GUIDED_STEP_ID_SET,
 ]);
 const CREATE_QUEST_SUBSTEP_SET = new Set<CreateQuestSubstepId>([
   ...CREATE_QUEST_SUBSTEP_ORDER,
@@ -111,6 +104,9 @@ const isProgressRecord = (value: unknown): value is Record<string, unknown> =>
 
 const MILESTONE_ID_SET = new Set<GuidedMilestoneId>([
   "mentor_intro_hello",
+  "meet_companion_intro",
+  "start_plan_my_day",
+  "first_plan_closeout_message",
   "stay_on_quests",
   "quests_campaigns_intro",
   "open_add_quest",
@@ -149,7 +145,11 @@ const emitTutorialEvent = (eventName: string, detail: Record<string, unknown>) =
 const getTargetSelectorsForMilestone = (milestoneId: GuidedMilestoneId): string[] => {
   switch (milestoneId) {
     case "mentor_intro_hello":
+    case "meet_companion_intro":
+    case "first_plan_closeout_message":
       return [];
+    case "start_plan_my_day":
+      return [PLAN_MY_DAY_SELECTOR];
     case "quests_campaigns_intro":
     case "companion_tab_intro":
     case "post_evolution_companion_intro":
@@ -193,32 +193,32 @@ interface MentorDialogueLine {
 
 const INTRO_DIALOGUE_BY_MENTOR_SLUG: Record<string, MentorDialogueLine> = {
   sage: {
-    text: "I'm The Sage. Let's quiet the noise and make your next step clear.",
-    support: "Stay with me through this short walkthrough. Calm first, then momentum.",
+    text: "I'm The Sage. Let's quiet the noise and plan one real day.",
+    support: "Your companion is already here. I'll show you the first useful loop.",
   },
   icon: {
-    text: "I'm The Icon. We're going to start with intention and a better standard.",
-    support: "Move through this walkthrough cleanly, then carry that energy forward.",
+    text: "I'm The Icon. We're going to turn this into immediate clarity.",
+    support: "Meet your companion, plan the day, then move with a better standard.",
   },
   charles: {
-    text: "Charles. Let's handle this walkthrough properly so we don't embarrass ourselves later.",
-    support: "Finish this cleanly and your system will be a lot less chaotic.",
+    text: "Charles. Let's make the app useful before anyone gets theatrical.",
+    support: "Meet the companion, plan the day, then go do the obvious next thing.",
   },
   princess: {
-    text: "I'm The Princess. Let's make your first steps feel gentle, clear, and beautiful.",
-    support: "We'll move through this together so your routine starts with softness and structure.",
+    text: "I'm The Princess. Let's make your first plan feel gentle and clear.",
+    support: "Your companion is ready. We'll use it once, beautifully, then let you explore.",
   },
   operator: {
-    text: "I'm The Operator. We are not improvising. We're building a system.",
-    support: "Complete the walkthrough, then execute with structure.",
+    text: "I'm The Operator. We are not touring features. We're creating operating clarity.",
+    support: "Meet the companion, generate today's plan, then execute.",
   },
   rival: {
-    text: "I'm The Rival. If you're serious about leveling up, prove it.",
-    support: "Finish this walkthrough and show me you can follow through.",
+    text: "I'm The Rival. If you're serious, get today's plan and prove it.",
+    support: "This is short. Meet the companion, plan the day, then follow through.",
   },
   reign: {
-    text: "I'm Reign. We still move with standards, even in legacy mode.",
-    support: "Lock in this walkthrough, then make the day count.",
+    text: "I'm Reign. We move with standards, even on day one.",
+    support: "Meet your companion, command the day, then make it count.",
   },
 };
 
@@ -237,13 +237,18 @@ const getMentorIntroDialogue = (mentorSlug: string | undefined, speakerName: str
 
   return {
     text: "Hey, I'm your guide. I'm glad you're here.",
-    support: "I'll guide your first few taps so you can settle in quickly.",
+    support: "I'll help you meet your companion and plan one real day.",
   };
 };
 
 const getQuestsCampaignsIntroDialogue = (): MentorDialogueLine => ({
   text: "This is your Quests tab. Think of Quests as your daily to-do list. Tasks you can schedule on your calendar, or save to your inbox to plan later.",
   support: "Campaigns are goals that build routines and rituals to help you succeed.",
+});
+
+const getMeetCompanionIntroDialogue = (): MentorDialogueLine => ({
+  text: "This is your Companion. It is the place to ask for clarity when the day feels noisy.",
+  support: "We'll start with the core move: Plan My Day.",
 });
 
 const resolveSelectorFromCandidates = (selectors: string[]): string | null => {
@@ -356,28 +361,6 @@ const mergeCreateQuestProgress = (
   };
 };
 
-const hasCreateQuestProgressSignal = ({
-  completedSteps,
-  milestones,
-  createQuestProgress,
-}: {
-  completedSteps: Set<GuidedTutorialStepId>;
-  milestones: Set<GuidedMilestoneId>;
-  createQuestProgress: CreateQuestProgressState;
-}) =>
-  createQuestProgress.completed.length > 0 ||
-  completedSteps.has("create_quest") ||
-  completedSteps.has("meet_companion") ||
-  completedSteps.has("morning_checkin") ||
-  completedSteps.has("evolve_companion") ||
-  completedSteps.has("post_evolution_companion_intro") ||
-  completedSteps.has("mentor_closeout") ||
-  milestones.has("stay_on_quests") ||
-  milestones.has("open_add_quest") ||
-  milestones.has("enter_title") ||
-  milestones.has("select_time") ||
-  milestones.has("submit_create_quest");
-
 const migrateGuidedTutorialProgress = ({
   completedSteps,
   awardedSteps,
@@ -405,37 +388,42 @@ const migrateGuidedTutorialProgress = ({
   const rawAwardedSet = new Set(awardedSteps);
   const rawMilestoneSet = new Set(milestonesCompleted);
 
-  const shouldMarkQuestsIntroComplete = hasCreateQuestProgressSignal({
-    completedSteps: rawCompletedSet,
-    milestones: rawMilestoneSet,
-    createQuestProgress,
-  });
-
   const migratedCompletedSet = new Set<GuidedTutorialStepId>(
     completedSteps.filter((stepId) => ACTIVE_GUIDED_STEP_ID_SET.has(stepId))
   );
-  const hasProgressPastCompanionIntro =
-    rawCompletedSet.has("evolve_companion") ||
-    rawCompletedSet.has("post_evolution_companion_intro") ||
-    rawCompletedSet.has("mentor_closeout");
-  if (hasProgressPastCompanionIntro) {
-    migratedCompletedSet.add("companion_tab_intro");
-  }
-  if (shouldMarkQuestsIntroComplete) {
-    migratedCompletedSet.add("quests_campaigns_intro");
-  }
 
   const isLegacyTutorialComplete = completed || rawCompletedSet.has("mentor_closeout");
+  const shouldMarkMeetCompanionComplete =
+    rawCompletedSet.has("meet_companion") ||
+    rawCompletedSet.has("companion_tab_intro") ||
+    rawCompletedSet.has("evolve_companion") ||
+    rawCompletedSet.has("post_evolution_companion_intro") ||
+    rawCompletedSet.has("mentor_closeout") ||
+    rawMilestoneSet.has("companion_tab_intro") ||
+    rawMilestoneSet.has("post_evolution_companion_intro");
+
   if (isLegacyTutorialComplete) {
     GUIDED_STEPS.forEach((step) => migratedCompletedSet.add(step.id));
+  } else if (shouldMarkMeetCompanionComplete) {
+    migratedCompletedSet.add("meet_companion");
   }
 
-  const migratedMilestoneSet = new Set<GuidedMilestoneId>(milestonesCompleted);
-  if (shouldMarkQuestsIntroComplete) {
-    migratedMilestoneSet.add("quests_campaigns_intro");
+  const currentFlowMilestones = new Set<GuidedMilestoneId>([
+    "mentor_intro_hello",
+    "meet_companion_intro",
+    "start_plan_my_day",
+    "first_plan_closeout_message",
+  ]);
+  const migratedMilestoneSet = new Set<GuidedMilestoneId>(
+    milestonesCompleted.filter((milestoneId) => currentFlowMilestones.has(milestoneId)),
+  );
+  if (migratedCompletedSet.has("meet_companion")) {
+    migratedMilestoneSet.add("meet_companion_intro");
   }
   if (isLegacyTutorialComplete) {
-    migratedMilestoneSet.add("post_evolution_companion_intro");
+    migratedMilestoneSet.add("meet_companion_intro");
+    migratedMilestoneSet.add("start_plan_my_day");
+    migratedMilestoneSet.add("first_plan_closeout_message");
   }
 
   const migratedAwardedSet = new Set<GuidedTutorialStepId>(
@@ -584,6 +572,22 @@ export const getMentorInstructionLines = (
   currentStep: GuidedTutorialStepId | null,
   currentSubstep: CreateQuestSubstepId | null
 ): string[] => {
+  if (currentStep === "meet_companion") {
+    return [
+      "Your companion is already created. This is where you ask it to help plan and adjust your day.",
+    ];
+  }
+
+  if (currentStep === "plan_my_day") {
+    return ["Tap Plan My Day."];
+  }
+
+  if (currentStep === "first_plan_closeout") {
+    return [
+      "You're ready. Start with the plan, and use Right Now or Adjust My Day when the day changes.",
+    ];
+  }
+
   if (currentStep === "quests_campaigns_intro") {
     return [
       "This is your Quests tab. Think of Quests as your daily to-do list. Tasks you can schedule on your calendar, or save to your inbox to plan later.",
@@ -634,6 +638,18 @@ const getMilestoneDialogue = (
   _mentorSlug: string | undefined
 ): { text: string; support?: string } => {
   switch (milestoneId) {
+    case "meet_companion_intro":
+      return getMeetCompanionIntroDialogue();
+    case "start_plan_my_day":
+      return {
+        text: "Tap Plan My Day.",
+        support: "This gives you the first real value: a focused, realistic plan for today.",
+      };
+    case "first_plan_closeout_message":
+      return {
+        text: "That's the loop: open Cosmiq, get clarity, take action.",
+        support: "If your day breaks, use Adjust My Day. If you're stuck, ask Right Now.",
+      };
     case "quests_campaigns_intro":
       return getQuestsCampaignsIntroDialogue();
     case "stay_on_quests":
@@ -715,6 +731,8 @@ const getMilestoneDialogue = (
 export const milestoneUsesStrictLock = (milestoneId: GuidedMilestoneId | null): boolean => {
   if (!milestoneId) return false;
   if (milestoneId === "mentor_intro_hello") return false;
+  if (milestoneId === "meet_companion_intro") return false;
+  if (milestoneId === "first_plan_closeout_message") return false;
   if (milestoneId === "quests_campaigns_intro") return false;
   if (milestoneId === "confirm_companion_progress") return false;
   if (milestoneId === "submit_morning_checkin") return false;
@@ -1148,6 +1166,27 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
   useEffect(() => {
     if (!tutorialReady || tutorialSuppressed || hasPendingIntroDialogue || !currentStep) return;
 
+    if (currentStep.id === "meet_companion") {
+      if (location.pathname !== "/companion") return;
+      if (milestoneSet.has("meet_companion_intro")) {
+        markStepComplete("meet_companion");
+      }
+      return;
+    }
+
+    if (currentStep.id === "plan_my_day") {
+      return;
+    }
+
+    if (currentStep.id === "first_plan_closeout") {
+      if (location.pathname !== "/companion") return;
+
+      if (milestoneSet.has("first_plan_closeout_message")) {
+        markStepComplete("first_plan_closeout");
+      }
+      return;
+    }
+
     if (currentStep.id === "quests_campaigns_intro") {
       if (location.pathname !== "/journeys") return;
       if (milestoneSet.has("quests_campaigns_intro")) {
@@ -1274,6 +1313,17 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
 
     const listeners: Array<{ eventName: string; handler: (event: Event) => void }> = [];
 
+    if (currentStep.id === "plan_my_day") {
+      listeners.push({
+        eventName: "companion-plan-my-day-started",
+        handler: () => {
+          if (location.pathname !== "/companion") return;
+          markMilestoneComplete("start_plan_my_day");
+          markStepComplete("plan_my_day");
+        },
+      });
+    }
+
     if (currentStep.id === "create_quest") {
       listeners.push({
         eventName: "add-quest-sheet-opened",
@@ -1391,6 +1441,18 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     if (!currentStep) return null;
     if (!milestoneSet.has("mentor_intro_hello")) return "mentor_intro_hello";
 
+    if (currentStep.id === "meet_companion") {
+      return "meet_companion_intro";
+    }
+
+    if (currentStep.id === "plan_my_day") {
+      return "start_plan_my_day";
+    }
+
+    if (currentStep.id === "first_plan_closeout") {
+      return "first_plan_closeout_message";
+    }
+
     if (currentStep.id === "quests_campaigns_intro") {
       return "quests_campaigns_intro";
     }
@@ -1427,12 +1489,16 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
   const isIntroDialogueActive = currentMilestone === "mentor_intro_hello";
   const supportsDialogueAction =
     currentMilestone === "mentor_intro_hello" ||
+    currentMilestone === "meet_companion_intro" ||
+    currentMilestone === "first_plan_closeout_message" ||
     currentMilestone === "quests_campaigns_intro" ||
     currentMilestone === "companion_tab_intro" ||
     currentMilestone === "post_evolution_companion_intro";
   const dialogueActionLabel = supportsDialogueAction
     ? currentMilestone === "mentor_intro_hello"
       ? "Start Tutorial"
+      : currentMilestone === "first_plan_closeout_message"
+      ? "Finish"
       : "Continue"
     : undefined;
   const onDialogueAction = useCallback(() => {
@@ -1475,19 +1541,19 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
       !tutorialReady ||
       tutorialMarkedComplete ||
       tutorialDismissed ||
-      currentStepId !== "mentor_closeout"
+      currentStepId !== "first_plan_closeout"
     ) {
       return;
     }
 
     if (
-      currentMilestone === "mentor_closeout_message" &&
-      !milestoneSet.has("mentor_closeout_message")
+      currentMilestone === "first_plan_closeout_message" &&
+      !milestoneSet.has("first_plan_closeout_message")
     ) {
-      markMilestoneComplete("mentor_closeout_message");
+      markMilestoneComplete("first_plan_closeout_message");
     }
 
-    markStepComplete("mentor_closeout");
+    markStepComplete("first_plan_closeout");
   }, [
     currentMilestone,
     currentStepId,
@@ -1688,17 +1754,11 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
   const currentIndex = currentStepId
     ? GUIDED_STEPS.findIndex((step) => step.id === currentStepId)
     : -1;
-  const createQuestSubstepIndex = createQuestProgress.completed.length + 1;
 
   const progressText =
-    currentStepId === "create_quest"
-      ? `Step ${currentIndex + 1} of ${GUIDED_STEPS.length} - Create Quest ${Math.min(
-          createQuestSubstepIndex,
-          CREATE_QUEST_SUBSTEP_ORDER.length
-        )}/${CREATE_QUEST_SUBSTEP_ORDER.length}`
-      : currentStepId
-        ? `Step ${currentIndex + 1} of ${GUIDED_STEPS.length}`
-        : "";
+    currentStepId && currentIndex >= 0
+      ? `Step ${currentIndex + 1} of ${GUIDED_STEPS.length}`
+      : "";
 
   const dialogue = currentMilestone
     ? currentMilestone === "mentor_intro_hello"
@@ -1746,19 +1806,16 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
   const strictLockEnabled = milestoneUsesStrictLock(currentMilestone);
   const secondaryActionLabel =
     !tutorialSuppressed && !isIntroDialogueActive
-      ? currentStepId === "mentor_closeout"
+      ? currentStepId === "first_plan_closeout"
         ? "Complete tutorial"
         : "Skip tutorial"
       : undefined;
   const onSecondaryAction = secondaryActionLabel
-    ? currentStepId === "mentor_closeout"
+    ? currentStepId === "first_plan_closeout"
       ? completeTutorial
       : dismissTutorial
     : undefined;
-  const isPreHatchCompanionStep =
-    !tutorialSuppressed &&
-    (currentStepId === "companion_tab_intro" ||
-      (currentStepId === "evolve_companion" && !evolutionInFlight));
+  const isPreHatchCompanionStep = false;
 
   return {
     isIntroDialogueActive,

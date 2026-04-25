@@ -19,6 +19,7 @@ import {
   type PlannerOpenSlot,
   type PlannerProposal,
   type PlannerQuestion,
+  type PlannerMemoryProfile,
   type PlannerScheduleConflict,
   type PlannerScheduleInsights,
   type PlannerSessionState,
@@ -617,6 +618,7 @@ const mapTask = (task: Record<string, unknown>): PlannerContextTask => ({
   category: asString(task.category),
   scheduledTime: asString(task.scheduled_time),
   estimatedDuration: asNumber(task.estimated_duration),
+  actualDurationMinutes: asNumber(task.actual_duration_minutes),
   actualTimeSpent: asNumber(task.actual_time_spent),
   notes: asString(task.notes),
   recurrencePattern: asString(task.recurrence_pattern),
@@ -646,6 +648,7 @@ const mapRitual = (ritual: Record<string, unknown>): PlannerContextRitual => ({
   frequency: asString(ritual.frequency),
   preferredTime: asString(ritual.preferred_time),
   estimatedMinutes: asNumber(ritual.estimated_minutes),
+  actualDurationMinutes: asNumber(ritual.actual_duration_minutes),
 });
 
 const mapCalendarEvent = (
@@ -664,13 +667,23 @@ const buildPlannerMemory = (
   context: LoadedCompanionAgentContext,
 ): Record<string, unknown> | null => {
   const plannerPreferences = asRecord(context.recentMemory.planner_preferences);
+  const profileOnboarding = asRecord(context.recentMemory.profile_onboarding);
   const preferredWorkBlocks = asRecord(
     plannerPreferences?.preferred_work_blocks,
   );
   const profile = asRecord(preferredWorkBlocks?.planner_profile) ?? {};
+  const scheduleArchetype = asString(profile.scheduleArchetype) ??
+    asString(profileOnboarding?.scheduleArchetype);
+  const scheduleArchetypePlanningHint =
+    asString(profile.scheduleArchetypePlanningHint) ??
+    asString(profileOnboarding?.scheduleArchetypePlanningHint);
 
   return {
     ...profile,
+    scheduleArchetype,
+    scheduleArchetypeLabel: asString(profile.scheduleArchetypeLabel) ??
+      asString(profileOnboarding?.scheduleArchetypeLabel),
+    scheduleArchetypePlanningHint,
     wakeTime: asString(plannerPreferences?.wake_time) ??
       asString(profile.wakeTime),
     windDownTime: asString(plannerPreferences?.wind_down_time) ??
@@ -967,6 +980,15 @@ export function consultPlannerForAgent(params: {
       scheduleInsights,
       plannerMemory: {
         tonePack: modeConfig.tonePack,
+        scheduleArchetype: asString(
+          plannerMemoryForPlanning?.scheduleArchetype,
+        ) as PlannerMemoryProfile["scheduleArchetype"],
+        scheduleArchetypeLabel: asString(
+          plannerMemoryForPlanning?.scheduleArchetypeLabel,
+        ),
+        scheduleArchetypePlanningHint: asString(
+          plannerMemoryForPlanning?.scheduleArchetypePlanningHint,
+        ),
         preferredTimeOfDay: asString(
           plannerMemoryForPlanning?.preferredTimeOfDay,
         ),

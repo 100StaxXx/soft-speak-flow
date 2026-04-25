@@ -45,6 +45,10 @@ import {
   getEnergyPreferenceFromAnswers,
 } from "@/utils/onboardingMentorMatching";
 import {
+  getOnboardingScheduleArchetypeFromAnswers,
+  getOnboardingScheduleArchetypeProfile,
+} from "@/shared/onboardingScheduleArchetype";
+import {
   createInitialGuidedTutorialProgress,
   getGuidedTutorialLocalProgressKey,
 } from "@/utils/guidedTutorial";
@@ -579,6 +583,8 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
       const existingData = (profile?.onboarding_data as Record<string, unknown>) || {};
       const explanationToSave = explanationOverride ?? mentorExplanation;
       const energyPreference = getEnergyPreferenceFromAnswers(answers);
+      const scheduleArchetype = getOnboardingScheduleArchetypeFromAnswers(answers);
+      const scheduleArchetypeProfile = getOnboardingScheduleArchetypeProfile(scheduleArchetype);
       
       const { error: updateError } = await supabase.from("profiles").update({
         selected_mentor_id: mentor.id,
@@ -587,6 +593,13 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
           mentorId: mentor.id,
           mentorName: mentor.name,
           mentorEnergyPreference: energyPreference,
+          ...(scheduleArchetype
+            ? {
+              scheduleArchetype,
+              scheduleArchetypeLabel: scheduleArchetypeProfile?.label ?? null,
+              scheduleArchetypePlanningHint: scheduleArchetypeProfile?.plannerHint ?? null,
+            }
+            : {}),
           explanation: explanationToSave ? {
             title: explanationToSave.title,
             subtitle: explanationToSave.subtitle,

@@ -124,6 +124,7 @@ Deno.test("accepts quest notes and subtask titles in planner task context", () =
         taskDate: "2026-04-18",
         scheduledTime: "18:00",
         estimatedDuration: 45,
+        actualDurationMinutes: 30,
         actualTimeSpent: 52,
         notes: "Leg day with extra stretching.",
         subtaskTitles: ["Warm up", "Cooldown walk"],
@@ -138,6 +139,7 @@ Deno.test("accepts quest notes and subtask titles in planner task context", () =
     "Leg day with extra stretching.",
   );
   assertEquals(parsed.plannerContext.tasks[0]?.actualTimeSpent, 52);
+  assertEquals(parsed.plannerContext.tasks[0]?.actualDurationMinutes, 30);
   assertEquals(parsed.plannerContext.tasks[0]?.subtaskTitles, [
     "Warm up",
     "Cooldown walk",

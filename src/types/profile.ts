@@ -2,10 +2,14 @@
  * Type definitions for profile onboarding data
  */
 
+import type { OnboardingScheduleArchetype } from "@/shared/onboardingScheduleArchetype";
+
 export type GuidedTutorialStepId =
   | "quests_campaigns_intro"
   | "create_quest"
-  | "meet_companion" // legacy step retained for migration compatibility
+  | "meet_companion"
+  | "plan_my_day"
+  | "first_plan_closeout"
   | "morning_checkin"
   | "companion_tab_intro"
   | "evolve_companion"
@@ -23,6 +27,9 @@ export type GuidedMilestoneId =
   | "mentor_intro_hello"
   | "stay_on_quests" // legacy
   | "quests_campaigns_intro"
+  | "meet_companion_intro"
+  | "start_plan_my_day"
+  | "first_plan_closeout_message"
   | "open_add_quest"
   | "enter_title"
   | "select_time"
@@ -71,6 +78,9 @@ export interface OnboardingData {
   mentorId?: string;
   mentorName?: string;
   mentorEnergyPreference?: string;
+  scheduleArchetype?: OnboardingScheduleArchetype;
+  scheduleArchetypeLabel?: string | null;
+  scheduleArchetypePlanningHint?: string | null;
   walkthrough_completed?: boolean;
   progression_reset_required?: boolean;
   quests_tutorial_seen?: boolean;

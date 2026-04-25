@@ -13,7 +13,7 @@ import {
   resolvePreassignedMentorSlug,
 } from "@/config/onboardingMentorAssignments";
 
-const feminineSlugs = new Set(["princess", "icon"]);
+const feminineSlugs = new Set(["princess", "icon", "lyra"]);
 const masculineSlugs = new Set(["sage", "operator", "rival", "charles"]);
 const validSlugs = new Set(ACTIVE_ONBOARDING_MENTOR_SLUGS);
 
@@ -68,7 +68,7 @@ describe("resolvePreassignedMentorSlug", () => {
     const slug = resolvePreassignedMentorSlug(
       makeAnswers("feminine_presence", "clarity_mindset", "gentle_compassionate", "principles_logic"),
     );
-    expect(slug).toBe("princess");
+    expect(slug).toBe("lyra");
   });
 
   it("returns null when option IDs are incomplete", () => {
@@ -109,12 +109,12 @@ describe("resolveAssignedMentorFromActiveMentors", () => {
       "gentle_compassionate",
       "principles_logic",
     );
-    const withoutPrincess = activeMentors.filter((mentor) => mentor.slug !== "princess");
-    const result = resolveAssignedMentorFromActiveMentors(answers, withoutPrincess);
+    const withoutLyra = activeMentors.filter((mentor) => mentor.slug !== "lyra");
+    const result = resolveAssignedMentorFromActiveMentors(answers, withoutLyra);
 
-    expect(result.requestedSlug).toBe("princess");
+    expect(result.requestedSlug).toBe("lyra");
     expect(result.usedFallback).toBe(true);
-    expect(result.mentor?.slug).toBe(SAME_ENERGY_FALLBACKS.feminine_presence[1]);
+    expect(result.mentor?.slug).toBe(SAME_ENERGY_FALLBACKS.feminine_presence[0]);
     expect(feminineSlugs.has(result.mentor?.slug ?? "")).toBe(true);
   });
 

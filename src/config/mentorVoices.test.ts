@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 import { getMentorVoiceConfig, mentorVoices } from "./mentorVoices";
 
 describe("mentorVoices", () => {
-  it("provides voice configs for the active Final 6 lineup", () => {
-    for (const slug of ["sage", "icon", "charles", "princess", "operator", "rival"]) {
+  it("provides voice configs for the active mentor lineup", () => {
+    for (const slug of ["sage", "lyra", "icon", "charles", "princess", "operator", "rival"]) {
       expect(mentorVoices[slug]).toBeDefined();
       expect(mentorVoices[slug]?.voiceId).toBeTruthy();
       expect(mentorVoices[slug]?.mentorSlug).toBe(slug);

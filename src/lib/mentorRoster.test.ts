@@ -21,11 +21,13 @@ describe("mentorRoster", () => {
 
   it("returns only active mentors from resolveActiveMentorSlug", () => {
     expect(resolveActiveMentorSlug("atlas")).toBe("sage");
+    expect(resolveActiveMentorSlug("lyra")).toBe("lyra");
     expect(resolveActiveMentorSlug("reign")).toBeNull();
   });
 
-  it("defines the initial avatar crop positions for the Final 6", () => {
+  it("defines the avatar crop positions for the active mentor roster", () => {
     expect(MENTOR_AVATAR_POSITION_MAP.sage).toBe("center 22%");
+    expect(MENTOR_AVATAR_POSITION_MAP.lyra).toBe("center 22%");
     expect(MENTOR_AVATAR_POSITION_MAP.icon).toBe("center 18%");
     expect(MENTOR_AVATAR_POSITION_MAP.charles).toBe("center 35%");
     expect(MENTOR_AVATAR_POSITION_MAP.princess).toBe("center 18%");

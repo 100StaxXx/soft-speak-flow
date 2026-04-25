@@ -1,5 +1,6 @@
 export const ACTIVE_MENTOR_SLUGS = [
   "sage",
+  "lyra",
   "icon",
   "charles",
   "princess",

@@ -7,7 +7,10 @@ import {
   createSafeErrorResponse,
   requireProtectedRequest,
 } from "../_shared/abuseProtection.ts";
-import { normalizePlannerDurationBucket } from "../../../src/shared/plannerDurationBuckets.ts";
+import {
+  PLANNER_DURATION_BUCKETS,
+  normalizePlannerDurationBucket,
+} from "../_shared/plannerDurationBuckets.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -93,6 +96,8 @@ const normalizeActivityDurationMinutes = (
 
   return normalizePlannerDurationBucket(value) ?? undefined;
 };
+
+const PLANNER_DURATION_BUCKET_LIST = PLANNER_DURATION_BUCKETS.join(", ");
 
 const normalizeExtractedTask = <T extends ExtractedTask>(task: T): T => {
   const normalizedDuration = normalizeActivityDurationMinutes(
@@ -421,7 +426,7 @@ For brain-dump type:
    - Example: "Which rooms need cleaning - kitchen, bathroom, bedroom, or all of them?"
    
 3. Extract individual tasks with metadata:
-   - estimatedDuration (in minutes, using only these buckets: 10, 15, 20, 30, 45, 60, 90, 120)
+   - estimatedDuration (in minutes, using only these buckets: ${PLANNER_DURATION_BUCKET_LIST})
    - energyLevel: low/medium/high
    - suggestedTimeOfDay: morning/afternoon/evening
    - category: cleaning, errands, self-care, work, etc.
@@ -457,7 +462,7 @@ Respond ONLY with valid JSON matching this schema:
 DURATION RULES:
 - For epics, use "suggestedDuration" for target days when helpful. You may also use "suggestedActivityDurationMinutes" for a realistic starter work block if that session length is clear; otherwise return null.
 - For quests, habits, and brain-dumps, use "suggestedActivityDurationMinutes" for the best activity estimate.
-- For extractedTasks and suggestedTasks, use only these minute buckets: 10, 15, 20, 30, 45, 60, 90, 120.
+- For extractedTasks and suggestedTasks, use only these minute buckets: ${PLANNER_DURATION_BUCKET_LIST}.
 - Never return arbitrary minute values like 37 or 52.
 - If you are unsure, choose the closest sensible bucket or null.`;
 

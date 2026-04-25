@@ -1,6 +1,6 @@
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 import type { ClassificationHint } from "./planner.ts";
-import { normalizePlannerDurationBucket } from "../../../src/shared/plannerDurationBuckets.ts";
+import { normalizePlannerDurationBucket } from "../_shared/plannerDurationBuckets.ts";
 
 const PLANNER_INTENT_TYPES = ["quest", "epic", "habit", "brain-dump"] as const;
 const PLANNER_STARTER_INTENTS = [
@@ -23,6 +23,14 @@ const PLANNER_STARTER_INTENTS = [
 ] as const;
 const PLANNER_TONE_PACKS = ["soft", "playful", "witty_sassy"] as const;
 const WORKLOAD_TOLERANCE_VALUES = ["light", "normal", "heavy"] as const;
+const ONBOARDING_SCHEDULE_ARCHETYPE_VALUES = [
+  "nine_to_five",
+  "business_owner",
+  "after_work_builder",
+  "student",
+  "variable_schedule",
+  "flexible_transition",
+] as const;
 const LEGACY_INTENT_TYPE_ALIASES = [
   "brain_dump",
   "brain dump",
@@ -115,6 +123,7 @@ const WorkloadToleranceSchema = z.preprocess(
   normalizeWorkloadTolerance,
   z.enum(WORKLOAD_TOLERANCE_VALUES),
 );
+const ScheduleArchetypeSchema = z.enum(ONBOARDING_SCHEDULE_ARCHETYPE_VALUES);
 
 const PlannerClassificationTimelineSchema = z.object({
   statedDays: z.number(),
@@ -196,6 +205,7 @@ export const PlannerRequestSchema = z.object({
       category: z.string().nullable().optional(),
       scheduledTime: z.string().nullable(),
       estimatedDuration: z.number().nullable(),
+      actualDurationMinutes: z.number().nullable().optional(),
       actualTimeSpent: z.number().nullable().optional(),
       notes: z.string().nullable().optional(),
       subtaskTitles: z.array(z.string()).optional(),
@@ -218,6 +228,7 @@ export const PlannerRequestSchema = z.object({
       category: z.string().nullable().optional(),
       scheduledTime: z.string().nullable(),
       estimatedDuration: z.number().nullable(),
+      actualDurationMinutes: z.number().nullable().optional(),
       actualTimeSpent: z.number().nullable().optional(),
       notes: z.string().nullable().optional(),
       subtaskTitles: z.array(z.string()).optional(),
@@ -240,6 +251,7 @@ export const PlannerRequestSchema = z.object({
       category: z.string().nullable().optional(),
       scheduledTime: z.string().nullable(),
       estimatedDuration: z.number().nullable(),
+      actualDurationMinutes: z.number().nullable().optional(),
       actualTimeSpent: z.number().nullable().optional(),
       notes: z.string().nullable().optional(),
       subtaskTitles: z.array(z.string()).optional(),
@@ -271,6 +283,7 @@ export const PlannerRequestSchema = z.object({
       frequency: z.string().nullable(),
       preferredTime: z.string().nullable(),
       estimatedMinutes: z.number().nullable().optional(),
+      actualDurationMinutes: z.number().nullable().optional(),
       currentStreak: z.number().nullable().optional(),
     })),
     calendarEvents: z.array(z.object({
@@ -387,6 +400,9 @@ export const PlannerRequestSchema = z.object({
       workloadTolerance: WorkloadToleranceSchema.nullable().optional(),
       contactCadencePatterns: z.record(z.number()).optional(),
       lastConfirmedAt: z.string().nullable().optional(),
+      scheduleArchetype: ScheduleArchetypeSchema.nullable().optional(),
+      scheduleArchetypeLabel: z.string().nullable().optional(),
+      scheduleArchetypePlanningHint: z.string().nullable().optional(),
     }).optional(),
     statInterpretation: z.object({
       statProfile: z.object({

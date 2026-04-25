@@ -41,7 +41,7 @@ Architecture remains:
 ### Implemented
 - Structured planner cards render across companion and journeys surfaces.
 - `Lock In`, `Balanced`, and `Recovery` planning modes are wired through launcher, panel, and planner requests.
-- Proposal-backed planner suggestions can be saved, confirmed, batch-confirmed, and protected from duplicate saves.
+- Proposal-backed planner suggestions can be saved, confirmed, and protected from duplicate saves. Batch confirmation remains available in the compatibility planner path; the unified `companion-agent` path intentionally resolves one pending action at a time.
 - Agent and planner paths persist and restore structured planner state through thread replay.
 - Timeout and malformed-output fallback paths are in place for planner/agent flows.
 - Agent-side campaign adjustments now execute through a dedicated pending-action path instead of leaking ad hoc campaign statuses into storage.
@@ -62,7 +62,7 @@ Architecture remains:
   - confirm
   - cancel
 
-### Last automated verification
+### Last local verification
 - Date: `2026-04-24`
 - Command: `npm run planner:phase-a:check`
 - Result:

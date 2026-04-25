@@ -4,6 +4,8 @@ import {
   resolveMentorSlug,
   selectThemeForDate,
 } from "./mentorPepTalkConfig.ts";
+import { getMentorNarrativeProfile } from "./mentorNarrativeProfiles.ts";
+import { resolveMentorVoiceConfig, resolveTutorialVoice } from "./mentorVoiceConfig.ts";
 
 function assert(condition: boolean, message: string): void {
   if (!condition) {
@@ -27,6 +29,25 @@ Deno.test("mentor pep talk config resolves active mentor themes", () => {
       `Expected complete theme entries for ${mentorSlug}`,
     );
   }
+});
+
+Deno.test("mentor pep talk config includes Lyra across backend mentor surfaces", () => {
+  assert(ACTIVE_MENTOR_SLUGS.includes("lyra"), "Expected Lyra to be active for backend generation");
+  assert(resolveMentorSlug("lyra") === "lyra", "Expected Lyra to resolve as a supported mentor");
+
+  const themes = getMentorThemes("lyra");
+  assert(themes.some((theme) => theme.topic_category === "strategy"), "Expected Lyra strategy themes");
+
+  const voiceConfig = resolveMentorVoiceConfig("lyra");
+  assert(Boolean(voiceConfig?.voiceId), "Expected Lyra to have a mentor voice config");
+  assert(
+    voiceConfig?.voiceId === "fgDJOgmENIR82PueQrVs",
+    "Expected Lyra to use her dedicated ElevenLabs voice",
+  );
+  assert(resolveTutorialVoice("lyra") === "nova", "Expected Lyra to resolve a tutorial voice");
+
+  const narrativeProfile = getMentorNarrativeProfile("lyra");
+  assert(narrativeProfile?.storyRole === "synthetic_oracle", "Expected Lyra narrative profile");
 });
 
 Deno.test("mentor pep talk config resolves legacy aliases", () => {

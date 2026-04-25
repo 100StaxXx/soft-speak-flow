@@ -303,7 +303,12 @@ function generateTitle(mentorSlug: string, category: string): string {
     physique: ['Train Like a Champion', 'Push Your Limits', 'Build Your Body', 'Strength Is Earned'],
     focus: ['Stay Locked In', 'Focus on What Matters', 'Eliminate Distractions', 'Sharp Mind, Clear Goals'],
     mindset: ['Shift Your Perspective', 'Master Your Mind', 'Think Bigger Today', 'Growth Starts Here'],
-    business: ['Execute Your Vision', 'Build Your Empire', 'Make It Happen', 'Business Moves Today']
+    business: ['Execute Your Vision', 'Build Your Empire', 'Make It Happen', 'Business Moves Today'],
+    strategy: ['Find the Signal', 'Choose the Leverage Point', 'See the Pattern', 'Make the Clean Move'],
+    boundaries: ['Protect the Standard', 'Choose What Aligns', 'Hold the Line', 'Respect Your Energy'],
+    habits: ['Build the Ritual', 'Repeat the Standard', 'Small Steps, Real Trust', 'Return to the Routine'],
+    identity: ['Act Like the Future You', 'Become on Purpose', 'Choose Your Standard', 'Move in Alignment'],
+    reflection: ['Read the Pattern', 'Learn From This Season', 'Find the Clear Lesson', 'Step Back and See']
   };
 
   const categoryTitles = titles[category] || ['Take Action Today'];
@@ -318,7 +323,12 @@ function generateSummary(category: string, triggers: string[]): string {
     physique: 'Push your physical limits and transform your body through dedication and effort.',
     focus: 'Cut through distractions and lock in on what truly matters for your success.',
     mindset: 'Shift your thinking, overcome mental blocks, and embrace a growth-oriented perspective.',
-    business: 'Take strategic action and build momentum toward your entrepreneurial goals.'
+    business: 'Take strategic action and build momentum toward your entrepreneurial goals.',
+    strategy: 'Separate signal from noise and choose the highest-leverage next move.',
+    boundaries: 'Protect your energy, honor your standard, and choose what truly aligns.',
+    habits: 'Build sustainable consistency through small routines you can trust.',
+    identity: 'Make choices that reinforce the person you are becoming.',
+    reflection: 'Step back, read the pattern clearly, and carry the lesson forward.'
   };
 
   return summaries[category] || 'A daily push to help you move forward with purpose and intention.';

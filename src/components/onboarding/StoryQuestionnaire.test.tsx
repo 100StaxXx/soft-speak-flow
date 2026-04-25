@@ -100,7 +100,8 @@ describe("StoryQuestionnaire", () => {
     answerCurrentQuestion(/woman/i);
     answerCurrentQuestion(/clarity & mindset/i);
     answerCurrentQuestion(/gentle & compassionate/i);
-    fireEvent.click(screen.getByRole("button", { name: /clear principles and logic/i }));
+    answerCurrentQuestion(/clear principles and logic/i);
+    fireEvent.click(screen.getByRole("button", { name: /i work a 9-5/i }));
 
     const continueButton = screen.getByRole("button", { name: /continue/i });
     fireEvent.touchStart(continueButton);
@@ -112,6 +113,7 @@ describe("StoryQuestionnaire", () => {
       expect.objectContaining({ questionId: "focus_area", optionId: "clarity_mindset" }),
       expect.objectContaining({ questionId: "guidance_tone", optionId: "gentle_compassionate" }),
       expect.objectContaining({ questionId: "progress_style", optionId: "principles_logic" }),
+      expect.objectContaining({ questionId: "schedule_archetype", optionId: "nine_to_five" }),
     ]);
   });
 
@@ -121,7 +123,8 @@ describe("StoryQuestionnaire", () => {
     answerCurrentQuestion(/woman/i);
     answerCurrentQuestion(/clarity & mindset/i);
     answerCurrentQuestion(/gentle & compassionate/i);
-    fireEvent.click(screen.getByRole("button", { name: /clear principles and logic/i }));
+    answerCurrentQuestion(/clear principles and logic/i);
+    fireEvent.click(screen.getByRole("button", { name: /i work a 9-5/i }));
 
     const continueButton = screen.getByRole("button", { name: /continue/i });
     fireEvent.pointerDown(continueButton, { pointerType: "mouse" });

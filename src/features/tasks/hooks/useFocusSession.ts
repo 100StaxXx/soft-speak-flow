@@ -148,45 +148,6 @@ export function useFocusSession() {
   const isUnderDailyCap = completedSessionsToday < FOCUS_XP_REWARDS.DAILY_SESSION_CAP;
   const sessionsUntilCap = Math.max(0, FOCUS_XP_REWARDS.DAILY_SESSION_CAP - completedSessionsToday);
 
-  const syncTaskActualTimeSpent = useCallback(async (session: FocusSession) => {
-    if (
-      !user?.id ||
-      !session.task_id ||
-      !session.actual_duration ||
-      session.actual_duration <= 0
-    ) {
-      return;
-    }
-
-    const actualDuration = Math.max(1, Math.round(session.actual_duration));
-    const { data: task, error: readError } = await supabase
-      .from('daily_tasks')
-      .select('actual_time_spent')
-      .eq('id', session.task_id)
-      .eq('user_id', user.id)
-      .maybeSingle();
-
-    if (readError) throw readError;
-
-    const currentActualTimeSpent =
-      typeof task?.actual_time_spent === 'number' && task.actual_time_spent > 0
-        ? task.actual_time_spent
-        : 0;
-    const { error: updateError } = await supabase
-      .from('daily_tasks')
-      .update({ actual_time_spent: currentActualTimeSpent + actualDuration })
-      .eq('id', session.task_id)
-      .eq('user_id', user.id);
-
-    if (updateError) throw updateError;
-
-    queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
-    queryClient.invalidateQueries({ queryKey: ['tasks'] });
-    queryClient.invalidateQueries({
-      queryKey: ['companion-planner-recent-completed-tasks'],
-    });
-  }, [queryClient, user?.id]);
-
   // Complete session mutation
   const completeSessionMutation = useMutation({
     mutationFn: async ({ 
@@ -213,33 +174,49 @@ export function useFocusSession() {
         xpEarned = FOCUS_XP_REWARDS.CAPPED_SESSION_XP;
       }
 
-      const { data, error } = await supabase
-        .from('focus_sessions')
-        .update({
-          status: 'completed',
-          completed_at: new Date().toISOString(),
-          actual_duration: actualDuration,
-          distractions_count: distractionsCount,
-          xp_earned: xpEarned,
-        })
-        .eq('id', sessionId)
-        .select()
-        .single();
+      const { data, error } = await supabase.rpc(
+        'complete_focus_session_with_task_actual_time',
+        {
+          p_session_id: sessionId,
+          p_actual_duration: actualDuration,
+          p_distractions_count: distractionsCount,
+          p_xp_earned: xpEarned,
+        },
+      );
 
       if (error) throw error;
-      return { session: data as FocusSession, isPerfect, underCap };
+      const payload = data as {
+        session?: FocusSession;
+        wasAlreadyCompleted?: boolean;
+      } | null;
+      if (!payload?.session) {
+        throw new Error('Focus session completion did not return a session');
+      }
+      return {
+        session: payload.session,
+        isPerfect,
+        underCap,
+        shouldAwardXp: payload.wasAlreadyCompleted !== true,
+      };
     },
-    onSuccess: ({ session, isPerfect, underCap }) => {
+    onSuccess: ({ session, isPerfect, underCap, shouldAwardXp }) => {
       queryClient.invalidateQueries({ queryKey: ['focus-sessions'] });
-      void syncTaskActualTimeSpent(session).catch((error) => {
-        console.warn('Failed to sync focus duration to task actual time:', error);
+      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({
+        queryKey: ['companion-planner-recent-completed-tasks'],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['companion-planner-ritual-actual-durations'],
       });
       
       // Award XP through centralized system
-      awardFocusSessionComplete(isPerfect, underCap);
+      if (shouldAwardXp) {
+        awardFocusSessionComplete(isPerfect, underCap);
+      }
       
       // Trigger companion reaction for sessions >= 15 minutes
-      if (session.planned_duration >= 15) {
+      if (shouldAwardXp && session.planned_duration >= 15) {
         triggerPomodoroComplete(session.planned_duration).catch(err =>
           console.log('[LivingCompanion] Pomodoro trigger failed:', err)
         );

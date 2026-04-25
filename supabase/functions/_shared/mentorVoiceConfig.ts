@@ -19,6 +19,13 @@ export const ELEVENLABS_MENTOR_VOICES: Record<SupportedMentorSlug, MentorVoiceCo
     style_exaggeration: 0.28,
     use_speaker_boost: true,
   },
+  lyra: {
+    voiceId: "fgDJOgmENIR82PueQrVs",
+    stability: 0.74,
+    similarity_boost: 0.84,
+    style_exaggeration: 0.22,
+    use_speaker_boost: true,
+  },
   icon: {
     voiceId: "6p0P6gezgvY1v6xbLzmU",
     stability: 0.7,
@@ -65,6 +72,7 @@ export const ELEVENLABS_MENTOR_VOICES: Record<SupportedMentorSlug, MentorVoiceCo
 
 export const OPENAI_TUTORIAL_VOICE_MAP: Record<SupportedMentorSlug, string> = {
   sage: "sage",
+  lyra: "nova",
   icon: "nova",
   charles: "echo",
   princess: "shimmer",

@@ -24,6 +24,14 @@ const PLANNER_STARTER_INTENTS = [
 ] as const;
 const PLANNER_TONE_PACKS = ["soft", "playful", "witty_sassy"] as const;
 const WORKLOAD_TOLERANCE_VALUES = ["light", "normal", "heavy"] as const;
+const ONBOARDING_SCHEDULE_ARCHETYPE_VALUES = [
+  "nine_to_five",
+  "business_owner",
+  "after_work_builder",
+  "student",
+  "variable_schedule",
+  "flexible_transition",
+] as const;
 const LEGACY_INTENT_TYPE_ALIASES = [
   "brain_dump",
   "brain dump",
@@ -182,6 +190,7 @@ const CompanionPlannerRequestValidationSchema = z.object({
       category: z.string().nullable().optional(),
       scheduledTime: z.string().nullable(),
       estimatedDuration: z.number().nullable(),
+      actualDurationMinutes: z.number().nullable().optional(),
       actualTimeSpent: z.number().nullable().optional(),
       notes: z.string().nullable().optional(),
       subtaskTitles: z.array(z.string()).optional(),
@@ -204,6 +213,7 @@ const CompanionPlannerRequestValidationSchema = z.object({
       category: z.string().nullable().optional(),
       scheduledTime: z.string().nullable(),
       estimatedDuration: z.number().nullable(),
+      actualDurationMinutes: z.number().nullable().optional(),
       actualTimeSpent: z.number().nullable().optional(),
       notes: z.string().nullable().optional(),
       subtaskTitles: z.array(z.string()).optional(),
@@ -226,6 +236,7 @@ const CompanionPlannerRequestValidationSchema = z.object({
       category: z.string().nullable().optional(),
       scheduledTime: z.string().nullable(),
       estimatedDuration: z.number().nullable(),
+      actualDurationMinutes: z.number().nullable().optional(),
       actualTimeSpent: z.number().nullable().optional(),
       notes: z.string().nullable().optional(),
       subtaskTitles: z.array(z.string()).optional(),
@@ -257,6 +268,7 @@ const CompanionPlannerRequestValidationSchema = z.object({
       frequency: z.string().nullable(),
       preferredTime: z.string().nullable(),
       estimatedMinutes: z.number().nullable().optional(),
+      actualDurationMinutes: z.number().nullable().optional(),
       currentStreak: z.number().nullable().optional(),
     })),
     calendarEvents: z.array(z.object({
@@ -373,6 +385,9 @@ const CompanionPlannerRequestValidationSchema = z.object({
       workloadTolerance: WorkloadToleranceSchema.nullable().optional(),
       contactCadencePatterns: z.record(z.number()).optional(),
       lastConfirmedAt: z.string().nullable().optional(),
+      scheduleArchetype: z.enum(ONBOARDING_SCHEDULE_ARCHETYPE_VALUES).nullable().optional(),
+      scheduleArchetypeLabel: z.string().nullable().optional(),
+      scheduleArchetypePlanningHint: z.string().nullable().optional(),
     }).optional(),
     statInterpretation: z.object({
       statProfile: z.object({

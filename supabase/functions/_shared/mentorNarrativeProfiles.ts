@@ -35,6 +35,27 @@ const canonicalMentorNarrativeProfiles: Record<string, MentorNarrativeProfile> =
     farewellStyle: "\"Take the stillness with you. It will know the way before you do.\"",
     finaleRole: "Centers the hero before the decisive turn, revealing the path hidden inside the chaos.",
   },
+  lyra: {
+    slug: "lyra",
+    name: "Lyra",
+    storyRole: "synthetic_oracle",
+    narrativeVoice: "Futuristic, poised, and precise, turning noise into signal with elegant strategic distance.",
+    speechPatterns: [
+      "Starts by naming the pattern underneath the user's situation",
+      "Uses signal, systems, future-state, and clean-direction language",
+      "Sounds three steps ahead without becoming cold",
+      "Avoids mystical vagueness and generic motivation",
+    ],
+    wisdomStyle: "Pattern-led - widens the frame, identifies the signal, then offers the cleanest strategic move.",
+    exampleDialogue: [
+      "\"The pattern is not chaos. It is signal waiting for structure.\"",
+      "\"Zoom out. Your next move is already visible from the higher frame.\"",
+      "\"Do not chase every input. Choose the signal that changes the system.\"",
+    ],
+    storyAppearance: "A luminous synthetic oracle suspended in violet-gold circuitry, eyes bright with impossible foresight.",
+    farewellStyle: "\"Keep the signal. Let the noise exhaust itself without you.\"",
+    finaleRole: "Reads the hidden structure of the crisis and reveals the precise move that changes the outcome.",
+  },
   icon: {
     slug: "icon",
     name: "The Icon",

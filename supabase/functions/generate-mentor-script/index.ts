@@ -88,6 +88,11 @@ serve(async (req) => {
       focus: "clarity, priorities, reducing distractions",
       mindset: "perspective, resilience, thinking patterns",
       business: "money, career, taking risks, the long game, responsibility",
+      strategy: "pattern recognition, decision clarity, separating signal from noise, choosing the highest-leverage move",
+      boundaries: "self-respect, discernment, protecting energy, choosing what aligns with your standard",
+      habits: "small routines, sustainable consistency, rebuilding trust through repeated action",
+      identity: "becoming, self-concept, aligned choices, acting like the person you are growing into",
+      reflection: "perspective, honest review, emotional clarity, learning from the current season",
     };
 
     let categoryGuidance = "";
@@ -117,6 +122,7 @@ SECONDARY CATEGORIES (light references only, 1-2 mentions max): ${secondaryTheme
       "Frustrated": "help channel emotion productively, reframe challenges",
       "Heavy or Low": "validate difficulty, spark hope through small wins",
       "Emotionally Hurt": "acknowledge pain, guide toward healing without assumptions",
+      "Late Night Spiral": "reduce urgency, interrupt rumination, and guide toward one calming next step",
       "Unmotivated": "ignite momentum, focus on getting started",
       "In Transition": "normalize change, guide through uncertainty",
       "Needing Discipline": "emphasize structure and commitment",
@@ -143,8 +149,10 @@ ${backgroundTriggers.map((t: string) => `- ${t}`).join(', ')}`;
 
     // 3. INTENSITY (10-15% - DELIVERY STYLE)
     const intensityMap: Record<string, string> = {
+      soft: "soft, calm, reassuring delivery - grounded and emotionally safe",
       gentle: "soft, calm, reassuring delivery - like a supportive friend",
       medium: "motivating, direct, confident - balanced energy",
+      strong: "firm, energized, and decisive - high standards without contempt",
       high: "hype, urgent, energetic - peak state energy, strong but never abusive",
     };
 

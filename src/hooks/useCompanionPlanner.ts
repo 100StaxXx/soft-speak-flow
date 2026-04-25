@@ -17,6 +17,10 @@ import { useTaskMutations } from "@/hooks/useTaskMutations";
 import type { AddTaskParams } from "@/hooks/useTaskMutations";
 import { useRitualUpdate } from "@/hooks/useRitualUpdate";
 import { useUserAIContext } from "@/hooks/useUserAIContext";
+import {
+  attachActualDurationMinutes,
+  attachRitualActualDurationMinutes,
+} from "@/hooks/plannerActualDurations";
 import { useAIInteractionTracker } from "@/hooks/useAIInteractionTracker";
 import { useSchedulingLearner } from "@/hooks/useSchedulingLearner";
 import { useAuth } from "@/hooks/useAuth";
@@ -71,6 +75,7 @@ import {
   mapWorkloadToleranceToPlanningMode,
   type CompanionPlanningMode,
 } from "@/shared/companionPlanningMode";
+import { getOnboardingScheduleArchetypeProfile } from "@/shared/onboardingScheduleArchetype";
 import { computePlannerPriorityScores } from "@/shared/companionPlannerPriority";
 import { buildCompanionStatInterpretation } from "@/shared/companionStatSignals";
 import { withTimeout } from "@/utils/asyncTimeout";
@@ -114,6 +119,7 @@ type StoredPlannerPreferences = {
 
 type PlannerMemoryQueryResult = {
   preferredWorkBlocks: Json | null;
+  onboardingData: Json | null;
   wakeTime: string | null;
   windDownTime: string | null;
   coldContactThresholdDays: number | null;
@@ -311,6 +317,9 @@ const extractPlannerProfile = (
   return {
     preferredWorkBlocksRecord: preferredWorkBlocks,
     tonePack: asString(profile.tonePack) as PlannerTonePack | null | undefined,
+    scheduleArchetype: asString(profile.scheduleArchetype) as PlannerMemoryProfile["scheduleArchetype"],
+    scheduleArchetypeLabel: asString(profile.scheduleArchetypeLabel),
+    scheduleArchetypePlanningHint: asString(profile.scheduleArchetypePlanningHint),
     preferredTimeOfDay: asString(profile.preferredTimeOfDay),
     preferredTimeReason: asString(profile.preferredTimeReason),
     reminderMinutesBefore: asNumber(profile.reminderMinutesBefore),
@@ -822,6 +831,7 @@ const serializeTaskContext = (task: {
   category?: string | null;
   scheduled_time: string | null;
   estimated_duration?: number | null;
+  actual_duration_minutes?: number | null;
   actual_time_spent?: number | null;
   notes?: string | null;
   subtasks?: Array<{ title: string | null } | null> | null;
@@ -843,6 +853,7 @@ const serializeTaskContext = (task: {
   category: task.category ?? null,
   scheduledTime: task.scheduled_time,
   estimatedDuration: task.estimated_duration ?? null,
+  actualDurationMinutes: task.actual_duration_minutes ?? null,
   actualTimeSpent: task.actual_time_spent ?? null,
   notes: task.notes ?? null,
   subtaskTitles: (task.subtasks ?? [])
@@ -1200,6 +1211,7 @@ export function useCompanionPlanner({
       const [
         { data: preferenceRow, error: preferenceError },
         { data: learningRow, error: learningError },
+        { data: profileRow, error: profileError },
       ] = await Promise.all([
         supabase
           .from("daily_planning_preferences")
@@ -1215,13 +1227,20 @@ export function useCompanionPlanner({
           )
           .eq("user_id", user.id)
           .maybeSingle(),
+        supabase
+          .from("profiles")
+          .select("onboarding_data")
+          .eq("id", user.id)
+          .maybeSingle(),
       ]);
 
       if (preferenceError) throw preferenceError;
       if (learningError) throw learningError;
+      if (profileError) throw profileError;
 
       return {
         preferredWorkBlocks: preferenceRow?.preferred_work_blocks ?? null,
+        onboardingData: profileRow?.onboarding_data ?? null,
         wakeTime: preferenceRow?.wake_time ?? null,
         windDownTime: preferenceRow?.wind_down_time ?? null,
         coldContactThresholdDays: preferenceRow?.cold_contact_threshold_days ??
@@ -1442,7 +1461,32 @@ export function useCompanionPlanner({
         .lte("completed_at", `${todayIso}T23:59:59.999Z`);
 
       if (error) throw error;
-      return data ?? [];
+      return attachActualDurationMinutes(user.id, data ?? []);
+    },
+  });
+
+  const baseRituals = useMemo(
+    () => mapRitualsToContext(activeEpics),
+    [activeEpics],
+  );
+  const durationHistoryStartIso = `${format(addDays(today, -59), "yyyy-MM-dd")}T00:00:00.000Z`;
+
+  const ritualsQuery = useQuery({
+    queryKey: [
+      "companion-planner-ritual-actual-durations",
+      user?.id,
+      todayIso,
+      baseRituals.map((ritual) => ritual.id),
+    ],
+    enabled: enabled && !!user?.id && baseRituals.length > 0,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      if (!user?.id) return [];
+      return attachRitualActualDurationMinutes(
+        user.id,
+        baseRituals,
+        durationHistoryStartIso,
+      );
     },
   });
 
@@ -1465,10 +1509,17 @@ export function useCompanionPlanner({
     const remoteProfile = extractPlannerProfile(
       plannerMemoryQuery.data?.preferredWorkBlocks,
     );
+    const onboardingData = isRecord(plannerMemoryQuery.data?.onboardingData)
+      ? plannerMemoryQuery.data.onboardingData
+      : {};
+    const onboardingScheduleProfile = getOnboardingScheduleArchetypeProfile(
+      onboardingData.scheduleArchetype,
+    );
     const preferredTimeOfDay = plannerMemoryOverride?.preferredTimeOfDay ??
       sessionState.preferredTimeOfDay ??
       remoteProfile.preferredTimeOfDay ??
       storedPreferences.preferredTimeOfDay ??
+      onboardingScheduleProfile?.defaultPreferredTimeOfDay ??
       null;
     const preferredTimeReason = resolveTimeReasonFromSources({
       resolvedTimeOfDay: preferredTimeOfDay,
@@ -1488,6 +1539,10 @@ export function useCompanionPlanner({
         {
           timeOfDay: storedPreferences.preferredTimeOfDay ?? null,
           timeReason: storedPreferences.preferredTimeReason ?? null,
+        },
+        {
+          timeOfDay: onboardingScheduleProfile?.defaultPreferredTimeOfDay ?? null,
+          timeReason: onboardingScheduleProfile?.defaultPreferredTimeReason ?? null,
         },
       ],
     });
@@ -1515,6 +1570,14 @@ export function useCompanionPlanner({
 
     return {
       tonePack: plannerMemoryOverride?.tonePack ?? tonePack,
+      scheduleArchetype: remoteProfile.scheduleArchetype ??
+        onboardingScheduleProfile?.id ?? null,
+      scheduleArchetypeLabel: remoteProfile.scheduleArchetypeLabel ??
+        onboardingScheduleProfile?.label ?? null,
+      scheduleArchetypePlanningHint:
+        remoteProfile.scheduleArchetypePlanningHint ??
+        onboardingScheduleProfile?.plannerHint ??
+        asString(onboardingData.scheduleArchetypePlanningHint),
       preferredTimeOfDay,
       preferredTimeReason,
       reminderMinutesBefore,
@@ -1534,6 +1597,7 @@ export function useCompanionPlanner({
       cadencePatterns,
       workloadTolerance: plannerMemoryOverride?.workloadTolerance ??
         remoteProfile.workloadTolerance ??
+        onboardingScheduleProfile?.defaultWorkloadTolerance ??
         (plannerMemoryQuery.data?.defaultEnergyLevel === "low"
           ? "light"
           : plannerMemoryQuery.data?.defaultEnergyLevel === "high"
@@ -1548,6 +1612,7 @@ export function useCompanionPlanner({
   }, [
     plannerMemoryOverride,
     plannerMemoryQuery.data?.defaultEnergyLevel,
+    plannerMemoryQuery.data?.onboardingData,
     plannerMemoryQuery.data?.peakProductivityTimes,
     plannerMemoryQuery.data?.preferredWorkBlocks,
     plannerMemoryQuery.data?.schedulingPatterns,
@@ -1750,7 +1815,7 @@ export function useCompanionPlanner({
           .map(serializeTaskContext),
       ),
       activeEpics: mapEpicsToContext(activeEpics, todayIso),
-      rituals: mapRitualsToContext(activeEpics),
+      rituals: ritualsQuery.data ?? baseRituals,
       calendarEvents: contextEventsQuery
         .events as PlannerContextCalendarEvent[],
       contactsNeedingAttention: contactsAttentionQuery.data ?? [],
@@ -1764,6 +1829,7 @@ export function useCompanionPlanner({
     }),
     [
       activeEpics,
+      baseRituals,
       careSignals,
       contactsAttentionQuery.data,
       contextEventsQuery.events,
@@ -1773,6 +1839,7 @@ export function useCompanionPlanner({
       plannerAISignals,
       priorityScores,
       recentCompletedTasksQuery.data,
+      ritualsQuery.data,
       statInterpretation,
       reflectionSignalsQuery.data,
       scheduleInsights,
@@ -3134,6 +3201,7 @@ export function useCompanionPlanner({
       contactsAttentionQuery.isLoading ||
       reflectionSignalsQuery.isLoading ||
       recentStatSignalsQuery.isLoading ||
+      ritualsQuery.isLoading ||
       recentCompletedTasksQuery.isLoading,
   };
 }

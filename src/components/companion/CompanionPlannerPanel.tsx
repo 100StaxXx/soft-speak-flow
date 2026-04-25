@@ -153,7 +153,13 @@ export const CompanionPlannerPanel = memo(() => {
                 className="h-9 rounded-full border-white/10 bg-white/[0.04] px-4 text-[0.68rem] font-black uppercase tracking-[0.16em] text-white/80 hover:bg-white/[0.08]"
                 disabled={quickActionsDisabled}
                 data-testid={`companion-quick-action-${action.id}`}
+                data-tour={action.id === "plan-day" ? "companion-plan-my-day-action" : undefined}
                 onClick={() => {
+                  if (action.id === "plan-day") {
+                    window.dispatchEvent(
+                      new CustomEvent("companion-plan-my-day-started"),
+                    );
+                  }
                   if (action.planningMode) {
                     assistant.setPlanningMode(action.planningMode);
                   }

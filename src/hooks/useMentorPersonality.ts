@@ -16,12 +16,18 @@ interface MentorPersonality {
   nudge: () => string;
 }
 
-const personalityTemplates: Record<string, Partial<MentorPersonality>> = {
+export const personalityTemplates: Record<string, Partial<MentorPersonality>> = {
   sage: {
     buttonText: (action) => `${action} with calm`,
     emptyState: (context) => `One clear step is enough. Begin with ${context}.`,
     encouragement: () => "Small steps still move mountains.",
     nudge: () => "Breathe first. Then continue.",
+  },
+  lyra: {
+    buttonText: (action) => `${action} with clarity`,
+    emptyState: (context) => `The signal is hidden in ${context}. Let's find it.`,
+    encouragement: () => "The pattern is already there. Choose the clean move.",
+    nudge: () => "Step back. Find the signal.",
   },
   icon: {
     buttonText: (action) => `${action} with intention`,

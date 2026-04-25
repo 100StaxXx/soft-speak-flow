@@ -38,6 +38,23 @@ const THEMES_BY_MENTOR: Record<SupportedMentorSlug, MentorDailyTheme[]> = {
       triggers: ["In Transition", "Late Night Spiral"],
     },
   ],
+  lyra: [
+    {
+      topic_category: "strategy",
+      intensity: "medium",
+      triggers: ["Anxious & Overthinking", "Feeling Stuck"],
+    },
+    {
+      topic_category: "focus",
+      intensity: "medium",
+      triggers: ["In Transition", "Motivated & Ready"],
+    },
+    {
+      topic_category: "mindset",
+      intensity: "soft",
+      triggers: ["Self-Doubt", "Late Night Spiral"],
+    },
+  ],
   icon: [
     {
       topic_category: "confidence",

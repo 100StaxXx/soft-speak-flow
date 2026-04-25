@@ -192,7 +192,7 @@ Deno.test("prefers a historical quest duration over the generic AI estimate for 
   );
 });
 
-Deno.test("prefers actual historical time spent over estimated duration", () => {
+Deno.test("prefers learned actual session duration over estimated duration", () => {
   const result = buildPlannerResponse(baseInput({
     message: "Workout tomorrow",
     currentDate: "2026-04-18",
@@ -227,7 +227,8 @@ Deno.test("prefers actual historical time spent over estimated duration", () => 
           taskDate: "2026-04-16",
           scheduledTime: "17:00",
           estimatedDuration: 45,
-          actualTimeSpent: 60,
+          actualDurationMinutes: 60,
+          actualTimeSpent: 75,
           recurrencePattern: null,
           completed: true,
           completedAt: "2026-04-16T18:00:00.000Z",
@@ -325,6 +326,18 @@ Deno.test("uses category duration history when the title is new", () => {
           recurrencePattern: null,
           completed: true,
           completedAt: "2026-04-16T09:20:00.000Z",
+          priority: "medium",
+          category: "admin",
+        },
+        {
+          id: "task-admin-history-2",
+          title: "Renew registration",
+          taskDate: "2026-04-15",
+          scheduledTime: "13:00",
+          estimatedDuration: 60,
+          recurrencePattern: null,
+          completed: true,
+          completedAt: "2026-04-15T14:00:00.000Z",
           priority: "medium",
           category: "admin",
         },
@@ -5445,6 +5458,62 @@ Deno.test("prefers a historical starter ritual duration over the generic AI esti
       }
     ).habits?.[0]?.estimated_minutes,
     90,
+  );
+});
+
+Deno.test("prefers a ritual's learned actual session duration over its template estimate", () => {
+  const result = buildPlannerResponse(baseInput({
+    message: "I want to launch a new campaign for Launch Sprint",
+    parsedInput: {
+      text: "Launch Sprint",
+      scheduledTime: null,
+      scheduledDate: null,
+      estimatedDuration: null,
+      recurrencePattern: null,
+      recurrenceDays: [],
+      recurrenceMonthDays: [],
+      recurrenceCustomPeriod: null,
+      recurrenceEndDate: null,
+      notes: null,
+      category: "mind",
+      newTitle: null,
+    },
+    classificationHint: {
+      type: "epic",
+      confidence: 0.91,
+      reasoning: "Multi-step outcome",
+      suggestedDuration: 84,
+      suggestedActivityDurationMinutes: 30,
+    },
+    plannerContext: {
+      tasks: [],
+      inboxTasks: [],
+      activeEpics: [],
+      rituals: [
+        {
+          id: "ritual-campaign-actual-history-1",
+          epicId: "old-epic-1",
+          epicTitle: "Old Launch Sprint",
+          title: "Work on Launch Sprint",
+          frequency: "daily",
+          preferredTime: "09:00",
+          estimatedMinutes: 90,
+          actualDurationMinutes: 60,
+        },
+      ],
+    },
+  }));
+
+  assertEquals(result.proposals[0].kind, "create_campaign");
+  assertEquals(
+    (
+      result.proposals[0]?.payload as {
+        habits?: Array<{
+          estimated_minutes?: number | null;
+        }>;
+      }
+    ).habits?.[0]?.estimated_minutes,
+    60,
   );
 });
 

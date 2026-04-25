@@ -33,6 +33,12 @@ const QUESTIONNAIRE_ANSWERS = [
     answer: "Clear principles and logic",
     tags: ["discipline"],
   },
+  {
+    questionId: "schedule_archetype",
+    optionId: "after_work_builder",
+    answer: "I'm building something after work",
+    tags: ["schedule_after_work_builder"],
+  },
 ];
 
 const ACTIVE_MENTOR = {
@@ -530,7 +536,7 @@ describe("StoryOnboarding questionnaire submission flow", () => {
 
       expect(screen.getByTestId("mentor-result-stage")).toBeInTheDocument();
 
-      expect(mocks.questionnaireUpsert).toHaveBeenCalledTimes(4);
+      expect(mocks.questionnaireUpsert).toHaveBeenCalledTimes(5);
       expect(mocks.toastError).not.toHaveBeenCalled();
     } finally {
       vi.useRealTimers();
@@ -651,7 +657,7 @@ describe("StoryOnboarding questionnaire submission flow", () => {
       const guidedTutorial = JSON.parse(rawProgress ?? "{}");
       expect(guidedTutorial).toMatchObject({
         version: 2,
-        flowVersion: 3,
+        flowVersion: 4,
         eligible: true,
         completed: false,
         dismissed: false,

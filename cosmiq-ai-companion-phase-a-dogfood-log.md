@@ -8,8 +8,8 @@ Use this alongside:
 ## Purpose
 Capture real-day validation for the Phase A planner loop so we can decide based on trust failures, not vague impressions.
 
-## Current Automated Baseline
-- Last verified: `2026-04-24`
+## Current Local Validation Baseline
+- Last local verification: `2026-04-24`
 - Command: `npm run planner:phase-a:check`
 - Result:
   - focused UI / hook / persistence slice passed

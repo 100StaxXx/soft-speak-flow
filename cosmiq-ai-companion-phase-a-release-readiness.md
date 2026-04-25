@@ -12,8 +12,8 @@ Phase A is functionally implemented.
 The remaining question is not whether the planner loop exists.
 It is whether the planner loop is trustworthy enough to ship.
 
-## Automated Baseline
-- Last verified: `2026-04-24`
+## Local Validation Baseline
+- Last local verification: `2026-04-24`
 - Command: `npm run planner:phase-a:check`
 - Result:
   - focused UI / hook / persistence slice passed
@@ -26,6 +26,7 @@ It is whether the planner loop is trustworthy enough to ship.
 - `What Should I Do Right Now`
 - `What Do I Have Coming Up`
 - proposal-backed save / confirm / reload flows
+- batch confirmation in the compatibility planner path
 - planner modes: `Lock In`, `Balanced`, `Recovery`
 - campaign pressure and repeated-slip guidance across core planner surfaces
 - deterministic fallback when planner AI output is slow or malformed
@@ -70,6 +71,8 @@ Treat any of the following as a blocker:
 - At least 3 real-day dogfood sessions are logged.
 - No open blocker remains in the dogfood log.
 - The team would personally use the planner loop instead of planning elsewhere.
+
+Note: Phase A validation is currently recorded as a local command run, not as a dedicated CI workflow.
 
 ## Recommended Next Step
 Do not add more planner behavior first.

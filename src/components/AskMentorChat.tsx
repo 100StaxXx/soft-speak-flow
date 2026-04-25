@@ -35,7 +35,7 @@ interface AskMentorChatProps {
   comprehensiveMode?: boolean;
 }
 
-const getSmartPrompts = (
+export const getSmartPrompts = (
   mentorSlug: string | undefined,
   mentorTone: string,
   hasActiveHabits: boolean,
@@ -50,6 +50,8 @@ const getSmartPrompts = (
   
   if (resolvedSlug === "operator") {
     prompts.push("Help me build a clean plan for today", "Time-block my next few hours");
+  } else if (resolvedSlug === "lyra") {
+    prompts.push("Help me find the signal", "Show me the pattern I'm missing");
   } else if (resolvedSlug === "sage") {
     prompts.push("I'm overwhelmed. Help me reset", "Give me one calm next step");
   } else if (resolvedSlug === "icon") {
@@ -82,7 +84,10 @@ const getSmartPrompts = (
     prompts.push("Help me build better habits");
   }
   
-  return prompts.sort(() => Math.random() - 0.5).slice(0, 3);
+  return [
+    ...prompts.slice(0, 2),
+    ...prompts.slice(2).sort(() => Math.random() - 0.5),
+  ].slice(0, 3);
 };
 
 export const AskMentorChat = ({ 

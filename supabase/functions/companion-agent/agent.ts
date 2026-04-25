@@ -38,6 +38,138 @@ const MAX_CALENDAR_EVENTS = 16;
 const MAX_REFLECTIONS = 8;
 const AGENT_RESPONSE_TIMEOUT_MS = 5_000;
 
+const medianDuration = (durations: number[]): number | null => {
+  if (durations.length === 0) return null;
+
+  const sorted = [...durations].sort((left, right) => left - right);
+  const middle = Math.floor(sorted.length / 2);
+  if (sorted.length % 2 === 1) return Math.round(sorted[middle]);
+
+  return Math.round((sorted[middle - 1] + sorted[middle]) / 2);
+};
+
+const attachActualDurationMinutes = async (
+  supabase: { from: (table: string) => any },
+  userId: string,
+  tasks: Array<Record<string, unknown>>,
+): Promise<Array<Record<string, unknown>>> => {
+  const taskIds = [...new Set(tasks.map((task) => String(task.id ?? "")).filter(
+    (id) => id.length > 0,
+  ))];
+  if (taskIds.length === 0) return tasks;
+
+  const { data, error } = await supabase
+    .from("focus_sessions")
+    .select("task_id, actual_duration")
+    .eq("user_id", userId)
+    .eq("status", "completed")
+    .in("task_id", taskIds)
+    .not("actual_duration", "is", null)
+    .gt("actual_duration", 0);
+
+  if (error) throw error;
+
+  const durationsByTaskId = new Map<string, number[]>();
+  for (const row of (data ?? []) as Array<Record<string, unknown>>) {
+    const taskId = typeof row.task_id === "string" ? row.task_id : null;
+    const duration = typeof row.actual_duration === "number"
+      ? row.actual_duration
+      : null;
+    if (!taskId || !duration || !Number.isFinite(duration) || duration <= 0) {
+      continue;
+    }
+
+    const durations = durationsByTaskId.get(taskId) ?? [];
+    durations.push(duration);
+    durationsByTaskId.set(taskId, durations);
+  }
+
+  return tasks.map((task) => ({
+    ...task,
+    actual_duration_minutes: medianDuration(
+      durationsByTaskId.get(String(task.id ?? "")) ?? [],
+    ),
+  }));
+};
+
+const attachRitualActualDurationMinutes = async (
+  supabase: { from: (table: string) => any },
+  userId: string,
+  rituals: Array<Record<string, unknown>>,
+  completedSinceIso: string,
+  limit = 200,
+): Promise<Array<Record<string, unknown>>> => {
+  const ritualIds = [
+    ...new Set(rituals.map((ritual) => String(ritual.id ?? "")).filter((id) =>
+      id.length > 0
+    )),
+  ];
+  if (ritualIds.length === 0) return rituals;
+
+  const { data: taskRows, error: taskError } = await supabase
+    .from("daily_tasks")
+    .select("id, habit_source_id")
+    .eq("user_id", userId)
+    .eq("completed", true)
+    .gte("completed_at", completedSinceIso)
+    .order("completed_at", { ascending: false })
+    .limit(limit)
+    .in("habit_source_id", ritualIds);
+
+  if (taskError) throw taskError;
+
+  const taskToRitualId = new Map<string, string>();
+  for (const row of (taskRows ?? []) as Array<Record<string, unknown>>) {
+    const taskId = typeof row.id === "string" ? row.id : null;
+    const ritualId = typeof row.habit_source_id === "string"
+      ? row.habit_source_id
+      : null;
+    if (taskId && ritualId) taskToRitualId.set(taskId, ritualId);
+  }
+
+  const taskIds = [...taskToRitualId.keys()];
+  if (taskIds.length === 0) {
+    return rituals.map((ritual) => ({
+      ...ritual,
+      actual_duration_minutes: null,
+    }));
+  }
+
+  const { data: sessionRows, error: sessionError } = await supabase
+    .from("focus_sessions")
+    .select("task_id, actual_duration")
+    .eq("user_id", userId)
+    .eq("status", "completed")
+    .in("task_id", taskIds)
+    .not("actual_duration", "is", null)
+    .gt("actual_duration", 0);
+
+  if (sessionError) throw sessionError;
+
+  const durationsByRitualId = new Map<string, number[]>();
+  for (const row of (sessionRows ?? []) as Array<Record<string, unknown>>) {
+    const taskId = typeof row.task_id === "string" ? row.task_id : null;
+    const duration = typeof row.actual_duration === "number"
+      ? row.actual_duration
+      : null;
+    const ritualId = taskId ? taskToRitualId.get(taskId) : null;
+    if (!ritualId || !duration || !Number.isFinite(duration) || duration <= 0) {
+      continue;
+    }
+
+    const durations = durationsByRitualId.get(ritualId) ?? [];
+    durations.push(duration);
+    durationsByRitualId.set(ritualId, durations);
+  }
+
+  return rituals.map((ritual) => ({
+    ...ritual,
+    actual_duration_minutes: medianDuration(
+      durationsByRitualId.get(String(ritual.id ?? "")) ?? [],
+    ),
+  }));
+};
+
 const PrepareTaskCreateSchema = z.object({
   title: z.string().min(1).max(200),
   task_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
@@ -295,6 +427,7 @@ async function loadCompanionAgentContext(params: {
     calendarResult,
     aiLearning,
     plannerPreferences,
+    profileResult,
     aiPreferences,
     companionMemories,
     reflections,
@@ -383,6 +516,11 @@ async function loadCompanionAgentContext(params: {
       .select("preferred_work_blocks, wake_time, wind_down_time")
       .eq("user_id", params.userId)
       .maybeSingle(),
+    params.supabase
+      .from("profiles")
+      .select("onboarding_data")
+      .eq("id", params.userId)
+      .maybeSingle(),
     loadUserAIPreferences(params.supabase, params.userId),
     params.supabase
       .from("companion_memories")
@@ -423,6 +561,7 @@ async function loadCompanionAgentContext(params: {
     calendarResult,
     aiLearning,
     plannerPreferences,
+    profileResult,
     companionMemories,
     reflections,
     dailyCheckIns,
@@ -434,11 +573,18 @@ async function loadCompanionAgentContext(params: {
   const inboxTasks = (inboxTasksResult.data ?? []) as Array<
     Record<string, unknown>
   >;
-  const recentCompletedTasks = (recentCompletedTasksResult.data ?? []) as Array<
-    Record<string, unknown>
-  >;
+  const recentCompletedTasks = await attachActualDurationMinutes(
+    params.supabase,
+    params.userId,
+    (recentCompletedTasksResult.data ?? []) as Array<Record<string, unknown>>,
+  );
   const tasks = [...datedTasks, ...inboxTasks];
-  const rituals = (ritualsResult.data ?? []) as Array<Record<string, unknown>>;
+  const rituals = await attachRitualActualDurationMinutes(
+    params.supabase,
+    params.userId,
+    (ritualsResult.data ?? []) as Array<Record<string, unknown>>,
+    `${addDays(toDateOnly(params.request.currentDateTime), -59)}T00:00:00.000Z`,
+  );
   const campaigns = (campaignsResult.data ?? []) as Array<
     Record<string, unknown>
   >;
@@ -485,6 +631,7 @@ async function loadCompanionAgentContext(params: {
       ?.peak_productivity_times,
     ai_preferences: asRecord(aiPreferences),
     planner_preferences: asRecord(plannerPreferences.data),
+    profile_onboarding: asRecord(profileResult.data?.onboarding_data),
     callback_memories: (companionMemories.data ?? []) as Array<
       Record<string, unknown>
     >,

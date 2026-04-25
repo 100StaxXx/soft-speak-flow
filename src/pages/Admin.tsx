@@ -318,12 +318,12 @@ const Admin = () => {
   // Active mentors only
   const mentorPreviewTexts: Record<string, string> = {
     sage: "Peace comes before progress. Start with one clear step.",
+    lyra: "The pattern is already there. Step back and find the signal.",
     icon: "We don't do things that lower our standard.",
     charles: "Oh, we're procrastinating again. Shocking.",
     princess: "A soft, productive day is enough.",
     operator: "Your current system lacks structure. Let's correct it.",
     rival: "You said you were different. Show me.",
-    reign: "Excellence isn't optional. Let's make today count.",
   };
 
   const handleVoicePreview = async (mentorSlug: string) => {
@@ -517,7 +517,7 @@ const Admin = () => {
           <h2 className="font-heading text-2xl font-semibold mb-4">Voice Preview</h2>
           <p className="text-muted-foreground mb-6">Test each guide's voice before generating content</p>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {mentors.map((mentor) => (
+            {mentors.filter((mentor) => mentor.is_active !== false).map((mentor) => (
               <div key={mentor.id} className="flex items-center justify-between p-4 border rounded-2xl bg-card">
                 <div>
                   <p className="font-medium">{mentor.name}</p>

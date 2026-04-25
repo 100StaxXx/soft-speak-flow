@@ -1,4 +1,5 @@
 import { buildPlannerAISignals } from "@/utils/companionPlannerAiSignals";
+import { normalizeOnboardingScheduleArchetype } from "@/shared/onboardingScheduleArchetype";
 import type {
   CompanionPlannerRequest,
   PlannerCareState,
@@ -215,6 +216,7 @@ const sanitizeTaskLikeEntry = (
     category: asNullableString(entry.category),
     scheduledTime: asNullableString(entry.scheduledTime),
     estimatedDuration: asNullableNumber(entry.estimatedDuration),
+    actualDurationMinutes: asNullableNumber(entry.actualDurationMinutes),
     actualTimeSpent: asNullableNumber(entry.actualTimeSpent),
     notes: asNullableString(entry.notes),
     subtaskTitles: asStringArray(entry.subtaskTitles),
@@ -266,6 +268,7 @@ const sanitizeRitual = (
     frequency: asNullableString(entry.frequency),
     preferredTime: asNullableString(entry.preferredTime),
     estimatedMinutes: asNullableNumber(entry.estimatedMinutes),
+    actualDurationMinutes: asNullableNumber(entry.actualDurationMinutes),
     currentStreak: asNullableNumber(entry.currentStreak),
   };
 };
@@ -535,6 +538,15 @@ const sanitizePlannerMemory = (
     nextMemory.tonePack = entry.tonePack;
   }
 
+  nextMemory.scheduleArchetype = normalizeOnboardingScheduleArchetype(
+    entry.scheduleArchetype,
+  );
+  nextMemory.scheduleArchetypeLabel = asNullableString(
+    entry.scheduleArchetypeLabel,
+  );
+  nextMemory.scheduleArchetypePlanningHint = asNullableString(
+    entry.scheduleArchetypePlanningHint,
+  );
   nextMemory.preferredTimeOfDay = asNullableString(entry.preferredTimeOfDay);
   nextMemory.preferredTimeReason = asNullableString(entry.preferredTimeReason);
   nextMemory.reminderMinutesBefore = asNullableNumber(

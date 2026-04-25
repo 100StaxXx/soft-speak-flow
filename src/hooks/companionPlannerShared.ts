@@ -9,9 +9,14 @@ import { useExternalCalendarEvents } from "@/hooks/useExternalCalendarEvents";
 import { useInboxTasks } from "@/hooks/useInboxTasks";
 import { useTasksQuery } from "@/hooks/useTasksQuery";
 import { useUserAIContext } from "@/hooks/useUserAIContext";
+import {
+  attachActualDurationMinutes,
+  attachRitualActualDurationMinutes,
+} from "@/hooks/plannerActualDurations";
 import { sanitizePlannerContext } from "@/utils/companionPlannerRequest";
 import { buildCompanionPlannerScheduleInsights } from "@/utils/companionPlannerSchedule";
 import { formatCurrentDateTimeWithOffset } from "@/utils/currentDateTime";
+import { getOnboardingScheduleArchetypeProfile } from "@/shared/onboardingScheduleArchetype";
 import type { Json } from "@/integrations/supabase/types";
 import { supabase } from "@/integrations/supabase/client";
 import type { EpicRecord } from "@/hooks/epicsQuery";
@@ -43,6 +48,7 @@ export type StoredPlannerPreferences = {
 
 export type PlannerMemoryQueryResult = {
   preferredWorkBlocks: Json | null;
+  onboardingData: Json | null;
   wakeTime: string | null;
   windDownTime: string | null;
   peakProductivityTimes: string[];
@@ -128,6 +134,9 @@ export const extractPlannerProfile = (
   return {
     preferredWorkBlocksRecord: preferredWorkBlocks,
     tonePack: asString(profile.tonePack) as PlannerTonePack | null | undefined,
+    scheduleArchetype: asString(profile.scheduleArchetype) as PlannerMemoryProfile["scheduleArchetype"],
+    scheduleArchetypeLabel: asString(profile.scheduleArchetypeLabel),
+    scheduleArchetypePlanningHint: asString(profile.scheduleArchetypePlanningHint),
     preferredTimeOfDay: asString(profile.preferredTimeOfDay),
     preferredTimeReason: asString(profile.preferredTimeReason),
     reminderMinutesBefore: asNumber(profile.reminderMinutesBefore),
@@ -264,6 +273,7 @@ export const serializeTaskToPlannerContext = (task: {
   task_date: string | null;
   scheduled_time: string | null;
   estimated_duration?: number | null;
+  actual_duration_minutes?: number | null;
   actual_time_spent?: number | null;
   notes?: string | null;
   subtasks?: Array<{ title: string | null } | null> | null;
@@ -281,6 +291,7 @@ export const serializeTaskToPlannerContext = (task: {
   taskDate: task.task_date,
   scheduledTime: task.scheduled_time,
   estimatedDuration: task.estimated_duration ?? null,
+  actualDurationMinutes: task.actual_duration_minutes ?? null,
   actualTimeSpent: task.actual_time_spent ?? null,
   notes: task.notes ?? null,
   subtaskTitles: (task.subtasks ?? [])
@@ -367,7 +378,11 @@ export function useCompanionPlanningContext({
     queryFn: async (): Promise<PlannerMemoryQueryResult | null> => {
       if (!user?.id) return null;
 
-      const [{ data: preferenceRow, error: preferenceError }, { data: learningRow, error: learningError }] = await Promise.all([
+      const [
+        { data: preferenceRow, error: preferenceError },
+        { data: learningRow, error: learningError },
+        { data: profileRow, error: profileError },
+      ] = await Promise.all([
         supabase
           .from("daily_planning_preferences")
           .select("preferred_work_blocks, wake_time, wind_down_time")
@@ -378,13 +393,20 @@ export function useCompanionPlanningContext({
           .select("peak_productivity_times, scheduling_patterns, successful_patterns")
           .eq("user_id", user.id)
           .maybeSingle(),
+        supabase
+          .from("profiles")
+          .select("onboarding_data")
+          .eq("id", user.id)
+          .maybeSingle(),
       ]);
 
       if (preferenceError) throw preferenceError;
       if (learningError) throw learningError;
+      if (profileError) throw profileError;
 
       return {
         preferredWorkBlocks: preferenceRow?.preferred_work_blocks ?? null,
+        onboardingData: profileRow?.onboarding_data ?? null,
         wakeTime: preferenceRow?.wake_time ?? null,
         windDownTime: preferenceRow?.wind_down_time ?? null,
         peakProductivityTimes: learningRow?.peak_productivity_times ?? [],
@@ -414,7 +436,32 @@ export function useCompanionPlanningContext({
         .lte("completed_at", `${todayIso}T23:59:59.999Z`);
 
       if (error) throw error;
-      return data ?? [];
+      return attachActualDurationMinutes(user.id, data ?? []);
+    },
+  });
+
+  const baseRituals = useMemo(
+    () => mapRitualsToPlannerContext(activeEpics),
+    [activeEpics],
+  );
+  const durationHistoryStartIso = `${format(addDays(today, -59), "yyyy-MM-dd")}T00:00:00.000Z`;
+
+  const ritualsQuery = useQuery({
+    queryKey: [
+      "companion-planner-ritual-actual-durations",
+      user?.id,
+      todayIso,
+      baseRituals.map((ritual) => ritual.id),
+    ],
+    enabled: !!user?.id && baseRituals.length > 0,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      if (!user?.id) return [];
+      return attachRitualActualDurationMinutes(
+        user.id,
+        baseRituals,
+        durationHistoryStartIso,
+      );
     },
   });
 
@@ -430,15 +477,23 @@ export function useCompanionPlanningContext({
 
   const plannerMemory = useMemo<PlannerMemoryProfile>(() => {
     const remoteProfile = extractPlannerProfile(plannerMemoryQuery.data?.preferredWorkBlocks);
+    const onboardingData = isRecord(plannerMemoryQuery.data?.onboardingData)
+      ? plannerMemoryQuery.data.onboardingData
+      : {};
+    const onboardingScheduleProfile = getOnboardingScheduleArchetypeProfile(
+      onboardingData.scheduleArchetype,
+    );
     const preferredTimeOfDay = plannerMemoryOverride?.preferredTimeOfDay
       ?? sessionState.preferredTimeOfDay
       ?? remoteProfile.preferredTimeOfDay
       ?? storedPreferences.preferredTimeOfDay
+      ?? onboardingScheduleProfile?.defaultPreferredTimeOfDay
       ?? null;
     const preferredTimeReason = plannerMemoryOverride?.preferredTimeReason
       ?? sessionState.preferredTimeReason
       ?? remoteProfile.preferredTimeReason
       ?? storedPreferences.preferredTimeReason
+      ?? onboardingScheduleProfile?.defaultPreferredTimeReason
       ?? null;
     const reminderMinutesBefore = plannerMemoryOverride?.reminderMinutesBefore
       ?? remoteProfile.reminderMinutesBefore
@@ -463,6 +518,16 @@ export function useCompanionPlanningContext({
 
     return {
       tonePack: plannerMemoryOverride?.tonePack ?? tonePack,
+      scheduleArchetype: remoteProfile.scheduleArchetype
+        ?? onboardingScheduleProfile?.id
+        ?? null,
+      scheduleArchetypeLabel: remoteProfile.scheduleArchetypeLabel
+        ?? onboardingScheduleProfile?.label
+        ?? null,
+      scheduleArchetypePlanningHint:
+        remoteProfile.scheduleArchetypePlanningHint ??
+        onboardingScheduleProfile?.plannerHint ??
+        asString(onboardingData.scheduleArchetypePlanningHint),
       preferredTimeOfDay,
       preferredTimeReason,
       reminderMinutesBefore,
@@ -480,10 +545,15 @@ export function useCompanionPlanningContext({
         ?? [],
       preferredWindows,
       cadencePatterns,
+      workloadTolerance: plannerMemoryOverride?.workloadTolerance
+        ?? remoteProfile.workloadTolerance
+        ?? onboardingScheduleProfile?.defaultWorkloadTolerance
+        ?? null,
       lastConfirmedAt: plannerMemoryOverride?.lastConfirmedAt ?? remoteProfile.lastConfirmedAt ?? null,
     };
   }, [
     plannerMemoryOverride,
+    plannerMemoryQuery.data?.onboardingData,
     plannerMemoryQuery.data?.peakProductivityTimes,
     plannerMemoryQuery.data?.preferredWorkBlocks,
     plannerMemoryQuery.data?.schedulingPatterns,
@@ -517,12 +587,12 @@ export function useCompanionPlanningContext({
         (recentCompletedTasksQuery.data ?? []).map(serializeTaskToPlannerContext),
       ),
       activeEpics: mapEpicsToPlannerContext(activeEpics),
-      rituals: mapRitualsToPlannerContext(activeEpics),
+      rituals: ritualsQuery.data ?? baseRituals,
       calendarEvents: contextEventsQuery.events,
       scheduleInsights,
       plannerMemory,
       aiSignals: enrichedContext,
-    }), [activeEpics, contextEventsQuery.events, contextTasks, enrichedContext, inboxTasks, plannerMemory, recentCompletedTasksQuery.data, scheduleInsights]);
+    }), [activeEpics, baseRituals, contextEventsQuery.events, contextTasks, enrichedContext, inboxTasks, plannerMemory, recentCompletedTasksQuery.data, ritualsQuery.data, scheduleInsights]);
 
   return {
     today,
@@ -545,6 +615,7 @@ export function useCompanionPlanningContext({
       || activeEventsQuery.isLoading
       || contextEventsQuery.isLoading
       || plannerMemoryQuery.isLoading
+      || ritualsQuery.isLoading
       || recentCompletedTasksQuery.isLoading,
   };
 }
