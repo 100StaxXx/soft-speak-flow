@@ -56,7 +56,7 @@ export const OnboardingStoryToneSelection = ({
                     Choose The Story Tone
                   </h1>
                   <p className="max-w-2xl text-sm leading-6 text-white/[0.72] sm:text-base">
-                    This shapes the emotional fantasy of your companion line. Species, color, and element come next.
+                    This shapes the emotional fantasy of your companion line. Species and color come next.
                   </p>
                 </div>
               </div>
@@ -119,7 +119,7 @@ export const OnboardingStoryToneSelection = ({
                     Shape The Hidden Lineage
                   </h2>
                   <p className="text-sm leading-6 text-white/[0.72]">
-                    Choose the spirit animal, favorite color, and core element that will define your AI-generated egg.
+                    Choose the spirit animal and favorite color that will define your AI-generated egg.
                   </p>
                 </div>
               </div>

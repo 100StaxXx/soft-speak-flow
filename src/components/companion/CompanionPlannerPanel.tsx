@@ -152,25 +152,25 @@ export const CompanionPlannerPanel = memo(() => {
                 variant="outline"
                 className="h-9 rounded-full border-white/10 bg-white/[0.04] px-4 text-[0.68rem] font-black uppercase tracking-[0.16em] text-white/80 hover:bg-white/[0.08]"
                 disabled={quickActionsDisabled}
-	                data-testid={`companion-quick-action-${action.id}`}
-	                data-tour={action.id === "plan-day" ? "companion-plan-my-day-action" : undefined}
-	                onClick={() => {
-	                  if (action.planningMode) {
-	                    assistant.setPlanningMode(action.planningMode);
-	                  }
-	                  void assistant
-	                    .submitMessage(action.message, "text", {
-	                      starterIntent: action.starterIntent,
-	                      planningMode: action.planningMode ?? null,
-	                    })
-	                    .then((submitted) => {
-	                      if (action.id !== "plan-day" || !submitted) return;
-	                      window.dispatchEvent(
-	                        new CustomEvent("companion-plan-my-day-started"),
-	                      );
-	                    });
-	                }}
-	              >
+                data-testid={`companion-quick-action-${action.id}`}
+                data-tour={action.id === "plan-day" ? "companion-plan-my-day-action" : undefined}
+                onClick={() => {
+                  if (action.planningMode) {
+                    assistant.setPlanningMode(action.planningMode);
+                  }
+                  void assistant
+                    .submitMessage(action.message, "text", {
+                      starterIntent: action.starterIntent,
+                      planningMode: action.planningMode ?? null,
+                    })
+                    .then((submitted) => {
+                      if (action.id !== "plan-day" || !submitted) return;
+                      window.dispatchEvent(
+                        new CustomEvent("companion-plan-my-day-started"),
+                      );
+                    });
+                }}
+              >
                 {action.id === "plan-week"
                   ? "Plan My Week"
                   : action.id === "plan-day"

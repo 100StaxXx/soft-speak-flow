@@ -41,6 +41,17 @@ const SPIRIT_ANIMALS = [
   { name: "Griffin", glyph: "Gr" },
 ] as const;
 
+const COLOR_ELEMENT_DEFAULTS: Record<string, CompanionElementId> = {
+  "#f5b942": "light",
+  "#ff6b7f": "fire",
+  "#52b7ff": "ice",
+  "#58d68d": "nature",
+  "#9b6bff": "void",
+  "#d6dee8": "light",
+  "#ef4444": "fire",
+  "#14b8a6": "nature",
+};
+
 export interface AICompanionCreationData {
   favoriteColor: string;
   spiritAnimal: string;
@@ -82,7 +93,7 @@ export const AICompanionCreator = ({
   initialCompanionName = null,
   onBack,
   title = "Shape Your Companion Lineage",
-  description = "Choose the color, species, and element that will define your egg's hidden destiny.",
+  description = "Choose the color and species that will define your egg's hidden destiny.",
 }: AICompanionCreatorProps) => {
   const isCompact = layout === "compact";
   const [favoriteColor, setFavoriteColor] = useState<string>(
@@ -91,9 +102,9 @@ export const AICompanionCreator = ({
   const [spiritAnimal, setSpiritAnimal] = useState<string>(
     isKnownSpiritAnimal(initialSpiritAnimal) ? initialSpiritAnimal : SPIRIT_ANIMALS[0].name,
   );
-  const [coreElement, setCoreElement] = useState<CompanionElementId>(initialElement ?? "fire");
   const [selectedStoryTone, setSelectedStoryTone] = useState<CompanionStoryTone>(storyTone);
   const [customCompanionName, setCustomCompanionName] = useState(initialCompanionName ?? "");
+  const coreElement = COLOR_ELEMENT_DEFAULTS[favoriteColor] ?? initialElement ?? "fire";
 
   const normalizedCustomName = normalizeCompanionCustomName(customCompanionName);
   const selectedTone = useMemo(
@@ -146,103 +157,69 @@ export const AICompanionCreator = ({
             <div className="space-y-6">
               <section className="space-y-3">
                 <div className="space-y-1">
-                  <Label className="text-lg font-semibold text-white">Favorite Color</Label>
-                  <p className="text-sm text-white/60">This becomes the visual anchor that carries across every evolution.</p>
+                  <Label htmlFor="favorite-color-select" className="text-lg font-semibold text-white">
+                    Favorite Color
+                  </Label>
+                  <p className="text-sm text-white/60">
+                    Pick the color that should anchor your companion's look.
+                  </p>
                 </div>
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                  {FAVORITE_COLORS.map((color) => {
-                    const isSelected = color.value === favoriteColor;
-                    return (
-                      <button
-                        key={color.value}
-                        type="button"
-                        onClick={() => setFavoriteColor(color.value)}
-                        className={cn(
-                          "rounded-[24px] border p-3 text-left transition-all duration-200",
-                          isSelected
-                            ? "border-white/40 bg-white/12 shadow-[0_18px_40px_rgba(255,255,255,0.08)]"
-                            : "border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/8",
-                        )}
-                      >
-                        <div className={cn("h-20 rounded-2xl bg-gradient-to-br", color.gradient)} />
-                        <div className="mt-3 flex items-center justify-between gap-3">
-                          <span className="text-sm font-semibold text-white">{color.label}</span>
-                          {isSelected ? (
-                            <span className="rounded-full border border-white/20 bg-white/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/85">
-                              Selected
-                            </span>
-                          ) : null}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </section>
-
-              <section className="space-y-3">
-                <div className="space-y-1">
-                  <Label className="text-lg font-semibold text-white">Spirit Animal</Label>
-                  <p className="text-sm text-white/60">This sets the creature family your egg will grow toward.</p>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                  {SPIRIT_ANIMALS.map((animal) => {
-                    const isSelected = animal.name === spiritAnimal;
-                    return (
-                      <button
-                        key={animal.name}
-                        type="button"
-                        onClick={() => setSpiritAnimal(animal.name)}
-                        className={cn(
-                          "flex items-center gap-4 rounded-[24px] border px-4 py-4 text-left transition-all duration-200",
-                          isSelected
-                            ? "border-emerald-300/45 bg-emerald-300/14 text-white shadow-[0_18px_40px_rgba(52,211,153,0.14)]"
-                            : "border-white/10 bg-white/5 text-white/86 hover:border-white/20 hover:bg-white/8",
-                        )}
-                      >
-                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-black/25 text-sm font-black tracking-[0.16em] text-white/85">
-                          {animal.glyph}
-                        </div>
-                        <div className="min-w-0">
-                          <div className="text-sm font-semibold">{animal.name}</div>
-                          <p className="mt-1 text-xs leading-5 text-white/60">AI lineage locked to {animal.name.toLowerCase()} family anatomy.</p>
-                        </div>
-                      </button>
-                    );
-                  })}
+                <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
+                  <select
+                    id="favorite-color-select"
+                    value={favoriteColor}
+                    onChange={(event) => setFavoriteColor(event.target.value)}
+                    className="h-12 w-full rounded-2xl border border-white/10 bg-black/35 px-4 text-sm font-semibold text-white outline-none transition-colors focus:border-white/35"
+                  >
+                    {FAVORITE_COLORS.map((color) => (
+                      <option key={color.value} value={color.value}>
+                        {color.label}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="mt-4 flex items-center gap-3">
+                    <div className={cn("h-14 w-20 rounded-2xl bg-gradient-to-br", selectedColorMeta.gradient)} />
+                    <div>
+                      <p className="text-sm font-semibold text-white">{selectedColorMeta.label}</p>
+                      <p className="text-xs leading-5 text-white/55">
+                        This color also hints the egg toward {selectedElement.label.toLowerCase()} energy.
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </section>
 
               <section className="space-y-3">
                 <div className="space-y-1">
-                  <Label className="text-lg font-semibold text-white">Core Element</Label>
-                  <p className="text-sm text-white/60">This shapes the aura, energy effects, and symbolic mood of the line.</p>
+                  <Label htmlFor="spirit-animal-select" className="text-lg font-semibold text-white">
+                    Species
+                  </Label>
+                  <p className="text-sm text-white/60">
+                    Choose the creature family your egg will grow toward.
+                  </p>
                 </div>
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                  {COMPANION_ELEMENTS.map((element) => {
-                    const isSelected = element.id === coreElement;
-                    return (
-                      <button
-                        key={element.id}
-                        type="button"
-                        onClick={() => setCoreElement(element.id)}
-                        className={cn(
-                          "rounded-[24px] border px-4 py-4 text-left transition-all duration-200",
-                          isSelected
-                            ? "border-amber-300/45 bg-amber-300/14 text-white shadow-[0_18px_40px_rgba(245,158,11,0.14)]"
-                            : "border-white/10 bg-white/5 text-white/86 hover:border-white/20 hover:bg-white/8",
-                        )}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div
-                            className="h-4 w-4 rounded-full shadow-[0_0_18px_currentColor]"
-                            style={{ backgroundColor: element.anchorColor, color: element.anchorColor }}
-                          />
-                          <div className="text-sm font-semibold">{element.label}</div>
-                        </div>
-                        <p className="mt-2 text-xs leading-5 text-white/60">{element.summary}</p>
-                      </button>
-                    );
-                  })}
+                <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
+                  <select
+                    id="spirit-animal-select"
+                    value={spiritAnimal}
+                    onChange={(event) => setSpiritAnimal(event.target.value)}
+                    className="h-12 w-full rounded-2xl border border-white/10 bg-black/35 px-4 text-sm font-semibold text-white outline-none transition-colors focus:border-white/35"
+                  >
+                    {SPIRIT_ANIMALS.map((animal) => (
+                      <option key={animal.name} value={animal.name}>
+                        {animal.name}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-4">
+                    <div className="text-xs uppercase tracking-[0.22em] text-white/45">
+                      Selected Species
+                    </div>
+                    <div className="mt-2 text-lg font-semibold text-white">{spiritAnimal}</div>
+                    <p className="mt-1 text-xs leading-5 text-white/55">
+                      AI lineage locked to {spiritAnimal.toLowerCase()} family anatomy.
+                    </p>
+                  </div>
                 </div>
               </section>
             </div>

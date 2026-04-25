@@ -109,7 +109,7 @@ export const ResetCompanionButton = memo(() => {
             allowToneSelection
             isLoading={createCompanion.isPending}
             layout="compact"
-            description="Choose the hidden lineage traits for the new AI-generated egg you want to begin with."
+            description="Choose the color and species for the new AI-generated egg you want to begin with."
           />
         </DialogContent>
       </Dialog>

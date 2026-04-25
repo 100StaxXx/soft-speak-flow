@@ -1301,8 +1301,8 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
                 title={isResetMode ? "Shape Your New Companion Egg" : "Shape Your Companion Egg"}
                 description={
                   isResetMode
-                    ? "Pick the lineage traits for the new AI-generated egg that will carry your fresh start."
-                    : "Choose the hidden lineage traits that will define your AI-generated companion egg."
+                    ? "Pick the color and species for the new AI-generated egg that will carry your fresh start."
+                    : "Choose the color and species that will define your AI-generated companion egg."
                 }
                 onBack={handleCompanionBack}
               />

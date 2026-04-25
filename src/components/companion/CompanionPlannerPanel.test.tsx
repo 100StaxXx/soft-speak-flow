@@ -1,11 +1,12 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CompanionStructuredResponse } from "@/shared/companionStructuredOutput";
+import type { PendingActionView } from "@/types/companionAgent";
 
 const mocks = vi.hoisted(() => ({
   assistant: {
     setDraftInput: vi.fn(),
-    submitMessage: vi.fn().mockResolvedValue(undefined),
+    submitMessage: vi.fn().mockResolvedValue(true),
     submitTypedMessage: vi.fn(),
     toggleRecording: vi.fn(),
     requestMicrophonePermission: vi.fn(),
@@ -52,7 +53,7 @@ const mocks = vi.hoisted(() => ({
       affectedEntities: null,
       expiresAt: "2026-04-18T20:00:00.000Z",
       createdAt: "2026-04-18T08:02:00.000Z",
-    },
+    } as PendingActionView | null,
     structuredResponse: {
       intent: {
         intentType: "conversation" as const,
@@ -137,6 +138,7 @@ import { CompanionPlannerPanel } from "./CompanionPlannerPanel";
 describe("CompanionPlannerPanel", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.assistant.submitMessage.mockResolvedValue(true);
   });
 
   it("renders the unified transcript and pending confirmation card", () => {
@@ -182,6 +184,55 @@ describe("CompanionPlannerPanel", () => {
     fireEvent.click(screen.getByTestId("companion-planning-mode-recovery"));
 
     expect(mocks.planningMode.setPlanningMode).toHaveBeenCalledWith("recovery");
+  });
+
+  it("emits the Plan My Day tutorial event only after submit succeeds", async () => {
+    const previousPendingAction = mocks.state.pendingAction;
+    mocks.state.pendingAction = null;
+    const listener = vi.fn();
+    window.addEventListener("companion-plan-my-day-started", listener);
+
+    try {
+      render(<CompanionPlannerPanel />);
+
+      fireEvent.click(screen.getByRole("button", { name: "Plan My Day" }));
+
+      expect(listener).not.toHaveBeenCalled();
+      await waitFor(() => {
+        expect(listener).toHaveBeenCalledTimes(1);
+      });
+      expect(mocks.assistant.submitMessage).toHaveBeenCalledWith(
+        "Plan my day",
+        "text",
+        expect.objectContaining({ starterIntent: "plan_day" }),
+      );
+    } finally {
+      window.removeEventListener("companion-plan-my-day-started", listener);
+      mocks.state.pendingAction = previousPendingAction;
+    }
+  });
+
+  it("does not emit the Plan My Day tutorial event when submit fails", async () => {
+    const previousPendingAction = mocks.state.pendingAction;
+    mocks.state.pendingAction = null;
+    mocks.assistant.submitMessage.mockResolvedValueOnce(false);
+    const listener = vi.fn();
+    window.addEventListener("companion-plan-my-day-started", listener);
+
+    try {
+      render(<CompanionPlannerPanel />);
+
+      fireEvent.click(screen.getByRole("button", { name: "Plan My Day" }));
+
+      await waitFor(() => {
+        expect(mocks.assistant.submitMessage).toHaveBeenCalled();
+      });
+      await Promise.resolve();
+      expect(listener).not.toHaveBeenCalled();
+    } finally {
+      window.removeEventListener("companion-plan-my-day-started", listener);
+      mocks.state.pendingAction = previousPendingAction;
+    }
   });
 
   it("renders campaign pressure signals when advance-campaign guidance is active", () => {
