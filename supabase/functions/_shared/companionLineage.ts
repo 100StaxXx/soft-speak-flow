@@ -41,6 +41,7 @@ export interface CompanionImageLineageMetadata {
   eggImageUrl: string | null;
   lastReachedBoundaryLevel: number;
   lastReachedBoundaryImageUrl: string | null;
+  generationLog?: Record<string, unknown>;
   updatedAt: string;
 }
 
@@ -441,6 +442,9 @@ export const coerceImageLineageMetadata = (
       ? record.lastReachedBoundaryLevel
       : fallback.lastReachedBoundaryLevel,
     lastReachedBoundaryImageUrl: normalizeText(typeof record.lastReachedBoundaryImageUrl === "string" ? record.lastReachedBoundaryImageUrl : null, "") || null,
+    generationLog: record.generationLog && typeof record.generationLog === "object" && !Array.isArray(record.generationLog)
+      ? record.generationLog as Record<string, unknown>
+      : undefined,
     updatedAt: normalizeText(typeof record.updatedAt === "string" ? record.updatedAt : null, fallback.updatedAt),
   };
 };
@@ -452,6 +456,7 @@ export const buildInitialImageLineageMetadata = ({
   eggFocalY,
   hiddenStageOneFocalX,
   hiddenStageOneFocalY,
+  generationLog,
 }: {
   eggImageUrl: string;
   hiddenStageOneImageUrl: string;
@@ -459,6 +464,7 @@ export const buildInitialImageLineageMetadata = ({
   eggFocalY?: number | null;
   hiddenStageOneFocalX?: number | null;
   hiddenStageOneFocalY?: number | null;
+  generationLog?: Record<string, unknown>;
 }): CompanionImageLineageMetadata => ({
   schemaVersion: 1,
   provider: DEFAULT_IMAGE_LINEAGE_PROVIDER,
@@ -478,6 +484,7 @@ export const buildInitialImageLineageMetadata = ({
   eggImageUrl,
   lastReachedBoundaryLevel: 0,
   lastReachedBoundaryImageUrl: eggImageUrl,
+  ...(generationLog ? { generationLog } : {}),
   updatedAt: new Date().toISOString(),
 });
 

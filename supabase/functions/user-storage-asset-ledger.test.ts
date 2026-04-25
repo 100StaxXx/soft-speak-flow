@@ -46,13 +46,44 @@ Deno.test("user-owned media writers register uploaded assets in the ledger", asy
   }
 });
 
+Deno.test("companion image bootstrap cleans up hidden stage-one assets and records idempotency", async () => {
+  const source = await Deno.readTextFile(
+    new URL("./generate-companion-image/index.ts", import.meta.url),
+  );
+  const migration = await Deno.readTextFile(
+    new URL("../migrations/20260425150000_add_companion_image_generation_idempotency.sql", import.meta.url),
+  );
+
+  assert(
+    source.includes("deleteUploadedAssetBestEffort") &&
+      source.includes("stage0_egg_bootstrap_failed"),
+    "Expected stage-1-first bootstrap to clean hidden uploads when egg creation fails",
+  );
+  assert(
+    source.includes("beginCompanionImageRequest") &&
+      source.includes("completeCompanionImageRequestBestEffort"),
+    "Expected companion image generation to use request-level idempotency",
+  );
+  assert(
+    source.includes("qualityWarning") &&
+      source.includes("judgeUnavailable"),
+    "Expected bootstrap responses to surface quality and judge warnings",
+  );
+  assert(
+    migration.includes("CREATE TABLE IF NOT EXISTS public.companion_image_generation_requests") &&
+      migration.includes("begin_companion_image_generation_request") &&
+      migration.includes("complete_companion_image_generation_request"),
+    "Expected migration to provision companion image generation idempotency helpers",
+  );
+});
+
 Deno.test("legacy nonconforming storage writers now prefix uploads with the user id", async () => {
   const companionEvolutionSource = await Deno.readTextFile(
     new URL("./generate-companion-evolution/index.ts", import.meta.url),
   );
   assert(
     companionEvolutionSource.includes(
-      'const fileName = `${resolvedUserId}/evolutions/${companion.id}_stage_${nextStage}_${Date.now()}.png`;',
+      'const fileName = `${userId}/evolutions/${companionId}_stage_${nextStage}_${Date.now()}.png`;',
     ),
     "Expected companion evolution uploads to be user-prefixed",
   );

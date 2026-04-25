@@ -382,10 +382,11 @@ function getElementOverlay(element: string): string {
 }
 
 const DEFAULT_INTERNAL_RETRIES = 2;
-const STAGE_ZERO_INTERNAL_RETRIES = 1;
+const STAGE_ZERO_INTERNAL_RETRIES = 2;
 const MAX_ALLOWED_RETRIES = 3;
 const GENERATION_FETCH_TIMEOUT_MS = 75_000;
 const AUXILIARY_FETCH_TIMEOUT_MS = 25_000;
+const COMPANION_IMAGE_REQUEST_IN_PROGRESS_STATUS = 409;
 
 type CompanionImageFlowType = "onboarding" | "regenerate" | "evolution" | "background" | "admin" | "ai_onboarding_egg";
 
@@ -478,6 +479,278 @@ const parseDataUrl = (dataUrl: string): Uint8Array => {
   return Uint8Array.from(atob(base64Data), (char) => char.charCodeAt(0));
 };
 
+interface SupabaseMutationResult {
+  error: { message?: string } | null;
+}
+
+interface SupabaseFilterBuilder extends PromiseLike<SupabaseMutationResult> {
+  eq: (column: string, value: string) => SupabaseFilterBuilder;
+}
+
+interface SupabaseTableBuilder {
+  delete: () => SupabaseFilterBuilder;
+  upsert: (
+    values: Record<string, unknown>,
+    options?: { onConflict?: string },
+  ) => PromiseLike<SupabaseMutationResult>;
+}
+
+interface SupabaseStorageBucket {
+  upload: (
+    path: string,
+    data: Uint8Array,
+    options: { contentType: string; upsert: boolean },
+  ) => PromiseLike<SupabaseMutationResult>;
+  getPublicUrl: (path: string) => { data: { publicUrl: string } };
+  remove: (paths: string[]) => PromiseLike<SupabaseMutationResult>;
+}
+
+interface SupabaseServiceClient {
+  storage: {
+    from: (bucketId: string) => SupabaseStorageBucket;
+  };
+  from: (table: string) => SupabaseTableBuilder;
+  rpc: (
+    functionName: string,
+    args?: Record<string, unknown>,
+  ) => PromiseLike<{ data: unknown; error: { message?: string } | null }>;
+}
+
+type CompanionImageRequestState =
+  | { action: "disabled"; requestKey: null }
+  | { action: "started"; requestKey: string }
+  | { action: "completed"; requestKey: string; responsePayload: Record<string, unknown> }
+  | { action: "in_progress"; requestKey: string };
+
+const normalizeIdempotencyKey = (value: unknown): string | null => {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 && trimmed.length <= 160 ? trimmed : null;
+};
+
+const appendRetrySuffixToPath = (filePath: string): string => {
+  const dotIndex = filePath.lastIndexOf(".");
+  const suffix = `_retry_${Date.now()}`;
+  if (dotIndex <= 0) {
+    return `${filePath}${suffix}`;
+  }
+  return `${filePath.slice(0, dotIndex)}${suffix}${filePath.slice(dotIndex)}`;
+};
+
+const uploadStorageObjectWithRetry = async ({
+  supabase,
+  filePath,
+  binaryData,
+}: {
+  supabase: SupabaseServiceClient;
+  filePath: string;
+  binaryData: Uint8Array;
+}): Promise<string> => {
+  let lastErrorMessage = "unknown_storage_error";
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const attemptedPath = attempt === 0 ? filePath : appendRetrySuffixToPath(filePath);
+    const { error: uploadError } = await supabase.storage
+      .from(COMPANION_IMAGE_BUCKET)
+      .upload(attemptedPath, binaryData, { contentType: "image/png", upsert: false });
+
+    if (!uploadError) {
+      return attemptedPath;
+    }
+
+    lastErrorMessage = uploadError.message ?? "unknown_storage_error";
+    console.error("[CompanionImageStorageUpload]", {
+      attempt: attempt + 1,
+      bucketId: COMPANION_IMAGE_BUCKET,
+      storagePath: attemptedPath,
+      error: lastErrorMessage,
+    });
+  }
+
+  throw new Error(`Storage upload failed after retry: ${lastErrorMessage}`);
+};
+
+const registerUserStorageAssetBestEffort = async ({
+  supabase,
+  userId,
+  bucketId,
+  storagePath,
+  sourceKind,
+}: {
+  supabase: SupabaseServiceClient;
+  userId: string;
+  bucketId: string;
+  storagePath: string;
+  sourceKind: string;
+}): Promise<void> => {
+  try {
+    await registerUserStorageAsset({
+      supabase,
+      userId,
+      bucketId,
+      storagePath,
+      sourceKind,
+    });
+  } catch (error) {
+    console.warn("[CompanionImageStorageLedger] Failed to register uploaded asset", {
+      bucketId,
+      storagePath,
+      sourceKind,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+};
+
+const deleteUploadedAssetBestEffort = async ({
+  supabase,
+  bucketId,
+  storagePath,
+  reason,
+}: {
+  supabase: SupabaseServiceClient;
+  bucketId: string;
+  storagePath: string;
+  reason: string;
+}): Promise<void> => {
+  try {
+    const { error } = await supabase.storage.from(bucketId).remove([storagePath]);
+    if (error) {
+      console.warn("[CompanionImageStorageCleanup] Storage cleanup failed", {
+        bucketId,
+        storagePath,
+        reason,
+        error: error.message ?? "unknown_storage_error",
+      });
+    }
+  } catch (error) {
+    console.warn("[CompanionImageStorageCleanup] Storage cleanup threw", {
+      bucketId,
+      storagePath,
+      reason,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
+  try {
+    const { error } = await supabase
+      .from("user_storage_assets")
+      .delete()
+      .eq("bucket_id", bucketId)
+      .eq("storage_path", storagePath);
+    if (error) {
+      console.warn("[CompanionImageStorageCleanup] Ledger cleanup failed", {
+        bucketId,
+        storagePath,
+        reason,
+        error: error.message ?? "unknown_ledger_error",
+      });
+    }
+  } catch (error) {
+    console.warn("[CompanionImageStorageCleanup] Ledger cleanup threw", {
+      bucketId,
+      storagePath,
+      reason,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+};
+
+const beginCompanionImageRequest = async ({
+  supabase,
+  userId,
+  idempotencyKey,
+}: {
+  supabase: SupabaseServiceClient;
+  userId: string;
+  idempotencyKey: unknown;
+}): Promise<CompanionImageRequestState> => {
+  const requestKey = normalizeIdempotencyKey(idempotencyKey);
+  if (!requestKey) {
+    return { action: "disabled", requestKey: null };
+  }
+
+  try {
+    const { data, error } = await supabase.rpc("begin_companion_image_generation_request", {
+      p_user_id: userId,
+      p_request_key: requestKey,
+    });
+
+    if (error) {
+      console.warn("[CompanionImageIdempotency] Begin request failed; continuing without idempotency", {
+        requestKey,
+        error: error.message ?? "unknown_rpc_error",
+      });
+      return { action: "disabled", requestKey: null };
+    }
+
+    const row = Array.isArray(data)
+      ? (data[0] as Record<string, unknown> | undefined)
+      : (data as Record<string, unknown> | undefined);
+    const action = typeof row?.action === "string" ? row.action : "started";
+
+    if (action === "completed") {
+      const responsePayload = row?.response_payload && typeof row.response_payload === "object" && !Array.isArray(row.response_payload)
+        ? row.response_payload as Record<string, unknown>
+        : {};
+      return { action: "completed", requestKey, responsePayload };
+    }
+
+    if (action === "in_progress") {
+      return { action: "in_progress", requestKey };
+    }
+
+    return { action: "started", requestKey };
+  } catch (error) {
+    console.warn("[CompanionImageIdempotency] Begin request threw; continuing without idempotency", {
+      requestKey,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return { action: "disabled", requestKey: null };
+  }
+};
+
+const completeCompanionImageRequestBestEffort = async ({
+  supabase,
+  userId,
+  requestKey,
+  status,
+  responsePayload,
+  errorMessage,
+}: {
+  supabase: SupabaseServiceClient;
+  userId: string;
+  requestKey: string | null;
+  status: "completed" | "failed";
+  responsePayload?: Record<string, unknown> | null;
+  errorMessage?: string | null;
+}): Promise<void> => {
+  if (!requestKey) return;
+
+  try {
+    const { error } = await supabase.rpc("complete_companion_image_generation_request", {
+      p_user_id: userId,
+      p_request_key: requestKey,
+      p_status: status,
+      p_response_payload: responsePayload ?? null,
+      p_error_message: errorMessage ?? null,
+    });
+
+    if (error) {
+      console.warn("[CompanionImageIdempotency] Complete request failed", {
+        requestKey,
+        status,
+        error: error.message ?? "unknown_rpc_error",
+      });
+    }
+  } catch (error) {
+    console.warn("[CompanionImageIdempotency] Complete request threw", {
+      requestKey,
+      status,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+};
+
 const uploadGeneratedDataUrl = async ({
   supabase,
   userId,
@@ -485,31 +758,25 @@ const uploadGeneratedDataUrl = async ({
   filePath,
   sourceKind,
 }: {
-  supabase: ReturnType<typeof createClient>;
+  supabase: SupabaseServiceClient;
   userId: string;
   dataUrl: string;
   filePath: string;
   sourceKind: string;
 }): Promise<{ filePath: string; publicUrl: string }> => {
   const binaryData = parseDataUrl(dataUrl);
-  const { error: uploadError } = await supabase.storage
-    .from(COMPANION_IMAGE_BUCKET)
-    .upload(filePath, binaryData, { contentType: "image/png", upsert: false });
+  const uploadedPath = await uploadStorageObjectWithRetry({ supabase, filePath, binaryData });
 
-  if (uploadError) {
-    throw new Error(`Storage upload failed: ${uploadError.message ?? "unknown_storage_error"}`);
-  }
-
-  const { data: { publicUrl } } = supabase.storage.from(COMPANION_IMAGE_BUCKET).getPublicUrl(filePath);
-  await registerUserStorageAsset({
+  const { data: { publicUrl } } = supabase.storage.from(COMPANION_IMAGE_BUCKET).getPublicUrl(uploadedPath);
+  await registerUserStorageAssetBestEffort({
     supabase,
     userId,
     bucketId: COMPANION_IMAGE_BUCKET,
-    storagePath: filePath,
+    storagePath: uploadedPath,
     sourceKind,
   });
 
-  return { filePath, publicUrl };
+  return { filePath: uploadedPath, publicUrl };
 };
 
 const judgeScoresPass = ({
@@ -523,7 +790,7 @@ const judgeScoresPass = ({
   previousLevel?: number;
   nextLevel?: number;
 }): boolean => {
-  if (!scores) return true;
+  if (!scores) return false;
 
   if (
     scores.overall < JUDGE_MINIMUMS.overall
@@ -635,6 +902,9 @@ serve(async (req) => {
   };
 
   let authDurationMs = 0;
+  let idempotencyRequestKey: string | null = null;
+  let idempotencyUserId: string | null = null;
+  let idempotencyStarted = false;
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -705,6 +975,7 @@ serve(async (req) => {
       flowType,
       debug = false,
       image_size,
+      idempotencyKey,
     } = await req.json();
 
     console.log(`Request - Animal: ${spiritAnimal}, Element: ${element}, Stage: ${stage}, Color: ${favoriteColor}`);
@@ -754,6 +1025,41 @@ serve(async (req) => {
     }
 
     if (normalizedFlowType === "ai_onboarding_egg" && Number(stage) === 0) {
+      const idempotencyState = await beginCompanionImageRequest({
+        supabase,
+        userId: user.id,
+        idempotencyKey,
+      });
+      if (idempotencyState.action === "completed") {
+        return timedResponse(
+          new Response(JSON.stringify({
+            ...idempotencyState.responsePayload,
+            idempotencyReplay: true,
+          }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }),
+          "success_bootstrap_stage1_first_idempotent_replay",
+        );
+      }
+      if (idempotencyState.action === "in_progress") {
+        return timedResponse(
+          new Response(
+            JSON.stringify({
+              error: "Companion image generation is already in progress.",
+              code: "GENERATION_IN_PROGRESS",
+            }),
+            {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+              status: COMPANION_IMAGE_REQUEST_IN_PROGRESS_STATUS,
+            },
+          ),
+          "idempotency_in_progress",
+        );
+      }
+      if (idempotencyState.action === "started") {
+        idempotencyRequestKey = idempotencyState.requestKey;
+        idempotencyUserId = user.id;
+        idempotencyStarted = true;
+      }
+
       const promptBuildStartedAt = Date.now();
       const starterPromptBase = buildStage1BootstrapPrompt(visualIdentityProfile);
       const starterPrompt = spiritLockPromptBlock
@@ -786,7 +1092,7 @@ serve(async (req) => {
         referenceImageUrl?: string | null;
         previousLevel?: number;
         nextLevel?: number;
-        render: (prompt: string) => Promise<{ imageDataUrl: string; revisedPrompt: string | null }>;
+        render: (prompt: string) => Promise<{ imageDataUrl: string; revisedPrompt: string | null; size?: string | null }>;
       }) => {
         let promptForAttempt = basePrompt;
         let bestAttempt:
@@ -795,6 +1101,9 @@ serve(async (req) => {
             revisedPrompt: string | null;
             scores: Awaited<ReturnType<typeof judgeCompanionImage>>;
             retryCount: number;
+            size: string | null;
+            passed: boolean;
+            judgeUnavailable: boolean;
           }
           | null = null;
 
@@ -821,13 +1130,16 @@ serve(async (req) => {
             revisedPrompt: rendered.revisedPrompt,
             scores,
             retryCount: attempt,
+            size: "size" in rendered && typeof rendered.size === "string" ? rendered.size : null,
+            passed: judgeScoresPass({ mode, scores, previousLevel, nextLevel }),
+            judgeUnavailable: !scores,
           };
 
           if (!bestAttempt || rankJudgeScores(scores) >= rankJudgeScores(bestAttempt.scores)) {
             bestAttempt = attemptResult;
           }
 
-          if (judgeScoresPass({ mode, scores, previousLevel, nextLevel })) {
+          if (attemptResult.passed) {
             return attemptResult;
           }
 
@@ -867,40 +1179,78 @@ serve(async (req) => {
       });
       storageUploadDurationMs += Date.now() - stageOneUploadStartedAt;
 
-      const eggAttempt = await runJudgedRender({
-        mode: "egg",
-        basePrompt: eggPrompt,
-        referenceImageUrl: stageOneAttempt.imageDataUrl,
-        render: async (prompt) =>
-          await editCompanionImage({
-            guardedFetch,
-            openAIApiKey: OPENAI_API_KEY,
-            prompt,
-            size: imageSize,
-            quality: "high",
-            userId: user.id,
-            referenceImages: [
-              {
-                imageUrl: hiddenStageOne.publicUrl,
-              },
-            ],
-          }),
-      });
+      let eggAttempt: Awaited<ReturnType<typeof runJudgedRender>>;
+      let eggUpload: { filePath: string; publicUrl: string };
+      try {
+        eggAttempt = await runJudgedRender({
+          mode: "egg",
+          basePrompt: eggPrompt,
+          referenceImageUrl: stageOneAttempt.imageDataUrl,
+          render: async (prompt) =>
+            await editCompanionImage({
+              guardedFetch,
+              openAIApiKey: OPENAI_API_KEY,
+              prompt,
+              size: imageSize,
+              quality: "high",
+              userId: user.id,
+              referenceImages: [
+                {
+                  imageUrl: hiddenStageOne.publicUrl,
+                },
+              ],
+            }),
+        });
 
-      const eggUploadStartedAt = Date.now();
-      const eggUpload = await uploadGeneratedDataUrl({
-        supabase,
-        userId: user.id,
-        dataUrl: eggAttempt.imageDataUrl,
-        filePath: `${user.id}/companions/bootstrap/stage0_egg_${Date.now()}.png`,
-        sourceKind: "companion_image",
-      });
-      storageUploadDurationMs += Date.now() - eggUploadStartedAt;
+        const eggUploadStartedAt = Date.now();
+        eggUpload = await uploadGeneratedDataUrl({
+          supabase,
+          userId: user.id,
+          dataUrl: eggAttempt.imageDataUrl,
+          filePath: `${user.id}/companions/bootstrap/stage0_egg_${Date.now()}.png`,
+          sourceKind: "companion_image",
+        });
+        storageUploadDurationMs += Date.now() - eggUploadStartedAt;
+      } catch (eggError) {
+        await deleteUploadedAssetBestEffort({
+          supabase,
+          bucketId: COMPANION_IMAGE_BUCKET,
+          storagePath: hiddenStageOne.filePath,
+          reason: "stage0_egg_bootstrap_failed",
+        });
+        throw eggError;
+      }
 
       const hiddenStageOneFocalX = resolveJudgeFocalValue(stageOneAttempt.scores?.subjectCenterX);
       const hiddenStageOneFocalY = resolveJudgeFocalValue(stageOneAttempt.scores?.subjectCenterY);
       const eggFocalX = resolveJudgeFocalValue(eggAttempt.scores?.subjectCenterX);
       const eggFocalY = resolveJudgeFocalValue(eggAttempt.scores?.subjectCenterY);
+
+      type BootstrapQualityWarning = {
+        phase: "hidden_stage1" | "egg";
+        code: "JUDGE_UNAVAILABLE" | "QUALITY_NOT_APPROVED";
+        retryCount: number;
+        scores: Awaited<ReturnType<typeof judgeCompanionImage>>;
+      };
+      const stageOneWarning = !stageOneAttempt.passed
+        ? {
+          phase: "hidden_stage1" as const,
+          code: stageOneAttempt.judgeUnavailable ? ("JUDGE_UNAVAILABLE" as const) : ("QUALITY_NOT_APPROVED" as const),
+          retryCount: stageOneAttempt.retryCount,
+          scores: stageOneAttempt.scores,
+        }
+        : null;
+      const eggWarning = !eggAttempt.passed
+        ? {
+          phase: "egg" as const,
+          code: eggAttempt.judgeUnavailable ? ("JUDGE_UNAVAILABLE" as const) : ("QUALITY_NOT_APPROVED" as const),
+          retryCount: eggAttempt.retryCount,
+          scores: eggAttempt.scores,
+        }
+        : null;
+      const qualityWarnings: BootstrapQualityWarning[] = [stageOneWarning, eggWarning]
+        .filter((warning): warning is BootstrapQualityWarning => Boolean(warning));
+      const judgeUnavailable = stageOneAttempt.judgeUnavailable || eggAttempt.judgeUnavailable;
 
       const imageLineageMetadata = buildInitialImageLineageMetadata({
         eggImageUrl: eggUpload.publicUrl,
@@ -909,6 +1259,23 @@ serve(async (req) => {
         eggFocalY,
         hiddenStageOneFocalX,
         hiddenStageOneFocalY,
+        generationLog: {
+          requestedSize: imageSize,
+          hiddenStageOne: {
+            retryCount: stageOneAttempt.retryCount,
+            passedJudge: stageOneAttempt.passed,
+            judgeUnavailable: stageOneAttempt.judgeUnavailable,
+            size: stageOneAttempt.size,
+            scores: stageOneAttempt.scores,
+          },
+          egg: {
+            retryCount: eggAttempt.retryCount,
+            passedJudge: eggAttempt.passed,
+            judgeUnavailable: eggAttempt.judgeUnavailable,
+            size: eggAttempt.size,
+            scores: eggAttempt.scores,
+          },
+        },
       });
 
       const responseData: Record<string, unknown> = {
@@ -918,7 +1285,18 @@ serve(async (req) => {
         visualIdentityProfile,
         imageLineageMetadata,
         hiddenStageOneImageUrl: hiddenStageOne.publicUrl,
+        requestedImageSize: imageSize,
+        imageSize: eggAttempt.size ?? imageSize,
       };
+
+      if (qualityWarnings.length > 0) {
+        responseData.qualityWarning = qualityWarnings[0];
+        responseData.qualityWarnings = qualityWarnings;
+      }
+
+      if (judgeUnavailable) {
+        responseData.judgeUnavailable = true;
+      }
 
       if (debug === true) {
         responseData.bootstrap = {
@@ -928,6 +1306,14 @@ serve(async (req) => {
           eggRevisedPrompt: eggAttempt.revisedPrompt,
         };
       }
+
+      await completeCompanionImageRequestBestEffort({
+        supabase,
+        userId: user.id,
+        requestKey: idempotencyRequestKey,
+        status: "completed",
+        responsePayload: responseData,
+      });
 
       return timedResponse(
         new Response(JSON.stringify(responseData),
@@ -1272,10 +1658,13 @@ Slightly brighter exposure with lifted midtones and clearer highlights for reada
     const MAX_INTERNAL_RETRIES = requestedRetries;
     let currentAttempt = 0;
     let imageUrl: string | null = null;
-    let qualityScore: { 
-      overall: number; 
-      limbCount: number; 
-      speciesFidelity: number; 
+    let lastUpstreamStatus: number | null = null;
+    let lastProviderError: string | null = null;
+    let qualityJudgeUnavailable = false;
+    let qualityScore: {
+      overall: number;
+      limbCount: number;
+      speciesFidelity: number;
       colorMatch: number;
       subjectCenterX?: number;
       subjectCenterY?: number;
@@ -1287,8 +1676,9 @@ Slightly brighter exposure with lifted midtones and clearer highlights for reada
       shouldRetry: boolean;
     } | null = null;
 
-    while (currentAttempt <= MAX_INTERNAL_RETRIES) {
-      console.log(`Calling AI for T2I generation (stage ${stage}, attempt ${currentAttempt + 1}/${MAX_INTERNAL_RETRIES + 1}, ${extractedMetadata ? 'with metadata' : 'no metadata'})...`);
+    while (currentAttempt <= Math.max(MAX_INTERNAL_RETRIES, qualityJudgeUnavailable ? 1 : 0)) {
+      const loggedMaxInternalRetries = Math.max(MAX_INTERNAL_RETRIES, qualityJudgeUnavailable ? 1 : 0);
+      console.log(`Calling AI for T2I generation (stage ${stage}, attempt ${currentAttempt + 1}/${loggedMaxInternalRetries + 1}, ${extractedMetadata ? 'with metadata' : 'no metadata'})...`);
 
       const messageContent = currentAttempt > 0 
         ? `${fullPrompt}\n\n━━━ QUALITY RETRY #${currentAttempt} ━━━\nPrevious attempt had issues: ${qualityScore?.issues?.join(', ') || 'low quality'}${spiritLockActive ? `\nSpirit-lock material issues: ${qualityScore?.materialIssues?.join(', ') || 'material drift detected'}` : ''}\nPAY EXTRA ATTENTION to anatomical correctness. Ensure EXACTLY ${anatomy.limbCount} limbs.${spiritLockActive ? '\nKeep Mechanical Dragon identity strictly mechanical.' : ''}`
@@ -1333,8 +1723,10 @@ Slightly brighter exposure with lifted midtones and clearer highlights for reada
       }
       console.log(`[CompanionImageTiming] generation_attempt_ms=${Date.now() - generationAttemptStartedAt} attempt=${currentAttempt + 1}`);
 
+      lastUpstreamStatus = aiResponse.status;
       if (!aiResponse.ok) {
         const errorText = await aiResponse.text();
+        lastProviderError = errorText.slice(0, 1000);
         console.error("AI error:", errorText);
 
         if (aiResponse.status === 400) {
@@ -1386,6 +1778,7 @@ Slightly brighter exposure with lifted midtones and clearer highlights for reada
       // ========================================================================
       qualityScore = null;
       const qualityStartedAt = Date.now();
+      let currentAttemptJudgeUnavailable = false;
 
       try {
         const qualityTool = {
@@ -1462,7 +1855,7 @@ Score each aspect from 0-100 and list any issues.`;
         if (qualityResponse.ok) {
           const qualityData = await qualityResponse.json();
           const toolCall = qualityData.choices?.[0]?.message?.tool_calls?.[0];
-          
+
           if (toolCall?.function?.arguments) {
             const scores = JSON.parse(toolCall.function.arguments);
             const subjectCenterX = typeof scores.subjectCenterX === "number"
@@ -1528,10 +1921,19 @@ Score each aspect from 0-100 and list any issues.`;
                 retry_required: materialRetryRequired,
               });
             }
+          } else {
+            currentAttemptJudgeUnavailable = true;
+            qualityJudgeUnavailable = true;
           }
+        } else {
+          currentAttemptJudgeUnavailable = true;
+          qualityJudgeUnavailable = true;
+          console.warn("Quality analysis request failed (non-blocking):", qualityResponse.status);
         }
       } catch (qualityError) {
         qualityCallDurationMs += Date.now() - qualityStartedAt;
+        currentAttemptJudgeUnavailable = true;
+        qualityJudgeUnavailable = true;
         console.log(`[CompanionImageTiming] quality_attempt_ms=${Date.now() - qualityStartedAt} attempt=${currentAttempt + 1} status=error`);
         if (isTimedRequestError(qualityError)) {
           console.warn("Quality analysis timed out (non-blocking)");
@@ -1541,9 +1943,18 @@ Score each aspect from 0-100 and list any issues.`;
       }
 
       // Check if we should retry
-      if (qualityScore?.shouldRetry && currentAttempt < MAX_INTERNAL_RETRIES) {
+      const effectiveMaxInternalRetries = Math.max(MAX_INTERNAL_RETRIES, currentAttemptJudgeUnavailable ? 1 : 0);
+      if (!qualityScore && currentAttemptJudgeUnavailable && currentAttempt < effectiveMaxInternalRetries) {
         console.log(
-          `Quality too low (overall: ${qualityScore.overall}, limbs: ${qualityScore.limbCount}, centering: ${qualityScore.centeringScore ?? "n/a"}), retrying... (${currentAttempt + 1}/${MAX_INTERNAL_RETRIES})`,
+          `Quality judge unavailable, retrying once before accepting an unvalidated image... (${currentAttempt + 1}/${effectiveMaxInternalRetries})`,
+        );
+        currentAttempt++;
+        continue;
+      }
+
+      if (qualityScore?.shouldRetry && currentAttempt < effectiveMaxInternalRetries) {
+        console.log(
+          `Quality too low (overall: ${qualityScore.overall}, limbs: ${qualityScore.limbCount}, centering: ${qualityScore.centeringScore ?? "n/a"}), retrying... (${currentAttempt + 1}/${effectiveMaxInternalRetries})`,
         );
         currentAttempt++;
         continue;
@@ -1560,7 +1971,20 @@ Score each aspect from 0-100 and list any issues.`;
     // UPLOAD TO STORAGE
     // ========================================================================
     if (!imageUrl) {
-      throw new Error("No image was generated after all attempts");
+      console.error("[CompanionImageGenerationFailure]", {
+        stage,
+        flowType: normalizedFlowType,
+        model: "google/gemini-2.5-flash-image-preview",
+        imageSize,
+        attempts: currentAttempt + 1,
+        lastUpstreamStatus,
+        lastProviderError,
+        finalQualityScore: qualityScore,
+        judgeUnavailable: qualityJudgeUnavailable,
+      });
+      throw new Error(
+        `No image was generated after all attempts (model=google/gemini-2.5-flash-image-preview, image_size=${imageSize}, attempts=${currentAttempt + 1}, last_upstream_status=${lastUpstreamStatus ?? "n/a"}, final_quality_overall=${qualityScore?.overall ?? "n/a"})`,
+      );
     }
     
     console.log("Uploading to storage...");
@@ -1570,21 +1994,18 @@ Score each aspect from 0-100 and list any issues.`;
     const binaryData = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
     const filePath = `${user.id}/companion_${user.id}_stage${stage}_${Date.now()}.png`;
 
-    const { error: uploadError } = await supabase.storage
-      .from("mentors-avatars")
-      .upload(filePath, binaryData, { contentType: "image/png", upsert: false });
+    const uploadedPath = await uploadStorageObjectWithRetry({
+      supabase,
+      filePath,
+      binaryData,
+    });
 
-    if (uploadError) {
-      console.error("Storage upload error:", uploadError);
-      throw uploadError;
-    }
-
-    const { data: { publicUrl } } = supabase.storage.from("mentors-avatars").getPublicUrl(filePath);
-    await registerUserStorageAsset({
+    const { data: { publicUrl } } = supabase.storage.from("mentors-avatars").getPublicUrl(uploadedPath);
+    await registerUserStorageAssetBestEffort({
       supabase,
       userId: user.id,
       bucketId: "mentors-avatars",
-      storagePath: filePath,
+      storagePath: uploadedPath,
       sourceKind: "companion_image",
     });
     storageUploadDurationMs = Date.now() - storageStartedAt;
@@ -1598,6 +2019,8 @@ Score each aspect from 0-100 and list any issues.`;
       imageFocalX: qualityScore?.subjectCenterX ?? 0.5,
       imageFocalY: qualityScore?.subjectCenterY ?? 0.5,
       visualIdentityProfile,
+      requestedImageSize: imageSize,
+      imageSize,
     };
     if (debug === true) {
       responseData.prompt = fullPrompt;
@@ -1608,6 +2031,23 @@ Score each aspect from 0-100 and list any issues.`;
         ...qualityScore,
         overallScore: qualityScore.overall,
         retryCount: currentAttempt,
+      };
+    }
+
+    if (qualityScore?.shouldRetry) {
+      responseData.qualityWarning = {
+        phase: "legacy_render",
+        code: "QUALITY_NOT_APPROVED",
+        retryCount: currentAttempt,
+        scores: qualityScore,
+      };
+    } else if (!qualityScore && qualityJudgeUnavailable) {
+      responseData.judgeUnavailable = true;
+      responseData.qualityWarning = {
+        phase: "legacy_render",
+        code: "JUDGE_UNAVAILABLE",
+        retryCount: currentAttempt,
+        scores: null,
       };
     }
     
@@ -1622,6 +2062,19 @@ Score each aspect from 0-100 and list any issues.`;
     );
 
   } catch (error) {
+    if (idempotencyStarted && idempotencyUserId) {
+      await completeCompanionImageRequestBestEffort({
+        supabase: createClient(
+          Deno.env.get("SUPABASE_URL")!,
+          Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+        ) as unknown as SupabaseServiceClient,
+        userId: idempotencyUserId,
+        requestKey: idempotencyRequestKey,
+        status: "failed",
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
+    }
+
     if (isCostGuardrailBlockedError(error)) {
       return timedResponse(
         buildCostGuardrailBlockedResponse(error, corsHeaders),

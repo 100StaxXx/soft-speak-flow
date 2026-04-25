@@ -1094,14 +1094,15 @@ describe("useCompanion evolveCompanion", () => {
     });
 
     expect(mocks.invokeMock).toHaveBeenCalledWith("generate-companion-image", {
-      body: {
+      body: expect.objectContaining({
         spiritAnimal: "Wolf",
         element: "ice",
         stage: 0,
         favoriteColor: "#000000",
         storyTone: "epic_adventure",
         flowType: "ai_onboarding_egg",
-      },
+        idempotencyKey: expect.any(String),
+      }),
     });
     expect(mocks.rpcMock).toHaveBeenCalledWith(
       "create_companion_if_not_exists",

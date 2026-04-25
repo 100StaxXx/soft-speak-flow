@@ -30,7 +30,10 @@ function createImageResponse(content = "image-bytes", contentType = "image/png")
   });
 }
 
-function restoreEnv(name: "OPENAI_COMPANION_IMAGE_MODEL" | "OPENAI_IMAGE_MODEL", value: string | undefined) {
+function restoreEnv(
+  name: "OPENAI_COMPANION_IMAGE_MODEL" | "OPENAI_IMAGE_MODEL" | "COMPANION_IMAGE_REFERENCE_RETRY_BACKOFF_MS",
+  value: string | undefined,
+) {
   if (typeof value === "string") {
     Deno.env.set(name, value);
   } else {
@@ -248,6 +251,68 @@ Deno.test("editCompanionImage sends multipart image uploads without input_fideli
   } finally {
     restoreEnv("OPENAI_COMPANION_IMAGE_MODEL", originalCompanionImageModel ?? undefined);
     restoreEnv("OPENAI_IMAGE_MODEL", originalImageModel ?? undefined);
+  }
+});
+
+Deno.test("editCompanionImage retries transient reference image downloads before editing", async () => {
+  const originalCompanionImageModel = Deno.env.get("OPENAI_COMPANION_IMAGE_MODEL");
+  const originalImageModel = Deno.env.get("OPENAI_IMAGE_MODEL");
+  const originalBackoff = Deno.env.get("COMPANION_IMAGE_REFERENCE_RETRY_BACKOFF_MS");
+
+  try {
+    Deno.env.delete("OPENAI_COMPANION_IMAGE_MODEL");
+    Deno.env.delete("OPENAI_IMAGE_MODEL");
+    Deno.env.set("COMPANION_IMAGE_REFERENCE_RETRY_BACKOFF_MS", "0");
+
+    let referenceDownloadCalls = 0;
+    let editCalls = 0;
+    const guardedFetch: typeof fetch = async (input, init) => {
+      const url = resolveInputUrl(input);
+      const requestInit = coerceRequestInit(init);
+
+      if (url === "https://example.com/reference.png") {
+        referenceDownloadCalls += 1;
+        if (referenceDownloadCalls === 1) {
+          return new Response("storage warming", { status: 503 });
+        }
+        return createImageResponse("reference-image");
+      }
+
+      if (url === OPENAI_IMAGE_EDITS_URL) {
+        editCalls += 1;
+        const formData = requestInit.body;
+        assert(formData instanceof FormData, "Expected edit body to be FormData after reference retry");
+        const images = formData.getAll("image[]");
+        assert(images.length === 1, `Expected 1 uploaded reference image, got ${images.length}`);
+        return createJsonResponse({
+          data: [
+            {
+              b64_json: btoa("edited-after-reference-retry"),
+            },
+          ],
+        });
+      }
+
+      throw new Error(`Unexpected guardedFetch URL: ${url}`);
+    };
+
+    const result = await editCompanionImage({
+      guardedFetch,
+      openAIApiKey: "test-key",
+      prompt: "egg from hidden stage one",
+      size: "1536x1024",
+      quality: "high",
+      userId: "user-1",
+      referenceImages: [{ imageUrl: "https://example.com/reference.png" }],
+    });
+
+    assert(referenceDownloadCalls === 2, `Expected 2 reference download attempts, got ${referenceDownloadCalls}`);
+    assert(editCalls === 1, `Expected edit call after reference retry, got ${editCalls}`);
+    assert(result.imageDataUrl.startsWith("data:image/png;base64,"), "Expected edit result to return a data URL");
+  } finally {
+    restoreEnv("OPENAI_COMPANION_IMAGE_MODEL", originalCompanionImageModel ?? undefined);
+    restoreEnv("OPENAI_IMAGE_MODEL", originalImageModel ?? undefined);
+    restoreEnv("COMPANION_IMAGE_REFERENCE_RETRY_BACKOFF_MS", originalBackoff ?? undefined);
   }
 });
 

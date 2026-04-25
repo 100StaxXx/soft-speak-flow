@@ -443,7 +443,47 @@ interface GeneratedCompanionImageResponse {
   imageFocalY?: number | null;
   visualIdentityProfile?: Record<string, unknown> | null;
   imageLineageMetadata?: Record<string, unknown> | null;
+  qualityWarning?: Record<string, unknown> | null;
+  qualityWarnings?: Array<Record<string, unknown>>;
+  judgeUnavailable?: boolean;
+  idempotencyReplay?: boolean;
 }
+
+const AI_COMPANION_IMAGE_REQUEST_KEY_PREFIX = "soft-speak-flow:ai-companion-image-request:";
+
+const createClientRequestId = (): string => {
+  if (typeof globalThis.crypto?.randomUUID === "function") {
+    return globalThis.crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+};
+
+const getAiCompanionImageRequestKey = (userId: string, fingerprint: string): string => {
+  const fallback = createClientRequestId();
+  try {
+    const storageKey = `${AI_COMPANION_IMAGE_REQUEST_KEY_PREFIX}${userId}`;
+    const existingRaw = window.sessionStorage.getItem(storageKey);
+    if (existingRaw) {
+      const existing = JSON.parse(existingRaw) as { fingerprint?: unknown; requestId?: unknown };
+      if (existing.fingerprint === fingerprint && typeof existing.requestId === "string" && existing.requestId.trim()) {
+        return existing.requestId;
+      }
+    }
+
+    window.sessionStorage.setItem(storageKey, JSON.stringify({ fingerprint, requestId: fallback }));
+  } catch {
+    // Session storage is best-effort; the server still accepts a one-off key.
+  }
+  return fallback;
+};
+
+const clearAiCompanionImageRequestKey = (userId: string): void => {
+  try {
+    window.sessionStorage.removeItem(`${AI_COMPANION_IMAGE_REQUEST_KEY_PREFIX}${userId}`);
+  } catch {
+    // Best-effort cleanup only.
+  }
+};
 
 type CreateAiCompanionInput = {
   creationMode: "ai";
@@ -980,6 +1020,14 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
         let imageLineageMetadata: Record<string, unknown> | null = null;
 
         if (isAiCreation) {
+          const imageRequestFingerprint = JSON.stringify({
+            spiritAnimal: resolvedSpiritAnimal,
+            element: normalizedElement,
+            favoriteColor: resolvedFavoriteColor,
+            storyTone: data.storyTone,
+            flowType: "ai_onboarding_egg",
+          });
+          const imageRequestIdempotencyKey = getAiCompanionImageRequestKey(user.id, imageRequestFingerprint);
           const { data: generatedImageData, error: generatedImageError } =
             await supabase.functions.invoke("generate-companion-image", {
               body: {
@@ -989,6 +1037,7 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
                 favoriteColor: resolvedFavoriteColor,
                 storyTone: data.storyTone,
                 flowType: "ai_onboarding_egg",
+                idempotencyKey: imageRequestIdempotencyKey,
               },
             });
 
@@ -1009,6 +1058,14 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
           };
           visualIdentityProfile = generatedImage.visualIdentityProfile ?? null;
           imageLineageMetadata = generatedImage.imageLineageMetadata ?? null;
+          if (generatedImage.qualityWarning || generatedImage.judgeUnavailable) {
+            logger.warn("AI companion image returned with quality warning", {
+              userId: user.id,
+              idempotencyReplay: generatedImage.idempotencyReplay === true,
+              qualityWarning: generatedImage.qualityWarning ?? null,
+              judgeUnavailable: generatedImage.judgeUnavailable === true,
+            });
+          }
         }
 
         logger.log("Stage 0 asset resolved successfully, creating companion record...");
@@ -1094,6 +1151,9 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
         const isNewCompanion = companionData.is_new;
 
         logger.log(`Companion ${isNewCompanion ? "created" : "already exists"}:`, companionData.id);
+        if (isAiCreation) {
+          clearAiCompanionImageRequestKey(user.id);
+        }
 
         // Stage 0 history is now created by the security-definer RPC so onboarding
         // does not depend on client-side INSERT access to companion_evolutions.

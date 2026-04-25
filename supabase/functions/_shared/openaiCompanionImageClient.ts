@@ -1,6 +1,10 @@
 const OPENAI_IMAGE_GENERATIONS_URL = "https://api.openai.com/v1/images/generations";
 const OPENAI_IMAGE_EDITS_URL = "https://api.openai.com/v1/images/edits";
 const FALLBACK_IMAGE_SIZE = "1024x1024";
+const REFERENCE_IMAGE_MAX_DOWNLOAD_ATTEMPTS = 2;
+const DEFAULT_REFERENCE_IMAGE_RETRY_BACKOFF_MS = 500;
+
+let resolvedModelLogged = false;
 
 export interface CompanionImageGenerationResult {
   imageDataUrl: string;
@@ -21,10 +25,44 @@ interface EditCompanionImageArgs extends BaseImageRequestArgs {
   referenceImages: Array<{ imageUrl: string }>;
 }
 
-export const resolveCompanionImageModel = (): string =>
-  Deno.env.get("OPENAI_COMPANION_IMAGE_MODEL")
-  ?? Deno.env.get("OPENAI_IMAGE_MODEL")
-  ?? "gpt-image-2";
+const getReferenceImageRetryBackoffMs = (): number => {
+  const raw = Deno.env.get("COMPANION_IMAGE_REFERENCE_RETRY_BACKOFF_MS");
+  if (!raw) return DEFAULT_REFERENCE_IMAGE_RETRY_BACKOFF_MS;
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : DEFAULT_REFERENCE_IMAGE_RETRY_BACKOFF_MS;
+};
+
+const isProductionRuntime = (): boolean => {
+  const environment = (
+    Deno.env.get("APP_ENV")
+    ?? Deno.env.get("NODE_ENV")
+    ?? Deno.env.get("ENVIRONMENT")
+    ?? ""
+  ).trim().toLowerCase();
+  return environment === "production" || environment === "prod" || Boolean(Deno.env.get("DENO_DEPLOYMENT_ID"));
+};
+
+export const resolveCompanionImageModel = (): string => {
+  const companionModel = Deno.env.get("OPENAI_COMPANION_IMAGE_MODEL");
+  const defaultImageModel = Deno.env.get("OPENAI_IMAGE_MODEL");
+  const resolved = companionModel ?? defaultImageModel ?? "gpt-image-2";
+  const source = companionModel
+    ? "OPENAI_COMPANION_IMAGE_MODEL"
+    : defaultImageModel
+    ? "OPENAI_IMAGE_MODEL"
+    : "fallback";
+
+  if (!companionModel && !defaultImageModel && isProductionRuntime()) {
+    throw new Error("Companion image model is not configured in production");
+  }
+
+  if (!resolvedModelLogged) {
+    resolvedModelLogged = true;
+    console.log(`[CompanionImageModel] model=${resolved} source=${source}`);
+  }
+
+  return resolved;
+};
 
 const buildHeaders = (openAIApiKey: string) => ({
   Authorization: `Bearer ${openAIApiKey}`,
@@ -190,18 +228,45 @@ const downloadReferenceImageFile = async ({
   imageUrl: string;
   index: number;
 }): Promise<File> => {
-  const response = await guardedFetch(imageUrl);
-  if (!response.ok) {
-    throw new Error(`Failed to download reference image: ${response.status}`);
+  let lastStatus: number | null = null;
+  let lastError: unknown = null;
+
+  for (let attempt = 1; attempt <= REFERENCE_IMAGE_MAX_DOWNLOAD_ATTEMPTS; attempt += 1) {
+    try {
+      const response = await guardedFetch(imageUrl);
+      lastStatus = response.status;
+      if (!response.ok) {
+        const retryableStatus = response.status === 408 || response.status >= 500;
+        if (retryableStatus && attempt < REFERENCE_IMAGE_MAX_DOWNLOAD_ATTEMPTS) {
+          await new Promise((resolve) => setTimeout(resolve, getReferenceImageRetryBackoffMs()));
+          continue;
+        }
+        throw new Error(`Failed to download reference image: ${response.status}`);
+      }
+
+      const buffer = await response.arrayBuffer();
+      const contentType = response.headers.get("content-type") || "image/png";
+      return new File(
+        [buffer],
+        inferFilenameFromUrl(imageUrl, index, contentType),
+        { type: contentType },
+      );
+    } catch (error) {
+      lastError = error;
+      if (error instanceof Error && error.message.startsWith("Failed to download reference image:")) {
+        throw error;
+      }
+      if (attempt >= REFERENCE_IMAGE_MAX_DOWNLOAD_ATTEMPTS) {
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, getReferenceImageRetryBackoffMs()));
+    }
   }
 
-  const buffer = await response.arrayBuffer();
-  const contentType = response.headers.get("content-type") || "image/png";
-  return new File(
-    [buffer],
-    inferFilenameFromUrl(imageUrl, index, contentType),
-    { type: contentType },
-  );
+  if (lastError instanceof Error) {
+    throw lastError;
+  }
+  throw new Error(`Failed to download reference image: ${lastStatus ?? "unknown_status"}`);
 };
 
 const buildEditFormData = ({
