@@ -225,6 +225,14 @@ export function useFocusSession() {
       // Start cooldown
       startCooldown();
     },
+    onError: (error, variables) => {
+      console.error('[duration-learning] Failed to complete focus session', {
+        error,
+        sessionId: variables.sessionId,
+        actualDuration: variables.actualDuration,
+        distractionsCount: variables.distractionsCount,
+      });
+    },
   });
 
   // Pause session mutation

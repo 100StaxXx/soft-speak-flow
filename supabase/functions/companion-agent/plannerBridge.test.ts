@@ -125,6 +125,29 @@ Deno.test("consultPlannerForAgent uses actual completed time for learned quest d
   );
 });
 
+Deno.test("consultPlannerForAgent applies onboarding schedule defaults to primary planning", () => {
+  const result = consultPlannerForAgent({
+    message: "Plan my day",
+    currentDateTime: "2026-04-18T08:00:00-07:00",
+    surface: "companion",
+    horizon: "day",
+    starterIntent: "plan_day",
+    context: buildContext({
+      recentMemory: {
+        profile_onboarding: {
+          scheduleArchetype: "after_work_builder",
+        },
+      },
+    }),
+  });
+
+  assertEquals(result.scheduleInsights.suggestedSlots[0]?.time, "19:00");
+  assertMatch(
+    result.scheduleInsights.suggestedSlots[0]?.reason ?? "",
+    /after work|evening/i,
+  );
+});
+
 Deno.test("consultPlannerForAgent converts at-risk campaign adjustments into campaign action hints", () => {
   const result = consultPlannerForAgent({
     message: "Advance my campaign",

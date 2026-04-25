@@ -797,16 +797,16 @@ export function useCompanionAssistant({
     },
   ) => {
     const message = rawMessage.trim();
-    if (!message || isSubmitting || isResolvingAction) return;
+    if (!message || isSubmitting || isResolvingAction) return false;
 
     if (useLegacyFallback) {
       await legacyAssistant.submitMessage(message, inputMode, options);
-      return;
+      return true;
     }
 
     if (!user?.id || !companion?.id) {
       toast.error("Your companion is still loading. Try again in a moment.");
-      return;
+      return false;
     }
 
     setIsSubmitting(true);
@@ -865,6 +865,7 @@ export function useCompanionAssistant({
         },
       });
       void invalidateThreads();
+      return true;
     } catch (error) {
       console.error("Failed to submit companion agent message:", error);
       if (await shouldFallbackToLegacyAgent(error)) {
@@ -876,7 +877,7 @@ export function useCompanionAssistant({
         });
         setUseLegacyFallback(true);
         await legacyAssistant.submitMessage(message, inputMode, options);
-        return;
+        return true;
       }
 
       toast.error("Cosmiq hit a snag. Try that again.");
@@ -888,6 +889,7 @@ export function useCompanionAssistant({
           { source: "agent" },
         ),
       ]);
+      return false;
     } finally {
       setIsSubmitting(false);
     }

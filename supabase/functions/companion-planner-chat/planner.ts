@@ -1269,8 +1269,10 @@ const getClassificationActivityDurationMinutes = (
   );
 
 const getRitualDurationMinutes = (
-  ritual: Pick<PlannerContextRitual, "estimatedMinutes">,
-): number => normalizePlannerDurationBucket(ritual.estimatedMinutes) ?? 20;
+  ritual: Pick<PlannerContextRitual, "actualDurationMinutes" | "estimatedMinutes">,
+): number =>
+  normalizePlannerDurationBucket(ritual.actualDurationMinutes) ??
+    normalizePlannerDurationBucket(ritual.estimatedMinutes) ?? 20;
 
 const getMeaningfulTokens = (value: string) =>
   normalizeText(value)

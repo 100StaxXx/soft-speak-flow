@@ -38,6 +38,87 @@ const DEFAULT_WIND_DOWN_TIME = "21:00";
 const DAY_SLOT_LIMIT = 2;
 const TOTAL_SLOT_LIMIT = 6;
 
+type ScheduleWorkloadTolerance = "light" | "normal" | "heavy";
+
+type ScheduleArchetypeDefaults = {
+  label: string;
+  plannerHint: string;
+  defaultWorkloadTolerance: ScheduleWorkloadTolerance;
+  defaultPreferredTimeOfDay: string | null;
+  defaultPreferredTimeReason: string | null;
+  defaultPreferredTime: string | null;
+};
+
+const SCHEDULE_ARCHETYPE_DEFAULTS: Record<string, ScheduleArchetypeDefaults> = {
+  nine_to_five: {
+    label: "9-5 schedule",
+    plannerHint:
+      "Assume daytime work hours are constrained; favor morning, lunch, evening, or clearly open windows.",
+    defaultWorkloadTolerance: "normal",
+    defaultPreferredTimeOfDay: "evening",
+    defaultPreferredTimeReason:
+      "You said we are planning around a 9-5, so after-work windows may be more realistic.",
+    defaultPreferredTime: "18:00",
+  },
+  business_owner: {
+    label: "business owner",
+    plannerHint:
+      "Favor leverage, revenue, follow-ups, admin batching, and protected deep-work blocks.",
+    defaultWorkloadTolerance: "normal",
+    defaultPreferredTimeOfDay: "morning",
+    defaultPreferredTimeReason:
+      "Business owner planning usually benefits from protecting early deep-work momentum.",
+    defaultPreferredTime: "09:00",
+  },
+  after_work_builder: {
+    label: "after-work builder",
+    plannerHint:
+      "Keep daily plans small and energy-aware; favor one meaningful evening momentum task over overload.",
+    defaultWorkloadTolerance: "light",
+    defaultPreferredTimeOfDay: "evening",
+    defaultPreferredTimeReason:
+      "You said you are building after work, so evening plans should stay focused and realistic.",
+    defaultPreferredTime: "19:00",
+  },
+  student: {
+    label: "student",
+    plannerHint:
+      "Weight classes, assignments, exams, due dates, study blocks, and recovery between academic demands.",
+    defaultWorkloadTolerance: "normal",
+    defaultPreferredTimeOfDay: "afternoon",
+    defaultPreferredTimeReason:
+      "Student schedules often work best when study blocks fit around class and deadline pressure.",
+    defaultPreferredTime: "15:00",
+  },
+  variable_schedule: {
+    label: "variable schedule",
+    plannerHint:
+      "Avoid rigid assumptions; prefer lighter plans, flexible ordering, and easy Adjust My Day recovery.",
+    defaultWorkloadTolerance: "light",
+    defaultPreferredTimeOfDay: null,
+    defaultPreferredTimeReason: null,
+    defaultPreferredTime: null,
+  },
+  flexible_transition: {
+    label: "flexible or transition season",
+    plannerHint:
+      "Create gentle anchors and clear next actions without assuming a fixed routine or overloading the day.",
+    defaultWorkloadTolerance: "light",
+    defaultPreferredTimeOfDay: "morning",
+    defaultPreferredTimeReason:
+      "A flexible season benefits from a simple morning anchor before the day diffuses.",
+    defaultPreferredTime: "09:00",
+  },
+};
+
+const getScheduleArchetypeDefaults = (
+  value: unknown,
+): (ScheduleArchetypeDefaults & { id: string }) | null => {
+  const key = asString(value);
+  const defaults = key ? SCHEDULE_ARCHETYPE_DEFAULTS[key] : null;
+  return key && defaults ? { id: key, ...defaults } : null;
+};
+
 type TimelineInterval = {
   id: string;
   title: string;
@@ -672,18 +753,46 @@ const buildPlannerMemory = (
     plannerPreferences?.preferred_work_blocks,
   );
   const profile = asRecord(preferredWorkBlocks?.planner_profile) ?? {};
-  const scheduleArchetype = asString(profile.scheduleArchetype) ??
+  const rawScheduleArchetype = asString(profile.scheduleArchetype) ??
     asString(profileOnboarding?.scheduleArchetype);
+  const scheduleDefaults = getScheduleArchetypeDefaults(rawScheduleArchetype);
+  const scheduleArchetype = scheduleDefaults?.id ?? null;
   const scheduleArchetypePlanningHint =
     asString(profile.scheduleArchetypePlanningHint) ??
-    asString(profileOnboarding?.scheduleArchetypePlanningHint);
+    asString(profileOnboarding?.scheduleArchetypePlanningHint) ??
+    scheduleDefaults?.plannerHint ??
+    null;
+  const preferredTimeOfDay = asString(profile.preferredTimeOfDay) ??
+    scheduleDefaults?.defaultPreferredTimeOfDay ??
+    null;
+  const preferredTimeReason = asString(profile.preferredTimeReason) ??
+    scheduleDefaults?.defaultPreferredTimeReason ??
+    null;
+  const preferredWindows = Array.isArray(profile.preferredWindows)
+    ? profile.preferredWindows
+    : preferredTimeOfDay
+    ? [{
+      timeOfDay: preferredTimeOfDay,
+      time: scheduleDefaults?.defaultPreferredTime ?? null,
+      reason: preferredTimeReason,
+      sourceCount: 1,
+    }]
+    : [];
 
   return {
     ...profile,
     scheduleArchetype,
     scheduleArchetypeLabel: asString(profile.scheduleArchetypeLabel) ??
-      asString(profileOnboarding?.scheduleArchetypeLabel),
+      asString(profileOnboarding?.scheduleArchetypeLabel) ??
+      scheduleDefaults?.label ??
+      null,
     scheduleArchetypePlanningHint,
+    preferredTimeOfDay,
+    preferredTimeReason,
+    preferredWindows,
+    workloadTolerance: asString(profile.workloadTolerance) ??
+      scheduleDefaults?.defaultWorkloadTolerance ??
+      null,
     wakeTime: asString(plannerPreferences?.wake_time) ??
       asString(profile.wakeTime),
     windDownTime: asString(plannerPreferences?.wind_down_time) ??

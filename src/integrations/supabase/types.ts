@@ -8690,13 +8690,6 @@ export type Database = {
           xp_before: number | null
         }[]
       }
-      increment_task_actual_time_spent: {
-        Args: {
-          p_delta: number
-          p_task_id: string
-        }
-        Returns: number
-      }
       complete_focus_session_with_task_actual_time: {
         Args: {
           p_actual_duration: number
