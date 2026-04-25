@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CompanionStructuredResponse } from "@/shared/companionStructuredOutput";
 import type { PendingActionView } from "@/types/companionAgent";
@@ -186,55 +186,6 @@ describe("CompanionPlannerPanel", () => {
     expect(mocks.planningMode.setPlanningMode).toHaveBeenCalledWith("recovery");
   });
 
-  it("emits the Plan My Day tutorial event only after submit succeeds", async () => {
-    const previousPendingAction = mocks.state.pendingAction;
-    mocks.state.pendingAction = null;
-    const listener = vi.fn();
-    window.addEventListener("companion-plan-my-day-started", listener);
-
-    try {
-      render(<CompanionPlannerPanel />);
-
-      fireEvent.click(screen.getByRole("button", { name: "Plan My Day" }));
-
-      expect(listener).not.toHaveBeenCalled();
-      await waitFor(() => {
-        expect(listener).toHaveBeenCalledTimes(1);
-      });
-      expect(mocks.assistant.submitMessage).toHaveBeenCalledWith(
-        "Plan my day",
-        "text",
-        expect.objectContaining({ starterIntent: "plan_day" }),
-      );
-    } finally {
-      window.removeEventListener("companion-plan-my-day-started", listener);
-      mocks.state.pendingAction = previousPendingAction;
-    }
-  });
-
-  it("does not emit the Plan My Day tutorial event when submit fails", async () => {
-    const previousPendingAction = mocks.state.pendingAction;
-    mocks.state.pendingAction = null;
-    mocks.assistant.submitMessage.mockResolvedValueOnce(false);
-    const listener = vi.fn();
-    window.addEventListener("companion-plan-my-day-started", listener);
-
-    try {
-      render(<CompanionPlannerPanel />);
-
-      fireEvent.click(screen.getByRole("button", { name: "Plan My Day" }));
-
-      await waitFor(() => {
-        expect(mocks.assistant.submitMessage).toHaveBeenCalled();
-      });
-      await Promise.resolve();
-      expect(listener).not.toHaveBeenCalled();
-    } finally {
-      window.removeEventListener("companion-plan-my-day-started", listener);
-      mocks.state.pendingAction = previousPendingAction;
-    }
-  });
-
   it("renders campaign pressure signals when advance-campaign guidance is active", () => {
     const previousStructuredResponse = mocks.state.structuredResponse;
     mocks.state.structuredResponse = {
@@ -390,74 +341,6 @@ describe("CompanionPlannerPanel", () => {
       .toHaveTextContent("6 days quiet");
 
     mocks.state.structuredResponse = previousStructuredResponse;
-  });
-
-  it("launches quick planner starters through the unified assistant intent path", () => {
-    const previousPendingAction = mocks.state.pendingAction;
-    mocks.state.pendingAction = null;
-
-    render(<CompanionPlannerPanel />);
-
-    fireEvent.click(screen.getByTestId("companion-quick-action-plan-week"));
-    fireEvent.click(screen.getByTestId("companion-quick-action-plan-day"));
-    fireEvent.click(screen.getByTestId("companion-quick-action-prepare-tomorrow"));
-    fireEvent.click(screen.getByTestId("companion-quick-action-advance-campaign"));
-    fireEvent.click(screen.getByTestId("companion-quick-action-make-room"));
-    fireEvent.click(screen.getByTestId("companion-quick-action-low-energy"));
-    fireEvent.click(screen.getByTestId("companion-quick-action-what-matters"));
-    fireEvent.click(screen.getByTestId("companion-quick-action-upcoming"));
-
-    expect(mocks.assistant.submitMessage).toHaveBeenNthCalledWith(
-      1,
-      "Plan my week",
-      "text",
-      { starterIntent: "plan_week", planningMode: null },
-    );
-    expect(mocks.assistant.submitMessage).toHaveBeenNthCalledWith(
-      2,
-      "Plan my day",
-      "text",
-      { starterIntent: "plan_day", planningMode: null },
-    );
-    expect(mocks.assistant.submitMessage).toHaveBeenNthCalledWith(
-      3,
-      "Prepare me for tomorrow",
-      "text",
-      { starterIntent: "briefing_followup", planningMode: null },
-    );
-    expect(mocks.assistant.submitMessage).toHaveBeenNthCalledWith(
-      4,
-      "Advance my campaign",
-      "text",
-      { starterIntent: "advance_campaign_start", planningMode: null },
-    );
-    expect(mocks.assistant.submitMessage).toHaveBeenNthCalledWith(
-      5,
-      "Help me make room for what matters.",
-      "text",
-      { starterIntent: "make_room", planningMode: null },
-    );
-    expect(mocks.assistant.submitMessage).toHaveBeenNthCalledWith(
-      6,
-      "I'm low energy today",
-      "text",
-      { starterIntent: "low_energy_adjust", planningMode: "recovery" },
-    );
-    expect(mocks.assistant.submitMessage).toHaveBeenNthCalledWith(
-      7,
-      "What matters most today?",
-      "text",
-      { starterIntent: "what_matters", planningMode: null },
-    );
-    expect(mocks.assistant.submitMessage).toHaveBeenNthCalledWith(
-      8,
-      "What do I have coming up?",
-      "text",
-      { starterIntent: "upcoming_start", planningMode: null },
-    );
-    expect(mocks.planningMode.setPlanningMode).toHaveBeenCalledWith("recovery");
-
-    mocks.state.pendingAction = previousPendingAction;
   });
 
   it("renders a next best action inside the coming-up surface", () => {

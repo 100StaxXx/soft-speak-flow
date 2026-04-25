@@ -410,7 +410,7 @@ const Journeys = () => {
   const openCompanionPlanner = useCallback((intent?: CompanionPlannerLaunchIntent | null) => {
     if (intent) {
       if (intent.target === "campaign_builder") {
-        openCampaignBuilder();
+        openCampaignBuilder(resolveCampaignBuilderInitialGoal(intent.message));
         return;
       }
       setPlannerLaunchIntent(intent);

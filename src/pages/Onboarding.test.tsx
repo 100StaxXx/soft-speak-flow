@@ -192,6 +192,27 @@ describe("Onboarding route guard", () => {
     expect(mocks.navigate).not.toHaveBeenCalled();
   });
 
+  it("restarts at the opening name screen when saved mid-onboarding progress has no name", () => {
+    mocks.profile = {
+      onboarding_completed: false,
+      selected_mentor_id: "mentor-1",
+      onboarding_step: "questionnaire",
+      onboarding_data: {
+        questionnaireAnswers: [],
+      },
+    };
+
+    renderOnboarding();
+
+    expect(screen.getByText("StoryOnboarding")).toBeInTheDocument();
+    expect(mocks.storyOnboardingProps).toMatchObject({
+      resumeState: {
+        stage: "prologue",
+        userName: "",
+      },
+    });
+  });
+
   it("shows a recovery action when onboarding gate loading stalls", async () => {
     vi.useFakeTimers();
     mocks.profileLoading = true;

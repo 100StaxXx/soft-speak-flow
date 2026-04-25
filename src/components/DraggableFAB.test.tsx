@@ -254,32 +254,6 @@ describe("DraggableFAB", () => {
     }));
   });
 
-  it("routes the prepare-tomorrow option through the planner as the reflection bridge starter", () => {
-    render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
-
-    fireEvent.click(screen.getByTestId("journeys-companion-launcher-floating"));
-    fireEvent.click(screen.getByTestId("journeys-companion-launcher-option-prepare-tomorrow"));
-
-    expect(mocks.onOpenCompanionPlanner).toHaveBeenCalledWith(expect.objectContaining({
-      target: "planner",
-      starterIntent: "briefing_followup",
-      message: "Prepare me for tomorrow",
-    }));
-  });
-
-  it("routes the plan-week option through the planner as the weekly planning starter", () => {
-    render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
-
-    fireEvent.click(screen.getByTestId("journeys-companion-launcher-floating"));
-    fireEvent.click(screen.getByTestId("journeys-companion-launcher-option-plan-week"));
-
-    expect(mocks.onOpenCompanionPlanner).toHaveBeenCalledWith(expect.objectContaining({
-      target: "planner",
-      starterIntent: "plan_week",
-      message: "Plan my week",
-    }));
-  });
-
   it("routes the right-now option through the planner as an immediate next-action starter", () => {
     render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
 
@@ -303,19 +277,6 @@ describe("DraggableFAB", () => {
       target: "planner",
       starterIntent: "adjust_today",
       message: "Adjust my day",
-    }));
-  });
-
-  it("routes the make-room option through the planner as a prioritization starter", () => {
-    render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
-
-    fireEvent.click(screen.getByTestId("journeys-companion-launcher-floating"));
-    fireEvent.click(screen.getByTestId("journeys-companion-launcher-option-make-room"));
-
-    expect(mocks.onOpenCompanionPlanner).toHaveBeenCalledWith(expect.objectContaining({
-      target: "planner",
-      starterIntent: "make_room",
-      message: "Help me make room for what matters.",
     }));
   });
 

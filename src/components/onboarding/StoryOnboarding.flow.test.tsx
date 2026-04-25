@@ -420,6 +420,10 @@ vi.mock("@/components/CompanionPersonalization", () => ({
   CompanionPersonalization: () => <div data-testid="companion-stage">Companion</div>,
 }));
 
+vi.mock("@/components/CompanionCreationLoader", () => ({
+  CompanionCreationLoader: () => <div data-testid="companion-creation-loader">Loading companion</div>,
+}));
+
 vi.mock("./JourneyBegins", () => ({
   JourneyBegins: ({
     userName,
@@ -603,7 +607,7 @@ describe("StoryOnboarding questionnaire submission flow", () => {
     }
   });
 
-  it("enters journey-begins immediately and blocks completion while setup is still pending", async () => {
+  it("enters journey-begins immediately and shows the companion loader while setup is still pending", async () => {
     mocks.createCompanionMutateAsync.mockImplementation(() => new Promise(() => {
       // Keep pending to verify the journey screen no longer waits on setup.
     }));
@@ -633,12 +637,11 @@ describe("StoryOnboarding questionnaire submission flow", () => {
 
       fireEvent.click(screen.getByRole("button", { name: "finish-journey" }));
 
-      await waitFor(() => {
-        expect(mocks.toastError).toHaveBeenCalledWith(
-          "Your companion is still taking shape. Please try again in a moment.",
-          expect.objectContaining({ duration: expect.any(Number) }),
-        );
-      });
+      expect(await screen.findByTestId("companion-creation-loader")).toBeInTheDocument();
+      expect(mocks.toastError).not.toHaveBeenCalledWith(
+        "Your companion is still taking shape. Please try again in a moment.",
+        expect.anything(),
+      );
       expect(mocks.createCompanionMutateAsync).toHaveBeenCalledTimes(1);
       expect(mocks.profilesUpdateEq).not.toHaveBeenCalled();
     } finally {
@@ -1227,6 +1230,21 @@ describe("StoryOnboarding questionnaire submission flow", () => {
     });
 
     expect(await screen.findByTestId(testId)).toBeTruthy();
+  });
+
+  it("returns to the prologue when a mid-flow resume is missing the saved user name", async () => {
+    renderOnboarding({
+      resumeState: {
+        stage: "questionnaire",
+        faction: "starfall",
+        onboardingData: {
+          questionnaireAnswers: QUESTIONNAIRE_ANSWERS.slice(0, 2),
+        },
+      },
+    });
+
+    await screen.findByRole("button", { name: "prologue-next" });
+    expect(screen.queryByTestId("questionnaire-stage")).not.toBeInTheDocument();
   });
 
   it("resumes questionnaire with saved answers available to the questionnaire", async () => {

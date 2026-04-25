@@ -30,7 +30,6 @@ import { useCompanionAssistant } from "@/hooks/useCompanionAssistant";
 import { useCompanionModeSettings } from "@/hooks/useCompanionModeSettings";
 import { cn, stripMarkdown } from "@/lib/utils";
 import { COMPANION_MODE_OPTIONS } from "@/shared/companionModes";
-import { COMPANION_PLANNER_SURFACE_ACTIONS } from "@/shared/companionPlannerSurfaceActions";
 
 export const CompanionPlannerPanel = memo(() => {
   const assistant = useCompanionAssistant({
@@ -38,9 +37,6 @@ export const CompanionPlannerPanel = memo(() => {
     conversationEnabled: true,
   });
   const modeSettings = useCompanionModeSettings();
-  const quickActionsDisabled = assistant.isSubmitting ||
-    assistant.isResolvingAction ||
-    Boolean(assistant.pendingAction);
 
   const handleComposerKeyDown = useCallback(
     (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -124,76 +120,6 @@ export const CompanionPlannerPanel = memo(() => {
           onChange={assistant.setPlanningMode}
           variant="companion"
         />
-
-        <div className="space-y-2">
-          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/45">
-            Quick Starts
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {COMPANION_PLANNER_SURFACE_ACTIONS.filter((action) =>
-              [
-                "plan-week",
-                "plan-day",
-                "prepare-tomorrow",
-                "advance-campaign",
-                "adjust-day",
-                "make-room",
-                "low-energy",
-                "what-matters",
-                "right-now",
-                "upcoming",
-              ].includes(
-                action.id,
-              )
-            ).map((action) => (
-              <Button
-                key={action.id}
-                type="button"
-                variant="outline"
-                className="h-9 rounded-full border-white/10 bg-white/[0.04] px-4 text-[0.68rem] font-black uppercase tracking-[0.16em] text-white/80 hover:bg-white/[0.08]"
-                disabled={quickActionsDisabled}
-                data-testid={`companion-quick-action-${action.id}`}
-                data-tour={action.id === "plan-day" ? "companion-plan-my-day-action" : undefined}
-                onClick={() => {
-                  if (action.planningMode) {
-                    assistant.setPlanningMode(action.planningMode);
-                  }
-                  void assistant
-                    .submitMessage(action.message, "text", {
-                      starterIntent: action.starterIntent,
-                      planningMode: action.planningMode ?? null,
-                    })
-                    .then((submitted) => {
-                      if (action.id !== "plan-day" || !submitted) return;
-                      window.dispatchEvent(
-                        new CustomEvent("companion-plan-my-day-started"),
-                      );
-                    });
-                }}
-              >
-                {action.id === "plan-week"
-                  ? "Plan My Week"
-                  : action.id === "plan-day"
-                  ? "Plan My Day"
-                  : action.id === "prepare-tomorrow"
-                  ? "Tomorrow"
-                  : action.id === "advance-campaign"
-                  ? "Advance My Campaign"
-                  : action.id === "adjust-day"
-                  ? "Adjust My Day"
-                  : action.id === "make-room"
-                  ? "Make Room"
-                  : action.id === "low-energy"
-                  ? "Low Energy"
-                  : action.id === "what-matters"
-                  ? "What Matters"
-                  : action.id === "right-now"
-                  ? "Right Now"
-                  : "Coming Up"}
-              </Button>
-            ))}
-          </div>
-        </div>
 
         {assistant.isRecording || assistant.interimText || assistant.isSpeaking
           ? (

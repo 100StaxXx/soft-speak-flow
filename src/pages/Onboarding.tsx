@@ -60,6 +60,12 @@ export default function Onboarding() {
 
     const trimmedUserName =
       typeof onboardingData?.userName === "string" ? onboardingData.userName.trim() : "";
+    const resumeStep =
+      trimmedUserName.length > 0 ||
+      onboardingGate.resumeStep === "prologue" ||
+      onboardingGate.resumeStep === "journey-begins"
+        ? onboardingGate.resumeStep
+        : "prologue";
     const spiritAnimal =
       typeof companion?.spirit_animal === "string" ? companion.spirit_animal.trim() : "";
     const presetName = companion?.preset_id
@@ -74,8 +80,8 @@ export default function Onboarding() {
       || (spiritAnimal.length > 0 && spiritAnimal !== "Egg" ? spiritAnimal : elementalEggLabel);
 
     return {
-      stage: onboardingGate.resumeStep,
-      userName: trimmedUserName || "You",
+      stage: resumeStep,
+      userName: trimmedUserName || (resumeStep === "journey-begins" ? "You" : ""),
       companionLabel,
       onboardingData,
       faction: typeof profile?.faction === "string" ? profile.faction : null,

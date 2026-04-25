@@ -18,6 +18,7 @@ import type { OnboardingStoryToneSelectionValue } from "./OnboardingStoryToneSel
 import { EggSelectionPrelude } from "./EggSelectionPrelude";
 import { OnboardingCosmicBackdrop, type OnboardingBackdropStage } from "./OnboardingCosmicBackdrop";
 import { CompanionPersonalization } from "@/components/CompanionPersonalization";
+import { CompanionCreationLoader } from "@/components/CompanionCreationLoader";
 import { AICompanionCreator } from "@/components/AICompanionCreator";
 import { JourneyBegins } from "./JourneyBegins";
 import { MentorGrid } from "@/components/MentorGrid";
@@ -321,10 +322,23 @@ export const StoryOnboarding = ({
   const isMigrationMode = mode === "migration";
   const isResetMode = mode === "reset";
   const startsAtCompanion = isMigrationMode || isResetMode;
-  const resumesAtJourneyBegins = resumeState?.stage === "journey-begins";
-  const resumeData = resumeState?.onboardingData ?? null;
-  const resumeFaction = isFactionType(resumeState?.faction)
-    ? resumeState.faction
+  const activeResumeState = useMemo<StoryOnboardingResumeState | null>(() => {
+    if (!resumeState || isMigrationMode || isResetMode) return resumeState;
+
+    const trimmedUserName = typeof resumeState.userName === "string" ? resumeState.userName.trim() : "";
+    const canResumeWithoutName = resumeState.stage === "prologue" || resumeState.stage === "journey-begins";
+    if (trimmedUserName.length > 0 || canResumeWithoutName) return resumeState;
+
+    return {
+      ...resumeState,
+      stage: "prologue",
+      userName: "",
+    };
+  }, [isMigrationMode, isResetMode, resumeState]);
+  const resumesAtJourneyBegins = activeResumeState?.stage === "journey-begins";
+  const resumeData = activeResumeState?.onboardingData ?? null;
+  const resumeFaction = isFactionType(activeResumeState?.faction)
+    ? activeResumeState.faction
     : isFactionType(resumeData?.faction)
     ? resumeData.faction
     : null;
@@ -335,7 +349,7 @@ export const StoryOnboarding = ({
   const resumeStoryTone = isCompanionStoryTone(resumeData?.story_tone)
     ? resumeData.story_tone
     : "epic_adventure";
-  const resumeStage = !isMigrationMode && !isResetMode ? resumeState?.stage ?? null : null;
+  const resumeStage = !isMigrationMode && !isResetMode ? activeResumeState?.stage ?? null : null;
   const initialResumeStage: OnboardingStage | null =
     resumeStage === "questionnaire" && !resumeFaction
       ? "faction"
@@ -350,7 +364,7 @@ export const StoryOnboarding = ({
           ? "story-tone"
           : "prologue",
   );
-  const [userName, setUserName] = useState(resumeState?.userName ?? "");
+  const [userName, setUserName] = useState(activeResumeState?.userName ?? "");
 
   // Auto scroll to top when stage changes
   useEffect(() => {
@@ -363,13 +377,14 @@ export const StoryOnboarding = ({
   const [mentorCatalogStatus, setMentorCatalogStatus] = useState<MentorCatalogStatus>("loading");
   const [recommendedMentor, setRecommendedMentor] = useState<Mentor | null>(null);
   const [mentorExplanation, setMentorExplanation] = useState<MentorExplanation | null>(null);
-  const [companionAnimal, setCompanionAnimal] = useState(resumeState?.companionLabel ?? "");
+  const [companionAnimal, setCompanionAnimal] = useState(activeResumeState?.companionLabel ?? "");
   const [selectedStoryTone, setSelectedStoryTone] = useState<CompanionStoryTone>(resumeStoryTone);
   const [isCreatingCompanion, setIsCreatingCompanion] = useState(false);
   const [companionSetupStatus, setCompanionSetupStatus] = useState<CompanionSetupStatus>(
     resumesAtJourneyBegins ? "ready" : "idle",
   );
   const [pendingCompanionSetup, setPendingCompanionSetup] = useState<CompanionSelectionPreferences | null>(null);
+  const [isAwaitingJourneyCompletion, setIsAwaitingJourneyCompletion] = useState(false);
   const [isSubmittingQuestionnaire, setIsSubmittingQuestionnaire] = useState(false);
   const [isPersistingOnboardingStep, setIsPersistingOnboardingStep] = useState(false);
   const [isContinuingLater, setIsContinuingLater] = useState(false);
@@ -386,9 +401,9 @@ export const StoryOnboarding = ({
       userId: user?.id ?? null,
       stage,
       mode,
-      resumeStage: resumeState?.stage ?? null,
+      resumeStage: activeResumeState?.stage ?? null,
     });
-  }, [mode, resumeState?.stage, stage, user?.id]);
+  }, [activeResumeState?.stage, mode, stage, user?.id]);
 
   const clearMentorRevealTimeout = useCallback(() => {
     if (mentorRevealTimeoutRef.current) {
@@ -404,29 +419,29 @@ export const StoryOnboarding = ({
   }, [clearMentorRevealTimeout]);
 
   useEffect(() => {
-    if (!resumeState || isMigrationMode || isResetMode) return;
+    if (!activeResumeState || isMigrationMode || isResetMode) return;
 
     const nextStage =
-      resumeState.stage === "questionnaire" && !resumeFaction
+      activeResumeState.stage === "questionnaire" && !resumeFaction
         ? "faction"
-        : resumeState.stage;
+        : activeResumeState.stage;
 
     setStage(nextStage);
-    setUserName(resumeState.userName ?? "");
+    setUserName(activeResumeState.userName ?? "");
     setFaction(resumeFaction);
     setAnswers(resumeAnswers);
     setSelectedStoryTone(resumeStoryTone);
 
-    if (resumeState.stage === "journey-begins") {
-      setCompanionAnimal(resumeState.companionLabel ?? "");
+    if (activeResumeState.stage === "journey-begins") {
+      setCompanionAnimal(activeResumeState.companionLabel ?? "");
       setCompanionSetupStatus("ready");
     }
   }, [
+    activeResumeState,
     isMigrationMode,
     isResetMode,
     resumeAnswers,
     resumeFaction,
-    resumeState,
     resumeStoryTone,
   ]);
 
@@ -1361,31 +1376,8 @@ export const StoryOnboarding = ({
     });
   }, [isCreatingCompanion, isMigrationMode, isResetMode, runCompanionSetup, user]);
 
-  const handleJourneyComplete = async () => {
-    if (!user) return;
-
-    if (companionSetupStatus === "pending") {
-      toast.error("Your companion is still taking shape. Please try again in a moment.");
-      return;
-    }
-
-    let setupReady = companionSetupStatus === "ready";
-    if (companionSetupStatus === "failed") {
-      if (!pendingCompanionSetup) {
-        toast.error("We couldn't recover your companion setup. Please restart onboarding.");
-        return;
-      }
-
-      setupReady = await runCompanionSetup(pendingCompanionSetup);
-      if (!setupReady) {
-        return;
-      }
-    }
-
-    if (!setupReady) {
-      toast.error("Your companion is still taking shape. Please try again in a moment.");
-      return;
-    }
+  const completeJourney = useCallback(async () => {
+    if (!user) return false;
 
     try {
       const existingData = await loadExistingOnboardingData();
@@ -1427,14 +1419,86 @@ export const StoryOnboarding = ({
       });
       toast.success("Welcome to Cosmiq! Your journey begins.");
       safeNavigate(navigate, "/journeys");
+      return true;
     } catch (error) {
       logger.error("Journey completion finalization failed", {
         userId: user.id,
         error: getErrorMessage(error, "Unknown journey completion error"),
       });
       toast.error(JOURNEY_FINALIZATION_FAILURE_TOAST);
+      return false;
     }
-  };
+  }, [
+    loadExistingOnboardingData,
+    mode,
+    navigate,
+    onJourneyCinematicComplete,
+    queryClient,
+    selectedStoryTone,
+    user,
+  ]);
+
+  const recoverOrCompleteJourney = useCallback(async () => {
+    if (!user) return false;
+
+    if (companionSetupStatus === "ready") {
+      return await completeJourney();
+    }
+
+    if (companionSetupStatus === "failed") {
+      if (!pendingCompanionSetup) {
+        toast.error("We couldn't recover your companion setup. Please restart onboarding.");
+        return false;
+      }
+
+      const setupReady = await runCompanionSetup(pendingCompanionSetup);
+      if (!setupReady) {
+        return false;
+      }
+
+      return await completeJourney();
+    }
+
+    return false;
+  }, [
+    companionSetupStatus,
+    completeJourney,
+    pendingCompanionSetup,
+    runCompanionSetup,
+    user,
+  ]);
+
+  const handleJourneyComplete = useCallback(() => {
+    if (!user || isAwaitingJourneyCompletion) return;
+
+    if (companionSetupStatus === "pending" || companionSetupStatus === "failed") {
+      setIsAwaitingJourneyCompletion(true);
+      return;
+    }
+
+    void recoverOrCompleteJourney();
+  }, [
+    companionSetupStatus,
+    isAwaitingJourneyCompletion,
+    recoverOrCompleteJourney,
+    user,
+  ]);
+
+  useEffect(() => {
+    if (!isAwaitingJourneyCompletion) return;
+    if (companionSetupStatus !== "ready" && companionSetupStatus !== "failed") return;
+
+    let cancelled = false;
+    void recoverOrCompleteJourney().then(() => {
+      if (!cancelled) {
+        setIsAwaitingJourneyCompletion(false);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [companionSetupStatus, isAwaitingJourneyCompletion, recoverOrCompleteJourney]);
 
   const handleContinueLater = async () => {
     if (continueLaterInFlightRef.current) return;
@@ -1678,7 +1742,7 @@ export const StoryOnboarding = ({
           </motion.div>
         )}
 
-        {stage === "companion" && (faction || startsAtCompanion || resumeState?.stage === "companion") && (
+        {stage === "companion" && (faction || startsAtCompanion || activeResumeState?.stage === "companion") && (
           <motion.div
             key={isMigrationMode ? "companion-migration" : isResetMode ? "companion-reset" : "companion"}
             initial={{ opacity: 0 }}
@@ -1710,7 +1774,19 @@ export const StoryOnboarding = ({
           </motion.div>
         )}
 
-        {stage === "journey-begins" && (
+        {stage === "journey-begins" && isAwaitingJourneyCompletion && (
+          <motion.div
+            key="journey-companion-loading"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="relative z-10 w-full"
+          >
+            <CompanionCreationLoader />
+          </motion.div>
+        )}
+
+        {stage === "journey-begins" && !isAwaitingJourneyCompletion && (
           <motion.div
             key="journey-begins"
             initial={{ opacity: 0 }}

@@ -68,44 +68,12 @@ describe("journeys companion launcher greetings", () => {
       starterIntent: "plan_day",
     });
 
-    expect(templates.find((template) => template.id === "prepare-tomorrow")).toMatchObject({
-      id: "prepare-tomorrow",
-      label: "Prepare me for tomorrow",
-      message: "Prepare me for tomorrow",
-      target: "planner",
-      starterIntent: "briefing_followup",
-    });
-
-    expect(templates.find((template) => template.id === "plan-week")).toMatchObject({
-      id: "plan-week",
-      label: "Plan my week",
-      message: "Plan my week",
-      target: "planner",
-      starterIntent: "plan_week",
-    });
-
-    expect(templates.find((template) => template.id === "advance-campaign")).toMatchObject({
-      id: "advance-campaign",
-      label: "Advance my campaign",
-      message: "Advance my campaign",
-      target: "planner",
-      starterIntent: "advance_campaign_start",
-    });
-
     expect(templates.find((template) => template.id === "adjust-day")).toMatchObject({
       id: "adjust-day",
       label: "Adjust my day",
       message: "Adjust my day",
       target: "planner",
       starterIntent: "adjust_today",
-    });
-
-    expect(templates.find((template) => template.id === "make-room")).toMatchObject({
-      id: "make-room",
-      label: "Make room",
-      message: "Help me make room for what matters.",
-      target: "planner",
-      starterIntent: "make_room",
     });
 
     expect(templates.find((template) => template.id === "low-energy")).toMatchObject({
@@ -117,14 +85,6 @@ describe("journeys companion launcher greetings", () => {
       planningMode: "recovery",
     });
 
-    expect(templates.find((template) => template.id === "what-matters")).toMatchObject({
-      id: "what-matters",
-      label: "What matters most?",
-      message: "What matters most today?",
-      target: "planner",
-      starterIntent: "what_matters",
-    });
-
     expect(templates.find((template) => template.id === "right-now")).toMatchObject({
       id: "right-now",
       label: "What should I do right now?",
@@ -132,5 +92,40 @@ describe("journeys companion launcher greetings", () => {
       target: "planner",
       starterIntent: "right_now_start",
     });
+
+    expect(templates.find((template) => template.id === "upcoming")).toMatchObject({
+      id: "upcoming",
+      label: "What do I have coming up?",
+      message: "What do I have coming up?",
+      target: "planner",
+      starterIntent: "upcoming_start",
+    });
+
+    expect(templates.find((template) => template.id === "quest")).toMatchObject({
+      id: "quest",
+      label: "Quest?",
+      message: "Quest?",
+      target: "planner",
+      starterIntent: "quest_capture",
+    });
+
+    expect(templates.find((template) => template.id === "goal")).toMatchObject({
+      id: "goal",
+      label: "Let's lock in a new goal",
+      message: "Let's lock in a new goal",
+      target: "campaign_builder",
+      starterIntent: "goal_breakdown_start",
+    });
+
+    expect(templates.map((template) => template.id)).toEqual([
+      "free-talk",
+      "plan-day",
+      "adjust-day",
+      "low-energy",
+      "right-now",
+      "upcoming",
+      "quest",
+      "goal",
+    ]);
   });
 });

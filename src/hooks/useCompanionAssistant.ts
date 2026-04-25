@@ -1207,10 +1207,13 @@ export function useCompanionAssistant({
         await startNewChat({ greetingText: null });
       }
 
-      await submitMessage(launchMessage, "text", {
+      const submitted = await submitMessage(launchMessage, "text", {
         starterIntent: launchIntent.starterIntent,
         planningMode: launchIntent.planningMode,
       });
+      if (submitted && launchIntent.starterIntent === "plan_day") {
+        window.dispatchEvent(new CustomEvent("companion-plan-my-day-started"));
+      }
       onLaunchIntentConsumed?.(intentId);
     })();
   }, [

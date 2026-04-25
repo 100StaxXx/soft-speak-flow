@@ -1,6 +1,16 @@
 import type { CSSProperties } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Archive } from "lucide-react";
+import {
+  Archive,
+  BatteryLow,
+  CalendarCheck,
+  Clock3,
+  MessageCircle,
+  Plus,
+  RotateCcw,
+  Sparkles,
+  Target,
+} from "lucide-react";
 import type { FABPopupAlignment } from "@/hooks/useDraggableFAB";
 import { cn } from "@/lib/utils";
 import type { JourneysCompanionLauncherTemplate } from "@/shared/journeysCompanionLauncherTemplates";
@@ -31,6 +41,93 @@ const TAIL_ROTATION_CLASSNAME: Record<FABPopupAlignment["vertical"], string> = {
   bottom: "rotate-[225deg]",
 };
 
+const OPTION_META: Record<
+  JourneysCompanionLauncherTemplate["id"],
+  {
+    label?: string;
+    Icon: typeof MessageCircle;
+    className: string;
+    iconClassName: string;
+  }
+> = {
+  "free-talk": {
+    Icon: MessageCircle,
+    className: "border-[#6b3416] bg-[linear-gradient(180deg,#fffdf7_0%,#fff1cb_100%)] text-[#3c1f10]",
+    iconClassName: "bg-[#fff7dc] text-[#b04b12]",
+  },
+  "plan-week": {
+    label: "Plan week",
+    Icon: CalendarCheck,
+    className: "border-[#6b3416] bg-[linear-gradient(180deg,#fff8e5_0%,#ffd77d_100%)] text-[#3c1f10]",
+    iconClassName: "bg-[#fff7dc] text-[#b04b12]",
+  },
+  "plan-day": {
+    label: "Plan day",
+    Icon: CalendarCheck,
+    className: "border-[#6b3416] bg-[linear-gradient(180deg,#fff8e5_0%,#ffd77d_100%)] text-[#3c1f10]",
+    iconClassName: "bg-[#fff7dc] text-[#b04b12]",
+  },
+  "prepare-tomorrow": {
+    label: "Tomorrow",
+    Icon: Clock3,
+    className: "border-[#5a3f8c] bg-[linear-gradient(180deg,#efe4ff_0%,#c5a7ff_100%)] text-[#2e1d5a]",
+    iconClassName: "bg-white/55 text-[#2e1d5a]",
+  },
+  "advance-campaign": {
+    label: "Campaign",
+    Icon: Target,
+    className: "border-[#224c52] bg-[linear-gradient(180deg,#cffff3_0%,#6fded2_100%)] text-[#08333a]",
+    iconClassName: "bg-white/55 text-[#08333a]",
+  },
+  "adjust-day": {
+    label: "Adjust day",
+    Icon: RotateCcw,
+    className: "border-[#7a3b14] bg-[linear-gradient(180deg,#ffd7aa_0%,#ffae52_100%)] text-[#5b2608]",
+    iconClassName: "bg-white/55 text-[#5b2608]",
+  },
+  "make-room": {
+    label: "Make room",
+    Icon: Sparkles,
+    className: "border-[#6b3f11] bg-[linear-gradient(180deg,#ffe8c8_0%,#f0b167_100%)] text-[#4d2607]",
+    iconClassName: "bg-white/55 text-[#4d2607]",
+  },
+  "low-energy": {
+    label: "Low energy",
+    Icon: BatteryLow,
+    className: "border-[#35528a] bg-[linear-gradient(180deg,#dfe9ff_0%,#9dc0ff_100%)] text-[#102a57]",
+    iconClassName: "bg-white/55 text-[#102a57]",
+  },
+  "what-matters": {
+    label: "Priorities",
+    Icon: Target,
+    className: "border-[#6b3416] bg-[linear-gradient(180deg,#fff8e5_0%,#ffd77d_100%)] text-[#3c1f10]",
+    iconClassName: "bg-[#fff7dc] text-[#b04b12]",
+  },
+  "right-now": {
+    label: "Right now",
+    Icon: Clock3,
+    className: "border-[#6b3416] bg-[linear-gradient(180deg,#fff8e5_0%,#ffd77d_100%)] text-[#3c1f10]",
+    iconClassName: "bg-[#fff7dc] text-[#b04b12]",
+  },
+  upcoming: {
+    label: "Coming up",
+    Icon: Clock3,
+    className: "border-[#315114] bg-[linear-gradient(180deg,#d7ff86_0%,#9fda3f_100%)] text-[#183304]",
+    iconClassName: "bg-white/55 text-[#183304]",
+  },
+  quest: {
+    Icon: Sparkles,
+    className: "border-[#6b3416] bg-[linear-gradient(180deg,#fff8e5_0%,#ffd77d_100%)] text-[#3c1f10]",
+    iconClassName: "bg-[#fff7dc] text-[#b04b12]",
+  },
+  goal: {
+    label: "New goal",
+    Icon: Plus,
+    className: "border-[#6b3416] bg-[linear-gradient(180deg,#fff8e5_0%,#ffd77d_100%)] text-[#3c1f10]",
+    iconClassName: "bg-[#fff7dc] text-[#b04b12]",
+  },
+};
+
 export function JourneysCompanionLauncherPopup({
   open,
   alignment,
@@ -50,7 +147,7 @@ export function JourneysCompanionLauncherPopup({
           exit={{ opacity: 0, scale: 0.94, y: alignment.vertical === "bottom" ? 6 : -6 }}
           transition={{ duration: 0.18, ease: "easeOut" }}
           className={cn(
-            "absolute z-[70] w-[min(21rem,calc(100vw-2rem))]",
+            "absolute z-[70] w-[min(19rem,calc(100vw-2rem))]",
             POPUP_VERTICAL_CLASSNAME[alignment.vertical],
           )}
           style={popupStyle}
@@ -61,7 +158,7 @@ export function JourneysCompanionLauncherPopup({
           data-popup-horizontal={alignment.horizontal}
           data-popup-vertical={alignment.vertical}
         >
-          <div className="relative rounded-[2rem] border-[3px] border-[#543012] bg-[linear-gradient(180deg,#fff8e7_0%,#ffe7a7_20%,#ffc861_100%)] p-4 shadow-[0_18px_0_#5f3212,0_30px_45px_rgba(55,24,5,0.45)]">
+          <div className="relative rounded-[1.6rem] border-[3px] border-[#543012] bg-[linear-gradient(180deg,#fff8e7_0%,#ffe3a1_35%,#ffc861_100%)] p-3 shadow-[0_12px_0_#5f3212,0_24px_38px_rgba(55,24,5,0.42)]">
             <span
               aria-hidden="true"
               className={cn(
@@ -71,14 +168,19 @@ export function JourneysCompanionLauncherPopup({
               )}
               style={tailStyle}
             />
-            <div className="flex items-center justify-between gap-3 rounded-[1.4rem] border-2 border-white/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(255,244,210,0.88))] px-4 py-3 shadow-[inset_0_3px_0_rgba(255,255,255,0.55)]">
-              <p className="text-[0.7rem] font-black uppercase tracking-[0.22em] text-[#b04b12]">
-                {companionLabel}
-              </p>
+            <div className="flex items-center justify-between gap-3 rounded-[1.15rem] border-2 border-white/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(255,244,210,0.88))] px-3 py-2 shadow-[inset_0_3px_0_rgba(255,255,255,0.55)]">
+              <div className="min-w-0">
+                <p className="truncate text-[0.7rem] font-black uppercase tracking-[0.2em] text-[#b04b12]">
+                  {companionLabel}
+                </p>
+                <p className="text-xs font-semibold text-[#6b3416]/75">
+                  Pick a planner starter
+                </p>
+              </div>
               <button
                 type="button"
                 onClick={onOpenHistory}
-                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-[3px] border-[#6b3416] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(255,233,183,0.96))] text-[#b04b12] shadow-[0_4px_0_#7a3a14] transition-transform hover:-translate-y-0.5"
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-[3px] border-[#6b3416] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(255,233,183,0.96))] text-[#b04b12] shadow-[0_3px_0_#7a3a14] transition-transform hover:-translate-y-0.5"
                 aria-label="Open past chats"
                 data-testid="journeys-companion-launcher-history-button"
               >
@@ -86,58 +188,41 @@ export function JourneysCompanionLauncherPopup({
               </button>
             </div>
 
-            <div className="mt-3 space-y-2.5">
-              {options.map((option, index) => (
-                <motion.button
-                  key={option.id}
-                  type="button"
-                  initial={{ opacity: 0, x: alignment.horizontal === "right" ? 10 : -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.04 * index, duration: 0.18 }}
-                  className={cn(
-                    "flex w-full items-center justify-between gap-3 rounded-[1.6rem] border-[3px] border-[#4b2612] px-4 py-3 text-left text-[#3c1f10] shadow-[0_8px_0_#7a3a14,0_14px_22px_rgba(74,31,8,0.22)] transition-transform hover:-translate-y-0.5 hover:shadow-[0_10px_0_#7a3a14,0_16px_24px_rgba(74,31,8,0.24)]",
-                    option.id === "free-talk"
-                      ? "bg-[linear-gradient(180deg,#fffdf7_0%,#fff1cb_100%)]"
-                      : option.id === "advance-campaign"
-                        ? "border-[#224c52] bg-[linear-gradient(180deg,#cffff3_0%,#6fded2_100%)] text-[#08333a] shadow-[0_8px_0_rgba(34,76,82,0.8),0_14px_22px_rgba(34,76,82,0.24)] hover:shadow-[0_10px_0_rgba(34,76,82,0.82),0_16px_24px_rgba(34,76,82,0.28)]"
-                      : option.id === "prepare-tomorrow"
-                        ? "border-[#5a3f8c] bg-[linear-gradient(180deg,#efe4ff_0%,#c5a7ff_100%)] text-[#2e1d5a] shadow-[0_8px_0_rgba(90,63,140,0.8),0_14px_22px_rgba(90,63,140,0.24)] hover:shadow-[0_10px_0_rgba(90,63,140,0.82),0_16px_24px_rgba(90,63,140,0.28)]"
-                      : option.id === "adjust-day"
-                        ? "border-[#7a3b14] bg-[linear-gradient(180deg,#ffd7aa_0%,#ffae52_100%)] text-[#5b2608] shadow-[0_8px_0_rgba(122,59,20,0.8),0_14px_22px_rgba(122,59,20,0.24)] hover:shadow-[0_10px_0_rgba(122,59,20,0.82),0_16px_24px_rgba(122,59,20,0.28)]"
-                      : option.id === "make-room"
-                        ? "border-[#6b3f11] bg-[linear-gradient(180deg,#ffe8c8_0%,#f0b167_100%)] text-[#4d2607] shadow-[0_8px_0_rgba(107,63,17,0.8),0_14px_22px_rgba(107,63,17,0.24)] hover:shadow-[0_10px_0_rgba(107,63,17,0.82),0_16px_24px_rgba(107,63,17,0.28)]"
-                      : option.id === "low-energy"
-                        ? "border-[#35528a] bg-[linear-gradient(180deg,#dfe9ff_0%,#9dc0ff_100%)] text-[#102a57] shadow-[0_8px_0_rgba(53,82,138,0.8),0_14px_22px_rgba(53,82,138,0.24)] hover:shadow-[0_10px_0_rgba(53,82,138,0.82),0_16px_24px_rgba(53,82,138,0.28)]"
-                      : option.id === "upcoming"
-                        ? "border-[#315114] bg-[linear-gradient(180deg,#d7ff86_0%,#9fda3f_100%)] text-[#183304] shadow-[0_8px_0_rgba(49,81,20,0.8),0_14px_22px_rgba(49,81,20,0.24)] hover:shadow-[0_10px_0_rgba(49,81,20,0.82),0_16px_24px_rgba(49,81,20,0.28)]"
-                        : "bg-[linear-gradient(180deg,#fff8e5_0%,#ffd77d_100%)]",
-                  )}
-                  onClick={() => onSelect(option)}
-                  data-testid={`journeys-companion-launcher-option-${option.id}`}
-                >
-                  <span className="text-sm font-black leading-5 sm:text-[0.98rem]">{option.label}</span>
-                  <span
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              {options.map((option, index) => {
+                const meta = OPTION_META[option.id];
+                const Icon = meta.Icon;
+                const label = meta.label ?? option.label;
+
+                return (
+                  <motion.button
+                    key={option.id}
+                    type="button"
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.025 * index, duration: 0.16 }}
                     className={cn(
-                      "shrink-0 rounded-full border-2 px-2 py-1 text-[0.65rem] font-black uppercase tracking-[0.18em]",
-                      option.id === "upcoming"
-                        ? "border-[#315114] bg-white/35 text-[#183304]"
-                        : option.id === "advance-campaign"
-                          ? "border-[#224c52] bg-white/35 text-[#08333a]"
-                        : option.id === "prepare-tomorrow"
-                          ? "border-[#5a3f8c] bg-white/35 text-[#2e1d5a]"
-                        : option.id === "adjust-day"
-                          ? "border-[#7a3b14] bg-white/35 text-[#5b2608]"
-                        : option.id === "make-room"
-                          ? "border-[#6b3f11] bg-white/35 text-[#4d2607]"
-                        : option.id === "low-energy"
-                          ? "border-[#35528a] bg-white/35 text-[#102a57]"
-                        : "border-[#6b3416] bg-white/60 text-[#b04b12]",
+                      "flex min-h-[4.25rem] flex-col items-start justify-between gap-2 rounded-[1.1rem] border-[3px] px-3 py-2.5 text-left shadow-[0_5px_0_rgba(95,50,18,0.72),0_10px_18px_rgba(74,31,8,0.18)] transition-transform hover:-translate-y-0.5 hover:shadow-[0_7px_0_rgba(95,50,18,0.76),0_13px_20px_rgba(74,31,8,0.2)]",
+                      option.id === "free-talk" && "col-span-2 min-h-[3.5rem] flex-row items-center justify-start",
+                      meta.className,
                     )}
+                    onClick={() => onSelect(option)}
+                    data-testid={`journeys-companion-launcher-option-${option.id}`}
                   >
-                    Tap
-                  </span>
-                </motion.button>
-              ))}
+                    <span
+                      className={cn(
+                        "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 border-current/35",
+                        meta.iconClassName,
+                      )}
+                    >
+                      <Icon className="h-3.5 w-3.5" />
+                    </span>
+                    <span className="text-[0.78rem] font-black leading-4 sm:text-[0.82rem]">
+                      {label}
+                    </span>
+                  </motion.button>
+                );
+              })}
             </div>
           </div>
         </motion.div>

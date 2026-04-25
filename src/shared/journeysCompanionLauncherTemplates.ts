@@ -62,6 +62,16 @@ const getStableIndex = (seed: string, length: number) => {
   return Math.abs(hash) % length;
 };
 
+const JOURNEYS_LAUNCHER_ACTION_IDS = new Set<JourneysCompanionLauncherTemplate["id"]>([
+  "plan-day",
+  "adjust-day",
+  "low-energy",
+  "right-now",
+  "upcoming",
+  "quest",
+  "goal",
+]);
+
 export const getJourneysCompanionLauncherGreeting = ({
   date = new Date(),
   userId = null,
@@ -90,6 +100,8 @@ export const getJourneysCompanionLauncherTemplates = ({
       target: "conversation",
       starterIntent: "free_talk_start",
     },
-    ...COMPANION_PLANNER_SURFACE_ACTIONS,
+    ...COMPANION_PLANNER_SURFACE_ACTIONS.filter((action) =>
+      JOURNEYS_LAUNCHER_ACTION_IDS.has(action.id)
+    ),
   ];
 };

@@ -30,7 +30,7 @@ const getPopupWidthPx = () => {
     window.getComputedStyle(document.documentElement).fontSize || "16",
   );
   const safeRootFontSize = Number.isFinite(rootFontSize) && rootFontSize > 0 ? rootFontSize : 16;
-  return Math.max(0, Math.min(21 * safeRootFontSize, window.innerWidth - (POPUP_VIEWPORT_GUTTER_PX * 2)));
+  return Math.max(0, Math.min(19 * safeRootFontSize, window.innerWidth - (POPUP_VIEWPORT_GUTTER_PX * 2)));
 };
 
 export const DraggableFAB = ({ onOpenCompanionPlanner, onTap }: DraggableFABProps) => {
