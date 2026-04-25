@@ -7,7 +7,7 @@ import { CampaignEmptyStateModal } from "./CampaignEmptyStateModal";
 import { CampaignCreatedAnimation } from "@/components/CampaignCreatedAnimation";
 import { useEpics } from "@/hooks/useEpics";
 import { useFirstTimeModal } from "@/hooks/useFirstTimeModal";
-import { Plus } from "lucide-react";
+import { HelpCircle, Plus } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ACTIVE_CAMPAIGN_LIMIT, hasReachedActiveCampaignLimit } from "@/features/epics/constants";
 
@@ -23,7 +23,11 @@ export const EpicsTab = memo(function EpicsTab() {
   const [joinEpicDialogOpen, setJoinEpicDialogOpen] = useState(false);
   const [showCreatedAnimation, setShowCreatedAnimation] = useState(false);
   const [createdCampaignData, setCreatedCampaignData] = useState<CreatedCampaignData | null>(null);
-  const { showModal: showTutorial, dismissModal: dismissTutorial } = useFirstTimeModal('epics');
+  const {
+    showModal: showTutorial,
+    dismissModal: dismissTutorial,
+    openModal: openTutorial,
+  } = useFirstTimeModal("epics");
 
   const hasCampaigns = activeEpics.length > 0 || completedEpics.length > 0;
 
@@ -58,6 +62,17 @@ export const EpicsTab = memo(function EpicsTab() {
 
   return (
     <div className="space-y-4">
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={openTutorial}
+          className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/60 px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+          aria-label="Replay campaigns tutorial"
+        >
+          <HelpCircle className="h-3.5 w-3.5" />
+          Tutorial
+        </button>
+      </div>
       <AnimatePresence mode="wait">
         {isLoading ? (
           <motion.div

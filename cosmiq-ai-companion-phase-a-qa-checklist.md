@@ -11,6 +11,28 @@ Validate that the core daily ritual loop feels:
 - calm under pressure
 - resilient across reloads and fallback paths
 
+## First-Run / Tutorial Scenarios
+### Fresh Onboarding
+- Create a fresh test account and enter `/onboarding`.
+- Complete prologue, destiny, faction, questionnaire, story tone, and companion color/species dropdowns.
+- Refresh after each major stage and verify the flow resumes from the saved step instead of restarting at prologue.
+- Use `Continue Later`, sign back in, and verify the saved stage resumes.
+- Confirm questionnaire failures are visible and do not silently advance to mentor result.
+
+### Legacy / Broken Companion Recovery
+- Create or simulate a legacy companion state that requires reset.
+- Visit `/onboarding`.
+- Verify no account deletion starts automatically.
+- Verify the destructive reset requires explicit `Reset my account` confirmation.
+- Verify `Not now` exits without deleting account data.
+
+### Guided Tutorial
+- Complete onboarding and verify the companion tutorial starts with `meet_companion`.
+- Trigger `Plan My Day` and verify the tutorial advances only after the companion request succeeds.
+- Reload during the guided tutorial and verify server/local progress stay aligned.
+- Dismiss the guided tutorial and verify `/onboarding` does not force journey-begins recovery afterward.
+- Replay Search, Campaigns, and Postcards tutorial modals from their help controls.
+
 ## Daily Ritual Scenarios
 ### Plan My Day
 - Trigger `Plan My Day` from the companion panel.

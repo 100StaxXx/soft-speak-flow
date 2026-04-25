@@ -69,6 +69,8 @@ const mocks = vi.hoisted(() => ({
   userCompanionMaybeSingle: vi.fn(),
   userCompanionUpdate: vi.fn(),
   userCompanionUpdateEq: vi.fn(),
+  companionMemoryMaybeSingle: vi.fn(),
+  companionMemoryInsert: vi.fn(),
   toastError: vi.fn(),
   toastSuccess: vi.fn(),
   loggerError: vi.fn(),
@@ -207,6 +209,19 @@ vi.mock("@/integrations/supabase/client", () => ({
         return {
           select: () => selectChain,
           update: mocks.userCompanionUpdate,
+        };
+      }
+
+      if (table === "companion_memories") {
+        const selectChain = {
+          eq: vi.fn(),
+          maybeSingle: mocks.companionMemoryMaybeSingle,
+        };
+        selectChain.eq.mockReturnValue(selectChain);
+
+        return {
+          select: () => selectChain,
+          insert: mocks.companionMemoryInsert,
         };
       }
 
@@ -463,6 +478,8 @@ describe("StoryOnboarding questionnaire submission flow", () => {
     mocks.userCompanionMaybeSingle.mockReset();
     mocks.userCompanionUpdate.mockReset();
     mocks.userCompanionUpdateEq.mockReset();
+    mocks.companionMemoryMaybeSingle.mockReset();
+    mocks.companionMemoryInsert.mockReset();
     mocks.toastError.mockReset();
     mocks.toastSuccess.mockReset();
     mocks.loggerError.mockReset();
@@ -479,6 +496,8 @@ describe("StoryOnboarding questionnaire submission flow", () => {
       eq: mocks.userCompanionUpdateEq,
     });
     mocks.userCompanionUpdateEq.mockResolvedValue({ error: null });
+    mocks.companionMemoryMaybeSingle.mockResolvedValue({ data: null, error: null });
+    mocks.companionMemoryInsert.mockResolvedValue({ error: null });
     storageMocks.reset();
   });
 
@@ -511,7 +530,7 @@ describe("StoryOnboarding questionnaire submission flow", () => {
     }
   });
 
-  it("still reveals mentor after 2000ms when questionnaire persistence fails", async () => {
+  it("returns to questionnaire when questionnaire persistence fails", async () => {
     mocks.questionnaireUpsert.mockResolvedValue({
       error: { message: "write failed" },
     });
@@ -525,19 +544,15 @@ describe("StoryOnboarding questionnaire submission flow", () => {
       expect(screen.getByTestId("calculating-stage")).toBeInTheDocument();
 
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(CALCULATING_STAGE_DURATION_MS - 1);
-      });
-      expect(screen.queryByTestId("mentor-result-stage")).not.toBeInTheDocument();
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(1);
         await Promise.resolve();
       });
 
-      expect(screen.getByTestId("mentor-result-stage")).toBeInTheDocument();
-
+      expect(screen.getByRole("button", { name: "questionnaire-submit" })).toBeInTheDocument();
       expect(mocks.questionnaireUpsert).toHaveBeenCalledTimes(5);
-      expect(mocks.toastError).not.toHaveBeenCalled();
+      expect(mocks.toastError).toHaveBeenCalledWith(
+        "We hit a temporary snag matching your guide. Please try again.",
+        expect.objectContaining({ duration: expect.any(Number) }),
+      );
     } finally {
       vi.useRealTimers();
     }
@@ -992,14 +1007,7 @@ describe("StoryOnboarding questionnaire submission flow", () => {
   });
 
   it("shows a finalization-specific toast when companion creation succeeds but onboarding completion fails", async () => {
-    mocks.profilesUpdateEq.mockReset();
-    mocks.profilesUpdateEq
-      .mockResolvedValueOnce({ error: null })
-      .mockResolvedValueOnce({ error: null })
-      .mockResolvedValueOnce({ error: null })
-      .mockResolvedValueOnce({ error: null })
-      .mockResolvedValueOnce({ error: null })
-      .mockResolvedValueOnce({ error: { message: "finalization failed" } });
+    mocks.companionMemoryInsert.mockResolvedValueOnce({ error: { message: "finalization failed" } });
 
     renderOnboarding();
     await advanceToQuestionnaire();
@@ -1018,7 +1026,6 @@ describe("StoryOnboarding questionnaire submission flow", () => {
       await advanceFromMentorToEggSelection();
       fireEvent.click(screen.getByRole("button", { name: "complete-companion" }));
       await screen.findByTestId("journey-begins-stage");
-      fireEvent.click(screen.getByRole("button", { name: "finish-journey" }));
 
       await waitFor(() => {
         expect(mocks.toastError).toHaveBeenCalledWith(

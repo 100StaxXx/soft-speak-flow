@@ -15,7 +15,22 @@ export type EstablishedAccountReason =
   | "companion_exists"
   | "legacy_resolved_mentor";
 
-export type OnboardingResumeStep = "journey-begins";
+export const ONBOARDING_RESUME_STEPS = [
+  "prologue",
+  "destiny",
+  "faction",
+  "questionnaire",
+  "mentor-result",
+  "mentor-grid",
+  "story-tone",
+  "egg-prelude",
+  "companion",
+  "journey-begins",
+] as const;
+
+export type OnboardingResumeStep = typeof ONBOARDING_RESUME_STEPS[number];
+
+const ONBOARDING_RESUME_STEP_SET = new Set<string>(ONBOARDING_RESUME_STEPS);
 
 export interface OnboardingGateState {
   isEstablished: boolean;
@@ -48,6 +63,13 @@ export const hasGuidedTutorialProgress = (onboardingData: unknown): boolean => {
   return isRecord(onboardingData.guided_tutorial);
 };
 
+export const hasResolvedGuidedTutorialProgress = (onboardingData: unknown): boolean => {
+  if (!isRecord(onboardingData)) return false;
+  const guidedTutorial = onboardingData.guided_tutorial;
+  if (!isRecord(guidedTutorial)) return false;
+  return guidedTutorial.completed === true || guidedTutorial.dismissed === true;
+};
+
 const normalizeOnboardingData = (onboardingData: unknown): Record<string, unknown> =>
   isRecord(onboardingData) ? onboardingData : {};
 
@@ -74,7 +96,7 @@ export const getOnboardingGateState = ({
   hasCompanionImages?: boolean;
 }): OnboardingGateState => {
   const walkthroughCompleted = hasWalkthroughCompleted(profile?.onboarding_data);
-  const hasGuidedTutorial = hasGuidedTutorialProgress(profile?.onboarding_data);
+  const hasResolvedGuidedTutorial = hasResolvedGuidedTutorialProgress(profile?.onboarding_data);
   const needsProgressionReset = hasProgressionResetPending(profile?.onboarding_data);
   const hasStageZeroEggCompanion = hasCompanion && companionStage === 0;
   const hasInvalidCompanionStage = hasCompanion && !hasValidCompanionStage({ current_stage: companionStage });
@@ -84,13 +106,16 @@ export const getOnboardingGateState = ({
   );
   const onboardingStep = normalizeOnboardingStep(profile?.onboarding_step);
   const isCompletionStep = onboardingStep === "complete";
+  const inProgressResumeStep = onboardingStep && ONBOARDING_RESUME_STEP_SET.has(onboardingStep)
+    ? onboardingStep as OnboardingResumeStep
+    : null;
   const needsJourneyBeginsRecovery =
     hasCompanion
     && !walkthroughCompleted
     && !isCompletionStep
     && (
       onboardingStep === "journey-begins"
-      || (hasStageZeroEggCompanion && !hasGuidedTutorial)
+      || (hasStageZeroEggCompanion && !hasResolvedGuidedTutorial)
     );
   let reason: EstablishedAccountReason | null = null;
   let resumeStep: OnboardingResumeStep | null = null;
@@ -101,6 +126,8 @@ export const getOnboardingGateState = ({
     reason = null;
   } else if (needsJourneyBeginsRecovery) {
     resumeStep = "journey-begins";
+  } else if (inProgressResumeStep && !walkthroughCompleted && !isCompletionStep) {
+    resumeStep = inProgressResumeStep;
   } else if (isCompletionStep) {
     reason = "onboarding_step_complete";
   } else if (profile?.onboarding_completed === true) {

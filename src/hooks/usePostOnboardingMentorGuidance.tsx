@@ -39,6 +39,7 @@ const EVOLVE_AUTOSCROLL_VIEWPORT_MARGIN_PX = 72;
 
 const STEP_XP_REWARDS: Partial<Record<GuidedTutorialStepId, number>> = {
   plan_my_day: 3,
+  first_plan_closeout: 7,
 };
 
 interface GuidedStep {
@@ -74,6 +75,7 @@ const QUEST_ADD_LAUNCHER_SELECTORS = [
 ];
 
 const ACTIVE_GUIDED_STEP_ID_SET = new Set<GuidedTutorialStepId>(GUIDED_STEPS.map((step) => step.id));
+// Legacy IDs are accepted only to sanitize older persisted progress. New flows should use GUIDED_STEPS above.
 const LEGACY_GUIDED_STEP_ID_SET = new Set<GuidedTutorialStepId>([
   "quests_campaigns_intro",
   "create_quest",

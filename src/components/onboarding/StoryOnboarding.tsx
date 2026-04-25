@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { safeNavigate } from "@/utils/nativeNavigation";
@@ -34,6 +34,7 @@ import {
   getCompanionEggLabel,
   getCompanionElementAnchorColor,
   getCompanionPreset,
+  COMPANION_STORY_TONES,
   type CompanionStoryTone,
   type CompanionPresetId,
 } from "@/config/companionCatalog";
@@ -52,10 +53,9 @@ import {
   createInitialGuidedTutorialProgress,
   getGuidedTutorialLocalProgressKey,
 } from "@/utils/guidedTutorial";
+import type { OnboardingResumeStep } from "@/utils/profileOnboarding";
 import { safeLocalStorage } from "@/utils/storage";
 import { resolveAssignedMentorFromActiveMentors } from "@/config/onboardingMentorAssignments";
-
-// Removed duplicate outer function - using inner component method instead
 
 type OnboardingStage = 
   | "prologue" 
@@ -178,6 +178,64 @@ export const mapGuidanceToneToIntensity = (answer: string): "high" | "medium" | 
   return getDesiredIntensityFromGuidanceTone(answer.trim());
 };
 
+const serializeOnboardingAnswers = (answers: OnboardingAnswer[]) =>
+  answers.map((answer) => ({
+    questionId: answer.questionId,
+    optionId: answer.optionId,
+    answer: answer.answer,
+    tags: Array.isArray(answer.tags) ? answer.tags : [],
+  }));
+
+const parseOnboardingAnswers = (value: unknown): OnboardingAnswer[] => {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((answer) => {
+    if (!answer || typeof answer !== "object") return [];
+    const candidate = answer as Record<string, unknown>;
+    if (
+      typeof candidate.questionId !== "string" ||
+      typeof candidate.optionId !== "string" ||
+      typeof candidate.answer !== "string"
+    ) {
+      return [];
+    }
+
+    return [{
+      questionId: candidate.questionId,
+      optionId: candidate.optionId,
+      answer: candidate.answer,
+      tags: Array.isArray(candidate.tags)
+        ? candidate.tags.filter((tag): tag is string => typeof tag === "string")
+        : [],
+    }];
+  });
+};
+
+const isCompanionStoryTone = (value: unknown): value is CompanionStoryTone =>
+  typeof value === "string" && COMPANION_STORY_TONES.some((tone) => tone.value === value);
+
+const isFactionType = (value: unknown): value is FactionType =>
+  value === "starfall" || value === "void" || value === "stellar";
+
+const parseMentorExplanation = (value: unknown): MentorExplanation | null => {
+  if (!value || typeof value !== "object") return null;
+  const candidate = value as Record<string, unknown>;
+  if (
+    typeof candidate.title !== "string" ||
+    typeof candidate.subtitle !== "string" ||
+    typeof candidate.paragraph !== "string" ||
+    !Array.isArray(candidate.bullets)
+  ) {
+    return null;
+  }
+
+  return {
+    title: candidate.title,
+    subtitle: candidate.subtitle,
+    paragraph: candidate.paragraph,
+    bullets: candidate.bullets.filter((bullet): bullet is string => typeof bullet === "string"),
+  };
+};
+
 type MentorEnergyCandidate = {
   gender_energy?: string | null;
   tags?: string[] | null;
@@ -205,8 +263,8 @@ export const deriveOnboardingMentorCandidates = <T extends MentorEnergyCandidate
   };
 };
 
-const COMPANION_RECOVERY_DEADLINE_MS = 30_000;
-const COMPANION_RECOVERY_INTERVAL_MS = 3_000;
+const COMPANION_RECOVERY_DEADLINE_MS = 90_000;
+const COMPANION_RECOVERY_INTERVAL_MS = 2_000;
 const onboardingLog = logger.scope("StoryOnboarding");
 const JOURNEY_FINALIZATION_FAILURE_TOAST =
   "Your egg was created, but we couldn't finish setup. Please try again.";
@@ -214,9 +272,11 @@ const JOURNEY_FINALIZATION_FAILURE_TOAST =
 type StoryOnboardingMode = "standard" | "migration" | "reset";
 
 export interface StoryOnboardingResumeState {
-  stage: "journey-begins";
+  stage: OnboardingResumeStep;
   userName?: string | null;
   companionLabel?: string | null;
+  onboardingData?: Record<string, unknown> | null;
+  faction?: string | null;
 }
 
 interface StoryOnboardingProps {
@@ -252,17 +312,35 @@ export const StoryOnboarding = ({
   onJourneyCinematicComplete,
 }: StoryOnboardingProps) => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const queryClient = useQueryClient();
   const { createCompanion } = useCompanion();
   const isMigrationMode = mode === "migration";
   const isResetMode = mode === "reset";
   const startsAtCompanion = isMigrationMode || isResetMode;
   const resumesAtJourneyBegins = resumeState?.stage === "journey-begins";
+  const resumeData = resumeState?.onboardingData ?? null;
+  const resumeFaction = isFactionType(resumeState?.faction)
+    ? resumeState.faction
+    : isFactionType(resumeData?.faction)
+    ? resumeData.faction
+    : null;
+  const resumeAnswers = useMemo(
+    () => parseOnboardingAnswers(resumeData?.questionnaireAnswers),
+    [resumeData],
+  );
+  const resumeStoryTone = isCompanionStoryTone(resumeData?.story_tone)
+    ? resumeData.story_tone
+    : "epic_adventure";
+  const resumeStage = !isMigrationMode && !isResetMode ? resumeState?.stage ?? null : null;
+  const initialResumeStage: OnboardingStage | null =
+    resumeStage === "questionnaire" && !resumeFaction
+      ? "faction"
+      : resumeStage;
 
   const [stage, setStage] = useState<OnboardingStage>(
-    resumesAtJourneyBegins
-      ? "journey-begins"
+    initialResumeStage
+      ? initialResumeStage
       : isMigrationMode
         ? "companion"
         : isResetMode
@@ -276,13 +354,13 @@ export const StoryOnboarding = ({
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [stage]);
 
-  const [faction, setFaction] = useState<FactionType | null>(null);
-  const [answers, setAnswers] = useState<OnboardingAnswer[]>([]);
+  const [faction, setFaction] = useState<FactionType | null>(resumeFaction);
+  const [answers, setAnswers] = useState<OnboardingAnswer[]>(resumeAnswers);
   const [mentors, setMentors] = useState<Mentor[]>([]);
   const [recommendedMentor, setRecommendedMentor] = useState<Mentor | null>(null);
   const [mentorExplanation, setMentorExplanation] = useState<MentorExplanation | null>(null);
   const [companionAnimal, setCompanionAnimal] = useState(resumeState?.companionLabel ?? "");
-  const [selectedStoryTone, setSelectedStoryTone] = useState<CompanionStoryTone>("epic_adventure");
+  const [selectedStoryTone, setSelectedStoryTone] = useState<CompanionStoryTone>(resumeStoryTone);
   const [isCreatingCompanion, setIsCreatingCompanion] = useState(false);
   const [companionSetupStatus, setCompanionSetupStatus] = useState<CompanionSetupStatus>(
     resumesAtJourneyBegins ? "ready" : "idle",
@@ -308,13 +386,31 @@ export const StoryOnboarding = ({
   }, [clearMentorRevealTimeout]);
 
   useEffect(() => {
-    if (!resumesAtJourneyBegins) return;
+    if (!resumeState || isMigrationMode || isResetMode) return;
 
-    setStage("journey-begins");
-    setUserName(resumeState?.userName ?? "");
-    setCompanionAnimal(resumeState?.companionLabel ?? "");
-    setCompanionSetupStatus("ready");
-  }, [resumeState?.companionLabel, resumeState?.userName, resumesAtJourneyBegins]);
+    const nextStage =
+      resumeState.stage === "questionnaire" && !resumeFaction
+        ? "faction"
+        : resumeState.stage;
+
+    setStage(nextStage);
+    setUserName(resumeState.userName ?? "");
+    setFaction(resumeFaction);
+    setAnswers(resumeAnswers);
+    setSelectedStoryTone(resumeStoryTone);
+
+    if (resumeState.stage === "journey-begins") {
+      setCompanionAnimal(resumeState.companionLabel ?? "");
+      setCompanionSetupStatus("ready");
+    }
+  }, [
+    isMigrationMode,
+    isResetMode,
+    resumeAnswers,
+    resumeFaction,
+    resumeState,
+    resumeStoryTone,
+  ]);
 
   useEffect(() => {
     if (isResetMode || stage !== "journey-begins" || journeyCinematicStartedRef.current) return;
@@ -341,18 +437,41 @@ export const StoryOnboarding = ({
     return (profile?.onboarding_data as Record<string, unknown>) || {};
   }, [user]);
 
-  const persistOnboardingStep = useCallback(async (nextStep: string) => {
+  const persistOnboardingProgress = useCallback(async (
+    nextStep: OnboardingResumeStep | "complete",
+    dataPatch: Record<string, unknown> = {},
+  ) => {
     if (!user) return;
 
+    const existingData = await loadExistingOnboardingData();
     const { error } = await supabase
       .from("profiles")
-      .update({ onboarding_step: nextStep })
+      .update({
+        onboarding_step: nextStep,
+        onboarding_data: {
+          ...existingData,
+          ...dataPatch,
+        } as any,
+      })
       .eq("id", user.id);
 
     if (error) {
       throw error;
     }
-  }, [user]);
+  }, [loadExistingOnboardingData, user]);
+
+  const persistOnboardingProgressSafely = useCallback((
+    nextStep: OnboardingResumeStep,
+    dataPatch: Record<string, unknown> = {},
+  ) => {
+    void persistOnboardingProgress(nextStep, dataPatch).catch((error: unknown) => {
+      onboardingLog.warn("Failed to persist onboarding progress", {
+        userId: user?.id,
+        nextStep,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
+  }, [persistOnboardingProgress, user?.id]);
 
   const fetchActiveMentors = useCallback(async (): Promise<Mentor[]> => {
     const { data, error } = await supabase
@@ -405,6 +524,23 @@ export const StoryOnboarding = ({
     };
   }, [fetchActiveMentors]);
 
+  useEffect(() => {
+    if (!resumeData || mentors.length === 0 || recommendedMentor) return;
+    const mentorId = typeof resumeData.mentorId === "string" ? resumeData.mentorId : null;
+    if (!mentorId) return;
+
+    const mentor = mentors.find((candidate) => candidate.id === mentorId);
+    if (!mentor) return;
+
+    setRecommendedMentor(mentor);
+    setMentorExplanation(
+      parseMentorExplanation(resumeData.explanation) ??
+        generateMentorExplanation(mentor, Object.fromEntries(
+          answers.map((answer) => [answer.questionId, answer.tags[0] || ""]),
+        )),
+    );
+  }, [answers, mentors, recommendedMentor, resumeData]);
+
   const handlePrologueComplete = async (name: string) => {
     setUserName(name);
     
@@ -425,6 +561,7 @@ export const StoryOnboarding = ({
       const existingData = (profile?.onboarding_data as Record<string, unknown>) || {};
 
       const { error: updateError } = await supabase.from("profiles").update({
+        onboarding_step: "destiny",
         onboarding_data: {
           ...existingData,
           userName: name,
@@ -443,21 +580,53 @@ export const StoryOnboarding = ({
 
   const handleDestinyComplete = () => {
     setStage("faction");
+    persistOnboardingProgressSafely("faction", { userName });
   };
 
-const handleFactionComplete = async (selectedFaction: FactionType) => {
-  // Set faction in local state FIRST
-  setFaction(selectedFaction);
-  
-  // Save faction to profile
-  if (user) {
-    await supabase.from("profiles").update({
-      faction: selectedFaction,
-    }).eq("id", user.id);
-  }
-  
-  setStage("questionnaire");
-};
+  const handleFactionComplete = async (selectedFaction: FactionType) => {
+    setFaction(selectedFaction);
+
+    if (user) {
+      const existingData = await loadExistingOnboardingData();
+      const { error } = await supabase.from("profiles").update({
+        faction: selectedFaction,
+        onboarding_step: "questionnaire",
+        onboarding_data: {
+          ...existingData,
+          faction: selectedFaction,
+        } as any,
+      }).eq("id", user.id);
+
+      if (error) {
+        onboardingLog.warn("Failed to save onboarding faction", {
+          userId: user.id,
+          error: error.message,
+        });
+        toast.error("We couldn't save that choice right now. Please try again.");
+        return;
+      }
+    }
+
+    setStage("questionnaire");
+  };
+
+  const persistQuestionnaireResponses = useCallback(async (questionAnswers: OnboardingAnswer[]) => {
+    if (!user) return;
+
+    const results = await Promise.all(
+      questionAnswers.map((answer) =>
+        supabase.from("questionnaire_responses").upsert({
+          user_id: user.id,
+          question_id: answer.questionId,
+          answer_tags: answer.tags,
+        }, { onConflict: "user_id,question_id" })
+      ),
+    );
+    const failedWrites = results.filter((result) => result.error);
+    if (failedWrites.length > 0) {
+      throw failedWrites[0]?.error ?? new Error("Questionnaire response persistence failed");
+    }
+  }, [user]);
 
   const handleQuestionnaireComplete = async (questionAnswers: OnboardingAnswer[]) => {
     if (isSubmittingQuestionnaire) {
@@ -470,6 +639,13 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
     setStage(resolveQuestionnaireCompletionStage());
 
     try {
+      const serializedAnswers = serializeOnboardingAnswers(questionAnswers);
+      await persistOnboardingProgress("questionnaire", {
+        faction,
+        questionnaireAnswers: serializedAnswers,
+      });
+      await persistQuestionnaireResponses(questionAnswers);
+
       const mentorPool = await runWithTimeout(
         mentors.length > 0 ? Promise.resolve(mentors) : fetchActiveMentors(),
         QUESTIONNAIRE_PIPELINE_TIMEOUT_MS,
@@ -513,34 +689,28 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
         // Generate explanation
         const explanation = generateMentorExplanation(bestMatch, selectedAnswers);
         setMentorExplanation(explanation);
-
-        // Persist questionnaire responses without blocking mentor reveal.
-        if (user) {
-          void Promise.all(
-            questionAnswers.map((answer) =>
-              supabase.from("questionnaire_responses").upsert({
-                user_id: user.id,
-                question_id: answer.questionId,
-                answer_tags: answer.tags,
-              }, { onConflict: "user_id,question_id" })
-            ),
-          )
-            .then((results) => {
-              const failedWrites = results.filter((result) => result.error);
-              if (failedWrites.length > 0) {
-                onboardingLog.warn("Some questionnaire responses failed to persist", {
-                  failedCount: failedWrites.length,
-                  userId: user.id,
-                });
-              }
-            })
-            .catch((error: unknown) => {
-              onboardingLog.warn("Questionnaire response persistence failed", {
-                userId: user.id,
-                error: error instanceof Error ? error.message : String(error),
-              });
-            });
-        }
+        const scheduleArchetype = getOnboardingScheduleArchetypeFromAnswers(questionAnswers);
+        const scheduleArchetypeProfile = getOnboardingScheduleArchetypeProfile(scheduleArchetype);
+        await persistOnboardingProgress("mentor-result", {
+          faction,
+          questionnaireAnswers: serializedAnswers,
+          mentorId: bestMatch.id,
+          mentorName: bestMatch.name,
+          mentorEnergyPreference: energyPref,
+          ...(scheduleArchetype
+            ? {
+              scheduleArchetype,
+              scheduleArchetypeLabel: scheduleArchetypeProfile?.label ?? null,
+              scheduleArchetypePlanningHint: scheduleArchetypeProfile?.plannerHint ?? null,
+            }
+            : {}),
+          explanation: {
+            title: explanation.title,
+            subtitle: explanation.subtitle,
+            paragraph: explanation.paragraph,
+            bullets: explanation.bullets,
+          },
+        });
 
         mentorRevealTimeoutRef.current = scheduleMentorRevealTransition(() => {
           setStage("mentor-result");
@@ -555,6 +725,10 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
       });
       toast.error("We couldn't automatically match a guide. Please pick one from the grid.");
       setStage("mentor-grid");
+      persistOnboardingProgressSafely("mentor-grid", {
+        faction,
+        questionnaireAnswers: serializeOnboardingAnswers(questionAnswers),
+      });
     } catch (error) {
       onboardingLog.error("Questionnaire completion failed", {
         error: error instanceof Error ? error.message : String(error),
@@ -588,8 +762,11 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
       
       const { error: updateError } = await supabase.from("profiles").update({
         selected_mentor_id: mentor.id,
+        onboarding_step: "story-tone",
         onboarding_data: {
           ...existingData,
+          faction,
+          questionnaireAnswers: serializeOnboardingAnswers(answers),
           mentorId: mentor.id,
           mentorName: mentor.name,
           mentorEnergyPreference: energyPreference,
@@ -624,6 +801,10 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
 
   const handleSeeAllMentors = () => {
     setStage("mentor-grid");
+    persistOnboardingProgressSafely("mentor-grid", {
+      faction,
+      questionnaireAnswers: serializeOnboardingAnswers(answers),
+    });
   };
 
   const handleMentorSelectFromGrid = async (mentorId: string) => {
@@ -645,12 +826,14 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
 
   const handleCompanionBack = useCallback(() => {
     setStage("story-tone");
-  }, []);
+    persistOnboardingProgressSafely("story-tone", { story_tone: selectedStoryTone });
+  }, [persistOnboardingProgressSafely, selectedStoryTone]);
 
   const handleStoryToneComplete = useCallback((selection: OnboardingStoryToneSelectionValue) => {
     setSelectedStoryTone(selection.storyTone);
     setStage("egg-prelude");
-  }, []);
+    persistOnboardingProgressSafely("egg-prelude", { story_tone: selection.storyTone });
+  }, [persistOnboardingProgressSafely]);
 
   const handleStoryToneBack = useCallback(() => {
     if (isResetMode) {
@@ -669,17 +852,13 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
 
   const handleEggPreludeComplete = useCallback(() => {
     setStage("companion");
-    void persistOnboardingStep("companion").catch((error: unknown) => {
-      onboardingLog.warn("Failed to persist onboarding companion step", {
-        userId: user?.id,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    });
-  }, [persistOnboardingStep, user?.id]);
+    persistOnboardingProgressSafely("companion", { story_tone: selectedStoryTone });
+  }, [persistOnboardingProgressSafely, selectedStoryTone]);
 
   const handleEggPreludeBack = useCallback(() => {
     setStage("story-tone");
-  }, []);
+    persistOnboardingProgressSafely("story-tone", { story_tone: selectedStoryTone });
+  }, [persistOnboardingProgressSafely, selectedStoryTone]);
 
   const getCompanionSelectionDisplayName = useCallback((preferences: CompanionSelectionPreferences) => {
     if (preferences.companionName?.trim()) {
@@ -690,13 +869,8 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
   }, []);
 
   const persistJourneyBeginsStep = useCallback(() => {
-    void persistOnboardingStep("journey-begins").catch((error: unknown) => {
-      onboardingLog.warn("Failed to persist onboarding journey-begins step", {
-        userId: user?.id,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    });
-  }, [persistOnboardingStep, user?.id]);
+    persistOnboardingProgressSafely("journey-begins", { story_tone: selectedStoryTone });
+  }, [persistOnboardingProgressSafely, selectedStoryTone]);
 
   const runCompanionSetup = useCallback(async (
     preferences: CompanionSelectionPreferences,
@@ -730,6 +904,46 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
       const existingData = await loadExistingOnboardingData();
       const { walkthrough_completed: _walkthroughCompleted, guided_tutorial: _guidedTutorial, ...inProgressData } =
         existingData;
+      const { data: existingFirstMeeting, error: memoryLookupError } = await supabase
+        .from("companion_memories")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("companion_id", companionId)
+        .eq("memory_type", "first_meeting")
+        .maybeSingle();
+
+      if (memoryLookupError) {
+        throw memoryLookupError;
+      }
+
+      if (!existingFirstMeeting?.id) {
+        const today = new Date().toISOString().split("T")[0];
+        const { error: memoryInsertError } = await supabase
+          .from("companion_memories")
+          .insert({
+            user_id: user.id,
+            companion_id: companionId,
+            memory_type: "first_meeting",
+            memory_date: today,
+            memory_context: {
+              title: "Our First Meeting",
+              description: preferences.presetId
+                ? `The day we found your ${eggDisplayName.toLowerCase()}, already carrying the spirit of ${preferences.spiritAnimal}.`
+                : `The day we found your ${eggDisplayName.toLowerCase()}, humming with possibility.`,
+              emotion: "wonder",
+              details: {
+                spiritAnimal: preferences.spiritAnimal,
+                coreElement: preferences.coreElement,
+              },
+            },
+            referenced_count: 0,
+          });
+
+        if (memoryInsertError) {
+          throw memoryInsertError;
+        }
+      }
+
       const { error: completionError } = await supabase
         .from("profiles")
         .update(
@@ -763,36 +977,6 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
 
       await queryClient.refetchQueries({ queryKey: ["profile", user.id] });
       await queryClient.refetchQueries({ queryKey: ["companion", user.id] });
-
-      const today = new Date().toISOString().split("T")[0];
-      supabase
-        .from("companion_memories")
-        .insert({
-          user_id: user.id,
-          companion_id: companionId,
-          memory_type: "first_meeting",
-          memory_date: today,
-          memory_context: {
-            title: "Our First Meeting",
-            description: preferences.presetId
-              ? `The day we found your ${eggDisplayName.toLowerCase()}, already carrying the spirit of ${preferences.spiritAnimal}.`
-              : `The day we found your ${eggDisplayName.toLowerCase()}, humming with possibility.`,
-            emotion: "wonder",
-            details: {
-              spiritAnimal: preferences.spiritAnimal,
-              coreElement: preferences.coreElement,
-            },
-          },
-          referenced_count: 0,
-        })
-        .then(({ error }) => {
-          if (error) {
-            logger.warn("Failed to create first meeting memory", {
-              companionId,
-              error: error.message,
-            });
-          }
-        });
 
       setCompanionAnimal(fallbackName);
       setCompanionSetupStatus("ready");
@@ -1129,10 +1313,34 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
     }
   };
 
+  const handleContinueLater = async () => {
+    const persistedStage: OnboardingResumeStep = stage === "calculating" ? "questionnaire" : stage;
+    persistOnboardingProgressSafely(persistedStage, {
+      userName,
+      faction,
+      questionnaireAnswers: serializeOnboardingAnswers(answers),
+      story_tone: selectedStoryTone,
+    });
+    try {
+      await signOut?.();
+    } finally {
+      safeNavigate(navigate, "/auth");
+    }
+  };
+
   return (
     <div className="min-h-screen relative overflow-hidden bg-background">
       <StarfieldBackground />
       {backdropStage && <OnboardingCosmicBackdrop stage={backdropStage} faction={faction} motionLevel="balanced" />}
+      {!isResetMode && stage !== "journey-begins" ? (
+        <button
+          type="button"
+          onClick={handleContinueLater}
+          className="fixed right-4 top-[calc(env(safe-area-inset-top,0px)+1rem)] z-30 rounded-full border border-white/12 bg-black/30 px-4 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-white/72 backdrop-blur-md transition-colors hover:bg-black/45 hover:text-white"
+        >
+          Continue Later
+        </button>
+      ) : null}
       
       <AnimatePresence mode="wait">
         {stage === "prologue" && (
@@ -1278,7 +1486,7 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
           </motion.div>
         )}
 
-        {stage === "companion" && (faction || startsAtCompanion) && (
+        {stage === "companion" && (faction || startsAtCompanion || resumeState?.stage === "companion") && (
           <motion.div
             key={isMigrationMode ? "companion-migration" : isResetMode ? "companion-reset" : "companion"}
             initial={{ opacity: 0 }}

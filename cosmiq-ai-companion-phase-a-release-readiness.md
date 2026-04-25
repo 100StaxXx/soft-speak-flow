@@ -31,16 +31,22 @@ It is whether the planner loop is trustworthy enough to ship.
 - campaign pressure and repeated-slip guidance across core planner surfaces
 - deterministic fallback when planner AI output is slow or malformed
 - read-only legacy fallback when the unified agent path is unavailable
+- first-run onboarding stage resume across the cinematic flow
+- explicit confirmation before destructive legacy account reset
+- server-backed replayable intro/tutorial dismissals for Search, Campaigns, and Postcards
 
 ## What Still Decides Ship Readiness
+- Does a fresh signup reach the companion and first Plan My Day without confusion?
 - Does `Plan My Day` feel obviously right on real days?
 - Does `Adjust My Day` calm the user down when the day breaks?
 - Does `What Should I Do Right Now` return one useful next move quickly?
 - Do proposal-backed cards stay trustworthy across reload, resume, and confirm flows?
 - Does fallback stay invisible enough that users do not feel path drift?
+- Does first-run recovery feel boring and predictable after refresh, network failure, or continue-later?
 
 ## Remaining Risks
 - Real-day planner trust may still fail in ways synthetic tests will not catch.
+- First-run trust may still fail in ways component tests cannot catch, especially on mobile web/iOS.
 - Legacy fallback may still feel behaviorally different under unusual runtime conditions, even though it is now read-only.
 - Repo-wide TypeScript debt still exists outside the scoped planner slice.
 
@@ -57,6 +63,8 @@ Treat any of the following as a blocker:
 - `Right Now` regularly returns low-value or mistimed actions.
 - Proposal-backed surfaces lose `Save`, `Saving`, or `Saved` state across reload/confirm flows.
 - Any AI-originated write appears to bypass confirmation.
+- Any account deletion or destructive reset starts without explicit user confirmation.
+- A fresh user loses onboarding progress after refresh or a transient failed write.
 
 ## Non-Blockers For Phase A
 - Full removal of compatibility infrastructure
@@ -68,6 +76,7 @@ Treat any of the following as a blocker:
 ## Signoff Checklist
 - `npm run planner:phase-a:check` is green.
 - The QA checklist has been run.
+- Fresh signup / onboarding / guided tutorial checks have been run.
 - At least 3 real-day dogfood sessions are logged.
 - No open blocker remains in the dogfood log.
 - The team would personally use the planner loop instead of planning elsewhere.

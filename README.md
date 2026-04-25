@@ -69,6 +69,18 @@ This repository is configured for self-managed hosted Supabase outside the previ
 ./scripts/check-function-manifest.sh
 ```
 
+## First-run onboarding and tutorial
+
+The first-run path is `/auth` -> `/onboarding` -> companion creation -> guided companion tutorial -> established account.
+
+- `src/pages/Onboarding.tsx` owns route gating, established-account self-heal, and explicit legacy reset confirmation.
+- `src/components/onboarding/StoryOnboarding.tsx` owns the cinematic onboarding state machine and persists resumable steps in `profiles.onboarding_step` plus `profiles.onboarding_data`.
+- `src/utils/profileOnboarding.ts` is the shared gate helper for established / reset / resumable accounts.
+- `src/hooks/usePostOnboardingMentorGuidance.tsx` owns the post-onboarding guided companion tutorial.
+- `src/hooks/useFirstTimeModal.ts` owns replayable first-time section modals and mirrors dismissal into `profiles.onboarding_data.tab_intros`.
+
+Destructive account reset must never run automatically from onboarding. Broken legacy companion states should render an explicit confirmation screen first.
+
 ## Deployment automation
 
 GitHub Actions workflows:

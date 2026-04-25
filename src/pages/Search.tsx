@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { BookOpen, MessageSquare } from "lucide-react";
+import { BookOpen, HelpCircle, MessageSquare } from "lucide-react";
 import { PageTransition } from "@/components/PageTransition";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { GlobalSearch } from "@/components/GlobalSearch";
@@ -22,7 +22,11 @@ const Search = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const trimmedQuery = searchQuery.trim();
   const isSearchActive = trimmedQuery.length >= 2;
-  const { showModal: showTutorial, dismissModal: dismissTutorial } = useFirstTimeModal('search');
+  const {
+    showModal: showTutorial,
+    dismissModal: dismissTutorial,
+    openModal: openTutorial,
+  } = useFirstTimeModal("search");
 
   const { data: featuredQuotes, isLoading: quotesLoading } = useQuery({
     queryKey: ["featured-quotes"],
@@ -92,6 +96,15 @@ const Search = () => {
                       <BookOpen className="h-5 w-5 text-royal-purple" />
                       Featured Quotes
                     </motion.h2>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={openTutorial}
+                      aria-label="Replay search tutorial"
+                      className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                    >
+                      <HelpCircle className="h-4 w-4" />
+                    </Button>
                     <Button
                       variant="ghost"
                       size="sm"

@@ -71,24 +71,54 @@ export const MentorSpotlightGuard = ({
       return;
     }
 
+    let animationFrame = 0;
+    let resizeObserver: ResizeObserver | null = null;
+    let mutationObserver: MutationObserver | null = null;
+
     const update = () => {
       const target = document.querySelector(targetSelector) as HTMLElement | null;
       setTargetElement(target);
       setSpotlightRect(target ? toSpotlightRect(target, 10) : null);
+      if (target && resizeObserver) {
+        resizeObserver.disconnect();
+        resizeObserver.observe(target);
+      }
+    };
+
+    const scheduleUpdate = () => {
+      window.cancelAnimationFrame(animationFrame);
+      animationFrame = window.requestAnimationFrame(update);
     };
 
     update();
 
-    const interval = window.setInterval(update, 250);
-    window.addEventListener("scroll", update, true);
-    window.addEventListener("resize", update);
-    window.addEventListener("orientationchange", update);
+    if ("ResizeObserver" in window) {
+      resizeObserver = new ResizeObserver(scheduleUpdate);
+      const target = document.querySelector(targetSelector) as HTMLElement | null;
+      if (target) resizeObserver.observe(target);
+    }
+
+    if ("MutationObserver" in window && document.body) {
+      mutationObserver = new MutationObserver(scheduleUpdate);
+      mutationObserver.observe(document.body, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["class", "style", "data-state", "hidden"],
+      });
+    }
+
+    window.addEventListener("scroll", scheduleUpdate, true);
+    window.addEventListener("resize", scheduleUpdate);
+    window.addEventListener("orientationchange", scheduleUpdate);
 
     return () => {
-      window.clearInterval(interval);
-      window.removeEventListener("scroll", update, true);
-      window.removeEventListener("resize", update);
-      window.removeEventListener("orientationchange", update);
+      window.cancelAnimationFrame(animationFrame);
+      resizeObserver?.disconnect();
+      mutationObserver?.disconnect();
+      window.removeEventListener("scroll", scheduleUpdate, true);
+      window.removeEventListener("resize", scheduleUpdate);
+      window.removeEventListener("orientationchange", scheduleUpdate);
     };
   }, [active, targetSelector]);
 
@@ -98,15 +128,30 @@ export const MentorSpotlightGuard = ({
       return;
     }
 
+    let animationFrame = 0;
+    let mutationObserver: MutationObserver | null = null;
     const updatePanel = () => {
       setPanelElement(document.querySelector(panelSelector) as HTMLElement | null);
     };
+    const scheduleUpdatePanel = () => {
+      window.cancelAnimationFrame(animationFrame);
+      animationFrame = window.requestAnimationFrame(updatePanel);
+    };
 
     updatePanel();
-    const interval = window.setInterval(updatePanel, 250);
+    if ("MutationObserver" in window && document.body) {
+      mutationObserver = new MutationObserver(scheduleUpdatePanel);
+      mutationObserver.observe(document.body, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["class", "style", "data-state", "hidden"],
+      });
+    }
 
     return () => {
-      window.clearInterval(interval);
+      window.cancelAnimationFrame(animationFrame);
+      mutationObserver?.disconnect();
     };
   }, [active, mode, panelSelector]);
 

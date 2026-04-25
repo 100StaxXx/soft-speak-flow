@@ -1,6 +1,19 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { safeLocalStorage } from "@/utils/storage";
 import { useAuth } from "@/hooks/useAuth";
+import { useProfile } from "@/hooks/useProfile";
+import { supabase } from "@/integrations/supabase/client";
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === "object" && !Array.isArray(value);
+
+const getDismissedTabIntros = (onboardingData: unknown): Record<string, boolean> => {
+  if (!isRecord(onboardingData) || !isRecord(onboardingData.tab_intros)) return {};
+  return Object.fromEntries(
+    Object.entries(onboardingData.tab_intros)
+      .filter((entry): entry is [string, boolean] => typeof entry[1] === "boolean"),
+  );
+};
 
 /**
  * Hook to manage first-time modal display per tab/section
@@ -8,7 +21,17 @@ import { useAuth } from "@/hooks/useAuth";
  */
 export function useFirstTimeModal(tabName: string) {
   const { user } = useAuth();
+  const { profile } = useProfile();
   const userId = user?.id;
+  const onboardingData = useMemo(
+    () => isRecord(profile?.onboarding_data) ? profile.onboarding_data : {},
+    [profile?.onboarding_data],
+  );
+  const dismissedTabIntros = useMemo(
+    () => getDismissedTabIntros(onboardingData),
+    [onboardingData],
+  );
+  const hasSeenServerModal = dismissedTabIntros[tabName] === true;
   
   const [showModal, setShowModal] = useState(false);
   const hasCheckedRef = useRef(false);
@@ -28,19 +51,46 @@ export function useFirstTimeModal(tabName: string) {
     
     const storageKey = `tab_intro_${tabName}_${userId}`;
     const hasSeenModal = safeLocalStorage.getItem(storageKey);
-    
-    if (!hasSeenModal) {
+    if (!hasSeenModal && !hasSeenServerModal) {
       setShowModal(true);
+      return;
     }
-  }, [userId, tabName]);
+
+    if (hasSeenServerModal && !hasSeenModal) {
+      safeLocalStorage.setItem(storageKey, "true");
+    }
+  }, [hasSeenServerModal, userId, tabName]);
+
+  useEffect(() => {
+    if (!userId || !hasSeenServerModal) return;
+    const storageKey = `tab_intro_${tabName}_${userId}`;
+    safeLocalStorage.setItem(storageKey, "true");
+    setShowModal(false);
+  }, [hasSeenServerModal, tabName, userId]);
 
   const dismissModal = useCallback(() => {
     setShowModal(false);
     if (userId) {
       const storageKey = `tab_intro_${tabName}_${userId}`;
       safeLocalStorage.setItem(storageKey, 'true');
+      void supabase
+        .from("profiles")
+        .update({
+          onboarding_data: {
+            ...onboardingData,
+            tab_intros: {
+              ...dismissedTabIntros,
+              [tabName]: true,
+            },
+          } as any,
+        })
+        .eq("id", userId);
     }
-  }, [userId, tabName]);
+  }, [dismissedTabIntros, onboardingData, userId, tabName]);
 
-  return { showModal, dismissModal };
+  const openModal = useCallback(() => {
+    setShowModal(true);
+  }, []);
+
+  return { showModal, dismissModal, openModal };
 }

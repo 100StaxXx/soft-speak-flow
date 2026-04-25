@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { toast } from "@/components/ui/sonner";
@@ -435,12 +435,15 @@ describe("Onboarding route guard", () => {
     });
   });
 
-  it("deletes legacy companion accounts instead of rendering the removed migration flow", async () => {
+  it("requires explicit confirmation before resetting legacy companion accounts", async () => {
     mocks.companion = { id: "companion-legacy", preset_id: null, current_stage: 2 };
 
     renderOnboarding();
 
-    expect(screen.getByText("Resetting your account so you can restart onboarding...")).toBeInTheDocument();
+    expect(screen.getByText("Your old companion setup needs a reset")).toBeInTheDocument();
+    expect(mocks.deleteCurrentAccount).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Reset my account" }));
 
     await waitFor(() => {
       expect(mocks.deleteCurrentAccount).toHaveBeenCalledWith({
@@ -462,7 +465,7 @@ describe("Onboarding route guard", () => {
     expect(screen.queryByText("StoryOnboarding")).not.toBeInTheDocument();
   });
 
-  it("logs and surfaces a stage-aware failure when legacy account deletion fails", async () => {
+  it("logs and surfaces a stage-aware failure after confirmed legacy account deletion fails", async () => {
     mocks.companion = { id: "companion-legacy", preset_id: null, current_stage: 2 };
     mocks.deleteCurrentAccount.mockRejectedValueOnce(
       Object.assign(new Error("Account deletion is temporarily unavailable. Please try again later."), {
@@ -476,6 +479,8 @@ describe("Onboarding route guard", () => {
     const toastErrorSpy = vi.spyOn(toast, "error").mockImplementation(() => "");
 
     renderOnboarding();
+
+    fireEvent.click(screen.getByRole("button", { name: "Reset my account" }));
 
     await waitFor(() => {
       expect(mocks.loggerError).toHaveBeenCalledWith("[Account Deletion] Legacy onboarding reset failed", {

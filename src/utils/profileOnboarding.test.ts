@@ -74,6 +74,53 @@ describe("getOnboardingGateState", () => {
     });
   });
 
+  it("does not force journey recovery after the guided tutorial was dismissed", () => {
+    expect(
+      getOnboardingGateState({
+        profile: {
+          onboarding_completed: false,
+          selected_mentor_id: "mentor-1",
+          onboarding_data: {
+            guided_tutorial: {
+              dismissed: true,
+              completed: false,
+            },
+          },
+        },
+        hasCompanion: true,
+        hasPresetCompanion: false,
+        companionStage: 0,
+        hasCompanionImages: true,
+      }),
+    ).toMatchObject({
+      isEstablished: false,
+      needsOnboarding: true,
+      resumeStep: null,
+      needsCompanionMigration: false,
+    });
+  });
+
+  it("resumes an explicit in-progress onboarding step", () => {
+    expect(
+      getOnboardingGateState({
+        profile: {
+          onboarding_completed: false,
+          onboarding_step: "story-tone",
+          selected_mentor_id: "mentor-1",
+          onboarding_data: {
+            userName: "Nova",
+          },
+        },
+        hasCompanion: false,
+      }),
+    ).toMatchObject({
+      isEstablished: false,
+      needsOnboarding: true,
+      resumeStep: "story-tone",
+      shouldSelfHeal: false,
+    });
+  });
+
   it("keeps explicit journey-begins recovery active even when the companion has already advanced past stage 0", () => {
     expect(
       getOnboardingGateState({

@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
+import { AlertTriangle } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { StoryOnboarding } from "@/components/onboarding";
 import { PageLoader } from "@/components/PageLoader";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useProfile } from "@/hooks/useProfile";
@@ -31,6 +33,7 @@ export default function Onboarding() {
   const onboardingSelfHealAttemptedRef = useRef(false);
   const legacyAccountDeletionAttemptedRef = useRef(false);
   const [isDeletingLegacyAccount, setIsDeletingLegacyAccount] = useState(false);
+  const [isSelfHealingProfile, setIsSelfHealingProfile] = useState(false);
   const [isShowingJourneyCinematic, setIsShowingJourneyCinematic] = useState(false);
   const onboardingData = (profile?.onboarding_data as Record<string, unknown> | null) ?? null;
   const hasCompanion = Boolean(companion);
@@ -49,7 +52,7 @@ export default function Onboarding() {
     status !== "recovering" &&
     (!user || (!profileLoading && !companionLoading));
   const journeyResumeState = useMemo(() => {
-    if (onboardingGate.resumeStep !== "journey-begins") return null;
+    if (!onboardingGate.resumeStep) return null;
 
     const trimmedUserName =
       typeof onboardingData?.userName === "string" ? onboardingData.userName.trim() : "";
@@ -67,16 +70,19 @@ export default function Onboarding() {
       || (spiritAnimal.length > 0 && spiritAnimal !== "Egg" ? spiritAnimal : elementalEggLabel);
 
     return {
-      stage: "journey-begins" as const,
+      stage: onboardingGate.resumeStep,
       userName: trimmedUserName || "You",
       companionLabel,
+      onboardingData,
+      faction: typeof profile?.faction === "string" ? profile.faction : null,
     };
-  }, [companion, onboardingData, onboardingGate.resumeStep]);
+  }, [companion, onboardingData, onboardingGate.resumeStep, profile?.faction]);
 
   useEffect(() => {
     onboardingSelfHealAttemptedRef.current = false;
     legacyAccountDeletionAttemptedRef.current = false;
     setIsDeletingLegacyAccount(false);
+    setIsSelfHealingProfile(false);
     setIsShowingJourneyCinematic(false);
   }, [user?.id]);
 
@@ -93,6 +99,7 @@ export default function Onboarding() {
     if (!patch) return;
 
     onboardingSelfHealAttemptedRef.current = true;
+    setIsSelfHealingProfile(true);
 
     void supabase
       .from("profiles")
@@ -102,12 +109,14 @@ export default function Onboarding() {
         if (error) {
           onboardingSelfHealAttemptedRef.current = false;
           console.warn("Failed to self-heal established profile flags:", error);
+          toast.error("We couldn't finish repairing your onboarding state. Please refresh and try again.");
         }
+        setIsSelfHealingProfile(false);
       });
   }, [user, onboardingGateReady, profile, hasCompanion, hasPresetCompanion, companionStage, hasCompanionImages]);
 
-  useEffect(() => {
-    if (!user || !onboardingGateReady || !onboardingGate.needsCompanionMigration) return;
+  const handleConfirmLegacyAccountReset = () => {
+    if (!user || !onboardingGate.needsCompanionMigration) return;
     if (legacyAccountDeletionAttemptedRef.current) return;
 
     legacyAccountDeletionAttemptedRef.current = true;
@@ -156,7 +165,7 @@ export default function Onboarding() {
         toast.error(getAccountDeletionFailureMessage(error));
       }
     })();
-  }, [user, onboardingGateReady, onboardingGate.needsCompanionMigration, navigate, queryClient, signOut]);
+  };
 
   useEffect(() => {
     if (!user || !onboardingGateReady) return;
@@ -170,11 +179,56 @@ export default function Onboarding() {
     return null;
   }
 
-  if (isDeletingLegacyAccount || (user && onboardingGate.needsCompanionMigration)) {
+  if (isDeletingLegacyAccount) {
     return <PageLoader message="Resetting your account so you can restart onboarding..." />;
   }
 
-  if (user && (profileLoading || companionLoading || (onboardingGate.isEstablished && !isShowingJourneyCinematic))) {
+  if (user && onboardingGate.needsCompanionMigration) {
+    return (
+      <main className="min-h-screen bg-background px-4 py-safe flex items-center justify-center">
+        <section className="max-w-xl rounded-[28px] border border-destructive/25 bg-card/95 p-6 text-card-foreground shadow-2xl">
+          <div className="flex items-start gap-4">
+            <div className="rounded-full bg-destructive/10 p-3 text-destructive">
+              <AlertTriangle className="h-6 w-6" aria-hidden="true" />
+            </div>
+            <div className="space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-destructive">
+                Account Reset Required
+              </p>
+              <h1 className="text-2xl font-semibold">Your old companion setup needs a reset</h1>
+              <p className="text-sm leading-6 text-muted-foreground">
+                This account was created before the current companion system. Resetting removes the old account data so
+                you can restart onboarding cleanly with the new companion flow. We will not do this unless you confirm.
+              </p>
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={handleConfirmLegacyAccountReset}
+                >
+                  Reset my account
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => signOut()}
+                >
+                  Not now
+                </Button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
+  if (user && (
+    profileLoading
+    || companionLoading
+    || isSelfHealingProfile
+    || (onboardingGate.isEstablished && !isShowingJourneyCinematic)
+  )) {
     return null;
   }
 

@@ -38,8 +38,11 @@ export const CompanionPostcards = ({ layoutMode = "mobile" }: CompanionPostcards
   const { postcards, isLoading } = useCompanionPostcards();
   const [selectedPostcard, setSelectedPostcard] = useState<CompanionPostcard | null>(null);
   const [filter, setFilter] = useState<"all" | "active" | "completed">("all");
-  const { showModal: showTutorial, dismissModal: dismissTutorial } = useFirstTimeModal("postcards");
-  const [manualTutorialOpen, setManualTutorialOpen] = useState(false);
+  const {
+    showModal: showTutorial,
+    dismissModal: dismissTutorial,
+    openModal: openTutorial,
+  } = useFirstTimeModal("postcards");
   const isDesktop = layoutMode === "desktop";
 
   // Fetch epic info for grouping
@@ -123,11 +126,8 @@ export const CompanionPostcards = ({ layoutMode = "mobile" }: CompanionPostcards
     <div className={cn("space-y-6", isDesktop && "pt-1")}>
       {/* Tutorial Modal */}
       <PostcardsTutorialModal 
-        open={showTutorial || manualTutorialOpen} 
-        onClose={() => {
-          dismissTutorial();
-          setManualTutorialOpen(false);
-        }} 
+        open={showTutorial}
+        onClose={dismissTutorial}
       />
 
       {/* Header Stats */}
@@ -136,7 +136,7 @@ export const CompanionPostcards = ({ layoutMode = "mobile" }: CompanionPostcards
           <MapPin className="w-5 h-5 text-primary" />
           <h3 className="font-semibold text-foreground">Cosmic Postcards</h3>
           <button
-            onClick={() => setManualTutorialOpen(true)}
+            onClick={openTutorial}
             className="p-1 rounded-full hover:bg-muted/50 transition-colors"
             aria-label="Learn about postcards"
           >
